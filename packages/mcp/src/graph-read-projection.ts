@@ -1,22 +1,14 @@
 /** Pure DTO projections shared by the SQLite graph read operations. */
 
+import { toGraphSymbolRef, type GraphSymbolRef } from '@opensip-cli/graph/read';
+
 import type { DeadCodeDto } from './graph-read-port.js';
-import type { SymbolRef } from './symbol-dto.js';
 import type { Signal } from '@opensip-cli/core';
 import type { FunctionOccurrence, Indexes } from '@opensip-cli/graph';
 
-/** Project one graph occurrence into MCP's metadata-only symbol DTO. */
-export function toSymbolRef(occurrence: FunctionOccurrence): SymbolRef {
-  return {
-    symbolId: `${occurrence.filePath}:${String(occurrence.line)}:${String(occurrence.column)}`,
-    bodyHash: occurrence.bodyHash,
-    qualifiedName: occurrence.qualifiedName,
-    filePath: occurrence.filePath,
-    line: occurrence.line,
-    column: occurrence.column,
-    kind: occurrence.kind,
-    visibility: occurrence.visibility,
-  };
+/** Project one graph occurrence into the public symbol DTO (or undefined if malformed). */
+export function toSymbolRef(occurrence: FunctionOccurrence): GraphSymbolRef | undefined {
+  return toGraphSymbolRef(occurrence);
 }
 
 /** Map a `graph:orphan-subtree` signal to a {@link DeadCodeDto} without filesystem reads. */
@@ -29,7 +21,9 @@ export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | u
     `${code.file}:${String(code.line)}:${String(code.column)}`,
   );
   if (occurrence === undefined) return undefined;
-  return { symbol: toSymbolRef(occurrence), message: signal.message };
+  const symbol = toSymbolRef(occurrence);
+  if (symbol === undefined) return undefined;
+  return { symbol, message: signal.message };
 }
 
 /** Total out-edge count across the callees adjacency. */

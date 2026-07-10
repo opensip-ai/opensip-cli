@@ -44,6 +44,7 @@ import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import { createPressureMonitor } from './pressure-monitor.js';
 
 import type {
+  AdapterSelectionEvidence,
   Catalog,
   FeatureColumn,
   FeatureTable,
@@ -208,7 +209,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
 
   const monitor = createPressureMonitor();
   try {
-    const adapter = pickAdapterFor(input);
+    const { adapter, adapterSelection } = pickAdapterFor(input);
     const discovery = await runStage({
       stage: 'discover',
       onProgress: input.onProgress,
@@ -233,6 +234,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
     const { catalog, cacheHit, resolutionStats } = await obtainCatalog({
       runStage,
       adapter,
+      adapterSelection,
       discovery,
       catalogRepo,
       useCache: input.noCache !== true,
@@ -327,10 +329,20 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
  * Pick a graph language adapter for the run. When `language` is set, the
  * selector fails immediately if that adapter is not registered; implicit runs
  * still use file-extension dominance plus the deterministic fallback.
+ * Selection provenance is derived from the same pick (never a second select).
  */
-function pickAdapterFor(input: RunGraphInput): GraphLanguageAdapter {
-  return new GraphAdapterSelector(currentAdapterRegistry()).pick({
+function pickAdapterFor(input: RunGraphInput): {
+  readonly adapter: GraphLanguageAdapter;
+  readonly adapterSelection: AdapterSelectionEvidence;
+} {
+  const requested = input.language?.trim();
+  const adapter = new GraphAdapterSelector(currentAdapterRegistry()).pick({
     cwd: input.cwd,
     language: input.language,
   });
+  const adapterSelection: AdapterSelectionEvidence =
+    requested !== undefined && requested.length > 0
+      ? { mode: 'forced', requestedId: requested, selectedId: adapter.id }
+      : { mode: 'auto', selectedId: adapter.id };
+  return { adapter, adapterSelection };
 }

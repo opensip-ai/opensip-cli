@@ -36,7 +36,6 @@ import { typescriptGraphAdapter } from '@opensip-cli/graph-typescript';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { workingTreeContextFromCatalog } from '../freshness.js';
 import { registerMcpGraphAdapter } from '../register-mcp-graph-adapters.js';
 import { SessionResultsReadPort } from '../session-results-read-port.js';
 import { SqliteGraphReadPort } from '../sqlite-graph-read-port.js';
@@ -96,7 +95,8 @@ function buildGraphPort(): GraphReadPort {
   };
   return new SqliteGraphReadPort({
     store,
-    freshnessContext: workingTreeContextFromCatalog,
+    projectRoot: dir,
+    adapters: runWithScopeSync(scope, () => currentAdapterRegistry()),
     rebuild,
   });
 }
@@ -116,38 +116,46 @@ describe('MCP integration — adapter load + real catalog', () => {
     const graph = buildGraphPort();
 
     // refresh_graph: a project without a loaded catalog → build it.
-    const refreshed = await graph.refresh();
+    const refreshed = await graph.refresh({ forceRebuild: true });
     expect(refreshed.ok).toBe(true);
+    if (refreshed.ok) {
+      expect(refreshed.value.context.catalog.status).toBe('loaded');
+      expect(refreshed.value.data.action).toBe('rebuilt');
+    }
 
     // search → get_symbol
-    const search = graph.searchSymbols('helper');
+    const search = await graph.searchSymbols('helper');
     expect(search.ok).toBe(true);
     const helperRef = search.ok
       ? search.value.data.find((r) => r.qualifiedName.includes('helper'))
       : undefined;
     expect(helperRef).toBeDefined();
 
-    const span = graph.findBySpan(helperRef!.filePath, helperRef!.line);
+    const span = await graph.findBySpan(helperRef!.filePath, helperRef!.line);
     expect(span.ok && span.value.data.some((r) => r.bodyHash === helperRef!.bodyHash)).toBe(true);
 
     // who_calls (reverse adjacency): main calls helper.
-    const callers = graph.callerGraph();
+    const callers = await graph.traverse({
+      direction: 'callers',
+      startSymbolId: helperRef!.symbolId,
+      depth: 2,
+    });
     expect(callers.ok).toBe(true);
     if (callers.ok) {
-      const callerHashes = callers.value.data.edges.get(helperRef!.bodyHash) ?? [];
-      const callerNames = callerHashes
-        .map((h) => callers.value.data.resolve(h)?.qualifiedName ?? '')
-        .join(',');
+      const callerNames = callers.value.data.nodes.map((n) => n.symbol.qualifiedName).join(',');
       expect(callerNames).toContain('main');
+      expect(callers.value.context.catalog.identity).toBe(
+        refreshed.ok ? refreshed.value.context.catalog.identity : undefined,
+      );
     }
 
     // blast: helper has at least one direct caller.
-    const blast = graph.blast(helperRef!.symbolId);
+    const blast = await graph.blast(helperRef!.symbolId);
     expect(blast.ok).toBe(true);
     expect(blast.ok && (blast.value.data?.direct ?? 0)).toBeGreaterThanOrEqual(1);
 
     // dead_code: `unused` is unreachable.
-    const dead = graph.deadCode();
+    const dead = await graph.deadCode();
     expect(dead.ok).toBe(true);
     const deadNames = dead.ok ? dead.value.data.map((d) => d.symbol.qualifiedName) : [];
     expect(deadNames.some((n) => n.includes('unused'))).toBe(true);

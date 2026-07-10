@@ -1,20 +1,15 @@
 /**
- * `trace_path` — shortest forward call path `from → … → to` (ADR-0084, Task 4.2).
+ * `trace_path` — shortest forward call path `from → … → to`.
  *
- * The third caller of the shared {@link boundedBfs}: resolves both symbolIds via
- * the port, runs a goal-directed BFS over the forward-call adjacency, and (on a
- * hit) reconstructs the path via the BFS parent map. No path within the depth
- * bound returns `{ found: false, path: [] }` — not an error.
+ * Routes through one `GraphReadPort.traverse` call so path, context, and
+ * freshness share a single immutable generation.
  */
 
-import { boundedBfs, MAX_WALK_NODES, reconstructPath } from './graph-walk.js';
 import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
-import { errorResult, failure, jsonResult } from './tool-result.js';
+import { errorResult, jsonResult } from './tool-result.js';
 
-import type { PathTraceDto } from '../graph-read-port.js';
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
-import type { SymbolRef } from '../symbol-dto.js';
 
 export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): void {
   server.register(
@@ -32,37 +27,25 @@ export function registerTracePath(server: McpStdioServer, deps: McpToolDeps): vo
         depth: depthSchema(),
       },
     },
-    ({ fromSymbolId, toSymbolId, depth }) => {
-      const from = deps.graph.resolveSymbolId(fromSymbolId);
-      if (!from.ok) return errorResult(from.error);
-      const to = deps.graph.resolveSymbolId(toSymbolId);
-      if (!to.ok) return errorResult(to.error);
-      const fromRef = from.value.data;
-      const toRef = to.value.data;
-      if (fromRef === undefined || toRef === undefined) {
-        const missing = fromRef === undefined ? fromSymbolId : toSymbolId;
-        return failure(
-          'symbol-not-found',
-          `Unknown symbolId "${missing}". Obtain valid symbolIds from search_symbols or get_symbol.`,
-        );
-      }
-      const graph = deps.graph.calleeGraph();
-      if (!graph.ok) return errorResult(graph.error);
-      const { data: snapshot, freshness } = graph.value;
-      const walk = boundedBfs(snapshot.edges, fromRef.bodyHash, {
+    async ({ fromSymbolId, toSymbolId, depth }) => {
+      const outcome = await deps.graph.traverse({
+        direction: 'path',
+        startSymbolId: fromSymbolId,
+        goalSymbolId: toSymbolId,
         depth,
-        cap: MAX_WALK_NODES,
-        goal: toRef.bodyHash,
+        identity: 'body-twin-union',
       });
-      if (!walk.foundGoal) {
-        const data: PathTraceDto = { found: false, path: [] };
-        return jsonResult({ data, freshness, ...(walk.truncated ? { truncated: true } : {}) });
-      }
-      const path: SymbolRef[] = reconstructPath(walk.parents, fromRef.bodyHash, toRef.bodyHash)
-        .map((hash) => snapshot.resolve(hash))
-        .filter((ref): ref is SymbolRef => ref !== undefined);
-      const data: PathTraceDto = { found: true, path };
-      return jsonResult({ data, freshness });
+      if (!outcome.ok) return errorResult(outcome.error);
+      const { data, context, freshness, coverage } = outcome.value;
+      return jsonResult({
+        data: {
+          found: data.found,
+          path: data.path ?? [],
+        },
+        context,
+        freshness,
+        coverage,
+      });
     },
   );
 }

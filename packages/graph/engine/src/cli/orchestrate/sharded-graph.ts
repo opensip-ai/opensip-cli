@@ -252,7 +252,17 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     boundaryCalls,
     manifestIndex,
   );
-  const catalog = stampAndConstrainPackages(resolved, projectRoot);
+  const stamped = stampAndConstrainPackages(resolved, projectRoot);
+  // Parent-run selection provenance (not independently selected per shard).
+  const requested = input.language?.trim();
+  const catalog: Catalog = {
+    ...stamped,
+    adapterSelection:
+      requested !== undefined && requested.length > 0
+        ? { mode: 'forced', requestedId: requested, selectedId: stamped.language }
+        : { mode: 'auto', selectedId: stamped.language },
+    engineMode: 'sharded',
+  };
   emitStage(
     onProgress,
     'resolve',

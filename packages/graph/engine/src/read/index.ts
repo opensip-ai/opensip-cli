@@ -21,6 +21,7 @@ export {
   GRAPH_SYMBOL_NAME_MAX,
   GRAPH_SYMBOL_PACKAGE_MAX,
 } from './query-contracts.js';
+export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
 
 export type {
   GraphReadError,
@@ -45,4 +46,14 @@ export type {
   GraphReadCoverage,
   GraphSymbolRef,
   CallEdgeEvidence,
+  FreshnessReasonCode,
+  FreshnessChangeSummary,
+  FreshnessVerification,
+  AdapterSelectionEvidence,
+  CatalogEngineMode,
 } from './query-contracts.js';
+
+export type {
+  GraphAdapterRegistryReader,
+  VerifyCatalogInputsInput,
+} from './catalog-freshness.js';

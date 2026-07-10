@@ -13,7 +13,11 @@ describe('fromGraphReadError', () => {
       'Failed to load graph catalog generation',
     ],
     ['GRAPH.READ.REBUILD_EMPTY', 'rebuild', 'Graph rebuild produced an empty catalog'],
-    ['GRAPH.READ.REBUILD_FAILED', 'rebuild', 'Graph rebuild failed due to infrastructure error'],
+    [
+      'GRAPH.READ.REBUILD_FAILED',
+      'rebuild',
+      'Graph rebuild failed due to an infrastructure error',
+    ],
   ] as const)('maps %s to its fixed MCP DTO', (code, operation, message) => {
     const source: GraphReadError = {
       code,

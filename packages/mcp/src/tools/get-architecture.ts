@@ -1,9 +1,5 @@
 /**
- * `get_architecture` — compact codebase overview (ADR-0084, Task 4.3).
- *
- * Delegates to `graphPort.architectureSummary()`: function/edge counts,
- * languages, the top-coupled packages, and the highest-blast hotspots (graph's
- * canonical scoring). Capped via `limit`; carries `{ freshness }`.
+ * `get_architecture` — compact codebase overview.
  */
 
 import { limit as limitSchema } from './schemas.js';
@@ -26,8 +22,8 @@ export function registerGetArchitecture(server: McpStdioServer, deps: McpToolDep
         limit: limitSchema(),
       },
     },
-    ({ limit }) => {
-      const outcome = deps.graph.architectureSummary(limit);
+    async ({ limit }) => {
+      const outcome = await deps.graph.architectureSummary(limit);
       if (!outcome.ok) return errorResult(outcome.error);
       const targetConventions = deps.targetConventions ?? [];
       if (targetConventions.length === 0) return jsonResult(outcome.value);

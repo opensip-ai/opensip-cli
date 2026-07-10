@@ -1,126 +1,163 @@
 /**
- * `GraphReadPort` — the narrow read interface every MCP graph tool handler
- * depends on (ADR-0084). Handlers NEVER touch `CatalogRepo` / `Indexes`
- * directly; they go through this port. Two named benefits justify the boundary:
- *   1. **Test seam** — handlers are unit-tested against an in-memory fake port,
- *      no SQLite needed (Phase 6).
- *   2. **Compile-time SaaS parity** — a handler cannot reach the storage layer,
- *      so an alternate (cloud) backend can substitute behind the same interface.
+ * `GraphReadPort` — the narrow async read interface every MCP graph tool
+ * handler depends on (ADR-0084 + MCP Graph Audit Phase 1).
  *
- * Every read returns `Result<McpToolResult<T>, McpReadError>` (ADR-0084): the
- * success arm carries `{ data, freshness }`; storage and rebuild failures stay
- * in the error arm. A missing catalog is NOT an error — it surfaces as
- * `freshness.fresh === false` with empty data and no auto-build.
+ * Every operation returns `Promise<Result<GraphToolResult<T>, McpReadError>>`.
+ * A missing catalog is NOT an error — it surfaces as `context.catalog.status
+ * === 'missing'` with empty data and no auto-build. Only `refresh` mutates.
  */
 
 import type { McpReadError } from './mcp-error.js';
-import type { Freshness, McpToolResult, SymbolRef } from './symbol-dto.js';
+import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { TargetConventionSummary } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
+import type {
+  GraphSourceFilter,
+  TraversalIdentity,
+} from '@opensip-cli/graph/read';
 
 /** Identity of the in-memory catalog generation a read was served from. */
 export interface GraphGeneration {
-  /** ISO timestamp the served generation's catalog was built at. */
   readonly builtAt: string;
+  readonly identity: string;
+  readonly source?: string;
 }
 
-/** A blast-radius score for one symbol (graph's canonical scoring — reused, not reinvented). */
+/** A blast-radius score for one symbol (graph's canonical scoring). */
 export interface BlastDto {
   readonly symbol: SymbolRef;
-  /** Direct (depth-1) caller count. */
   readonly direct: number;
-  /** Transitive (depth 2..5) caller count. */
   readonly transitive: number;
-  /** `direct + 0.5 × transitive`. */
   readonly score: number;
+  readonly identityMode: 'body-twin-union';
+  readonly twinCount?: number;
 }
 
 /** One dead-code (orphan) finding projected from `graph:orphan-subtree`. */
 export interface DeadCodeDto {
   readonly symbol: SymbolRef;
-  /** The rule's human-readable message. */
   readonly message: string;
 }
 
-/** The outcome of the `trace_path` tool: an ordered symbol chain. */
-export interface PathTraceDto {
-  /** `true` when a call path `from → … → to` exists within the depth bound. */
+/** Phase 1 traversal snapshot (body-twin walk; Phase 2 widens evidence). */
+export interface TraversalSnapshot {
   readonly found: boolean;
-  /** The ordered path (empty when not found). */
-  readonly path: readonly SymbolRef[];
+  readonly nodes: readonly TraversalNodeDto[];
+  readonly path?: readonly SymbolRef[];
+  readonly truncated: boolean;
+  readonly identityMode: TraversalIdentity;
 }
 
-/**
- * A walkable adjacency snapshot for one call direction. The MCP call-graph tools
- * (`who_calls`/`callees_of`/`trace_path`) run the shared `boundedBfs` over this
- * — the port exposes the engine's `Indexes.callers`/`callees` body-hash
- * adjacency (twin-union per ADR-0003) plus a body-hash → {@link SymbolRef}
- * resolver, so the single walk lives in MCP (rule of three) and the port never
- * re-implements a parallel BFS.
- */
-export interface AdjacencySnapshot {
-  /** Body-hash → neighbor body-hashes for this direction. */
-  readonly edges: ReadonlyMap<string, readonly string[]>;
-  /** Resolve a body hash to its representative {@link SymbolRef} (metadata only). */
-  resolve(bodyHash: string): SymbolRef | undefined;
+export interface TraversalNodeDto {
+  readonly symbol: SymbolRef;
+  readonly depth: number;
+}
+
+/** Options for {@link GraphReadPort.traverse}. */
+export interface TraversalQuery {
+  readonly direction: 'callers' | 'callees' | 'path';
+  readonly startSymbolId: string;
+  readonly goalSymbolId?: string;
+  readonly depth?: number;
+  readonly identity?: TraversalIdentity;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly groupBy?: 'none' | 'package' | 'file';
 }
 
 /** One package-coupling row in the architecture summary. */
 export interface ArchitecturePackageDto {
   readonly name: string;
-  /** Distinct callee packages this package depends on. */
   readonly couplingOut: number;
-  /** Distinct caller packages that depend on this one. */
   readonly couplingIn: number;
 }
 
-/** A compact architecture overview: counts, languages, top-coupled packages, blast hotspots. */
+/** A compact architecture overview. */
 export interface ArchitectureSummaryDto {
   readonly functionCount: number;
   readonly edgeCount: number;
-  /** Languages present in the catalog (single-language per catalog today). */
   readonly languages: readonly string[];
   readonly packages: readonly ArchitecturePackageDto[];
-  /** Highest-blast symbols (graph's canonical scoring), capped. */
   readonly hotspots: readonly BlastDto[];
-  /** Bounded project convention counts from target config, when present. */
   readonly targetConventions?: readonly TargetConventionSummary[];
 }
 
-/** Options for {@link GraphReadPort.searchSymbols}. */
 export interface SearchSymbolsOptions {
-  /** Max results before truncation (handler-clamped; impl applies a default). */
   readonly limit?: number;
+  readonly kind?: string;
+  readonly cursor?: string;
+  readonly match?: 'substring' | 'exact' | 'qualified';
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: 'none' | 'package' | 'file';
+}
+
+export interface DeadCodeQuery {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: 'none' | 'package' | 'file';
+}
+
+export interface ArchitectureQuery {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: 'none' | 'package' | 'file';
+}
+
+export interface RefreshResult {
+  readonly generation: GraphGeneration;
+  readonly action: 'no-op' | 'reloaded' | 'rebuilt';
+  readonly durationMs: number;
+  readonly priorGenerationAvailable: boolean;
+}
+
+export interface CatalogStatus {
+  readonly context: GraphToolResult<null>['context'];
+  readonly freshness: Freshness;
 }
 
 export interface GraphReadPort {
-  /** Identity of the current generation (`undefined` when no catalog is loaded). */
-  getGeneration(): Result<McpToolResult<GraphGeneration | undefined>, McpReadError>;
+  /** Project/catalog context + freshness without serving query data. */
+  catalogStatus(): Promise<Result<CatalogStatus, McpReadError>>;
   /** Resolve a `file:line:col` symbolId to its {@link SymbolRef}. */
-  resolveSymbolId(symbolId: string): Result<McpToolResult<SymbolRef | undefined>, McpReadError>;
-  /** Search symbols by simple name (substring, case-insensitive). */
+  resolveSymbolId(symbolId: string): Promise<Result<GraphToolResult<SymbolRef | undefined>, McpReadError>>;
+  /** Search symbols (Phase 1: simple-name substring; Phase 4 widens). */
   searchSymbols(
     query: string,
     opts?: SearchSymbolsOptions,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
+  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>>;
   /** All symbols declared in `file` enclosing (or starting at) `line`. */
-  findBySpan(file: string, line: number): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
-  /** Reverse-call adjacency snapshot (who-calls): walked by MCP's `boundedBfs`. */
-  callerGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError>;
-  /** Forward-call adjacency snapshot (callees): walked by MCP's `boundedBfs`. */
-  calleeGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError>;
-  /** Blast radius of `symbolId` — graph's canonical `buildFeatures` scoring. */
-  blast(symbolId: string): Result<McpToolResult<BlastDto | undefined>, McpReadError>;
-  /** Orphan (dead-code) symbols via `graph:orphan-subtree` (no filesystem reads). */
-  deadCode(limit?: number): Result<McpToolResult<readonly DeadCodeDto[]>, McpReadError>;
-  /** Package-coupling architecture overview. */
-  architectureSummary(limit?: number): Result<McpToolResult<ArchitectureSummaryDto>, McpReadError>;
+  findBySpan(
+    file: string,
+    line: number,
+  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>>;
   /**
-   * Rebuild the catalog (the single state-changing op) and swap the generation
-   * atomically. Async — runs the graph programmatic build at a genuine infra
-   * boundary. Wired in Phase 4.
+   * One-generation traversal (callers/callees/path). Phase 1 exposes the
+   * currently shipped body-twin walk; Phase 2 adds occurrence identity.
    */
-  refresh(): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>>;
-  /** The current freshness verdict (read without serving data). */
-  freshness(): Result<Freshness, McpReadError>;
+  traverse(
+    query: TraversalQuery,
+  ): Promise<Result<GraphToolResult<TraversalSnapshot>, McpReadError>>;
+  /** Blast radius of `symbolId` — graph's canonical `buildFeatures` scoring. */
+  blast(
+    symbolId: string,
+    opts?: { limit?: number; cursor?: string },
+  ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>>;
+  /** Orphan (dead-code) symbols via public orphan evaluation. */
+  deadCode(
+    query?: DeadCodeQuery | number,
+  ): Promise<Result<GraphToolResult<readonly DeadCodeDto[]>, McpReadError>>;
+  /** Package-coupling architecture overview. */
+  architectureSummary(
+    query?: ArchitectureQuery | number,
+  ): Promise<Result<GraphToolResult<ArchitectureSummaryDto>, McpReadError>>;
+  /**
+   * Sole graph mutation: sync/verify and optionally rebuild.
+   * `forceRebuild` skips the no-op/reload short-circuit.
+   */
+  refresh(opts?: {
+    forceRebuild?: boolean;
+  }): Promise<Result<GraphToolResult<RefreshResult>, McpReadError>>;
 }

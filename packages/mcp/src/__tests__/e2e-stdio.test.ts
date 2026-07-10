@@ -308,8 +308,15 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(fixtureB);
     try {
       const refreshed = await call(conn, 'refresh_graph', {});
-      expect(typeof refreshed.builtAt).toBe('string');
-      expect(typeof refreshed.durationMs).toBe('number');
+      const refreshData = refreshed.data as {
+        generation: { builtAt: string };
+        durationMs: number;
+        action: string;
+      };
+      expect(typeof refreshData.generation.builtAt).toBe('string');
+      expect(typeof refreshData.durationMs).toBe('number');
+      expect(refreshData.action).toBe('rebuilt');
+      expect(refreshed.context).toBeDefined();
       // After the rebuild, the catalog is fresh and queryable.
       const search = await call(conn, 'search_symbols', { query: 'helper' });
       expect((search.data as unknown[]).length).toBeGreaterThan(0);

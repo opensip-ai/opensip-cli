@@ -67,11 +67,25 @@ function fakeResults(over: Partial<ResultsReadPort>): ResultsReadPort {
   return { ...base, ...over };
 }
 
+const GRAPH_FRESH = {
+  fresh: true as const,
+  builtAt: '2026-07-02T00:00:00.000Z',
+  verifiedAt: '2026-07-02T00:00:01.000Z',
+  verification: 'complete' as const,
+};
+
 function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])): McpToolDeps {
   return {
     graph: {
-      freshness: () => ok({ fresh: true, builtAt: '2026-07-02T00:00:00.000Z' }),
-    } as McpToolDeps['graph'],
+      catalogStatus: async () =>
+        ok({
+          context: {
+            project: { root: '/proj', scope: 'project' as const, configPath: 'opensip-cli.config.yml' },
+            catalog: { status: 'loaded' as const, builtAt: GRAPH_FRESH.builtAt },
+          },
+          freshness: GRAPH_FRESH,
+        }),
+    } as unknown as McpToolDeps['graph'],
     results,
     validToolIds,
   };
@@ -271,7 +285,7 @@ describe('review_change handler', () => {
         reviewBrief: reviewBrief(),
         source: { suiteRunId: 'suite-1', suiteName: 'audit', sessionIds: ['fit-1'] },
         freshness: {
-          graph: { fresh: true, builtAt: '2026-07-02T00:00:00.000Z' },
+          graph: GRAPH_FRESH,
           sessions: {
             replayedAt: '2026-07-02T00:00:01.000Z',
             replayedSessions: 1,
@@ -305,7 +319,7 @@ describe('review_change handler', () => {
       suite: 'audit',
       files: ['src/a.ts'],
       limit: 5,
-      graphFreshness: { fresh: true, builtAt: '2026-07-02T00:00:00.000Z' },
+      graphFreshness: GRAPH_FRESH,
     });
     expect((out.body.data as McpReviewChangeData).reviewBrief.version).toBe(1);
   });
@@ -325,13 +339,28 @@ describe('review_change handler', () => {
     expect((out.body.error as McpReadError).code).toBe('not-found');
   });
 
-  it('propagates graph freshness errors before reading stored review data', async () => {
-    let called = false;
+  it('degrades graph status errors and still replays stored review data', async () => {
+    let seen: ReviewChangeOptions | undefined;
     const base = deps(
       fakeResults({
-        reviewChange: () => {
-          called = true;
-          return Promise.resolve(err({ code: 'unexpected', message: 'unexpected' }));
+        reviewChange: (opts) => {
+          seen = opts;
+          return Promise.resolve(
+            ok({
+              data: {
+                reviewBrief: reviewBrief(),
+                source: { suiteRunId: 'suite-1', suiteName: 'audit', sessionIds: ['fit-1'] },
+                freshness: {
+                  graph: opts.graphFreshness,
+                  sessions: {
+                    replayedAt: '2026-07-02T00:00:01.000Z',
+                    replayedSessions: 1,
+                    degradedSteps: 0,
+                  },
+                },
+              },
+            }),
+          );
         },
       }),
     );
@@ -339,21 +368,22 @@ describe('review_change handler', () => {
     registerReviewChange(server, {
       ...base,
       graph: {
-        freshness: () =>
+        catalogStatus: async () =>
           err({
             code: 'GRAPH.READ.CATALOG_GENERATION',
             message: 'Failed to load graph catalog generation',
           }),
-      } as McpToolDeps['graph'],
+      } as unknown as McpToolDeps['graph'],
     });
 
     const out = parseResult(await handlers.get('review_change')!({}));
-    expect(out.isError).toBe(true);
-    expect(out.body.error).toEqual({
-      code: 'GRAPH.READ.CATALOG_GENERATION',
-      message: 'Failed to load graph catalog generation',
+    expect(out.isError).toBe(false);
+    expect(seen?.graphFreshness).toMatchObject({
+      fresh: false,
+      verification: 'partial',
+      reasonCode: 'verification-unavailable',
+      reason: 'Graph status unavailable',
     });
-    expect(called).toBe(false);
   });
 });
 

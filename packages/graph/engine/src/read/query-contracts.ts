@@ -14,6 +14,8 @@ import type {
   Visibility,
 } from '../types.js';
 
+export type { AdapterSelectionEvidence, CatalogEngineMode } from '../types.js';
+
 /** Production vs test vs all source files. */
 export type SourceScope = 'production' | 'test' | 'all';
 
@@ -25,6 +27,37 @@ export type TraversalIdentity = 'occurrence' | 'body-twin-union';
 
 /** Package dependency edge kind for package evidence queries. */
 export type PackageEdgeKind = 'call' | 'import' | 'combined';
+
+/** Freshness reason codes returned by complete input verification. */
+export type FreshnessReasonCode =
+  | 'missing'
+  | 'files-changed'
+  | 'language-changed'
+  | 'cache-key-changed'
+  | 'engine-mode-changed'
+  | 'selection-changed'
+  | 'verification-unavailable';
+
+/** Bounded file-change summary (at most 50 samples). */
+export interface FreshnessChangeSummary {
+  readonly added: number;
+  readonly modified: number;
+  readonly deleted: number;
+  readonly sample: readonly string[];
+}
+
+/**
+ * Complete freshness verification result from {@link verifyCatalogInputs}.
+ * `verification: 'partial'` never claims unqualified fresh.
+ */
+export interface FreshnessVerification {
+  readonly fresh: boolean;
+  readonly verifiedAt: string;
+  readonly verification: 'complete' | 'partial' | 'missing';
+  readonly reasonCode?: FreshnessReasonCode;
+  readonly reason?: string;
+  readonly changes?: FreshnessChangeSummary;
+}
 
 /**
  * Shared source filter applied before projection/paging in every graph read view.

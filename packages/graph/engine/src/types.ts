@@ -87,6 +87,23 @@ export type CallConfidence = 'high' | 'medium' | 'low';
  */
 export type ResolutionMode = 'exact' | 'fast';
 
+/**
+ * Whether the catalog was produced by the single-program exact engine or the
+ * multi-shard sharded engine. Distinct from {@link ResolutionMode} (semantic
+ * vs syntactic edges). Optional on legacy catalogs.
+ */
+export type CatalogEngineMode = 'exact' | 'sharded';
+
+/**
+ * How the active graph language adapter was selected for the producing run.
+ * Forced = explicit `--language` / `language` input; auto = file-dominance or
+ * registry fallback. Optional on pre-feature catalogs — absence means freshness
+ * verification is partial.
+ */
+export type AdapterSelectionEvidence =
+  | { readonly mode: 'forced'; readonly requestedId: string; readonly selectedId: string }
+  | { readonly mode: 'auto'; readonly selectedId: string };
+
 /** Function visibility tier: exported from module, module-local, or class-private. */
 export type Visibility = 'exported' | 'module-local' | 'private';
 
@@ -348,6 +365,17 @@ export interface Catalog {
    * whether edges are approximate read this field.
    */
   readonly resolutionMode?: ResolutionMode;
+  /**
+   * Adapter selection provenance for the producing run. Optional for
+   * forward-compat with pre-feature catalogs; absence yields partial
+   * freshness verification (never inferred as fresh).
+   */
+  readonly adapterSelection?: AdapterSelectionEvidence;
+  /**
+   * Whether the producing run used the exact or sharded engine. Optional for
+   * pre-feature catalogs; absence yields partial freshness verification.
+   */
+  readonly engineMode?: CatalogEngineMode;
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
   /**
    * Re-export facts captured at walk time (see {@link ReExportRecord}). Present

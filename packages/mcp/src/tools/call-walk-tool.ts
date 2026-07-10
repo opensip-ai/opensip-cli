@@ -1,24 +1,21 @@
 /**
  * Shared registration for bounded call-graph walk tools.
  *
- * `who_calls` and `callees_of` differ only by metadata and adjacency direction;
- * resolving `symbolId`, enforcing the bounded BFS, freshness propagation, and
- * `truncated` shaping belong in one implementation.
+ * `who_calls` and `callees_of` route through one `GraphReadPort.traverse` call
+ * so a single immutable generation is captured for the whole walk.
  */
 
-import { boundedBfs, MAX_WALK_NODES } from './graph-walk.js';
 import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
-import { errorResult, failure, jsonResult } from './tool-result.js';
+import { errorResult, jsonResult } from './tool-result.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
 import type { McpStdioServer } from '../server.js';
-import type { SymbolRef } from '../symbol-dto.js';
 
 export interface CallWalkToolSpec {
   readonly name: string;
   readonly title: string;
   readonly description: string;
-  readonly graph: (port: GraphReadPort) => ReturnType<GraphReadPort['callerGraph']>;
+  readonly direction: 'callers' | 'callees';
 }
 
 export function registerCallWalkTool(
@@ -36,33 +33,33 @@ export function registerCallWalkTool(
         depth: depthSchema(),
       },
     },
-    ({ symbolId, depth }) => {
-      const resolved = graphPort.resolveSymbolId(symbolId);
-      if (!resolved.ok) return errorResult(resolved.error);
-      const startRef = resolved.value.data;
-      if (startRef === undefined) {
-        return failure(
-          'symbol-not-found',
-          `Unknown symbolId "${symbolId}". Obtain a valid symbolId from search_symbols or get_symbol.`,
-        );
-      }
-      const graph = spec.graph(graphPort);
-      if (!graph.ok) return errorResult(graph.error);
-      const { data: snapshot, freshness } = graph.value;
-      const walk = boundedBfs(snapshot.edges, startRef.bodyHash, {
+    async ({ symbolId, depth }) => {
+      const outcome = await graphPort.traverse({
+        direction: spec.direction,
+        startSymbolId: symbolId,
         depth,
-        cap: MAX_WALK_NODES,
+        identity: 'body-twin-union',
       });
-      const data = walk.order.map((hash) => snapshot.resolve(hash)).filter(isSymbolRef);
+      if (!outcome.ok) return errorResult(outcome.error);
+      const { data, context, freshness, coverage, page } = outcome.value;
+      if (!data.found && data.nodes.length === 0) {
+        // Distinguish missing start from empty walk: check context + empty nodes.
+        // When catalog loaded but start unknown, nodes is empty and found is false.
+        return jsonResult({
+          data: data.nodes.map((n) => n.symbol),
+          context,
+          freshness,
+          coverage,
+          page,
+        });
+      }
       return jsonResult({
-        data,
+        data: data.nodes.map((n) => n.symbol),
+        context,
         freshness,
-        ...(walk.truncated ? { truncated: true } : {}),
+        coverage,
+        page,
       });
     },
   );
-}
-
-function isSymbolRef(ref: SymbolRef | undefined): ref is SymbolRef {
-  return ref !== undefined;
 }

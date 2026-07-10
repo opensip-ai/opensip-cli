@@ -18,7 +18,13 @@ import { sql } from 'drizzle-orm';
 import { graphCatalog, graphShardFragment } from './schema.js';
 
 import type { ShardBuildResult } from '../cli/orchestrate/shard-model.js';
-import type { Catalog, PersistedFeatures, ResolutionMode } from '../types.js';
+import type {
+  AdapterSelectionEvidence,
+  Catalog,
+  CatalogEngineMode,
+  PersistedFeatures,
+  ResolutionMode,
+} from '../types.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -39,6 +45,10 @@ interface CatalogRowPayload {
    * builds. Absent ⇒ exact (catalogs persisted before fast mode landed).
    */
   readonly resolutionMode?: ResolutionMode;
+  /** Optional adapter-selection provenance (no migration; payload-only). */
+  readonly adapterSelection?: AdapterSelectionEvidence;
+  /** Optional exact vs sharded engine mode (no migration; payload-only). */
+  readonly engineMode?: CatalogEngineMode;
   readonly functions: Catalog['functions'];
   /**
    * Re-export facts (re-export-chain resolution). Present only when the adapter
@@ -116,6 +126,8 @@ export class CatalogRepo {
           cacheKey: catalog.cacheKey,
           filesFingerprint: catalog.filesFingerprint,
           resolutionMode: catalog.resolutionMode,
+          adapterSelection: catalog.adapterSelection,
+          engineMode: catalog.engineMode,
           functions: catalog.functions,
           // Carries through whatever the caller attached; `undefined` when none
           // (a lean run) so the key is omitted from the persisted JSON.
@@ -199,6 +211,8 @@ export class CatalogRepo {
         cacheKey: payload.cacheKey,
         filesFingerprint: payload.filesFingerprint,
         resolutionMode: payload.resolutionMode,
+        adapterSelection: payload.adapterSelection,
+        engineMode: payload.engineMode,
         functions: payload.functions,
         reExports: payload.reExports,
         features: payload.features,

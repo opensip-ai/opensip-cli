@@ -1,10 +1,5 @@
 /**
- * `search_symbols` — name/substring symbol lookup (ADR-0084, Task 4.1).
- *
- * Returns the shared `{ data, freshness, truncated? }` envelope every graph tool
- * reuses. Each result is a {@link SymbolRef} carrying the stable
- * `symbolId = "${filePath}:${line}:${column}"` + `bodyHash` — the identity all
- * downstream graph tools accept (never a bare name). Reads only `graphPort`.
+ * `search_symbols` — name/substring symbol lookup.
  */
 
 import { z } from 'zod';
@@ -23,23 +18,21 @@ export function registerSearchSymbols(server: McpStdioServer, deps: McpToolDeps)
       description:
         'Find functions/methods by name (case-insensitive substring). Returns symbolId ' +
         '("<filePath>:<line>:<column>") + bodyHash for each match — pass that symbolId to ' +
-        'who_calls, callees_of, blast_radius, or trace_path. Results carry a freshness verdict; ' +
-        'a missing catalog returns empty data (run refresh_graph once to build it).',
+        'who_calls, callees_of, blast_radius, or trace_path. Results carry project/catalog ' +
+        'context and freshness; a missing catalog returns empty data (run refresh_graph once).',
       inputSchema: {
         query: querySchema(),
         kind: z.string().min(1).max(32).optional(),
         limit: limitSchema(),
       },
     },
-    ({ query, kind, limit }) => {
-      const opts = limit === undefined ? undefined : { limit };
-      const outcome = deps.graph.searchSymbols(query, opts);
+    async ({ query, kind, limit }) => {
+      const outcome = await deps.graph.searchSymbols(query, {
+        ...(limit === undefined ? {} : { limit }),
+        ...(kind === undefined ? {} : { kind }),
+      });
       if (!outcome.ok) return errorResult(outcome.error);
-      const result = outcome.value;
-      if (kind === undefined) return jsonResult(result);
-      // Optional kind narrowing is applied post-hoc on the (already capped) page.
-      const filtered = result.data.filter((ref) => ref.kind === kind);
-      return jsonResult({ ...result, data: filtered });
+      return jsonResult(outcome.value);
     },
   );
 }

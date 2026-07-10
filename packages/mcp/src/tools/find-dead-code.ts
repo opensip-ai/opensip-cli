@@ -1,9 +1,5 @@
 /**
- * `find_dead_code` — orphan (unreachable) symbols (ADR-0084, Task 4.3).
- *
- * Delegates to `graphPort.deadCode()`, backed by graph's `orphan-subtree` rule
- * (reachability from entry points) — NOT ad-hoc filesystem reachability. Returns
- * the `{ data, freshness, truncated? }` envelope; `limit` caps the result.
+ * `find_dead_code` — orphan (unreachable) symbols.
  */
 
 import { limit as limitSchema } from './schemas.js';
@@ -25,8 +21,8 @@ export function registerFindDeadCode(server: McpStdioServer, deps: McpToolDeps):
         limit: limitSchema(),
       },
     },
-    ({ limit }) => {
-      const outcome = deps.graph.deadCode(limit);
+    async ({ limit }) => {
+      const outcome = await deps.graph.deadCode(limit);
       if (!outcome.ok) return errorResult(outcome.error);
       return jsonResult(outcome.value);
     },

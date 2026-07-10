@@ -32,6 +32,8 @@ const EXPECTED = [
   'GRAPH_SYMBOL_PATH_MAX',
   'GRAPH_SYMBOL_NAME_MAX',
   'GRAPH_SYMBOL_PACKAGE_MAX',
+  'verifyCatalogInputs',
+  'isSafeAdapterDescriptor',
 ].sort();
 
 const BUILT_AT = '2026-07-09T00:00:00.000Z';

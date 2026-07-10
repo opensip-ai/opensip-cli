@@ -1,64 +1,71 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
-import { createGeneration } from '../catalog-generation.js';
+import { catalogGenerationKey, createGeneration } from '../catalog-generation.js';
+import type { Catalog } from '@opensip-cli/graph';
 
-import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
+const identity = {
+  language: 'typescript',
+  cacheKey: 'ck',
+  filesFingerprint: 'fp',
+  builtAt: '2026-07-09T00:00:00.000Z',
+};
 
-function occurrence(
-  bodyHash: string,
-  simpleName: string,
-  calls: FunctionOccurrence['calls'] = [],
-): FunctionOccurrence {
-  return {
-    bodyHash,
-    simpleName,
-    qualifiedName: simpleName,
-    filePath: `src/${simpleName}.ts`,
-    line: 1,
-    column: 0,
-    endLine: 3,
-    kind: 'function-declaration',
-    params: [],
-    returnType: null,
-    enclosingClass: null,
-    decorators: [],
-    visibility: 'module-local',
-    inTestFile: false,
-    definedInGenerated: false,
-    calls,
-  };
-}
+describe('catalogGenerationKey', () => {
+  it('returns g1: plus lowercase sha256 of the fixed tuple', () => {
+    const expected = createHash('sha256')
+      .update(
+        JSON.stringify([
+          'opensip:mcp:catalog-generation',
+          1,
+          identity.language,
+          identity.cacheKey,
+          identity.filesFingerprint,
+          identity.builtAt,
+        ]),
+        'utf8',
+      )
+      .digest('hex');
+    expect(catalogGenerationKey(identity)).toBe(`g1:${expected}`);
+  });
+
+  it('changes when any identity field drifts', () => {
+    const base = catalogGenerationKey(identity);
+    expect(catalogGenerationKey({ ...identity, language: 'python' })).not.toBe(base);
+    expect(catalogGenerationKey({ ...identity, cacheKey: 'other' })).not.toBe(base);
+    expect(catalogGenerationKey({ ...identity, filesFingerprint: 'x' })).not.toBe(base);
+    expect(catalogGenerationKey({ ...identity, builtAt: '2020-01-01T00:00:00.000Z' })).not.toBe(
+      base,
+    );
+  });
+
+  it('handles control and unicode components without throwing', () => {
+    const key = catalogGenerationKey({
+      language: 'ts\u0000',
+      cacheKey: 'café',
+      filesFingerprint: 'a|b',
+      builtAt: identity.builtAt,
+    });
+    expect(key.startsWith('g1:')).toBe(true);
+    expect(key.length).toBe(3 + 64);
+  });
+});
 
 describe('createGeneration', () => {
-  it('pins the catalog and derives canonical caller/callee indexes once', () => {
+  it('stamps key and source', () => {
     const catalog: Catalog = {
       version: '3.0',
       tool: 'graph',
       language: 'typescript',
-      builtAt: '2026-07-09T00:00:00.000Z',
-      cacheKey: 'test',
-      filesFingerprint: '0',
-      functions: {
-        caller: [
-          occurrence('caller-hash', 'caller', [
-            {
-              to: ['target-hash'],
-              line: 2,
-              column: 0,
-              resolution: 'static',
-              confidence: 'high',
-              text: 'target()',
-            },
-          ]),
-        ],
-        target: [occurrence('target-hash', 'target')],
-      },
+      builtAt: identity.builtAt,
+      cacheKey: 'ck',
+      filesFingerprint: 'fp',
+      functions: {},
     };
-
-    const generation = createGeneration(catalog);
-    expect(generation.catalog).toBe(catalog);
-    expect(generation.builtAt).toBe(catalog.builtAt);
-    expect(generation.indexes.callees.get('caller-hash')).toEqual(['target-hash']);
-    expect(generation.indexes.callers.get('target-hash')).toEqual(['caller-hash']);
+    const gen = createGeneration(catalog, 'initial-load', identity);
+    expect(gen.key).toBe(catalogGenerationKey(identity));
+    expect(gen.source).toBe('initial-load');
+    expect(gen.indexes).toBeDefined();
   });
 });
