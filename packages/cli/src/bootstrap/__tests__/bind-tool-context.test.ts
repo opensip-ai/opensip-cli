@@ -75,7 +75,6 @@ function makeContext(): {
           calls.push(`governance-get:${tool}`);
           return Promise.resolve(undefined);
         }),
-        listForProject: vi.fn(() => Promise.resolve([])),
         queryAudit: vi.fn((tool: string) => {
           calls.push(`governance-audit:${tool}`);
           return Promise.resolve([]);
@@ -180,11 +179,21 @@ describe('bindToolCliContext', () => {
     expect(() => bound.hostPlanes?.entitlements?.check('fitness')).toThrow(/namespace 'fitness'/);
   });
 
-  it('keeps project-level host-plane methods that are not tool-keyed available', async () => {
+  it('does not expose unbound listForProject / exportForCloud on bound context', () => {
     const { ctx } = makeContext();
     const bound = bindToolCliContext(makeTool(), ctx);
+    expect(bound.hostPlanes?.governance).not.toHaveProperty('listForProject');
+    expect(bound.hostPlanes?.audit).not.toHaveProperty('exportForCloud');
+  });
 
-    await expect(bound.hostPlanes?.governance?.listForProject('/repo')).resolves.toEqual([]);
+  it('rejects a reserved host-plane identity on owned-key candidates before binding seams', () => {
+    const tool = makeTool();
+    // Corrupt metadata id to the reserved prefix — toolOwnedKeys must throw
+    // before any seam is callable.
+    (tool.metadata as { id: string }).id = '@opensip-cli/host-plane:victim';
+    const { ctx, calls } = makeContext();
+    expect(() => bindToolCliContext(tool, ctx)).toThrow(/reserved host-plane identity/);
+    expect(calls).toEqual([]);
   });
 
   // Guards the hand-enumerated `wrapHostPlanes` shape: a method added to any host

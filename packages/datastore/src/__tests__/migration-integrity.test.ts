@@ -158,3 +158,94 @@ describe('fresh database fully realizes the ORM schema', () => {
     }
   });
 });
+
+describe('0009 host-plane namespace copy-only migration', () => {
+  it('copies governance/audit/entitlements to reserved identity without delete/overwrite', () => {
+    // Seed a pre-migration-shaped DB by applying migrations then inserting
+    // ordinary rows and re-running the 0009 SQL via a second open is not needed
+    // when the factory already applied 0009: instead insert ordinary rows and
+    // re-execute the committed SQL to prove idempotence + byte preservation.
+    const ds = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const handle = requireDrizzleHandle(ds);
+      // Ordinary host-key candidates + an unrelated key + already-reserved + collision.
+      handle.db.run(
+        sql.raw(`
+          INSERT INTO tool_state (tool, key, payload, updated_at) VALUES
+            ('fit', 'governance', '{"v":1}', 100),
+            ('fit', 'audit', 'null', 200),
+            ('fit', 'entitlements', '{"e":true}', 300),
+            ('fit', 'cursor', '{"x":1}', 400),
+            ('other', 'governance', '{"o":1}', 500),
+            ('@opensip-cli/host-plane:fit', 'governance', '{"existing":true}', 50);
+        `),
+      );
+      // Re-apply the committed 0009 SQL (idempotent ON CONFLICT DO NOTHING).
+      const sqlText = readFileSync(`${MIGRATIONS_DIR}/0009_host_plane_namespace.sql`, 'utf8');
+      // Strip SQL comments then run statements.
+      const body = sqlText
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('--'))
+        .join('\n')
+        .trim();
+      handle.db.run(sql.raw(body));
+
+      const rows = handle.db.all<{
+        tool: string;
+        key: string;
+        payload: string;
+        updated_at: number;
+      }>(sql.raw('SELECT tool, key, payload, updated_at FROM tool_state ORDER BY tool, key'));
+
+      // Ordinary rows preserved (including collision governance on fit).
+      expect(rows.find((r) => r.tool === 'fit' && r.key === 'governance')).toMatchObject({
+        payload: '{"v":1}',
+        updated_at: 100,
+      });
+      expect(rows.find((r) => r.tool === 'fit' && r.key === 'cursor')).toMatchObject({
+        payload: '{"x":1}',
+      });
+      // Already-reserved row NOT overwritten by the copy.
+      expect(
+        rows.find((r) => r.tool === '@opensip-cli/host-plane:fit' && r.key === 'governance'),
+      ).toMatchObject({
+        payload: '{"existing":true}',
+        updated_at: 50,
+      });
+      // Audit/entitlements for fit were copied (no prior reserved row).
+      expect(
+        rows.find((r) => r.tool === '@opensip-cli/host-plane:fit' && r.key === 'audit'),
+      ).toMatchObject({
+        payload: 'null',
+        updated_at: 200,
+      });
+      expect(
+        rows.find((r) => r.tool === '@opensip-cli/host-plane:fit' && r.key === 'entitlements'),
+      ).toMatchObject({
+        payload: '{"e":true}',
+        updated_at: 300,
+      });
+      // Other tool copied too.
+      expect(
+        rows.find((r) => r.tool === '@opensip-cli/host-plane:other' && r.key === 'governance'),
+      ).toMatchObject({
+        payload: '{"o":1}',
+        updated_at: 500,
+      });
+      // No double-prefix.
+      expect(rows.some((r) => r.tool.includes('@opensip-cli/host-plane:@opensip-cli/host-plane:'))).toBe(
+        false,
+      );
+
+      // Second application is a row-for-row no-op.
+      const before = JSON.stringify(rows);
+      handle.db.run(sql.raw(body));
+      const after = handle.db.all(
+        sql.raw('SELECT tool, key, payload, updated_at FROM tool_state ORDER BY tool, key'),
+      );
+      expect(JSON.stringify(after)).toBe(before);
+    } finally {
+      ds.close();
+    }
+  });
+});

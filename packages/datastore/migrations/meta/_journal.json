@@ -64,6 +64,13 @@
       "when": 1783634867033,
       "tag": "0008_sharp_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1783647473238,
+      "tag": "0009_host_plane_namespace",
+      "breakpoints": true
     }
   ]
 }

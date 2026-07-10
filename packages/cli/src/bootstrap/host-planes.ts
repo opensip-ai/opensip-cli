@@ -22,12 +22,15 @@ import type {
   ToolCliContext,
 } from '@opensip-cli/core';
 
+import { hostPlaneStateIdentity } from './host-plane-state.js';
+
 /**
  * Build the hostPlanes bag.
  *
- * Real implementations for the three sub-planes. Storage uses namespaced keys
- * over the existing host-owned `tool_state` table (via ToolStateRepo).
- * See the governing spec and plan for key conventions and rationale.
+ * Real implementations for the three sub-planes. Storage uses the reserved
+ * host-plane identity `@opensip-cli/host-plane:<toolId>` over the existing
+ * host-owned `tool_state` table (via ToolStateRepo) so tool-owned
+ * governance/audit/entitlements keys cannot collide (ADR-0146).
  */
 export function buildHostPlanes(opts: {
   getDatastore: () => DataStore;
@@ -45,25 +48,19 @@ export function buildHostPlanes(opts: {
   };
 
   // Simple read-modify-write helpers for object blobs under a top-level key.
-  // For production audit volume we would chunk (see spec), but this satisfies
-  // the first-cut contract and respects the 256 KiB per-payload cap.
+  // Public method arguments keep the ordinary tool id; storage maps through
+  // hostPlaneStateIdentity immediately before ToolStateRepo.
   const readBlob = <T>(toolId: string, key: string): T | undefined => {
-    return getRepo().get(toolId, key) as T | undefined;
+    return getRepo().get(hostPlaneStateIdentity(toolId), key) as T | undefined;
   };
   const writeBlob = (toolId: string, key: string, value: unknown) => {
-    getRepo().put(toolId, key, value);
+    getRepo().put(hostPlaneStateIdentity(toolId), key, value);
   };
 
   const governanceImpl: HostGovernance = {
     async getGovernanceState(toolId: string) {
       await Promise.resolve();
       return readBlob<Record<string, unknown>>(toolId, 'governance');
-    },
-    async listForProject(_projectRoot: string) {
-      await Promise.resolve();
-      // First-cut: the host (or future Cloud) would index; here we return empty.
-      // Real listing can be added by scanning known tools or a meta index key.
-      return [];
     },
     async queryAudit(toolId: string, _filter?: unknown) {
       await Promise.resolve();
@@ -123,14 +120,6 @@ export function buildHostPlanes(opts: {
     async query(toolId: string, _filter?: unknown) {
       await Promise.resolve();
       return readBlob<Record<string, unknown>[]>(toolId, 'audit') ?? [];
-    },
-    async exportForCloud(..._args: unknown[]) {
-      await Promise.resolve();
-      // Best-effort hook. Real Cloud sync will use existing deliverSignals
-      // or a dedicated path. For now just return the current log.
-      const entries =
-        readBlob<Record<string, unknown>[]>((_args[0] as string) || '', 'audit') ?? [];
-      return { entries };
     },
   };
 

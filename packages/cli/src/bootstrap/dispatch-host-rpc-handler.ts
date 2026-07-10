@@ -25,6 +25,7 @@ import type {
   HostRpcRequest,
   RpcReply,
 } from './tool-command-dispatch-types.js';
+import { HOST_PLANE_METHODS } from './tool-command-dispatch-types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 /** A host plane impl is a record of async methods (governance/audit/entitlements). */
@@ -55,20 +56,53 @@ const RECOGNIZED_SEAMS = new Set<HostRpcCall['seam']>([
   'hostPlane',
 ] satisfies HostRpcCall['seam'][]);
 
+const HOST_PLANE_KINDS = new Set<string>(Object.keys(HOST_PLANE_METHODS));
+
 /**
  * Validate an inbound IPC {@link HostRpcRequest} against the recognized-seam
- * allowlist before it is dispatched.
+ * allowlist before it is dispatched. For hostPlane calls also validate
+ * rpcId, known plane, allowlisted method, and array args (ADR-0146).
  *
  * @throws {TypeError} when the request shape is malformed or names a seam the
  *   host does not recognize — the host fails loud (the structured error crosses
  *   back to the worker) instead of silently ignoring an unknown upcall.
  */
 function validateHostRpcRequest(request: HostRpcRequest): void {
-  if (typeof request !== 'object' || typeof request.rpcId !== 'number') {
-    throw new TypeError('host-RPC: malformed request (missing numeric rpcId)');
+  if (typeof request !== 'object' || request === null) {
+    throw new TypeError('host-RPC: malformed request');
+  }
+  if (
+    typeof request.rpcId !== 'number' ||
+    !Number.isSafeInteger(request.rpcId) ||
+    request.rpcId < 0
+  ) {
+    throw new TypeError('host-RPC: malformed request (rpcId must be a nonnegative safe integer)');
   }
   if (!RECOGNIZED_SEAMS.has(request.seam)) {
     throw new TypeError(`host-RPC: unrecognized seam '${String(request.seam)}'`);
+  }
+  if (request.seam === 'hostPlane') {
+    if (!HOST_PLANE_KINDS.has(request.plane)) {
+      throw new TypeError(`host-RPC: unknown host plane '${String(request.plane)}'`);
+    }
+    // Wire payloads may carry arbitrary strings; validate via string form so
+    // prototype/unknown method names are rejected before property lookup.
+    const method = String((request as { method?: unknown }).method ?? '');
+    const allowed = HOST_PLANE_METHODS[request.plane] as readonly string[];
+    if (
+      method.length === 0 ||
+      method === '__proto__' ||
+      method === 'constructor' ||
+      method === 'prototype' ||
+      !allowed.includes(method)
+    ) {
+      throw new TypeError(
+        `host-RPC: method '${method}' is not allowlisted on plane '${request.plane}'`,
+      );
+    }
+    if (!Array.isArray(request.args)) {
+      throw new TypeError('host-RPC: hostPlane args must be an array');
+    }
   }
 }
 
@@ -192,17 +226,20 @@ export async function handleHostRpc(
     const value = await performHostRpc(request, ctx);
     return { kind: 'rpc-reply', rpcId: request.rpcId, ok: true, value };
   } catch (error) {
+    // Bounded generic seam failure only — never echo host exception text,
+    // stacks, paths, keys, or secrets across the worker IPC boundary (ADR-0146).
+    const code =
+      (error as { code?: unknown }).code !== undefined &&
+      typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : undefined;
     return {
       kind: 'rpc-reply',
       rpcId: request.rpcId,
       ok: false,
       error: {
-        message: error instanceof Error ? error.message : String(error),
-        ...((error as { code?: unknown }).code !== undefined &&
-        typeof (error as { code?: unknown }).code === 'string'
-          ? { code: (error as { code: string }).code }
-          : {}),
-        ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+        message: 'host-RPC seam failed',
+        ...(code === undefined ? {} : { code }),
         // Carry the canonical exit-class code for a typed ToolError (e.g. a
         // compareBaseline BASELINE_MISSING rejection → CONFIGURATION_ERROR) so the
         // worker shim re-throws a TYPED error and the exit class survives the

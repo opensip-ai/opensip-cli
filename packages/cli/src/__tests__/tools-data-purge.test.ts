@@ -84,14 +84,45 @@ function registryWithBundledTools(): ToolRegistry {
 }
 
 describe('toolsDataPurge', () => {
-  it('derives bundled id forms from registered tool identity', () => {
+  it('derives bundled id forms from registered tool identity (owned keys)', () => {
     const registry = registryWithBundledTools();
 
-    expect(deriveToolDataPurgeIdForms('fitness', registry)).toEqual(['fitness', 'fit']);
-    expect(deriveToolDataPurgeIdForms('fit', registry)).toEqual(['fitness', 'fit']);
-    expect(deriveToolDataPurgeIdForms('simulation', registry)).toEqual(['simulation', 'sim']);
-    expect(deriveToolDataPurgeIdForms('sim', registry)).toEqual(['simulation', 'sim']);
-    expect(deriveToolDataPurgeIdForms('graph', registry)).toEqual(['graph']);
+    // Validated toolOwnedKeys: metadata id, name, layoutKey/aliases.
+    expect([...deriveToolDataPurgeIdForms('fitness', registry)].sort()).toEqual(
+      ['fit', 'fitness', 'stable-fitness'].sort(),
+    );
+    expect([...deriveToolDataPurgeIdForms('fit', registry)].sort()).toEqual(
+      ['fit', 'fitness', 'stable-fitness'].sort(),
+    );
+    expect([...deriveToolDataPurgeIdForms('simulation', registry)].sort()).toEqual(
+      ['sim', 'simulation', 'stable-simulation'].sort(),
+    );
+    expect([...deriveToolDataPurgeIdForms('sim', registry)].sort()).toEqual(
+      ['sim', 'simulation', 'stable-simulation'].sort(),
+    );
+    expect([...deriveToolDataPurgeIdForms('graph', registry)].sort()).toEqual(
+      ['graph', 'stable-graph'].sort(),
+    );
+  });
+
+  it('rejects empty and reserved-prefix purge ids before repository access', () => {
+    expect(() => toolsDataPurge('', ds)).toThrow(/non-empty/);
+    expect(() => toolsDataPurge('  ', ds)).toThrow(/non-empty/);
+    expect(() => toolsDataPurge('@opensip-cli/host-plane:fit', ds)).toThrow(/reserved host-plane/);
+  });
+
+  it('clears both ordinary and reserved host-plane state rows', async () => {
+    const { hostPlaneStateIdentity } = await import('../bootstrap/host-plane-state.js');
+    new ToolStateRepo(ds).put('fitness', 'cursor', { v: 1 });
+    new ToolStateRepo(ds).put(hostPlaneStateIdentity('fitness'), 'governance', {
+      installed: true,
+    });
+    const result = toolsDataPurge('fitness', ds, ['fitness']);
+    expect(result.stateRows).toBe(2);
+    expect(new ToolStateRepo(ds).get('fitness', 'cursor')).toBeUndefined();
+    expect(
+      new ToolStateRepo(ds).get(hostPlaneStateIdentity('fitness'), 'governance'),
+    ).toBeUndefined();
   });
 
   it('purging the LONG id clears the SHORT-keyed sessions + LONG-keyed baselines + state', () => {

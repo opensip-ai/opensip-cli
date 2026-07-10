@@ -241,6 +241,28 @@ export interface ToolCommandResult {
  */
 export type HostPlaneKind = 'governance' | 'audit' | 'entitlements';
 
+/**
+ * Frozen allowlist of host-plane methods reachable via worker RPC (ADR-0146).
+ * Runtime admission and the TypeScript wire union both derive from this table so
+ * they cannot drift. Unbound project-wide methods (listForProject, exportForCloud)
+ * are intentionally absent.
+ */
+export const HOST_PLANE_METHODS = Object.freeze({
+  governance: Object.freeze([
+    'getGovernanceState',
+    'queryAudit',
+    'recordInstallation',
+    'recordApprovalDecision',
+    'setBlock',
+    'checkAllowed',
+  ] as const),
+  audit: Object.freeze(['append', 'query'] as const),
+  entitlements: Object.freeze(['check', 'recordUsage', 'getLicenseState'] as const),
+});
+
+export type HostPlaneMethodName<P extends HostPlaneKind> =
+  (typeof HOST_PLANE_METHODS)[P][number];
+
 /** The serializable subset of `deliverSignals`'s opts (no functions/handles). */
 export interface DeliverSignalsOpts {
   readonly cwd: string;
@@ -326,8 +348,20 @@ export type HostRpcCall =
   | { readonly seam: 'getExitCode' }
   | {
       readonly seam: 'hostPlane';
-      readonly plane: HostPlaneKind;
-      readonly method: string;
+      readonly plane: 'governance';
+      readonly method: HostPlaneMethodName<'governance'>;
+      readonly args: readonly unknown[];
+    }
+  | {
+      readonly seam: 'hostPlane';
+      readonly plane: 'audit';
+      readonly method: HostPlaneMethodName<'audit'>;
+      readonly args: readonly unknown[];
+    }
+  | {
+      readonly seam: 'hostPlane';
+      readonly plane: 'entitlements';
+      readonly method: HostPlaneMethodName<'entitlements'>;
       readonly args: readonly unknown[];
     };
 

@@ -277,14 +277,16 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       cap.ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error.message).toContain('faulted for key boom');
+    // Bounded generic message only — never host exception text (ADR-0146).
+    expect(reply.error.message).toBe('host-RPC seam failed');
+    expect(reply.error.message).not.toContain('boom');
+    expect(reply.error.stack).toBeUndefined();
   });
 
-  it('preserves a string `code` and the stack on a host-side Error fault reply', async () => {
-    // A thrown Error carrying a string `code` drives BOTH conditional spreads in
-    // the error reply: the `code` present arm (L192-195) and the `stack` present
-    // arm (L196). The maybeOpenReport seam stub is overridden to throw.
-    const coded = new Error('coded host fault') as Error & { code?: string };
+  it('preserves a string `code` but never stack or host exception text on fault', async () => {
+    // A thrown Error carrying a string `code` drives the `code` present arm.
+    // Stacks and raw host messages must not cross the worker IPC boundary.
+    const coded = new Error('coded host fault with /secret/path') as Error & { code?: string };
     coded.code = 'E_HOST_CODE';
     const ctx = {
       ...makeDispatchHostCtx().ctx,
@@ -303,10 +305,11 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
     expect(reply.error).toMatchObject({
-      message: 'coded host fault',
+      message: 'host-RPC seam failed',
       code: 'E_HOST_CODE',
     });
-    expect(reply.error.stack).toContain('coded host fault');
+    expect(reply.error.stack).toBeUndefined();
+    expect(JSON.stringify(reply.error)).not.toContain('secret');
   });
 
   it('carries the canonical toolErrorCode for a TYPED ToolError fault (compareBaseline reject → exit-2 survives the boundary)', async () => {
@@ -333,14 +336,13 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(reply.error.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
   });
 
-  it('stringifies a non-Error host fault (the String(error) ternary else)', async () => {
-    // A non-Error throw drives `error instanceof Error ? error.message : String(error)`
-    // down its else, AND leaves the `code`/`stack` spreads on their absent arm.
+  it('returns a bounded generic message for a non-Error host fault', async () => {
+    // A non-Error throw must not leak through String(error) — ADR-0146.
     const ctx = {
       ...makeDispatchHostCtx().ctx,
       getExitCode: () => {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- intentional non-Error throw: drives handleHostRpc's `error instanceof Error ? … : String(error)` else.
-        throw 'plain string fault';
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- intentional non-Error throw: drives handleHostRpc's catch path.
+        throw 'plain string fault with secret';
       },
     } as unknown as Parameters<typeof handleHostRpc>[1];
 
@@ -349,9 +351,57 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       { ok: false }
     >;
     expect(reply.ok).toBe(false);
-    expect(reply.error.message).toBe('plain string fault');
+    expect(reply.error.message).toBe('host-RPC seam failed');
     expect(reply.error.code).toBeUndefined();
     expect(reply.error.stack).toBeUndefined();
+    expect(JSON.stringify(reply.error)).not.toContain('secret');
+  });
+
+  it('rejects unknown, cross-plane, and prototype hostPlane methods without a host call', async () => {
+    const cap = makeDispatchHostCtx();
+    const cases = [
+      { plane: 'audit', method: 'exportForCloud', args: [] },
+      { plane: 'governance', method: 'listForProject', args: ['/p'] },
+      { plane: 'audit', method: '__proto__', args: [] },
+      { plane: 'audit', method: 'constructor', args: [] },
+      { plane: 'nope', method: 'append', args: [] },
+    ] as const;
+    for (const c of cases) {
+      const reply = (await handleHostRpc(
+        {
+          rpcId: 1,
+          seam: 'hostPlane',
+          plane: c.plane as never,
+          method: c.method as never,
+          args: c.args,
+        },
+        cap.ctx,
+      )) as Extract<RpcReply, { ok: false }>;
+      expect(reply.ok).toBe(false);
+      expect(reply.error.message).toBe('host-RPC seam failed');
+    }
+  });
+
+  it('rejects malformed rpcId and non-array hostPlane args', async () => {
+    const cap = makeDispatchHostCtx();
+    for (const rpcId of [-1, 1.5, Number.NaN] as const) {
+      const reply = (await handleHostRpc(
+        { rpcId: rpcId as never, seam: 'getExitCode' },
+        cap.ctx,
+      )) as Extract<RpcReply, { ok: false }>;
+      expect(reply.ok).toBe(false);
+    }
+    const badArgs = (await handleHostRpc(
+      {
+        rpcId: 1,
+        seam: 'hostPlane',
+        plane: 'audit',
+        method: 'append',
+        args: { not: 'array' } as never,
+      },
+      cap.ctx,
+    )) as Extract<RpcReply, { ok: false }>;
+    expect(badArgs.ok).toBe(false);
   });
 
   it('dispatches getExitCode + maybeOpenReport through the ctx', async () => {
@@ -403,7 +453,7 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       cap.ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error.message).toContain('unrecognized seam');
+    expect(reply.error.message).toBe('host-RPC seam failed');
   });
 
   it('rejects a malformed request (missing numeric rpcId) with a structured error', async () => {
@@ -413,7 +463,7 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       cap.ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error.message).toContain('malformed request');
+    expect(reply.error.message).toBe('host-RPC seam failed');
   });
 
   it('returns a structured error when a requested host plane is absent', async () => {
@@ -429,7 +479,7 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       cap.ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error.message).toContain('hostPlanes.governance is not provided');
+    expect(reply.error.message).toBe('host-RPC seam failed');
   });
 
   it('returns a structured error when a host plane method is absent', async () => {
@@ -448,6 +498,6 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       ctx,
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
-    expect(reply.error.message).toContain('entitlements.check is not a function');
+    expect(reply.error.message).toBe('host-RPC seam failed');
   });
 });

@@ -20,7 +20,11 @@ import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
 
 import { toolsListAvailable } from './available.js';
 import { toolsCreate } from './create.js';
-import { deriveToolDataPurgeIdForms, toolsDataPurge } from './data-purge.js';
+import {
+  assertToolDataPurgeId,
+  deriveToolDataPurgeIdForms,
+  toolsDataPurge,
+} from './data-purge.js';
 import { toolsDoctor } from './doctor.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
@@ -279,8 +283,14 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
         if (datastore !== undefined) {
           // Purge AFTER a successful project uninstall; counts ride stderr so
           // the uninstall result stays the command's one payload.
-          const purgeForms = deriveToolDataPurgeIdForms(result.removed.id, currentScope()?.tools);
-          const purge = toolsDataPurge(result.removed.id, datastore, purgeForms);
+          const scope = currentScope();
+          const purgeForms = deriveToolDataPurgeIdForms(result.removed.id, scope?.tools);
+          const purge = toolsDataPurge(
+            result.removed.id,
+            datastore,
+            purgeForms,
+            scope?.logger,
+          );
           process.stderr.write(
             `opensip: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
               `${purge.stateRows} state row(s) for '${purge.toolId}'\n`,
@@ -349,22 +359,37 @@ function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
     output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
+      const rawId = opts._args[0] ?? '';
+      let toolId: string;
+      try {
+        // Reject empty/whitespace/reserved-prefix before opening repositories.
+        toolId = assertToolDataPurgeId(rawId);
+      } catch (error) {
+        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return Promise.resolve({
+          type: 'tools-uninstall',
+          target: rawId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        } satisfies CommandResult);
+      }
       const datastore = ctx.datastore() as DataStore | undefined;
       if (datastore === undefined) {
         ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
         return Promise.resolve({
           type: 'tools-uninstall',
-          target: opts._args[0] ?? '',
+          target: toolId,
           success: false,
           error: 'tools data-purge requires the project datastore (run inside a project)',
         } satisfies CommandResult);
       }
-      const toolId = opts._args[0] ?? '';
+      const scope = currentScope();
       return Promise.resolve(
         toolsDataPurge(
           toolId,
           datastore,
-          deriveToolDataPurgeIdForms(toolId, currentScope()?.tools),
+          deriveToolDataPurgeIdForms(toolId, scope?.tools),
+          scope?.logger,
         ),
       );
     },

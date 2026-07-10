@@ -68,10 +68,14 @@ describe('host-planes — governance', () => {
     expect(await planes().governance.checkAllowed('never-seen', {})).toBe(true);
   });
 
-  it('queryAudit returns an empty list with no entries and listForProject is empty (first-cut)', async () => {
+  it('queryAudit returns an empty list with no entries', async () => {
     const { governance } = planes();
     expect(await governance.queryAudit('fit')).toEqual([]);
-    expect(await governance.listForProject('/proj')).toEqual([]);
+  });
+
+  it('does not expose unbound listForProject (ADR-0146)', () => {
+    const { governance } = planes();
+    expect(governance).not.toHaveProperty('listForProject');
   });
 
   it('emits a debug log when a logger is supplied (install-recorded)', async () => {
@@ -98,16 +102,23 @@ describe('host-planes — audit', () => {
     expect(typeof entries[0]?.ts).toBe('number');
   });
 
-  it('exportForCloud returns the current log for the given tool, empty for an unknown arg', async () => {
+  it('does not expose unbound exportForCloud (ADR-0146)', () => {
     const { audit } = planes();
-    await audit.append('fit', { action: 'run' });
-    const exported = (await audit.exportForCloud('fit')) as {
-      entries: unknown[];
-    };
-    expect(exported).toEqual({ entries: expect.any(Array) });
-    expect(exported.entries).toHaveLength(1);
-    // No/empty tool arg → empty export, no throw.
-    expect(await audit.exportForCloud()).toEqual({ entries: [] });
+    expect(audit).not.toHaveProperty('exportForCloud');
+  });
+
+  it('stores under reserved host-plane identity, not ordinary tool key', async () => {
+    const { ToolStateRepo } = await import('@opensip-cli/datastore');
+    const { hostPlaneStateIdentity } = await import('../host-plane-state.js');
+    const { governance } = planes();
+    await governance.recordInstallation('fit', { spec: '@x/fit' });
+    const repo = new ToolStateRepo(ds);
+    // Ordinary tool key must remain empty (no collision with tool-owned state).
+    expect(repo.get('fit', 'governance')).toBeUndefined();
+    // Reserved identity holds the host compatibility blob.
+    expect(repo.get(hostPlaneStateIdentity('fit'), 'governance')).toMatchObject({
+      installed: true,
+    });
   });
 
   it('emits a debug log on append when a logger is supplied', async () => {
