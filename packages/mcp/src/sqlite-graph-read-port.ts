@@ -17,7 +17,13 @@
  */
 
 import { err, ok } from '@opensip-cli/core';
-import { buildFeatures, CatalogRepo, orphanSubtreeRule } from '@opensip-cli/graph/internal';
+import {
+  deriveGraphReadFeatures,
+  evaluateGraphOrphans,
+  loadCatalogGeneration,
+  type GraphConfig,
+  type ValidationContext,
+} from '@opensip-cli/graph/read';
 
 import { createGeneration } from './catalog-generation.js';
 import { classifyFreshness, missingFreshness, unverifiedFreshness } from './freshness.js';
@@ -39,7 +45,6 @@ import type { Freshness, McpToolResult, SymbolRef } from './symbol-dto.js';
 import type { Result, Signal } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { Catalog, FeatureColumn, FunctionOccurrence, Indexes } from '@opensip-cli/graph';
-import type { GraphConfig, ValidationContext } from '@opensip-cli/graph/internal';
 
 /** Default search-result cap. */
 const DEFAULT_SEARCH_LIMIT = 50;
@@ -92,10 +97,16 @@ export class SqliteGraphReadPort implements GraphReadPort {
   /** Lazily load + pin the current generation from the persisted catalog. */
   private current(): CatalogGeneration | undefined {
     if (!this.loaded) {
-      // CatalogRepo throws only on a genuine SQLite/Drizzle failure (sanctioned
-      // infra boundary); a missing catalog returns null → no generation.
-      const catalog = new CatalogRepo(this.store).loadFullCatalog();
-      this.generation = catalog === null ? undefined : createGeneration(catalog);
+      // Public graph/read Result facade — missing catalog is ok(null); storage
+      // failures surface as err and are treated as no generation here (caller
+      // paths that need typed errors use loadCatalogGeneration directly).
+      const loaded = loadCatalogGeneration(this.store);
+      if (loaded.ok) {
+        this.generation =
+          loaded.value === null ? undefined : createGeneration(loaded.value);
+      } else {
+        this.generation = undefined;
+      }
       this.loaded = true;
       this.invalidateDerived();
     }
@@ -228,7 +239,12 @@ export class SqliteGraphReadPort implements GraphReadPort {
   ): ReadonlyMap<string, { direct: number; transitive: number; score: number }> {
     if (this.blastCache !== undefined) return this.blastCache;
     const columns: readonly FeatureColumn[] = ['blast'];
-    const features = buildFeatures(gen.catalog, gen.indexes, this.config, columns);
+    const features = deriveGraphReadFeatures(
+      gen.catalog,
+      gen.indexes,
+      this.config,
+      columns,
+    );
     const out = new Map<string, { direct: number; transitive: number; score: number }>();
     for (const [hash, row] of features.function) {
       if (row.blast !== undefined) {
@@ -247,12 +263,16 @@ export class SqliteGraphReadPort implements GraphReadPort {
     const gen = this.current();
     if (gen === undefined) return ok(this.wrap([] as readonly DeadCodeDto[]));
     const columns: readonly FeatureColumn[] = ['reachableFromEntry'];
-    const features = buildFeatures(gen.catalog, gen.indexes, this.config, columns);
-    const signals = orphanSubtreeRule.evaluate(
+    const features = deriveGraphReadFeatures(
       gen.catalog,
       gen.indexes,
       this.config,
-      undefined,
+      columns,
+    );
+    const signals = evaluateGraphOrphans(
+      gen.catalog,
+      gen.indexes,
+      this.config,
       features,
     );
     const entries: DeadCodeDto[] = [];
@@ -276,7 +296,12 @@ export class SqliteGraphReadPort implements GraphReadPort {
       );
     }
     const columns: readonly FeatureColumn[] = ['packageCoupling'];
-    const features = buildFeatures(gen.catalog, gen.indexes, this.config, columns);
+    const features = deriveGraphReadFeatures(
+      gen.catalog,
+      gen.indexes,
+      this.config,
+      columns,
+    );
     const cap = clampLimit(limit, DEFAULT_ARCH_LIMIT);
     const rows: ArchitecturePackageDto[] = [];
     for (const [name, row] of features.package) {

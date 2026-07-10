@@ -1,7 +1,6 @@
 {
-  "//": "depcruise-only. Generated from workspace package exports via scripts/verify-depcruise-export-paths.mjs inventory. Maps @opensip-cli/* to package SOURCE so dependency-cruiser resolves cross-package imports into packages/*/src. NOT used for tsc builds.",
+  "//": "depcruise-only. Generated from workspace package exports. Maps @opensip-cli/* to package SOURCE. NOT used for tsc builds.",
   "extends": "../tsconfig.json",
-  "//include": "Explicit include so TypeScript finds inputs from this file's .config/ home; the default '**/*' would glob .config/ (empty) and error TS18003. Paths are relative to this file's directory.",
   "include": [
     "../packages/**/*.ts"
   ],
@@ -115,6 +114,9 @@
       ],
       "@opensip-cli/graph/internal": [
         "packages/graph/engine/src/internal.ts"
+      ],
+      "@opensip-cli/graph/read": [
+        "packages/graph/engine/src/read/index.ts"
       ],
       "@opensip-cli/lang-cpp": [
         "packages/languages/lang-cpp/src/index.ts"

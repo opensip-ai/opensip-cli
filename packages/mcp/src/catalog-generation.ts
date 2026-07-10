@@ -10,7 +10,7 @@
  * `buildIndexes`, never persisted.
  */
 
-import { buildIndexes } from '@opensip-cli/graph/internal';
+import { buildGraphReadIndexes } from '@opensip-cli/graph/read';
 
 import type { Catalog, Indexes } from '@opensip-cli/graph';
 
@@ -26,7 +26,7 @@ export interface CatalogGeneration {
 export function createGeneration(catalog: Catalog): CatalogGeneration {
   return {
     catalog,
-    indexes: buildIndexes(catalog),
+    indexes: buildGraphReadIndexes(catalog),
     builtAt: catalog.builtAt,
   };
 }

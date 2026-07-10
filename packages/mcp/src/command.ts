@@ -26,7 +26,7 @@ import {
   type RunScope,
   type ToolCliContext,
 } from '@opensip-cli/core';
-import { runGraph } from '@opensip-cli/graph/internal';
+import { rebuildCatalog } from '@opensip-cli/graph/read';
 
 import { workingTreeContextFromCatalog } from './freshness.js';
 import { CliRepairWritePort } from './repair-write-port.js';
@@ -116,11 +116,11 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
      *   produced) — surfaced to the refresh tool as an infra-boundary failure.
      */
     async function rebuild(): Promise<Catalog> {
-      const outcome = await runGraph({ cwd: projectRoot, datastore: store });
-      if (outcome.catalog === null) {
-        throw new Error('graph rebuild produced no catalog (no source files discovered).');
+      const outcome = await rebuildCatalog({ cwd: projectRoot, datastore: store });
+      if (!outcome.ok) {
+        throw new Error(outcome.error.message);
       }
-      return outcome.catalog;
+      return outcome.value;
     }
     const graph = new SqliteGraphReadPort({
       store,

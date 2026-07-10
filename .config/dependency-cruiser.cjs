@@ -142,7 +142,6 @@ module.exports = {
         pathNot: [
           '/__tests__/',
           String.raw`\.test\.(ts|tsx)$`,
-          '^packages/mcp/',
           '^packages/session-store/',
           String.raw`^packages/graph/engine/src/persistence/`,
           '^packages/test-support/',
@@ -199,17 +198,13 @@ module.exports = {
       name: 'mcp-graph-internal-scope',
       severity: 'error',
       comment:
-        'ADR-0084: `@opensip-cli/mcp` may import `@opensip-cli/graph/internal` (read-only, ' +
-        'in-monorepo) — and ONLY graph/internal. Any other `*/src/internal.ts` import from ' +
-        'packages/mcp/ is forbidden (use the package public barrel). Replaced by ' +
-        '@opensip-cli/graph/read in Phase 5 of modular boundary hardening.',
+        'ADR-0147: MCP production must use @opensip-cli/graph/read only. graph/internal is forbidden.',
       from: {
         path: '^packages/mcp/',
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
         path: String.raw`/src/internal\.ts$`,
-        pathNot: String.raw`^packages/graph/engine/src/internal\.ts$`,
       },
     },
     {
