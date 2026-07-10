@@ -23,6 +23,8 @@
  *   rpc-fail  — call a host-RPC seam the host rejects (toolState.get with a key
  *               the host faults on) — the structured error crosses back and the
  *               handler sees a normal thrown error (proves fault-not-crash).
+ *   ds-scope  — attempt cli.scope.datastore() directly (ADR-0145 ambient denial).
+ *   ds-current — attempt currentScope().datastore() (proves ambient ALS denial).
  *
  * The id matches the manifest (`opensipTools.id` / `stableId`) so the
  * manifest-runtime coherence + provenance match resolve.
@@ -196,6 +198,22 @@ export const tool = {
           // The host faults on this key; the structured error crosses back and is
           // caught here as a normal thrown error (fault-not-crash).
           await cli.toolState.get('external-dispatch-tool', 'boom');
+        }
+        if (mode === 'ds-scope') {
+          // ADR-0145: ambient datastore via cli.scope must fail loud in the worker.
+          // Do not catch — the structured PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS
+          // crosses IPC as tool-handler-throw and the host process survives.
+          cli.scope.datastore();
+        }
+        if (mode === 'ds-current') {
+          // Same denial through imported currentScope() — a projected context
+          // alone is insufficient; the ambient RunScope thunk is denied.
+          const { currentScope } = await import('@opensip-cli/core');
+          const ambient = currentScope();
+          if (ambient === undefined) {
+            throw new Error('ds-current: currentScope() returned undefined in worker');
+          }
+          ambient.datastore();
         }
         if (mode === 'report-failure') {
           await cli.reportFailure({

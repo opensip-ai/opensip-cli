@@ -14,11 +14,14 @@
  * which serves the persisted catalog without re-verification.
  */
 
-import { classifyCatalog } from '@opensip-cli/graph/internal';
+import {
+  classifyGraphReadCatalog,
+  type CatalogVerdict,
+  type ValidationContext,
+} from '@opensip-cli/graph/read';
 
 import type { Freshness } from './symbol-dto.js';
 import type { Catalog } from '@opensip-cli/graph';
-import type { CatalogVerdict, ValidationContext } from '@opensip-cli/graph/internal';
 
 /** Freshness for an absent catalog — empty data, explicit refresh required. */
 export function missingFreshness(): Freshness {
@@ -51,7 +54,7 @@ export function freshnessFromVerdict(verdict: CatalogVerdict, builtAt: string): 
 
 /** Classify a loaded catalog against the current working-tree context. */
 export function classifyFreshness(catalog: Catalog, ctx: ValidationContext): Freshness {
-  return freshnessFromVerdict(classifyCatalog(catalog, ctx), catalog.builtAt);
+  return freshnessFromVerdict(classifyGraphReadCatalog(catalog, ctx), catalog.builtAt);
 }
 
 /**

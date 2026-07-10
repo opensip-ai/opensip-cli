@@ -20,7 +20,8 @@
  *   never read `scope.tools`. `RunScope` is a `ToolScope` plus `tools`.
  * - `ScopeContribution` — the augmentable slot bag a tool returns from
  *   `Tool.contributeScope()`. Tools augment THIS (not `RunScope`); the
- *   kernel `Object.assign`s it onto the scope. `RunScope`/`ToolScope`
+ *   kernel installs it via `applyToolContributeScope` (validated assign).
+ *   `RunScope`/`ToolScope`
  *   inherit the slots for reading.
  */
 
@@ -180,7 +181,7 @@ export interface ScopeContribution {
  * with nothing to dispose (graph, simulation).
  */
 export interface ScopeContributionWithDisposer {
-  /** The tool's subscope slot bag — installed onto the scope via Object.assign. */
+  /** The tool's subscope slot bag — installed via validated applyToolContributeScope. */
   readonly contribution: ScopeContribution;
   /**
    * Optional disposer invoked once when the scope is disposed. Registered by the

@@ -115,11 +115,7 @@ export {
   scrubModuleNotFoundPath,
 } from './lib/diagnostic-classifier.js';
 export type { IntegrityFailureInput } from './lib/diagnostic-classifier.js';
-export {
-  capabilityDiscoveryToCliDiagnostic,
-  fitnessEmptyCheckRegistryDiagnostic,
-  fitnessPluginLoadFailedDiagnostic,
-} from './lib/capability-diagnostic.js';
+export { capabilityDiscoveryToCliDiagnostic } from './lib/capability-diagnostic.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single

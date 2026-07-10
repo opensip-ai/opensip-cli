@@ -23,6 +23,8 @@ import { join } from 'node:path';
 
 import {
   applyToolContributeScope,
+  err,
+  ok,
   RunScope,
   runWithScope,
   runWithScopeSync,
@@ -40,7 +42,9 @@ import { SessionResultsReadPort } from '../session-results-read-port.js';
 import { SqliteGraphReadPort } from '../sqlite-graph-read-port.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
+import type { McpReadError } from '../mcp-error.js';
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
+import type { Result } from '@opensip-cli/core';
 import type { Catalog } from '@opensip-cli/graph';
 import type { SessionReplayFn } from '@opensip-cli/session-store';
 
@@ -83,10 +87,12 @@ afterEach(() => {
 
 /** Build the graph read port whose rebuild runs the real engine under the scope. */
 function buildGraphPort(): GraphReadPort {
-  const rebuild = async (): Promise<Catalog> => {
+  const rebuild = async (): Promise<Result<Catalog, McpReadError>> => {
     const outcome = await runWithScope(scope, () => runGraph({ cwd: dir, datastore: store }));
-    if (outcome.catalog === null) throw new Error('graph build produced no catalog');
-    return outcome.catalog;
+    if (outcome.catalog === null) {
+      return err({ code: 'refresh-empty', message: 'Graph build produced no catalog.' });
+    }
+    return ok(outcome.catalog);
   };
   return new SqliteGraphReadPort({
     store,

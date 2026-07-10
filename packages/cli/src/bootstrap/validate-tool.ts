@@ -21,6 +21,8 @@
 
 import { validateCommandSpec, validateToolIdentity, type Tool } from '@opensip-cli/core';
 
+import { isReservedHostPlaneIdentity } from './host-plane-state.js';
+
 type NormalizedIdentity = ReturnType<typeof validateToolIdentity>;
 
 /** Top-level hook keys removed in the tool-author-simplify contract. */
@@ -45,8 +47,14 @@ function metadataValidationFailure(metadata: unknown): string | undefined {
   if (typeof metadata !== 'object' || metadata === null) {
     return 'tool.metadata is missing or not an object';
   }
-  if (typeof (metadata as { id?: unknown }).id !== 'string') {
+  const id = (metadata as { id?: unknown }).id;
+  if (typeof id !== 'string') {
     return 'tool.metadata.id must be a string';
+  }
+  // ADR-0146: runtime Tool admission rejects a reserved host-plane identity
+  // before registry/handler/state access. Shared predicate with toolOwnedKeys.
+  if (isReservedHostPlaneIdentity(id)) {
+    return 'tool.metadata.id must not use the reserved host-plane identity prefix (@opensip-cli/host-plane:)';
   }
   if (typeof (metadata as { name?: unknown }).name !== 'string') {
     return 'tool.metadata.name must be a string';

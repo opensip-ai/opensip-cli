@@ -130,14 +130,21 @@ its enforcement (an ADR without this section is incomplete):
 |-----------|-----------|-------------|
 | Result/history tools replay persisted sessions; **never re-run** `fit`/`graph`/`sim`/`yagni` | **Check warranted** | NEW `mcp-results-no-rerun` — `packages/fitness/checks-typescript/src/checks/architecture/mcp-results-no-rerun.ts`; references this ADR in a top-of-file comment. |
 | MCP (a first-party tool) must not own session timing / name `SessionRepo` | **No new check** | Existing `architecture-session-timing-not-host-owned` (`opensip-cli/fit/checks/no-tool-owned-session-timing.mjs`) auto-governs `packages/mcp/` once it joins `bundledPackages`. |
-| MCP must not raw-query `DataStore.db` (reads via `CatalogRepo` / session-store read API) | **No new check** | Existing `restrict-raw-db-access` (`opensip-cli/fit/checks/restrict-raw-db-access.mjs`). |
-| No `mcp → cli` import edge; `graph/internal` import scoped to `packages/mcp/` only | **No check warranted** | dependency-cruiser (the layer DAG + the scoped `no-cross-package-internal` exception); a fitness check would duplicate depcruise. |
+| MCP must not raw-query `DataStore.db` (graph reads use `@opensip-cli/graph/read`; result reads use session-store APIs) | **No new check** | Existing `restrict-raw-db-access` plus ADR-0147's export/import verifiers. |
+| No `mcp → cli` import edge and no production `graph/internal` import | **No check warranted** | Dependency-cruiser layer DAG, `no-cross-package-internal`, and the graph/read liveness probes; a fitness check would duplicate depcruise. |
 | `opensip mcp` uses `output:'raw-stream'` + `rawStreamReason:'mcp-stdio'` | **No new check** | `raw-stream-parity` inventory test + `command-handler-host-owned-output` (the in-file justification comment). |
-| ADR-0009 internal-import exception is MCP-only | **No check warranted** | The narrowed dependency-cruiser `no-cross-package-internal` rule. |
+| MCP consumes graph only through declared public surfaces; catalog reads/rebuild use `graph/read` | **No check warranted** | ADR-0147's export-path verifier, workspace import verifier, and dependency-cruiser rules. |
 
 **Related specs / ADRs:** implemented by the local plan
 `docs/plans/ready/02-mcp-server/`. Related:
-[ADR-0009](ADR-0009-public-api-surface-policy.md) (internal-surface boundary,
-excepted here), [ADR-0006](ADR-0006-derived-data-persistence-policy.md) (catalog
+[ADR-0009](ADR-0009-public-api-surface-policy.md) (internal-surface boundary),
+[ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
+(public graph/read boundary), [ADR-0006](ADR-0006-derived-data-persistence-policy.md) (catalog
 as derived data), [ADR-0030](ADR-0030-authored-tool-discovery.md) (tool trust
 tiers — `@opensip-cli/mcp` is bundled first-party and fails closed).
+
+### Boundary hardening amendment (2026-07-09)
+The former production graph/internal exception is removed. Catalog reads,
+canonical analysis helpers, and rebuild now use
+[ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)'s
+public `@opensip-cli/graph/read` subpath.

@@ -96,3 +96,6 @@ roots through the one runtime-load seam without a parallel admission hierarchy.
 **Related specs / ADRs:** [ADR-0027](./ADR-0027-ga-parity-cutover.md) (the parity
 cutover whose three-sources-one-path claim this realizes);
 [ADR-0012](./ADR-0012-versioning-and-release-policy.md) (the 3.0.0 reservation).
+
+### Boundary hardening amendments (2026-07-09)
+Wildcard external trust is no longer admitted; exact-id admission is defined by [ADR-0145](ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md).

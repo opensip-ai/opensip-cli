@@ -19,3 +19,4 @@ export { installPreActionHook } from './pre-action-hook.js';
 export { buildCommandRegistrationInput } from './build-command-registration-input.js';
 export { buildHostPlanes } from './host-planes.js';
 export { isRootVersionRequest } from './root-version.js';
+export { resolveStartupExecutionMode, type ToolRuntimeExecutionMode } from './worker-datastore.js';

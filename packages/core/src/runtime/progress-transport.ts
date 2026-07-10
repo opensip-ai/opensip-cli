@@ -109,8 +109,16 @@ export type WorkerMessage<TEvent, TResult> =
        * boundary — which flattens the prototype chain — so the parent supervisor
        * can rebuild the right `ToolError` subclass (`toolErrorFromCanonicalCode`)
        * and preserve the frozen exit code instead of collapsing every worker-thrown
-       * typed error to `SystemError` (exit 1). Optional: absent for an untyped
-       * throw or an older worker build.
+       * typed error to `SystemError` (exit 1). The original stable subcode travels
+       * independently in `detailCode`. Optional: absent for an untyped throw or
+       * an older worker build.
        */
       readonly code?: string;
+      /**
+       * The original stable subcode carried by a typed `ToolError` (for example
+       * `PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS`). Kept separate from `code`,
+       * which is the canonical error-class discriminator used to rebuild the
+       * subclass after IPC flattens its prototype.
+       */
+      readonly detailCode?: string;
     };

@@ -3,6 +3,7 @@
 This is the **START HERE** document for AI agents working on the OpenSIP CLI codebase.
 
 <!-- opensip:agent-guidance start -->
+
 ## OpenSIP MCP First
 
 When answering questions about existing OpenSIP results, prior `fit` / `graph` / `yagni` / `sim` runs, findings, warnings, errors, scores, sessions, or graph relationships, use the OpenSIP MCP server first.
@@ -62,6 +63,9 @@ opensip.ai/docs). Keep this block a short summary — extend the doc, not this.
 Turborepo + pnpm monorepo. Workspace scope: `@opensip-cli/*`. Layered —
 higher-level packages depend on lower-level substrates, never the other
 direction. Architecture rules are enforced by dependency-cruiser in CI.
+The generated inventory in `docs/public/80-implementation/architecture-map.md`
+is authoritative: 58 workspace packages, 56 publishable and two private
+(`@opensip-cli/test-support` and `@opensip-cli/checks-dogfood`).
 
 ```
 opensip-cli/
@@ -84,6 +88,8 @@ opensip-cli/
 │   │                            #   consumed by the CLI-owned `report` command
 │   │                            #   (composition root), which aggregates each
 │   │                            #   tool's contributed data
+│   ├── external-tool-adapter/   # @opensip-cli/external-tool-adapter — shared
+│   │                            #   external scanner Tool substrate
 │   ├── cli/                     # opensip-cli — generic tool dispatcher
 │   ├── config/                  # @opensip-cli/config — config composer +
 │   │                            #   schema registry (ADR-0023): folds host-owned
@@ -99,6 +105,11 @@ opensip-cli/
 │   │                            #   runtime: runToolLiveView state machine +
 │   │                            #   produce() seam; all four tools render through
 │   │                            #   it (ADR-0058).
+│   ├── clone-detection/         # @opensip-cli/clone-detection — pure clone
+│   │                            #   detection substrate
+│   ├── format/                  # @opensip-cli/format — pure human formatters
+│   ├── tool-test-kit/           # @opensip-cli/tool-test-kit — public Tool
+│   │                            #   author test helpers
 │   ├── output/                  # @opensip-cli/output — machine output layer
 │   │                            #   (ADR-0011): pure format/ formatters (json,
 │   │                            #   sarif, table) + effectful sink/ delivery
@@ -130,7 +141,9 @@ opensip-cli/
 │   │   ├── checks-go/           # @opensip-cli/checks-go
 │   │   ├── checks-java/         # @opensip-cli/checks-java
 │   │   ├── checks-cpp/          # @opensip-cli/checks-cpp
-│   │   └── checks-rust/         # @opensip-cli/checks-rust
+│   │   ├── checks-rust/         # @opensip-cli/checks-rust
+│   │   └── checks-dogfood/      # @opensip-cli/checks-dogfood — PRIVATE
+│   │                            #   repository-only architecture checks
 │   │
 │   ├── simulation/              # simulation namespace
 │   │   └── engine/              # @opensip-cli/simulation
@@ -151,8 +164,11 @@ opensip-cli/
 │   │
 │   ├── yagni/                   # yagni namespace
 │   │   └── engine/              # @opensip-cli/yagni — advisory reduction
-│   │                            #   audit; graph evidence via one allowlisted
-│   │                            #   internal import in graph-evidence.ts
+│   │                            #   audit; owns its TypeScript inventory and
+│   │                            #   has no graph dependency
+│   ├── mcp/                     # @opensip-cli/mcp — MCP server Tool; graph
+│   │                            #   reads use @opensip-cli/graph/read
+│   ├── tool-*/                  # External scanner Tool adapters (Layer 4)
 │   │
 │   └── languages/               # language adapters
 │       ├── lang-typescript/
@@ -219,7 +235,7 @@ tool dispatcher:
    C/C++) into it.
 2. Constructs a fresh per-invocation `ToolRegistry` and registers the
    bundled tool packages (`@opensip-cli/fitness`, `@opensip-cli/simulation`,
-   `@opensip-cli/graph`, `@opensip-cli/yagni`) through the manifest → compatibility gate → dynamic
+   `@opensip-cli/graph`, `@opensip-cli/yagni`, `@opensip-cli/mcp`) through the manifest → compatibility gate → dynamic
    import path in `bootstrap/register-tools.ts`. Both registries are passed into
    `new RunScope({ tools, languages })` — there are no module-singleton
    registries (see the RunScope section below).
@@ -254,7 +270,8 @@ Subcommands available out of the box:
 - `opensip graph export --format catalog` — Write graph catalog JSON for downstream tooling
 - `opensip graph export --format sarif` — Run graph analysis and write SARIF findings
 - `opensip sim` — Run simulation scenarios [experimental]
-- `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--graph build`, `--min-confidence`)
+- `opensip yagni` — Run advisory YAGNI reduction audit (`--json`, `--min-confidence`)
+- `opensip mcp` — Serve stored sessions and the public graph/read catalog over MCP stdio
 - `opensip init` — Generate `opensip-cli.config.yml`; repeat init refreshes managed MCP-first agent guidance and `.gitignore`
 - `opensip sessions list|show|purge` — Manage stored sessions
 - `opensip agent-catalog` — Machine discovery surface for AI agents
@@ -387,12 +404,12 @@ fn)`, every async descendant of `fn` sees the same scope. The
   `Symbol.for(globalThis)` slot that held run state (`recipeCheckConfig`)
   stays deleted. There IS one `Symbol.for('@opensip-cli/core/scopeStorage')`
   slot on `globalThis`, but it holds only the `AsyncLocalStorage`
-  *container* (infrastructure), not run state: pinning the ALS instance
+  _container_ (infrastructure), not run state: pinning the ALS instance
   process-globally lets duplicate physical copies of `@opensip-cli/core`
   (pnpm `injectWorkspacePackages` hard-links a nested core into the
   virtual store) share one scope store instead of splitting it — which
   otherwise leaves `currentScope()` undefined in check execution and
-  silently degrades content filters to raw. The scope *value* still flows
+  silently degrades content filters to raw. The scope _value_ still flows
   per-async-context through `runWithScope`/`enterScope`, so this does NOT
   reintroduce module-level mutable run state. See `run-scope.ts` (ALS seam)
   and the fitness-transitive probe in `single-core-guard.ts`.
@@ -467,11 +484,13 @@ This is the mechanical realization of "only use documented seams".
 ```
 core (kernel)
   ↑
-contracts / cli-ui / datastore / tree-sitter (layer 2)
+contracts / datastore / tree-sitter / clone-detection / format / cli-ui /
+tool-test-kit (layer 2)
   ↑
-cli-live / output / config / targeting / lang-* / dashboard (layer 3)
+cli-live / session-store / output / config / targeting / lang-* / dashboard /
+external-tool-adapter (layer 3)
   ↑
-fitness / graph / simulation / yagni (layer 4 — tool engines)
+fitness / graph / simulation / yagni / mcp / tool-* (layer 4 — Tools)
   ↑
 checks-* / graph-* (layer 5)
   ↑
@@ -485,6 +504,13 @@ cli (layer 6 — composition root; depends on every tool)
 - `cli-live` (layer 3) owns `runToolLiveView`; all four bundled tools render
   through it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
 - fitness / graph / simulation / yagni must NOT import from cli (would create a cycle).
+- MCP production reads graph catalogs through `@opensip-cli/graph/read`; it must
+  not import `@opensip-cli/graph/internal`.
+- External Tool workers enter `host-rpc-only` mode only when the exact internal
+  command and host marker both match. Their ambient datastore thunk is denied;
+  privileged OpenSIP effects use the enumerated host RPC surface. This is not an
+  OS sandbox: admitted code retains the current user's filesystem and network
+  authority. External trust lists accept exact ids only; `*` is ignored.
 - check packs must NOT import from cli or contracts.
 - lang-\* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`

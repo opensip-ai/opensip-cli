@@ -36,6 +36,16 @@ vi.mock('../commands/tools/uninstall.js', () => ({
   toolsUninstall: (...a: unknown[]) => toolsUninstall(...a),
 }));
 vi.mock('../commands/tools/data-purge.js', () => ({
+  assertToolDataPurgeId: (toolId: string) => {
+    const trimmed = toolId.trim();
+    if (trimmed.length === 0) {
+      throw new Error('tools data-purge: tool id must be non-empty');
+    }
+    if (trimmed.startsWith('@opensip-cli/host-plane:')) {
+      throw new Error('tools data-purge: reserved host-plane identities cannot be purged by id');
+    }
+    return trimmed;
+  },
   deriveToolDataPurgeIdForms: (toolId: string) => [toolId],
   toolsDataPurge: (...a: unknown[]) => toolsDataPurge(...a),
 }));
@@ -211,7 +221,7 @@ describe('tools uninstall handler', () => {
       purgeData: true,
     })) as { success: boolean };
     expect(result.success).toBe(true);
-    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds, ['demo']);
+    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds, ['demo'], undefined);
   });
 
   it('skips the purge when --purge-data is not set even on a project uninstall', async () => {
@@ -285,6 +295,6 @@ describe('tools data-purge handler', () => {
       type: string;
     };
     expect(result.type).toBe('tools-data-purge');
-    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds, ['demo']);
+    expect(toolsDataPurge).toHaveBeenCalledWith('demo', ds, ['demo'], undefined);
   });
 });

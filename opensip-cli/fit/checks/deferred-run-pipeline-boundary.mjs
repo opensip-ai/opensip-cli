@@ -9,14 +9,14 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolEngineCliPathRe } from './tool-engine-paths.mjs';
+
 const PRODUCTION_TS = /(^|\/)packages\/.*\/src\/.*\.ts$/;
 const TEST_OR_FIXTURE = /(^|\/)(?:__tests__|__fixtures__|fixtures)\//;
 const TEST_FILE = /\.test\.ts$/;
 const CONTRACTS_SRC = /(^|\/)packages\/contracts\/src\//;
-const TOOL_COMMAND_SRC =
-  /(^|\/)packages\/(?:fitness\/engine|graph\/engine|simulation\/engine|yagni\/engine)\/src\/cli\/.*\.ts$/;
-const TOOL_CONFIG_BRIDGE =
-  /(^|\/)packages\/(?:fitness\/engine|graph\/engine|simulation\/engine|yagni\/engine)\/src\/cli\/.*config\.ts$/;
+const TOOL_COMMAND_SRC = toolEngineCliPathRe('.*\\.ts$');
+const TOOL_CONFIG_BRIDGE = toolEngineCliPathRe('.*config\\.ts$');
 
 const RESERVED_SYMBOLS = ['RunCommandPipeline'];
 

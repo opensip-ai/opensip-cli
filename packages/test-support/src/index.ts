@@ -30,6 +30,8 @@ export { makeTestScope, makeFitnessTestScope, withScope, withScopeSync } from '.
 export { runTwoScopesConcurrently } from './concurrent-scopes.js';
 export { findOrphanedDisplayKeys } from './display-parity.js';
 export type { DisplayParityCheck } from './display-parity.js';
+/** Test-only fitness FileCache singleton (from fitness/internal). */
+export { fitnessTestFileCache } from '@opensip-cli/fitness/internal';
 
 export {
   buildFixtureManifest,

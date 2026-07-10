@@ -1,9 +1,42 @@
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from 'vitest/config';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+const { readWorkspaceExportMap } = require('../scripts/lib/workspace-export-map.cjs') as {
+  readWorkspaceExportMap: (root: string) => {
+    entries: readonly {
+      specifier: string;
+      sourceFile: string;
+      relativeSource: string;
+    }[];
+    diagnostics: readonly string[];
+  };
+};
+
+/**
+ * Build Vitest aliases from declared workspace package exports only.
+ * Each specifier maps to its real source entry file — arbitrary suffixes do not
+ * fall through to a package `src/` directory (modular boundary Phase 4).
+ */
+function buildWorkspaceAliases(): { find: RegExp; replacement: string }[] {
+  const { entries, diagnostics } = readWorkspaceExportMap(repoRoot);
+  if (diagnostics.length > 0) {
+    throw new Error(
+      `vitest.base: workspace export map has diagnostics:\n${diagnostics.join('\n')}`,
+    );
+  }
+  // Longer specifiers first so `@opensip-cli/graph/read` wins over `@opensip-cli/graph`.
+  const sorted = [...entries].sort((a, b) => b.specifier.length - a.specifier.length);
+  return sorted.map((entry) => ({
+    // Exact specifier only — no prefix fall-through to undeclared subpaths.
+    find: new RegExp(`^${entry.specifier.replaceAll('/', String.raw`\/`)}$`),
+    replacement: entry.sourceFile,
+  }));
+}
 
 /**
  * Shared vitest defaults for every `@opensip-cli/*` package.
@@ -32,72 +65,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
  */
 export const vitestBase = defineConfig({
   resolve: {
-    alias: [
-      {
-        find: /^@opensip-cli\/core/,
-        replacement: join(repoRoot, 'packages/core/src'),
-      },
-      {
-        find: /^@opensip-cli\/fitness/,
-        replacement: join(repoRoot, 'packages/fitness/engine/src'),
-      },
-      {
-        find: /^@opensip-cli\/graph(?!-)/,
-        replacement: join(repoRoot, 'packages/graph/engine/src'),
-      },
-      {
-        find: /^@opensip-cli\/contracts/,
-        replacement: join(repoRoot, 'packages/contracts/src'),
-      },
-      {
-        find: /^@opensip-cli\/cli-live/,
-        replacement: join(repoRoot, 'packages/cli-live/src'),
-      },
-      {
-        find: /^@opensip-cli\/cli-ui/,
-        replacement: join(repoRoot, 'packages/cli-ui/src'),
-      },
-      {
-        find: /^@opensip-cli\/format/,
-        replacement: join(repoRoot, 'packages/format/src'),
-      },
-      {
-        find: /^@opensip-cli\/test-support/,
-        replacement: join(repoRoot, 'packages/test-support/src'),
-      },
-      {
-        find: /^@opensip-cli\/tool-test-kit/,
-        replacement: join(repoRoot, 'packages/tool-test-kit/src'),
-      },
-      {
-        find: /^@opensip-cli\/datastore/,
-        replacement: join(repoRoot, 'packages/datastore/src'),
-      },
-      {
-        find: /^@opensip-cli\/session-store/,
-        replacement: join(repoRoot, 'packages/session-store/src'),
-      },
-      {
-        find: /^@opensip-cli\/config/,
-        replacement: join(repoRoot, 'packages/config/src'),
-      },
-      {
-        find: /^@opensip-cli\/targeting/,
-        replacement: join(repoRoot, 'packages/targeting/src'),
-      },
-      {
-        find: /^@opensip-cli\/output/,
-        replacement: join(repoRoot, 'packages/output/src'),
-      },
-      {
-        find: /^@opensip-cli\/simulation/,
-        replacement: join(repoRoot, 'packages/simulation/engine/src'),
-      },
-      {
-        find: /^@opensip-cli\/yagni/,
-        replacement: join(repoRoot, 'packages/yagni/engine/src'),
-      },
-    ],
+    alias: buildWorkspaceAliases(),
   },
   server: {
     deps: {

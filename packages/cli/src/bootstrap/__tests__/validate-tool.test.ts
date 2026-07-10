@@ -75,4 +75,19 @@ describe('toolValidationFailure', () => {
     expect(isValidTool(value)).toBe(false);
     expect(toolValidationFailure(value)).toContain("must equal tool.identity.name 'demo'");
   });
+
+  it('rejects a reserved host-plane metadata.id (ADR-0146)', () => {
+    const value = {
+      identity: { name: 'demo' },
+      metadata: {
+        id: '@opensip-cli/host-plane:victim',
+        name: 'demo',
+        version: '0.0.0',
+        description: 'demo',
+      },
+      commandSpecs: [minimalSpec],
+    };
+    expect(isValidTool(value)).toBe(false);
+    expect(toolValidationFailure(value)).toMatch(/reserved host-plane identity prefix/);
+  });
 });

@@ -8,9 +8,9 @@
  *      so an alternate (cloud) backend can substitute behind the same interface.
  *
  * Every read returns `Result<McpToolResult<T>, McpReadError>` (ADR-0084): the
- * success arm carries `{ data, freshness }`; `throw` is reserved for the
- * SQLite/Drizzle boundary inside the impl. A missing catalog is NOT an error —
- * it surfaces as `freshness.fresh === false` with empty data and no auto-build.
+ * success arm carries `{ data, freshness }`; storage and rebuild failures stay
+ * in the error arm. A missing catalog is NOT an error — it surfaces as
+ * `freshness.fresh === false` with empty data and no auto-build.
  */
 
 import type { McpReadError } from './mcp-error.js';
@@ -122,5 +122,5 @@ export interface GraphReadPort {
    */
   refresh(): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>>;
   /** The current freshness verdict (read without serving data). */
-  freshness(): Freshness;
+  freshness(): Result<Freshness, McpReadError>;
 }

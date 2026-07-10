@@ -17,15 +17,12 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { toolSeamPathRe } from './tool-engine-paths.mjs';
+
 /** First-party TOOL-ENGINE / adapter source — builds envelopes, must not stamp. */
-const TOOL_ENGINE = [
-  /packages\/fitness\/engine\/src\//,
-  /packages\/graph\/(engine|graph-[a-z-]+)\/src\//,
-  /packages\/simulation\/engine\/src\//,
-  /packages\/yagni\/engine\/src\//,
-  /packages\/external-tool-adapter\/src\//,
-  /packages\/tool-[a-z-]+\/src\//,
-];
+const TOOL_ENGINE = toolSeamPathRe();
+/** Graph language adapters may also construct envelopes (not opensipTools tools). */
+const GRAPH_ADAPTER = /packages\/graph\/graph-[a-z-]+\/src\//;
 
 /** Test/fixture files are not runtime source. */
 const NON_SOURCE = /\.test\.tsx?$|\/__tests__\//;
@@ -36,6 +33,10 @@ const STAMP = /(^|[^.\w])declaredInputs\s*:/;
 
 function relPath(filePath) {
   return String(filePath).replaceAll('\\', '/');
+}
+
+function isToolEnginePath(rel) {
+  return TOOL_ENGINE.test(rel) || GRAPH_ADAPTER.test(rel);
 }
 
 export const checks = [
@@ -51,7 +52,7 @@ export const checks = [
     analyze(content, filePath) {
       const rel = relPath(filePath);
       if (NON_SOURCE.test(rel)) return [];
-      if (!TOOL_ENGINE.some((re) => re.test(rel))) return [];
+      if (!isToolEnginePath(rel)) return [];
 
       const violations = [];
       const lines = content.split('\n');

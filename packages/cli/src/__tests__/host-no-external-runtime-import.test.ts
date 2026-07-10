@@ -4,9 +4,9 @@
  *
  * The host registers a manifest-derived synthetic Tool for an external tool and
  * mounts its command shells from the static manifest — it NEVER imports the
- * untrusted runtime. The forked dispatch WORKER
- * (`OPENSIP_CLI_IN_TOOL_WORKER=1`) imports the real runtime at dispatch time
- * (the isolation boundary). These tests prove BOTH halves of that branch:
+ * untrusted runtime. The forked dispatch WORKER's prevalidated runtime mode
+ * imports the real runtime at dispatch time (the isolation boundary). These
+ * tests prove BOTH halves of that branch:
  *
  *   - HOST (no IN_TOOL_WORKER): discovery synthesizes. The fixture writes a
  *     module-global sentinel file ONLY when its runtime module is EVALUATED
@@ -14,7 +14,7 @@
  *     the runtime was never imported), the tool IS registered with command
  *     shells from the manifest, the synthetic handler throws the fail-loud stub,
  *     and the tool carries NO real extensionPoints.
- *   - WORKER (IN_TOOL_WORKER=1): discovery imports. The sentinel IS written
+ *   - WORKER (explicit worker mode): discovery imports. The sentinel IS written
  *     (proof the runtime ran) and the registered tool carries the REAL
  *     extensionPoints + a non-stub handler.
  *
@@ -141,10 +141,15 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
     const provenance: ToolProvenance[] = [];
     await discoverAndRegisterToolPackages(
       registry,
-      // HOST env: allowlist the fixture, but NO OPENSIP_CLI_IN_TOOL_WORKER.
+      // Import authority comes from the prevalidated runtime mode, not directly
+      // from an ambient marker. Even a forged marker cannot make host mode import.
       {
         sources: walkUpSourceList(),
-        env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID },
+        env: {
+          [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID,
+          OPENSIP_CLI_IN_TOOL_WORKER: '1',
+        },
+        runtimeMode: 'host',
       },
       new Set<string>(),
       provenance,
@@ -167,6 +172,25 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
     expect(provenance.some((p) => p.id === FIXTURE_ID)).toBe(true);
   });
 
+  it('CAPABILITY WORKER discovery cannot import an external Tool runtime', async () => {
+    const registry = new ToolRegistryClass();
+    await discoverAndRegisterToolPackages(
+      registry,
+      {
+        sources: walkUpSourceList(),
+        env: {
+          [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID,
+          OPENSIP_CLI_IN_TOOL_WORKER: '1',
+        },
+        runtimeMode: 'capability-pack-worker',
+      },
+      new Set<string>(),
+    );
+
+    expect(existsSync(sentinelFile)).toBe(false);
+    expect(registry.get(FIXTURE_ID)?.extensionPoints).toBeUndefined();
+  });
+
   it('WORKER discovery imports the real runtime (sentinel written; real hooks)', async () => {
     const registry = new ToolRegistryClass();
     await discoverAndRegisterToolPackages(
@@ -174,6 +198,7 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
       // WORKER env: the isolation boundary — the real runtime legitimately loads.
       {
         sources: walkUpSourceList(),
+        runtimeMode: 'external-tool-worker',
         env: {
           [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_ID,
           OPENSIP_CLI_IN_TOOL_WORKER: '1',

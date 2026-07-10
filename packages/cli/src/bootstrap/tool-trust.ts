@@ -25,8 +25,8 @@ import {
  * per-host trust record; env allowlists remain override/incident-response
  * mechanisms:
  *
- *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="my-audit, my-lint"    # override by id
- *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="*"                    # override all
+ *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="my-audit, my-lint"    # override by exact id
+ *   OPENSIP_CLI_ALLOW_PROJECT_TOOLS="*"                    # ignored (exact ids only)
  *
  * The decision is made BEFORE the tool's module is imported: a disallowed
  * project-local tool is fail-closed (exit 5) without its code ever running.
@@ -80,8 +80,9 @@ export interface InstalledToolTrustDecision {
 
 /**
  * Parse the allowlist env var into a set of permitted tool ids. Empty/
- * unset ⇒ empty set (deny-by-default). The wildcard `'*'` admits all
- * (surfaced via {@link isProjectLocalToolTrusted}).
+ * unset ⇒ empty set (deny-by-default). The token `'*'` is retained in the
+ * set so callers can emit a bounded warning, but it never admits a tool —
+ * only an exact id match does (ADR-0145).
  */
 function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
   if (!raw) return new Set();
@@ -93,15 +94,11 @@ function parseAllowlist(raw: string | undefined): ReadonlySet<string> {
   );
 }
 
-function warnWildcardAllowlist(envVar: string, allow: ReadonlySet<string>): void {
+function warnIgnoredToolWildcard(envVar: string, allow: ReadonlySet<string>): void {
   if (!allow.has('*')) return;
   logger.warn({
-    evt: 'cli.trust.wildcard_allowlist',
+    evt: 'cli.trust.tool_wildcard_ignored',
     envVar,
-    deprecated: true,
-    detail:
-      'DEPRECATED: trust allowlist contains wildcard * — every matching tool runs at full user privilege; ' +
-      'this is fault-isolation only, not a sandbox',
   });
 }
 
@@ -334,15 +331,15 @@ export function resolveInstalledToolTrust(args: {
  * @param id The tool's stable id (from its sidecar manifest).
  * @param env The environment to read the allowlist from (defaults to
  *   `process.env`; injectable for tests).
- * @returns `true` iff the allowlist contains `id` or the wildcard `'*'`.
+ * @returns `true` iff the allowlist contains the exact `id` (`*` is ignored).
  */
 export function isProjectLocalToolTrusted(
   id: string,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const allow = parseAllowlist(env[PROJECT_TOOL_ALLOWLIST_ENV]);
-  warnWildcardAllowlist(PROJECT_TOOL_ALLOWLIST_ENV, allow);
-  return allow.has('*') || allow.has(id);
+  warnIgnoredToolWildcard(PROJECT_TOOL_ALLOWLIST_ENV, allow);
+  return allow.has(id);
 }
 
 /**
@@ -356,12 +353,12 @@ export function isProjectLocalToolTrusted(
  * @param id The tool's stable id (from `package.json#opensipTools.id`).
  * @param env The environment to read the allowlist from (defaults to
  *   `process.env`; injectable for tests).
- * @returns `true` iff the allowlist contains `id` or the wildcard `'*'`.
+ * @returns `true` iff the allowlist contains the exact `id` (`*` is ignored).
  */
 export function isInstalledToolTrusted(id: string, env: NodeJS.ProcessEnv = process.env): boolean {
   const allow = parseAllowlist(env[INSTALLED_TOOL_ALLOWLIST_ENV]);
-  warnWildcardAllowlist(INSTALLED_TOOL_ALLOWLIST_ENV, allow);
-  return allow.has('*') || allow.has(id);
+  warnIgnoredToolWildcard(INSTALLED_TOOL_ALLOWLIST_ENV, allow);
+  return allow.has(id);
 }
 
 /**

@@ -25,7 +25,6 @@
 export interface HostGovernance {
   /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */
   getGovernanceState(toolId: string): Promise<ToolGovernanceState | undefined>;
-  listForProject(projectRoot: string): Promise<ToolGovernanceState[]>;
   queryAudit(toolId: string, filter?: unknown): Promise<AuditEntry[]>;
 
   recordInstallation(toolId: string, record: InstallationRecord): Promise<void>;
@@ -42,16 +41,14 @@ export interface HostGovernance {
 /**
  * Host-owned audit plane (hostPlanes.audit). Tools append per-tool audit
  * entries and query them back; the host persists them (Cloud primary, OSS
- * compat via tool_state). Cloud may additionally chain entries into its
- * WORM/tamper-evident log via {@link HostAudit.exportForCloud}.
+ * compat via tool_state). Project-wide Cloud export is host-only and is not
+ * part of the tool-facing surface (ADR-0146).
  */
 export interface HostAudit {
   /** Append one audit entry for `toolId` (host persists it). */
   append(toolId: string, entry: ToolAuditEntry): Promise<void>;
   /** Read back `toolId`'s audit entries, optionally narrowed by `filter`. */
   query(toolId: string, filter?: unknown): Promise<ToolAuditEntry[]>;
-  /** Best-effort linkage point for Cloud's WORM/tamper-evident audit chain. */
-  exportForCloud?(...args: unknown[]): Promise<unknown>;
 }
 
 /**

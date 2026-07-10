@@ -70,7 +70,7 @@ function fakeResults(over: Partial<ResultsReadPort>): ResultsReadPort {
 function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])): McpToolDeps {
   return {
     graph: {
-      freshness: () => ({ fresh: true, builtAt: '2026-07-02T00:00:00.000Z' }),
+      freshness: () => ok({ fresh: true, builtAt: '2026-07-02T00:00:00.000Z' }),
     } as McpToolDeps['graph'],
     results,
     validToolIds,
@@ -323,6 +323,37 @@ describe('review_change handler', () => {
     const out = parseResult(await handlers.get('review_change')!({ suiteRunId: 'missing' }));
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('not-found');
+  });
+
+  it('propagates graph freshness errors before reading stored review data', async () => {
+    let called = false;
+    const base = deps(
+      fakeResults({
+        reviewChange: () => {
+          called = true;
+          return Promise.resolve(err({ code: 'unexpected', message: 'unexpected' }));
+        },
+      }),
+    );
+    const { server, handlers } = captureServer();
+    registerReviewChange(server, {
+      ...base,
+      graph: {
+        freshness: () =>
+          err({
+            code: 'GRAPH.READ.CATALOG_GENERATION',
+            message: 'Failed to load graph catalog generation',
+          }),
+      } as McpToolDeps['graph'],
+    });
+
+    const out = parseResult(await handlers.get('review_change')!({}));
+    expect(out.isError).toBe(true);
+    expect(out.body.error).toEqual({
+      code: 'GRAPH.READ.CATALOG_GENERATION',
+      message: 'Failed to load graph catalog generation',
+    });
+    expect(called).toBe(false);
   });
 });
 

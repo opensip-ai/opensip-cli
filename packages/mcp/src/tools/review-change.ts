@@ -38,12 +38,14 @@ export function registerReviewChange(server: McpStdioServer, deps: McpToolDeps):
       },
     },
     async ({ suiteRunId, suite, files, limit }) => {
+      const freshness = deps.graph.freshness();
+      if (!freshness.ok) return errorResult(freshness.error);
       const outcome = await deps.results.reviewChange({
         ...(suiteRunId === undefined ? {} : { suiteRunId }),
         ...(suite === undefined ? {} : { suite }),
         ...(files === undefined ? {} : { files }),
         ...(limit === undefined ? {} : { limit }),
-        graphFreshness: deps.graph.freshness(),
+        graphFreshness: freshness.value,
       });
       if (!outcome.ok) return errorResult(outcome.error);
       return jsonResult(outcome.value);

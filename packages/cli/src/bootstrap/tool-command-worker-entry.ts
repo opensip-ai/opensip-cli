@@ -19,10 +19,13 @@
  * and runs ITS command handler against the WORKER-side `ToolCliContext` shim
  * (`tool-command-worker-context.ts`): FRR seams (render/json/envelope/raw/error/
  * exit) record the value and return it once in the {@link ToolCommandResult}; the
- * host-RPC seams (datastore / egress / SARIF / baselines / toolState / hostPlanes
- * / report-open / exit-code re-affirm) UPCALL the host over the rpc-reply channel
- * (the host performs the privileged effect — datastore/network/FS/exit stay
- * host-owned). Only the live-view seams fail loud (`unsupported-seam`).
+ * host-RPC seams (egress / SARIF / baselines / toolState / hostPlanes /
+ * report-open / exit-code re-affirm) UPCALL the host over the rpc-reply channel
+ * (the host performs the privileged effect — network/FS/exit stay host-owned).
+ * The ambient RunScope datastore thunk is DENIED in workers (ADR-0145 /
+ * `host-rpc-only`): `cli.scope.datastore()` and `currentScope().datastore()` fail
+ * loud with PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS. Only the live-view seams fail
+ * loud as `unsupported-seam`.
  *
  * A handler that calls `process.exit`, throws, crashes the native layer, or spins
  * the event loop is contained: the supervisor turns a premature child exit /
@@ -100,16 +103,16 @@ function send(msg: DispatchWorkerMessage): void {
 
 /**
  * Build a structured `error` IPC message with a failure class (+ stack when
- * present). `code` carries the thrown error's canonical exit-class
- * `ToolErrorCode` when it originated as a typed `ToolError`, so the supervisor
- * can rebuild the right subclass on the host side and the frozen exit code
- * survives the worker boundary (the IPC flattens the prototype chain).
+ * present). `code` carries the canonical exit class while `detailCode` carries
+ * the original stable subcode, so the supervisor can rebuild the right subclass
+ * without discarding machine-readable capability diagnostics.
  */
 function errorMessage(
   message: string,
   failureClass: ToolCommandFailureClass,
   stack?: string,
   code?: string,
+  detailCode?: string,
 ): DispatchWorkerMessage {
   return {
     kind: 'error',
@@ -117,6 +120,7 @@ function errorMessage(
     failureClass,
     ...(stack === undefined ? {} : { stack }),
     ...(code === undefined ? {} : { code }),
+    ...(detailCode === undefined ? {} : { detailCode }),
   };
 }
 
@@ -145,7 +149,8 @@ function readSpec(specPath: string): ToolCommandWorkerSpec | DispatchWorkerMessa
  * `currentScope()` here is the FULL per-run scope the CLI bootstrap built for the
  * `__tool-command-worker` subcommand (project/config/registries/contributeScope),
  * so the handler reads `cli.scope.toolConfig`/`cli.scope.<subscope>`/checks
- * worker-LOCAL while datastore/egress cross to the host via the RPC shim.
+ * worker-LOCAL. Datastore access is host-RPC-only: the ambient thunk is denied
+ * (ADR-0145); privileged effects cross to the host via the RPC shim.
  */
 async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWorkerMessage> {
   const tool = resolveTool(spec);
@@ -205,7 +210,10 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
             mode: 'live' as const,
             suppressHumanRender: true,
             emit: (event: ExternalAdapterProgressEvent) => {
-              send({ kind: 'progress', event: { kind: 'adapter-progress', event } });
+              send({
+                kind: 'progress',
+                event: { kind: 'adapter-progress', event },
+              });
             },
           }
         : undefined;
@@ -317,6 +325,10 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
       // SystemError → exit 1 fallthrough. ConfigurationError ALSO rides
       // `failureClass: 'config-invalid'` above; this carry generalizes the rest.
       error instanceof ToolError ? canonicalToolErrorCode(error) : undefined,
+      // Keep the stable subcode separate from the canonical class. In particular,
+      // ADR-0145's direct-datastore denial must remain machine-identifiable after
+      // the worker boundary.
+      error instanceof ToolError ? error.code : undefined,
     );
   }
 }

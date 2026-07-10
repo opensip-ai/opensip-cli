@@ -7,6 +7,7 @@ import { analyzeNoRawFsArtifactWrite } from '../../../../opensip-cli/fit/checks/
 import { analyzeAllReportProducerOpenFlag } from '../../../../opensip-cli/fit/checks/report-producer-open-flag.mjs';
 import { analyzeAllSessionPersistRequiresReplay } from '../../../../opensip-cli/fit/checks/session-persist-requires-replay.mjs';
 import { analyzeSharedGateDispatch } from '../../../../opensip-cli/fit/checks/shared-gate-dispatch.mjs';
+import { analyzeToolCommandsDerived } from '../../../../opensip-cli/fit/checks/tool-commands-derived.mjs';
 import {
   bundledToolPackageSegments,
   toolEnginePathRe,
@@ -39,6 +40,33 @@ describe('derived first-party tool-engine path gates', () => {
 
     expect(findings).toHaveLength(1);
     expect(findings[0]?.type).toBe('no-raw-fs-artifact-write-in-tool-engine');
+  });
+
+  it('accepts the canonical external adapter factory for Tool packages', () => {
+    expect(
+      analyzeToolCommandsDerived(
+        `export const tool = defineExternalToolAdapter({
+          config,
+          commands: [{ name: 'scan' }],
+          fingerprintStrategy: 'message-hash',
+        });`,
+        '/repo/packages/tool-bandit/src/tool.ts',
+      ),
+    ).toEqual([]);
+  });
+
+  it('rejects an unrecognized Tool factory in an external adapter package', () => {
+    expect(
+      analyzeToolCommandsDerived(
+        'export const tool = makeTool({ commands: [] });',
+        '/repo/packages/tool-bandit/src/tool.ts',
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        severity: 'error',
+        message: expect.stringContaining('defineExternalToolAdapter'),
+      }),
+    ]);
   });
 
   it('allows cli.writeArtifact and explicitly allowlisted ephemeral files', () => {

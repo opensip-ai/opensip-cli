@@ -26,7 +26,8 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./internal": "./dist/internal.js"
+    "./internal": "./dist/internal.js",
+    "./read": "./dist/read/index.js"
   },
   "files": [
     "dist",
@@ -36,7 +37,8 @@
   "publishConfig": {
     "exports": {
       ".": "./dist/index.js",
-      "./internal": "./dist/internal.js"
+      "./internal": "./dist/internal.js",
+      "./read": "./dist/read/index.js"
     }
   },
   "opensipTools": {

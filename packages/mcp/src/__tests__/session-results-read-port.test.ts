@@ -19,21 +19,25 @@ import {
   type StoredSession,
 } from '@opensip-cli/contracts';
 import {
+  BASELINE_FORMAT_VERSION,
   createSignal,
   HOST_VERDICT_POLICY_FALLBACK,
-  type ToolShortId,
+  type BaselineIdentityMetadata,
   type Signal,
+  type ToolShortId,
 } from '@opensip-cli/core';
-import {
-  BaselineRepo,
-  DataStoreFactory,
-  DEFAULT_TEST_BASELINE_IDENTITY,
-  type DataStore,
-} from '@opensip-cli/datastore';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { RunRepo, SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionResultsReadPort } from '../session-results-read-port.js';
+
+/** Local test fixture — not a runtime export. */
+const DEFAULT_TEST_BASELINE_IDENTITY: BaselineIdentityMetadata = {
+  baselineFormatVersion: BASELINE_FORMAT_VERSION,
+  fingerprintStrategyId: 'opensip.default.rule-file-line-col',
+  fingerprintStrategyVersion: 1,
+};
 
 let store: DataStore;
 let replayCalls: ToolShortId[];

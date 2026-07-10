@@ -18,6 +18,8 @@
 
 import { canonicalToolErrorCode, ToolError } from '@opensip-cli/core';
 
+import { HOST_PLANE_METHODS } from './tool-command-dispatch-types.js';
+
 import type {
   DeliverSignalsOpts,
   HostPlaneKind,
@@ -55,20 +57,85 @@ const RECOGNIZED_SEAMS = new Set<HostRpcCall['seam']>([
   'hostPlane',
 ] satisfies HostRpcCall['seam'][]);
 
+const HOST_PLANE_KINDS = new Set<string>(Object.keys(HOST_PLANE_METHODS));
+
+/** Stable subcodes permitted to cross from the host back into an external worker. */
+const ALLOWED_HOST_RPC_ERROR_CODES = new Set([
+  'CONFIGURATION.GATE.BASELINE_MISSING',
+  'CONFIGURATION.GATE.UNSTAMPED_SIGNAL',
+  'CONFIGURATION.GATE.BASELINE_IDENTITY_MISSING',
+  'CONFIGURATION.GATE.BASELINE_IDENTITY_MISMATCH',
+  'CONFIGURATION.GATE.BASELINE_INCONSISTENT',
+  'CONFIGURATION.POLICY.DENIED',
+  'CONFIGURATION.ARTIFACT_TARGET_IS_DIRECTORY',
+  'SYSTEM.ARTIFACT_DIR_FAILED',
+  'SYSTEM.ARTIFACT_WRITE_FAILED',
+  'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE',
+  'PLUGIN.IDENTITY_NAMESPACE_MISMATCH',
+]);
+
+const FIXED_CODE_MESSAGES: Readonly<Record<string, string>> = {
+  'CONFIGURATION.GATE.BASELINE_MISSING':
+    'No baseline found for this tool — run with --gate-save first',
+};
+
+function replyRpcId(request: unknown): number {
+  if (typeof request !== 'object' || request === null) return -1;
+  const rpcId = (request as { rpcId?: unknown }).rpcId;
+  return typeof rpcId === 'number' && Number.isSafeInteger(rpcId) && rpcId >= 0 ? rpcId : -1;
+}
+
+function allowlistedErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof ToolError)) return undefined;
+  return ALLOWED_HOST_RPC_ERROR_CODES.has(error.code) ? error.code : undefined;
+}
+
 /**
  * Validate an inbound IPC {@link HostRpcRequest} against the recognized-seam
- * allowlist before it is dispatched.
+ * allowlist before it is dispatched. For hostPlane calls also validate
+ * rpcId, known plane, allowlisted method, and array args (ADR-0146).
  *
  * @throws {TypeError} when the request shape is malformed or names a seam the
  *   host does not recognize — the host fails loud (the structured error crosses
  *   back to the worker) instead of silently ignoring an unknown upcall.
  */
-function validateHostRpcRequest(request: HostRpcRequest): void {
-  if (typeof request !== 'object' || typeof request.rpcId !== 'number') {
-    throw new TypeError('host-RPC: malformed request (missing numeric rpcId)');
+function validateHostRpcRequest(request: unknown): asserts request is HostRpcRequest {
+  if (typeof request !== 'object' || request === null) {
+    throw new TypeError('host-RPC: malformed request');
   }
-  if (!RECOGNIZED_SEAMS.has(request.seam)) {
-    throw new TypeError(`host-RPC: unrecognized seam '${String(request.seam)}'`);
+  const candidate = request as Record<string, unknown>;
+  if (
+    typeof candidate.rpcId !== 'number' ||
+    !Number.isSafeInteger(candidate.rpcId) ||
+    candidate.rpcId < 0
+  ) {
+    throw new TypeError('host-RPC: malformed request (rpcId must be a nonnegative safe integer)');
+  }
+  if (!RECOGNIZED_SEAMS.has(candidate.seam as HostRpcCall['seam'])) {
+    throw new TypeError(`host-RPC: unrecognized seam '${String(candidate.seam)}'`);
+  }
+  if (candidate.seam === 'hostPlane') {
+    const plane = candidate.plane;
+    if (typeof plane !== 'string' || !HOST_PLANE_KINDS.has(plane)) {
+      throw new TypeError(`host-RPC: unknown host plane '${String(plane)}'`);
+    }
+    // Wire payloads may carry arbitrary strings; validate via string form so
+    // prototype/unknown method names are rejected before property lookup.
+    const rawMethod = candidate.method;
+    const method = typeof rawMethod === 'string' ? rawMethod : '';
+    const allowed = HOST_PLANE_METHODS[plane as HostPlaneKind] as readonly string[];
+    if (
+      method.length === 0 ||
+      method === '__proto__' ||
+      method === 'constructor' ||
+      method === 'prototype' ||
+      !allowed.includes(method)
+    ) {
+      throw new TypeError(`host-RPC: method '${method}' is not allowlisted on plane '${plane}'`);
+    }
+    if (!Array.isArray(candidate.args)) {
+      throw new TypeError('host-RPC: hostPlane args must be an array');
+    }
   }
 }
 
@@ -180,29 +247,32 @@ async function performHostRpc(request: HostRpcRequest, ctx: ToolCliContext): Pro
  * host-side fault is caught and returned as a structured `{ ok: false }` reply
  * (the supervisor sends it; the worker shim re-throws it into the handler).
  */
-export async function handleHostRpc(
-  request: HostRpcRequest,
-  ctx: ToolCliContext,
-): Promise<RpcReply> {
+export async function handleHostRpc(request: unknown, ctx: ToolCliContext): Promise<RpcReply> {
+  const rpcId = replyRpcId(request);
   try {
     // Validate the inbound IPC request against the recognized-seam allowlist
     // before dispatching (defense-in-depth for the trust boundary; fail loud on
     // a malformed or version-skewed upcall rather than silently no-op'ing).
     validateHostRpcRequest(request);
     const value = await performHostRpc(request, ctx);
-    return { kind: 'rpc-reply', rpcId: request.rpcId, ok: true, value };
+    return { kind: 'rpc-reply', rpcId, ok: true, value };
   } catch (error) {
+    // Bounded failure reply — never echo host stacks, paths, or arbitrary
+    // exception text across the worker IPC boundary (ADR-0146). Known stable
+    // codes may map to fixed, allowlisted user messages; everything else uses
+    // a generic seam message.
+    const code = allowlistedErrorCode(error);
+    const message =
+      code !== undefined && FIXED_CODE_MESSAGES[code] !== undefined
+        ? FIXED_CODE_MESSAGES[code]
+        : 'host-RPC seam failed';
     return {
       kind: 'rpc-reply',
-      rpcId: request.rpcId,
+      rpcId,
       ok: false,
       error: {
-        message: error instanceof Error ? error.message : String(error),
-        ...((error as { code?: unknown }).code !== undefined &&
-        typeof (error as { code?: unknown }).code === 'string'
-          ? { code: (error as { code: string }).code }
-          : {}),
-        ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+        message,
+        ...(code === undefined ? {} : { code }),
         // Carry the canonical exit-class code for a typed ToolError (e.g. a
         // compareBaseline BASELINE_MISSING rejection → CONFIGURATION_ERROR) so the
         // worker shim re-throws a TYPED error and the exit class survives the

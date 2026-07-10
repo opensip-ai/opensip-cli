@@ -500,3 +500,6 @@ fitness check + bootstrap test.
 **Extended by:** [ADR-0082](ADR-0082-external-tools-cannot-declare-live-view.md)
 closes the external manifest output-mode gap by rejecting `live-view` command
 shells before runtime import.
+
+### Boundary hardening amendments (2026-07-09)
+Ambient worker datastore denial and exact worker mode are defined by [ADR-0145](ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md).

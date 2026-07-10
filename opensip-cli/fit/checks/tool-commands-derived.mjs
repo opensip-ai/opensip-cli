@@ -1,13 +1,15 @@
 /**
- * @fileoverview tool-commands-derived — first-party tools must use defineTool()
- *               and must not hand-maintain a commands[] list that diverges from
- *               commandSpecs. Project-local SELF-check.
+ * @fileoverview tool-commands-derived — first-party tools must use a canonical
+ *               Tool factory and must not hand-maintain a commands[] list that
+ *               diverges from commandSpecs. Project-local SELF-check.
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { toolDescriptorPathRe } from './tool-engine-paths.mjs';
 
 const TOOL_PATH = toolDescriptorPathRe();
+const DIRECT_TOOL_FACTORY = /\bdefineTool\s*\(/;
+const EXTERNAL_ADAPTER_FACTORY = /\bdefineExternalToolAdapter\s*\(/;
 
 /** Hand-maintained command descriptor constants (pre-defineTool pattern). */
 const HAND_COMMAND_DESCRIPTOR = /:\s*ToolCommandDescriptor\s*=/;
@@ -22,13 +24,16 @@ export function analyzeToolCommandsDerived(content, filePath) {
   const violations = [];
   const lines = content.split('\n');
 
-  if (!/\bdefineTool\s*\(/.test(content)) {
+  const usesDirectFactory = DIRECT_TOOL_FACTORY.test(content);
+  const usesExternalAdapterFactory = EXTERNAL_ADAPTER_FACTORY.test(content);
+  if (!usesDirectFactory && !usesExternalAdapterFactory) {
     violations.push({
       message:
-        'First-party tool registration must use defineTool() so commands[] is derived from commandSpecs.',
+        'First-party tool registration must use defineTool() or defineExternalToolAdapter() so commands[] is derived from commandSpecs.',
       severity: 'error',
       line: 1,
-      suggestion: 'Export the tool via defineTool({ metadata, commandSpecs, extensionPoints }).',
+      suggestion:
+        'Export the tool via defineTool({ metadata, commandSpecs, extensionPoints }) or the external adapter factory.',
     });
     return violations;
   }
@@ -43,6 +48,10 @@ export function analyzeToolCommandsDerived(content, filePath) {
       suggestion: 'Delete the descriptor constants and declare commands only as CommandSpecs.',
     });
   }
+
+  // The adapter factory owns its Tool lifecycle mapping. Fields such as config
+  // and fingerprintStrategy belong to ExternalToolAdapterSpec, not Tool itself.
+  if (usesExternalAdapterFactory) return violations;
 
   let inExtensionPoints = false;
   let braceDepth = 0;
@@ -78,8 +87,7 @@ export const checks = [
   defineCheck({
     id: 'c4e8f1a2-9b3d-4e5f-a6c7-8d9e0f1a2b3c',
     slug: 'tool-commands-derived',
-    description:
-      'First-party tools use defineTool() with hooks in extensionPoints; no hand-maintained commands[]',
+    description: 'First-party tools use canonical Tool factories; no hand-maintained commands[]',
     scope: { languages: ['typescript'], concerns: ['backend'] },
     tags: ['architecture'],
     fileTypes: ['ts'],

@@ -230,15 +230,22 @@ committed `tools.trusted`; that field is for tracked project-local authored tool
 ## `tools data-purge <tool-id>`
 
 Deletes one tool's rows from the project datastore — **rows, never tables**
-(the SQLite schema is host-owned and shared):
+(the SQLite schema is host-owned and shared). Input must be non-empty and must
+not use the reserved host-plane prefix. Registered aliases and stable/layout
+identities resolve to one deduplicated owned-key set before any repository call:
 
 - `sessions` rows (per-tool payloads cascade),
 - baseline entries + the baseline existence marker,
-- `tool_state` rows (the keyed tool-state plane, ADR-0042).
+- ordinary `tool_state` rows for every owned identity,
+- the corresponding host compatibility rows stored under the reserved
+  host-plane namespace (ADR-0146).
 
-Reports counts per store. Works for any tool id, including bundled tools
-(purging your fit history is legitimate). First-party ids are accepted in
-either form (`fit`/`fitness`, `sim`/`simulation`).
+The reserved identity is an internal cleanup detail, not a Tool-addressable
+command path; passing it directly is rejected without querying a repository.
+Reports bounded aggregate counts per store. Works for any ordinary tool id,
+including bundled tools (purging fit history is legitimate). First-party ids
+are accepted in either form (`fit`/`fitness`, `sim`/`simulation`). Unknown but
+valid ids still execute one parameterized cleanup set.
 
 Surface note: this is a flat `data-purge` subcommand (the spec drafted a
 nested `tools data purge`; the host's command machinery is deliberately one

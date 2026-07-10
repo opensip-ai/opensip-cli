@@ -66,6 +66,7 @@ function buildScopeWith(tools: readonly Tool[]) {
     provenance: [],
     logger,
     ui: { version: '0.0.0', update: undefined },
+    datastoreAccess: 'local',
   });
 }
 
@@ -105,5 +106,42 @@ describe('buildPerRunScope scope contributions', () => {
     expect(() => buildScopeWith([makeTool('bad', { dispose: { hijacked: true } })])).toThrow(
       /overwrite scope key 'dispose'/,
     );
+  });
+});
+
+describe('buildPerRunScope datastoreAccess', () => {
+  it('installs a denied ambient thunk for host-rpc-only and registers dispose', () => {
+    const registry = new ToolRegistry();
+    const scope = buildPerRunScope({
+      project,
+      runId: 'RUN_worker',
+      cwd: project.cwd,
+      parentCommand: '__tool-command-worker',
+      toolName: 'external',
+      cliDefaults,
+      registries: { languages: new LanguageRegistry(), tools: registry },
+      manifests: [],
+      provenance: [],
+      logger,
+      ui: { version: '0.0.0', update: undefined },
+      datastoreAccess: 'host-rpc-only',
+    });
+    expect(() => scope.datastore()).toThrow(PluginIncompatibleError);
+    try {
+      scope.datastore();
+    } catch (error) {
+      expect((error as PluginIncompatibleError).code).toBe('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS');
+    }
+    // Dispose must be safe (no open connection).
+    expect(() => scope.dispose()).not.toThrow();
+  });
+
+  it('uses explicit local datastore access for ordinary host scopes', () => {
+    const scope = buildScopeWith([]);
+    // Local mode returns a thunk that may open SQLite; we only assert the
+    // callable is present and is not the denied code path without invoking open
+    // against a real project when possible. Calling dispose is always safe.
+    expect(typeof scope.datastore).toBe('function');
+    expect(() => scope.dispose()).not.toThrow();
   });
 });

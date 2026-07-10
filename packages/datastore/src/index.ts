@@ -7,14 +7,11 @@ export type {
 export { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
 export { DataStoreFactory } from './factory.js';
 export { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
-// Generic host-owned baseline/ratchet plane (ADR-0036): the shared table pair
-// + the per-tool repo over them.
-export { toolBaselineEntries, toolBaselineMeta } from './schema/baseline.js';
+// Generic host-owned baseline/ratchet plane (ADR-0036): repository only —
+// table objects stay package-internal (ADR-0009 / ADR-0107).
 export { BaselineRepo } from './baseline-repo.js';
-// ADR-0042: the generic keyed tool-state table + repo (the cli.toolState seams).
-export { toolState } from './schema/tool-state.js';
+// ADR-0042: the generic keyed state repo (cli toolState seams).
 export { ToolStateRepo, TOOL_STATE_MAX_PAYLOAD_BYTES } from './tool-state-repo.js';
-export { policyAuditEvents } from './schema/policy-audit.js';
 export {
   PolicyAuditRepo,
   POLICY_AUDIT_DEFAULT_LIMIT,
@@ -29,5 +26,4 @@ export type {
   PolicyAuditListOptions,
   PolicyAuditStoredEvent,
 } from './policy-audit-repo.js';
-export { DEFAULT_TEST_BASELINE_IDENTITY } from './baseline-repo.js';
 export type { DataStoreLockContext } from './data-store.js';

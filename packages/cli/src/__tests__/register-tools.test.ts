@@ -393,7 +393,7 @@ describe('discoverAndRegisterToolPackages', () => {
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: empty, mode: 'walkUp' }] },
+          { sources: [{ dir: empty, mode: 'walkUp' }], runtimeMode: 'host' },
           new Set(),
         ),
       ).resolves.toBeUndefined();
@@ -414,26 +414,50 @@ describe('discoverAndRegisterToolPackages', () => {
 
 const CLI_PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE_SCOPE = join(CLI_PKG_ROOT, 'node_modules', '@opensip-cli-fixture');
-/** Installed npm tools are deny-by-default; tests that expect load opt in via `*`. */
+/**
+ * Exact fixture tool ids staged by this suite. ADR-0145: wildcard `*` no longer
+ * admits installed tools — tests must name the concrete ids they need.
+ */
+const FIXTURE_INSTALLED_IDS = [
+  'fixture-valid',
+  'fixture-dup-a',
+  'fixture-dup-b',
+  'fitness',
+  'fixture-drift',
+  'fixture-host-synth',
+  'fixture-bad',
+  'fixture-no-entry',
+  'fixture-future',
+  'fixture-throws',
+  'fixture-admits-then-throws',
+  'fixture-trust-allowed',
+  'fixture-no-apiv',
+].join(',');
+/** Installed npm tools are deny-by-default; tests that expect load opt in via exact ids. */
 const ALLOW_ALL_INSTALLED: NodeJS.ProcessEnv = {
-  [INSTALLED_TOOL_ALLOWLIST_ENV]: '*',
+  [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_INSTALLED_IDS,
 };
 const WALK_UP_SOURCE_LIST = [{ dir: CLI_PKG_ROOT, mode: 'walkUp' as const }];
 const WALK_UP_SOURCES = {
   sources: WALK_UP_SOURCE_LIST,
   env: ALLOW_ALL_INSTALLED,
+  runtimeMode: 'host' as const,
 };
 /**
- * ADR-0054 M4-G: discovery in the dispatch WORKER (`OPENSIP_CLI_IN_TOOL_WORKER=1`).
+ * ADR-0054 M4-G: discovery in the prevalidated dispatch WORKER mode.
  * The host NEVER imports an external runtime (it synthesizes a manifest-derived
  * Tool); the WORKER is the isolation boundary where the runtime import + the
  * runtime-shape checks (drift / malformed export / no-entry / import-throw) run.
  * Tests that assert those import-path skip behaviors therefore exercise the worker
- * path. Trust is still required (deny-by-default), so the allowlist stays `*`.
+ * path. Trust is still required (deny-by-default), so the allowlist names exact ids.
  */
 const WALK_UP_SOURCES_WORKER = {
   sources: WALK_UP_SOURCE_LIST,
-  env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*', OPENSIP_CLI_IN_TOOL_WORKER: '1' },
+  runtimeMode: 'external-tool-worker' as const,
+  env: {
+    [INSTALLED_TOOL_ALLOWLIST_ENV]: FIXTURE_INSTALLED_IDS,
+    OPENSIP_CLI_IN_TOOL_WORKER: '1',
+  },
 };
 
 interface Fixture {
@@ -597,6 +621,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           sources: WALK_UP_SOURCE_LIST,
           env: ALLOW_ALL_INSTALLED,
           bootstrapDiagnostics: collector,
+          runtimeMode: 'host',
         },
         BUILTIN_IDS,
       );
@@ -635,6 +660,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           sources: WALK_UP_SOURCE_LIST,
           env: ALLOW_ALL_INSTALLED,
           bootstrapDiagnostics: collector,
+          runtimeMode: 'host',
         },
         BUILTIN_IDS,
       );
@@ -681,6 +707,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
           sources: WALK_UP_SOURCE_LIST,
           env: {},
           bootstrapDiagnostics: collector,
+          runtimeMode: 'host',
         },
         BUILTIN_IDS,
       );
@@ -723,6 +750,7 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       {
         sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
         env: { [INSTALLED_TOOL_ALLOWLIST_ENV]: 'fixture-trust-allowed' },
+        runtimeMode: 'host',
       },
       BUILTIN_IDS,
     );
@@ -981,7 +1009,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          {
+            sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
+            runtimeMode: 'host',
+          },
           BUILTIN_IDS,
         ),
       ).resolves.toBeUndefined();
@@ -1015,7 +1046,10 @@ describe('discoverAndRegisterToolPackages — discovered package handling', () =
       await expect(
         discoverAndRegisterToolPackages(
           registry,
-          { sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }] },
+          {
+            sources: [{ dir: CLI_PKG_ROOT, mode: 'walkUp' }],
+            runtimeMode: 'host',
+          },
           BUILTIN_IDS,
         ),
       ).resolves.toBeUndefined();

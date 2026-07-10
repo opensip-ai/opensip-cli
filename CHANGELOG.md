@@ -2,6 +2,32 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [Unreleased]
+
+### Breaking
+
+- Public `DataStore` no longer exposes `transaction`; raw Drizzle handles, table
+  objects, and `DEFAULT_TEST_BASELINE_IDENTITY` are not public barrel exports
+  (use repositories; owners use `@opensip-cli/datastore/internal`).
+- Fitness no longer exports the test-only `fileCache` value from the public
+  barrel (tests use `fitnessTestFileCache` via `@opensip-cli/test-support`).
+- Core no longer exports dead `fitnessEmptyCheckRegistryDiagnostic` /
+  `fitnessPluginLoadFailedDiagnostic` builders.
+- `HostGovernance.listForProject` and `HostAudit.exportForCloud` are removed from
+  the tool-facing host-plane surface.
+- External tool trust env vars (`OPENSIP_CLI_ALLOW_*_TOOLS`) no longer admit `*`;
+  only exact ids are trusted (`cli.trust.tool_wildcard_ignored`).
+
+### Added
+
+- External workers install a denied ambient datastore thunk (`host-rpc-only`);
+  privileged effects remain host-RPC only (ADR-0145).
+- Host-plane storage identity `@opensip-cli/host-plane:<toolId>` with copy-only
+  migration 0009 and dual-identity purge (ADR-0146).
+- Public `@opensip-cli/graph/read` facade; MCP production consumes it (ADR-0147).
+- Architecture gates: complete depcruise export-path map, manifest-derived Tool
+  inventory, fail-closed internal-import owner allowlists.
+
 ## [0.5.1] - 2026-07-09
 
 A presentation-identity and run-evidence patch. Human duration and score labels

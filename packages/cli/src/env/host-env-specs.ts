@@ -100,11 +100,12 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Override for comma/whitespace-separated installed npm Tool ids. Normal opensip tools ' +
-      "install writes managed trust state; use '*' only to admit all ambient " +
-      'opensipTools.kind === tool packages discovered in ancestor node_modules. Does not ' +
-      'affect bundled or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for incident ' +
-      'response (kill switch wins).',
+      'Override for comma/whitespace-separated installed npm Tool ids (exact match only). ' +
+      'Normal opensip tools install writes managed trust state. The token * is retained as a ' +
+      'literal but is IGNORED for admission (emits cli.trust.tool_wildcard_ignored); only ' +
+      'exact ids admit ambient opensipTools.kind === tool packages. Does not affect bundled ' +
+      'or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for incident response (kill ' +
+      'switch wins).',
   },
   {
     canonical: 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
@@ -138,11 +139,13 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Override for comma/whitespace-separated project-authored Tool ids. The normal ' +
-      "committed trust path is tools.trusted. Use '*' only to admit all project-authored " +
-      'tools. A project-authored sidecar tool under <project>/opensip-cli/tools/ is NOT ' +
-      'loaded unless its id appears in config or this override. Global-authored tools ' +
-      '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
+      'Override for comma/whitespace-separated project-authored Tool ids (exact match only). ' +
+      'The normal committed trust path is tools.trusted. The token * is retained as a ' +
+      'literal but is IGNORED for admission (emits cli.trust.tool_wildcard_ignored); only ' +
+      'exact ids admit project-authored tools. A project-authored sidecar tool under ' +
+      '<project>/opensip-cli/tools/ is NOT loaded unless its id appears in config or this ' +
+      'override. Global-authored tools (~/.opensip-cli/tools/) are trusted-by-default and ' +
+      'ignore this list.',
   },
   {
     canonical: 'OPENSIP_STATE_LOCK_WAIT_MS',

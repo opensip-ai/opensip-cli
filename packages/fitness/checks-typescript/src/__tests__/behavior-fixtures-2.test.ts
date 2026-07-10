@@ -11,8 +11,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
-import { fileCache } from '@opensip-cli/fitness';
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
@@ -23,7 +23,7 @@ langRegistry.register(typescriptAdapter);
 const testScope = new RunScope({ languages: langRegistry });
 // Bind the scope cache to the test-only singleton these tests prewarm:
 // check.run resolves currentScope()?.fitness?.fileCache now (Phase 1).
-Object.assign(testScope, { fitness: { fileCache } });
+Object.assign(testScope, { fitness: { fileCache: fitnessTestFileCache } });
 
 let cwd: string;
 let written: string[] = [];
@@ -44,7 +44,7 @@ function findCheck(slug: string) {
 
 async function runCheck(slug: string) {
   const check = findCheck(slug);
-  await fileCache.prewarm(cwd, ['**/*']);
+  await fitnessTestFileCache.prewarm(cwd, ['**/*']);
   return runWithScope(testScope, () => check.run(cwd, { targetFiles: written }));
 }
 
@@ -54,7 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   rmSync(cwd, { recursive: true, force: true });
 });
 

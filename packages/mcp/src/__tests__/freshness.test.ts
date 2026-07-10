@@ -16,7 +16,7 @@ import {
 } from '../freshness.js';
 
 import type { Catalog } from '@opensip-cli/graph';
-import type { CatalogVerdict } from '@opensip-cli/graph/internal';
+import type { CatalogVerdict } from '@opensip-cli/graph/read';
 
 const BUILT_AT = '2026-05-22T00:00:00.000Z';
 

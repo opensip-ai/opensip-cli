@@ -8,7 +8,11 @@ import path from 'node:path';
 
 import { defineCheck } from '@opensip-cli/fitness';
 
-import { bundledToolPackageSegments, toolEnginePathRe } from './tool-engine-paths.mjs';
+import {
+  bundledToolDescriptorPathRe,
+  bundledToolPackageSegments,
+  toolEnginePathRe,
+} from './tool-engine-paths.mjs';
 
 const ROOT = process.cwd();
 const BUNDLED_TOOL_PACKAGE_NAMES = new Set(
@@ -315,9 +319,7 @@ function analyzeCapabilityByManifest(content, filePath) {
 // ADR-0021 / command plane: tools expose CommandSpec, not raw Commander hooks.
 // ---------------------------------------------------------------------------
 
-const TOOL_DESCRIPTOR_FILES = new Set(
-  bundledToolPackageSegments.map((segment) => `packages/${segment}/engine/src/tool.ts`),
-);
+const TOOL_DESCRIPTOR_FILE = bundledToolDescriptorPathRe();
 
 function analyzeCommandSurfaceParity(content, filePath) {
   const rel = relPath(filePath);
@@ -334,7 +336,7 @@ function analyzeCommandSurfaceParity(content, filePath) {
       ),
     );
   }
-  if (TOOL_DESCRIPTOR_FILES.has(rel)) {
+  if (TOOL_DESCRIPTOR_FILE.test(rel)) {
     if (!/\bcommandSpecs\s*:/.test(content)) {
       violations.push(
         violation(

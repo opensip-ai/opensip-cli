@@ -223,11 +223,11 @@ describe('run-presentation.ts adds no cli-ui (or any UI) edge', () => {
   it('the contracts-imports-core-only cruiser rule forbids the cli-ui edge (RP-0 Task 0.3)', () => {
     // Read the configured gate directly — the same rule `pnpm lint` enforces.
     const cruiser = readFileSync(join(REPO_ROOT, '.config', 'dependency-cruiser.cjs'), 'utf8');
-    // The rule exists and forbids every workspace package except core/contracts
-    // (so cli-ui / format / tools cannot be imported). A render-only contracts
-    // type can never silently start importing UI primitives.
+    // The rule exists and forbids every non-core/contracts package (including
+    // cli-ui) via a negative-lookahead allowlist — a render-only contracts type
+    // can never silently start importing UI primitives.
     expect(cruiser).toContain("name: 'contracts-imports-core-only'");
-    expect(cruiser).toContain("'^packages/(?!core/|contracts/)'");
+    expect(cruiser).toMatch(/\^packages\/\(\?!core\/\|contracts\/\)/);
     expect(cruiser).toMatch(/cli-ui edge is forbidden/);
   });
 

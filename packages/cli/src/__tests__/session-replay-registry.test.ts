@@ -55,7 +55,14 @@ describe('SessionReplayRegistry.fromTools', () => {
   });
 
   it('EXTERNAL tool: replays via the INJECTED dispatcher (not the in-host closure)', async () => {
-    const registry = registryWith([replayTool('ext', 'ext')]);
+    const externalTool = replayTool('ext', 'ext');
+    const registry = registryWith([externalTool]);
+    const externalProvenance = {
+      source: 'installed' as const,
+      id: 'ext',
+      version: '0.0.0',
+      manifestHash: 'h',
+    };
     const dispatch = vi.fn<ExternalReplayDispatcher>(() =>
       Promise.resolve({
         fidelity: 'projection',
@@ -63,13 +70,14 @@ describe('SessionReplayRegistry.fromTools', () => {
       }),
     );
     const reg = SessionReplayRegistry.fromTools(registry, {
-      provenance: [{ source: 'installed', id: 'ext', version: '0.0.0', manifestHash: 'h' }],
+      provenance: [externalProvenance],
       dispatchExternalReplay: dispatch,
     });
     const replay = await reg.get('ext')?.replaySession(STORED);
     // The dispatcher (worker path) ran, NOT the in-host closure (which would
     // return `{ in: 'host' }`).
     expect(dispatch).toHaveBeenCalledOnce();
+    expect(dispatch).toHaveBeenCalledWith(externalTool, externalProvenance, STORED);
     expect(replay).toMatchObject({ envelope: { in: 'worker' } });
   });
 

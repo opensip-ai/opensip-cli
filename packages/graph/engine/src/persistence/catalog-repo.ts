@@ -70,6 +70,36 @@ export class CatalogRepo {
   }
 
   /**
+   * Read only lifted identity columns for the single catalog row (id = 1).
+   * Never selects/parses payload. Returns null when no row exists.
+   */
+  readIdentity(): {
+    language: string;
+    cacheKey: string;
+    filesFingerprint: string;
+    builtAt: string;
+  } | null {
+    const row = this.datastore.db
+      .select({
+        language: graphCatalog.language,
+        cacheKey: graphCatalog.cacheKey,
+        filesFingerprint: graphCatalog.filesFingerprint,
+        builtAt: graphCatalog.builtAt,
+      })
+      .from(graphCatalog)
+      .where(sql`id = 1`)
+      .limit(1)
+      .get();
+    if (!row) return null;
+    return {
+      language: row.language,
+      cacheKey: row.cacheKey,
+      filesFingerprint: row.filesFingerprint,
+      builtAt: row.builtAt,
+    };
+  }
+
+  /**
    * Replace the catalog with a fresh value. Mirrors v1's atomic
    * tmp-file + rename write — the upsert is a single statement, and
    * SQLite's transaction semantics guarantee no torn reads.
@@ -178,8 +208,7 @@ export class CatalogRepo {
       logger.error({
         evt: 'graph.catalog.read.error',
         module: MODULE_NAME,
-        msg: 'Failed to read catalog',
-        error: error instanceof Error ? error.message : String(error),
+        code: 'GRAPH.CATALOG.READ_FAILED',
       });
       throw error;
       /* v8 ignore stop */
