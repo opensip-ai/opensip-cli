@@ -12,6 +12,12 @@ describe('@opensip-cli/test-support public API', () => {
     expect(fitness).not.toHaveProperty('fitnessTestFileCache');
   });
 
+  it('exposes concurrent-scope and CLI-json helpers on the barrel', () => {
+    expect(typeof support.runTwoScopesConcurrently).toBe('function');
+    expect(typeof support.parseCliJsonOutcomes).toBe('function');
+    expect(support.parseCliJsonOutcomes('{"ok":true}')).toEqual([{ ok: true }]);
+  });
+
   it('remains a private unpublished workspace package', () => {
     const manifest = JSON.parse(
       readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),

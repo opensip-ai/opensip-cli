@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.5.1
+release: v0.5.2
 title: "Performance SLOs"
 audience: [contributors, ci-integrators]
 purpose: "Reference for the opensip-cli synthetic performance SLO lane, corpus tiers, budgets, and report artifact."

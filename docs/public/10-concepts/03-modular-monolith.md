@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.5.1
+release: v0.5.2
 title: "Layered package graph"
 audience: [contributors]
 purpose: "The 58-package workspace, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."

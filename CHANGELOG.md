@@ -2,7 +2,12 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
-## [Unreleased]
+## [0.5.2] - 2026-07-09
+
+A modular-monolith boundary hardening release. Public packages fail closed on
+raw datastore and host-plane access, external workers lose ambient DB capability,
+MCP reads the graph only through `@opensip-cli/graph/read`, and architecture
+gates enforce export maps and tool inventory so those boundaries stay true in CI.
 
 ### Breaking
 
@@ -26,7 +31,27 @@ All notable changes to OpenSIP CLI are documented here.
   migration 0009 and dual-identity purge (ADR-0146).
 - Public `@opensip-cli/graph/read` facade; MCP production consumes it (ADR-0147).
 - Architecture gates: complete depcruise export-path map, manifest-derived Tool
-  inventory, fail-closed internal-import owner allowlists.
+  inventory, fail-closed internal-import owner allowlists, and workspace import-
+  surface verification in lint.
+- ADRs 0145–0147 (worker datastore capability, host-plane reserved namespace,
+  public graph/read + package boundaries).
+
+### Changed
+
+- `applyToolContributeScope` is the single validated installer for every tool
+  scope contribution (tests and CLI bootstrap share it).
+- ToolCliContext seam inventory is extracted via the TypeScript compiler API;
+  Vitest path aliases rebuild from declared package exports only.
+- Worker mode resolution for external-tool and capability-pack workers is
+  tightened; host-RPC baseline messages are allowlisted.
+
+### Fixed
+
+- HTML report overview ledger: suite and step Run cells show only the tool/suite
+  badge (no duplicate suite name or command text beside the badge).
+- `@opensip-cli/test-support` covers `parseCliJsonOutcomes` and
+  `runTwoScopesConcurrently` so the package meets coverage floors after those
+  helpers moved onto the private barrel.
 
 ## [0.5.1] - 2026-07-09
 
