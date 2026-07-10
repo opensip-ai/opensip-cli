@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildIndexes } from '../pipeline/indexes.js';
+import { type GraphSourceFilter } from '../read/query-contracts.js';
 import {
   searchSymbolOccurrences,
   symbolSearchStableKey,
   type SymbolSearchQuery,
 } from '../read/symbol-search.js';
-import { type GraphSourceFilter } from '../read/query-contracts.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
 
@@ -240,7 +240,7 @@ describe('searchSymbolOccurrences', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const keys = result.value.symbols.map(symbolSearchStableKey);
-    const sorted = [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const sorted = [...keys].sort();
     expect(keys).toEqual(sorted);
   });
 
@@ -251,7 +251,10 @@ describe('searchSymbolOccurrences', () => {
     expect(first.value.symbols).toHaveLength(2);
     expect(first.value.hasMore).toBe(true);
 
-    const afterKey = symbolSearchStableKey(first.value.symbols[1]!);
+    const secondSymbol = first.value.symbols[1];
+    expect(secondSymbol).toBeDefined();
+    if (secondSymbol === undefined) return;
+    const afterKey = symbolSearchStableKey(secondSymbol);
     const second = search(multi, {
       query: 'save',
       match: 'substring',

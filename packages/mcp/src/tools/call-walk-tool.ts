@@ -7,17 +7,10 @@
 
 import {
   depth as depthSchema,
-  exactFilePath,
-  filePrefix,
-  generatedPolicy,
-  groupBy,
-  kinds,
-  packageArray,
   pageFields,
-  sourceScope,
+  sourceFilterFields,
   symbolId as symbolIdSchema,
   traversalIdentity,
-  visibilities,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
@@ -45,15 +38,8 @@ export function registerCallWalkTool(
         symbolId: symbolIdSchema(),
         depth: depthSchema(),
         identity: traversalIdentity(),
-        packages: packageArray(),
-        filePath: exactFilePath().optional(),
-        filePrefix: filePrefix().optional(),
-        kinds: kinds(),
-        visibilities: visibilities(),
-        sourceScope: sourceScope(),
-        generated: generatedPolicy(),
+        ...sourceFilterFields(),
         ...pageFields(),
-        groupBy: groupBy(),
       },
     },
     async (args) => {

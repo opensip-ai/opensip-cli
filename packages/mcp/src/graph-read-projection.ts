@@ -26,13 +26,6 @@ export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | u
   return { symbol, message: signal.message };
 }
 
-/** Total out-edge count across the callees adjacency. */
-export function edgeCount(indexes: Indexes): number {
-  let total = 0;
-  for (const targets of indexes.callees.values()) total += targets.length;
-  return total;
-}
-
 /** Clamp a caller-supplied limit to a positive integer, defaulting when absent. */
 export function clampLimit(limit: number | undefined, fallback: number): number {
   if (limit === undefined || !Number.isFinite(limit) || limit <= 0) return fallback;
