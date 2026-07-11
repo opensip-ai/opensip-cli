@@ -113,3 +113,62 @@ export function collectGovernanceDriftProblems() {
 
   return problems;
 }
+
+// ---------------------------------------------------------------------
+// Published-artifact classification (ADR-0150).
+//
+// Production package builds must ship runtime artifacts only. These pure
+// helpers classify package-relative paths (from a real `dist/` tree OR from a
+// `pnpm pack --dry-run --json` packlist) and flag anything that must not be
+// published. No filesystem access — the verifier script does the I/O.
+// ---------------------------------------------------------------------
+
+/** Max normalized package-relative path length (defense against pathological input). */
+export const MAX_PUBLISHED_ARTIFACT_PATH_BYTES = 4096;
+
+/**
+ * Classify a package-relative published-artifact path (POSIX or Windows
+ * separators). Returns a stable reason string when the path must NOT ship in a
+ * production tarball, or `null` when it is an allowed runtime artifact.
+ *
+ * A filename merely CONTAINING "test"/"spec" (e.g. `contest.js`, `latest.js`)
+ * is allowed — only the `.test.`/`.spec.` infix and the test/fixture/coverage
+ * trees are rejected.
+ *
+ * @param {string} relPath
+ * @returns {string | null}
+ */
+export function classifyPublishedArtifactPath(relPath) {
+  if (typeof relPath !== 'string' || relPath.length === 0) return 'empty-path';
+  if (relPath.length > MAX_PUBLISHED_ARTIFACT_PATH_BYTES) return 'oversized-path';
+  if (relPath.includes('\0')) return 'nul-in-path';
+  const p = relPath.replaceAll('\\', '/');
+  if (p.startsWith('/') || /^[a-zA-Z]:/.test(p)) return 'absolute-path';
+  const segments = p.split('/');
+  if (segments.some((seg) => seg === '..')) return 'path-traversal';
+  const base = segments[segments.length - 1];
+  if (segments.some((seg) => seg === '__tests__')) return 'test-directory';
+  if (segments.some((seg) => seg === '__fixtures__')) return 'fixture-directory';
+  if (segments.some((seg) => seg === 'coverage')) return 'coverage';
+  if (/\.(test|spec)\./.test(base)) return 'test-file';
+  return null;
+}
+
+/**
+ * Collect forbidden-published-artifact problems for one package's file list.
+ *
+ * @param {string} pkgName
+ * @param {readonly string[]} files package-relative paths
+ * @param {string} source `dist` or `packlist` (for the diagnostic)
+ * @returns {string[]}
+ */
+export function collectPublishedArtifactProblems(pkgName, files, source = 'dist') {
+  const problems = [];
+  for (const file of files) {
+    const reason = classifyPublishedArtifactPath(file);
+    if (reason !== null) {
+      problems.push(`${pkgName}: forbidden ${source} artifact (${reason}): ${file}`);
+    }
+  }
+  return problems;
+}
