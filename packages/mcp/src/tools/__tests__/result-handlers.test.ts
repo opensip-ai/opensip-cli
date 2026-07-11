@@ -280,6 +280,48 @@ describe('repair_apply_verify handler', () => {
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('unknown-tool');
   });
+
+  it('errors when mutations are disabled and when the write port fails', async () => {
+    {
+      const { server, handlers } = captureServer();
+      registerRepairApplyVerify(server, {
+        ...deps(fakeResults({})),
+        // no repairWrite
+      });
+      const out = parseResult(
+        await handlers.get('repair_apply_verify')!({
+          ref: 'latest',
+          tool: 'fit',
+          signal: 'index:0',
+          action: 'replace-ts-ignore',
+        }),
+      );
+      expect(out.isError).toBe(true);
+      expect((out.body.error as McpReadError).code).toBe('mcp-mutation-disabled');
+    }
+    {
+      const repairWrite: RepairWritePort = {
+        applyVerify: () => Promise.resolve(err({ code: 'repair-failed', message: 'nope' })),
+      };
+      const { server, handlers } = captureServer();
+      registerRepairApplyVerify(server, {
+        ...deps(fakeResults({})),
+        repairWrite,
+        mutationsEnabled: true,
+      });
+      const out = parseResult(
+        await handlers.get('repair_apply_verify')!({
+          ref: 'latest',
+          tool: 'fit',
+          signal: 'index:0',
+          action: 'replace-ts-ignore',
+          // force omitted branch
+        }),
+      );
+      expect(out.isError).toBe(true);
+      expect((out.body.error as McpReadError).code).toBe('repair-failed');
+    }
+  });
 });
 
 // ── review_change ───────────────────────────────────────────────────

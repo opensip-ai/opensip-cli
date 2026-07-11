@@ -17,6 +17,7 @@ export default mergeConfig(
           // Pure type/interface surfaces — no executable code.
           'src/graph-read-port.ts',
           'src/results-read-port.ts',
+          'src/runtime-wiring-read-port.ts',
           'src/symbol-dto.ts',
           'src/result-dto.ts',
           'src/tools/types.ts',

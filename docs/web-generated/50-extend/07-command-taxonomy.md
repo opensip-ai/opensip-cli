@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-21
-release: v0.5.2
+release: v0.5.3
 title: "Command surface taxonomy"
 audience: [plugin-authors, contributors, ci-integrators]
 purpose: "The Tier-1/2/3 command grammar — nested `<tool> <verb>` mounting, export `--format`, internal visibility, and manifest drift rules."
@@ -40,8 +40,8 @@ plugins.
 
 Authoring on-ramps: `opensip tools create` (`minimal-js`, `ts-local`). See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/),
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md), and
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## The three tiers
 
@@ -151,7 +151,7 @@ YAML fallback loaders are only for tests or explicit worker compatibility.
 `output: 'raw-stream'` and `rawStreamReason: 'runtime-render-dispatch'`, because
 the helper performs runtime dispatch internally. Tool code should not copy that
 orchestration locally. See
-[ADR-0117](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0117-host-owned-analysis-run-pipeline.md).
+[ADR-0117](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0117-host-owned-analysis-run-pipeline.md).
 
 ## Long-lived stream commands (`output: 'raw-stream'`)
 
@@ -182,7 +182,7 @@ the serve lifetime. There is no run verdict to render, so the command emits no
 the documented escape hatch from the `SignalEnvelope`/`CommandResult` currency,
 recorded in `raw-stream-parity` and justified in-file for
 `command-handler-host-owned-output`. See
-[ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0084-mcp-server-surface.md).
+[ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0084-mcp-server-surface.md).
 
 ## Tier 3 — Internal commands
 

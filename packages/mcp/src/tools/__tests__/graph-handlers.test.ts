@@ -287,6 +287,72 @@ describe('graph handlers (async GraphToolResult)', () => {
     expect(parsed.body.context).toEqual(CONTEXT);
   });
 
+  it('get_symbol reports not-found, stale not-found, and ambiguity', async () => {
+    {
+      const { handlers, server } = captureServer();
+      registerGetSymbol(
+        server,
+        deps(
+          fakePort({
+            findBySpan: () => Promise.resolve(ok(wrap([] as readonly SymbolRef[]))),
+          }),
+        ),
+      );
+      const parsed = parseResult(
+        await handlers.get('get_symbol')!({ file: 'src/missing.ts', line: 1 }),
+      );
+      expect(parsed.isError).toBe(false);
+      expect(parsed.body).toMatchObject({
+        found: false,
+        error: { code: 'symbol-not-found' },
+      });
+      expect(String((parsed.body.error as { message: string }).message)).toContain(
+        'search_symbols',
+      );
+    }
+    {
+      const staleFreshness = { ...FRESH, fresh: false };
+      const { handlers, server } = captureServer();
+      registerGetSymbol(
+        server,
+        deps(
+          fakePort({
+            findBySpan: () =>
+              Promise.resolve(
+                ok({
+                  data: [] as readonly SymbolRef[],
+                  context: CONTEXT,
+                  freshness: staleFreshness,
+                  coverage: COVERAGE,
+                }),
+              ),
+          }),
+        ),
+      );
+      const parsed = parseResult(
+        await handlers.get('get_symbol')!({ file: 'src/missing.ts', line: 1 }),
+      );
+      expect(String((parsed.body.error as { message: string }).message)).toContain('refresh_graph');
+    }
+    {
+      const { handlers, server } = captureServer();
+      registerGetSymbol(
+        server,
+        deps(
+          fakePort({
+            findBySpan: () =>
+              Promise.resolve(
+                ok(wrap([symRef(), symRef({ symbolId: 'src/a.ts:12:0' })] as readonly SymbolRef[])),
+              ),
+          }),
+        ),
+      );
+      const parsed = parseResult(await handlers.get('get_symbol')!({ file: 'src/a.ts', line: 10 }));
+      expect(parsed.body).toMatchObject({ ambiguous: true });
+      expect(Array.isArray(parsed.body.candidates)).toBe(true);
+    }
+  });
+
   it('who_calls and callees_of await traverse', async () => {
     const { handlers, server } = captureServer();
     registerWhoCalls(server, deps(fakePort()));
@@ -298,6 +364,32 @@ describe('graph handlers (async GraphToolResult)', () => {
       expect(parsed.body.context).toEqual(CONTEXT);
       expect(parsed.body.coverage).toBeDefined();
       expect(parsed.body).not.toHaveProperty('truncated');
+    }
+  });
+
+  it('surfaces graph port failures from walk, path, dead-code, and blast tools', async () => {
+    const failure = err({
+      code: 'catalog-missing',
+      message: 'no catalog',
+    });
+    const port = fakePort({
+      traverse: () => Promise.resolve(failure),
+      deadCode: () => Promise.resolve(failure),
+      blast: () => Promise.resolve(failure),
+    });
+    const { handlers, server } = captureServer();
+    registerWhoCalls(server, deps(port));
+    registerTracePath(server, deps(port));
+    registerFindDeadCode(server, deps(port));
+    registerBlastRadius(server, deps(port));
+    for (const [name, args] of [
+      ['who_calls', { symbolId: 'src/a.ts:10:2' }],
+      ['trace_path', { fromSymbolId: 'src/a.ts:10:2', toSymbolId: 'src/b.ts:1:0' }],
+      ['find_dead_code', { limit: 10 }],
+      ['blast_radius', { symbolId: 'src/a.ts:10:2' }],
+    ] as const) {
+      const parsed = parseResult(await handlers.get(name)!(args));
+      expect(parsed.isError).toBe(true);
     }
   });
 
@@ -328,6 +420,54 @@ describe('graph handlers (async GraphToolResult)', () => {
     expect(data.identityMode).toBe('body-twin-union');
   });
 
+  it('blast_radius reports unavailable for missing scores (fresh and stale)', async () => {
+    {
+      const { handlers, server } = captureServer();
+      registerBlastRadius(
+        server,
+        deps(
+          fakePort({
+            blast: () => Promise.resolve(ok(wrap(undefined as unknown as BlastDto))),
+          }),
+        ),
+      );
+      const parsed = parseResult(
+        await handlers.get('blast_radius')!({ symbolId: 'src/missing.ts:1:0' }),
+      );
+      expect(parsed.body).toMatchObject({
+        found: false,
+        data: null,
+        error: { code: 'blast-unavailable' },
+      });
+      expect(String((parsed.body.error as { message: string }).message)).toContain(
+        'search_symbols',
+      );
+    }
+    {
+      const { handlers, server } = captureServer();
+      registerBlastRadius(
+        server,
+        deps(
+          fakePort({
+            blast: () =>
+              Promise.resolve(
+                ok({
+                  data: undefined,
+                  context: CONTEXT,
+                  freshness: { ...FRESH, fresh: false },
+                  coverage: COVERAGE,
+                }),
+              ),
+          }),
+        ),
+      );
+      const parsed = parseResult(
+        await handlers.get('blast_radius')!({ symbolId: 'src/missing.ts:1:0' }),
+      );
+      expect(String((parsed.body.error as { message: string }).message)).toContain('refresh_graph');
+    }
+  });
+
   it('find_dead_code and get_architecture await async port', async () => {
     const { handlers, server } = captureServer();
     registerFindDeadCode(server, deps(fakePort()));
@@ -343,6 +483,21 @@ describe('graph handlers (async GraphToolResult)', () => {
     expect(archData.uniqueBodyCount).toBeDefined();
     expect(archData.callEvidence).toBeDefined();
     expect(archData.packageEdges).toBeDefined();
+  });
+
+  it('get_architecture surfaces port failures', async () => {
+    const { handlers, server } = captureServer();
+    registerGetArchitecture(
+      server,
+      deps(
+        fakePort({
+          architectureSummary: () =>
+            Promise.resolve(err({ code: 'catalog-missing', message: 'none' })),
+        }),
+      ),
+    );
+    const parsed = parseResult(await handlers.get('get_architecture')!({ limit: 10 }));
+    expect(parsed.isError).toBe(true);
   });
 
   it('get_architecture injects target conventions without changing graph metrics', async () => {

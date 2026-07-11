@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.5.2
+release: v0.5.3
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
@@ -78,7 +78,7 @@ re-running:
 opensip sessions show latest --tool fit --json --filter errors-only --filter top:20
 ```
 
-See [ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0085-change-detection-substrate.md) for how
+See [ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0085-change-detection-substrate.md) for how
 change detection and filtering share one substrate.
 
 ## Edit loop
@@ -108,7 +108,7 @@ opensip fit --json --raw --filter errors-only
 ```
 
 Signals may carry structured repair guidance under `signal.repair` — see
-[ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0086-signal-repair-metadata.md).
+[ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0086-signal-repair-metadata.md).
 Preview deterministic repairs before applying them. When you apply one, use
 `--verify` and treat the verification verdict literally:
 
@@ -173,13 +173,13 @@ For existing-result questions, MCP is the first source of truth. Do not grep
 `.runtime/logs`, read `datastore.sqlite` directly, or re-run `fit` / `graph` /
 `yagni` / `sim` just to answer what the last stored run reported; those are
 fallback/debug paths. See
-[ADR-0109](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
+[ADR-0109](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0109-mcp-first-agent-guidance-init-refresh.md).
 Catalog auto-swap/freshness is governed by
-[ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md);
+[ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md);
 bounded labelled query/runtime evidence by
-[ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md).
+[ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md).
 MCP production reaches graph internals only through the public read facade in
-[ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md).
+[ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md).
 
 Setup is client-specific (JSON vs TOML, config file locations, approval flows).
 See **[Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)** for copy-paste config for

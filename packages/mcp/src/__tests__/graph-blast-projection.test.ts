@@ -76,6 +76,46 @@ describe('projectBlastMembers', () => {
     expect(result.value.requested?.symbolId).toBe('packages/b/b.ts:1:0');
   });
 
+  it('handles unknown body hashes, wrong-body requests, package grouping, and bad cursors', () => {
+    const current = generation();
+    const unknown = projectBlastMembers({
+      generation: current,
+      bodyHash: 'missing-body',
+      symbolId: 'packages/a/a.ts:1:0',
+      filter: { sourceScope: 'all', generated: 'include' },
+      options: { limit: 10, groupBy: 'package' },
+      projectKey: 'b'.repeat(24),
+    });
+    expect(unknown.ok).toBe(true);
+    if (!unknown.ok) return;
+    expect(unknown.value.members).toEqual([]);
+    expect(unknown.value.requested).toBeUndefined();
+    expect(unknown.value.twinCount).toBe(0);
+
+    const wrongBody = projectBlastMembers({
+      generation: current,
+      bodyHash: 'same-body',
+      symbolId: 'packages/other/o.ts:1:0',
+      filter: { sourceScope: 'all', generated: 'include' },
+      options: { groupBy: 'file' },
+      projectKey: 'b'.repeat(24),
+    });
+    expect(wrongBody.ok).toBe(true);
+    if (!wrongBody.ok) return;
+    expect(wrongBody.value.requested).toBeUndefined();
+    expect(wrongBody.value.options.groups?.length).toBeGreaterThan(0);
+
+    const badCursor = projectBlastMembers({
+      generation: current,
+      bodyHash: 'same-body',
+      symbolId: 'packages/a/a.ts:1:0',
+      filter: { sourceScope: 'all', generated: 'include' },
+      options: { cursor: 'not-a-valid-cursor' },
+      projectKey: 'b'.repeat(24),
+    });
+    expect(badCursor.ok).toBe(false);
+  });
+
   it('labels when a source filter cannot scope the canonical body-twin score', () => {
     const result = projectBlastMembers({
       generation: generation(),

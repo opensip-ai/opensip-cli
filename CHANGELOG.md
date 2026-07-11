@@ -2,6 +2,45 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.5.3] - 2026-07-10
+
+An MCP graph-audit readiness release. Agents can inspect occurrence-precise
+call evidence, package boundaries, architecture views, and runtime wiring from
+stored catalogs over MCP without re-running analysis; ordinary reads auto-swap
+to a newly persisted catalog generation and report complete or partial
+freshness. The HTML report overview suite expander keeps step columns aligned
+with the table header.
+
+### Added
+
+- Graph public read surface for occurrence call views, package evidence
+  (dependencies, why-depends, SCCs), architecture view, filter-first symbol
+  search, dead-code paging, and source filters with project-bound cursors.
+- MCP tools and projections for bounded, labelled audit evidence: occurrence-
+  default walks (`who_calls`, `callees_of`, `trace_path`, blast radius),
+  package tools, `get_architecture`, `find_dead_code`, `get_runtime_wiring`,
+  and shared paging / identity / freshness envelopes.
+- Catalog identity and generation lifecycle: opaque `g1:` generation keys,
+  auto-swap on newly persisted external graph catalogs, complete/partial
+  freshness without building a graph on ordinary reads; `refresh_graph`
+  remains the sole explicit rebuild path (ADR-0148).
+- ADRs 0148–0149 (catalog identity / auto-swap / freshness; bounded labelled
+  MCP audit evidence).
+
+### Changed
+
+- MCP graph traversal defaults to occurrence-precise identity; body-twin
+  reachability is explicit and label-preserving.
+- Agent guidance and public MCP docs document the expanded tool inventory,
+  freshness fields, and evidence-kind / confidence contracts.
+- Dashboard suite steps render as sibling table rows (same columns as the
+  overview header) with a darker child-row background.
+
+### Fixed
+
+- Overview Recent Activity: expanded suite child rows no longer indent out of
+  alignment with the TIMESTAMP / RUN / … header columns.
+
 ## [0.5.2] - 2026-07-09
 
 A modular-monolith boundary hardening release. Public packages fail closed on

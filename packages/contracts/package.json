@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/contracts",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "license": "Apache-2.0",
   "description": "Public Tool↔runner contracts and shared host-run runtime for OpenSIP CLI",
   "keywords": [

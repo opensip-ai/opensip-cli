@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-30
-release: v0.5.2
+release: v0.5.3
 title: "Connect MCP clients (Cursor, Claude Code, Codex)"
 audience: [getting-started, ci-integrators]
 purpose: "Register opensip mcp as a stdio MCP server in Cursor, Claude Code, and Codex."
@@ -71,7 +71,7 @@ until the client closes stdin:
 Use an **absolute path** for `--cwd` unless the client provides a project-root
 variable (Claude Code's `${CLAUDE_PROJECT_DIR}`). MCP result tools are scoped to
 that project root: runs recorded under another root are treated as not found
-([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)).
+([ADR-0130](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0130-mcp-repo-scoped-session-reads.md)).
 
 The server is read-only by default. To opt in to `repair_apply_verify`, append
 `--allow-mutations` to the registered args or set
@@ -120,9 +120,9 @@ generation cursor keys are distinct; keep filters stable across pages. Call
 `package_dependencies`, `why_depends`, or `package_cycles` for labelled
 call/import package evidence, and `get_runtime_wiring` for live
 manifest/registry/CommandSpec evidence that a static path cannot prove.
-See [ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md)
-for lifecycle/freshness, [ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md)
-for query/evidence bounds, and [ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
+See [ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md)
+for lifecycle/freshness, [ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md)
+for query/evidence bounds, and [ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
 for the public graph-read boundary.
 
 For symbol lookup, `search_symbols` defaults to a case-insensitive substring of
@@ -339,4 +339,4 @@ stdout must stay clean for JSON-RPC; do not pipe or tee it manually while testin
 
 - [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) — CLI loops without MCP
 - [`mcp` command reference](/docs/opensip-cli/70-reference/01-cli-commands/#mcp--serve-the-call-graph--results-to-agents-over-stdio) — full tool table and limitations
-- [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.5.2/docs/decisions/ADR-0084-mcp-server-surface.md) — design decisions and trust model
+- [ADR-0084](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0084-mcp-server-surface.md) — design decisions and trust model

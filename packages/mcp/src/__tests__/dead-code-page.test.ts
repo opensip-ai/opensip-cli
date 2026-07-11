@@ -1,7 +1,8 @@
+import { continuationToken } from '@opensip-cli/graph/read';
 import { describe, expect, it } from 'vitest';
 
 import { createGeneration } from '../catalog-generation.js';
-import { MAX_ORPHAN_EVALUATION, pageDeadCode } from '../dead-code-page.js';
+import { deadCodeStableKey, MAX_ORPHAN_EVALUATION, pageDeadCode } from '../dead-code-page.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
 
@@ -116,5 +117,42 @@ describe('pageDeadCode', () => {
     expect(reverse.rows).toEqual(forward.rows);
     expect(forward.groups).toEqual([{ key: 'keep/late.ts', count: 1 }]);
     expect(forward.coverage).toEqual({ complete: true, truncated: false, reasons: [] });
+  });
+
+  it('continues after a known cursor, rejects unknown anchors, and groups by package', () => {
+    const gen = generation(3);
+    const first = pageDeadCode({
+      generation: gen,
+      config: {},
+      filter,
+      limit: 1,
+      afterKey: undefined,
+      groupBy: 'none',
+    });
+    expect(first.rows).toHaveLength(1);
+    const firstKey = deadCodeStableKey(first.rows[0]);
+    const after = pageDeadCode({
+      generation: gen,
+      config: {},
+      filter,
+      limit: 10,
+      afterKey: continuationToken(firstKey),
+      groupBy: 'package',
+    });
+    expect(after.anchorFound).toBe(true);
+    expect(after.rows.every((row) => deadCodeStableKey(row) !== firstKey)).toBe(true);
+    expect(after.groups?.some((group) => group.key === 'pkg')).toBe(true);
+
+    const missing = pageDeadCode({
+      generation: gen,
+      config: {},
+      filter,
+      limit: 10,
+      afterKey: continuationToken('no-such-row'),
+      groupBy: 'none',
+    });
+    expect(missing.anchorFound).toBe(false);
+    // Without a matched anchor, paging starts from the beginning of the ordered set.
+    expect(missing.rows.length).toBeGreaterThan(0);
   });
 });

@@ -43,6 +43,30 @@ describe('freshness mapping', () => {
     expect(f.builtAt).toBe('2026-01-01T00:00:00.000Z');
   });
 
+  it('omits optional fields when verification has no builtAt/reason/changes', () => {
+    const f = freshnessFromVerification({
+      fresh: false,
+      verifiedAt: '2026-01-01T00:00:00.000Z',
+      verification: 'complete',
+    });
+    expect(f.fresh).toBe(false);
+    expect(f.builtAt).toBeUndefined();
+    expect(f.reasonCode).toBeUndefined();
+    expect(f.reason).toBeUndefined();
+    expect(f.changes).toBeUndefined();
+
+    const withChanges = freshnessFromVerification({
+      fresh: false,
+      verifiedAt: '2026-01-01T00:00:00.000Z',
+      verification: 'partial',
+      reasonCode: 'files-changed',
+      reason: 'file churn',
+      changes: { added: 1, modified: 0, deleted: 0, sample: [] },
+    });
+    expect(withChanges.changes).toEqual({ added: 1, modified: 0, deleted: 0, sample: [] });
+    expect(withChanges.reasonCode).toBe('files-changed');
+  });
+
   it('unavailableGraphStatus is the review_change degradation shape', () => {
     const f = unavailableGraphStatus();
     expect(f).toMatchObject({
