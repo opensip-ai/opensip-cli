@@ -133,7 +133,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/external-tool-adapter": "workspace:*"
   },

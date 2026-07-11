@@ -44,7 +44,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-cli/core": "workspace:*",
     "@opensip-cli/fitness": "workspace:*"
   },
   "devDependencies": {

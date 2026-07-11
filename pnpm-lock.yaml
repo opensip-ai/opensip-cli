@@ -522,9 +522,6 @@ importers:
 
   packages/fitness/checks-cpp:
     dependencies:
-      '@opensip-cli/core':
-        specifier: workspace:*
-        version: link:../../core
       '@opensip-cli/fitness':
         specifier: workspace:*
         version: file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
@@ -1366,9 +1363,6 @@ importers:
 
   packages/tool-gitleaks:
     dependencies:
-      '@opensip-cli/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../core
@@ -1432,9 +1426,6 @@ importers:
 
   packages/tool-osv-scanner:
     dependencies:
-      '@opensip-cli/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../core
@@ -1571,9 +1562,6 @@ importers:
 
   packages/tool-trivy:
     dependencies:
-      '@opensip-cli/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../core
@@ -5432,7 +5420,6 @@ snapshots:
 
   '@opensip-cli/checks-cpp@file:packages/fitness/checks-cpp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)':
     dependencies:
-      '@opensip-cli/core': file:packages/core
       '@opensip-cli/fitness': file:packages/fitness/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
