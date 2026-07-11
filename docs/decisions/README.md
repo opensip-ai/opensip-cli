@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0151](ADR-0151-manifest-derived-package-and-export-boundaries.md) — Manifest-derived Tool/fit-pack classification, fail-closed dependency allowlists, dynamic CLI Tool loading, complete internal file/dir matching, and exact TypeScript value+type export locks.
+- [ADR-0150](ADR-0150-production-builds-publish-runtime-artifacts-only.md) — Production `tsc` output + real `pnpm pack` packlists jointly define the publish boundary; per-package no-emit test projects keep excluded test sources semantically checked.
 - [ADR-0149](ADR-0149-bounded-labelled-mcp-audit-evidence.md) — Occurrence-default traversal, labelled package/runtime evidence, and bounded MCP audit queries (19 tools).
 - [ADR-0148](ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md) — `g1:` catalog identity, persisted auto-swap, complete freshness verification, refresh-only rebuild.
 - [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md) — Public `@opensip-cli/graph/read` free functions, complete export-source maps, manifest Tool inventory, and allowlist-shaped peer boundaries.
