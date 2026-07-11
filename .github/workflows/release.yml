@@ -78,6 +78,12 @@ jobs:
       - run: node scripts/build-ci.mjs
       - run: pnpm typecheck
 
+      # Emitted + packed bytes must contain runtime artifacts only, verified
+      # against real dist trees and pnpm packlists BEFORE the correctness gates
+      # and pack/publish (ADR-0150). Lane invariant: clean -> build -> inspect
+      # build/packlist -> correctness/dogfood -> actual pack/smoke -> publish.
+      - run: pnpm verify:published-artifacts
+
       # ADR-0017 — the release gate must be at least as strict as the PR gate.
       # npm versions are immutable; the release lane is the last gate before an
       # unrecoverable artifact, so it re-runs the same correctness gates PR CI

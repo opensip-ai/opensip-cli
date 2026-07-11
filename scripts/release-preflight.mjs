@@ -69,6 +69,10 @@ function main() {
   pnpm('install frozen lockfile', ['install', '--frozen-lockfile']);
   pnpm('clean package outputs', ['-r', 'run', 'clean']);
   run('build with injected workspace re-sync', 'node', ['scripts/build-ci.mjs']);
+  // Inspect emitted + packed bytes right after the clean build, before
+  // typecheck/lint/tests (ADR-0150). Clean -> build -> inspect build/packlist ->
+  // correctness -> actual pack/smoke -> publish.
+  pnpm('verify published artifact boundary', ['verify:published-artifacts']);
   pnpm('typecheck', ['typecheck']);
   pnpm('supply-chain policy', ['supply-chain:verify']);
   pnpm('lint', ['lint']);
