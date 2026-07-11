@@ -1,9 +1,11 @@
 /**
  * Export-surface lock for `@opensip-cli/simulation/internal`.
  *
- * `/internal` is the deliberate, test-only escape hatch for simulation engine
- * registry/lifecycle/recipe execution seams. Production packages must use the
- * public barrel and Tool contract; dependency-cruiser enforces that boundary.
+ * `/internal` is excluded from the root barrel but deliberately published as an
+ * explicit `./internal` subpath export — a test-only escape hatch for simulation
+ * engine registry/lifecycle/recipe execution seams (ADR-0009). Production
+ * packages must use the public barrel and Tool contract; dependency-cruiser
+ * enforces that boundary.
  */
 
 import { describe, expect, it } from 'vitest';
