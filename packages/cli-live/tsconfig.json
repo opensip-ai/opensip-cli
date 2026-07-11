@@ -6,6 +6,15 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__fixtures__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
 }
