@@ -167,11 +167,14 @@ export interface DependencySiteRecord {
   readonly line: number;
   /** 0-based column. */
   readonly column: number;
-  /** How the dependency statement is written (P2 Phase 0). Adapters that
-   *  classify their sites populate it; the engine threads it to the edge. */
-  readonly form: DependencyForm;
-  /** The executable role of the dependency (P2 Phase 0). */
-  readonly role: DependencyRole;
+  /** How the dependency statement is written (P2 Phase 0). Optional: an adapter
+   *  that classifies its sites populates form+role (the TS adapter always does);
+   *  one that emits sites without classification omits BOTH — the resulting
+   *  `DependencyEdge` then carries no atomic classification (absent = unsupported).
+   *  Never populate one without the other. */
+  readonly form?: DependencyForm;
+  /** The executable role of the dependency (P2 Phase 0). Omitted iff `form` is. */
+  readonly role?: DependencyRole;
 }
 
 export interface WalkOutput {

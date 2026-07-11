@@ -457,6 +457,33 @@ function resolveSiteTargets(
 }
 
 /**
+ * Build one classified {@link DependencyEdge} from a site + its resolution. The
+ * TS walk always sets form+role, so every TS edge is fully classified; the
+ * presence check keeps the atomic-classification invariant explicit (a partial
+ * classification is never emitted).
+ */
+function buildDependencyEdge(site: TsDependencySiteRecord, r: SiteResolution): DependencyEdge {
+  const classification: DependencyClassification | undefined =
+    site.form === undefined || site.role === undefined
+      ? undefined
+      : {
+          form: site.form,
+          role: site.role,
+          targetKind: r.targetKind,
+          basis: r.basis,
+          reason: r.reason,
+          ...(r.resolvedPackage === undefined ? {} : { resolvedPackage: r.resolvedPackage }),
+        };
+  return {
+    to: r.to,
+    line: site.line,
+    column: site.column,
+    specifier: site.specifier,
+    ...(classification === undefined ? {} : { classification }),
+  };
+}
+
+/**
  * Resolve TS import sites into per-owner {@link DependencyEdge}s carrying the
  * complete {@link DependencyClassification}. EVERY module-init owner is
  * initialized with an empty array first, so a supported file with zero imports
@@ -494,21 +521,7 @@ function resolveDependencies(
       moduleInitByFilePath,
       manifestIndex,
     );
-    const classification: DependencyClassification = {
-      form: site.form,
-      role: site.role,
-      targetKind: r.targetKind,
-      basis: r.basis,
-      reason: r.reason,
-      ...(r.resolvedPackage === undefined ? {} : { resolvedPackage: r.resolvedPackage }),
-    };
-    const edge: DependencyEdge = {
-      to: r.to,
-      line: site.line,
-      column: site.column,
-      specifier: site.specifier,
-      classification,
-    };
+    const edge = buildDependencyEdge(site, r);
     // Key per owner OCCURRENCE (module-init bodyHash + file + line + column) to
     // match stitchEdges; module-init bodies can collide across trivial files
     // (ADR-0136).

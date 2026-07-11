@@ -40,6 +40,7 @@ import { GRAPH_TRACER } from '../graph-tracer.js';
 import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
 import {
   mergeShardFragments,
+  reattributeDeclarationDependencies,
   resolveCrossBoundaryCalls,
   stampAndConstrainPackages,
 } from './cross-shard-resolve.js';
@@ -159,9 +160,15 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   const manifestIndex = buildPackageManifestIndex(shards, projectRoot);
   const walkStart = Date.now();
   emitStageStart(onProgress, 'walk');
-  const merged = mergeShardFragments(
-    fragments.map((f) => f.fragment),
-    allFiles,
+  // Fill cross-shard declaration-target `resolvedPackage` from the complete
+  // merged manifest index — a single worker can't attribute an import to a
+  // package whose files live in another shard (P2 Phase 0 Task 0.2).
+  const merged = reattributeDeclarationDependencies(
+    mergeShardFragments(
+      fragments.map((f) => f.fragment),
+      allFiles,
+    ),
+    manifestIndex,
   );
   emitStage(
     onProgress,

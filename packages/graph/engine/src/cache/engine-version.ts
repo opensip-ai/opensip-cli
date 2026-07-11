@@ -66,6 +66,16 @@ const ENGINE_MODE_PREFIX = 'mode=';
 const SIGNATURE_VERSION_PREFIX = 'sig=';
 
 /**
+ * Cache-key segment carrying the dependency-evidence ABI version (P2 Phase 0).
+ * Independent of {@link ENGINE_VERSION} so a change to the persisted
+ * dependency/classification shape invalidates exact, incremental, and
+ * shard-derived caches exactly once — without touching catalog version `3.0` or
+ * making old persisted catalogs unreadable. Bump when that shape changes.
+ */
+const DEPENDENCY_ABI_PREFIX = 'dep=';
+const DEPENDENCY_ABI_VERSION = 1;
+
+/**
  * Prefix an adapter's `cacheKey` with the running engine version AND the
  * build engine mode so (a) a tool upgrade invalidates persisted
  * catalogs/fragments, and (b) the exact and sharded engines — which write
@@ -86,5 +96,5 @@ const SIGNATURE_VERSION_PREFIX = 'sig=';
  */
 export function stampEngineVersion(adapterCacheKey: string, mode: EngineMode = 'exact'): string {
   const sig = `${String(NEAR_DUP_SIGNATURE_K)}.${String(NEAR_DUP_SIGNATURE_VERSION)}`;
-  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${sig}|${adapterCacheKey}`;
+  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${sig}|${DEPENDENCY_ABI_PREFIX}${String(DEPENDENCY_ABI_VERSION)}|${adapterCacheKey}`;
 }

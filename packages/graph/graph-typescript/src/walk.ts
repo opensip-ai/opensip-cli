@@ -110,10 +110,11 @@ export interface DependencySiteRecord {
   readonly line: number;
   /** 0-based column. */
   readonly column: number;
-  /** How the dependency statement is written (P2 Phase 0). */
-  readonly form: DependencyForm;
+  /** How the dependency statement is written (P2 Phase 0). The TS walk always
+   *  sets form+role; typed optional only to match the polyglot contract. */
+  readonly form?: DependencyForm;
   /** The executable role of the dependency (P2 Phase 0). */
-  readonly role: DependencyRole;
+  readonly role?: DependencyRole;
 }
 
 /**
