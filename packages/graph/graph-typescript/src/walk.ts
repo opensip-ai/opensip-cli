@@ -37,7 +37,12 @@ import { synthesizeModuleInit } from './inventory-visitors/module-init.js';
 import { isTypescriptTestFile } from './test-file.js';
 
 import type { VisitorContext } from './inventory-visitors/types.js';
-import type { FunctionOccurrence, ParseError } from '@opensip-cli/graph';
+import type {
+  DependencyForm,
+  DependencyRole,
+  FunctionOccurrence,
+  ParseError,
+} from '@opensip-cli/graph';
 
 /**
  * A node the unified walk identified as a candidate Stage 2 resolver
@@ -105,6 +110,11 @@ export interface DependencySiteRecord {
   readonly line: number;
   /** 0-based column. */
   readonly column: number;
+  /** How the dependency statement is written (P2 Phase 0). The TS walk always
+   *  sets form+role; typed optional only to match the polyglot contract. */
+  readonly form?: DependencyForm;
+  /** The executable role of the dependency (P2 Phase 0). */
+  readonly role?: DependencyRole;
 }
 
 /**
@@ -189,48 +199,123 @@ export function walkProgram(input: WalkInput): WalkOutput {
 }
 
 /**
- * Walk a source file's top-level statements for `ImportDeclaration`
- * and `ImportEqualsDeclaration` nodes; emit one `DependencySiteRecord`
- * per import with a string module specifier. The owner is the file's
- * synthesized module-init occurrence (every file has exactly one).
- *
- * Phase 4 of opensip's substrate consolidation (DEC-498). Out of
- * scope at v1: re-exports (`ExportDeclaration` with `moduleSpecifier`),
- * dynamic imports (`import(…)` expressions), and side-effect imports
- * with no specifier identifier.
+ * Walk a source file for module-level dependency statements and emit one
+ * {@link DependencySiteRecord} per statement, classified by form and role
+ * (P2 Phase 0). From the top-level statements:
+ *   - `import …` / `import type …` declarations (runtime/type-only/mixed/side-effect)
+ *   - `import x = require('…')` import-equals (runtime, or type-only)
+ *   - `export … from '…'` re-exports (runtime/type-only/mixed)
+ * and, from anywhere in the file (dynamic forms can appear in any expression):
+ *   - literal `import('…')` dynamic imports (runtime)
+ *   - literal `require('…')` CommonJS calls (runtime)
+ * The owner is always the file's synthesized module-init occurrence. Nonliteral
+ * specifiers and source text are never retained.
  */
 function collectDependencySites(
   sourceFile: ts.SourceFile,
   moduleInit: FunctionOccurrence,
   out: DependencySiteRecord[],
 ): void {
-  for (const stmt of sourceFile.statements) {
-    let specifierNode: ts.Expression | undefined;
-    if (ts.isImportDeclaration(stmt)) {
-      specifierNode = stmt.moduleSpecifier;
-    } else if (
-      ts.isImportEqualsDeclaration(stmt) &&
-      ts.isExternalModuleReference(stmt.moduleReference) &&
-      stmt.moduleReference.expression !== undefined
-    ) {
-      specifierNode = stmt.moduleReference.expression;
-    }
-    if (specifierNode === undefined || !ts.isStringLiteral(specifierNode)) {
-      continue;
-    }
-    const startPos = stmt.getStart(sourceFile);
-    const lineChar = sourceFile.getLineAndCharacterOfPosition(startPos);
+  const push = (node: ts.Node, specifier: string, form: DependencyForm, role: DependencyRole) => {
+    const lineChar = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
     out.push({
-      node: stmt,
+      node,
       sourceFile,
       ownerHash: moduleInit.bodyHash,
       ownerLine: moduleInit.line,
       ownerColumn: moduleInit.column,
-      specifier: specifierNode.text,
+      specifier,
       line: lineChar.line + 1,
       column: lineChar.character,
+      form,
+      role,
     });
+  };
+
+  // Static top-level statements: import declarations, import-equals, re-exports.
+  for (const stmt of sourceFile.statements) {
+    if (ts.isImportDeclaration(stmt) && ts.isStringLiteral(stmt.moduleSpecifier)) {
+      push(
+        stmt,
+        stmt.moduleSpecifier.text,
+        'import-declaration',
+        classifyImportClauseRole(stmt.importClause),
+      );
+    } else if (
+      ts.isImportEqualsDeclaration(stmt) &&
+      ts.isExternalModuleReference(stmt.moduleReference) &&
+      stmt.moduleReference.expression !== undefined &&
+      ts.isStringLiteral(stmt.moduleReference.expression)
+    ) {
+      push(
+        stmt,
+        stmt.moduleReference.expression.text,
+        'import-equals',
+        stmt.isTypeOnly ? 'type-only' : 'runtime',
+      );
+    } else if (
+      ts.isExportDeclaration(stmt) &&
+      stmt.moduleSpecifier !== undefined &&
+      ts.isStringLiteral(stmt.moduleSpecifier)
+    ) {
+      push(stmt, stmt.moduleSpecifier.text, 're-export', classifyReExportRole(stmt));
+    }
   }
+
+  // Dynamic forms anywhere in the file: literal `import('…')` and `require('…')`.
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        const arg = node.arguments[0];
+        if (arg !== undefined && ts.isStringLiteral(arg)) {
+          push(node, arg.text, 'dynamic-import', 'runtime');
+        }
+      } else if (
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'require' &&
+        node.arguments.length > 0 &&
+        ts.isStringLiteral(node.arguments[0])
+      ) {
+        push(node, node.arguments[0].text, 'commonjs-require', 'runtime');
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(sourceFile, visit);
+}
+
+/** Executable role of an `import …` declaration, from its clause. */
+function classifyImportClauseRole(clause: ts.ImportClause | undefined): DependencyRole {
+  if (clause === undefined) return 'side-effect'; // `import '…'`
+  // sonarjs/deprecation false positive: the ImportClause.isTypeOnly PROPERTY is
+  // not deprecated — only the same-named createImportClause() factory PARAM is.
+  // eslint-disable-next-line sonarjs/deprecation -- ImportClause.isTypeOnly property is not deprecated
+  if (clause.isTypeOnly) return 'type-only'; // `import type …`
+  const named = clause.namedBindings;
+  if (named !== undefined && ts.isNamedImports(named)) {
+    const hasValue = clause.name !== undefined || named.elements.some((e) => !e.isTypeOnly);
+    const hasType = named.elements.some((e) => e.isTypeOnly);
+    if (hasType && !hasValue) return 'type-only';
+    if (hasType && hasValue) return 'mixed';
+    return 'runtime';
+  }
+  // Default import, `import * as ns`, or default + namespace — all runtime.
+  return 'runtime';
+}
+
+/** Executable role of a re-export (`export … from`), from its clause. */
+function classifyReExportRole(stmt: ts.ExportDeclaration): DependencyRole {
+  if (stmt.isTypeOnly) return 'type-only'; // `export type { … } from`
+  const clause = stmt.exportClause;
+  if (clause !== undefined && ts.isNamedExports(clause)) {
+    const hasType = clause.elements.some((e) => e.isTypeOnly);
+    const hasValue = clause.elements.some((e) => !e.isTypeOnly);
+    if (hasType && !hasValue) return 'type-only';
+    if (hasType && hasValue) return 'mixed';
+    return 'runtime';
+  }
+  // `export * from` / `export * as ns from` — runtime.
+  return 'runtime';
 }
 
 /**

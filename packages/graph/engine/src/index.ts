@@ -42,6 +42,11 @@ export type {
   FunctionOccurrence,
   CallEdge,
   DependencyEdge,
+  DependencyClassification,
+  DependencyForm,
+  DependencyRole,
+  DependencyTargetKind,
+  DependencyResolutionBasis,
   Param,
   Indexes,
   Rule,
@@ -65,6 +70,9 @@ export type {
   PersistedFeatures,
   PersistedFunctionFeatures,
 } from './types.js';
+// Dependency-classification validator (P2 Phase 0) — a value: producers and the
+// CatalogRepo re-validator constrain form→role pairs to the closed set.
+export { isValidDependencyFormRole } from './types.js';
 // `Shard` / `ShardBuildResult` are orchestration internals (sharded build
 // model) consumed only by tests — moved to ./internal (ADR-0009, Finding 3).
 

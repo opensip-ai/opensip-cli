@@ -16,6 +16,7 @@ import { requireDrizzleHandle, type DrizzleDataStore } from '@opensip-cli/datast
 import { sql } from 'drizzle-orm';
 
 import { isSafeShardedCacheAnchor } from '../cache/sharded-cache-key.js';
+import { isValidDependencyFormRole } from '../types.js';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
 
@@ -225,6 +226,39 @@ function hasBoundedOccurrenceContainers(
   );
 }
 
+const DEPENDENCY_TARGET_KINDS = new Set([
+  'catalog-source',
+  'declaration-file',
+  'external',
+  'unresolved',
+]);
+const DEPENDENCY_RESOLUTION_BASES = new Set([
+  'catalog-target',
+  'workspace-manifest',
+  'external-specifier',
+  'unresolved',
+]);
+
+/**
+ * Validate a persisted {@link DependencyEdge} classification after JSON decode
+ * (P2 Phase 0): closed-set form/role (a valid pair), closed-set targetKind/basis,
+ * bounded reason text, and — when present — a bounded `resolvedPackage`. A
+ * malformed/oversized classification on a TAMPERED catalog is rejected fail-closed
+ * before projection, never silently loaded.
+ */
+function isSafeDependencyClassification(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const { form, role, targetKind, basis, reason, resolvedPackage } = value;
+  if (typeof form !== 'string' || typeof role !== 'string') return false;
+  // `isValidDependencyFormRole` also constrains each axis to its closed set.
+  if (!isValidDependencyFormRole(form as never, role as never)) return false;
+  if (typeof targetKind !== 'string' || !DEPENDENCY_TARGET_KINDS.has(targetKind)) return false;
+  if (typeof basis !== 'string' || !DEPENDENCY_RESOLUTION_BASES.has(basis)) return false;
+  if (!isSafeCatalogText(reason)) return false;
+  if (resolvedPackage !== undefined && !isSafeCatalogText(resolvedPackage)) return false;
+  return true;
+}
+
 function addBoundedEdges(
   edges: readonly unknown[],
   counts: { edges: number; targets: number },
@@ -234,6 +268,11 @@ function addBoundedEdges(
   for (const edge of edges) {
     if (!isRecord(edge) || !Array.isArray(edge.to)) continue;
     if (edge.to.length > MAX_TARGETS_PER_EDGE) return false;
+    // Dependency edges carry an optional atomic classification; call edges never
+    // do (`classification` is undefined and the check is skipped).
+    if (edge.classification !== undefined && !isSafeDependencyClassification(edge.classification)) {
+      return false;
+    }
     counts.targets += edge.to.length;
     if (counts.targets > MAX_NESTED_TARGETS) return false;
   }

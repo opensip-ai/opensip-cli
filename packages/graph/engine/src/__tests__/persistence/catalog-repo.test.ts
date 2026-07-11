@@ -143,6 +143,106 @@ describe('CatalogRepo', () => {
     expect(() => repo.loadFullCatalog()).toThrow('Malformed catalog payload');
   });
 
+  function moduleInitWithClassification(classification: unknown): Catalog {
+    const occ: FunctionOccurrence = {
+      bodyHash: 'mi',
+      simpleName: '<module-init>',
+      qualifiedName: 'a.ts.<module-init>',
+      filePath: 'a.ts',
+      line: 1,
+      column: 0,
+      endLine: 1,
+      kind: 'module-init',
+      params: [],
+      returnType: null,
+      enclosingClass: null,
+      decorators: [],
+      visibility: 'module-local',
+      inTestFile: false,
+      definedInGenerated: false,
+      calls: [],
+      dependencies: [
+        { to: [], line: 1, column: 0, specifier: '@scope/dep', classification } as never,
+      ],
+    };
+    return makeCatalog({ functions: { '<module-init>': [occ] } });
+  }
+
+  it('round-trips a valid dependency classification (P2 Phase 0)', () => {
+    repo.replaceAll(
+      moduleInitWithClassification({
+        form: 'import-declaration',
+        role: 'runtime',
+        targetKind: 'declaration-file',
+        basis: 'workspace-manifest',
+        reason: 'workspace-declaration-entry',
+        resolvedPackage: '@scope/dep',
+      }),
+    );
+    const c =
+      repo.loadFullCatalog()?.functions['<module-init>']?.[0]?.dependencies?.[0]?.classification;
+    expect(c?.form).toBe('import-declaration');
+    expect(c?.resolvedPackage).toBe('@scope/dep');
+  });
+
+  it.each([
+    [
+      'unknown form',
+      { form: 'bogus', role: 'runtime', targetKind: 'external', basis: 'unresolved', reason: 'x' },
+    ],
+    [
+      'impossible form+role',
+      {
+        form: 'dynamic-import',
+        role: 'type-only',
+        targetKind: 'external',
+        basis: 'unresolved',
+        reason: 'x',
+      },
+    ],
+    [
+      'unknown targetKind',
+      {
+        form: 'import-declaration',
+        role: 'runtime',
+        targetKind: 'bogus',
+        basis: 'unresolved',
+        reason: 'x',
+      },
+    ],
+    [
+      'unknown basis',
+      {
+        form: 'import-declaration',
+        role: 'runtime',
+        targetKind: 'external',
+        basis: 'bogus',
+        reason: 'x',
+      },
+    ],
+    [
+      'missing reason',
+      { form: 'import-declaration', role: 'runtime', targetKind: 'external', basis: 'unresolved' },
+    ],
+    [
+      'oversized reason',
+      {
+        form: 'import-declaration',
+        role: 'runtime',
+        targetKind: 'external',
+        basis: 'unresolved',
+        reason: 'x'.repeat(1_000_000),
+      },
+    ],
+  ])('fails closed on a malformed dependency classification (%s)', (_label, classification) => {
+    repo.replaceAll(makeCatalog());
+    const db = requireDrizzleHandle(datastore).db;
+    db.run(
+      sql`UPDATE graph_catalog SET payload = ${JSON.stringify(moduleInitWithClassification(classification))} WHERE id = 1`,
+    );
+    expect(() => repo.loadFullCatalog()).toThrow(/Malformed catalog/);
+  });
+
   it('keeps structurally bounded malformed symbol rows queryable for partial projection', () => {
     repo.replaceAll(
       makeCatalog({

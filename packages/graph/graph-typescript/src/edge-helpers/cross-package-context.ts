@@ -65,8 +65,12 @@ export function buildCrossPackageContext(
  * stops at the first `package.json` (or the project root) — so a monorepo with
  * `packages/<ns>/<pkg>/package.json` resolves each leaf package, not the
  * workspace root. Deduped by root dir.
+ *
+ * Exported so a caller that needs ONLY the manifest index (dependency resolution)
+ * can `buildPackageManifestIndexFromRoots(derivePackageRoots(...))` directly,
+ * without building and discarding the (call-resolution-only) export index.
  */
-function derivePackageRoots(catalog: Catalog, projectDirAbs: string): string[] {
+export function derivePackageRoots(catalog: Catalog, projectDirAbs: string): string[] {
   const rootDirs = new Set<string>();
   const projectRootAbs = normalizeDir(projectDirAbs);
 

@@ -14,11 +14,18 @@ import { describe, expect, it } from 'vitest';
 import {
   diffCatalogsByEdge,
   mergeShardFragments,
+  reattributeDeclarationDependencies,
   resolveCrossBoundaryCalls,
 } from '../cross-shard-resolve.js';
 
 import type { PackageManifest, PackageManifestIndex } from '../../../cross-package/export-index.js';
-import type { Catalog, CallEdge, CrossBoundaryCall, FunctionOccurrence } from '../../../types.js';
+import type {
+  Catalog,
+  CallEdge,
+  CrossBoundaryCall,
+  DependencyEdge,
+  FunctionOccurrence,
+} from '../../../types.js';
 import type { Shard } from '../shard-model.js';
 
 function occ(
@@ -91,6 +98,91 @@ function crossEdge(catalog: Catalog): CallEdge | undefined {
     catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard)
   );
 }
+
+describe('reattributeDeclarationDependencies (P2 Phase 0)', () => {
+  function moduleInitWithDeps(
+    filePath: string,
+    deps: readonly DependencyEdge[],
+  ): FunctionOccurrence {
+    return {
+      ...occ('<module-init>', filePath, `mi-${filePath}`),
+      kind: 'module-init',
+      dependencies: deps,
+    };
+  }
+
+  function depEdge(
+    specifier: string,
+    line: number,
+    classification: DependencyEdge['classification'],
+  ): DependencyEdge {
+    return { to: [], line, column: 0, specifier, ...(classification && { classification }) };
+  }
+
+  it('fills a cross-shard workspace declaration import from the complete manifest index', () => {
+    const unmapped = depEdge('@scope/dep', 1, {
+      form: 'import-declaration',
+      role: 'runtime',
+      targetKind: 'declaration-file',
+      basis: 'unresolved',
+      reason: 'workspace-declaration-unmapped',
+    });
+    const external = depEdge('lodash', 2, {
+      form: 'import-declaration',
+      role: 'runtime',
+      targetKind: 'external',
+      basis: 'external-specifier',
+      reason: 'external-package',
+    });
+    const catalog = fragment('typescript', moduleInitWithDeps('pkgA/a.ts', [unmapped, external]));
+
+    const out = reattributeDeclarationDependencies(
+      catalog,
+      manifests(manifest('@scope/dep', 'packages/dep')),
+    );
+    const deps = out.functions['<module-init>'][0].dependencies!;
+
+    const filled = deps.find((d) => d.specifier === '@scope/dep')!.classification!;
+    expect(filled.basis).toBe('workspace-manifest');
+    expect(filled.resolvedPackage).toBe('@scope/dep');
+    expect(filled.reason).toBe('workspace-declaration-entry');
+    // A genuine external import is never re-attributed.
+    const ext = deps.find((d) => d.specifier === 'lodash')!.classification!;
+    expect(ext.resolvedPackage).toBeUndefined();
+    expect(ext.reason).toBe('external-package');
+  });
+
+  it('re-attributes an external-declaration reason (workspace resolved via node_modules)', () => {
+    const viaNodeModules = depEdge('@scope/dep', 1, {
+      form: 'import-declaration',
+      role: 'runtime',
+      targetKind: 'external',
+      basis: 'external-specifier',
+      reason: 'external-declaration',
+    });
+    const catalog = fragment('typescript', moduleInitWithDeps('pkgA/a.ts', [viaNodeModules]));
+    const out = reattributeDeclarationDependencies(
+      catalog,
+      manifests(manifest('@scope/dep', 'packages/dep')),
+    );
+    const c = out.functions['<module-init>'][0].dependencies![0].classification!;
+    expect(c.targetKind).toBe('declaration-file');
+    expect(c.resolvedPackage).toBe('@scope/dep');
+  });
+
+  it('returns the SAME catalog reference when nothing needs re-attribution', () => {
+    const alreadyResolved = depEdge('@scope/dep', 1, {
+      form: 'import-declaration',
+      role: 'runtime',
+      targetKind: 'declaration-file',
+      basis: 'workspace-manifest',
+      reason: 'workspace-declaration-entry',
+      resolvedPackage: '@scope/dep',
+    });
+    const catalog = fragment('typescript', moduleInitWithDeps('pkgA/a.ts', [alreadyResolved]));
+    expect(reattributeDeclarationDependencies(catalog, EMPTY_MANIFESTS)).toBe(catalog);
+  });
+});
 
 describe('mergeShardFragments', () => {
   it('unions occurrences from every fragment, preserving intra-shard calls', () => {

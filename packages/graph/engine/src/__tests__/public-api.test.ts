@@ -58,6 +58,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'hashBody',
   'isBuiltInGraphRecipe',
   'isTestFilePath',
+  'isValidDependencyFormRole',
   'languageOfFile',
   'linkExported',
   'lshBandHashes',
