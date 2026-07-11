@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
+  collectBundledToolDocProblems,
   collectGovernanceDriftProblems,
   readGovernanceFacts,
 } from '../lib/release-governance-surface.mjs';
@@ -80,6 +81,46 @@ test('package catalog verification trail matches publishable count or source-of-
     /release-package-order\.mjs/.test(catalog) ||
     new RegExp(`\\b${publishableCount}\\s+publishable\\s+packages\\b`).test(catalog);
   assert.ok(hasSourceOfTruth, 'package catalog must cite source of truth or correct count');
+});
+
+test('collectBundledToolDocProblems binds bundled-tool prose to the manifest count', () => {
+  // Facts are injected; the expected count/word is DERIVED, never a test literal.
+  const facts = { bundledToolPackageNames: ['a', 'b', 'c', 'd', 'e'] }; // 5 → "five"
+  const stale = collectBundledToolDocProblems(
+    'AGENTS.md',
+    'Today it ships with four bundled tools: fit, graph, sim, yagni.',
+    facts,
+  );
+  assert.ok(
+    stale.some((p) => /five \(5\) bundled tools/.test(p)),
+    'a stale count is an actionable problem',
+  );
+  assert.ok(
+    stale.some((p) => /bundled-tools\.manifest\.json/.test(p)),
+    'a missing source-of-truth citation is flagged',
+  );
+  // A correct, manifest-cited rendering passes with no problems.
+  assert.deepEqual(
+    collectBundledToolDocProblems(
+      'AGENTS.md',
+      'It ships with the five bundled tools declared in bundled-tools.manifest.json.',
+      facts,
+    ),
+    [],
+  );
+  // A missing doc is a hard problem, not a silent pass.
+  assert.ok(collectBundledToolDocProblems('AGENTS.md', '', facts).some((p) => /missing/.test(p)));
+});
+
+test('the real AGENTS.md and CLAUDE.md describe the derived bundled-tool set', () => {
+  const facts = readGovernanceFacts();
+  for (const doc of ['AGENTS.md', 'CLAUDE.md']) {
+    assert.deepEqual(
+      collectBundledToolDocProblems(doc, read(doc), facts),
+      [],
+      `${doc} bundled-tool prose drifted from the manifest`,
+    );
+  }
 });
 
 test('readGovernanceFacts fails closed on source disagreement (returns no partial facts)', () => {

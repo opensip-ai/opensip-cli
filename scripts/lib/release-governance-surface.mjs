@@ -24,10 +24,64 @@ const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const PRIVATE_ROOT_NAME = '@opensip-cli/root';
 const BUNDLED_MANIFEST = 'packages/cli/src/bootstrap/bundled-tools.manifest.json';
 
+/** Contributor/agent docs whose bundled-tool prose is bound to the manifest. */
+const CONTRIBUTOR_DOCS = ['AGENTS.md', 'CLAUDE.md'];
+
+const NUMBER_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+];
+
+/** Small-integer English word (for prose counts), or the digits for larger n. */
+function numberWord(n) {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
 function byCodePoint(a, b) {
   if (a < b) return -1;
   if (a > b) return 1;
   return 0;
+}
+
+/**
+ * Pure text projection: a doc that enumerates the bundled Tools must state the
+ * manifest-derived count (as an English word) and cite the manifest as the source
+ * of truth — never a frozen literal. Returns actionable drift problems (ADR-0151).
+ *
+ * @param {string} docName
+ * @param {string} text doc contents ('' when the doc is absent)
+ * @param {{ bundledToolPackageNames: readonly string[] }} facts
+ * @returns {string[]}
+ */
+export function collectBundledToolDocProblems(docName, text, facts) {
+  const problems = [];
+  if (!text) {
+    problems.push(`${docName}: missing — cannot verify bundled-tool facts`);
+    return problems;
+  }
+  const bundledCount = facts.bundledToolPackageNames.length;
+  const word = numberWord(bundledCount);
+  if (!new RegExp(String.raw`\b${word}\s+bundled\s+tools\b`, 'i').test(text)) {
+    problems.push(
+      `${docName} must describe ${word} (${bundledCount}) bundled tools, derived from ` +
+        `${BUNDLED_MANIFEST}. Update the count if a bundled tool was added or removed.`,
+    );
+  }
+  if (!text.includes('bundled-tools.manifest.json')) {
+    problems.push(
+      `${docName} must cite bundled-tools.manifest.json as the bundled-tool source of truth.`,
+    );
+  }
+  return problems;
 }
 
 /**
@@ -214,6 +268,11 @@ export function collectGovernanceDriftProblems() {
         `docs/public/70-reference/02-package-catalog.md verification trail claims ${match[1]} publishable packages; expected ${publishableCount}.`,
       );
     }
+  }
+
+  // Contributor/agent docs must describe the manifest-derived bundled-tool set.
+  for (const doc of CONTRIBUTOR_DOCS) {
+    problems.push(...collectBundledToolDocProblems(doc, readRepoFile(doc), facts));
   }
 
   return problems;
