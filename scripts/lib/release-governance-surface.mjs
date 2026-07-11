@@ -6,16 +6,110 @@
  * carry stale literal counts.
  */
 
+import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RELEASE_PACKAGE_ORDER } from '../release-package-order.mjs';
 
+const require = createRequire(import.meta.url);
+const { readWorkspacePackageManifests } = require('./workspace-package-manifests.cjs');
+const { readProductionToolPackageInventory } = require('./workspace-tool-package-inventory.cjs');
+
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
-/** Private package.json files that share the product version during bump. */
-export const PRIVATE_VERSIONED_PACKAGE_JSON_COUNT = 2;
+/** The private, version-bumped root manifest (`@opensip-cli/root`), which is NOT
+ * a workspace package. */
+const PRIVATE_ROOT_NAME = '@opensip-cli/root';
+const BUNDLED_MANIFEST = 'packages/cli/src/bootstrap/bundled-tools.manifest.json';
+
+const byCodePoint = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * One immutable projection over the canonical package/Tool authorities:
+ * `readWorkspacePackageManifests`, `RELEASE_PACKAGE_ORDER`,
+ * `readProductionToolPackageInventory`, and `bundled-tools.manifest.json`.
+ * Generators and drift checks consume this instead of recomputing or freezing
+ * literal counts. Fails closed on any disagreement between the sources (ADR-0151).
+ *
+ * @param {string} [repoRoot]
+ */
+export function readGovernanceFacts(repoRoot = REPO_ROOT) {
+  const records = readWorkspacePackageManifests(repoRoot);
+  const workspaceNames = records.map((r) => r.name).sort(byCodePoint);
+  const privateNames = records
+    .filter((r) => r.private)
+    .map((r) => r.name)
+    .sort(byCodePoint);
+  const publishableNames = records
+    .filter((r) => !r.private)
+    .map((r) => r.name)
+    .sort(byCodePoint);
+  const releaseOrderNames = RELEASE_PACKAGE_ORDER.map((p) => p.name);
+
+  // RELEASE_PACKAGE_ORDER must equal the publishable workspace set.
+  const publishableSet = new Set(publishableNames);
+  const orderSet = new Set(releaseOrderNames);
+  if (orderSet.size !== releaseOrderNames.length) {
+    throw new Error('RELEASE_PACKAGE_ORDER contains a duplicate package');
+  }
+  for (const name of releaseOrderNames) {
+    if (!publishableSet.has(name)) {
+      throw new Error(`RELEASE_PACKAGE_ORDER includes ${name}, not a publishable workspace package`);
+    }
+  }
+  for (const name of publishableNames) {
+    if (!orderSet.has(name)) {
+      throw new Error(`publishable workspace package ${name} is missing from RELEASE_PACKAGE_ORDER`);
+    }
+  }
+  for (const name of privateNames) {
+    if (orderSet.has(name)) {
+      throw new Error(`private workspace package ${name} must not appear in RELEASE_PACKAGE_ORDER`);
+    }
+  }
+  if (workspaceNames.includes(PRIVATE_ROOT_NAME)) {
+    throw new Error(`${PRIVATE_ROOT_NAME} is the private root manifest and must not be a workspace package`);
+  }
+
+  // Bundled Tool facts cross-checked against the production Tool inventory.
+  const bundledRaw = readRepoFile(BUNDLED_MANIFEST);
+  const bundled = bundledRaw ? JSON.parse(bundledRaw) : {};
+  const bundledToolPackageNames = Array.isArray(bundled.bundledPackages)
+    ? [...bundled.bundledPackages]
+    : [];
+  const toolInventory = readProductionToolPackageInventory(repoRoot);
+  const toolByName = new Map(toolInventory.map((t) => [t.name, t]));
+  for (const name of bundledToolPackageNames) {
+    const rec = toolByName.get(name);
+    if (!rec) {
+      throw new Error(`bundled manifest names ${name}, absent from the production Tool inventory`);
+    }
+    if (rec.bundled !== true) {
+      throw new Error(`bundled manifest names ${name}, but the Tool inventory does not classify it bundled`);
+    }
+  }
+
+  // Versioned package.json files = every publishable + every private workspace
+  // package (all share the product version) + the private root manifest.
+  const versionedPackageJsonCount = publishableNames.length + privateNames.length + 1;
+
+  return Object.freeze({
+    workspacePackageNames: Object.freeze(workspaceNames),
+    workspacePackageCount: records.length,
+    publishableNames: Object.freeze(publishableNames),
+    publishableCount: publishableNames.length,
+    releaseOrderNames: Object.freeze([...releaseOrderNames]),
+    privateWorkspaceNames: Object.freeze(privateNames),
+    privateWorkspaceCount: privateNames.length,
+    scopedPublishableCount: publishableNames.filter((n) => n.startsWith('@opensip-cli/')).length,
+    privateRootName: PRIVATE_ROOT_NAME,
+    versionedPackageJsonCount,
+    bundledToolPackageNames: Object.freeze(bundledToolPackageNames),
+    productionToolPackageNames: Object.freeze(toolInventory.map((t) => t.name).sort(byCodePoint)),
+  });
+}
 
 const STALE_COUNT_PATTERNS = [
   /\ball\s+33\b/i,
@@ -38,11 +132,10 @@ function readRepoFile(relPath) {
  */
 export function collectGovernanceDriftProblems() {
   const problems = [];
-  const publishableCount = RELEASE_PACKAGE_ORDER.length;
-  const scopedPublishableCount = RELEASE_PACKAGE_ORDER.filter((p) =>
-    p.name.startsWith('@opensip-cli/'),
-  ).length;
-  const versionedPackageJsonCount = publishableCount + PRIVATE_VERSIONED_PACKAGE_JSON_COUNT;
+  const facts = readGovernanceFacts();
+  const publishableCount = facts.publishableCount;
+  const scopedPublishableCount = facts.scopedPublishableCount;
+  const versionedPackageJsonCount = facts.versionedPackageJsonCount;
 
   const releasingMd = readRepoFile('RELEASING.md');
   const releaseYml = readRepoFile('.github/workflows/release.yml');
@@ -92,7 +185,7 @@ export function collectGovernanceDriftProblems() {
   const versionedProse = new RegExp(`${versionedPackageJsonCount}\\s+\`package\\.json\` files`);
   if (!versionedProse.test(releasingMd)) {
     problems.push(
-      `RELEASING.md must state ${versionedPackageJsonCount} package.json files for version bumps (${publishableCount} publishable + ${PRIVATE_VERSIONED_PACKAGE_JSON_COUNT} private).`,
+      `RELEASING.md must state ${versionedPackageJsonCount} package.json files for version bumps (${publishableCount} publishable + ${facts.privateWorkspaceCount} private workspace + the private root).`,
     );
   }
 

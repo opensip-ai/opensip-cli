@@ -59,13 +59,17 @@ export interface ToolCliContext { readonly b: 2 }
     assert.ok(!seams.includes('list'));
   });
 
-  it('workspace inventory is 58 packages (56 publishable, 2 private)', () => {
+  it('workspace inventory reconciles publishable + private (derived, structural identities)', () => {
     const records = readWorkspacePackageManifests(REPO);
-    assert.equal(records.length, 58);
     const priv = records.filter((r) => r.private);
-    assert.equal(priv.length, 2);
-    const names = new Set(priv.map((r) => r.name));
-    assert.ok(names.has('@opensip-cli/test-support'));
-    assert.ok(names.has('@opensip-cli/checks-dogfood'));
+    // Relationship, not a frozen number: total = publishable + private.
+    assert.equal(records.length, records.filter((r) => !r.private).length + priv.length);
+    // The two known private ownership packages (identity, not a literal count).
+    assert.deepEqual(
+      priv.map((r) => r.name).sort(),
+      ['@opensip-cli/checks-dogfood', '@opensip-cli/test-support'],
+    );
+    const names = records.map((r) => r.name);
+    assert.equal(new Set(names).size, names.length, 'unique names');
   });
 });

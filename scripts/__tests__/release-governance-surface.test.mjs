@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
-  PRIVATE_VERSIONED_PACKAGE_JSON_COUNT,
   collectGovernanceDriftProblems,
+  readGovernanceFacts,
 } from '../lib/release-governance-surface.mjs';
 import { RELEASE_PACKAGE_ORDER } from '../release-package-order.mjs';
 
@@ -21,23 +21,42 @@ test('release governance surface has no stale package-count drift', () => {
   assert.deepEqual(problems, [], problems.length > 0 ? problems.join('\n') : undefined);
 });
 
-test('publishable count matches RELEASE_PACKAGE_ORDER', () => {
-  const publishableCount = RELEASE_PACKAGE_ORDER.length;
-  const scopedCount = RELEASE_PACKAGE_ORDER.filter((p) =>
-    p.name.startsWith('@opensip-cli/'),
-  ).length;
-  assert.equal(publishableCount, 56);
-  assert.equal(scopedCount, 55);
-  assert.equal(RELEASE_PACKAGE_ORDER.at(-1)?.name, 'opensip-cli');
+test('release order equals the derived publishable workspace set (no frozen counts)', () => {
+  const facts = readGovernanceFacts();
+  // Relationships between the sources, not a frozen number.
+  assert.equal(RELEASE_PACKAGE_ORDER.length, facts.publishableCount);
+  assert.deepEqual(
+    RELEASE_PACKAGE_ORDER.map((p) => p.name).sort(),
+    [...facts.publishableNames].sort(),
+  );
+  // Structural identities that hold regardless of package count.
+  assert.equal(RELEASE_PACKAGE_ORDER.at(-1)?.name, 'opensip-cli', 'CLI publishes last');
+  assert.equal(
+    facts.scopedPublishableCount,
+    facts.publishableCount - 1,
+    'exactly one unscoped publishable package (opensip-cli)',
+  );
+  assert.deepEqual(
+    [...facts.privateWorkspaceNames],
+    ['@opensip-cli/checks-dogfood', '@opensip-cli/test-support'],
+    'the two known private workspace packages',
+  );
 });
 
-test('RELEASING.md version surfaces distinguish publishable vs private package.json files', () => {
+test('RELEASING.md version surfaces match the derived governance facts', () => {
+  const facts = readGovernanceFacts();
   const releasingMd = read('RELEASING.md');
-  const publishableCount = RELEASE_PACKAGE_ORDER.length;
-  const versionedCount = publishableCount + PRIVATE_VERSIONED_PACKAGE_JSON_COUNT;
-  assert.match(releasingMd, new RegExp(`## The ${publishableCount} packages`));
-  assert.match(releasingMd, new RegExp(`All ${publishableCount} publishable packages`));
-  assert.match(releasingMd, new RegExp(`${versionedCount}\\s+\`package\\.json\` files`));
+  assert.match(releasingMd, new RegExp(`## The ${facts.publishableCount} packages`));
+  assert.match(releasingMd, new RegExp(`All ${facts.publishableCount} publishable packages`));
+  assert.match(releasingMd, new RegExp(`${facts.versionedPackageJsonCount}\\s+\`package\\.json\` files`));
+  // Must name both private workspace packages + the private root manifest.
+  for (const name of [...facts.privateWorkspaceNames, facts.privateRootName]) {
+    assert.match(
+      releasingMd,
+      new RegExp(name.replaceAll(/[/@\-.]/g, String.raw`\$&`)),
+      `RELEASING.md must name ${name}`,
+    );
+  }
 });
 
 test('release.yml pack comment avoids stale literal package counts', () => {

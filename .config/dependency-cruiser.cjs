@@ -29,8 +29,7 @@
  *   4. @opensip-cli/tool-*         — external scanner Tool adapters
  *   5. @opensip-cli/checks-*       — fitness check packs (depend on fitness)
  *   5. @opensip-cli/graph-*        — graph adapter packs (depend on graph)
- *   6. opensip-cli                 — CLI composition root (loads Tools dynamically;
- *                                    no static Tool source imports — ADR-0151)
+ *   6. opensip-cli                 — CLI composition root (loads Tools dynamically, no static Tool imports)
  *
  *   (workspace-private, outside the runtime layers: @opensip-cli/test-support —
  *   cross-package test scaffolding, ADR-0040; only test files may import it.)

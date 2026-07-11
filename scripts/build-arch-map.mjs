@@ -9,15 +9,13 @@
  * subprocess fallback).
  */
 
-import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
 
-const require = createRequire(import.meta.url);
-const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
+import { readGovernanceFacts } from './lib/release-governance-surface.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT_PATH = join(REPO_ROOT, 'docs/public/80-implementation/architecture-map.md');
@@ -91,14 +89,14 @@ function readToolCliSeams() {
 }
 
 function packageInventorySummary(repoRoot = REPO_ROOT) {
-  const records = readWorkspacePackageManifests(repoRoot);
-  const privateCount = records.filter((r) => r.private).length;
-  const publishableCount = records.length - privateCount;
+  // Derived from the single governance projection so counts/names never drift
+  // from the release-order + workspace-manifest sources (ADR-0151).
+  const facts = readGovernanceFacts(repoRoot);
   return {
-    total: records.length,
-    publishable: publishableCount,
-    private: privateCount,
-    names: records.map((r) => r.name).sort((a, b) => a.localeCompare(b)),
+    total: facts.workspacePackageCount,
+    publishable: facts.publishableCount,
+    private: facts.privateWorkspaceCount,
+    names: [...facts.workspacePackageNames].sort((a, b) => a.localeCompare(b)),
   };
 }
 
