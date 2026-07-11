@@ -82,7 +82,9 @@ describe('suite step helpers', () => {
           envelope({
             verification: TRUST,
             // Minimal signal stub carrying only the trust metadata under test.
-            signals: [{ metadata: { trust: fallbackTrust } }] as unknown as SignalEnvelope['signals'],
+            signals: [
+              { metadata: { trust: fallbackTrust } },
+            ] as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toBe(TRUST);

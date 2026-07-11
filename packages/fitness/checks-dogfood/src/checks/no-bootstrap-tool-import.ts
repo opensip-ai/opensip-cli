@@ -45,14 +45,20 @@ const CLI_HOST_PATH = 'packages/cli/src/';
  * packages avoids false positives on core helpers that also end in `Tool`
  * (`defineTool`, `admitTool`, `assertManifestMatchesTool`). dependency-cruiser's
  * manifest-derived rule remains authoritative for a Tool with any package name. */
-const TOOL_PACKAGE_RE = /^@opensip-cli\/(?:fitness|graph|simulation|yagni|mcp|tool-[a-z0-9-]+)(?:\/.*)?$/;
+const TOOL_PACKAGE_RE =
+  /^@opensip-cli\/(?:fitness|graph|simulation|yagni|mcp|tool-[a-z0-9-]+)(?:\/.*)?$/;
 
 /** A Tool runtime export is conventionally `tool` (the generic alias) or `*Tool`. */
 function isToolRuntimeName(name: string): boolean {
   return name === 'tool' || /Tool$/.test(name);
 }
 
-function violation(sourceFile: ts.SourceFile, node: ts.Node, detail: string, specifier: string): CheckViolation {
+function violation(
+  sourceFile: ts.SourceFile,
+  node: ts.Node,
+  detail: string,
+  specifier: string,
+): CheckViolation {
   const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
   return {
     message:
@@ -96,7 +102,9 @@ export function analyzeBootstrapToolImport(content: string, filePath: string): C
 
     // Default import (`import graphTool from ...`) loads the runtime.
     if (clause.name !== undefined) {
-      violations.push(violation(sourceFile, clause.name, `default import '${clause.name.text}'`, specifier));
+      violations.push(
+        violation(sourceFile, clause.name, `default import '${clause.name.text}'`, specifier),
+      );
     }
 
     const named = clause.namedBindings;
@@ -104,7 +112,9 @@ export function analyzeBootstrapToolImport(content: string, filePath: string): C
 
     // Namespace import (`import * as graph from ...`) loads the runtime.
     if (ts.isNamespaceImport(named)) {
-      violations.push(violation(sourceFile, named.name, `namespace import '${named.name.text}'`, specifier));
+      violations.push(
+        violation(sourceFile, named.name, `namespace import '${named.name.text}'`, specifier),
+      );
       continue;
     }
 

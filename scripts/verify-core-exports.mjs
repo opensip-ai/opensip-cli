@@ -60,7 +60,9 @@ function verifyCore() {
   let failed = false;
   if (missing.length > 0) {
     failed = true;
-    console.error('core-export-allowlist: new @opensip-cli/core exports without a sub-boundary entry:');
+    console.error(
+      'core-export-allowlist: new @opensip-cli/core exports without a sub-boundary entry:',
+    );
     console.error(bullets(missing));
     console.error(
       'Add each export to .config/core-export-allowlist.cjs with an ADR-0055 sub-boundary tag.',
@@ -99,7 +101,9 @@ function verifyPackageSurface(spec, expected) {
 
   if (diff.missingValues.length > 0) {
     failed = true;
-    console.error(`${spec}: new VALUE exports not in allowlist (add to .config/package-export-allowlists.cjs):`);
+    console.error(
+      `${spec}: new VALUE exports not in allowlist (add to .config/package-export-allowlists.cjs):`,
+    );
     console.error(bullets(diff.missingValues));
   }
   if (diff.staleValues.length > 0) {
@@ -109,7 +113,9 @@ function verifyPackageSurface(spec, expected) {
   }
   if (diff.missingTypes.length > 0) {
     failed = true;
-    console.error(`${spec}: new TYPE exports not in allowlist (add to .config/package-export-allowlists.cjs):`);
+    console.error(
+      `${spec}: new TYPE exports not in allowlist (add to .config/package-export-allowlists.cjs):`,
+    );
     console.error(bullets(diff.missingTypes));
   }
   if (diff.staleTypes.length > 0) {

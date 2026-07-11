@@ -64,10 +64,10 @@ test('collectPublishedArtifactProblems reports only forbidden entries with packa
 
 test('forbiddenPackHooks detects prepack/prepare/postpack only', () => {
   assert.deepEqual(forbiddenPackHooks({ scripts: { build: 'tsc', prepack: 'x' } }), ['prepack']);
-  assert.deepEqual(
-    forbiddenPackHooks({ scripts: { prepare: 'a', postpack: 'b', build: 'tsc' } }),
-    ['prepare', 'postpack'],
-  );
+  assert.deepEqual(forbiddenPackHooks({ scripts: { prepare: 'a', postpack: 'b', build: 'tsc' } }), [
+    'prepare',
+    'postpack',
+  ]);
   assert.deepEqual(forbiddenPackHooks({ scripts: { build: 'tsc', test: 'vitest' } }), []);
   assert.deepEqual(forbiddenPackHooks({}), []);
 });
@@ -87,11 +87,17 @@ test('verifyPackage: clean dist + clean packlist has no problems', () => {
   after(() => rmSync(root, { recursive: true, force: true }));
   const pkgDir = join(root, 'packages', 'demo');
   mkdirSync(join(pkgDir, 'dist', 'framework'), { recursive: true });
-  writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: '@x/demo', scripts: { build: 'tsc' } }));
+  writeFileSync(
+    join(pkgDir, 'package.json'),
+    JSON.stringify({ name: '@x/demo', scripts: { build: 'tsc' } }),
+  );
   writeFileSync(join(pkgDir, 'dist', 'index.js'), 'export {};');
   writeFileSync(join(pkgDir, 'dist', 'framework', 'contest.js'), 'export {};');
 
-  const runner = () => ({ status: 0, stdout: '{"files":[{"path":"dist/index.js"},{"path":"package.json"}]}' });
+  const runner = () => ({
+    status: 0,
+    stdout: '{"files":[{"path":"dist/index.js"},{"path":"package.json"}]}',
+  });
   const { problems, builtCount, packedCount } = verifyPackage(
     { name: '@x/demo', dir: 'packages/demo', filter: '@x/demo' },
     { runner, repoRoot: root },
@@ -106,11 +112,17 @@ test('verifyPackage: flags a forbidden dist artifact and a forbidden packlist en
   after(() => rmSync(root, { recursive: true, force: true }));
   const pkgDir = join(root, 'packages', 'demo');
   mkdirSync(join(pkgDir, 'dist', '__tests__'), { recursive: true });
-  writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ name: '@x/demo', scripts: { build: 'tsc' } }));
+  writeFileSync(
+    join(pkgDir, 'package.json'),
+    JSON.stringify({ name: '@x/demo', scripts: { build: 'tsc' } }),
+  );
   writeFileSync(join(pkgDir, 'dist', 'index.js'), 'export {};');
   writeFileSync(join(pkgDir, 'dist', '__tests__', 'a.test.js'), 'export {};');
 
-  const runner = () => ({ status: 0, stdout: '{"files":[{"path":"dist/index.js"},{"path":"dist/b.spec.js"}]}' });
+  const runner = () => ({
+    status: 0,
+    stdout: '{"files":[{"path":"dist/index.js"},{"path":"dist/b.spec.js"}]}',
+  });
   const { problems } = verifyPackage(
     { name: '@x/demo', dir: 'packages/demo', filter: '@x/demo' },
     { runner, repoRoot: root },

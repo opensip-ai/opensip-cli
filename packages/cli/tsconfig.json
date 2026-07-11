@@ -6,9 +6,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "exclude": [
     "**/__test-support__/**",
     "**/__tests__/**",

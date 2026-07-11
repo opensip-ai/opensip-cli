@@ -10,7 +10,6 @@ import {
   type Indexes,
 } from '@opensip-cli/graph/read';
 
-
 export type GenerationSource = 'initial-load' | 'persisted-auto-swap' | 'refresh-rebuild';
 
 /** Canonical opaque generation key over the fixed persisted identity tuple. */

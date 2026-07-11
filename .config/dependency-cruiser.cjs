@@ -225,7 +225,8 @@ const FIT_PACK_ALLOWED_PACKAGES = Object.freeze({
 });
 
 const FIT_PACK_PACKAGES = WORKSPACE_PACKAGES.filter(
-  (pkg) => pkg.manifest && pkg.manifest.opensipTools && pkg.manifest.opensipTools.kind === 'fit-pack',
+  (pkg) =>
+    pkg.manifest && pkg.manifest.opensipTools && pkg.manifest.opensipTools.kind === 'fit-pack',
 );
 
 for (const name of Object.keys(FIT_PACK_ALLOWED_PACKAGES)) {

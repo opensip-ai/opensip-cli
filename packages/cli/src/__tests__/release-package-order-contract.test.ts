@@ -269,7 +269,10 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
       `RELEASING.md must state ${versionedJsonCount} package.json files (derived: ${count} publishable + ${governanceFacts.privateWorkspaceNames.length} private workspace + the private root)`,
     ).toBe(true);
     // RELEASING.md must name both private workspace packages and the private root.
-    for (const name of [...governanceFacts.privateWorkspaceNames, governanceFacts.privateRootName]) {
+    for (const name of [
+      ...governanceFacts.privateWorkspaceNames,
+      governanceFacts.privateRootName,
+    ]) {
       expect(releasingMd.includes(name), `RELEASING.md must name ${name}`).toBe(true);
     }
   });

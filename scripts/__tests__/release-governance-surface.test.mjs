@@ -48,7 +48,10 @@ test('RELEASING.md version surfaces match the derived governance facts', () => {
   const releasingMd = read('RELEASING.md');
   assert.match(releasingMd, new RegExp(`## The ${facts.publishableCount} packages`));
   assert.match(releasingMd, new RegExp(`All ${facts.publishableCount} publishable packages`));
-  assert.match(releasingMd, new RegExp(`${facts.versionedPackageJsonCount}\\s+\`package\\.json\` files`));
+  assert.match(
+    releasingMd,
+    new RegExp(`${facts.versionedPackageJsonCount}\\s+\`package\\.json\` files`),
+  );
   // Must name both private workspace packages + the private root manifest.
   for (const name of [...facts.privateWorkspaceNames, facts.privateRootName]) {
     assert.match(

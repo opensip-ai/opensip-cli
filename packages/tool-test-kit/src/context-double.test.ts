@@ -91,7 +91,9 @@ describe('createToolCliContextDouble', () => {
   it('captures every documented host seam exposed by the double', async () => {
     const envelope = sampleEnvelope();
     const compareResult: GateCompareResult = {
-      added: [createSignal({ source: 'fit', severity: 'high', ruleId: 'new', message: 'new finding' })],
+      added: [
+        createSignal({ source: 'fit', severity: 'high', ruleId: 'new', message: 'new finding' }),
+      ],
       resolved: [],
       unchanged: [],
       degraded: true,
@@ -106,17 +108,13 @@ describe('createToolCliContextDouble', () => {
     // `renderLive`; these stubs deliberately return an inspectable shape (not a
     // real ToolRunCompletion) so the test can assert the args/result
     // pass-through and the duplicate-registration warning.
-    double.ctx.registerLiveView(
-      'sample-live',
-      ((args: unknown, liveContext?: LiveViewContext) => ({
-        args,
-        elapsedMs: liveContext?.runSession.timing.elapsedMs(),
-      })) as unknown as LiveViewRenderer,
-    );
-    double.ctx.registerLiveView(
-      'sample-live',
-      (() => ({ duplicate: true })) as unknown as LiveViewRenderer,
-    );
+    double.ctx.registerLiveView('sample-live', ((args: unknown, liveContext?: LiveViewContext) => ({
+      args,
+      elapsedMs: liveContext?.runSession.timing.elapsedMs(),
+    })) as unknown as LiveViewRenderer);
+    double.ctx.registerLiveView('sample-live', (() => ({
+      duplicate: true,
+    })) as unknown as LiveViewRenderer);
     await expect(double.ctx.renderLive('sample-live', { ok: true })).resolves.toMatchObject({
       args: { ok: true },
     });

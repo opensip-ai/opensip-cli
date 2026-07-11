@@ -273,7 +273,10 @@ test('cap: resolved path length', () => {
 
 test('unsupported export = / export default declarations throw', () => {
   withRepo({ 'entry.ts': 'const x = 1;\nexport = x;' }, (root) => {
-    assert.throws(() => readPublicExportSurface('entry.ts', { repoRoot: root }), /unsupported export/);
+    assert.throws(
+      () => readPublicExportSurface('entry.ts', { repoRoot: root }),
+      /unsupported export/,
+    );
   });
   withRepo({ 'entry.ts': 'export default function foo() {}' }, (root) => {
     assert.throws(

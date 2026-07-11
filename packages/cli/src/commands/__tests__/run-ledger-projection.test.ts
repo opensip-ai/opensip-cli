@@ -160,7 +160,9 @@ describe('run ledger projection', () => {
         projectEnvelopeEvidence(
           envelope({
             // Minimal signal stub with no string fingerprint (defensive path).
-            signals: [{ fingerprint: undefined, metadata: {} }] as unknown as SignalEnvelope['signals'],
+            signals: [
+              { fingerprint: undefined, metadata: {} },
+            ] as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toEqual({

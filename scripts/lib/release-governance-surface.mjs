@@ -56,12 +56,16 @@ export function readGovernanceFacts(repoRoot = REPO_ROOT) {
   }
   for (const name of releaseOrderNames) {
     if (!publishableSet.has(name)) {
-      throw new Error(`RELEASE_PACKAGE_ORDER includes ${name}, not a publishable workspace package`);
+      throw new Error(
+        `RELEASE_PACKAGE_ORDER includes ${name}, not a publishable workspace package`,
+      );
     }
   }
   for (const name of publishableNames) {
     if (!orderSet.has(name)) {
-      throw new Error(`publishable workspace package ${name} is missing from RELEASE_PACKAGE_ORDER`);
+      throw new Error(
+        `publishable workspace package ${name} is missing from RELEASE_PACKAGE_ORDER`,
+      );
     }
   }
   for (const name of privateNames) {
@@ -70,7 +74,9 @@ export function readGovernanceFacts(repoRoot = REPO_ROOT) {
     }
   }
   if (workspaceNames.includes(PRIVATE_ROOT_NAME)) {
-    throw new Error(`${PRIVATE_ROOT_NAME} is the private root manifest and must not be a workspace package`);
+    throw new Error(
+      `${PRIVATE_ROOT_NAME} is the private root manifest and must not be a workspace package`,
+    );
   }
 
   // Bundled Tool facts cross-checked against the production Tool inventory.
@@ -87,7 +93,9 @@ export function readGovernanceFacts(repoRoot = REPO_ROOT) {
       throw new Error(`bundled manifest names ${name}, absent from the production Tool inventory`);
     }
     if (rec.bundled !== true) {
-      throw new Error(`bundled manifest names ${name}, but the Tool inventory does not classify it bundled`);
+      throw new Error(
+        `bundled manifest names ${name}, but the Tool inventory does not classify it bundled`,
+      );
     }
   }
 

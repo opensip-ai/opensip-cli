@@ -112,7 +112,11 @@ export function verifyPackage(entry, { runner = defaultRunner, repoRoot = REPO_R
   const problems = [];
   const pkgRoot = join(repoRoot, entry.dir);
   if (!existsSync(pkgRoot)) {
-    return { problems: [`${entry.name}: package dir missing: ${entry.dir}`], builtCount: 0, packedCount: 0 };
+    return {
+      problems: [`${entry.name}: package dir missing: ${entry.dir}`],
+      builtCount: 0,
+      packedCount: 0,
+    };
   }
   const pkgRootReal = realpathSync(pkgRoot);
 
@@ -124,7 +128,9 @@ export function verifyPackage(entry, { runner = defaultRunner, repoRoot = REPO_R
 
   const hooks = forbiddenPackHooks(manifest);
   if (hooks.length > 0) {
-    problems.push(`${entry.name}: publishable manifest declares forbidden pack hook(s): ${hooks.join(', ')}`);
+    problems.push(
+      `${entry.name}: publishable manifest declares forbidden pack hook(s): ${hooks.join(', ')}`,
+    );
   }
 
   // 1) Real built tree.
@@ -147,7 +153,9 @@ export function verifyPackage(entry, { runner = defaultRunner, repoRoot = REPO_R
     } else if (result.signal) {
       problems.push(`${entry.name}: pack killed by signal ${result.signal}`);
     } else if (result.status !== 0) {
-      problems.push(`${entry.name}: pack exited ${result.status}: ${String(result.stderr).slice(0, 500)}`);
+      problems.push(
+        `${entry.name}: pack exited ${result.status}: ${String(result.stderr).slice(0, 500)}`,
+      );
     } else {
       try {
         const packed = parsePacklist(result.stdout);
@@ -186,7 +194,10 @@ function main() {
 }
 
 // Only run when invoked directly (tests import the pure helpers).
-if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] &&
+  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+) {
   main();
 }
 

@@ -66,7 +66,10 @@ describe('analyzeBootstrapToolImport (AST)', () => {
 
   it('flags default, namespace, and side-effect imports of a Tool-family package', () => {
     expect(
-      analyzeBootstrapToolImport("import gt from '@opensip-cli/graph'\nexport const t = gt", CLI_PATH),
+      analyzeBootstrapToolImport(
+        "import gt from '@opensip-cli/graph'\nexport const t = gt",
+        CLI_PATH,
+      ),
     ).toHaveLength(1);
     expect(
       analyzeBootstrapToolImport(
@@ -74,9 +77,9 @@ describe('analyzeBootstrapToolImport (AST)', () => {
         CLI_PATH,
       ),
     ).toHaveLength(1);
-    expect(
-      analyzeBootstrapToolImport("import '@opensip-cli/simulation'", CLI_PATH),
-    ).toHaveLength(1);
+    expect(analyzeBootstrapToolImport("import '@opensip-cli/simulation'", CLI_PATH)).toHaveLength(
+      1,
+    );
   });
 
   it('does NOT flag an `import type` declaration or an inline `type` specifier', () => {

@@ -268,7 +268,9 @@ function collectSpineWildcards(file, ctx, depth, seen) {
     if (isRelativeSpecifier(spec)) {
       const target = resolveRelativeTarget(file, spec, ctx.limits);
       if (!target) {
-        throw new PublicExportSurfaceError(`missing relative export * target '${spec}' from ${file}`);
+        throw new PublicExportSurfaceError(
+          `missing relative export * target '${spec}' from ${file}`,
+        );
       }
       collectSpineWildcards(target, ctx, depth + 1, seen);
     }
@@ -508,7 +510,10 @@ function surfaceOfFile(file, ctx, depth) {
             `missing relative re-export target '${moduleSpecifier}' from ${file}`,
           );
         }
-        addStrong(exportedName, surfaceOfFile(target, ctx, depth + 1).names.get(localName) ?? 'value');
+        addStrong(
+          exportedName,
+          surfaceOfFile(target, ctx, depth + 1).names.get(localName) ?? 'value',
+        );
       }
     }
   }
