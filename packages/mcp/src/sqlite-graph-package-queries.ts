@@ -4,6 +4,7 @@ import {
   buildPackageScc,
   compareCodePointStrings,
   packageDependencyStableKey,
+  type FeatureTable,
   type PackageCallEvidenceRow,
   type PackageEvidenceView,
   type PackageImportEvidenceRow,
@@ -30,7 +31,6 @@ import type {
 import type { McpReadError } from './mcp-error.js';
 import type { SqliteGraphQueryContext } from './sqlite-graph-query-context.js';
 import type { GraphCoverage, GraphToolResult } from './symbol-dto.js';
-import type { FeatureTable } from '@opensip-cli/graph';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 

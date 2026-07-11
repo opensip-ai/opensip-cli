@@ -8,6 +8,7 @@ import {
   evaluateGraphOrphans,
   matchesGraphSourceFilter,
   symbolSearchStableKey,
+  type FeatureTable,
   type GraphConfig,
   type GraphSourceFilter,
 } from '@opensip-cli/graph/read';
@@ -18,7 +19,6 @@ import { toDeadCodeDto } from './graph-read-projection.js';
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { DeadCodeDto } from './graph-read-port.js';
 import type { GraphCoverage } from './symbol-dto.js';
-import type { FeatureTable } from '@opensip-cli/graph';
 
 /** Hard cap separating incomplete orphan evaluation from ordinary pagination. */
 export const MAX_ORPHAN_EVALUATION = 10_000;

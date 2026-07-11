@@ -45,5 +45,5 @@ export interface RebuildCatalogInput {
 
 export type { CatalogVerdict, ValidationContext } from '../cache/invalidate.js';
 
-export type { Catalog, Indexes, FeatureColumn } from '../types.js';
+export type { Catalog, Indexes, FeatureColumn, FeatureTable } from '../types.js';
 export type { GraphConfig } from '../types.js';
