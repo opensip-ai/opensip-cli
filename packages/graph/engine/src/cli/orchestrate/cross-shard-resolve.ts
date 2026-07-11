@@ -119,6 +119,14 @@ export function stampAndConstrainPackages(catalog: Catalog, projectRoot: string)
  * re-attributed here to a unique workspace package, matching the single-program
  * exact catalog byte-for-byte. Ambiguous names (tombstoned duplicates) stay
  * unresolved. Pure: returns the SAME catalog reference when nothing changes.
+ *
+ * Scope: this parity holds when workspace imports resolve to DECLARATION files —
+ * the norm for built `dist/*.d.ts` packages, where a worker emits
+ * `workspace-declaration-unmapped` / `external-declaration` and this patch upgrades
+ * both to `workspace-declaration-entry`. A workspace that exports raw source `.ts`
+ * would resolve to `catalog-source` (a real `to:[hash]`) in the exact build; this
+ * classification-only patch cannot reconstruct that target hash, so such a repo is
+ * a fidelity boundary rather than byte-identical. (Not reachable in this repo.)
  */
 export function reattributeDeclarationDependencies(
   catalog: Catalog,

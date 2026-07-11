@@ -27,12 +27,16 @@
 
 import { relative, sep } from 'node:path';
 
-import { ownerEdgeKey, resolveSpecifierToPackage } from '@opensip-cli/graph';
+import {
+  buildPackageManifestIndexFromRoots,
+  ownerEdgeKey,
+  resolveSpecifierToPackage,
+} from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
-import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
+import { derivePackageRoots } from './edge-helpers/cross-package-context.js';
 import { methodTargetFile } from './edge-helpers/method-target.js';
 import { extractBoundaryCalls, type MethodTargetResolver } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
@@ -499,7 +503,14 @@ function resolveDependencies(
   const moduleInitByFilePath = buildModuleInitIndex(catalog);
   const compilerOptions = program.getCompilerOptions();
   const moduleResolutionHost = createModuleResolutionHost();
-  const { manifestIndex } = buildCrossPackageContext(catalog, projectDirAbs);
+  // Only the manifest index is needed here (declaration-target attribution).
+  // Build it directly rather than the full cross-package context, whose export
+  // index is a call-resolution-only pass we would discard. (Task 0.4 shares one
+  // context across call + dependency resolution.)
+  const manifestIndex = buildPackageManifestIndexFromRoots(
+    derivePackageRoots(catalog, projectDirAbs),
+    projectDirAbs,
+  );
 
   // Initialize every module-init owner to an explicit empty array (Task 0.1 #3).
   const out = new Map<string, DependencyEdge[]>();
@@ -524,10 +535,12 @@ function resolveDependencies(
     const edge = buildDependencyEdge(site, r);
     // Key per owner OCCURRENCE (module-init bodyHash + file + line + column) to
     // match stitchEdges; module-init bodies can collide across trivial files
-    // (ADR-0136).
+    // (ADR-0136). The filePath component MUST be POSIX — every sibling key
+    // (init loop, stitchEdges, owner-key.ts) uses the occurrence's `/`-separated
+    // `filePath`, but `path.relative` yields `\` on Windows.
     const ownerKey = ownerEdgeKey(
       site.ownerHash,
-      relative(projectDirAbs, site.sourceFile.fileName),
+      relative(projectDirAbs, site.sourceFile.fileName).split(sep).join('/'),
       site.ownerLine,
       site.ownerColumn,
     );

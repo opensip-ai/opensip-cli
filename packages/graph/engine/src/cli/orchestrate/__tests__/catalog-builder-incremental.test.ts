@@ -183,4 +183,42 @@ describe('buildAndResolveCatalogIncremental', () => {
     });
     expect(catalog.functions.mod?.[0]?.dependencies).toEqual([dep]);
   });
+
+  it("keeps an unchanged file's cached dependencies even when the adapter keys it with [] (no clobber)", async () => {
+    // The adapter resolves against the FULL merged catalog (P2 Phase 0), so it
+    // keys EVERY module-init — including unchanged files — with []. The
+    // incremental post-pass must apply that only to CLOSURE files, or an
+    // unchanged file's cached `dependencies` get wiped.
+    const cachedDepA: DependencyEdge = { to: [], specifier: 'old', line: 1, column: 0 };
+    const cachedDepB: DependencyEdge = { to: [], specifier: 'react', line: 1, column: 0 };
+    const cached = catalogOf(
+      { ...occ('a', 'a.ts', 'A1'), kind: 'module-init', dependencies: [cachedDepA] },
+      { ...occ('b', 'b.ts', 'B1'), kind: 'module-init', dependencies: [cachedDepB] },
+    );
+
+    const freshDepA: DependencyEdge = { to: [], specifier: 'lodash', line: 1, column: 0 };
+    const adapter = incrementalAdapter({
+      walked: { 'a.ts': [{ ...occ('a', 'a.ts', 'A2'), kind: 'module-init' }] },
+      edges: new Map(),
+      // Closure file a.ts (A2) resolved fresh; unchanged b.ts (B1) keyed with []
+      // because the adapter saw it in the full catalog — the clobber shape.
+      deps: new Map([
+        [ownerEdgeKey('A2', 'a.ts', 1, 0), [freshDepA]],
+        [ownerEdgeKey('B1', 'b.ts', 1, 0), []],
+      ]),
+    });
+
+    const { catalog } = await buildAndResolveCatalogIncremental({
+      runStage,
+      adapter,
+      discovery: { projectDirAbs: root, files: [join(root, 'a.ts'), join(root, 'b.ts')] },
+      cachedCatalog: cached,
+      changedFilesAbs: [join(root, 'a.ts')],
+      resolutionMode: 'exact',
+    });
+
+    // Closure file gets its fresh deps; the unchanged file keeps its cached deps.
+    expect(catalog.functions.a?.[0]?.dependencies).toEqual([freshDepA]);
+    expect(catalog.functions.b?.[0]?.dependencies).toEqual([cachedDepB]);
+  });
 });

@@ -311,6 +311,7 @@ export async function buildAndResolveCatalogIncremental(
       const stitchedFunctions = attachDependenciesIncremental(
         finalFunctions,
         result.dependenciesByOwner,
+        closureRel,
       );
       const catalog: Catalog = {
         ...initialCatalog,
@@ -329,18 +330,23 @@ export async function buildAndResolveCatalogIncremental(
 }
 
 /**
- * Incremental post-pass. A freshly walked closure module-init REPLACES its
+ * Incremental post-pass. A freshly walked CLOSURE module-init REPLACES its
  * cached dependency facts with the newly resolved array — including replacing
  * prior populated data with an explicit `[]` when the file now has zero imports
- * (P2 Phase 0 Task 0.2). Unchanged-file occurrences (never keyed in the fresh
- * map) keep their cached `dependencies` untouched.
+ * (P2 Phase 0 Task 0.2).
  *
- * No-op only when the map is ABSENT (adapter/tier emits no dependency
- * evidence). A present map — even empty — is "supported" and is applied.
+ * Only CLOSURE files are touched. The adapter's `resolveDependencies` is handed
+ * the FULL merged catalog, so it also keys UNCHANGED files' module-inits with
+ * `[]`; applying that here would clobber their cached dependencies. Gating on
+ * `closureRel` (the set the engine re-walked this pass) keeps unchanged files'
+ * cached `dependencies` untouched — the adapter's `[]` for them is ignored.
+ *
+ * No-op only when the map is ABSENT (adapter/tier emits no dependency evidence).
  */
 function attachDependenciesIncremental(
   functions: Record<string, readonly FunctionOccurrence[]>,
   dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined,
+  closureRel: ReadonlySet<string>,
 ): Record<string, readonly FunctionOccurrence[]> {
   if (dependenciesByOwner === undefined) {
     return functions;
@@ -351,6 +357,7 @@ function attachDependenciesIncremental(
   >;
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
+      if (!closureRel.has(o.filePath)) return o; // unchanged file — keep cached
       const deps = dependenciesByOwner.get(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column));
       return deps === undefined ? o : { ...o, dependencies: deps };
     });
