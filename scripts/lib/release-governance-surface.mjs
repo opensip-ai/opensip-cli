@@ -315,14 +315,11 @@ export function collectGovernanceDriftProblems() {
   // tools; the doc-conventions verification trail states a package count.
   const publicReadme = 'docs/public/README.md';
   const publicReadmeText = readRepoFile(publicReadme);
-  problems.push(...collectBundledToolDocProblems(publicReadme, publicReadmeText, facts));
-  problems.push(...collectPackageFactDocProblems(publicReadme, publicReadmeText, facts));
+  const docConventions = 'docs/public/80-implementation/06-doc-conventions.md';
   problems.push(
-    ...collectPackageFactDocProblems(
-      'docs/public/80-implementation/06-doc-conventions.md',
-      readRepoFile('docs/public/80-implementation/06-doc-conventions.md'),
-      facts,
-    ),
+    ...collectBundledToolDocProblems(publicReadme, publicReadmeText, facts),
+    ...collectPackageFactDocProblems(publicReadme, publicReadmeText, facts),
+    ...collectPackageFactDocProblems(docConventions, readRepoFile(docConventions), facts),
   );
 
   return problems;
