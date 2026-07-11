@@ -29,7 +29,8 @@
  *   4. @opensip-cli/tool-*         — external scanner Tool adapters
  *   5. @opensip-cli/checks-*       — fitness check packs (depend on fitness)
  *   5. @opensip-cli/graph-*        — graph adapter packs (depend on graph)
- *   6. opensip-cli                 — CLI composition root (depends on tools)
+ *   6. opensip-cli                 — CLI composition root (loads Tools dynamically;
+ *                                    no static Tool source imports — ADR-0151)
  *
  *   (workspace-private, outside the runtime layers: @opensip-cli/test-support —
  *   cross-package test scaffolding, ADR-0040; only test files may import it.)
@@ -269,11 +270,58 @@ const FIT_PACK_IMPORT_ALLOWLIST_RULES = FIT_PACK_PACKAGES.map((pack) => {
   };
 });
 
+// Internal-subpath target (ADR-0009): a package's `src/internal.ts(x)` barrel OR
+// anything under a `src/internal/` directory. Files AND directories are internal.
+const INTERNAL_TARGET_PATH = String.raw`/src/internal(?:\.tsx?$|/)`;
+
+// The CLI composition root loads Tools dynamically; a static import of any
+// manifest Tool's source root is forbidden (ADR-0151). Manifest-derived so a
+// newly declared Tool is covered without editing this file.
+const CLI_FORBIDDEN_TOOL_SOURCES = PRODUCTION_TOOL_PACKAGES.map((tool) =>
+  escapeRegex(tool.sourceRoot),
+).join('|');
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     ...TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES,
     ...FIT_PACK_IMPORT_ALLOWLIST_RULES,
+    {
+      name: 'cli-no-static-tool-package-import',
+      severity: 'error',
+      comment:
+        'The CLI is the composition root and loads Tools DYNAMICALLY through the plugin ' +
+        'path (ADR-0151). Production CLI source must not statically import a manifest ' +
+        "Tool's source root — that would recreate the very coupling dynamic loading avoids. " +
+        'Manifest deps stay for pnpm linking; only static source imports are forbidden.',
+      from: {
+        path: '^packages/cli/src/',
+        pathNot: ['/__tests__/', '/__test-support__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: `^(?:${CLI_FORBIDDEN_TOOL_SOURCES})`,
+      },
+    },
+    {
+      name: 'mcp-graph-root-registrar-only',
+      severity: 'error',
+      comment:
+        'MCP production may resolve the @opensip-cli/graph ROOT barrel only from ' +
+        'register-mcp-graph-adapters.ts (currentAdapterRegistry — a runtime composition ' +
+        'seam). All other MCP graph consumption must go through @opensip-cli/graph/read ' +
+        '(ADR-0147/0151). graph/internal is separately forbidden by mcp-graph-internal-scope.',
+      from: {
+        path: '^packages/mcp/src/',
+        pathNot: [
+          '/__tests__/',
+          String.raw`\.test\.(ts|tsx)$`,
+          String.raw`^packages/mcp/src/register-mcp-graph-adapters\.ts$`,
+        ],
+      },
+      to: {
+        path: String.raw`^packages/graph/engine/src/index\.ts$`,
+      },
+    },
     // -------------------------------------------------------------------
     // Generic hygiene
     // -------------------------------------------------------------------
@@ -331,7 +379,7 @@ module.exports = {
           '^packages/test-support/',
         ],
       },
-      to: { path: String.raw`/src/internal\.ts$` },
+      to: { path: INTERNAL_TARGET_PATH },
     },
     {
       name: 'test-support-fitness-internal-only',
@@ -344,7 +392,7 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
         pathNot: String.raw`^packages/fitness/engine/src/internal\.ts$`,
       },
     },
@@ -359,7 +407,7 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
         pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
       },
     },
@@ -374,7 +422,7 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
         pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
       },
     },
@@ -388,7 +436,7 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
       },
     },
     {

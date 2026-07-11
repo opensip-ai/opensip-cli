@@ -170,6 +170,30 @@ const MODULAR_BOUNDARY_FAILURE_PROBES = [
       'export const _gateProbe = CatalogRepo;\n',
     rule: 'mcp-graph-internal-scope',
   },
+  {
+    // CLI composition root may not statically import a manifest Tool source.
+    file: 'packages/cli/src/__gate_probe_static_tool__.ts',
+    source:
+      "import { graphTool } from '@opensip-cli/graph';\nexport const _gateProbe = graphTool;\n",
+    rule: 'cli-no-static-tool-package-import',
+  },
+  {
+    // Production siblings may not import simulation/internal (test-only subpath,
+    // ADR-0009) — enforced by the generic internal rule (no owner exception).
+    file: 'packages/fitness/engine/src/__gate_probe_sim_internal__.ts',
+    source:
+      "import { createScenarioRegistry } from '@opensip-cli/simulation/internal';\n" +
+      'export const _gateProbe = createScenarioRegistry;\n',
+    rule: 'no-cross-package-internal',
+  },
+  {
+    // MCP may resolve the graph ROOT barrel only from the adapter registrar.
+    file: 'packages/mcp/src/__gate_probe_graph_root__.ts',
+    source:
+      "import { currentAdapterRegistry } from '@opensip-cli/graph';\n" +
+      'export const _gateProbe = currentAdapterRegistry;\n',
+    rule: 'mcp-graph-root-registrar-only',
+  },
 ];
 
 const MODULAR_BOUNDARY_RESOLUTION_PROBES = [
