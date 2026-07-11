@@ -97,7 +97,6 @@ describe('yagni worker command', () => {
         includeTests: true,
         pathRoots: ['src'],
       }),
-      cli,
     );
     expect(sendWorkerIpcMessageMock).toHaveBeenNthCalledWith(1, {
       kind: 'progress',

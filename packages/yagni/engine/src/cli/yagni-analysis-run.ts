@@ -145,19 +145,16 @@ export function buildYagniAnalysisRunCommand(setUpLiveView: (cli: ToolCliContext
       },
     ],
     normalize: normalizeYagniRequest,
-    execute: (request, cli) =>
-      executeYagni(
-        {
-          cwd: request.cwd,
-          config: request.config,
-          minConfidence: request.minConfidence,
-          detectors: request.detectors,
-          categories: request.categories,
-          includeTests: request.includeTests,
-          pathRoots: request.pathRoots,
-        },
-        cli,
-      ),
+    execute: (request) =>
+      executeYagni({
+        cwd: request.cwd,
+        config: request.config,
+        minConfidence: request.minConfidence,
+        detectors: request.detectors,
+        categories: request.categories,
+        includeTests: request.includeTests,
+        pathRoots: request.pathRoots,
+      }),
     envelope: (result) => result.envelope,
     session: (result) => result.session,
     presentation: ({ options, request, result, envelope, durationMs }) =>

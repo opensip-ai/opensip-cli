@@ -14,31 +14,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { executeYagni } from '../cli/execute-yagni.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
-import type { ToolCliContext } from '@opensip-cli/core';
-
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = join(HERE, 'fixtures', 'unused-config-surface', 'pkg');
 
 function normalizeFixturePath(value: string): string {
   if (!value.startsWith(FIXTURE_ROOT)) return value;
   return `<fixture>/${relative(FIXTURE_ROOT, value).split('\\').join('/')}`;
-}
-
-function stubCli(): ToolCliContext {
-  return {
-    scope: { datastore: () => undefined },
-    emitEnvelope: vi.fn(),
-    emitJson: vi.fn(),
-    emitError: vi.fn(),
-    render: vi.fn(() => Promise.resolve()),
-    renderLive: vi.fn(() => Promise.resolve()),
-    registerLiveView: vi.fn(),
-    setExitCode: vi.fn(),
-    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
-    writeSarif: vi.fn(() => Promise.resolve()),
-    maybeOpenReport: vi.fn(() => Promise.resolve()),
-    reportFailure: vi.fn(() => Promise.resolve()),
-  } as unknown as ToolCliContext;
 }
 
 function stableJson(value: unknown): unknown {
@@ -88,7 +69,6 @@ describe('yagni golden snapshots', () => {
         },
         includeTests: true,
       },
-      stubCli(),
       [unusedConfigSurfaceDetector],
     );
 
@@ -124,8 +104,8 @@ describe('yagni golden snapshots', () => {
       config: { defaultMinConfidence: 'low' as const },
       includeTests: true,
     };
-    const firstRun = await executeYagni(opts, stubCli(), [unusedConfigSurfaceDetector]);
-    const secondRun = await executeYagni(opts, stubCli(), [unusedConfigSurfaceDetector]);
+    const firstRun = await executeYagni(opts, [unusedConfigSurfaceDetector]);
+    const secondRun = await executeYagni(opts, [unusedConfigSurfaceDetector]);
     const first = stableJson(firstRun.envelope.signals);
     const second = stableJson(secondRun.envelope.signals);
     expect(first).toEqual(second);
