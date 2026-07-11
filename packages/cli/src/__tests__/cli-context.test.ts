@@ -12,12 +12,13 @@ import {
 } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import {
   buildHostDispatchCtx,
   buildToolCliContext,
   createLiveViewRegistry,
+  type BuildToolCliContextOptions,
 } from '../cli-context.js';
 
 function makeLogger(): {
@@ -100,17 +101,17 @@ describe('createLiveViewRegistry', () => {
 });
 
 function makeBuildOpts(): {
-  render: ReturnType<typeof vi.fn>;
+  render: Mock<BuildToolCliContextOptions['render']>;
   liveViews: ReturnType<typeof createLiveViewRegistry>;
-  maybeOpenReport: ReturnType<typeof vi.fn>;
+  maybeOpenReport: Mock<BuildToolCliContextOptions['maybeOpenReport']>;
   logger: Logger;
 } {
   const { log } = makeLogger();
   const liveViews = createLiveViewRegistry(log);
   return {
-    render: vi.fn(() => Promise.resolve()),
+    render: vi.fn<BuildToolCliContextOptions['render']>(() => Promise.resolve()),
     liveViews,
-    maybeOpenReport: vi.fn(() => Promise.resolve()),
+    maybeOpenReport: vi.fn<BuildToolCliContextOptions['maybeOpenReport']>(() => Promise.resolve()),
     logger: log,
   };
 }
@@ -118,7 +119,7 @@ function makeBuildOpts(): {
 describe('buildToolCliContext', () => {
   // The factory mutates `process.exitCode` through `setExitCode` — keep
   // each test isolated by snapshotting the exit code around it.
-  let savedExitCode: number | undefined;
+  let savedExitCode: typeof process.exitCode;
   beforeEach(() => {
     savedExitCode = process.exitCode;
     process.exitCode = 0;
@@ -222,7 +223,7 @@ const RESOLVER_CONTRIBUTION = {
   payload: {},
 };
 
-function buildCtxWithDebug(debug: ReturnType<typeof vi.fn>) {
+function buildCtxWithDebug(debug: Mock<Logger['debug']>) {
   const base = makeBuildOpts();
   const logger: Logger = {
     debug,
@@ -237,7 +238,7 @@ const completeRunOf = (handle: ReturnType<typeof buildCtxWithDebug>): ((r: unkno
   handle.runActionHooks.completeRun ?? vi.fn();
 
 describe('buildToolCliContext — run-plane datastore resolver', () => {
-  let savedExit: number | undefined;
+  let savedExit: typeof process.exitCode;
   beforeEach(() => {
     savedExit = process.exitCode;
     process.exitCode = 0;
@@ -247,7 +248,7 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
   });
 
   it('swallows a NOT_ENTERED scope and debug-logs datastore_unavailable', () => {
-    const debug = vi.fn();
+    const debug = vi.fn<Logger['debug']>();
     const handle = buildCtxWithDebug(debug);
     // No entered scope → readScope() throws → resolver catch → undefined → no-op.
     expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
@@ -257,16 +258,16 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
   });
 
   it('returns undefined when the entered scope carries no datastore thunk', async () => {
-    const handle = buildCtxWithDebug(vi.fn());
-    await withScope(makeTestScope({}), () => {
+    const handle = buildCtxWithDebug(vi.fn<Logger['debug']>());
+    await withScope(makeTestScope({}), async () => {
       expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
     });
   });
 
   it('reads through the scope datastore thunk when one is present', async () => {
-    const handle = buildCtxWithDebug(vi.fn());
+    const handle = buildCtxWithDebug(vi.fn<Logger['debug']>());
     const ds = DataStoreFactory.open({ backend: 'memory' });
-    await withScope(makeTestScope({ datastore: () => ds }), () => {
+    await withScope(makeTestScope({ datastore: () => ds }), async () => {
       expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
     });
     ds.close();
@@ -286,7 +287,7 @@ describe('buildHostDispatchCtx (ADR-0054 M4-F hook-worker host ctx)', () => {
 
   it('denies the output / render / egress seams a data-gathering hook has no business calling', () => {
     const ctx = buildHostDispatchCtx();
-    expect(() => ctx.registerLiveView('k', () => undefined)).toThrow(/not available/);
+    expect(() => ctx.registerLiveView('k', () => Promise.resolve())).toThrow(/not available/);
     expect(() => ctx.renderLive('k', {})).toThrow(/not available/);
     expect(() => ctx.deliverSignals({}, { cwd: '.' })).toThrow(/not available/);
     expect(() => ctx.writeSarif({}, 'p')).toThrow(/not available/);
@@ -362,6 +363,7 @@ describe('admitted-tool facts ride the RunScope (no module-global handoff bag)',
         kind: 'tool' as const,
         apiVersion: core.PLUGIN_API_VERSION,
         id: 'plugin-a',
+        identity: { name: 'plugin-a' },
         name: 'Plugin A',
         version: '1.0.0',
         commands: [],

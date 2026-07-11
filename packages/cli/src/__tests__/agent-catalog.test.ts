@@ -135,12 +135,16 @@ async function makeRegistry(): Promise<ToolRegistry> {
       {
         name: 'third-party-tool',
         description: 'run the third-party tool',
+        commonFlags: [],
+        scope: 'project',
         output: 'command-result',
         handler: () => ({ type: 'text-lines', lines: ['ok'] }),
       },
       {
         name: 'third-party-tool-worker',
         description: '[internal] worker',
+        commonFlags: [],
+        scope: 'project',
         output: 'raw-stream',
         rawStreamReason: 'worker-ipc',
         visibility: 'internal',
@@ -363,6 +367,8 @@ describe('buildAgentCatalog', () => {
         {
           name: 'internal-only-run-worker',
           description: '[internal] worker',
+          commonFlags: [],
+          scope: 'project',
           output: 'raw-stream',
           rawStreamReason: 'worker-ipc',
           visibility: 'internal',
@@ -389,6 +395,8 @@ describe('buildAgentCatalog', () => {
         {
           name: 'hidden-tool',
           description: 'hidden by host policy',
+          commonFlags: [],
+          scope: 'project',
           output: 'command-result',
           handler: () => ({ type: 'text-lines', lines: ['hidden'] }),
         },

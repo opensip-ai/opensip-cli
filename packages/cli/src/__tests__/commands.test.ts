@@ -16,15 +16,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { registerCliCommands } from '../commands/index.js';
 
+import type { CliCommandsContext } from '../commands/shared.js';
 import type { CommandResult } from '@opensip-cli/contracts';
 
-function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
-  setExitCode: ReturnType<typeof vi.fn>;
-  render: (result: CommandResult) => Promise<void>;
-  datastore: () => unknown;
-  pluginLayouts: readonly PluginLayout[];
-  tools?: ToolRegistry;
-} {
+function makeContext(pluginLayouts: readonly PluginLayout[] = []): CliCommandsContext {
   const tools = new ToolRegistry();
   if (pluginLayouts.some((l) => l.domain === 'fit')) {
     tools.register({
@@ -45,8 +40,12 @@ function makeContext(pluginLayouts: readonly PluginLayout[] = []): {
   return {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
+    emitJson: vi.fn(),
+    emitRaw: vi.fn(),
+    emitError: vi.fn(),
     datastore: () => undefined,
     pluginLayouts,
+    toolScaffolds: [],
     tools,
   };
 }

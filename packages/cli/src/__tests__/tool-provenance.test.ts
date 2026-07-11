@@ -17,6 +17,7 @@ import {
 
 function tool(id: string, name?: string): Tool {
   return {
+    identity: { name: name ?? id },
     metadata: { id, name: name ?? id, version: '0.0.0', description: id },
     commandSpecs: [],
   };

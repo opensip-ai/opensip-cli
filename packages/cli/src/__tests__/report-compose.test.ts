@@ -47,6 +47,7 @@ afterEach(() => {
 
 function makeTool(id: string, contribution?: Record<string, unknown>): Tool {
   return {
+    identity: { name: id },
     metadata: { id, name: id, version: '0.0.0', description: id },
     commandSpecs: [],
     ...(contribution
@@ -125,6 +126,7 @@ describe('composeAndWriteReport', () => {
     );
 
     const external: Tool = {
+      identity: { name: 'ext-tool' },
       metadata: {
         id: 'ext-tool',
         name: 'ext-tool',
@@ -219,6 +221,7 @@ describe('composeAndWriteReport', () => {
     // instead (which fails here, since the test process is not the CLI binary), is
     // caught best-effort, and the report still renders for the bundled tool.
     const external: Tool = {
+      identity: { name: 'ext-tool' },
       metadata: {
         id: 'ext-tool',
         name: 'ext-tool',

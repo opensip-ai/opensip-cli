@@ -82,7 +82,9 @@ describe('telemetry SDK init (opt-in gate)', () => {
     initTelemetry(CLI_ENTRY);
     // The proxy delegates to the real provider; capture it to prove the second
     // init does not swap in a new one.
-    const proxy = trace.getTracerProvider() as { getDelegate: () => unknown };
+    // The OTel proxy provider exposes an internal getDelegate() the public
+    // TracerProvider type doesn't declare; reach past it for this test.
+    const proxy = trace.getTracerProvider() as unknown as { getDelegate: () => unknown };
     const delegateAfterFirst = proxy.getDelegate();
     initTelemetry(CLI_ENTRY);
     expect(proxy.getDelegate()).toBe(delegateAfterFirst);

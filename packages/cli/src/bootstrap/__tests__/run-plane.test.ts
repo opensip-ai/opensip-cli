@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import {
   RunScope,
   createSignal,
-  runWithScope,
+  runWithScopeSync,
   type Logger,
   type ProjectContext,
   type ToolCliContext,
@@ -255,12 +255,12 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
     const scope = new RunScope({
       toolManifests: [
         { id: 'fit', identity: { name: 'fit' }, version: '9.9.9' },
-      ] as unknown as ConstructorParameters<typeof RunScope>[0]['toolManifests'],
+      ] as unknown as NonNullable<ConstructorParameters<typeof RunScope>[0]>['toolManifests'],
     });
-    const recorded = runWithScope(scope, () =>
+    const recorded = runWithScopeSync(scope, () =>
       factory.current().completeAndPersist(contribution()),
     );
-    const row = new SessionRepo(datastore).get(recorded.id);
+    const row = new SessionRepo(datastore).get(recorded!.id);
     expect(row?.engineVersion).toBe('9.9.9');
     expect(row?.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
   });
@@ -346,7 +346,7 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
           projectContext: projectContext(projectRoot),
           datastore: () => scopedDatastore,
         });
-        void runWithScope(scope, () => {
+        runWithScopeSync(scope, () => {
           scopedFactory.current().completeAndPersist(contribution({ cwd: projectRoot }));
         });
       });

@@ -48,6 +48,7 @@ const tempDirs: string[] = [];
 
 function tool(id: string, name: string, specs: Tool['commandSpecs']): Tool {
   return {
+    identity: { name },
     metadata: {
       id,
       name,
@@ -204,7 +205,7 @@ describe('runSuite', () => {
       output: 'command-result',
       producesVerdict: true,
       handler: (opts, cli) => {
-        seen.push(opts);
+        seen.push(opts as Record<string, unknown>);
         emitPassingEvidence(cli);
         return { type: 'help' };
       },

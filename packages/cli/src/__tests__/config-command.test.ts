@@ -466,13 +466,16 @@ describe('config command specs', () => {
       toolManifests: manifests,
       toolProvenance: provenance,
       projectContext: {
+        cwd: dir,
+        cwdExplicit: false,
         scope: 'project',
         projectRoot: dir,
         configPath: join(dir, 'opensip-cli.config.yml'),
+        walkedUp: 0,
       },
     });
 
-    const valid = await runWithScope(scope, () =>
+    const valid = await runWithScope(scope, async () =>
       validate.handler({ cwd: dir }, makeConfigContext()),
     );
     expect(valid).toMatchObject({ type: 'config-validate', valid: true });

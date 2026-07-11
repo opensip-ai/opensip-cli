@@ -162,12 +162,12 @@ describe('ADR-0054 M4-G capstone — host never imports external runtime', () =>
     const tool = registry.get(FIXTURE_ID);
     expect(tool).toBeDefined();
     expect(tool?.metadata.id).toBe(STABLE_ID);
-    expect(tool?.commandSpecs.map((s) => s.name)).toEqual([FIXTURE_ID]);
+    expect((tool?.commandSpecs ?? []).map((s) => s.name)).toEqual([FIXTURE_ID]);
     // Synthetic: NO real runtime hooks (the host runs none for external tools).
     expect(tool?.extensionPoints).toBeUndefined();
     // The handler is the fail-loud dispatch stub (the host never calls it; the
     // worker owns the real handler). Calling it directly proves the stub.
-    expect(() => tool?.commandSpecs[0]?.handler({}, {} as never)).toThrow(SystemError);
+    expect(() => tool?.commandSpecs?.[0]?.handler({}, {} as never)).toThrow(SystemError);
     // Provenance was still recorded for `plugin list`.
     expect(provenance.some((p) => p.id === FIXTURE_ID)).toBe(true);
   });

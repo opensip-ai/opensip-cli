@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildHostPlanes } from '../host-planes.js';
 
-import type { Logger } from '@opensip-cli/core';
+import type { HostAudit, HostEntitlements, HostGovernance, Logger } from '@opensip-cli/core';
 
 let ds: DataStore;
 const MIGRATIONS_DIR = fileURLToPath(new URL('../../../../datastore/migrations', import.meta.url));
@@ -42,11 +42,22 @@ afterEach(() => {
   ds.close();
 });
 
-function planes(logger?: Logger) {
-  return buildHostPlanes({
+function planes(logger?: Logger): {
+  governance: HostGovernance;
+  audit: HostAudit;
+  entitlements: HostEntitlements;
+} {
+  const built = buildHostPlanes({
     getDatastore: () => ds,
     ...(logger ? { logger } : {}),
   });
+  // buildHostPlanes always constructs all three planes; narrow the tool-facing
+  // optional shape to the concrete triple these tests exercise.
+  return built as {
+    governance: HostGovernance;
+    audit: HostAudit;
+    entitlements: HostEntitlements;
+  };
 }
 
 describe('host-planes — governance', () => {
@@ -96,13 +107,13 @@ describe('host-planes — governance', () => {
     expect(state.lastInstallation).toEqual({ spec: '@x/fit' });
 
     // No block recorded yet → checkAllowed defaults to allow.
-    expect(await governance.checkAllowed('fit', { action: 'run' })).toBe(true);
+    expect(await governance.checkAllowed('fit', 'run-simulation')).toBe(true);
 
     await governance.setBlock('fit', true, 'policy violation');
-    expect(await governance.checkAllowed('fit', { action: 'run' })).toBe(false);
+    expect(await governance.checkAllowed('fit', 'run-simulation')).toBe(false);
 
     await governance.setBlock('fit', false);
-    expect(await governance.checkAllowed('fit', { action: 'run' })).toBe(true);
+    expect(await governance.checkAllowed('fit', 'run-simulation')).toBe(true);
   });
 
   it('appends approval decisions cumulatively', async () => {
@@ -119,7 +130,7 @@ describe('host-planes — governance', () => {
   });
 
   it('defaults checkAllowed to allow for a tool with no governance record', async () => {
-    expect(await planes().governance.checkAllowed('never-seen', {})).toBe(true);
+    expect(await planes().governance.checkAllowed('never-seen', 'run-simulation')).toBe(true);
   });
 
   it('queryAudit returns an empty list with no entries', async () => {

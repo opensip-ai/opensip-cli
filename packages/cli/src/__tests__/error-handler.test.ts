@@ -18,22 +18,23 @@ import {
   ValidationError,
 } from '@opensip-cli/core';
 import { CommanderError } from 'commander';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 
 import { BootstrapError } from '../bootstrap/bootstrap-error.js';
 import { handleFatalBootstrapError, handleParseError } from '../error-handler.js';
 
 function makeOpts(): {
-  setExitCode: ReturnType<typeof vi.fn>;
-  render: ReturnType<typeof vi.fn>;
+  setExitCode: Mock<(code: number) => void>;
+  render: Mock<(result: ErrorResult) => Promise<void>>;
   rendered: ErrorResult[];
+  jsonRequested: boolean;
 } {
   const rendered: ErrorResult[] = [];
   const render = vi.fn((result: ErrorResult) => {
     rendered.push(result);
     return Promise.resolve();
   });
-  return { setExitCode: vi.fn(), render, rendered };
+  return { setExitCode: vi.fn<(code: number) => void>(), render, rendered, jsonRequested: false };
 }
 
 describe('handleParseError', () => {

@@ -95,7 +95,8 @@ function makeSpec(name: string): CommandSpec<unknown, ToolCliContext> {
 /** A tool that mounts one command via the declarative commandSpecs path. */
 function specTool(id: string, commandName: string): Tool {
   return {
-    metadata: { id, version: '0.0.0', description: id },
+    identity: { name: id },
+    metadata: { id, name: id, version: '0.0.0', description: id },
     commands: [{ name: commandName, description: `${commandName} cmd` }],
     commandSpecs: [makeSpec(commandName)],
   };
@@ -104,7 +105,8 @@ function specTool(id: string, commandName: string): Tool {
 /** A tool whose primary `prim` command hosts a `parent`-nested `child` leaf. */
 function nestedTool(id: string): Tool {
   return {
-    metadata: { id, version: '0.0.0', description: id },
+    identity: { name: id },
+    metadata: { id, name: id, version: '0.0.0', description: id },
     commands: [
       { name: 'prim', description: 'primary' },
       { name: 'child', description: 'child', parent: 'prim' },
@@ -172,7 +174,8 @@ describe('mountAllToolCommands — nested tool-command mounting (CommandSpec.par
   it('falls back to a flat root mount + warns when the declared parent is absent', () => {
     const registry = new ToolRegistryClass();
     const orphan: Tool = {
-      metadata: { id: 'orphan-tool', version: '0.0.0', description: 'orphan' },
+      identity: { name: 'orphan-tool' },
+      metadata: { id: 'orphan-tool', name: 'orphan-tool', version: '0.0.0', description: 'orphan' },
       commands: [{ name: 'lonely', description: 'lonely', parent: 'missing' }],
       commandSpecs: [{ ...makeSpec('lonely'), parent: 'missing' }],
     };
@@ -197,7 +200,8 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
   it('a bundled failing mount aborts startup (PluginIncompatibleError)', () => {
     const registry = new ToolRegistryClass();
     const bad: Tool = {
-      metadata: { id: 'bad-tool', version: '0.0.0', description: 'bad' },
+      identity: { name: 'bad-tool' },
+      metadata: { id: 'bad-tool', name: 'bad-tool', version: '0.0.0', description: 'bad' },
       commands: [{ name: 'badcmd', description: 'bad' }],
       commandSpecs: [
         {
@@ -231,7 +235,8 @@ describe('mountAllToolCommands — per-tool failure isolation', () => {
     const registry = new ToolRegistryClass();
     // A malformed spec (a boolean flag marked required) throws inside mountCommandSpec.
     const bad: Tool = {
-      metadata: { id: 'bad-tool', version: '0.0.0', description: 'bad' },
+      identity: { name: 'bad-tool' },
+      metadata: { id: 'bad-tool', name: 'bad-tool', version: '0.0.0', description: 'bad' },
       commands: [{ name: 'badcmd', description: 'bad' }],
       commandSpecs: [
         {

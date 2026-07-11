@@ -150,6 +150,7 @@ describe('createReportFailure', () => {
         severity: 'error',
         code: 'CONFIG.BAD',
         category: 'configuration',
+        message: 'bad configuration',
         impact: 'cannot run',
       },
     });

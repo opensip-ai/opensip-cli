@@ -175,7 +175,7 @@ describe('buildWorkerContext — RPC seams upcall the client', () => {
 describe('buildWorkerContext — host-only seams fail loud', () => {
   it('registerLiveView / renderLive throw UnsupportedSeamError', () => {
     const { ctx } = build();
-    expect(() => ctx.registerLiveView('k', () => undefined)).toThrow(UnsupportedSeamError);
+    expect(() => ctx.registerLiveView('k', () => Promise.resolve())).toThrow(UnsupportedSeamError);
     expect(() => ctx.renderLive('k', {})).toThrow(UnsupportedSeamError);
   });
 });

@@ -294,7 +294,10 @@ describe('executeInit (ambiguous language)', () => {
 
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError).toBeDefined();
-    expect(result.ambiguousLanguageError?.detected.sort()).toEqual(['rust', 'typescript']);
+    expect([...(result.ambiguousLanguageError?.detected ?? [])].sort()).toEqual([
+      'rust',
+      'typescript',
+    ]);
     expect(result.ambiguousLanguageError?.message).toContain('--language');
 
     // Nothing was written

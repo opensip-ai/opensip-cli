@@ -26,7 +26,6 @@ import { describe, it, expect } from 'vitest';
 
 import { mountCommandSpec, type CommandMountContext } from '../commands/mount-command-spec.js';
 
-import type { CommandResult } from '@opensip-cli/contracts';
 import type { CommandSpec, Tool, ToolCliContext } from '@opensip-cli/core';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -53,7 +52,7 @@ const REMOVED_FLAT_COMMANDS = [
 
 /** Minimal mount context — enough for mountCommandSpec to wire the command. */
 const STUB_CTX: CommandMountContext = {
-  render: (_r: CommandResult) => Promise.resolve(),
+  render: (_r: unknown) => Promise.resolve(),
   setExitCode: () => undefined,
 };
 
@@ -136,7 +135,7 @@ describe('graph externalization acceptance test (§1 / §8 — invariant 1, grap
     };
     const program = new Command();
     for (const spec of mod.tool!.commandSpecs ?? []) {
-      mountCommandSpec(program, spec as CommandSpec<unknown, CommandMountContext>, STUB_CTX);
+      mountCommandSpec(program, spec, STUB_CTX as unknown as ToolCliContext);
     }
     const mounted = program.commands.map((c) => c.name());
     // This test mounts each spec via the raw `mountCommandSpec` loop (NOT the

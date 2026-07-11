@@ -17,6 +17,7 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import {
   exitScope,
   LanguageRegistry,
@@ -28,6 +29,7 @@ import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
+import { PolicyAuditCollector } from '../bootstrap/policy-audit.js';
 import { resetInitializedToolIdsForTest } from '../bootstrap/process-idempotency.js';
 import { mountAllToolCommands } from '../bootstrap/register-tools.js';
 import { buildCommandScopeIndex } from '../commands/command-scope-index.js';
@@ -55,10 +57,13 @@ function stubCtx(): ToolCliContext {
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
-    deliverSignals: vi.fn(() => Promise.resolve()),
+    deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
     datastore: undefined,
-  };
+    // Mount-only stub: command handlers are never invoked in these tests, so
+    // the remaining ToolCliContext seams (scope, baseline/artifact/toolState)
+    // are intentionally omitted. Cast is compile-time only — no runtime change.
+  } as unknown as ToolCliContext;
 }
 
 interface FixtureOpts {
@@ -73,7 +78,8 @@ function makeFixtureTool(
   opts: FixtureOpts = {},
 ): Tool {
   return {
-    metadata: { id, version: '0.0.0', description: 'fixture tool' },
+    identity: { name: id },
+    metadata: { id, name: id, version: '0.0.0', description: 'fixture tool' },
     commands: [{ name: cmdName, description: 'fixture command', aliases: opts.aliases }],
     extensionPoints: {
       initialize: () => {
@@ -109,7 +115,8 @@ function makeToolWithCommandSpecs(
   }[],
 ): Tool {
   return {
-    metadata: { id, version: '0.0.0', description: `${id} fixture` },
+    identity: { name: id },
+    metadata: { id, name: id, version: '0.0.0', description: `${id} fixture` },
     commands: specs.map((spec) => ({
       name: spec.name,
       description: `${spec.name} command`,
@@ -146,6 +153,9 @@ function buildProgram(tool: Tool): Command {
       tools,
       manifests: [],
       provenance: [],
+      bootstrapDiagnostics: [],
+      trustPolicy: BUILTIN_TRUST_POLICY,
+      policyAudit: new PolicyAuditCollector(),
     },
     buildCommandScopeIndex({
       toolSpecs: tool.commandSpecs ?? [],

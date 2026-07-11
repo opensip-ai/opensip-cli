@@ -297,7 +297,13 @@ describe('toolsCreate', () => {
     const mod = (await import(`file://${join(toolDir, 'index.mjs')}`)) as {
       tool: Parameters<typeof assertManifestMatchesTool>[1];
     };
-    assertManifestMatchesTool(manifest!, mod.tool);
+    // loadToolManifest returns the pre-admission raw shape (apiVersion optional); the
+    // generated minimal-js manifest carries a concrete apiVersion, so narrow to the
+    // admitted param type for the identity-coherence assertion.
+    assertManifestMatchesTool(
+      manifest! as Parameters<typeof assertManifestMatchesTool>[0],
+      mod.tool,
+    );
   });
 
   it('typechecks the rendered ts-local template under strict settings', () => {

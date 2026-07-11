@@ -15,6 +15,7 @@ import {
 
 function replayTool(id: string, shortId: string): Tool {
   return {
+    identity: { name: id },
     metadata: { id, name: id, version: '0.0.0', description: id },
     commandSpecs: [],
     extensionPoints: {
@@ -98,6 +99,7 @@ describe('SessionReplayRegistry.fromTools', () => {
 
   it('skips tools with no sessionReplay contribution', () => {
     const plain: Tool = {
+      identity: { name: 'plain' },
       metadata: {
         id: 'plain',
         name: 'plain',

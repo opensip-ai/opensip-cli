@@ -24,6 +24,8 @@ const RPC_FLOOD_WORKER = join(HERE, 'fixtures/dispatch-rpc-flood-worker.mjs');
 
 const SPEC = {
   toolId: 't',
+  toolPackageDir: '/tmp/tool',
+  source: 'installed' as const,
   commandName: 'cmd',
   opts: {},
   positionals: [] as readonly string[],

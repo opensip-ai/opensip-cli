@@ -62,7 +62,7 @@ const ENVELOPES: Record<ToolShortId, SignalEnvelope> = {
 /** Reduce an envelope to its top-level structural shape (sorted key set). */
 function topLevelKeys(env: SignalEnvelope): string[] {
   return Object.keys(env)
-    .filter((k) => (env as Record<string, unknown>)[k] !== undefined)
+    .filter((k) => (env as unknown as Record<string, unknown>)[k] !== undefined)
     .sort();
 }
 

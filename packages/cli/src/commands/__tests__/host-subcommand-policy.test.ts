@@ -91,7 +91,7 @@ describe('policy command specs', () => {
     const scope = new RunScope({ trustPolicy: makePolicy(), policyAudit: audit });
     const [status] = buildPolicyGroupLeaves(makeContext());
 
-    const result = await runWithScope(scope, () => status.handler({}, makeContext()));
+    const result = await runWithScope(scope, async () => status.handler({}, makeContext()));
 
     expect(result).toMatchObject({
       type: 'policy-status',
@@ -112,7 +112,7 @@ describe('policy command specs', () => {
       policyAudit: new PolicyAuditCollector(),
     });
 
-    const invalidSubject = await runWithScope(scope, () =>
+    const invalidSubject = await runWithScope(scope, async () =>
       explain.handler({ _args: ['bad-subject'], action: 'load' }, ctx),
     );
     expect(invalidSubject).toMatchObject({
@@ -122,7 +122,7 @@ describe('policy command specs', () => {
     expect(exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
 
     exitCode = undefined;
-    const invalidAction = await runWithScope(scope, () =>
+    const invalidAction = await runWithScope(scope, async () =>
       explain.handler({ _args: ['installed-tool:demo'], action: 'bad-action' }, ctx),
     );
     expect(invalidAction).toMatchObject({
@@ -132,7 +132,7 @@ describe('policy command specs', () => {
     expect(exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
 
     exitCode = undefined;
-    const denied = await runWithScope(scope, () =>
+    const denied = await runWithScope(scope, async () =>
       explain.handler({ _args: ['installed-tool:other'], action: 'load' }, ctx),
     );
     expect(denied).toMatchObject({
@@ -155,11 +155,11 @@ describe('policy command specs', () => {
     });
     const out = join(root, 'policy-audit.json');
 
-    const limitOption = auditSpec.options.find((option) => option.flag === '--limit');
-    expect(limitOption?.parse?.('2')).toBe(2);
-    expect(() => limitOption?.parse?.('0')).toThrow(/positive integer/);
+    const limitOption = auditSpec.options?.find((option) => option.flag === '--limit');
+    expect(limitOption?.parse?.('2', undefined)).toBe(2);
+    expect(() => limitOption?.parse?.('0', undefined)).toThrow(/positive integer/);
 
-    const result = await runWithScope(scope, () => auditSpec.handler({ limit: 1, out }, ctx));
+    const result = await runWithScope(scope, async () => auditSpec.handler({ limit: 1, out }, ctx));
 
     expect(result).toMatchObject({
       type: 'policy-audit',

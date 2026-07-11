@@ -131,7 +131,8 @@ describe('run ledger projection', () => {
         projectEnvelopeEvidence(
           envelope({
             resolutionMode: 'exact',
-            signals: signals as SignalEnvelope['signals'],
+            // Minimal signal stubs: this test only exercises fingerprint projection/capping.
+            signals: signals as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toEqual({
@@ -158,7 +159,8 @@ describe('run ledger projection', () => {
       expect(
         projectEnvelopeEvidence(
           envelope({
-            signals: [{ fingerprint: undefined, metadata: {} }] as SignalEnvelope['signals'],
+            // Minimal signal stub with no string fingerprint (defensive path).
+            signals: [{ fingerprint: undefined, metadata: {} }] as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toEqual({

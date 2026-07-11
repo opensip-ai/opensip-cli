@@ -52,15 +52,16 @@ describe('viewInit — refusals', () => {
 describe('viewInit — partial-state report', () => {
   it('renders each headline state and summarizes pre-existing files without listing them', () => {
     const files = [
-      { path: '/proj/opensip-cli/custom.ts', classification: 'custom' },
-      { path: '/proj/opensip-cli/old.ts', classification: 'stale-scaffolded' },
-      { path: '/proj/opensip-cli/other.ts', classification: 'scaffolded' },
+      { path: '/proj/opensip-cli/custom.ts', classification: 'custom' as const },
+      { path: '/proj/opensip-cli/old.ts', classification: 'stale-scaffolded' as const },
+      { path: '/proj/opensip-cli/other.ts', classification: 'scaffolded' as const },
     ];
     const dirOnly = text(
       result({
         partialStateError: {
           state: 'partial-dir-only',
           preExistingFiles: files,
+          message: 'partial state',
         },
       } as Partial<InitResult>),
     );
@@ -77,6 +78,7 @@ describe('viewInit — partial-state report', () => {
         partialStateError: {
           state: 'partial-config-only',
           preExistingFiles: [],
+          message: 'partial state',
         },
       } as Partial<InitResult>),
     );
@@ -84,7 +86,11 @@ describe('viewInit — partial-state report', () => {
 
     const full = text(
       result({
-        partialStateError: { state: 'fully-initialized', preExistingFiles: [] },
+        partialStateError: {
+          state: 'fully-initialized',
+          preExistingFiles: [],
+          message: 'partial state',
+        },
       } as Partial<InitResult>),
     );
     expect(full).toContain('Already initialized');
@@ -100,6 +106,7 @@ describe('viewInit — partial-state report', () => {
         partialStateError: {
           state: 'partial-dir-only',
           preExistingFiles: files,
+          message: 'partial state',
         },
       } as Partial<InitResult>),
     );

@@ -15,6 +15,7 @@ import type { Tool } from '@opensip-cli/core';
 function toolStub(over: Partial<Tool['metadata']> & { contractVersion?: string } = {}): Tool {
   const { contractVersion, ...metaOver } = over;
   const tool: Tool = {
+    identity: { name: 'demo' },
     metadata: {
       id: '00000000-0000-0000-0000-000000000000',
       name: 'demo',

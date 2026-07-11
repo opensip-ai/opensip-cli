@@ -39,8 +39,8 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
     expect(tool.metadata.id).toBe('00000000-0000-4000-8000-00000000ext1');
     expect(tool.metadata.name).toBe('ext-tool');
     expect(tool.metadata.version).toBe('1.2.3');
-    expect(tool.commandSpecs.map((s) => s.name)).toEqual(['ext-tool']);
-    const spec = tool.commandSpecs[0];
+    expect((tool.commandSpecs ?? []).map((s) => s.name)).toEqual(['ext-tool']);
+    const spec = tool.commandSpecs?.[0];
     expect(spec?.commonFlags).toEqual(['cwd', 'json']);
     expect(spec?.options).toEqual([{ flag: '--mode', value: '<m>', description: 'mode' }]);
     expect(spec?.scope).toBe('project');
@@ -59,9 +59,9 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
 
   it('every synthetic handler is the fail-loud dispatch stub (host never calls it)', () => {
     const tool = synthesizeExternalTool(manifest());
-    expect(() => tool.commandSpecs[0]?.handler({}, {} as never)).toThrow(SystemError);
+    expect(() => tool.commandSpecs?.[0]?.handler({}, {} as never)).toThrow(SystemError);
     try {
-      tool.commandSpecs[0]?.handler({}, {} as never);
+      tool.commandSpecs?.[0]?.handler({}, {} as never);
     } catch (error) {
       expect((error as SystemError).code).toBe('SYSTEM.DISPATCH.EXTERNAL_HANDLER_UNREACHABLE');
     }
@@ -90,7 +90,7 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
         commands: [{ name: 'bare', description: 'bare' }],
       }),
     );
-    const spec = tool.commandSpecs[0];
+    const spec = tool.commandSpecs?.[0];
     expect(spec?.commonFlags).toEqual([]);
     expect(spec?.scope).toBe('project');
     expect(spec?.output).toBe('command-result');

@@ -131,7 +131,14 @@ function makeHarness(actions: readonly SignalRepairAction[] = [action()]): {
   };
   const scope = new RunScope({
     tools,
-    projectContext: { projectRoot: root, configPath: join(root, 'opensip-cli.config.yml') },
+    projectContext: {
+      projectRoot: root,
+      configPath: join(root, 'opensip-cli.config.yml'),
+      cwd: root,
+      cwdExplicit: false,
+      walkedUp: 0,
+      scope: 'project',
+    },
     datastore: () => datastore,
   });
   return { ctx, scope };
@@ -153,7 +160,7 @@ describe('repair command specs', () => {
     const { ctx, scope } = makeHarness();
     const [preview] = buildRepairGroupLeaves(ctx);
 
-    const result = await runWithScope(scope, () =>
+    const result = await runWithScope(scope, async () =>
       preview.handler({ _args: ['latest'], tool: 'fit' }, ctx),
     );
 
@@ -175,7 +182,7 @@ describe('repair command specs', () => {
     const { ctx, scope } = makeHarness();
     const [preview] = buildRepairGroupLeaves(ctx);
 
-    const result = await runWithScope(scope, () =>
+    const result = await runWithScope(scope, async () =>
       preview.handler({ _args: ['latest'], tool: 'fit', signal: 'fingerprint:fp-1' }, ctx),
     );
 
@@ -199,7 +206,7 @@ describe('repair command specs', () => {
     const { ctx, scope } = makeHarness([advisory]);
     const [, apply] = buildRepairGroupLeaves(ctx);
 
-    const result = await runWithScope(scope, () =>
+    const result = await runWithScope(scope, async () =>
       apply.handler(
         {
           _args: ['latest'],

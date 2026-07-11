@@ -38,8 +38,13 @@ const logger: Logger = {
   error: vi.fn(),
 };
 
-function makeTool(name: string, contribution: ScopeContribution): Tool {
+// The contribution bag is intentionally typed as an arbitrary record: several
+// tests pass non-standard / host-owned / dangerous scope keys (`alpha`,
+// `logger`, `shared`, `constructor`, `dispose`) that are NOT part of
+// `ScopeContribution` precisely to exercise the install guard's rejection paths.
+function makeTool(name: string, contribution: Record<string, unknown>): Tool {
   return {
+    identity: { name },
     metadata: {
       id: `00000000-0000-4000-8000-${name.padEnd(12, '0').slice(0, 12)}`,
       name,
@@ -47,7 +52,7 @@ function makeTool(name: string, contribution: ScopeContribution): Tool {
       description: `${name} fixture`,
     },
     commands: [{ name, description: `${name} command` }],
-    extensionPoints: { contributeScope: () => contribution },
+    extensionPoints: { contributeScope: () => contribution as ScopeContribution },
   };
 }
 

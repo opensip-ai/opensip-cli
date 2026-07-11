@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { RunScope, runWithScope } from '@opensip-cli/core';
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { DataStoreFactory, PolicyAuditRepo } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -48,7 +48,7 @@ describe('flushPolicyAuditEvents', () => {
     const audit = new PolicyAuditCollector('run-1');
     const scope = new RunScope({ policyAudit: audit, datastore: () => datastore });
 
-    const inserted = await runWithScope(scope, () => flushPolicyAuditEvents());
+    const inserted = await runWithScopeSync(scope, () => flushPolicyAuditEvents());
 
     expect(inserted).toBe(0);
     expect(audit.list()).toEqual([]);
@@ -60,7 +60,7 @@ describe('flushPolicyAuditEvents', () => {
     audit.record(event({ subject: 'not-a-policy-subject', action: 'install', outcome: 'deny' }));
     const scope = new RunScope({ policyAudit: audit, datastore: () => datastore });
 
-    const inserted = await runWithScope(scope, () => flushPolicyAuditEvents());
+    const inserted = await runWithScopeSync(scope, () => flushPolicyAuditEvents());
 
     expect(inserted).toBe(2);
     expect(audit.list()).toEqual([]);
@@ -92,7 +92,7 @@ describe('flushPolicyAuditEvents', () => {
       },
     });
 
-    expect(runWithScope(unavailableScope, () => flushPolicyAuditEvents())).toBe(0);
+    expect(runWithScopeSync(unavailableScope, () => flushPolicyAuditEvents())).toBe(0);
     expect(unavailable.list()).toHaveLength(1);
 
     const failing = new PolicyAuditCollector();
@@ -105,7 +105,7 @@ describe('flushPolicyAuditEvents', () => {
       withWriteLock: (_operation: string, fn: () => unknown) => fn(),
     };
 
-    const inserted = runWithScope(new RunScope({ policyAudit: failing }), () =>
+    const inserted = runWithScopeSync(new RunScope({ policyAudit: failing }), () =>
       flushPolicyAuditEvents(failingStore as DataStore),
     );
 

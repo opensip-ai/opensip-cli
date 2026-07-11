@@ -14,7 +14,7 @@ import { createCapturingContext } from '../capturing-context.js';
  * deliverEnvelope exit writes so unit tests avoid real network I/O.
  */
 function captureWith(deliveryResult?: Partial<SignalDeliveryResult>) {
-  const result = deliveryResult ?? { cloudAccepted: 0 };
+  const result: SignalDeliveryResult = { cloudAccepted: 0, ...deliveryResult };
   const deliverSignals = vi.fn(
     (
       envelopeArg: Parameters<ToolCliContext['deliverSignals']>[0],
@@ -113,7 +113,7 @@ describe('createCapturingContext', () => {
       }),
     });
     capture.context.setExitCode(2);
-    await capture.context.deliverSignals({}, { runFailed: true });
+    await capture.context.deliverSignals({}, { cwd: '/x', runFailed: true });
 
     // runFailed override DOMINATES and OVERWRITES the earlier setExitCode(2).
     expect(capture.getExitCode()).toBe(EXIT_CODES.RUNTIME_ERROR);

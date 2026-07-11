@@ -50,6 +50,7 @@ const OWNING_TOOL: Tool = {
     {
       name: 'external-dispatch-tool',
       description: 'external hook owner',
+      commonFlags: [],
       scope: 'none',
       output: 'command-result',
       handler: () => undefined,
