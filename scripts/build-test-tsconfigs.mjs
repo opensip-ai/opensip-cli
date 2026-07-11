@@ -40,6 +40,12 @@ const log = (msg) => console.error(`[build-test-tsconfigs] ${msg}`);
 const COMPILER_OVERRIDES = {
   'packages/cli-ui': { lib: ['ES2022', 'DOM', 'DOM.Iterable'] },
   'packages/dashboard': { lib: ['ES2022', 'DOM', 'DOM.Iterable'] },
+  // The CLI's dogfood tests import the repo-root `opensip-cli/fit/checks/*.mjs`
+  // local checks (plain ESM, no declarations). allowJs lets tsc resolve and
+  // infer them (checkJs off — the scaffold is not type-checked here); rootDir is
+  // widened to the repo root so those out-of-`src` modules satisfy containment.
+  // Harmless under --noEmit.
+  'packages/cli': { allowJs: true, checkJs: false, rootDir: '../..' },
 };
 
 // Per-package extra excludes for intentionally-invalid corpora that do NOT live
