@@ -361,6 +361,45 @@ function verifyArbitraryToolAllowlist() {
   );
 }
 
+function verifyArbitraryFitPackAllowlist() {
+  const packageDir = 'packages/__gate_probe_oddity_fitpack__';
+  const sourceFile = `${packageDir}/src/check.ts`;
+  try {
+    mkdirSync(`${packageDir}/src`, { recursive: true });
+    writeFileSync(
+      `${packageDir}/package.json`,
+      JSON.stringify({
+        name: '@opensip-cli/unlisted-audit-fitpack',
+        type: 'module',
+        exports: { '.': './dist/index.js' },
+        opensipTools: { kind: 'fit-pack' },
+      }),
+      'utf8',
+    );
+    // An illegal datastore import a permissive default would allow.
+    writeFileSync(
+      sourceFile,
+      "import { DataStoreFactory } from '@opensip-cli/datastore';\nexport const factory = DataStoreFactory;\n",
+      'utf8',
+    );
+    // A fit pack absent from FIT_PACK_ALLOWED_PACKAGES must fail closed at config
+    // load (ADR-0151), not receive a permissive default — stricter than a rule firing.
+    const report = depcruiseReport(sourceFile);
+    if (!/no reviewed dependency allowlist|not a kind:fit-pack/u.test(report)) {
+      console.error(
+        'verify-gate-live: FAIL — an arbitrarily named manifest fit pack did not fail closed at ' +
+          `dependency-cruiser config load.\ndepcruise report:\n${report}`,
+      );
+      process.exit(1);
+    }
+  } finally {
+    rmSync(packageDir, { recursive: true, force: true });
+  }
+  console.log(
+    'verify-gate-live: OK — an arbitrarily named manifest fit pack fails closed without a reviewed allowlist.',
+  );
+}
+
 function verifyWorkspaceReaderGuards() {
   const root = mkdtempSync(join(tmpdir(), 'opensip-gate-workspace-'));
   const outside = mkdtempSync(join(tmpdir(), 'opensip-gate-outside-'));
@@ -473,6 +512,7 @@ function verifyModularBoundaryGates() {
   );
   verifyModularBoundaryResolution();
   verifyArbitraryToolAllowlist();
+  verifyArbitraryFitPackAllowlist();
   verifyWorkspaceReaderGuards();
 }
 

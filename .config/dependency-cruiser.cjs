@@ -199,10 +199,81 @@ const TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES = PRODUCTION_TOOL_PACKAGES.map((tool) 
   };
 });
 
+// Fit-pack (check-pack) production import allowlists (ADR-0151), manifest-derived.
+// Mirrors the Tool allowlist above: from each fit pack's `src` root, every
+// `packages/` import outside its reviewed allowlist is a fail-closed error. A
+// newly declared `kind: fit-pack` package absent from the map throws at config
+// load, so a new pack cannot silently receive a permissive default; a stale map
+// entry (no matching fit pack) also throws.
+const FIT_PACK_ALLOWED_PACKAGES = Object.freeze({
+  '@opensip-cli/checks-cpp': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-go': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-java': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-rust': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-python': Object.freeze(['@opensip-cli/fitness', '@opensip-cli/lang-python']),
+  '@opensip-cli/checks-universal': Object.freeze(['@opensip-cli/core', '@opensip-cli/fitness']),
+  '@opensip-cli/checks-dogfood': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/fitness',
+    '@opensip-cli/lang-typescript',
+  ]),
+  '@opensip-cli/checks-typescript': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/fitness',
+    '@opensip-cli/lang-typescript',
+  ]),
+});
+
+const FIT_PACK_PACKAGES = WORKSPACE_PACKAGES.filter(
+  (pkg) => pkg.manifest && pkg.manifest.opensipTools && pkg.manifest.opensipTools.kind === 'fit-pack',
+);
+
+for (const name of Object.keys(FIT_PACK_ALLOWED_PACKAGES)) {
+  if (!FIT_PACK_PACKAGES.some((pack) => pack.name === name)) {
+    throw new Error(
+      `FIT_PACK_ALLOWED_PACKAGES lists ${name}, which is not a kind:fit-pack workspace package (stale policy entry).`,
+    );
+  }
+}
+
+const FIT_PACK_IMPORT_ALLOWLIST_RULES = FIT_PACK_PACKAGES.map((pack) => {
+  if (!Object.hasOwn(FIT_PACK_ALLOWED_PACKAGES, pack.name)) {
+    throw new Error(
+      `fit pack ${pack.name} has no reviewed dependency allowlist. Add it to ` +
+        'FIT_PACK_ALLOWED_PACKAGES in .config/dependency-cruiser.cjs (ADR-0151).',
+    );
+  }
+  const sourceRoot = `${packageDirForRule(pack.name)}/src`;
+  const allowedDirs = [
+    pack.relativeDir,
+    ...FIT_PACK_ALLOWED_PACKAGES[pack.name].map((packageName) => packageDirForRule(packageName)),
+  ];
+  const allowedFromPackagesRoot = allowedDirs
+    .map((relativeDir) => escapeRegex(relativeDir.slice('packages/'.length) + '/'))
+    .join('|');
+  const ruleName = pack.name.replace(/^@opensip-cli\//u, '').replace(/[^a-zA-Z0-9-]+/gu, '-');
+
+  return {
+    name: `fit-pack-${ruleName}-imports-allowlist`,
+    severity: 'error',
+    comment:
+      `${pack.name} production imports are fail-closed from its manifest-derived source root (ADR-0151). ` +
+      'A new workspace dependency requires an explicit FIT_PACK_ALLOWED_PACKAGES update.',
+    from: {
+      path: `^${escapeRegex(sourceRoot)}`,
+      pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+    },
+    to: {
+      path: `^packages/(?!${allowedFromPackagesRoot})`,
+    },
+  };
+});
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     ...TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES,
+    ...FIT_PACK_IMPORT_ALLOWLIST_RULES,
     // -------------------------------------------------------------------
     // Generic hygiene
     // -------------------------------------------------------------------
