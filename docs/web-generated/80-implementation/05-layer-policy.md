@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-14
+last_verified: 2026-07-11
 release: v0.5.3
 title: "Layer policy"
 audience: [contributors]
@@ -127,9 +127,12 @@ These rules follow the same negative-lookahead form and are intentionally
 future-proof:
 
 - **`mcp-imports-allowlist`** — MCP production source may import only core,
-  contracts, datastore, session-store, graph engine internals, and itself. It
-  must not reach into the CLI composition root, other tool engines, check packs,
-  language packs, or graph adapter packs.
+  contracts, datastore, session-store, the public `@opensip-cli/graph/read`
+  surface, and itself — never `@opensip-cli/graph/internal`. The sole exception is
+  the single adapter-registrar root file, allowed the graph root by
+  **`mcp-graph-root-registrar-only`**. MCP must not reach into the CLI
+  composition root, other tool engines, check packs, language packs, or graph
+  adapter packs.
 - **`tool-test-kit-imports-core-contracts-only`** — the published test-helper
   package for tool authors may import only core, contracts, and itself.
 - **`lang-adapters-disjoint`** — `@opensip-cli/lang-*` packages may not import
@@ -260,6 +263,37 @@ Six rules guard the dashboard's HTML-generator package against the failure modes
 These rules exist because the dashboard ships as a single self-contained `index.html`. Every layering violation here would either bloat the file, break the no-server promise, or reintroduce panel-cross-talk bugs.
 
 ---
+
+## Manifest-derived boundaries and export locks
+
+Beyond the hand-authored layer rules above, a family of gates is **derived from
+manifests** so it stays correct as packages are added
+([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)).
+These do not name specific packages pairwise; they classify by
+`opensipTools.kind` and by declared exports:
+
+- **`cli-no-static-tool-package-import`** — the CLI host may not statically import
+  a Tool runtime from *any* package (the rule is manifest-derived, so a Tool with
+  any name is covered). Bundled Tools load only through the dynamic plugin path.
+- **`fit-pack-*-imports-allowlist`** — each `kind: fit-pack` package gets a
+  reviewed import allowlist; an unlisted fit pack **fails closed at
+  dependency-cruiser config load**, not with a permissive default.
+- **`no-cross-package-internal`** — cross-package `/internal` subpaths are matched
+  completely (file *and* directory forms) and are test-only; the one sanctioned
+  live edge is MCP → `graph/read` via `mcp-graph-root-registrar-only`.
+- **Exact export locks** — `scripts/verify-core-exports.mjs` walks each governed
+  package's barrel with a TypeScript AST and locks the exact **value and type**
+  namespace against `.config/package-export-allowlists.cjs`, catching a leaked
+  type a runtime `Object.keys` check would miss.
+- **Production-only packed output** — package builds ship runtime bytes only;
+  `scripts/verify-published-artifacts.mjs` rejects any test/fixture/coverage path
+  or pack hook in the real `dist/` tree and packlist
+  ([ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md)).
+
+Every rule above has both a firing probe and a legal-edge control in
+`scripts/verify-gate-live.mjs`, each cleaned up after success and forced failure,
+plus the local `no-bootstrap-tool-import` dogfood diagnostic for actionable
+file/line output.
 
 ## What this enforces in practice
 

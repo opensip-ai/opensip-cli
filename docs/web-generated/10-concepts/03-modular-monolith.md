@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-11
 release: v0.5.3
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 58-package workspace, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The layered workspace, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -196,15 +196,15 @@ We've been comfortable with these costs. They're the price of the marketplace sh
 Tracing the dependency arrows for the `no-console-log` check we followed in [`01-fitness-loop.md`](/docs/opensip-cli/10-concepts/01-fitness-loop/):
 
 ```
-opensip-cli           ─── imports ───►  @opensip-cli/fitness
-                                                       │
-                                                       │ imports
-                                                       ▼
-                                              @opensip-cli/core
-                                                       ▲
-                                                       │ imports
-                                                       │
-@opensip-cli/checks-universal ─── imports ──────────┘
+opensip-cli        ─ dynamic-loads ─►  @opensip-cli/fitness
+(resolves manifest,                              │
+ dynamic-imports the                             │ imports
+ `tool` export — no                              ▼
+ static symbol import)                  @opensip-cli/core
+                                                 ▲
+                                                 │ imports
+                                                 │
+@opensip-cli/checks-universal ─── imports ──────┘
        │
        │ exports `noConsoleLog`
        ▼
@@ -214,6 +214,39 @@ opensip-cli           ─── imports ───►  @opensip-cli/fitness
 The `cli` imports the bundled language adapters to register them (Layer 5 → Layer 3). First-party tools are not statically imported by runtime symbol: the CLI lists their package names, resolves their manifests on disk, admits them, and dynamic-imports the same `tool` export shape that installed tool plugins use. It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring the `fit-pack` marker plus target-domain epoch (or listed exactly in `plugins.checkPackages`). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
 
 ---
+
+## Complete boundaries, derived and locked
+
+The layer cake above is enforced by more than the dependency-cruiser layer rules.
+Two decisions ([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)
+and [ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md))
+make the boundaries **derived** and **complete** rather than hand-maintained. The
+current package/tool inventory is authoritative in the generated
+[`architecture-map.md`](/docs/opensip-cli/80-implementation/architecture-map/) and the release
+governance projection, not in a frozen count here:
+
+- **Dynamic CLI Tool loading.** The CLI host statically imports **no** Tool
+  runtime (`cli-no-static-tool-package-import`, manifest-derived so it covers a
+  Tool with any package name); a bundled Tool and an installed Tool travel the
+  same dynamic plugin path, so install-source independence is structural.
+- **Fail-closed capability allowlists.** Tool/fit-pack classification comes from
+  `opensipTools.kind`; an unlisted fit pack throws at dependency-cruiser config
+  load rather than getting a permissive default.
+- **Test-only internal subpaths.** Cross-package `/internal` subpaths are matched
+  completely (file *and* directory forms); MCP reads graph evidence only through
+  the public `@opensip-cli/graph/read` surface, with a single sanctioned
+  adapter-registrar root exception.
+- **Exact export locks.** Each governed package's public surface is locked as an
+  exact **value and type** namespace by a TypeScript-AST walker
+  (`verify-core-exports`), so a leaked type is caught even though a runtime
+  `Object.keys` check would miss it.
+- **Production-only packed output.** Package builds emit runtime bytes only;
+  test/spec/fixture trees are excluded from both `tsc` output and the verified
+  `pnpm pack` packlist, while test sources stay semantically checked by a
+  per-package no-emit test project (ADR-0150).
+
+Every one of these gates ships with a firing probe *and* a legal-edge control in
+`scripts/verify-gate-live.mjs`.
 
 ## What's next
 
