@@ -112,7 +112,7 @@ describe('target resolution path parity (resolveTargets vs preResolveAllTargets)
 
     const preForT = pre.get('src') ?? [];
     // direct returns the flat union for the targets passed; for single it must match
-    expect(preForT.sort()).toEqual(direct.sort());
+    expect([...preForT].sort()).toEqual([...direct].sort());
   });
 
   it('produces identical results when a target has its own excludes + project globals', () => {
@@ -124,7 +124,7 @@ describe('target resolution path parity (resolveTargets vs preResolveAllTargets)
     const pre = preResolveAllTargets(reg, globals, rootDir);
     const directForAll = resolveTargets([reg.getByName('all-ts')!], rootDir, globals);
 
-    expect((pre.get('all-ts') ?? []).sort()).toEqual(directForAll.sort());
+    expect([...(pre.get('all-ts') ?? [])].sort()).toEqual([...directForAll].sort());
   });
 
   it('produces identical results for two targets sharing a pattern but with different per-target excludes', () => {
@@ -138,7 +138,7 @@ describe('target resolution path parity (resolveTargets vs preResolveAllTargets)
     const directNoTests = resolveTargets([reg.getByName('no-tests')!], rootDir, globals);
     const directOnlyTests = resolveTargets([reg.getByName('only-tests')!], rootDir, globals);
 
-    expect((pre.get('no-tests') ?? []).sort()).toEqual(directNoTests.sort());
-    expect((pre.get('only-tests') ?? []).sort()).toEqual(directOnlyTests.sort());
+    expect([...(pre.get('no-tests') ?? [])].sort()).toEqual([...directNoTests].sort());
+    expect([...(pre.get('only-tests') ?? [])].sort()).toEqual([...directOnlyTests].sort());
   });
 });

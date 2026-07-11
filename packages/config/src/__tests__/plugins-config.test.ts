@@ -11,7 +11,12 @@ import {
 
 import type { ToolPluginManifest } from '@opensip-cli/core';
 
-function manifestWithPluginKeys(keys: PluginConfigKeyDeclaration[]): readonly ToolPluginManifest[] {
+// A minimal manifest shape for config-key derivation: this suite only reads
+// `capabilities`, so the return is narrowed to what it builds and consumes
+// rather than fabricating a full ToolPluginManifest (identity/source/commands…).
+function manifestWithPluginKeys(
+  keys: PluginConfigKeyDeclaration[],
+): readonly Pick<ToolPluginManifest, 'id' | 'apiVersion' | 'capabilities'>[] {
   return [
     {
       id: 'new-tool',
@@ -20,6 +25,8 @@ function manifestWithPluginKeys(keys: PluginConfigKeyDeclaration[]): readonly To
         {
           id: 'new-cap',
           apiVersion: 1,
+          minSupportedApiVersion: 1,
+          contributionSchema: {},
           contributionKind: 'module-export',
           discovery: {
             discovery: { mode: 'marker', markerKind: 'new-marker' },
