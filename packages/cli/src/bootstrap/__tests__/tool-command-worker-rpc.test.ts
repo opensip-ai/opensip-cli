@@ -150,7 +150,7 @@ describe('createWorkerRpcClient — host fault reply', () => {
       error: { message: 'minimal fault' },
     } satisfies RpcReply);
 
-    const err = await pending.catch((error: unknown) => error as Error & { code?: string });
+    const err = (await pending.catch((error: unknown) => error)) as Error & { code?: string };
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe('minimal fault');
     expect(err.code).toBeUndefined();
@@ -185,7 +185,7 @@ describe('createWorkerRpcClient — host fault reply', () => {
       },
     } satisfies RpcReply);
 
-    const err = await pending.catch((error: unknown) => error as ToolError);
+    const err = (await pending.catch((error: unknown) => error)) as ToolError;
     expect(err).toBeInstanceOf(ConfigurationError);
     // The original subcode round-trips onto the rebuilt instance for diagnostics.
     expect(err.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
@@ -221,7 +221,7 @@ describe('createWorkerRpcClient — host fault reply', () => {
         toolErrorCode: 'NOT_A_REAL_CODE',
       },
     } satisfies RpcReply);
-    const err = await pending.catch((error: unknown) => error as Error & { code?: string });
+    const err = (await pending.catch((error: unknown) => error)) as Error & { code?: string };
     expect(err).toBeInstanceOf(Error);
     expect(err).not.toBeInstanceOf(ToolError);
     expect(err.code).toBe('SUB');

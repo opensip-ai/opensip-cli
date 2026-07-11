@@ -6,28 +6,34 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import {
   defineCommand,
   LanguageRegistry,
   ToolRegistry,
   type CommandScopeRequirement,
   type CommandSpec,
+  type ScopeContribution,
   type Tool,
+  type ToolCliContext,
   type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
+import { type HostSpec } from '../../commands/host-subcommand-shared.js';
+import { type CliCommandsContext } from '../../commands/shared.js';
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
+import { PolicyAuditCollector } from '../policy-audit.js';
 import { POST_BAILOUT_PHASE_ORDER, PRE_ACTION_PHASES } from '../pre-action-bootstrap-phases.js';
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
 
-function scopeSpec(name: string, scope: CommandScopeRequirement): CommandSpec {
-  return defineCommand({
+function scopeSpec(name: string, scope: CommandScopeRequirement): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
     name,
     description: `${name} command`,
     commonFlags: [],
@@ -41,8 +47,8 @@ function toolCommandSpec(
   name: string,
   scope: CommandScopeRequirement,
   parent?: string,
-): CommandSpec {
-  return defineCommand({
+): CommandSpec<unknown, ToolCliContext> {
+  return defineCommand<unknown, ToolCliContext>({
     name,
     description: `${name} command`,
     commonFlags: [],
@@ -73,6 +79,7 @@ const COMMAND_SCOPES = buildCommandScopeIndex({
 });
 
 const noopTool = (name: string): Tool => ({
+  identity: { name },
   metadata: { id: name, name, version: '0', description: name },
   commands: [{ name, description: name }],
   commandSpecs: [],
@@ -82,6 +89,7 @@ const nestedTool = (id: string, primary: string): Tool => {
   const primarySpec = toolCommandSpec(primary, 'project');
   const listSpec = toolCommandSpec('list', 'project', primary);
   return {
+    identity: { name: primary },
     metadata: { id, name: primary, version: '0', description: primary },
     commands: [
       { name: primary, description: primary, scope: 'project' },
@@ -100,6 +108,8 @@ function runtimeWith(tools: Tool[]): PreActionRuntime {
     manifests: [] as ToolPluginManifest[],
     provenance: [] as ToolProvenance[],
     bootstrapDiagnostics: [],
+    trustPolicy: BUILTIN_TRUST_POLICY,
+    policyAudit: new PolicyAuditCollector(),
   };
 }
 
@@ -286,7 +296,9 @@ describe('executePostBailoutBootstrap phase ordering', () => {
     const tool = {
       ...noopTool('scoped-tool'),
       extensionPoints: {
-        contributeScope: () => ({ scopedTool: { ready: true } }),
+        // `scopedTool` is a tool-contributed subscope slot (module-augmented in
+        // real tools); cast to the augmentable contribution bag the host installs.
+        contributeScope: () => ({ scopedTool: { ready: true } }) as ScopeContribution,
       },
     } satisfies Tool;
     const runtime = {

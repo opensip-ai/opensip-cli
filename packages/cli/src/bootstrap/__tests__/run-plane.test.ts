@@ -13,17 +13,14 @@ import { join } from 'node:path';
 
 import {
   RunScope,
-  createSignal,
-  runWithScope,
+  runWithScopeSync,
   type Logger,
   type ProjectContext,
-  type ToolCliContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { listSessionSummaries, SessionRepo } from '@opensip-cli/session-store';
-import { executeYagni } from '@opensip-cli/yagni';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { disposeCurrentScope } from '../pre-action-hook.js';
@@ -36,8 +33,6 @@ import {
 } from '../run-plane.js';
 import * as sessionRetentionMod from '../session-retention.js';
 import { resolveCurrentSessionRetentionPolicy } from '../session-retention.js';
-
-type ExecuteYagniDetector = NonNullable<Parameters<typeof executeYagni>[2]>[number];
 
 /** Silent logger so the best-effort warn/info paths don't spam test output. */
 const SILENT: Logger = {
@@ -90,29 +85,6 @@ function withCwd<T>(cwd: string, fn: () => T): T {
   } finally {
     process.chdir(previous);
   }
-}
-
-function warningYagniDetector(): ExecuteYagniDetector {
-  return {
-    id: 'warning-detector',
-    slug: 'yagni:warning-detector',
-    description: 'fixture warning detector',
-    run: () =>
-      Promise.resolve({
-        durationMs: 1,
-        signals: [
-          createSignal({
-            source: 'yagni:warning-detector',
-            provider: 'yagni',
-            severity: 'medium',
-            category: 'architecture',
-            ruleId: 'yagni:warning-detector',
-            message: 'warning policy should fail this run',
-            code: { file: 'subject.ts', line: 1, column: 1 },
-          }),
-        ],
-      }),
-  };
 }
 
 describe('createRunPlaneFactory — invocation lifecycle', () => {
@@ -255,12 +227,12 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
     const scope = new RunScope({
       toolManifests: [
         { id: 'fit', identity: { name: 'fit' }, version: '9.9.9' },
-      ] as unknown as ConstructorParameters<typeof RunScope>[0]['toolManifests'],
+      ] as unknown as NonNullable<ConstructorParameters<typeof RunScope>[0]>['toolManifests'],
     });
-    const recorded = runWithScope(scope, () =>
+    const recorded = runWithScopeSync(scope, () =>
       factory.current().completeAndPersist(contribution()),
     );
-    const row = new SessionRepo(datastore).get(recorded.id);
+    const row = new SessionRepo(datastore).get(recorded!.id);
     expect(row?.engineVersion).toBe('9.9.9');
     expect(row?.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
   });
@@ -346,7 +318,7 @@ describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
           projectContext: projectContext(projectRoot),
           datastore: () => scopedDatastore,
         });
-        void runWithScope(scope, () => {
+        runWithScopeSync(scope, () => {
           scopedFactory.current().completeAndPersist(contribution({ cwd: projectRoot }));
         });
       });
@@ -595,43 +567,42 @@ describe('createRunActionHooks', () => {
     }
   });
 
-  it('round-trips a failing YAGNI verdict through host persistence into session summaries', async () => {
-    const cwd = mkdtempSync(join(tmpdir(), 'opensip-yagni-run-plane-'));
-    try {
-      writeFileSync(join(cwd, 'subject.ts'), 'export const subject = true;\n', 'utf8');
-      const result = await executeYagni(
-        {
-          cwd,
-          config: { failOnErrors: 0, failOnWarnings: 1 },
-        },
-        {} as ToolCliContext,
-        [warningYagniDetector()],
-      );
-
-      expect(result.session.passed).toBe(false);
-
-      const hooks = createRunActionHooks(factory);
-      hooks.beginRun?.();
-      hooks.completeRun?.(result);
-
-      const summaries = listSessionSummaries(datastore, { summaryOnly: true });
-      expect(summaries.sessions).toHaveLength(1);
-      expect(summaries.sessions[0]).toMatchObject({
+  it('round-trips a failing YAGNI verdict through host persistence into session summaries', () => {
+    // Exercises the generic ToolRunCompletion -> StoredSession host path for a
+    // failing verdict. The contribution is constructed directly: this is a
+    // host-plane unit test and must not run a tool implementation. YAGNI (like
+    // every analysis tool) returns exactly this shape; `passed: false` derives
+    // `runOutcome: 'failed'`, and `payload.summary` projects into the session.
+    const cwd = '/proj/yagni-subject';
+    const failingCompletion = {
+      session: {
         tool: 'yagni',
         cwd,
+        score: 0,
         passed: false,
-        runOutcome: 'failed',
-        summary: {
-          total: 1,
-          passed: 1,
-          failed: 0,
-          errors: 0,
-          warnings: 1,
-        },
-      });
-    } finally {
-      rmSync(cwd, { recursive: true, force: true });
-    }
+        payload: { summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 1 } },
+      },
+    } satisfies ToolRunCompletion;
+
+    const hooks = createRunActionHooks(factory);
+    hooks.beginRun?.();
+    hooks.completeRun?.(failingCompletion);
+
+    const summaries = listSessionSummaries(datastore, { summaryOnly: true });
+    expect(summaries.sessions).toHaveLength(1);
+    expect(summaries.sessions[0]).toMatchObject({
+      tool: 'yagni',
+      cwd,
+      passed: false,
+      runOutcome: 'failed',
+      summary: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+        errors: 0,
+        warnings: 1,
+      },
+    });
   });
 });
 

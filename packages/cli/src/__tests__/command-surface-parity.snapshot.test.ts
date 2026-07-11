@@ -159,8 +159,12 @@ function buildFullProgram(): Command {
     registerCliCommands(program, {
       setExitCode: vi.fn(),
       render: vi.fn(() => Promise.resolve()),
+      emitJson: vi.fn(),
+      emitRaw: vi.fn(),
+      emitError: vi.fn(),
       datastore: () => undefined,
       pluginLayouts,
+      toolScaffolds: [],
       tools: registry,
     });
 

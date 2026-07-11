@@ -105,6 +105,7 @@ function toolWithConfig(config: unknown): Tool {
 /** A tool whose single command's handler throws `thrown` (typed-error exit tests). */
 function toolThatThrows(thrown: unknown): Tool {
   return {
+    identity: fixtureTool.identity,
     metadata: { ...fixtureTool.metadata },
     commandSpecs: [
       {
@@ -118,7 +119,7 @@ function toolThatThrows(thrown: unknown): Tool {
         },
       },
     ],
-  } as Tool;
+  };
 }
 
 describe('runToolCommandWorker', () => {
@@ -138,6 +139,7 @@ describe('runToolCommandWorker', () => {
 
   it('fails loud when a return-valued command returns undefined without an explicit seam', async () => {
     const tool = {
+      identity: fixtureTool.identity,
       metadata: { ...fixtureTool.metadata },
       commandSpecs: [
         {
@@ -319,6 +321,7 @@ describe('runToolCommandWorker', () => {
       extensionPoints: {
         initialize: () => {
           initialized = true;
+          return Promise.resolve();
         },
         collectReportData: () => ({
           initSkip: { initialized },

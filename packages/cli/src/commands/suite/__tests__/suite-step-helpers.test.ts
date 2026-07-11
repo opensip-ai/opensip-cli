@@ -62,7 +62,8 @@ describe('suite step helpers', () => {
                   },
                 },
               },
-            ] as SignalEnvelope['signals'],
+              // Deliberately malformed trust metadata to exercise the validation reject path.
+            ] as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toBeUndefined();
@@ -80,7 +81,10 @@ describe('suite step helpers', () => {
         verificationFromEnvelope(
           envelope({
             verification: TRUST,
-            signals: [{ metadata: { trust: fallbackTrust } }] as SignalEnvelope['signals'],
+            // Minimal signal stub carrying only the trust metadata under test.
+            signals: [
+              { metadata: { trust: fallbackTrust } },
+            ] as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toBe(TRUST);
@@ -90,10 +94,11 @@ describe('suite step helpers', () => {
       expect(
         verificationFromEnvelope(
           envelope({
+            // Minimal signal stubs: one invalid trust, one valid — exercises fallback selection.
             signals: [
               { metadata: { trust: { coverage: 'nope' } } },
               { metadata: { trust: TRUST } },
-            ] as SignalEnvelope['signals'],
+            ] as unknown as SignalEnvelope['signals'],
           }),
         ),
       ).toBe(TRUST);

@@ -27,7 +27,11 @@ import { CAPABILITY_PACK_ALLOWLIST_ENV } from '../bootstrap/tool-trust.js';
 let testDir: string;
 
 function makeTool(id: string): Tool {
-  return { metadata: { id, version: '0.0.0', description: id }, commands: [] };
+  return {
+    identity: { name: id },
+    metadata: { id, name: id, version: '0.0.0', description: id },
+    commands: [],
+  };
 }
 
 /** A marker-mode domain spec owned by `ownerToolId`, discovering kind `marker`. */

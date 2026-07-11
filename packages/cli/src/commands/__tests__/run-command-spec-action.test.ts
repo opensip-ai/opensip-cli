@@ -33,7 +33,7 @@ describe('runCommandSpecAction', () => {
   it('runs handler output through dispatch and lifecycle hooks', async () => {
     const beginRun = vi.fn();
     const completeRun = vi.fn();
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -57,7 +57,7 @@ describe('runCommandSpecAction', () => {
     const handler = vi.fn(() => ({ type: 'help' }) as const);
     const maybeDispatchExternal = vi.fn(() => Promise.resolve(true));
     const completeRun = vi.fn();
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -86,7 +86,7 @@ describe('runCommandSpecAction', () => {
           getDatastore: () => datastore,
         }),
       );
-      const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+      const spec = defineCommand<unknown, ToolCliContext>({
         name: 'fit',
         description: 'fixture',
         commonFlags: [],
@@ -163,7 +163,7 @@ describe('runCommandSpecAction', () => {
         }),
       );
       const error = new ConfigurationError('bad config');
-      const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+      const spec = defineCommand<unknown, ToolCliContext>({
         name: 'fit',
         description: 'fixture',
         commonFlags: [],
@@ -270,7 +270,7 @@ describe('runCommandSpecAction', () => {
           getDatastore: () => datastore,
         }),
       );
-      const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+      const spec = defineCommand<unknown, ToolCliContext>({
         name: 'graph',
         description: 'fixture',
         commonFlags: [],
@@ -305,7 +305,7 @@ describe('runCommandSpecAction', () => {
           getDatastore: () => datastore,
         }),
       );
-      const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+      const spec = defineCommand<unknown, ToolCliContext>({
         name: 'graph',
         description: 'fixture',
         commonFlags: [],
@@ -346,7 +346,7 @@ describe('runCommandSpecAction', () => {
 
   it('captures reportFailure and skips dispatch when a reporting handler returns void', async () => {
     const reportFailure = vi.fn((_detail: ReportFailureDetail) => Promise.resolve());
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -372,7 +372,7 @@ describe('runCommandSpecAction', () => {
 
   it('maps ToolError through setExitCode when no reportFailure seam exists', async () => {
     const error = new ConfigurationError('bad config');
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -393,7 +393,7 @@ describe('runCommandSpecAction', () => {
   it('routes ToolError through reportFailure when available', async () => {
     const error = new NetworkError('upload failed');
     const reportFailure = vi.fn((_detail: ReportFailureDetail) => Promise.resolve());
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],

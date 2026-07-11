@@ -161,6 +161,18 @@ describe('@opensip-cli/graph/read public surface', () => {
       read.PackageCallEvidence | read.PackageImportEvidence
     >();
   });
+
+  it('exposes FeatureTable as a type without adding a runtime export', () => {
+    // MCP consumes graph feature evidence through the read facade (ADR-0151);
+    // FeatureTable must be reachable as a TYPE. A type-only re-export must never
+    // add a runtime key — the value surface stays exactly EXPECTED.
+    expectTypeOf<read.FeatureTable>().not.toBeNever();
+    expect(read).not.toHaveProperty('FeatureTable');
+    const runtimeKeys = Object.keys(read)
+      .filter((key) => (read as Record<string, unknown>)[key] !== undefined)
+      .sort();
+    expect(runtimeKeys).toEqual(EXPECTED);
+  });
 });
 
 describe('@opensip-cli/graph/read catalog Results', () => {

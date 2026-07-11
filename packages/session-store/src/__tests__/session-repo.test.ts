@@ -1,4 +1,5 @@
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -53,7 +54,11 @@ let datastore: DrizzleDataStore;
 let repo: SessionRepo;
 
 beforeEach(() => {
-  datastore = DataStoreFactory.open({ backend: 'memory' });
+  // The memory backend is a Drizzle-backed store; narrow to the concrete
+  // handle (matching `let datastore: DrizzleDataStore`) for the `.db` EXPLAIN
+  // QUERY PLAN introspection below. `requireDrizzleHandle` is the production
+  // narrowing seam used by SessionRepo itself.
+  datastore = requireDrizzleHandle(DataStoreFactory.open({ backend: 'memory' }));
   repo = new SessionRepo(datastore);
 });
 

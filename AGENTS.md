@@ -3,6 +3,7 @@
 This is the **START HERE** document for AI agents working on the OpenSIP CLI codebase.
 
 <!-- opensip:agent-guidance start -->
+
 ## OpenSIP MCP First
 
 When answering questions about existing OpenSIP results, prior `fit` / `graph` / `yagni` / `sim` runs, findings, warnings, errors, scores, sessions, or graph relationships, use the OpenSIP MCP server first.
@@ -28,10 +29,14 @@ Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result
 ## What is OpenSIP CLI?
 
 OpenSIP CLI is an **open-source codebase intelligence CLI** — a CLI that
-hosts pluggable tools for static analysis. Today it ships with four: `fit`
-(fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
-(static call-graph analysis), `sim` (simulation scenarios, experimental), and
-`yagni` (advisory YAGNI reduction audit).
+hosts pluggable tools for static analysis and evidence serving. It ships with the
+five bundled tools declared in
+`packages/cli/src/bootstrap/bundled-tools.manifest.json` (the source of truth):
+`fit` (fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
+(static call-graph analysis), `sim` (simulation scenarios, experimental), `yagni`
+(advisory YAGNI reduction audit), and `mcp` (stored results + graph evidence over
+stdio for MCP clients). Of these, the four analysis tools (`fit`, `graph`, `sim`,
+`yagni`) render live views; `mcp` is a raw stdio server.
 Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Product Origin And Intent
@@ -110,8 +115,8 @@ opensip-cli/
 │   │                            #   UI kit without pulling in the dispatcher.
 │   ├── cli-live/                # @opensip-cli/cli-live — shared live-run
 │   │                            #   runtime: runToolLiveView state machine +
-│   │                            #   produce() seam; all four tools render through
-│   │                            #   it (ADR-0058).
+│   │                            #   produce() seam; the four analysis tools render
+│   │                            #   through it (ADR-0058).
 │   ├── clone-detection/         # @opensip-cli/clone-detection — pure clone
 │   │                            #   detection substrate
 │   ├── format/                  # @opensip-cli/format — pure human formatters
@@ -508,7 +513,7 @@ cli (layer 6 — composition root; depends on every tool)
 - contracts must NOT import from cli, fitness, simulation, lang-_, or checks-_.
 - `cli-ui` is presentational only (layer 2): Banner, Spinner, `<LiveRun>`,
   `liveRunTable`, theme — no `core` or `contracts`.
-- `cli-live` (layer 3) owns `runToolLiveView`; all four bundled tools render
+- `cli-live` (layer 3) owns `runToolLiveView`; the four analysis tools render
   through it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
 - fitness / graph / simulation / yagni must NOT import from cli (would create a cycle).
 - MCP production reads graph catalogs through `@opensip-cli/graph/read`; it must

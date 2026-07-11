@@ -21,7 +21,7 @@ import type { SkippedDetector, YagniDetector } from '../detectors/types.js';
 import type { YagniConfig } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { Signal, ToolCliContext } from '@opensip-cli/core';
+import type { Signal } from '@opensip-cli/core';
 
 /** Runtime options for one YAGNI detector pass. */
 export interface ExecuteYagniOptions {
@@ -149,13 +149,12 @@ function suppressionAdjustedUnits(
 /**
  * Run the selected YAGNI detectors and build the persisted signal envelope.
  *
- * `_cli` is retained in the signature for API stability and the Track 2 reduction
- * coordinator (which will re-acquire graph/fitness evidence through it); the
- * current detector-only path does not use it.
+ * Detector execution receives analysis inputs only. Host output/gate/delivery/
+ * session behavior stays at the command/runner boundaries (documented
+ * ToolCliContext seams); this executor returns the completion/contribution.
  */
 export async function executeYagni(
   opts: ExecuteYagniOptions,
-  _cli: ToolCliContext,
   detectors: readonly YagniDetector[] = YAGNI_DETECTORS,
 ): Promise<ExecuteYagniResult> {
   const config = opts.config ?? {};

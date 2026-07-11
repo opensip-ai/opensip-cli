@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest';
 
 import { buildCommandScopeIndex, commandPath } from '../commands/command-scope-index.js';
 
+import type { CliCommandsContext } from '../commands/shared.js';
+
 function spec(
   name: string,
   scope: CommandScopeRequirement,
   aliases?: readonly string[],
-): CommandSpec {
-  return defineCommand({
+): CommandSpec<unknown, CliCommandsContext> {
+  return defineCommand<unknown, CliCommandsContext>({
     name,
     description: `${name} command`,
     aliases,

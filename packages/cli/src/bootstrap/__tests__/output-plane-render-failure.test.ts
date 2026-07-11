@@ -7,9 +7,9 @@
  * to reject so those catch arms are reachable without a real render crash.
  */
 
+import { DEFAULT_BASELINE_IDENTITY, type SignalEnvelope } from '@opensip-cli/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { Logger } from '@opensip-cli/core';
 
 const renderOutcome = vi.fn();
@@ -22,7 +22,7 @@ vi.mock('../../commands/render-outcome.js', () => ({
 
 const { createOutputPlane } = await import('../output-plane.js');
 
-let savedExit: number | undefined;
+let savedExit: typeof process.exitCode;
 let logged: Record<string, unknown>[];
 let logger: Logger;
 
@@ -60,6 +60,7 @@ const CLEAN_ENVELOPE: SignalEnvelope = {
   },
   units: [],
   signals: [],
+  baselineIdentity: DEFAULT_BASELINE_IDENTITY,
 };
 
 describe('output-plane — render failure forces exit when the run had not failed', () => {

@@ -59,6 +59,7 @@ export type {
   Catalog,
   Indexes,
   FeatureColumn,
+  FeatureTable,
   GraphConfig,
   GraphAdapterRegistryReader,
 } from './types.js';

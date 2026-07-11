@@ -29,7 +29,7 @@
  *   4. @opensip-cli/tool-*         — external scanner Tool adapters
  *   5. @opensip-cli/checks-*       — fitness check packs (depend on fitness)
  *   5. @opensip-cli/graph-*        — graph adapter packs (depend on graph)
- *   6. opensip-cli                 — CLI composition root (depends on tools)
+ *   6. opensip-cli                 — CLI composition root (loads Tools dynamically, no static Tool imports)
  *
  *   (workspace-private, outside the runtime layers: @opensip-cli/test-support —
  *   cross-package test scaffolding, ADR-0040; only test files may import it.)
@@ -199,10 +199,136 @@ const TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES = PRODUCTION_TOOL_PACKAGES.map((tool) 
   };
 });
 
+// Fit-pack (check-pack) production import allowlists (ADR-0151), manifest-derived.
+// Mirrors the Tool allowlist above: from each fit pack's `src` root, every
+// `packages/` import outside its reviewed allowlist is a fail-closed error. A
+// newly declared `kind: fit-pack` package absent from the map throws at config
+// load, so a new pack cannot silently receive a permissive default; a stale map
+// entry (no matching fit pack) also throws.
+const FIT_PACK_ALLOWED_PACKAGES = Object.freeze({
+  '@opensip-cli/checks-cpp': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-go': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-java': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-rust': Object.freeze(['@opensip-cli/fitness']),
+  '@opensip-cli/checks-python': Object.freeze(['@opensip-cli/fitness', '@opensip-cli/lang-python']),
+  '@opensip-cli/checks-universal': Object.freeze(['@opensip-cli/core', '@opensip-cli/fitness']),
+  '@opensip-cli/checks-dogfood': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/fitness',
+    '@opensip-cli/lang-typescript',
+  ]),
+  '@opensip-cli/checks-typescript': Object.freeze([
+    '@opensip-cli/core',
+    '@opensip-cli/fitness',
+    '@opensip-cli/lang-typescript',
+  ]),
+});
+
+const FIT_PACK_PACKAGES = WORKSPACE_PACKAGES.filter(
+  (pkg) =>
+    pkg.manifest && pkg.manifest.opensipTools && pkg.manifest.opensipTools.kind === 'fit-pack',
+);
+
+for (const name of Object.keys(FIT_PACK_ALLOWED_PACKAGES)) {
+  if (!FIT_PACK_PACKAGES.some((pack) => pack.name === name)) {
+    throw new Error(
+      `FIT_PACK_ALLOWED_PACKAGES lists ${name}, which is not a kind:fit-pack workspace package (stale policy entry).`,
+    );
+  }
+}
+
+const FIT_PACK_IMPORT_ALLOWLIST_RULES = FIT_PACK_PACKAGES.map((pack) => {
+  if (!Object.hasOwn(FIT_PACK_ALLOWED_PACKAGES, pack.name)) {
+    throw new Error(
+      `fit pack ${pack.name} has no reviewed dependency allowlist. Add it to ` +
+        'FIT_PACK_ALLOWED_PACKAGES in .config/dependency-cruiser.cjs (ADR-0151).',
+    );
+  }
+  const sourceRoot = `${packageDirForRule(pack.name)}/src`;
+  const allowedDirs = [
+    pack.relativeDir,
+    ...FIT_PACK_ALLOWED_PACKAGES[pack.name].map((packageName) => packageDirForRule(packageName)),
+  ];
+  const allowedFromPackagesRoot = allowedDirs
+    .map((relativeDir) => escapeRegex(relativeDir.slice('packages/'.length) + '/'))
+    .join('|');
+  const ruleName = pack.name.replace(/^@opensip-cli\//u, '').replace(/[^a-zA-Z0-9-]+/gu, '-');
+
+  return {
+    name: `fit-pack-${ruleName}-imports-allowlist`,
+    severity: 'error',
+    comment:
+      `${pack.name} production imports are fail-closed from its manifest-derived source root (ADR-0151). ` +
+      'A new workspace dependency requires an explicit FIT_PACK_ALLOWED_PACKAGES update.',
+    from: {
+      path: `^${escapeRegex(sourceRoot)}`,
+      pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
+    },
+    to: {
+      path: `^packages/(?!${allowedFromPackagesRoot})`,
+    },
+  };
+});
+
+// Internal-subpath target (ADR-0009): a package's `src/internal.ts(x)` barrel OR
+// anything under a `src/internal/` directory. Files AND directories are internal.
+const INTERNAL_SUFFIX = String.raw`internal(?:\.tsx?$|/)`;
+const INTERNAL_TARGET_PATH = String.raw`/src/${INTERNAL_SUFFIX}`;
+// A specific owner's internal barrel/dir, for the sanctioned-owner `to.pathNot`
+// carve-outs. Shares INTERNAL_SUFFIX so the file-OR-directory shape stays in
+// lockstep with INTERNAL_TARGET_PATH (an owner that converts its `internal.ts`
+// barrel to an `internal/` directory must not trip its own owner rule).
+const ownerInternalTarget = (packageSrcPrefix) =>
+  String.raw`^${packageSrcPrefix}/src/${INTERNAL_SUFFIX}`;
+
+// The CLI composition root loads Tools dynamically; a static import of any
+// manifest Tool's source root is forbidden (ADR-0151). Manifest-derived so a
+// newly declared Tool is covered without editing this file.
+const CLI_FORBIDDEN_TOOL_SOURCES = PRODUCTION_TOOL_PACKAGES.map((tool) =>
+  escapeRegex(tool.sourceRoot),
+).join('|');
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
     ...TOOL_PACKAGE_IMPORT_ALLOWLIST_RULES,
+    ...FIT_PACK_IMPORT_ALLOWLIST_RULES,
+    {
+      name: 'cli-no-static-tool-package-import',
+      severity: 'error',
+      comment:
+        'The CLI is the composition root and loads Tools DYNAMICALLY through the plugin ' +
+        'path (ADR-0151). Production CLI source must not statically import a manifest ' +
+        "Tool's source root — that would recreate the very coupling dynamic loading avoids. " +
+        'Manifest deps stay for pnpm linking; only static source imports are forbidden.',
+      from: {
+        path: '^packages/cli/src/',
+        pathNot: ['/__tests__/', '/__test-support__/', String.raw`\.test\.(ts|tsx)$`],
+      },
+      to: {
+        path: `^(?:${CLI_FORBIDDEN_TOOL_SOURCES})`,
+      },
+    },
+    {
+      name: 'mcp-graph-root-registrar-only',
+      severity: 'error',
+      comment:
+        'MCP production may resolve the @opensip-cli/graph ROOT barrel only from ' +
+        'register-mcp-graph-adapters.ts (currentAdapterRegistry — a runtime composition ' +
+        'seam). All other MCP graph consumption must go through @opensip-cli/graph/read ' +
+        '(ADR-0147/0151). graph/internal is separately forbidden by mcp-graph-internal-scope.',
+      from: {
+        path: '^packages/mcp/src/',
+        pathNot: [
+          '/__tests__/',
+          String.raw`\.test\.(ts|tsx)$`,
+          String.raw`^packages/mcp/src/register-mcp-graph-adapters\.ts$`,
+        ],
+      },
+      to: {
+        path: String.raw`^packages/graph/engine/src/index\.ts$`,
+      },
+    },
     // -------------------------------------------------------------------
     // Generic hygiene
     // -------------------------------------------------------------------
@@ -260,7 +386,7 @@ module.exports = {
           '^packages/test-support/',
         ],
       },
-      to: { path: String.raw`/src/internal\.ts$` },
+      to: { path: INTERNAL_TARGET_PATH },
     },
     {
       name: 'test-support-fitness-internal-only',
@@ -273,8 +399,8 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
-        pathNot: String.raw`^packages/fitness/engine/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
+        pathNot: ownerInternalTarget('packages/fitness/engine'),
       },
     },
     {
@@ -288,8 +414,8 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
-        pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
+        pathNot: ownerInternalTarget('packages/datastore'),
       },
     },
     {
@@ -303,8 +429,8 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
-        pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
+        pathNot: ownerInternalTarget('packages/datastore'),
       },
     },
     {
@@ -317,7 +443,7 @@ module.exports = {
         pathNot: ['/__tests__/', String.raw`\.test\.(ts|tsx)$`],
       },
       to: {
-        path: String.raw`/src/internal\.ts$`,
+        path: INTERNAL_TARGET_PATH,
       },
     },
     {

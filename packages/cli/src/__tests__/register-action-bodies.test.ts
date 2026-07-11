@@ -145,6 +145,7 @@ function makeCtx(): MakeCtxResult {
       { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
       { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
     ],
+    toolScaffolds: [],
   };
   return { ctx, rendered, setExitCode, datastore };
 }
@@ -201,8 +202,11 @@ describe('<tool> plugin spec — action bodies (domain-bound)', () => {
       effectiveCwd({
         cwd: '/explicit/cwd',
         projectContext: {
+          cwd: '/discovered/root',
+          cwdExplicit: false,
           scope: 'project',
           projectRoot: '/discovered/root',
+          configPath: undefined,
           walkedUp: 0,
         },
       }),

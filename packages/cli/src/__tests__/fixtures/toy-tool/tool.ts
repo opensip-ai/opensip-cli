@@ -89,8 +89,10 @@ export function toyNetNewSignal(): Signal {
  * "free ratchet" surface a new tool must author.
  */
 export const toyTool: Tool = {
+  identity: { name: TOY_TOOL_ID },
   metadata: {
     id: TOY_TOOL_ID,
+    name: TOY_TOOL_ID,
     version: '0.0.0',
     description: 'Toy tool (ratchet proof)',
   },

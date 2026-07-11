@@ -1,0 +1,183 @@
+#!/usr/bin/env node
+/**
+ * build-test-tsconfigs — generate `<pkg>/tsconfig.test.json` for every workspace
+ * package that has test files (ADR-0150).
+ *
+ * Production package builds exclude test/spec/fixture trees (tsconfig.json +
+ * per-package overrides), so tests would otherwise lose semantic TypeScript
+ * checking — Vitest transpiles with esbuild and does NOT type-check. Each
+ * generated config re-includes the package's tests under `--noEmit` and is
+ * type-checked in ISOLATION (it extends the package's own `tsconfig.json`, so
+ * `@opensip-cli/*` resolves to built `dist/.d.ts` exactly as the package builds).
+ *
+ * Per-package isolation — rather than one whole-repo test project — is deliberate:
+ * a single program spanning every package would (a) treat a type reached via a
+ * dependency's `dist/.d.ts` and via its `src` as two distinct nominal types
+ * (the monorepo dual-identity hazard), and (b) activate cross-package module
+ * augmentations (graph/fitness/simulation augment core's RunScope), producing
+ * false positives in tests that legitimately compile a package in isolation.
+ * Isolation matches how each package is actually built and run.
+ *
+ * The generated files are checked in and kept honest by `--check` (wired into
+ * `pnpm lint`). Run `pnpm typecheck:tests:sync` to regenerate.
+ */
+
+import { createRequire } from 'node:module';
+import { existsSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
+
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const CHECK_ONLY = process.argv.slice(2).includes('--check');
+const log = (msg) => console.error(`[build-test-tsconfigs] ${msg}`);
+
+// Per-package compilerOptions overrides merged into the generated config.
+// Browser-environment suites (jsdom) need the DOM libs their production build
+// omits; keep this map tiny and explicit rather than sniffing test contents.
+const COMPILER_OVERRIDES = {
+  'packages/cli-ui': { lib: ['ES2022', 'DOM', 'DOM.Iterable'] },
+  'packages/dashboard': { lib: ['ES2022', 'DOM', 'DOM.Iterable'] },
+  // The CLI's dogfood tests import the repo-root `opensip-cli/fit/checks/*.mjs`
+  // local checks (plain ESM, no declarations). allowJs lets tsc resolve and
+  // infer them (checkJs off — the scaffold is not type-checked here); rootDir is
+  // widened to the repo root so those out-of-`src` modules satisfy containment.
+  // Harmless under --noEmit.
+  'packages/cli': { allowJs: true, checkJs: false, rootDir: '../..' },
+};
+
+// Per-package extra excludes for intentionally-invalid corpora that do NOT live
+// under a `__fixtures__/` or `__tests__/fixtures/` path (those are excluded for
+// every package below). Keep narrow and documented.
+const EXTRA_EXCLUDES = {};
+
+const INCLUDE = [
+  'src/**/*.test.ts',
+  'src/**/*.test.tsx',
+  'src/**/*.spec.ts',
+  'src/**/*.spec.tsx',
+  'src/**/__tests__/**/*.ts',
+  'src/**/__tests__/**/*.tsx',
+];
+
+const BASE_EXCLUDE = [
+  'node_modules',
+  'dist',
+  // Synthetic fixture corpora are analyzed as text by the tools (never imported
+  // as modules) and are intentionally invalid in places — not semantic test
+  // sources. Real, imported fixtures stay checked via the import graph.
+  '**/__fixtures__/**',
+  '**/__tests__/fixtures/**',
+];
+
+const TEST_FILE_RE = /\.(test|spec)\.tsx?$/;
+
+/**
+ * Does this package have any test source the generated config would actually
+ * INCLUDE? This mirrors the config's include/exclude (below): a `.ts`/`.tsx`
+ * under a `__tests__` subtree, or a `.test`/`.spec` file elsewhere — but NOT
+ * anything under an excluded `__fixtures__/` or `__tests__/fixtures/` corpus.
+ * A package whose only test-pattern files live under an excluded fixture path
+ * has no included inputs, so it must NOT get a config (which would resolve to
+ * zero inputs → `tsc` TS18003 "No inputs were found").
+ */
+function hasTests(pkgDir) {
+  const srcDir = join(pkgDir, 'src');
+  if (!existsSync(srcDir)) return false;
+  const stack = [{ dir: srcDir, underTests: false, parentName: '' }];
+  while (stack.length > 0) {
+    const { dir, underTests, parentName } = stack.pop();
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      // Never descend into non-source or excluded fixture trees.
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '__fixtures__') {
+        continue;
+      }
+      // `__tests__/fixtures/**` is excluded from the generated config.
+      if (entry.name === 'fixtures' && parentName === '__tests__') continue;
+      if (entry.isDirectory()) {
+        stack.push({
+          dir: join(dir, entry.name),
+          underTests: underTests || entry.name === '__tests__',
+          parentName: entry.name,
+        });
+      } else if (underTests ? /\.tsx?$/.test(entry.name) : TEST_FILE_RE.test(entry.name)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function renderConfig(relativeDir) {
+  const compilerOptions = {
+    rootDir: 'src',
+    noEmit: true,
+    ...COMPILER_OVERRIDES[relativeDir],
+  };
+  const exclude = [...BASE_EXCLUDE, ...(EXTRA_EXCLUDES[relativeDir] ?? [])];
+  const config = {
+    '//': 'Generated by scripts/build-test-tsconfigs.mjs — do not edit by hand. Run `pnpm typecheck:tests:sync`; CI enforces sync via `pnpm typecheck:tests:check`.',
+    extends: './tsconfig.json',
+    compilerOptions,
+    include: INCLUDE,
+    exclude,
+  };
+  return JSON.stringify(config, null, 2) + '\n';
+}
+
+function main() {
+  const records = readWorkspacePackageManifests(REPO_ROOT);
+  const problems = [];
+  let generated = 0;
+
+  for (const rec of records) {
+    const outPath = join(rec.dir, 'tsconfig.test.json');
+    if (!hasTests(rec.dir)) {
+      // A package with no tests must not carry a stale generated config.
+      if (existsSync(outPath)) {
+        if (CHECK_ONLY) {
+          problems.push(`stale tsconfig.test.json (package has no tests): ${rec.relativeDir}`);
+        } else {
+          rmSync(outPath);
+          log(`removed stale ${rec.relativeDir}/tsconfig.test.json`);
+        }
+      }
+      continue;
+    }
+    const content = renderConfig(rec.relativeDir);
+    generated += 1;
+    if (CHECK_ONLY) {
+      const current = existsSync(outPath) ? readFileSync(outPath, 'utf8') : null;
+      if (current !== content) {
+        problems.push(
+          current === null
+            ? `missing tsconfig.test.json: ${rec.relativeDir}`
+            : `out-of-date tsconfig.test.json: ${rec.relativeDir}`,
+        );
+      }
+    } else {
+      writeFileSync(outPath, content);
+    }
+  }
+
+  if (CHECK_ONLY) {
+    if (problems.length > 0) {
+      for (const p of problems) log(`DRIFT: ${p}`);
+      log(`FAIL — run \`pnpm typecheck:tests:sync\` (${problems.length} problem(s))`);
+      process.exit(1);
+    }
+    log(`ok — ${generated} test tsconfig(s) in sync`);
+  } else {
+    log(`generated ${generated} test tsconfig(s)`);
+  }
+}
+
+main();

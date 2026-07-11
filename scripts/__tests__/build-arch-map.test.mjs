@@ -59,13 +59,35 @@ export interface ToolCliContext { readonly b: 2 }
     assert.ok(!seams.includes('list'));
   });
 
-  it('workspace inventory is 58 packages (56 publishable, 2 private)', () => {
+  it('renders the map purely from injected derived facts (no test-owned package baseline)', () => {
+    // renderArchitectureMap must be a pure function of the counts/names/seams it
+    // is handed, so the generated map reflects readGovernanceFacts and never a
+    // frozen inventory literal. Inject synthetic facts and prove they surface.
+    const out = arch.renderArchitectureMap(
+      [{ layer: 1, pkg: '@x/core', note: 'kernel' }],
+      ['@x/core', '@x/tool'],
+      ['render', 'emitJson'],
+      { total: 2, publishable: 1, private: 1 },
+    );
+    assert.match(out, /## Workspace packages \(2: 1 publishable, 1 private\)/);
+    assert.match(out, /- `@x\/core`/);
+    assert.match(out, /- `@x\/tool`/);
+    assert.match(out, /## ToolCliContext seams \(2\)/);
+    // No real package leaks in — the renderer has no hidden inventory of its own.
+    assert.ok(!out.includes('@opensip-cli/fitness'), 'no baseline package leaks into output');
+  });
+
+  it('workspace inventory reconciles publishable + private (derived, structural identities)', () => {
     const records = readWorkspacePackageManifests(REPO);
-    assert.equal(records.length, 58);
     const priv = records.filter((r) => r.private);
-    assert.equal(priv.length, 2);
-    const names = new Set(priv.map((r) => r.name));
-    assert.ok(names.has('@opensip-cli/test-support'));
-    assert.ok(names.has('@opensip-cli/checks-dogfood'));
+    // Relationship, not a frozen number: total = publishable + private.
+    assert.equal(records.length, records.filter((r) => !r.private).length + priv.length);
+    // The two known private ownership packages (identity, not a literal count).
+    assert.deepEqual(priv.map((r) => r.name).sort(), [
+      '@opensip-cli/checks-dogfood',
+      '@opensip-cli/test-support',
+    ]);
+    const names = records.map((r) => r.name);
+    assert.equal(new Set(names).size, names.length, 'unique names');
   });
 });

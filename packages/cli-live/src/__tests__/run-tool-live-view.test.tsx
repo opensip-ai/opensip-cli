@@ -2,6 +2,7 @@
  * @fileoverview Integration tests for the shared live-run state machine.
  */
 
+import { DEFAULT_BASELINE_IDENTITY, SIGNAL_ENVELOPE_SCHEMA_VERSION } from '@opensip-cli/contracts';
 import {
   createRunLogger,
   LanguageRegistry,
@@ -14,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { runToolLiveView } from '../run-tool-live-view.js';
 
+import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { RunScopeOptions } from '@opensip-cli/core';
 
 const ACT_GLOBAL = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
@@ -27,6 +29,28 @@ function makeScope(opts: RunScopeOptions = {}): RunScope {
     tools: new ToolRegistry(),
     runId: 'RUN_liveview_test',
   });
+}
+
+/**
+ * A fully-typed, minimal {@link SignalEnvelope} with no signals — the shape a
+ * successful `produce()` returns. Reused at each produce site so the test
+ * carries the same envelope contract the runtime does.
+ */
+function makeEnvelope(): SignalEnvelope {
+  return {
+    schemaVersion: SIGNAL_ENVELOPE_SCHEMA_VERSION,
+    tool: 'yagni',
+    runId: 'RUN_liveview_test',
+    createdAt: '2026-07-09T00:00:00.000Z',
+    verdict: {
+      score: 100,
+      passed: true,
+      summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+    },
+    units: [],
+    signals: [],
+    baselineIdentity: DEFAULT_BASELINE_IDENTITY,
+  };
 }
 
 function stderrEvents(calls: readonly string[]): Record<string, unknown>[] {
@@ -78,17 +102,15 @@ describe('runToolLiveView', () => {
             kind: 'done',
             done: { summary: { passed: true, errors: 0, warnings: 0 } },
             session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
-            envelope: {
-              signals: [],
-              units: [],
-              verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
-            },
+            envelope: makeEnvelope(),
           }),
       }),
     );
 
     expect(completion.session?.tool).toBe('yagni');
-    expect(completion.envelope?.signals).toEqual([]);
+    // envelope is typed `unknown` on ToolRunCompletion (opaque tool payload);
+    // narrow to the known runtime SignalEnvelope shape for the assertion.
+    expect((completion.envelope as SignalEnvelope | undefined)?.signals).toEqual([]);
   }, 10_000);
 
   it('sets exit code and returns empty completion on headless produce errors', async () => {
@@ -139,11 +161,7 @@ describe('runToolLiveView', () => {
                 kind: 'done',
                 done: { summary: { passed: true, errors: 0, warnings: 0 } },
                 session: { tool: 'yagni', cwd: '/proj', passed: true, score: 100 },
-                envelope: {
-                  signals: [],
-                  units: [],
-                  verdict: { passed: true, summary: { total: 0, errors: 0, warnings: 0 } },
-                },
+                envelope: makeEnvelope(),
               });
             },
           }),
@@ -151,7 +169,9 @@ describe('runToolLiveView', () => {
       );
       // The work still ran and the envelope/session are still returned...
       expect(produced).toBe(true);
-      expect(completion.envelope?.signals).toEqual([]);
+      // envelope is typed `unknown` on ToolRunCompletion (opaque tool payload);
+      // narrow to the known runtime SignalEnvelope shape for the assertion.
+      expect((completion.envelope as SignalEnvelope | undefined)?.signals).toEqual([]);
       expect(completion.session?.tool).toBe('yagni');
       // ...but nothing reached the terminal (Ink never mounted; no trailing newline).
       expect(writeSpy).not.toHaveBeenCalled();
@@ -560,7 +580,7 @@ describe('runToolLiveView', () => {
   }, 10_000);
 
   it('accepts a third-party tool id (LiveRunTool is open string)', async () => {
-    const scope = makeScope({ logger: createRunLogger() });
+    const scope = makeScope({ logger: createRunLogger({}) });
     await expect(
       runWithScope(scope, () =>
         runToolLiveView({

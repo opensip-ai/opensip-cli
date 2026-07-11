@@ -20,6 +20,7 @@ function parseCount(raw: string): number {
 
 function fixtureTool(): Tool {
   return {
+    identity: { name: 'fitness' },
     metadata: {
       id: TOOL_ID,
       name: 'fitness',

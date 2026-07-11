@@ -37,6 +37,7 @@ import {
   type PostBailoutBootstrapDeps,
 } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
+import { PolicyAuditCollector } from '../policy-audit.js';
 
 import type { loadCliDefaults } from '../cli-defaults.js';
 import type { PreActionRuntime } from '../pre-action-runtime.js';
@@ -129,6 +130,8 @@ function emptyRuntime(): PreActionRuntime {
     manifests: [],
     provenance: [],
     bootstrapDiagnostics: [],
+    trustPolicy: configModule.BUILTIN_TRUST_POLICY,
+    policyAudit: new PolicyAuditCollector(),
   };
 }
 

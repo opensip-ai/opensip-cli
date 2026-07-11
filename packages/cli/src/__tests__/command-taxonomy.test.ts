@@ -65,8 +65,12 @@ function buildFullProgram(): Command {
     registerCliCommands(program, {
       setExitCode: vi.fn(),
       render: vi.fn(() => Promise.resolve()),
+      emitJson: vi.fn(),
+      emitRaw: vi.fn(),
+      emitError: vi.fn(),
       datastore: () => undefined,
       pluginLayouts: [],
+      toolScaffolds: [],
     });
     return program;
   });
@@ -170,7 +174,7 @@ describe('command taxonomy — internal descriptors carry visibility:internal (S
   ];
 
   it.each(INTERNAL)('descriptor for $name declares visibility: internal', ({ tool, name }) => {
-    const descriptor = tool.commands.find((c) => c.name === name);
+    const descriptor = (tool.commands ?? []).find((c) => c.name === name);
     expect(descriptor, `tool must declare a '${name}' command descriptor`).toBeDefined();
     expect(descriptor?.visibility).toBe('internal');
   });
@@ -178,7 +182,7 @@ describe('command taxonomy — internal descriptors carry visibility:internal (S
   it('no PUBLIC tool command descriptor is marked visibility: internal', () => {
     const internalNames = new Set(INTERNAL.map((i) => i.name));
     for (const tool of [fitnessTool, simulationTool, graphTool, yagniTool]) {
-      for (const descriptor of tool.commands) {
+      for (const descriptor of tool.commands ?? []) {
         if (internalNames.has(descriptor.name)) continue;
         expect(
           descriptor.visibility,

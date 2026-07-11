@@ -16,6 +16,7 @@ import {
   verifyCatalogInputs,
   type Catalog,
   type FeatureColumn,
+  type FeatureTable,
   type GraphAdapterRegistryReader,
   type GraphConfig,
 } from '@opensip-cli/graph/read';
@@ -62,7 +63,6 @@ import type {
 import type { McpReadError } from './mcp-error.js';
 import type { GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { DataStore } from '@opensip-cli/datastore';
-import type { FeatureTable } from '@opensip-cli/graph';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;

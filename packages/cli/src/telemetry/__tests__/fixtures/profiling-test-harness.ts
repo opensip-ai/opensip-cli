@@ -145,7 +145,10 @@ export function createProfilingHarness(): ProfilingHarness {
     },
     installSyncFakeSession: (opts: FakeSessionOptions = {}) => {
       const flags = { connected: false, disconnected: false };
-      const fake: InspectorSession = {
+      // A single general `post` implementation stands in for InspectorSession's two
+      // typed overloads (Profiler.enable/start vs Profiler.stop); no single non-overloaded
+      // signature satisfies both, so cast this test double past the overload variance.
+      const fake = {
         connect() {
           // eslint-disable-next-line @typescript-eslint/only-throw-error -- intentional non-Error throw: drives startProfiling's `error instanceof Error ? … : String(error)` else arm.
           if (opts.throwOnConnect === 'non-error') throw 'connect string boom';
@@ -176,7 +179,7 @@ export function createProfilingHarness(): ProfilingHarness {
           // Profiler.enable / Profiler.start succeed synchronously.
           callback(null);
         },
-      };
+      } as unknown as InspectorSession;
       __setInspectorSessionFactoryForTests(() => fake);
       return flags;
     },

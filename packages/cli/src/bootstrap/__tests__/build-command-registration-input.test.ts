@@ -29,6 +29,7 @@ function tool(overrides: {
   readonly extensionPoints?: Tool['extensionPoints'];
 }): Tool {
   return {
+    identity: { name: overrides.name },
     metadata: {
       id: overrides.id ?? '00000000-0000-4000-8000-000000000000',
       name: overrides.name,

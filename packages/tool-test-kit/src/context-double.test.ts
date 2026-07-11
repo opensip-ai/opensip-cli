@@ -1,3 +1,4 @@
+import { createSignal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -11,11 +12,19 @@ import {
   withScopeSync,
 } from './index.js';
 
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type {
+  CommandSpec,
+  GateCompareResult,
+  LiveViewContext,
+  LiveViewRenderer,
+  ToolCliContext,
+} from '@opensip-cli/core';
 
 const command: CommandSpec<{ readonly json?: boolean }, ToolCliContext> = {
   name: 'sample',
   description: 'sample command',
+  commonFlags: [],
+  scope: 'project',
   output: 'command-result',
   handler: async (opts, cli) => {
     if (opts.json === true) cli.emitJson({ ok: true });
@@ -81,8 +90,10 @@ describe('createToolCliContextDouble', () => {
 
   it('captures every documented host seam exposed by the double', async () => {
     const envelope = sampleEnvelope();
-    const compareResult = {
-      added: ['new'],
+    const compareResult: GateCompareResult = {
+      added: [
+        createSignal({ source: 'fit', severity: 'high', ruleId: 'new', message: 'new finding' }),
+      ],
       resolved: [],
       unchanged: [],
       degraded: true,
@@ -93,11 +104,17 @@ describe('createToolCliContextDouble', () => {
     });
 
     await double.ctx.render({ type: 'text-lines', lines: ['rendered'] });
-    double.ctx.registerLiveView('sample-live', (args, liveContext) => ({
+    // The double stores a renderer and returns its value verbatim from
+    // `renderLive`; these stubs deliberately return an inspectable shape (not a
+    // real ToolRunCompletion) so the test can assert the args/result
+    // pass-through and the duplicate-registration warning.
+    double.ctx.registerLiveView('sample-live', ((args: unknown, liveContext?: LiveViewContext) => ({
       args,
       elapsedMs: liveContext?.runSession.timing.elapsedMs(),
-    }));
-    double.ctx.registerLiveView('sample-live', () => ({ duplicate: true }));
+    })) as unknown as LiveViewRenderer);
+    double.ctx.registerLiveView('sample-live', (() => ({
+      duplicate: true,
+    })) as unknown as LiveViewRenderer);
     await expect(double.ctx.renderLive('sample-live', { ok: true })).resolves.toMatchObject({
       args: { ok: true },
     });
@@ -140,7 +157,7 @@ describe('createToolCliContextDouble', () => {
     double.ctx.logger.warn('warn');
     double.ctx.logger.error('error');
 
-    expect(double.ctx.getExitCode()).toBe(2);
+    expect(double.ctx.getExitCode?.()).toBe(2);
     expect(double.captured.rendered).toHaveLength(1);
     expect(double.captured.liveRenders).toEqual([
       { key: 'sample-live', args: { ok: true } },

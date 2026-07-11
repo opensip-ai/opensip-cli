@@ -105,7 +105,7 @@ describe('policy views', () => {
     const out = renderToText(
       viewPolicyResult(
         status({
-          orgStatus: { state: 'available', sourceTier: 'builtin' },
+          orgStatus: { state: 'available' },
           sources: [],
           exceptions: [],
         }),

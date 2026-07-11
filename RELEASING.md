@@ -34,7 +34,7 @@ contract tests derive from or verify against that source.
 | Shared CLI     | `@opensip-cli/contracts`             | `packages/contracts`                  |
 | Authoring      | `@opensip-cli/tool-test-kit`         | `packages/tool-test-kit`              |
 | Substrate      | `@opensip-cli/clone-detection`       | `packages/clone-detection`            |
-| Substrate      | `@opensip-cli/format`               | `packages/format`                     |
+| Substrate      | `@opensip-cli/format`                | `packages/format`                     |
 | Persistence    | `@opensip-cli/session-store`         | `packages/session-store`              |
 | Output         | `@opensip-cli/output`                | `packages/output`                     |
 | Config         | `@opensip-cli/config`                | `packages/config`                     |
@@ -100,8 +100,9 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 ### 1. Version fields (hand-set, lockstep)
 
 All 56 publishable packages **plus** the private root (`@opensip-cli/root`) and
-the private `@opensip-cli/test-support` carry one shared version — 58
-`package.json` files. The bump script matches `name === 'opensip-cli'`,
+the private `@opensip-cli/test-support` and `@opensip-cli/checks-dogfood` carry
+one shared version — 59 `package.json` files. The bump script matches
+`name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
 `@opensip-cli-fixture/*`, bare names) and are deliberately **not** touched.
@@ -153,7 +154,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    derived ones (see "Version Surfaces" above):
 
    ```bash
-   node scripts/bump-version.mjs <new-version>   # 58 package.json + docs + SECURITY + prose
+   node scripts/bump-version.mjs <new-version>   # 59 package.json + docs + SECURITY + prose
    pnpm install --lockfile-only                  # refresh the lockfile
    pnpm docs:readmes && pnpm docs:build          # regenerate version-pinned READMEs + web docs
    node scripts/bump-version.mjs --check         # assert no surface drifted
@@ -177,6 +178,22 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    `pnpm test:coverage:fresh` directly or through `pnpm release:preflight` so
    package-level coverage thresholds are recomputed locally before the immutable
    npm publish lane starts.
+
+   The preflight also runs `pnpm verify:published-artifacts` after the clean
+   build. Production tarballs ship **runtime artifacts only**
+   ([ADR-0150](docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md)):
+   the gate inspects both each package's real `dist/` tree and its actual
+   `pnpm pack --dry-run --json` packlist over `RELEASE_PACKAGE_ORDER`, and rejects
+   any test/spec/fixture/coverage path or a publishable pack lifecycle hook
+   (`prepack`/`prepare`/`postpack`). The release order is therefore: clean →
+   build → `verify:published-artifacts` → correctness/dogfood gates → actual pack
+   - tarball smoke → publish. Packaging evidence is valid only after a clean
+     build; a cached/incremental build is not. To inspect one package's packlist by
+     hand:
+
+   ```bash
+   pnpm --filter=@opensip-cli/graph pack --dry-run --json
+   ```
 
 4. Commit, tag, and push:
 

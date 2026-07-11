@@ -231,11 +231,16 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ## Factual Baseline
 
-This v0.5.3 doc set was rechecked against the source on 2026-07-07:
+This v0.5.3 doc set was rechecked against the source on 2026-07-11:
 
 - 160 built-in fitness checks across seven packs.
-- 55 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
-- Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
+- 56 publishable workspace packages, plus the two private workspace packages
+  `@opensip-cli/test-support` and `@opensip-cli/checks-dogfood`; the generated
+  `80-implementation/architecture-map.md` is the authoritative current inventory.
+- Five bundled first-party tools (declared in
+  `packages/cli/src/bootstrap/bundled-tools.manifest.json`): `fit`, `graph`,
+  `sim`, `yagni`, and `mcp`. The four analysis tools render live views; `mcp` is a
+  raw stdio server.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.
 - First-party Tool commands are mounted through `CommandSpec`; installed Tool

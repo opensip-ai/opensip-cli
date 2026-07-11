@@ -26,6 +26,12 @@ function makeCtx(): {
       rendered.push(result);
       return Promise.resolve();
     }),
+    emitJson: vi.fn(),
+    emitRaw: vi.fn(),
+    emitError: vi.fn(),
+    pluginLayouts: [],
+    toolScaffolds: [],
+    datastore: () => undefined,
   };
   return { ctx, rendered };
 }
@@ -47,7 +53,7 @@ describe('mountResultCommand', () => {
     const { ctx, rendered } = makeCtx();
     const writes: string[] = [];
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
-      writes.push(typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
+      writes.push(typeof chunk === 'string' ? chunk : (chunk as Buffer).toString('utf8'));
       return true;
     });
 

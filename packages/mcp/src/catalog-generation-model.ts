@@ -6,10 +6,9 @@ import {
   buildGraphReadIndexes,
   type Catalog,
   type CatalogIdentity,
+  type FeatureTable,
   type Indexes,
 } from '@opensip-cli/graph/read';
-
-import type { FeatureTable } from '@opensip-cli/graph';
 
 export type GenerationSource = 'initial-load' | 'persisted-auto-swap' | 'refresh-rebuild';
 

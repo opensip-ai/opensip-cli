@@ -8,9 +8,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { executeYagni } from '../execute-yagni.js';
 
 import type { YagniDetector } from '../../detectors/types.js';
-import type { ToolCliContext } from '@opensip-cli/core';
-
-const cli = {} as ToolCliContext;
 
 let tempDir: string | undefined;
 
@@ -64,7 +61,6 @@ describe('executeYagni', () => {
         cwd: fixtureDir(),
         config: { failOnErrors: 0, failOnWarnings: 1 },
       },
-      cli,
       [warningDetector()],
     );
 
@@ -78,7 +74,6 @@ describe('executeYagni', () => {
         cwd: fixtureDir(),
         config: { failOnErrors: 0, failOnWarnings: 1 },
       },
-      cli,
       [cleanDetector()],
     );
 

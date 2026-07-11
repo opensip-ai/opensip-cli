@@ -26,7 +26,11 @@ function makeCtx() {
         exitCode = n;
       },
       render: () => Promise.resolve(),
+      emitJson: () => undefined,
+      emitRaw: () => undefined,
+      emitError: () => undefined,
       pluginLayouts: [],
+      toolScaffolds: [],
       datastore: () => {
         throw new Error('not opened in this test');
       },

@@ -130,6 +130,7 @@ function replayWithSignals(
 function makeSignalReplayRegistry(signals: readonly Signal[]): SessionReplayRegistry {
   const registry = new ToolRegistry();
   registry.register({
+    identity: { name: 'fit-replay-signals' },
     metadata: {
       id: '00000000-0000-4000-8000-000000000000',
       name: 'fit-replay-signals',
@@ -322,6 +323,7 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_1'));
     const registry = new ToolRegistry();
     registry.register({
+      identity: { name: 'fit-throw' },
       metadata: {
         id: '00000000-0000-4000-8000-000000000000',
         name: 'fit-throw',
@@ -410,6 +412,7 @@ describe('executeSessionShow', () => {
     repo.save(makeSession('FIT_1'));
     const registry = new ToolRegistry();
     registry.register({
+      identity: { name: 'fit-throw-str' },
       metadata: {
         id: '00000000-0000-4000-8000-000000000000',
         name: 'fit-throw-str',

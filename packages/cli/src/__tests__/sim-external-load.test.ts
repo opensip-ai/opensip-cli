@@ -28,7 +28,6 @@ import { describe, it, expect } from 'vitest';
 
 import { mountCommandSpec, type CommandMountContext } from '../commands/mount-command-spec.js';
 
-import type { CommandResult } from '@opensip-cli/contracts';
 import type { CommandSpec, Tool, ToolCliContext } from '@opensip-cli/core';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -37,7 +36,7 @@ const SIM_DIR = join(__dirname, '..', '..', '..', 'simulation', 'engine');
 
 /** Minimal mount context — enough for mountCommandSpec to wire the command. */
 const STUB_CTX: CommandMountContext = {
-  render: (_r: CommandResult) => Promise.resolve(),
+  render: (_r: unknown) => Promise.resolve(),
   setExitCode: () => undefined,
 };
 
@@ -91,7 +90,7 @@ describe('sim externalization proof slice (§8)', () => {
 
     // The host mount produces a real Commander command named `sim` with its flags.
     const program = new Command();
-    mountCommandSpec(program, external as CommandSpec<unknown, CommandMountContext>, STUB_CTX);
+    mountCommandSpec(program, external, STUB_CTX as unknown as ToolCliContext);
     const cmd = program.commands.find((c) => c.name() === 'simulation');
     expect(cmd, 'mountCommandSpec must mount a `simulation` command').toBeDefined();
     const flagNames = cmd!.options.map((o) => o.long);

@@ -9,6 +9,7 @@ import { bindToolCliContext, toolOwnedKeys } from '../bind-tool-context.js';
 
 function makeTool(): Tool {
   return {
+    identity: { name: 'simulation' },
     metadata: {
       id: '00000000-0000-4000-8000-00000000abcd',
       name: 'simulation',
@@ -236,7 +237,7 @@ describe('bindToolCliContext', () => {
       expect(wrapped, `bound.hostPlanes.${plane} missing`).toBeDefined();
       for (const method of Object.keys(source as object)) {
         expect(
-          typeof (wrapped as Record<string, unknown>)[method],
+          typeof (wrapped as unknown as Record<string, unknown>)[method],
           `host plane '${plane}' method '${method}' not forwarded by wrapHostPlanes`,
         ).toBe('function');
       }

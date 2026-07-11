@@ -3,6 +3,7 @@
 This is the **START HERE** document for AI agents working on the OpenSIP CLI codebase.
 
 <!-- opensip:agent-guidance start -->
+
 ## OpenSIP MCP First
 
 When answering questions about existing OpenSIP results, prior `fit` / `graph` / `yagni` / `sim` runs, findings, warnings, errors, scores, sessions, or graph relationships, use the OpenSIP MCP server first.
@@ -28,11 +29,14 @@ Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result
 ## What is OpenSIP CLI?
 
 OpenSIP CLI is an **open-source codebase intelligence CLI** — a CLI that
-hosts pluggable tools for static analysis and evidence serving. Today it ships
-with five bundled tools: `fit` (fitness checks across TypeScript, Rust, Python,
-Java, Go, C/C++), `graph` (static call-graph analysis), `sim` (simulation
-scenarios, experimental), `yagni` (advisory YAGNI reduction audit), and `mcp`
-(stored results + graph evidence over stdio for MCP clients).
+hosts pluggable tools for static analysis and evidence serving. It ships with the
+five bundled tools declared in
+`packages/cli/src/bootstrap/bundled-tools.manifest.json` (the source of truth):
+`fit` (fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
+(static call-graph analysis), `sim` (simulation scenarios, experimental), `yagni`
+(advisory YAGNI reduction audit), and `mcp` (stored results + graph evidence over
+stdio for MCP clients). Of these, the four analysis tools (`fit`, `graph`, `sim`,
+`yagni`) render live views; `mcp` is a raw stdio server.
 Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Product Origin And Intent
@@ -412,12 +416,12 @@ fn)`, every async descendant of `fn` sees the same scope. The
   `Symbol.for(globalThis)` slot that held run state (`recipeCheckConfig`)
   stays deleted. There IS one `Symbol.for('@opensip-cli/core/scopeStorage')`
   slot on `globalThis`, but it holds only the `AsyncLocalStorage`
-  *container* (infrastructure), not run state: pinning the ALS instance
+  _container_ (infrastructure), not run state: pinning the ALS instance
   process-globally lets duplicate physical copies of `@opensip-cli/core`
   (pnpm `injectWorkspacePackages` hard-links a nested core into the
   virtual store) share one scope store instead of splitting it — which
   otherwise leaves `currentScope()` undefined in check execution and
-  silently degrades content filters to raw. The scope *value* still flows
+  silently degrades content filters to raw. The scope _value_ still flows
   per-async-context through `runWithScope`/`enterScope`, so this does NOT
   reintroduce module-level mutable run state. See `run-scope.ts` (ALS seam)
   and the fitness-transitive probe in `single-core-guard.ts`.

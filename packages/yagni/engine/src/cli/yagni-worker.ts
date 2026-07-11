@@ -38,31 +38,28 @@ function send(msg: WorkerMessage<ProgressEvent, ExecuteYagniResult>): void {
   sendWorkerIpcMessage(msg);
 }
 
-export async function executeYagniWorker(specPath: string, cli: ToolCliContext): Promise<void> {
+export async function executeYagniWorker(specPath: string, _cli: ToolCliContext): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as YagniWorkerSpec;
     const config = loadYagniConfig(args.cwd);
-    const result = await executeYagni(
-      {
-        cwd: args.cwd,
-        config,
-        minConfidence: args.minConfidence,
-        detectors: args.detectors,
-        categories: args.categories,
-        includeTests: args.includeTests,
-        pathRoots: args.pathRoots,
-        onDetectorStart: (slug) => send({ kind: 'progress', event: detectorStartEvent(slug) }),
-        onDetectorDone: (slug, durationMs) =>
-          send({ kind: 'progress', event: detectorDoneEvent(slug, durationMs) }),
-        onDetectorsSkipped: (slugs) => {
-          for (const slug of slugs) {
-            send({ kind: 'progress', event: detectorDoneEvent(slug, 0, 'skipped') });
-          }
-        },
+    const result = await executeYagni({
+      cwd: args.cwd,
+      config,
+      minConfidence: args.minConfidence,
+      detectors: args.detectors,
+      categories: args.categories,
+      includeTests: args.includeTests,
+      pathRoots: args.pathRoots,
+      onDetectorStart: (slug) => send({ kind: 'progress', event: detectorStartEvent(slug) }),
+      onDetectorDone: (slug, durationMs) =>
+        send({ kind: 'progress', event: detectorDoneEvent(slug, durationMs) }),
+      onDetectorsSkipped: (slugs) => {
+        for (const slug of slugs) {
+          send({ kind: 'progress', event: detectorDoneEvent(slug, 0, 'skipped') });
+        }
       },
-      cli,
-    );
+    });
     send({ kind: 'result', value: result });
   } catch (error) {
     send({

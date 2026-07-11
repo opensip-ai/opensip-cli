@@ -1,20 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
 import { buildYagniPresentationLines } from '../cli/yagni-presentation.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
-import type { ToolCliContext } from '@opensip-cli/core';
-
 const FIXTURE_ROOT = new URL('fixtures/unused-config-surface/pkg', import.meta.url).pathname;
-
-function stubCli(): ToolCliContext {
-  return {
-    scope: { datastore: () => undefined },
-    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
-    reportFailure: vi.fn(() => Promise.resolve()),
-  } as unknown as ToolCliContext;
-}
 
 describe('yagni presentation', () => {
   it('renders compact summary with net footer for default output', async () => {
@@ -24,7 +14,6 @@ describe('yagni presentation', () => {
         config: { defaultMinConfidence: 'low' },
         includeTests: true,
       },
-      stubCli(),
       [unusedConfigSurfaceDetector],
     );
     const lines = buildYagniPresentationLines(

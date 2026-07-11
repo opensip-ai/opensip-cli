@@ -25,9 +25,9 @@ function writePackage(root, relativeDir, manifest, source = 'export {};\n') {
 }
 
 describe('workspace package manifests', () => {
-  it('returns unique package names and 58 workspace packages', () => {
+  it('returns unique package names for every workspace package (no frozen count)', () => {
     const packages = readWorkspacePackageManifests(REPO_ROOT);
-    assert.equal(packages.length, 58);
+    assert.ok(packages.length > 0);
     const names = packages.map((p) => p.name);
     assert.equal(new Set(names).size, names.length);
   });
@@ -141,6 +141,39 @@ describe('production tool package inventory', () => {
         predicates.toolSeamPathRe().test('packages/external-tool-adapter/src/run-adapter.ts'),
       );
       assert.equal(predicates.toolEnginePathRe().test('packages/not-a-tool/src/tool.ts'), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes an arbitrarily named kind:fit-pack package from the production Tool inventory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fit-pack-inventory-'));
+    try {
+      writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+      // A fit pack whose directory/name match no current regex: it is a fitness
+      // EXTENSION, not a Tool, so it must never enter the Tool inventory or match
+      // a Tool source-path predicate — the fit-pack allowlist governs it instead.
+      writePackage(root, 'packages/reduce-audit', {
+        name: '@vendor/reduce-audit',
+        opensipTools: { kind: 'fit-pack' },
+      });
+      writePackage(root, 'packages/oddity-analyzer', {
+        name: '@vendor/oddity-analyzer',
+        opensipTools: { kind: 'tool' },
+      });
+
+      const inventory = readProductionToolPackageInventory(root);
+      assert.deepEqual(
+        inventory.map((tool) => tool.name),
+        ['@vendor/oddity-analyzer'],
+        'only the kind:tool package is a production Tool',
+      );
+      const predicates = createToolPathPredicates(root);
+      assert.equal(
+        predicates.toolEnginePathRe().test('packages/reduce-audit/src/tool.ts'),
+        false,
+        'a fit-pack path must not classify as a Tool engine path',
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -61,7 +61,7 @@ describe('policy source loading', () => {
 
   it('uses user and project policy tiers without an org cache when no project root is known', () => {
     const result = resolveRuntimePolicy({
-      userPolicy: { mode: 'permissive' },
+      userPolicy: { mode: 'default' },
       projectPolicy: { mode: 'strict', org: { required: true, cachePath: '.opensip/org.json' } },
       now: new Date('2026-07-02T00:00:00.000Z'),
     });

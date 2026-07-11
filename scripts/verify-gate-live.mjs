@@ -170,6 +170,30 @@ const MODULAR_BOUNDARY_FAILURE_PROBES = [
       'export const _gateProbe = CatalogRepo;\n',
     rule: 'mcp-graph-internal-scope',
   },
+  {
+    // CLI composition root may not statically import a manifest Tool source.
+    file: 'packages/cli/src/__gate_probe_static_tool__.ts',
+    source:
+      "import { graphTool } from '@opensip-cli/graph';\nexport const _gateProbe = graphTool;\n",
+    rule: 'cli-no-static-tool-package-import',
+  },
+  {
+    // Production siblings may not import simulation/internal (test-only subpath,
+    // ADR-0009) — enforced by the generic internal rule (no owner exception).
+    file: 'packages/fitness/engine/src/__gate_probe_sim_internal__.ts',
+    source:
+      "import { createScenarioRegistry } from '@opensip-cli/simulation/internal';\n" +
+      'export const _gateProbe = createScenarioRegistry;\n',
+    rule: 'no-cross-package-internal',
+  },
+  {
+    // MCP may resolve the graph ROOT barrel only from the adapter registrar.
+    file: 'packages/mcp/src/__gate_probe_graph_root__.ts',
+    source:
+      "import { currentAdapterRegistry } from '@opensip-cli/graph';\n" +
+      'export const _gateProbe = currentAdapterRegistry;\n',
+    rule: 'mcp-graph-root-registrar-only',
+  },
 ];
 
 const MODULAR_BOUNDARY_RESOLUTION_PROBES = [
@@ -251,21 +275,28 @@ function depcruiseJson(target) {
 // the expected rule appears in the report, then remove the file in a finally so
 // the working tree is never left dirty even if depcruise throws.
 function verifyProbesFire(probes, label) {
+  // Capture failure and exit AFTER the loop so each probe's `finally` cleanup
+  // actually runs — `process.exit()` inside the `try` would skip it and leak the
+  // probe file into the repo tree.
+  let failure;
   for (const probe of probes) {
     try {
       writeFileSync(probe.file, probe.source, 'utf8');
       const report = depcruiseReport(probe.file);
       if (!report.includes(probe.rule)) {
-        console.error(
+        failure =
           `verify-gate-live: FAIL — probe import in ${probe.file} did NOT trip ` +
-            `'${probe.rule}'. The ${label} is INERT.\n` +
-            `depcruise report:\n${report}`,
-        );
-        process.exit(1);
+          `'${probe.rule}'. The ${label} is INERT.\n` +
+          `depcruise report:\n${report}`;
       }
     } finally {
       rmSync(probe.file, { force: true });
     }
+    if (failure) break;
+  }
+  if (failure) {
+    console.error(failure);
+    process.exit(1);
   }
 }
 
@@ -299,6 +330,7 @@ function verifyAdr0064GatesFire() {
 }
 
 function verifyModularBoundaryResolution() {
+  let failure;
   for (const probe of MODULAR_BOUNDARY_RESOLUTION_PROBES) {
     try {
       writeFileSync(probe.file, probe.source, 'utf8');
@@ -308,15 +340,19 @@ function verifyModularBoundaryResolution() {
         (candidate) => candidate.module === probe.module,
       );
       if (dependency?.resolved !== probe.resolved) {
-        console.error(
+        failure =
           `verify-gate-live: FAIL — ${probe.module} resolved to ` +
-            `${dependency?.resolved ?? '<missing>'}; expected ${probe.resolved}.`,
-        );
-        process.exit(1);
+          `${dependency?.resolved ?? '<missing>'}; expected ${probe.resolved}.`;
       }
     } finally {
+      // Runs on break/normal completion — process.exit would skip it.
       rmSync(probe.file, { force: true });
     }
+    if (failure) break;
+  }
+  if (failure) {
+    console.error(failure);
+    process.exit(1);
   }
   console.log(
     `verify-gate-live: OK — all ${MODULAR_BOUNDARY_RESOLUTION_PROBES.length} ` +
@@ -327,6 +363,7 @@ function verifyModularBoundaryResolution() {
 function verifyArbitraryToolAllowlist() {
   const packageDir = 'packages/__gate_probe_oddity_tool__';
   const sourceFile = `${packageDir}/src/tool.ts`;
+  let failure;
   try {
     mkdirSync(`${packageDir}/src`, { recursive: true });
     writeFileSync(
@@ -347,17 +384,65 @@ function verifyArbitraryToolAllowlist() {
     const report = depcruiseReport(sourceFile);
     const expectedRule = 'tool-package-unlisted-audit-tool-imports-allowlist';
     if (!report.includes(expectedRule)) {
-      console.error(
+      failure =
         `verify-gate-live: FAIL — arbitrarily named manifest Tool did not trip ` +
-          `${expectedRule}.\ndepcruise report:\n${report}`,
-      );
-      process.exit(1);
+        `${expectedRule}.\ndepcruise report:\n${report}`;
     }
   } finally {
+    // MUST run before any exit — a leftover probe PACKAGE poisons every later
+    // depcruise config load, so cleanup cannot be skipped by process.exit.
     rmSync(packageDir, { recursive: true, force: true });
+  }
+  if (failure) {
+    console.error(failure);
+    process.exit(1);
   }
   console.log(
     'verify-gate-live: OK — an arbitrarily named manifest Tool was automatically denied a peer import.',
+  );
+}
+
+function verifyArbitraryFitPackAllowlist() {
+  const packageDir = 'packages/__gate_probe_oddity_fitpack__';
+  const sourceFile = `${packageDir}/src/check.ts`;
+  let failure;
+  try {
+    mkdirSync(`${packageDir}/src`, { recursive: true });
+    writeFileSync(
+      `${packageDir}/package.json`,
+      JSON.stringify({
+        name: '@opensip-cli/unlisted-audit-fitpack',
+        type: 'module',
+        exports: { '.': './dist/index.js' },
+        opensipTools: { kind: 'fit-pack' },
+      }),
+      'utf8',
+    );
+    // An illegal datastore import a permissive default would allow.
+    writeFileSync(
+      sourceFile,
+      "import { DataStoreFactory } from '@opensip-cli/datastore';\nexport const factory = DataStoreFactory;\n",
+      'utf8',
+    );
+    // A fit pack absent from FIT_PACK_ALLOWED_PACKAGES must fail closed at config
+    // load (ADR-0151), not receive a permissive default — stricter than a rule firing.
+    const report = depcruiseReport(sourceFile);
+    if (!/no reviewed dependency allowlist|not a kind:fit-pack/u.test(report)) {
+      failure =
+        'verify-gate-live: FAIL — an arbitrarily named manifest fit pack did not fail closed at ' +
+        `dependency-cruiser config load.\ndepcruise report:\n${report}`;
+    }
+  } finally {
+    // MUST run before any exit — a leftover kind:fit-pack probe package throws at
+    // every later depcruise config load (self-poisoning), so never skip cleanup.
+    rmSync(packageDir, { recursive: true, force: true });
+  }
+  if (failure) {
+    console.error(failure);
+    process.exit(1);
+  }
+  console.log(
+    'verify-gate-live: OK — an arbitrarily named manifest fit pack fails closed without a reviewed allowlist.',
   );
 }
 
@@ -473,6 +558,7 @@ function verifyModularBoundaryGates() {
   );
   verifyModularBoundaryResolution();
   verifyArbitraryToolAllowlist();
+  verifyArbitraryFitPackAllowlist();
   verifyWorkspaceReaderGuards();
 }
 

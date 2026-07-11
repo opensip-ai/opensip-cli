@@ -38,6 +38,7 @@ describe('getProjectDatastore', () => {
       } catch (error) {
         expect((error as { code?: string }).code).toBe('CONFIGURATION.REQUIRES_PROJECT');
       }
+      return Promise.resolve();
     });
   });
 
@@ -47,6 +48,7 @@ describe('getProjectDatastore', () => {
     });
     await withScope(scopeThrowing(other), () => {
       expect(() => getProjectDatastore()).toThrow('disk exploded');
+      return Promise.resolve();
     });
   });
 });

@@ -34,8 +34,6 @@ function makeStoredSession(id: string, timestamp: number): StoredSession {
     score: 95,
     passed: true,
     durationMs: 100,
-    summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
-    checks: [],
   };
 }
 

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { evaluateTrustPolicy } from './trust-policy-evaluator.js';
 import { resolveTrustPolicySources } from './trust-policy-resolution.js';
 
+import type { PolicyResourceRequirement } from './trust-policy-schema.js';
+
 const NOW = new Date('2026-07-02T00:00:00.000Z');
 
 describe('evaluateTrustPolicy', () => {
@@ -196,7 +198,7 @@ describe('evaluateTrustPolicy', () => {
     expect(load.reasons.join(' ')).toContain('optional org policy unavailable');
 
     const runtimeExclude = evaluateTrustPolicy(policy, {
-      subject: { kind: 'runtime', id: 'paths' },
+      subject: { kind: 'runtime-exclude', id: 'paths' },
       action: 'runtime-exclude',
       evidence: { ci: false },
       now: NOW,
@@ -237,8 +239,10 @@ describe('evaluateTrustPolicy', () => {
         legacyTrusted: true,
         declaredResources: [
           { resource: 'filesystem', scope: 'src/**' },
-          { resource: 'not-real', scope: 'ignored' },
-          null,
+          // Deliberately malformed entries — this test asserts the evaluator
+          // normalizes untrusted declared resources defensively (drops both).
+          { resource: 'not-real', scope: 'ignored' } as unknown as PolicyResourceRequirement,
+          null as unknown as PolicyResourceRequirement,
           { resource: 'subprocess', reason: 'run scanner' },
         ],
       },

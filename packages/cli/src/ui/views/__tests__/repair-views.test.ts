@@ -43,9 +43,10 @@ function verifyResult(overrides: Partial<RepairApplyVerifyResult> = {}): RepairA
   return {
     ...baseResult(),
     type: 'repair-apply-verify',
+    force: false,
     verification: {
       status: 'partial',
-      coverage: 'changed-only',
+      coverage: 'partial',
       scope: {
         tool: 'fit',
         ruleId: 'rule-a',

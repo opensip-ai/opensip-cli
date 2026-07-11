@@ -47,6 +47,13 @@ jobs:
       - name: Build
         run: node scripts/build-ci.mjs
 
+      # Inspect emitted + packed bytes right after the clean build, before
+      # benchmarks/typecheck — PRs fail on any test/spec/fixture/coverage path in
+      # a dist tree or the real pnpm packlist (ADR-0150). Lane invariant:
+      # clean -> build -> inspect build/packlist -> test/smoke -> publish.
+      - name: Verify published artifact boundary
+        run: pnpm verify:published-artifacts
+
       - name: Performance SLO benchmark
         run: pnpm bench:slo:ci -- --profile pr --require-memory --out slo-report.json
 

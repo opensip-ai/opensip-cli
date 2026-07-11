@@ -72,6 +72,19 @@ const sourceOfTruth = (await import(join(REPO_ROOT, 'scripts', 'release-package-
 const RELEASE_PACKAGE_ORDER = sourceOfTruth.RELEASE_PACKAGE_ORDER;
 const referenceNames = new Set(RELEASE_PACKAGE_ORDER.map((p) => p.name));
 
+// Derived governance facts (versioned-manifest total, private names) come from
+// the same canonical manifests — no hardcoded private-count literal (ADR-0151).
+const governance = (await import(
+  join(REPO_ROOT, 'scripts', 'lib', 'release-governance-surface.mjs')
+)) as {
+  readGovernanceFacts: (repoRoot?: string) => {
+    readonly versionedPackageJsonCount: number;
+    readonly privateWorkspaceNames: readonly string[];
+    readonly privateRootName: string;
+  };
+};
+const governanceFacts = governance.readGovernanceFacts(REPO_ROOT);
+
 const read = (relPath: string): string => readFileSync(join(REPO_ROOT, relPath), 'utf8');
 
 describe('release package-order contract (ADR-0017 — workspace invariant)', () => {
@@ -234,7 +247,6 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
 
   it('RELEASING.md stated package count == the reference length', () => {
     const count = RELEASE_PACKAGE_ORDER.length;
-    const privateVersionedPackageJsonCount = 2;
     const headerHasCount = new RegExp(`The ${count} packages`).test(releasingMd);
     expect(
       headerHasCount,
@@ -246,14 +258,23 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
       publishableProse,
       `RELEASING.md must state "All ${count} publishable packages" in version surfaces`,
     ).toBe(true);
-    const versionedJsonCount = count + privateVersionedPackageJsonCount;
+    // Versioned package.json total is DERIVED (publishable + private workspace +
+    // private root), not a hardcoded literal.
+    const versionedJsonCount = governanceFacts.versionedPackageJsonCount;
     const versionedProse = new RegExp(`${versionedJsonCount}\\s+\`package\\.json\` files`).test(
       releasingMd,
     );
     expect(
       versionedProse,
-      `RELEASING.md must state ${versionedJsonCount} package.json files (${count} publishable + ${privateVersionedPackageJsonCount} private)`,
+      `RELEASING.md must state ${versionedJsonCount} package.json files (derived: ${count} publishable + ${governanceFacts.privateWorkspaceNames.length} private workspace + the private root)`,
     ).toBe(true);
+    // RELEASING.md must name both private workspace packages and the private root.
+    for (const name of [
+      ...governanceFacts.privateWorkspaceNames,
+      governanceFacts.privateRootName,
+    ]) {
+      expect(releasingMd.includes(name), `RELEASING.md must name ${name}`).toBe(true);
+    }
   });
 
   it('RELEASING.md npm-verify `for p in …` loop names == the scoped reference set', () => {

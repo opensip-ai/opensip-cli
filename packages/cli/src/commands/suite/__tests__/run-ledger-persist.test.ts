@@ -107,7 +107,8 @@ function envelope(): SignalEnvelope {
       },
     },
     units: [{ slug: 'check-a', passed: true, durationMs: 1 }],
-    signals: [{ fingerprint: 'fp-1', metadata: {} }] as SignalEnvelope['signals'],
+    // Minimal signal stub: this fixture only needs a fingerprint + metadata for projection.
+    signals: [{ fingerprint: 'fp-1', metadata: {} }] as unknown as SignalEnvelope['signals'],
     baselineIdentity: {
       fingerprintStrategyId: 'test',
       fingerprintStrategyVersion: 1,

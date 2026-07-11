@@ -57,6 +57,7 @@ function fixtureTool(
   ],
 ): Tool {
   return {
+    identity: { name },
     metadata: {
       id,
       name,
@@ -166,7 +167,7 @@ function withSuiteScope<T>(
       scope: 'project',
     },
   });
-  return runWithScope(scope, fn);
+  return runWithScope(scope, async () => fn());
 }
 
 describe('buildSuiteGroupLeaves', () => {

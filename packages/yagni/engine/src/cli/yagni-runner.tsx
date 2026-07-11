@@ -141,8 +141,7 @@ export async function renderYagniLive(
             argv: ['yagni-run-worker', specPath],
             ...(correlation ? { correlation } : {}),
           },
-          inProcess: (workerEmit) =>
-            executeYagni(buildExecuteOptions(args, config, workerEmit), cli),
+          inProcess: (workerEmit) => executeYagni(buildExecuteOptions(args, config, workerEmit)),
         });
 
         helpers.setRunning(run.onProgress);

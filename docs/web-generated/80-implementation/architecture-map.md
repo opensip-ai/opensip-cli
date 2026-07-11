@@ -34,7 +34,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 4 | `@opensip-cli/tool-*` | external scanner Tool adapters |
 | 5 | `@opensip-cli/checks-*` | fitness check packs (depend on fitness) |
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
-| 6 | `opensip-cli` | CLI composition root (depends on tools) |
+| 6 | `opensip-cli` | CLI composition root (loads Tools dynamically, no static Tool imports) |
 
 ## Workspace packages (58: 56 publishable, 2 private)
 
