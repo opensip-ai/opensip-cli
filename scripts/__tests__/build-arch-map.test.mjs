@@ -59,6 +59,24 @@ export interface ToolCliContext { readonly b: 2 }
     assert.ok(!seams.includes('list'));
   });
 
+  it('renders the map purely from injected derived facts (no test-owned package baseline)', () => {
+    // renderArchitectureMap must be a pure function of the counts/names/seams it
+    // is handed, so the generated map reflects readGovernanceFacts and never a
+    // frozen inventory literal. Inject synthetic facts and prove they surface.
+    const out = arch.renderArchitectureMap(
+      [{ layer: 1, pkg: '@x/core', note: 'kernel' }],
+      ['@x/core', '@x/tool'],
+      ['render', 'emitJson'],
+      { total: 2, publishable: 1, private: 1 },
+    );
+    assert.match(out, /## Workspace packages \(2: 1 publishable, 1 private\)/);
+    assert.match(out, /- `@x\/core`/);
+    assert.match(out, /- `@x\/tool`/);
+    assert.match(out, /## ToolCliContext seams \(2\)/);
+    // No real package leaks in — the renderer has no hidden inventory of its own.
+    assert.ok(!out.includes('@opensip-cli/fitness'), 'no baseline package leaks into output');
+  });
+
   it('workspace inventory reconciles publishable + private (derived, structural identities)', () => {
     const records = readWorkspacePackageManifests(REPO);
     const priv = records.filter((r) => r.private);

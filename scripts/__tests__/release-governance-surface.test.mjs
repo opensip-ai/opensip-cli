@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -79,6 +80,26 @@ test('package catalog verification trail matches publishable count or source-of-
     /release-package-order\.mjs/.test(catalog) ||
     new RegExp(`\\b${publishableCount}\\s+publishable\\s+packages\\b`).test(catalog);
   assert.ok(hasSourceOfTruth, 'package catalog must cite source of truth or correct count');
+});
+
+test('readGovernanceFacts fails closed on source disagreement (returns no partial facts)', () => {
+  // A projected root whose workspace packages disagree with the real
+  // RELEASE_PACKAGE_ORDER must THROW, never return a partially-derived object —
+  // a half-true governance projection is worse than a hard failure (ADR-0151).
+  const root = mkdtempSync(join(tmpdir(), 'gov-disagreement-'));
+  try {
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n");
+    const pkgDir = join(root, 'packages', 'ghost');
+    mkdirSync(pkgDir, { recursive: true });
+    // Publishable (not private) but absent from RELEASE_PACKAGE_ORDER.
+    writeFileSync(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({ name: '@vendor/ghost', version: '0.0.0' }),
+    );
+    assert.throws(() => readGovernanceFacts(root), /RELEASE_PACKAGE_ORDER/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('dependency automation config is singular when present', () => {
