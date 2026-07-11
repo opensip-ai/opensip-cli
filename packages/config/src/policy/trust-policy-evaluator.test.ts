@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { evaluateTrustPolicy } from './trust-policy-evaluator.js';
 import { resolveTrustPolicySources } from './trust-policy-resolution.js';
+
 import type { PolicyResourceRequirement } from './trust-policy-schema.js';
 
 const NOW = new Date('2026-07-02T00:00:00.000Z');

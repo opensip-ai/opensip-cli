@@ -50,7 +50,7 @@ const TOOL_PACKAGE_RE =
 
 /** A Tool runtime export is conventionally `tool` (the generic alias) or `*Tool`. */
 function isToolRuntimeName(name: string): boolean {
-  return name === 'tool' || /Tool$/.test(name);
+  return name === 'tool' || name.endsWith('Tool');
 }
 
 function violation(
@@ -73,63 +73,69 @@ function violation(
   };
 }
 
-/** Pure analysis over a parsed source file. Exported for unit tests. */
-export function analyzeBootstrapToolImport(content: string, filePath: string): CheckViolation[] {
-  const violations: CheckViolation[] = [];
-  const sourceFile = getSharedSourceFile(filePath, content);
-  if (!sourceFile) return violations;
-  for (const stmt of sourceFile.statements) {
-    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
-    const specifier = stmt.moduleSpecifier.text;
-    const clause = stmt.importClause;
-
-    // Side-effect import (`import '@opensip-cli/graph';`) — no clause; loads the
-    // runtime. Only meaningful for a Tool-family package.
-    if (clause === undefined) {
-      if (TOOL_PACKAGE_RE.test(specifier)) {
-        violations.push(violation(sourceFile, stmt, 'side-effect import', specifier));
-      }
-      continue;
-    }
-
-    // `import type { ... }` / `import type X` — no runtime load.
-    if (clause.isTypeOnly) continue;
-
-    const isToolFamily = TOOL_PACKAGE_RE.test(specifier);
-    // Only Tool-family packages carry runtime imports; skip everything else
-    // (e.g. core helpers named `*Tool`) — depcruise is the manifest-complete gate.
-    if (!isToolFamily) continue;
-
-    // Default import (`import graphTool from ...`) loads the runtime.
-    if (clause.name !== undefined) {
-      violations.push(
-        violation(sourceFile, clause.name, `default import '${clause.name.text}'`, specifier),
-      );
-    }
-
-    const named = clause.namedBindings;
-    if (named === undefined) continue;
-
-    // Namespace import (`import * as graph from ...`) loads the runtime.
-    if (ts.isNamespaceImport(named)) {
-      violations.push(
-        violation(sourceFile, named.name, `namespace import '${named.name.text}'`, specifier),
-      );
-      continue;
-    }
-
-    // Named imports: a `tool`/`*Tool` value specifier is a Tool runtime
-    // (aliases resolve via propertyName).
-    if (ts.isNamedImports(named)) {
-      for (const element of named.elements) {
-        if (element.isTypeOnly) continue; // inline `type` specifier — no runtime.
-        const imported = (element.propertyName ?? element.name).text;
-        if (!isToolRuntimeName(imported)) continue;
-        violations.push(violation(sourceFile, element, `tool runtime '${imported}'`, specifier));
-      }
+/** `import { tool, graphTool as g } from '@opensip-cli/graph'` — a `tool`/`*Tool`
+ * VALUE specifier (aliases resolve via propertyName) is a Tool runtime. */
+function namedImportViolations(
+  named: ts.NamedImports,
+  sourceFile: ts.SourceFile,
+  specifier: string,
+): CheckViolation[] {
+  const out: CheckViolation[] = [];
+  for (const element of named.elements) {
+    if (element.isTypeOnly) continue; // inline `type` specifier — no runtime.
+    const imported = (element.propertyName ?? element.name).text;
+    if (isToolRuntimeName(imported)) {
+      out.push(violation(sourceFile, element, `tool runtime '${imported}'`, specifier));
     }
   }
-  return violations;
+  return out;
+}
+
+/** Tool-runtime violations for one import declaration (all import forms). */
+function importDeclarationViolations(
+  stmt: ts.Statement,
+  sourceFile: ts.SourceFile,
+): CheckViolation[] {
+  if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) return [];
+  const specifier = stmt.moduleSpecifier.text;
+  const clause = stmt.importClause;
+
+  // Side-effect import (`import '@opensip-cli/graph';`) — no clause; loads the
+  // runtime. Only meaningful for a Tool-family package.
+  if (clause === undefined) {
+    return TOOL_PACKAGE_RE.test(specifier)
+      ? [violation(sourceFile, stmt, 'side-effect import', specifier)]
+      : [];
+  }
+  // `import type { ... }` has no runtime load; and only Tool-family packages carry
+  // runtime imports (core helpers named `*Tool` are not runtimes — depcruise is
+  // the manifest-complete gate).
+  // sonarjs/deprecation false positive: the ImportClause.isTypeOnly PROPERTY is not
+  // deprecated — only the same-named createImportClause() factory PARAMETER is.
+  // eslint-disable-next-line sonarjs/deprecation -- ImportClause.isTypeOnly property is not deprecated
+  if (clause.isTypeOnly || !TOOL_PACKAGE_RE.test(specifier)) return [];
+
+  const out: CheckViolation[] = [];
+  // Default import (`import graphTool from ...`) loads the runtime.
+  if (clause.name !== undefined) {
+    out.push(violation(sourceFile, clause.name, `default import '${clause.name.text}'`, specifier));
+  }
+  const named = clause.namedBindings;
+  if (named === undefined) return out;
+  // Namespace import (`import * as graph from ...`) loads the runtime.
+  if (ts.isNamespaceImport(named)) {
+    out.push(violation(sourceFile, named.name, `namespace import '${named.name.text}'`, specifier));
+  } else if (ts.isNamedImports(named)) {
+    out.push(...namedImportViolations(named, sourceFile, specifier));
+  }
+  return out;
+}
+
+/** Pure analysis over a parsed source file. Exported for unit tests. */
+export function analyzeBootstrapToolImport(content: string, filePath: string): CheckViolation[] {
+  const sourceFile = getSharedSourceFile(filePath, content);
+  if (!sourceFile) return [];
+  return sourceFile.statements.flatMap((stmt) => importDeclarationViolations(stmt, sourceFile));
 }
 
 export const noBootstrapToolImport = defineCheck({

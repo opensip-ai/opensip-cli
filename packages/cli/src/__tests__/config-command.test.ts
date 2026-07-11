@@ -475,8 +475,8 @@ describe('config command specs', () => {
       },
     });
 
-    const valid = await runWithScope(scope, async () =>
-      validate.handler({ cwd: dir }, makeConfigContext()),
+    const valid = await runWithScope(scope, () =>
+      Promise.resolve(validate.handler({ cwd: dir }, makeConfigContext())),
     );
     expect(valid).toMatchObject({ type: 'config-validate', valid: true });
 

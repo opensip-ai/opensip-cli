@@ -63,7 +63,7 @@ describe('viewInit — partial-state report', () => {
           preExistingFiles: files,
           message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
     expect(dirOnly).toContain('opensip-cli/ present but');
     expect(dirOnly).toContain('Found 3 file(s) preserved under opensip-cli/.');
@@ -80,7 +80,7 @@ describe('viewInit — partial-state report', () => {
           preExistingFiles: [],
           message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
     expect(cfgOnly).toContain('present but opensip-cli/ missing');
 
@@ -91,7 +91,7 @@ describe('viewInit — partial-state report', () => {
           preExistingFiles: [],
           message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
     expect(full).toContain('Already initialized');
   });
@@ -108,7 +108,7 @@ describe('viewInit — partial-state report', () => {
           preExistingFiles: files,
           message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
 
     expect(out).toContain('Found 45 file(s) preserved under opensip-cli/.');

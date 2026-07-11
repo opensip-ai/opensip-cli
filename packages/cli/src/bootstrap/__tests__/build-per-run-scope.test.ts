@@ -11,7 +11,6 @@ import {
   ToolRegistry,
   type Logger,
   type ProjectContext,
-  type ScopeContribution,
   type Tool,
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
@@ -52,7 +51,7 @@ function makeTool(name: string, contribution: Record<string, unknown>): Tool {
       description: `${name} fixture`,
     },
     commands: [{ name, description: `${name} command` }],
-    extensionPoints: { contributeScope: () => contribution as ScopeContribution },
+    extensionPoints: { contributeScope: () => contribution },
   };
 }
 

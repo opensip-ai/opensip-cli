@@ -259,16 +259,18 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
 
   it('returns undefined when the entered scope carries no datastore thunk', async () => {
     const handle = buildCtxWithDebug(vi.fn<Logger['debug']>());
-    await withScope(makeTestScope({}), async () => {
+    await withScope(makeTestScope({}), () => {
       expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
+      return Promise.resolve();
     });
   });
 
   it('reads through the scope datastore thunk when one is present', async () => {
     const handle = buildCtxWithDebug(vi.fn<Logger['debug']>());
     const ds = DataStoreFactory.open({ backend: 'memory' });
-    await withScope(makeTestScope({ datastore: () => ds }), async () => {
+    await withScope(makeTestScope({ datastore: () => ds }), () => {
       expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
+      return Promise.resolve();
     });
     ds.close();
   });

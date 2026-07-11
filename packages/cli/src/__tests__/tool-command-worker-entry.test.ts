@@ -119,7 +119,7 @@ function toolThatThrows(thrown: unknown): Tool {
         },
       },
     ],
-  } as Tool;
+  };
 }
 
 describe('runToolCommandWorker', () => {
@@ -319,8 +319,9 @@ describe('runToolCommandWorker', () => {
       metadata: { ...fixtureTool.metadata },
       commandSpecs: fixtureTool.commandSpecs,
       extensionPoints: {
-        initialize: async () => {
+        initialize: () => {
           initialized = true;
+          return Promise.resolve();
         },
         collectReportData: () => ({
           initSkip: { initialized },

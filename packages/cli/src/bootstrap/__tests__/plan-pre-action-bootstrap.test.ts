@@ -27,8 +27,8 @@ import { type CliCommandsContext } from '../../commands/shared.js';
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
-import { POST_BAILOUT_PHASE_ORDER, PRE_ACTION_PHASES } from '../pre-action-bootstrap-phases.js';
 import { PolicyAuditCollector } from '../policy-audit.js';
+import { POST_BAILOUT_PHASE_ORDER, PRE_ACTION_PHASES } from '../pre-action-bootstrap-phases.js';
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
 

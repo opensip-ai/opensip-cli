@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
 import { buildYagniPresentationLines } from '../cli/yagni-presentation.js';

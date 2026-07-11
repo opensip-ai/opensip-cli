@@ -24,7 +24,11 @@ const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const PRIVATE_ROOT_NAME = '@opensip-cli/root';
 const BUNDLED_MANIFEST = 'packages/cli/src/bootstrap/bundled-tools.manifest.json';
 
-const byCodePoint = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+function byCodePoint(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 
 /**
  * One immutable projection over the canonical package/Tool authorities:
@@ -246,11 +250,11 @@ export function classifyPublishedArtifactPath(relPath) {
   const p = relPath.replaceAll('\\', '/');
   if (p.startsWith('/') || /^[a-zA-Z]:/.test(p)) return 'absolute-path';
   const segments = p.split('/');
-  if (segments.some((seg) => seg === '..')) return 'path-traversal';
-  const base = segments[segments.length - 1];
-  if (segments.some((seg) => seg === '__tests__')) return 'test-directory';
-  if (segments.some((seg) => seg === '__fixtures__')) return 'fixture-directory';
-  if (segments.some((seg) => seg === 'coverage')) return 'coverage';
+  if (segments.includes('..')) return 'path-traversal';
+  const base = segments.at(-1);
+  if (segments.includes('__tests__')) return 'test-directory';
+  if (segments.includes('__fixtures__')) return 'fixture-directory';
+  if (segments.includes('coverage')) return 'coverage';
   if (/\.(test|spec)\./.test(base)) return 'test-file';
   return null;
 }

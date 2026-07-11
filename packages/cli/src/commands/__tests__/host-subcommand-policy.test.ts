@@ -91,7 +91,9 @@ describe('policy command specs', () => {
     const scope = new RunScope({ trustPolicy: makePolicy(), policyAudit: audit });
     const [status] = buildPolicyGroupLeaves(makeContext());
 
-    const result = await runWithScope(scope, async () => status.handler({}, makeContext()));
+    const result = await runWithScope(scope, () =>
+      Promise.resolve(status.handler({}, makeContext())),
+    );
 
     expect(result).toMatchObject({
       type: 'policy-status',
@@ -112,8 +114,8 @@ describe('policy command specs', () => {
       policyAudit: new PolicyAuditCollector(),
     });
 
-    const invalidSubject = await runWithScope(scope, async () =>
-      explain.handler({ _args: ['bad-subject'], action: 'load' }, ctx),
+    const invalidSubject = await runWithScope(scope, () =>
+      Promise.resolve(explain.handler({ _args: ['bad-subject'], action: 'load' }, ctx)),
     );
     expect(invalidSubject).toMatchObject({
       type: 'error',
@@ -122,8 +124,10 @@ describe('policy command specs', () => {
     expect(exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
 
     exitCode = undefined;
-    const invalidAction = await runWithScope(scope, async () =>
-      explain.handler({ _args: ['installed-tool:demo'], action: 'bad-action' }, ctx),
+    const invalidAction = await runWithScope(scope, () =>
+      Promise.resolve(
+        explain.handler({ _args: ['installed-tool:demo'], action: 'bad-action' }, ctx),
+      ),
     );
     expect(invalidAction).toMatchObject({
       type: 'error',
@@ -132,8 +136,8 @@ describe('policy command specs', () => {
     expect(exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
 
     exitCode = undefined;
-    const denied = await runWithScope(scope, async () =>
-      explain.handler({ _args: ['installed-tool:other'], action: 'load' }, ctx),
+    const denied = await runWithScope(scope, () =>
+      Promise.resolve(explain.handler({ _args: ['installed-tool:other'], action: 'load' }, ctx)),
     );
     expect(denied).toMatchObject({
       type: 'policy-explain',
@@ -159,7 +163,9 @@ describe('policy command specs', () => {
     expect(limitOption?.parse?.('2', undefined)).toBe(2);
     expect(() => limitOption?.parse?.('0', undefined)).toThrow(/positive integer/);
 
-    const result = await runWithScope(scope, async () => auditSpec.handler({ limit: 1, out }, ctx));
+    const result = await runWithScope(scope, () =>
+      Promise.resolve(auditSpec.handler({ limit: 1, out }, ctx)),
+    );
 
     expect(result).toMatchObject({
       type: 'policy-audit',

@@ -31,13 +31,14 @@ describe('getProjectDatastore', () => {
     const outside = new SystemError('no datastore outside a project', {
       code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT',
     });
-    await withScope(scopeThrowing(outside), async () => {
+    await withScope(scopeThrowing(outside), () => {
       expect(() => getProjectDatastore()).toThrow(/requires an OpenSIP CLI project/);
       try {
         getProjectDatastore();
       } catch (error) {
         expect((error as { code?: string }).code).toBe('CONFIGURATION.REQUIRES_PROJECT');
       }
+      return Promise.resolve();
     });
   });
 
@@ -45,8 +46,9 @@ describe('getProjectDatastore', () => {
     const other = new SystemError('disk exploded', {
       code: 'SYSTEM.DATASTORE.IO',
     });
-    await withScope(scopeThrowing(other), async () => {
+    await withScope(scopeThrowing(other), () => {
       expect(() => getProjectDatastore()).toThrow('disk exploded');
+      return Promise.resolve();
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
 import { detectorDoneEvent, detectorLabel, detectorStartEvent } from '../cli/yagni-progress.js';

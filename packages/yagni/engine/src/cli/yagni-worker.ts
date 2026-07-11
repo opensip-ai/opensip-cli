@@ -38,7 +38,7 @@ function send(msg: WorkerMessage<ProgressEvent, ExecuteYagniResult>): void {
   sendWorkerIpcMessage(msg);
 }
 
-export async function executeYagniWorker(specPath: string, cli: ToolCliContext): Promise<void> {
+export async function executeYagniWorker(specPath: string, _cli: ToolCliContext): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
   try {
     const args = JSON.parse(readFileSync(specPath, 'utf8')) as YagniWorkerSpec;

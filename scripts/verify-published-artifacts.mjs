@@ -21,10 +21,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RELEASE_PACKAGE_ORDER } from './release-package-order.mjs';
-import {
-  classifyPublishedArtifactPath,
-  collectPublishedArtifactProblems,
-} from './lib/release-governance-surface.mjs';
+import { collectPublishedArtifactProblems } from './lib/release-governance-surface.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const log = (msg) => console.error(`[verify-published-artifacts] ${msg}`);
@@ -94,7 +91,9 @@ export function parsePacklist(stdout) {
   try {
     parsed = JSON.parse(stdout);
   } catch (error) {
-    throw new Error(`malformed pack JSON: ${error instanceof Error ? error.message : error}`);
+    throw new Error(`malformed pack JSON: ${error instanceof Error ? error.message : error}`, {
+      cause: error,
+    });
   }
   const files = parsed?.files;
   if (!Array.isArray(files)) throw new Error('pack JSON missing files[] array');
@@ -152,11 +151,7 @@ export function verifyPackage(entry, { runner = defaultRunner, repoRoot = REPO_R
       problems.push(`${entry.name}: pack failed to spawn: ${result.error.message}`);
     } else if (result.signal) {
       problems.push(`${entry.name}: pack killed by signal ${result.signal}`);
-    } else if (result.status !== 0) {
-      problems.push(
-        `${entry.name}: pack exited ${result.status}: ${String(result.stderr).slice(0, 500)}`,
-      );
-    } else {
+    } else if (result.status === 0) {
       try {
         const packed = parsePacklist(result.stdout);
         packedCount = packed.length;
@@ -164,6 +159,10 @@ export function verifyPackage(entry, { runner = defaultRunner, repoRoot = REPO_R
       } catch (error) {
         problems.push(`${entry.name}: ${error instanceof Error ? error.message : error}`);
       }
+    } else {
+      problems.push(
+        `${entry.name}: pack exited ${result.status}: ${String(result.stderr).slice(0, 500)}`,
+      );
     }
   }
 
@@ -201,4 +200,4 @@ if (
   main();
 }
 
-export { classifyPublishedArtifactPath };
+export { classifyPublishedArtifactPath } from './lib/release-governance-surface.mjs';

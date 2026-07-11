@@ -16,7 +16,6 @@ import {
   runWithScopeSync,
   type Logger,
   type ProjectContext,
-  type ToolCliContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';

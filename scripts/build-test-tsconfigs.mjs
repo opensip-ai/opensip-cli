@@ -105,7 +105,7 @@ function renderConfig(relativeDir) {
   const compilerOptions = {
     rootDir: 'src',
     noEmit: true,
-    ...(COMPILER_OVERRIDES[relativeDir] ?? {}),
+    ...COMPILER_OVERRIDES[relativeDir],
   };
   const exclude = [...BASE_EXCLUDE, ...(EXTRA_EXCLUDES[relativeDir] ?? [])];
   const config = {
@@ -122,7 +122,6 @@ function main() {
   const records = readWorkspacePackageManifests(REPO_ROOT);
   const problems = [];
   let generated = 0;
-  const expected = new Set();
 
   for (const rec of records) {
     const outPath = join(rec.dir, 'tsconfig.test.json');
@@ -138,7 +137,6 @@ function main() {
       }
       continue;
     }
-    expected.add(outPath);
     const content = renderConfig(rec.relativeDir);
     generated += 1;
     if (CHECK_ONLY) {

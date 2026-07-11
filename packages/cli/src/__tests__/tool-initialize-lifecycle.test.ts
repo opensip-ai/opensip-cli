@@ -28,8 +28,8 @@ import {
 import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
 import { PolicyAuditCollector } from '../bootstrap/policy-audit.js';
+import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
 import { resetInitializedToolIdsForTest } from '../bootstrap/process-idempotency.js';
 import { mountAllToolCommands } from '../bootstrap/register-tools.js';
 import { buildCommandScopeIndex } from '../commands/command-scope-index.js';

@@ -160,8 +160,8 @@ describe('repair command specs', () => {
     const { ctx, scope } = makeHarness();
     const [preview] = buildRepairGroupLeaves(ctx);
 
-    const result = await runWithScope(scope, async () =>
-      preview.handler({ _args: ['latest'], tool: 'fit' }, ctx),
+    const result = await runWithScope(scope, () =>
+      Promise.resolve(preview.handler({ _args: ['latest'], tool: 'fit' }, ctx)),
     );
 
     expect(exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
@@ -182,8 +182,10 @@ describe('repair command specs', () => {
     const { ctx, scope } = makeHarness();
     const [preview] = buildRepairGroupLeaves(ctx);
 
-    const result = await runWithScope(scope, async () =>
-      preview.handler({ _args: ['latest'], tool: 'fit', signal: 'fingerprint:fp-1' }, ctx),
+    const result = await runWithScope(scope, () =>
+      Promise.resolve(
+        preview.handler({ _args: ['latest'], tool: 'fit', signal: 'fingerprint:fp-1' }, ctx),
+      ),
     );
 
     expect(result).toMatchObject({
@@ -206,16 +208,18 @@ describe('repair command specs', () => {
     const { ctx, scope } = makeHarness([advisory]);
     const [, apply] = buildRepairGroupLeaves(ctx);
 
-    const result = await runWithScope(scope, async () =>
-      apply.handler(
-        {
-          _args: ['latest'],
-          tool: 'fit',
-          signal: 'id:sig-1',
-          action: 'manual-action',
-          force: true,
-        },
-        ctx,
+    const result = await runWithScope(scope, () =>
+      Promise.resolve(
+        apply.handler(
+          {
+            _args: ['latest'],
+            tool: 'fit',
+            signal: 'id:sig-1',
+            action: 'manual-action',
+            force: true,
+          },
+          ctx,
+        ),
       ),
     );
 

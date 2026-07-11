@@ -15,14 +15,5 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": "src"
-  },
-  "//": "Production emit policy (ADR-0150): exclude test/spec/fixture trees so package builds ship runtime artifacts only. Packages that declare their own `exclude` must repeat this canonical set (TypeScript replaces, not merges, an inherited exclude). Test sources stay semantically checked via the per-package `tsconfig.test.json` lane (scripts/typecheck-tests.mjs).",
-  "exclude": [
-    "**/__tests__/**",
-    "**/__fixtures__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
-  ]
+  }
 }

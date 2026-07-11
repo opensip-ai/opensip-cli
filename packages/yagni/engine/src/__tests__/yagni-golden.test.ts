@@ -9,7 +9,7 @@
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';

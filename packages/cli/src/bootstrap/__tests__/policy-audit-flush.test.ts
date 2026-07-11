@@ -44,23 +44,23 @@ describe('flushPolicyAuditEvents', () => {
     expect(flushPolicyAuditEvents(datastore)).toBe(0);
   });
 
-  it('returns zero for an empty collector without draining it', async () => {
+  it('returns zero for an empty collector without draining it', () => {
     const audit = new PolicyAuditCollector('run-1');
     const scope = new RunScope({ policyAudit: audit, datastore: () => datastore });
 
-    const inserted = await runWithScopeSync(scope, () => flushPolicyAuditEvents());
+    const inserted = runWithScopeSync(scope, () => flushPolicyAuditEvents());
 
     expect(inserted).toBe(0);
     expect(audit.list()).toEqual([]);
   });
 
-  it('persists buffered events through the scoped datastore and drains the collector', async () => {
+  it('persists buffered events through the scoped datastore and drains the collector', () => {
     const audit = new PolicyAuditCollector('run-1');
     audit.record(event());
     audit.record(event({ subject: 'not-a-policy-subject', action: 'install', outcome: 'deny' }));
     const scope = new RunScope({ policyAudit: audit, datastore: () => datastore });
 
-    const inserted = await runWithScopeSync(scope, () => flushPolicyAuditEvents());
+    const inserted = runWithScopeSync(scope, () => flushPolicyAuditEvents());
 
     expect(inserted).toBe(2);
     expect(audit.list()).toEqual([]);

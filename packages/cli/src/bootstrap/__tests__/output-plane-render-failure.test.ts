@@ -7,9 +7,8 @@
  * to reject so those catch arms are reachable without a real render crash.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { DEFAULT_BASELINE_IDENTITY, type SignalEnvelope } from '@opensip-cli/contracts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Logger } from '@opensip-cli/core';
 
