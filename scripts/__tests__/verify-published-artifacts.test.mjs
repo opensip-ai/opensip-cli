@@ -156,6 +156,49 @@ test('verifyPackage: rejects a pack lifecycle hook WITHOUT spawning pnpm', () =>
   assert.ok(problems.some((p) => /forbidden pack hook\(s\): prepack/.test(p)));
 });
 
+test('verifyPackage: missing package.json is a hard failure', () => {
+  const root = mkdtempSync(join(tmpdir(), 'vpa-nomanifest-'));
+  after(() => rmSync(root, { recursive: true, force: true }));
+  const pkgDir = join(root, 'packages', 'demo');
+  mkdirSync(join(pkgDir, 'dist'), { recursive: true });
+  writeFileSync(join(pkgDir, 'dist', 'index.js'), 'export {};');
+
+  const { problems } = verifyPackage(
+    { name: '@x/demo', dir: 'packages/demo', filter: '@x/demo' },
+    { runner: () => ({ status: 0, stdout: '{"files":[]}' }), repoRoot: root },
+  );
+  assert.ok(problems.some((p) => /package\.json missing/.test(p)));
+});
+
+test('verifyPackage: diagnostics report the path but never echo file contents (no secret leak)', () => {
+  const secret = 'S3CR3T-SENTINEL-do-not-echo';
+  const root = mkdtempSync(join(tmpdir(), 'vpa-secret-'));
+  after(() => rmSync(root, { recursive: true, force: true }));
+  const pkgDir = join(root, 'packages', 'demo');
+  mkdirSync(join(pkgDir, 'dist'), { recursive: true });
+  writeFileSync(
+    join(pkgDir, 'package.json'),
+    JSON.stringify({ name: '@x/demo', scripts: { build: 'tsc' } }),
+  );
+  // A forbidden dist artifact whose CONTENTS embed a secret. The scanner records
+  // only the path, so the secret must never surface in a diagnostic.
+  writeFileSync(join(pkgDir, 'dist', 'leaky.test.js'), `export const token = '${secret}';`);
+
+  const runner = () => ({
+    status: 0,
+    stdout: `{"files":[{"path":"dist/index.js"},{"path":"dist/creds.spec.js"}]}`,
+  });
+  const { problems } = verifyPackage(
+    { name: '@x/demo', dir: 'packages/demo', filter: '@x/demo' },
+    { runner, repoRoot: root },
+  );
+  assert.ok(
+    problems.some((p) => /forbidden dist artifact \(test-file\).*leaky\.test\.js/.test(p)),
+    'reports the offending path',
+  );
+  assert.ok(!problems.some((p) => p.includes(secret)), 'must not echo the forbidden file contents');
+});
+
 test('verifyPackage: missing dist is a hard failure', () => {
   const root = mkdtempSync(join(tmpdir(), 'vpa-nodist-'));
   after(() => rmSync(root, { recursive: true, force: true }));

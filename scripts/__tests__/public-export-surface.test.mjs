@@ -286,6 +286,12 @@ test('unsupported export = / export default declarations throw', () => {
   });
 });
 
+test('malformed TypeScript is rejected rather than silently mis-parsed', () => {
+  withRepo({ 'entry.ts': 'export const = ;\nexport function (' }, (root) => {
+    assert.throws(() => readPublicExportSurface('entry.ts', { repoRoot: root }), /parse error/);
+  });
+});
+
 test('conflicting aliases resolved to different kinds throw', () => {
   withRepo(
     {
