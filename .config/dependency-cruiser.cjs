@@ -272,7 +272,14 @@ const FIT_PACK_IMPORT_ALLOWLIST_RULES = FIT_PACK_PACKAGES.map((pack) => {
 
 // Internal-subpath target (ADR-0009): a package's `src/internal.ts(x)` barrel OR
 // anything under a `src/internal/` directory. Files AND directories are internal.
-const INTERNAL_TARGET_PATH = String.raw`/src/internal(?:\.tsx?$|/)`;
+const INTERNAL_SUFFIX = String.raw`internal(?:\.tsx?$|/)`;
+const INTERNAL_TARGET_PATH = String.raw`/src/${INTERNAL_SUFFIX}`;
+// A specific owner's internal barrel/dir, for the sanctioned-owner `to.pathNot`
+// carve-outs. Shares INTERNAL_SUFFIX so the file-OR-directory shape stays in
+// lockstep with INTERNAL_TARGET_PATH (an owner that converts its `internal.ts`
+// barrel to an `internal/` directory must not trip its own owner rule).
+const ownerInternalTarget = (packageSrcPrefix) =>
+  String.raw`^${packageSrcPrefix}/src/${INTERNAL_SUFFIX}`;
 
 // The CLI composition root loads Tools dynamically; a static import of any
 // manifest Tool's source root is forbidden (ADR-0151). Manifest-derived so a
@@ -393,7 +400,7 @@ module.exports = {
       },
       to: {
         path: INTERNAL_TARGET_PATH,
-        pathNot: String.raw`^packages/fitness/engine/src/internal\.ts$`,
+        pathNot: ownerInternalTarget('packages/fitness/engine'),
       },
     },
     {
@@ -408,7 +415,7 @@ module.exports = {
       },
       to: {
         path: INTERNAL_TARGET_PATH,
-        pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
+        pathNot: ownerInternalTarget('packages/datastore'),
       },
     },
     {
@@ -423,7 +430,7 @@ module.exports = {
       },
       to: {
         path: INTERNAL_TARGET_PATH,
-        pathNot: String.raw`^packages/datastore/src/internal\.ts$`,
+        pathNot: ownerInternalTarget('packages/datastore'),
       },
     },
     {

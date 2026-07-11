@@ -70,8 +70,13 @@ export function collectBundledToolDocProblems(docName, text, facts) {
   }
   const bundledCount = facts.bundledToolPackageNames.length;
   const word = numberWord(bundledCount);
-  // Accept "bundled tools" and "bundled first-party tools" (README voice).
-  if (!new RegExp(String.raw`\b${word}\s+bundled\s+(?:first-party\s+)?tools\b`, 'i').test(text)) {
+  // Accept the English word OR the digits (so "five" and "5" both pass — and a
+  // count > 10, where numberWord already returns digits, still works), and
+  // "bundled tools" or "bundled first-party tools" (README voice).
+  const countForm = word === String(bundledCount) ? word : `(?:${word}|${bundledCount})`;
+  if (
+    !new RegExp(String.raw`\b${countForm}\s+bundled\s+(?:first-party\s+)?tools\b`, 'i').test(text)
+  ) {
     problems.push(
       `${docName} must describe ${word} (${bundledCount}) bundled tools, derived from ` +
         `${BUNDLED_MANIFEST}. Update the count if a bundled tool was added or removed.`,
@@ -174,7 +179,7 @@ export function readGovernanceFacts(repoRoot = REPO_ROOT) {
   }
 
   // Bundled Tool facts cross-checked against the production Tool inventory.
-  const bundledRaw = readRepoFile(BUNDLED_MANIFEST);
+  const bundledRaw = readRepoFile(BUNDLED_MANIFEST, repoRoot);
   const bundled = bundledRaw ? JSON.parse(bundledRaw) : {};
   const bundledToolPackageNames = Array.isArray(bundled.bundledPackages)
     ? [...bundled.bundledPackages]
@@ -224,8 +229,8 @@ const STALE_COUNT_PATTERNS = [
   /\b33\s+publishable\s+packages\b/i,
 ];
 
-function readRepoFile(relPath) {
-  const abs = join(REPO_ROOT, relPath);
+function readRepoFile(relPath, root = REPO_ROOT) {
+  const abs = join(root, relPath);
   return existsSync(abs) ? readFileSync(abs, 'utf8') : '';
 }
 
@@ -343,8 +348,8 @@ export const MAX_PUBLISHED_ARTIFACT_PATH_BYTES = 4096;
  * production tarball, or `null` when it is an allowed runtime artifact.
  *
  * A filename merely CONTAINING "test"/"spec" (e.g. `contest.js`, `latest.js`)
- * is allowed — only the `.test.`/`.spec.` infix and the test/fixture/coverage
- * trees are rejected.
+ * is allowed — only the `.test.`/`.spec.` infix and the test/fixture/coverage/
+ * test-support trees are rejected.
  *
  * @param {string} relPath
  * @returns {string | null}
@@ -359,6 +364,9 @@ export function classifyPublishedArtifactPath(relPath) {
   if (segments.includes('..')) return 'path-traversal';
   const base = segments.at(-1);
   if (segments.includes('__tests__')) return 'test-directory';
+  // `__test-support__` is a production-build exclude (packages/cli/tsconfig.json);
+  // the classifier backstops that exclude, so it must reject it too.
+  if (segments.includes('__test-support__')) return 'test-support-directory';
   if (segments.includes('__fixtures__')) return 'fixture-directory';
   if (segments.includes('coverage')) return 'coverage';
   if (/\.(test|spec)\./.test(base)) return 'test-file';

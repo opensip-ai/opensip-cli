@@ -74,13 +74,21 @@ const BASE_EXCLUDE = [
 
 const TEST_FILE_RE = /\.(test|spec)\.tsx?$/;
 
-/** Does this package directory contain any test/spec source under src/? */
+/**
+ * Does this package have any test source the generated config would actually
+ * INCLUDE? This mirrors the config's include/exclude (below): a `.ts`/`.tsx`
+ * under a `__tests__` subtree, or a `.test`/`.spec` file elsewhere — but NOT
+ * anything under an excluded `__fixtures__/` or `__tests__/fixtures/` corpus.
+ * A package whose only test-pattern files live under an excluded fixture path
+ * has no included inputs, so it must NOT get a config (which would resolve to
+ * zero inputs → `tsc` TS18003 "No inputs were found").
+ */
 function hasTests(pkgDir) {
   const srcDir = join(pkgDir, 'src');
   if (!existsSync(srcDir)) return false;
-  const stack = [srcDir];
+  const stack = [{ dir: srcDir, underTests: false, parentName: '' }];
   while (stack.length > 0) {
-    const dir = stack.pop();
+    const { dir, underTests, parentName } = stack.pop();
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
@@ -88,12 +96,19 @@ function hasTests(pkgDir) {
       continue;
     }
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
-      const full = join(dir, entry.name);
+      // Never descend into non-source or excluded fixture trees.
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '__fixtures__') {
+        continue;
+      }
+      // `__tests__/fixtures/**` is excluded from the generated config.
+      if (entry.name === 'fixtures' && parentName === '__tests__') continue;
       if (entry.isDirectory()) {
-        if (entry.name === '__tests__') return true;
-        stack.push(full);
-      } else if (TEST_FILE_RE.test(entry.name)) {
+        stack.push({
+          dir: join(dir, entry.name),
+          underTests: underTests || entry.name === '__tests__',
+          parentName: entry.name,
+        });
+      } else if (underTests ? /\.tsx?$/.test(entry.name) : TEST_FILE_RE.test(entry.name)) {
         return true;
       }
     }

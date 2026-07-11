@@ -311,27 +311,37 @@ function surfaceOfFile(file, ctx, depth) {
    */
   const importBindings = new Map();
 
+  // A name may be declared as both a type and a value in the same module — the
+  // legal `interface Foo {}` + `const Foo` companion (declaration-merging)
+  // pattern. Merge to 'both' rather than clobber, so the type aspect is not
+  // silently dropped and the two direct exports do not later look conflicting.
+  /** @param {string} name @param {ExportKind} kind */
+  const setLocal = (name, kind) => {
+    const existing = localDecls.get(name);
+    localDecls.set(name, existing === undefined || existing === kind ? kind : 'both');
+  };
+
   for (const stmt of sourceFile.statements) {
     if (ts.isVariableStatement(stmt)) {
       for (const decl of stmt.declarationList.declarations) {
         /** @type {string[]} */
         const ids = [];
         collectBindingIdentifiers(decl.name, ids);
-        for (const id of ids) localDecls.set(id, 'value');
+        for (const id of ids) setLocal(id, 'value');
       }
     } else if (ts.isFunctionDeclaration(stmt) && stmt.name) {
-      localDecls.set(stmt.name.text, 'value');
+      setLocal(stmt.name.text, 'value');
     } else if (ts.isClassDeclaration(stmt) && stmt.name) {
-      localDecls.set(stmt.name.text, 'both');
+      setLocal(stmt.name.text, 'both');
     } else if (ts.isEnumDeclaration(stmt)) {
-      localDecls.set(stmt.name.text, 'both');
+      setLocal(stmt.name.text, 'both');
     } else if (ts.isInterfaceDeclaration(stmt)) {
-      localDecls.set(stmt.name.text, 'type');
+      setLocal(stmt.name.text, 'type');
     } else if (ts.isTypeAliasDeclaration(stmt)) {
-      localDecls.set(stmt.name.text, 'type');
+      setLocal(stmt.name.text, 'type');
     } else if (ts.isModuleDeclaration(stmt) && stmt.name && ts.isIdentifier(stmt.name)) {
       // namespace/module declaration — treated as dual-space (value + type).
-      localDecls.set(stmt.name.text, 'both');
+      setLocal(stmt.name.text, 'both');
     } else if (ts.isImportDeclaration(stmt) && stmt.importClause) {
       const clause = stmt.importClause;
       const moduleSpecifier = ts.isStringLiteral(stmt.moduleSpecifier)
@@ -410,9 +420,15 @@ function surfaceOfFile(file, ctx, depth) {
 
   for (const stmt of sourceFile.statements) {
     if (ts.isExportAssignment(stmt)) {
-      throw new PublicExportSurfaceError(
-        `unsupported ${stmt.isExportEquals ? 'export = ' : 'export default '}assignment in ${file}`,
-      );
+      // `export =` / `export default <expr>` contribute no NAMED export. Reject
+      // them only on the entry barrel (which must use named exports); on a
+      // followed module they are irrelevant to the name we are resolving.
+      if (depth === 0) {
+        throw new PublicExportSurfaceError(
+          `unsupported ${stmt.isExportEquals ? 'export = ' : 'export default '}assignment in ${file}`,
+        );
+      }
+      continue;
     }
 
     // Exported declarations: export const/function/class/interface/type/enum ...
@@ -427,14 +443,21 @@ function surfaceOfFile(file, ctx, depth) {
     ) {
       if (!isExported(stmt)) continue;
       if (isDefaultExport(stmt)) {
-        throw new PublicExportSurfaceError(`unsupported export default declaration in ${file}`);
+        // A default-exported declaration is not a named export. Reject only on
+        // the entry barrel; skip it on a followed module.
+        if (depth === 0) {
+          throw new PublicExportSurfaceError(`unsupported export default declaration in ${file}`);
+        }
+        continue;
       }
       if (ts.isVariableStatement(stmt)) {
         for (const decl of stmt.declarationList.declarations) {
           /** @type {string[]} */
           const ids = [];
           collectBindingIdentifiers(decl.name, ids);
-          for (const id of ids) addStrong(id, 'value');
+          // Use the merged local kind so a `const Foo` companion of an
+          // `interface Foo` exports as 'both', not a conflicting 'value'.
+          for (const id of ids) addStrong(id, localDecls.get(id) ?? 'value');
         }
       } else if (stmt.name && ts.isIdentifier(stmt.name)) {
         addStrong(stmt.name.text, localDecls.get(stmt.name.text) ?? 'value');

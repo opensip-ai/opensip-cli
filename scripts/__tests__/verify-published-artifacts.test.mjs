@@ -18,6 +18,7 @@ import {
 test('classifyPublishedArtifactPath rejects test/fixture/coverage paths', () => {
   const forbidden = {
     'dist/__tests__/x.test.js': 'test-directory',
+    'dist/__test-support__/helper.js': 'test-support-directory',
     'dist/__fixtures__/corpus/a.ts': 'fixture-directory',
     'dist/foo.test.js': 'test-file',
     'dist/foo.test.d.ts': 'test-file',
@@ -168,6 +169,22 @@ test('verifyPackage: missing package.json is a hard failure', () => {
     { runner: () => ({ status: 0, stdout: '{"files":[]}' }), repoRoot: root },
   );
   assert.ok(problems.some((p) => /package\.json missing/.test(p)));
+});
+
+test('verifyPackage: a malformed package.json is a per-package problem, not a crash', () => {
+  const root = mkdtempSync(join(tmpdir(), 'vpa-badmanifest-'));
+  after(() => rmSync(root, { recursive: true, force: true }));
+  const pkgDir = join(root, 'packages', 'demo');
+  mkdirSync(join(pkgDir, 'dist'), { recursive: true });
+  writeFileSync(join(pkgDir, 'package.json'), '{ this is not: valid json ');
+  writeFileSync(join(pkgDir, 'dist', 'index.js'), 'export {};');
+
+  // Must return a problem rather than throwing (which would abort the whole run).
+  const { problems } = verifyPackage(
+    { name: '@x/demo', dir: 'packages/demo', filter: '@x/demo' },
+    { runner: () => ({ status: 0, stdout: '{"files":[]}' }), repoRoot: root },
+  );
+  assert.ok(problems.some((p) => /malformed package\.json/.test(p)));
 });
 
 test('verifyPackage: diagnostics report the path but never echo file contents (no secret leak)', () => {

@@ -123,7 +123,20 @@ export function verifyPackage(entry, { runner = defaultRunner, repoRoot = REPO_R
   if (!existsSync(manifestPath)) {
     return { problems: [`${entry.name}: package.json missing`], builtCount: 0, packedCount: 0 };
   }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch (error) {
+    // A malformed manifest is this package's problem, not a reason to abort the
+    // whole verification run.
+    return {
+      problems: [
+        `${entry.name}: malformed package.json: ${error instanceof Error ? error.message : error}`,
+      ],
+      builtCount: 0,
+      packedCount: 0,
+    };
+  }
 
   const hooks = forbiddenPackHooks(manifest);
   if (hooks.length > 0) {

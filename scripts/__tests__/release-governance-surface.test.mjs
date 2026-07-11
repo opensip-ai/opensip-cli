@@ -100,15 +100,14 @@ test('collectBundledToolDocProblems binds bundled-tool prose to the manifest cou
     stale.some((p) => /bundled-tools\.manifest\.json/.test(p)),
     'a missing source-of-truth citation is flagged',
   );
-  // A correct, manifest-cited rendering passes with no problems.
-  assert.deepEqual(
-    collectBundledToolDocProblems(
-      'AGENTS.md',
-      'It ships with the five bundled tools declared in bundled-tools.manifest.json.',
-      facts,
-    ),
-    [],
-  );
+  // A correct, manifest-cited rendering passes with no problems — in the word
+  // form OR the digit form (5), so prose voice is not over-constrained.
+  for (const prose of [
+    'It ships with the five bundled tools declared in bundled-tools.manifest.json.',
+    'It ships with the 5 bundled tools declared in bundled-tools.manifest.json.',
+  ]) {
+    assert.deepEqual(collectBundledToolDocProblems('AGENTS.md', prose, facts), []);
+  }
   // A missing doc is a hard problem, not a silent pass.
   assert.ok(collectBundledToolDocProblems('AGENTS.md', '', facts).some((p) => /missing/.test(p)));
 });

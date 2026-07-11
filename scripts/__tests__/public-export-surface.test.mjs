@@ -286,6 +286,46 @@ test('unsupported export = / export default declarations throw', () => {
   });
 });
 
+test('a value+type companion (interface + const, same file) exports as both, either order', () => {
+  // The legal declaration-merging companion must not drop the type aspect nor
+  // look like a conflict — regardless of source order.
+  for (const body of [
+    'export interface W { x: number }\nexport const W = { x: 1 };',
+    'export const W = { x: 1 };\nexport interface W { x: number }',
+  ]) {
+    withRepo({ 'entry.ts': body }, (root) => {
+      const s = readPublicExportSurface('entry.ts', { repoRoot: root });
+      assert.ok(s.valueExports.includes('W'), `const companion is a value export (${body})`);
+      assert.ok(s.typeExports.includes('W'), `interface companion is a type export (${body})`);
+    });
+  }
+});
+
+test("a followed module's unrelated `export default` does not break a named re-export", () => {
+  // A barrel re-exporting one name from an impl module must not choke on that
+  // module's own (irrelevant) default export.
+  withRepo(
+    {
+      'impl.ts': 'export const helper = 1;\nexport default function main() {}',
+      'entry.ts': "export { helper } from './impl.js';",
+    },
+    (root) => {
+      const s = readPublicExportSurface('entry.ts', { repoRoot: root });
+      assert.deepEqual(s.valueExports, ['helper']);
+      assert.deepEqual(s.typeExports, []);
+    },
+  );
+});
+
+test('the entry barrel itself still rejects export default / export =', () => {
+  withRepo({ 'entry.ts': 'export default function foo() {}' }, (root) => {
+    assert.throws(
+      () => readPublicExportSurface('entry.ts', { repoRoot: root }),
+      /unsupported export default/,
+    );
+  });
+});
+
 test('malformed TypeScript is rejected rather than silently mis-parsed', () => {
   withRepo({ 'entry.ts': 'export const = ;\nexport function (' }, (root) => {
     assert.throws(() => readPublicExportSurface('entry.ts', { repoRoot: root }), /parse error/);
