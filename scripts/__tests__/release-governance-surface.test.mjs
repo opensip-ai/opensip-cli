@@ -8,6 +8,7 @@ import test from 'node:test';
 import {
   collectBundledToolDocProblems,
   collectGovernanceDriftProblems,
+  collectPackageFactDocProblems,
   readGovernanceFacts,
 } from '../lib/release-governance-surface.mjs';
 import { RELEASE_PACKAGE_ORDER } from '../release-package-order.mjs';
@@ -121,6 +122,53 @@ test('the real AGENTS.md and CLAUDE.md describe the derived bundled-tool set', (
       `${doc} bundled-tool prose drifted from the manifest`,
     );
   }
+});
+
+test('collectPackageFactDocProblems catches a stale count and an omitted private package', () => {
+  const facts = {
+    publishableCount: 56,
+    privateWorkspaceNames: ['@opensip-cli/test-support', '@opensip-cli/checks-dogfood'],
+  };
+  const stale = collectPackageFactDocProblems(
+    'docs/public/README.md',
+    '55 publishable workspace packages, plus the private `@opensip-cli/test-support` package.',
+    facts,
+  );
+  assert.ok(stale.some((p) => /claims 55 publishable packages; expected 56/.test(p)));
+  assert.ok(stale.some((p) => /omits @opensip-cli\/checks-dogfood/.test(p)));
+  // Naming both private packages with the derived count passes.
+  assert.deepEqual(
+    collectPackageFactDocProblems(
+      'docs/public/README.md',
+      '56 publishable packages, plus `@opensip-cli/test-support` and `@opensip-cli/checks-dogfood`.',
+      facts,
+    ),
+    [],
+  );
+  // Source-of-truth wording (no literal count, no private names) also passes.
+  assert.deepEqual(
+    collectPackageFactDocProblems(
+      'docs/public/README.md',
+      'See scripts/release-package-order.mjs for the authoritative inventory.',
+      facts,
+    ),
+    [],
+  );
+});
+
+test('the audited public pages match derived package + bundled-tool facts', () => {
+  const facts = readGovernanceFacts();
+  const readme = read('docs/public/README.md');
+  assert.deepEqual(collectBundledToolDocProblems('docs/public/README.md', readme, facts), []);
+  assert.deepEqual(collectPackageFactDocProblems('docs/public/README.md', readme, facts), []);
+  assert.deepEqual(
+    collectPackageFactDocProblems(
+      'docs/public/80-implementation/06-doc-conventions.md',
+      read('docs/public/80-implementation/06-doc-conventions.md'),
+      facts,
+    ),
+    [],
+  );
 });
 
 test('readGovernanceFacts fails closed on source disagreement (returns no partial facts)', () => {

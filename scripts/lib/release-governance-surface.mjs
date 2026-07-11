@@ -70,7 +70,8 @@ export function collectBundledToolDocProblems(docName, text, facts) {
   }
   const bundledCount = facts.bundledToolPackageNames.length;
   const word = numberWord(bundledCount);
-  if (!new RegExp(String.raw`\b${word}\s+bundled\s+tools\b`, 'i').test(text)) {
+  // Accept "bundled tools" and "bundled first-party tools" (README voice).
+  if (!new RegExp(String.raw`\b${word}\s+bundled\s+(?:first-party\s+)?tools\b`, 'i').test(text)) {
     problems.push(
       `${docName} must describe ${word} (${bundledCount}) bundled tools, derived from ` +
         `${BUNDLED_MANIFEST}. Update the count if a bundled tool was added or removed.`,
@@ -79,6 +80,41 @@ export function collectBundledToolDocProblems(docName, text, facts) {
   if (!text.includes('bundled-tools.manifest.json')) {
     problems.push(
       `${docName} must cite bundled-tools.manifest.json as the bundled-tool source of truth.`,
+    );
+  }
+  return problems;
+}
+
+/**
+ * Pure text projection: a doc that states a publishable package count must match
+ * the derived count, and a doc that names any private workspace package by name
+ * must name them all — no stale literal survives (ADR-0151). Counts/names are
+ * derived from `facts`, never frozen in the check.
+ *
+ * @param {string} docName
+ * @param {string} text doc contents ('' when absent)
+ * @param {{ publishableCount: number, privateWorkspaceNames: readonly string[] }} facts
+ * @returns {string[]}
+ */
+export function collectPackageFactDocProblems(docName, text, facts) {
+  const problems = [];
+  if (!text) {
+    problems.push(`${docName}: missing — cannot verify package facts`);
+    return problems;
+  }
+  const countMatch = text.match(/\b(\d+)\s+publishable\s+(?:workspace\s+)?packages\b/i);
+  if (countMatch && Number.parseInt(countMatch[1], 10) !== facts.publishableCount) {
+    problems.push(
+      `${docName} claims ${countMatch[1]} publishable packages; expected ${facts.publishableCount} ` +
+        `(RELEASE_PACKAGE_ORDER). Use the derived count or source-of-truth wording.`,
+    );
+  }
+  const named = facts.privateWorkspaceNames.filter((name) => text.includes(name));
+  if (named.length > 0 && named.length !== facts.privateWorkspaceNames.length) {
+    const missing = facts.privateWorkspaceNames.filter((name) => !text.includes(name));
+    problems.push(
+      `${docName} names a private workspace package but omits ${missing.join(', ')}; ` +
+        `name both private workspace packages.`,
     );
   }
   return problems;
@@ -274,6 +310,20 @@ export function collectGovernanceDriftProblems() {
   for (const doc of CONTRIBUTOR_DOCS) {
     problems.push(...collectBundledToolDocProblems(doc, readRepoFile(doc), facts));
   }
+
+  // Audited public factual pages: the README enumerates packages AND bundled
+  // tools; the doc-conventions verification trail states a package count.
+  const publicReadme = 'docs/public/README.md';
+  const publicReadmeText = readRepoFile(publicReadme);
+  problems.push(...collectBundledToolDocProblems(publicReadme, publicReadmeText, facts));
+  problems.push(...collectPackageFactDocProblems(publicReadme, publicReadmeText, facts));
+  problems.push(
+    ...collectPackageFactDocProblems(
+      'docs/public/80-implementation/06-doc-conventions.md',
+      readRepoFile('docs/public/80-implementation/06-doc-conventions.md'),
+      facts,
+    ),
+  );
 
   return problems;
 }
