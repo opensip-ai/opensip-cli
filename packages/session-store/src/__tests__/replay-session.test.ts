@@ -3,10 +3,11 @@ import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { resolveAndReplaySession } from '../replay-session.js';
+import { resolveAndReplaySession, type SessionReplayFn } from '../replay-session.js';
 import { SessionRepo } from '../session-repo.js';
 
-import type { StoredSession } from '@opensip-cli/contracts';
+import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
+import type { Signal } from '@opensip-cli/core';
 
 function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -24,15 +25,19 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
-function replayEnvelope(tool: string) {
+function replayEnvelope(
+  tool: string,
+  signals: readonly Signal[] = [],
+): ToolSessionReplay<CommandResult> {
   return {
-    fidelity: 'projection' as const,
+    result: { type: 'text-lines', lines: [] },
+    fidelity: 'projection',
     envelope: buildSignalEnvelope({
       tool,
       runId: 'r1',
       createdAt: '2026-01-01T00:00:00.000Z',
       units: [{ slug: 'u', passed: true, durationMs: 1 }],
-      signals: [],
+      signals,
       policy: HOST_VERDICT_POLICY_FALLBACK,
       runFaulted: false,
     }),
@@ -94,8 +99,7 @@ describe('resolveAndReplaySession', () => {
 
   it('replays successfully and applies agent filters when requested', async () => {
     repo.save(makeSession({ id: 'FIT_01' }));
-    const replay = replayEnvelope('fit');
-    replay.envelope.signals = [
+    const replay = replayEnvelope('fit', [
       createSignal({
         source: 'fit',
         severity: 'high',
@@ -108,7 +112,7 @@ describe('resolveAndReplaySession', () => {
         ruleId: 'demo2',
         message: 'warn',
       }),
-    ];
+    ]);
     const replayFn = () => replay;
 
     const result = await resolveAndReplaySession(datastore, {
@@ -148,7 +152,7 @@ describe('resolveAndReplaySession', () => {
     // Record which session actually reaches the replay closure. The newer
     // FOREIGN row is filtered out before resolution, so only IN is replayed.
     const replayedIds: string[] = [];
-    const recordingReplay = (stored: StoredSession) => {
+    const recordingReplay: SessionReplayFn = (stored) => {
       replayedIds.push(stored.id);
       return replayEnvelope(stored.tool);
     };
