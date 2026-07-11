@@ -20,6 +20,8 @@ import type {
   CallEdge,
   CrossBoundaryCall,
   DependencyEdge,
+  DependencyForm,
+  DependencyRole,
   FunctionOccurrence,
   ParseError,
   ReExportRecord,
@@ -165,6 +167,11 @@ export interface DependencySiteRecord {
   readonly line: number;
   /** 0-based column. */
   readonly column: number;
+  /** How the dependency statement is written (P2 Phase 0). Adapters that
+   *  classify their sites populate it; the engine threads it to the edge. */
+  readonly form: DependencyForm;
+  /** The executable role of the dependency (P2 Phase 0). */
+  readonly role: DependencyRole;
 }
 
 export interface WalkOutput {

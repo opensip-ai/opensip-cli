@@ -27,11 +27,12 @@
 
 import { relative, sep } from 'node:path';
 
-import { ownerEdgeKey } from '@opensip-cli/graph';
+import { ownerEdgeKey, resolveSpecifierToPackage } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
+import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
 import { methodTargetFile } from './edge-helpers/method-target.js';
 import { extractBoundaryCalls, type MethodTargetResolver } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
@@ -47,11 +48,15 @@ import type {
 } from './walk.js';
 import type {
   CallSiteRecord as ContractCallSiteRecord,
+  DependencyClassification,
   DependencyEdge,
+  DependencyResolutionBasis,
   DependencySiteRecord as ContractDependencySiteRecord,
+  DependencyTargetKind,
   DiscoverInput,
   DiscoverOutput,
   GraphLanguageAdapter,
+  PackageManifestIndex,
   ParseInput,
   ParseOutput,
   ResolveInput,
@@ -144,6 +149,8 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
     specifier: r.specifier,
     line: r.line,
     column: r.column,
+    form: r.form,
+    role: r.role,
   }));
   return {
     occurrences: walked.functions,
@@ -235,26 +242,31 @@ async function resolveCallSitesExact(
   // Phase 4 (DEC-498): resolve dependency sites if any. Translate
   // back to the TS-specific shape (with real ts.Node handles) and
   // run module resolution.
-  const dependenciesByOwner =
-    input.dependencySites && input.dependencySites.length > 0
-      ? resolveDependencies(
-          input.dependencySites.map((r): TsDependencySiteRecord => ({
-            node: r.nodeRef as ts.Node,
-            sourceFile: r.sourceFileRef as ts.SourceFile,
-            ownerHash: r.ownerHash,
-            // Always set by the TS walk (see requireOwnerPos) — keep the
-            // module-init occurrence position exact for the ownerEdgeKey stitch.
-            ownerLine: requireOwnerPos(r.ownerLine, 'ownerLine'),
-            ownerColumn: requireOwnerPos(r.ownerColumn, 'ownerColumn'),
-            specifier: r.specifier,
-            line: r.line,
-            column: r.column,
-          })),
-          input.catalog,
-          project.program,
-          input.projectDirAbs,
-        )
-      : undefined;
+  // Resolve dependency sites whenever the adapter emitted a (possibly empty)
+  // site list. An empty array is "supported, no imports"; `undefined` is
+  // "unsupported" and stays `undefined`. (P2 Phase 0 Task 0.1 step 3.)
+  let dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined;
+  if (input.dependencySites !== undefined) {
+    dependenciesByOwner = resolveDependencies(
+      input.dependencySites.map((r): TsDependencySiteRecord => ({
+        node: r.nodeRef as ts.Node,
+        sourceFile: r.sourceFileRef as ts.SourceFile,
+        ownerHash: r.ownerHash,
+        // Always set by the TS walk (see requireOwnerPos) — keep the module-init
+        // occurrence position exact for the ownerEdgeKey stitch.
+        ownerLine: requireOwnerPos(r.ownerLine, 'ownerLine'),
+        ownerColumn: requireOwnerPos(r.ownerColumn, 'ownerColumn'),
+        specifier: r.specifier,
+        line: r.line,
+        column: r.column,
+        form: r.form,
+        role: r.role,
+      })),
+      input.catalog,
+      project.program,
+      input.projectDirAbs,
+    );
+  }
 
   return {
     edgesByOwner: collectByOwner(result.catalog),
@@ -329,11 +341,23 @@ function createModuleResolutionHost(): ts.ModuleResolutionHost {
   };
 }
 
+/** Bounded resolution of one import site: target hashes plus the classification
+ *  axes downstream attribution needs even when there is no callable body hash. */
+interface SiteResolution {
+  readonly to: readonly string[];
+  readonly targetKind: DependencyTargetKind;
+  readonly basis: DependencyResolutionBasis;
+  readonly reason: string;
+  readonly resolvedPackage?: string;
+}
+
 /**
- * Resolve a single import site to its target module-init bodyHash(es).
- * Returns the empty array if the module resolves outside the catalog
- * (e.g. external package, `.d.ts` declaration file) or fails to resolve
- * at all — both treated as unresolved by downstream attribution.
+ * Resolve a single import site to a bounded {@link SiteResolution}. A source
+ * module-init in the catalog resolves to `catalog-source`; a `.d.ts` entry to
+ * `declaration-file`, canonically attributed to a unique workspace package via
+ * the manifest index when possible; an installed package to `external`; a
+ * relative or otherwise unresolvable target to `unresolved`. External/unresolved
+ * sites carry no `resolvedPackage` but stay fully classified (P2 Phase 0).
  */
 function resolveSiteTargets(
   site: TsDependencySiteRecord,
@@ -341,31 +365,103 @@ function resolveSiteTargets(
   moduleResolutionHost: ts.ModuleResolutionHost,
   projectDirAbs: string,
   moduleInitByFilePath: ReadonlyMap<string, string>,
-): readonly string[] {
+  manifestIndex: PackageManifestIndex,
+): SiteResolution {
   const resolution = ts.resolveModuleName(
     site.specifier,
     site.sourceFile.fileName,
     compilerOptions,
     moduleResolutionHost,
   );
-  if (resolution.resolvedModule === undefined) return [];
-  // Convert absolute resolved path → project-relative POSIX path
-  const projectRel = relative(projectDirAbs, resolution.resolvedModule.resolvedFileName)
-    .split(sep)
-    .join('/');
+  const resolved = resolution.resolvedModule;
+  if (resolved === undefined) {
+    return site.specifier.startsWith('.')
+      ? {
+          to: [],
+          targetKind: 'unresolved',
+          basis: 'unresolved',
+          reason: 'relative-target-unresolved',
+        }
+      : {
+          to: [],
+          targetKind: 'external',
+          basis: 'external-specifier',
+          reason: 'external-unresolved',
+        };
+  }
+
+  // Resolved to a source module-init in the callable catalog.
+  const projectRel = relative(projectDirAbs, resolved.resolvedFileName).split(sep).join('/');
   const targetHash = moduleInitByFilePath.get(projectRel);
-  return targetHash === undefined ? [] : [targetHash];
+  if (targetHash !== undefined) {
+    return {
+      to: [targetHash],
+      targetKind: 'catalog-source',
+      basis: 'catalog-target',
+      reason: 'catalog-target',
+    };
+  }
+
+  // Resolved to a file OUTSIDE the callable catalog.
+  const isExternal =
+    resolved.isExternalLibraryImport === true ||
+    resolved.resolvedFileName.split(sep).join('/').includes('/node_modules/');
+  const isDeclaration = /\.d\.[cm]?ts$/.test(resolved.resolvedFileName);
+
+  if (isDeclaration) {
+    // The compiler target is a declaration file (e.g. a built workspace
+    // `dist/*.d.ts` entry). Attribute to a unique workspace package by manifest.
+    const pkg = resolveSpecifierToPackage(site.specifier, manifestIndex);
+    if (pkg !== undefined) {
+      return {
+        to: [],
+        targetKind: 'declaration-file',
+        basis: 'workspace-manifest',
+        reason: 'workspace-declaration-entry',
+        resolvedPackage: pkg.packageGroup,
+      };
+    }
+    // A declaration entry that is not a UNIQUE workspace package: an external
+    // type package, or a workspace name that is ambiguous/undeclared (the
+    // manifest index tombstones duplicates, Task 0.4).
+    return isExternal
+      ? {
+          to: [],
+          targetKind: 'external',
+          basis: 'external-specifier',
+          reason: 'external-declaration',
+        }
+      : {
+          to: [],
+          targetKind: 'declaration-file',
+          basis: 'unresolved',
+          reason: 'workspace-declaration-unmapped',
+        };
+  }
+
+  if (isExternal) {
+    return {
+      to: [],
+      targetKind: 'external',
+      basis: 'external-specifier',
+      reason: 'external-package',
+    };
+  }
+  // A real source file that is simply outside the discovered catalog.
+  return {
+    to: [],
+    targetKind: 'unresolved',
+    basis: 'unresolved',
+    reason: 'target-outside-catalog',
+  };
 }
 
 /**
- * Resolve TS import sites to target module-init bodyHashes. Imports
- * resolving to a same-project source file map to that file's
- * module-init occurrence; imports resolving to an external package or
- * a `.d.ts` declaration file (outside the catalog) produce unresolved
- * `DependencyEdge` entries with `to: []` and the raw specifier carried
- * in `specifier` for downstream attribution.
- *
- * Phase 4 of opensip's substrate consolidation (DEC-498).
+ * Resolve TS import sites into per-owner {@link DependencyEdge}s carrying the
+ * complete {@link DependencyClassification}. EVERY module-init owner is
+ * initialized with an empty array first, so a supported file with zero imports
+ * persists `dependencies: []` (present-empty) — distinct from an unsupported
+ * adapter/tier (map absent). (P2 Phase 0; supersedes DEC-498 v1.)
  */
 function resolveDependencies(
   sites: readonly TsDependencySiteRecord[],
@@ -376,21 +472,42 @@ function resolveDependencies(
   const moduleInitByFilePath = buildModuleInitIndex(catalog);
   const compilerOptions = program.getCompilerOptions();
   const moduleResolutionHost = createModuleResolutionHost();
+  const { manifestIndex } = buildCrossPackageContext(catalog, projectDirAbs);
 
+  // Initialize every module-init owner to an explicit empty array (Task 0.1 #3).
   const out = new Map<string, DependencyEdge[]>();
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const occ of occs) {
+      if (occ.kind === 'module-init') {
+        out.set(ownerEdgeKey(occ.bodyHash, occ.filePath, occ.line, occ.column), []);
+      }
+    }
+  }
+
   for (const site of sites) {
-    const to = resolveSiteTargets(
+    const r = resolveSiteTargets(
       site,
       compilerOptions,
       moduleResolutionHost,
       projectDirAbs,
       moduleInitByFilePath,
+      manifestIndex,
     );
+    const classification: DependencyClassification = {
+      form: site.form,
+      role: site.role,
+      targetKind: r.targetKind,
+      basis: r.basis,
+      reason: r.reason,
+      ...(r.resolvedPackage === undefined ? {} : { resolvedPackage: r.resolvedPackage }),
+    };
     const edge: DependencyEdge = {
-      to,
+      to: r.to,
       line: site.line,
       column: site.column,
       specifier: site.specifier,
+      classification,
     };
     // Key per owner OCCURRENCE (module-init bodyHash + file + line + column) to
     // match stitchEdges; module-init bodies can collide across trivial files
