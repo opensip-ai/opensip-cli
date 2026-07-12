@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-07-11
 release: v0.5.3
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -32,6 +32,8 @@ source-files:
   - packages/graph/engine/src/cli/positional-paths.ts
   - packages/graph/engine/src/cli/workspace-runner.ts
   - packages/graph/engine/src/types.ts
+  - packages/graph/graph-typescript/src/semantic-reference-facts.ts
+  - packages/graph/engine/src/read/declaration-reference-view.ts
 related-docs:
   - ./02-rules-and-gating.md
   - ./03-adding-a-language.md
@@ -330,7 +332,52 @@ injected live port and is not written into this static catalog. Cross-package
 readers remain restricted to the public graph-read boundary
 ([ADR-0147](../../decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md));
 query semantics and ceilings are recorded in
-[ADR-0149](../../decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md).
+[ADR-0153](../../decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)
+(supersedes ADR-0149).
+
+
+### Dependency and declaration audit evidence
+
+Exact catalogs preserve two additional audit planes beyond callable occurrences.
+Neither requires a SQLite schema migration: optional JSON payload fields use
+**absent-field** defaults so pre-feature catalogs stay readable
+([ADR-0152](../../decisions/ADR-0152-dependency-and-declaration-audit-evidence.md)).
+
+**Module dependencies (three-state contract).** On each module-init occurrence:
+
+| State | Meaning |
+| --- | --- |
+| Field **absent** | Adapter or resolution tier did not produce dependency evidence (fast mode, non-emitting adapters, pre-feature catalogs). |
+| Field **present empty** (`dependencies: []`) | Exact inspection found zero import/require/re-export sites. |
+| Field **populated** | Each edge carries orthogonal **form** + **role** + **target-kind** + **basis** classification with a closed valid form→role map. |
+
+Unique workspace bare-specifier targets that resolve only through declaration-file
+entries are attributed via the workspace manifest (`workspace-declaration-entry`)
+with labelled basis/confidence. Ambiguous package candidates fail closed
+(unresolved) rather than inventing a target. External/unresolved edges omit only
+`resolvedPackage` while retaining a complete atomic classification.
+
+**Optional semantic facts (`semanticFacts`).** Exact TypeScript may attach a
+bounded declaration/reference bundle with `referenceScope: 'cross-file'`.
+Declaration IDs (`d1|…`) are separate from callable `symbolId`s. Same-file and
+declaration-file reference sites are deliberately omitted — this is audit
+evidence, not IDE find-all-references. Fast mode, polyglot adapters, and
+pre-feature catalogs leave the plane absent and report
+`semantic-facts-unsupported` rather than complete-empty inventory.
+
+**Bounds and cache ABI.** Production caps include 100,000 declarations and
+500,000 cross-file references per generation (plus per-declaration soft bounds
+and text/span limits). Producers allocate producer-first under injected limits
+in tests. Dependency classification and semantic facts use **independent**
+engine-version cache ABI segments so advancing one plane does not overload the
+other. Exact, incremental, and sharded assembly must preserve optional presence,
+classification labels, workspace attribution, and deterministic order
+(no absent-to-empty coercion).
+
+Public graph/read exposes these planes through package evidence views and
+declaration/reference views; MCP wraps them as compact tools
+([ADR-0153](../../decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)).
+Generation/freshness behaviour remains [ADR-0148](../../decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md).
 
 ## Cache invalidation
 
