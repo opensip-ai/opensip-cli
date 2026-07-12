@@ -51,6 +51,7 @@ export interface GraphGeneration {
 /** A blast-radius score for one symbol (graph's canonical scoring). */
 export interface BlastDto {
   readonly symbol: SymbolRef;
+  /** Populated only for detail=nodes; empty for summary/groups. */
   readonly members: readonly SymbolRef[];
   readonly totalMembership: number;
   readonly direct: number;
@@ -59,6 +60,7 @@ export interface BlastDto {
   readonly identityMode: 'body-twin-union';
   readonly twinCount?: number;
   readonly filteringLimitations?: readonly string[];
+  readonly detail?: CompactQueryDetail;
 }
 
 /** One dead-code (orphan) finding projected from `graph:orphan-subtree`. */
@@ -197,6 +199,19 @@ export interface DeadCodeQuery {
   readonly cursor?: string;
   readonly filter?: Partial<GraphSourceFilter>;
   readonly groupBy?: GroupByMode;
+  /** Exclusive representation (P2 Phase 2.7/2.8). Default `summary`. */
+  readonly detail?: CompactQueryDetail;
+}
+
+/**
+ * Exclusive dead-code payload. `rows` is populated only for `detail: 'nodes'`.
+ */
+export interface DeadCodeResultDto {
+  readonly detail: CompactQueryDetail;
+  readonly rows: readonly DeadCodeDto[];
+  readonly totalOrphans: number;
+  readonly reasonCounts: readonly { readonly reason: string; readonly count: number }[];
+  readonly ruleCounts: readonly { readonly ruleId: string; readonly count: number }[];
 }
 
 export interface ArchitectureQuery {
@@ -254,12 +269,13 @@ export interface GraphReadPort {
       cursor?: string;
       filter?: Partial<GraphSourceFilter>;
       groupBy?: GroupByMode;
+      detail?: CompactQueryDetail;
     },
   ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>>;
   /** Orphan (dead-code) symbols via public orphan evaluation. */
   deadCode(
     query?: DeadCodeQuery,
-  ): Promise<Result<GraphToolResult<readonly DeadCodeDto[]>, McpReadError>>;
+  ): Promise<Result<GraphToolResult<DeadCodeResultDto>, McpReadError>>;
   /** Labelled architecture overview (production/non-generated default). */
   architectureSummary(
     query?: ArchitectureQuery,

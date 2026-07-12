@@ -13,6 +13,8 @@
 
 import { z } from 'zod';
 
+import { DEFAULT_IDENTITY_SEARCH_LIMIT } from '../graph-read-port.js';
+
 import { hasControlCharacter, safeNormalizeProjectRelativePath } from './schema-validation.js';
 
 /** Build a strict SDK input object so unknown MCP arguments are rejected, not stripped. */
@@ -157,6 +159,13 @@ export const limit = () => z.number().int().positive().max(MAX_LIMIT).optional()
  * Page limit with default 100 and max 500. Use when a tool always pages.
  */
 export const pageLimit = () => z.number().int().positive().max(MAX_LIMIT).default(DEFAULT_LIMIT);
+
+/**
+ * Identity-search page limit (search_symbols / search_declarations). Default 20.
+ * Caller range remains 1–500; does not change {@link DEFAULT_LIMIT}.
+ */
+export const identitySearchLimit = () =>
+  z.number().int().positive().max(MAX_LIMIT).default(DEFAULT_IDENTITY_SEARCH_LIMIT);
 
 /** Opaque base64url cursor (decoded/bound in the page helper). */
 export const cursor = () =>

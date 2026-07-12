@@ -3,7 +3,7 @@
  */
 
 import { err, ok, type Result } from '@opensip-cli/core';
-import { facetsFromFlatCoverage } from '@opensip-cli/graph/read';
+import { makeFacet, rollupFacets, UNREQUESTED_FACET } from '@opensip-cli/graph/read';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -24,7 +24,7 @@ import {
 import type {
   ArchitectureSummaryDto,
   BlastDto,
-  DeadCodeDto,
+  DeadCodeResultDto,
   GraphReadPort,
   RefreshResult,
   SymbolSearchDto,
@@ -78,10 +78,11 @@ const CONTEXT: GraphEvidenceContext = {
   },
 };
 
-const COVERAGE = facetsFromFlatCoverage({
-  complete: true,
-  truncated: false,
-  reasons: [],
+const COVERAGE = rollupFacets({
+  inventory: makeFacet(true, new Set()),
+  evidence: UNREQUESTED_FACET,
+  grouping: UNREQUESTED_FACET,
+  projection: UNREQUESTED_FACET,
 });
 
 function wrap<T>(data: T): GraphToolResult<T> {
@@ -163,14 +164,13 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
     deadCode: () =>
       Promise.resolve(
         ok(
-          wrap([
-            {
-              symbol: symRef(),
-              message: 'orphan',
-              ruleId: 'graph:orphan-subtree',
-              reason: 'unreachable-from-inferred-entry-point',
-            },
-          ] as readonly DeadCodeDto[]),
+          wrap({
+            detail: 'summary',
+            rows: [],
+            totalOrphans: 1,
+            reasonCounts: [{ reason: 'unreachable-from-inferred-entry-point', count: 1 }],
+            ruleCounts: [{ ruleId: 'graph:orphan-subtree', count: 1 }],
+          } satisfies DeadCodeResultDto),
         ),
       ),
     architectureSummary: () =>
@@ -571,7 +571,17 @@ describe('graph handlers (async GraphToolResult)', () => {
     const graph = fakePort({
       deadCode: (query) => {
         captured.dead = query;
-        return Promise.resolve(ok(wrap([] as readonly DeadCodeDto[])));
+        return Promise.resolve(
+          ok(
+            wrap({
+              detail: 'summary',
+              rows: [],
+              totalOrphans: 0,
+              reasonCounts: [],
+              ruleCounts: [],
+            } satisfies DeadCodeResultDto),
+          ),
+        );
       },
       architectureSummary: (query) => {
         captured.architecture = query;

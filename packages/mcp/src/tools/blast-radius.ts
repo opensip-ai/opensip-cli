@@ -3,6 +3,7 @@
  */
 
 import {
+  compactDetail,
   pageFields,
   sourceFilterFields,
   strictInput,
@@ -21,10 +22,12 @@ export function registerBlastRadius(server: McpStdioServer, deps: McpToolDeps): 
       description:
         'Change-impact score for a symbol: direct (depth-1) callers, transitive callers, and a ' +
         'composite blast score (direct + 0.5×transitive) — the same scoring `opensip graph` ' +
-        'uses (body-twin-union identity). Members are filter-first and cursor-paged; the ' +
-        'canonical score remains explicitly labelled when excluded twins contribute.',
+        'uses (body-twin-union identity). Default detail=summary returns score metadata and ' +
+        'totalMembership without concrete member rows. Pass detail=nodes for paged members, or ' +
+        'detail=groups with groupBy=package|file for package/file counts only.',
       inputSchema: strictInput({
         symbolId: symbolIdSchema(),
+        detail: compactDetail('summary'),
         ...sourceFilterFields(),
         ...pageFields(),
       }),
@@ -34,6 +37,7 @@ export function registerBlastRadius(server: McpStdioServer, deps: McpToolDeps): 
         limit: args.limit,
         cursor: args.cursor,
         groupBy: args.groupBy,
+        detail: args.detail ?? 'summary',
         filter: {
           packages: args.packages,
           filePath: args.filePath,
@@ -45,7 +49,7 @@ export function registerBlastRadius(server: McpStdioServer, deps: McpToolDeps): 
         },
       });
       if (!outcome.ok) return errorResult(outcome.error);
-      const { data, freshness, context, coverage } = outcome.value;
+      const { data, freshness } = outcome.value;
       if (data === undefined) {
         const message = freshness.fresh
           ? `No blast score for symbolId "${args.symbolId}" — check the id via search_symbols/get_symbol.`
@@ -57,8 +61,6 @@ export function registerBlastRadius(server: McpStdioServer, deps: McpToolDeps): 
           error: { code: 'blast-unavailable', message },
         });
       }
-      void context;
-      void coverage;
       return jsonResult(outcome.value);
     },
   );
