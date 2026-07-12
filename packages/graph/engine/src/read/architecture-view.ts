@@ -197,8 +197,31 @@ function countArchitectureNodes(
   return { occurrenceCount, bodyHashes, packageNames };
 }
 
-function increment(values: Record<string, number>, key: string): void {
-  values[key] = (values[key] ?? 0) + 1;
+/**
+ * Own-key-only counter increment (P2 Phase 1.2). A `Map` treats every label —
+ * including hostile ones from a malformed catalog (`__proto__`, `constructor`,
+ * `toString`, `prototype`) — as pure data: no prototype walk (so a label never
+ * reads an inherited function and string-concats) and no `__proto__` setter.
+ */
+function increment(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/** Fold `source` counts into `target` with the SAME safe own-key semantics. */
+function mergeCounts(target: Map<string, number>, source: ReadonlyMap<string, number>): void {
+  for (const [key, value] of source) target.set(key, (target.get(key) ?? 0) + value);
+}
+
+/**
+ * Materialize a counter `Map` as a deterministically ordered plain output record
+ * at the DTO boundary. `Object.fromEntries` uses CreateDataProperty, so a
+ * `__proto__` label becomes an OWN enumerable data property — never a prototype
+ * mutation — and the serialized DTO stays a plain JSON object.
+ */
+function toCountRecord(counts: ReadonlyMap<string, number>): Record<string, number> {
+  return Object.fromEntries(
+    [...counts.entries()].sort((a, b) => compareCodePointStrings(a[0], b[0])),
+  );
 }
 
 function noteMalformedCalls(malformedCalls: number, reasons: Set<string>): void {
@@ -213,10 +236,10 @@ function buildCallMetrics(
 ): CallEvidenceMetrics {
   const graph = occurrenceCallGraphFor(indexes);
   noteMalformedCalls(graph.malformedCalls, reasons);
-  const resolvedConfidence: Record<string, number> = {};
-  const resolvedResolution: Record<string, number> = {};
-  const unresolvedConfidence: Record<string, number> = {};
-  const unresolvedResolution: Record<string, number> = {};
+  const resolvedConfidence = new Map<string, number>();
+  const resolvedResolution = new Map<string, number>();
+  const unresolvedConfidence = new Map<string, number>();
+  const unresolvedResolution = new Map<string, number>();
   const resolvedSiteKeys = new Set<string>();
   const unresolvedSites = new Map<
     string,
@@ -274,30 +297,34 @@ function buildCallMetrics(
     increment(unresolvedResolution, unresolved.resolution);
   }
 
-  const confidence = { ...resolvedConfidence };
-  const resolution = { ...resolvedResolution };
-  for (const [key, value] of Object.entries(unresolvedConfidence)) {
-    confidence[key] = (confidence[key] ?? 0) + value;
-  }
-  for (const [key, value] of Object.entries(unresolvedResolution)) {
-    resolution[key] = (resolution[key] ?? 0) + value;
-  }
+  // Combined distributions = resolved + unresolved, folded through the ONE safe
+  // merge helper (no duplicated inline key handling for the two label kinds).
+  const confidence = new Map(resolvedConfidence);
+  mergeCounts(confidence, unresolvedConfidence);
+  const resolution = new Map(resolvedResolution);
+  mergeCounts(resolution, unresolvedResolution);
 
   return {
     resolvedCallSites: resolvedSiteKeys.size,
     resolvedTargets,
     unresolvedCallSites: unresolvedSites.size,
-    confidence,
-    resolution,
+    confidence: toCountRecord(confidence),
+    resolution: toCountRecord(resolution),
     distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
-    resolvedTargetConfidence: { values: resolvedConfidence, countUnit: 'resolved-targets' },
-    resolvedTargetResolution: { values: resolvedResolution, countUnit: 'resolved-targets' },
+    resolvedTargetConfidence: {
+      values: toCountRecord(resolvedConfidence),
+      countUnit: 'resolved-targets',
+    },
+    resolvedTargetResolution: {
+      values: toCountRecord(resolvedResolution),
+      countUnit: 'resolved-targets',
+    },
     unresolvedCallSiteConfidence: {
-      values: unresolvedConfidence,
+      values: toCountRecord(unresolvedConfidence),
       countUnit: 'unresolved-call-sites',
     },
     unresolvedCallSiteResolution: {
-      values: unresolvedResolution,
+      values: toCountRecord(unresolvedResolution),
       countUnit: 'unresolved-call-sites',
     },
     nodeIdentity: 'occurrence',

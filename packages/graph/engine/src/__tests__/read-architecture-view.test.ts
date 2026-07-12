@@ -312,6 +312,76 @@ describe('buildArchitectureView', () => {
     });
   });
 
+  it('counts a prototype-named resolution label as data and drops unreachable ones upstream (P2 Phase 1.2)', () => {
+    const call = (
+      resolution: string,
+      line: number,
+    ): NonNullable<FunctionOccurrence['calls']>[number] =>
+      ({
+        // Resolve to a clean, twin-free target so the resolved edge stays in
+        // scope (h-target has a pkg-c body twin the filter would drop).
+        to: ['h-clean'],
+        line,
+        column: 0,
+        resolution,
+        confidence: 'high',
+        text: 'x()',
+      }) as unknown as NonNullable<FunctionOccurrence['calls']>[number];
+
+    const base = makeCatalog();
+    const catalog: Catalog = {
+      ...base,
+      functions: {
+        ...base.functions,
+        caller: [
+          occ({
+            bodyHash: 'h-caller',
+            simpleName: 'caller',
+            filePath: 'src/a/caller.ts',
+            package: 'pkg-a',
+            // `constructor` is a VALID call resolution (occurrence-call-graph
+            // enum) that is also a prototype key — the reachable hostile case.
+            // `__proto__` is NOT a valid resolution, so it is dropped upstream as
+            // a malformed edge and never reaches the counter (layered defense).
+            calls: [call('constructor', 3), call('constructor', 5), call('static', 7), call('__proto__', 9)],
+          }),
+        ],
+        cleanTarget: [
+          occ({
+            bodyHash: 'h-clean',
+            simpleName: 'cleanTarget',
+            filePath: 'src/b/clean.ts',
+            package: 'pkg-b',
+          }),
+        ],
+      },
+    };
+
+    const result = buildArchitectureView(catalog, buildIndexes(catalog), {
+      filter: { packages: ['pkg-a', 'pkg-b'], sourceScope: 'all', generated: 'include' },
+      limit: 25,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const ce = result.value.callEvidence;
+
+    // The old plain-object counter read Object.prototype.constructor (a function)
+    // and string-concatenated it; the Map-based counter treats it as pure data.
+    expect(ce.resolution.constructor).toBe(2);
+    expect(typeof ce.resolution.constructor).toBe('number');
+    expect(ce.resolvedTargetResolution.values.constructor).toBe(2);
+    expect(ce.resolution.static).toBe(1);
+    // The invalid `__proto__` resolution is dropped upstream as malformed — it
+    // never reaches the counter and never becomes a key.
+    expect(Object.hasOwn(ce.resolution, '__proto__')).toBe(false);
+    expect(result.value.coverage.reasons).toContain('malformed-call-edge-omitted');
+    // Every DTO record is a plain, prototype-intact object; no global pollution.
+    for (const record of [ce.resolution, ce.confidence, ce.resolvedTargetResolution.values]) {
+      expect(Object.getPrototypeOf(record)).toBe(Object.prototype);
+    }
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+  });
+
   it('pages package edges and hotspots independently without repeating completed rows', () => {
     const catalog = makeCatalog();
     const indexes = buildIndexes(catalog);
