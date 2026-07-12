@@ -43,6 +43,16 @@ import type { Catalog } from '@opensip-cli/graph';
 
 const CLI_DIST = fileURLToPath(new URL('../../../../packages/cli/dist/index.js', import.meta.url));
 
+interface SymbolSearchPayload {
+  readonly detail: 'summary' | 'groups' | 'nodes';
+  readonly symbols: readonly { symbolId: string; simpleName?: string; bodyHash?: string; package?: string; qualifiedName?: string }[];
+  readonly totalMatches: number;
+}
+
+function searchPayload(data: unknown): SymbolSearchPayload {
+  return data as SymbolSearchPayload;
+}
+
 const TSCONFIG = JSON.stringify({
   compilerOptions: {
     target: 'ES2022',
@@ -730,6 +740,7 @@ describe('MCP e2e over real stdio', () => {
         edgeKind: 'combined',
         sourceScope: 'all',
         generated: 'include',
+        evidenceLimit: 100,
       });
       const whyData = why.data as {
         edgeKind: string;
@@ -755,6 +766,7 @@ describe('MCP e2e over real stdio', () => {
         edgeKind: 'combined',
         sourceScope: 'all',
         generated: 'include',
+        proofLimit: 50,
       });
       const cycleData = cycles.data as {
         edgeKind: string;
@@ -829,21 +841,16 @@ describe('MCP e2e over real stdio', () => {
         filePrefix: 'index.ts',
         sourceScope: 'production',
         generated: 'exclude',
-        groupBy: 'file',
+        // detail defaults to nodes (port); MCP schema exposure is Task 2.7
         limit: 5,
       });
-      const firstSymbols = firstSearch.data as {
-        symbolId: string;
-        simpleName: string;
-      }[];
+      const firstSymbols = searchPayload(firstSearch.data).symbols;
       const searchCursor = (firstSearch.page as { nextCursor?: string }).nextCursor;
       expect(firstSymbols).toHaveLength(5);
-      expect(firstSymbols.every((symbol) => symbol.simpleName.startsWith('caller'))).toBe(true);
+      expect(firstSymbols.every((symbol) => (symbol.simpleName ?? '').startsWith('caller'))).toBe(true);
       expect(searchCursor).toBeTypeOf('string');
-      expect(firstSearch.groups).toContainEqual({
-        key: 'index.ts',
-        count: 2100,
-      });
+      // Exclusive nodes mode omits groups; detail=groups is exposed in Task 2.7.
+      expect(firstSearch.groups).toBeUndefined();
       if (searchCursor === undefined) throw new Error('high-fan-in search did not page');
 
       const cursorPayload = JSON.parse(Buffer.from(searchCursor, 'base64url').toString('utf8')) as {
@@ -861,11 +868,10 @@ describe('MCP e2e over real stdio', () => {
         filePrefix: 'index.ts',
         sourceScope: 'production',
         generated: 'exclude',
-        groupBy: 'file',
         limit: 5,
         cursor: searchCursor,
       });
-      const secondSymbols = secondSearch.data as { symbolId: string }[];
+      const secondSymbols = searchPayload(secondSearch.data).symbols;
       const firstIds = new Set(firstSymbols.map((symbol) => symbol.symbolId));
       expect(secondSymbols).toHaveLength(5);
       expect(secondSymbols.every((symbol) => !firstIds.has(symbol.symbolId))).toBe(true);
@@ -875,7 +881,9 @@ describe('MCP e2e over real stdio', () => {
         match: 'exact',
         filePath: 'index.ts',
       });
-      const helper = (exactHelper.data as { symbolId: string; qualifiedName: string }[])[0];
+      const helper = searchPayload(exactHelper.data).symbols[0] as
+        | { symbolId: string; qualifiedName: string }
+        | undefined;
       expect(helper).toBeDefined();
       if (helper === undefined) throw new Error('exact helper search returned no symbol');
       const qualifiedHelper = await call(conn, 'search_symbols', {
@@ -883,7 +891,7 @@ describe('MCP e2e over real stdio', () => {
         match: 'qualified',
         filePath: 'index.ts',
       });
-      expect(qualifiedHelper.data).toEqual(
+      expect(searchPayload(qualifiedHelper.data).symbols).toEqual(
         expect.arrayContaining([expect.objectContaining({ symbolId: helper.symbolId })]),
       );
 
@@ -918,7 +926,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'unused',
         match: 'exact',
       });
-      const unusedSymbol = (unused.data as { symbolId: string }[])[0];
+      const unusedSymbol = searchPayload(unused.data).symbols[0];
       expect(unusedSymbol).toBeDefined();
       if (unusedSymbol === undefined) throw new Error('unused symbol not found');
       const noPath = await call(conn, 'trace_path', {
@@ -937,7 +945,7 @@ describe('MCP e2e over real stdio', () => {
         match: 'exact',
         sourceScope: 'all',
       });
-      const twins = twinSearch.data as {
+      const twins = searchPayload(twinSearch.data).symbols as {
         symbolId: string;
         bodyHash: string;
         filePath: string;
@@ -1166,7 +1174,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'legacyHelper',
         match: 'exact',
       });
-      expect(legacy.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(legacy.data).symbols).toHaveLength(1);
       expect(legacy.freshness).toMatchObject({
         fresh: false,
         verification: 'partial',
@@ -1189,7 +1197,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'legacyHelper',
         match: 'exact',
       });
-      expect(replaced.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(replaced.data).symbols).toHaveLength(1);
       expect(replaced.freshness).toMatchObject({
         fresh: true,
         verification: 'complete',
@@ -1342,7 +1350,7 @@ describe('MCP e2e over real stdio', () => {
       expect((forced.data as { action: string }).action).toBe('rebuilt');
       // After the rebuild, the catalog is fresh and queryable.
       const search = await call(conn, 'search_symbols', { query: 'helper' });
-      expect((search.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(search.data).symbols.length).toBeGreaterThan(0);
       const afterRuns = await call(conn, 'list_runs', { tool: 'graph' });
       expect(afterRuns.runs).toEqual(afterExternalRun.runs);
     } finally {
@@ -1370,7 +1378,7 @@ describe('MCP e2e over real stdio', () => {
       });
       const oldIdentity = (before.context as { catalog: { identity?: string } }).catalog.identity;
       expect(oldIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
-      expect(before.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(before.data).symbols).toHaveLength(1);
 
       writeFileSync(join(root, 'index.ts'), concurrentRefreshSource('new'), 'utf8');
       await new Promise((resolve) => setTimeout(resolve, 2200));
@@ -1413,7 +1421,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'newEpoch',
         match: 'exact',
       });
-      expect(newReader.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(newReader.data).symbols).toHaveLength(1);
       expect((newReader.context as { catalog: { identity?: string } }).catalog.identity).toBe(
         firstData.generation.identity,
       );
@@ -1425,7 +1433,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'oldEpoch',
         match: 'exact',
       });
-      expect(oldAfterSwap.data).toEqual([]);
+      expect(searchPayload(oldAfterSwap.data).symbols).toEqual([]);
 
       const followUp = await call(conn, 'refresh_graph', {});
       expect((followUp.data as { action: string }).action).toBe('no-op');
@@ -1512,7 +1520,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'helper',
         match: 'exact',
       });
-      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(recovered.data).symbols.length).toBeGreaterThan(0);
       expect((recovered.context as { catalog: { identity?: string } }).catalog.identity).toBe(
         priorIdentity,
       );
@@ -1560,7 +1568,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'helper',
         match: 'exact',
       });
-      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(recovered.data).symbols.length).toBeGreaterThan(0);
       expect(
         (recovered.context as { catalog: { generationSource?: string } }).catalog.generationSource,
       ).toBe('initial-load');
@@ -1602,7 +1610,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'helper',
         match: 'exact',
       });
-      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(recovered.data).symbols.length).toBeGreaterThan(0);
       expect((recovered.context as { catalog: { identity?: string } }).catalog.identity).toBe(
         priorIdentity,
       );

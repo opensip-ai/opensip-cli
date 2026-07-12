@@ -123,6 +123,8 @@ export type { SymbolSearchMatch, SymbolSearchQuery, SymbolSearchView } from './s
 
 export type {
   ArchitectureViewQuery,
+  ArchitectureSection,
+  ArchitectureFamilySummary,
   LabelledNodeCount,
   LabelledPackageCount,
   LabelledDistribution,

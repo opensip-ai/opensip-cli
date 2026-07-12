@@ -130,10 +130,24 @@ function makeCatalog(): Catalog {
   };
 }
 
+const ALL_SECTIONS = ['metrics', 'packageEdges', 'hotspots'] as const;
+
 function view(filter: GraphSourceFilter, limit = 25) {
   const catalog = makeCatalog();
   const indexes = buildIndexes(catalog);
-  return buildArchitectureView(catalog, indexes, { filter, limit }, noMatcher);
+  // Tests that exercise ranked families request them explicitly (P2 Phase 2.5
+  // defaults to metrics-only).
+  return buildArchitectureView(
+    catalog,
+    indexes,
+    {
+      filter,
+      limit,
+      sections: ALL_SECTIONS,
+      topN: 100,
+    },
+    noMatcher,
+  );
 }
 
 describe('buildArchitectureView', () => {
@@ -299,6 +313,8 @@ describe('buildArchitectureView', () => {
         generated: 'include',
       },
       limit: 25,
+      sections: ALL_SECTIONS,
+      topN: 100,
     }, noMatcher);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -363,6 +379,8 @@ describe('buildArchitectureView', () => {
     const result = buildArchitectureView(catalog, buildIndexes(catalog), {
       filter: { packages: ['pkg-a', 'pkg-b'], sourceScope: 'all', generated: 'include' },
       limit: 25,
+      sections: ALL_SECTIONS,
+      topN: 100,
     }, noMatcher);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -389,7 +407,7 @@ describe('buildArchitectureView', () => {
     const catalog = makeCatalog();
     const indexes = buildIndexes(catalog);
     const filter: GraphSourceFilter = { sourceScope: 'production', generated: 'exclude' };
-    const first = buildArchitectureView(catalog, indexes, { filter, limit: 1 }, noMatcher);
+    const first = buildArchitectureView(catalog, indexes, { filter, limit: 1, sections: ALL_SECTIONS, topN: 100 }, noMatcher);
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     const packageKey = first.value.packageEdges[0];
@@ -401,6 +419,8 @@ describe('buildArchitectureView', () => {
     const second = buildArchitectureView(catalog, indexes, {
       filter,
       limit: 1,
+      sections: ALL_SECTIONS,
+      topN: 100,
       afterPackageEdgeKey: continuationToken(packageEdgeStableKey(packageKey)),
       afterHotspotKey: continuationToken(hotspotStableKey(hotspotKey)),
       packageEdgesDone: !first.value.packageEdgesHasMore,
@@ -420,6 +440,8 @@ describe('buildArchitectureView', () => {
       filter: { sourceScope: 'production', generated: 'exclude' },
       limit: 1,
       groupBy: 'file',
+      sections: ALL_SECTIONS,
+      topN: 100,
     }, noMatcher);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -460,10 +482,14 @@ describe('buildArchitectureView', () => {
     const forward = buildArchitectureView(forwardCatalog, buildIndexes(forwardCatalog), {
       filter,
       limit: 25,
+      sections: ALL_SECTIONS,
+      topN: 100,
     }, noMatcher);
     const reverse = buildArchitectureView(reverseCatalog, buildIndexes(reverseCatalog), {
       filter,
       limit: 25,
+      sections: ALL_SECTIONS,
+      topN: 100,
     }, noMatcher);
     expect(forward.ok).toBe(true);
     expect(reverse.ok).toBe(true);

@@ -173,6 +173,8 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(configs.get('get_architecture')?.description ?? '').toMatch(/convention counts/i);
+    expect(configs.get('get_architecture')?.description ?? '').toMatch(
+      /sections=\["metrics"\]|topN|packageEdges|hotspots/i,
+    );
   });
 });

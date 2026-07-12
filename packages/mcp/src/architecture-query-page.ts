@@ -59,17 +59,23 @@ export function nextArchitectureAfterKey(
   prior: ArchitectureCursorState,
   view: ArchitectureView,
 ): string | undefined {
-  const lastEdge = view.packageEdges.at(-1);
-  const lastHotspot = view.hotspots.at(-1);
-  const packageEdgesDone = prior.packageEdgesDone || !view.packageEdgesHasMore;
-  const hotspotsDone = prior.hotspotsDone || !view.hotspotsHasMore;
+  const edgesSelected = view.packageEdges !== undefined;
+  const hotspotsSelected = view.hotspots !== undefined;
+  // Unselected families are immediately "done" and never contribute cursor state.
+  const lastEdge = view.packageEdges?.at(-1);
+  const lastHotspot = view.hotspots?.at(-1);
+  const packageEdgesDone =
+    !edgesSelected || prior.packageEdgesDone || !view.packageEdgesHasMore;
+  const hotspotsDone = !hotspotsSelected || prior.hotspotsDone || !view.hotspotsHasMore;
   if (packageEdgesDone && hotspotsDone) return undefined;
   const packageEdgeKey =
-    lastEdge === undefined
+    !edgesSelected || lastEdge === undefined
       ? prior.packageEdgeKey
       : continuationToken(packageEdgeStableKey(lastEdge));
   const hotspotKey =
-    lastHotspot === undefined ? prior.hotspotKey : continuationToken(hotspotStableKey(lastHotspot));
+    !hotspotsSelected || lastHotspot === undefined
+      ? prior.hotspotKey
+      : continuationToken(hotspotStableKey(lastHotspot));
   return JSON.stringify({
     pd: packageEdgesDone,
     hd: hotspotsDone,

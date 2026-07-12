@@ -225,6 +225,7 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
               sourceScope: 'production',
               generated: 'exclude',
             },
+            includedSections: ['metrics', 'packageEdges', 'hotspots'],
             packageEdges: [
               {
                 fromPackage: 'pkg',

@@ -136,6 +136,9 @@ export interface TraversalQuery {
   readonly groupBy?: GroupByMode;
 }
 
+/** Architecture response family selector (P2 Phase 2.5). */
+export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
+
 /** A compact, labelled architecture overview. */
 export interface ArchitectureSummaryDto {
   readonly languages: readonly string[];
@@ -143,8 +146,19 @@ export interface ArchitectureSummaryDto {
   readonly uniqueBodyCount: LabelledNodeCount;
   readonly callEvidence: CallEvidenceMetrics;
   readonly packageCount: LabelledPackageCount;
-  readonly packageEdges: readonly ArchitecturePackageEdgeRow[];
-  readonly hotspots: readonly ArchitectureHotspot[];
+  readonly includedSections: readonly ArchitectureSection[];
+  readonly packageEdges?: readonly ArchitecturePackageEdgeRow[];
+  readonly packageEdgesSummary?: {
+    readonly totalAvailable: number;
+    readonly selectedCount: number;
+    readonly pageReturned: number;
+  };
+  readonly hotspots?: readonly ArchitectureHotspot[];
+  readonly hotspotsSummary?: {
+    readonly totalAvailable: number;
+    readonly selectedCount: number;
+    readonly pageReturned: number;
+  };
 }
 
 export interface SearchSymbolsOptions {
@@ -184,6 +198,10 @@ export interface ArchitectureQuery {
   readonly cursor?: string;
   readonly filter?: Partial<GraphSourceFilter>;
   readonly groupBy?: GroupByMode;
+  /** Default `['metrics']`. Unselected families are omitted from the response. */
+  readonly sections?: readonly ArchitectureSection[];
+  /** Global top-N for ranked families before page limit. Default 20, max 100. */
+  readonly topN?: number;
 }
 
 export interface RefreshResult {

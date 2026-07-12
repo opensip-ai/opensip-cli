@@ -392,7 +392,10 @@ export class SqliteGraphQueryContext {
 }
 
 /** Builds the zero-catalog architecture response with explicit count semantics. */
-export function emptyArchitecture(filter: GraphSourceFilter): ArchitectureSummaryDto {
+export function emptyArchitecture(
+  filter: GraphSourceFilter,
+  sections: readonly ('metrics' | 'packageEdges' | 'hotspots')[] = ['metrics'],
+): ArchitectureSummaryDto {
   return {
     languages: [],
     occurrenceCount: {
@@ -436,7 +439,18 @@ export function emptyArchitecture(filter: GraphSourceFilter): ArchitectureSummar
       sourceScope: filter.sourceScope,
       generated: filter.generated,
     },
-    packageEdges: [],
-    hotspots: [],
+    includedSections: sections,
+    ...(sections.includes('packageEdges')
+      ? {
+          packageEdges: [],
+          packageEdgesSummary: { totalAvailable: 0, selectedCount: 0, pageReturned: 0 },
+        }
+      : {}),
+    ...(sections.includes('hotspots')
+      ? {
+          hotspots: [],
+          hotspotsSummary: { totalAvailable: 0, selectedCount: 0, pageReturned: 0 },
+        }
+      : {}),
   };
 }

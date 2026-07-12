@@ -315,6 +315,8 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             op: 'architectureSummary',
             filter: productionFilter,
             groupBy: 'none',
+            sections: ['metrics'],
+            topN: 20,
           }),
         }),
       ],
@@ -682,8 +684,21 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(arch.value.data.callEvidence.edgeKind).toBe('call');
     expect(arch.value.filter?.sourceScope).toBe('production');
     expect(arch.value.filter?.generated).toBe('exclude');
-    expect(Array.isArray(arch.value.data.packageEdges)).toBe(true);
-    expect(Array.isArray(arch.value.data.hotspots)).toBe(true);
+    // Default sections=['metrics'] omit ranked families (P2 Phase 2.5).
+    expect(arch.value.data.includedSections).toEqual(['metrics']);
+    expect(arch.value.data.packageEdges).toBeUndefined();
+    expect(arch.value.data.hotspots).toBeUndefined();
+
+    const full = await port.architectureSummary({
+      limit: 10,
+      sections: ['metrics', 'packageEdges', 'hotspots'],
+      topN: 20,
+    });
+    expect(full.ok).toBe(true);
+    if (!full.ok) return;
+    expect(Array.isArray(full.value.data.packageEdges)).toBe(true);
+    expect(Array.isArray(full.value.data.hotspots)).toBe(true);
+    expect(full.value.data.packageEdgesSummary?.selectedCount).toBeLessThanOrEqual(20);
   });
 
   it('reclassifies configured support paths to test scope end-to-end (P2 Phase 1)', async () => {
@@ -1003,16 +1018,18 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     for (let page = 0; page < 10; page++) {
       const result = await port.architectureSummary({
         limit: 1,
+        sections: ['metrics', 'packageEdges', 'hotspots'],
+        topN: 100,
         ...(cursor === undefined ? {} : { cursor }),
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      for (const edge of result.value.data.packageEdges) {
+      for (const edge of result.value.data.packageEdges ?? []) {
         const key = `${edge.fromPackage}:${edge.toPackage}`;
         expect(edgeKeys.has(key)).toBe(false);
         edgeKeys.add(key);
       }
-      for (const hotspot of result.value.data.hotspots) {
+      for (const hotspot of result.value.data.hotspots ?? []) {
         expect(hotspotKeys.has(hotspot.symbol.symbolId)).toBe(false);
         hotspotKeys.add(hotspot.symbol.symbolId);
       }

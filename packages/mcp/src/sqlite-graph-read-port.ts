@@ -349,10 +349,14 @@ export class SqliteGraphReadPort implements GraphReadPort {
     const limit = clampLimit(query?.limit, DEFAULT_ARCH_LIMIT);
     const filter = this.queryContext.resolveFilter(query?.filter, 'production');
     const groupBy = query?.groupBy ?? 'none';
+    const sections = query?.sections ?? (['metrics'] as const);
+    const topN = query?.topN ?? 20;
     const queryDigest = digestNormalizedQuery({
       op: 'architectureSummary',
       filter,
       groupBy,
+      sections,
+      topN,
     });
     return this.queryContext.runQuery(
       'architectureSummary',
@@ -364,7 +368,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
             queryDigest,
           });
           if (!cursor.ok) return cursor;
-          return this.queryContext.envelope(emptyArchitecture(filter), gen, freshness, {
+          return this.queryContext.envelope(emptyArchitecture(filter, sections), gen, freshness, {
             coverage: completeInventoryCoverage(),
             page: { limit },
             filter,
@@ -388,6 +392,8 @@ export class SqliteGraphReadPort implements GraphReadPort {
             filter,
             limit,
             groupBy,
+            sections,
+            topN,
             ...(cursorState.value.packageEdgeKey === undefined
               ? {}
               : { afterPackageEdgeKey: cursorState.value.packageEdgeKey }),
@@ -412,10 +418,24 @@ export class SqliteGraphReadPort implements GraphReadPort {
           uniqueBodyCount: view.value.uniqueBodyCount,
           callEvidence: view.value.callEvidence,
           packageCount: view.value.packageCount,
-          packageEdges: view.value.packageEdges,
-          hotspots: view.value.hotspots,
+          includedSections: view.value.includedSections,
+          ...(view.value.packageEdges === undefined
+            ? {}
+            : {
+                packageEdges: view.value.packageEdges,
+                ...(view.value.packageEdgesSummary === undefined
+                  ? {}
+                  : { packageEdgesSummary: view.value.packageEdgesSummary }),
+              }),
+          ...(view.value.hotspots === undefined
+            ? {}
+            : {
+                hotspots: view.value.hotspots,
+                ...(view.value.hotspotsSummary === undefined
+                  ? {}
+                  : { hotspotsSummary: view.value.hotspotsSummary }),
+              }),
         };
-        // Architecture selectors land in Task 2.5; facet-bridge until then.
         return this.queryContext.envelope(data, gen, freshness, {
           coverage: facetsFromFlatCoverage(view.value.coverage),
           page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },

@@ -243,6 +243,20 @@ export const searchMatch = () => z.enum(['substring', 'exact', 'qualified']).def
 /** Package edge kind. */
 export const packageEdgeKind = () => z.enum(['call', 'import', 'combined']).default('call');
 
+/** Architecture section family selector (unique, non-empty). Default metrics-only. */
+export const architectureSections = () =>
+  z
+    .array(z.enum(['metrics', 'packageEdges', 'hotspots']))
+    .min(1)
+    .max(3)
+    .refine((items) => new Set(items).size === items.length, {
+      message: 'sections must be unique',
+    })
+    .default(['metrics']);
+
+/** Deterministic top-N for architecture ranked families. Default 20, max 100. */
+export const architectureTopN = () => z.number().int().min(1).max(100).default(20);
+
 /**
  * Nested sample size per package dependency row (P2 Phase 2.4). Default 0 =
  * count/distribution only; max 5 full evidence samples. Independent of page

@@ -30,6 +30,9 @@ import {
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
+/** Selectable architecture response families (P2 Phase 2.5). */
+export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
+
 export interface ArchitectureViewQuery {
   readonly filter: GraphSourceFilter;
   readonly limit: number;
@@ -38,6 +41,22 @@ export interface ArchitectureViewQuery {
   readonly packageEdgesDone?: boolean;
   readonly hotspotsDone?: boolean;
   readonly groupBy?: 'none' | 'package' | 'file';
+  /**
+   * Which row families to compute (P2 Phase 2.5). Default metrics-only.
+   * Unselected families are not computed and are omitted from the response.
+   */
+  readonly sections?: readonly ArchitectureSection[];
+  /**
+   * Global top-N for each selected ranked family before page `limit` slices
+   * inside that window. Default 20, max 100.
+   */
+  readonly topN?: number;
+}
+
+export interface ArchitectureFamilySummary {
+  readonly totalAvailable: number;
+  readonly selectedCount: number;
+  readonly pageReturned: number;
 }
 
 export interface LabelledNodeCount {
@@ -110,13 +129,43 @@ export interface ArchitectureView {
   readonly uniqueBodyCount: LabelledNodeCount;
   readonly callEvidence: CallEvidenceMetrics;
   readonly packageCount: LabelledPackageCount;
-  readonly packageEdges: readonly ArchitecturePackageEdgeRow[];
+  readonly includedSections: readonly ArchitectureSection[];
+  readonly packageEdges?: readonly ArchitecturePackageEdgeRow[];
   readonly packageEdgesHasMore: boolean;
-  readonly hotspots: readonly ArchitectureHotspot[];
+  readonly packageEdgesSummary?: ArchitectureFamilySummary;
+  readonly hotspots?: readonly ArchitectureHotspot[];
   readonly hotspotsHasMore: boolean;
+  readonly hotspotsSummary?: ArchitectureFamilySummary;
   readonly effectiveFilter: EffectiveGraphSourceFilter;
   readonly coverage: GraphReadCoverage;
   readonly groups?: readonly ReadGroupSummary[];
+}
+
+const DEFAULT_TOP_N = 20;
+const MAX_TOP_N = 100;
+const DEFAULT_SECTIONS: readonly ArchitectureSection[] = ['metrics'];
+
+function normalizeSections(
+  sections: readonly ArchitectureSection[] | undefined,
+): readonly ArchitectureSection[] {
+  if (sections === undefined || sections.length === 0) return DEFAULT_SECTIONS;
+  const unique: ArchitectureSection[] = [];
+  for (const section of sections) {
+    if (!unique.includes(section)) unique.push(section);
+  }
+  return unique;
+}
+
+function resolveTopN(topN: number | undefined): number {
+  if (topN === undefined || !Number.isFinite(topN)) return DEFAULT_TOP_N;
+  return Math.min(MAX_TOP_N, Math.max(1, Math.trunc(topN)));
+}
+
+function wantsSection(
+  sections: readonly ArchitectureSection[],
+  section: ArchitectureSection,
+): boolean {
+  return sections.includes(section);
 }
 
 interface ArchitectureCounts {
@@ -558,23 +607,46 @@ export function buildArchitectureView(
   try {
     const filter = query.filter;
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
+    const sections = normalizeSections(query.sections);
+    const topN = resolveTopN(query.topN);
+    const includeMetrics = wantsSection(sections, 'metrics');
+    const includePackageEdges = wantsSection(sections, 'packageEdges');
+    const includeHotspots = wantsSection(sections, 'hotspots');
     const reasons = new Set<string>();
     if (resolutionMode(catalog) === 'fast') reasons.add('fast-resolution-approximate');
-    const counts = countArchitectureNodes(indexes, filter, reasons, matcher);
-    const packageEdges = buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures, matcher);
-    const hotspots = buildHotspots(catalog, indexes, filter, reasons, cachedFeatures, matcher);
-    const packageAfter = resolveStableAnchor(
-      packageEdges,
-      query.afterPackageEdgeKey,
-      query.packageEdgesDone === true,
-      packageEdgeStableKey,
-    );
-    const hotspotAfter = resolveStableAnchor(
-      hotspots,
-      query.afterHotspotKey,
-      query.hotspotsDone === true,
-      hotspotStableKey,
-    );
+
+    // Metrics counts always computed when metrics selected; packageCount needed
+    // for metrics section only. Ranked families only when selected.
+    const counts = includeMetrics
+      ? countArchitectureNodes(indexes, filter, reasons, matcher)
+      : { occurrenceCount: 0, bodyHashes: new Set<string>(), packageNames: new Set<string>() };
+    const packageEdges = includePackageEdges
+      ? buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures, matcher)
+      : [];
+    const hotspots = includeHotspots
+      ? buildHotspots(catalog, indexes, filter, reasons, cachedFeatures, matcher)
+      : [];
+
+    // Deterministic global top-N window; page limit slices only inside it.
+    const packageWindow = includePackageEdges ? packageEdges.slice(0, topN) : [];
+    const hotspotWindow = includeHotspots ? hotspots.slice(0, topN) : [];
+
+    const packageAfter = includePackageEdges
+      ? resolveStableAnchor(
+          packageWindow,
+          query.afterPackageEdgeKey,
+          query.packageEdgesDone === true,
+          packageEdgeStableKey,
+        )
+      : undefined;
+    const hotspotAfter = includeHotspots
+      ? resolveStableAnchor(
+          hotspotWindow,
+          query.afterHotspotKey,
+          query.hotspotsDone === true,
+          hotspotStableKey,
+        )
+      : undefined;
     if (packageAfter === null || hotspotAfter === null) {
       return err({
         code: 'GRAPH.READ.CURSOR_INVALID',
@@ -582,23 +654,29 @@ export function buildArchitectureView(
         message: 'Cursor continuation anchor is not present in this architecture view',
       });
     }
-    const packagePage = pageSorted(
-      packageEdges,
-      limit,
-      packageAfter,
-      query.packageEdgesDone === true,
-      packageEdgeStableKey,
-    );
-    const hotspotPage = pageSorted(
-      hotspots,
-      limit,
-      hotspotAfter,
-      query.hotspotsDone === true,
-      hotspotStableKey,
-    );
-    const grouped = architectureGroups(packageEdges, hotspots, query.groupBy ?? 'none');
+    const packagePage = includePackageEdges
+      ? pageSorted(
+          packageWindow,
+          limit,
+          packageAfter,
+          query.packageEdgesDone === true,
+          packageEdgeStableKey,
+        )
+      : { rows: [] as readonly ArchitecturePackageEdgeRow[], hasMore: false };
+    const hotspotPage = includeHotspots
+      ? pageSorted(
+          hotspotWindow,
+          limit,
+          hotspotAfter,
+          query.hotspotsDone === true,
+          hotspotStableKey,
+        )
+      : { rows: [] as readonly ArchitectureHotspot[], hasMore: false };
+    const grouped = architectureGroups(packageWindow, hotspotWindow, query.groupBy ?? 'none');
     if (grouped?.truncated === true) reasons.add('group-key-cap');
-    const callEvidence = buildCallMetrics(catalog, indexes, filter, reasons, matcher);
+    const callEvidence = includeMetrics
+      ? buildCallMetrics(catalog, indexes, filter, reasons, matcher)
+      : emptyCallMetrics(filter, catalog);
     const reasonValues = [...reasons].sort(compareCodePointStrings);
 
     return ok({
@@ -622,9 +700,28 @@ export function buildArchitectureView(
         sourceScope: filter.sourceScope,
         generated: filter.generated,
       },
-      packageEdges: packagePage.rows,
+      includedSections: sections,
+      ...(includePackageEdges
+        ? {
+            packageEdges: packagePage.rows,
+            packageEdgesSummary: {
+              totalAvailable: packageEdges.length,
+              selectedCount: packageWindow.length,
+              pageReturned: packagePage.rows.length,
+            },
+          }
+        : {}),
       packageEdgesHasMore: packagePage.hasMore,
-      hotspots: hotspotPage.rows,
+      ...(includeHotspots
+        ? {
+            hotspots: hotspotPage.rows,
+            hotspotsSummary: {
+              totalAvailable: hotspots.length,
+              selectedCount: hotspotWindow.length,
+              pageReturned: hotspotPage.rows.length,
+            },
+          }
+        : {}),
       hotspotsHasMore: hotspotPage.hasMore,
       effectiveFilter: filter,
       coverage: {
@@ -637,4 +734,24 @@ export function buildArchitectureView(
   } catch {
     return err(archError('Failed to build architecture view'));
   }
+}
+
+function emptyCallMetrics(filter: GraphSourceFilter, catalog: Catalog): CallEvidenceMetrics {
+  return {
+    resolvedCallSites: 0,
+    resolvedTargets: 0,
+    unresolvedCallSites: 0,
+    confidence: {},
+    resolution: {},
+    distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
+    resolvedTargetConfidence: { values: {}, countUnit: 'resolved-targets' },
+    resolvedTargetResolution: { values: {}, countUnit: 'resolved-targets' },
+    unresolvedCallSiteConfidence: { values: {}, countUnit: 'unresolved-call-sites' },
+    unresolvedCallSiteResolution: { values: {}, countUnit: 'unresolved-call-sites' },
+    nodeIdentity: 'occurrence',
+    sourceScope: filter.sourceScope,
+    generated: filter.generated,
+    edgeKind: 'call',
+    catalogResolutionMode: resolutionMode(catalog),
+  };
 }
