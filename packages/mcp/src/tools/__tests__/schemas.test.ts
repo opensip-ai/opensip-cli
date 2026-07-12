@@ -22,6 +22,9 @@ import {
   kinds,
   limit,
   packageArray,
+  packageEvidenceLimit,
+  packageProofLimit,
+  packageSampleLimit,
   pageLimit,
   query,
   sourceScope,
@@ -163,6 +166,30 @@ describe('pageLimit schema', () => {
 
   it('rejects above max 500', () => {
     expect(pageLimit().safeParse(501).success).toBe(false);
+  });
+});
+
+describe('package detail limits (P2 Phase 2.4)', () => {
+  it('defaults sample/evidence/proof limits to 0 (compact opt-in)', () => {
+    expect(packageSampleLimit().safeParse(undefined)).toMatchObject({ success: true, data: 0 });
+    expect(packageEvidenceLimit().safeParse(undefined)).toMatchObject({ success: true, data: 0 });
+    expect(packageProofLimit().safeParse(undefined)).toMatchObject({ success: true, data: 0 });
+  });
+
+  it('accepts the inclusive max bounds', () => {
+    expect(packageSampleLimit().safeParse(5).success).toBe(true);
+    expect(packageEvidenceLimit().safeParse(100).success).toBe(true);
+    expect(packageProofLimit().safeParse(50).success).toBe(true);
+  });
+
+  it('rejects negative, fractional, and oversized values', () => {
+    for (const schema of [packageSampleLimit(), packageEvidenceLimit(), packageProofLimit()]) {
+      expect(schema.safeParse(-1).success).toBe(false);
+      expect(schema.safeParse(1.5).success).toBe(false);
+    }
+    expect(packageSampleLimit().safeParse(6).success).toBe(false);
+    expect(packageEvidenceLimit().safeParse(101).success).toBe(false);
+    expect(packageProofLimit().safeParse(51).success).toBe(false);
   });
 });
 

@@ -1,6 +1,7 @@
 import { packageSourceFilter, packageToolResult } from './package-tool-helpers.js';
 import {
   packageEdgeKind,
+  packageEvidenceLimit,
   packageName,
   pageFields,
   sourceFilterFields,
@@ -16,13 +17,16 @@ export function registerWhyDepends(server: McpStdioServer, deps: McpToolDeps): v
     {
       title: 'Why package A depends on package B',
       description:
-        'Return bounded call/import evidence for a required package pair (fromPackage → toPackage). ' +
-        'Call edges include symbol refs, call sites, resolution, and confidence. Import edges retain ' +
-        'specifiers. Fast catalogs may omit import evidence (coverage partial).',
+        'Return matching call/import evidence for a required package pair (fromPackage → toPackage). ' +
+        'Default evidenceLimit=0 returns aggregate totalMatchingEvidence only (no concrete sites). ' +
+        'Set evidenceLimit 1–100 to request bounded call/import sites. Use limit for paging those ' +
+        'sites; evidenceLimit never substitutes for paging. Fast catalogs may omit import evidence ' +
+        '(coverage partial).',
       inputSchema: strictInput({
         fromPackage: packageName(),
         toPackage: packageName(),
         edgeKind: packageEdgeKind(),
+        evidenceLimit: packageEvidenceLimit(),
         ...sourceFilterFields('production'),
         ...pageFields(),
       }),
@@ -37,6 +41,7 @@ export function registerWhyDepends(server: McpStdioServer, deps: McpToolDeps): v
           limit: args.limit,
           cursor: args.cursor,
           groupBy: args.groupBy,
+          evidenceLimit: args.evidenceLimit ?? 0,
         }),
       ),
   );

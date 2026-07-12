@@ -684,17 +684,20 @@ describe('graph handlers (async GraphToolResult)', () => {
       limit: 9,
       cursor: 'cursor',
       groupBy: 'package',
+      sampleLimit: 0,
       filter: expect.objectContaining({ filePath: 'src/a.ts', kinds: ['method'] }),
     });
     expect(captured.why).toMatchObject({
       fromPackage: 'pkg-a',
       toPackage: 'pkg-b',
       groupBy: 'package',
+      evidenceLimit: 0,
       filter: expect.objectContaining({ visibilities: ['private'] }),
     });
     expect(captured.cycles).toMatchObject({
       edgeKind: 'combined',
       groupBy: 'package',
+      proofLimit: 0,
       filter: expect.objectContaining({ packages: ['pkg-a'] }),
     });
   });

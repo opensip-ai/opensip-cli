@@ -243,6 +243,25 @@ export const searchMatch = () => z.enum(['substring', 'exact', 'qualified']).def
 /** Package edge kind. */
 export const packageEdgeKind = () => z.enum(['call', 'import', 'combined']).default('call');
 
+/**
+ * Nested sample size per package dependency row (P2 Phase 2.4). Default 0 =
+ * count/distribution only; max 5 full evidence samples. Independent of page
+ * `limit`. Set `sampleLimit` > 0 to request bounded concrete sites.
+ */
+export const packageSampleLimit = () => z.number().int().min(0).max(5).default(0);
+
+/**
+ * Max concrete evidence sites for why_depends (P2 Phase 2.4). Default 0 =
+ * aggregate counts only; max 100. Independent of page `limit`.
+ */
+export const packageEvidenceLimit = () => z.number().int().min(0).max(100).default(0);
+
+/**
+ * Max proof edges per package SCC component (P2 Phase 2.4). Default 0 = members
+ * and counts only; max 50. Independent of page `limit`.
+ */
+export const packageProofLimit = () => z.number().int().min(0).max(50).default(0);
+
 /** Shared source-filter field bag for composing tool schemas. */
 export const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') => ({
   packages: packageArray(),
