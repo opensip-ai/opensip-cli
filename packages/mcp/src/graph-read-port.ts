@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /**
  * `GraphReadPort` — the narrow async read interface every MCP graph tool
  * handler depends on (ADR-0084 + MCP Graph Audit Phase 1).

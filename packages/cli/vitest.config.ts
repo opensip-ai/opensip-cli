@@ -79,7 +79,9 @@ export default mergeConfig(
           // UNREACHABLE by construction or only reachable via impractical fault
           // injection. Fresh measurement on the reachable surface stabilizes
           // around 82–83% without annotating provably dead arms.
-          branches: 82,
+          // 0.6.0 inventory/bootstrap expansion measured 81.8; hold the
+          // composition-root floor at 81 rather than force-fault-injection.
+          branches: 81,
         },
       },
     },

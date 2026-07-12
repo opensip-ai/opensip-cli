@@ -87,6 +87,12 @@ function readStringArray(target: object, key: PropertyKey): readonly string[] {
   return out;
 }
 
+/**
+ * Read an optional static-handler descriptor from a command-spec object.
+ *
+ * @throws {Error} When `staticHandler` is present but not a plain data object
+ *   or is missing required package/path/declaration fields.
+ */
 function readStaticHandler(target: object): StaticHandlerDescriptor | undefined {
   const property = readOwn(target, 'staticHandler');
   if (property.kind === 'missing') return undefined;
@@ -151,6 +157,11 @@ function toolForCommand(
   return tools.find((t) => t.identity.name === name);
 }
 
+/**
+ * Project one leaf command-spec into plain inventory data (never invokes handler).
+ *
+ * @throws {Error} When name/output/handler is missing or staticHandler is invalid.
+ */
 function projectLeafFromSpec(
   spec: object,
   path: string,
@@ -195,6 +206,8 @@ function projectLeafFromSpec(
 /**
  * Tool commands (flat or parent-nested) from the registry. Prefer registry tools
  * so each leaf carries admitted provenance/package identity when available.
+ *
+ * @throws {Error} When a tool has an invalid commandSpecs entry or leaf projection fails.
  */
 function projectRegistryToolLeaves(
   toolRegistry: ToolRegistry,
@@ -245,7 +258,11 @@ function projectExtraToolSpecLeaves(
   }
 }
 
-/** Top-level host commands. */
+/**
+ * Top-level host commands.
+ *
+ * @throws {Error} When a host spec is invalid or leaf projection fails.
+ */
 function projectHostSpecLeaves(hostSpecs: readonly object[], leaves: RuntimeCommandLeaf[]): void {
   for (const spec of hostSpecs) {
     if (spec === null || typeof spec !== 'object') {
@@ -259,7 +276,11 @@ function projectHostSpecLeaves(hostSpecs: readonly object[], leaves: RuntimeComm
   }
 }
 
-/** Action-less host groups plus their leaves. */
+/**
+ * Action-less host groups plus their leaves.
+ *
+ * @throws {Error} When a host group leaf is missing a name or projection fails.
+ */
 function projectHostGroups(
   hostGroups: readonly HostSubcommandGroup[],
   groups: RuntimeCommandGroup[],
@@ -283,7 +304,11 @@ function projectHostGroups(
   }
 }
 
-/** Per-tool plugin groups: `<tool> plugin <leaf>`. */
+/**
+ * Per-tool plugin groups: `<tool> plugin <leaf>`.
+ *
+ * @throws {Error} When a plugin group leaf is missing a name or projection fails.
+ */
 function projectToolPluginGroups(
   toolPluginGroups: readonly ToolPluginGroup[],
   toolFacts: ReadonlyMap<string, ToolIdentityFacts>,

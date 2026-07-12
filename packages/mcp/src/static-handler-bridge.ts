@@ -94,6 +94,8 @@ function isReviewedCrossPackage(ref: StaticHandlerRef): boolean {
 /**
  * Deduplicate descriptors for one batch join while preserving first-seen order.
  * Fails closed when N+1 descriptors are supplied.
+ *
+ * @throws {Error} When `refs.length` exceeds `limits.maxDescriptors`.
  */
 export function dedupeStaticHandlerRefs(
   refs: readonly StaticHandlerRef[],

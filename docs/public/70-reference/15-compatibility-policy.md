@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.5.3
+release: v0.6.0
 title: "Compatibility policy"
 audience: [ci-integrators, plugin-authors, contributors]
 purpose: "The public compatibility contract classes, version markers, deprecation posture, and migration/check lanes for opensip-cli."

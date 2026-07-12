@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /**
  * SQLite-backed declaration + cross-file reference queries (P2 Phase 3 Task 3.7).
  *

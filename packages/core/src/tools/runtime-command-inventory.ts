@@ -128,6 +128,9 @@ function isSafePath(value: string, max: number): boolean {
  * Validate and freeze a runtime command inventory.
  * Rejects N+1 counts, duplicate paths, invalid owner pairs, and text overflow.
  * Does not slice identities — fails closed on overflow.
+ *
+ * @throws {Error} When leaf/group counts exceed limits, paths duplicate, or text is invalid.
+ * @throws {TypeError} When a leaf is not a plain object.
  */
 export function createRuntimeCommandInventory(
   input: {
@@ -189,6 +192,10 @@ export function createRuntimeCommandInventory(
   });
 }
 
+/**
+ * @throws {Error} When path/name/owner/scope/output/aliases/handler claims are invalid.
+ * @throws {TypeError} When the leaf is not a plain object.
+ */
 function validateLeaf(
   leaf: RuntimeCommandLeaf,
   limits: RuntimeCommandInventoryLimits,
@@ -226,7 +233,11 @@ function validateLeaf(
   validateLeafHandlerClaims(leaf);
 }
 
-/** Validate the alias array shape and each alias string. */
+/**
+ * Validate the alias array shape and each alias string.
+ *
+ * @throws {Error} When aliases exceed the limit or contain invalid strings.
+ */
 function validateLeafAliases(
   leaf: RuntimeCommandLeaf,
   limits: RuntimeCommandInventoryLimits,
@@ -243,7 +254,11 @@ function validateLeafAliases(
   }
 }
 
-/** Validate optional package identity and static-handler descriptor claims. */
+/**
+ * Validate optional package identity and static-handler descriptor claims.
+ *
+ * @throws {Error} When packageIdentity or staticHandler fields are invalid.
+ */
 function validateLeafHandlerClaims(leaf: RuntimeCommandLeaf): void {
   if (
     leaf.owner === 'tool' &&
@@ -265,6 +280,9 @@ function validateLeafHandlerClaims(leaf: RuntimeCommandLeaf): void {
   }
 }
 
+/**
+ * @throws {Error} When group path/name/owner/visibility is invalid or path duplicates a leaf.
+ */
 function validateGroup(
   group: RuntimeCommandGroup,
   limits: RuntimeCommandInventoryLimits,

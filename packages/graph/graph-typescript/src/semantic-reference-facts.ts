@@ -67,6 +67,57 @@ interface DeclRecord {
   readonly symbol: ts.Symbol;
 }
 
+/** Shared program-scope inputs for both declaration and reference collection. */
+interface CollectScope {
+  readonly program: ts.Program;
+  readonly discoveredSet: ReadonlySet<string>;
+  readonly checker: ts.TypeChecker;
+  readonly projectRootReal: string;
+  readonly crossPackage: CrossPackageContext;
+  readonly limits: SemanticFactLimits;
+  readonly coverage: MutableCoverage;
+}
+
+/** Mutable sinks + shared scope for phase-1 declaration collection. */
+interface DeclarationCollectCtx extends CollectScope {
+  readonly decls: DeclarationFact[];
+  readonly declBySymbol: Map<ts.Symbol, DeclRecord>;
+}
+
+/** Mutable sinks + shared scope for phase-2 reference collection. */
+interface ReferenceCollectCtx extends CollectScope {
+  readonly declBySymbol: ReadonlyMap<ts.Symbol, DeclRecord>;
+  readonly exportIndex: UniqueExportIndex;
+  readonly refs: CrossFileReferenceFact[];
+}
+
+/** Per-source-file declaration walk context (wide params collapsed). */
+interface FileDeclarationCtx {
+  readonly sourceFile: ts.SourceFile;
+  readonly checker: ts.TypeChecker;
+  readonly filePath: string;
+  readonly pkg: string;
+  readonly limits: SemanticFactLimits;
+  readonly coverage: MutableCoverage;
+  readonly decls: DeclarationFact[];
+  readonly declBySymbol: Map<ts.Symbol, DeclRecord>;
+}
+
+/** Per-source-file reference walk context (wide params collapsed). */
+interface FileReferenceCtx {
+  readonly sourceFile: ts.SourceFile;
+  readonly checker: ts.TypeChecker;
+  readonly filePath: string;
+  readonly pkg: string;
+  readonly projectRootReal: string;
+  readonly declBySymbol: ReadonlyMap<ts.Symbol, DeclRecord>;
+  readonly exportIndex: UniqueExportIndex;
+  readonly crossPackage: CrossPackageContext;
+  readonly limits: SemanticFactLimits;
+  readonly coverage: MutableCoverage;
+  readonly refs: CrossFileReferenceFact[];
+}
+
 /**
  * Collect bounded declaration + cross-file reference facts from an exact
  * TypeScript program. Always returns a PRESENT bundle (empty arrays + complete
@@ -97,39 +148,27 @@ export function collectSemanticReferenceFacts(
 
   const discoveredSet = new Set(input.discoveredFiles.map((f) => normalizeAbs(f)));
   const checker = input.program.getTypeChecker();
+  const scope: CollectScope = {
+    program: input.program,
+    discoveredSet,
+    checker,
+    projectRootReal,
+    crossPackage: input.crossPackage,
+    limits,
+    coverage,
+  };
 
   // Phase 1: collect declarations from project source files.
   const declBySymbol = new Map<ts.Symbol, DeclRecord>();
   const decls: DeclarationFact[] = [];
-  collectDeclarations(
-    input.program,
-    discoveredSet,
-    checker,
-    projectRootReal,
-    input.crossPackage,
-    limits,
-    coverage,
-    decls,
-    declBySymbol,
-  );
+  collectDeclarations({ ...scope, decls, declBySymbol });
 
   // Unique exported-declaration index for workspace .d.ts joins.
   const exportIndex = buildUniqueExportIndex(decls, input.crossPackage);
 
   // Phase 2: collect cross-file references.
   const refs: CrossFileReferenceFact[] = [];
-  collectReferences(
-    input.program,
-    discoveredSet,
-    checker,
-    projectRootReal,
-    input.crossPackage,
-    declBySymbol,
-    exportIndex,
-    limits,
-    coverage,
-    refs,
-  );
+  collectReferences({ ...scope, declBySymbol, exportIndex, refs });
 
   return applySemanticFactCaps(
     decls,
@@ -149,172 +188,94 @@ export function collectSemanticReferenceFacts(
 }
 
 /** Phase 1: collect declaration facts from discovered project source files. */
-function collectDeclarations(
-  program: ts.Program,
-  discoveredSet: ReadonlySet<string>,
-  checker: ts.TypeChecker,
-  projectRootReal: string,
-  crossPackage: CrossPackageContext,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  decls: DeclarationFact[],
-  declBySymbol: Map<ts.Symbol, DeclRecord>,
-): void {
-  for (const sf of program.getSourceFiles()) {
+function collectDeclarations(ctx: DeclarationCollectCtx): void {
+  for (const sf of ctx.program.getSourceFiles()) {
     if (sf.isDeclarationFile) continue;
-    if (!discoveredSet.has(normalizeAbs(sf.fileName))) continue;
-    const filePath = toProjectRel(sf.fileName, projectRootReal, coverage);
+    if (!ctx.discoveredSet.has(normalizeAbs(sf.fileName))) continue;
+    const filePath = toProjectRel(sf.fileName, ctx.projectRootReal, ctx.coverage);
     if (filePath === undefined) continue;
-    const pkg = packageGroupOf(filePath, crossPackage.manifestIndex);
-    visitDeclarations(sf, sf, checker, filePath, pkg, limits, coverage, decls, declBySymbol);
-    if (decls.length >= limits.maxDeclarations) {
-      coverage.reasons.push('declaration-cap');
+    const pkg = packageGroupOf(filePath, ctx.crossPackage.manifestIndex);
+    const fileCtx: FileDeclarationCtx = {
+      sourceFile: sf,
+      checker: ctx.checker,
+      filePath,
+      pkg,
+      limits: ctx.limits,
+      coverage: ctx.coverage,
+      decls: ctx.decls,
+      declBySymbol: ctx.declBySymbol,
+    };
+    visitDeclarations(sf, fileCtx);
+    if (ctx.decls.length >= ctx.limits.maxDeclarations) {
+      ctx.coverage.reasons.push('declaration-cap');
       break;
     }
   }
 }
 
 /** Phase 2: collect cross-file reference facts from discovered project source files. */
-function collectReferences(
-  program: ts.Program,
-  discoveredSet: ReadonlySet<string>,
-  checker: ts.TypeChecker,
-  projectRootReal: string,
-  crossPackage: CrossPackageContext,
-  declBySymbol: ReadonlyMap<ts.Symbol, DeclRecord>,
-  exportIndex: UniqueExportIndex,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  refs: CrossFileReferenceFact[],
-): void {
-  for (const sf of program.getSourceFiles()) {
+function collectReferences(ctx: ReferenceCollectCtx): void {
+  for (const sf of ctx.program.getSourceFiles()) {
     if (sf.isDeclarationFile) continue; // omit reference sites inside .d.ts
-    if (!discoveredSet.has(normalizeAbs(sf.fileName))) continue;
-    const filePath = toProjectRel(sf.fileName, projectRootReal, coverage);
+    if (!ctx.discoveredSet.has(normalizeAbs(sf.fileName))) continue;
+    const filePath = toProjectRel(sf.fileName, ctx.projectRootReal, ctx.coverage);
     if (filePath === undefined) continue;
-    const pkg = packageGroupOf(filePath, crossPackage.manifestIndex);
-    visitReferences(
-      sf,
-      checker,
+    const pkg = packageGroupOf(filePath, ctx.crossPackage.manifestIndex);
+    visitReferences({
+      sourceFile: sf,
+      checker: ctx.checker,
       filePath,
       pkg,
-      projectRootReal,
-      declBySymbol,
-      exportIndex,
-      crossPackage,
-      limits,
-      coverage,
-      refs,
-    );
-    if (refs.length >= limits.maxReferences) {
-      coverage.reasons.push('reference-cap');
+      projectRootReal: ctx.projectRootReal,
+      declBySymbol: ctx.declBySymbol,
+      exportIndex: ctx.exportIndex,
+      crossPackage: ctx.crossPackage,
+      limits: ctx.limits,
+      coverage: ctx.coverage,
+      refs: ctx.refs,
+    });
+    if (ctx.refs.length >= ctx.limits.maxReferences) {
+      ctx.coverage.reasons.push('reference-cap');
       break;
     }
   }
 }
 
-function visitDeclarations(
-  node: ts.Node,
-  sourceFile: ts.SourceFile,
-  checker: ts.TypeChecker,
-  filePath: string,
-  pkg: string,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  decls: DeclarationFact[],
-  declBySymbol: Map<ts.Symbol, DeclRecord>,
-): void {
+function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx): void {
   const kind = declarationKindOf(node);
   if (kind !== undefined) {
-    coverage.inspectedDeclarations++;
-    if (decls.length >= limits.maxDeclarations) {
-      coverage.omittedDeclarations++;
+    ctx.coverage.inspectedDeclarations++;
+    if (ctx.decls.length >= ctx.limits.maxDeclarations) {
+      ctx.coverage.omittedDeclarations++;
       return;
     }
-    const fact = buildDeclarationFact(
-      node,
-      sourceFile,
-      checker,
-      filePath,
-      pkg,
-      kind,
-      limits,
-      coverage,
-    );
+    const fact = buildDeclarationFact(node, kind, ctx);
     if (fact === undefined) {
-      coverage.omittedDeclarations++;
+      ctx.coverage.omittedDeclarations++;
     } else {
-      decls.push(fact);
-      coverage.emittedDeclarations++;
-      const sym = symbolOfDeclaration(node, checker);
+      ctx.decls.push(fact);
+      ctx.coverage.emittedDeclarations++;
+      const sym = symbolOfDeclaration(node, ctx.checker);
       if (sym !== undefined) {
-        const real = unaliasSymbol(sym, checker);
-        if (!declBySymbol.has(real)) declBySymbol.set(real, { fact, symbol: real });
+        const real = unaliasSymbol(sym, ctx.checker);
+        if (!ctx.declBySymbol.has(real)) ctx.declBySymbol.set(real, { fact, symbol: real });
       }
     }
   }
   ts.forEachChild(node, (child) => {
-    visitDeclarations(
-      child,
-      sourceFile,
-      checker,
-      filePath,
-      pkg,
-      limits,
-      coverage,
-      decls,
-      declBySymbol,
-    );
+    visitDeclarations(child, ctx);
   });
 }
 
-function visitReferences(
-  sourceFile: ts.SourceFile,
-  checker: ts.TypeChecker,
-  filePath: string,
-  pkg: string,
-  projectRootReal: string,
-  declBySymbol: ReadonlyMap<ts.Symbol, DeclRecord>,
-  exportIndex: UniqueExportIndex,
-  crossPackage: CrossPackageContext,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  refs: CrossFileReferenceFact[],
-): void {
+function visitReferences(ctx: FileReferenceCtx): void {
   const visit = (node: ts.Node): void => {
-    if (refs.length >= limits.maxReferences) return;
+    if (ctx.refs.length >= ctx.limits.maxReferences) return;
 
     // Identifier / type-reference / heritage / import-export sites.
     if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
-      maybeEmitReference(
-        node,
-        sourceFile,
-        checker,
-        filePath,
-        pkg,
-        projectRootReal,
-        declBySymbol,
-        exportIndex,
-        crossPackage,
-        limits,
-        coverage,
-        refs,
-      );
+      maybeEmitReference(node, ctx);
     } else if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      emitImportExportReferences(
-        node,
-        sourceFile,
-        checker,
-        filePath,
-        pkg,
-        projectRootReal,
-        declBySymbol,
-        exportIndex,
-        crossPackage,
-        limits,
-        coverage,
-        refs,
-      );
+      emitImportExportReferences(node, ctx);
     } else if (
       ts.isExpressionWithTypeArguments(node) ||
       ts.isTypeReferenceNode(node) ||
@@ -325,7 +286,7 @@ function visitReferences(
 
     ts.forEachChild(node, visit);
   };
-  visit(sourceFile);
+  visit(ctx.sourceFile);
 }
 
 /** Resolve the identifier a reference site keys on (identifier or member name). */
@@ -392,66 +353,52 @@ function emitRefFact(ctx: ReferenceEmitContext, fields: RefFactFields): void {
   pushOrOmit(fact, ctx.refs, ctx.coverage);
 }
 
-function maybeEmitReference(
-  node: ts.Node,
-  sourceFile: ts.SourceFile,
-  checker: ts.TypeChecker,
-  filePath: string,
-  pkg: string,
-  projectRootReal: string,
-  declBySymbol: ReadonlyMap<ts.Symbol, DeclRecord>,
-  exportIndex: UniqueExportIndex,
-  crossPackage: CrossPackageContext,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  refs: CrossFileReferenceFact[],
-): void {
+function maybeEmitReference(node: ts.Node, file: FileReferenceCtx): void {
   const id = referenceIdentifier(node);
   if (id === undefined) return;
 
   // Skip declaration names themselves (they are declarations, not references).
   if (isDeclarationName(id)) return;
 
-  coverage.inspectedReferences++;
-  if (refs.length >= limits.maxReferences) {
-    coverage.omittedReferences++;
+  file.coverage.inspectedReferences++;
+  if (file.refs.length >= file.limits.maxReferences) {
+    file.coverage.omittedReferences++;
     return;
   }
 
   let symbol: ts.Symbol | undefined;
   try {
-    symbol = checker.getSymbolAtLocation(id);
+    symbol = file.checker.getSymbolAtLocation(id);
   } catch {
-    coverage.omittedReferences++;
-    return;
+    symbol = undefined;
   }
   if (symbol === undefined) {
-    coverage.omittedReferences++;
+    file.coverage.omittedReferences++;
     return;
   }
 
-  const real = unaliasSymbol(symbol, checker);
-  const span = nodeSpan(id, sourceFile, limits, coverage);
+  const real = unaliasSymbol(symbol, file.checker);
+  const span = nodeSpan(id, file.sourceFile, file.limits, file.coverage);
   if (span === undefined) {
-    coverage.omittedReferences++;
+    file.coverage.omittedReferences++;
     return;
   }
 
   const ctx: ReferenceEmitContext = {
-    refKind: referenceKindOf(id, sourceFile),
-    filePath,
-    pkg,
+    refKind: referenceKindOf(id, file.sourceFile),
+    filePath: file.filePath,
+    pkg: file.pkg,
     span,
-    sourceFile,
-    projectRootReal,
-    exportIndex,
-    crossPackage,
-    limits,
-    coverage,
-    refs,
+    sourceFile: file.sourceFile,
+    projectRootReal: file.projectRootReal,
+    exportIndex: file.exportIndex,
+    crossPackage: file.crossPackage,
+    limits: file.limits,
+    coverage: file.coverage,
+    refs: file.refs,
   };
 
-  const local = declBySymbol.get(real);
+  const local = file.declBySymbol.get(real);
   if (local !== undefined) {
     emitLocalReference(ctx, local);
     return;
@@ -571,17 +518,7 @@ function emitWorkspaceJoinReference(
 
 function emitImportExportReferences(
   node: ts.ImportDeclaration | ts.ExportDeclaration,
-  sourceFile: ts.SourceFile,
-  checker: ts.TypeChecker,
-  filePath: string,
-  pkg: string,
-  projectRootReal: string,
-  declBySymbol: ReadonlyMap<ts.Symbol, DeclRecord>,
-  exportIndex: UniqueExportIndex,
-  crossPackage: CrossPackageContext,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  refs: CrossFileReferenceFact[],
+  file: FileReferenceCtx,
 ): void {
   const moduleSpec = node.moduleSpecifier;
   if (moduleSpec === undefined || !ts.isStringLiteral(moduleSpec)) return;
@@ -590,37 +527,13 @@ function emitImportExportReferences(
   const named = namedBindingsOf(node);
   if (named !== undefined && (ts.isNamedImports(named) || ts.isNamedExports(named))) {
     for (const el of named.elements) {
-      maybeEmitReference(
-        el.name,
-        sourceFile,
-        checker,
-        filePath,
-        pkg,
-        projectRootReal,
-        declBySymbol,
-        exportIndex,
-        crossPackage,
-        limits,
-        coverage,
-        refs,
-      );
+      maybeEmitReference(el.name, file);
     }
     return;
   }
 
   // Side-effect import / star re-export: record the module reference site.
-  emitModuleReference(
-    node,
-    moduleSpec,
-    specifier,
-    sourceFile,
-    filePath,
-    pkg,
-    crossPackage,
-    limits,
-    coverage,
-    refs,
-  );
+  emitModuleReference(node, moduleSpec, specifier, file);
 }
 
 /** Named import/export bindings for a module declaration, if present. */
@@ -651,77 +564,66 @@ function emitModuleReference(
   node: ts.ImportDeclaration | ts.ExportDeclaration,
   moduleSpec: ts.StringLiteral,
   specifier: string,
-  sourceFile: ts.SourceFile,
-  filePath: string,
-  pkg: string,
-  crossPackage: CrossPackageContext,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
-  refs: CrossFileReferenceFact[],
+  file: FileReferenceCtx,
 ): void {
-  coverage.inspectedReferences++;
-  const span = nodeSpan(moduleSpec, sourceFile, limits, coverage);
+  file.coverage.inspectedReferences++;
+  const span = nodeSpan(moduleSpec, file.sourceFile, file.limits, file.coverage);
   if (span === undefined) {
-    coverage.omittedReferences++;
+    file.coverage.omittedReferences++;
     return;
   }
   const kind: CrossFileReferenceFact['kind'] = ts.isImportDeclaration(node) ? 'import' : 'export';
-  const resolved = resolveSpecifierToPackage(specifier, crossPackage.manifestIndex);
+  const resolved = resolveSpecifierToPackage(specifier, file.crossPackage.manifestIndex);
   const { basis, reason } = classifyModuleSpecifier(
     resolved !== undefined,
     specifier.startsWith('.'),
   );
   const fact = makeRefFact({
     kind,
-    filePath,
-    package: pkg,
+    filePath: file.filePath,
+    package: file.pkg,
     span,
     targetPackage: resolved?.packageGroup,
     basis,
     confidence: resolved === undefined ? 'low' : 'medium',
     reason,
-    importSpecifier: boundText(specifier, limits),
-    inTestFile: isTestFilePath(filePath),
-    definedInGenerated: isGeneratedFile(filePath),
-    limits,
-    coverage,
+    importSpecifier: boundText(specifier, file.limits),
+    inTestFile: isTestFilePath(file.filePath),
+    definedInGenerated: isGeneratedFile(file.filePath),
+    limits: file.limits,
+    coverage: file.coverage,
   });
-  pushOrOmit(fact, refs, coverage);
+  pushOrOmit(fact, file.refs, file.coverage);
 }
 
 function buildDeclarationFact(
   node: ts.Node,
-  sourceFile: ts.SourceFile,
-  checker: ts.TypeChecker,
-  filePath: string,
-  pkg: string,
   kind: DeclarationKind,
-  limits: SemanticFactLimits,
-  coverage: MutableCoverage,
+  ctx: FileDeclarationCtx,
 ): DeclarationFact | undefined {
   const nameNode = declarationNameNode(node);
   const name =
-    nameNode?.getText(sourceFile) ??
+    nameNode?.getText(ctx.sourceFile) ??
     (ts.isConstructorDeclaration(node) ? 'constructor' : undefined);
   if (name === undefined || name.length === 0) return undefined;
-  if (!isSafeSemanticText(name, limits.maxName)) {
-    coverage.reasons.push('hostile-declaration-name');
+  if (!isSafeSemanticText(name, ctx.limits.maxName)) {
+    ctx.coverage.reasons.push('hostile-declaration-name');
     return undefined;
   }
-  const span = nodeSpan(nameNode ?? node, sourceFile, limits, coverage);
+  const span = nodeSpan(nameNode ?? node, ctx.sourceFile, ctx.limits, ctx.coverage);
   if (span === undefined) return undefined;
 
-  const visibility = visibilityOf(node, sourceFile);
-  const exportRole = exportRoleOf(node, sourceFile);
-  const qualifiedName = boundText(`${filePath.replace(/\.[^.]+$/, '')}.${name}`, limits);
+  const visibility = visibilityOf(node, ctx.sourceFile);
+  const exportRole = exportRoleOf(node, ctx.sourceFile);
+  const qualifiedName = boundText(`${ctx.filePath.replace(/\.[^.]+$/, '')}.${name}`, ctx.limits);
   if (qualifiedName === undefined) {
-    coverage.reasons.push('hostile-qualified-name');
+    ctx.coverage.reasons.push('hostile-qualified-name');
     return undefined;
   }
 
   const declarationId = makeDeclarationId({
-    package: pkg,
-    filePath,
+    package: ctx.pkg,
+    filePath: ctx.filePath,
     kind,
     name,
     line: span.line,
@@ -733,16 +635,16 @@ function buildDeclarationFact(
     name,
     qualifiedName,
     kind,
-    package: pkg,
-    filePath,
+    package: ctx.pkg,
+    filePath: ctx.filePath,
     line: span.line,
     column: span.column,
     endLine: span.endLine,
     endColumn: span.endColumn,
     visibility,
     exportRole,
-    inTestFile: isTestFilePath(filePath),
-    definedInGenerated: isGeneratedFile(filePath),
+    inTestFile: isTestFilePath(ctx.filePath),
+    definedInGenerated: isGeneratedFile(ctx.filePath),
   };
 }
 
@@ -870,11 +772,13 @@ function declarationNameNode(node: ts.Node): ts.Node | undefined {
 }
 
 function symbolOfDeclaration(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
+  let symbol: ts.Symbol | undefined;
   try {
-    return checker.getSymbolAtLocation(declarationNameNode(node) ?? node);
+    symbol = checker.getSymbolAtLocation(declarationNameNode(node) ?? node);
   } catch {
-    return undefined;
+    symbol = undefined;
   }
+  return symbol;
 }
 
 function visibilityOf(node: ts.Node, _sourceFile: ts.SourceFile): SemanticVisibility {

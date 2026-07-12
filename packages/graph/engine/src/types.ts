@@ -227,6 +227,10 @@ export interface DependencyClassification {
   readonly reason: string;
 }
 
+/**
+ * One import/require/use edge from a module-init occurrence to resolved targets.
+ * Carries the raw specifier plus optional atomic classification (form/role/basis).
+ */
 export interface DependencyEdge {
   /** bodyHash[] of the target module-init occurrence(s). Empty when the
    *  import resolves to a module outside the catalog (external package). */

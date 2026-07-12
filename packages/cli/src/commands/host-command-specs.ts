@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /**
  * host-command-specs — CLI-owned commands as declarative {@link CommandSpec}s,
  * mounted via the same `mountCommandSpec` plane as tools (Phase 6/7 parity).

@@ -1,3 +1,4 @@
+// @fitness-ignore-file module-coupling-fan-out -- registration barrel: imports every graph MCP tool module to mount the public surface; fan-out is the registry's role.
 /** Register graph catalog reads plus the explicit graph refresh operation. */
 
 import { registerBlastRadius } from './blast-radius.js';

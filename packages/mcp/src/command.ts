@@ -154,7 +154,9 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
   );
   const targetConventions = summarizeTargetConventions(scope.targets);
-  registerMcpTools(server, {
+  // Registration is synchronous; the Promise-shaped registerMcpTools return is
+  // not a detached async job — fire-and-forget without awaiting is intentional.
+  void registerMcpTools(server, {
     graph,
     results,
     runtimeWiring,

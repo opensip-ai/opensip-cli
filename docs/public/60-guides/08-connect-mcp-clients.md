@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-11
-release: v0.5.3
+release: v0.6.0
 title: "Connect MCP clients (Cursor, Claude Code, Codex)"
 audience: [getting-started, ci-integrators]
 purpose: "Register opensip mcp as a stdio MCP server in Cursor, Claude Code, and Codex."

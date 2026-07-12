@@ -161,6 +161,8 @@ function commonFlagsError(name: string, commonFlags: readonly unknown[]): Error 
 /**
  * Read own enumerable data properties without invoking accessors.
  * Throws TypeError on throwing/revoked Proxies (fail-closed admission).
+ *
+ * @throws {TypeError} When a property is an accessor (get/set), not a data property.
  */
 function ownDataProperties(value: object): Record<string, unknown> {
   const out: Record<string, unknown> = Object.create(null) as Record<string, unknown>;

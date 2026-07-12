@@ -410,9 +410,10 @@ export function searchDeclarationFacts(
     const totalMatches = matches.length;
 
     let afterStable: string | undefined;
-    if (query.afterKey !== undefined) {
+    const afterKey = query.afterKey;
+    if (afterKey !== undefined) {
       const found = matches.find((m) =>
-        matchesContinuationIdentity(declarationStableKey(m), query.afterKey!),
+        matchesContinuationIdentity(declarationStableKey(m), afterKey),
       );
       if (found === undefined) {
         return err({
@@ -520,9 +521,10 @@ export function referencesToDeclaration(
     const totalMatches = matches.length;
 
     let afterStable: string | undefined;
-    if (query.afterKey !== undefined) {
+    const afterKey = query.afterKey;
+    if (afterKey !== undefined) {
       const found = matches.find((m) =>
-        matchesContinuationIdentity(referenceStableKey(m), query.afterKey!),
+        matchesContinuationIdentity(referenceStableKey(m), afterKey),
       );
       if (found === undefined) {
         return err({

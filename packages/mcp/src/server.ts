@@ -164,6 +164,12 @@ export class McpStdioServer {
     return result;
   };
 
+  /**
+   * Reject invalid or over-cap tool names before registration.
+   *
+   * @throws {Error} When the name is empty, overlong, contains control chars,
+   *   is a duplicate, or the registration cap is exceeded.
+   */
   private assertRegistrableName(name: string): void {
     if (typeof name !== 'string' || name.length === 0) {
       throw new Error('MCP tool name must be a non-empty string.');

@@ -15,6 +15,8 @@ import {
   registerGetSymbol,
   registerPackageCycles,
   registerPackageDependencies,
+  registerReferencesTo,
+  registerSearchDeclarations,
   registerSearchSymbols,
   registerTracePath,
   registerWhoCalls,
@@ -324,6 +326,40 @@ describe('graph handlers (async GraphToolResult)', () => {
       data: { detail: 'nodes', symbols: [expect.objectContaining({ symbolId: 'src/a.ts:10:2' })] },
     });
     expect(Array.isArray((parsed.body.data as { symbols: unknown }).symbols)).toBe(true);
+  });
+
+  it('search_declarations and references_to project envelopes', async () => {
+    {
+      const { handlers, server } = captureServer();
+      registerSearchDeclarations(server, deps(fakePort()));
+      const parsed = parseResult(await handlers.get('search_declarations')!({ query: 'Foo' }));
+      expect(parsed.isError).toBe(false);
+      expect(parsed.body).toMatchObject({
+        context: CONTEXT,
+        data: { detail: 'nodes', referenceScope: 'cross-file' },
+      });
+    }
+    {
+      const { handlers, server } = captureServer();
+      registerReferencesTo(server, deps(fakePort()));
+      const parsed = parseResult(
+        await handlers.get('references_to')!({ declarationId: 'd1:none' }),
+      );
+      expect(parsed.isError).toBe(false);
+      expect(parsed.body).toMatchObject({
+        data: { detail: 'nodes', referenceScope: 'cross-file' },
+      });
+    }
+    {
+      const graph = fakePort({
+        searchDeclarations: () => Promise.resolve(err({ code: 'invalid-query', message: 'bad' })),
+      });
+      const { handlers, server } = captureServer();
+      registerSearchDeclarations(server, deps(graph));
+      expect(parseResult(await handlers.get('search_declarations')!({ query: 'x' })).isError).toBe(
+        true,
+      );
+    }
   });
 
   it('get_symbol returns candidates with context', async () => {

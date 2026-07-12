@@ -182,4 +182,35 @@ describe('collectSemanticReferenceFacts', () => {
     expect(Array.isArray(resolved.semanticFacts!.declarations)).toBe(true);
     expect(Array.isArray(resolved.semanticFacts!.references)).toBe(true);
   });
+
+  it('emits class/enum/namespace declarations and heritage references', async () => {
+    const projectDir = writeProject({
+      'src/base.ts': `export class Base { x = 1; }\nexport enum Kind { A, B }\nexport namespace NS { export const v = 1; }\n`,
+      'src/derived.ts': `import { Base, Kind, NS } from './base.js';\nexport class Child extends Base { k: Kind = Kind.A; n = NS.v; }\n`,
+    });
+    const { resolved } = await exactSemanticFacts(projectDir);
+    const facts = resolved.semanticFacts!;
+    const kinds = new Set(facts.declarations.map((d) => d.kind));
+    expect(kinds.has('class') || kinds.has('enum') || kinds.has('namespace')).toBe(true);
+    expect(facts.references.some((r) => r.kind === 'heritage' || r.kind === 'type')).toBe(true);
+  });
+
+  it('emits re-export and import declaration facts without same-file references only', async () => {
+    const projectDir = writeProject({
+      'src/lib.ts': `export function helper() { return 1; }\nexport interface Shape { n: number }\n`,
+      'src/reexport.ts': `export { helper } from './lib.js';\nexport type { Shape } from './lib.js';\n`,
+      'src/local.ts': `export interface Local { a: number }\nexport type LocalAlias = Local;\n`,
+    });
+    const { resolved } = await exactSemanticFacts(projectDir);
+    const facts = resolved.semanticFacts!;
+    expect(facts.declarations.some((d) => d.kind === 'export' || d.name === 'helper')).toBe(true);
+    // Same-file Local -> LocalAlias must not appear as a cross-file reference.
+    const local = facts.declarations.find((d) => d.name === 'Local');
+    if (local !== undefined) {
+      const sameFileRefs = facts.references.filter(
+        (r) => r.targetDeclarationId === local.declarationId && r.filePath === local.filePath,
+      );
+      expect(sameFileRefs).toHaveLength(0);
+    }
+  });
 });

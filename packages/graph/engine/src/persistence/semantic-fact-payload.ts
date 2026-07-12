@@ -7,6 +7,8 @@
  * oversized decoded structures fail-closed.
  */
 
+import { isPlainRecord } from '@opensip-cli/core';
+
 import {
   DEFAULT_SEMANTIC_FACT_LIMITS,
   MAX_REFERENCES_PER_DECLARATION,
@@ -120,10 +122,6 @@ const COVERAGE_KEYS = new Set([
   'reasons',
 ]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function isSafeText(value: unknown, max: number): value is string {
   return (
     typeof value === 'string' &&
@@ -168,12 +166,15 @@ function reasonsSorted(reasons: readonly string[]): boolean {
 /**
  * Assert `value` is a well-formed {@link SemanticFactBundle} within production
  * bounds. Throws on any malformed/oversized structure.
+ *
+ * @throws {Error} When the bundle shape, counts, or nested entries are invalid.
+ * @throws {TypeError} When declarations/references are not arrays.
  */
 export function validateSemanticFactBundle(
   value: unknown,
   limits: SemanticFactLimits = DEFAULT_SEMANTIC_FACT_LIMITS,
 ): asserts value is SemanticFactBundle {
-  if (!isRecord(value) || !exactKeys(value, BUNDLE_KEYS)) {
+  if (!isPlainRecord(value) || !exactKeys(value, BUNDLE_KEYS)) {
     throw new Error('Malformed semanticFacts bundle');
   }
   if (value.referenceScope !== 'cross-file') {
@@ -195,7 +196,11 @@ export function validateSemanticFactBundle(
   validateCoverage(value.coverage, value.declarations.length, value.references.length);
 }
 
-/** Validate each declaration, reject duplicate ids, and index by id. */
+/**
+ * Validate each declaration, reject duplicate ids, and index by id.
+ *
+ * @throws {Error} When a declaration is malformed or declarationIds collide.
+ */
 function validateDeclarationEntries(
   declarations: readonly unknown[],
   limits: SemanticFactLimits,
@@ -213,7 +218,11 @@ function validateDeclarationEntries(
   return declById;
 }
 
-/** Validate each reference, reject duplicate ids, and enforce the per-declaration cap. */
+/**
+ * Validate each reference, reject duplicate ids, and enforce the per-declaration cap.
+ *
+ * @throws {Error} When a reference is malformed, ids collide, or per-declaration caps are exceeded.
+ */
 function validateReferenceEntries(
   references: readonly unknown[],
   limits: SemanticFactLimits,
@@ -240,8 +249,11 @@ function validateReferenceEntries(
   }
 }
 
+/**
+ * @throws {Error} When declaration shape or field values are malformed.
+ */
 function validateDeclaration(raw: unknown, limits: SemanticFactLimits): DeclarationFact {
-  if (!isRecord(raw) || !exactKeys(raw, DECL_KEYS)) {
+  if (!isPlainRecord(raw) || !exactKeys(raw, DECL_KEYS)) {
     throw new Error('Malformed semanticFacts declaration');
   }
   if (
@@ -270,12 +282,15 @@ function validateDeclaration(raw: unknown, limits: SemanticFactLimits): Declarat
   return raw as unknown as DeclarationFact;
 }
 
+/**
+ * @throws {Error} When reference shape, basis/target consistency, or target identity is invalid.
+ */
 function validateReference(
   raw: unknown,
   limits: SemanticFactLimits,
   declById: ReadonlyMap<string, DeclarationFact>,
 ): CrossFileReferenceFact {
-  if (!isRecord(raw) || !exactKeys(raw, REF_KEYS)) {
+  if (!isPlainRecord(raw) || !exactKeys(raw, REF_KEYS)) {
     throw new Error('Malformed semanticFacts reference');
   }
   if (
@@ -336,8 +351,11 @@ function validateReference(
   return raw as unknown as CrossFileReferenceFact;
 }
 
+/**
+ * @throws {Error} When coverage shape, status, counters, or reasons are invalid.
+ */
 function validateCoverage(raw: unknown, declCount: number, refCount: number): void {
-  if (!isRecord(raw) || !exactKeys(raw, COVERAGE_KEYS)) {
+  if (!isPlainRecord(raw) || !exactKeys(raw, COVERAGE_KEYS)) {
     throw new Error('Malformed semanticFacts coverage');
   }
   if (raw.status !== 'complete' && raw.status !== 'partial') {

@@ -602,16 +602,18 @@ function resolveFromTargetHashes(
   const { indexes, reasons, sourcePackage } = context;
   const { packages, targetMissing } = collectImportTargetPackages(dependency.to, indexes, reasons);
   if (!targetMissing && packages.size === 1) {
-    const selected = packages.values().next().value!;
-    return [
-      {
-        toPackage: selected,
-        target: selected,
-        resolution: 'internal',
-        ...withClass,
-        confidence: 'high',
-      },
-    ];
+    const selected = packages.values().next().value;
+    if (selected !== undefined) {
+      return [
+        {
+          toPackage: selected,
+          target: selected,
+          resolution: 'internal',
+          ...withClass,
+          confidence: 'high',
+        },
+      ];
+    }
   }
   // A relative same-package import whose body-twin resolves into several
   // packages is attributed to its own source package — not first-wins.

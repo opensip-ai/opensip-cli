@@ -6,6 +6,8 @@ export { registerGetRuntimeWiring } from '../get-runtime-wiring.js';
 export { registerGetSymbol } from '../get-symbol.js';
 export { registerPackageCycles } from '../package-cycles.js';
 export { registerPackageDependencies } from '../package-dependencies.js';
+export { registerReferencesTo } from '../references-to.js';
+export { registerSearchDeclarations } from '../search-declarations.js';
 export { registerSearchSymbols } from '../search-symbols.js';
 export { registerTracePath } from '../trace-path.js';
 export { registerWhoCalls } from '../who-calls.js';

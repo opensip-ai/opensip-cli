@@ -1,3 +1,5 @@
+// @fitness-ignore-file module-coupling-fan-out -- composition root for GraphReadPort: wires generation controller, package/symbol/declaration collaborators, and envelope assembly; high fan-out is the port's job.
+// @fitness-ignore-file file-length-limit -- SQLite graph read port aggregates every public query collaborator; length is inherent to the storage-facing facade.
 /**
  * SQLite-backed {@link GraphReadPort} (ADR-0084 + MCP Graph Audit Phase 1).
  *

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-08
-release: v0.5.3
+release: v0.6.0
 title: "External tool adapters"
 audience: [plugin-authors]
 purpose: "Wrap a local CLI scanner (gitleaks/semgrep/ruff/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."

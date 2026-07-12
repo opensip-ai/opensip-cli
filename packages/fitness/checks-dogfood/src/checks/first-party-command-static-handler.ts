@@ -1,3 +1,4 @@
+// @fitness-ignore-file shipped-checks-must-be-generic -- opensip-internal dogfood guard (ADR-0154): path-gated to first-party CLI/tool packages; inert for adopters.
 /**
  * @fileoverview First-party command specs must declare staticHandler metadata.
  *

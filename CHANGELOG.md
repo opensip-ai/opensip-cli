@@ -2,6 +2,83 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.6.0] - 2026-07-12
+
+An MCP audit-evidence correctness and efficiency release. Graph catalogs and
+MCP tools now carry complete import evidence, optional declaration/reference
+facts, four independent coverage facets, and exclusive compact projections so
+agents can diagnose connectors, packages, and runtime wiring without flooding
+context. Publishable packages fail closed on incomplete boundary maps and ship
+runtime artifacts only; test typecheck runs as an isolated monorepo lane.
+
+While opensip-cli is pre-1.0, this **minor is potentially breaking** for MCP
+clients and tool authors that assumed mixed verbose payloads, identity-stable
+`defineCommand` returns, or incomplete public package export maps.
+
+### Breaking
+
+- MCP graph tools default to **exclusive** compact `detail` modes
+  (`summary` | `groups` | `nodes`) instead of combining nodes with groups or
+  verbose mixed payloads. Identity searches (`search_symbols`,
+  `search_declarations`) default to `detail=nodes` with **limit 20** (caller
+  range still 1–500); other paged tools keep default 100 / max 500.
+- Package samples, cycle proofs, and architecture row families are **opt-in**;
+  default responses return counts/coverage without large evidence samples.
+- `defineCommand()` **copies and freezes** the validated spec (including optional
+  `staticHandler`); it is no longer an identity pass-through. Mutating a
+  returned spec or relying on `===` with the input fails.
+- Publishable package boundaries and production packlists are enforced: incomplete
+  export allowlists, test files in published `dist`, and masked workspace deps
+  fail CI. Consumers must use documented public barrels only.
+
+### Added
+
+- Optional catalog **semantic facts** (exact TypeScript): bounded declarations
+  and cross-file references with present-empty vs absent semantics; public
+  graph/read views and MCP tools `search_declarations` / `references_to`
+  (default MCP inventory **21** tools; **22** with mutation).
+- Complete module **import evidence** on exact catalogs (form/role/target/basis),
+  workspace declaration-entry attribution, and independent dependency/semantic
+  producer cache ABI segments (catalog version remains `3.0`, no SQL migration).
+- Four **coverage facets** (inventory / evidence / grouping / projection) on
+  graph MCP responses, independent of each other.
+- Config `graph.auditTestSourceGlobs` and an explicit source-role matcher for
+  audit-oriented test/production classification on reads.
+- Core `CommandSpec.staticHandler` descriptors and plain per-run
+  `RuntimeCommandInventory` on `RunScope`; CLI projects the full host+Tool
+  surface; MCP `get_runtime_wiring` bridges handlers to declarations without
+  inventing call edges (`w1:` runtime identity + `g1:` catalog join).
+- `get_agent_catalog` additive `mcp` block: live server version, surface epoch,
+  registered tool names/count, mutation posture, and canonical project root for
+  connector diagnosis (reconnect for a new surface; `refresh_graph` is not a
+  connector repair).
+- Architecture gates for complete package export allowlists, production packlists,
+  and derived Tool/package facts (ADR-0150, ADR-0151).
+- Isolated per-package **test typecheck** lane wired into monorepo typecheck/lint.
+- ADRs 0150–0154 (production artifacts only; package/export boundaries; dependency
+  and declaration evidence; faceted compact MCP protocol; declarative runtime
+  handler bridge). ADR-0153 supersedes ADR-0149.
+
+### Changed
+
+- Discovery diagnostics are caller-owned (`diagnosticIntent: normal | quiet`);
+  freshness/probe paths use quiet discovery so agent logs stay aggregate-level.
+- Managed agent guidance (`opensip init` blocks in AGENTS/CLAUDE) prioritizes
+  MCP evidence tools, four facets, declaration/reference separation, and
+  reconnect-vs-refresh diagnosis.
+- Public graph, MCP, configuration, and CLI dispatch docs document compact
+  defaults, audit source roles, and runtime inventory ownership.
+
+### Fixed
+
+- Package SCCs no longer include same-package self edges; architecture counters
+  and workspace declaration imports are hardened against hostile keys and
+  ambiguous attribution.
+- Review follow-ups after the MCP audit rollout (red gates and correctness bugs
+  across phases 2–9).
+- Root `yagni.sarif` dogfood artifact is no longer tracked; packaging excludes
+  tests from production builds.
+
 ## [0.5.3] - 2026-07-10
 
 An MCP graph-audit readiness release. Agents can inspect occurrence-precise

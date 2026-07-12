@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/format",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "license": "Apache-2.0",
   "description": "Pure, zero-dependency human presentation formatters and display projections for OpenSIP CLI surfaces (ADR-0144)",
   "keywords": [

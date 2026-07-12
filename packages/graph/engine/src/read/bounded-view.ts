@@ -4,6 +4,7 @@ import { compareCodePointStrings } from '../code-point-order.js';
 
 import type { CoverageFacet, GraphReadFacetCoverage } from './query-contracts.js';
 
+/** One group key and its match count for a bounded grouped read view. */
 export interface ReadGroupSummary {
   readonly key: string;
   readonly count: number;

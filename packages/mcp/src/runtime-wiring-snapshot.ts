@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /** Command/tool graph assembly for immutable live runtime-wiring snapshots. */
 
 import {

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.5.3
+release: v0.6.0
 title: "What is opensip-cli?"
 audience: [getting-started, contributors]
 purpose: "The front door — what problem opensip-cli solves, what it does, what it isn't, and how to try it."

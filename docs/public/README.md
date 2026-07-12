@@ -1,12 +1,12 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.5.3
+release: v0.6.0
 owner: opensip-cli
 indexable: true
 title: "opensip-cli Docs"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Public documentation entry point for opensip-cli v0.5.3: product overview, fast paths, and the full reference map."
+purpose: "Public documentation entry point for opensip-cli v0.6.0: product overview, fast paths, and the full reference map."
 ---
 # opensip-cli Docs
 
@@ -231,7 +231,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ## Factual Baseline
 
-This v0.5.3 doc set was rechecked against the source on 2026-07-11:
+This v0.6.0 doc set was rechecked against the source on 2026-07-11:
 
 - 160 built-in fitness checks across seven packs.
 - 56 publishable workspace packages, plus the two private workspace packages

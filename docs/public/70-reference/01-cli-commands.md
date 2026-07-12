@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-11
-release: v0.5.3
+release: v0.6.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."

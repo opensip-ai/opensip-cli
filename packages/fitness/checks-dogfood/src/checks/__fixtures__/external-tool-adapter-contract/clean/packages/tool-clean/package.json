@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-clean",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "private": true,
   "description": "Fixture package for the external adapter contract check",
   "dependencies": {
