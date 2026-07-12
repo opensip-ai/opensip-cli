@@ -21,7 +21,11 @@ import {
   type GraphSymbolRef,
   type SourceScope,
 } from './query-contracts.js';
-import { isCanonicalProductionFilter, matchesGraphSourceFilter } from './source-filter.js';
+import {
+  isCanonicalProductionFilter,
+  matchesGraphSourceFilterWithRoles,
+  type SourceRoleMatcher,
+} from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
@@ -178,12 +182,16 @@ function countArchitectureNodes(
   indexes: Indexes,
   filter: GraphSourceFilter,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): ArchitectureCounts {
   const bodyHashes = new Set<string>();
   const packageNames = new Set<string>();
   let occurrenceCount = 0;
   for (const occurrence of indexes.byOccId.values()) {
-    if (occurrence.kind === 'module-init' || !matchesGraphSourceFilter(occurrence, filter))
+    if (
+      occurrence.kind === 'module-init' ||
+      !matchesGraphSourceFilterWithRoles(occurrence, filter, matcher)
+    )
       continue;
     const symbol = toGraphSymbolRef(occurrence);
     if (symbol === undefined) {
@@ -233,6 +241,7 @@ function buildCallMetrics(
   indexes: Indexes,
   filter: GraphSourceFilter,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): CallEvidenceMetrics {
   const graph = occurrenceCallGraphFor(indexes);
   noteMalformedCalls(graph.malformedCalls, reasons);
@@ -249,8 +258,8 @@ function buildCallMetrics(
 
   for (const edge of graph.edges) {
     if (
-      !matchesGraphSourceFilter(edge.owner, filter) ||
-      !matchesGraphSourceFilter(edge.target, filter)
+      !matchesGraphSourceFilterWithRoles(edge.owner, filter, matcher) ||
+      !matchesGraphSourceFilterWithRoles(edge.target, filter, matcher)
     ) {
       continue;
     }
@@ -268,7 +277,7 @@ function buildCallMetrics(
     increment(resolvedResolution, edge.resolution);
   }
   for (const unresolved of graph.unresolved) {
-    if (!matchesGraphSourceFilter(unresolved.owner, filter)) continue;
+    if (!matchesGraphSourceFilterWithRoles(unresolved.owner, filter, matcher)) continue;
     const owner = toGraphSymbolRef(unresolved.owner);
     if (owner === undefined) {
       reasons.add(MALFORMED_SYMBOL_REASON);
@@ -381,14 +390,15 @@ function filteredPackageEdges(
   indexes: Indexes,
   filter: GraphSourceFilter,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): ArchitecturePackageEdgeRow[] {
   const buckets = new Map<string, ArchitecturePackageEdgeRow>();
   const graph = occurrenceCallGraphFor(indexes);
   noteMalformedCalls(graph.malformedCalls, reasons);
   for (const edge of graph.edges) {
     if (
-      !matchesGraphSourceFilter(edge.owner, filter) ||
-      !matchesGraphSourceFilter(edge.target, filter)
+      !matchesGraphSourceFilterWithRoles(edge.owner, filter, matcher) ||
+      !matchesGraphSourceFilterWithRoles(edge.target, filter, matcher)
     ) {
       continue;
     }
@@ -417,10 +427,11 @@ function buildPackageEdges(
   filter: GraphSourceFilter,
   reasons: Set<string>,
   cachedFeatures: FeatureTable | undefined,
+  matcher: SourceRoleMatcher,
 ): ArchitecturePackageEdgeRow[] {
   const rows = isCanonicalProductionFilter(filter)
     ? canonicalPackageEdges(catalog, indexes, filter, reasons, cachedFeatures)
-    : filteredPackageEdges(catalog, indexes, filter, reasons);
+    : filteredPackageEdges(catalog, indexes, filter, reasons, matcher);
   const selected = boundedArchitectureRows(rows, MAX_ORIENTATION_ROWS, comparePackageEdges);
   if (selected.truncated) reasons.add('package-edge-cap');
   return [...selected.rows];
@@ -432,6 +443,7 @@ function buildHotspots(
   filter: GraphSourceFilter,
   reasons: Set<string>,
   cachedFeatures: FeatureTable | undefined,
+  matcher: SourceRoleMatcher,
 ): ArchitectureHotspot[] {
   const features = cachedFeatures ?? buildFeatures(catalog, indexes, {}, ['blast']);
   const allTwinCounts = new Map<string, number>();
@@ -445,7 +457,7 @@ function buildHotspots(
       continue;
     }
     allTwinCounts.set(symbol.bodyHash, (allTwinCounts.get(symbol.bodyHash) ?? 0) + 1);
-    if (matchesGraphSourceFilter(symbol, filter)) {
+    if (matchesGraphSourceFilterWithRoles(symbol, filter, matcher)) {
       matchingTwinCounts.set(symbol.bodyHash, (matchingTwinCounts.get(symbol.bodyHash) ?? 0) + 1);
       const prior = representatives.get(symbol.bodyHash);
       if (prior === undefined || compareCodePointStrings(symbol.symbolId, prior.symbolId) < 0) {
@@ -540,6 +552,7 @@ export function buildArchitectureView(
   catalog: Catalog,
   indexes: Indexes,
   query: ArchitectureViewQuery,
+  matcher: SourceRoleMatcher,
   cachedFeatures?: FeatureTable,
 ): Result<ArchitectureView, GraphReadError> {
   try {
@@ -547,9 +560,9 @@ export function buildArchitectureView(
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
     const reasons = new Set<string>();
     if (resolutionMode(catalog) === 'fast') reasons.add('fast-resolution-approximate');
-    const counts = countArchitectureNodes(indexes, filter, reasons);
-    const packageEdges = buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures);
-    const hotspots = buildHotspots(catalog, indexes, filter, reasons, cachedFeatures);
+    const counts = countArchitectureNodes(indexes, filter, reasons, matcher);
+    const packageEdges = buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures, matcher);
+    const hotspots = buildHotspots(catalog, indexes, filter, reasons, cachedFeatures, matcher);
     const packageAfter = resolveStableAnchor(
       packageEdges,
       query.afterPackageEdgeKey,
@@ -585,7 +598,7 @@ export function buildArchitectureView(
     );
     const grouped = architectureGroups(packageEdges, hotspots, query.groupBy ?? 'none');
     if (grouped?.truncated === true) reasons.add('group-key-cap');
-    const callEvidence = buildCallMetrics(catalog, indexes, filter, reasons);
+    const callEvidence = buildCallMetrics(catalog, indexes, filter, reasons, matcher);
     const reasonValues = [...reasons].sort(compareCodePointStrings);
 
     return ok({

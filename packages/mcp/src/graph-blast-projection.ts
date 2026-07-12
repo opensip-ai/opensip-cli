@@ -2,8 +2,9 @@ import { ok, type Result } from '@opensip-cli/core';
 import {
   codePointSortKey,
   compareCodePointStrings,
-  matchesGraphSourceFilter,
+  matchesGraphSourceFilterWithRoles,
   type GraphSourceFilter,
+  type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
 
 import { digestNormalizedQuery, groupRows, pageRows } from './graph-query-page.js';
@@ -38,6 +39,7 @@ export interface BlastMemberProjectionInput {
   readonly bodyHash: string;
   readonly symbolId: string;
   readonly filter: GraphSourceFilter;
+  readonly matcher: SourceRoleMatcher;
   readonly options: BlastOptions;
   readonly projectKey: string;
 }
@@ -45,7 +47,7 @@ export interface BlastMemberProjectionInput {
 export function projectBlastMembers(
   input: BlastMemberProjectionInput,
 ): Result<BlastMemberProjection, McpReadError> {
-  const { generation, bodyHash, symbolId, filter, options, projectKey } = input;
+  const { generation, bodyHash, symbolId, filter, matcher, options, projectKey } = input;
   const limit = boundedLimit(options?.limit);
   const allOccurrences = generation.indexes.occurrencesByHash.get(bodyHash) ?? [];
   const membershipCapped = allOccurrences.length > MAX_BLAST_OCCURRENCES;
@@ -57,7 +59,9 @@ export function projectBlastMembers(
   const projected = projectedRows.filter(
     (symbol, index) => index === 0 || projectedRows[index - 1]?.symbolId !== symbol.symbolId,
   );
-  const matching = projected.filter((symbol) => matchesGraphSourceFilter(symbol, filter));
+  const matching = projected.filter((symbol) =>
+    matchesGraphSourceFilterWithRoles(symbol, filter, matcher),
+  );
   const requestedOccurrence = generation.indexes.byOccId.get(symbolId);
   const requested =
     requestedOccurrence?.bodyHash === bodyHash ? toSymbolRef(requestedOccurrence) : undefined;

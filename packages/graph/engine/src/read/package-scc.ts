@@ -14,6 +14,7 @@ import {
 } from './package-evidence.js';
 
 import type { GraphReadCoverage } from './query-contracts.js';
+import type { SourceRoleMatcher } from './source-filter.js';
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
@@ -137,10 +138,11 @@ export function buildPackageScc(
   catalog: Catalog,
   indexes: Indexes,
   query: PackageEvidenceQuery,
+  matcher: SourceRoleMatcher,
   cachedFeatures?: FeatureTable,
 ): Result<PackageSccView, GraphReadError> {
   try {
-    const evidence = buildPackageEvidence(catalog, indexes, query, cachedFeatures);
+    const evidence = buildPackageEvidence(catalog, indexes, query, matcher, cachedFeatures);
     if (!evidence.ok) return evidence;
     const proof = cycleProofRows(evidence.value);
     const adjacency = packageAdjacency(proof);

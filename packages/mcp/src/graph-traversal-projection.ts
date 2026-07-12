@@ -4,6 +4,7 @@ import {
   codePointSortKey,
   type GraphSourceFilter,
   type OccurrenceCallView,
+  type SourceRoleMatcher,
   type TraversalIdentity,
 } from '@opensip-cli/graph/read';
 
@@ -80,6 +81,7 @@ export function projectTraversal(
   query: TraversalQuery,
   filter: GraphSourceFilter,
   projectKey: string,
+  matcher: SourceRoleMatcher,
 ): Result<TraversalProjection, McpReadError> {
   const identity = query.identity ?? 'occurrence';
   const limit = boundedLimit(query.limit);
@@ -116,15 +118,20 @@ export function projectTraversal(
     );
   }
 
-  const view = buildOccurrenceCallView(generation.catalog, generation.indexes, {
-    filter,
-    identity,
-    startSymbolId: query.startSymbolId,
-    goalSymbolId: query.goalSymbolId,
-    direction: query.direction === 'path' ? 'callees' : query.direction,
-    depth: query.depth ?? 5,
-    maxNodes: MAX_WALK_NODES,
-  });
+  const view = buildOccurrenceCallView(
+    generation.catalog,
+    generation.indexes,
+    {
+      filter,
+      identity,
+      startSymbolId: query.startSymbolId,
+      goalSymbolId: query.goalSymbolId,
+      direction: query.direction === 'path' ? 'callees' : query.direction,
+      depth: query.depth ?? 5,
+      maxNodes: MAX_WALK_NODES,
+    },
+    matcher,
+  );
   if (!view.ok) return err(fromGraphReadError(view.error));
 
   const startKey = identity === 'occurrence' ? query.startSymbolId : start.bodyHash;

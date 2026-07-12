@@ -8,9 +8,12 @@ import {
   hotspotStableKey,
   packageEdgeStableKey,
 } from '../read/architecture-view.js';
+import { type SourceRoleMatcher } from '../read/index.js';
 import { type GraphSourceFilter } from '../read/query-contracts.js';
 
 import type { Catalog, FunctionOccurrence } from '../types.js';
+
+const noMatcher: SourceRoleMatcher = { matches: () => false };
 
 function reversed<T>(values: readonly T[]): T[] {
   return values.reduceRight<T[]>((output, value) => {
@@ -130,7 +133,7 @@ function makeCatalog(): Catalog {
 function view(filter: GraphSourceFilter, limit = 25) {
   const catalog = makeCatalog();
   const indexes = buildIndexes(catalog);
-  return buildArchitectureView(catalog, indexes, { filter, limit });
+  return buildArchitectureView(catalog, indexes, { filter, limit }, noMatcher);
 }
 
 describe('buildArchitectureView', () => {
@@ -296,7 +299,7 @@ describe('buildArchitectureView', () => {
         generated: 'include',
       },
       limit: 25,
-    });
+    }, noMatcher);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.occurrenceCount.value).toBe(5);
@@ -360,7 +363,7 @@ describe('buildArchitectureView', () => {
     const result = buildArchitectureView(catalog, buildIndexes(catalog), {
       filter: { packages: ['pkg-a', 'pkg-b'], sourceScope: 'all', generated: 'include' },
       limit: 25,
-    });
+    }, noMatcher);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const ce = result.value.callEvidence;
@@ -386,7 +389,7 @@ describe('buildArchitectureView', () => {
     const catalog = makeCatalog();
     const indexes = buildIndexes(catalog);
     const filter: GraphSourceFilter = { sourceScope: 'production', generated: 'exclude' };
-    const first = buildArchitectureView(catalog, indexes, { filter, limit: 1 });
+    const first = buildArchitectureView(catalog, indexes, { filter, limit: 1 }, noMatcher);
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     const packageKey = first.value.packageEdges[0];
@@ -402,7 +405,7 @@ describe('buildArchitectureView', () => {
       afterHotspotKey: continuationToken(hotspotStableKey(hotspotKey)),
       packageEdgesDone: !first.value.packageEdgesHasMore,
       hotspotsDone: !first.value.hotspotsHasMore,
-    });
+    }, noMatcher);
     expect(second.ok).toBe(true);
     if (!second.ok) return;
     if (!first.value.packageEdgesHasMore) expect(second.value.packageEdges).toEqual([]);
@@ -417,7 +420,7 @@ describe('buildArchitectureView', () => {
       filter: { sourceScope: 'production', generated: 'exclude' },
       limit: 1,
       groupBy: 'file',
-    });
+    }, noMatcher);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.hotspots).toHaveLength(1);
@@ -457,11 +460,11 @@ describe('buildArchitectureView', () => {
     const forward = buildArchitectureView(forwardCatalog, buildIndexes(forwardCatalog), {
       filter,
       limit: 25,
-    });
+    }, noMatcher);
     const reverse = buildArchitectureView(reverseCatalog, buildIndexes(reverseCatalog), {
       filter,
       limit: 25,
-    });
+    }, noMatcher);
     expect(forward.ok).toBe(true);
     expect(reverse.ok).toBe(true);
     if (!forward.ok || !reverse.ok) return;

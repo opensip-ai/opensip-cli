@@ -128,17 +128,6 @@ export function matchesGraphSourceFilterWithRoles(
   return matchesNonScopeFilter(row, filter);
 }
 
-/**
- * Phase-local matcher-less source filter (P2 Phase 1.4). Evaluates source scope
- * from the adapter `inTestFile` bit ALONE — audit source-role globs are NOT
- * applied. Retained only until Tasks 1.5-1.6 route every caller through
- * {@link matchesGraphSourceFilterWithRoles}; deleted in Task 1.6.
- */
-export function matchesGraphSourceFilter(row: FilterableRow, filter: GraphSourceFilter): boolean {
-  if (!matchesSourceScope(row.inTestFile, filter.sourceScope)) return false;
-  return matchesNonScopeFilter(row, filter);
-}
-
 /** Filter checks independent of the source-scope/test classification. */
 function matchesNonScopeFilter(row: FilterableRow, filter: GraphSourceFilter): boolean {
   if (!matchesGenerated(row.definedInGenerated, filter.generated)) return false;

@@ -28,7 +28,7 @@ import {
   type GraphSourceFilter,
   type GraphSymbolRef,
 } from './query-contracts.js';
-import { matchesGraphSourceFilter } from './source-filter.js';
+import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type { Catalog, Indexes } from '../types.js';
@@ -91,10 +91,11 @@ export function compareSymbolRefs(a: GraphSymbolRef, b: GraphSymbolRef): number 
 function* matchingSymbolRefs(
   indexes: Indexes,
   query: SymbolSearchQuery,
+  matcher: SourceRoleMatcher,
 ): Generator<GraphSymbolRef> {
   for (const occurrence of indexes.byOccId.values()) {
     if (occurrence.kind === 'module-init') continue;
-    if (!matchesGraphSourceFilter(occurrence, query.filter)) continue;
+    if (!matchesGraphSourceFilterWithRoles(occurrence, query.filter, matcher)) continue;
     if (!matchesQuery(occurrence, query.query, query.match)) continue;
     const ref = toGraphSymbolRef(occurrence);
     if (ref !== undefined) yield ref;
@@ -127,12 +128,13 @@ function collectSearchWindow(
   indexes: Indexes,
   query: SymbolSearchQuery,
   windowCap: number,
+  matcher: SourceRoleMatcher,
 ): { readonly window: GraphSymbolRef[]; readonly omittedMalformed: number } {
   const window: GraphSymbolRef[] = [];
   let omittedMalformed = 0;
   for (const occurrence of indexes.byOccId.values()) {
     if (occurrence.kind === 'module-init') continue;
-    if (!matchesGraphSourceFilter(occurrence, query.filter)) continue;
+    if (!matchesGraphSourceFilterWithRoles(occurrence, query.filter, matcher)) continue;
     if (!matchesQuery(occurrence, query.query, query.match)) continue;
     const ref = toGraphSymbolRef(occurrence);
     if (ref === undefined) {
@@ -153,9 +155,10 @@ function collectSearchWindow(
 function resolveAfterStableKey(
   indexes: Indexes,
   query: SymbolSearchQuery,
+  matcher: SourceRoleMatcher,
 ): string | null | undefined {
   if (query.afterKey === undefined) return undefined;
-  for (const ref of matchingSymbolRefs(indexes, query)) {
+  for (const ref of matchingSymbolRefs(indexes, query, matcher)) {
     const stableKey = symbolSearchStableKey(ref);
     if (matchesContinuationIdentity(stableKey, query.afterKey)) return stableKey;
   }
@@ -172,11 +175,12 @@ export function searchSymbolOccurrences(
   _catalog: Catalog,
   indexes: Indexes,
   query: SymbolSearchQuery,
+  matcher: SourceRoleMatcher,
 ): Result<SymbolSearchView, GraphReadError> {
   try {
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
     const windowCap = limit + 1;
-    const afterStableKey = resolveAfterStableKey(indexes, query);
+    const afterStableKey = resolveAfterStableKey(indexes, query, matcher);
     if (afterStableKey === null) {
       return err({
         code: 'GRAPH.READ.CURSOR_INVALID',
@@ -188,7 +192,12 @@ export function searchSymbolOccurrences(
       ...query,
       ...(afterStableKey === undefined ? {} : { afterKey: afterStableKey }),
     };
-    const { window, omittedMalformed } = collectSearchWindow(indexes, resolvedQuery, windowCap);
+    const { window, omittedMalformed } = collectSearchWindow(
+      indexes,
+      resolvedQuery,
+      windowCap,
+      matcher,
+    );
 
     const hasMore = window.length > limit;
     const symbols = hasMore ? window.slice(0, limit) : window;
@@ -199,7 +208,7 @@ export function searchSymbolOccurrences(
       groupBy === 'none'
         ? undefined
         : boundedIterableGroups(
-            () => matchingSymbolRefs(indexes, query),
+            () => matchingSymbolRefs(indexes, query, matcher),
             (ref) => (groupBy === 'package' ? ref.package : ref.filePath),
           );
     if (grouped?.truncated === true) reasons.push('group-key-cap');

@@ -2,15 +2,38 @@ import { describe, expect, it } from 'vitest';
 
 import { buildFeatures } from '../pipeline/features.js';
 import { buildIndexes } from '../pipeline/indexes.js';
-import { buildPackageEvidence } from '../read/package-evidence.js';
-import { buildPackageScc } from '../read/package-scc.js';
+import { buildPackageEvidence as rawBuildPackageEvidence } from '../read/package-evidence.js';
+import { buildPackageScc as rawBuildPackageScc } from '../read/package-scc.js';
 
+import type { SourceRoleMatcher } from '../read/index.js';
 import type {
   Catalog,
   DependencyClassification,
   DependencyEdge,
   FunctionOccurrence,
 } from '../types.js';
+
+// Task 1.5 threads a required source-role matcher through the package views;
+// these tests exercise no audit globs, so a no-op matcher is used everywhere.
+const noMatcher: SourceRoleMatcher = { matches: () => false };
+type PkgEvidenceArgs = Parameters<typeof rawBuildPackageEvidence>;
+type PkgSccArgs = Parameters<typeof rawBuildPackageScc>;
+function buildPackageEvidence(
+  catalog: PkgEvidenceArgs[0],
+  indexes: PkgEvidenceArgs[1],
+  query: PkgEvidenceArgs[2],
+  cachedFeatures?: PkgEvidenceArgs[4],
+): ReturnType<typeof rawBuildPackageEvidence> {
+  return rawBuildPackageEvidence(catalog, indexes, query, noMatcher, cachedFeatures);
+}
+function buildPackageScc(
+  catalog: PkgSccArgs[0],
+  indexes: PkgSccArgs[1],
+  query: PkgSccArgs[2],
+  cachedFeatures?: PkgSccArgs[4],
+): ReturnType<typeof rawBuildPackageScc> {
+  return rawBuildPackageScc(catalog, indexes, query, noMatcher, cachedFeatures);
+}
 
 function occurrence(
   partial: Partial<FunctionOccurrence> &

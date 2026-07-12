@@ -112,12 +112,15 @@ export class SqliteGraphPackageQueries {
             filter,
           });
         }
+        const matcher = this.deps.context.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
         const views: PackageEvidenceView[] = [];
         for (const selector of packageSelectors(query.package, direction)) {
           const view = buildPackageEvidence(
             gen.catalog,
             gen.indexes,
             { edgeKind, filter, ...selector },
+            matcher.value,
             this.deps.features(gen),
           );
           if (!view.ok) return err(fromGraphReadError(view.error));
@@ -192,6 +195,8 @@ export class SqliteGraphPackageQueries {
             { page: { limit }, filter },
           );
         }
+        const matcher = this.deps.context.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
         const view = buildPackageEvidence(
           gen.catalog,
           gen.indexes,
@@ -201,6 +206,7 @@ export class SqliteGraphPackageQueries {
             fromPackage: query.fromPackage,
             toPackage: query.toPackage,
           },
+          matcher.value,
           this.deps.features(gen),
         );
         if (!view.ok) return err(fromGraphReadError(view.error));
@@ -262,10 +268,13 @@ export class SqliteGraphPackageQueries {
             filter,
           });
         }
+        const matcher = this.deps.context.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
         const view = buildPackageScc(
           gen.catalog,
           gen.indexes,
           { edgeKind, filter },
+          matcher.value,
           this.deps.features(gen),
         );
         if (!view.ok) return err(fromGraphReadError(view.error));

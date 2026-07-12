@@ -22,7 +22,11 @@ import {
   type PackageImportEvidence,
   type SourceScope,
 } from './query-contracts.js';
-import { isCanonicalProductionFilter, matchesGraphSourceFilter } from './source-filter.js';
+import {
+  isCanonicalProductionFilter,
+  matchesGraphSourceFilterWithRoles,
+  type SourceRoleMatcher,
+} from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type {
@@ -271,6 +275,7 @@ interface CallCollectionState {
   readonly evidence: PackageCallEvidence[];
   readonly evidenceCount: { value: number };
   readonly reasons: Set<string>;
+  readonly matcher: SourceRoleMatcher;
 }
 
 function collectResolvedCallEdge(
@@ -279,8 +284,8 @@ function collectResolvedCallEdge(
   state: CallCollectionState,
 ): void {
   if (
-    !matchesGraphSourceFilter(edge.owner, query.filter) ||
-    !matchesGraphSourceFilter(edge.target, query.filter)
+    !matchesGraphSourceFilterWithRoles(edge.owner, query.filter, state.matcher) ||
+    !matchesGraphSourceFilterWithRoles(edge.target, query.filter, state.matcher)
   ) {
     return;
   }
@@ -315,6 +320,7 @@ function collectCallBuckets(
   indexes: Indexes,
   query: PackageEvidenceQuery,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): {
   buckets: BoundedBucketState<MutableCallBucket>;
   evidence: PackageCallEvidence[];
@@ -327,7 +333,7 @@ function collectCallBuckets(
   const evidence: PackageCallEvidence[] = [];
   const evidenceCount = { value: 0 };
   const graph = occurrenceCallGraphFor(indexes);
-  const state = { buckets, evidence, evidenceCount, reasons };
+  const state = { buckets, evidence, evidenceCount, reasons, matcher };
   if (graph.malformedCalls > 0) addReason(reasons, 'malformed-call-edge-omitted');
 
   for (const edge of graph.edges) {
@@ -387,12 +393,13 @@ function buildCallRows(
   query: PackageEvidenceQuery,
   reasons: Set<string>,
   cachedFeatures: FeatureTable | undefined,
+  matcher: SourceRoleMatcher,
 ): {
   rows: PackageCallEvidenceRow[];
   evidence: PackageCallEvidence[];
   totalEvidence: number;
 } {
-  const collected = collectCallBuckets(catalog, indexes, query, reasons);
+  const collected = collectCallBuckets(catalog, indexes, query, reasons, matcher);
   const buckets = applyCanonicalCounts({
     catalog,
     indexes,
@@ -621,9 +628,13 @@ function appendImportEvidence(
   insertUniqueBoundedTopK(allEvidence, evidence, MAX_EVIDENCE, compareImportEvidence);
 }
 
-function moduleMatchesImportFilter(occurrence: FunctionOccurrence, filter: GraphSourceFilter) {
+function moduleMatchesImportFilter(
+  occurrence: FunctionOccurrence,
+  filter: GraphSourceFilter,
+  matcher: SourceRoleMatcher,
+) {
   if (filter.kinds !== undefined && !filter.kinds.includes('module-init')) return false;
-  return matchesGraphSourceFilter(occurrence, filter);
+  return matchesGraphSourceFilterWithRoles(occurrence, filter, matcher);
 }
 
 interface ImportCollectionState {
@@ -639,6 +650,7 @@ interface ImportCollectionContext {
   readonly reasons: Set<string>;
   readonly evidenceCount: { value: number };
   readonly catalogLanguage: string;
+  readonly matcher: SourceRoleMatcher;
 }
 
 function collectDependencyImports(
@@ -722,7 +734,10 @@ function collectOccurrenceImports(
   state: ImportCollectionState,
 ): void {
   const { query, reasons } = context;
-  if (occurrence.kind !== 'module-init' || !moduleMatchesImportFilter(occurrence, query.filter)) {
+  if (
+    occurrence.kind !== 'module-init' ||
+    !moduleMatchesImportFilter(occurrence, query.filter, context.matcher)
+  ) {
     return;
   }
   state.moduleCount++;
@@ -750,6 +765,7 @@ function buildImportRows(
   indexes: Indexes,
   query: PackageEvidenceQuery,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): {
   rows: PackageImportEvidenceRow[];
   evidence: PackageImportEvidence[];
@@ -773,6 +789,7 @@ function buildImportRows(
     reasons,
     evidenceCount,
     catalogLanguage: catalog.language,
+    matcher,
   };
 
   for (const occurrence of indexes.byOccId.values()) {
@@ -814,6 +831,7 @@ export function buildPackageEvidence(
   catalog: Catalog,
   indexes: Indexes,
   query: PackageEvidenceQuery,
+  matcher: SourceRoleMatcher,
   cachedFeatures?: FeatureTable,
 ): Result<PackageEvidenceView, GraphReadError> {
   try {
@@ -821,11 +839,11 @@ export function buildPackageEvidence(
     const importReasons = new Set<string>();
     const calls =
       query.edgeKind === 'call' || query.edgeKind === 'combined'
-        ? buildCallRows(catalog, indexes, query, callReasons, cachedFeatures)
+        ? buildCallRows(catalog, indexes, query, callReasons, cachedFeatures, matcher)
         : { rows: [], evidence: [], totalEvidence: 0 };
     const imports =
       query.edgeKind === 'import' || query.edgeKind === 'combined'
-        ? buildImportRows(catalog, indexes, query, importReasons)
+        ? buildImportRows(catalog, indexes, query, importReasons, matcher)
         : { rows: [], evidence: [], totalEvidence: 0 };
     const reasons = new Set([...callReasons, ...importReasons]);
     return ok({

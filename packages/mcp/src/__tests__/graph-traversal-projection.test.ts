@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
 import { createGeneration } from '../catalog-generation.js';
-import { projectTraversal } from '../graph-traversal-projection.js';
+import { projectTraversal as rawProjectTraversal } from '../graph-traversal-projection.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
+import type { SourceRoleMatcher } from '@opensip-cli/graph/read';
+
+// Task 1.5: projectTraversal now requires a source-role matcher; these tests use
+// no audit globs, so a no-op matcher is threaded through a thin wrapper.
+const noMatcher: SourceRoleMatcher = { matches: () => false };
+type ProjectTraversalArgs = Parameters<typeof rawProjectTraversal>;
+function projectTraversal(
+  generation: ProjectTraversalArgs[0],
+  query: ProjectTraversalArgs[1],
+  filter: ProjectTraversalArgs[2],
+  projectKey: ProjectTraversalArgs[3],
+): ReturnType<typeof rawProjectTraversal> {
+  return rawProjectTraversal(generation, query, filter, projectKey, noMatcher);
+}
 
 function occurrence(
   partial: Partial<FunctionOccurrence> &

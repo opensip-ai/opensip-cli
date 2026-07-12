@@ -574,6 +574,55 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(Array.isArray(arch.value.data.hotspots)).toBe(true);
   });
 
+  it('reclassifies configured support paths to test scope end-to-end (P2 Phase 1)', async () => {
+    // A non-test production file plus a support file the adapter did NOT flag as
+    // a test (inTestFile false). Audit globs should move the support file to test
+    // scope so it drops out of the production architecture summary.
+    const roleCatalog: Catalog = {
+      ...seededCatalog(),
+      functions: {
+        prod: [fnOcc({ bodyHash: 'h-prod', simpleName: 'prodFn', filePath: 'packages/core/src/index.ts', package: 'pkg-core' })],
+        support: [
+          fnOcc({
+            bodyHash: 'h-support',
+            simpleName: 'supportFn',
+            filePath: 'packages/test-support/src/harness.ts',
+            package: 'pkg-test-support',
+            inTestFile: false,
+          }),
+        ],
+      },
+    };
+    new CatalogRepo(store).replaceAll(roleCatalog);
+
+    // Control: no audit globs → the support file stays in production scope.
+    const base = makePort(store);
+    const baseArch = await base.architectureSummary({ limit: 10 });
+    expect(baseArch.ok).toBe(true);
+    if (!baseArch.ok) return;
+    expect(baseArch.value.data.occurrenceCount.value).toBe(2);
+    expect(baseArch.value.filter?.sourceRoles).toBeUndefined();
+
+    // Audited: the support glob reclassifies the support file as a test source,
+    // excluding it from the production summary, and the plain policy is echoed.
+    const audited = new SqliteGraphReadPort({
+      store,
+      projectRoot: PROJECT,
+      adapters: stubAdapters(),
+      languageAdapters: [],
+      rebuild: () => Promise.resolve(ok(roleCatalog)),
+      config: { auditTestSourceGlobs: ['packages/test-support/**'] },
+    });
+    const arch = await audited.architectureSummary({ limit: 10 });
+    expect(arch.ok).toBe(true);
+    if (!arch.ok) return;
+    expect(arch.value.data.occurrenceCount.value).toBe(1);
+    expect(arch.value.filter?.sourceRoles).toEqual({
+      testGlobs: ['packages/test-support/**'],
+      mode: 'audit-test-globs-v1',
+    });
+  });
+
   it('deadCode filters before pagination and rejects stale cursors', async () => {
     new CatalogRepo(store).replaceAll(seededCatalog());
     const port = makePort(store);

@@ -21,7 +21,6 @@ export {
   continuationToken,
 } from '../code-point-order.js';
 export {
-  matchesGraphSourceFilter,
   matchesGraphSourceFilterWithRoles,
   matchesFilePrefix,
   compileSourceRoleMatcher,

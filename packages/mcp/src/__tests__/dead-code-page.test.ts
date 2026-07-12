@@ -2,9 +2,23 @@ import { continuationToken } from '@opensip-cli/graph/read';
 import { describe, expect, it } from 'vitest';
 
 import { createGeneration } from '../catalog-generation.js';
-import { deadCodeStableKey, MAX_ORPHAN_EVALUATION, pageDeadCode } from '../dead-code-page.js';
+import {
+  deadCodeStableKey,
+  MAX_ORPHAN_EVALUATION,
+  pageDeadCode as rawPageDeadCode,
+} from '../dead-code-page.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
+import type { SourceRoleMatcher } from '@opensip-cli/graph/read';
+
+// Task 1.6 threads a required source-role matcher; these tests use no audit
+// globs, so a no-op matcher is injected through a thin wrapper.
+const noMatcher: SourceRoleMatcher = { matches: () => false };
+function pageDeadCode(
+  input: Omit<Parameters<typeof rawPageDeadCode>[0], 'matcher'>,
+): ReturnType<typeof rawPageDeadCode> {
+  return rawPageDeadCode({ ...input, matcher: noMatcher });
+}
 
 function occurrence(index: number): FunctionOccurrence {
   return {

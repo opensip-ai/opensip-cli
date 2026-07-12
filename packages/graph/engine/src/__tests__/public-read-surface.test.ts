@@ -27,7 +27,6 @@ const EXPECTED = [
   'evaluateGraphOrphans',
   'classifyGraphReadCatalog',
   'computeGraphReadFilesFingerprint',
-  'matchesGraphSourceFilter',
   'matchesGraphSourceFilterWithRoles',
   'matchesFilePrefix',
   'compileSourceRoleMatcher',

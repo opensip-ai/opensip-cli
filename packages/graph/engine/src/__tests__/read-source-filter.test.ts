@@ -6,7 +6,6 @@ import {
   GRAPH_SYMBOL_NAME_MAX,
   GRAPH_SYMBOL_PATH_MAX,
   matchesFilePrefix,
-  matchesGraphSourceFilter,
   matchesGraphSourceFilterWithRoles,
   MAX_AUDIT_SOURCE_ROLE_FILES,
   toGraphSymbolRef,
@@ -21,6 +20,16 @@ const policy = (testGlobs: readonly string[]): AuditSourceRolePolicy => ({
   testGlobs,
   mode: 'audit-test-globs-v1',
 });
+
+// The matcher-less overload was deleted in Task 1.6; these scope/narrowing tests
+// exercise the canonical role-aware filter with an empty (no-op) matcher.
+const emptyMatcher: SourceRoleMatcher = { matches: () => false };
+function matchesGraphSourceFilter(
+  row: Parameters<typeof matchesGraphSourceFilterWithRoles>[0],
+  filter: GraphSourceFilter,
+): boolean {
+  return matchesGraphSourceFilterWithRoles(row, filter, emptyMatcher);
+}
 
 function unwrapMatcher(
   result: ReturnType<typeof compileSourceRoleMatcher>,

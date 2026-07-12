@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import { createGeneration } from '../catalog-generation.js';
-import { projectBlastMembers } from '../graph-blast-projection.js';
+import { projectBlastMembers as rawProjectBlastMembers } from '../graph-blast-projection.js';
 
 import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
+import type { SourceRoleMatcher } from '@opensip-cli/graph/read';
+
+// Task 1.6 threads a required source-role matcher; these tests use no audit
+// globs, so a no-op matcher is injected through a thin wrapper.
+const noMatcher: SourceRoleMatcher = { matches: () => false };
+function projectBlastMembers(
+  input: Omit<Parameters<typeof rawProjectBlastMembers>[0], 'matcher'>,
+): ReturnType<typeof rawProjectBlastMembers> {
+  return rawProjectBlastMembers({ ...input, matcher: noMatcher });
+}
 
 function member(filePath: string, packageName: string): FunctionOccurrence {
   return {

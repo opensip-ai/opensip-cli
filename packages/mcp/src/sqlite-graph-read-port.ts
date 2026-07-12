@@ -15,6 +15,7 @@ import {
   readCatalogIdentity,
   verifyCatalogInputs,
   type Catalog,
+  type AuditSourceRolePolicy,
   type FeatureColumn,
   type FeatureTable,
   type GraphAdapterRegistryReader,
@@ -66,6 +67,20 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
+
+/**
+ * Resolve the plain audit source-role policy from the validated graph config
+ * (P2 Phase 1.4). Returns `{}` (no `sourceRolePolicy` key) when no globs are
+ * configured, so the query context echoes nothing and compiles the no-op matcher.
+ */
+function sourceRolePolicyDep(
+  config: GraphConfig,
+): { sourceRolePolicy?: AuditSourceRolePolicy } {
+  const testGlobs = config.auditTestSourceGlobs ?? [];
+  if (testGlobs.length === 0) return {};
+  return { sourceRolePolicy: { testGlobs, mode: 'audit-test-globs-v1' } };
+}
+
 export interface SqliteGraphReadPortDeps {
   readonly store: DataStore;
   readonly projectRoot: string;
@@ -106,6 +121,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
     this.queryContext = new SqliteGraphQueryContext(this.controller, {
       projectRoot: deps.projectRoot,
       ...(deps.configPath === undefined ? {} : { configPath: deps.configPath }),
+      ...sourceRolePolicyDep(this.config),
       ...(deps.log === undefined ? {} : { log: deps.log }),
     });
     this.packageQueries = new SqliteGraphPackageQueries({
@@ -148,7 +164,15 @@ export class SqliteGraphReadPort implements GraphReadPort {
       'traverse',
       { identityMode: identity, sourceScope: filter.sourceScope },
       (gen, freshness) => {
-        const projected = projectTraversal(gen, query, filter, this.queryContext.projectKey);
+        const matcher = this.queryContext.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
+        const projected = projectTraversal(
+          gen,
+          query,
+          filter,
+          this.queryContext.projectKey,
+          matcher.value,
+        );
         if (!projected.ok) return projected;
         return this.queryContext.envelope(
           projected.value.data,
@@ -190,11 +214,14 @@ export class SqliteGraphReadPort implements GraphReadPort {
         if (occ === undefined) return this.queryContext.envelope(undefined, gen, freshness);
         const score = this.generationFeatures(gen).function.get(occ.bodyHash)?.blast;
         if (score === undefined) return this.queryContext.envelope(undefined, gen, freshness);
+        const blastMatcher = this.queryContext.sourceRoleMatcherFor(gen);
+        if (!blastMatcher.ok) return blastMatcher;
         const projected = projectBlastMembers({
           generation: gen,
           bodyHash: occ.bodyHash,
           symbolId,
           filter,
+          matcher: blastMatcher.value,
           options: opts,
           projectKey: this.queryContext.projectKey,
         });
@@ -264,10 +291,13 @@ export class SqliteGraphReadPort implements GraphReadPort {
         };
         const after = this.queryContext.resolveAfterKey(query?.cursor, binding);
         if (!after.ok) return after;
+        const deadCodeMatcher = this.queryContext.sourceRoleMatcherFor(gen);
+        if (!deadCodeMatcher.ok) return deadCodeMatcher;
         const page = pageDeadCode({
           generation: gen,
           config: this.config,
           filter,
+          matcher: deadCodeMatcher.value,
           limit,
           afterKey: after.value,
           groupBy,
@@ -327,6 +357,8 @@ export class SqliteGraphReadPort implements GraphReadPort {
         if (!after.ok) return after;
         const cursorState = decodeArchitectureCursorState(after.value);
         if (!cursorState.ok) return cursorState;
+        const matcher = this.queryContext.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
         const view = buildArchitectureView(
           gen.catalog,
           gen.indexes,
@@ -343,6 +375,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
             packageEdgesDone: cursorState.value.packageEdgesDone,
             hotspotsDone: cursorState.value.hotspotsDone,
           },
+          matcher.value,
           this.generationFeatures(gen),
         );
         if (!view.ok) return err(fromGraphReadError(view.error));

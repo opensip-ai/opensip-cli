@@ -12,7 +12,7 @@ import {
   type GraphSourceFilter,
   type GraphSymbolRef,
 } from './query-contracts.js';
-import { matchesGraphSourceFilter } from './source-filter.js';
+import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type {
@@ -103,9 +103,10 @@ export function buildOccurrenceCallView(
   _catalog: Catalog,
   indexes: Indexes,
   query: OccurrenceCallViewQuery,
+  matcher: SourceRoleMatcher,
 ): Result<OccurrenceCallView, GraphReadError> {
   try {
-    return ok(new ViewCollector(cachedOccurrenceIndex(indexes), query).collect());
+    return ok(new ViewCollector(cachedOccurrenceIndex(indexes), query, matcher).collect());
   } catch {
     return err(viewError('Failed to build occurrence call view'));
   }
@@ -136,6 +137,7 @@ class ViewCollector {
   constructor(
     private readonly index: CachedOccurrenceIndex,
     private readonly query: OccurrenceCallViewQuery,
+    private readonly matcher: SourceRoleMatcher,
   ) {
     this.identity = query.identity;
     this.direction = query.direction ?? 'both';
@@ -276,7 +278,7 @@ class ViewCollector {
       this.hardTruncated = true;
       return false;
     }
-    const matches = matchesGraphSourceFilter(occurrence, this.query.filter);
+    const matches = matchesGraphSourceFilterWithRoles(occurrence, this.query.filter, this.matcher);
     this.predicate.set(id, matches);
     if (!matches) this.excluded.add(id);
     return matches;
