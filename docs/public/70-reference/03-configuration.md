@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-02
+last_verified: 2026-07-11
 release: v0.5.3
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -407,6 +407,34 @@ dashboard:
 Validated by the project-config schema and read by the dashboard data path. Unknown dashboard fields are rejected by the strict loader.
 
 ## `graph`
+
+### `graph.auditTestSourceGlobs`
+
+Bounded, project-relative POSIX globs that reclassify matching catalog paths as
+**audit-test sources** at MCP/graph read time ([ADR-0153](../../decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)
+source-role policy). They do **not** rewrite the catalog or infer package privacy.
+
+```yaml
+graph:
+  auditTestSourceGlobs:
+    - packages/test-support/**
+    - '**/__fixtures__/**'
+```
+
+Semantics:
+
+- Effective test role is `inTestFile || matches(auditTestSourceGlobs, filePath)`.
+- Simple minimatch only: no brace expansion, extglob, leading negation, comments,
+  absolute roots, backslashes, or parent traversal.
+- Bounds: at most **64** patterns, **256** characters and **32** wildcard/class
+  tokens per pattern; unique patterns required.
+- Config is loaded once when the MCP command constructs its query context.
+  Editing globs takes effect on the next MCP process/reconnect (or other newly
+  constructed context). There is no live config watcher. Changing globs changes
+  effective source policy and cursor digests without a catalog rebuild.
+- Classification of more than the production distinct-file limit fails closed
+  with a typed resource error.
+
 
 Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
 
