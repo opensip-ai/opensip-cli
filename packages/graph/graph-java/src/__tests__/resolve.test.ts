@@ -33,7 +33,7 @@ interface Pipeline {
 }
 
 function pipeline(dir: string): Pipeline {
-  const discovery = javaGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = javaGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = javaGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

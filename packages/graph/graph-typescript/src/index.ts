@@ -107,6 +107,7 @@ function discoverFilesAdapter(input: DiscoverInput): DiscoverOutput {
   const result = discoverTypescriptFiles({
     projectDir: input.cwd,
     tsConfigPath: input.configPathOverride,
+    diagnosticIntent: input.diagnosticIntent,
   });
   return {
     projectDirAbs: result.projectDirAbs,

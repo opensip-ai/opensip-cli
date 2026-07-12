@@ -48,7 +48,7 @@ function writeProject(files: Record<string, string>): string {
 }
 
 async function exactSemanticFacts(projectDir: string) {
-  const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectDir });
+  const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectDir, diagnosticIntent: 'quiet' });
   const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -110,7 +110,7 @@ describe('collectSemanticReferenceFacts', () => {
     const projectDir = writeProject({
       'src/a.ts': `export function a() { return 1; }\n`,
     });
-    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectDir });
+    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectDir, diagnosticIntent: 'quiet' });
     const parsed = await typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

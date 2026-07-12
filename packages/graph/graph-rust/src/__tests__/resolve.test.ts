@@ -39,7 +39,7 @@ function runPipeline(dir: string): {
   readonly allEdges: readonly CallEdge[];
   readonly catalog: Catalog;
 } {
-  const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = rustGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

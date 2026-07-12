@@ -34,7 +34,7 @@ func work(items []string) []string {
 `,
       'utf8',
     );
-    const discovery = goGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = goGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

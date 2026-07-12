@@ -32,7 +32,7 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
       `# hello\ndef with_hash_comment():\n    # inner\n    return 1\n`,
       'utf8',
     );
-    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -53,7 +53,7 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
       `def with_string():\n    s = "not # a comment"\n    return s\n`,
       'utf8',
     );
-    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -74,7 +74,7 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
       `def with_docstring():\n    """A docstring\n    multi-line.\n    """\n    return 1\n`,
       'utf8',
     );
-    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

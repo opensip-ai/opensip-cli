@@ -146,13 +146,14 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
       graph,
       results,
       version: readPackageVersion(import.meta.url),
+      mutationsEnabled: mutationEnabled,
     });
 
     const validToolIds = new Set(
       scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
     );
     const targetConventions = summarizeTargetConventions(scope.targets);
-    void registerMcpTools(server, {
+    registerMcpTools(server, {
       graph,
       results,
       runtimeWiring,
@@ -160,6 +161,8 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
       targetConventions,
       ...(repairWrite === undefined ? {} : { repairWrite }),
       mutationsEnabled: mutationEnabled,
+      // Surface snapshot is final after registration completes.
+      mcpSurface: () => server.describeSurface(),
     });
 
     await server.serve();

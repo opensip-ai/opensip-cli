@@ -22,7 +22,7 @@ import { pythonGraphAdapter } from '../index.js';
 import { isTestFile } from '../walk.js';
 
 function runWalk(dir: string): ReturnType<typeof pythonGraphAdapter.walkProject> {
-  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = pythonGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -164,7 +164,7 @@ describe('lang-python walk.ts — function/param shapes', () => {
 
   it('skips files in input.files that are missing from project.files', () => {
     writeFileSync(join(dir, 'a.py'), `def f():\n    return 1\n`, 'utf8');
-    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

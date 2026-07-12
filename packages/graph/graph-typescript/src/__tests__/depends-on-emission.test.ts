@@ -87,7 +87,8 @@ async function runAdapter(): Promise<{
 }> {
   const discovery = await typescriptGraphAdapter.discoverFiles({
     cwd: fixtureRoot,
-  });
+      diagnosticIntent: 'quiet',
+    });
   const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

@@ -61,7 +61,7 @@ function runAdapter(): {
       >
     | undefined;
 } {
-  const discovery = rustGraphAdapter.discoverFiles({ cwd: fixtureRoot });
+  const discovery = rustGraphAdapter.discoverFiles({ cwd: fixtureRoot, diagnosticIntent: 'quiet' });
   const parsed = rustGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

@@ -35,7 +35,7 @@ describe('Rust bodySignature population', () => {
 `,
       'utf8',
     );
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

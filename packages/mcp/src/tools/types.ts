@@ -29,4 +29,9 @@ export interface McpToolDeps {
   readonly repairWrite?: RepairWritePort;
   /** True only when the server was started with explicit mutation posture. */
   readonly mutationsEnabled?: boolean;
+  /**
+   * Final MCP surface snapshot after all registrations. Used by
+   * `get_agent_catalog` for connector diagnosis (version/epoch/names/root).
+   */
+  readonly mcpSurface?: () => import('../server.js').McpSurfaceSnapshot;
 }

@@ -48,11 +48,23 @@ export type ParsedProject = unknown;
 
 // ── method 1 ──────────────────────────────────────────────────────
 
+/**
+ * Who owns discovery lifecycle logging for this invocation.
+ * - `normal` — producer boundary may log aggregate terminal events (adapters stay quiet).
+ * - `quiet`  — no adapter lifecycle logs; used by freshness/probes/sub-operations.
+ */
+export type DiscoveryDiagnosticIntent = 'normal' | 'quiet';
+
 export interface DiscoverInput {
   /** Absolute, realpath-normalized cwd. */
   readonly cwd: string;
   /** User-supplied --tsconfig (or analogue) override; optional. */
   readonly configPathOverride?: string;
+  /**
+   * Required diagnostic intent. Adapters never emit lifecycle logs; callers
+   * that pass `normal` own the single aggregate terminal discovery event.
+   */
+  readonly diagnosticIntent: DiscoveryDiagnosticIntent;
 }
 
 export interface DiscoverOutput {

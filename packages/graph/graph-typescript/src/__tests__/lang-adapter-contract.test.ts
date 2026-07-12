@@ -87,7 +87,7 @@ async function buildPipeline(
   readonly catalog: Catalog;
   readonly discovery: Awaited<ReturnType<typeof typescriptGraphAdapter.discoverFiles>>;
 }> {
-  const discovery = await adapter.discoverFiles({ cwd: dir });
+  const discovery = await adapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = await adapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -296,7 +296,7 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
   // ── I-7: parseProject is total over `files` ──────────────────
 
   it('I-7 — parseProject is total: every file is either parsed or in parseErrors', async () => {
-    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = await typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -335,8 +335,8 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
   // ── I-9: adapter is referentially transparent ────────────────
 
   it('I-9 — repeated discoverFiles calls return the same files list', async () => {
-    const a = await typescriptGraphAdapter.discoverFiles({ cwd: dir });
-    const b = await typescriptGraphAdapter.discoverFiles({ cwd: dir });
+    const a = await typescriptGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
+    const b = await typescriptGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     expect(b.projectDirAbs).toBe(a.projectDirAbs);
     expect([...b.files].sort()).toEqual([...a.files].sort());
     expect(b.configPathAbs).toBe(a.configPathAbs);
@@ -440,7 +440,7 @@ async function buildPythonPipeline(
   readonly catalog: Catalog;
   readonly discovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
 }> {
-  const discovery = await adapter.discoverFiles({ cwd: dir });
+  const discovery = await adapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = await adapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -604,7 +604,7 @@ requires-python = ">=3.11"
   });
 
   it('I-7 — parseProject is total: every file is either parsed or in parseErrors', () => {
-    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -631,8 +631,8 @@ requires-python = ">=3.11"
   });
 
   it('I-9 — repeated discoverFiles calls return the same files list', () => {
-    const a = pythonGraphAdapter.discoverFiles({ cwd: dir });
-    const b = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const a = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
+    const b = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     expect(b.projectDirAbs).toBe(a.projectDirAbs);
     expect([...b.files].sort()).toEqual([...a.files].sort());
     expect(b.configPathAbs).toBe(a.configPathAbs);
@@ -756,7 +756,7 @@ async function buildRustPipeline(
   readonly catalog: Catalog;
   readonly discovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
 }> {
-  const discovery = await adapter.discoverFiles({ cwd: dir });
+  const discovery = await adapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = await adapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -917,7 +917,7 @@ edition = "2021"
   });
 
   it('I-7 — parseProject is total: every file is either parsed or in parseErrors', () => {
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -944,8 +944,8 @@ edition = "2021"
   });
 
   it('I-9 — repeated discoverFiles calls return the same files list', () => {
-    const a = rustGraphAdapter.discoverFiles({ cwd: dir });
-    const b = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const a = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
+    const b = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     expect(b.projectDirAbs).toBe(a.projectDirAbs);
     expect([...b.files].sort()).toEqual([...a.files].sort());
     expect(b.configPathAbs).toBe(a.configPathAbs);

@@ -197,6 +197,7 @@ async function buildShard(
   const discovered = await adapter.discoverFiles({
     cwd: shard.rootDir,
     configPathOverride: shard.configPathAbs,
+    diagnosticIntent: 'quiet',
   });
   const discovery: DiscoverOutput = {
     projectDirAbs: projectRoot,

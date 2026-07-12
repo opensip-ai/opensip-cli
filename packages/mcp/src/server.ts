@@ -44,6 +44,22 @@ const SERVER_NAME = 'opensip-cli-mcp';
 /** `module` field stamped on every structured logger event from this file. */
 const LOG_MODULE = 'mcp:server';
 
+/** Max tools that may be registered on one server instance. */
+export const MAX_MCP_REGISTERED_TOOLS = 256;
+/** Max code points in a tool name (never truncated). */
+export const MAX_MCP_TOOL_NAME_LENGTH = 128;
+
+/** Immutable snapshot of the actual registered MCP surface. */
+export interface McpSurfaceSnapshot {
+  readonly version: string;
+  readonly surfaceEpoch: number;
+  readonly toolNames: readonly string[];
+  readonly toolCount: number;
+  readonly mutationPosture: 'read-only' | 'mutations-enabled';
+  readonly projectRoot: string;
+  readonly projectScope: 'project';
+}
+
 // The SDK's tool-registration signature comes from its own generic `registerTool`
 // (the public `./server/mcp.js` value import). `CallToolResult` is the SDK's
 // concrete result type — re-exported from its public `./types.js` surface because
@@ -66,6 +82,13 @@ export interface McpStdioServerDeps {
   readonly results: ResultsReadPort;
   /** Server version advertised in the handshake (the `@opensip-cli/mcp` version). */
   readonly version: string;
+  /**
+   * Surface epoch for connector diagnosis. Bump when the default registered
+   * tool set changes (e.g. Phase 3 search_declarations/references_to).
+   */
+  readonly surfaceEpoch?: number;
+  /** Whether opt-in repair mutation tools are registered. */
+  readonly mutationsEnabled?: boolean;
 }
 
 /**
@@ -80,6 +103,9 @@ export class McpStdioServer {
   private readonly transport: StdioServerTransport;
   private readonly scope: RunScope;
   private readonly version: string;
+  private readonly surfaceEpoch: number;
+  private readonly mutationsEnabled: boolean;
+  private readonly registeredNames: string[] = [];
   /** The graph read port handlers close over. */
   readonly graph: GraphReadPort;
   /** The results read port handlers close over. */
@@ -90,9 +116,32 @@ export class McpStdioServer {
     this.graph = deps.graph;
     this.results = deps.results;
     this.version = deps.version;
+    // Phase 3 tools (search_declarations + references_to) are in the default surface.
+    this.surfaceEpoch = deps.surfaceEpoch ?? 3;
+    this.mutationsEnabled = deps.mutationsEnabled === true;
     this.mcp = new McpServer({ name: SERVER_NAME, version: deps.version });
     // Default stdin/stdout; the transport owns stdout for JSON-RPC frames.
     this.transport = new StdioServerTransport();
+  }
+
+  /**
+   * Immutable snapshot of the actual registered surface after registrations.
+   * Names are code-point sorted; root is the canonical project root only.
+   */
+  describeSurface(): McpSurfaceSnapshot {
+    const root = this.scope.projectContext?.projectRoot ?? process.cwd();
+    const sorted = [...this.registeredNames].sort((a, b) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
+    return Object.freeze({
+      version: this.version,
+      surfaceEpoch: this.surfaceEpoch,
+      toolNames: Object.freeze(sorted),
+      toolCount: sorted.length,
+      mutationPosture: this.mutationsEnabled ? 'mutations-enabled' : 'read-only',
+      projectRoot: root,
+      projectScope: 'project' as const,
+    });
   }
 
   /**
@@ -103,6 +152,7 @@ export class McpStdioServer {
    * forwarder casts internally because it is scope-/schema-agnostic.
    */
   register: SdkRegisterTool = (name, config, cb) => {
+    this.assertRegistrableName(name);
     const handler = cb as (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
     const wrapped = (...args: unknown[]): Promise<CallToolResult> =>
       this.dispatch(name, () => handler(...args));
@@ -110,8 +160,32 @@ export class McpStdioServer {
     // The forwarder is schema-agnostic, so the broad→narrow assignment is widened
     // through `unknown` (the public `register` signature stays the SDK's exact
     // generic for the Phase-4 call sites).
-    return this.mcp.registerTool(name, config, wrapped as unknown as typeof cb);
+    const result = this.mcp.registerTool(name, config, wrapped as unknown as typeof cb);
+    this.registeredNames.push(name);
+    return result;
   };
+
+  private assertRegistrableName(name: string): void {
+    if (typeof name !== 'string' || name.length === 0) {
+      throw new Error('MCP tool name must be a non-empty string.');
+    }
+    if (name.length > MAX_MCP_TOOL_NAME_LENGTH) {
+      throw new Error(
+        `MCP tool name exceeds ${String(MAX_MCP_TOOL_NAME_LENGTH)} characters (never truncated).`,
+      );
+    }
+    if (/\p{Cc}/u.test(name) || name.includes('\0')) {
+      throw new Error('MCP tool name must not contain NUL or control characters.');
+    }
+    if (this.registeredNames.includes(name)) {
+      throw new Error(`MCP tool name already registered: ${name}`);
+    }
+    if (this.registeredNames.length >= MAX_MCP_REGISTERED_TOOLS) {
+      throw new Error(
+        `MCP registration cap (${String(MAX_MCP_REGISTERED_TOOLS)}) exceeded; registration rejected.`,
+      );
+    }
+  }
 
   /** Run one wrapped handler inside the captured scope, with decision logging. */
   private dispatch(
@@ -162,12 +236,16 @@ export class McpStdioServer {
     // non-file destination is stderr, gated behind debug — so we enable it here
     // (the documented `configureLogger` sink seam) and keep stdout pristine.
     configureLogger({ silent: false, debugMode: true });
+    const surface = this.describeSurface();
     logger.info({
       evt: 'mcp.server.start',
       module: LOG_MODULE,
       server: SERVER_NAME,
-      version: this.version,
-      // Never log absolute project paths on the shared stderr sink.
+      version: surface.version,
+      surfaceEpoch: surface.surfaceEpoch,
+      toolCount: surface.toolCount,
+      mutationPosture: surface.mutationPosture,
+      // Never log absolute project paths or tool-name arrays on stderr.
       projectScope: 'project',
     });
 
