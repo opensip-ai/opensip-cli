@@ -54,6 +54,11 @@ interface InitOpts extends InitOptions {
 
 function buildInitSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-command-specs.ts',
+      declaration: 'buildInitSpec',
+    },
     name: 'init',
     description: 'Scaffold opensip-cli.config.yml + example checks/scenarios for your project',
     // `--cwd` here matches the registry text ("Target directory"); `--json` /
@@ -114,6 +119,11 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildConfigureSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-command-specs.ts',
+      declaration: 'buildConfigureSpec',
+    },
     name: 'configure',
     description: 'Set up OpenSIP Cloud API key',
     commonFlags: ['json', 'debug'],
@@ -129,6 +139,11 @@ function buildConfigureSpec(): HostSpec {
 
 function buildReportSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-command-specs.ts',
+      declaration: 'buildReportSpec',
+    },
     name: 'report',
     description: 'Generate the cross-tool HTML report and open it in your browser',
     commonFlags: ['json'],
@@ -158,6 +173,11 @@ function buildReportSpec(): HostSpec {
 
 function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-command-specs.ts',
+      declaration: 'buildCompletionSpec',
+    },
     name: 'completion',
     description: 'Print a shell-completion script (bash | zsh | fish)',
     commonFlags: [],
@@ -228,6 +248,11 @@ interface UninstallOpts {
 
 function buildUninstallSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-command-specs.ts',
+      declaration: 'buildUninstallSpec',
+    },
     name: 'uninstall',
     description:
       'Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.',
@@ -291,6 +316,11 @@ function buildUninstallSpec(): HostSpec {
 
 function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-command-specs.ts',
+      declaration: 'buildAgentCatalogSpec',
+    },
     name: 'agent-catalog',
     description:
       'Structured catalog of agent-friendly commands, patterns, and output shapes (JSON preferred). ' +

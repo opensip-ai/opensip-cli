@@ -96,6 +96,11 @@ export const capabilityWorkerCommandSpec: CommandSpec<unknown, CliCommandsContex
   unknown,
   CliCommandsContext
 >({
+  staticHandler: {
+    package: 'opensip-cli',
+    path: 'packages/cli/src/bootstrap/capability-worker/entry.ts',
+    declaration: 'capabilityWorkerCommandSpec',
+  },
   name: '__capability-pack-worker',
   visibility: 'internal',
   description:

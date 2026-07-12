@@ -48,20 +48,8 @@ function mutationsEnabled(opts: McpCommandOptions): boolean {
   return opts.allowMutations === true || env.get<boolean>('OPENSIP_MCP_ALLOW_MUTATIONS') === true;
 }
 
-export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
-  description: 'Serve the OpenSIP call graph + stored results to MCP agents over stdio',
-  commonFlags: ['cwd'],
-  options: [
-    {
-      flag: '--allow-mutations',
-      description: 'Enable explicitly mutating MCP tools such as repair_apply_verify',
-      default: false,
-    },
-  ],
-  scope: 'project',
-  output: 'raw-stream',
-  rawStreamReason: 'mcp-stdio',
-  handler: async (rawOpts, cli) => {
+/** Named serve entry for static-handler audit bridging. */
+async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
     const scope = cli.scope as RunScope;
 
     const store = cli.scope.datastore() as DataStore | undefined;
@@ -176,5 +164,25 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
 
     await server.serve();
     cli.setExitCode(EXIT_CODES.SUCCESS);
+}
+
+export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
+  staticHandler: {
+    package: '@opensip-cli/mcp',
+    path: 'packages/mcp/src/command.ts',
+    declaration: 'serveMcpStdio',
   },
+  description: 'Serve the OpenSIP call graph + stored results to MCP agents over stdio',
+  commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--allow-mutations',
+      description: 'Enable explicitly mutating MCP tools such as repair_apply_verify',
+      default: false,
+    },
+  ],
+  scope: 'project',
+  output: 'raw-stream',
+  rawStreamReason: 'mcp-stdio',
+  handler: serveMcpStdio,
 });

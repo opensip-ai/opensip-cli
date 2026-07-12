@@ -63,6 +63,11 @@ export const simRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/simulation',
+    path: 'packages/simulation/engine/src/cli/sim-worker.ts',
+    declaration: 'simRunWorkerCommandSpec',
+  },
   name: 'sim-run-worker',
   visibility: 'internal',
   description:

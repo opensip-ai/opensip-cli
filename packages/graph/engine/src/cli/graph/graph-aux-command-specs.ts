@@ -297,6 +297,11 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    declaration: 'graphShardWorkerCommandSpec',
+  },
   name: 'graph-shard-worker',
   visibility: 'internal',
   description:
@@ -323,6 +328,11 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    declaration: 'graphEquivalenceCheckCommandSpec',
+  },
   name: 'graph-equivalence-check',
   visibility: 'internal',
   description:
@@ -458,6 +468,11 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    declaration: 'graphExportCommandSpec',
+  },
   name: 'export',
   description:
     'Export graph analysis artifacts: --format sarif (SARIF v2.1.0 findings), catalog (CatalogExport JSON), or baseline (gate fingerprint JSON)',
@@ -552,6 +567,11 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
  */
 export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/graph',
+      path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+      declaration: 'graphRecipesGroupedCommandSpec',
+    },
     name: 'recipes',
     description: 'List available graph recipes',
     commonFlags: ['json'],
@@ -563,6 +583,11 @@ export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext
 /** `graph lookup <name>` — look up function occurrences by simple name. */
 export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/graph',
+      path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+      declaration: 'graphLookupGroupedCommandSpec',
+    },
     name: 'lookup',
     description: 'Look up function occurrences by simple name from the persisted catalog',
     commonFlags: ['json', 'cwd'],
@@ -587,6 +612,11 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
  */
 export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/graph',
+      path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+      declaration: 'graphIndexGroupedCommandSpec',
+    },
     name: 'index',
     description:
       'Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first',
@@ -635,6 +665,11 @@ export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    declaration: 'graphListCommandSpec',
+  },
   name: 'list',
   description: 'List available graph rules',
   commonFlags: ['cwd', 'json'],
@@ -648,6 +683,11 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    declaration: 'graphImpactCommandSpec',
+  },
   name: 'impact',
   description:
     'Analyze what changed and what depends on it (git --changed/--since or explicit --files)',

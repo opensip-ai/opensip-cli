@@ -48,6 +48,11 @@ export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/fitness',
+    path: 'packages/fitness/engine/src/cli/fit/fit-aux-command-specs.ts',
+    declaration: 'fitListGroupedCommandSpec',
+  },
   name: 'list',
   description: 'List available fitness checks',
   commonFlags: ['cwd', 'json'],
@@ -62,6 +67,11 @@ export const fitListGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> = d
 /** `fit recipes` — list available fitness recipes. */
 export const fitRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/fitness',
+      path: 'packages/fitness/engine/src/cli/fit/fit-aux-command-specs.ts',
+      declaration: 'fitRecipesGroupedCommandSpec',
+    },
     name: 'recipes',
     description: 'List available fitness recipes',
     commonFlags: ['cwd', 'json'],
@@ -126,6 +136,11 @@ export const fitExportCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/fitness',
+    path: 'packages/fitness/engine/src/cli/fit/fit-aux-command-specs.ts',
+    declaration: 'fitExportCommandSpec',
+  },
   name: 'export',
   description: 'Export fit artifacts: --format baseline (the SARIF-shaped gate baseline)',
   commonFlags: ['cwd', 'json'],

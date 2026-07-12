@@ -204,6 +204,11 @@ export function buildDoctorCommand(
 ): ToolCommandSpecInput<unknown, ToolCliContext> {
   const deps = probeDeps ?? DEFAULT_PROBE_DEPS;
   return defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/external-tool-adapter',
+      path: 'packages/external-tool-adapter/src/doctor-command.ts',
+      declaration: 'buildDoctorCommand',
+    },
     name: 'doctor',
     description: `Check that the ${input.tool} binary is installed and ready`,
     commonFlags: ['json', 'cwd'],

@@ -62,6 +62,11 @@ function configCommandBase(ctx: CliCommandsContext, opts: ConfigCommandRawOpts) 
 
 function buildConfigCommandSpec(ctx: CliCommandsContext, spec: ConfigCommandDefinition): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-config.ts',
+      declaration: 'buildConfigCommandSpec',
+    },
     name: spec.name,
     description: spec.description,
     commonFlags: ['json', 'cwd'],

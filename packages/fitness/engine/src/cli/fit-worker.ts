@@ -65,6 +65,11 @@ export const fitRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/fitness',
+    path: 'packages/fitness/engine/src/cli/fit-worker.ts',
+    declaration: 'fitRunWorkerCommandSpec',
+  },
   name: 'fit-run-worker',
   visibility: 'internal',
   description:

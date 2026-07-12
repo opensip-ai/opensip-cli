@@ -45,6 +45,11 @@ function buildSuiteStepLabels(suite: SuiteDefinition, tools: readonly Tool[]): s
 
 function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/suite/suite-command-specs.ts',
+      declaration: 'buildSuiteRunSpec',
+    },
     name: 'run',
     description: 'Run a configured suite in one shared project scope',
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'reportTo', 'apiKey', 'open'],
@@ -174,6 +179,11 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildSuiteListSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/suite/suite-command-specs.ts',
+      declaration: 'buildSuiteListSpec',
+    },
     name: 'list',
     description: 'List configured suites and their resolved steps',
     commonFlags: ['json'],
@@ -207,6 +217,11 @@ function buildSuiteListSpec(): HostSpec {
 
 function buildSuiteAddSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/suite/suite-command-specs.ts',
+      declaration: 'buildSuiteAddSpec',
+    },
     name: 'add',
     description: 'Add a tool command step to a configured suite',
     commonFlags: ['json', 'cwd'],

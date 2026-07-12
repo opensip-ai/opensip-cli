@@ -15,6 +15,7 @@
 export * from './external-adapter-progress-private-bridge.js';
 export * from './external-tool-adapter-contract.js';
 export * from './command-handler-host-owned-output.js';
+export * from './first-party-command-static-handler.js';
 export * from './host-tool-runtime-import-boundary.js';
 export * from './live-view-through-cli-live.js';
 export * from './mcp-results-no-rerun.js';

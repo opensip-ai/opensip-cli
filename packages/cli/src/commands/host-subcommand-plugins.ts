@@ -43,6 +43,11 @@ function boundLayouts(ctx: CliCommandsContext, domain: string): readonly PluginL
 
 function buildPluginListSpec(ctx: CliCommandsContext, domain: string): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-plugins.ts',
+      declaration: 'buildPluginListSpec',
+    },
     name: 'list',
     description: `List installed ${domain} packs`,
     commonFlags: ['json'],
@@ -91,6 +96,11 @@ function buildPluginMutationSpec(
   },
 ): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-plugins.ts',
+      declaration: 'buildPluginMutationSpec',
+    },
     name: input.name,
     description: input.description,
     commonFlags: ['json'],
@@ -108,6 +118,11 @@ function buildPluginMutationSpec(
 
 function buildPluginSyncSpec(ctx: CliCommandsContext, domain: string): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-plugins.ts',
+      declaration: 'buildPluginSyncSpec',
+    },
     name: 'sync',
     description: `Install every ${domain} pack declared in opensip-cli.config.yml (post-clone bootstrap)`,
     commonFlags: ['json'],

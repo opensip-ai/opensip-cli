@@ -534,6 +534,11 @@ function parseConcurrency(v: string): number {
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
  */
 export const graphCommandSpec = definePrimaryRunCommand<unknown>({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+    declaration: 'runGraphCommand',
+  },
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
   options: [
