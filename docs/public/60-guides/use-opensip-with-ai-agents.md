@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-02
+last_verified: 2026-07-11
 release: v0.5.3
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
@@ -165,7 +165,7 @@ hard-cap reasons, and cursor continuation. A newly persisted external
 that explicitly needs a new build.
 
 Use `package_dependencies`, `why_depends`, and `package_cycles` for labelled
-call/import boundary evidence. Use `get_runtime_wiring` for admitted
+call/import boundary evidence. Use `get_runtime_wiring` / `search_declarations` / `references_to` for admitted
 manifest/registry/CommandSpec/host-mount paths that static traversal cannot
 prove. Direct source, configuration, and tests remain the final proof.
 
@@ -184,3 +184,5 @@ MCP production reaches graph internals only through the public read facade in
 Setup is client-specific (JSON vs TOML, config file locations, approval flows).
 See **[Connect MCP clients](./08-connect-mcp-clients.md)** for copy-paste config for
 Cursor, Claude Code, and Codex.
+
+See also [Connect MCP clients](./08-connect-mcp-clients.md) and ADR-0152..0154 for the compact audit surface.
