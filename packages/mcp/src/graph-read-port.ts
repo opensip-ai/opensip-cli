@@ -182,6 +182,104 @@ export interface SearchSymbolsOptions {
   readonly detail?: CompactQueryDetail;
 }
 
+/** Declaration kinds for {@link GraphReadPort.searchDeclarations}. */
+export type McpDeclarationKind =
+  | 'function'
+  | 'class'
+  | 'interface'
+  | 'type-alias'
+  | 'enum'
+  | 'namespace'
+  | 'variable'
+  | 'property'
+  | 'method'
+  | 'import'
+  | 'export';
+
+/** Reference kinds for {@link GraphReadPort.referencesTo}. */
+export type McpReferenceKind =
+  | 'type'
+  | 'value'
+  | 'import'
+  | 'export'
+  | 'heritage'
+  | 'annotation';
+
+export interface SearchDeclarationsOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly match?: 'substring' | 'exact' | 'qualified';
+  readonly kinds?: readonly McpDeclarationKind[];
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation. Default `nodes` (declaration IDs for references_to). */
+  readonly detail?: CompactQueryDetail;
+}
+
+export interface DeclarationRefDto {
+  readonly declarationId: string;
+  readonly name: string;
+  readonly qualifiedName: string;
+  readonly kind: McpDeclarationKind;
+  readonly package: string;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly visibility: string;
+  readonly exportRole: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+export interface DeclarationSearchDto {
+  readonly detail: CompactQueryDetail;
+  readonly referenceScope: 'cross-file';
+  readonly declarations: readonly DeclarationRefDto[];
+  readonly totalMatches: number;
+}
+
+export interface ReferencesToOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly kinds?: readonly McpReferenceKind[];
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation. Default `summary` (counts only; no sites). */
+  readonly detail?: CompactQueryDetail;
+}
+
+export interface ReferenceSiteDto {
+  readonly referenceId: string;
+  readonly kind: McpReferenceKind;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly package: string;
+  readonly targetDeclarationId?: string;
+  readonly targetPackage?: string;
+  readonly targetName?: string;
+  readonly targetKind?: McpDeclarationKind;
+  readonly basis: string;
+  readonly confidence: string;
+  readonly importSpecifier?: string;
+  readonly reason?: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+export interface ReferencesToDto {
+  readonly detail: CompactQueryDetail;
+  readonly referenceScope: 'cross-file';
+  readonly declarationId: string;
+  readonly references: readonly ReferenceSiteDto[];
+  readonly totalMatches: number;
+  readonly kindCounts?: readonly { readonly kind: string; readonly count: number }[];
+}
+
 /**
  * Exclusive `search_symbols` payload. `symbols` is populated only for
  * `detail: 'nodes'`; group rows live on the envelope `groups` field for
@@ -249,6 +347,21 @@ export interface GraphReadPort {
     query: string,
     opts?: SearchSymbolsOptions,
   ): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>>;
+  /**
+   * Search non-callable declaration facts (P2 Phase 3). Separate from
+   * {@link searchSymbols} — declaration IDs are not callable symbol IDs.
+   */
+  searchDeclarations(
+    query: string,
+    opts?: SearchDeclarationsOptions,
+  ): Promise<Result<GraphToolResult<DeclarationSearchDto>, McpReadError>>;
+  /**
+   * Cross-file references to a declaration id from {@link searchDeclarations}.
+   */
+  referencesTo(
+    declarationId: string,
+    opts?: ReferencesToOptions,
+  ): Promise<Result<GraphToolResult<ReferencesToDto>, McpReadError>>;
   /** All symbols declared in `file` enclosing (or starting at) `line`. */
   findBySpan(
     file: string,

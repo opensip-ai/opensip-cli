@@ -40,6 +40,7 @@ import { methodTargetFile } from './edge-helpers/method-target.js';
 import { extractBoundaryCalls, type MethodTargetResolver } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
 import { parseProject as parseTypescriptProject } from './parse.js';
+import { collectSemanticReferenceFacts } from './semantic-reference-facts.js';
 import { isTypescriptTestFile } from './test-file.js';
 import { walkProgram } from './walk.js';
 
@@ -278,9 +279,23 @@ async function resolveCallSitesExact(
     );
   }
 
+  // Phase 3 semantic declaration/reference plane — exact tier only. Always a
+  // present bundle (empty arrays = supported, no facts). Fast mode omits it.
+  const discoveredFiles = project.program
+    .getSourceFiles()
+    .filter((sf) => !sf.isDeclarationFile)
+    .map((sf) => sf.fileName);
+  const semanticFacts = collectSemanticReferenceFacts({
+    program: project.program,
+    discoveredFiles,
+    projectRootAbs: input.projectDirAbs,
+    crossPackage,
+  });
+
   return {
     edgesByOwner: collectByOwner(result.catalog),
     dependenciesByOwner,
+    semanticFacts,
     stats: result.resolutionStats,
   };
 }

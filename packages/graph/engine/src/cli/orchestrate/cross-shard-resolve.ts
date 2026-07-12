@@ -39,8 +39,10 @@ import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 import { computeSccs } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
+import { mergeSemanticFactBundles } from '../../semantic-facts.js';
 
 import { bucketEdgesByOwner, stitchEdgesByOwner } from './edge-identity.js';
+import { reconcileSemanticFacts } from './semantic-fact-reconcile.js';
 import { traceResolveOne } from './resolution-trace.js';
 
 import type { ShardBuildResult } from './shard-model.js';
@@ -73,8 +75,12 @@ export function mergeAndResolveShards(
     fragments.map((f) => f.fragment),
     allFiles,
   );
+  // Global semantic reconciliation runs AFTER fragment union so cross-package
+  // references can join against the complete declaration inventory. Results
+  // are never written back into shard-fragment rows (Task 3.4).
+  const reconciled = reconcileCatalogSemanticFacts(merged, manifestIndex);
   const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
-  return resolveCrossBoundaryCalls(merged, boundaryCalls, manifestIndex);
+  return resolveCrossBoundaryCalls(reconciled, boundaryCalls, manifestIndex);
 }
 
 /**
@@ -194,6 +200,7 @@ export function mergeShardFragments(
   // catalog (Phase 3).
   const canonicalFunctions = canonicalizeFunctions(functions);
   const reExports = mergeFragmentReExports(fragments);
+  const semanticFacts = mergeFragmentSemanticFacts(fragments);
 
   const first = fragments[0];
   return {
@@ -222,8 +229,38 @@ export function mergeShardFragments(
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
     ...(reExports.length > 0 ? { reExports } : {}),
+    // Present-empty vs absent: only attach when at least one fragment supported
+    // the plane (mergeSemanticFactBundles returns undefined when all omit it).
+    ...(semanticFacts === undefined ? {} : { semanticFacts }),
     functions: canonicalFunctions,
   };
+}
+
+/**
+ * Union per-shard semantic fact bundles by stable identity. Absent on every
+ * fragment stays absent; a present-empty fragment keeps the plane present.
+ */
+function mergeFragmentSemanticFacts(
+  fragments: readonly Catalog[],
+): ReturnType<typeof mergeSemanticFactBundles> {
+  return mergeSemanticFactBundles(fragments.map((f) => f.semanticFacts));
+}
+
+/**
+ * Run the pure global reconciler over a merged catalog's semantic plane.
+ * No-op when the plane is absent.
+ */
+function reconcileCatalogSemanticFacts(
+  catalog: Catalog,
+  manifestIndex: PackageManifestIndex,
+): Catalog {
+  if (catalog.semanticFacts === undefined) return catalog;
+  const semanticFacts = reconcileSemanticFacts(catalog.semanticFacts, manifestIndex);
+  if (semanticFacts === undefined) {
+    const { semanticFacts: _drop, ...rest } = catalog;
+    return rest;
+  }
+  return { ...catalog, semanticFacts };
 }
 
 /**

@@ -115,6 +115,24 @@ export type {
 
 export type { SymbolSearchMatch, SymbolSearchQuery, SymbolSearchView } from './symbol-search.js';
 
+export {
+  searchDeclarationFacts,
+  referencesToDeclaration,
+  declarationStableKey,
+  referenceStableKey,
+  compareDeclarationRefs,
+  compareReferenceSites,
+} from './declaration-reference-view.js';
+export type {
+  DeclarationSearchMatch,
+  DeclarationSearchQuery,
+  DeclarationRef,
+  DeclarationSearchView,
+  ReferencesToQuery,
+  ReferenceSiteRef,
+  ReferencesToView,
+} from './declaration-reference-view.js';
+
 export type {
   ArchitectureViewQuery,
   ArchitectureSection,

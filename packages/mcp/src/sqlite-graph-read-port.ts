@@ -41,6 +41,7 @@ import {
 import { clampLimit } from './graph-read-projection.js';
 import { projectTraversal } from './graph-traversal-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
+import { SqliteGraphDeclarationQueries } from './sqlite-graph-declaration-queries.js';
 import { SqliteGraphPackageQueries } from './sqlite-graph-package-queries.js';
 import {
   completeInventoryCoverage,
@@ -56,12 +57,16 @@ import type {
   CatalogStatus,
   DeadCodeQuery,
   DeadCodeResultDto,
+  DeclarationSearchDto,
   GraphReadPort,
   PackageCyclesDto,
   PackageCyclesQuery,
   PackageDependenciesDto,
   PackageDependenciesQuery,
+  ReferencesToDto,
+  ReferencesToOptions,
   RefreshResult,
+  SearchDeclarationsOptions,
   SearchSymbolsOptions,
   SymbolSearchDto,
   TraversalQuery,
@@ -146,6 +151,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private readonly queryContext: SqliteGraphQueryContext;
   private readonly packageQueries: SqliteGraphPackageQueries;
   private readonly symbolQueries: SqliteGraphSymbolQueries;
+  private readonly declarationQueries: SqliteGraphDeclarationQueries;
   private readonly config: GraphConfig;
   constructor(deps: SqliteGraphReadPortDeps) {
     this.config = deps.config ?? {};
@@ -175,6 +181,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       features: (generation) => this.generationFeatures(generation),
     });
     this.symbolQueries = new SqliteGraphSymbolQueries(this.queryContext);
+    this.declarationQueries = new SqliteGraphDeclarationQueries(this.queryContext);
   }
 
   async catalogStatus(): Promise<Result<CatalogStatus, McpReadError>> {
@@ -192,6 +199,20 @@ export class SqliteGraphReadPort implements GraphReadPort {
     opts?: SearchSymbolsOptions,
   ): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>> {
     return this.symbolQueries.searchSymbols(query, opts);
+  }
+
+  async searchDeclarations(
+    query: string,
+    opts?: SearchDeclarationsOptions,
+  ): Promise<Result<GraphToolResult<DeclarationSearchDto>, McpReadError>> {
+    return this.declarationQueries.searchDeclarations(query, opts);
+  }
+
+  async referencesTo(
+    declarationId: string,
+    opts?: ReferencesToOptions,
+  ): Promise<Result<GraphToolResult<ReferencesToDto>, McpReadError>> {
+    return this.declarationQueries.referencesTo(declarationId, opts);
   }
 
   async findBySpan(

@@ -28,6 +28,7 @@ import type {
   ResolutionMode,
   ResolutionStats,
   RuleHints,
+  SemanticFactBundle,
 } from '../types.js';
 
 /**
@@ -245,6 +246,12 @@ export interface ResolveOutput {
    * globally. Undefined when not requested or not implemented.
    */
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
+  /**
+   * Optional compiler-attested declaration + cross-file reference plane
+   * (P2 MCP audit Phase 3). Exact TypeScript emits a present bundle
+   * (possibly empty); fast mode and non-emitting adapters omit the field.
+   */
+  readonly semanticFacts?: SemanticFactBundle;
   readonly stats: ResolutionStats;
 }
 

@@ -76,6 +76,16 @@ const DEPENDENCY_ABI_PREFIX = 'dep=';
 const DEPENDENCY_ABI_VERSION = 1;
 
 /**
+ * Cache-key segment carrying the semantic declaration/reference fact ABI
+ * (P2 MCP audit Phase 3). Independent of {@link DEPENDENCY_ABI_VERSION} so
+ * fact-identity, reference-scope, retained-declaration-closure, or producer-cap
+ * changes invalidate exact/incremental/shard caches without overloading the
+ * dependency-evidence segment. Bump when those recipes change.
+ */
+const SEMANTIC_ABI_PREFIX = 'sem=';
+const SEMANTIC_ABI_VERSION = 1;
+
+/**
  * Prefix an adapter's `cacheKey` with the running engine version AND the
  * build engine mode so (a) a tool upgrade invalidates persisted
  * catalogs/fragments, and (b) the exact and sharded engines — which write
@@ -96,5 +106,5 @@ const DEPENDENCY_ABI_VERSION = 1;
  */
 export function stampEngineVersion(adapterCacheKey: string, mode: EngineMode = 'exact'): string {
   const sig = `${String(NEAR_DUP_SIGNATURE_K)}.${String(NEAR_DUP_SIGNATURE_VERSION)}`;
-  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${sig}|${DEPENDENCY_ABI_PREFIX}${String(DEPENDENCY_ABI_VERSION)}|${adapterCacheKey}`;
+  return `${ENGINE_VERSION_PREFIX}${ENGINE_VERSION}|${ENGINE_MODE_PREFIX}${mode}|${SIGNATURE_VERSION_PREFIX}${sig}|${DEPENDENCY_ABI_PREFIX}${String(DEPENDENCY_ABI_VERSION)}|${SEMANTIC_ABI_PREFIX}${String(SEMANTIC_ABI_VERSION)}|${adapterCacheKey}`;
 }

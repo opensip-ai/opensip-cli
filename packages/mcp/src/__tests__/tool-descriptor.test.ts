@@ -3,7 +3,7 @@
  *
  * Asserts the bundled tool descriptor (`mcp` identity, the single `mcp` command,
  * the `mcp-graph-adapter` capability registrar) and that `registerMcpTools`
- * mounts all 19 tools (13 graph/package/wiring + 6 result/review) through the server's register seam.
+ * mounts all 21 tools (15 graph/package/wiring + 6 result/review) through the server's register seam.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -20,6 +20,8 @@ import type { McpToolDeps } from '../tools/types.js';
 
 const DEFAULT_TOOL_NAMES = [
   'search_symbols',
+  'search_declarations',
+  'references_to',
   'get_symbol',
   'who_calls',
   'callees_of',
@@ -53,7 +55,7 @@ describe('mcpTool descriptor', () => {
 });
 
 describe('registerMcpTools', () => {
-  it('mounts all 19 MCP tools (13 graph/package/wiring + 6 result/review) on the server', () => {
+  it('mounts all 21 MCP tools (15 graph/package/wiring + 6 result/review) on the server', () => {
     const names: string[] = [];
     const server = {
       register: (name: string) => {
@@ -70,7 +72,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(19);
+    expect(names).toHaveLength(21);
     expect(new Set(names)).toEqual(new Set(DEFAULT_TOOL_NAMES));
   });
 
@@ -93,7 +95,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(20);
+    expect(names).toHaveLength(22);
     expect(new Set(names)).toEqual(new Set([...DEFAULT_TOOL_NAMES, 'repair_apply_verify']));
   });
 
@@ -116,7 +118,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(configs.size).toBe(20);
+    expect(configs.size).toBe(22);
     for (const [name, config] of configs) {
       expect(config.inputSchema, `${name} must declare an input schema`).toBeInstanceOf(
         z.ZodObject,
