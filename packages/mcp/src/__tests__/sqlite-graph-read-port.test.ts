@@ -284,6 +284,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             identity: 'occurrence',
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'nodes',
           }),
         }),
       ],

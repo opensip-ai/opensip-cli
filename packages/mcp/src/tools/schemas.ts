@@ -233,6 +233,13 @@ export const productionGeneratedPolicy = () =>
 /** Grouping mode for paged results. */
 export const groupBy = () => z.enum(['none', 'package', 'file']).default('none');
 
+/**
+ * Exclusive compact representation for high-volume graph tools (P2 Phase 2.6+).
+ * Exactly one of summary / groups / nodes is projected per request.
+ */
+export const compactDetail = (defaultDetail: 'summary' | 'groups' | 'nodes' = 'nodes') =>
+  z.enum(['summary', 'groups', 'nodes']).default(defaultDetail);
+
 /** Traversal identity mode (default occurrence). */
 export const traversalIdentity = () =>
   z.enum(['occurrence', 'body-twin-union']).default('occurrence');

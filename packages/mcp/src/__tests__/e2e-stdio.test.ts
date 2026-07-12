@@ -899,22 +899,18 @@ describe('MCP e2e over real stdio', () => {
         symbolId: helper.symbolId,
         depth: 1,
         limit: 10,
-        groupBy: 'file',
+        // default detail=nodes; groupBy must be none for exclusive nodes mode
       });
       const fanInNodes = (fanIn.data as { nodes: { symbol: { symbolId: string } }[] }).nodes;
       const fanInCursor = (fanIn.page as { nextCursor?: string }).nextCursor;
       expect(fanInNodes).toHaveLength(10);
       expect(fanInCursor).toBeTypeOf('string');
-      expect(fanIn.coverage).toMatchObject({
-        complete: false,
-        truncated: true,
-      });
+      expect(fanIn.groups).toBeUndefined();
       if (fanInCursor === undefined) throw new Error('high-fan-in traversal did not page');
       const fanInNext = await call(conn, 'who_calls', {
         symbolId: helper.symbolId,
         depth: 1,
         limit: 10,
-        groupBy: 'file',
         cursor: fanInCursor,
       });
       const firstFanInIds = new Set(fanInNodes.map((node) => node.symbol.symbolId));

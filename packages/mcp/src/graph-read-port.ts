@@ -134,6 +134,12 @@ export interface TraversalQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /**
+   * Exclusive representation for callers/callees walks (P2 Phase 2.6).
+   * Default `nodes`. `path` walks ignore this and keep ordered path/hop DTOs.
+   * `groups` requires `groupBy: package|file`.
+   */
+  readonly detail?: CompactQueryDetail;
 }
 
 /** Architecture response family selector (P2 Phase 2.5). */

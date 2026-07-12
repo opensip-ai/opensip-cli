@@ -218,10 +218,8 @@ export class SqliteGraphReadPort implements GraphReadPort {
           matcher.value,
         );
         if (!projected.ok) return projected;
-        // Traversal exclusive modes land in Task 2.6; facet-bridge until then.
         return this.queryContext.envelope(projected.value.data, gen, freshness, {
           ...projected.value.options,
-          coverage: facetsFromFlatCoverage(projected.value.options.coverage),
         });
       },
     );
