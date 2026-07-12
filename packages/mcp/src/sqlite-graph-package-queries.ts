@@ -3,8 +3,10 @@ import {
   buildPackageEvidence,
   buildPackageScc,
   compareCodePointStrings,
+  facetsFromFlatCoverage,
   packageDependencyStableKey,
   type FeatureTable,
+  type GraphReadCoverage,
   type PackageCallEvidenceRow,
   type PackageEvidenceView,
   type PackageImportEvidenceRow,
@@ -18,6 +20,10 @@ import {
   pagePackageDependencies,
   pageWhyDepends,
 } from './package-query-page.js';
+import {
+  completeInventoryCoverage,
+  type SqliteGraphQueryContext,
+} from './sqlite-graph-query-context.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type {
@@ -29,15 +35,19 @@ import type {
   WhyDependsQuery,
 } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
-import type { SqliteGraphQueryContext } from './sqlite-graph-query-context.js';
 import type { GraphCoverage, GraphToolResult } from './symbol-dto.js';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 
-function withGroupCoverage(coverage: GraphCoverage, groupTruncated: boolean): GraphCoverage {
+/** Flat package coverage until Task 2.3 migrates package facets. */
+function withGroupCoverage(coverage: GraphReadCoverage, groupTruncated: boolean): GraphReadCoverage {
   if (!groupTruncated) return coverage;
   const reasons = [...new Set([...coverage.reasons, 'group-key-cap'])].sort();
   return { complete: false, truncated: true, reasons };
+}
+
+function packageEnvelopeCoverage(coverage: GraphReadCoverage): GraphCoverage {
+  return facetsFromFlatCoverage(coverage);
 }
 
 function mergePackageRows<T extends PackageCallEvidenceRow | PackageImportEvidenceRow>(
@@ -50,7 +60,7 @@ function mergePackageRows<T extends PackageCallEvidenceRow | PackageImportEviden
   );
 }
 
-function mergeCoverage(coverages: readonly GraphCoverage[]): GraphCoverage {
+function mergeCoverage(coverages: readonly GraphReadCoverage[]): GraphReadCoverage {
   const reasons = [...new Set(coverages.flatMap((coverage) => coverage.reasons))].sort(
     compareCodePointStrings,
   );
@@ -108,6 +118,7 @@ export class SqliteGraphPackageQueries {
           });
           if (!cursor.ok) return cursor;
           return this.deps.context.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness, {
+            coverage: completeInventoryCoverage(),
             page: { limit },
             filter,
           });
@@ -150,7 +161,7 @@ export class SqliteGraphPackageQueries {
           gen,
           freshness,
           {
-            coverage: withGroupCoverage(coverage, page.value.groupTruncated),
+            coverage: packageEnvelopeCoverage(withGroupCoverage(coverage, page.value.groupTruncated)),
             page: {
               limit,
               ...(page.value.nextCursor === undefined ? {} : { nextCursor: page.value.nextCursor }),
@@ -192,7 +203,7 @@ export class SqliteGraphPackageQueries {
             { edgeKind, calls: [], imports: [], totalMatchingEvidence: 0 },
             gen,
             freshness,
-            { page: { limit }, filter },
+            { coverage: completeInventoryCoverage(), page: { limit }, filter },
           );
         }
         const matcher = this.deps.context.sourceRoleMatcherFor(gen);
@@ -232,7 +243,9 @@ export class SqliteGraphPackageQueries {
           gen,
           freshness,
           {
-            coverage: withGroupCoverage(view.value.coverage, page.value.groupTruncated),
+            coverage: packageEnvelopeCoverage(
+              withGroupCoverage(view.value.coverage, page.value.groupTruncated),
+            ),
             page: {
               limit,
               ...(page.value.nextCursor === undefined ? {} : { nextCursor: page.value.nextCursor }),
@@ -264,6 +277,7 @@ export class SqliteGraphPackageQueries {
           });
           if (!cursor.ok) return cursor;
           return this.deps.context.envelope({ edgeKind, components: [] }, gen, freshness, {
+            coverage: completeInventoryCoverage(),
             page: { limit },
             filter,
           });
@@ -300,7 +314,9 @@ export class SqliteGraphPackageQueries {
           gen,
           freshness,
           {
-            coverage: withGroupCoverage(view.value.coverage, page.value.groupTruncated),
+            coverage: packageEnvelopeCoverage(
+              withGroupCoverage(view.value.coverage, page.value.groupTruncated),
+            ),
             page: {
               limit,
               ...(page.value.nextCursor === undefined ? {} : { nextCursor: page.value.nextCursor }),

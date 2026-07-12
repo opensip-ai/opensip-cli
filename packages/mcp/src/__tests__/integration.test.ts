@@ -128,7 +128,7 @@ describe('MCP integration — adapter load + real catalog', () => {
     const search = await graph.searchSymbols('helper');
     expect(search.ok).toBe(true);
     const helperRef = search.ok
-      ? search.value.data.find((r) => r.qualifiedName.includes('helper'))
+      ? search.value.data.symbols.find((r) => r.qualifiedName.includes('helper'))
       : undefined;
     expect(helperRef).toBeDefined();
 

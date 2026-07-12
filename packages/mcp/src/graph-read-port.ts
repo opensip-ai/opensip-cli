@@ -29,6 +29,18 @@ import type {
 type GroupByMode = 'none' | 'package' | 'file';
 type PackageEdgeKindParam = 'call' | 'import' | 'combined';
 
+/**
+ * Exclusive compact representation for high-volume graph queries (P2 Phase 2.2+).
+ * Exactly one representation is projected per request — never rows plus groups.
+ */
+export type CompactQueryDetail = 'summary' | 'groups' | 'nodes';
+
+/**
+ * Default page size for identity-producing searches (`search_symbols`).
+ * Intentionally smaller than the shared paged-tool default (100). Caller range 1–500.
+ */
+export const DEFAULT_IDENTITY_SEARCH_LIMIT = 20;
+
 /** Identity of the in-memory catalog generation a read was served from. */
 export interface GraphGeneration {
   readonly builtAt: string;
@@ -141,6 +153,23 @@ export interface SearchSymbolsOptions {
   readonly match?: 'substring' | 'exact' | 'qualified';
   readonly filter?: Partial<GraphSourceFilter>;
   readonly groupBy?: GroupByMode;
+  /**
+   * Exclusive representation (P2 Phase 2.2). Default `nodes` so callers receive
+   * symbol IDs for traversal tools. `groups` requires `groupBy: package|file`.
+   */
+  readonly detail?: CompactQueryDetail;
+}
+
+/**
+ * Exclusive `search_symbols` payload. `symbols` is populated only for
+ * `detail: 'nodes'`; group rows live on the envelope `groups` field for
+ * `detail: 'groups'`; summary returns counts only.
+ */
+export interface SymbolSearchDto {
+  readonly detail: CompactQueryDetail;
+  readonly symbols: readonly SymbolRef[];
+  /** Total filtered matches in the candidate inventory (all detail modes). */
+  readonly totalMatches: number;
 }
 
 export interface DeadCodeQuery {
@@ -180,7 +209,7 @@ export interface GraphReadPort {
   searchSymbols(
     query: string,
     opts?: SearchSymbolsOptions,
-  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>>;
+  ): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>>;
   /** All symbols declared in `file` enclosing (or starting at) `line`. */
   findBySpan(
     file: string,

@@ -11,6 +11,7 @@ import {
   buildArchitectureView,
   continuationToken,
   deriveGraphReadFeatures,
+  facetsFromFlatCoverage,
   loadCatalogGeneration,
   readCatalogIdentity,
   verifyCatalogInputs,
@@ -39,7 +40,11 @@ import { clampLimit } from './graph-read-projection.js';
 import { projectTraversal } from './graph-traversal-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
 import { SqliteGraphPackageQueries } from './sqlite-graph-package-queries.js';
-import { emptyArchitecture, SqliteGraphQueryContext } from './sqlite-graph-query-context.js';
+import {
+  completeInventoryCoverage,
+  emptyArchitecture,
+  SqliteGraphQueryContext,
+} from './sqlite-graph-query-context.js';
 import { SqliteGraphSymbolQueries } from './sqlite-graph-symbol-queries.js';
 
 import type {
@@ -56,6 +61,7 @@ import type {
   PackageDependenciesQuery,
   RefreshResult,
   SearchSymbolsOptions,
+  SymbolSearchDto,
   TraversalQuery,
   TraversalSnapshot,
   WhyDependsDto,
@@ -144,7 +150,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   async searchSymbols(
     query: string,
     opts?: SearchSymbolsOptions,
-  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
+  ): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>> {
     return this.symbolQueries.searchSymbols(query, opts);
   }
 
@@ -174,12 +180,11 @@ export class SqliteGraphReadPort implements GraphReadPort {
           matcher.value,
         );
         if (!projected.ok) return projected;
-        return this.queryContext.envelope(
-          projected.value.data,
-          gen,
-          freshness,
-          projected.value.options,
-        );
+        // Traversal exclusive modes land in Task 2.6; facet-bridge until then.
+        return this.queryContext.envelope(projected.value.data, gen, freshness, {
+          ...projected.value.options,
+          coverage: facetsFromFlatCoverage(projected.value.options.coverage),
+        });
       },
     );
   }
@@ -200,7 +205,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
             queryDigest,
           });
           if (!cursor.ok) return cursor;
-          return this.queryContext.envelope(undefined, gen, freshness);
+          return this.queryContext.envelope(undefined, gen, freshness, {
+            coverage: completeInventoryCoverage(),
+          });
         }
         const cursor = validateCursorBinding({
           projectKey: this.queryContext.projectKey,
@@ -211,9 +218,17 @@ export class SqliteGraphReadPort implements GraphReadPort {
         });
         if (!cursor.ok) return cursor;
         const occ = gen.indexes.byOccId.get(symbolId);
-        if (occ === undefined) return this.queryContext.envelope(undefined, gen, freshness);
+        if (occ === undefined) {
+          return this.queryContext.envelope(undefined, gen, freshness, {
+            coverage: completeInventoryCoverage(),
+          });
+        }
         const score = this.generationFeatures(gen).function.get(occ.bodyHash)?.blast;
-        if (score === undefined) return this.queryContext.envelope(undefined, gen, freshness);
+        if (score === undefined) {
+          return this.queryContext.envelope(undefined, gen, freshness, {
+            coverage: completeInventoryCoverage(),
+          });
+        }
         const blastMatcher = this.queryContext.sourceRoleMatcherFor(gen);
         if (!blastMatcher.ok) return blastMatcher;
         const projected = projectBlastMembers({
@@ -226,9 +241,15 @@ export class SqliteGraphReadPort implements GraphReadPort {
           projectKey: this.queryContext.projectKey,
         });
         if (!projected.ok) return projected;
+        // Blast exclusive modes land in Task 2.8; facet-bridge until then.
+        const options = {
+          ...projected.value.options,
+          coverage: facetsFromFlatCoverage(projected.value.options.coverage),
+        };
         const symbol = projected.value.requested;
-        if (symbol === undefined)
-          return this.queryContext.envelope(undefined, gen, freshness, projected.value.options);
+        if (symbol === undefined) {
+          return this.queryContext.envelope(undefined, gen, freshness, options);
+        }
         return this.queryContext.envelope(
           {
             symbol,
@@ -243,7 +264,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
           },
           gen,
           freshness,
-          projected.value.options,
+          options,
         );
       },
     );
@@ -279,7 +300,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
           });
           if (!cursor.ok) return cursor;
           return this.queryContext.envelope([] as readonly DeadCodeDto[], gen, freshness, {
-            coverage: { complete: true, truncated: false, reasons: [] },
+            coverage: completeInventoryCoverage(),
             page: { limit },
             filter,
           });
@@ -311,8 +332,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
           page.hasMore && last !== undefined
             ? this.queryContext.nextCursorFor(binding, continuationToken(deadCodeStableKey(last)))
             : undefined;
+        // Dead-code exclusive modes land in Task 2.8; facet-bridge until then.
         return this.queryContext.envelope(page.rows, gen, freshness, {
-          coverage: page.coverage,
+          coverage: facetsFromFlatCoverage(page.coverage),
           page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
           filter,
           ...(page.groups === undefined ? {} : { groups: page.groups }),
@@ -343,7 +365,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
           });
           if (!cursor.ok) return cursor;
           return this.queryContext.envelope(emptyArchitecture(filter), gen, freshness, {
-            coverage: { complete: true, truncated: false, reasons: [] },
+            coverage: completeInventoryCoverage(),
             page: { limit },
             filter,
           });
@@ -393,8 +415,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
           packageEdges: view.value.packageEdges,
           hotspots: view.value.hotspots,
         };
+        // Architecture selectors land in Task 2.5; facet-bridge until then.
         return this.queryContext.envelope(data, gen, freshness, {
-          coverage: view.value.coverage,
+          coverage: facetsFromFlatCoverage(view.value.coverage),
           page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
           filter: view.value.effectiveFilter,
           ...(view.value.groups === undefined ? {} : { groups: view.value.groups }),
@@ -442,7 +465,11 @@ export class SqliteGraphReadPort implements GraphReadPort {
       durationMs: outcome.value.durationMs,
       priorGenerationAvailable: outcome.value.priorGenerationAvailable,
     };
-    return ok(this.queryContext.envelope(data, gen, freshness));
+    return ok(
+      this.queryContext.envelope(data, gen, freshness, {
+        coverage: completeInventoryCoverage(),
+      }),
+    );
   }
 }
 

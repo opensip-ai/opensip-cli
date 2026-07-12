@@ -10,6 +10,7 @@ import {
   symbolSearchStableKey,
   type FeatureTable,
   type GraphConfig,
+  type GraphReadCoverage,
   type GraphSourceFilter,
   type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
@@ -19,7 +20,6 @@ import { toDeadCodeDto } from './graph-read-projection.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { DeadCodeDto } from './graph-read-port.js';
-import type { GraphCoverage } from './symbol-dto.js';
 
 /** Hard cap separating incomplete orphan evaluation from ordinary pagination. */
 export const MAX_ORPHAN_EVALUATION = 10_000;
@@ -27,7 +27,8 @@ export const MAX_ORPHAN_EVALUATION = 10_000;
 export interface DeadCodePage {
   readonly rows: readonly DeadCodeDto[];
   readonly hasMore: boolean;
-  readonly coverage: GraphCoverage;
+  /** Flat intermediate coverage; envelope converts via facetsFromFlatCoverage (Task 2.8). */
+  readonly coverage: GraphReadCoverage;
   readonly groups?: readonly GroupSummary[];
   readonly anchorFound: boolean;
 }

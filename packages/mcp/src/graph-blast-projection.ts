@@ -3,6 +3,7 @@ import {
   codePointSortKey,
   compareCodePointStrings,
   matchesGraphSourceFilterWithRoles,
+  type GraphReadCoverage,
   type GraphSourceFilter,
   type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
@@ -13,13 +14,14 @@ import { toSymbolRef } from './graph-read-projection.js';
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { GraphReadPort } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
-import type { GraphCoverage, SymbolRef } from './symbol-dto.js';
+import type { SymbolRef } from './symbol-dto.js';
 
 type BlastOptions = Parameters<GraphReadPort['blast']>[1];
 const MAX_BLAST_OCCURRENCES = 20_000;
 
 interface BlastProjectionOptions {
-  readonly coverage: GraphCoverage;
+  /** Flat intermediate coverage; envelope converts via facetsFromFlatCoverage (Task 2.8). */
+  readonly coverage: GraphReadCoverage;
   readonly page: { readonly limit: number; readonly nextCursor?: string };
   readonly filter: GraphSourceFilter;
   readonly groups?: readonly { readonly key: string; readonly count: number }[];

@@ -2,6 +2,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 import {
   buildOccurrenceCallView,
   codePointSortKey,
+  type GraphReadCoverage,
   type GraphSourceFilter,
   type OccurrenceCallView,
   type SourceRoleMatcher,
@@ -32,10 +33,10 @@ import type {
   TraversalQuery,
   TraversalSnapshot,
 } from './graph-read-port.js';
-import type { GraphCoverage } from './symbol-dto.js';
 
 interface TraversalProjectionOptions {
-  readonly coverage: GraphCoverage;
+  /** Flat intermediate coverage; envelope converts via facetsFromFlatCoverage (Task 2.6). */
+  readonly coverage: GraphReadCoverage;
   readonly page: { readonly limit: number; readonly nextCursor?: string };
   readonly filter: GraphSourceFilter;
   readonly groups?: readonly { readonly key: string; readonly count: number }[];

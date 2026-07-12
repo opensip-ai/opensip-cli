@@ -28,6 +28,12 @@ export const DEFAULT_DEPTH = 5;
 export const MAX_LIMIT = 500;
 /** Default page size when the caller omits `limit`. */
 export const DEFAULT_LIMIT = 100;
+/**
+ * Default page size for identity-producing searches (`search_symbols`, and later
+ * `search_declarations`). Re-exported from the graph-read port contract so
+ * schemas and query collaborators share one constant. Caller range remains 1–500.
+ */
+export { DEFAULT_IDENTITY_SEARCH_LIMIT } from '../graph-read-port.js';
 /** Hard cap on a free-text query length (bounds work; search is substring, not regex → no ReDoS). */
 export const MAX_QUERY_LEN = 200;
 /** Hard cap on a file-path argument length. */

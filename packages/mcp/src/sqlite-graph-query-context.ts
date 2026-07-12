@@ -1,7 +1,13 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
-import { compileSourceRoleMatcher, MAX_AUDIT_SOURCE_ROLE_FILES } from '@opensip-cli/graph/read';
+import {
+  compileSourceRoleMatcher,
+  makeFacet,
+  rollupFacets,
+  UNREQUESTED_FACET,
+  MAX_AUDIT_SOURCE_ROLE_FILES,
+} from '@opensip-cli/graph/read';
 
 import { freshnessFromVerification, missingFreshness } from './freshness.js';
 import { bindCursor, decodeCursor, encodeCursor, type GroupSummary } from './graph-query-page.js';
@@ -10,12 +16,7 @@ import { readError } from './mcp-error.js';
 import type { CatalogGeneration, GraphGenerationController } from './catalog-generation.js';
 import type { ArchitectureSummaryDto, CatalogStatus } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
-import type {
-  Freshness,
-  GraphCoverage,
-  GraphEvidenceContext,
-  GraphToolResult,
-} from './symbol-dto.js';
+import type { Freshness, GraphCoverage, GraphEvidenceContext, GraphToolResult } from './symbol-dto.js';
 import type {
   AuditSourceRolePolicy,
   Catalog,
@@ -28,10 +29,37 @@ const LOG_QUERY_FAILED = 'mcp.graph.query.failed';
 const LOG_QUERY_COMPLETED = 'mcp.graph.query.completed';
 
 interface EnvelopeOptions {
-  readonly coverage?: GraphCoverage;
+  /** Explicit four-facet coverage — required (P2 Phase 2.2). */
+  readonly coverage: GraphCoverage;
   readonly page?: { readonly limit: number; readonly nextCursor?: string };
   readonly filter?: GraphSourceFilter;
   readonly groups?: readonly GroupSummary[];
+}
+
+/**
+ * Complete inventory-only facet coverage for reads that inspected the full
+ * candidate set with no truncation reasons (missing catalog, empty result, etc.).
+ */
+export function completeInventoryCoverage(): GraphCoverage {
+  return rollupFacets({
+    inventory: makeFacet(true, new Set()),
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
+}
+
+/**
+ * Inventory facet with explicit reasons (malformed rows, candidate caps, etc.).
+ * Other facets remain unrequested.
+ */
+export function inventoryCoverage(reasons: readonly string[]): GraphCoverage {
+  return rollupFacets({
+    inventory: makeFacet(true, new Set(reasons)),
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
 }
 
 type QueryIdentityMode = 'occurrence' | 'body-twin-union' | 'package' | 'mixed' | 'not-applicable';
@@ -200,25 +228,24 @@ export class SqliteGraphQueryContext {
     return ok(freshnessFromVerification(verified.value, gen.builtAt));
   }
 
+  /**
+   * Assemble a graph tool envelope. Coverage is REQUIRED as explicit four-facet
+   * {@link GraphCoverage} (P2 Phase 2.2) — no flat default / conversion overload.
+   */
   envelope<T>(
     data: T,
     gen: CatalogGeneration | undefined,
     freshness: Freshness,
-    options?: EnvelopeOptions,
+    options: EnvelopeOptions,
   ): GraphToolResult<T> {
-    const coverage = options?.coverage ?? {
-      complete: true,
-      truncated: false,
-      reasons: [],
-    };
     return {
       data,
       context: this.contextFor(gen),
       freshness,
-      ...(options?.page === undefined ? {} : { page: options.page }),
-      coverage,
-      ...(options?.filter === undefined ? {} : { filter: options.filter }),
-      ...(options?.groups === undefined ? {} : { groups: options.groups }),
+      ...(options.page === undefined ? {} : { page: options.page }),
+      coverage: options.coverage,
+      ...(options.filter === undefined ? {} : { filter: options.filter }),
+      ...(options.groups === undefined ? {} : { groups: options.groups }),
     };
   }
 

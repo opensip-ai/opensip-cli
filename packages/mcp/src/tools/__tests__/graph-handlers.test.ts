@@ -3,6 +3,7 @@
  */
 
 import { err, ok, type Result } from '@opensip-cli/core';
+import { facetsFromFlatCoverage } from '@opensip-cli/graph/read';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -26,6 +27,7 @@ import type {
   DeadCodeDto,
   GraphReadPort,
   RefreshResult,
+  SymbolSearchDto,
   TraversalSnapshot,
 } from '../../graph-read-port.js';
 import type { McpReadError } from '../../mcp-error.js';
@@ -76,7 +78,11 @@ const CONTEXT: GraphEvidenceContext = {
   },
 };
 
-const COVERAGE = { complete: true, truncated: false, reasons: [] as const };
+const COVERAGE = facetsFromFlatCoverage({
+  complete: true,
+  truncated: false,
+  reasons: [],
+});
 
 function wrap<T>(data: T): GraphToolResult<T> {
   return { data, context: CONTEXT, freshness: FRESH, coverage: COVERAGE };
@@ -100,12 +106,16 @@ function symRef(over: Partial<SymbolRef> = {}): SymbolRef {
   };
 }
 
+function searchDto(symbols: readonly SymbolRef[] = [symRef()]): SymbolSearchDto {
+  return { detail: 'nodes', symbols, totalMatches: symbols.length };
+}
+
 function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
   const base: GraphReadPort = {
     catalogStatus: () => Promise.resolve(ok({ context: CONTEXT, freshness: FRESH })),
     resolveSymbolId: (id) =>
       Promise.resolve(ok(wrap(id === 'src/a.ts:10:2' ? symRef() : undefined))),
-    searchSymbols: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    searchSymbols: () => Promise.resolve(ok(wrap(searchDto()))),
     findBySpan: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
     traverse: (query) => {
       const nodes = [
@@ -274,8 +284,9 @@ describe('graph handlers (async GraphToolResult)', () => {
       context: CONTEXT,
       freshness: FRESH,
       coverage: COVERAGE,
+      data: { detail: 'nodes', symbols: [expect.objectContaining({ symbolId: 'src/a.ts:10:2' })] },
     });
-    expect(Array.isArray(parsed.body.data)).toBe(true);
+    expect(Array.isArray((parsed.body.data as { symbols: unknown }).symbols)).toBe(true);
   });
 
   it('get_symbol returns candidates with context', async () => {
@@ -526,7 +537,7 @@ describe('graph handlers (async GraphToolResult)', () => {
     const graph = fakePort({
       searchSymbols: (q, opts) => {
         captured = { q, opts };
-        return Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[])));
+        return Promise.resolve(ok(wrap(searchDto())));
       },
     });
     const { handlers, server } = captureServer();
@@ -690,7 +701,7 @@ describe('graph handlers (async GraphToolResult)', () => {
 
   it('maps port errors through errorResult', async () => {
     const graph = fakePort({
-      searchSymbols: (): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> =>
+      searchSymbols: (): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>> =>
         Promise.resolve(err({ code: 'boom', message: 'failed' })),
     });
     const { handlers, server } = captureServer();

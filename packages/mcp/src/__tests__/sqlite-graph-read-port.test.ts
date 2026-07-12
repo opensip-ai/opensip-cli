@@ -266,6 +266,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             match: 'substring',
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'nodes',
           }),
         }),
       ],
@@ -374,10 +375,13 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(search.value.context.catalog.status).toBe('loaded');
     expect(search.value.context.catalog.identity?.startsWith('g1:')).toBe(true);
     expect(search.value.coverage).toBeDefined();
-    expect(search.value.data.some((s) => s.simpleName === 'caller')).toBe(true);
-    expect(search.value.data[0]?.package).toBe('pkg');
+    expect(search.value.coverage.inventory.requested).toBe(true);
+    expect(search.value.data.detail).toBe('nodes');
+    expect(search.value.data.symbols.some((s) => s.simpleName === 'caller')).toBe(true);
+    expect(search.value.data.symbols[0]?.package).toBe('pkg');
+    expect(search.value.data.symbols[0]?.symbolId.length).toBeGreaterThan(0);
 
-    const start = search.value.data[0].symbolId;
+    const start = search.value.data.symbols[0]!.symbolId;
     const walk = await port.traverse({
       direction: 'callees',
       startSymbolId: start,
@@ -420,21 +424,24 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(malformed.ok).toBe(true);
     if (!malformed.ok) return;
     expect(malformed.value.data).toBeUndefined();
-    expect(malformed.value.coverage).toEqual({
+    expect(malformed.value.coverage.complete).toBe(false);
+    expect(malformed.value.coverage.truncated).toBe(false);
+    expect(malformed.value.coverage.reasons).toEqual(['malformed-symbol-omitted']);
+    expect(malformed.value.coverage.inventory).toMatchObject({
+      requested: true,
       complete: false,
-      truncated: false,
       reasons: ['malformed-symbol-omitted'],
     });
+    expect(malformed.value.coverage.evidence.requested).toBe(false);
 
     const span = await port.findBySpan('src/nested.ts', 2);
     expect(span.ok).toBe(true);
     if (!span.ok) return;
     expect(span.value.data).toHaveLength(500);
-    expect(span.value.coverage).toEqual({
-      complete: false,
-      truncated: true,
-      reasons: ['span-candidate-cap'],
-    });
+    expect(span.value.coverage.complete).toBe(false);
+    expect(span.value.coverage.truncated).toBe(true);
+    expect(span.value.coverage.reasons).toEqual(['span-candidate-cap']);
+    expect(span.value.coverage.inventory.truncated).toBe(true);
   });
 
   it('refresh returns action + generation without throwing', async () => {
@@ -539,24 +546,126 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     });
     expect(filtered.ok).toBe(true);
     if (!filtered.ok) return;
-    expect(filtered.value.data).toHaveLength(1);
-    expect(filtered.value.data[0]?.kind).toBe('method');
+    expect(filtered.value.data.detail).toBe('nodes');
+    expect(filtered.value.data.symbols).toHaveLength(1);
+    expect(filtered.value.data.symbols[0]?.kind).toBe('method');
     expect(filtered.value.filter?.kinds).toEqual(['method']);
 
     const exact = await port.searchSymbols('save', {
       match: 'exact',
       filter: { sourceScope: 'all', generated: 'include' },
     });
-    expect(exact.ok && exact.value.data.every((s) => s.simpleName === 'save')).toBe(true);
+    expect(
+      exact.ok && exact.value.data.symbols.every((s) => s.simpleName === 'save'),
+    ).toBe(true);
 
     const qualified = await port.searchSymbols('fit.saveBaseline', {
       match: 'qualified',
       filter: { sourceScope: 'all', generated: 'include' },
     });
-    expect(qualified.ok && qualified.value.data).toHaveLength(1);
+    expect(qualified.ok && qualified.value.data.symbols).toHaveLength(1);
+    expect(qualified.ok && qualified.value.data.symbols[0]?.symbolId).toBeTruthy();
 
     const clamped = await port.searchSymbols('save', { limit: 10_000 });
     expect(clamped.ok && clamped.value.page?.limit).toBe(500);
+
+    // Omitted limit defaults to DEFAULT_IDENTITY_SEARCH_LIMIT = 20.
+    const omitted = await port.searchSymbols('save');
+    expect(omitted.ok && omitted.value.page?.limit).toBe(20);
+
+    for (const limit of [1, 19, 20, 21, 500] as const) {
+      const page = await port.searchSymbols('save', { limit });
+      expect(page.ok && page.value.page?.limit, `limit=${String(limit)}`).toBe(limit);
+    }
+  });
+
+  it('search_symbols projects exclusive summary/groups/nodes and binds detail into cursors', async () => {
+    const functions: Record<string, FunctionOccurrence[]> = {};
+    for (let index = 0; index < 5; index++) {
+      functions[`fn${String(index)}`] = [
+        fnOcc({
+          bodyHash: `h-${String(index)}`,
+          simpleName: `shared${String(index)}`,
+          filePath: index % 2 === 0 ? 'src/a.ts' : 'src/b.ts',
+          package: index % 2 === 0 ? 'pkg-a' : 'pkg-b',
+          line: index + 1,
+          column: 0,
+        }),
+      ];
+    }
+    new CatalogRepo(store).replaceAll({ ...seededCatalog(), functions });
+    const port = makePort(store);
+
+    const summary = await port.searchSymbols('shared', { detail: 'summary' });
+    expect(summary.ok).toBe(true);
+    if (!summary.ok) return;
+    expect(summary.value.data).toEqual({
+      detail: 'summary',
+      symbols: [],
+      totalMatches: 5,
+    });
+    expect(summary.value.groups).toBeUndefined();
+    expect(summary.value.coverage.inventory.requested).toBe(true);
+    expect(summary.value.coverage.grouping.requested).toBe(false);
+    expect(summary.value.coverage.evidence.requested).toBe(false);
+
+    const groups = await port.searchSymbols('shared', {
+      detail: 'groups',
+      groupBy: 'package',
+      limit: 10,
+    });
+    expect(groups.ok).toBe(true);
+    if (!groups.ok) return;
+    expect(groups.value.data.detail).toBe('groups');
+    expect(groups.value.data.symbols).toEqual([]);
+    expect(groups.value.data.totalMatches).toBe(5);
+    expect(groups.value.groups?.map((g) => g.key).sort()).toEqual(['pkg-a', 'pkg-b']);
+    expect(groups.value.coverage.grouping.requested).toBe(true);
+    expect(groups.value.coverage.projection.requested).toBe(true);
+
+    const nodes = await port.searchSymbols('shared', { detail: 'nodes', limit: 2 });
+    expect(nodes.ok).toBe(true);
+    if (!nodes.ok) return;
+    expect(nodes.value.data.detail).toBe('nodes');
+    expect(nodes.value.data.symbols).toHaveLength(2);
+    expect(nodes.value.data.totalMatches).toBe(5);
+    expect(nodes.value.groups).toBeUndefined();
+    expect(nodes.value.page?.nextCursor).toBeDefined();
+    expect(nodes.value.data.symbols[0]?.symbolId).toMatch(/:/);
+
+    // Cursor from nodes is invalid for groups (detail bound into digest).
+    const mismatch = await port.searchSymbols('shared', {
+      detail: 'groups',
+      groupBy: 'package',
+      cursor: nodes.value.page?.nextCursor,
+    });
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) expect(mismatch.error.code).toBe('cursor-query-mismatch');
+
+    // groups without groupBy rejected; nodes with groupBy rejected.
+    const groupsNeedMode = await port.searchSymbols('shared', { detail: 'groups' });
+    expect(groupsNeedMode.ok).toBe(false);
+    if (!groupsNeedMode.ok) expect(groupsNeedMode.error.code).toBe('invalid-query');
+
+    const nodesNoGroup = await port.searchSymbols('shared', {
+      detail: 'nodes',
+      groupBy: 'package',
+    });
+    expect(nodesNoGroup.ok).toBe(false);
+    if (!nodesNoGroup.ok) expect(nodesNoGroup.error.code).toBe('invalid-query');
+
+    // Exact empty catalog / exact missing match still returns usable shape.
+    const emptyExact = await port.searchSymbols('no-such-symbol', {
+      match: 'exact',
+      detail: 'nodes',
+    });
+    expect(emptyExact.ok).toBe(true);
+    if (!emptyExact.ok) return;
+    expect(emptyExact.value.data).toEqual({
+      detail: 'nodes',
+      symbols: [],
+      totalMatches: 0,
+    });
   });
 
   it('architecture returns labelled metrics and production defaults', async () => {
