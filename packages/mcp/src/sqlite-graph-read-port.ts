@@ -74,6 +74,44 @@ import type { DataStore } from '@opensip-cli/datastore';
 const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
 
+function toArchitectureSummaryDto(
+  view: {
+    readonly languages: ArchitectureSummaryDto['languages'];
+    readonly occurrenceCount: ArchitectureSummaryDto['occurrenceCount'];
+    readonly uniqueBodyCount: ArchitectureSummaryDto['uniqueBodyCount'];
+    readonly callEvidence: ArchitectureSummaryDto['callEvidence'];
+    readonly packageCount: ArchitectureSummaryDto['packageCount'];
+    readonly includedSections: ArchitectureSummaryDto['includedSections'];
+    readonly packageEdges?: ArchitectureSummaryDto['packageEdges'];
+    readonly packageEdgesSummary?: ArchitectureSummaryDto['packageEdgesSummary'];
+    readonly hotspots?: ArchitectureSummaryDto['hotspots'];
+    readonly hotspotsSummary?: ArchitectureSummaryDto['hotspotsSummary'];
+  },
+): ArchitectureSummaryDto {
+  return {
+    languages: view.languages,
+    occurrenceCount: view.occurrenceCount,
+    uniqueBodyCount: view.uniqueBodyCount,
+    callEvidence: view.callEvidence,
+    packageCount: view.packageCount,
+    includedSections: view.includedSections,
+    ...(view.packageEdges === undefined
+      ? {}
+      : {
+          packageEdges: view.packageEdges,
+          ...(view.packageEdgesSummary === undefined
+            ? {}
+            : { packageEdgesSummary: view.packageEdgesSummary }),
+        }),
+    ...(view.hotspots === undefined
+      ? {}
+      : {
+          hotspots: view.hotspots,
+          ...(view.hotspotsSummary === undefined ? {} : { hotspotsSummary: view.hotspotsSummary }),
+        }),
+  };
+}
+
 /**
  * Resolve the plain audit source-role policy from the validated graph config
  * (P2 Phase 1.4). Returns `{}` (no `sourceRolePolicy` key) when no globs are
@@ -361,88 +399,90 @@ export class SqliteGraphReadPort implements GraphReadPort {
     return this.queryContext.runQuery(
       'architectureSummary',
       { identityMode: 'mixed', sourceScope: filter.sourceScope },
-      (gen, freshness) => {
-        if (gen === undefined) {
-          const cursor = rejectCursorWithoutGeneration(query?.cursor, {
-            projectKey: this.queryContext.projectKey,
-            queryDigest,
-          });
-          if (!cursor.ok) return cursor;
-          return this.queryContext.envelope(emptyArchitecture(filter, sections), gen, freshness, {
-            coverage: completeInventoryCoverage(),
-            page: { limit },
-            filter,
-          });
-        }
-        const binding = {
-          projectKey: this.queryContext.projectKey,
-          generationKey: gen.key,
+      (gen, freshness) =>
+        this.projectArchitectureSummary({
+          gen,
+          freshness,
+          filter,
+          limit,
+          groupBy,
+          sections,
+          topN,
           queryDigest,
-        };
-        const after = this.queryContext.resolveAfterKey(query?.cursor, binding);
-        if (!after.ok) return after;
-        const cursorState = decodeArchitectureCursorState(after.value);
-        if (!cursorState.ok) return cursorState;
-        const matcher = this.queryContext.sourceRoleMatcherFor(gen);
-        if (!matcher.ok) return matcher;
-        const view = buildArchitectureView(
-          gen.catalog,
-          gen.indexes,
-          {
-            filter,
-            limit,
-            groupBy,
-            sections,
-            topN,
-            ...(cursorState.value.packageEdgeKey === undefined
-              ? {}
-              : { afterPackageEdgeKey: cursorState.value.packageEdgeKey }),
-            ...(cursorState.value.hotspotKey === undefined
-              ? {}
-              : { afterHotspotKey: cursorState.value.hotspotKey }),
-            packageEdgesDone: cursorState.value.packageEdgesDone,
-            hotspotsDone: cursorState.value.hotspotsDone,
-          },
-          matcher.value,
-          this.generationFeatures(gen),
-        );
-        if (!view.ok) return err(fromGraphReadError(view.error));
-        const nextAfterKey = nextArchitectureAfterKey(cursorState.value, view.value);
-        const nextCursor =
-          nextAfterKey === undefined
-            ? undefined
-            : this.queryContext.nextCursorFor(binding, nextAfterKey);
-        const data: ArchitectureSummaryDto = {
-          languages: view.value.languages,
-          occurrenceCount: view.value.occurrenceCount,
-          uniqueBodyCount: view.value.uniqueBodyCount,
-          callEvidence: view.value.callEvidence,
-          packageCount: view.value.packageCount,
-          includedSections: view.value.includedSections,
-          ...(view.value.packageEdges === undefined
-            ? {}
-            : {
-                packageEdges: view.value.packageEdges,
-                ...(view.value.packageEdgesSummary === undefined
-                  ? {}
-                  : { packageEdgesSummary: view.value.packageEdgesSummary }),
-              }),
-          ...(view.value.hotspots === undefined
-            ? {}
-            : {
-                hotspots: view.value.hotspots,
-                ...(view.value.hotspotsSummary === undefined
-                  ? {}
-                  : { hotspotsSummary: view.value.hotspotsSummary }),
-              }),
-        };
-        return this.queryContext.envelope(data, gen, freshness, {
-          coverage: facetsFromFlatCoverage(view.value.coverage),
-          page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
-          filter: view.value.effectiveFilter,
-          ...(view.value.groups === undefined ? {} : { groups: view.value.groups }),
-        });
+          cursor: query?.cursor,
+        }),
+    );
+  }
+
+  private projectArchitectureSummary(input: {
+    readonly gen: CatalogGeneration | undefined;
+    readonly freshness: GraphToolResult<unknown>['freshness'];
+    readonly filter: ReturnType<SqliteGraphQueryContext['resolveFilter']>;
+    readonly limit: number;
+    readonly groupBy: 'none' | 'package' | 'file';
+    readonly sections: ArchitectureSummaryDto['includedSections'];
+    readonly topN: number;
+    readonly queryDigest: string;
+    readonly cursor: string | undefined;
+  }): Result<GraphToolResult<ArchitectureSummaryDto>, McpReadError> {
+    const { gen, freshness, filter, limit, groupBy, sections, topN, queryDigest, cursor } = input;
+    if (gen === undefined) {
+      const missing = rejectCursorWithoutGeneration(cursor, {
+        projectKey: this.queryContext.projectKey,
+        queryDigest,
+      });
+      if (!missing.ok) return missing;
+      return ok(
+        this.queryContext.envelope(emptyArchitecture(filter, sections), gen, freshness, {
+          coverage: completeInventoryCoverage(),
+          page: { limit },
+          filter,
+        }),
+      );
+    }
+    const binding = {
+      projectKey: this.queryContext.projectKey,
+      generationKey: gen.key,
+      queryDigest,
+    };
+    const after = this.queryContext.resolveAfterKey(cursor, binding);
+    if (!after.ok) return after;
+    const cursorState = decodeArchitectureCursorState(after.value);
+    if (!cursorState.ok) return cursorState;
+    const matcher = this.queryContext.sourceRoleMatcherFor(gen);
+    if (!matcher.ok) return matcher;
+    const view = buildArchitectureView(
+      gen.catalog,
+      gen.indexes,
+      {
+        filter,
+        limit,
+        groupBy,
+        sections,
+        topN,
+        ...(cursorState.value.packageEdgeKey === undefined
+          ? {}
+          : { afterPackageEdgeKey: cursorState.value.packageEdgeKey }),
+        ...(cursorState.value.hotspotKey === undefined
+          ? {}
+          : { afterHotspotKey: cursorState.value.hotspotKey }),
+        packageEdgesDone: cursorState.value.packageEdgesDone,
+        hotspotsDone: cursorState.value.hotspotsDone,
       },
+      matcher.value,
+      this.generationFeatures(gen),
+    );
+    if (!view.ok) return err(fromGraphReadError(view.error));
+    const nextAfterKey = nextArchitectureAfterKey(cursorState.value, view.value);
+    const nextCursor =
+      nextAfterKey === undefined ? undefined : this.queryContext.nextCursorFor(binding, nextAfterKey);
+    return ok(
+      this.queryContext.envelope(toArchitectureSummaryDto(view.value), gen, freshness, {
+        coverage: facetsFromFlatCoverage(view.value.coverage),
+        page: { limit, ...(nextCursor === undefined ? {} : { nextCursor }) },
+        filter: view.value.effectiveFilter,
+        ...(view.value.groups === undefined ? {} : { groups: view.value.groups }),
+      }),
     );
   }
 

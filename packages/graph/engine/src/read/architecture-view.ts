@@ -596,6 +596,49 @@ function architectureGroups(
   );
 }
 
+interface RankedPage<T> {
+  readonly rows: readonly T[];
+  readonly hasMore: boolean;
+  readonly cursorInvalid: boolean;
+}
+
+function pageRankedFamily<T>(
+  selected: boolean,
+  window: readonly T[],
+  limit: number,
+  afterKey: string | undefined,
+  done: boolean,
+  keyOf: (row: T) => string,
+): RankedPage<T> {
+  if (!selected) return { rows: [], hasMore: false, cursorInvalid: false };
+  const after = resolveStableAnchor(window, afterKey, done, keyOf);
+  if (after === null) return { rows: [], hasMore: false, cursorInvalid: true };
+  const page = pageSorted(window, limit, after, done, keyOf);
+  return { rows: page.rows, hasMore: page.hasMore, cursorInvalid: false };
+}
+
+function optionalFamilySlice<T>(
+  selected: boolean,
+  all: readonly T[],
+  window: readonly T[],
+  page: RankedPage<T>,
+): {
+  readonly rows?: readonly T[];
+  readonly summary?: ArchitectureFamilySummary;
+  readonly hasMore: boolean;
+} {
+  if (!selected) return { hasMore: false };
+  return {
+    rows: page.rows,
+    summary: {
+      totalAvailable: all.length,
+      selectedCount: window.length,
+      pageReturned: page.rows.length,
+    },
+    hasMore: page.hasMore,
+  };
+}
+
 /** Build labelled architecture metrics for one filtered catalog generation. */
 export function buildArchitectureView(
   catalog: Catalog,
@@ -615,8 +658,6 @@ export function buildArchitectureView(
     const reasons = new Set<string>();
     if (resolutionMode(catalog) === 'fast') reasons.add('fast-resolution-approximate');
 
-    // Metrics counts always computed when metrics selected; packageCount needed
-    // for metrics section only. Ranked families only when selected.
     const counts = includeMetrics
       ? countArchitectureNodes(indexes, filter, reasons, matcher)
       : { occurrenceCount: 0, bodyHashes: new Set<string>(), packageNames: new Set<string>() };
@@ -626,58 +667,45 @@ export function buildArchitectureView(
     const hotspots = includeHotspots
       ? buildHotspots(catalog, indexes, filter, reasons, cachedFeatures, matcher)
       : [];
-
-    // Deterministic global top-N window; page limit slices only inside it.
     const packageWindow = includePackageEdges ? packageEdges.slice(0, topN) : [];
     const hotspotWindow = includeHotspots ? hotspots.slice(0, topN) : [];
 
-    const packageAfter = includePackageEdges
-      ? resolveStableAnchor(
-          packageWindow,
-          query.afterPackageEdgeKey,
-          query.packageEdgesDone === true,
-          packageEdgeStableKey,
-        )
-      : undefined;
-    const hotspotAfter = includeHotspots
-      ? resolveStableAnchor(
-          hotspotWindow,
-          query.afterHotspotKey,
-          query.hotspotsDone === true,
-          hotspotStableKey,
-        )
-      : undefined;
-    if (packageAfter === null || hotspotAfter === null) {
+    const packagePage = pageRankedFamily(
+      includePackageEdges,
+      packageWindow,
+      limit,
+      query.afterPackageEdgeKey,
+      query.packageEdgesDone === true,
+      packageEdgeStableKey,
+    );
+    const hotspotPage = pageRankedFamily(
+      includeHotspots,
+      hotspotWindow,
+      limit,
+      query.afterHotspotKey,
+      query.hotspotsDone === true,
+      hotspotStableKey,
+    );
+    if (packagePage.cursorInvalid || hotspotPage.cursorInvalid) {
       return err({
         code: 'GRAPH.READ.CURSOR_INVALID',
         operation: 'analysis',
         message: 'Cursor continuation anchor is not present in this architecture view',
       });
     }
-    const packagePage = includePackageEdges
-      ? pageSorted(
-          packageWindow,
-          limit,
-          packageAfter,
-          query.packageEdgesDone === true,
-          packageEdgeStableKey,
-        )
-      : { rows: [] as readonly ArchitecturePackageEdgeRow[], hasMore: false };
-    const hotspotPage = includeHotspots
-      ? pageSorted(
-          hotspotWindow,
-          limit,
-          hotspotAfter,
-          query.hotspotsDone === true,
-          hotspotStableKey,
-        )
-      : { rows: [] as readonly ArchitectureHotspot[], hasMore: false };
     const grouped = architectureGroups(packageWindow, hotspotWindow, query.groupBy ?? 'none');
     if (grouped?.truncated === true) reasons.add('group-key-cap');
     const callEvidence = includeMetrics
       ? buildCallMetrics(catalog, indexes, filter, reasons, matcher)
       : emptyCallMetrics(filter, catalog);
     const reasonValues = [...reasons].sort(compareCodePointStrings);
+    const edgeSlice = optionalFamilySlice(
+      includePackageEdges,
+      packageEdges,
+      packageWindow,
+      packagePage,
+    );
+    const hotspotSlice = optionalFamilySlice(includeHotspots, hotspots, hotspotWindow, hotspotPage);
 
     return ok({
       languages: [catalog.language],
@@ -701,28 +729,14 @@ export function buildArchitectureView(
         generated: filter.generated,
       },
       includedSections: sections,
-      ...(includePackageEdges
-        ? {
-            packageEdges: packagePage.rows,
-            packageEdgesSummary: {
-              totalAvailable: packageEdges.length,
-              selectedCount: packageWindow.length,
-              pageReturned: packagePage.rows.length,
-            },
-          }
-        : {}),
-      packageEdgesHasMore: packagePage.hasMore,
-      ...(includeHotspots
-        ? {
-            hotspots: hotspotPage.rows,
-            hotspotsSummary: {
-              totalAvailable: hotspots.length,
-              selectedCount: hotspotWindow.length,
-              pageReturned: hotspotPage.rows.length,
-            },
-          }
-        : {}),
-      hotspotsHasMore: hotspotPage.hasMore,
+      ...(edgeSlice.rows === undefined
+        ? {}
+        : { packageEdges: edgeSlice.rows, packageEdgesSummary: edgeSlice.summary }),
+      packageEdgesHasMore: edgeSlice.hasMore,
+      ...(hotspotSlice.rows === undefined
+        ? {}
+        : { hotspots: hotspotSlice.rows, hotspotsSummary: hotspotSlice.summary }),
+      hotspotsHasMore: hotspotSlice.hasMore,
       effectiveFilter: filter,
       coverage: {
         complete: reasonValues.length === 0,
