@@ -1045,4 +1045,223 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(hotspotKeys.size).toBeGreaterThan(1);
     expect(cursor).toBeUndefined();
   });
+
+  it('searchDeclarations / referencesTo page exclusive detail and bind cursors (P2 Phase 3)', async () => {
+    const declarationId =
+      'd1|pkg|src/types.ts|interface|AuditShape|0000000000000001|0000000000000000';
+    // Distinct builtAt so catalog identity differs from the pre-feature seed and
+    // the SQLite generation controller auto-swaps (identity is not content-deep).
+    const semanticCatalog: Catalog = {
+      ...seededCatalog('2026-07-11T12:00:00.000Z'),
+      engineMode: 'exact',
+      resolutionMode: 'exact',
+      semanticFacts: {
+        referenceScope: 'cross-file',
+        declarations: [
+          {
+            declarationId,
+            name: 'AuditShape',
+            qualifiedName: 'src/types.AuditShape',
+            kind: 'interface',
+            package: 'pkg',
+            filePath: 'src/types.ts',
+            line: 1,
+            column: 0,
+            endLine: 5,
+            endColumn: 1,
+            visibility: 'exported',
+            exportRole: 'named-export',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+          {
+            declarationId:
+              'd1|pkg|src/types.ts|type-alias|AuditAlias|0000000000000002|0000000000000000',
+            name: 'AuditAlias',
+            qualifiedName: 'src/types.AuditAlias',
+            kind: 'type-alias',
+            package: 'pkg',
+            filePath: 'src/types.ts',
+            line: 7,
+            column: 0,
+            endLine: 7,
+            endColumn: 30,
+            visibility: 'exported',
+            exportRole: 'named-export',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+        ],
+        references: [
+          {
+            referenceId: 'r1|src/use.ts|type|0000000000000010|0000000000000000|d1',
+            kind: 'type',
+            filePath: 'src/use.ts',
+            line: 2,
+            column: 0,
+            endLine: 2,
+            endColumn: 10,
+            package: 'pkg',
+            targetDeclarationId: declarationId,
+            targetPackage: 'pkg',
+            targetName: 'AuditShape',
+            targetKind: 'interface',
+            basis: 'compiler-declaration',
+            confidence: 'high',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+          {
+            referenceId: 'r1|src/other.ts|type|0000000000000011|0000000000000000|d1',
+            kind: 'type',
+            filePath: 'src/other.ts',
+            line: 3,
+            column: 0,
+            endLine: 3,
+            endColumn: 10,
+            package: 'pkg-b',
+            targetDeclarationId: declarationId,
+            targetPackage: 'pkg',
+            targetName: 'AuditShape',
+            targetKind: 'interface',
+            basis: 'compiler-declaration',
+            confidence: 'high',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+        ],
+        coverage: {
+          status: 'complete',
+          inspectedDeclarations: 2,
+          emittedDeclarations: 2,
+          omittedDeclarations: 0,
+          inspectedReferences: 2,
+          emittedReferences: 2,
+          omittedReferences: 0,
+          reasons: [],
+        },
+      },
+    };
+    // Absent plane: pre-feature catalogs report unsupported inventory honestly.
+    new CatalogRepo(store).replaceAll(seededCatalog('2026-07-11T11:00:00.000Z'));
+    const port = makePort(store);
+    const unsupported = await port.searchDeclarations('AuditShape');
+    expect(unsupported.ok).toBe(true);
+    if (!unsupported.ok) return;
+    expect(unsupported.value.data.declarations).toEqual([]);
+    expect(unsupported.value.coverage.inventory.complete).toBe(false);
+    expect(unsupported.value.coverage.inventory.reasons).toContain('semantic-facts-unsupported');
+
+    // Externally persist a newer generation with the semantic plane; ordinary
+    // reads auto-load it without a rebuild.
+    new CatalogRepo(store).replaceAll(semanticCatalog);
+
+    const summary = await port.searchDeclarations('Audit', { detail: 'summary' });
+    expect(summary.ok).toBe(true);
+    if (!summary.ok) return;
+    expect(summary.value.data).toMatchObject({
+      detail: 'summary',
+      referenceScope: 'cross-file',
+      declarations: [],
+      totalMatches: 2,
+    });
+    expect(summary.value.context.catalog.generationSource).toBe('persisted-auto-swap');
+    // Identity-search default page limit is 20 (not the unrelated 100-row default).
+    const omittedLimit = await port.searchDeclarations('Audit');
+    expect(omittedLimit.ok && omittedLimit.value.page?.limit).toBe(20);
+
+    const nodes = await port.searchDeclarations('AuditShape', {
+      match: 'exact',
+      detail: 'nodes',
+      kinds: ['interface'],
+      limit: 20,
+    });
+    expect(nodes.ok).toBe(true);
+    if (!nodes.ok) return;
+    expect(nodes.value.data.declarations).toHaveLength(1);
+    expect(nodes.value.data.declarations[0]?.declarationId).toBe(declarationId);
+    // Declaration IDs must never look like callable symbolIds (file:line:col).
+    expect(nodes.value.data.declarations[0]?.declarationId.includes(':')).toBe(false);
+
+    const groups = await port.searchDeclarations('Audit', {
+      detail: 'groups',
+      groupBy: 'package',
+    });
+    expect(groups.ok).toBe(true);
+    if (!groups.ok) return;
+    expect(groups.value.data.detail).toBe('groups');
+    expect(groups.value.data.declarations).toEqual([]);
+    expect(groups.value.groups?.length).toBeGreaterThan(0);
+
+    // Detail/groupBy are bound into the cursor digest (nodes ↔ groups mismatch).
+    // Summary intentionally ignores cursors (counts only); mismatch is enforced
+    // on paged exclusive projections.
+    const paged = await port.searchDeclarations('Audit', { detail: 'nodes', limit: 1 });
+    expect(paged.ok && paged.value.page?.nextCursor).toBeDefined();
+    if (!paged.ok || paged.value.page?.nextCursor === undefined) return;
+    const mismatch = await port.searchDeclarations('Audit', {
+      detail: 'groups',
+      groupBy: 'package',
+      cursor: paged.value.page.nextCursor,
+    });
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) expect(mismatch.error.code).toBe('cursor-query-mismatch');
+
+    // references_to defaults to summary and never invents same-file sites.
+    const refsSummary = await port.referencesTo(declarationId, { detail: 'summary' });
+    expect(refsSummary.ok).toBe(true);
+    if (!refsSummary.ok) return;
+    expect(refsSummary.value.data).toMatchObject({
+      detail: 'summary',
+      referenceScope: 'cross-file',
+      declarationId,
+      references: [],
+      totalMatches: 2,
+    });
+
+    const refsNodes = await port.referencesTo(declarationId, { detail: 'nodes', limit: 10 });
+    expect(refsNodes.ok).toBe(true);
+    if (!refsNodes.ok) return;
+    expect(refsNodes.value.data.references).toHaveLength(2);
+    expect(refsNodes.value.data.references.every((r) => r.filePath !== 'src/types.ts')).toBe(true);
+
+    const missing = await port.referencesTo('d1|missing');
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.error.code).toBe('not-found');
+
+    // Batch static-handler bridge over one generation (no N+1 freshness flights).
+    const bridge = await port.resolveStaticHandlerDeclarations('w1:test-snapshot', [
+      {
+        package: 'pkg',
+        path: 'src/types.ts',
+        declaration: 'AuditShape',
+        owner: 'host',
+      },
+      {
+        package: 'pkg',
+        path: 'src/types.ts',
+        declaration: 'NoSuchDecl',
+        owner: 'host',
+      },
+    ]);
+    expect(bridge.ok).toBe(true);
+    if (!bridge.ok) return;
+    expect(bridge.value.catalogStatus).toBe('loaded');
+    expect(bridge.value.outcomes).toHaveLength(2);
+    expect(bridge.value.outcomes[0]?.status).toBe('resolved');
+    expect(bridge.value.outcomes[0]?.declarationId).toBe(declarationId);
+    expect(bridge.value.outcomes[0]?.claimProvenance).toBe('author-declared');
+    expect(bridge.value.outcomes[1]?.status).toBe('not-found');
+
+    // Cache hit path: same w1:+g1: reuses completed outcomes.
+    const again = await port.resolveStaticHandlerDeclarations('w1:test-snapshot', [
+      {
+        package: 'pkg',
+        path: 'src/types.ts',
+        declaration: 'AuditShape',
+        owner: 'host',
+      },
+    ]);
+    expect(again.ok && again.value.outcomes[0]?.status).toBe('resolved');
+  });
 });
