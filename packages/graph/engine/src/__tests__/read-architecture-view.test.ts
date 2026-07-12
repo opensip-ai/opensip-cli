@@ -199,8 +199,8 @@ describe('buildArchitectureView', () => {
       sourceScope: 'production',
       generated: 'exclude',
     });
-    expect(result.value.packageEdges.length).toBeGreaterThanOrEqual(1);
-    const edge = result.value.packageEdges.find(
+    expect(result.value.packageEdges?.length).toBeGreaterThanOrEqual(1);
+    const edge = result.value.packageEdges?.find(
       (e) => e.fromPackage === 'pkg-a' && e.toPackage === 'pkg-b',
     );
     expect(edge).toBeDefined();
@@ -219,7 +219,7 @@ describe('buildArchitectureView', () => {
     const result = view({ sourceScope: 'production', generated: 'exclude' }, 10);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    for (const h of result.value.hotspots) {
+    for (const h of result.value.hotspots ?? []) {
       expect(h.identityMode).toBe('body-twin-union');
       expect(h.symbol.inTestFile).toBe(false);
       expect(h.symbol.definedInGenerated).toBe(false);
@@ -410,8 +410,8 @@ describe('buildArchitectureView', () => {
     const first = buildArchitectureView(catalog, indexes, { filter, limit: 1, sections: ALL_SECTIONS, topN: 100 }, noMatcher);
     expect(first.ok).toBe(true);
     if (!first.ok) return;
-    const packageKey = first.value.packageEdges[0];
-    const hotspotKey = first.value.hotspots[0];
+    const packageKey = first.value.packageEdges?.[0];
+    const hotspotKey = first.value.hotspots?.[0];
     expect(packageKey).toBeDefined();
     expect(hotspotKey).toBeDefined();
     if (packageKey === undefined || hotspotKey === undefined) return;
@@ -446,7 +446,7 @@ describe('buildArchitectureView', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.hotspots).toHaveLength(1);
-    expect((result.value.groups?.length ?? 0) > result.value.hotspots.length).toBe(true);
+    expect((result.value.groups?.length ?? 0) > (result.value.hotspots?.length ?? 0)).toBe(true);
   });
 
   it('keeps the actual deterministic top rows when candidates exceed the hard cap', () => {
@@ -495,7 +495,7 @@ describe('buildArchitectureView', () => {
     expect(reverse.ok).toBe(true);
     if (!forward.ok || !reverse.ok) return;
     expect(
-      forward.value.hotspots.find((row) => row.symbol.bodyHash === 'h-target')?.symbol.symbolId,
+      forward.value.hotspots?.find((row) => row.symbol.bodyHash === 'h-target')?.symbol.symbolId,
     ).toBe('src/b/target.ts:1:0');
     expect(reverse.value.hotspots).toEqual(forward.value.hotspots);
   });
