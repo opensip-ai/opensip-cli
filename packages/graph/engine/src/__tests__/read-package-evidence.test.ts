@@ -5,7 +5,12 @@ import { buildIndexes } from '../pipeline/indexes.js';
 import { buildPackageEvidence } from '../read/package-evidence.js';
 import { buildPackageScc } from '../read/package-scc.js';
 
-import type { Catalog, DependencyEdge, FunctionOccurrence } from '../types.js';
+import type {
+  Catalog,
+  DependencyClassification,
+  DependencyEdge,
+  FunctionOccurrence,
+} from '../types.js';
 
 function occurrence(
   partial: Partial<FunctionOccurrence> &
@@ -40,8 +45,29 @@ function call(to: string, line = 2): NonNullable<FunctionOccurrence['calls']>[nu
   };
 }
 
-function dependency(to: readonly string[], specifier: string, line: number): DependencyEdge {
-  return { to, specifier, line, column: 0 };
+function dependency(
+  to: readonly string[],
+  specifier: string,
+  line: number,
+  classification?: DependencyClassification,
+): DependencyEdge {
+  return { to, specifier, line, column: 0, ...(classification && { classification }) };
+}
+
+/**
+ * Build a persisted {@link DependencyClassification} for a to-`[]` declaration /
+ * external / relative edge. Defaults `form`/`role` to a runtime import so tests
+ * exercise the target-kind/basis/resolvedPackage attribution path directly.
+ */
+function cls(partial: Partial<DependencyClassification>): DependencyClassification {
+  return {
+    form: 'import-declaration',
+    role: 'runtime',
+    targetKind: 'catalog-source',
+    basis: 'catalog-target',
+    reason: 'test-classification',
+    ...partial,
+  };
 }
 
 function catalogOf(
@@ -273,7 +299,10 @@ describe('buildPackageEvidence', () => {
     expect(result.value.imports.every((row) => row.countUnit === 'import-statements')).toBe(true);
   });
 
-  it('classifies empty relative and known-workspace targets as unresolved', () => {
+  it('resolves empty-target imports from the persisted classification', () => {
+    // A `.d.ts` declaration entry that global-merge attributed to a unique
+    // workspace package resolves internal on its persisted resolvedPackage —
+    // NOT by re-inferring a package from the specifier's leaf name.
     const catalog = catalogOf({
       moduleA: [
         occurrence({
@@ -283,9 +312,9 @@ describe('buildPackageEvidence', () => {
           package: 'pkg-a',
           kind: 'module-init',
           dependencies: [
-            dependency([], './missing.js', 1),
-            dependency([], '@scope/pkg-b', 2),
-            dependency([], 'clearly-external', 3),
+            dependency([], './missing.js', 1, cls({ targetKind: 'unresolved', basis: 'unresolved', reason: 'relative-target-unresolved' })),
+            dependency([], '@scope/pkg-b', 2, cls({ targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-b' })),
+            dependency([], 'clearly-external', 3, cls({ targetKind: 'external', basis: 'external-specifier', reason: 'external-package' })),
           ],
         }),
       ],
@@ -306,13 +335,63 @@ describe('buildPackageEvidence', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(
-      Object.fromEntries(result.value.imports.map((row) => [row.target, row.resolution])),
-    ).toMatchObject({
-      './missing.js': 'unresolved',
-      '@scope/pkg-b': 'unresolved',
-      'clearly-external': 'external',
+    // Aggregated rows key by resolved `target`: unresolved/external keep the
+    // specifier; the workspace declaration resolves to its `resolvedPackage`.
+    const byTarget = Object.fromEntries(result.value.imports.map((row) => [row.target, row]));
+    expect(byTarget['./missing.js']?.resolution).toBe('unresolved');
+    expect(byTarget['clearly-external']?.resolution).toBe('external');
+    expect(byTarget['pkg-b']?.resolution).toBe('internal');
+    expect(byTarget['pkg-b']?.toPackage).toBe('pkg-b');
+    // Concrete evidence samples carry the persisted classification + confidence.
+    const workspaceEvidence = result.value.importEvidence.find(
+      (row) => row.specifier === '@scope/pkg-b',
+    );
+    expect(workspaceEvidence?.resolution).toBe('internal');
+    expect(workspaceEvidence?.confidence).toBe('high');
+    expect(workspaceEvidence?.classification?.basis).toBe('workspace-manifest');
+    expect(workspaceEvidence?.classification?.resolvedPackage).toBe('pkg-b');
+  });
+
+  it('carries form/role and resolves subpath, type-only, and re-export declarations', () => {
+    // Root and subpath declaration entries both resolve on their persisted
+    // resolvedPackage; an undeclared subpath fails closed; type-only imports and
+    // re-exports preserve their form/role while still resolving internally.
+    const catalog = catalogOf({
+      moduleA: [
+        occurrence({
+          bodyHash: 'module-a',
+          simpleName: '<module-init:a>',
+          filePath: 'packages/a/src/index.ts',
+          package: 'pkg-a',
+          kind: 'module-init',
+          dependencies: [
+            dependency([], '@scope/pkg-b/sub', 1, cls({ targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-subpath-declaration-entry', resolvedPackage: 'pkg-b' })),
+            dependency([], '@scope/pkg-b/undeclared', 2, cls({ targetKind: 'unresolved', basis: 'unresolved', reason: 'undeclared-exports-subpath' })),
+            dependency([], '@scope/pkg-b', 3, cls({ form: 'import-declaration', role: 'type-only', targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-b' })),
+            dependency([], '@scope/pkg-c', 4, cls({ form: 're-export', role: 'runtime', targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-c' })),
+          ],
+        }),
+      ],
     });
+    const result = buildPackageEvidence(catalog, buildIndexes(catalog), {
+      edgeKind: 'import',
+      filter: productionFilter,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const byTarget = Object.fromEntries(result.value.imports.map((row) => [row.target, row]));
+    // The subpath and the type-only import both attribute to pkg-b (one row).
+    expect(byTarget['pkg-b']?.resolution).toBe('internal');
+    expect(byTarget['pkg-c']?.resolution).toBe('internal');
+    expect(byTarget['@scope/pkg-b/undeclared']?.resolution).toBe('unresolved');
+    const bySpecifier = Object.fromEntries(
+      result.value.importEvidence.map((row) => [row.specifier, row]),
+    );
+    expect(bySpecifier['@scope/pkg-b']?.classification?.role).toBe('type-only');
+    expect(bySpecifier['@scope/pkg-c']?.classification?.form).toBe('re-export');
+    expect(bySpecifier['@scope/pkg-b/sub']?.classification?.reason).toBe(
+      'workspace-subpath-declaration-entry',
+    );
   });
 
   it('does not fan a colliding module body hash into invented package edges', () => {
@@ -365,7 +444,10 @@ describe('buildPackageEvidence', () => {
     expect(result.value.coverage.reasons).toContain('ambiguous-import-target');
   });
 
-  it('prefers an exact scoped package over a colliding legacy leaf name', () => {
+  it('fails a colliding multi-package body twin closed to unresolved', () => {
+    // A bare-specifier import whose target body hash exists in two packages is
+    // ambiguous — the removed leaf-name path would have invented an edge to the
+    // package matching the specifier's leaf. It now fails closed to unresolved.
     const catalog = catalogOf({
       source: [
         occurrence({
@@ -407,9 +489,9 @@ describe('buildPackageEvidence', () => {
     expect(result.value.imports).toEqual([
       expect.objectContaining({
         fromPackage: 'pkg-a',
-        toPackage: '@scope/pkg-b',
+        toPackage: null,
         target: '@scope/pkg-b',
-        resolution: 'internal',
+        resolution: 'unresolved',
       }),
     ]);
   });

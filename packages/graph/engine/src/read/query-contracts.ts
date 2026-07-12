@@ -15,6 +15,7 @@ import { pkgOf } from '../resolve-callee.js';
 import type {
   CallConfidence,
   CallResolution,
+  DependencyClassification,
   FunctionKind,
   FunctionOccurrence,
   Visibility,
@@ -147,6 +148,18 @@ export interface PackageImportEvidence {
     readonly line: number;
     readonly column: number;
   };
+  /**
+   * The persisted atomic dependency classification (form/role/target-kind/basis/
+   * reason/resolvedPackage) of the underlying edge, when the producing catalog
+   * carried one (P2 Phase 0.3). Absent for a pre-feature edge.
+   */
+  readonly classification?: DependencyClassification;
+  /**
+   * Attribution confidence (P2 Phase 0.3): `'high'` for a unique catalog-target
+   * or a unique workspace-manifest declaration entry; absent for weaker /
+   * unresolved / external outcomes.
+   */
+  readonly confidence?: 'high' | 'medium' | 'low';
 }
 
 /** Canonical concrete proof row for one package dependency. */
