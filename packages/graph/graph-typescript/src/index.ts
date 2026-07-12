@@ -27,16 +27,15 @@
 
 import { relative, sep } from 'node:path';
 
-import {
-  buildPackageManifestIndexFromRoots,
-  ownerEdgeKey,
-  resolveSpecifierToPackage,
-} from '@opensip-cli/graph';
+import { ownerEdgeKey, resolveSpecifierToPackage } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
-import { derivePackageRoots } from './edge-helpers/cross-package-context.js';
+import {
+  buildCrossPackageContext,
+  type CrossPackageContext,
+} from './edge-helpers/cross-package-context.js';
 import { methodTargetFile } from './edge-helpers/method-target.js';
 import { extractBoundaryCalls, type MethodTargetResolver } from './edge-resolvers/boundary.js';
 import { resolveEdgesFromRecords, resolveEdgesSyntactic } from './edges.js';
@@ -236,11 +235,17 @@ async function resolveCallSitesExact(
   project: TypescriptParsedProject,
 ): Promise<ResolveOutput> {
   const tsCallSites = toTsCallSites(input.callSites);
+  // Build the cross-package resolution context ONCE (P2 Phase 0.4) and thread it
+  // into BOTH call-edge resolution and dependency resolution — a single manifest
+  // read + export-index pass shared across the exact stage (and, from Phase 3,
+  // semantic-fact capture), with one canonical fail-closed package attribution.
+  const crossPackage = buildCrossPackageContext(input.catalog, input.projectDirAbs);
   const result = await resolveEdgesFromRecords({
     catalog: input.catalog,
     program: project.program,
     projectDirAbs: input.projectDirAbs,
     callSites: tsCallSites,
+    crossPackage,
   });
 
   // Phase 4 (DEC-498): resolve dependency sites if any. Translate
@@ -269,6 +274,7 @@ async function resolveCallSitesExact(
       input.catalog,
       project.program,
       input.projectDirAbs,
+      crossPackage,
     );
   }
 
@@ -499,18 +505,15 @@ function resolveDependencies(
   catalog: Catalog,
   program: ts.Program,
   projectDirAbs: string,
+  crossPackage: CrossPackageContext,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
   const moduleInitByFilePath = buildModuleInitIndex(catalog);
   const compilerOptions = program.getCompilerOptions();
   const moduleResolutionHost = createModuleResolutionHost();
-  // Only the manifest index is needed here (declaration-target attribution).
-  // Build it directly rather than the full cross-package context, whose export
-  // index is a call-resolution-only pass we would discard. (Task 0.4 shares one
-  // context across call + dependency resolution.)
-  const manifestIndex = buildPackageManifestIndexFromRoots(
-    derivePackageRoots(catalog, projectDirAbs),
-    projectDirAbs,
-  );
+  // Declaration-target attribution reads the SHARED manifest index built once by
+  // `resolveCallSitesExact` (P2 Phase 0.4) — the same fail-closed package
+  // resolution call-edge resolution used, no second manifest read.
+  const manifestIndex = crossPackage.manifestIndex;
 
   // Initialize every module-init owner to an explicit empty array (Task 0.1 #3).
   const out = new Map<string, DependencyEdge[]>();

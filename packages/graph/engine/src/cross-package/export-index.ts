@@ -238,17 +238,46 @@ export function buildPackageManifestIndex(
  * single-program (exact) engine uses: it has no `Shard[]` to hand the shard
  * overload, only the package roots it derived from the catalog. Same best-effort
  * semantics — a root with no readable/parseable manifest, or a manifest with no
- * string `name`, is skipped (it won't be specifier-resolvable). First write
- * wins on a duplicate `name`.
+ * string `name`, is skipped (it won't be specifier-resolvable).
+ *
+ * Duplicate `package.json#name` FAILS CLOSED (P2 Phase 0.4): the first time a
+ * name is seen twice it is tombstoned and removed from the index, so
+ * {@link resolveSpecifierToPackage} declines that name regardless of root order.
+ * A guessed first-write-wins attribution across an ambiguous workspace name is
+ * strictly worse than an honest decline. Only a bounded diagnostic COUNT is
+ * logged — never the ambiguous names or paths.
  */
 export function buildPackageManifestIndexFromRoots(
   rootDirs: readonly string[],
   projectRoot: string,
 ): PackageManifestIndex {
   const index = new Map<string, PackageManifest>();
+  const tombstoned = new Set<string>();
+  let duplicates = 0;
   for (const rootDir of rootDirs) {
     const manifest = readManifest(rootDir, projectRoot);
-    if (manifest && !index.has(manifest.name)) index.set(manifest.name, manifest);
+    if (manifest === undefined) continue;
+    const { name } = manifest;
+    if (tombstoned.has(name)) {
+      duplicates += 1;
+      continue;
+    }
+    if (index.has(name)) {
+      // Ambiguous workspace name → remove it entirely and remember the tombstone
+      // so a third+ occurrence never resurrects it. Order-independent by design.
+      index.delete(name);
+      tombstoned.add(name);
+      duplicates += 1;
+      continue;
+    }
+    index.set(name, manifest);
+  }
+  if (duplicates > 0) {
+    logger.debug({
+      evt: 'graph.export_index.duplicate_package_names',
+      module: 'graph:export-index',
+      duplicates,
+    });
   }
   return index;
 }

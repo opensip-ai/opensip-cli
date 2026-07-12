@@ -21,7 +21,6 @@ import {
   pushCreationEdge as pushSharedCreationEdge,
 } from '@opensip-cli/graph';
 
-import { buildCrossPackageContext } from './edge-helpers/cross-package-context.js';
 import {
   buildImportIndex,
   buildImportSpecifierIndex,
@@ -31,6 +30,7 @@ import {
 } from './edge-resolvers/syntactic.js';
 import { computeVerdict, pushCallEdge, rebuildCatalog, tsPosition } from './edges-dispatch.js';
 
+import type { CrossPackageContext } from './edge-helpers/cross-package-context.js';
 import type { ResolverContext } from './edge-resolvers/types.js';
 import type { CallSiteRecord } from './walk.js';
 import type { CallEdge, Catalog, ResolutionStats } from '@opensip-cli/graph';
@@ -56,6 +56,13 @@ export interface EdgeResolutionFromRecordsInput {
   readonly program: ts.Program;
   readonly projectDirAbs: string;
   readonly callSites: readonly CallSiteRecord[];
+  /**
+   * The shared cross-package resolution context, built ONCE per exact resolve
+   * stage by `resolveCallSitesExact` and threaded into both call and dependency
+   * resolution (P2 Phase 0.4). Building it here would duplicate the manifest
+   * read + export-index pass the caller already performed.
+   */
+  readonly crossPackage: CrossPackageContext;
 }
 
 export async function resolveEdgesFromRecords(
@@ -67,7 +74,7 @@ export async function resolveEdgesFromRecords(
   const stats = createMutableStats();
   const sink = { edgesByOwner: callsByHash, stats };
 
-  const crossPackage = buildCrossPackageContext(input.catalog, input.projectDirAbs);
+  const crossPackage = input.crossPackage;
   const importSpecifiersByFile = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
 
   let processed = 0;

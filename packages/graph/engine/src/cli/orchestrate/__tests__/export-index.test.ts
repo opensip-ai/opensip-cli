@@ -522,4 +522,56 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
     const byName = exportIndex.get(resolved?.packageGroup ?? '<none>');
     expect(byName?.get('parse')?.map((o) => o.bodyHash)).toEqual(['P']);
   });
+
+  describe('duplicate package.json#name fails closed (P2 Phase 0.4)', () => {
+    let dupRoot: string;
+
+    beforeAll(() => {
+      dupRoot = mkdtempSync(join(tmpdir(), 'export-index-dup-'));
+      const write = (relDir: string, manifest: Record<string, unknown>): void => {
+        const abs = join(dupRoot, relDir);
+        mkdirSync(abs, { recursive: true });
+        writeFileSync(join(abs, 'package.json'), JSON.stringify(manifest), 'utf8');
+      };
+      // Two distinct dirs declaring the SAME name → ambiguous.
+      write('packages/first', { name: '@dup/pkg', exports: { '.': './dist/index.js' } });
+      write('packages/second', { name: '@dup/pkg', exports: { '.': './dist/index.js' } });
+      // A non-colliding neighbour that must keep resolving.
+      write('packages/unique', { name: '@dup/unique' });
+    });
+
+    afterAll(() => {
+      rmSync(dupRoot, { recursive: true, force: true });
+    });
+
+    function dupShard(relDir: string): Shard {
+      return { id: `pkg:${relDir}`, rootDir: join(dupRoot, relDir), files: [] };
+    }
+
+    const first = () => dupShard('packages/first');
+    const second = () => dupShard('packages/second');
+    const unique = () => dupShard('packages/unique');
+
+    it('tombstones the ambiguous name so it is absent regardless of input order', () => {
+      const forward = buildPackageManifestIndex([first(), second(), unique()], dupRoot);
+      const reverse = buildPackageManifestIndex([second(), first(), unique()], dupRoot);
+      // Order-independent: the colliding name is removed either way; the unique
+      // neighbour survives both orders (no first-wins for the duplicate).
+      expect(forward.has('@dup/pkg')).toBe(false);
+      expect(reverse.has('@dup/pkg')).toBe(false);
+      expect(forward.has('@dup/unique')).toBe(true);
+      expect(reverse.has('@dup/unique')).toBe(true);
+    });
+
+    it('declines resolving the ambiguous specifier (no guessed first-wins package)', () => {
+      const index = buildPackageManifestIndex([first(), second()], dupRoot);
+      expect(resolveSpecifierToPackage('@dup/pkg', index)).toBeUndefined();
+      expect(resolveSpecifierToPackage('@dup/pkg/sub', index)).toBeUndefined();
+    });
+
+    it('keeps the tombstone even when the name appears three+ times', () => {
+      const index = buildPackageManifestIndex([first(), second(), first()], dupRoot);
+      expect(index.has('@dup/pkg')).toBe(false);
+    });
+  });
 });
