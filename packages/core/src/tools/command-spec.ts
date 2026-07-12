@@ -259,6 +259,42 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly producesVerdict?: boolean;
   /** The business-logic handler the host invokes after parse. */
   readonly handler: CommandHandler<TOpts, TCtx>;
+  /**
+   * Optional author-declared static handler identity for audit bridging.
+   *
+   * Identifies a declaration *candidate* in the graph catalog (exact package
+   * name + project-root-relative POSIX path + declaration name). It is NOT
+   * proof of a call edge or live dispatch — runtime wiring joins this claim to
+   * declaration facts when present. Missing metadata is valid for third-party
+   * and pre-feature tools (later reported as an unresolved bridge).
+   *
+   * Never derived from `Function.toString()`, stack traces, source maps, or
+   * handler `.name` reflection.
+   */
+  readonly staticHandler?: StaticHandlerDescriptor;
+}
+
+/**
+ * Production caps for {@link StaticHandlerDescriptor} text fields.
+ * Validators and inventory projectors share these constants.
+ */
+export const MAX_STATIC_HANDLER_PACKAGE = 214;
+export const MAX_STATIC_HANDLER_PATH = 1_024;
+export const MAX_STATIC_HANDLER_DECLARATION = 256;
+
+/**
+ * Author-declared source identity for a command handler.
+ *
+ * Plain readonly data only — no functions, getters, or compiler handles.
+ * `path` is project-root-relative POSIX (never package-relative, never absolute).
+ */
+export interface StaticHandlerDescriptor {
+  /** Exact workspace package name (e.g. `@opensip-cli/graph`). */
+  readonly package: string;
+  /** Project-root-relative POSIX path to the declaring source file. */
+  readonly path: string;
+  /** Exact declaration name in that file (function/const/class member). */
+  readonly declaration: string;
 }
 
 /**

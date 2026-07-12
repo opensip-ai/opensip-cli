@@ -29,9 +29,118 @@ function baseSpec(overrides: Partial<CommandSpec> = {}): CommandSpec {
 }
 
 describe('defineCommand', () => {
-  it('returns the spec unchanged (identity) for a valid spec', () => {
+  it('returns a frozen copy (not identity) for a valid spec', () => {
     const spec = baseSpec();
-    expect(defineCommand(spec)).toBe(spec);
+    const defined = defineCommand(spec);
+    expect(defined).not.toBe(spec);
+    expect(defined).toEqual(spec);
+    expect(Object.isFrozen(defined)).toBe(true);
+    expect(Object.isFrozen(defined.commonFlags)).toBe(true);
+  });
+
+  it('preserves handler identity while freezing the rest', () => {
+    const handler = (): undefined => undefined;
+    const defined = defineCommand(baseSpec({ handler }));
+    expect(defined.handler).toBe(handler);
+  });
+
+  it('accepts and freezes a valid staticHandler descriptor', () => {
+    const defined = defineCommand(
+      baseSpec({
+        staticHandler: {
+          package: '@opensip-cli/graph',
+          path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+          declaration: 'runGraphCommand',
+        },
+      }),
+    );
+    expect(defined.staticHandler).toEqual({
+      package: '@opensip-cli/graph',
+      path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+      declaration: 'runGraphCommand',
+    });
+    expect(Object.isFrozen(defined.staticHandler)).toBe(true);
+  });
+
+  it('rejects staticHandler with unknown fields', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: '@opensip-cli/graph',
+            path: 'packages/graph/engine/src/x.ts',
+            declaration: 'run',
+            extra: true,
+          } as never,
+        }),
+      ),
+    ).toThrow(/unknown field 'extra'/);
+  });
+
+  it('rejects absolute staticHandler paths', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: '@opensip-cli/graph',
+            path: '/abs/path.ts',
+            declaration: 'run',
+          },
+        }),
+      ),
+    ).toThrow(/project-root-relative/);
+  });
+
+  it('rejects staticHandler paths with parent traversal', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: '@opensip-cli/graph',
+            path: 'packages/../secret.ts',
+            declaration: 'run',
+          },
+        }),
+      ),
+    ).toThrow(/project-root-relative/);
+  });
+
+  it('rejects staticHandler package at N+1 length', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: 'a'.repeat(215),
+            path: 'packages/x.ts',
+            declaration: 'run',
+          },
+        }),
+      ),
+    ).toThrow(/staticHandler\.package/);
+  });
+
+  it('accepts staticHandler package at N length', () => {
+    const defined = defineCommand(
+      baseSpec({
+        staticHandler: {
+          package: 'a'.repeat(214),
+          path: 'packages/x.ts',
+          declaration: 'run',
+        },
+      }),
+    );
+    expect(defined.staticHandler?.package).toHaveLength(214);
+  });
+
+  it('rejects accessor-backed command specs', () => {
+    const base = baseSpec();
+    const hostile = {
+      ...base,
+      get name() {
+        return 'evil';
+      },
+    };
+    expect(() => defineCommand(hostile as CommandSpec)).toThrow(/data property/);
   });
 
   it('accepts every CommonFlagKey', () => {

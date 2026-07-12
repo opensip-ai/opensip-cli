@@ -23,6 +23,10 @@ import type { UiContext } from './ui-context.js';
 import type { CapabilityPackAdmission } from '../plugins/capability-discovery-types.js';
 import type { SignalSink } from '../signals/signal-sink.js';
 import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
+import {
+  EMPTY_RUNTIME_COMMAND_INVENTORY,
+  type RuntimeCommandInventory,
+} from '../tools/runtime-command-inventory.js';
 
 class DefaultRecipeUnitConfigSlot implements RecipeUnitConfigSlot {
   private store: Record<string, Record<string, unknown>> = {};
@@ -63,6 +67,12 @@ export interface RunScopeOptions {
   readonly trustPolicy?: unknown;
   readonly policyAudit?: unknown;
   readonly capabilityAdmission?: CapabilityPackAdmission;
+  /**
+   * Plain complete host+Tool command inventory for this invocation.
+   * Defaults to an empty inventory; CLI bootstrap injects the real surface.
+   * Never holds live handlers or Commander objects.
+   */
+  readonly runtimeCommands?: RuntimeCommandInventory;
 }
 
 /**
@@ -93,6 +103,8 @@ export class RunScope {
   readonly trustPolicy: unknown;
   readonly policyAudit: unknown;
   readonly capabilityAdmission: CapabilityPackAdmission | undefined;
+  /** Plain host+Tool command inventory (default empty). */
+  readonly runtimeCommands: RuntimeCommandInventory;
 
   private readonly disposers: (() => void)[] = [];
 
@@ -120,6 +132,7 @@ export class RunScope {
     this.trustPolicy = opts.trustPolicy;
     this.policyAudit = opts.policyAudit;
     this.capabilityAdmission = opts.capabilityAdmission;
+    this.runtimeCommands = opts.runtimeCommands ?? EMPTY_RUNTIME_COMMAND_INVENTORY;
   }
 
   onDispose(fn: () => void): void {

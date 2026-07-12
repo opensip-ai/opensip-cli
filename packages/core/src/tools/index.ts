@@ -44,10 +44,42 @@ export { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from './manifest
 // tool exports for the host to mount, plus the CommonFlagKey key type (the pure
 // type lives in core; the Commander-touching applyCommonFlags runtime stays in
 // contracts). Re-exported by @opensip-cli/contracts for the public surface.
-export { COMMON_FLAG_KEYS, RAW_STREAM_REASONS, commandProducesVerdict } from './command-spec.js';
+export {
+  COMMON_FLAG_KEYS,
+  MAX_STATIC_HANDLER_DECLARATION,
+  MAX_STATIC_HANDLER_PACKAGE,
+  MAX_STATIC_HANDLER_PATH,
+  RAW_STREAM_REASONS,
+  commandProducesVerdict,
+} from './command-spec.js';
+export type { StaticHandlerDescriptor } from './command-spec.js';
 // The runtime admission guard for the command contract lives beside the types
 // in ./command-spec-validate.ts (kept separate so each file stays one concern).
-export { assertCommandSpec, defineCommand, validateCommandSpec } from './command-spec-validate.js';
+export {
+  assertCommandSpec,
+  defineCommand,
+  freezeStaticHandlerDescriptor,
+  isSafeProjectRelativePosixPath,
+  staticHandlerValidationError,
+  validateCommandSpec,
+} from './command-spec-validate.js';
+export {
+  EMPTY_RUNTIME_COMMAND_INVENTORY,
+  MAX_RUNTIME_COMMAND_ALIASES,
+  MAX_RUNTIME_COMMAND_LEAVES,
+  MAX_RUNTIME_COMMAND_NAME,
+  MAX_RUNTIME_COMMAND_PATH,
+  MAX_RUNTIME_COMMAND_GROUPS,
+  RUNTIME_COMMAND_INVENTORY_VERSION,
+  createRuntimeCommandInventory,
+} from './runtime-command-inventory.js';
+export type {
+  RuntimeCommandInventory,
+  RuntimeCommandInventoryLimits,
+  RuntimeCommandLeaf,
+  RuntimeCommandOwner,
+  RuntimeCommandGroup,
+} from './runtime-command-inventory.js';
 export { defineNestedCommand, definePrimaryCommand } from './command-spec-draft.js';
 export type {
   NestedCommandSpecDraft,
