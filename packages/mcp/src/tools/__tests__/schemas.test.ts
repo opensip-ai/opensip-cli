@@ -6,19 +6,24 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_DEPTH,
+  DEFAULT_IDENTITY_SEARCH_LIMIT,
   DEFAULT_LIMIT,
   MAX_CURSOR_LEN,
   MAX_DEPTH,
   MAX_LIMIT,
   MAX_PACKAGE_ARRAY,
   MAX_QUERY_LEN,
+  architectureSections,
+  architectureTopN,
   boundedName,
   boundedText,
+  compactDetail,
   cursor,
   depth,
   filePath,
   filePrefix,
   groupBy,
+  identitySearchLimit,
   kinds,
   limit,
   packageArray,
@@ -190,6 +195,50 @@ describe('package detail limits (P2 Phase 2.4)', () => {
     expect(packageSampleLimit().safeParse(6).success).toBe(false);
     expect(packageEvidenceLimit().safeParse(101).success).toBe(false);
     expect(packageProofLimit().safeParse(51).success).toBe(false);
+  });
+});
+
+describe('identitySearchLimit and compactDetail (P2 Phase 2/3)', () => {
+  it('defaults identity search to 20 and accepts 1–500 inclusive', () => {
+    expect(DEFAULT_IDENTITY_SEARCH_LIMIT).toBe(20);
+    expect(identitySearchLimit().safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 20,
+    });
+    expect(identitySearchLimit().safeParse(1).success).toBe(true);
+    expect(identitySearchLimit().safeParse(19).success).toBe(true);
+    expect(identitySearchLimit().safeParse(20).success).toBe(true);
+    expect(identitySearchLimit().safeParse(21).success).toBe(true);
+    expect(identitySearchLimit().safeParse(500).success).toBe(true);
+    expect(identitySearchLimit().safeParse(0).success).toBe(false);
+    expect(identitySearchLimit().safeParse(501).success).toBe(false);
+  });
+
+  it('defaults compactDetail and rejects unknown modes', () => {
+    expect(compactDetail('nodes').safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 'nodes',
+    });
+    expect(compactDetail('summary').safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 'summary',
+    });
+    expect(compactDetail().safeParse('groups').success).toBe(true);
+    expect(compactDetail().safeParse('verbose').success).toBe(false);
+  });
+
+  it('bounds architecture sections and top-N (1–100, default 20)', () => {
+    expect(architectureSections().safeParse(undefined)).toMatchObject({
+      success: true,
+      data: ['metrics'],
+    });
+    expect(architectureSections().safeParse(['metrics', 'metrics']).success).toBe(false);
+    expect(architectureSections().safeParse([]).success).toBe(false);
+    expect(architectureTopN().safeParse(undefined)).toMatchObject({ success: true, data: 20 });
+    expect(architectureTopN().safeParse(1).success).toBe(true);
+    expect(architectureTopN().safeParse(100).success).toBe(true);
+    expect(architectureTopN().safeParse(0).success).toBe(false);
+    expect(architectureTopN().safeParse(101).success).toBe(false);
   });
 });
 
