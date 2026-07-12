@@ -114,6 +114,40 @@ export interface GraphReadCoverage {
   readonly reasons: readonly string[];
 }
 
+/** The four named coverage facets a graph read reports on (P2 Phase 2.1). */
+export type CoverageFacetName = 'inventory' | 'evidence' | 'grouping' | 'projection';
+
+/**
+ * One coverage facet (P2 Phase 2.1). `requested` states whether the caller asked
+ * for this family at all — an UNrequested facet is `complete: true`,
+ * `truncated: false` and never contributes to the top-level summary, so an
+ * intentionally omitted sample/group/detail is not mistaken for truncation.
+ */
+export interface CoverageFacet {
+  readonly requested: boolean;
+  readonly complete: boolean;
+  readonly truncated: boolean;
+  readonly reasons: readonly string[];
+}
+
+/**
+ * Facet-specific coverage (P2 Phase 2.1). Each facet carries its own
+ * completeness; the top-level `complete`/`truncated`/`reasons` is a deliberately
+ * redefined CONSERVATIVE summary over the REQUESTED facets only (not a
+ * compatibility adapter). A complete inventory can therefore report complete
+ * even when a bounded evidence sample was capped, provided that sample was not
+ * requested.
+ */
+export interface GraphReadFacetCoverage {
+  readonly inventory: CoverageFacet;
+  readonly evidence: CoverageFacet;
+  readonly grouping: CoverageFacet;
+  readonly projection: CoverageFacet;
+  readonly complete: boolean;
+  readonly truncated: boolean;
+  readonly reasons: readonly string[];
+}
+
 /**
  * Public symbol projection reused by every graph audit view.
  * Control-free bounded fields; malformed oversized catalog rows are omitted.

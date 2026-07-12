@@ -37,6 +37,14 @@ export {
   GRAPH_SYMBOL_PACKAGE_MAX,
 } from './query-contracts.js';
 export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
+export {
+  makeFacet,
+  mergeFacet,
+  rollupFacets,
+  facetsFromFlatCoverage,
+  UNREQUESTED_FACET,
+} from './bounded-view.js';
+export type { CoverageFacetSet } from './bounded-view.js';
 export { buildOccurrenceCallView } from './occurrence-call-view.js';
 export {
   buildPackageEvidence,
@@ -80,6 +88,9 @@ export type {
   EffectiveGraphSourceFilter,
   AuditSourceRolePolicy,
   GraphReadCoverage,
+  CoverageFacet,
+  CoverageFacetName,
+  GraphReadFacetCoverage,
   GraphSymbolRef,
   CallEdgeEvidence,
   PackageCallEvidence,
