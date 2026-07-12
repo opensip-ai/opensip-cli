@@ -75,26 +75,25 @@ import type {
   WhyDependsQuery,
 } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
+import type { StaticHandlerBridgeOutcome } from './static-handler-bridge.js';
 import type { GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
 
-function toArchitectureSummaryDto(
-  view: {
-    readonly languages: ArchitectureSummaryDto['languages'];
-    readonly occurrenceCount: ArchitectureSummaryDto['occurrenceCount'];
-    readonly uniqueBodyCount: ArchitectureSummaryDto['uniqueBodyCount'];
-    readonly callEvidence: ArchitectureSummaryDto['callEvidence'];
-    readonly packageCount: ArchitectureSummaryDto['packageCount'];
-    readonly includedSections: ArchitectureSummaryDto['includedSections'];
-    readonly packageEdges?: ArchitectureSummaryDto['packageEdges'];
-    readonly packageEdgesSummary?: ArchitectureSummaryDto['packageEdgesSummary'];
-    readonly hotspots?: ArchitectureSummaryDto['hotspots'];
-    readonly hotspotsSummary?: ArchitectureSummaryDto['hotspotsSummary'];
-  },
-): ArchitectureSummaryDto {
+function toArchitectureSummaryDto(view: {
+  readonly languages: ArchitectureSummaryDto['languages'];
+  readonly occurrenceCount: ArchitectureSummaryDto['occurrenceCount'];
+  readonly uniqueBodyCount: ArchitectureSummaryDto['uniqueBodyCount'];
+  readonly callEvidence: ArchitectureSummaryDto['callEvidence'];
+  readonly packageCount: ArchitectureSummaryDto['packageCount'];
+  readonly includedSections: ArchitectureSummaryDto['includedSections'];
+  readonly packageEdges?: ArchitectureSummaryDto['packageEdges'];
+  readonly packageEdgesSummary?: ArchitectureSummaryDto['packageEdgesSummary'];
+  readonly hotspots?: ArchitectureSummaryDto['hotspots'];
+  readonly hotspotsSummary?: ArchitectureSummaryDto['hotspotsSummary'];
+}): ArchitectureSummaryDto {
   return {
     languages: view.languages,
     occurrenceCount: view.occurrenceCount,
@@ -124,9 +123,7 @@ function toArchitectureSummaryDto(
  * (P2 Phase 1.4). Returns `{}` (no `sourceRolePolicy` key) when no globs are
  * configured, so the query context echoes nothing and compiles the no-op matcher.
  */
-function sourceRolePolicyDep(
-  config: GraphConfig,
-): { sourceRolePolicy?: AuditSourceRolePolicy } {
+function sourceRolePolicyDep(config: GraphConfig): { sourceRolePolicy?: AuditSourceRolePolicy } {
   const testGlobs = config.auditTestSourceGlobs ?? [];
   if (testGlobs.length === 0) return {};
   return { sourceRolePolicy: { testGlobs, mode: 'audit-test-globs-v1' } };
@@ -229,7 +226,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       {
         readonly catalogIdentity?: string;
         readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
-        readonly outcomes: readonly import('./static-handler-bridge.js').StaticHandlerBridgeOutcome[];
+        readonly outcomes: readonly StaticHandlerBridgeOutcome[];
       },
       McpReadError
     >
@@ -540,7 +537,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
     if (!view.ok) return err(fromGraphReadError(view.error));
     const nextAfterKey = nextArchitectureAfterKey(cursorState.value, view.value);
     const nextCursor =
-      nextAfterKey === undefined ? undefined : this.queryContext.nextCursorFor(binding, nextAfterKey);
+      nextAfterKey === undefined
+        ? undefined
+        : this.queryContext.nextCursorFor(binding, nextAfterKey);
     // Architecture view still returns flat coverage reasons; map them onto the
     // inventory facet (groups already contribute group-key-cap there).
     const archCoverage = rollupFacets({

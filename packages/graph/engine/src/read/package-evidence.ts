@@ -114,7 +114,11 @@ export interface PackageEvidenceView {
 }
 
 /** Reasons that truncate the retained concrete evidence array only. */
-const EVIDENCE_CAP_REASONS = new Set(['call-evidence-cap', 'import-evidence-cap', 'proof-edge-cap']);
+const EVIDENCE_CAP_REASONS = new Set([
+  'call-evidence-cap',
+  'import-evidence-cap',
+  'proof-edge-cap',
+]);
 
 interface MutableCallBucket {
   readonly fromPackage: string;
@@ -422,7 +426,13 @@ function collectCallBuckets(
     collectResolvedCallEdge(edge, query, state);
   }
   // Cap reason is evidence-only: bucket counts remain complete from the full walk.
-  if (evidenceCount.value > evidenceLimit) addReason(reasons, 'call-evidence-cap');
+  // Only a REQUESTED sample (evidenceLimit > 0) that overflowed is a cap; when
+  // evidenceLimit is 0 the caller opted out of concrete evidence, so a non-zero
+  // matching count is NOT truncation (P2 Phase 2.4 — an omitted sample leaves the
+  // evidence facet unrequested, not truncated).
+  if (evidenceLimit > 0 && evidenceCount.value > evidenceLimit) {
+    addReason(reasons, 'call-evidence-cap');
+  }
   if (modeOf(catalog) === 'fast') addReason(reasons, 'fast-resolution-approximate');
   return { buckets, evidence, totalEvidence: evidenceCount.value, sampleLimit };
 }
@@ -494,24 +504,22 @@ function buildCallRows(
   const common = labels(catalog, query.filter);
   const sampleLimit = collected.sampleLimit;
   const rows = [...buckets.buckets.values()]
-    .map(
-      (bucket): PackageCallEvidenceRow => ({
-        ...common,
-        fromPackage: bucket.fromPackage,
-        toPackage: bucket.toPackage,
-        kind: 'call',
-        count: bucket.resolvedTargets,
-        countUnit: 'resolved-targets',
-        callSiteCount: bucket.callSites.size,
-        sample: bucket.sample,
-        sampleReturned: bucket.sample.length,
-        sampleAvailable: bucket.callSites.size,
-        sampleLimit,
-        // Row inventory is complete whenever the bucket was retained; global caps
-        // never stamp onto individual row coverage.
-        coverage: completeRowInventory(),
-      }),
-    )
+    .map((bucket): PackageCallEvidenceRow => ({
+      ...common,
+      fromPackage: bucket.fromPackage,
+      toPackage: bucket.toPackage,
+      kind: 'call',
+      count: bucket.resolvedTargets,
+      countUnit: 'resolved-targets',
+      callSiteCount: bucket.callSites.size,
+      sample: bucket.sample,
+      sampleReturned: bucket.sample.length,
+      sampleAvailable: bucket.callSites.size,
+      sampleLimit,
+      // Row inventory is complete whenever the bucket was retained; global caps
+      // never stamp onto individual row coverage.
+      coverage: completeRowInventory(),
+    }))
     .sort((a, b) =>
       compareCodePointStrings(packageDependencyStableKey(a), packageDependencyStableKey(b)),
     );
@@ -579,8 +587,7 @@ function importTargets(
   context: ImportResolutionContext,
 ): readonly ImportTargetResult[] {
   const classification = dependency.classification;
-  const withClass: ClassificationSpread =
-    classification === undefined ? {} : { classification };
+  const withClass: ClassificationSpread = classification === undefined ? {} : { classification };
   return dependency.to.length > 0
     ? resolveFromTargetHashes(dependency, context, withClass)
     : resolveFromEmptyTargets(dependency, classification, context.catalogLanguage, withClass);
@@ -596,15 +603,37 @@ function resolveFromTargetHashes(
   const { packages, targetMissing } = collectImportTargetPackages(dependency.to, indexes, reasons);
   if (!targetMissing && packages.size === 1) {
     const selected = packages.values().next().value!;
-    return [{ toPackage: selected, target: selected, resolution: 'internal', ...withClass, confidence: 'high' }];
+    return [
+      {
+        toPackage: selected,
+        target: selected,
+        resolution: 'internal',
+        ...withClass,
+        confidence: 'high',
+      },
+    ];
   }
   // A relative same-package import whose body-twin resolves into several
   // packages is attributed to its own source package — not first-wins.
-  if (packages.size > 1 && isRelativeSpecifier(dependency.specifier) && packages.has(sourcePackage)) {
-    return [{ toPackage: sourcePackage, target: sourcePackage, resolution: 'internal', ...withClass, confidence: 'high' }];
+  if (
+    packages.size > 1 &&
+    isRelativeSpecifier(dependency.specifier) &&
+    packages.has(sourcePackage)
+  ) {
+    return [
+      {
+        toPackage: sourcePackage,
+        target: sourcePackage,
+        resolution: 'internal',
+        ...withClass,
+        confidence: 'high',
+      },
+    ];
   }
   if (packages.size > 1) addReason(reasons, 'ambiguous-import-target');
-  return [{ toPackage: null, target: dependency.specifier, resolution: 'unresolved', ...withClass }];
+  return [
+    { toPackage: null, target: dependency.specifier, resolution: 'unresolved', ...withClass },
+  ];
 }
 
 /**
@@ -903,27 +932,28 @@ function buildImportRows(
     addReason(reasons, 'dependency-edges-unavailable');
   }
   if (modeOf(catalog) === 'fast') addReason(reasons, 'fast-import-coverage-partial');
-  if (evidenceCount.value > evidenceLimit) addReason(reasons, 'import-evidence-cap');
+  // See call-evidence-cap: only a requested (evidenceLimit > 0) overflow caps.
+  if (evidenceLimit > 0 && evidenceCount.value > evidenceLimit) {
+    addReason(reasons, 'import-evidence-cap');
+  }
 
   const common = labels(catalog, query.filter);
   const rows = [...buckets.buckets.values()]
-    .map(
-      (bucket): PackageImportEvidenceRow => ({
-        ...common,
-        fromPackage: bucket.fromPackage,
-        toPackage: bucket.toPackage,
-        target: bucket.target,
-        kind: 'import',
-        resolution: bucket.resolution,
-        count: bucket.count,
-        countUnit: 'import-statements',
-        sample: bucket.sample,
-        sampleReturned: bucket.sample.length,
-        sampleAvailable: bucket.count,
-        sampleLimit,
-        coverage: completeRowInventory(),
-      }),
-    )
+    .map((bucket): PackageImportEvidenceRow => ({
+      ...common,
+      fromPackage: bucket.fromPackage,
+      toPackage: bucket.toPackage,
+      target: bucket.target,
+      kind: 'import',
+      resolution: bucket.resolution,
+      count: bucket.count,
+      countUnit: 'import-statements',
+      sample: bucket.sample,
+      sampleReturned: bucket.sample.length,
+      sampleAvailable: bucket.count,
+      sampleLimit,
+      coverage: completeRowInventory(),
+    }))
     .sort((a, b) =>
       compareCodePointStrings(packageDependencyStableKey(a), packageDependencyStableKey(b)),
     );

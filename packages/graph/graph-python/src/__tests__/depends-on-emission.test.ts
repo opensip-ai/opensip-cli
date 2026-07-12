@@ -67,7 +67,10 @@ function runAdapter(): {
       >
     | undefined;
 } {
-  const discovery = pythonGraphAdapter.discoverFiles({ cwd: fixtureRoot, diagnosticIntent: 'quiet' });
+  const discovery = pythonGraphAdapter.discoverFiles({
+    cwd: fixtureRoot,
+    diagnosticIntent: 'quiet',
+  });
   const parsed = pythonGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

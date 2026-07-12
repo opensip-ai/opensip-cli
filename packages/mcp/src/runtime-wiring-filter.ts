@@ -174,12 +174,14 @@ export function groupRuntimeNodes(
   const counts = new Map<string, number>();
   let groupTruncated = false;
   for (const node of nodes) {
-    const key =
-      groupBy === 'tool'
-        ? (node.tool ?? 'unattributed')
-        : groupBy === 'owner'
-          ? (node.owner ?? 'unattributed')
-          : (node.provenanceSource ?? node.source ?? 'unattributed');
+    let key: string;
+    if (groupBy === 'tool') {
+      key = node.tool ?? 'unattributed';
+    } else if (groupBy === 'owner') {
+      key = node.owner ?? 'unattributed';
+    } else {
+      key = node.provenanceSource ?? node.source ?? 'unattributed';
+    }
     const count = counts.get(key);
     if (count !== undefined) {
       counts.set(key, count + 1);

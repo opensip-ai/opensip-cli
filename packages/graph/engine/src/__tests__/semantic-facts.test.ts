@@ -6,6 +6,7 @@ import {
   makeDeclarationId,
   makeReferenceId,
   mergeSemanticFactBundles,
+  mergeSemanticFactsIncremental,
 } from '../semantic-facts.js';
 
 import type {
@@ -25,10 +26,7 @@ const tinyLimits: SemanticFactLimits = {
   maxColumn: 1_000_000,
 };
 
-function decl(
-  id: string,
-  over: Partial<DeclarationFact> = {},
-): DeclarationFact {
+function decl(id: string, over: Partial<DeclarationFact> = {}): DeclarationFact {
   return {
     declarationId: id,
     name: over.name ?? id,
@@ -47,10 +45,7 @@ function decl(
   };
 }
 
-function ref(
-  id: string,
-  over: Partial<CrossFileReferenceFact> = {},
-): CrossFileReferenceFact {
+function ref(id: string, over: Partial<CrossFileReferenceFact> = {}): CrossFileReferenceFact {
   return {
     referenceId: id,
     kind: over.kind ?? 'type',
@@ -64,7 +59,9 @@ function ref(
     targetPackage: over.targetPackage,
     targetName: over.targetName,
     targetKind: over.targetKind,
-    basis: over.basis ?? (over.targetDeclarationId !== undefined ? 'compiler-declaration' : 'unresolved'),
+    basis:
+      over.basis ??
+      (over.targetDeclarationId === undefined ? 'unresolved' : 'compiler-declaration'),
     confidence: over.confidence ?? 'high',
     reason: over.reason,
     importSpecifier: over.importSpecifier,
@@ -139,12 +136,10 @@ describe('applySemanticFactCaps', () => {
       },
       tinyLimits,
     );
-    expect(out.declarations.length).toBeLessThanOrEqual(tinyLimits.maxDeclarations + 1_000);
+    expect(out.declarations.length).toBeLessThanOrEqual(tinyLimits.maxDeclarations + 1000);
     for (const r of out.references) {
       if (r.targetDeclarationId !== undefined) {
-        expect(out.declarations.some((d) => d.declarationId === r.targetDeclarationId)).toBe(
-          true,
-        );
+        expect(out.declarations.some((d) => d.declarationId === r.targetDeclarationId)).toBe(true);
       }
     }
     expect(out.coverage.reasons.length).toBeGreaterThan(0);
@@ -211,5 +206,61 @@ describe('mergeSemanticFactBundles', () => {
     };
     const merged = mergeSemanticFactBundles([left, right])!;
     expect(merged.declarations).toHaveLength(1);
+  });
+});
+
+describe('mergeSemanticFactsIncremental coverage does not compound (P2 Phase 3 regression)', () => {
+  // The exact tier re-walks the WHOLE program each incremental run, so both the
+  // cached and the fresh bundle carry whole-project coverage. Summing them would
+  // double the inspected* counters every rebuild until they cross the validation
+  // bound and permanently brick the catalog on read. The merged coverage must
+  // instead track the fresh (authoritative) whole-project inspection.
+  const wholeProject = (inspectedReferences: number): SemanticFactBundle => ({
+    referenceScope: 'cross-file',
+    declarations: [decl('a', { filePath: 'src/a.ts' })],
+    references: [
+      ref('r1', {
+        filePath: 'src/a.ts',
+        targetDeclarationId: 'a',
+        targetPackage: 'pkg',
+        targetName: 'a',
+        targetKind: 'interface',
+      }),
+    ],
+    coverage: {
+      status: 'complete',
+      inspectedDeclarations: 1,
+      emittedDeclarations: 1,
+      omittedDeclarations: 0,
+      inspectedReferences,
+      emittedReferences: 1,
+      omittedReferences: 0,
+      reasons: [],
+    },
+  });
+
+  it('keeps inspected counts bounded across repeated whole-project incremental merges', () => {
+    const closure = new Set(['src/a.ts']);
+    const declFileById = new Map([['a', 'src/a.ts']]);
+
+    const merged1 = mergeSemanticFactsIncremental(
+      wholeProject(500),
+      wholeProject(500),
+      closure,
+      declFileById,
+    );
+    // Fresh's 500, NOT the summed 1000.
+    expect(merged1?.coverage.inspectedReferences).toBe(500);
+    expect(merged1?.coverage.inspectedDeclarations).toBe(1);
+
+    // Feed the merged result back as cached (the next incremental run) — the
+    // counters must still not grow.
+    const merged2 = mergeSemanticFactsIncremental(
+      merged1,
+      wholeProject(500),
+      closure,
+      declFileById,
+    );
+    expect(merged2?.coverage.inspectedReferences).toBe(500);
   });
 });

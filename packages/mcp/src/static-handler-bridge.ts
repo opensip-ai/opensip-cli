@@ -5,15 +5,19 @@
  * Production injects GraphReadPort.resolveStaticHandlerDeclarations for lookup.
  */
 
-import type { StaticHandlerDescriptor } from '@opensip-cli/core';
 import type { RuntimeWiringEdge, RuntimeWiringNode } from './runtime-wiring-read-port.js';
+import type { StaticHandlerDescriptor } from '@opensip-cli/core';
 
 /** Max descriptors accepted in one batch join. */
-export const MAX_STATIC_HANDLER_DESCRIPTORS = 2_000;
+export const MAX_STATIC_HANDLER_DESCRIPTORS = 2000;
 /** Max declaration candidates retained per descriptor before ambiguous/cap. */
 export const MAX_STATIC_HANDLER_CANDIDATES = 8;
 /** Max completed bridge cache entries (w1:+g1:). */
 export const MAX_STATIC_HANDLER_CACHE_ENTRIES = 4;
+
+/** Provenance + match-basis stamped on every author-declared static-handler outcome. */
+const CLAIM_PROVENANCE_AUTHOR_DECLARED = 'author-declared' as const;
+const MATCH_BASIS_AUTHOR_DECLARED = 'author-declared-exact-declaration' as const;
 
 export type StaticBridgeStatus =
   | 'resolved'
@@ -115,18 +119,23 @@ export function dedupeStaticHandlerRefs(
  * Apply provenance/package policy before catalog lookup.
  * Returns a terminal unresolved outcome when the claim is not admissible.
  */
-export function preflightStaticHandlerRef(ref: StaticHandlerRef): StaticHandlerBridgeOutcome | undefined {
-  if (ref.owner === 'tool' && ref.admittedPackageIdentity !== undefined) {
-    if (ref.package !== ref.admittedPackageIdentity && !isReviewedCrossPackage(ref)) {
-      return {
-        ref,
-        status: 'provenance-mismatch',
-        claimProvenance: 'author-declared',
-        matchBasis: 'author-declared-exact-declaration',
-        confidence: 'low',
-        reason: 'claimed-package-differs-from-admitted-plugin-identity',
-      };
-    }
+export function preflightStaticHandlerRef(
+  ref: StaticHandlerRef,
+): StaticHandlerBridgeOutcome | undefined {
+  if (
+    ref.owner === 'tool' &&
+    ref.admittedPackageIdentity !== undefined &&
+    ref.package !== ref.admittedPackageIdentity &&
+    !isReviewedCrossPackage(ref)
+  ) {
+    return {
+      ref,
+      status: 'provenance-mismatch',
+      claimProvenance: CLAIM_PROVENANCE_AUTHOR_DECLARED,
+      matchBasis: MATCH_BASIS_AUTHOR_DECLARED,
+      confidence: 'low',
+      reason: 'claimed-package-differs-from-admitted-plugin-identity',
+    };
   }
   return undefined;
 }
@@ -155,7 +164,8 @@ export function matchStaticHandlerCandidates(
     (c) =>
       c.package === ref.package &&
       c.filePath === ref.path &&
-      (c.name === ref.declaration || c.qualifiedName === ref.declaration ||
+      (c.name === ref.declaration ||
+        c.qualifiedName === ref.declaration ||
         c.qualifiedName.endsWith(`.${ref.declaration}`)),
   );
 
@@ -163,8 +173,8 @@ export function matchStaticHandlerCandidates(
     return {
       ref,
       status: 'not-found',
-      claimProvenance: 'author-declared',
-      matchBasis: 'author-declared-exact-declaration',
+      claimProvenance: CLAIM_PROVENANCE_AUTHOR_DECLARED,
+      matchBasis: MATCH_BASIS_AUTHOR_DECLARED,
       confidence: 'low',
     };
   }
@@ -172,8 +182,8 @@ export function matchStaticHandlerCandidates(
     return {
       ref,
       status: 'candidate-cap',
-      claimProvenance: 'author-declared',
-      matchBasis: 'author-declared-exact-declaration',
+      claimProvenance: CLAIM_PROVENANCE_AUTHOR_DECLARED,
+      matchBasis: MATCH_BASIS_AUTHOR_DECLARED,
       confidence: 'low',
       reason: `candidates-exceed-${String(limits.maxCandidates)}`,
     };
@@ -182,20 +192,20 @@ export function matchStaticHandlerCandidates(
     return {
       ref,
       status: 'ambiguous',
-      claimProvenance: 'author-declared',
-      matchBasis: 'author-declared-exact-declaration',
+      claimProvenance: CLAIM_PROVENANCE_AUTHOR_DECLARED,
+      matchBasis: MATCH_BASIS_AUTHOR_DECLARED,
       confidence: 'low',
       reason: `matches-${String(exact.length)}`,
     };
   }
-  const hit = exact[0]!;
+  const hit = exact[0];
   return {
     ref,
     status: 'resolved',
     declarationId: hit.declarationId,
     declarationQualifiedName: hit.qualifiedName,
-    claimProvenance: 'author-declared',
-    matchBasis: 'author-declared-exact-declaration',
+    claimProvenance: CLAIM_PROVENANCE_AUTHOR_DECLARED,
+    matchBasis: MATCH_BASIS_AUTHOR_DECLARED,
     confidence: 'medium',
   };
 }

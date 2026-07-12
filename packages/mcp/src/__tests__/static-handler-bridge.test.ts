@@ -35,7 +35,8 @@ function ref(over: Partial<StaticHandlerRef> = {}): StaticHandlerRef {
 
 function candidate(over: Partial<DeclarationCandidate> = {}): DeclarationCandidate {
   return {
-    declarationId: 'd1|@opensip-cli/fitness|packages/fitness/engine/src/cli/fit/fit-command-spec.ts|function|runFitCommand|1|0',
+    declarationId:
+      'd1|@opensip-cli/fitness|packages/fitness/engine/src/cli/fit/fit-command-spec.ts|function|runFitCommand|1|0',
     package: '@opensip-cli/fitness',
     filePath: 'packages/fitness/engine/src/cli/fit/fit-command-spec.ts',
     name: 'runFitCommand',
@@ -46,11 +47,11 @@ function candidate(over: Partial<DeclarationCandidate> = {}): DeclarationCandida
 
 describe('static-handler-bridge production constants', () => {
   it('wires literal production descriptor/candidate/cache ceilings', () => {
-    expect(MAX_STATIC_HANDLER_DESCRIPTORS).toBe(2_000);
+    expect(MAX_STATIC_HANDLER_DESCRIPTORS).toBe(2000);
     expect(MAX_STATIC_HANDLER_CANDIDATES).toBe(8);
     expect(MAX_STATIC_HANDLER_CACHE_ENTRIES).toBe(4);
     expect(DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS).toEqual({
-      maxDescriptors: 2_000,
+      maxDescriptors: 2000,
       maxCandidates: 8,
     });
   });
@@ -93,7 +94,7 @@ describe('preflightStaticHandlerRef', () => {
   });
 
   it('allows reviewed first-party shared mappings across packages', () => {
-    const shared = REVIEWED_CROSS_PACKAGE_HANDLERS[0]!;
+    const shared = REVIEWED_CROSS_PACKAGE_HANDLERS[0];
     const allowed = preflightStaticHandlerRef(
       ref({
         package: shared.package,

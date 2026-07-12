@@ -21,20 +21,7 @@ import {
   type GraphReadFacetCoverage,
   type GraphSourceFilter,
   type ReferenceSiteRef,
-  type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
-
-import {
-  DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS,
-  dedupeStaticHandlerRefs,
-  matchStaticHandlerCandidates,
-  MAX_STATIC_HANDLER_CACHE_ENTRIES,
-  MAX_STATIC_HANDLER_DESCRIPTORS,
-  preflightStaticHandlerRef,
-  type DeclarationCandidate,
-  type StaticHandlerBridgeOutcome,
-  type StaticHandlerRef,
-} from './static-handler-bridge.js';
 
 import {
   digestNormalizedQuery,
@@ -58,6 +45,17 @@ import {
   completeInventoryCoverage,
   type SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
+import {
+  DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS,
+  dedupeStaticHandlerRefs,
+  matchStaticHandlerCandidates,
+  MAX_STATIC_HANDLER_CACHE_ENTRIES,
+  MAX_STATIC_HANDLER_DESCRIPTORS,
+  preflightStaticHandlerRef,
+  type DeclarationCandidate,
+  type StaticHandlerBridgeOutcome,
+  type StaticHandlerRef,
+} from './static-handler-bridge.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { McpReadError } from './mcp-error.js';
@@ -68,17 +66,27 @@ const DEFAULT_REFERENCE_LIMIT = 100;
 /** Max inventory rows retained for exclusive projection (matches page max). */
 const MAX_INVENTORY = 500;
 
+/** Grouping mode for declaration-search rollups. */
+type DeclarationGroupBy = 'none' | 'package' | 'file';
+/** Catalog load status recorded on a static-handler cache entry. */
+type CatalogLoadStatus = 'loaded' | 'missing' | 'unsupported';
+
+/** Reason code stamped on every invalid-query read error from this port. */
+const INVALID_QUERY = 'invalid-query';
+/** Reference scope stamped on every declaration/reference DTO from this port. */
+const CROSS_FILE_SCOPE = 'cross-file' as const;
+
 function validateDetail(
   detail: CompactQueryDetail,
-  groupBy: 'none' | 'package' | 'file',
+  groupBy: DeclarationGroupBy,
 ): Result<void, McpReadError> {
   if (detail === 'groups' && groupBy === 'none') {
-    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
+    return err(readError(INVALID_QUERY, 'detail=groups requires groupBy package or file.'));
   }
   if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
     return err(
       readError(
-        'invalid-query',
+        INVALID_QUERY,
         'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
       ),
     );
@@ -133,7 +141,7 @@ function toReferenceDto(ref: ReferenceSiteRef): ReferenceSiteDto {
 interface StaticHandlerCacheEntry {
   readonly runtimeSnapshotKey: string;
   readonly catalogIdentity: string;
-  readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+  readonly catalogStatus: CatalogLoadStatus;
   readonly outcomes: readonly StaticHandlerBridgeOutcome[];
 }
 
@@ -154,28 +162,26 @@ export class SqliteGraphDeclarationQueries {
     Result<
       {
         readonly catalogIdentity?: string;
-        readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+        readonly catalogStatus: CatalogLoadStatus;
         readonly outcomes: readonly StaticHandlerBridgeOutcome[];
       },
       McpReadError
     >
   > {
     if (typeof runtimeSnapshotKey !== 'string' || !runtimeSnapshotKey.startsWith('w1:')) {
-      return err(
-        readError('invalid-query', 'runtimeSnapshotKey must be a validated w1: identity.'),
-      );
+      return err(readError(INVALID_QUERY, 'runtimeSnapshotKey must be a validated w1: identity.'));
     }
     if (refs.length > MAX_STATIC_HANDLER_DESCRIPTORS) {
       return err(
         readError(
-          'invalid-query',
+          INVALID_QUERY,
           `static handler batch exceeds maxDescriptors (${String(MAX_STATIC_HANDLER_DESCRIPTORS)}).`,
         ),
       );
     }
 
     interface BridgeBatchPayload {
-      readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+      readonly catalogStatus: CatalogLoadStatus;
       readonly catalogIdentity?: string;
       readonly outcomes: readonly StaticHandlerBridgeOutcome[];
     }
@@ -220,7 +226,11 @@ export class SqliteGraphDeclarationQueries {
         const outcomes = unique.map((ref) => {
           const preflight = preflightStaticHandlerRef(ref);
           if (preflight !== undefined) return preflight;
-          return matchStaticHandlerCandidates(ref, candidates, DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS);
+          return matchStaticHandlerCandidates(
+            ref,
+            candidates,
+            DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS,
+          );
         });
         return this.context.envelope(
           {
@@ -241,10 +251,7 @@ export class SqliteGraphDeclarationQueries {
     // Expand outcomes to one per input ref (preserve caller order).
     const byKey = new Map<string, StaticHandlerBridgeOutcome>();
     for (const outcome of data.outcomes) {
-      byKey.set(
-        `${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`,
-        outcome,
-      );
+      byKey.set(`${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`, outcome);
     }
     const ordered: StaticHandlerBridgeOutcome[] = refs.map((ref) => {
       const key = `${ref.package}\0${ref.path}\0${ref.declaration}`;
@@ -287,7 +294,15 @@ export class SqliteGraphDeclarationQueries {
     if (
       data.catalogStatus === 'loaded' &&
       data.catalogIdentity !== undefined &&
-      ordered.every((o) => o.status === 'resolved' || o.status === 'not-found' || o.status === 'ambiguous' || o.status === 'provenance-mismatch' || o.status === 'candidate-cap' || o.status === 'metadata-missing')
+      ordered.every(
+        (o) =>
+          o.status === 'resolved' ||
+          o.status === 'not-found' ||
+          o.status === 'ambiguous' ||
+          o.status === 'provenance-mismatch' ||
+          o.status === 'candidate-cap' ||
+          o.status === 'metadata-missing',
+      )
     ) {
       this.insertStaticHandlerCache({
         runtimeSnapshotKey,
@@ -319,8 +334,7 @@ export class SqliteGraphDeclarationQueries {
     for (let i = this.staticHandlerCache.length - 1; i >= 0; i--) {
       const existing = this.staticHandlerCache[i];
       if (
-        existing !== undefined &&
-        existing.runtimeSnapshotKey === entry.runtimeSnapshotKey &&
+        existing?.runtimeSnapshotKey === entry.runtimeSnapshotKey &&
         existing.catalogIdentity !== entry.catalogIdentity
       ) {
         this.staticHandlerCache.splice(i, 1);
@@ -361,7 +375,7 @@ export class SqliteGraphDeclarationQueries {
       filter,
       groupBy,
       detail,
-      referenceScope: 'cross-file',
+      referenceScope: CROSS_FILE_SCOPE,
     });
 
     return this.context.runQuery(
@@ -374,16 +388,11 @@ export class SqliteGraphDeclarationQueries {
             queryDigest,
           });
           if (!cursor.ok) return cursor;
-          return this.context.envelope(
-            emptyDeclarationDto(detail),
-            gen,
-            freshness,
-            {
-              coverage: completeInventoryCoverage(),
-              page: { limit },
-              filter,
-            },
-          );
+          return this.context.envelope(emptyDeclarationDto(detail), gen, freshness, {
+            coverage: completeInventoryCoverage(),
+            page: { limit },
+            filter,
+          });
         }
 
         const matcher = this.context.sourceRoleMatcherFor(gen);
@@ -402,7 +411,7 @@ export class SqliteGraphDeclarationQueries {
           matcher.value,
         );
         if (!view.ok) {
-          return err(readError('invalid-query', view.error.message));
+          return err(readError(INVALID_QUERY, view.error.message));
         }
 
         const inventory = [...view.value.declarations].sort(compareDeclarationRefs);
@@ -460,7 +469,7 @@ export class SqliteGraphDeclarationQueries {
       filter,
       groupBy,
       detail,
-      referenceScope: 'cross-file',
+      referenceScope: CROSS_FILE_SCOPE,
     });
 
     return this.context.runQuery(
@@ -473,16 +482,11 @@ export class SqliteGraphDeclarationQueries {
             queryDigest,
           });
           if (!cursor.ok) return cursor;
-          return this.context.envelope(
-            emptyReferencesDto(detail, declarationId),
-            gen,
-            freshness,
-            {
-              coverage: completeInventoryCoverage(),
-              page: { limit },
-              filter,
-            },
-          );
+          return this.context.envelope(emptyReferencesDto(detail, declarationId), gen, freshness, {
+            coverage: completeInventoryCoverage(),
+            page: { limit },
+            filter,
+          });
         }
 
         const matcher = this.context.sourceRoleMatcherFor(gen);
@@ -499,7 +503,7 @@ export class SqliteGraphDeclarationQueries {
           matcher.value,
         );
         if (!view.ok) {
-          return err(readError('invalid-query', view.error.message));
+          return err(readError(INVALID_QUERY, view.error.message));
         }
         if (view.value.declarationMissing) {
           return err(
@@ -537,13 +541,13 @@ export class SqliteGraphDeclarationQueries {
 }
 
 function emptyDeclarationDto(detail: CompactQueryDetail): DeclarationSearchDto {
-  return { detail, referenceScope: 'cross-file', declarations: [], totalMatches: 0 };
+  return { detail, referenceScope: CROSS_FILE_SCOPE, declarations: [], totalMatches: 0 };
 }
 
 function emptyReferencesDto(detail: CompactQueryDetail, declarationId: string): ReferencesToDto {
   return {
     detail,
-    referenceScope: 'cross-file',
+    referenceScope: CROSS_FILE_SCOPE,
     declarationId,
     references: [],
     totalMatches: 0,
@@ -555,7 +559,7 @@ function projectDeclarationDetail(input: {
   readonly gen: CatalogGeneration;
   readonly freshness: GraphToolResult<unknown>['freshness'];
   readonly detail: CompactQueryDetail;
-  readonly groupBy: 'none' | 'package' | 'file';
+  readonly groupBy: DeclarationGroupBy;
   readonly limit: number;
   readonly cursor: string | undefined;
   readonly filter: GraphSourceFilter;
@@ -593,7 +597,7 @@ function projectDeclarationDetail(input: {
       context.envelope(
         {
           detail: 'summary',
-          referenceScope: 'cross-file',
+          referenceScope: CROSS_FILE_SCOPE,
           declarations: [],
           totalMatches,
         },
@@ -623,7 +627,7 @@ function projectDeclarationDetail(input: {
       context.envelope(
         {
           detail: 'groups',
-          referenceScope: 'cross-file',
+          referenceScope: CROSS_FILE_SCOPE,
           declarations: [],
           totalMatches,
         },
@@ -653,7 +657,7 @@ function projectDeclarationDetail(input: {
     context.envelope(
       {
         detail: 'nodes',
-        referenceScope: 'cross-file',
+        referenceScope: CROSS_FILE_SCOPE,
         declarations: paged.value.rows.map(toDeclarationDto),
         totalMatches,
       },
@@ -681,7 +685,7 @@ function projectReferenceDetail(input: {
   readonly gen: CatalogGeneration;
   readonly freshness: GraphToolResult<unknown>['freshness'];
   readonly detail: CompactQueryDetail;
-  readonly groupBy: 'none' | 'package' | 'file';
+  readonly groupBy: DeclarationGroupBy;
   readonly limit: number;
   readonly cursor: string | undefined;
   readonly filter: GraphSourceFilter;
@@ -729,7 +733,7 @@ function projectReferenceDetail(input: {
       context.envelope(
         {
           detail: 'summary',
-          referenceScope: 'cross-file',
+          referenceScope: CROSS_FILE_SCOPE,
           declarationId,
           references: [],
           totalMatches,
@@ -761,7 +765,7 @@ function projectReferenceDetail(input: {
       context.envelope(
         {
           detail: 'groups',
-          referenceScope: 'cross-file',
+          referenceScope: CROSS_FILE_SCOPE,
           declarationId,
           references: [],
           totalMatches,
@@ -793,7 +797,7 @@ function projectReferenceDetail(input: {
     context.envelope(
       {
         detail: 'nodes',
-        referenceScope: 'cross-file',
+        referenceScope: CROSS_FILE_SCOPE,
         declarationId,
         references: paged.value.rows.map(toReferenceDto),
         totalMatches,
@@ -819,4 +823,5 @@ function projectReferenceDetail(input: {
 }
 
 // Silence unused import when SourceRoleMatcher is only used as type in comments.
-export type { SourceRoleMatcher };
+
+export { type SourceRoleMatcher } from '@opensip-cli/graph/read';

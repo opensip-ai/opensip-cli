@@ -64,6 +64,12 @@ const RAW_STREAM = 'raw-stream' as const;
 // duplicated (sonarjs/no-duplicate-string).
 const REASON_FILE_EXPORT = 'file-export' as const;
 
+// Static-handler provenance shared by every graph aux command spec in this
+// module. Declared once so the literals are not duplicated
+// (sonarjs/no-duplicate-string).
+const GRAPH_AUX_PACKAGE = '@opensip-cli/graph';
+const GRAPH_AUX_SPECS_PATH = 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts';
+
 /** Read the single trailing positional (`<name>` / `<specPath>`) off the parsed opts. */
 function firstArg(opts: Record<string, unknown>): string {
   const args = (opts._args ?? []) as readonly string[];
@@ -298,8 +304,8 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
   ToolCliContext
 >({
   staticHandler: {
-    package: '@opensip-cli/graph',
-    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
     declaration: 'graphShardWorkerCommandSpec',
   },
   name: 'graph-shard-worker',
@@ -329,8 +335,8 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
   ToolCliContext
 >({
   staticHandler: {
-    package: '@opensip-cli/graph',
-    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
     declaration: 'graphEquivalenceCheckCommandSpec',
   },
   name: 'graph-equivalence-check',
@@ -469,8 +475,8 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   ToolCliContext
 >({
   staticHandler: {
-    package: '@opensip-cli/graph',
-    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
     declaration: 'graphExportCommandSpec',
   },
   name: 'export',
@@ -568,8 +574,8 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
 export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
     staticHandler: {
-      package: '@opensip-cli/graph',
-      path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+      package: GRAPH_AUX_PACKAGE,
+      path: GRAPH_AUX_SPECS_PATH,
       declaration: 'graphRecipesGroupedCommandSpec',
     },
     name: 'recipes',
@@ -584,8 +590,8 @@ export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext
 export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
     staticHandler: {
-      package: '@opensip-cli/graph',
-      path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+      package: GRAPH_AUX_PACKAGE,
+      path: GRAPH_AUX_SPECS_PATH,
       declaration: 'graphLookupGroupedCommandSpec',
     },
     name: 'lookup',
@@ -613,8 +619,8 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
 export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
     staticHandler: {
-      package: '@opensip-cli/graph',
-      path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+      package: GRAPH_AUX_PACKAGE,
+      path: GRAPH_AUX_SPECS_PATH,
       declaration: 'graphIndexGroupedCommandSpec',
     },
     name: 'index',
@@ -666,8 +672,8 @@ export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   ToolCliContext
 >({
   staticHandler: {
-    package: '@opensip-cli/graph',
-    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
     declaration: 'graphListCommandSpec',
   },
   name: 'list',
@@ -684,8 +690,8 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   ToolCliContext
 >({
   staticHandler: {
-    package: '@opensip-cli/graph',
-    path: 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts',
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
     declaration: 'graphImpactCommandSpec',
   },
   name: 'impact',

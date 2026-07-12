@@ -187,7 +187,7 @@ describe('pageDeadCode', () => {
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     expect(first.value.data.rows).toHaveLength(1);
-    const firstKey = deadCodeStableKey(first.value.data.rows[0]!);
+    const firstKey = deadCodeStableKey(first.value.data.rows[0]);
     const after = pageDeadCode({
       generation: gen,
       config: {},

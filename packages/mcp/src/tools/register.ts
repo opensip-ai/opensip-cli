@@ -17,10 +17,11 @@ import type { McpStdioServer } from '../server.js';
 
 /**
  * Default protocol surface epoch. Increment when the registered default tool
- * set changes (Phase 3 added search_declarations + references_to → epoch 3).
+ * set changes (Phase 3 added search_declarations + references_to → epoch 3;
+ * Phase 4 added get_runtime_wiring and Phase 6 added get_agent_catalog → epoch 4).
  * Actual registration names remain authoritative via server.describeSurface().
  */
-export const MCP_SURFACE_EPOCH = 3;
+export const MCP_SURFACE_EPOCH = 4;
 
 /**
  * Register the default protocol inventory (21 tools with Phase 3 declaration

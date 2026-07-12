@@ -134,22 +134,25 @@ export const firstPartyCommandStaticHandler = defineCheck({
         // Match through import bindings / aliases only — not bare local functions.
         if (name !== undefined && bindings.has(name) && node.arguments.length > 0) {
           const arg0 = node.arguments[0];
-          if (arg0 !== undefined && ts.isObjectLiteralExpression(arg0) && hasHandler(arg0)) {
-            if (!hasStaticHandler(arg0)) {
-              const line =
-                sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-              violations.push({
-                message:
-                  `First-party command factory '${name}' mounts a handler without staticHandler ` +
-                  `{ package, path, declaration }. Runtime wiring cannot bridge this leaf.`,
-                severity: 'error',
-                line,
-                suggestion:
-                  'Add staticHandler with the exact workspace package name, project-root-relative ' +
-                  'POSIX path, and declaration name. defineAnalysisRunCommand is excluded ' +
-                  '(contracts-owned fixed descriptor). See ADR-0154.',
-              });
-            }
+          if (
+            arg0 !== undefined &&
+            ts.isObjectLiteralExpression(arg0) &&
+            hasHandler(arg0) &&
+            !hasStaticHandler(arg0)
+          ) {
+            const line =
+              sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+            violations.push({
+              message:
+                `First-party command factory '${name}' mounts a handler without staticHandler ` +
+                `{ package, path, declaration }. Runtime wiring cannot bridge this leaf.`,
+              severity: 'error',
+              line,
+              suggestion:
+                'Add staticHandler with the exact workspace package name, project-root-relative ' +
+                'POSIX path, and declaration name. defineAnalysisRunCommand is excluded ' +
+                '(contracts-owned fixed descriptor). See ADR-0154.',
+            });
           }
         }
       }

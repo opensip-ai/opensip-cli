@@ -10,10 +10,7 @@
 import {
   DEFAULT_SEMANTIC_FACT_LIMITS,
   MAX_REFERENCES_PER_DECLARATION,
-  MAX_SEMANTIC_COLUMN,
   MAX_SEMANTIC_DECLARATIONS,
-  MAX_SEMANTIC_LINE,
-  MAX_SEMANTIC_NAME,
   MAX_SEMANTIC_REFERENCES,
   MAX_SEMANTIC_TEXT,
   type CrossFileReferenceFact,
@@ -107,6 +104,10 @@ const REF_KEYS = new Set([
   'definedInGenerated',
 ]);
 
+/** Coverage reason codes come from a small fixed producer vocabulary; bound the
+ *  array count so a tampered payload cannot embed an unbounded reasons list. */
+const MAX_COVERAGE_REASONS = 64;
+
 const BUNDLE_KEYS = new Set(['referenceScope', 'declarations', 'references', 'coverage']);
 const COVERAGE_KEYS = new Set([
   'status',
@@ -138,7 +139,12 @@ function isSafeOptionalText(value: unknown, max: number): boolean {
 }
 
 function isNonNegInt(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= Number.MAX_SAFE_INTEGER
+  );
 }
 
 function isSpanInt(value: unknown, max: number): value is number {
@@ -174,7 +180,7 @@ export function validateSemanticFactBundle(
     throw new Error('Malformed semanticFacts referenceScope');
   }
   if (!Array.isArray(value.declarations) || !Array.isArray(value.references)) {
-    throw new Error('Malformed semanticFacts arrays');
+    throw new TypeError('Malformed semanticFacts arrays');
   }
   if (value.declarations.length > limits.maxDeclarations) {
     throw new Error('semanticFacts declarations exceed bound');
@@ -183,9 +189,20 @@ export function validateSemanticFactBundle(
     throw new Error('semanticFacts references exceed bound');
   }
 
+  const declById = validateDeclarationEntries(value.declarations, limits);
+  validateReferenceEntries(value.references, limits, declById);
+
+  validateCoverage(value.coverage, value.declarations.length, value.references.length);
+}
+
+/** Validate each declaration, reject duplicate ids, and index by id. */
+function validateDeclarationEntries(
+  declarations: readonly unknown[],
+  limits: SemanticFactLimits,
+): Map<string, DeclarationFact> {
   const declIds = new Set<string>();
   const declById = new Map<string, DeclarationFact>();
-  for (const raw of value.declarations) {
+  for (const raw of declarations) {
     const decl = validateDeclaration(raw, limits);
     if (declIds.has(decl.declarationId)) {
       throw new Error('Duplicate semanticFacts declarationId');
@@ -193,10 +210,18 @@ export function validateSemanticFactBundle(
     declIds.add(decl.declarationId);
     declById.set(decl.declarationId, decl);
   }
+  return declById;
+}
 
+/** Validate each reference, reject duplicate ids, and enforce the per-declaration cap. */
+function validateReferenceEntries(
+  references: readonly unknown[],
+  limits: SemanticFactLimits,
+  declById: ReadonlyMap<string, DeclarationFact>,
+): void {
   const refIds = new Set<string>();
   const perDecl = new Map<string, number>();
-  for (const raw of value.references) {
+  for (const raw of references) {
     const ref = validateReference(raw, limits, declById);
     if (refIds.has(ref.referenceId)) {
       throw new Error('Duplicate semanticFacts referenceId');
@@ -205,13 +230,14 @@ export function validateSemanticFactBundle(
     if (ref.targetDeclarationId !== undefined) {
       const n = (perDecl.get(ref.targetDeclarationId) ?? 0) + 1;
       if (n > Math.max(limits.maxReferencesPerDeclaration, MAX_REFERENCES_PER_DECLARATION)) {
-        // Soft producer bound — repository allows up to the configured limit.
+        // Fail closed on a tampered/over-limit plane (the producer already caps
+        // this; a decoded catalog exceeding it is malformed). With graceful
+        // degradation upstream this drops the optional plane, not the catalog.
+        throw new Error('semanticFacts references-per-declaration exceed bound');
       }
       perDecl.set(ref.targetDeclarationId, n);
     }
   }
-
-  validateCoverage(value.coverage, value.declarations.length, value.references.length);
 }
 
 function validateDeclaration(raw: unknown, limits: SemanticFactLimits): DeclarationFact {
@@ -227,10 +253,10 @@ function validateDeclaration(raw: unknown, limits: SemanticFactLimits): Declarat
     !isSafeText(raw.package, limits.maxText) ||
     !isSafeText(raw.filePath, limits.maxText) ||
     !isSpanInt(raw.line, limits.maxLine) ||
-    (raw.line as number) < 1 ||
+    raw.line < 1 ||
     !isSpanInt(raw.column, limits.maxColumn) ||
     !isSpanInt(raw.endLine, limits.maxLine) ||
-    (raw.endLine as number) < 1 ||
+    raw.endLine < 1 ||
     !isSpanInt(raw.endColumn, limits.maxColumn) ||
     typeof raw.visibility !== 'string' ||
     !VISIBILITIES.has(raw.visibility as SemanticVisibility) ||
@@ -258,10 +284,10 @@ function validateReference(
     !REFERENCE_KINDS.has(raw.kind as ReferenceKind) ||
     !isSafeText(raw.filePath, limits.maxText) ||
     !isSpanInt(raw.line, limits.maxLine) ||
-    (raw.line as number) < 1 ||
+    raw.line < 1 ||
     !isSpanInt(raw.column, limits.maxColumn) ||
     !isSpanInt(raw.endLine, limits.maxLine) ||
-    (raw.endLine as number) < 1 ||
+    raw.endLine < 1 ||
     !isSpanInt(raw.endColumn, limits.maxColumn) ||
     !isSafeText(raw.package, limits.maxText) ||
     !isSafeOptionalText(raw.targetDeclarationId, limits.maxText) ||
@@ -310,11 +336,7 @@ function validateReference(
   return raw as unknown as CrossFileReferenceFact;
 }
 
-function validateCoverage(
-  raw: unknown,
-  declCount: number,
-  refCount: number,
-): void {
+function validateCoverage(raw: unknown, declCount: number, refCount: number): void {
   if (!isRecord(raw) || !exactKeys(raw, COVERAGE_KEYS)) {
     throw new Error('Malformed semanticFacts coverage');
   }
@@ -329,8 +351,9 @@ function validateCoverage(
     !isNonNegInt(raw.emittedReferences) ||
     !isNonNegInt(raw.omittedReferences) ||
     !Array.isArray(raw.reasons) ||
+    raw.reasons.length > MAX_COVERAGE_REASONS ||
     !raw.reasons.every((r) => isSafeText(r, MAX_SEMANTIC_TEXT)) ||
-    !reasonsSorted(raw.reasons as readonly string[])
+    !reasonsSorted(raw.reasons)
   ) {
     throw new Error('Malformed semanticFacts coverage fields');
   }
@@ -339,20 +362,9 @@ function validateCoverage(
   }
   // Bound absolute counters so a tampered payload cannot claim unbounded inspection.
   if (
-    (raw.inspectedDeclarations as number) > MAX_SEMANTIC_DECLARATIONS * 2 ||
-    (raw.inspectedReferences as number) > MAX_SEMANTIC_REFERENCES * 2
+    raw.inspectedDeclarations > MAX_SEMANTIC_DECLARATIONS * 2 ||
+    raw.inspectedReferences > MAX_SEMANTIC_REFERENCES * 2
   ) {
     throw new Error('semanticFacts coverage counters exceed bound');
   }
 }
-
-/** Re-export production constants so CatalogRepo shares one source. */
-export const SEMANTIC_FACT_REPO_LIMITS = {
-  maxDeclarations: MAX_SEMANTIC_DECLARATIONS,
-  maxReferences: MAX_SEMANTIC_REFERENCES,
-  maxReferencesPerDeclaration: MAX_REFERENCES_PER_DECLARATION,
-  maxName: MAX_SEMANTIC_NAME,
-  maxText: MAX_SEMANTIC_TEXT,
-  maxLine: MAX_SEMANTIC_LINE,
-  maxColumn: MAX_SEMANTIC_COLUMN,
-} as const satisfies SemanticFactLimits;

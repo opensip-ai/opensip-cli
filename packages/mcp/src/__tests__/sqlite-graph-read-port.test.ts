@@ -389,7 +389,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(search.value.data.symbols[0]?.package).toBe('pkg');
     expect(search.value.data.symbols[0]?.symbolId.length).toBeGreaterThan(0);
 
-    const start = search.value.data.symbols[0]!.symbolId;
+    const start = search.value.data.symbols[0].symbolId;
     const walk = await port.traverse({
       direction: 'callees',
       startSymbolId: start,
@@ -563,9 +563,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
       match: 'exact',
       filter: { sourceScope: 'all', generated: 'include' },
     });
-    expect(
-      exact.ok && exact.value.data.symbols.every((s) => s.simpleName === 'save'),
-    ).toBe(true);
+    expect(exact.ok && exact.value.data.symbols.every((s) => s.simpleName === 'save')).toBe(true);
 
     const qualified = await port.searchSymbols('fit.saveBaseline', {
       match: 'qualified',
@@ -711,7 +709,14 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     const roleCatalog: Catalog = {
       ...seededCatalog(),
       functions: {
-        prod: [fnOcc({ bodyHash: 'h-prod', simpleName: 'prodFn', filePath: 'packages/core/src/index.ts', package: 'pkg-core' })],
+        prod: [
+          fnOcc({
+            bodyHash: 'h-prod',
+            simpleName: 'prodFn',
+            filePath: 'packages/core/src/index.ts',
+            package: 'pkg-core',
+          }),
+        ],
         support: [
           fnOcc({
             bodyHash: 'h-support',

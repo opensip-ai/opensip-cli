@@ -152,7 +152,7 @@ describe('referencesToDeclaration', () => {
   });
 
   it('returns cross-file references for a known id', () => {
-    const id = sampleBundle.declarations[0]!.declarationId;
+    const id = sampleBundle.declarations[0].declarationId;
     const result = referencesToDeclaration(
       catalog(sampleBundle),
       { declarationId: id, filter, limit: 20 },

@@ -13,13 +13,10 @@
  * removed/renamed packages cannot leave stale target IDs.
  */
 
-import {
-  applySemanticFactCaps,
-  makeReferenceId,
-  sortReasonCodes,
-} from '../../semantic-facts.js';
 import { resolveSpecifierToPackage } from '../../cross-package/export-index.js';
 import { packageGroupOf } from '../../cross-package/package-group.js';
+import { applySemanticFactCaps, makeReferenceId, sortReasonCodes } from '../../semantic-facts.js';
+import { DEFAULT_SEMANTIC_FACT_LIMITS } from '../../types.js';
 
 import type { PackageManifestIndex } from '../../cross-package/export-index.js';
 import type {
@@ -29,7 +26,6 @@ import type {
   SemanticFactBundle,
   SemanticFactLimits,
 } from '../../types.js';
-import { DEFAULT_SEMANTIC_FACT_LIMITS } from '../../types.js';
 
 /** Index key: packageGroup | exportSubpath | name | kind */
 function exportKey(
@@ -97,10 +93,7 @@ export function reconcileSemanticFacts(
   if (bundle === undefined) return undefined;
 
   const declById = new Map(bundle.declarations.map((d) => [d.declarationId, d] as const));
-  const { unique, ambiguous } = buildExportedDeclarationIndex(
-    bundle.declarations,
-    manifestIndex,
-  );
+  const { unique, ambiguous } = buildExportedDeclarationIndex(bundle.declarations, manifestIndex);
 
   const reasons = [...bundle.coverage.reasons];
   const nextRefs: CrossFileReferenceFact[] = [];
@@ -139,8 +132,7 @@ export function reconcileSemanticFacts(
     nextRefs,
     {
       ...bundle.coverage,
-      status:
-        reasons.length > 0 || bundle.coverage.status === 'partial' ? 'partial' : 'complete',
+      status: reasons.length > 0 || bundle.coverage.status === 'partial' ? 'partial' : 'complete',
       reasons: sortReasonCodes(reasons),
     },
     limits,

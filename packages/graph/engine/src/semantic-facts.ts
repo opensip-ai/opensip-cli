@@ -7,7 +7,10 @@
  * recipes so fact IDs and order stay generation-stable.
  */
 
+import { createHash } from 'node:crypto';
+
 import { compareCodePointStrings } from './code-point-order.js';
+import { DEFAULT_SEMANTIC_FACT_LIMITS, MAX_SEMANTIC_TEXT } from './types.js';
 
 import type {
   CrossFileReferenceFact,
@@ -16,7 +19,6 @@ import type {
   SemanticFactLimits,
   SemanticFactProducerCoverage,
 } from './types.js';
-import { DEFAULT_SEMANTIC_FACT_LIMITS } from './types.js';
 
 /**
  * Escape `|` and `\` in identity segments so join-based ids stay reversible
@@ -24,6 +26,20 @@ import { DEFAULT_SEMANTIC_FACT_LIMITS } from './types.js';
  */
 function idSegment(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll('|', '\\|');
+}
+
+/**
+ * Bound a composite id to {@link MAX_SEMANTIC_TEXT} so it always survives the
+ * read-time validator (which rejects any id longer than `maxText`). Individual
+ * segments are already bounded, but their concatenation (e.g. a ~1000-char
+ * filePath) can still exceed the limit; a pathologically long id collapses to
+ * its `<prefix>|~<sha256>` — deterministic, collision-resistant, and stable
+ * across runs so declaration/reference ids still join by equality. The `<prefix>|`
+ * head is preserved so id-shape guards keep working. (P2 Phase 3 — id-length brick fix.)
+ */
+function boundId(prefix: 'd1' | 'r1', raw: string): string {
+  if (raw.length <= MAX_SEMANTIC_TEXT) return raw;
+  return `${prefix}|~${createHash('sha256').update(raw).digest('base64url')}`;
 }
 
 /** Build a stable declaration id from normalized identity inputs. */
@@ -35,15 +51,18 @@ export function makeDeclarationId(input: {
   readonly line: number;
   readonly column: number;
 }): string {
-  return [
+  return boundId(
     'd1',
-    idSegment(input.package),
-    idSegment(input.filePath),
-    idSegment(input.kind),
-    idSegment(input.name),
-    String(input.line),
-    String(input.column),
-  ].join('|');
+    [
+      'd1',
+      idSegment(input.package),
+      idSegment(input.filePath),
+      idSegment(input.kind),
+      idSegment(input.name),
+      String(input.line),
+      String(input.column),
+    ].join('|'),
+  );
 }
 
 /** Build a stable reference id from source span + kind + target fingerprint. */
@@ -56,16 +75,19 @@ export function makeReferenceId(input: {
   readonly targetName?: string;
   readonly targetPackage?: string;
 }): string {
-  return [
+  return boundId(
     'r1',
-    idSegment(input.filePath),
-    idSegment(input.kind),
-    String(input.line),
-    String(input.column),
-    idSegment(input.targetDeclarationId ?? ''),
-    idSegment(input.targetPackage ?? ''),
-    idSegment(input.targetName ?? ''),
-  ].join('|');
+    [
+      'r1',
+      idSegment(input.filePath),
+      idSegment(input.kind),
+      String(input.line),
+      String(input.column),
+      idSegment(input.targetDeclarationId ?? ''),
+      idSegment(input.targetPackage ?? ''),
+      idSegment(input.targetName ?? ''),
+    ].join('|'),
+  );
 }
 
 /** Deterministic declaration order: package, path, line, column, id. */
@@ -205,6 +227,43 @@ export function applySemanticFactCaps(
   }
 
   // Per-declaration reference soft bound (deterministic: first N by ref order).
+  keptRefs = applyPerDeclarationCap(keptRefs, limits, reasons);
+
+  // Declaration cap: keep top-K, then restore any still-referenced ids.
+  const referencedIds = new Set<string>();
+  for (const ref of keptRefs) {
+    if (ref.targetDeclarationId !== undefined) referencedIds.add(ref.targetDeclarationId);
+  }
+
+  const capped = applyDeclarationCap(sortedDecls, keptRefs, referencedIds, limits, reasons);
+
+  const finalCoverage = finalizeProducerCoverage(
+    {
+      ...coverage,
+      reasons: sortReasonCodes(reasons),
+      status: reasons.length > 0 || coverage.status === 'partial' ? 'partial' : coverage.status,
+    },
+    capped.keptDecls,
+    capped.keptRefs,
+  );
+
+  return {
+    referenceScope: 'cross-file',
+    declarations: capped.keptDecls,
+    references: capped.keptRefs,
+    coverage: finalCoverage,
+  };
+}
+
+/**
+ * Per-declaration reference soft bound (deterministic: first N by ref order).
+ * Pushes `references-per-declaration-cap` when any reference is dropped.
+ */
+function applyPerDeclarationCap(
+  keptRefs: readonly CrossFileReferenceFact[],
+  limits: SemanticFactLimits,
+  reasons: string[],
+): CrossFileReferenceFact[] {
   const perDeclCounts = new Map<string, number>();
   const afterPerDecl: CrossFileReferenceFact[] = [];
   let perDeclOmitted = 0;
@@ -224,69 +283,50 @@ export function applySemanticFactCaps(
   }
   if (perDeclOmitted > 0) {
     reasons.push('references-per-declaration-cap');
-    keptRefs = afterPerDecl;
-  } else {
-    keptRefs = afterPerDecl;
+  }
+  return afterPerDecl;
+}
+
+/**
+ * Declaration cap: keep top-K, restore still-referenced ids under a modest
+ * closure overflow, otherwise downgrade references whose targets fall outside.
+ */
+function applyDeclarationCap(
+  sortedDecls: readonly DeclarationFact[],
+  keptRefs: CrossFileReferenceFact[],
+  referencedIds: ReadonlySet<string>,
+  limits: SemanticFactLimits,
+  reasons: string[],
+): { readonly keptDecls: readonly DeclarationFact[]; readonly keptRefs: CrossFileReferenceFact[] } {
+  if (sortedDecls.length <= limits.maxDeclarations) {
+    const ids = new Set(sortedDecls.map((d) => d.declarationId));
+    return { keptDecls: sortedDecls, keptRefs: downgradeMissingTargets(keptRefs, ids, reasons) };
   }
 
-  // Declaration cap: keep top-K, then restore any still-referenced ids.
-  const referencedIds = new Set<string>();
-  for (const ref of keptRefs) {
-    if (ref.targetDeclarationId !== undefined) referencedIds.add(ref.targetDeclarationId);
-  }
-
-  let keptDecls = sortedDecls;
-  if (sortedDecls.length > limits.maxDeclarations) {
-    const primary = sortedDecls.slice(0, limits.maxDeclarations);
-    const primaryIds = new Set(primary.map((d) => d.declarationId));
-    const closureExtras: DeclarationFact[] = [];
-    for (const d of sortedDecls.slice(limits.maxDeclarations)) {
-      if (referencedIds.has(d.declarationId) && !primaryIds.has(d.declarationId)) {
-        closureExtras.push(d);
-      }
+  const primary = sortedDecls.slice(0, limits.maxDeclarations);
+  const primaryIds = new Set(primary.map((d) => d.declarationId));
+  const closureExtras: DeclarationFact[] = [];
+  for (const d of sortedDecls.slice(limits.maxDeclarations)) {
+    if (referencedIds.has(d.declarationId) && !primaryIds.has(d.declarationId)) {
+      closureExtras.push(d);
     }
-    // Prefer referential closure when extras fit under a modest overflow of the
-    // cap; otherwise downgrade references whose targets fall outside.
-    const withClosure = [...primary, ...closureExtras].sort(compareDeclarationFacts);
-    if (withClosure.length <= limits.maxDeclarations + Math.min(1_000, limits.maxDeclarations)) {
-      // Still over hard cap when closure is large — keep primary only and downgrade.
-      if (withClosure.length > limits.maxDeclarations && closureExtras.length > 0) {
-        keptDecls = primary;
-        reasons.push('declaration-cap');
-        keptRefs = downgradeMissingTargets(keptRefs, primaryIds, reasons);
-      } else {
-        keptDecls = withClosure.slice(0, limits.maxDeclarations);
-        if (sortedDecls.length > keptDecls.length) reasons.push('declaration-cap');
-        const ids = new Set(keptDecls.map((d) => d.declarationId));
-        keptRefs = downgradeMissingTargets(keptRefs, ids, reasons);
-      }
-    } else {
-      keptDecls = primary;
-      reasons.push('declaration-cap');
-      keptRefs = downgradeMissingTargets(keptRefs, primaryIds, reasons);
-    }
-  } else {
-    const ids = new Set(keptDecls.map((d) => d.declarationId));
-    keptRefs = downgradeMissingTargets(keptRefs, ids, reasons);
   }
-
-  const finalCoverage = finalizeProducerCoverage(
-    {
-      ...coverage,
-      reasons: sortReasonCodes(reasons),
-      status:
-        reasons.length > 0 || coverage.status === 'partial' ? 'partial' : coverage.status,
-    },
-    keptDecls,
-    keptRefs,
-  );
-
-  return {
-    referenceScope: 'cross-file',
-    declarations: keptDecls,
-    references: keptRefs,
-    coverage: finalCoverage,
-  };
+  // Prefer referential closure when extras fit under a modest overflow of the
+  // cap; otherwise downgrade references whose targets fall outside.
+  const withClosure = [...primary, ...closureExtras].sort(compareDeclarationFacts);
+  if (withClosure.length > limits.maxDeclarations + Math.min(1000, limits.maxDeclarations)) {
+    reasons.push('declaration-cap');
+    return { keptDecls: primary, keptRefs: downgradeMissingTargets(keptRefs, primaryIds, reasons) };
+  }
+  // Still over hard cap when closure is large — keep primary only and downgrade.
+  if (withClosure.length > limits.maxDeclarations && closureExtras.length > 0) {
+    reasons.push('declaration-cap');
+    return { keptDecls: primary, keptRefs: downgradeMissingTargets(keptRefs, primaryIds, reasons) };
+  }
+  const keptDecls = withClosure.slice(0, limits.maxDeclarations);
+  if (sortedDecls.length > keptDecls.length) reasons.push('declaration-cap');
+  const ids = new Set(keptDecls.map((d) => d.declarationId));
+  return { keptDecls, keptRefs: downgradeMissingTargets(keptRefs, ids, reasons) };
 }
 
 function downgradeMissingTargets(
@@ -296,10 +336,7 @@ function downgradeMissingTargets(
 ): CrossFileReferenceFact[] {
   let downgraded = 0;
   const out = refs.map((ref) => {
-    if (
-      ref.targetDeclarationId === undefined ||
-      declIds.has(ref.targetDeclarationId)
-    ) {
+    if (ref.targetDeclarationId === undefined || declIds.has(ref.targetDeclarationId)) {
       return ref;
     }
     downgraded++;
@@ -350,12 +387,7 @@ export function mergeSemanticFactBundles(
     for (const r of b.references) refMap.set(r.referenceId, r);
   }
   const coverage = mergeProducerCoverage(present.map((b) => b.coverage));
-  return applySemanticFactCaps(
-    [...declMap.values()],
-    [...refMap.values()],
-    coverage,
-    limits,
-  );
+  return applySemanticFactCaps([...declMap.values()], [...refMap.values()], coverage, limits);
 }
 
 /**
@@ -372,12 +404,10 @@ export function mergeSemanticFactsIncremental(
   limits: SemanticFactLimits = DEFAULT_SEMANTIC_FACT_LIMITS,
 ): SemanticFactBundle | undefined {
   if (cached === undefined && fresh === undefined) return undefined;
-  if (cached === undefined) return fresh === undefined ? undefined : applySemanticFactCaps(
-    fresh.declarations,
-    fresh.references,
-    fresh.coverage,
-    limits,
-  );
+  if (cached === undefined)
+    return fresh === undefined
+      ? undefined
+      : applySemanticFactCaps(fresh.declarations, fresh.references, fresh.coverage, limits);
   if (fresh === undefined) {
     // Closure was re-walked but adapter omitted the plane → drop cached facts
     // whose files are in the closure (they may be stale) and keep the rest.
@@ -394,13 +424,23 @@ export function mergeSemanticFactsIncremental(
     return true;
   });
 
+  // Coverage must NOT compound across incremental rebuilds. The exact tier
+  // re-walks the WHOLE program each run (graph-typescript collects over
+  // program.getSourceFiles()), so `fresh.coverage` already describes the entire
+  // project — summing it with the equally whole-project `cached.coverage` would
+  // double the inspected*/omitted* counters every rebuild until they cross the
+  // validation bound and permanently brick the catalog on read. The cached
+  // bundle contributes only its retained (outside-closure) declarations and
+  // references here; `fresh.coverage` is the authoritative current-state
+  // coverage, and finalizeProducerCoverage re-derives emitted* from the merged
+  // arrays. (P2 Phase 3 — fix for compounding coverage brick.)
   return mergeSemanticFactBundles(
     [
       {
         referenceScope: 'cross-file',
         declarations: keptDecls,
         references: keptRefs,
-        coverage: cached.coverage,
+        coverage: mergeProducerCoverage([]),
       },
       fresh,
     ],

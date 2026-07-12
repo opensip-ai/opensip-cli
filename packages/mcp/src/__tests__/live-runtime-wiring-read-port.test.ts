@@ -172,7 +172,6 @@ describe('LiveRuntimeWiringReadPort', () => {
     expect(outcome.value.context.project.root).toBe('/fixture/project');
     expect(outcome.value.context.project.scope).toBe('project');
     expect(outcome.value.context.runtime.identity).toMatch(/^w1:/);
-    expect(outcome.value.context.snapshotKey).toMatch(/^w1:/);
     expect(outcome.value.context.projectKey).not.toContain('/fixture/project');
     expect(outcome.value.coverage).toMatchObject({
       complete: true,
@@ -237,7 +236,15 @@ describe('LiveRuntimeWiringReadPort', () => {
           },
         }),
       ],
-      [{ path: 'sessions', name: 'sessions', owner: 'host', ownerLabel: 'cli', visibility: 'public' }],
+      [
+        {
+          path: 'sessions',
+          name: 'sessions',
+          owner: 'host',
+          ownerLabel: 'cli',
+          visibility: 'public',
+        },
+      ],
     );
     const outcome = await port({ runtimeCommands: inv }).query({ detail: 'nodes', limit: 100 });
     expect(outcome.ok).toBe(true);
@@ -250,9 +257,7 @@ describe('LiveRuntimeWiringReadPort', () => {
     );
     expect(
       outcome.value.edges.every(
-        (edge) =>
-          edge.kind !== 'registry-owns-command' ||
-          !edge.to.includes('init'),
+        (edge) => edge.kind !== 'registry-owns-command' || !edge.to.includes('init'),
       ),
     ).toBe(true);
   });
@@ -394,19 +399,22 @@ describe('LiveRuntimeWiringReadPort', () => {
   });
 
   it('overlays resolved static handler bridges via injected resolver', async () => {
-    const resolveStaticHandlers: ResolveStaticHandlers = async (_key, refs) => ({
-      catalogStatus: 'loaded',
-      catalogIdentity: `g1:${'b'.repeat(64)}`,
-      outcomes: refs.map((ref) => ({
-        ref,
-        status: 'resolved' as const,
-        declarationId: `d1:${ref.declaration}`,
-        declarationQualifiedName: ref.declaration,
-        claimProvenance: 'author-declared' as const,
-        matchBasis: 'author-declared-exact-declaration' as const,
-        confidence: 'medium' as const,
-      })),
-    });
+    const resolveStaticHandlers: ResolveStaticHandlers = async (_key, refs) => {
+      await Promise.resolve();
+      return {
+        catalogStatus: 'loaded',
+        catalogIdentity: `g1:${'b'.repeat(64)}`,
+        outcomes: refs.map((ref) => ({
+          ref,
+          status: 'resolved' as const,
+          declarationId: `d1:${ref.declaration}`,
+          declarationQualifiedName: ref.declaration,
+          claimProvenance: 'author-declared' as const,
+          matchBasis: 'author-declared-exact-declaration' as const,
+          confidence: 'medium' as const,
+        })),
+      };
+    };
     const outcome = await port({ resolveStaticHandlers }).query({ detail: 'nodes', limit: 100 });
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;

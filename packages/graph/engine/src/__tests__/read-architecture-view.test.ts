@@ -306,16 +306,21 @@ describe('buildArchitectureView', () => {
         ],
       },
     };
-    const result = buildArchitectureView(malformedCatalog, buildIndexes(malformedCatalog), {
-      filter: {
-        packages: ['pkg-a', 'pkg-b', 'pkg-c', 'gen', 'bad'],
-        sourceScope: 'all',
-        generated: 'include',
+    const result = buildArchitectureView(
+      malformedCatalog,
+      buildIndexes(malformedCatalog),
+      {
+        filter: {
+          packages: ['pkg-a', 'pkg-b', 'pkg-c', 'gen', 'bad'],
+          sourceScope: 'all',
+          generated: 'include',
+        },
+        limit: 25,
+        sections: ALL_SECTIONS,
+        topN: 100,
       },
-      limit: 25,
-      sections: ALL_SECTIONS,
-      topN: 100,
-    }, noMatcher);
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.occurrenceCount.value).toBe(5);
@@ -362,7 +367,12 @@ describe('buildArchitectureView', () => {
             // enum) that is also a prototype key — the reachable hostile case.
             // `__proto__` is NOT a valid resolution, so it is dropped upstream as
             // a malformed edge and never reaches the counter (layered defense).
-            calls: [call('constructor', 3), call('constructor', 5), call('static', 7), call('__proto__', 9)],
+            calls: [
+              call('constructor', 3),
+              call('constructor', 5),
+              call('static', 7),
+              call('__proto__', 9),
+            ],
           }),
         ],
         cleanTarget: [
@@ -376,12 +386,17 @@ describe('buildArchitectureView', () => {
       },
     };
 
-    const result = buildArchitectureView(catalog, buildIndexes(catalog), {
-      filter: { packages: ['pkg-a', 'pkg-b'], sourceScope: 'all', generated: 'include' },
-      limit: 25,
-      sections: ALL_SECTIONS,
-      topN: 100,
-    }, noMatcher);
+    const result = buildArchitectureView(
+      catalog,
+      buildIndexes(catalog),
+      {
+        filter: { packages: ['pkg-a', 'pkg-b'], sourceScope: 'all', generated: 'include' },
+        limit: 25,
+        sections: ALL_SECTIONS,
+        topN: 100,
+      },
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const ce = result.value.callEvidence;
@@ -407,7 +422,12 @@ describe('buildArchitectureView', () => {
     const catalog = makeCatalog();
     const indexes = buildIndexes(catalog);
     const filter: GraphSourceFilter = { sourceScope: 'production', generated: 'exclude' };
-    const first = buildArchitectureView(catalog, indexes, { filter, limit: 1, sections: ALL_SECTIONS, topN: 100 }, noMatcher);
+    const first = buildArchitectureView(
+      catalog,
+      indexes,
+      { filter, limit: 1, sections: ALL_SECTIONS, topN: 100 },
+      noMatcher,
+    );
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     const packageKey = first.value.packageEdges?.[0];
@@ -416,16 +436,21 @@ describe('buildArchitectureView', () => {
     expect(hotspotKey).toBeDefined();
     if (packageKey === undefined || hotspotKey === undefined) return;
 
-    const second = buildArchitectureView(catalog, indexes, {
-      filter,
-      limit: 1,
-      sections: ALL_SECTIONS,
-      topN: 100,
-      afterPackageEdgeKey: continuationToken(packageEdgeStableKey(packageKey)),
-      afterHotspotKey: continuationToken(hotspotStableKey(hotspotKey)),
-      packageEdgesDone: !first.value.packageEdgesHasMore,
-      hotspotsDone: !first.value.hotspotsHasMore,
-    }, noMatcher);
+    const second = buildArchitectureView(
+      catalog,
+      indexes,
+      {
+        filter,
+        limit: 1,
+        sections: ALL_SECTIONS,
+        topN: 100,
+        afterPackageEdgeKey: continuationToken(packageEdgeStableKey(packageKey)),
+        afterHotspotKey: continuationToken(hotspotStableKey(hotspotKey)),
+        packageEdgesDone: !first.value.packageEdgesHasMore,
+        hotspotsDone: !first.value.hotspotsHasMore,
+      },
+      noMatcher,
+    );
     expect(second.ok).toBe(true);
     if (!second.ok) return;
     if (!first.value.packageEdgesHasMore) expect(second.value.packageEdges).toEqual([]);
@@ -436,13 +461,18 @@ describe('buildArchitectureView', () => {
 
   it('computes group summaries over the full filtered orientation set, not one page', () => {
     const catalog = makeCatalog();
-    const result = buildArchitectureView(catalog, buildIndexes(catalog), {
-      filter: { sourceScope: 'production', generated: 'exclude' },
-      limit: 1,
-      groupBy: 'file',
-      sections: ALL_SECTIONS,
-      topN: 100,
-    }, noMatcher);
+    const result = buildArchitectureView(
+      catalog,
+      buildIndexes(catalog),
+      {
+        filter: { sourceScope: 'production', generated: 'exclude' },
+        limit: 1,
+        groupBy: 'file',
+        sections: ALL_SECTIONS,
+        topN: 100,
+      },
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.hotspots).toHaveLength(1);
@@ -479,18 +509,28 @@ describe('buildArchitectureView', () => {
       functions: Object.fromEntries(reversed(Object.entries(forwardCatalog.functions))),
     };
     const filter: GraphSourceFilter = { sourceScope: 'production', generated: 'exclude' };
-    const forward = buildArchitectureView(forwardCatalog, buildIndexes(forwardCatalog), {
-      filter,
-      limit: 25,
-      sections: ALL_SECTIONS,
-      topN: 100,
-    }, noMatcher);
-    const reverse = buildArchitectureView(reverseCatalog, buildIndexes(reverseCatalog), {
-      filter,
-      limit: 25,
-      sections: ALL_SECTIONS,
-      topN: 100,
-    }, noMatcher);
+    const forward = buildArchitectureView(
+      forwardCatalog,
+      buildIndexes(forwardCatalog),
+      {
+        filter,
+        limit: 25,
+        sections: ALL_SECTIONS,
+        topN: 100,
+      },
+      noMatcher,
+    );
+    const reverse = buildArchitectureView(
+      reverseCatalog,
+      buildIndexes(reverseCatalog),
+      {
+        filter,
+        limit: 25,
+        sections: ALL_SECTIONS,
+        topN: 100,
+      },
+      noMatcher,
+    );
     expect(forward.ok).toBe(true);
     expect(reverse.ok).toBe(true);
     if (!forward.ok || !reverse.ok) return;

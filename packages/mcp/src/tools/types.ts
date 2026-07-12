@@ -12,6 +12,7 @@ import type { GraphReadPort } from '../graph-read-port.js';
 import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
 import type { RuntimeWiringReadPort } from '../runtime-wiring-read-port.js';
+import type { McpSurfaceSnapshot } from '../server.js';
 import type { TargetConventionSummary } from '@opensip-cli/contracts';
 
 export interface McpToolDeps {
@@ -33,5 +34,5 @@ export interface McpToolDeps {
    * Final MCP surface snapshot after all registrations. Used by
    * `get_agent_catalog` for connector diagnosis (version/epoch/names/root).
    */
-  readonly mcpSurface?: () => import('../server.js').McpSurfaceSnapshot;
+  readonly mcpSurface?: () => McpSurfaceSnapshot;
 }

@@ -70,17 +70,15 @@ describe('audit prompts graph-first workflow', () => {
       const section = sectionForHeading(markdown, heading);
       if (section === null) {
         // Table title may not equal the ## heading exactly — fuzzy match.
-        const fuzzy = markdown.match(new RegExp(`^## ${heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'));
+        const fuzzy = markdown.match(
+          new RegExp(`^## ${heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm'),
+        );
         assert.ok(fuzzy, `missing section heading for table row: ${heading}`);
         continue;
       }
       if (!section.includes('### Required Graph-First Workflow')) continue;
       const start = section.indexOf('### Required Graph-First Workflow');
-      const after = section.slice(start);
-      const endRel = after.search(/\n### /);
-      // Second ### after the workflow title ends the block when endRel points past title
-      const end = endRel > 0 ? start + endRel : section.length;
-      // Actually first match is the title itself; find next ### after title line
+      // The first ### match is the title itself; find the next ### after the title line.
       const bodyStart = section.indexOf('\n', start) + 1;
       const nextH3 = section.indexOf('\n### ', bodyStart);
       const block = section.slice(start, nextH3 < 0 ? section.length : nextH3);
@@ -103,8 +101,10 @@ describe('audit prompts graph-first workflow', () => {
     }
 
     for (const token of REQUIRED_TOKENS) {
-      assert.ok(first.includes(token.replace(/\s+/g, ' ')) || workflows[0].block.includes(token),
-        `missing required token: ${token}`);
+      assert.ok(
+        first.includes(token.replace(/\s+/g, ' ')) || workflows[0].block.includes(token),
+        `missing required token: ${token}`,
+      );
     }
 
     // Explicit negatives

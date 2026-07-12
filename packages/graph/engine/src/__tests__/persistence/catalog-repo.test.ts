@@ -180,8 +180,10 @@ describe('CatalogRepo', () => {
     expect(repo.loadFullCatalog()?.semanticFacts).toBeUndefined();
   });
 
-  it('rejects malformed semanticFacts at the repository boundary on load', () => {
+  it('drops a malformed semanticFacts plane on load (degrades to unsupported, not bricking the catalog)', () => {
     // replaceAll trusts the in-process Catalog shape; load re-validates JSON.
+    // The semantic plane is OPTIONAL: a malformed decoded plane must degrade to
+    // unsupported (absent), never reject the whole required catalog (P2 Phase 3).
     repo.replaceAll(makeCatalog());
     const handle = requireDrizzleHandle(datastore);
     handle.db
@@ -213,7 +215,11 @@ describe('CatalogRepo', () => {
       })
       .where(sql`id = 1`)
       .run();
-    expect(() => repo.loadFullCatalog()).toThrow(/semanticFacts|referenceScope|Malformed/);
+    const loaded = repo.loadFullCatalog();
+    expect(loaded).not.toBeNull();
+    // Required catalog data survives; the malformed optional plane is dropped.
+    expect(loaded?.language).toBe('typescript');
+    expect(loaded?.semanticFacts).toBeUndefined();
   });
 
   it.each([

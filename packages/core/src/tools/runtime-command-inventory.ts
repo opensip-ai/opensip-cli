@@ -25,15 +25,15 @@ import {
 export const RUNTIME_COMMAND_INVENTORY_VERSION = 1 as const;
 
 /** Production cap: command leaves with handlers. */
-export const MAX_RUNTIME_COMMAND_LEAVES = 2_000;
+export const MAX_RUNTIME_COMMAND_LEAVES = 2000;
 /** Production cap: action-less groups (sessions, tools, suite containers). */
-export const MAX_RUNTIME_COMMAND_GROUPS = 1_000;
+export const MAX_RUNTIME_COMMAND_GROUPS = 1000;
 /** Production cap: aliases per command leaf. */
 export const MAX_RUNTIME_COMMAND_ALIASES = 16;
 /** Max characters for name / alias / owner label fields. */
 export const MAX_RUNTIME_COMMAND_NAME = 256;
 /** Max characters for a full canonical command path. */
-export const MAX_RUNTIME_COMMAND_PATH = 1_024;
+export const MAX_RUNTIME_COMMAND_PATH = 1024;
 
 /**
  * Immutable limits object for pure inventory validation.
@@ -194,7 +194,7 @@ function validateLeaf(
   limits: RuntimeCommandInventoryLimits,
   paths: Set<string>,
 ): void {
-  if (!isPlainRecord(leaf as unknown as object)) {
+  if (!isPlainRecord(leaf)) {
     throw new TypeError('runtime command leaf must be a plain object.');
   }
   if (!isSafePath(leaf.path, limits.maxPath)) {
@@ -222,6 +222,15 @@ function validateLeaf(
   if (typeof leaf.output !== 'string' || !isSafeName(leaf.output, limits.maxName)) {
     throw new Error(`runtime command leaf output invalid.`);
   }
+  validateLeafAliases(leaf, limits);
+  validateLeafHandlerClaims(leaf);
+}
+
+/** Validate the alias array shape and each alias string. */
+function validateLeafAliases(
+  leaf: RuntimeCommandLeaf,
+  limits: RuntimeCommandInventoryLimits,
+): void {
   if (!Array.isArray(leaf.aliases) || leaf.aliases.length > limits.maxAliases) {
     throw new Error(
       `runtime command leaf aliases must be an array of at most ${String(limits.maxAliases)}.`,
@@ -232,13 +241,17 @@ function validateLeaf(
       throw new Error(`runtime command leaf alias invalid: '${String(alias)}'.`);
     }
   }
-  if (leaf.owner === 'tool' && leaf.packageIdentity !== undefined) {
-    if (
-      typeof leaf.packageIdentity !== 'string' ||
-      !isSafeName(leaf.packageIdentity, MAX_STATIC_HANDLER_PACKAGE)
-    ) {
-      throw new Error('runtime command leaf packageIdentity invalid.');
-    }
+}
+
+/** Validate optional package identity and static-handler descriptor claims. */
+function validateLeafHandlerClaims(leaf: RuntimeCommandLeaf): void {
+  if (
+    leaf.owner === 'tool' &&
+    leaf.packageIdentity !== undefined &&
+    (typeof leaf.packageIdentity !== 'string' ||
+      !isSafeName(leaf.packageIdentity, MAX_STATIC_HANDLER_PACKAGE))
+  ) {
+    throw new Error('runtime command leaf packageIdentity invalid.');
   }
   if (leaf.staticHandler !== undefined) {
     const err = staticHandlerValidationError(leaf.staticHandler, leaf.name);

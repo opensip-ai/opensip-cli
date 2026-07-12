@@ -4,11 +4,13 @@ import { emptySemanticFactBundle } from '../../../semantic-facts.js';
 import { reconcileSemanticFacts } from '../semantic-fact-reconcile.js';
 
 import type { PackageManifestIndex } from '../../../cross-package/export-index.js';
-import type { CrossFileReferenceFact, DeclarationFact, SemanticFactBundle } from '../../../types.js';
+import type {
+  CrossFileReferenceFact,
+  DeclarationFact,
+  SemanticFactBundle,
+} from '../../../types.js';
 
-function manifestIndex(
-  entries: readonly { name: string; dir: string }[],
-): PackageManifestIndex {
+function manifestIndex(entries: readonly { name: string; dir: string }[]): PackageManifestIndex {
   const map = new Map();
   for (const e of entries) {
     map.set(e.name, { name: e.name, dir: e.dir, exportsMap: { '.': './src/index.ts' } });
@@ -16,7 +18,10 @@ function manifestIndex(
   return map;
 }
 
-function decl(over: Partial<DeclarationFact> & Pick<DeclarationFact, 'declarationId' | 'name' | 'filePath' | 'package'>): DeclarationFact {
+function decl(
+  over: Partial<DeclarationFact> &
+    Pick<DeclarationFact, 'declarationId' | 'name' | 'filePath' | 'package'>,
+): DeclarationFact {
   return {
     kind: 'interface',
     qualifiedName: `${over.filePath}.${over.name}`,
@@ -32,7 +37,9 @@ function decl(over: Partial<DeclarationFact> & Pick<DeclarationFact, 'declaratio
   };
 }
 
-function ref(over: Partial<CrossFileReferenceFact> & Pick<CrossFileReferenceFact, 'referenceId' | 'filePath'>): CrossFileReferenceFact {
+function ref(
+  over: Partial<CrossFileReferenceFact> & Pick<CrossFileReferenceFact, 'referenceId' | 'filePath'>,
+): CrossFileReferenceFact {
   return {
     kind: 'type',
     line: 2,
@@ -124,8 +131,9 @@ describe('reconcileSemanticFacts', () => {
       references: [dangling],
       coverage: emptySemanticFactBundle().coverage,
     };
-    // Fix coverage counts for validator-like consistency in reconcile path.
-    bundle.coverage.emittedReferences; // present
+    // The empty bundle starts with a zero emitted-reference count; the reconcile
+    // call below overrides the coverage counts for validator-like consistency.
+    expect(bundle.coverage.emittedReferences).toBe(0);
     const out = reconcileSemanticFacts(
       {
         ...bundle,

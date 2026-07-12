@@ -9,6 +9,10 @@ import { LanguageParseCache } from '../languages/parse-cache-class.js';
 import { LanguageRegistry } from '../languages/registry.js';
 import { noopSignalSink } from '../signals/signal-sink.js';
 import { ToolRegistry } from '../tools/registry.js';
+import {
+  EMPTY_RUNTIME_COMMAND_INVENTORY,
+  type RuntimeCommandInventory,
+} from '../tools/runtime-command-inventory.js';
 
 import { BootstrapDiagnosticsCollector } from './bootstrap-diagnostics.js';
 import { DiagnosticsBus } from './diagnostics-bus.js';
@@ -23,10 +27,6 @@ import type { UiContext } from './ui-context.js';
 import type { CapabilityPackAdmission } from '../plugins/capability-discovery-types.js';
 import type { SignalSink } from '../signals/signal-sink.js';
 import type { ToolPluginManifest, ToolProvenance } from '../tools/manifest.js';
-import {
-  EMPTY_RUNTIME_COMMAND_INVENTORY,
-  type RuntimeCommandInventory,
-} from '../tools/runtime-command-inventory.js';
 
 class DefaultRecipeUnitConfigSlot implements RecipeUnitConfigSlot {
   private store: Record<string, Record<string, unknown>> = {};

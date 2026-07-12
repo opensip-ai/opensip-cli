@@ -11,10 +11,7 @@
  */
 
 import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.js';
-import {
-  declarationFileIndex,
-  mergeSemanticFactsIncremental,
-} from '../../semantic-facts.js';
+import { declarationFileIndex, mergeSemanticFactsIncremental } from '../../semantic-facts.js';
 
 import { countCatalogCallSites } from './catalog-stats.js';
 import { ownerEdgeKey } from './edge-identity.js';
@@ -514,7 +511,8 @@ function attachSemanticFacts(
   if (semanticFacts === undefined) {
     // Drop any stale plane when the adapter omitted facts this pass.
     if (catalog.semanticFacts === undefined) return catalog;
-    const { semanticFacts: _drop, ...rest } = catalog;
+    const rest = { ...catalog };
+    delete rest.semanticFacts;
     return rest;
   }
   return { ...catalog, semanticFacts };

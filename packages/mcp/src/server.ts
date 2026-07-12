@@ -31,6 +31,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { configureLogger, logger, runWithScope } from '@opensip-cli/core';
+import { compareCodePointStrings } from '@opensip-cli/graph/read';
 
 import { sanitizeMcpErrorMessage } from './mcp-error.js';
 
@@ -130,9 +131,7 @@ export class McpStdioServer {
    */
   describeSurface(): McpSurfaceSnapshot {
     const root = this.scope.projectContext?.projectRoot ?? process.cwd();
-    const sorted = [...this.registeredNames].sort((a, b) =>
-      a < b ? -1 : a > b ? 1 : 0,
-    );
+    const sorted = [...this.registeredNames].sort(compareCodePointStrings);
     return Object.freeze({
       version: this.version,
       surfaceEpoch: this.surfaceEpoch,

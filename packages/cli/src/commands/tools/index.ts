@@ -33,6 +33,10 @@ import type { DataStore } from '@opensip-cli/datastore';
 type HostSpec = CommandSpec<unknown, CliCommandsContext>;
 const COMMAND_RESULT_OUTPUT = 'command-result';
 
+/** Static-handler provenance shared by every tools-group command spec. */
+const TOOLS_COMMAND_PACKAGE = 'opensip-cli';
+const TOOLS_COMMAND_SPECS_PATH = 'packages/cli/src/commands/tools/index.ts';
+
 interface ScopeFilterOpts {
   cwd?: string;
   projectContext?: ProjectContext;
@@ -53,8 +57,8 @@ function effectiveCwd(opts: ScopeFilterOpts): string {
 function buildToolsDoctorSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsDoctorSpec',
     },
     name: 'doctor',
@@ -72,8 +76,8 @@ function buildToolsDoctorSpec(): HostSpec {
 function buildToolsListSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsListSpec',
     },
     name: 'list',
@@ -147,8 +151,8 @@ function buildToolsListSpec(): HostSpec {
 function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsValidateSpec',
     },
     name: 'validate',
@@ -190,8 +194,8 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
 function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsInstallSpec',
     },
     name: 'install',
@@ -242,8 +246,8 @@ function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
 function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsUninstallSpec',
     },
     name: 'uninstall',
@@ -321,8 +325,8 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
 function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsCreateSpec',
     },
     name: 'create',
@@ -372,8 +376,8 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
 function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/tools/index.ts',
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
       declaration: 'buildToolsDataPurgeSpec',
     },
     name: 'data-purge',

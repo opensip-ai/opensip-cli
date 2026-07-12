@@ -30,6 +30,8 @@ import { captureRuntimeToolIdentities } from './runtime-wiring-identity.js';
 import type { RuntimeWiringNode, RuntimeWiringResult } from './runtime-wiring-read-port.js';
 
 const STATIC_NOT_APPLICABLE = 'not-applicable' as const;
+/** Edge/node source for host-contract-owned runtime wiring (declared once). */
+const HOST_CONTRACT_SOURCE = 'host-contract' as const;
 
 /** Immutable captured graph and cursor identities used by the read port. */
 export interface RuntimeWiringSnapshot {
@@ -94,7 +96,7 @@ function addInventoryGroup(state: MutableRuntimeSnapshot, group: RuntimeCommandG
     kind: 'command-group',
     label: boundRuntimeText(group.name, state),
     tool: group.owner === 'tool' ? boundRuntimeText(group.ownerLabel, state) : undefined,
-    source: 'host-contract',
+    source: HOST_CONTRACT_SOURCE,
     owner: group.owner,
     commandPath: boundRuntimeText(group.path, state),
     visibility: group.visibility,
@@ -124,7 +126,7 @@ function addInventoryLeaf(
       kind: 'command',
       label: boundRuntimeText(leaf.name, state),
       ...common,
-      source: leaf.owner === 'tool' ? 'command-spec' : 'host-contract',
+      source: leaf.owner === 'tool' ? 'command-spec' : HOST_CONTRACT_SOURCE,
       aliases: leaf.aliases.map((alias) => boundRuntimeText(alias, state)),
     })
   ) {
@@ -135,12 +137,9 @@ function addInventoryLeaf(
     !addRuntimeNode(state, {
       id: handlerId,
       kind: 'handler',
-      label: boundRuntimeText(
-        leaf.staticHandler?.declaration ?? leaf.name,
-        state,
-      ),
+      label: boundRuntimeText(leaf.staticHandler?.declaration ?? leaf.name, state),
       ...common,
-      source: leaf.owner === 'tool' ? 'command-spec' : 'host-contract',
+      source: leaf.owner === 'tool' ? 'command-spec' : HOST_CONTRACT_SOURCE,
       handlerName: leaf.staticHandler?.declaration,
       staticHandlerPackage: leaf.staticHandler?.package,
       staticHandlerPath: leaf.staticHandler?.path,
@@ -158,25 +157,24 @@ function addInventoryLeaf(
       kind: 'host-mount',
       label: boundRuntimeText(leaf.name, state),
       ...common,
-      source: 'host-contract',
+      source: HOST_CONTRACT_SOURCE,
     })
   ) {
     return false;
   }
 
-  if (toolNodeId !== undefined) {
-    if (
-      !addRuntimeEdge(state, {
-        from: toolNodeId,
-        to: commandId,
-        kind: 'registry-owns-command',
-        source: 'registry',
-        confidence: 'high',
-        staticBridge: STATIC_NOT_APPLICABLE,
-      })
-    ) {
-      return false;
-    }
+  if (
+    toolNodeId !== undefined &&
+    !addRuntimeEdge(state, {
+      from: toolNodeId,
+      to: commandId,
+      kind: 'registry-owns-command',
+      source: 'registry',
+      confidence: 'high',
+      staticBridge: STATIC_NOT_APPLICABLE,
+    })
+  ) {
+    return false;
   }
 
   if (
@@ -184,7 +182,7 @@ function addInventoryLeaf(
       from: commandId,
       to: mountId,
       kind: 'host-mounts-command',
-      source: 'host-contract',
+      source: HOST_CONTRACT_SOURCE,
       confidence: 'medium',
       staticBridge: STATIC_NOT_APPLICABLE,
     })
@@ -197,37 +195,53 @@ function addInventoryLeaf(
       from: mountId,
       to: handlerId,
       kind: 'command-dispatches-handler',
-      source: leaf.owner === 'tool' ? 'command-spec' : 'host-contract',
+      source: leaf.owner === 'tool' ? 'command-spec' : HOST_CONTRACT_SOURCE,
       confidence: 'medium',
-      // Bridge resolution overlays this later; author claim only until joined.
-      staticBridge: leaf.staticHandler === undefined ? 'unresolved' : 'unresolved',
+      // Provisional 'unresolved' for every dispatch edge; the static-handler
+      // bridge overlay resolves it (to 'resolved') once the catalog loads. A
+      // command with no staticHandler stays 'unresolved' — consistent with the
+      // overlay, which never marks a dispatch edge 'not-applicable'.
+      staticBridge: 'unresolved',
     })
   ) {
     return false;
   }
 
-  // Nest under parent path when path has multiple segments (e.g. `fit list`).
-  const segments = leaf.path.split(' ');
-  if (segments.length > 1) {
-    const parentPath = segments.slice(0, -1).join(' ');
-    const parentId = `command:${parentPath}`;
-    if (state.nodeIds.has(parentId)) {
-      if (
-        !addRuntimeEdge(state, {
-          from: parentId,
-          to: commandId,
-          kind: 'command-nests-under',
-          source: 'host-contract',
-          confidence: 'high',
-          staticBridge: STATIC_NOT_APPLICABLE,
-        })
-      ) {
-        return false;
-      }
-    }
-  }
+  return addCommandNestingEdge(state, leaf, commandId);
+}
 
-  return true;
+/**
+ * Nest a leaf command under its parent path when the path has multiple segments.
+ * The parent may be a command LEAF (`fit list` → `command:fit`) OR a command
+ * GROUP (`sessions list` → `command-group:sessions`, `fit plugin add` →
+ * `command-group:fit plugin`). Groups are added before leaves, so whichever
+ * parent node exists is present here — matching only `command:` orphaned every
+ * host/plugin group container and its leaves' nesting edges. (P2 Phase 4 fix.)
+ * Returns false only when the edge add itself fails, preserving the caller's
+ * fail-closed contract.
+ */
+function addCommandNestingEdge(
+  state: MutableRuntimeSnapshot,
+  leaf: RuntimeCommandLeaf,
+  commandId: string,
+): boolean {
+  const segments = leaf.path.split(' ');
+  if (segments.length <= 1) return true;
+  const parentPath = segments.slice(0, -1).join(' ');
+  const commandParentId = `command:${parentPath}`;
+  const groupParentId = `command-group:${parentPath}`;
+  let parentId: string | undefined;
+  if (state.nodeIds.has(commandParentId)) parentId = commandParentId;
+  else if (state.nodeIds.has(groupParentId)) parentId = groupParentId;
+  if (parentId === undefined) return true;
+  return addRuntimeEdge(state, {
+    from: parentId,
+    to: commandId,
+    kind: 'command-nests-under',
+    source: HOST_CONTRACT_SOURCE,
+    confidence: 'high',
+    staticBridge: STATIC_NOT_APPLICABLE,
+  });
 }
 
 function addTool(
@@ -295,7 +309,7 @@ function addTool(
         label: posture,
         tool: canonical,
         layoutKey,
-        source: 'host-contract',
+        source: HOST_CONTRACT_SOURCE,
         provenanceSource: provenance?.source,
         workerPosture: posture,
       })
@@ -311,6 +325,64 @@ function addTool(
     }
   }
   return toolId;
+}
+
+/** Add one tool node per captured tool and index its node id by canonical name. */
+function addToolNodesToSnapshot(
+  state: MutableRuntimeSnapshot,
+  tools: readonly CapturedRuntimeTool[],
+  bindingByCanonical: ReadonlyMap<string, RuntimeToolIdentityIndex['bindings'][number]>,
+  matchedManifest: ReadonlyMap<CapturedRuntimeTool, string>,
+  matchedProvenance: ReadonlyMap<CapturedRuntimeTool, MatchedRuntimeProvenance>,
+): Map<string, string> {
+  const toolNodeByCanonical = new Map<string, string>();
+  for (const tool of tools) {
+    if (state.nodeTruncated || state.edgeTruncated) break;
+    if (!reserveRuntimeFact(state)) break;
+    const binding = bindingByCanonical.get(tool.canonicalName);
+    if (binding === undefined) {
+      state.reasons.add('unmatched-tool-identity-binding');
+      continue;
+    }
+    const toolId = addTool(
+      state,
+      tool,
+      binding.layoutKey,
+      matchedManifest.get(tool),
+      matchedProvenance.get(tool),
+    );
+    if (toolId !== undefined) toolNodeByCanonical.set(tool.canonicalName, toolId);
+  }
+  return toolNodeByCanonical;
+}
+
+/**
+ * Project commands (groups then leaves) exclusively from the plain inventory —
+ * never live handlers — and record inventory incompleteness reasons.
+ */
+function addInventoryCommandsToSnapshot(
+  state: MutableRuntimeSnapshot,
+  inventory: RuntimeCommandInventory,
+  toolNodeByCanonical: ReadonlyMap<string, string>,
+): void {
+  for (const group of inventory.groups) {
+    if (!reserveRuntimeFact(state)) break;
+    if (!addInventoryGroup(state, group)) break;
+  }
+  // Sort leaves so parents are more likely present before nested edges attach.
+  const orderedLeaves = [...inventory.leaves].sort((a, b) =>
+    compareCodePointStrings(a.path, b.path),
+  );
+  for (const leaf of orderedLeaves) {
+    if (!reserveRuntimeFact(state)) break;
+    const toolNodeId = leaf.owner === 'tool' ? toolNodeByCanonical.get(leaf.ownerLabel) : undefined;
+    if (!addInventoryLeaf(state, leaf, toolNodeId)) break;
+  }
+
+  if (!inventory.complete) {
+    for (const reason of inventory.reasons) state.reasons.add(reason);
+    state.reasons.add('runtime-inventory-incomplete');
+  }
 }
 
 /** Build and freeze one deterministic runtime-wiring snapshot. */
@@ -339,45 +411,15 @@ export function buildRuntimeWiringSnapshot(deps: LiveRuntimeWiringDeps): Runtime
   const bindingByCanonical = new Map(
     identityIndex.bindings.map((binding) => [binding.canonicalName, binding]),
   );
-  const toolNodeByCanonical = new Map<string, string>();
-  for (const tool of tools) {
-    if (state.nodeTruncated || state.edgeTruncated) break;
-    if (!reserveRuntimeFact(state)) break;
-    const binding = bindingByCanonical.get(tool.canonicalName);
-    if (binding === undefined) {
-      state.reasons.add('unmatched-tool-identity-binding');
-      continue;
-    }
-    const toolId = addTool(
-      state,
-      tool,
-      binding.layoutKey,
-      matchedManifest.get(tool),
-      matchedProvenance.get(tool),
-    );
-    if (toolId !== undefined) toolNodeByCanonical.set(tool.canonicalName, toolId);
-  }
-
-  // Project commands exclusively from the plain inventory — never live handlers.
-  for (const group of inventory.groups) {
-    if (!reserveRuntimeFact(state)) break;
-    if (!addInventoryGroup(state, group)) break;
-  }
-  // Sort leaves so parents are more likely present before nested edges attach.
-  const orderedLeaves = [...inventory.leaves].sort((a, b) =>
-    compareCodePointStrings(a.path, b.path),
+  const toolNodeByCanonical = addToolNodesToSnapshot(
+    state,
+    tools,
+    bindingByCanonical,
+    matchedManifest,
+    matchedProvenance,
   );
-  for (const leaf of orderedLeaves) {
-    if (!reserveRuntimeFact(state)) break;
-    const toolNodeId =
-      leaf.owner === 'tool' ? toolNodeByCanonical.get(leaf.ownerLabel) : undefined;
-    if (!addInventoryLeaf(state, leaf, toolNodeId)) break;
-  }
 
-  if (!inventory.complete) {
-    for (const reason of inventory.reasons) state.reasons.add(reason);
-    state.reasons.add('runtime-inventory-incomplete');
-  }
+  addInventoryCommandsToSnapshot(state, inventory, toolNodeByCanonical);
 
   const nodes = Object.freeze([...state.nodes].sort((a, b) => compareCodePointStrings(a.id, b.id)));
   const edges = Object.freeze(
@@ -418,16 +460,5 @@ export function buildRuntimeWiringSnapshot(deps: LiveRuntimeWiringDeps): Runtime
       runtimeInventoryComplete: inventory.complete,
       staticBridgeComplete: false, // overlaid by bridge when resolved
     }),
-  });
-}
-
-/** Rebuild snapshot with a real capture timestamp (identity unchanged). */
-export function withCapturedAt(
-  snapshot: RuntimeWiringSnapshot,
-  capturedAt: string,
-): RuntimeWiringSnapshot {
-  return Object.freeze({
-    ...snapshot,
-    capturedAt,
   });
 }

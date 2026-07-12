@@ -36,12 +36,17 @@ import type {
   CrossFileReferenceFact,
   DeclarationFact,
   DeclarationKind,
+  FunctionKind,
   ReferenceKind,
   SemanticFactBundle,
+  Visibility,
 } from '../types.js';
 
 /** Match semantics for declaration search (mirrors symbol search). */
 export type DeclarationSearchMatch = 'substring' | 'exact' | 'qualified';
+
+/** Reference scope stamped on every declaration/reference view (declared once). */
+const CROSS_FILE_SCOPE = 'cross-file' as const;
 
 export interface DeclarationSearchQuery {
   readonly query: string;
@@ -140,8 +145,8 @@ function occurrenceLike(fact: {
   readonly inTestFile: boolean;
   readonly definedInGenerated: boolean;
   readonly package: string;
-  readonly kind: import('../types.js').FunctionKind;
-  readonly visibility: import('../types.js').Visibility;
+  readonly kind: FunctionKind;
+  readonly visibility: Visibility;
 } {
   // Path / package / generated / test filters only. Kind and visibility on
   // GraphSourceFilter are FunctionOccurrence axes — declaration kinds are
@@ -239,9 +244,7 @@ function toReferenceSite(r: CrossFileReferenceFact): ReferenceSiteRef {
     endLine: r.endLine,
     endColumn: r.endColumn,
     package: r.package,
-    ...(r.targetDeclarationId === undefined
-      ? {}
-      : { targetDeclarationId: r.targetDeclarationId }),
+    ...(r.targetDeclarationId === undefined ? {} : { targetDeclarationId: r.targetDeclarationId }),
     ...(r.targetPackage === undefined ? {} : { targetPackage: r.targetPackage }),
     ...(r.targetName === undefined ? {} : { targetName: r.targetName }),
     ...(r.targetKind === undefined ? {} : { targetKind: r.targetKind }),
@@ -279,18 +282,97 @@ function matchesDeclQuery(
 function planeInventoryFacet(
   catalog: Catalog,
   bundle: SemanticFactBundle | undefined,
-): { readonly facet: ReturnType<typeof makeFacet>; readonly unsupported: boolean } {
+): ReturnType<typeof makeFacet> {
   if (bundle === undefined) {
     const reasons = new Set<string>(['semantic-facts-unsupported']);
     if (catalog.resolutionMode === 'fast') reasons.add('resolution-mode-fast');
     // Inventory was requested; incomplete because the plane is unsupported.
-    return { facet: makeFacet(true, reasons), unsupported: true };
+    return makeFacet(true, reasons);
   }
   const reasons = new Set<string>(bundle.coverage.reasons);
   if (bundle.coverage.status === 'partial' && reasons.size === 0) {
     reasons.add('producer-partial');
   }
-  return { facet: makeFacet(true, reasons), unsupported: false };
+  return makeFacet(true, reasons);
+}
+
+/** Filter + sort declaration facts into the deterministic match list. */
+function collectDeclarationMatches(
+  bundle: SemanticFactBundle,
+  query: DeclarationSearchQuery,
+  matcher: SourceRoleMatcher,
+): DeclarationRef[] {
+  const kinds = query.kinds === undefined ? undefined : new Set(query.kinds);
+  const filter = sourceOnlyFilter(query.filter);
+  const matches: DeclarationRef[] = [];
+  for (const d of bundle.declarations) {
+    if (kinds !== undefined && !kinds.has(d.kind)) continue;
+    if (!matchesGraphSourceFilterWithRoles(occurrenceLike(d), filter, matcher)) continue;
+    if (!matchesDeclQuery(d, query.query, query.match)) continue;
+    const ref = toDeclarationRef(d);
+    if (ref === undefined) continue;
+    matches.push(ref);
+  }
+  matches.sort(compareDeclarationRefs);
+  return matches;
+}
+
+/** Filter + sort cross-file references targeting one declaration id. */
+function collectReferenceMatches(
+  bundle: SemanticFactBundle,
+  query: ReferencesToQuery,
+  matcher: SourceRoleMatcher,
+): ReferenceSiteRef[] {
+  const kinds = query.kinds === undefined ? undefined : new Set(query.kinds);
+  const filter = sourceOnlyFilter(query.filter);
+  const matches: ReferenceSiteRef[] = [];
+  for (const r of bundle.references) {
+    if (r.targetDeclarationId !== query.declarationId) continue;
+    if (kinds !== undefined && !kinds.has(r.kind)) continue;
+    if (!matchesGraphSourceFilterWithRoles(occurrenceLike(r), filter, matcher)) continue;
+    matches.push(toReferenceSite(r));
+  }
+  matches.sort(compareReferenceSites);
+  return matches;
+}
+
+/**
+ * Apply the after-cursor skip and bounded top-K window, returning the page rows
+ * plus whether more matches exist beyond the limit.
+ */
+function sliceWindow<T>(
+  matches: readonly T[],
+  afterStable: string | undefined,
+  limit: number,
+  stableKey: (item: T) => string,
+  compare: (a: T, b: T) => number,
+): { readonly rows: T[]; readonly hasMore: boolean } {
+  const window: T[] = [];
+  for (const item of matches) {
+    if (afterStable !== undefined && compareCodePointStrings(stableKey(item), afterStable) <= 0) {
+      continue;
+    }
+    insertBoundedTopK(window, item, limit + 1, compare);
+  }
+  const hasMore = window.length > limit;
+  return { rows: hasMore ? window.slice(0, limit) : window, hasMore };
+}
+
+/** Build optional package/file groups and their truncation reasons. */
+function buildGroups<T>(
+  groupBy: NonNullable<DeclarationSearchQuery['groupBy']>,
+  matches: readonly T[],
+  pkgOf: (item: T) => string,
+  fileOf: (item: T) => string,
+): { readonly groups?: readonly ReadGroupSummary[]; readonly reasons: Set<string> } {
+  if (groupBy === 'none') return { reasons: new Set<string>() };
+  const grouped = boundedIterableGroups(
+    () => matches,
+    (item) => (groupBy === 'package' ? pkgOf(item) : fileOf(item)),
+  );
+  const reasons = new Set<string>();
+  if (grouped.truncated === true) reasons.add('group-key-cap');
+  return { groups: grouped.groups, reasons };
 }
 
 /**
@@ -305,11 +387,11 @@ export function searchDeclarationFacts(
   try {
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
     const bundle = catalog.semanticFacts;
-    const { facet: inventory, unsupported } = planeInventoryFacet(catalog, bundle);
+    const inventory = planeInventoryFacet(catalog, bundle);
 
     if (bundle === undefined) {
       return ok({
-        referenceScope: 'cross-file',
+        referenceScope: CROSS_FILE_SCOPE,
         declarations: [],
         hasMore: false,
         totalMatches: 0,
@@ -324,18 +406,7 @@ export function searchDeclarationFacts(
       });
     }
 
-    const kinds = query.kinds === undefined ? undefined : new Set(query.kinds);
-    const filter = sourceOnlyFilter(query.filter);
-    const matches: DeclarationRef[] = [];
-    for (const d of bundle.declarations) {
-      if (kinds !== undefined && !kinds.has(d.kind)) continue;
-      if (!matchesGraphSourceFilterWithRoles(occurrenceLike(d), filter, matcher)) continue;
-      if (!matchesDeclQuery(d, query.query, query.match)) continue;
-      const ref = toDeclarationRef(d);
-      if (ref === undefined) continue;
-      matches.push(ref);
-    }
-    matches.sort(compareDeclarationRefs);
+    const matches = collectDeclarationMatches(bundle, query, matcher);
     const totalMatches = matches.length;
 
     let afterStable: string | undefined;
@@ -353,40 +424,37 @@ export function searchDeclarationFacts(
       afterStable = declarationStableKey(found);
     }
 
-    const window: DeclarationRef[] = [];
-    for (const ref of matches) {
-      if (afterStable !== undefined && compareCodePointStrings(declarationStableKey(ref), afterStable) <= 0) {
-        continue;
-      }
-      insertBoundedTopK(window, ref, limit + 1, compareDeclarationRefs);
-    }
-    const hasMore = window.length > limit;
-    const declarations = hasMore ? window.slice(0, limit) : window;
+    const { rows: declarations, hasMore } = sliceWindow(
+      matches,
+      afterStable,
+      limit,
+      declarationStableKey,
+      compareDeclarationRefs,
+    );
 
     const groupBy = query.groupBy ?? 'none';
-    const grouped =
-      groupBy === 'none'
-        ? undefined
-        : boundedIterableGroups(
-            () => matches,
-            (ref) => (groupBy === 'package' ? ref.package : ref.filePath),
-          );
-    const groupingReasons = new Set<string>();
-    if (grouped?.truncated === true) groupingReasons.add('group-key-cap');
+    const grouping = buildGroups(
+      groupBy,
+      matches,
+      (ref) => ref.package,
+      (ref) => ref.filePath,
+    );
 
     return ok({
-      referenceScope: 'cross-file',
+      referenceScope: CROSS_FILE_SCOPE,
       declarations,
       hasMore,
       totalMatches,
       effectiveFilter: query.filter,
       unsupported: false,
-      ...(grouped === undefined ? {} : { groups: grouped.groups }),
+      ...(grouping.groups === undefined ? {} : { groups: grouping.groups }),
       coverage: rollupFacets({
         inventory,
         evidence: UNREQUESTED_FACET,
         grouping:
-          groupBy === 'none' ? UNREQUESTED_FACET : makeFacet(groupingReasons.size === 0, groupingReasons),
+          groupBy === 'none'
+            ? UNREQUESTED_FACET
+            : makeFacet(grouping.reasons.size === 0, grouping.reasons),
         projection: makeFacet(true, new Set()),
       }),
     });
@@ -407,11 +475,11 @@ export function referencesToDeclaration(
   try {
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
     const bundle = catalog.semanticFacts;
-    const { facet: inventory, unsupported } = planeInventoryFacet(catalog, bundle);
+    const inventory = planeInventoryFacet(catalog, bundle);
 
     if (bundle === undefined) {
       return ok({
-        referenceScope: 'cross-file',
+        referenceScope: CROSS_FILE_SCOPE,
         declarationId: query.declarationId,
         references: [],
         hasMore: false,
@@ -431,7 +499,7 @@ export function referencesToDeclaration(
     const declExists = bundle.declarations.some((d) => d.declarationId === query.declarationId);
     if (!declExists) {
       return ok({
-        referenceScope: 'cross-file',
+        referenceScope: CROSS_FILE_SCOPE,
         declarationId: query.declarationId,
         references: [],
         hasMore: false,
@@ -448,16 +516,7 @@ export function referencesToDeclaration(
       });
     }
 
-    const kinds = query.kinds === undefined ? undefined : new Set(query.kinds);
-    const filter = sourceOnlyFilter(query.filter);
-    const matches: ReferenceSiteRef[] = [];
-    for (const r of bundle.references) {
-      if (r.targetDeclarationId !== query.declarationId) continue;
-      if (kinds !== undefined && !kinds.has(r.kind)) continue;
-      if (!matchesGraphSourceFilterWithRoles(occurrenceLike(r), filter, matcher)) continue;
-      matches.push(toReferenceSite(r));
-    }
-    matches.sort(compareReferenceSites);
+    const matches = collectReferenceMatches(bundle, query, matcher);
     const totalMatches = matches.length;
 
     let afterStable: string | undefined;
@@ -475,26 +534,21 @@ export function referencesToDeclaration(
       afterStable = referenceStableKey(found);
     }
 
-    const window: ReferenceSiteRef[] = [];
-    for (const ref of matches) {
-      if (afterStable !== undefined && compareCodePointStrings(referenceStableKey(ref), afterStable) <= 0) {
-        continue;
-      }
-      insertBoundedTopK(window, ref, limit + 1, compareReferenceSites);
-    }
-    const hasMore = window.length > limit;
-    const references = hasMore ? window.slice(0, limit) : window;
+    const { rows: references, hasMore } = sliceWindow(
+      matches,
+      afterStable,
+      limit,
+      referenceStableKey,
+      compareReferenceSites,
+    );
 
     const groupBy = query.groupBy ?? 'none';
-    const grouped =
-      groupBy === 'none'
-        ? undefined
-        : boundedIterableGroups(
-            () => matches,
-            (ref) => (groupBy === 'package' ? ref.package : ref.filePath),
-          );
-    const groupingReasons = new Set<string>();
-    if (grouped?.truncated === true) groupingReasons.add('group-key-cap');
+    const grouping = buildGroups(
+      groupBy,
+      matches,
+      (ref) => ref.package,
+      (ref) => ref.filePath,
+    );
 
     // Evidence facet: the concrete reference sites (cross-file only).
     const evidenceReasons = new Set<string>();
@@ -503,7 +557,7 @@ export function referencesToDeclaration(
     }
 
     return ok({
-      referenceScope: 'cross-file',
+      referenceScope: CROSS_FILE_SCOPE,
       declarationId: query.declarationId,
       references,
       hasMore,
@@ -511,12 +565,14 @@ export function referencesToDeclaration(
       effectiveFilter: query.filter,
       unsupported: false,
       declarationMissing: false,
-      ...(grouped === undefined ? {} : { groups: grouped.groups }),
+      ...(grouping.groups === undefined ? {} : { groups: grouping.groups }),
       coverage: rollupFacets({
         inventory,
         evidence: makeFacet(evidenceReasons.size === 0, evidenceReasons),
         grouping:
-          groupBy === 'none' ? UNREQUESTED_FACET : makeFacet(groupingReasons.size === 0, groupingReasons),
+          groupBy === 'none'
+            ? UNREQUESTED_FACET
+            : makeFacet(grouping.reasons.size === 0, grouping.reasons),
         projection: makeFacet(true, new Set()),
       }),
     });

@@ -63,52 +63,84 @@ function commandSpecValidationError(value: unknown): Error | undefined {
       : new TypeError('defineCommand: command spec own-property inspection failed.');
   }
 
-  const name = own['name'];
+  const header = validateCommandHeader(own);
+  if (header instanceof Error) return header;
+  const { name, output, commonFlags } = header;
+
+  const rawStreamError = rawStreamDeclarationError({
+    name,
+    output,
+    rawStreamReason: own.rawStreamReason,
+  });
+  if (rawStreamError !== undefined) return rawStreamError;
+
+  const flagsError = commonFlagsError(name, commonFlags);
+  if (flagsError !== undefined) return flagsError;
+
+  if (Object.hasOwn(own, 'staticHandler')) {
+    const descriptorError = staticHandlerValidationError(own.staticHandler, name);
+    if (descriptorError !== undefined) return descriptorError;
+  }
+
+  return undefined;
+}
+
+/** Validated scalar header fields required before flag/handler admission. */
+interface ValidatedCommandHeader {
+  readonly name: string;
+  readonly output: CommandOutputMode;
+  readonly commonFlags: readonly unknown[];
+}
+
+/**
+ * Validate the scalar command-spec header (name, description, visibility, scope,
+ * output, handler) in declaration order. Returns the first error, or the parsed
+ * `name`/`output`/`commonFlags` needed by the remaining checks.
+ */
+function validateCommandHeader(own: Record<string, unknown>): ValidatedCommandHeader | Error {
+  const name = own.name;
   if (typeof name !== 'string' || name.trim() === '') {
     return new Error('defineCommand: `name` must be a non-empty string.');
   }
-  const description = own['description'];
+  const description = own.description;
   if (typeof description !== 'string' || description.trim() === '') {
     return new Error(`defineCommand: command '${name}' must have a non-empty description.`);
   }
-  const visibility = own['visibility'];
+  const visibility = own.visibility;
   if (visibility !== undefined && visibility !== 'public' && visibility !== 'internal') {
     return new Error(
       `defineCommand: command '${name}' declares unknown visibility '${describeUnknownValue(visibility)}'. ` +
         'Valid values: public, internal.',
     );
   }
-  const commonFlags = own['commonFlags'];
+  const commonFlags = own.commonFlags;
   if (!Array.isArray(commonFlags)) {
     return new TypeError(`defineCommand: command '${name}' must declare commonFlags as an array.`);
   }
-  const scope = own['scope'];
+  const scope = own.scope;
   if (!COMMAND_SCOPE_REQUIREMENTS.includes(scope as CommandScopeRequirement)) {
     return new Error(
       `defineCommand: command '${name}' declares unknown scope '${describeUnknownValue(scope)}'. ` +
         `Valid scopes: ${COMMAND_SCOPE_REQUIREMENTS.join(', ')}.`,
     );
   }
-  const output = own['output'];
+  const output = own.output;
   if (!COMMAND_OUTPUT_MODES.includes(output as CommandOutputMode)) {
     return new Error(
       `defineCommand: command '${name}' declares unknown output '${describeUnknownValue(output)}'. ` +
         `Valid outputs: ${COMMAND_OUTPUT_MODES.join(', ')}.`,
     );
   }
-  if (typeof own['handler'] !== 'function') {
+  if (typeof own.handler !== 'function') {
     return new TypeError(`defineCommand: command '${name}' must have a function handler.`);
   }
+  return { name, output: output as CommandOutputMode, commonFlags };
+}
 
-  const rawStreamError = rawStreamDeclarationError({
-    name,
-    output: output as CommandOutputMode,
-    rawStreamReason: own['rawStreamReason'],
-  });
-  if (rawStreamError !== undefined) return rawStreamError;
-
+/** Validate each declared common flag key: known key, no duplicates. */
+function commonFlagsError(name: string, commonFlags: readonly unknown[]): Error | undefined {
   const seen = new Set<CommonFlagKey>();
-  for (const key of commonFlags as readonly unknown[]) {
+  for (const key of commonFlags) {
     if (typeof key !== 'string' || !COMMON_FLAG_KEYS.includes(key as CommonFlagKey)) {
       return new Error(
         `defineCommand: command '${name}' declares unknown common flag '${describeUnknownValue(key)}'. ` +
@@ -123,12 +155,6 @@ function commandSpecValidationError(value: unknown): Error | undefined {
     }
     seen.add(commonFlag);
   }
-
-  if (Object.hasOwn(own, 'staticHandler')) {
-    const descriptorError = staticHandlerValidationError(own['staticHandler'], name);
-    if (descriptorError !== undefined) return descriptorError;
-  }
-
   return undefined;
 }
 
@@ -183,9 +209,9 @@ export function staticHandlerValidationError(
       );
     }
   }
-  const pkg = own['package'];
-  const path = own['path'];
-  const declaration = own['declaration'];
+  const pkg = own.package;
+  const path = own.path;
+  const declaration = own.declaration;
   if (typeof pkg !== 'string' || !isSafeStaticHandlerText(pkg, MAX_STATIC_HANDLER_PACKAGE)) {
     return new Error(
       `defineCommand: command '${commandName}' staticHandler.package must be a non-empty ` +
@@ -285,7 +311,11 @@ export function defineCommand<TOpts = unknown, TCtx = CommandContext>(
 ): CommandSpec<TOpts, TCtx> {
   // assertCommandSpec narrows to the default CommandSpec shape; keep the
   // caller's TOpts/TCtx generics by validating on a widened view and freezing
-  // the original typed reference.
+  // the original typed reference. The `as CommandSpec` makes the assertion
+  // target the cast EXPRESSION, not the `spec` variable, so `spec` keeps its
+  // TOpts/TCtx generics for freezeCommandSpec (removing it regresses the return
+  // type to CommandSpec<unknown, ...>). Load-bearing despite the lint heuristic.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- narrowing guard, see above
   assertCommandSpec(spec as CommandSpec);
   return freezeCommandSpec(spec);
 }
@@ -294,40 +324,37 @@ export function defineCommand<TOpts = unknown, TCtx = CommandContext>(
  * Shallow-copy and freeze a validated command spec so admitted metadata is
  * immutable. Handler function identity is preserved (not wrapped).
  */
-function freezeCommandSpec<TOpts, TCtx>(
-  spec: CommandSpec<TOpts, TCtx>,
-): CommandSpec<TOpts, TCtx> {
+function freezeCommandSpec<TOpts, TCtx>(spec: CommandSpec<TOpts, TCtx>): CommandSpec<TOpts, TCtx> {
   const frozen = {
     name: spec.name,
     description: spec.description,
-    commonFlags: Object.freeze([...spec.commonFlags]) as readonly CommonFlagKey[],
+    commonFlags: Object.freeze([...spec.commonFlags]),
     scope: spec.scope,
     output: spec.output,
     handler: spec.handler,
-    ...(spec.aliases !== undefined
-      ? { aliases: Object.freeze([...spec.aliases]) as readonly string[] }
-      : {}),
-    ...(spec.visibility !== undefined ? { visibility: spec.visibility } : {}),
-    ...(spec.parent !== undefined ? { parent: spec.parent } : {}),
-    ...(spec.options !== undefined
-      ? {
+    ...(spec.aliases === undefined ? {} : { aliases: Object.freeze([...spec.aliases]) }),
+    ...(spec.visibility === undefined ? {} : { visibility: spec.visibility }),
+    ...(spec.parent === undefined ? {} : { parent: spec.parent }),
+    ...(spec.options === undefined
+      ? {}
+      : {
           options: Object.freeze(
             spec.options.map((option) => Object.freeze({ ...option })),
           ) as CommandSpec<TOpts, TCtx>['options'],
-        }
-      : {}),
-    ...(spec.args !== undefined
-      ? {
-          args: Object.freeze(
-            spec.args.map((arg) => Object.freeze({ ...arg })),
-          ) as CommandSpec<TOpts, TCtx>['args'],
-        }
-      : {}),
-    ...(spec.rawStreamReason !== undefined ? { rawStreamReason: spec.rawStreamReason } : {}),
-    ...(spec.producesVerdict !== undefined ? { producesVerdict: spec.producesVerdict } : {}),
-    ...(spec.staticHandler !== undefined
-      ? { staticHandler: freezeStaticHandlerDescriptor(spec.staticHandler) }
-      : {}),
+        }),
+    ...(spec.args === undefined
+      ? {}
+      : {
+          args: Object.freeze(spec.args.map((arg) => Object.freeze({ ...arg }))) as CommandSpec<
+            TOpts,
+            TCtx
+          >['args'],
+        }),
+    ...(spec.rawStreamReason === undefined ? {} : { rawStreamReason: spec.rawStreamReason }),
+    ...(spec.producesVerdict === undefined ? {} : { producesVerdict: spec.producesVerdict }),
+    ...(spec.staticHandler === undefined
+      ? {}
+      : { staticHandler: freezeStaticHandlerDescriptor(spec.staticHandler) }),
   };
   return Object.freeze(frozen as unknown as CommandSpec<TOpts, TCtx>);
 }

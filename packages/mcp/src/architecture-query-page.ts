@@ -64,8 +64,7 @@ export function nextArchitectureAfterKey(
   // Unselected families are immediately "done" and never contribute cursor state.
   const lastEdge = view.packageEdges?.at(-1);
   const lastHotspot = view.hotspots?.at(-1);
-  const packageEdgesDone =
-    !edgesSelected || prior.packageEdgesDone || !view.packageEdgesHasMore;
+  const packageEdgesDone = !edgesSelected || prior.packageEdgesDone || !view.packageEdgesHasMore;
   const hotspotsDone = !hotspotsSelected || prior.hotspotsDone || !view.hotspotsHasMore;
   if (packageEdgesDone && hotspotsDone) return undefined;
   const packageEdgeKey =

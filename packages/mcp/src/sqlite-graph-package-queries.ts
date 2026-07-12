@@ -43,10 +43,7 @@ import type { GraphCoverage, GraphToolResult } from './symbol-dto.js';
 const DEFAULT_SEARCH_LIMIT = 100;
 
 /** Merge grouping/projection facets over package inventory+evidence coverage. */
-function withPageFacets(
-  coverage: GraphReadFacetCoverage,
-  groupTruncated: boolean,
-): GraphCoverage {
+function withPageFacets(coverage: GraphReadFacetCoverage, groupTruncated: boolean): GraphCoverage {
   return rollupFacets({
     inventory: coverage.inventory,
     evidence: coverage.evidence,
@@ -152,6 +149,11 @@ export class SqliteGraphPackageQueries {
               edgeKind,
               filter,
               ...selector,
+              // Rows carry per-row samples (sampleLimit); the flat concrete-evidence
+              // array is never returned here, so disable it (evidenceLimit: 0) to
+              // avoid building ≤10k unused rows and a spurious *-evidence-cap on
+              // large graphs (P2 Phase 2.4).
+              evidenceLimit: 0,
               ...(sampleLimit === undefined ? {} : { sampleLimit }),
             },
             matcher.value,

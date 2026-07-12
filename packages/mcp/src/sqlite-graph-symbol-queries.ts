@@ -112,12 +112,7 @@ function validateSearchDetail(
   groupBy: 'none' | 'package' | 'file',
 ): Result<void, McpReadError> {
   if (detail === 'groups' && groupBy === 'none') {
-    return err(
-      readError(
-        'invalid-query',
-        'detail=groups requires groupBy package or file.',
-      ),
-    );
+    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
   }
   if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
     return err(
@@ -174,9 +169,7 @@ function projectExclusiveSearch(
     binding,
   } = input;
   const inventoryReasons = new Set<string>();
-  const inventory = [
-    ...matchingSearchRefs(gen, query, match, filter, matcher, inventoryReasons),
-  ];
+  const inventory = [...matchingSearchRefs(gen, query, match, filter, matcher, inventoryReasons)];
   inventory.sort(compareSymbolRefs);
   const totalMatches = inventory.length;
   const pageInput = {
@@ -229,24 +222,19 @@ function projectExclusiveSearch(
   const paged = pageRows(inventory, pageInput, (symbol) => symbolSearchStableKey(symbol));
   if (!paged.ok) return paged;
   return ok(
-    context.envelope(
-      { detail: 'nodes', symbols: paged.value.rows, totalMatches },
-      gen,
-      freshness,
-      {
-        coverage: rollupFacets({
-          inventory: makeFacet(true, inventoryReasons),
-          evidence: UNREQUESTED_FACET,
-          grouping: UNREQUESTED_FACET,
-          projection: makeFacet(true, new Set()),
-        }),
-        page: {
-          limit,
-          ...(paged.value.nextCursor === undefined ? {} : { nextCursor: paged.value.nextCursor }),
-        },
-        filter,
+    context.envelope({ detail: 'nodes', symbols: paged.value.rows, totalMatches }, gen, freshness, {
+      coverage: rollupFacets({
+        inventory: makeFacet(true, inventoryReasons),
+        evidence: UNREQUESTED_FACET,
+        grouping: UNREQUESTED_FACET,
+        projection: makeFacet(true, new Set()),
+      }),
+      page: {
+        limit,
+        ...(paged.value.nextCursor === undefined ? {} : { nextCursor: paged.value.nextCursor }),
       },
-    ),
+      filter,
+    }),
   );
 }
 

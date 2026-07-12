@@ -27,7 +27,10 @@ describe('makeFacet (P2 Phase 2.1)', () => {
   });
 
   it('marks truncation only for -cap reasons and sorts/dedupes reasons', () => {
-    const facet = makeFacet(true, new Set(['malformed-omitted', 'proof-edge-cap', 'malformed-omitted']));
+    const facet = makeFacet(
+      true,
+      new Set(['malformed-omitted', 'proof-edge-cap', 'malformed-omitted']),
+    );
     expect(facet.complete).toBe(false);
     expect(facet.truncated).toBe(true);
     expect(facet.reasons).toEqual(['malformed-omitted', 'proof-edge-cap']);
@@ -103,4 +106,3 @@ describe('rollupFacets (P2 Phase 2.1)', () => {
     expect(coverage).toMatchObject({ complete: true, truncated: false, reasons: [] });
   });
 });
-

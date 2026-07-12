@@ -42,6 +42,10 @@ import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
 /** Shared `output` mode for the host commands that return a renderable result. */
 const COMMAND_RESULT = 'command-result' as const;
 
+/** Static-handler provenance shared by every host command spec in this module. */
+const HOST_COMMAND_PACKAGE = 'opensip-cli';
+const HOST_COMMAND_SPECS_PATH = 'packages/cli/src/commands/host-command-specs.ts';
+
 // ---------------------------------------------------------------------------
 // init
 // ---------------------------------------------------------------------------
@@ -55,8 +59,8 @@ interface InitOpts extends InitOptions {
 function buildInitSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/host-command-specs.ts',
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
       declaration: 'buildInitSpec',
     },
     name: 'init',
@@ -120,8 +124,8 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
 function buildConfigureSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/host-command-specs.ts',
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
       declaration: 'buildConfigureSpec',
     },
     name: 'configure',
@@ -140,8 +144,8 @@ function buildConfigureSpec(): HostSpec {
 function buildReportSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/host-command-specs.ts',
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
       declaration: 'buildReportSpec',
     },
     name: 'report',
@@ -174,8 +178,8 @@ function buildReportSpec(): HostSpec {
 function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/host-command-specs.ts',
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
       declaration: 'buildCompletionSpec',
     },
     name: 'completion',
@@ -249,8 +253,8 @@ interface UninstallOpts {
 function buildUninstallSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/host-command-specs.ts',
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
       declaration: 'buildUninstallSpec',
     },
     name: 'uninstall',
@@ -317,8 +321,8 @@ function buildUninstallSpec(): HostSpec {
 function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
-      package: 'opensip-cli',
-      path: 'packages/cli/src/commands/host-command-specs.ts',
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
       declaration: 'buildAgentCatalogSpec',
     },
     name: 'agent-catalog',

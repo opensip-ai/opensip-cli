@@ -93,7 +93,7 @@ function readStaticHandler(target: object): StaticHandlerDescriptor | undefined 
   if (property.kind !== 'data' || property.value === null || typeof property.value !== 'object') {
     throw new Error('runtime inventory: staticHandler must be own data plain object.');
   }
-  const descriptor = property.value as object;
+  const descriptor = property.value;
   const pkg = readString(descriptor, 'package');
   const path = readString(descriptor, 'path');
   const declaration = readString(descriptor, 'declaration');
@@ -193,24 +193,15 @@ function projectLeafFromSpec(
 }
 
 /**
- * Project the complete mounted command surface into a plain frozen inventory.
- * Fail-closed on duplicate paths, caps, accessors, and invalid specs.
+ * Tool commands (flat or parent-nested) from the registry. Prefer registry tools
+ * so each leaf carries admitted provenance/package identity when available.
  */
-export function buildRuntimeCommandInventory(
-  input: BuildRuntimeCommandInventoryInput,
-): RuntimeCommandInventory {
-  const limits = input.limits ?? PRODUCTION_LIMITS;
-  const leaves: RuntimeCommandLeaf[] = [];
-  const groups: RuntimeCommandGroup[] = [];
-  const toolFacts = indexToolFacts(
-    input.toolRegistry,
-    input.manifests ?? [],
-    input.provenance ?? [],
-  );
-
-  // Tool commands (flat or parent-nested). Prefer registry tools so each leaf
-  // carries admitted provenance/package identity when available.
-  for (const tool of input.toolRegistry.values()) {
+function projectRegistryToolLeaves(
+  toolRegistry: ToolRegistry,
+  toolFacts: ReadonlyMap<string, ToolIdentityFacts>,
+  leaves: RuntimeCommandLeaf[],
+): void {
+  for (const tool of toolRegistry.values()) {
     const canonical = tool.identity.name;
     const facts = toolFacts.get(canonical);
     const specs = tool.commandSpecs ?? [];
@@ -227,9 +218,17 @@ export function buildRuntimeCommandInventory(
       leaves.push(projectLeafFromSpec(spec, path, 'tool', canonical, facts));
     }
   }
+}
 
-  // Also project any toolCommandSpecs not already covered (defensive: registration
-  // input is the mount surface; registry is the identity source).
+/**
+ * Project any toolCommandSpecs not already covered by the registry pass
+ * (defensive: registration input is the mount surface; registry is identity).
+ */
+function projectExtraToolSpecLeaves(
+  input: BuildRuntimeCommandInventoryInput,
+  toolFacts: ReadonlyMap<string, ToolIdentityFacts>,
+  leaves: RuntimeCommandLeaf[],
+): void {
   const seenPaths = new Set(leaves.map((l) => l.path));
   for (const spec of input.toolCommandSpecs) {
     if (spec === null || typeof spec !== 'object') continue;
@@ -244,9 +243,11 @@ export function buildRuntimeCommandInventory(
     leaves.push(projectLeafFromSpec(spec, path, 'tool', ownerLabel, facts));
     seenPaths.add(path);
   }
+}
 
-  // Top-level host commands.
-  for (const spec of input.hostSpecs) {
+/** Top-level host commands. */
+function projectHostSpecLeaves(hostSpecs: readonly object[], leaves: RuntimeCommandLeaf[]): void {
+  for (const spec of hostSpecs) {
     if (spec === null || typeof spec !== 'object') {
       throw new Error('runtime inventory: invalid host command spec.');
     }
@@ -256,9 +257,15 @@ export function buildRuntimeCommandInventory(
     }
     leaves.push(projectLeafFromSpec(spec, name, 'host', 'cli'));
   }
+}
 
-  // Action-less host groups + leaves.
-  for (const group of input.hostGroups) {
+/** Action-less host groups plus their leaves. */
+function projectHostGroups(
+  hostGroups: readonly HostSubcommandGroup[],
+  groups: RuntimeCommandGroup[],
+  leaves: RuntimeCommandLeaf[],
+): void {
+  for (const group of hostGroups) {
     groups.push({
       path: group.name,
       name: group.name,
@@ -274,9 +281,16 @@ export function buildRuntimeCommandInventory(
       leaves.push(projectLeafFromSpec(leaf, `${group.name} ${leafName}`, 'host', 'cli'));
     }
   }
+}
 
-  // Per-tool plugin groups: `<tool> plugin <leaf>`.
-  for (const group of input.toolPluginGroups) {
+/** Per-tool plugin groups: `<tool> plugin <leaf>`. */
+function projectToolPluginGroups(
+  toolPluginGroups: readonly ToolPluginGroup[],
+  toolFacts: ReadonlyMap<string, ToolIdentityFacts>,
+  groups: RuntimeCommandGroup[],
+  leaves: RuntimeCommandLeaf[],
+): void {
+  for (const group of toolPluginGroups) {
     const groupPath = `${group.parentVerb} plugin`;
     groups.push({
       path: groupPath,
@@ -291,10 +305,39 @@ export function buildRuntimeCommandInventory(
         throw new Error(`runtime inventory: plugin group '${groupPath}' leaf missing name.`);
       }
       leaves.push(
-        projectLeafFromSpec(leaf, `${groupPath} ${leafName}`, 'tool', group.parentVerb, toolFacts.get(group.parentVerb)),
+        projectLeafFromSpec(
+          leaf,
+          `${groupPath} ${leafName}`,
+          'tool',
+          group.parentVerb,
+          toolFacts.get(group.parentVerb),
+        ),
       );
     }
   }
+}
+
+/**
+ * Project the complete mounted command surface into a plain frozen inventory.
+ * Fail-closed on duplicate paths, caps, accessors, and invalid specs.
+ */
+export function buildRuntimeCommandInventory(
+  input: BuildRuntimeCommandInventoryInput,
+): RuntimeCommandInventory {
+  const limits = input.limits ?? PRODUCTION_LIMITS;
+  const leaves: RuntimeCommandLeaf[] = [];
+  const groups: RuntimeCommandGroup[] = [];
+  const toolFacts = indexToolFacts(
+    input.toolRegistry,
+    input.manifests ?? [],
+    input.provenance ?? [],
+  );
+
+  projectRegistryToolLeaves(input.toolRegistry, toolFacts, leaves);
+  projectExtraToolSpecLeaves(input, toolFacts, leaves);
+  projectHostSpecLeaves(input.hostSpecs, leaves);
+  projectHostGroups(input.hostGroups, groups, leaves);
+  projectToolPluginGroups(input.toolPluginGroups, toolFacts, groups, leaves);
 
   return createRuntimeCommandInventory(
     {

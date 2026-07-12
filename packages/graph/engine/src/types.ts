@@ -420,13 +420,7 @@ export type DeclarationKind =
   | 'export';
 
 /** Kind of a cross-file reference site. */
-export type ReferenceKind =
-  | 'type'
-  | 'value'
-  | 'import'
-  | 'export'
-  | 'heritage'
-  | 'annotation';
+export type ReferenceKind = 'type' | 'value' | 'import' | 'export' | 'heritage' | 'annotation';
 
 /** How a reference's target was resolved (or why it was not). */
 export type SemanticResolutionBasis =
@@ -537,11 +531,11 @@ export const MAX_SEMANTIC_DECLARATIONS = 100_000;
 /** Max retained cross-file reference facts per catalog generation. */
 export const MAX_SEMANTIC_REFERENCES = 500_000;
 /** Max retained references pointing at one declaration (producer soft bound). */
-export const MAX_REFERENCES_PER_DECLARATION = 1_000;
+export const MAX_REFERENCES_PER_DECLARATION = 1000;
 /** Max characters for declaration/reference simple names. */
 export const MAX_SEMANTIC_NAME = 256;
 /** Max characters for qualified names, import specifiers, and paths. */
-export const MAX_SEMANTIC_TEXT = 1_024;
+export const MAX_SEMANTIC_TEXT = 1024;
 /** Max 1-based line accepted on a semantic fact span. */
 export const MAX_SEMANTIC_LINE = 10_000_000;
 /** Max 0-based column accepted on a semantic fact span. */

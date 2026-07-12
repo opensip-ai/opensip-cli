@@ -27,23 +27,13 @@ import { errorResult, jsonResult } from './tool-result.js';
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
 
-const REFERENCE_KINDS = [
-  'type',
-  'value',
-  'import',
-  'export',
-  'heritage',
-  'annotation',
-] as const;
+const REFERENCE_KINDS = ['type', 'value', 'import', 'export', 'heritage', 'annotation'] as const;
 
 /** Declaration ids are stable `d1|…` keys, not file:line:col symbol ids. */
 const declarationId = () =>
-  boundedText(MAX_PATH_LEN + 128, 'declarationId').refine(
-    (value) => value.startsWith('d1|') || value.startsWith('d1'),
-    {
-      message: 'declarationId must be a search_declarations id (d1|…), not a symbolId',
-    },
-  );
+  boundedText(MAX_PATH_LEN + 128, 'declarationId').refine((value) => value.startsWith('d1|'), {
+    message: 'declarationId must be a search_declarations id (d1|…), not a symbolId',
+  });
 
 export function registerReferencesTo(server: McpStdioServer, deps: McpToolDeps): void {
   server.register(

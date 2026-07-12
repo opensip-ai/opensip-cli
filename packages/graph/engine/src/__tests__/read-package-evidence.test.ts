@@ -300,6 +300,23 @@ describe('buildPackageEvidence', () => {
     expect(result.value.coverage.reasons).toContain('package-edge-group-cap');
   });
 
+  it('does not cap when concrete evidence is opted out (evidenceLimit=0) (P2 Phase 2.4 regression)', () => {
+    const catalog = fixture();
+    const result = buildPackageEvidence(catalog, buildIndexes(catalog), {
+      edgeKind: 'call',
+      filter: productionFilter,
+      evidenceLimit: 0,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Matching call edges exist, but the caller asked for aggregate rows only —
+    // an omitted sample is NOT truncation and the evidence facet stays unrequested.
+    expect(result.value.calls.length).toBeGreaterThan(0);
+    expect(result.value.coverage.reasons).not.toContain('call-evidence-cap');
+    expect(result.value.coverage.evidence.requested).toBe(false);
+    expect(result.value.coverage.truncated).toBe(false);
+  });
+
   it('keeps internal, external, and unresolved imports distinct and sanitizes specifiers', () => {
     const catalog = fixture();
     const result = buildPackageEvidence(catalog, buildIndexes(catalog), {
@@ -335,9 +352,37 @@ describe('buildPackageEvidence', () => {
           package: 'pkg-a',
           kind: 'module-init',
           dependencies: [
-            dependency([], './missing.js', 1, cls({ targetKind: 'unresolved', basis: 'unresolved', reason: 'relative-target-unresolved' })),
-            dependency([], '@scope/pkg-b', 2, cls({ targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-b' })),
-            dependency([], 'clearly-external', 3, cls({ targetKind: 'external', basis: 'external-specifier', reason: 'external-package' })),
+            dependency(
+              [],
+              './missing.js',
+              1,
+              cls({
+                targetKind: 'unresolved',
+                basis: 'unresolved',
+                reason: 'relative-target-unresolved',
+              }),
+            ),
+            dependency(
+              [],
+              '@scope/pkg-b',
+              2,
+              cls({
+                targetKind: 'declaration-file',
+                basis: 'workspace-manifest',
+                reason: 'workspace-declaration-entry',
+                resolvedPackage: 'pkg-b',
+              }),
+            ),
+            dependency(
+              [],
+              'clearly-external',
+              3,
+              cls({
+                targetKind: 'external',
+                basis: 'external-specifier',
+                reason: 'external-package',
+              }),
+            ),
           ],
         }),
       ],
@@ -388,10 +433,53 @@ describe('buildPackageEvidence', () => {
           package: 'pkg-a',
           kind: 'module-init',
           dependencies: [
-            dependency([], '@scope/pkg-b/sub', 1, cls({ targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-subpath-declaration-entry', resolvedPackage: 'pkg-b' })),
-            dependency([], '@scope/pkg-b/undeclared', 2, cls({ targetKind: 'unresolved', basis: 'unresolved', reason: 'undeclared-exports-subpath' })),
-            dependency([], '@scope/pkg-b', 3, cls({ form: 'import-declaration', role: 'type-only', targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-b' })),
-            dependency([], '@scope/pkg-c', 4, cls({ form: 're-export', role: 'runtime', targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-c' })),
+            dependency(
+              [],
+              '@scope/pkg-b/sub',
+              1,
+              cls({
+                targetKind: 'declaration-file',
+                basis: 'workspace-manifest',
+                reason: 'workspace-subpath-declaration-entry',
+                resolvedPackage: 'pkg-b',
+              }),
+            ),
+            dependency(
+              [],
+              '@scope/pkg-b/undeclared',
+              2,
+              cls({
+                targetKind: 'unresolved',
+                basis: 'unresolved',
+                reason: 'undeclared-exports-subpath',
+              }),
+            ),
+            dependency(
+              [],
+              '@scope/pkg-b',
+              3,
+              cls({
+                form: 'import-declaration',
+                role: 'type-only',
+                targetKind: 'declaration-file',
+                basis: 'workspace-manifest',
+                reason: 'workspace-declaration-entry',
+                resolvedPackage: 'pkg-b',
+              }),
+            ),
+            dependency(
+              [],
+              '@scope/pkg-c',
+              4,
+              cls({
+                form: 're-export',
+                role: 'runtime',
+                targetKind: 'declaration-file',
+                basis: 'workspace-manifest',
+                reason: 'workspace-declaration-entry',
+                resolvedPackage: 'pkg-c',
+              }),
+            ),
           ],
         }),
       ],
@@ -739,13 +827,48 @@ describe('buildPackageScc', () => {
     // Two packages, each with ONLY intra-package edges — a package depending on
     // itself is not a package cycle, so no SCC is returned.
     const catalog = catalogOf({
-      aOne: [occurrence({ bodyHash: 'a1', simpleName: 'a1', filePath: 'packages/a/src/one.ts', package: 'pkg-a', calls: [call('a2')] })],
-      aTwo: [occurrence({ bodyHash: 'a2', simpleName: 'a2', filePath: 'packages/a/src/two.ts', package: 'pkg-a', calls: [call('a1')] })],
-      bOne: [occurrence({ bodyHash: 'b1', simpleName: 'b1', filePath: 'packages/b/src/one.ts', package: 'pkg-b', calls: [call('b2')] })],
-      bTwo: [occurrence({ bodyHash: 'b2', simpleName: 'b2', filePath: 'packages/b/src/two.ts', package: 'pkg-b', calls: [call('b1')] })],
+      aOne: [
+        occurrence({
+          bodyHash: 'a1',
+          simpleName: 'a1',
+          filePath: 'packages/a/src/one.ts',
+          package: 'pkg-a',
+          calls: [call('a2')],
+        }),
+      ],
+      aTwo: [
+        occurrence({
+          bodyHash: 'a2',
+          simpleName: 'a2',
+          filePath: 'packages/a/src/two.ts',
+          package: 'pkg-a',
+          calls: [call('a1')],
+        }),
+      ],
+      bOne: [
+        occurrence({
+          bodyHash: 'b1',
+          simpleName: 'b1',
+          filePath: 'packages/b/src/one.ts',
+          package: 'pkg-b',
+          calls: [call('b2')],
+        }),
+      ],
+      bTwo: [
+        occurrence({
+          bodyHash: 'b2',
+          simpleName: 'b2',
+          filePath: 'packages/b/src/two.ts',
+          package: 'pkg-b',
+          calls: [call('b1')],
+        }),
+      ],
     });
     for (const edgeKind of ['call', 'import', 'combined'] as const) {
-      const result = buildPackageScc(catalog, buildIndexes(catalog), { edgeKind, filter: productionFilter });
+      const result = buildPackageScc(catalog, buildIndexes(catalog), {
+        edgeKind,
+        filter: productionFilter,
+      });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.components).toEqual([]);
@@ -764,6 +887,46 @@ describe('buildPackageScc', () => {
     const kinds = new Set(cycle?.proofEdges.map((e) => e.kind));
     expect(kinds.has('call')).toBe(true);
     expect(kinds.has('import')).toBe(true);
+  });
+
+  it('does not cap when proofs are opted out (proofLimit=0) (P2 Phase 2.4 regression)', () => {
+    // Clean pkg-a↔pkg-b cycle (no malformed edges) so the only possible cap is
+    // the proof/evidence one under test. evidenceLimit maps to the proof sample
+    // bound; 0 = members/counts only.
+    const cyclic = catalogOf({
+      a: [
+        occurrence({
+          bodyHash: 'a',
+          simpleName: 'a',
+          filePath: 'packages/a/src/i.ts',
+          package: 'pkg-a',
+          calls: [call('b')],
+        }),
+      ],
+      b: [
+        occurrence({
+          bodyHash: 'b',
+          simpleName: 'b',
+          filePath: 'packages/b/src/i.ts',
+          package: 'pkg-b',
+          calls: [call('a')],
+        }),
+      ],
+    });
+    const combined = buildPackageScc(cyclic, buildIndexes(cyclic), {
+      edgeKind: 'combined',
+      filter: productionFilter,
+      evidenceLimit: 0,
+    });
+    expect(combined.ok).toBe(true);
+    if (!combined.ok) return;
+    // The cycle is still found, with no proof edges and NO spurious proof-edge-cap
+    // or call-evidence-cap (the SCC never uses the flat evidence array).
+    expect(combined.value.components.length).toBeGreaterThan(0);
+    expect(combined.value.components.every((c) => c.proofEdges.length === 0)).toBe(true);
+    expect(combined.value.coverage.truncated).toBe(false);
+    expect(combined.value.coverage.reasons).not.toContain('proof-edge-cap');
+    expect(combined.value.coverage.reasons).not.toContain('call-evidence-cap');
   });
 
   it('caps proving edges independently and propagates partial coverage', () => {

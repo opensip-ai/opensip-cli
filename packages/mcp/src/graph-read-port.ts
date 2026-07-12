@@ -8,6 +8,7 @@
  */
 
 import type { McpReadError } from './mcp-error.js';
+import type { StaticHandlerBridgeOutcome } from './static-handler-bridge.js';
 import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { Result } from '@opensip-cli/core';
 import type {
@@ -197,13 +198,7 @@ export type McpDeclarationKind =
   | 'export';
 
 /** Reference kinds for {@link GraphReadPort.referencesTo}. */
-export type McpReferenceKind =
-  | 'type'
-  | 'value'
-  | 'import'
-  | 'export'
-  | 'heritage'
-  | 'annotation';
+export type McpReferenceKind = 'type' | 'value' | 'import' | 'export' | 'heritage' | 'annotation';
 
 export interface SearchDeclarationsOptions {
   readonly limit?: number;
@@ -429,7 +424,7 @@ export interface GraphReadPort {
       {
         readonly catalogIdentity?: string;
         readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
-        readonly outcomes: readonly import('./static-handler-bridge.js').StaticHandlerBridgeOutcome[];
+        readonly outcomes: readonly StaticHandlerBridgeOutcome[];
       },
       McpReadError
     >

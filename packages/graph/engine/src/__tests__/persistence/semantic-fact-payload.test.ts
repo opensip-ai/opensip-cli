@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { emptySemanticFactBundle } from '../../semantic-facts.js';
 import { validateSemanticFactBundle } from '../../persistence/semantic-fact-payload.js';
+import { emptySemanticFactBundle } from '../../semantic-facts.js';
 
 import type { SemanticFactBundle } from '../../types.js';
 
@@ -80,7 +80,7 @@ describe('validateSemanticFactBundle', () => {
       validateSemanticFactBundle({
         ...validBundle(),
         extra: true,
-      } as unknown as SemanticFactBundle),
+      }),
     ).toThrow(/Malformed/);
   });
 });

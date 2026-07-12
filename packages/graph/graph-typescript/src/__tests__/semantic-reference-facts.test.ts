@@ -1,15 +1,13 @@
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
-import { rmSync } from 'node:fs';
-
 import { DEFAULT_SEMANTIC_FACT_LIMITS, MAX_SEMANTIC_DECLARATIONS } from '@opensip-cli/graph';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildCrossPackageContext } from '../edge-helpers/cross-package-context.js';
-import { collectSemanticReferenceFacts } from '../semantic-reference-facts.js';
 import { typescriptGraphAdapter } from '../index.js';
+import { collectSemanticReferenceFacts } from '../semantic-reference-facts.js';
 
 import type { Catalog } from '@opensip-cli/graph';
 
@@ -48,7 +46,10 @@ function writeProject(files: Record<string, string>): string {
 }
 
 async function exactSemanticFacts(projectDir: string) {
-  const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectDir, diagnosticIntent: 'quiet' });
+  const discovery = await typescriptGraphAdapter.discoverFiles({
+    cwd: projectDir,
+    diagnosticIntent: 'quiet',
+  });
   const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -110,7 +111,10 @@ describe('collectSemanticReferenceFacts', () => {
     const projectDir = writeProject({
       'src/a.ts': `export function a() { return 1; }\n`,
     });
-    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectDir, diagnosticIntent: 'quiet' });
+    const discovery = await typescriptGraphAdapter.discoverFiles({
+      cwd: projectDir,
+      diagnosticIntent: 'quiet',
+    });
     const parsed = await typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

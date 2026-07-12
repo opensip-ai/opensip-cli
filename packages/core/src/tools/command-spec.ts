@@ -279,7 +279,7 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
  * Validators and inventory projectors share these constants.
  */
 export const MAX_STATIC_HANDLER_PACKAGE = 214;
-export const MAX_STATIC_HANDLER_PATH = 1_024;
+export const MAX_STATIC_HANDLER_PATH = 1024;
 export const MAX_STATIC_HANDLER_DECLARATION = 256;
 
 /**

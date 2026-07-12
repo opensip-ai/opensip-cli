@@ -45,7 +45,13 @@ const CLI_DIST = fileURLToPath(new URL('../../../../packages/cli/dist/index.js',
 
 interface SymbolSearchPayload {
   readonly detail: 'summary' | 'groups' | 'nodes';
-  readonly symbols: readonly { symbolId: string; simpleName?: string; bodyHash?: string; package?: string; qualifiedName?: string }[];
+  readonly symbols: readonly {
+    symbolId: string;
+    simpleName?: string;
+    bodyHash?: string;
+    package?: string;
+    qualifiedName?: string;
+  }[];
   readonly totalMatches: number;
 }
 
@@ -704,7 +710,12 @@ describe('MCP e2e over real stdio', () => {
       const packageData = packageDeps.data as {
         edgeKind: string;
         calls: { fromPackage: string; toPackage: string }[];
-        imports: { fromPackage: string; target: string; toPackage: string | null; resolution: string }[];
+        imports: {
+          fromPackage: string;
+          target: string;
+          toPackage: string | null;
+          resolution: string;
+        }[];
       };
       expect(packageData.edgeKind).toBe('combined');
       expect(packageData.calls).toEqual(
@@ -853,7 +864,9 @@ describe('MCP e2e over real stdio', () => {
       const firstSymbols = searchPayload(firstSearch.data).symbols;
       const searchCursor = (firstSearch.page as { nextCursor?: string }).nextCursor;
       expect(firstSymbols).toHaveLength(5);
-      expect(firstSymbols.every((symbol) => (symbol.simpleName ?? '').startsWith('caller'))).toBe(true);
+      expect(firstSymbols.every((symbol) => (symbol.simpleName ?? '').startsWith('caller'))).toBe(
+        true,
+      );
       expect(searchCursor).toBeTypeOf('string');
       // Exclusive nodes mode omits groups; detail=groups is exposed in Task 2.7.
       expect(firstSearch.groups).toBeUndefined();
@@ -888,8 +901,7 @@ describe('MCP e2e over real stdio', () => {
         filePath: 'index.ts',
       });
       const helper = searchPayload(exactHelper.data).symbols[0] as
-        | { symbolId: string; qualifiedName: string }
-        | undefined;
+        { symbolId: string; qualifiedName: string } | undefined;
       expect(helper).toBeDefined();
       if (helper === undefined) throw new Error('exact helper search returned no symbol');
       const qualifiedHelper = await call(conn, 'search_symbols', {

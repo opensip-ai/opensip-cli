@@ -48,7 +48,9 @@ function validateDetail(
   groupBy: RuntimeWiringQuery['groupBy'],
 ): Result<void, McpReadError> {
   if (detail === 'groups' && (groupBy === undefined || groupBy === 'none')) {
-    return err(readError('invalid-query', 'detail=groups requires groupBy tool, source, or owner.'));
+    return err(
+      readError('invalid-query', 'detail=groups requires groupBy tool, source, or owner.'),
+    );
   }
   if ((detail === 'summary' || detail === 'nodes') && groupBy !== undefined && groupBy !== 'none') {
     return err(
@@ -61,17 +63,18 @@ function validateDetail(
   return ok(undefined);
 }
 
-function summarize(
-  nodes: RuntimeWiringResult['nodes'],
-  edges: RuntimeWiringResult['edges'],
-): RuntimeWiringSummary {
+function summarizeNodeKinds(nodes: RuntimeWiringResult['nodes']): {
+  readonly toolCount: number;
+  readonly commandCount: number;
+  readonly handlerCount: number;
+  readonly hostCommandCount: number;
+  readonly groupCount: number;
+} {
   let toolCount = 0;
   let commandCount = 0;
   let handlerCount = 0;
   let hostCommandCount = 0;
   let groupCount = 0;
-  let resolvedBridgeCount = 0;
-  let unresolvedBridgeCount = 0;
   for (const node of nodes) {
     if (node.kind === 'tool') toolCount += 1;
     if (node.kind === 'command') {
@@ -81,21 +84,32 @@ function summarize(
     if (node.kind === 'handler') handlerCount += 1;
     if (node.kind === 'command-group') groupCount += 1;
   }
+  return { toolCount, commandCount, handlerCount, hostCommandCount, groupCount };
+}
+
+function summarizeBridges(edges: RuntimeWiringResult['edges']): {
+  readonly resolvedBridgeCount: number;
+  readonly unresolvedBridgeCount: number;
+} {
+  let resolvedBridgeCount = 0;
+  let unresolvedBridgeCount = 0;
   for (const edge of edges) {
     if (edge.kind !== 'command-dispatches-handler') continue;
     if (edge.staticBridge === 'resolved') resolvedBridgeCount += 1;
     else if (edge.staticBridge === 'unresolved') unresolvedBridgeCount += 1;
   }
+  return { resolvedBridgeCount, unresolvedBridgeCount };
+}
+
+function summarize(
+  nodes: RuntimeWiringResult['nodes'],
+  edges: RuntimeWiringResult['edges'],
+): RuntimeWiringSummary {
   return {
     nodeCount: nodes.length,
     edgeCount: edges.length,
-    toolCount,
-    commandCount,
-    handlerCount,
-    hostCommandCount,
-    groupCount,
-    resolvedBridgeCount,
-    unresolvedBridgeCount,
+    ...summarizeNodeKinds(nodes),
+    ...summarizeBridges(edges),
   };
 }
 
@@ -131,6 +145,45 @@ function collectHandlerRefs(snapshot: RuntimeWiringSnapshot): {
   return { refs, pathByKey };
 }
 
+/**
+ * Map batch resolution outcomes onto command paths, then mark every
+ * metadata-missing handler node (no declared static handler) as such.
+ */
+function mapOutcomesByPath(
+  outcomes: readonly StaticHandlerBridgeOutcome[],
+  pathByKey: ReadonlyMap<string, string[]>,
+  snapshot: RuntimeWiringSnapshot,
+): Map<string, StaticHandlerBridgeOutcome> {
+  const byPath = new Map<string, StaticHandlerBridgeOutcome>();
+  for (const outcome of outcomes) {
+    const key = `${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`;
+    for (const path of pathByKey.get(key) ?? []) {
+      byPath.set(path, outcome);
+    }
+  }
+  // Also mark metadata-missing handlers.
+  for (const node of snapshot.nodes) {
+    if (
+      node.kind === 'handler' &&
+      node.commandPath !== undefined &&
+      node.staticHandlerDeclaration === undefined
+    ) {
+      byPath.set(node.commandPath, {
+        ref: {
+          package: '',
+          path: '',
+          declaration: '',
+        },
+        status: 'metadata-missing',
+        claimProvenance: 'author-declared',
+        matchBasis: 'author-declared-exact-declaration',
+        confidence: 'low',
+      });
+    }
+  }
+  return byPath;
+}
+
 /** Deterministic, session-free runtime-wiring reader for the captured host state. */
 export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
   private readonly snapshot: RuntimeWiringSnapshot;
@@ -141,6 +194,36 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
     this.snapshot = buildRuntimeWiringSnapshot(deps);
     this.identityIndex = this.snapshot.identityIndex;
     this.resolveStaticHandlers = deps.resolveStaticHandlers;
+  }
+
+  /**
+   * Overlay the static-handler bridge on every request (the collaborator caches
+   * by w1:+g1:). Returns the snapshot nodes/edges unchanged when no resolver is
+   * wired or there are no handler refs; otherwise the overlaid graph.
+   */
+  private async applyStaticBridge(): Promise<{
+    readonly nodes: RuntimeWiringSnapshot['nodes'];
+    readonly edges: RuntimeWiringSnapshot['edges'];
+    readonly staticBridgeComplete: boolean;
+  }> {
+    const nodes = this.snapshot.nodes;
+    const edges = this.snapshot.edges;
+    const staticBridgeComplete = this.snapshot.coverage.staticBridgeComplete ?? false;
+    if (this.resolveStaticHandlers === undefined) {
+      return { nodes, edges, staticBridgeComplete };
+    }
+    const { refs, pathByKey } = collectHandlerRefs(this.snapshot);
+    if (refs.length === 0) {
+      return { nodes, edges, staticBridgeComplete: true };
+    }
+    const batch = await this.resolveStaticHandlers(this.snapshot.snapshotKey, refs);
+    const byPath = mapOutcomesByPath(batch.outcomes, pathByKey, this.snapshot);
+    const overlaid = overlayStaticHandlerBridge(nodes, edges, byPath);
+    return {
+      nodes: overlaid.nodes,
+      edges: overlaid.edges,
+      staticBridgeComplete: batch.catalogStatus === 'loaded' && overlaid.unresolvedCount === 0,
+    };
   }
 
   async query(input: RuntimeWiringQuery): Promise<Result<RuntimeWiringResult, McpReadError>> {
@@ -156,53 +239,11 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
           ? undefined
           : resolveCanonicalRuntimeTool(input.tool, this.identityIndex);
 
-      // Bridge on every request; collaborator caches by w1:+g1:.
-      let bridgedNodes = this.snapshot.nodes;
-      let bridgedEdges = this.snapshot.edges;
-      let staticBridgeComplete = this.snapshot.coverage.staticBridgeComplete ?? false;
-      if (this.resolveStaticHandlers !== undefined) {
-        const { refs, pathByKey } = collectHandlerRefs(this.snapshot);
-        if (refs.length > 0) {
-          const batch = await this.resolveStaticHandlers(this.snapshot.snapshotKey, refs);
-          const byPath = new Map<string, StaticHandlerBridgeOutcome>();
-          for (const outcome of batch.outcomes) {
-            const key = `${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`;
-            for (const path of pathByKey.get(key) ?? []) {
-              byPath.set(path, outcome);
-            }
-          }
-          // Also mark metadata-missing handlers.
-          for (const node of this.snapshot.nodes) {
-            if (
-              node.kind === 'handler' &&
-              node.commandPath !== undefined &&
-              node.staticHandlerDeclaration === undefined
-            ) {
-              byPath.set(node.commandPath, {
-                ref: {
-                  package: '',
-                  path: '',
-                  declaration: '',
-                },
-                status: 'metadata-missing',
-                claimProvenance: 'author-declared',
-                matchBasis: 'author-declared-exact-declaration',
-                confidence: 'low',
-              });
-            }
-          }
-          const overlaid = overlayStaticHandlerBridge(bridgedNodes, bridgedEdges, byPath);
-          bridgedNodes = overlaid.nodes;
-          bridgedEdges = overlaid.edges;
-          staticBridgeComplete =
-            batch.catalogStatus === 'loaded' && overlaid.unresolvedCount === 0;
-        } else {
-          staticBridgeComplete = true;
-        }
-      }
+      const bridged = await this.applyStaticBridge();
+      const staticBridgeComplete = bridged.staticBridgeComplete;
 
       const filtered = filterRuntimeSnapshot(
-        { nodes: bridgedNodes, edges: bridgedEdges },
+        { nodes: bridged.nodes, edges: bridged.edges },
         input,
         canonicalTool,
       );

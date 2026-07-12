@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { RunScope } from '../../lib/run-scope-class.js';
 import {
   createRuntimeCommandInventory,
   EMPTY_RUNTIME_COMMAND_INVENTORY,
@@ -7,7 +8,6 @@ import {
   RUNTIME_COMMAND_INVENTORY_VERSION,
   type RuntimeCommandLeaf,
 } from '../runtime-command-inventory.js';
-import { RunScope } from '../../lib/run-scope-class.js';
 
 function leaf(overrides: Partial<RuntimeCommandLeaf> = {}): RuntimeCommandLeaf {
   return {
@@ -51,7 +51,11 @@ describe('createRuntimeCommandInventory', () => {
     expect(() =>
       createRuntimeCommandInventory(
         {
-          leaves: [leaf({ path: 'a', name: 'a' }), leaf({ path: 'b', name: 'b' }), leaf({ path: 'c', name: 'c' })],
+          leaves: [
+            leaf({ path: 'a', name: 'a' }),
+            leaf({ path: 'b', name: 'b' }),
+            leaf({ path: 'c', name: 'c' }),
+          ],
         },
         { maxLeaves: 2, maxGroups: 4, maxAliases: 4, maxName: 64, maxPath: 128 },
       ),
@@ -88,7 +92,7 @@ describe('createRuntimeCommandInventory', () => {
   });
 
   it('wires production maxLeaves constant', () => {
-    expect(MAX_RUNTIME_COMMAND_LEAVES).toBe(2_000);
+    expect(MAX_RUNTIME_COMMAND_LEAVES).toBe(2000);
   });
 });
 

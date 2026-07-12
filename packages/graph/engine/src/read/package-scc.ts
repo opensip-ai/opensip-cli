@@ -131,7 +131,9 @@ function projectComponents(
     if (component === undefined || component !== componentByPackage.get(row.to)) continue;
     component.totalProofEdges++;
     if (component.proofEdges.length < proofLimit) component.proofEdges.push(row);
-    else proofCapped = true;
+    // Only a REQUESTED proof sample (proofLimit > 0) that overflowed is a cap;
+    // proofLimit === 0 is opt-out (members/counts only), not truncation.
+    else if (proofLimit > 0) proofCapped = true;
   }
   projected.sort((a, b) => compareCodePointStrings(a.packages.join('\0'), b.packages.join('\0')));
   return { projected, proofCapped };
@@ -154,7 +156,17 @@ export function buildPackageScc(
 ): Result<PackageSccView, GraphReadError> {
   try {
     // Inventory rows drive Tarjan; sample/proof caps must not change components.
-    const evidence = buildPackageEvidence(catalog, indexes, query, matcher, cachedFeatures);
+    // Proofs are built from the aggregated call/import ROWS (cycleProofRows), not
+    // the flat concrete-evidence array — so disable that array (evidenceLimit: 0)
+    // to avoid a spurious call/import-evidence-cap leaking into SCC coverage
+    // (P2 Phase 2.4). The proof sample bound comes from resolveProofLimit(query).
+    const evidence = buildPackageEvidence(
+      catalog,
+      indexes,
+      { ...query, evidenceLimit: 0 },
+      matcher,
+      cachedFeatures,
+    );
     if (!evidence.ok) return evidence;
     const proof = cycleProofRows(evidence.value);
     const adjacency = packageAdjacency(proof);

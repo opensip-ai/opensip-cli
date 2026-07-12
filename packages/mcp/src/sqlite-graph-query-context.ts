@@ -16,7 +16,12 @@ import { readError } from './mcp-error.js';
 import type { CatalogGeneration, GraphGenerationController } from './catalog-generation.js';
 import type { ArchitectureSummaryDto, CatalogStatus } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
-import type { Freshness, GraphCoverage, GraphEvidenceContext, GraphToolResult } from './symbol-dto.js';
+import type {
+  Freshness,
+  GraphCoverage,
+  GraphEvidenceContext,
+  GraphToolResult,
+} from './symbol-dto.js';
 import type {
   AuditSourceRolePolicy,
   Catalog,

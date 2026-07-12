@@ -33,6 +33,9 @@ import type { Catalog, FeatureTable, Indexes } from '../types.js';
 /** Selectable architecture response families (P2 Phase 2.5). */
 export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
 
+/** Count-unit label for resolved-target distribution metrics (declared once). */
+const RESOLVED_TARGETS_UNIT = 'resolved-targets' as const;
+
 export interface ArchitectureViewQuery {
   readonly filter: GraphSourceFilter;
   readonly limit: number;
@@ -371,11 +374,11 @@ function buildCallMetrics(
     distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
     resolvedTargetConfidence: {
       values: toCountRecord(resolvedConfidence),
-      countUnit: 'resolved-targets',
+      countUnit: RESOLVED_TARGETS_UNIT,
     },
     resolvedTargetResolution: {
       values: toCountRecord(resolvedResolution),
-      countUnit: 'resolved-targets',
+      countUnit: RESOLVED_TARGETS_UNIT,
     },
     unresolvedCallSiteConfidence: {
       values: toCountRecord(unresolvedConfidence),
@@ -405,7 +408,7 @@ function packageEdgeRow(
     toPackage,
     kind: 'call',
     count,
-    countUnit: 'resolved-targets',
+    countUnit: RESOLVED_TARGETS_UNIT,
     nodeIdentity: 'package',
     sourceScope: filter.sourceScope,
     generated: filter.generated,
@@ -758,8 +761,8 @@ function emptyCallMetrics(filter: GraphSourceFilter, catalog: Catalog): CallEvid
     confidence: {},
     resolution: {},
     distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
-    resolvedTargetConfidence: { values: {}, countUnit: 'resolved-targets' },
-    resolvedTargetResolution: { values: {}, countUnit: 'resolved-targets' },
+    resolvedTargetConfidence: { values: {}, countUnit: RESOLVED_TARGETS_UNIT },
+    resolvedTargetResolution: { values: {}, countUnit: RESOLVED_TARGETS_UNIT },
     unresolvedCallSiteConfidence: { values: {}, countUnit: 'unresolved-call-sites' },
     unresolvedCallSiteResolution: { values: {}, countUnit: 'unresolved-call-sites' },
     nodeIdentity: 'occurrence',

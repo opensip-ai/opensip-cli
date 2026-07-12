@@ -42,8 +42,8 @@ import { buildIndexes } from '../../pipeline/indexes.js';
 import { mergeSemanticFactBundles } from '../../semantic-facts.js';
 
 import { bucketEdgesByOwner, stitchEdgesByOwner } from './edge-identity.js';
-import { reconcileSemanticFacts } from './semantic-fact-reconcile.js';
 import { traceResolveOne } from './resolution-trace.js';
+import { reconcileSemanticFacts } from './semantic-fact-reconcile.js';
 
 import type { ShardBuildResult } from './shard-model.js';
 import type { ExportIndex, PackageManifestIndex } from '../../cross-package/export-index.js';
@@ -257,7 +257,8 @@ function reconcileCatalogSemanticFacts(
   if (catalog.semanticFacts === undefined) return catalog;
   const semanticFacts = reconcileSemanticFacts(catalog.semanticFacts, manifestIndex);
   if (semanticFacts === undefined) {
-    const { semanticFacts: _drop, ...rest } = catalog;
+    const rest = { ...catalog };
+    delete rest.semanticFacts;
     return rest;
   }
   return { ...catalog, semanticFacts };

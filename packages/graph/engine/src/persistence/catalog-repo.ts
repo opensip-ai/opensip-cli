@@ -202,7 +202,20 @@ function validateCatalogPayload(value: unknown): asserts value is CatalogRowPayl
   }
   validateOptionalProvenance(value);
   if (value.semanticFacts !== undefined) {
-    validateSemanticFactBundle(value.semanticFacts);
+    try {
+      validateSemanticFactBundle(value.semanticFacts);
+    } catch {
+      // The semantic-fact plane is OPTIONAL (absent = unsupported). A malformed
+      // or oversized decoded plane must degrade to unsupported, NOT brick the
+      // required catalog for every graph read — the read views already treat an
+      // absent plane cleanly. Drop it and note the swallow (P2 Phase 3).
+      delete (value as { semanticFacts?: unknown }).semanticFacts;
+      logger.debug({
+        evt: 'graph.catalog_repo.semantic_facts_dropped',
+        module: 'graph:catalog-repo',
+        reason: 'validation-failed',
+      });
+    }
   }
 }
 

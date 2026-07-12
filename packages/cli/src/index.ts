@@ -31,6 +31,7 @@ import {
 } from '@opensip-cli/core';
 import { Command } from 'commander';
 
+import { buildRuntimeCommandInventory } from './bootstrap/build-runtime-command-inventory.js';
 import {
   bootstrapCli,
   installPreActionHook,
@@ -41,7 +42,6 @@ import {
   buildCommandRegistrationInput,
   resolveStartupExecutionMode,
 } from './bootstrap/index.js';
-import { buildRuntimeCommandInventory } from './bootstrap/build-runtime-command-inventory.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import { buildTopLevelHostSpecs } from './commands/host-command-specs.js';

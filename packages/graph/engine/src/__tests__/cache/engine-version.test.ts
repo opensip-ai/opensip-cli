@@ -47,9 +47,7 @@ describe('stampEngineVersion', () => {
     // mode ⇒ different cacheKey.
     const exact = stampEngineVersion('ts-6.0.3-exact-abc', 'exact');
     const sharded = stampEngineVersion('ts-6.0.3-exact-abc', 'sharded');
-    expect(exact).toBe(
-      `eng=${ENGINE_VERSION}|mode=exact|sig=128.2|dep=1|sem=1|ts-6.0.3-exact-abc`,
-    );
+    expect(exact).toBe(`eng=${ENGINE_VERSION}|mode=exact|sig=128.2|dep=1|sem=1|ts-6.0.3-exact-abc`);
     expect(sharded).toBe(
       `eng=${ENGINE_VERSION}|mode=sharded|sig=128.2|dep=1|sem=1|ts-6.0.3-exact-abc`,
     );

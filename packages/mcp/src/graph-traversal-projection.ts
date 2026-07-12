@@ -93,9 +93,7 @@ function validateTraversalDetail(
 ): Result<void, McpReadError> {
   if (direction === 'path') return ok(undefined);
   if (detail === 'groups' && groupBy === 'none') {
-    return err(
-      readError('invalid-query', 'detail=groups requires groupBy package or file.'),
-    );
+    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
   }
   if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
     return err(
@@ -218,8 +216,7 @@ function assembleTraversalProjection(input: {
   readonly view: OccurrenceCallView;
   readonly selected: WalkSelection;
 }): Result<TraversalProjection, McpReadError> {
-  const { generation, query, filter, projectKey, identity, limit, detail, view, selected } =
-    input;
+  const { generation, query, filter, projectKey, identity, limit, detail, view, selected } = input;
   // One bounded walk inventory — exclusive projection chooses summary/groups/nodes.
   const flattened = flattenRows(view, selected, query.direction, identity);
   const analysis = analyzeTraversal(view, selected, flattened, query, identity, detail);
@@ -374,9 +371,7 @@ function facetsForTraversal(
     ...(selected.truncated ? ['walk-node-cap'] : []),
     ...(flattened.truncated ? ['walk-membership-cap'] : []),
   ]);
-  const evidenceReasons = new Set<string>(
-    analysis.evidenceTruncated ? ['hop-evidence-cap'] : [],
-  );
+  const evidenceReasons = new Set<string>(analysis.evidenceTruncated ? ['hop-evidence-cap'] : []);
   const groupingReasons = new Set<string>(
     detail === 'groups' && analysis.groupTruncated ? ['group-key-cap'] : [],
   );

@@ -296,7 +296,10 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
   // ── I-7: parseProject is total over `files` ──────────────────
 
   it('I-7 — parseProject is total: every file is either parsed or in parseErrors', async () => {
-    const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
+    const discovery = await typescriptGraphAdapter.discoverFiles({
+      cwd: dir,
+      diagnosticIntent: 'quiet',
+    });
     const parsed = await typescriptGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
