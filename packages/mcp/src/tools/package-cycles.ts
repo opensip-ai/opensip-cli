@@ -31,8 +31,9 @@ export function registerPackageCycles(server: McpStdioServer, deps: McpToolDeps)
       title: 'Package dependency cycles',
       description:
         'Find non-trivial package strongly-connected components (cycles) for call, import, or ' +
-        'combined edges. Returns member packages and up to 50 proving edges per component with ' +
-        'total proof counts and coverage when more exist.',
+        'combined edges. Intra-package (self) aggregate edges are excluded, so every returned ' +
+        'component has at least two distinct packages. Returns member packages and up to 50 ' +
+        'proving edges per component with total proof counts and coverage when more exist.',
       inputSchema: packageCyclesInput,
     },
     (args) => queryPackageCycles(deps, args),

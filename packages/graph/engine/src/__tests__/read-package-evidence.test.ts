@@ -663,7 +663,7 @@ describe('buildPackageEvidence', () => {
 });
 
 describe('buildPackageScc', () => {
-  it('finds deterministic call/import self and multi-package cycles with labelled proofs', () => {
+  it('finds deterministic multi-package call/import cycles with labelled proofs', () => {
     const catalog = fixture();
     const callCycles = buildPackageScc(catalog, buildIndexes(catalog), {
       edgeKind: 'call',
@@ -690,6 +690,11 @@ describe('buildPackageScc', () => {
         }),
       ]),
     );
+    // No returned component is a singleton, and no proof edge is a self edge.
+    for (const component of callCycles.value.components) {
+      expect(component.packages.length).toBeGreaterThanOrEqual(2);
+      for (const edge of component.proofEdges) expect(edge.from).not.toBe(edge.to);
+    }
 
     const importCycles = buildPackageScc(catalog, buildIndexes(catalog), {
       edgeKind: 'import',
@@ -702,6 +707,37 @@ describe('buildPackageScc', () => {
       importCycles.ok &&
         importCycles.value.components[0]?.proofEdges.every((edge) => edge.kind === 'import'),
     ).toBe(true);
+  });
+
+  it('returns no components for a self-edges-only graph (P2 Phase 1.1)', () => {
+    // Two packages, each with ONLY intra-package edges — a package depending on
+    // itself is not a package cycle, so no SCC is returned.
+    const catalog = catalogOf({
+      aOne: [occurrence({ bodyHash: 'a1', simpleName: 'a1', filePath: 'packages/a/src/one.ts', package: 'pkg-a', calls: [call('a2')] })],
+      aTwo: [occurrence({ bodyHash: 'a2', simpleName: 'a2', filePath: 'packages/a/src/two.ts', package: 'pkg-a', calls: [call('a1')] })],
+      bOne: [occurrence({ bodyHash: 'b1', simpleName: 'b1', filePath: 'packages/b/src/one.ts', package: 'pkg-b', calls: [call('b2')] })],
+      bTwo: [occurrence({ bodyHash: 'b2', simpleName: 'b2', filePath: 'packages/b/src/two.ts', package: 'pkg-b', calls: [call('b1')] })],
+    });
+    for (const edgeKind of ['call', 'import', 'combined'] as const) {
+      const result = buildPackageScc(catalog, buildIndexes(catalog), { edgeKind, filter: productionFilter });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.components).toEqual([]);
+    }
+  });
+
+  it('preserves both call and import proof kinds for a combined multi-package cycle', () => {
+    const combined = buildPackageScc(fixture(), buildIndexes(fixture()), {
+      edgeKind: 'combined',
+      filter: productionFilter,
+    });
+    expect(combined.ok).toBe(true);
+    if (!combined.ok) return;
+    const cycle = combined.value.components.find((c) => c.packages.join(',') === 'pkg-a,pkg-b');
+    expect(cycle).toBeDefined();
+    const kinds = new Set(cycle?.proofEdges.map((e) => e.kind));
+    expect(kinds.has('call')).toBe(true);
+    expect(kinds.has('import')).toBe(true);
   });
 
   it('caps proving edges independently and propagates partial coverage', () => {
@@ -725,7 +761,9 @@ describe('buildPackageScc', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.components[0]?.totalProofEdges).toBe(64);
+    // 8 packages each call all 8 targets; the 8 self edges are excluded from the
+    // SCC (P2 Phase 1.1), leaving 8x7 = 56 cross-package proof edges.
+    expect(result.value.components[0]?.totalProofEdges).toBe(56);
     expect(result.value.components[0]?.proofEdges).toHaveLength(50);
     expect(result.value.coverage).toMatchObject({
       complete: false,
