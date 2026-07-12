@@ -96,14 +96,18 @@ function* matchingSymbolRefs(
   for (const occurrence of indexes.byOccId.values()) {
     if (occurrence.kind === 'module-init') continue;
     if (!matchesGraphSourceFilterWithRoles(occurrence, query.filter, matcher)) continue;
-    if (!matchesQuery(occurrence, query.query, query.match)) continue;
+    if (!matchesSymbolSearchQuery(occurrence, query.query, query.match)) continue;
     const ref = toGraphSymbolRef(occurrence);
     if (ref !== undefined) yield ref;
   }
 }
 
-function matchesQuery(
-  occ: { simpleName: string; qualifiedName: string },
+/**
+ * Shared match semantics for symbol search (substring / exact / qualified).
+ * Exported so MCP and other readers reuse one implementation.
+ */
+export function matchesSymbolSearchQuery(
+  occ: { readonly simpleName: string; readonly qualifiedName: string },
   query: string,
   match: SymbolSearchMatch,
 ): boolean {
@@ -135,7 +139,7 @@ function collectSearchWindow(
   for (const occurrence of indexes.byOccId.values()) {
     if (occurrence.kind === 'module-init') continue;
     if (!matchesGraphSourceFilterWithRoles(occurrence, query.filter, matcher)) continue;
-    if (!matchesQuery(occurrence, query.query, query.match)) continue;
+    if (!matchesSymbolSearchQuery(occurrence, query.query, query.match)) continue;
     const ref = toGraphSymbolRef(occurrence);
     if (ref === undefined) {
       omittedMalformed++;

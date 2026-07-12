@@ -24,6 +24,7 @@ import {
   type ReferenceSiteRef,
 } from '@opensip-cli/graph/read';
 
+import { validateCompactQueryDetail } from './compact-query-detail.js';
 import {
   digestNormalizedQuery,
   groupRows,
@@ -76,24 +77,6 @@ type CatalogLoadStatus = 'loaded' | 'missing' | 'unsupported';
 const INVALID_QUERY = 'invalid-query';
 /** Reference scope stamped on every declaration/reference DTO from this port. */
 const CROSS_FILE_SCOPE = 'cross-file' as const;
-
-function validateDetail(
-  detail: CompactQueryDetail,
-  groupBy: DeclarationGroupBy,
-): Result<void, McpReadError> {
-  if (detail === 'groups' && groupBy === 'none') {
-    return err(readError(INVALID_QUERY, 'detail=groups requires groupBy package or file.'));
-  }
-  if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
-    return err(
-      readError(
-        INVALID_QUERY,
-        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
-      ),
-    );
-  }
-  return ok(undefined);
-}
 
 function toDeclarationDto(ref: DeclarationRef): DeclarationRefDto {
   return {
@@ -365,7 +348,7 @@ export class SqliteGraphDeclarationQueries {
     const match = opts?.match ?? 'substring';
     const groupBy = opts?.groupBy ?? 'none';
     const detail: CompactQueryDetail = opts?.detail ?? 'nodes';
-    const detailOk = validateDetail(detail, groupBy);
+    const detailOk = validateCompactQueryDetail(detail, groupBy);
     if (!detailOk.ok) return detailOk;
 
     const queryDigest = digestNormalizedQuery({
@@ -460,7 +443,7 @@ export class SqliteGraphDeclarationQueries {
     const limit = clampLimit(opts?.limit, DEFAULT_REFERENCE_LIMIT);
     const groupBy = opts?.groupBy ?? 'none';
     const detail: CompactQueryDetail = opts?.detail ?? 'summary';
-    const detailOk = validateDetail(detail, groupBy);
+    const detailOk = validateCompactQueryDetail(detail, groupBy);
     if (!detailOk.ok) return detailOk;
 
     const queryDigest = digestNormalizedQuery({

@@ -56,6 +56,7 @@ const EXPECTED = [
   'searchSymbolOccurrences',
   'symbolSearchStableKey',
   'compareSymbolRefs',
+  'matchesSymbolSearchQuery',
   'searchDeclarationFacts',
   'referencesToDeclaration',
   'declarationStableKey',

@@ -473,14 +473,18 @@ function filteredPackageEdges(
   return [...buckets.values()];
 }
 
-function buildPackageEdges(
-  catalog: Catalog,
-  indexes: Indexes,
-  filter: GraphSourceFilter,
-  reasons: Set<string>,
-  cachedFeatures: FeatureTable | undefined,
-  matcher: SourceRoleMatcher,
-): ArchitecturePackageEdgeRow[] {
+/** Shared catalog/filter/reasons bag for architecture family builders. */
+interface ArchitectureFamilyInput {
+  readonly catalog: Catalog;
+  readonly indexes: Indexes;
+  readonly filter: GraphSourceFilter;
+  readonly reasons: Set<string>;
+  readonly cachedFeatures: FeatureTable | undefined;
+  readonly matcher: SourceRoleMatcher;
+}
+
+function buildPackageEdges(input: ArchitectureFamilyInput): ArchitecturePackageEdgeRow[] {
+  const { catalog, indexes, filter, reasons, cachedFeatures, matcher } = input;
   const rows = isCanonicalProductionFilter(filter)
     ? canonicalPackageEdges(catalog, indexes, filter, reasons, cachedFeatures)
     : filteredPackageEdges(catalog, indexes, filter, reasons, matcher);
@@ -489,14 +493,8 @@ function buildPackageEdges(
   return [...selected.rows];
 }
 
-function buildHotspots(
-  catalog: Catalog,
-  indexes: Indexes,
-  filter: GraphSourceFilter,
-  reasons: Set<string>,
-  cachedFeatures: FeatureTable | undefined,
-  matcher: SourceRoleMatcher,
-): ArchitectureHotspot[] {
+function buildHotspots(input: ArchitectureFamilyInput): ArchitectureHotspot[] {
+  const { catalog, indexes, filter, reasons, cachedFeatures, matcher } = input;
   const features = cachedFeatures ?? buildFeatures(catalog, indexes, {}, ['blast']);
   const allTwinCounts = new Map<string, number>();
   const matchingTwinCounts = new Map<string, number>();
@@ -605,14 +603,17 @@ interface RankedPage<T> {
   readonly cursorInvalid: boolean;
 }
 
-function pageRankedFamily<T>(
-  selected: boolean,
-  window: readonly T[],
-  limit: number,
-  afterKey: string | undefined,
-  done: boolean,
-  keyOf: (row: T) => string,
-): RankedPage<T> {
+interface RankedFamilyPageInput<T> {
+  readonly selected: boolean;
+  readonly window: readonly T[];
+  readonly limit: number;
+  readonly afterKey: string | undefined;
+  readonly done: boolean;
+  readonly keyOf: (row: T) => string;
+}
+
+function pageRankedFamily<T>(input: RankedFamilyPageInput<T>): RankedPage<T> {
+  const { selected, window, limit, afterKey, done, keyOf } = input;
   if (!selected) return { rows: [], hasMore: false, cursorInvalid: false };
   const after = resolveStableAnchor(window, afterKey, done, keyOf);
   if (after === null) return { rows: [], hasMore: false, cursorInvalid: true };
@@ -664,31 +665,35 @@ export function buildArchitectureView(
     const counts = includeMetrics
       ? countArchitectureNodes(indexes, filter, reasons, matcher)
       : { occurrenceCount: 0, bodyHashes: new Set<string>(), packageNames: new Set<string>() };
-    const packageEdges = includePackageEdges
-      ? buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures, matcher)
-      : [];
-    const hotspots = includeHotspots
-      ? buildHotspots(catalog, indexes, filter, reasons, cachedFeatures, matcher)
-      : [];
+    const familyInput: ArchitectureFamilyInput = {
+      catalog,
+      indexes,
+      filter,
+      reasons,
+      cachedFeatures,
+      matcher,
+    };
+    const packageEdges = includePackageEdges ? buildPackageEdges(familyInput) : [];
+    const hotspots = includeHotspots ? buildHotspots(familyInput) : [];
     const packageWindow = includePackageEdges ? packageEdges.slice(0, topN) : [];
     const hotspotWindow = includeHotspots ? hotspots.slice(0, topN) : [];
 
-    const packagePage = pageRankedFamily(
-      includePackageEdges,
-      packageWindow,
+    const packagePage = pageRankedFamily({
+      selected: includePackageEdges,
+      window: packageWindow,
       limit,
-      query.afterPackageEdgeKey,
-      query.packageEdgesDone === true,
-      packageEdgeStableKey,
-    );
-    const hotspotPage = pageRankedFamily(
-      includeHotspots,
-      hotspotWindow,
+      afterKey: query.afterPackageEdgeKey,
+      done: query.packageEdgesDone === true,
+      keyOf: packageEdgeStableKey,
+    });
+    const hotspotPage = pageRankedFamily({
+      selected: includeHotspots,
+      window: hotspotWindow,
       limit,
-      query.afterHotspotKey,
-      query.hotspotsDone === true,
-      hotspotStableKey,
-    );
+      afterKey: query.afterHotspotKey,
+      done: query.hotspotsDone === true,
+      keyOf: hotspotStableKey,
+    });
     if (packagePage.cursorInvalid || hotspotPage.cursorInvalid) {
       return err({
         code: 'GRAPH.READ.CURSOR_INVALID',

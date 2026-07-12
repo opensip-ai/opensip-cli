@@ -220,7 +220,14 @@ function assembleTraversalProjection(input: {
   const { generation, query, filter, projectKey, identity, limit, detail, view, selected } = input;
   // One bounded walk inventory — exclusive projection chooses summary/groups/nodes.
   const flattened = flattenRows(view, selected, query.direction, identity);
-  const analysis = analyzeTraversal(view, selected, flattened, query, identity, detail);
+  const analysis = analyzeTraversal({
+    view,
+    selected,
+    flattened,
+    query,
+    identity,
+    detail,
+  });
   const binding: PageBinding = {
     projectKey,
     generationKey: generation.key,
@@ -333,14 +340,17 @@ function nodesProjection(
   });
 }
 
-function analyzeTraversal(
-  view: OccurrenceCallView,
-  selected: WalkSelection,
-  flattened: FlattenedRows,
-  query: TraversalQuery,
-  identity: TraversalIdentity,
-  detail: CompactQueryDetail,
-): TraversalAnalysis {
+interface AnalyzeTraversalInput {
+  readonly view: OccurrenceCallView;
+  readonly selected: WalkSelection;
+  readonly flattened: FlattenedRows;
+  readonly query: TraversalQuery;
+  readonly identity: TraversalIdentity;
+  readonly detail: CompactQueryDetail;
+}
+
+function analyzeTraversal(input: AnalyzeTraversalInput): TraversalAnalysis {
+  const { view, selected, flattened, query, identity, detail } = input;
   const allRows = flattened.rows.map((row) => row.value);
   const groupBy = detail === 'groups' ? (query.groupBy ?? 'none') : 'none';
   const grouped = groupRows(allRows, groupBy, (row, mode) =>

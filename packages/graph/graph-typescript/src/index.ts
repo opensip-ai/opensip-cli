@@ -377,6 +377,15 @@ interface SiteResolution {
   readonly resolvedPackage?: string;
 }
 
+/** Compiler + catalog context threaded through one dependency-site resolve. */
+interface SiteResolveContext {
+  readonly compilerOptions: ts.CompilerOptions;
+  readonly moduleResolutionHost: ts.ModuleResolutionHost;
+  readonly projectDirAbs: string;
+  readonly moduleInitByFilePath: ReadonlyMap<string, string>;
+  readonly manifestIndex: PackageManifestIndex;
+}
+
 /**
  * Resolve a single import site to a bounded {@link SiteResolution}. A source
  * module-init in the catalog resolves to `catalog-source`; a `.d.ts` entry to
@@ -387,12 +396,15 @@ interface SiteResolution {
  */
 function resolveSiteTargets(
   site: TsDependencySiteRecord,
-  compilerOptions: ts.CompilerOptions,
-  moduleResolutionHost: ts.ModuleResolutionHost,
-  projectDirAbs: string,
-  moduleInitByFilePath: ReadonlyMap<string, string>,
-  manifestIndex: PackageManifestIndex,
+  context: SiteResolveContext,
 ): SiteResolution {
+  const {
+    compilerOptions,
+    moduleResolutionHost,
+    projectDirAbs,
+    moduleInitByFilePath,
+    manifestIndex,
+  } = context;
   const resolution = ts.resolveModuleName(
     site.specifier,
     site.sourceFile.fileName,
@@ -542,15 +554,15 @@ function resolveDependencies(
     }
   }
 
+  const resolveContext: SiteResolveContext = {
+    compilerOptions,
+    moduleResolutionHost,
+    projectDirAbs,
+    moduleInitByFilePath,
+    manifestIndex,
+  };
   for (const site of sites) {
-    const r = resolveSiteTargets(
-      site,
-      compilerOptions,
-      moduleResolutionHost,
-      projectDirAbs,
-      moduleInitByFilePath,
-      manifestIndex,
-    );
+    const r = resolveSiteTargets(site, resolveContext);
     const edge = buildDependencyEdge(site, r);
     // Key per owner OCCURRENCE (module-init bodyHash + file + line + column) to
     // match stitchEdges; module-init bodies can collide across trivial files

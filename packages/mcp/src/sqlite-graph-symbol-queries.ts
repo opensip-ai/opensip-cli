@@ -4,13 +4,16 @@ import {
   compareSymbolRefs,
   makeFacet,
   matchesGraphSourceFilterWithRoles,
+  matchesSymbolSearchQuery,
   rollupFacets,
   symbolSearchStableKey,
   UNREQUESTED_FACET,
   type GraphSourceFilter,
   type SourceRoleMatcher,
+  type SymbolSearchMatch,
 } from '@opensip-cli/graph/read';
 
+import { validateCompactQueryDetail } from './compact-query-detail.js';
 import {
   boundedTopRows,
   digestNormalizedQuery,
@@ -38,8 +41,6 @@ import type { GraphToolResult, SymbolRef } from './symbol-dto.js';
 
 const MAX_SPAN_CANDIDATES = 500;
 
-type SymbolSearchMatch = 'substring' | 'exact' | 'qualified';
-
 interface SpanCandidateState {
   malformed: boolean;
 }
@@ -60,44 +61,25 @@ function* spanCandidates(
   }
 }
 
-function matchesSearchQuery(
-  occ: { readonly simpleName: string; readonly qualifiedName: string },
-  query: string,
-  match: SymbolSearchMatch,
-): boolean {
-  switch (match) {
-    case 'substring': {
-      return occ.simpleName.toLowerCase().includes(query.toLowerCase());
-    }
-    case 'exact': {
-      return occ.simpleName === query;
-    }
-    case 'qualified': {
-      return occ.qualifiedName === query;
-    }
-    default: {
-      const _exhaustive: never = match;
-      return _exhaustive;
-    }
-  }
+interface MatchingSearchRefsInput {
+  readonly generation: CatalogGeneration;
+  readonly query: string;
+  readonly match: SymbolSearchMatch;
+  readonly filter: GraphSourceFilter;
+  readonly matcher: SourceRoleMatcher;
+  readonly inventoryReasons: Set<string>;
 }
 
 /**
  * Stream-filter catalog occurrences into the exclusive search inventory without
  * retaining an unbounded array when only a count is needed.
  */
-function* matchingSearchRefs(
-  generation: CatalogGeneration,
-  query: string,
-  match: SymbolSearchMatch,
-  filter: GraphSourceFilter,
-  matcher: SourceRoleMatcher,
-  inventoryReasons: Set<string>,
-): Generator<SymbolRef> {
+function* matchingSearchRefs(input: MatchingSearchRefsInput): Generator<SymbolRef> {
+  const { generation, query, match, filter, matcher, inventoryReasons } = input;
   for (const occurrence of generation.indexes.byOccId.values()) {
     if (occurrence.kind === 'module-init') continue;
     if (!matchesGraphSourceFilterWithRoles(occurrence, filter, matcher)) continue;
-    if (!matchesSearchQuery(occurrence, query, match)) continue;
+    if (!matchesSymbolSearchQuery(occurrence, query, match)) continue;
     const ref = toSymbolRef(occurrence);
     if (ref === undefined) {
       inventoryReasons.add('malformed-symbol-omitted');
@@ -105,24 +87,6 @@ function* matchingSearchRefs(
     }
     yield ref;
   }
-}
-
-function validateSearchDetail(
-  detail: CompactQueryDetail,
-  groupBy: 'none' | 'package' | 'file',
-): Result<void, McpReadError> {
-  if (detail === 'groups' && groupBy === 'none') {
-    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
-  }
-  if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
-    return err(
-      readError(
-        'invalid-query',
-        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
-      ),
-    );
-  }
-  return ok(undefined);
 }
 
 function emptySearchDto(detail: CompactQueryDetail): SymbolSearchDto {
@@ -169,7 +133,16 @@ function projectExclusiveSearch(
     binding,
   } = input;
   const inventoryReasons = new Set<string>();
-  const inventory = [...matchingSearchRefs(gen, query, match, filter, matcher, inventoryReasons)];
+  const inventory = [
+    ...matchingSearchRefs({
+      generation: gen,
+      query,
+      match,
+      filter,
+      matcher,
+      inventoryReasons,
+    }),
+  ];
   inventory.sort(compareSymbolRefs);
   const totalMatches = inventory.length;
   const pageInput = {
@@ -280,7 +253,7 @@ export class SqliteGraphSymbolQueries {
     const match = opts?.match ?? 'substring';
     const groupBy = opts?.groupBy ?? 'none';
     const detail: CompactQueryDetail = opts?.detail ?? 'nodes';
-    const detailOk = validateSearchDetail(detail, groupBy);
+    const detailOk = validateCompactQueryDetail(detail, groupBy);
     if (!detailOk.ok) return detailOk;
 
     const queryDigest = digestNormalizedQuery({

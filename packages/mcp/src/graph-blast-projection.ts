@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 import {
   codePointSortKey,
   compareCodePointStrings,
@@ -10,9 +10,12 @@ import {
   type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
 
+import {
+  validateCompactQueryDetail,
+  type CompactGroupBy,
+} from './compact-query-detail.js';
 import { digestNormalizedQuery, groupRows, pageRows } from './graph-query-page.js';
 import { toSymbolRef } from './graph-read-projection.js';
-import { readError } from './mcp-error.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { CompactQueryDetail, GraphReadPort } from './graph-read-port.js';
@@ -49,26 +52,6 @@ export interface BlastMemberProjectionInput {
   readonly projectKey: string;
 }
 
-type GroupByMode = 'none' | 'package' | 'file';
-
-function validateDetail(
-  detail: CompactQueryDetail,
-  groupBy: GroupByMode,
-): Result<void, McpReadError> {
-  if (detail === 'groups' && groupBy === 'none') {
-    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
-  }
-  if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
-    return err(
-      readError(
-        'invalid-query',
-        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
-      ),
-    );
-  }
-  return ok(undefined);
-}
-
 export function projectBlastMembers(
   input: BlastMemberProjectionInput,
 ): Result<BlastMemberProjection, McpReadError> {
@@ -76,7 +59,7 @@ export function projectBlastMembers(
   const limit = boundedLimit(options?.limit);
   const detail: CompactQueryDetail = options?.detail ?? 'summary';
   const groupBy = options?.groupBy ?? 'none';
-  const detailOk = validateDetail(detail, groupBy);
+  const detailOk = validateCompactQueryDetail(detail, groupBy);
   if (!detailOk.ok) return detailOk;
 
   const allOccurrences = generation.indexes.occurrencesByHash.get(bodyHash) ?? [];
@@ -150,7 +133,7 @@ function projectExclusiveBlast(input: {
     readonly detail: CompactQueryDetail;
   };
   readonly matching: readonly SymbolRef[];
-  readonly groupBy: GroupByMode;
+  readonly groupBy: CompactGroupBy;
   readonly detail: CompactQueryDetail;
   readonly binding: {
     readonly projectKey: string;

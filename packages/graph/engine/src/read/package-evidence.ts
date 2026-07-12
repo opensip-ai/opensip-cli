@@ -480,18 +480,21 @@ function applyCanonicalCounts(input: CanonicalCountInput): BoundedBucketState<Mu
   return canonical;
 }
 
-function buildCallRows(
-  catalog: Catalog,
-  indexes: Indexes,
-  query: PackageEvidenceQuery,
-  reasons: Set<string>,
-  cachedFeatures: FeatureTable | undefined,
-  matcher: SourceRoleMatcher,
-): {
+interface BuildCallRowsInput {
+  readonly catalog: Catalog;
+  readonly indexes: Indexes;
+  readonly query: PackageEvidenceQuery;
+  readonly reasons: Set<string>;
+  readonly cachedFeatures: FeatureTable | undefined;
+  readonly matcher: SourceRoleMatcher;
+}
+
+function buildCallRows(input: BuildCallRowsInput): {
   rows: PackageCallEvidenceRow[];
   evidence: PackageCallEvidence[];
   totalEvidence: number;
 } {
+  const { catalog, indexes, query, reasons, cachedFeatures, matcher } = input;
   const collected = collectCallBuckets(catalog, indexes, query, reasons, matcher);
   const buckets = applyCanonicalCounts({
     catalog,
@@ -732,24 +735,35 @@ function getImportBucket(
   );
 }
 
-function appendImportEvidence(
-  buckets: BoundedBucketState<MutableImportBucket>,
-  allEvidence: PackageImportEvidence[],
-  evidence: PackageImportEvidence,
-  reasons: Set<string>,
-  count: { value: number },
-  limits: { readonly sampleLimit: number; readonly evidenceLimit: number },
-): void {
-  const bucket = getImportBucket(buckets, evidence, reasons);
+interface ImportEvidenceSink {
+  readonly buckets: BoundedBucketState<MutableImportBucket>;
+  readonly allEvidence: PackageImportEvidence[];
+  readonly reasons: Set<string>;
+  readonly count: { value: number };
+  readonly limits: { readonly sampleLimit: number; readonly evidenceLimit: number };
+}
+
+function appendImportEvidence(sink: ImportEvidenceSink, evidence: PackageImportEvidence): void {
+  const bucket = getImportBucket(sink.buckets, evidence, sink.reasons);
   if (bucket !== undefined) {
     bucket.count++;
-    if (limits.sampleLimit > 0) {
-      insertUniqueBoundedTopK(bucket.sample, evidence, limits.sampleLimit, compareImportEvidence);
+    if (sink.limits.sampleLimit > 0) {
+      insertUniqueBoundedTopK(
+        bucket.sample,
+        evidence,
+        sink.limits.sampleLimit,
+        compareImportEvidence,
+      );
     }
   }
-  count.value++;
-  if (limits.evidenceLimit > 0) {
-    insertUniqueBoundedTopK(allEvidence, evidence, limits.evidenceLimit, compareImportEvidence);
+  sink.count.value++;
+  if (sink.limits.evidenceLimit > 0) {
+    insertUniqueBoundedTopK(
+      sink.allEvidence,
+      evidence,
+      sink.limits.evidenceLimit,
+      compareImportEvidence,
+    );
   }
 }
 
@@ -811,8 +825,13 @@ function collectDependencyImports(
   )) {
     if (!pairAllowed(source.fromPackage, target.toPackage, query)) continue;
     appendImportEvidence(
-      buckets,
-      evidence,
+      {
+        buckets,
+        allEvidence: evidence,
+        reasons,
+        count: evidenceCount,
+        limits: { sampleLimit: context.sampleLimit, evidenceLimit: context.evidenceLimit },
+      },
       {
         fromPackage: source.fromPackage,
         toPackage: target.toPackage,
@@ -828,9 +847,6 @@ function collectDependencyImports(
         ...(target.classification === undefined ? {} : { classification: target.classification }),
         ...(target.confidence === undefined ? {} : { confidence: target.confidence }),
       },
-      reasons,
-      evidenceCount,
-      { sampleLimit: context.sampleLimit, evidenceLimit: context.evidenceLimit },
     );
   }
 }
@@ -975,7 +991,14 @@ export function buildPackageEvidence(
     const importReasons = new Set<string>();
     const calls =
       query.edgeKind === 'call' || query.edgeKind === 'combined'
-        ? buildCallRows(catalog, indexes, query, callReasons, cachedFeatures, matcher)
+        ? buildCallRows({
+            catalog,
+            indexes,
+            query,
+            reasons: callReasons,
+            cachedFeatures,
+            matcher,
+          })
         : { rows: [], evidence: [], totalEvidence: 0 };
     const imports =
       query.edgeKind === 'import' || query.edgeKind === 'combined'

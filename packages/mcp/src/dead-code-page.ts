@@ -1,6 +1,6 @@
 /** Bounded filter-first projection over canonical graph orphan findings. */
 
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 import {
   codePointSortKey,
   compareCodePointStrings,
@@ -18,9 +18,9 @@ import {
   type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
 
+import { validateCompactQueryDetail } from './compact-query-detail.js';
 import { boundedTopRows, groupRows, pageRows, type GroupSummary } from './graph-query-page.js';
 import { toDeadCodeDto } from './graph-read-projection.js';
-import { readError } from './mcp-error.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { CompactQueryDetail, DeadCodeDto, DeadCodeResultDto } from './graph-read-port.js';
@@ -62,24 +62,6 @@ export function deadCodeStableKey(row: DeadCodeDto): string {
     codePointSortKey(row.message),
     codePointSortKey(row.suggestion ?? ''),
   ].join('|');
-}
-
-function validateDetail(
-  detail: CompactQueryDetail,
-  groupBy: 'none' | 'package' | 'file',
-): Result<void, McpReadError> {
-  if (detail === 'groups' && groupBy === 'none') {
-    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
-  }
-  if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
-    return err(
-      readError(
-        'invalid-query',
-        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
-      ),
-    );
-  }
-  return ok(undefined);
 }
 
 function countDistribution(
@@ -138,7 +120,7 @@ export function pageDeadCode(input: DeadCodePageInput): Result<DeadCodePage, Mcp
     cursor,
     cachedFeatures,
   } = input;
-  const detailOk = validateDetail(detail, groupBy);
+  const detailOk = validateCompactQueryDetail(detail, groupBy);
   if (!detailOk.ok) return detailOk;
 
   const features =

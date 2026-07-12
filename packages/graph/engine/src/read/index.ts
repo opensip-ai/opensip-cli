@@ -51,6 +51,7 @@ export {
   searchSymbolOccurrences,
   symbolSearchStableKey,
   compareSymbolRefs,
+  matchesSymbolSearchQuery,
 } from './symbol-search.js';
 export {
   buildArchitectureView,
