@@ -12,10 +12,11 @@ const CALLEES_SPEC: CallWalkToolSpec = {
   title: 'Callees of a symbol',
   description:
     'Find the callees of a symbol (forward call graph), out to `depth` levels (default 5, ' +
-    'max 5; hard walk-node cap 2000). Default identity is occurrence-precise; pass ' +
+    'max 5; hard walk-node cap 2000). detail defaults to nodes (paged concrete callees). ' +
+    'Pass detail=summary for counts only, or detail=groups with groupBy=package|file for ' +
+    'group pages without member nodes. Default identity is occurrence-precise; pass ' +
     'identity=body-twin-union for endpoint-filtered twin reachability. Filters apply to both ' +
-    'edge endpoints before grouping. Unresolved reverse calls cannot be attributed to a ' +
-    'requested target. Pass symbolId from search_symbols/get_symbol.',
+    'edge endpoints before projection. Pass symbolId from search_symbols/get_symbol.',
   direction: 'callees',
 };
 

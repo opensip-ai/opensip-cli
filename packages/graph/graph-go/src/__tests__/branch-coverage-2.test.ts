@@ -49,7 +49,7 @@ function discoverAndParse(): {
   readonly files: readonly string[];
   readonly project: GoParsedProject;
 } {
-  const discovery = goGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = goGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

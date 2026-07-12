@@ -31,9 +31,7 @@ function matchesGraphSourceFilter(
   return matchesGraphSourceFilterWithRoles(row, filter, emptyMatcher);
 }
 
-function unwrapMatcher(
-  result: ReturnType<typeof compileSourceRoleMatcher>,
-): SourceRoleMatcher {
+function unwrapMatcher(result: ReturnType<typeof compileSourceRoleMatcher>): SourceRoleMatcher {
   if (!result.ok) throw new Error(`expected ok matcher, got ${result.error.code}`);
   return result.value;
 }
@@ -254,25 +252,33 @@ describe('matchesGraphSourceFilterWithRoles (P2 Phase 1.4)', () => {
 
   it('reclassifies a glob-matched non-test file as a test source', () => {
     const matcher = unwrapMatcher(
-      compileSourceRoleMatcher(
-        policy(['packages/test-support/**']),
-        [supportFile.filePath],
-        { maxFiles: 10 },
-      ),
+      compileSourceRoleMatcher(policy(['packages/test-support/**']), [supportFile.filePath], {
+        maxFiles: 10,
+      }),
     );
     expect(effectiveTestSource(supportFile, matcher)).toBe(true);
     // production scope now EXCLUDES the reclassified support file…
     expect(
-      matchesGraphSourceFilterWithRoles(supportFile, { ...baseFilter(), sourceScope: 'production' }, matcher),
+      matchesGraphSourceFilterWithRoles(
+        supportFile,
+        { ...baseFilter(), sourceScope: 'production' },
+        matcher,
+      ),
     ).toBe(false);
     // …and test scope INCLUDES it.
     expect(
-      matchesGraphSourceFilterWithRoles(supportFile, { ...baseFilter(), sourceScope: 'test' }, matcher),
+      matchesGraphSourceFilterWithRoles(
+        supportFile,
+        { ...baseFilter(), sourceScope: 'test' },
+        matcher,
+      ),
     ).toBe(true);
   });
 
   it('is exactly the matcher-less filter when the policy is empty', () => {
-    const matcher = unwrapMatcher(compileSourceRoleMatcher(policy([]), [supportFile.filePath], { maxFiles: 10 }));
+    const matcher = unwrapMatcher(
+      compileSourceRoleMatcher(policy([]), [supportFile.filePath], { maxFiles: 10 }),
+    );
     for (const scope of ['all', 'production', 'test'] as const) {
       const filter: GraphSourceFilter = { ...baseFilter(), sourceScope: scope };
       expect(matchesGraphSourceFilterWithRoles(supportFile, filter, matcher)).toBe(

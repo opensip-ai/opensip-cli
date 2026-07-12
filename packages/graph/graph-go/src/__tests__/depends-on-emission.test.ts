@@ -59,7 +59,7 @@ function runAdapter(): {
       >
     | undefined;
 } {
-  const discovery = goGraphAdapter.discoverFiles({ cwd: fixtureRoot });
+  const discovery = goGraphAdapter.discoverFiles({ cwd: fixtureRoot, diagnosticIntent: 'quiet' });
   const parsed = goGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

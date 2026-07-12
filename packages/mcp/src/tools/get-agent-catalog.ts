@@ -30,7 +30,24 @@ export function registerGetAgentCatalog(server: McpStdioServer, deps: McpToolDep
     () => {
       const outcome = deps.results.agentCatalog();
       if (!outcome.ok) return errorResult(outcome.error);
-      return jsonResult(outcome.value);
+      const catalog = outcome.value;
+      const surface = deps.mcpSurface?.();
+      if (surface === undefined) return jsonResult(catalog);
+      // Additive MCP-only overlay — never forced into contracts AgentCatalog.
+      return jsonResult({
+        ...(catalog as unknown as Record<string, unknown>),
+        mcp: {
+          version: surface.version,
+          surfaceEpoch: surface.surfaceEpoch,
+          toolNames: surface.toolNames,
+          toolCount: surface.toolCount,
+          mutationPosture: surface.mutationPosture,
+          project: {
+            root: surface.projectRoot,
+            scope: surface.projectScope,
+          },
+        },
+      });
     },
   );
 }

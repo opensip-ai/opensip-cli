@@ -60,12 +60,11 @@ export interface GraphPageMeta {
 }
 
 /**
- * MCP graph coverage — the compact top-level summary PROJECTED from the
- * graph/read facet coverage (P2 Phase 2.1), not a duplicated triple. Task 2.2
- * migrates the envelope to carry the full four-facet {@link GraphReadFacetCoverage};
- * this alias keeps the summary shape tied to the single graph/read roll-up.
+ * MCP graph coverage — the full four-facet graph/read coverage (P2 Phase 2.2).
+ * Top-level `complete`/`truncated`/`reasons` is the conservative roll-up over
+ * requested facets only; facets are authoritative for incompleteness analysis.
  */
-export type GraphCoverage = Pick<GraphReadFacetCoverage, 'complete' | 'truncated' | 'reasons'>;
+export type GraphCoverage = GraphReadFacetCoverage;
 
 /** Group summary from bounded `groupBy` projection. */
 export interface GraphGroupSummary {

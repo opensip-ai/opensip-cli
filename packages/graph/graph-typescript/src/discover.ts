@@ -31,25 +31,18 @@ export interface DiscoveryOutput {
 }
 
 /** Resolves the tsconfig for a TS project and returns the in-program source-file set. */
-export function discoverFiles(input: DiscoveryInput): DiscoveryOutput {
-  logger.info({
-    evt: 'graph.discover.start',
-    module: 'graph:discover',
-    projectScope: 'project',
-  });
+export function discoverFiles(
+  input: DiscoveryInput & { readonly diagnosticIntent?: 'normal' | 'quiet' },
+): DiscoveryOutput {
+  // Adapters retain no lifecycle log; callers own aggregate terminal events.
+  // Local helper keeps intent optional; GraphLanguageAdapter.DiscoverInput is required.
+  void input.diagnosticIntent;
+  void logger;
 
   const projectDirAbs = normalizeProjectDir(input.projectDir);
   const tsConfigPathAbs = resolveTsConfigPath(projectDirAbs, input.tsConfigPath);
   const { options, fileNames } = loadTsConfig(tsConfigPathAbs);
   const files = filterToSourceFiles(fileNames);
-
-  logger.info({
-    evt: 'graph.discover.complete',
-    module: 'graph:discover',
-    projectScope: 'project',
-    configDetected: true,
-    fileCount: files.length,
-  });
 
   return {
     projectDirAbs,

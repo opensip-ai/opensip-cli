@@ -87,6 +87,7 @@ async function runAdapter(): Promise<{
 }> {
   const discovery = await typescriptGraphAdapter.discoverFiles({
     cwd: fixtureRoot,
+    diagnosticIntent: 'quiet',
   });
   const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
@@ -269,11 +270,14 @@ describe('TypeScript adapter — dependency classification (P2 Phase 0)', () => 
         `import type { Shape } from './dep.js';`, // import-declaration, type-only
         `import { type Shape as S2, value as v2 } from './dep.js';`, // import-declaration, mixed
         `import './dep.js';`, // import-declaration, side-effect
+        `import equalsRuntime = require('./dep.js');`, // import-equals, runtime
+        `import type equalsType = require('./dep.js');`, // import-equals, type-only
         `export { value as reValue } from './dep.js';`, // re-export, runtime
         `export type { Shape as ReShape } from './dep.js';`, // re-export, type-only
+        `export { value as reMixed, type Shape as ReMixedShape } from './dep.js';`, // re-export, mixed
         `const lazy = () => import('./dep.js');`, // dynamic-import, runtime
         `const cjs = require('./dep.js');`, // commonjs-require, runtime
-        `export function forms(): unknown { return [value, v2, S2, lazy, cjs]; }`,
+        `export function forms(): unknown { return [value, v2, S2, equalsRuntime, lazy, cjs]; }`,
         '',
       ].join('\n'),
     );
@@ -292,13 +296,32 @@ describe('TypeScript adapter — dependency classification (P2 Phase 0)', () => 
       'import-declaration:type-only',
       'import-declaration:mixed',
       'import-declaration:side-effect',
+      'import-equals:runtime',
+      'import-equals:type-only',
       're-export:runtime',
       're-export:type-only',
+      're-export:mixed',
       'dynamic-import:runtime',
       'commonjs-require:runtime',
     ]) {
       expect(combos, `emitted ${expected}`).toContain(expected);
     }
+  });
+
+  it('rejects impossible form+role pairs at the closed validator', () => {
+    // Closed map: producers must never emit these combinations; CatalogRepo
+    // re-validates after JSON decode.
+    expect(isValidDependencyFormRole('dynamic-import', 'type-only')).toBe(false);
+    expect(isValidDependencyFormRole('dynamic-import', 'mixed')).toBe(false);
+    expect(isValidDependencyFormRole('dynamic-import', 'side-effect')).toBe(false);
+    expect(isValidDependencyFormRole('commonjs-require', 'type-only')).toBe(false);
+    expect(isValidDependencyFormRole('import-equals', 'mixed')).toBe(false);
+    expect(isValidDependencyFormRole('import-equals', 'side-effect')).toBe(false);
+    expect(isValidDependencyFormRole('re-export', 'side-effect')).toBe(false);
+    expect(isValidDependencyFormRole('import-declaration', 'runtime')).toBe(true);
+    expect(isValidDependencyFormRole('import-equals', 'runtime')).toBe(true);
+    expect(isValidDependencyFormRole('import-equals', 'type-only')).toBe(true);
+    expect(isValidDependencyFormRole('re-export', 'mixed')).toBe(true);
   });
 
   it('classifies an internal import as catalog-source and an external as external', async () => {

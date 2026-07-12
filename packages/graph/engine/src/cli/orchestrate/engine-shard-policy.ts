@@ -53,6 +53,7 @@ async function resolveWorkspaceShards(input: DefaultEngineShardPolicyInput): Pro
   try {
     const discovery = await input.graphAdapter.discoverFiles({
       cwd: input.projectRoot,
+      diagnosticIntent: 'quiet',
     });
     return partitionFilesIntoShards({
       canonicalFiles: resolveCanonicalFileSet(discovery.files),
@@ -77,6 +78,7 @@ async function resolveSyntheticShards(
   try {
     discovery = await input.graphAdapter.discoverFiles({
       cwd: input.projectRoot,
+      diagnosticIntent: 'quiet',
     });
   } catch {
     return recoverShardPolicyFailure(input, { shards: [] }, 'synthetic-file-discovery');

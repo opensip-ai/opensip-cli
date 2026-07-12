@@ -12,11 +12,11 @@ const WHO_CALLS_SPEC: CallWalkToolSpec = {
   title: 'Who calls a symbol',
   description:
     'Find the callers of a symbol (reverse call graph), out to `depth` levels (default 5, ' +
-    'max 5; hard walk-node cap 2000). Default identity is occurrence-precise; pass ' +
-    'identity=body-twin-union for endpoint-filtered twin reachability (never the global ' +
-    'body-hash union). Filters (package/filePath/filePrefix/kinds/sourceScope/generated) ' +
-    'apply to both edge endpoints before grouping. page.nextCursor is independent of ' +
-    'coverage.truncated. Pass symbolId from search_symbols/get_symbol.',
+    'max 5; hard walk-node cap 2000). detail defaults to nodes (paged concrete callers). ' +
+    'Pass detail=summary for counts only, or detail=groups with groupBy=package|file for ' +
+    'group pages without member nodes. Default identity is occurrence-precise; pass ' +
+    'identity=body-twin-union for endpoint-filtered twin reachability. Filters apply to both ' +
+    'edge endpoints before projection. Pass symbolId from search_symbols/get_symbol.',
   direction: 'callers',
 };
 

@@ -49,7 +49,7 @@ function runAdapter(): {
     | ReadonlyMap<string, readonly { readonly to: readonly string[]; readonly specifier: string }[]>
     | undefined;
 } {
-  const discovery = goGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = goGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -155,7 +155,7 @@ describe('graph-go branch coverage', () => {
       `package main\nfunc unterminated() int { return 1 /* trailing comment that never closes`,
       'utf8',
     );
-    const discovery = goGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = goGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,

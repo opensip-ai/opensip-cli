@@ -3,6 +3,7 @@
  */
 
 import {
+  compactDetail,
   exactFilePath,
   filePrefix,
   generatedPolicy,
@@ -24,10 +25,10 @@ export function registerFindDeadCode(server: McpStdioServer, deps: McpToolDeps):
     {
       title: 'Find dead code',
       description:
-        'List symbols unreachable from any entry point (graph orphan-subtree rule). Filters ' +
-        '(package/filePath/filePrefix/kinds/visibilities/sourceScope/generated) apply BEFORE ' +
-        'pagination. Each finding carries symbolId + reason. page.nextCursor continues a full ' +
-        'orphan evaluation; coverage.truncated is reserved for hard evaluation caps, not paging. ' +
+        'List symbols unreachable from any entry point (graph orphan-subtree rule). Default ' +
+        'detail=summary returns total orphan count and reason/rule distributions without ' +
+        'concrete rows. Pass detail=nodes for paged findings, or detail=groups with ' +
+        'groupBy=package|file for group counts only. Filters apply BEFORE pagination. ' +
         'Reads the catalog only — no filesystem walk.',
       inputSchema: strictInput({
         packages: packageArray(),
@@ -37,6 +38,7 @@ export function registerFindDeadCode(server: McpStdioServer, deps: McpToolDeps):
         visibilities: visibilities(),
         sourceScope: sourceScope(),
         generated: generatedPolicy(),
+        detail: compactDetail('summary'),
         ...pageFields(),
       }),
     },
@@ -45,6 +47,7 @@ export function registerFindDeadCode(server: McpStdioServer, deps: McpToolDeps):
         limit: args.limit,
         cursor: args.cursor,
         groupBy: args.groupBy,
+        detail: args.detail ?? 'summary',
         filter: {
           packages: args.packages,
           filePath: args.filePath,

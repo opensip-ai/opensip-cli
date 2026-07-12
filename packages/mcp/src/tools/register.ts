@@ -16,8 +16,17 @@ import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
 
 /**
- * Register the exact 19-tool default protocol inventory. `refresh_graph` is the
- * sole graph mutation; explicit mutation mode adds only `repair_apply_verify`.
+ * Default protocol surface epoch. Increment when the registered default tool
+ * set changes (Phase 3 added search_declarations + references_to → epoch 3;
+ * Phase 4 added get_runtime_wiring and Phase 6 added get_agent_catalog → epoch 4).
+ * Actual registration names remain authoritative via server.describeSurface().
+ */
+export const MCP_SURFACE_EPOCH = 4;
+
+/**
+ * Register the default protocol inventory (21 tools with Phase 3 declaration
+ * tools). `refresh_graph` is the sole graph mutation; explicit mutation mode
+ * adds only `repair_apply_verify` (22 tools).
  */
 export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): void {
   // ── Graph tools (over GraphReadPort) ──────────────────────────────

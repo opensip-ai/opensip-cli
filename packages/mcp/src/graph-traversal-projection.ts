@@ -2,6 +2,9 @@ import { err, ok, type Result } from '@opensip-cli/core';
 import {
   buildOccurrenceCallView,
   codePointSortKey,
+  makeFacet,
+  rollupFacets,
+  UNREQUESTED_FACET,
   type GraphSourceFilter,
   type OccurrenceCallView,
   type SourceRoleMatcher,
@@ -27,6 +30,7 @@ import { boundedBfs, MAX_WALK_NODES, reconstructPath } from './tools/graph-walk.
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type {
+  CompactQueryDetail,
   TraversalHopDto,
   TraversalNodeDto,
   TraversalQuery,
@@ -76,6 +80,32 @@ interface TraversalAnalysis {
   readonly evidenceTruncated: boolean;
 }
 
+function effectiveDetail(query: TraversalQuery): CompactQueryDetail {
+  // Ordered path/hop semantics stay on the path DTO — never compact-summary.
+  if (query.direction === 'path') return 'nodes';
+  return query.detail ?? 'nodes';
+}
+
+function validateTraversalDetail(
+  detail: CompactQueryDetail,
+  groupBy: 'none' | 'package' | 'file',
+  direction: TraversalQuery['direction'],
+): Result<void, McpReadError> {
+  if (direction === 'path') return ok(undefined);
+  if (detail === 'groups' && groupBy === 'none') {
+    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
+  }
+  if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
+    return err(
+      readError(
+        'invalid-query',
+        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
+      ),
+    );
+  }
+  return ok(undefined);
+}
+
 export function projectTraversal(
   generation: CatalogGeneration | undefined,
   query: TraversalQuery,
@@ -85,11 +115,16 @@ export function projectTraversal(
 ): Result<TraversalProjection, McpReadError> {
   const identity = query.identity ?? 'occurrence';
   const limit = boundedLimit(query.limit);
-  const queryDigest = traversalQueryDigest(query, filter, identity);
+  const detail = effectiveDetail(query);
+  const groupBy = query.groupBy ?? 'none';
+  const detailOk = validateTraversalDetail(detail, groupBy, query.direction);
+  if (!detailOk.ok) return detailOk;
+
+  const queryDigest = traversalQueryDigest(query, filter, identity, detail);
   if (generation === undefined) {
     const cursor = rejectCursorWithoutGeneration(query.cursor, { projectKey, queryDigest });
     if (!cursor.ok) return cursor;
-    return ok(emptyProjection(identity, filter, limit));
+    return ok(emptyProjection(identity, filter, limit, detail));
   }
   const cursor = validateCursorBinding({
     projectKey,
@@ -135,7 +170,9 @@ export function projectTraversal(
   if (!view.ok) return err(fromGraphReadError(view.error));
 
   const startKey = identity === 'occurrence' ? query.startSymbolId : start.bodyHash;
-  if (!view.value.members.has(startKey)) return ok(emptyProjection(identity, filter, limit));
+  if (!view.value.members.has(startKey)) {
+    return ok(emptyProjection(identity, filter, limit, detail));
+  }
   const selected = selectWalk(generation, view.value, query, startKey, identity);
   return assembleTraversalProjection({
     generation,
@@ -144,9 +181,28 @@ export function projectTraversal(
     projectKey,
     identity,
     limit,
+    detail,
     view: view.value,
     selected,
   });
+}
+
+type TraversalBaseData = Pick<
+  TraversalSnapshot,
+  | 'found'
+  | 'identityMode'
+  | 'totalMembership'
+  | 'counts'
+  | 'unresolvedAttribution'
+  | 'unresolvedCounts'
+>;
+
+interface PageBinding {
+  readonly projectKey: string;
+  readonly generationKey: string;
+  readonly queryDigest: string;
+  readonly limit: number;
+  readonly cursor?: string;
 }
 
 function assembleTraversalProjection(input: {
@@ -156,60 +212,122 @@ function assembleTraversalProjection(input: {
   readonly projectKey: string;
   readonly identity: TraversalIdentity;
   readonly limit: number;
+  readonly detail: CompactQueryDetail;
   readonly view: OccurrenceCallView;
   readonly selected: WalkSelection;
 }): Result<TraversalProjection, McpReadError> {
-  const { generation, query, filter, projectKey, identity, limit, view, selected } = input;
+  const { generation, query, filter, projectKey, identity, limit, detail, view, selected } = input;
+  // One bounded walk inventory — exclusive projection chooses summary/groups/nodes.
   const flattened = flattenRows(view, selected, query.direction, identity);
-  const binding = {
+  const analysis = analyzeTraversal(view, selected, flattened, query, identity, detail);
+  const binding: PageBinding = {
     projectKey,
     generationKey: generation.key,
-    queryDigest: traversalQueryDigest(query, filter, identity),
+    queryDigest: traversalQueryDigest(query, filter, identity, detail),
     limit,
     ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
   };
+  const baseData: TraversalBaseData = {
+    found: selected.found,
+    identityMode: identity,
+    totalMembership: flattened.totalMembership,
+    counts: analysis.counts,
+    unresolvedAttribution: view.unresolvedAttribution,
+    unresolvedCounts: view.unresolvedCounts,
+  };
+  const coverage = facetsForTraversal(view, selected, flattened, analysis, detail);
+
+  if (detail === 'summary') {
+    return ok(summaryProjection(baseData, coverage, filter, limit));
+  }
+  if (detail === 'groups') {
+    return groupsProjection(baseData, coverage, filter, analysis.groups ?? [], binding);
+  }
+  return nodesProjection(baseData, coverage, filter, {
+    flattened,
+    analysis,
+    query,
+    selected,
+    view,
+    identity,
+    binding,
+  });
+}
+
+function summaryProjection(
+  baseData: TraversalBaseData,
+  coverage: GraphCoverage,
+  filter: GraphSourceFilter,
+  limit: number,
+): TraversalProjection {
+  return {
+    data: { ...baseData, nodes: [], unresolved: [] },
+    options: { coverage, page: { limit }, filter },
+  };
+}
+
+function groupsProjection(
+  baseData: TraversalBaseData,
+  coverage: GraphCoverage,
+  filter: GraphSourceFilter,
+  groups: readonly { readonly key: string; readonly count: number }[],
+  binding: PageBinding,
+): Result<TraversalProjection, McpReadError> {
+  const paged = pageRows(groups, binding, (group) => group.key);
+  if (!paged.ok) return paged;
+  return ok({
+    data: { ...baseData, nodes: [], unresolved: [] },
+    options: {
+      coverage,
+      page: {
+        limit: binding.limit,
+        ...(paged.value.nextCursor === undefined ? {} : { nextCursor: paged.value.nextCursor }),
+      },
+      filter,
+      ...(paged.value.rows.length === 0 ? {} : { groups: paged.value.rows }),
+    },
+  });
+}
+
+function nodesProjection(
+  baseData: TraversalBaseData,
+  coverage: GraphCoverage,
+  filter: GraphSourceFilter,
+  input: {
+    readonly flattened: FlattenedRows;
+    readonly analysis: TraversalAnalysis;
+    readonly query: TraversalQuery;
+    readonly selected: WalkSelection;
+    readonly view: OccurrenceCallView;
+    readonly identity: TraversalIdentity;
+    readonly binding: PageBinding;
+  },
+): Result<TraversalProjection, McpReadError> {
+  const { flattened, analysis, query, selected, view, identity, binding } = input;
   const paged = pageRows(flattened.rows, binding, (row) => row.key);
   if (!paged.ok) return paged;
-
-  const analysis = analyzeTraversal(view, selected, flattened, query, identity);
-  const reasons = traversalCoverageReasons(view, selected, flattened, analysis);
-  const weakest = analysis.hops === undefined ? undefined : weakestHopConfidence(analysis.hops);
   const pageNodes = paged.value.rows.map((row) => row.value);
   const path =
     query.direction === 'path' && selected.found
       ? pathSymbols(view, selected.outputKeys, query, identity)
       : undefined;
-
+  const weakest = analysis.hops === undefined ? undefined : weakestHopConfidence(analysis.hops);
   return ok({
     data: {
-      found: selected.found,
+      ...baseData,
       nodes: pageNodes,
+      unresolved: analysis.unresolved,
       ...(path === undefined ? {} : { path }),
       ...(analysis.hops === undefined ? {} : { hops: analysis.hops }),
       ...(weakest === undefined ? {} : { weakestConfidence: weakest }),
-      identityMode: identity,
-      totalMembership: flattened.totalMembership,
-      counts: analysis.counts,
-      unresolved: analysis.unresolved,
-      unresolvedCounts: view.unresolvedCounts,
-      unresolvedAttribution: view.unresolvedAttribution,
     },
     options: {
-      coverage: {
-        complete: reasons.length === 0,
-        truncated:
-          view.coverage.truncated ||
-          selected.truncated ||
-          flattened.truncated ||
-          analysis.evidenceTruncated,
-        reasons,
-      },
+      coverage,
       page: {
-        limit,
+        limit: binding.limit,
         ...(paged.value.nextCursor === undefined ? {} : { nextCursor: paged.value.nextCursor }),
       },
       filter,
-      ...(analysis.groups === undefined ? {} : { groups: analysis.groups }),
     },
   });
 }
@@ -220,40 +338,49 @@ function analyzeTraversal(
   flattened: FlattenedRows,
   query: TraversalQuery,
   identity: TraversalIdentity,
+  detail: CompactQueryDetail,
 ): TraversalAnalysis {
   const allRows = flattened.rows.map((row) => row.value);
-  const grouped = groupRows(allRows, query.groupBy ?? 'none', (row, mode) =>
+  const groupBy = detail === 'groups' ? (query.groupBy ?? 'none') : 'none';
+  const grouped = groupRows(allRows, groupBy, (row, mode) =>
     mode === 'package' ? row.symbol.package : row.symbol.filePath,
   );
-  const counts = view.counts;
-  const unresolved = view.unresolved;
   const hops =
     query.direction === 'path' ? pathHops(view, selected.outputKeys, identity) : undefined;
   return {
     allRows,
     ...(grouped.groups === undefined ? {} : { groups: grouped.groups }),
     groupTruncated: grouped.groupTruncated,
-    counts,
-    unresolved,
+    counts: view.counts,
+    unresolved: view.unresolved,
     ...(hops === undefined ? {} : { hops }),
     evidenceTruncated:
       query.direction === 'path' && hasTruncatedHopEvidence(view, selected.outputKeys, identity),
   };
 }
 
-function traversalCoverageReasons(
+function facetsForTraversal(
   view: OccurrenceCallView,
   selected: WalkSelection,
   flattened: FlattenedRows,
   analysis: TraversalAnalysis,
-): string[] {
-  return [
+  detail: CompactQueryDetail,
+): GraphCoverage {
+  const inventoryReasons = new Set<string>([
     ...view.coverage.reasons,
     ...(selected.truncated ? ['walk-node-cap'] : []),
     ...(flattened.truncated ? ['walk-membership-cap'] : []),
-    ...(analysis.evidenceTruncated ? ['hop-evidence-cap'] : []),
-    ...(analysis.groupTruncated ? ['group-key-cap'] : []),
-  ];
+  ]);
+  const evidenceReasons = new Set<string>(analysis.evidenceTruncated ? ['hop-evidence-cap'] : []);
+  const groupingReasons = new Set<string>(
+    detail === 'groups' && analysis.groupTruncated ? ['group-key-cap'] : [],
+  );
+  return rollupFacets({
+    inventory: makeFacet(true, inventoryReasons),
+    evidence: makeFacet(analysis.evidenceTruncated || detail === 'nodes', evidenceReasons),
+    grouping: detail === 'groups' ? makeFacet(true, groupingReasons) : UNREQUESTED_FACET,
+    projection: makeFacet(detail !== 'summary', new Set()),
+  });
 }
 
 function selectWalk(
@@ -363,6 +490,7 @@ function traversalQueryDigest(
   query: TraversalQuery,
   filter: GraphSourceFilter,
   identity: TraversalIdentity,
+  detail: CompactQueryDetail,
 ): string {
   return digestNormalizedQuery({
     op: 'traverse',
@@ -373,6 +501,7 @@ function traversalQueryDigest(
     identity,
     filter,
     groupBy: query.groupBy ?? 'none',
+    detail,
   });
 }
 
@@ -385,6 +514,7 @@ function emptyProjection(
   identityMode: TraversalIdentity,
   filter: GraphSourceFilter,
   limit: number,
+  detail: CompactQueryDetail,
 ): TraversalProjection {
   return {
     data: {
@@ -404,7 +534,12 @@ function emptyProjection(
       unresolvedAttribution: 'owner-only',
     },
     options: {
-      coverage: { complete: true, truncated: false, reasons: [] },
+      coverage: rollupFacets({
+        inventory: makeFacet(true, new Set()),
+        evidence: UNREQUESTED_FACET,
+        grouping: detail === 'groups' ? makeFacet(true, new Set()) : UNREQUESTED_FACET,
+        projection: makeFacet(detail !== 'summary', new Set()),
+      }),
       page: { limit },
       filter,
     },

@@ -20,7 +20,12 @@ const LABELS = {
   catalogResolutionMode: 'exact' as const,
 };
 
-const COVERAGE = { complete: true, truncated: false, reasons: [] as const };
+const COVERAGE = {
+  requested: true,
+  complete: true,
+  truncated: false,
+  reasons: [] as const,
+};
 
 const FROM = {
   symbolId: 'src/a.ts:1:0',
@@ -85,6 +90,9 @@ function callRow(over: Partial<PackageCallEvidenceRow> = {}): PackageCallEvidenc
     countUnit: 'resolved-targets',
     callSiteCount: 1,
     sample: [callEvidence()],
+    sampleReturned: 1,
+    sampleAvailable: 1,
+    sampleLimit: 5,
     coverage: COVERAGE,
     ...over,
   };
@@ -101,6 +109,9 @@ function importRow(over: Partial<PackageImportEvidenceRow> = {}): PackageImportE
     count: 1,
     countUnit: 'import-statements',
     sample: [importEvidence()],
+    sampleReturned: 1,
+    sampleAvailable: 1,
+    sampleLimit: 5,
     coverage: COVERAGE,
     ...over,
   };

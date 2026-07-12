@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-30
+last_verified: 2026-07-11
 release: v0.5.3
 title: "Connect MCP clients (Cursor, Claude Code, Codex)"
 audience: [getting-started, ci-integrators]
@@ -108,8 +108,8 @@ team standardizes in docs/onboarding.
 ### Verify
 
 1. Restart Cursor or reload MCP servers from Settings.
-2. Open the MCP panel — `opensip` should appear with exactly **19 tools** (12 graph, one live runtime-wiring, and 6 result/review). Mutating repair apply/verify is off by default; starting the server with `--allow-mutations` adds only `repair_apply_verify` as a 20th tool.
-3. Ask the agent: *"Use OpenSIP to call `get_architecture` and summarize the graph."*
+2. Open the MCP panel — `opensip` should appear with exactly **21 tools** by default (graph + declaration/reference + package + runtime + results/review). Mutating repair apply/verify is off by default; starting the server with `--allow-mutations` adds only `repair_apply_verify` as a **22nd** tool. Treat the live `listTools` / `get_agent_catalog.mcp` names as authority (defensive registration caps: 256 tools / 128-character names — not targets).
+3. Ask the agent: *"Use OpenSIP to call `get_agent_catalog`, then `get_architecture`, and summarize the graph."*
 4. Ask a result replay question: *"Use OpenSIP MCP to show the latest `fit`
    findings before deciding whether to re-run fit."*
 
@@ -121,13 +121,36 @@ generation cursor keys are distinct; keep filters stable across pages. Call
 call/import package evidence, and `get_runtime_wiring` for live
 manifest/registry/CommandSpec evidence that a static path cannot prove.
 See [ADR-0148](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md)
-for lifecycle/freshness, [ADR-0149](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md)
-for query/evidence bounds, and [ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
+for lifecycle/freshness, [ADR-0153](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)
+for faceted compact query bounds (supersedes ADR-0149),
+[ADR-0152](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0152-dependency-and-declaration-audit-evidence.md) for
+dependency/declaration evidence,
+[ADR-0154](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0154-declarative-runtime-handler-bridge.md) for runtime
+handler bridging, and [ADR-0147](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
 for the public graph-read boundary.
 
-For symbol lookup, `search_symbols` defaults to a case-insensitive substring of
-the simple name. Set `match` to `exact` for a case-sensitive simple-name match or
-to `qualified` for a case-sensitive qualified-name match.
+### Compact audit workflow
+
+1. **Diagnose the connector** with `get_agent_catalog` (version, surface epoch,
+   names/count, mutation posture, root). Compare with initialize/listTools. A
+   rebuilt executable requires a new MCP process/connection — `refresh_graph`
+   cannot repair a cached connector inventory.
+2. **Prefer exclusive detail modes:** `summary` (counts), `groups` (bounded
+   group keys), or `nodes` (rows). Default package samples and cycle proofs are
+   off (opt-in). Architecture defaults to metrics with deterministic top-N.
+3. **Coverage facets:** inventory / evidence / grouping / projection are
+   independent. A complete edge inventory may still omit samples.
+4. **Identity searches** (`search_symbols`, `search_declarations`) default to
+   **20** nodes (caller range 1–500). Unrelated paged tools default to 100 / max
+   500. Final JSON stays under **4 MiB**.
+5. **Declarations:** `search_declarations` → declaration ID → `references_to`
+   (cross-file, exact TypeScript). Keep `search_symbols` callable-only.
+6. **Runtime wiring:** `get_runtime_wiring` exposes stable-content `w1:` inventory
+   and author-declared static-handler bridges against `g1:`. Runtime edges are
+   not call edges; third-party package claims must match admitted identity.
+7. Continue pages with the returned cursor and stable filters. Externally
+   persisted newer catalogs auto-swap on ordinary reads (including runtime-only
+   follow-ups).
 
 ---
 

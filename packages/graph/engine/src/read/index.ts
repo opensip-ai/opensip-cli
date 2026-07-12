@@ -37,13 +37,7 @@ export {
   GRAPH_SYMBOL_PACKAGE_MAX,
 } from './query-contracts.js';
 export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
-export {
-  makeFacet,
-  mergeFacet,
-  rollupFacets,
-  facetsFromFlatCoverage,
-  UNREQUESTED_FACET,
-} from './bounded-view.js';
+export { makeFacet, mergeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
 export type { CoverageFacetSet } from './bounded-view.js';
 export { buildOccurrenceCallView } from './occurrence-call-view.js';
 export {
@@ -121,8 +115,28 @@ export type {
 
 export type { SymbolSearchMatch, SymbolSearchQuery, SymbolSearchView } from './symbol-search.js';
 
+export {
+  searchDeclarationFacts,
+  referencesToDeclaration,
+  declarationStableKey,
+  referenceStableKey,
+  compareDeclarationRefs,
+  compareReferenceSites,
+} from './declaration-reference-view.js';
+export type {
+  DeclarationSearchMatch,
+  DeclarationSearchQuery,
+  DeclarationRef,
+  DeclarationSearchView,
+  ReferencesToQuery,
+  ReferenceSiteRef,
+  ReferencesToView,
+} from './declaration-reference-view.js';
+
 export type {
   ArchitectureViewQuery,
+  ArchitectureSection,
+  ArchitectureFamilySummary,
   LabelledNodeCount,
   LabelledPackageCount,
   LabelledDistribution,

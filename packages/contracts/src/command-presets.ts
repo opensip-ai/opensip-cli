@@ -9,6 +9,7 @@ import {
   type CommonFlagKey,
   type ArgSpec,
   type RawStreamReason,
+  type StaticHandlerDescriptor,
   type ToolCliContext,
   type OptionSpec,
   type PrimaryCommandSpecDraft,
@@ -25,6 +26,12 @@ interface CommandPresetInput<TOpts> {
   readonly options?: readonly OptionSpec[];
   readonly args?: readonly ArgSpec[];
   readonly handler: PresetHandler<TOpts>;
+  /**
+   * Optional author-declared static handler identity for audit bridging.
+   * Copied unchanged into the core {@link CommandSpec}; omission is valid for
+   * third-party/pre-feature tools (reported later as an unresolved bridge).
+   */
+  readonly staticHandler?: StaticHandlerDescriptor;
 }
 
 interface PrimaryRunCommandPresetInput<TOpts> {
@@ -32,6 +39,12 @@ interface PrimaryRunCommandPresetInput<TOpts> {
   readonly options?: readonly OptionSpec[];
   readonly args?: readonly ArgSpec[];
   readonly handler: PresetHandler<TOpts>;
+  /**
+   * Optional author-declared static handler identity for audit bridging.
+   * First-party direct callers supply an exact package+path+declaration
+   * descriptor; omission remains allowed for third-party compatibility.
+   */
+  readonly staticHandler?: StaticHandlerDescriptor;
 }
 
 interface CommandPresetDefaults {
@@ -90,6 +103,7 @@ function definePresetCommand<TOpts>(
       : { producesVerdict: defaults.producesVerdict }),
     ...(input.options === undefined ? {} : { options: input.options }),
     ...(input.args === undefined ? {} : { args: input.args }),
+    ...(input.staticHandler === undefined ? {} : { staticHandler: input.staticHandler }),
     handler: input.handler,
   });
 }
@@ -103,6 +117,7 @@ export function definePrimaryRunCommand<TOpts>(
     commonFlags: [...REPORTING_RUN_COMMON_FLAGS],
     ...(input.options === undefined ? {} : { options: input.options }),
     ...(input.args === undefined ? {} : { args: input.args }),
+    ...(input.staticHandler === undefined ? {} : { staticHandler: input.staticHandler }),
     scope: 'project',
     output: 'raw-stream',
     rawStreamReason: 'runtime-render-dispatch',

@@ -51,6 +51,11 @@ function parseOlderThanDays(raw: string): number {
 
 function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-sessions.ts',
+      declaration: 'buildSessionsListSpec',
+    },
     name: 'list',
     description: 'List stored sessions',
     commonFlags: ['json'],
@@ -104,6 +109,11 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-sessions.ts',
+      declaration: 'buildSessionsShowSpec',
+    },
     name: 'show',
     description: 'Display a stored session result',
     commonFlags: ['json'],
@@ -183,6 +193,11 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-sessions.ts',
+      declaration: 'buildSessionsPurgeSpec',
+    },
     name: 'purge',
     description:
       'Delete session rows from the project-local SQLite store (opensip-cli/.runtime/datastore.sqlite)',

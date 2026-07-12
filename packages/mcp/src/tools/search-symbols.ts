@@ -3,16 +3,19 @@
  */
 
 import {
+  compactDetail,
   exactFilePath,
   filePrefix,
   generatedPolicy,
+  identitySearchLimit,
   kinds,
   packageArray,
-  pageFields,
   query as querySchema,
   searchMatch,
   sourceScope,
   strictInput,
+  cursor,
+  groupBy,
   visibilities,
 } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
@@ -28,10 +31,10 @@ export function registerSearchSymbols(server: McpStdioServer, deps: McpToolDeps)
       description:
         'Find functions/methods by name. match=substring (default, case-insensitive simpleName), ' +
         'exact (case-sensitive simpleName), or qualified (case-sensitive qualifiedName). ' +
-        'Filters (package/filePath/filePrefix/kinds/visibilities/sourceScope/generated) apply ' +
-        'BEFORE the page limit. Returns symbolId ("<filePath>:<line>:<column>") + bodyHash — pass ' +
-        'that symbolId to who_calls, callees_of, blast_radius, or trace_path. Use cursor from ' +
-        'page.nextCursor for continuation; a missing catalog returns empty data (run refresh_graph).',
+        'Default detail=nodes with limit=20 returns symbol IDs for traversal tools. ' +
+        'Pass detail=summary for match counts only, or detail=groups with groupBy=package|file. ' +
+        'Filters apply BEFORE the page limit. Use page.nextCursor for continuation; a missing ' +
+        'catalog returns empty data (run refresh_graph).',
       inputSchema: strictInput({
         query: querySchema(),
         match: searchMatch(),
@@ -42,7 +45,10 @@ export function registerSearchSymbols(server: McpStdioServer, deps: McpToolDeps)
         visibilities: visibilities(),
         sourceScope: sourceScope(),
         generated: generatedPolicy(),
-        ...pageFields(),
+        detail: compactDetail('nodes'),
+        limit: identitySearchLimit(),
+        cursor: cursor(),
+        groupBy: groupBy(),
       }),
     },
     async (args) => {
@@ -51,6 +57,7 @@ export function registerSearchSymbols(server: McpStdioServer, deps: McpToolDeps)
         limit: args.limit,
         cursor: args.cursor,
         groupBy: args.groupBy,
+        detail: args.detail ?? 'nodes',
         filter: {
           packages: args.packages,
           filePath: args.filePath,

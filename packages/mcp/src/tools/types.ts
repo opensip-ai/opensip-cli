@@ -12,6 +12,7 @@ import type { GraphReadPort } from '../graph-read-port.js';
 import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
 import type { RuntimeWiringReadPort } from '../runtime-wiring-read-port.js';
+import type { McpSurfaceSnapshot } from '../server.js';
 import type { TargetConventionSummary } from '@opensip-cli/contracts';
 
 export interface McpToolDeps {
@@ -29,4 +30,9 @@ export interface McpToolDeps {
   readonly repairWrite?: RepairWritePort;
   /** True only when the server was started with explicit mutation posture. */
   readonly mutationsEnabled?: boolean;
+  /**
+   * Final MCP surface snapshot after all registrations. Used by
+   * `get_agent_catalog` for connector diagnosis (version/epoch/names/root).
+   */
+  readonly mcpSurface?: () => McpSurfaceSnapshot;
 }

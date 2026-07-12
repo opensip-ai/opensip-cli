@@ -218,7 +218,10 @@ export {
   gateRunFlagSpecs,
   sarifRunFlagSpec,
 } from './command-presets.js';
-export { defineAnalysisRunCommand } from './analysis-run-command.js';
+export {
+  ANALYSIS_RUN_COMMAND_STATIC_HANDLER,
+  defineAnalysisRunCommand,
+} from './analysis-run-command.js';
 export { readOptionalToolConfig, readToolConfig } from './tool-config-read.js';
 export { runHostGateDispatch } from './gate-dispatch.js';
 export { runBaselineExport } from './baseline-export.js';

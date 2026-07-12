@@ -386,6 +386,60 @@ describe('projectTraversal', () => {
     expect(result.value.data.hops?.[0]?.weakestConfidence).toBe('low');
     expect(result.value.data.weakestConfidence).toBe('low');
     expect(result.value.options.coverage.reasons).toContain('hop-evidence-cap');
+    expect(result.value.options.coverage.inventory.requested).toBe(true);
+  });
+
+  it('projects exclusive summary and groups without concrete nodes (P2 Phase 2.6)', () => {
+    const generation = createGeneration(fixture(), 'initial-load');
+    const summary = projectTraversal(
+      generation,
+      {
+        direction: 'callers',
+        startSymbolId: 'packages/a/target.ts:1:0',
+        detail: 'summary',
+      },
+      FILTER,
+      PROJECT_KEY,
+    );
+    expect(summary.ok).toBe(true);
+    if (!summary.ok) return;
+    expect(summary.value.data.nodes).toEqual([]);
+    expect(summary.value.data.unresolved).toEqual([]);
+    expect(summary.value.data.totalMembership).toBeGreaterThan(0);
+    expect(summary.value.options.groups).toBeUndefined();
+    expect(summary.value.options.coverage.grouping.requested).toBe(false);
+
+    const groups = projectTraversal(
+      generation,
+      {
+        direction: 'callers',
+        startSymbolId: 'packages/a/target.ts:1:0',
+        detail: 'groups',
+        groupBy: 'package',
+        limit: 10,
+      },
+      FILTER,
+      PROJECT_KEY,
+    );
+    expect(groups.ok).toBe(true);
+    if (!groups.ok) return;
+    expect(groups.value.data.nodes).toEqual([]);
+    expect(groups.value.options.groups?.length).toBeGreaterThan(0);
+    expect(groups.value.options.coverage.grouping.requested).toBe(true);
+
+    const mismatch = projectTraversal(
+      generation,
+      {
+        direction: 'callers',
+        startSymbolId: 'packages/a/target.ts:1:0',
+        detail: 'nodes',
+        groupBy: 'package',
+      },
+      FILTER,
+      PROJECT_KEY,
+    );
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) expect(mismatch.error.code).toBe('invalid-query');
   });
 
   it('stops goal-directed collection before later siblings and counts only path membership', () => {

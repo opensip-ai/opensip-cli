@@ -121,6 +121,7 @@ export async function runHeapPreflight(
   const discovery = await adapter.discoverFiles({
     cwd: input.cwd,
     configPathOverride: input.configPathOverride,
+    diagnosticIntent: 'quiet',
   });
   const fileCount = discovery.files.length;
   const targetMb = decideHeapTargetMb(fileCount);

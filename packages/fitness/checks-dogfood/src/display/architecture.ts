@@ -13,6 +13,7 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'external-adapter-progress-private-bridge': ['🔒', 'External Adapter Progress Private Bridge'],
   'external-tool-adapter-contract': ['🧩', 'External Tool Adapter Contract'],
   'command-handler-host-owned-output': ['🚪', 'Command Handler Host-Owned Output'],
+  'first-party-command-static-handler': ['📎', 'First-Party Command Static Handler'],
   'host-tool-runtime-import-boundary': ['🧱', 'Host Tool Runtime Import Boundary'],
   'live-view-through-cli-live': ['🖥️', 'Live View Through cli-live'],
   'mcp-results-no-rerun': ['♻️', 'MCP Results Replay (No Re-Run)'],

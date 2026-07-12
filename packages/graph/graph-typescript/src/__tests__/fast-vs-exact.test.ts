@@ -47,7 +47,7 @@ async function buildBothTiers(
     resolved: Awaited<ReturnType<typeof adapter.resolveCallSites>>;
     cacheKey: string;
   }> => {
-    const disc = await adapter.discoverFiles({ cwd: dir });
+    const disc = await adapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = await adapter.parseProject({
       projectDirAbs: disc.projectDirAbs,
       files: disc.files,

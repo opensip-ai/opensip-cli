@@ -3,6 +3,7 @@
  */
 
 import { err, ok, type Result } from '@opensip-cli/core';
+import { makeFacet, rollupFacets, UNREQUESTED_FACET } from '@opensip-cli/graph/read';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -23,9 +24,10 @@ import {
 import type {
   ArchitectureSummaryDto,
   BlastDto,
-  DeadCodeDto,
+  DeadCodeResultDto,
   GraphReadPort,
   RefreshResult,
+  SymbolSearchDto,
   TraversalSnapshot,
 } from '../../graph-read-port.js';
 import type { McpReadError } from '../../mcp-error.js';
@@ -76,7 +78,12 @@ const CONTEXT: GraphEvidenceContext = {
   },
 };
 
-const COVERAGE = { complete: true, truncated: false, reasons: [] as const };
+const COVERAGE = rollupFacets({
+  inventory: makeFacet(true, new Set()),
+  evidence: UNREQUESTED_FACET,
+  grouping: UNREQUESTED_FACET,
+  projection: UNREQUESTED_FACET,
+});
 
 function wrap<T>(data: T): GraphToolResult<T> {
   return { data, context: CONTEXT, freshness: FRESH, coverage: COVERAGE };
@@ -100,12 +107,16 @@ function symRef(over: Partial<SymbolRef> = {}): SymbolRef {
   };
 }
 
+function searchDto(symbols: readonly SymbolRef[] = [symRef()]): SymbolSearchDto {
+  return { detail: 'nodes', symbols, totalMatches: symbols.length };
+}
+
 function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
   const base: GraphReadPort = {
     catalogStatus: () => Promise.resolve(ok({ context: CONTEXT, freshness: FRESH })),
     resolveSymbolId: (id) =>
       Promise.resolve(ok(wrap(id === 'src/a.ts:10:2' ? symRef() : undefined))),
-    searchSymbols: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    searchSymbols: () => Promise.resolve(ok(wrap(searchDto()))),
     findBySpan: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
     traverse: (query) => {
       const nodes = [
@@ -153,14 +164,13 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
     deadCode: () =>
       Promise.resolve(
         ok(
-          wrap([
-            {
-              symbol: symRef(),
-              message: 'orphan',
-              ruleId: 'graph:orphan-subtree',
-              reason: 'unreachable-from-inferred-entry-point',
-            },
-          ] as readonly DeadCodeDto[]),
+          wrap({
+            detail: 'summary',
+            rows: [],
+            totalOrphans: 1,
+            reasonCounts: [{ reason: 'unreachable-from-inferred-entry-point', count: 1 }],
+            ruleCounts: [{ ruleId: 'graph:orphan-subtree', count: 1 }],
+          } satisfies DeadCodeResultDto),
         ),
       ),
     architectureSummary: () =>
@@ -215,6 +225,7 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
               sourceScope: 'production',
               generated: 'exclude',
             },
+            includedSections: ['metrics', 'packageEdges', 'hotspots'],
             packageEdges: [
               {
                 fromPackage: 'pkg',
@@ -250,6 +261,42 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
         ok(wrap({ edgeKind: 'combined', calls: [], imports: [], totalMatchingEvidence: 0 })),
       ),
     packageCycles: () => Promise.resolve(ok(wrap({ edgeKind: 'call', components: [] }))),
+    searchDeclarations: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            detail: 'nodes',
+            referenceScope: 'cross-file',
+            declarations: [],
+            totalMatches: 0,
+          }),
+        ),
+      ),
+    referencesTo: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            detail: 'nodes',
+            referenceScope: 'cross-file',
+            declarationId: 'd1:none',
+            references: [],
+            totalMatches: 0,
+          }),
+        ),
+      ),
+    resolveStaticHandlerDeclarations: (_key, refs) =>
+      Promise.resolve(
+        ok({
+          catalogStatus: 'missing' as const,
+          outcomes: refs.map((ref) => ({
+            ref,
+            status: 'catalog-missing' as const,
+            claimProvenance: 'author-declared' as const,
+            matchBasis: 'author-declared-exact-declaration' as const,
+            confidence: 'low' as const,
+          })),
+        }),
+      ),
   };
   return { ...base, ...overrides };
 }
@@ -274,8 +321,9 @@ describe('graph handlers (async GraphToolResult)', () => {
       context: CONTEXT,
       freshness: FRESH,
       coverage: COVERAGE,
+      data: { detail: 'nodes', symbols: [expect.objectContaining({ symbolId: 'src/a.ts:10:2' })] },
     });
-    expect(Array.isArray(parsed.body.data)).toBe(true);
+    expect(Array.isArray((parsed.body.data as { symbols: unknown }).symbols)).toBe(true);
   });
 
   it('get_symbol returns candidates with context', async () => {
@@ -526,7 +574,7 @@ describe('graph handlers (async GraphToolResult)', () => {
     const graph = fakePort({
       searchSymbols: (q, opts) => {
         captured = { q, opts };
-        return Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[])));
+        return Promise.resolve(ok(wrap(searchDto())));
       },
     });
     const { handlers, server } = captureServer();
@@ -559,7 +607,17 @@ describe('graph handlers (async GraphToolResult)', () => {
     const graph = fakePort({
       deadCode: (query) => {
         captured.dead = query;
-        return Promise.resolve(ok(wrap([] as readonly DeadCodeDto[])));
+        return Promise.resolve(
+          ok(
+            wrap({
+              detail: 'summary',
+              rows: [],
+              totalOrphans: 0,
+              reasonCounts: [],
+              ruleCounts: [],
+            } satisfies DeadCodeResultDto),
+          ),
+        );
       },
       architectureSummary: (query) => {
         captured.architecture = query;
@@ -673,24 +731,27 @@ describe('graph handlers (async GraphToolResult)', () => {
       limit: 9,
       cursor: 'cursor',
       groupBy: 'package',
+      sampleLimit: 0,
       filter: expect.objectContaining({ filePath: 'src/a.ts', kinds: ['method'] }),
     });
     expect(captured.why).toMatchObject({
       fromPackage: 'pkg-a',
       toPackage: 'pkg-b',
       groupBy: 'package',
+      evidenceLimit: 0,
       filter: expect.objectContaining({ visibilities: ['private'] }),
     });
     expect(captured.cycles).toMatchObject({
       edgeKind: 'combined',
       groupBy: 'package',
+      proofLimit: 0,
       filter: expect.objectContaining({ packages: ['pkg-a'] }),
     });
   });
 
   it('maps port errors through errorResult', async () => {
     const graph = fakePort({
-      searchSymbols: (): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> =>
+      searchSymbols: (): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>> =>
         Promise.resolve(err({ code: 'boom', message: 'failed' })),
     });
     const { handlers, server } = captureServer();
@@ -708,14 +769,27 @@ describe('graph handlers (async GraphToolResult)', () => {
         captured = input;
         return Promise.resolve(
           ok({
-            context: { projectKey: 'abcdabcdabcdabcd', snapshotKey: `g1:${'a'.repeat(64)}` },
+            context: {
+              project: {
+                root: '/fixture',
+                scope: 'project' as const,
+                configPath: 'opensip-cli.config.yml',
+              },
+              runtime: {
+                kind: 'runtime-wiring' as const,
+                identity: `w1:${'a'.repeat(64)}`,
+                capturedAt: '2026-01-01T00:00:00.000Z',
+              },
+              projectKey: 'abcdabcdabcdabcd',
+              snapshotKey: `w1:${'a'.repeat(64)}`,
+            },
             nodes: [
-              { id: 'command:alpha:inspect', kind: 'command', label: 'inspect', tool: 'alpha' },
+              { id: 'command:alpha inspect', kind: 'command', label: 'inspect', tool: 'alpha' },
             ],
             edges: [
               {
-                from: 'command:alpha:inspect',
-                to: 'handler:alpha:inspect',
+                from: 'command:alpha inspect',
+                to: 'handler:alpha inspect',
                 kind: 'command-dispatches-handler',
                 source: 'command-spec',
                 confidence: 'medium',
@@ -727,9 +801,9 @@ describe('graph handlers (async GraphToolResult)', () => {
             groupTruncated: false,
             coverage: {
               complete: true,
-              scope: 'captured-admitted-tool-registry',
+              scope: 'captured-admitted-registry-and-command-inventory',
               truncated: false,
-              reasons: ['top-level-host-commands-outside-port'],
+              reasons: [],
             },
             effectiveFilters: {
               tool: 'alpha',
@@ -737,6 +811,7 @@ describe('graph handlers (async GraphToolResult)', () => {
               provenanceSource: 'bundled',
               limit: 10,
               groupBy: 'tool',
+              detail: 'nodes',
             },
           }),
         );
@@ -751,6 +826,7 @@ describe('graph handlers (async GraphToolResult)', () => {
       limit: 10,
       cursor: undefined,
       groupBy: 'tool',
+      detail: 'nodes',
     });
     expect(parseResult(result)).toMatchObject({
       isError: false,
@@ -772,6 +848,7 @@ describe('graph handlers (async GraphToolResult)', () => {
       limit: 10,
       cursor: undefined,
       groupBy: 'tool',
+      detail: 'nodes',
     });
   });
 

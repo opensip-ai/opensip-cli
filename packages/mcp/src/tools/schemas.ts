@@ -13,6 +13,8 @@
 
 import { z } from 'zod';
 
+import { DEFAULT_IDENTITY_SEARCH_LIMIT } from '../graph-read-port.js';
+
 import { hasControlCharacter, safeNormalizeProjectRelativePath } from './schema-validation.js';
 
 /** Build a strict SDK input object so unknown MCP arguments are rejected, not stripped. */
@@ -28,6 +30,12 @@ export const DEFAULT_DEPTH = 5;
 export const MAX_LIMIT = 500;
 /** Default page size when the caller omits `limit`. */
 export const DEFAULT_LIMIT = 100;
+/**
+ * Default page size for identity-producing searches (`search_symbols`, and later
+ * `search_declarations`). Re-exported from the graph-read port contract so
+ * schemas and query collaborators share one constant. Caller range remains 1–500.
+ */
+export { DEFAULT_IDENTITY_SEARCH_LIMIT } from '../graph-read-port.js';
 /** Hard cap on a free-text query length (bounds work; search is substring, not regex → no ReDoS). */
 export const MAX_QUERY_LEN = 200;
 /** Hard cap on a file-path argument length. */
@@ -152,6 +160,13 @@ export const limit = () => z.number().int().positive().max(MAX_LIMIT).optional()
  */
 export const pageLimit = () => z.number().int().positive().max(MAX_LIMIT).default(DEFAULT_LIMIT);
 
+/**
+ * Identity-search page limit (search_symbols / search_declarations). Default 20.
+ * Caller range remains 1–500; does not change {@link DEFAULT_LIMIT}.
+ */
+export const identitySearchLimit = () =>
+  z.number().int().positive().max(MAX_LIMIT).default(DEFAULT_IDENTITY_SEARCH_LIMIT);
+
 /** Opaque base64url cursor (decoded/bound in the page helper). */
 export const cursor = () =>
   z
@@ -227,6 +242,13 @@ export const productionGeneratedPolicy = () =>
 /** Grouping mode for paged results. */
 export const groupBy = () => z.enum(['none', 'package', 'file']).default('none');
 
+/**
+ * Exclusive compact representation for high-volume graph tools (P2 Phase 2.6+).
+ * Exactly one of summary / groups / nodes is projected per request.
+ */
+export const compactDetail = (defaultDetail: 'summary' | 'groups' | 'nodes' = 'nodes') =>
+  z.enum(['summary', 'groups', 'nodes']).default(defaultDetail);
+
 /** Traversal identity mode (default occurrence). */
 export const traversalIdentity = () =>
   z.enum(['occurrence', 'body-twin-union']).default('occurrence');
@@ -236,6 +258,39 @@ export const searchMatch = () => z.enum(['substring', 'exact', 'qualified']).def
 
 /** Package edge kind. */
 export const packageEdgeKind = () => z.enum(['call', 'import', 'combined']).default('call');
+
+/** Architecture section family selector (unique, non-empty). Default metrics-only. */
+export const architectureSections = () =>
+  z
+    .array(z.enum(['metrics', 'packageEdges', 'hotspots']))
+    .min(1)
+    .max(3)
+    .refine((items) => new Set(items).size === items.length, {
+      message: 'sections must be unique',
+    })
+    .default(['metrics']);
+
+/** Deterministic top-N for architecture ranked families. Default 20, max 100. */
+export const architectureTopN = () => z.number().int().min(1).max(100).default(20);
+
+/**
+ * Nested sample size per package dependency row (P2 Phase 2.4). Default 0 =
+ * count/distribution only; max 5 full evidence samples. Independent of page
+ * `limit`. Set `sampleLimit` > 0 to request bounded concrete sites.
+ */
+export const packageSampleLimit = () => z.number().int().min(0).max(5).default(0);
+
+/**
+ * Max concrete evidence sites for why_depends (P2 Phase 2.4). Default 0 =
+ * aggregate counts only; max 100. Independent of page `limit`.
+ */
+export const packageEvidenceLimit = () => z.number().int().min(0).max(100).default(0);
+
+/**
+ * Max proof edges per package SCC component (P2 Phase 2.4). Default 0 = members
+ * and counts only; max 50. Independent of page `limit`.
+ */
+export const packageProofLimit = () => z.number().int().min(0).max(50).default(0);
 
 /** Shared source-filter field bag for composing tool schemas. */
 export const sourceFilterFields = (defaults: 'discover' | 'production' = 'discover') => ({

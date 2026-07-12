@@ -384,6 +384,7 @@ async function recomputeCatalogInputs(
   }
   const discovery = await input.adapter.discoverFiles({
     cwd: input.projectRoot,
+    diagnosticIntent: 'quiet',
   });
   const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
   if (!discoveryCheck.ok) return discoveryCheck;
@@ -427,6 +428,7 @@ async function recomputeShardedInputs(
     }
     const discovery = await input.adapter.discoverFiles({
       cwd: anchor.value.rootDir,
+      diagnosticIntent: 'quiet',
       ...(anchor.value.configPath === undefined
         ? {}
         : { configPathOverride: anchor.value.configPath }),

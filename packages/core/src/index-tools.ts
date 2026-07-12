@@ -95,6 +95,20 @@ export {
   commandProducesVerdict,
   COMMON_FLAG_KEYS,
   RAW_STREAM_REASONS,
+  MAX_STATIC_HANDLER_DECLARATION,
+  MAX_STATIC_HANDLER_PACKAGE,
+  MAX_STATIC_HANDLER_PATH,
+  freezeStaticHandlerDescriptor,
+  isSafeProjectRelativePosixPath,
+  staticHandlerValidationError,
+  EMPTY_RUNTIME_COMMAND_INVENTORY,
+  MAX_RUNTIME_COMMAND_ALIASES,
+  MAX_RUNTIME_COMMAND_GROUPS,
+  MAX_RUNTIME_COMMAND_LEAVES,
+  MAX_RUNTIME_COMMAND_NAME,
+  MAX_RUNTIME_COMMAND_PATH,
+  RUNTIME_COMMAND_INVENTORY_VERSION,
+  createRuntimeCommandInventory,
 } from './tools/index.js';
 export type {
   CommandSpec,
@@ -106,6 +120,12 @@ export type {
   CommandScopeRequirement,
   CommonFlagKey,
   RawStreamReason,
+  StaticHandlerDescriptor,
+  RuntimeCommandInventory,
+  RuntimeCommandInventoryLimits,
+  RuntimeCommandLeaf,
+  RuntimeCommandOwner,
+  RuntimeCommandGroup,
 } from './tools/index.js';
 // Capability domain model (launch, §5.3): the data shape a tool
 // uses to declare an extension point it owns. The scope-owned runtime

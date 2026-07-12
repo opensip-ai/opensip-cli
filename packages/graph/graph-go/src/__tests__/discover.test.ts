@@ -22,7 +22,7 @@ describe('graph-go discover.ts — branches', () => {
   });
 
   it('returns undefined configPathAbs when no go.mod or go.sum exists', () => {
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeUndefined();
     expect(out.files).toEqual([]);
   });
@@ -30,14 +30,14 @@ describe('graph-go discover.ts — branches', () => {
   it('uses go.sum when present (preferred over go.mod)', () => {
     writeFileSync(join(dir, 'go.sum'), '# checksums\n', 'utf8');
     writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('go.sum');
   });
 
   it('falls back to go.mod when go.sum absent', () => {
     writeFileSync(join(dir, 'go.mod'), 'module example.com/x\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('go.mod');
   });
@@ -45,13 +45,21 @@ describe('graph-go discover.ts — branches', () => {
   it('honors a configPathOverride that exists', () => {
     const override = join(dir, 'custom.mod');
     writeFileSync(override, 'module example.com/x\n', 'utf8');
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'custom.mod' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'custom.mod',
+    });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('custom.mod');
   });
 
   it('returns the override path verbatim when the override does not exist', () => {
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'nonexistent.mod' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'nonexistent.mod',
+    });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('nonexistent.mod');
   });
@@ -62,7 +70,7 @@ describe('graph-go discover.ts — branches', () => {
     writeFileSync(join(dir, 'pkg/b.go'), 'package pkg\n', 'utf8');
     mkdirSync(join(dir, 'vendor', 'github.com', 'x'), { recursive: true });
     writeFileSync(join(dir, 'vendor/github.com/x/excluded.go'), 'package x\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.files.length).toBe(2);
     expect(out.files.every((f) => !f.includes('/vendor/'))).toBe(true);
     expect([...out.files]).toEqual([...out.files].sort());

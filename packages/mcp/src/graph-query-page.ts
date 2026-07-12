@@ -3,7 +3,8 @@
  *
  * Cursor fields:
  * - `projectKey` = core `ephemeralProjectCacheKey(projectRoot)` (not re-hashed here)
- * - `generationKey` = MCP `g1:<sha256>` catalog generation key only
+ * - `generationKey` = MCP `g1:<sha256>` catalog generation key, or `w1:<sha256>`
+ *   runtime-wiring snapshot identity
  * - `queryDigest` = digest of the normalized query/filter
  * - `afterKey` = compact `r1:<sha256>` identity of the previous page's last stable key
  */
@@ -39,7 +40,7 @@ export type GraphQueryCursorInput = Omit<GraphQueryCursor, 'integrity'>;
 export interface PageInput {
   /** Core ephemeral project cache key (caller-provided; never re-hashed). */
   readonly projectKey: string;
-  /** Canonical `g1:` generation key. */
+  /** Canonical `g1:` catalog generation key or `w1:` runtime snapshot identity. */
   readonly generationKey: string;
   /** Digest of the normalized query/filter for this operation. */
   readonly queryDigest: string;
@@ -65,7 +66,7 @@ export interface BoundedTopRows<T> {
 }
 
 const PROJECT_KEY_PATTERN = /^[a-f0-9]{24}$/;
-const GENERATION_KEY_PATTERN = /^g1:[a-f0-9]{64}$/;
+const GENERATION_KEY_PATTERN = /^(?:g1|w1):[a-f0-9]{64}$/;
 const QUERY_DIGEST_PATTERN = /^[a-f0-9]{32}$/;
 const CURSOR_FIELDS = new Set([
   'v',

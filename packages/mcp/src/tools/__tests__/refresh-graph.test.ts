@@ -85,7 +85,15 @@ function refreshResult(
       },
     },
     freshness: FRESH,
-    coverage: { complete: true, truncated: false, reasons: [] },
+    coverage: {
+      inventory: { requested: true, complete: true, truncated: false, reasons: [] },
+      evidence: { requested: false, complete: true, truncated: false, reasons: [] },
+      grouping: { requested: false, complete: true, truncated: false, reasons: [] },
+      projection: { requested: false, complete: true, truncated: false, reasons: [] },
+      complete: true,
+      truncated: false,
+      reasons: [],
+    },
   };
 }
 

@@ -7,7 +7,10 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
-import { defineAnalysisRunCommand } from './analysis-run-command.js';
+import {
+  ANALYSIS_RUN_COMMAND_STATIC_HANDLER,
+  defineAnalysisRunCommand,
+} from './analysis-run-command.js';
 import { REPORTING_RUN_COMMON_FLAGS } from './command-presets.js';
 
 import type { SignalEnvelope } from './signal-envelope.js';
@@ -178,6 +181,19 @@ function command() {
 }
 
 describe('defineAnalysisRunCommand', () => {
+  it('stamps the fixed contracts-owned runAnalysisCommand staticHandler', () => {
+    const spec = command();
+    expect(spec.staticHandler).toEqual(ANALYSIS_RUN_COMMAND_STATIC_HANDLER);
+    expect(spec.staticHandler).toEqual({
+      package: '@opensip-cli/contracts',
+      path: 'packages/contracts/src/analysis-run-command.ts',
+      declaration: 'runAnalysisCommand',
+    });
+    // The fixed descriptor is not caller-overridable: AnalysisRunCommandInput
+    // has no staticHandler field, so only the contracts-owned constant applies.
+    expect(ANALYSIS_RUN_COMMAND_STATIC_HANDLER.declaration).toBe('runAnalysisCommand');
+  });
+
   it('preserves primary run command preset fields and routes static human runs', async () => {
     const spec = command();
     expect(spec).toMatchObject({
@@ -186,6 +202,7 @@ describe('defineAnalysisRunCommand', () => {
       output: 'raw-stream',
       rawStreamReason: 'runtime-render-dispatch',
       producesVerdict: true,
+      staticHandler: ANALYSIS_RUN_COMMAND_STATIC_HANDLER,
     });
 
     const cli = makeCli();

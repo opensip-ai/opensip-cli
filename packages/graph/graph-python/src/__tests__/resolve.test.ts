@@ -38,7 +38,7 @@ function runPipeline(dir: string): {
     unresolved: number;
   };
 } {
-  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = pythonGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

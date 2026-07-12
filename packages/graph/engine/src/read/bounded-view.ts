@@ -2,25 +2,11 @@
 
 import { compareCodePointStrings } from '../code-point-order.js';
 
-import type {
-  CoverageFacet,
-  GraphReadCoverage,
-  GraphReadFacetCoverage,
-} from './query-contracts.js';
+import type { CoverageFacet, GraphReadFacetCoverage } from './query-contracts.js';
 
 export interface ReadGroupSummary {
   readonly key: string;
   readonly count: number;
-}
-
-/** Convert accumulated partial/truncation reasons into the shared coverage shape. */
-export function coverageFromReasons(reasons: ReadonlySet<string>): GraphReadCoverage {
-  const values = [...reasons].sort(compareCodePointStrings);
-  return {
-    complete: values.length === 0,
-    truncated: values.some((reason) => reason.endsWith('-cap')),
-    reasons: values,
-  };
 }
 
 // ── P2 Phase 2.1: facet coverage helpers ─────────────────────────
@@ -78,12 +64,9 @@ export interface CoverageFacetSet {
  * unioned across requested facets. An unrequested facet never leaks into it.
  */
 export function rollupFacets(facets: CoverageFacetSet): GraphReadFacetCoverage {
-  const requested = [
-    facets.inventory,
-    facets.evidence,
-    facets.grouping,
-    facets.projection,
-  ].filter((facet) => facet.requested);
+  const requested = [facets.inventory, facets.evidence, facets.grouping, facets.projection].filter(
+    (facet) => facet.requested,
+  );
   const reasons = [...new Set(requested.flatMap((facet) => [...facet.reasons]))].sort(
     compareCodePointStrings,
   );
@@ -93,27 +76,6 @@ export function rollupFacets(facets: CoverageFacetSet): GraphReadFacetCoverage {
     truncated: requested.some((facet) => facet.truncated),
     reasons,
   };
-}
-
-/**
- * PHASE-LOCAL flat coverage bridge (P2 Phase 2.1). Maps a legacy flat
- * {@link GraphReadCoverage} onto facet coverage: the flat triple becomes the
- * requested `inventory` facet with the other three unrequested, preserving the
- * flat top-level semantics. Bridges pre-facet callers until Tasks 2.2-2.8
- * migrate every query family; DELETED in Task 2.8. Do NOT add new callers.
- */
-export function facetsFromFlatCoverage(coverage: GraphReadCoverage): GraphReadFacetCoverage {
-  return rollupFacets({
-    inventory: {
-      requested: true,
-      complete: coverage.complete,
-      truncated: coverage.truncated,
-      reasons: coverage.reasons,
-    },
-    evidence: UNREQUESTED_FACET,
-    grouping: UNREQUESTED_FACET,
-    projection: UNREQUESTED_FACET,
-  });
 }
 
 function insertionIndex<T>(

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-27
+last_verified: 2026-07-11
 release: v0.5.3
 title: "CLI dispatch"
 audience: [contributors]
@@ -363,3 +363,23 @@ fallback for external tools (ADR-0054).
 - **[`02-plugin-loader.md`](/docs/opensip-cli/80-implementation/02-plugin-loader/)** — what happens inside `loadDiscoveredTools()` and inside the Tool's lazy plugin loading.
 - **[`03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/)** — what gets written to disk during and after a run.
 - **[`../70-reference/01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/)** — the lookup-shaped reference for every command and flag.
+
+## Runtime command inventory (MCP audit)
+
+The composition root projects the **exact** CommandSpec arrays used for mounting
+into a bounded frozen `RuntimeCommandInventory` (host groups/leaves, Tool
+commands, plugin groups, aliases, internal workers, owners, admitted provenance).
+That plain data is attached on `PreActionRuntime` → per-invocation `RunScope` →
+MCP ([ADR-0154](https://github.com/opensip-ai/opensip-cli/blob/v0.5.3/docs/decisions/ADR-0154-declarative-runtime-handler-bridge.md)).
+
+Properties:
+
+- Own-property-safe projection only — no retained functions, Commander objects,
+  or accessors.
+- Stable content identity `w1:` excludes `capturedAt` volatility.
+- Optional `staticHandler` descriptors (`package` / path / declaration) join to
+  declaration facts through a provenance-bound `g1:` bridge. Reviewed first-party
+  shared mappings: `@opensip-cli/contracts`, `@opensip-cli/external-tool-adapter`.
+- Runtime edges remain runtime edges (never call edges). Inventory/bridge caps
+  fail closed at bootstrap without implying an OS sandbox.
+

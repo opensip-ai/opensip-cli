@@ -67,6 +67,11 @@ export const simRecipesCommandSpec: CommandSpec<unknown, ToolCliContext> = defin
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/simulation',
+    path: 'packages/simulation/engine/src/cli/sim-recipes.ts',
+    declaration: 'simRecipesCommandSpec',
+  },
   name: 'recipes',
   description: 'List available simulation recipes',
   commonFlags: ['cwd', 'json'],

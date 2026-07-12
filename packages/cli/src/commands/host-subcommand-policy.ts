@@ -172,6 +172,11 @@ function executePolicyAudit(args: {
 
 function buildPolicyStatusSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-policy.ts',
+      declaration: 'buildPolicyStatusSpec',
+    },
     name: 'status',
     description: 'Show the effective local trust policy',
     commonFlags: ['json', 'cwd'],
@@ -183,6 +188,11 @@ function buildPolicyStatusSpec(): HostSpec {
 
 function buildPolicyExplainSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-policy.ts',
+      declaration: 'buildPolicyExplainSpec',
+    },
     name: 'explain',
     description: 'Explain the policy decision for a subject and action',
     commonFlags: ['json', 'cwd'],
@@ -210,6 +220,11 @@ function buildPolicyExplainSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildPolicyAuditSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-policy.ts',
+      declaration: 'buildPolicyAuditSpec',
+    },
     name: 'audit',
     description: 'List or export local trust-policy audit events',
     commonFlags: ['json'],

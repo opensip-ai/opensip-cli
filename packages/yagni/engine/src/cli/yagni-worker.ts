@@ -79,6 +79,11 @@ export const yagniRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/yagni',
+    path: 'packages/yagni/engine/src/cli/yagni-worker.ts',
+    declaration: 'yagniRunWorkerCommandSpec',
+  },
   name: 'yagni-run-worker',
   visibility: 'internal',
   description:

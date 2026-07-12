@@ -61,7 +61,7 @@ function runAdapter(): {
       >
     | undefined;
 } {
-  const discovery = javaGraphAdapter.discoverFiles({ cwd: fixtureRoot });
+  const discovery = javaGraphAdapter.discoverFiles({ cwd: fixtureRoot, diagnosticIntent: 'quiet' });
   const parsed = javaGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

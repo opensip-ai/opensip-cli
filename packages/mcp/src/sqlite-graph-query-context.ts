@@ -1,7 +1,13 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
-import { compileSourceRoleMatcher, MAX_AUDIT_SOURCE_ROLE_FILES } from '@opensip-cli/graph/read';
+import {
+  compileSourceRoleMatcher,
+  makeFacet,
+  rollupFacets,
+  UNREQUESTED_FACET,
+  MAX_AUDIT_SOURCE_ROLE_FILES,
+} from '@opensip-cli/graph/read';
 
 import { freshnessFromVerification, missingFreshness } from './freshness.js';
 import { bindCursor, decodeCursor, encodeCursor, type GroupSummary } from './graph-query-page.js';
@@ -28,10 +34,37 @@ const LOG_QUERY_FAILED = 'mcp.graph.query.failed';
 const LOG_QUERY_COMPLETED = 'mcp.graph.query.completed';
 
 interface EnvelopeOptions {
-  readonly coverage?: GraphCoverage;
+  /** Explicit four-facet coverage — required (P2 Phase 2.2). */
+  readonly coverage: GraphCoverage;
   readonly page?: { readonly limit: number; readonly nextCursor?: string };
   readonly filter?: GraphSourceFilter;
   readonly groups?: readonly GroupSummary[];
+}
+
+/**
+ * Complete inventory-only facet coverage for reads that inspected the full
+ * candidate set with no truncation reasons (missing catalog, empty result, etc.).
+ */
+export function completeInventoryCoverage(): GraphCoverage {
+  return rollupFacets({
+    inventory: makeFacet(true, new Set()),
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
+}
+
+/**
+ * Inventory facet with explicit reasons (malformed rows, candidate caps, etc.).
+ * Other facets remain unrequested.
+ */
+export function inventoryCoverage(reasons: readonly string[]): GraphCoverage {
+  return rollupFacets({
+    inventory: makeFacet(true, new Set(reasons)),
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
 }
 
 type QueryIdentityMode = 'occurrence' | 'body-twin-union' | 'package' | 'mixed' | 'not-applicable';
@@ -200,25 +233,24 @@ export class SqliteGraphQueryContext {
     return ok(freshnessFromVerification(verified.value, gen.builtAt));
   }
 
+  /**
+   * Assemble a graph tool envelope. Coverage is REQUIRED as explicit four-facet
+   * {@link GraphCoverage} (P2 Phase 2.2) — no flat default / conversion overload.
+   */
   envelope<T>(
     data: T,
     gen: CatalogGeneration | undefined,
     freshness: Freshness,
-    options?: EnvelopeOptions,
+    options: EnvelopeOptions,
   ): GraphToolResult<T> {
-    const coverage = options?.coverage ?? {
-      complete: true,
-      truncated: false,
-      reasons: [],
-    };
     return {
       data,
       context: this.contextFor(gen),
       freshness,
-      ...(options?.page === undefined ? {} : { page: options.page }),
-      coverage,
-      ...(options?.filter === undefined ? {} : { filter: options.filter }),
-      ...(options?.groups === undefined ? {} : { groups: options.groups }),
+      ...(options.page === undefined ? {} : { page: options.page }),
+      coverage: options.coverage,
+      ...(options.filter === undefined ? {} : { filter: options.filter }),
+      ...(options.groups === undefined ? {} : { groups: options.groups }),
     };
   }
 
@@ -365,7 +397,10 @@ export class SqliteGraphQueryContext {
 }
 
 /** Builds the zero-catalog architecture response with explicit count semantics. */
-export function emptyArchitecture(filter: GraphSourceFilter): ArchitectureSummaryDto {
+export function emptyArchitecture(
+  filter: GraphSourceFilter,
+  sections: readonly ('metrics' | 'packageEdges' | 'hotspots')[] = ['metrics'],
+): ArchitectureSummaryDto {
   return {
     languages: [],
     occurrenceCount: {
@@ -409,7 +444,18 @@ export function emptyArchitecture(filter: GraphSourceFilter): ArchitectureSummar
       sourceScope: filter.sourceScope,
       generated: filter.generated,
     },
-    packageEdges: [],
-    hotspots: [],
+    includedSections: sections,
+    ...(sections.includes('packageEdges')
+      ? {
+          packageEdges: [],
+          packageEdgesSummary: { totalAvailable: 0, selectedCount: 0, pageReturned: 0 },
+        }
+      : {}),
+    ...(sections.includes('hotspots')
+      ? {
+          hotspots: [],
+          hotspotsSummary: { totalAvailable: 0, selectedCount: 0, pageReturned: 0 },
+        }
+      : {}),
   };
 }

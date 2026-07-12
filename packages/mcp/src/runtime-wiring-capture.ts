@@ -5,6 +5,7 @@ import { hasControlCharacter } from './control-text.js';
 import type { RuntimeWiringEdge, RuntimeWiringNode } from './runtime-wiring-read-port.js';
 import type {
   buildToolIdentityIndex,
+  RuntimeCommandInventory,
   Tool,
   ToolPluginManifest,
   ToolProvenance,
@@ -19,9 +20,16 @@ const MAX_RUNTIME_TEXT = 256;
 /** Captured host state used to build one immutable runtime-wiring snapshot. */
 export interface LiveRuntimeWiringDeps {
   readonly projectRoot: string;
+  /** Project-relative config path for canonical context (default opensip-cli.config.yml). */
+  readonly configPath?: string;
   readonly tools: ToolRegistry;
   readonly manifests: readonly ToolPluginManifest[];
   readonly provenance: readonly ToolProvenance[];
+  /**
+   * Plain host+Tool command inventory from RunScope. Commands/handlers are
+   * projected from this only — never from live CommandSpec inspection.
+   */
+  readonly runtimeCommands?: RuntimeCommandInventory;
 }
 
 /** Original command source paired with its immutable, validated identity facts. */
@@ -43,15 +51,6 @@ export interface MutableRuntimeSnapshot {
   factTruncated: boolean;
   nodeTruncated: boolean;
   edgeTruncated: boolean;
-}
-
-/** Accessor-safe command surface projected from a host CommandSpec. */
-export interface CapturedCommandSurface {
-  readonly name: string;
-  readonly parent?: string;
-  readonly handlerObserved: boolean;
-  readonly handlerName?: string;
-  readonly handlerArity?: number;
 }
 
 /** Provenance record matched to a captured tool and its snapshot node. */
@@ -114,16 +113,6 @@ export function reserveRuntimeFact(state: MutableRuntimeSnapshot): boolean {
   return true;
 }
 
-function isArrayWithoutThrow(value: unknown): value is readonly unknown[] {
-  let isArray = false;
-  try {
-    isArray = Array.isArray(value);
-  } catch {
-    isArray = false;
-  }
-  return isArray;
-}
-
 /** Read an own data property without invoking accessors or propagating Proxy traps. */
 export function readOwnRuntimeProperty(target: object, key: PropertyKey): OwnRuntimeProperty {
   try {
@@ -134,60 +123,6 @@ export function readOwnRuntimeProperty(target: object, key: PropertyKey): OwnRun
   } catch {
     return { kind: 'invalid' };
   }
-}
-
-function ownData(target: object, key: PropertyKey): unknown {
-  const property = readOwnRuntimeProperty(target, key);
-  return property.kind === 'data' ? property.value : undefined;
-}
-
-function readHandlerMetadata(
-  handler: unknown,
-  state: MutableRuntimeSnapshot,
-): Pick<CapturedCommandSurface, 'handlerName' | 'handlerArity'> {
-  if (typeof handler !== 'function') return {};
-  const rawName = ownData(handler, 'name');
-  const rawArity = ownData(handler, 'length');
-  const handlerName =
-    typeof rawName === 'string' && rawName !== '' ? boundRuntimeText(rawName, state) : undefined;
-  return {
-    handlerName: handlerName === '' ? undefined : handlerName,
-    handlerArity:
-      typeof rawArity === 'number' && Number.isSafeInteger(rawArity) && rawArity >= 0
-        ? Math.min(rawArity, 64)
-        : undefined,
-  };
-}
-
-/** Read a CommandSpec without invoking accessors, handlers, or stringifiers. */
-export function readCapturedCommandSurface(
-  value: unknown,
-  state: MutableRuntimeSnapshot,
-): CapturedCommandSurface | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
-  const name = ownData(value, 'name');
-  if (typeof name !== 'string' || name === '') return undefined;
-  const parent = ownData(value, 'parent');
-  const handlerProperty = readOwnRuntimeProperty(value, 'handler');
-  if (handlerProperty.kind !== 'data' || typeof handlerProperty.value !== 'function') {
-    state.reasons.add('command-handler-missing-or-accessor');
-  }
-  const capturedName = boundRuntimeText(name, state);
-  if (capturedName === '') {
-    state.reasons.add('command-spec-invalid-or-accessor');
-    return undefined;
-  }
-  const capturedParent =
-    typeof parent === 'string' && parent !== '' ? boundRuntimeText(parent, state) : undefined;
-  return {
-    name: capturedName,
-    parent: capturedParent === '' ? undefined : capturedParent,
-    handlerObserved: handlerProperty.kind === 'data' && typeof handlerProperty.value === 'function',
-    ...readHandlerMetadata(
-      handlerProperty.kind === 'data' ? handlerProperty.value : undefined,
-      state,
-    ),
-  };
 }
 
 /** Append one de-duplicated node while enforcing the immutable snapshot cap. */
@@ -333,41 +268,6 @@ export function indexRuntimeProvenance(
     else matched.set(tool, { record: provenance, nodeId });
   }
   return matched;
-}
-
-/** Snapshot a tool's command array without invoking a command-surface accessor. */
-export function capturedCommandSpecs(
-  tool: Tool,
-  state: MutableRuntimeSnapshot,
-): readonly unknown[] {
-  const surfaceProperty = readOwnRuntimeProperty(tool, 'commandSpecs');
-  if (surfaceProperty.kind !== 'data') {
-    state.reasons.add('command-surface-missing-or-accessor');
-    return [];
-  }
-  const surface = surfaceProperty.value;
-  if (!isArrayWithoutThrow(surface)) {
-    state.reasons.add('command-surface-invalid');
-    return [];
-  }
-  const length = ownData(surface, 'length');
-  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0) {
-    state.reasons.add('command-surface-invalid');
-    return [];
-  }
-  const retained: unknown[] = [];
-  const boundedLength = Math.min(length, MAX_RUNTIME_FACTS);
-  for (let index = 0; index < boundedLength; index++) {
-    if (!reserveRuntimeFact(state)) break;
-    const item = readOwnRuntimeProperty(surface, String(index));
-    if (item.kind === 'data') retained.push(item.value);
-    else state.reasons.add('command-spec-invalid-or-accessor');
-  }
-  if (length > boundedLength) {
-    state.factTruncated = true;
-    state.reasons.add('fact-cap');
-  }
-  return retained;
 }
 
 /** Derive the execution posture exposed by runtime-wiring evidence. */

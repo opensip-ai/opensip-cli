@@ -6,6 +6,7 @@
  */
 
 import {
+  compactDetail,
   depth as depthSchema,
   pageFields,
   sourceFilterFields,
@@ -39,6 +40,7 @@ export function registerCallWalkTool(
         symbolId: symbolIdSchema(),
         depth: depthSchema(),
         identity: traversalIdentity(),
+        detail: compactDetail('nodes'),
         ...sourceFilterFields(),
         ...pageFields(),
       }),
@@ -52,6 +54,7 @@ export function registerCallWalkTool(
         limit: args.limit,
         cursor: args.cursor,
         groupBy: args.groupBy,
+        detail: args.detail ?? 'nodes',
         filter: {
           packages: args.packages,
           filePath: args.filePath,

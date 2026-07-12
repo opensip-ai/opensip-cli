@@ -86,6 +86,11 @@ export function buildVersionCommand(
 ): ToolCommandSpecInput<unknown, ToolCliContext> {
   const deps = probeDeps ?? DEFAULT_PROBE_DEPS;
   return defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/external-tool-adapter',
+      path: 'packages/external-tool-adapter/src/version-command.ts',
+      declaration: 'buildVersionCommand',
+    },
     name: 'version',
     description: `Print the resolved ${input.tool} binary version`,
     commonFlags: ['json', 'cwd'],

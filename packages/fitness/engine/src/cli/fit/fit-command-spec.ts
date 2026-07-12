@@ -90,6 +90,11 @@ async function runFit(
  */
 export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void) {
   return definePrimaryRunCommand<unknown>({
+    staticHandler: {
+      package: '@opensip-cli/fitness',
+      path: 'packages/fitness/engine/src/cli/fit/fit-command-spec.ts',
+      declaration: 'runFit',
+    },
     description: 'Run fitness checks',
     options: [
       {

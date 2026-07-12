@@ -163,6 +163,9 @@ export async function executePostBailoutBootstrap(
         logger: runLogger,
         ui: { version, update },
         datastoreAccess,
+        ...(runtime.runtimeCommands === undefined
+          ? {}
+          : { runtimeCommands: runtime.runtimeCommands }),
       }),
     };
   });

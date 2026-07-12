@@ -33,6 +33,10 @@ import type { DataStore } from '@opensip-cli/datastore';
 type HostSpec = CommandSpec<unknown, CliCommandsContext>;
 const COMMAND_RESULT_OUTPUT = 'command-result';
 
+/** Static-handler provenance shared by every tools-group command spec. */
+const TOOLS_COMMAND_PACKAGE = 'opensip-cli';
+const TOOLS_COMMAND_SPECS_PATH = 'packages/cli/src/commands/tools/index.ts';
+
 interface ScopeFilterOpts {
   cwd?: string;
   projectContext?: ProjectContext;
@@ -52,6 +56,11 @@ function effectiveCwd(opts: ScopeFilterOpts): string {
 
 function buildToolsDoctorSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsDoctorSpec',
+    },
     name: 'doctor',
     description: 'Show every buffered bootstrap diagnostic for this run',
     commonFlags: ['json'],
@@ -66,6 +75,11 @@ function buildToolsDoctorSpec(): HostSpec {
 
 function buildToolsListSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsListSpec',
+    },
     name: 'list',
     description: 'List the effective tool set (bundled, global, and project-local)',
     commonFlags: ['json'],
@@ -136,6 +150,11 @@ function buildToolsListSpec(): HostSpec {
 
 function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsValidateSpec',
+    },
     name: 'validate',
     description:
       'Validate a tool package against the Tool contract (runs the package module — see docs)',
@@ -174,6 +193,11 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsInstallSpec',
+    },
     name: 'install',
     description: 'Validate, then install a tool package (global by default; see tools validate)',
     commonFlags: ['json'],
@@ -221,6 +245,11 @@ function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsUninstallSpec',
+    },
     name: 'uninstall',
     description: 'Uninstall a tool by id or package name (never deletes project SQLite data)',
     commonFlags: ['json'],
@@ -295,6 +324,11 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsCreateSpec',
+    },
     name: 'create',
     description: 'Scaffold a minimal project-local Tool under opensip-cli/tools/<id>/',
     commonFlags: ['json'],
@@ -341,6 +375,11 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: TOOLS_COMMAND_PACKAGE,
+      path: TOOLS_COMMAND_SPECS_PATH,
+      declaration: 'buildToolsDataPurgeSpec',
+    },
     name: 'data-purge',
     description:
       'Delete one tool’s project SQLite rows (sessions, baselines, state) — never tables',

@@ -43,6 +43,22 @@ import type { Catalog } from '@opensip-cli/graph';
 
 const CLI_DIST = fileURLToPath(new URL('../../../../packages/cli/dist/index.js', import.meta.url));
 
+interface SymbolSearchPayload {
+  readonly detail: 'summary' | 'groups' | 'nodes';
+  readonly symbols: readonly {
+    symbolId: string;
+    simpleName?: string;
+    bodyHash?: string;
+    package?: string;
+    qualifiedName?: string;
+  }[];
+  readonly totalMatches: number;
+}
+
+function searchPayload(data: unknown): SymbolSearchPayload {
+  return data as SymbolSearchPayload;
+}
+
 const TSCONFIG = JSON.stringify({
   compilerOptions: {
     target: 'ES2022',
@@ -460,11 +476,11 @@ afterAll(() => {
 });
 
 describe('MCP e2e over real stdio', () => {
-  it('handshakes and lists all 19 tools', async () => {
+  it('handshakes and lists all 21 tools', async () => {
     const conn = await connect(fixtureA);
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(19);
+      expect(tools.tools).toHaveLength(21);
       const names = tools.tools.map((t) => t.name).sort();
       expect(names).toEqual(
         [
@@ -480,8 +496,10 @@ describe('MCP e2e over real stdio', () => {
           'list_runs',
           'package_cycles',
           'package_dependencies',
+          'references_to',
           'refresh_graph',
           'review_change',
+          'search_declarations',
           'search_symbols',
           'show_run',
           'trace_path',
@@ -565,7 +583,7 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(fixtureA, { allowMutations: true });
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(20);
+      expect(tools.tools).toHaveLength(22);
       const names = tools.tools.map((tool) => tool.name);
       expect(new Set(names)).toEqual(
         new Set([
@@ -581,9 +599,11 @@ describe('MCP e2e over real stdio', () => {
           'list_runs',
           'package_cycles',
           'package_dependencies',
+          'references_to',
           'refresh_graph',
           'repair_apply_verify',
           'review_change',
+          'search_declarations',
           'search_symbols',
           'show_run',
           'trace_path',
@@ -690,7 +710,12 @@ describe('MCP e2e over real stdio', () => {
       const packageData = packageDeps.data as {
         edgeKind: string;
         calls: { fromPackage: string; toPackage: string }[];
-        imports: { fromPackage: string; target: string; toPackage: string | null; resolution: string }[];
+        imports: {
+          fromPackage: string;
+          target: string;
+          toPackage: string | null;
+          resolution: string;
+        }[];
       };
       expect(packageData.edgeKind).toBe('combined');
       expect(packageData.calls).toEqual(
@@ -730,6 +755,7 @@ describe('MCP e2e over real stdio', () => {
         edgeKind: 'combined',
         sourceScope: 'all',
         generated: 'include',
+        evidenceLimit: 100,
       });
       const whyData = why.data as {
         edgeKind: string;
@@ -755,6 +781,7 @@ describe('MCP e2e over real stdio', () => {
         edgeKind: 'combined',
         sourceScope: 'all',
         generated: 'include',
+        proofLimit: 50,
       });
       const cycleData = cycles.data as {
         edgeKind: string;
@@ -773,18 +800,20 @@ describe('MCP e2e over real stdio', () => {
 
       const wiring = await call(conn, 'get_runtime_wiring', {
         tool: 'graph',
-        groupBy: 'tool',
+        detail: 'nodes',
         limit: 100,
       });
       expect(wiring.context).toMatchObject({
+        project: { scope: 'project' },
+        runtime: { kind: 'runtime-wiring', identity: expect.stringMatching(/^w1:/) },
         projectKey: expect.any(String),
-        snapshotKey: expect.stringMatching(/^g1:[a-f0-9]{64}$/),
+        snapshotKey: expect.stringMatching(/^w1:/),
       });
       expect(Array.isArray(wiring.nodes)).toBe(true);
       expect(wiring.coverage).toMatchObject({
-        scope: 'captured-admitted-tool-registry',
+        scope: 'captured-admitted-registry-and-command-inventory',
       });
-      expect((wiring.coverage as { reasons: string[] }).reasons).toContain(
+      expect((wiring.coverage as { reasons: string[] }).reasons).not.toContain(
         'top-level-host-commands-outside-port',
       );
       const wiringEdges = wiring.edges as {
@@ -829,21 +858,18 @@ describe('MCP e2e over real stdio', () => {
         filePrefix: 'index.ts',
         sourceScope: 'production',
         generated: 'exclude',
-        groupBy: 'file',
+        // detail defaults to nodes (port); MCP schema exposure is Task 2.7
         limit: 5,
       });
-      const firstSymbols = firstSearch.data as {
-        symbolId: string;
-        simpleName: string;
-      }[];
+      const firstSymbols = searchPayload(firstSearch.data).symbols;
       const searchCursor = (firstSearch.page as { nextCursor?: string }).nextCursor;
       expect(firstSymbols).toHaveLength(5);
-      expect(firstSymbols.every((symbol) => symbol.simpleName.startsWith('caller'))).toBe(true);
+      expect(firstSymbols.every((symbol) => (symbol.simpleName ?? '').startsWith('caller'))).toBe(
+        true,
+      );
       expect(searchCursor).toBeTypeOf('string');
-      expect(firstSearch.groups).toContainEqual({
-        key: 'index.ts',
-        count: 2100,
-      });
+      // Exclusive nodes mode omits groups; detail=groups is exposed in Task 2.7.
+      expect(firstSearch.groups).toBeUndefined();
       if (searchCursor === undefined) throw new Error('high-fan-in search did not page');
 
       const cursorPayload = JSON.parse(Buffer.from(searchCursor, 'base64url').toString('utf8')) as {
@@ -861,11 +887,10 @@ describe('MCP e2e over real stdio', () => {
         filePrefix: 'index.ts',
         sourceScope: 'production',
         generated: 'exclude',
-        groupBy: 'file',
         limit: 5,
         cursor: searchCursor,
       });
-      const secondSymbols = secondSearch.data as { symbolId: string }[];
+      const secondSymbols = searchPayload(secondSearch.data).symbols;
       const firstIds = new Set(firstSymbols.map((symbol) => symbol.symbolId));
       expect(secondSymbols).toHaveLength(5);
       expect(secondSymbols.every((symbol) => !firstIds.has(symbol.symbolId))).toBe(true);
@@ -875,7 +900,8 @@ describe('MCP e2e over real stdio', () => {
         match: 'exact',
         filePath: 'index.ts',
       });
-      const helper = (exactHelper.data as { symbolId: string; qualifiedName: string }[])[0];
+      const helper = searchPayload(exactHelper.data).symbols[0] as
+        { symbolId: string; qualifiedName: string } | undefined;
       expect(helper).toBeDefined();
       if (helper === undefined) throw new Error('exact helper search returned no symbol');
       const qualifiedHelper = await call(conn, 'search_symbols', {
@@ -883,7 +909,7 @@ describe('MCP e2e over real stdio', () => {
         match: 'qualified',
         filePath: 'index.ts',
       });
-      expect(qualifiedHelper.data).toEqual(
+      expect(searchPayload(qualifiedHelper.data).symbols).toEqual(
         expect.arrayContaining([expect.objectContaining({ symbolId: helper.symbolId })]),
       );
 
@@ -891,22 +917,18 @@ describe('MCP e2e over real stdio', () => {
         symbolId: helper.symbolId,
         depth: 1,
         limit: 10,
-        groupBy: 'file',
+        // default detail=nodes; groupBy must be none for exclusive nodes mode
       });
       const fanInNodes = (fanIn.data as { nodes: { symbol: { symbolId: string } }[] }).nodes;
       const fanInCursor = (fanIn.page as { nextCursor?: string }).nextCursor;
       expect(fanInNodes).toHaveLength(10);
       expect(fanInCursor).toBeTypeOf('string');
-      expect(fanIn.coverage).toMatchObject({
-        complete: false,
-        truncated: true,
-      });
+      expect(fanIn.groups).toBeUndefined();
       if (fanInCursor === undefined) throw new Error('high-fan-in traversal did not page');
       const fanInNext = await call(conn, 'who_calls', {
         symbolId: helper.symbolId,
         depth: 1,
         limit: 10,
-        groupBy: 'file',
         cursor: fanInCursor,
       });
       const firstFanInIds = new Set(fanInNodes.map((node) => node.symbol.symbolId));
@@ -918,7 +940,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'unused',
         match: 'exact',
       });
-      const unusedSymbol = (unused.data as { symbolId: string }[])[0];
+      const unusedSymbol = searchPayload(unused.data).symbols[0];
       expect(unusedSymbol).toBeDefined();
       if (unusedSymbol === undefined) throw new Error('unused symbol not found');
       const noPath = await call(conn, 'trace_path', {
@@ -937,7 +959,7 @@ describe('MCP e2e over real stdio', () => {
         match: 'exact',
         sourceScope: 'all',
       });
-      const twins = twinSearch.data as {
+      const twins = searchPayload(twinSearch.data).symbols as {
         symbolId: string;
         bodyHash: string;
         filePath: string;
@@ -981,7 +1003,7 @@ describe('MCP e2e over real stdio', () => {
       expect(badCursor.isError).toBe(true);
       expect(JSON.stringify(badCursor.content)).toContain('cursor-invalid');
 
-      const runtimePage = await call(conn, 'get_runtime_wiring', { limit: 1 });
+      const runtimePage = await call(conn, 'get_runtime_wiring', { detail: 'nodes', limit: 1 });
       const runtimeCursor = (runtimePage.page as { nextCursor?: string }).nextCursor;
       expect(runtimeCursor).toBeTypeOf('string');
       if (runtimeCursor === undefined) throw new Error('runtime wiring did not page');
@@ -989,7 +1011,7 @@ describe('MCP e2e over real stdio', () => {
       try {
         const wrongProject = await otherProject.client.callTool({
           name: 'get_runtime_wiring',
-          arguments: { limit: 1, cursor: runtimeCursor },
+          arguments: { detail: 'nodes', limit: 1, cursor: runtimeCursor },
         });
         expect(wrongProject.isError).toBe(true);
         expect(JSON.stringify(wrongProject.content)).toContain('cursor-project-mismatch');
@@ -1166,7 +1188,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'legacyHelper',
         match: 'exact',
       });
-      expect(legacy.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(legacy.data).symbols).toHaveLength(1);
       expect(legacy.freshness).toMatchObject({
         fresh: false,
         verification: 'partial',
@@ -1189,7 +1211,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'legacyHelper',
         match: 'exact',
       });
-      expect(replaced.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(replaced.data).symbols).toHaveLength(1);
       expect(replaced.freshness).toMatchObject({
         fresh: true,
         verification: 'complete',
@@ -1342,7 +1364,7 @@ describe('MCP e2e over real stdio', () => {
       expect((forced.data as { action: string }).action).toBe('rebuilt');
       // After the rebuild, the catalog is fresh and queryable.
       const search = await call(conn, 'search_symbols', { query: 'helper' });
-      expect((search.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(search.data).symbols.length).toBeGreaterThan(0);
       const afterRuns = await call(conn, 'list_runs', { tool: 'graph' });
       expect(afterRuns.runs).toEqual(afterExternalRun.runs);
     } finally {
@@ -1370,7 +1392,7 @@ describe('MCP e2e over real stdio', () => {
       });
       const oldIdentity = (before.context as { catalog: { identity?: string } }).catalog.identity;
       expect(oldIdentity).toMatch(/^g1:[a-f0-9]{64}$/);
-      expect(before.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(before.data).symbols).toHaveLength(1);
 
       writeFileSync(join(root, 'index.ts'), concurrentRefreshSource('new'), 'utf8');
       await new Promise((resolve) => setTimeout(resolve, 2200));
@@ -1413,7 +1435,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'newEpoch',
         match: 'exact',
       });
-      expect(newReader.data as unknown[]).toHaveLength(1);
+      expect(searchPayload(newReader.data).symbols).toHaveLength(1);
       expect((newReader.context as { catalog: { identity?: string } }).catalog.identity).toBe(
         firstData.generation.identity,
       );
@@ -1425,7 +1447,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'oldEpoch',
         match: 'exact',
       });
-      expect(oldAfterSwap.data).toEqual([]);
+      expect(searchPayload(oldAfterSwap.data).symbols).toEqual([]);
 
       const followUp = await call(conn, 'refresh_graph', {});
       expect((followUp.data as { action: string }).action).toBe('no-op');
@@ -1512,7 +1534,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'helper',
         match: 'exact',
       });
-      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(recovered.data).symbols.length).toBeGreaterThan(0);
       expect((recovered.context as { catalog: { identity?: string } }).catalog.identity).toBe(
         priorIdentity,
       );
@@ -1560,7 +1582,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'helper',
         match: 'exact',
       });
-      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(recovered.data).symbols.length).toBeGreaterThan(0);
       expect(
         (recovered.context as { catalog: { generationSource?: string } }).catalog.generationSource,
       ).toBe('initial-load');
@@ -1602,7 +1624,7 @@ describe('MCP e2e over real stdio', () => {
         query: 'helper',
         match: 'exact',
       });
-      expect((recovered.data as unknown[]).length).toBeGreaterThan(0);
+      expect(searchPayload(recovered.data).symbols.length).toBeGreaterThan(0);
       expect((recovered.context as { catalog: { identity?: string } }).catalog.identity).toBe(
         priorIdentity,
       );

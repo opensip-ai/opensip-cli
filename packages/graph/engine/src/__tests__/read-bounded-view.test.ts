@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  facetsFromFlatCoverage,
   makeFacet,
   mergeFacet,
   rollupFacets,
@@ -28,7 +27,10 @@ describe('makeFacet (P2 Phase 2.1)', () => {
   });
 
   it('marks truncation only for -cap reasons and sorts/dedupes reasons', () => {
-    const facet = makeFacet(true, new Set(['malformed-omitted', 'proof-edge-cap', 'malformed-omitted']));
+    const facet = makeFacet(
+      true,
+      new Set(['malformed-omitted', 'proof-edge-cap', 'malformed-omitted']),
+    );
     expect(facet.complete).toBe(false);
     expect(facet.truncated).toBe(true);
     expect(facet.reasons).toEqual(['malformed-omitted', 'proof-edge-cap']);
@@ -102,26 +104,5 @@ describe('rollupFacets (P2 Phase 2.1)', () => {
   it('is fully complete when no facet is requested', () => {
     const coverage = rollupFacets(facets());
     expect(coverage).toMatchObject({ complete: true, truncated: false, reasons: [] });
-  });
-});
-
-describe('facetsFromFlatCoverage (phase-local bridge, P2 Phase 2.1)', () => {
-  it('maps a flat triple onto the requested inventory facet, others unrequested', () => {
-    const coverage = facetsFromFlatCoverage({
-      complete: false,
-      truncated: true,
-      reasons: ['package-edge-cap'],
-    });
-    expect(coverage.inventory).toEqual({
-      requested: true,
-      complete: false,
-      truncated: true,
-      reasons: ['package-edge-cap'],
-    });
-    expect(coverage.evidence.requested).toBe(false);
-    expect(coverage.grouping.requested).toBe(false);
-    expect(coverage.projection.requested).toBe(false);
-    // Top-level preserves the flat semantics (inventory is the only requested facet).
-    expect(coverage).toMatchObject({ complete: false, truncated: true, reasons: ['package-edge-cap'] });
   });
 });

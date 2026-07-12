@@ -53,7 +53,7 @@ function runWalk(): {
   dependencySites: readonly DependencySiteRecord[];
   occurrences: Record<string, FunctionOccurrence[]>;
 } {
-  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = pythonGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -83,7 +83,7 @@ function resolveDeps(): {
   catalog: Catalog;
   byOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined;
 } {
-  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = pythonGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,
@@ -121,7 +121,7 @@ function buildPipeline(): {
   firstFile: PythonParsedFile;
   moduleInitHash: string;
 } {
-  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = pythonGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

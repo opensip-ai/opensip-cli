@@ -5,7 +5,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 import { codePointSortKey, compareCodePointStrings } from '../code-point-order.js';
 import { stronglyConnectedComponents } from '../pipeline/strongly-connected-components.js';
 
-import { coverageFromReasons } from './bounded-view.js';
+import { makeFacet, mergeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
 import {
   buildPackageEvidence,
   type PackageEvidenceQuery,
@@ -13,7 +13,7 @@ import {
   type PackageImportEvidenceRow,
 } from './package-evidence.js';
 
-import type { GraphReadCoverage } from './query-contracts.js';
+import type { GraphReadFacetCoverage } from './query-contracts.js';
 import type { SourceRoleMatcher } from './source-filter.js';
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
@@ -33,10 +33,10 @@ export interface PackageCycleComponent {
   readonly totalProofEdges: number;
 }
 
-/** Package-cycle components together with evidence coverage metadata. */
+/** Package-cycle components together with facet coverage metadata. */
 export interface PackageSccView {
   readonly components: readonly PackageCycleComponent[];
-  readonly coverage: GraphReadCoverage;
+  readonly coverage: GraphReadFacetCoverage;
 }
 
 const MAX_PROOF = 50;
@@ -102,8 +102,11 @@ function isCycle(members: readonly string[]): boolean {
 function projectComponents(
   components: readonly (readonly string[])[],
   proof: readonly PackageCycleProofEdge[],
-  reasons: Set<string>,
-): PackageCycleComponent[] {
+  proofLimit: number,
+): {
+  readonly projected: PackageCycleComponent[];
+  readonly proofCapped: boolean;
+} {
   const projected: {
     readonly packages: readonly string[];
     readonly proofEdges: PackageCycleProofEdge[];
@@ -121,16 +124,26 @@ function projectComponents(
     for (const member of members) componentByPackage.set(member, component);
   }
   // `proof` is already in stable order, so this single pass preserves the
-  // deterministic first-50 proof sample without rescanning it per component.
+  // deterministic first-N proof sample without rescanning it per component.
+  let proofCapped = false;
   for (const row of proof) {
     const component = componentByPackage.get(row.from);
     if (component === undefined || component !== componentByPackage.get(row.to)) continue;
     component.totalProofEdges++;
-    if (component.proofEdges.length < MAX_PROOF) component.proofEdges.push(row);
-    else reasons.add('proof-edge-cap');
+    if (component.proofEdges.length < proofLimit) component.proofEdges.push(row);
+    // Only a REQUESTED proof sample (proofLimit > 0) that overflowed is a cap;
+    // proofLimit === 0 is opt-out (members/counts only), not truncation.
+    else if (proofLimit > 0) proofCapped = true;
   }
   projected.sort((a, b) => compareCodePointStrings(a.packages.join('\0'), b.packages.join('\0')));
-  return projected;
+  return { projected, proofCapped };
+}
+
+function resolveProofLimit(query: PackageEvidenceQuery): number {
+  // Reuse evidenceLimit when supplied as the proof sample bound; default MAX_PROOF.
+  const raw = query.evidenceLimit;
+  if (raw === undefined || !Number.isFinite(raw)) return MAX_PROOF;
+  return Math.min(MAX_PROOF, Math.max(0, Math.trunc(raw)));
 }
 
 /** Package SCCs over the selected labelled edge kind. */
@@ -142,7 +155,18 @@ export function buildPackageScc(
   cachedFeatures?: FeatureTable,
 ): Result<PackageSccView, GraphReadError> {
   try {
-    const evidence = buildPackageEvidence(catalog, indexes, query, matcher, cachedFeatures);
+    // Inventory rows drive Tarjan; sample/proof caps must not change components.
+    // Proofs are built from the aggregated call/import ROWS (cycleProofRows), not
+    // the flat concrete-evidence array — so disable that array (evidenceLimit: 0)
+    // to avoid a spurious call/import-evidence-cap leaking into SCC coverage
+    // (P2 Phase 2.4). The proof sample bound comes from resolveProofLimit(query).
+    const evidence = buildPackageEvidence(
+      catalog,
+      indexes,
+      { ...query, evidenceLimit: 0 },
+      matcher,
+      cachedFeatures,
+    );
     if (!evidence.ok) return evidence;
     const proof = cycleProofRows(evidence.value);
     const adjacency = packageAdjacency(proof);
@@ -150,10 +174,18 @@ export function buildPackageScc(
     const components = stronglyConnectedComponents(nodes, (node) =>
       [...(adjacency.get(node) ?? [])].sort(compareCodePointStrings),
     );
-    const reasons = new Set(evidence.value.coverage.reasons);
+    const proofLimit = resolveProofLimit(query);
+    const { projected, proofCapped } = projectComponents(components, proof, proofLimit);
+    const base = evidence.value.coverage;
+    const proofEvidence = makeFacet(true, new Set(proofCapped ? ['proof-edge-cap'] : []));
     return ok({
-      components: projectComponents(components, proof, reasons),
-      coverage: coverageFromReasons(reasons),
+      components: projected,
+      coverage: rollupFacets({
+        inventory: base.inventory,
+        evidence: mergeFacet(base.evidence, proofEvidence),
+        grouping: UNREQUESTED_FACET,
+        projection: UNREQUESTED_FACET,
+      }),
     });
   } catch {
     return err({

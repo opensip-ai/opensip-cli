@@ -361,6 +361,11 @@ export const toolCommandWorkerCommandSpec: CommandSpec<unknown, CliCommandsConte
   unknown,
   CliCommandsContext
 >({
+  staticHandler: {
+    package: 'opensip-cli',
+    path: 'packages/cli/src/bootstrap/tool-command-worker-entry.ts',
+    declaration: 'toolCommandWorkerCommandSpec',
+  },
   name: '__tool-command-worker',
   visibility: 'internal',
   description:

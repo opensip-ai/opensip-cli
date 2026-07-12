@@ -11,6 +11,7 @@
  */
 
 import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.js';
+import { declarationFileIndex, mergeSemanticFactsIncremental } from '../../semantic-facts.js';
 
 import { countCatalogCallSites } from './catalog-stats.js';
 import { ownerEdgeKey } from './edge-identity.js';
@@ -32,6 +33,7 @@ import type {
   ReExportRecord,
   ResolutionMode,
   ResolutionStats,
+  SemanticFactBundle,
 } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
 import type { Attributes } from '@opensip-cli/core';
@@ -163,7 +165,10 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
         resolutionMode,
         emitBoundaryCalls,
       });
-      const catalog = stitchEdges(initialCatalog, result.edgesByOwner, result.dependenciesByOwner);
+      const catalog = attachSemanticFacts(
+        stitchEdges(initialCatalog, result.edgesByOwner, result.dependenciesByOwner),
+        result.semanticFacts,
+      );
       return { ...result, catalog };
     },
     detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
@@ -313,10 +318,20 @@ export async function buildAndResolveCatalogIncremental(
         result.dependenciesByOwner,
         closureRel,
       );
-      const catalog: Catalog = {
-        ...initialCatalog,
-        functions: stitchedFunctions,
-      };
+      const declIndex = declarationFileIndex(cachedCatalog.semanticFacts?.declarations ?? []);
+      const semanticFacts = mergeSemanticFactsIncremental(
+        cachedCatalog.semanticFacts,
+        result.semanticFacts,
+        closureRel,
+        declIndex,
+      );
+      const catalog = attachSemanticFacts(
+        {
+          ...initialCatalog,
+          functions: stitchedFunctions,
+        },
+        semanticFacts,
+      );
       return { ...result, catalog };
     },
     detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
@@ -483,4 +498,22 @@ function stitchEdges(
     });
   }
   return { ...initial, functions: next };
+}
+
+/**
+ * Attach optional semantic facts onto a catalog. Absent stays absent
+ * (unsupported); a present bundle (including empty arrays) is retained.
+ */
+function attachSemanticFacts(
+  catalog: Catalog,
+  semanticFacts: SemanticFactBundle | undefined,
+): Catalog {
+  if (semanticFacts === undefined) {
+    // Drop any stale plane when the adapter omitted facts this pass.
+    if (catalog.semanticFacts === undefined) return catalog;
+    const rest = { ...catalog };
+    delete rest.semanticFacts;
+    return rest;
+  }
+  return { ...catalog, semanticFacts };
 }

@@ -299,6 +299,11 @@ function sessionReplayResult(
  * authoritative — byte-identical to the former action body.
  */
 const simCommand = definePrimaryRunCommand<unknown>({
+  staticHandler: {
+    package: '@opensip-cli/simulation',
+    path: 'packages/simulation/engine/src/tool.ts',
+    declaration: 'runSim',
+  },
   description: 'Run simulation scenarios',
   options: [
     {

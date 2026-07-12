@@ -114,6 +114,112 @@ describe('CatalogRepo', () => {
     expect(loaded?.adapterSelection).toBeUndefined();
     expect(loaded?.engineMode).toBeUndefined();
     expect(loaded?.shardCacheInputs).toBeUndefined();
+    expect(loaded?.semanticFacts).toBeUndefined();
+  });
+
+  it('round-trips present-empty and populated semanticFacts without inventing a plane', () => {
+    const emptyPlane = makeCatalog({
+      semanticFacts: {
+        referenceScope: 'cross-file',
+        declarations: [],
+        references: [],
+        coverage: {
+          status: 'complete',
+          inspectedDeclarations: 0,
+          emittedDeclarations: 0,
+          omittedDeclarations: 0,
+          inspectedReferences: 0,
+          emittedReferences: 0,
+          omittedReferences: 0,
+          reasons: [],
+        },
+      },
+    });
+    repo.replaceAll(emptyPlane);
+    expect(repo.loadFullCatalog()?.semanticFacts).toEqual(emptyPlane.semanticFacts);
+
+    const populated = makeCatalog({
+      semanticFacts: {
+        referenceScope: 'cross-file',
+        declarations: [
+          {
+            declarationId: 'd1|pkg|src/a.ts|interface|Foo|0000000000000001|0000000000000000',
+            name: 'Foo',
+            qualifiedName: 'src/a.Foo',
+            kind: 'interface',
+            package: 'pkg',
+            filePath: 'src/a.ts',
+            line: 1,
+            column: 0,
+            endLine: 2,
+            endColumn: 1,
+            visibility: 'exported',
+            exportRole: 'named-export',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+        ],
+        references: [],
+        coverage: {
+          status: 'complete',
+          inspectedDeclarations: 1,
+          emittedDeclarations: 1,
+          omittedDeclarations: 0,
+          inspectedReferences: 0,
+          emittedReferences: 0,
+          omittedReferences: 0,
+          reasons: [],
+        },
+      },
+    });
+    repo.replaceAll(populated);
+    expect(repo.loadFullCatalog()?.semanticFacts).toEqual(populated.semanticFacts);
+
+    // Pre-feature catalog still omits the plane.
+    repo.replaceAll(makeCatalog());
+    expect(repo.loadFullCatalog()?.semanticFacts).toBeUndefined();
+  });
+
+  it('drops a malformed semanticFacts plane on load (degrades to unsupported, not bricking the catalog)', () => {
+    // replaceAll trusts the in-process Catalog shape; load re-validates JSON.
+    // The semantic plane is OPTIONAL: a malformed decoded plane must degrade to
+    // unsupported (absent), never reject the whole required catalog (P2 Phase 3).
+    repo.replaceAll(makeCatalog());
+    const handle = requireDrizzleHandle(datastore);
+    handle.db
+      .update(graphCatalog)
+      .set({
+        payload: {
+          version: '3.0',
+          tool: 'graph',
+          language: 'typescript',
+          builtAt: '2026-05-22T00:00:00.000Z',
+          cacheKey: 'ts-5.7.3-test',
+          functions: {},
+          semanticFacts: {
+            referenceScope: 'all',
+            declarations: [],
+            references: [],
+            coverage: {
+              status: 'complete',
+              inspectedDeclarations: 0,
+              emittedDeclarations: 0,
+              omittedDeclarations: 0,
+              inspectedReferences: 0,
+              emittedReferences: 0,
+              omittedReferences: 0,
+              reasons: [],
+            },
+          },
+        },
+      })
+      .where(sql`id = 1`)
+      .run();
+    const loaded = repo.loadFullCatalog();
+    expect(loaded).not.toBeNull();
+    // Required catalog data survives; the malformed optional plane is dropped.
+    expect(loaded?.language).toBe('typescript');
+    expect(loaded?.semanticFacts).toBeUndefined();
   });
 
   it.each([

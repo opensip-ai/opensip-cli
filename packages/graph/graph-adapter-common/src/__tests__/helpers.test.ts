@@ -295,7 +295,7 @@ describe('createDiscover', () => {
       configCandidates: ['go.sum', 'go.mod'],
       languageId: 'go',
     });
-    const out = discover({ cwd: dir });
+    const out = discover({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.files.length).toBe(2);
     expect([...out.files]).toEqual([...out.files].sort());
     expect(out.configPathAbs).toContain('go.mod');

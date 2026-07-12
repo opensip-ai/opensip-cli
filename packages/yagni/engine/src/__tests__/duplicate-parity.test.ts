@@ -274,7 +274,10 @@ type GraphOccurrenceLike = Pick<
 >;
 
 async function graphEligibleCandidates(projectRoot: string): Promise<CloneCandidate[]> {
-  const discovery = await typescriptGraphAdapter.discoverFiles({ cwd: projectRoot });
+  const discovery = await typescriptGraphAdapter.discoverFiles({
+    diagnosticIntent: 'quiet',
+    cwd: projectRoot,
+  });
   const parsed = await typescriptGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

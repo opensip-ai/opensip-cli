@@ -8,6 +8,7 @@
  */
 
 import type { McpReadError } from './mcp-error.js';
+import type { StaticHandlerBridgeOutcome } from './static-handler-bridge.js';
 import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
 import type { Result } from '@opensip-cli/core';
 import type {
@@ -29,6 +30,18 @@ import type {
 type GroupByMode = 'none' | 'package' | 'file';
 type PackageEdgeKindParam = 'call' | 'import' | 'combined';
 
+/**
+ * Exclusive compact representation for high-volume graph queries (P2 Phase 2.2+).
+ * Exactly one representation is projected per request — never rows plus groups.
+ */
+export type CompactQueryDetail = 'summary' | 'groups' | 'nodes';
+
+/**
+ * Default page size for identity-producing searches (`search_symbols`).
+ * Intentionally smaller than the shared paged-tool default (100). Caller range 1–500.
+ */
+export const DEFAULT_IDENTITY_SEARCH_LIMIT = 20;
+
 /** Identity of the in-memory catalog generation a read was served from. */
 export interface GraphGeneration {
   readonly builtAt: string;
@@ -39,6 +52,7 @@ export interface GraphGeneration {
 /** A blast-radius score for one symbol (graph's canonical scoring). */
 export interface BlastDto {
   readonly symbol: SymbolRef;
+  /** Populated only for detail=nodes; empty for summary/groups. */
   readonly members: readonly SymbolRef[];
   readonly totalMembership: number;
   readonly direct: number;
@@ -47,6 +61,7 @@ export interface BlastDto {
   readonly identityMode: 'body-twin-union';
   readonly twinCount?: number;
   readonly filteringLimitations?: readonly string[];
+  readonly detail?: CompactQueryDetail;
 }
 
 /** One dead-code (orphan) finding projected from `graph:orphan-subtree`. */
@@ -122,7 +137,16 @@ export interface TraversalQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /**
+   * Exclusive representation for callers/callees walks (P2 Phase 2.6).
+   * Default `nodes`. `path` walks ignore this and keep ordered path/hop DTOs.
+   * `groups` requires `groupBy: package|file`.
+   */
+  readonly detail?: CompactQueryDetail;
 }
+
+/** Architecture response family selector (P2 Phase 2.5). */
+export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
 
 /** A compact, labelled architecture overview. */
 export interface ArchitectureSummaryDto {
@@ -131,8 +155,19 @@ export interface ArchitectureSummaryDto {
   readonly uniqueBodyCount: LabelledNodeCount;
   readonly callEvidence: CallEvidenceMetrics;
   readonly packageCount: LabelledPackageCount;
-  readonly packageEdges: readonly ArchitecturePackageEdgeRow[];
-  readonly hotspots: readonly ArchitectureHotspot[];
+  readonly includedSections: readonly ArchitectureSection[];
+  readonly packageEdges?: readonly ArchitecturePackageEdgeRow[];
+  readonly packageEdgesSummary?: {
+    readonly totalAvailable: number;
+    readonly selectedCount: number;
+    readonly pageReturned: number;
+  };
+  readonly hotspots?: readonly ArchitectureHotspot[];
+  readonly hotspotsSummary?: {
+    readonly totalAvailable: number;
+    readonly selectedCount: number;
+    readonly pageReturned: number;
+  };
 }
 
 export interface SearchSymbolsOptions {
@@ -141,6 +176,115 @@ export interface SearchSymbolsOptions {
   readonly match?: 'substring' | 'exact' | 'qualified';
   readonly filter?: Partial<GraphSourceFilter>;
   readonly groupBy?: GroupByMode;
+  /**
+   * Exclusive representation (P2 Phase 2.2). Default `nodes` so callers receive
+   * symbol IDs for traversal tools. `groups` requires `groupBy: package|file`.
+   */
+  readonly detail?: CompactQueryDetail;
+}
+
+/** Declaration kinds for {@link GraphReadPort.searchDeclarations}. */
+export type McpDeclarationKind =
+  | 'function'
+  | 'class'
+  | 'interface'
+  | 'type-alias'
+  | 'enum'
+  | 'namespace'
+  | 'variable'
+  | 'property'
+  | 'method'
+  | 'import'
+  | 'export';
+
+/** Reference kinds for {@link GraphReadPort.referencesTo}. */
+export type McpReferenceKind = 'type' | 'value' | 'import' | 'export' | 'heritage' | 'annotation';
+
+export interface SearchDeclarationsOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly match?: 'substring' | 'exact' | 'qualified';
+  readonly kinds?: readonly McpDeclarationKind[];
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation. Default `nodes` (declaration IDs for references_to). */
+  readonly detail?: CompactQueryDetail;
+}
+
+export interface DeclarationRefDto {
+  readonly declarationId: string;
+  readonly name: string;
+  readonly qualifiedName: string;
+  readonly kind: McpDeclarationKind;
+  readonly package: string;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly visibility: string;
+  readonly exportRole: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+export interface DeclarationSearchDto {
+  readonly detail: CompactQueryDetail;
+  readonly referenceScope: 'cross-file';
+  readonly declarations: readonly DeclarationRefDto[];
+  readonly totalMatches: number;
+}
+
+export interface ReferencesToOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly kinds?: readonly McpReferenceKind[];
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation. Default `summary` (counts only; no sites). */
+  readonly detail?: CompactQueryDetail;
+}
+
+export interface ReferenceSiteDto {
+  readonly referenceId: string;
+  readonly kind: McpReferenceKind;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly package: string;
+  readonly targetDeclarationId?: string;
+  readonly targetPackage?: string;
+  readonly targetName?: string;
+  readonly targetKind?: McpDeclarationKind;
+  readonly basis: string;
+  readonly confidence: string;
+  readonly importSpecifier?: string;
+  readonly reason?: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+export interface ReferencesToDto {
+  readonly detail: CompactQueryDetail;
+  readonly referenceScope: 'cross-file';
+  readonly declarationId: string;
+  readonly references: readonly ReferenceSiteDto[];
+  readonly totalMatches: number;
+  readonly kindCounts?: readonly { readonly kind: string; readonly count: number }[];
+}
+
+/**
+ * Exclusive `search_symbols` payload. `symbols` is populated only for
+ * `detail: 'nodes'`; group rows live on the envelope `groups` field for
+ * `detail: 'groups'`; summary returns counts only.
+ */
+export interface SymbolSearchDto {
+  readonly detail: CompactQueryDetail;
+  readonly symbols: readonly SymbolRef[];
+  /** Total filtered matches in the candidate inventory (all detail modes). */
+  readonly totalMatches: number;
 }
 
 export interface DeadCodeQuery {
@@ -148,6 +292,19 @@ export interface DeadCodeQuery {
   readonly cursor?: string;
   readonly filter?: Partial<GraphSourceFilter>;
   readonly groupBy?: GroupByMode;
+  /** Exclusive representation (P2 Phase 2.7/2.8). Default `summary`. */
+  readonly detail?: CompactQueryDetail;
+}
+
+/**
+ * Exclusive dead-code payload. `rows` is populated only for `detail: 'nodes'`.
+ */
+export interface DeadCodeResultDto {
+  readonly detail: CompactQueryDetail;
+  readonly rows: readonly DeadCodeDto[];
+  readonly totalOrphans: number;
+  readonly reasonCounts: readonly { readonly reason: string; readonly count: number }[];
+  readonly ruleCounts: readonly { readonly ruleId: string; readonly count: number }[];
 }
 
 export interface ArchitectureQuery {
@@ -155,6 +312,10 @@ export interface ArchitectureQuery {
   readonly cursor?: string;
   readonly filter?: Partial<GraphSourceFilter>;
   readonly groupBy?: GroupByMode;
+  /** Default `['metrics']`. Unselected families are omitted from the response. */
+  readonly sections?: readonly ArchitectureSection[];
+  /** Global top-N for ranked families before page limit. Default 20, max 100. */
+  readonly topN?: number;
 }
 
 export interface RefreshResult {
@@ -180,7 +341,22 @@ export interface GraphReadPort {
   searchSymbols(
     query: string,
     opts?: SearchSymbolsOptions,
-  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>>;
+  ): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>>;
+  /**
+   * Search non-callable declaration facts (P2 Phase 3). Separate from
+   * {@link searchSymbols} — declaration IDs are not callable symbol IDs.
+   */
+  searchDeclarations(
+    query: string,
+    opts?: SearchDeclarationsOptions,
+  ): Promise<Result<GraphToolResult<DeclarationSearchDto>, McpReadError>>;
+  /**
+   * Cross-file references to a declaration id from {@link searchDeclarations}.
+   */
+  referencesTo(
+    declarationId: string,
+    opts?: ReferencesToOptions,
+  ): Promise<Result<GraphToolResult<ReferencesToDto>, McpReadError>>;
   /** All symbols declared in `file` enclosing (or starting at) `line`. */
   findBySpan(
     file: string,
@@ -201,12 +377,13 @@ export interface GraphReadPort {
       cursor?: string;
       filter?: Partial<GraphSourceFilter>;
       groupBy?: GroupByMode;
+      detail?: CompactQueryDetail;
     },
   ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>>;
   /** Orphan (dead-code) symbols via public orphan evaluation. */
   deadCode(
     query?: DeadCodeQuery,
-  ): Promise<Result<GraphToolResult<readonly DeadCodeDto[]>, McpReadError>>;
+  ): Promise<Result<GraphToolResult<DeadCodeResultDto>, McpReadError>>;
   /** Labelled architecture overview (production/non-generated default). */
   architectureSummary(
     query?: ArchitectureQuery,
@@ -228,6 +405,30 @@ export interface GraphReadPort {
   packageCycles(
     query: PackageCyclesQuery,
   ): Promise<Result<GraphToolResult<PackageCyclesDto>, McpReadError>>;
+  /**
+   * Batch-join author-declared static handler descriptors to declaration
+   * facts for one immutable catalog generation (P2 Phase 4.7).
+   * The runtime snapshot key must be a validated `w1:` identity.
+   */
+  resolveStaticHandlerDeclarations(
+    runtimeSnapshotKey: string,
+    refs: readonly {
+      readonly package: string;
+      readonly path: string;
+      readonly declaration: string;
+      readonly admittedPackageIdentity?: string;
+      readonly owner?: 'host' | 'tool';
+    }[],
+  ): Promise<
+    Result<
+      {
+        readonly catalogIdentity?: string;
+        readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+        readonly outcomes: readonly StaticHandlerBridgeOutcome[];
+      },
+      McpReadError
+    >
+  >;
 }
 
 export interface PackageDependenciesQuery {
@@ -238,6 +439,8 @@ export interface PackageDependenciesQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /** Nested evidence samples per inventory row (0–5). Graph default 5 until Task 2.4. */
+  readonly sampleLimit?: number;
 }
 
 export interface WhyDependsQuery {
@@ -248,6 +451,8 @@ export interface WhyDependsQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /** Max concrete evidence sites retained (0–100). Bound into the cursor digest. */
+  readonly evidenceLimit?: number;
 }
 
 export interface PackageCyclesQuery {
@@ -256,6 +461,8 @@ export interface PackageCyclesQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /** Max proof edges per component (0–50). Bound into the cursor digest. */
+  readonly proofLimit?: number;
 }
 
 export interface PackageDependenciesDto {

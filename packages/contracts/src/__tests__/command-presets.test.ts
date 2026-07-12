@@ -26,6 +26,12 @@ const ARGS: readonly ArgSpec[] = [
   },
 ];
 
+const STATIC_HANDLER = {
+  package: '@opensip-cli/fixture',
+  path: 'packages/fixture/src/handler.ts',
+  declaration: 'fixtureHandler',
+} as const;
+
 describe('command presets', () => {
   it('defines primary runtime-dispatched run commands with the full reporting surface', () => {
     const options = [...gateRunFlagSpecs, sarifRunFlagSpec, ...OPTIONS];
@@ -34,6 +40,7 @@ describe('command presets', () => {
       options,
       args: ARGS,
       handler: HANDLER,
+      staticHandler: STATIC_HANDLER,
     });
 
     expect(command).toMatchObject({
@@ -45,6 +52,7 @@ describe('command presets', () => {
       producesVerdict: true,
       options,
       args: ARGS,
+      staticHandler: STATIC_HANDLER,
     });
     expect(command.commonFlags).not.toBe(REPORTING_RUN_COMMON_FLAGS);
     expect(command.handler).toBe(HANDLER);
@@ -65,6 +73,7 @@ describe('command presets', () => {
       aliases: ['g'],
       options: OPTIONS,
       handler: HANDLER,
+      staticHandler: STATIC_HANDLER,
     });
 
     expect(command).toMatchObject({
@@ -75,9 +84,11 @@ describe('command presets', () => {
       scope: 'project',
       output: 'signal-envelope',
       options: OPTIONS,
+      staticHandler: STATIC_HANDLER,
     });
     expect(command.commonFlags).not.toBe(MANDATORY_COMMON_FLAGS);
     expect(command.handler).toBe(HANDLER);
+    expect(Object.isFrozen(command.staticHandler)).toBe(true);
   });
 
   it('defines list/catalog commands with the shared command-result surface', () => {
@@ -85,6 +96,7 @@ describe('command presets', () => {
       name: 'graph list',
       description: 'List graph rules',
       handler: HANDLER,
+      staticHandler: STATIC_HANDLER,
     });
 
     expect(command).toMatchObject({
@@ -93,10 +105,22 @@ describe('command presets', () => {
       commonFlags: ['cwd', 'json'],
       scope: 'project',
       output: 'command-result',
+      staticHandler: STATIC_HANDLER,
     });
     expect(command.aliases).toBeUndefined();
     expect(command.options).toBeUndefined();
     expect(command.handler).toBe(HANDLER);
+  });
+
+  it('propagates staticHandler through aux export presets', () => {
+    const command = defineAuxExportCommand({
+      name: 'export',
+      description: 'Export baseline',
+      handler: HANDLER,
+      staticHandler: STATIC_HANDLER,
+    });
+    expect(command.staticHandler).toEqual(STATIC_HANDLER);
+    expect(Object.isFrozen(command)).toBe(true);
   });
 
   it('defines auxiliary export commands as file-export raw streams', () => {

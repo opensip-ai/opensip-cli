@@ -266,6 +266,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             match: 'substring',
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'nodes',
           }),
         }),
       ],
@@ -283,6 +284,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             identity: 'occurrence',
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'nodes',
           }),
         }),
       ],
@@ -294,6 +296,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             symbolId,
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'summary',
           }),
         }),
       ],
@@ -304,6 +307,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             op: 'deadCode',
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'summary',
           }),
         }),
       ],
@@ -314,6 +318,8 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             op: 'architectureSummary',
             filter: productionFilter,
             groupBy: 'none',
+            sections: ['metrics'],
+            topN: 20,
           }),
         }),
       ],
@@ -327,6 +333,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             package: undefined,
             filter: productionFilter,
             groupBy: 'none',
+            sampleLimit: null,
           }),
         }),
       ],
@@ -342,6 +349,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             toPackage: 'pkg-b',
             filter: productionFilter,
             groupBy: 'none',
+            evidenceLimit: null,
           }),
         }),
       ],
@@ -353,6 +361,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             edgeKind: 'call',
             filter: productionFilter,
             groupBy: 'none',
+            proofLimit: null,
           }),
         }),
       ],
@@ -374,10 +383,13 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(search.value.context.catalog.status).toBe('loaded');
     expect(search.value.context.catalog.identity?.startsWith('g1:')).toBe(true);
     expect(search.value.coverage).toBeDefined();
-    expect(search.value.data.some((s) => s.simpleName === 'caller')).toBe(true);
-    expect(search.value.data[0]?.package).toBe('pkg');
+    expect(search.value.coverage.inventory.requested).toBe(true);
+    expect(search.value.data.detail).toBe('nodes');
+    expect(search.value.data.symbols.some((s) => s.simpleName === 'caller')).toBe(true);
+    expect(search.value.data.symbols[0]?.package).toBe('pkg');
+    expect(search.value.data.symbols[0]?.symbolId.length).toBeGreaterThan(0);
 
-    const start = search.value.data[0].symbolId;
+    const start = search.value.data.symbols[0].symbolId;
     const walk = await port.traverse({
       direction: 'callees',
       startSymbolId: start,
@@ -420,21 +432,24 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(malformed.ok).toBe(true);
     if (!malformed.ok) return;
     expect(malformed.value.data).toBeUndefined();
-    expect(malformed.value.coverage).toEqual({
+    expect(malformed.value.coverage.complete).toBe(false);
+    expect(malformed.value.coverage.truncated).toBe(false);
+    expect(malformed.value.coverage.reasons).toEqual(['malformed-symbol-omitted']);
+    expect(malformed.value.coverage.inventory).toMatchObject({
+      requested: true,
       complete: false,
-      truncated: false,
       reasons: ['malformed-symbol-omitted'],
     });
+    expect(malformed.value.coverage.evidence.requested).toBe(false);
 
     const span = await port.findBySpan('src/nested.ts', 2);
     expect(span.ok).toBe(true);
     if (!span.ok) return;
     expect(span.value.data).toHaveLength(500);
-    expect(span.value.coverage).toEqual({
-      complete: false,
-      truncated: true,
-      reasons: ['span-candidate-cap'],
-    });
+    expect(span.value.coverage.complete).toBe(false);
+    expect(span.value.coverage.truncated).toBe(true);
+    expect(span.value.coverage.reasons).toEqual(['span-candidate-cap']);
+    expect(span.value.coverage.inventory.truncated).toBe(true);
   });
 
   it('refresh returns action + generation without throwing', async () => {
@@ -539,24 +554,124 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     });
     expect(filtered.ok).toBe(true);
     if (!filtered.ok) return;
-    expect(filtered.value.data).toHaveLength(1);
-    expect(filtered.value.data[0]?.kind).toBe('method');
+    expect(filtered.value.data.detail).toBe('nodes');
+    expect(filtered.value.data.symbols).toHaveLength(1);
+    expect(filtered.value.data.symbols[0]?.kind).toBe('method');
     expect(filtered.value.filter?.kinds).toEqual(['method']);
 
     const exact = await port.searchSymbols('save', {
       match: 'exact',
       filter: { sourceScope: 'all', generated: 'include' },
     });
-    expect(exact.ok && exact.value.data.every((s) => s.simpleName === 'save')).toBe(true);
+    expect(exact.ok && exact.value.data.symbols.every((s) => s.simpleName === 'save')).toBe(true);
 
     const qualified = await port.searchSymbols('fit.saveBaseline', {
       match: 'qualified',
       filter: { sourceScope: 'all', generated: 'include' },
     });
-    expect(qualified.ok && qualified.value.data).toHaveLength(1);
+    expect(qualified.ok && qualified.value.data.symbols).toHaveLength(1);
+    expect(qualified.ok && qualified.value.data.symbols[0]?.symbolId).toBeTruthy();
 
     const clamped = await port.searchSymbols('save', { limit: 10_000 });
     expect(clamped.ok && clamped.value.page?.limit).toBe(500);
+
+    // Omitted limit defaults to DEFAULT_IDENTITY_SEARCH_LIMIT = 20.
+    const omitted = await port.searchSymbols('save');
+    expect(omitted.ok && omitted.value.page?.limit).toBe(20);
+
+    for (const limit of [1, 19, 20, 21, 500] as const) {
+      const page = await port.searchSymbols('save', { limit });
+      expect(page.ok && page.value.page?.limit, `limit=${String(limit)}`).toBe(limit);
+    }
+  });
+
+  it('search_symbols projects exclusive summary/groups/nodes and binds detail into cursors', async () => {
+    const functions: Record<string, FunctionOccurrence[]> = {};
+    for (let index = 0; index < 5; index++) {
+      functions[`fn${String(index)}`] = [
+        fnOcc({
+          bodyHash: `h-${String(index)}`,
+          simpleName: `shared${String(index)}`,
+          filePath: index % 2 === 0 ? 'src/a.ts' : 'src/b.ts',
+          package: index % 2 === 0 ? 'pkg-a' : 'pkg-b',
+          line: index + 1,
+          column: 0,
+        }),
+      ];
+    }
+    new CatalogRepo(store).replaceAll({ ...seededCatalog(), functions });
+    const port = makePort(store);
+
+    const summary = await port.searchSymbols('shared', { detail: 'summary' });
+    expect(summary.ok).toBe(true);
+    if (!summary.ok) return;
+    expect(summary.value.data).toEqual({
+      detail: 'summary',
+      symbols: [],
+      totalMatches: 5,
+    });
+    expect(summary.value.groups).toBeUndefined();
+    expect(summary.value.coverage.inventory.requested).toBe(true);
+    expect(summary.value.coverage.grouping.requested).toBe(false);
+    expect(summary.value.coverage.evidence.requested).toBe(false);
+
+    const groups = await port.searchSymbols('shared', {
+      detail: 'groups',
+      groupBy: 'package',
+      limit: 10,
+    });
+    expect(groups.ok).toBe(true);
+    if (!groups.ok) return;
+    expect(groups.value.data.detail).toBe('groups');
+    expect(groups.value.data.symbols).toEqual([]);
+    expect(groups.value.data.totalMatches).toBe(5);
+    expect(groups.value.groups?.map((g) => g.key).sort()).toEqual(['pkg-a', 'pkg-b']);
+    expect(groups.value.coverage.grouping.requested).toBe(true);
+    expect(groups.value.coverage.projection.requested).toBe(true);
+
+    const nodes = await port.searchSymbols('shared', { detail: 'nodes', limit: 2 });
+    expect(nodes.ok).toBe(true);
+    if (!nodes.ok) return;
+    expect(nodes.value.data.detail).toBe('nodes');
+    expect(nodes.value.data.symbols).toHaveLength(2);
+    expect(nodes.value.data.totalMatches).toBe(5);
+    expect(nodes.value.groups).toBeUndefined();
+    expect(nodes.value.page?.nextCursor).toBeDefined();
+    expect(nodes.value.data.symbols[0]?.symbolId).toMatch(/:/);
+
+    // Cursor from nodes is invalid for groups (detail bound into digest).
+    const mismatch = await port.searchSymbols('shared', {
+      detail: 'groups',
+      groupBy: 'package',
+      cursor: nodes.value.page?.nextCursor,
+    });
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) expect(mismatch.error.code).toBe('cursor-query-mismatch');
+
+    // groups without groupBy rejected; nodes with groupBy rejected.
+    const groupsNeedMode = await port.searchSymbols('shared', { detail: 'groups' });
+    expect(groupsNeedMode.ok).toBe(false);
+    if (!groupsNeedMode.ok) expect(groupsNeedMode.error.code).toBe('invalid-query');
+
+    const nodesNoGroup = await port.searchSymbols('shared', {
+      detail: 'nodes',
+      groupBy: 'package',
+    });
+    expect(nodesNoGroup.ok).toBe(false);
+    if (!nodesNoGroup.ok) expect(nodesNoGroup.error.code).toBe('invalid-query');
+
+    // Exact empty catalog / exact missing match still returns usable shape.
+    const emptyExact = await port.searchSymbols('no-such-symbol', {
+      match: 'exact',
+      detail: 'nodes',
+    });
+    expect(emptyExact.ok).toBe(true);
+    if (!emptyExact.ok) return;
+    expect(emptyExact.value.data).toEqual({
+      detail: 'nodes',
+      symbols: [],
+      totalMatches: 0,
+    });
   });
 
   it('architecture returns labelled metrics and production defaults', async () => {
@@ -570,8 +685,21 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(arch.value.data.callEvidence.edgeKind).toBe('call');
     expect(arch.value.filter?.sourceScope).toBe('production');
     expect(arch.value.filter?.generated).toBe('exclude');
-    expect(Array.isArray(arch.value.data.packageEdges)).toBe(true);
-    expect(Array.isArray(arch.value.data.hotspots)).toBe(true);
+    // Default sections=['metrics'] omit ranked families (P2 Phase 2.5).
+    expect(arch.value.data.includedSections).toEqual(['metrics']);
+    expect(arch.value.data.packageEdges).toBeUndefined();
+    expect(arch.value.data.hotspots).toBeUndefined();
+
+    const full = await port.architectureSummary({
+      limit: 10,
+      sections: ['metrics', 'packageEdges', 'hotspots'],
+      topN: 20,
+    });
+    expect(full.ok).toBe(true);
+    if (!full.ok) return;
+    expect(Array.isArray(full.value.data.packageEdges)).toBe(true);
+    expect(Array.isArray(full.value.data.hotspots)).toBe(true);
+    expect(full.value.data.packageEdgesSummary?.selectedCount).toBeLessThanOrEqual(20);
   });
 
   it('reclassifies configured support paths to test scope end-to-end (P2 Phase 1)', async () => {
@@ -581,7 +709,14 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     const roleCatalog: Catalog = {
       ...seededCatalog(),
       functions: {
-        prod: [fnOcc({ bodyHash: 'h-prod', simpleName: 'prodFn', filePath: 'packages/core/src/index.ts', package: 'pkg-core' })],
+        prod: [
+          fnOcc({
+            bodyHash: 'h-prod',
+            simpleName: 'prodFn',
+            filePath: 'packages/core/src/index.ts',
+            package: 'pkg-core',
+          }),
+        ],
         support: [
           fnOcc({
             bodyHash: 'h-support',
@@ -628,14 +763,16 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     const port = makePort(store);
     const first = await port.deadCode({
       limit: 1,
+      detail: 'nodes',
       filter: { sourceScope: 'all', generated: 'include' },
     });
     expect(first.ok).toBe(true);
     if (!first.ok) return;
-    expect(first.value.data.length).toBeLessThanOrEqual(1);
+    expect(first.value.data.rows.length).toBeLessThanOrEqual(1);
     if (first.value.page?.nextCursor !== undefined) {
       const stale = await port.deadCode({
         limit: 1,
+        detail: 'nodes',
         cursor: first.value.page.nextCursor,
         filter: { sourceScope: 'production', generated: 'exclude' },
       });
@@ -891,16 +1028,18 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     for (let page = 0; page < 10; page++) {
       const result = await port.architectureSummary({
         limit: 1,
+        sections: ['metrics', 'packageEdges', 'hotspots'],
+        topN: 100,
         ...(cursor === undefined ? {} : { cursor }),
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      for (const edge of result.value.data.packageEdges) {
+      for (const edge of result.value.data.packageEdges ?? []) {
         const key = `${edge.fromPackage}:${edge.toPackage}`;
         expect(edgeKeys.has(key)).toBe(false);
         edgeKeys.add(key);
       }
-      for (const hotspot of result.value.data.hotspots) {
+      for (const hotspot of result.value.data.hotspots ?? []) {
         expect(hotspotKeys.has(hotspot.symbol.symbolId)).toBe(false);
         hotspotKeys.add(hotspot.symbol.symbolId);
       }
@@ -910,5 +1049,224 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(edgeKeys.size).toBeGreaterThan(1);
     expect(hotspotKeys.size).toBeGreaterThan(1);
     expect(cursor).toBeUndefined();
+  });
+
+  it('searchDeclarations / referencesTo page exclusive detail and bind cursors (P2 Phase 3)', async () => {
+    const declarationId =
+      'd1|pkg|src/types.ts|interface|AuditShape|0000000000000001|0000000000000000';
+    // Distinct builtAt so catalog identity differs from the pre-feature seed and
+    // the SQLite generation controller auto-swaps (identity is not content-deep).
+    const semanticCatalog: Catalog = {
+      ...seededCatalog('2026-07-11T12:00:00.000Z'),
+      engineMode: 'exact',
+      resolutionMode: 'exact',
+      semanticFacts: {
+        referenceScope: 'cross-file',
+        declarations: [
+          {
+            declarationId,
+            name: 'AuditShape',
+            qualifiedName: 'src/types.AuditShape',
+            kind: 'interface',
+            package: 'pkg',
+            filePath: 'src/types.ts',
+            line: 1,
+            column: 0,
+            endLine: 5,
+            endColumn: 1,
+            visibility: 'exported',
+            exportRole: 'named-export',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+          {
+            declarationId:
+              'd1|pkg|src/types.ts|type-alias|AuditAlias|0000000000000002|0000000000000000',
+            name: 'AuditAlias',
+            qualifiedName: 'src/types.AuditAlias',
+            kind: 'type-alias',
+            package: 'pkg',
+            filePath: 'src/types.ts',
+            line: 7,
+            column: 0,
+            endLine: 7,
+            endColumn: 30,
+            visibility: 'exported',
+            exportRole: 'named-export',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+        ],
+        references: [
+          {
+            referenceId: 'r1|src/use.ts|type|0000000000000010|0000000000000000|d1',
+            kind: 'type',
+            filePath: 'src/use.ts',
+            line: 2,
+            column: 0,
+            endLine: 2,
+            endColumn: 10,
+            package: 'pkg',
+            targetDeclarationId: declarationId,
+            targetPackage: 'pkg',
+            targetName: 'AuditShape',
+            targetKind: 'interface',
+            basis: 'compiler-declaration',
+            confidence: 'high',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+          {
+            referenceId: 'r1|src/other.ts|type|0000000000000011|0000000000000000|d1',
+            kind: 'type',
+            filePath: 'src/other.ts',
+            line: 3,
+            column: 0,
+            endLine: 3,
+            endColumn: 10,
+            package: 'pkg-b',
+            targetDeclarationId: declarationId,
+            targetPackage: 'pkg',
+            targetName: 'AuditShape',
+            targetKind: 'interface',
+            basis: 'compiler-declaration',
+            confidence: 'high',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+        ],
+        coverage: {
+          status: 'complete',
+          inspectedDeclarations: 2,
+          emittedDeclarations: 2,
+          omittedDeclarations: 0,
+          inspectedReferences: 2,
+          emittedReferences: 2,
+          omittedReferences: 0,
+          reasons: [],
+        },
+      },
+    };
+    // Absent plane: pre-feature catalogs report unsupported inventory honestly.
+    new CatalogRepo(store).replaceAll(seededCatalog('2026-07-11T11:00:00.000Z'));
+    const port = makePort(store);
+    const unsupported = await port.searchDeclarations('AuditShape');
+    expect(unsupported.ok).toBe(true);
+    if (!unsupported.ok) return;
+    expect(unsupported.value.data.declarations).toEqual([]);
+    expect(unsupported.value.coverage.inventory.complete).toBe(false);
+    expect(unsupported.value.coverage.inventory.reasons).toContain('semantic-facts-unsupported');
+
+    // Externally persist a newer generation with the semantic plane; ordinary
+    // reads auto-load it without a rebuild.
+    new CatalogRepo(store).replaceAll(semanticCatalog);
+
+    const summary = await port.searchDeclarations('Audit', { detail: 'summary' });
+    expect(summary.ok).toBe(true);
+    if (!summary.ok) return;
+    expect(summary.value.data).toMatchObject({
+      detail: 'summary',
+      referenceScope: 'cross-file',
+      declarations: [],
+      totalMatches: 2,
+    });
+    expect(summary.value.context.catalog.generationSource).toBe('persisted-auto-swap');
+    // Identity-search default page limit is 20 (not the unrelated 100-row default).
+    const omittedLimit = await port.searchDeclarations('Audit');
+    expect(omittedLimit.ok && omittedLimit.value.page?.limit).toBe(20);
+
+    const nodes = await port.searchDeclarations('AuditShape', {
+      match: 'exact',
+      detail: 'nodes',
+      kinds: ['interface'],
+      limit: 20,
+    });
+    expect(nodes.ok).toBe(true);
+    if (!nodes.ok) return;
+    expect(nodes.value.data.declarations).toHaveLength(1);
+    expect(nodes.value.data.declarations[0]?.declarationId).toBe(declarationId);
+    // Declaration IDs must never look like callable symbolIds (file:line:col).
+    expect(nodes.value.data.declarations[0]?.declarationId.includes(':')).toBe(false);
+
+    const groups = await port.searchDeclarations('Audit', {
+      detail: 'groups',
+      groupBy: 'package',
+    });
+    expect(groups.ok).toBe(true);
+    if (!groups.ok) return;
+    expect(groups.value.data.detail).toBe('groups');
+    expect(groups.value.data.declarations).toEqual([]);
+    expect(groups.value.groups?.length).toBeGreaterThan(0);
+
+    // Detail/groupBy are bound into the cursor digest (nodes ↔ groups mismatch).
+    // Summary intentionally ignores cursors (counts only); mismatch is enforced
+    // on paged exclusive projections.
+    const paged = await port.searchDeclarations('Audit', { detail: 'nodes', limit: 1 });
+    expect(paged.ok && paged.value.page?.nextCursor).toBeDefined();
+    if (!paged.ok || paged.value.page?.nextCursor === undefined) return;
+    const mismatch = await port.searchDeclarations('Audit', {
+      detail: 'groups',
+      groupBy: 'package',
+      cursor: paged.value.page.nextCursor,
+    });
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) expect(mismatch.error.code).toBe('cursor-query-mismatch');
+
+    // references_to defaults to summary and never invents same-file sites.
+    const refsSummary = await port.referencesTo(declarationId, { detail: 'summary' });
+    expect(refsSummary.ok).toBe(true);
+    if (!refsSummary.ok) return;
+    expect(refsSummary.value.data).toMatchObject({
+      detail: 'summary',
+      referenceScope: 'cross-file',
+      declarationId,
+      references: [],
+      totalMatches: 2,
+    });
+
+    const refsNodes = await port.referencesTo(declarationId, { detail: 'nodes', limit: 10 });
+    expect(refsNodes.ok).toBe(true);
+    if (!refsNodes.ok) return;
+    expect(refsNodes.value.data.references).toHaveLength(2);
+    expect(refsNodes.value.data.references.every((r) => r.filePath !== 'src/types.ts')).toBe(true);
+
+    const missing = await port.referencesTo('d1|missing');
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.error.code).toBe('not-found');
+
+    // Batch static-handler bridge over one generation (no N+1 freshness flights).
+    const bridge = await port.resolveStaticHandlerDeclarations('w1:test-snapshot', [
+      {
+        package: 'pkg',
+        path: 'src/types.ts',
+        declaration: 'AuditShape',
+        owner: 'host',
+      },
+      {
+        package: 'pkg',
+        path: 'src/types.ts',
+        declaration: 'NoSuchDecl',
+        owner: 'host',
+      },
+    ]);
+    expect(bridge.ok).toBe(true);
+    if (!bridge.ok) return;
+    expect(bridge.value.catalogStatus).toBe('loaded');
+    expect(bridge.value.outcomes).toHaveLength(2);
+    expect(bridge.value.outcomes[0]?.status).toBe('resolved');
+    expect(bridge.value.outcomes[0]?.declarationId).toBe(declarationId);
+    expect(bridge.value.outcomes[0]?.claimProvenance).toBe('author-declared');
+    expect(bridge.value.outcomes[1]?.status).toBe('not-found');
+
+    // Cache hit path: same w1:+g1: reuses completed outcomes.
+    const again = await port.resolveStaticHandlerDeclarations('w1:test-snapshot', [
+      {
+        package: 'pkg',
+        path: 'src/types.ts',
+        declaration: 'AuditShape',
+        owner: 'host',
+      },
+    ]);
+    expect(again.ok && again.value.outcomes[0]?.status).toBe('resolved');
   });
 });

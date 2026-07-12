@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { goGraphAdapter } from '../index.js';
 
 function run(dir: string): ReturnType<typeof goGraphAdapter.walkProject> {
-  const discovery = goGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = goGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

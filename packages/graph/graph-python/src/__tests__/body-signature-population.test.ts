@@ -33,7 +33,7 @@ describe('Python bodySignature population', () => {
 `,
       'utf8',
     );
-    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = pythonGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = pythonGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
