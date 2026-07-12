@@ -261,6 +261,42 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
         ok(wrap({ edgeKind: 'combined', calls: [], imports: [], totalMatchingEvidence: 0 })),
       ),
     packageCycles: () => Promise.resolve(ok(wrap({ edgeKind: 'call', components: [] }))),
+    searchDeclarations: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            detail: 'nodes',
+            referenceScope: 'cross-file',
+            declarations: [],
+            totalMatches: 0,
+          }),
+        ),
+      ),
+    referencesTo: () =>
+      Promise.resolve(
+        ok(
+          wrap({
+            detail: 'nodes',
+            referenceScope: 'cross-file',
+            declarationId: 'd1:none',
+            references: [],
+            totalMatches: 0,
+          }),
+        ),
+      ),
+    resolveStaticHandlerDeclarations: (_key, refs) =>
+      Promise.resolve(
+        ok({
+          catalogStatus: 'missing' as const,
+          outcomes: refs.map((ref) => ({
+            ref,
+            status: 'catalog-missing' as const,
+            claimProvenance: 'author-declared' as const,
+            matchBasis: 'author-declared-exact-declaration' as const,
+            confidence: 'low' as const,
+          })),
+        }),
+      ),
   };
   return { ...base, ...overrides };
 }
@@ -733,14 +769,27 @@ describe('graph handlers (async GraphToolResult)', () => {
         captured = input;
         return Promise.resolve(
           ok({
-            context: { projectKey: 'abcdabcdabcdabcd', snapshotKey: `g1:${'a'.repeat(64)}` },
+            context: {
+              project: {
+                root: '/fixture',
+                scope: 'project' as const,
+                configPath: 'opensip-cli.config.yml',
+              },
+              runtime: {
+                kind: 'runtime-wiring' as const,
+                identity: `w1:${'a'.repeat(64)}`,
+                capturedAt: '2026-01-01T00:00:00.000Z',
+              },
+              projectKey: 'abcdabcdabcdabcd',
+              snapshotKey: `w1:${'a'.repeat(64)}`,
+            },
             nodes: [
-              { id: 'command:alpha:inspect', kind: 'command', label: 'inspect', tool: 'alpha' },
+              { id: 'command:alpha inspect', kind: 'command', label: 'inspect', tool: 'alpha' },
             ],
             edges: [
               {
-                from: 'command:alpha:inspect',
-                to: 'handler:alpha:inspect',
+                from: 'command:alpha inspect',
+                to: 'handler:alpha inspect',
                 kind: 'command-dispatches-handler',
                 source: 'command-spec',
                 confidence: 'medium',
@@ -752,9 +801,9 @@ describe('graph handlers (async GraphToolResult)', () => {
             groupTruncated: false,
             coverage: {
               complete: true,
-              scope: 'captured-admitted-tool-registry',
+              scope: 'captured-admitted-registry-and-command-inventory',
               truncated: false,
-              reasons: ['top-level-host-commands-outside-port'],
+              reasons: [],
             },
             effectiveFilters: {
               tool: 'alpha',
@@ -762,6 +811,7 @@ describe('graph handlers (async GraphToolResult)', () => {
               provenanceSource: 'bundled',
               limit: 10,
               groupBy: 'tool',
+              detail: 'nodes',
             },
           }),
         );
@@ -776,6 +826,7 @@ describe('graph handlers (async GraphToolResult)', () => {
       limit: 10,
       cursor: undefined,
       groupBy: 'tool',
+      detail: 'nodes',
     });
     expect(parseResult(result)).toMatchObject({
       isError: false,
@@ -797,6 +848,7 @@ describe('graph handlers (async GraphToolResult)', () => {
       limit: 10,
       cursor: undefined,
       groupBy: 'tool',
+      detail: 'nodes',
     });
   });
 

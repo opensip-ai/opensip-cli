@@ -41,6 +41,7 @@ import {
   buildCommandRegistrationInput,
   resolveStartupExecutionMode,
 } from './bootstrap/index.js';
+import { buildRuntimeCommandInventory } from './bootstrap/build-runtime-command-inventory.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import { buildTopLevelHostSpecs } from './commands/host-command-specs.js';
@@ -155,11 +156,26 @@ async function main(): Promise<void> {
     ...registrationInput,
   };
 
+  // Build host/tool command surfaces ONCE — same values feed scope indexing,
+  // plain runtime inventory projection, and Commander mounting so inventory
+  // cannot drift through repeated builders.
+  const hostSpecs = buildTopLevelHostSpecs(commandCtx);
+  const hostGroups = buildHostSubcommandGroups(commandCtx);
+  const toolPluginGroups = buildToolPluginGroups(commandCtx, toolRegistry);
   const commandScopes = buildCommandScopeIndex({
     toolSpecs: registrationInput.toolCommandSpecs,
-    hostSpecs: buildTopLevelHostSpecs(commandCtx),
-    hostGroups: buildHostSubcommandGroups(commandCtx),
-    toolPluginGroups: buildToolPluginGroups(commandCtx, toolRegistry),
+    hostSpecs,
+    hostGroups,
+    toolPluginGroups,
+  });
+  const runtimeCommands = buildRuntimeCommandInventory({
+    toolRegistry,
+    toolCommandSpecs: registrationInput.toolCommandSpecs,
+    hostSpecs,
+    hostGroups,
+    toolPluginGroups,
+    manifests,
+    provenance,
   });
 
   // Install the pre-action hook AFTER bootstrap + command-scope indexing so the
@@ -177,6 +193,7 @@ async function main(): Promise<void> {
       startupTimings,
       trustPolicy,
       policyAudit,
+      runtimeCommands,
     },
     commandScopes,
   );

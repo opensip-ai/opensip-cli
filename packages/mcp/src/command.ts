@@ -124,9 +124,27 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     });
     const runtimeWiring = new LiveRuntimeWiringReadPort({
       projectRoot,
+      configPath,
       tools: scope.tools,
       manifests: scope.toolManifests,
       provenance: scope.toolProvenance,
+      runtimeCommands: scope.runtimeCommands,
+      resolveStaticHandlers: async (runtimeSnapshotKey, refs) => {
+        const outcome = await graph.resolveStaticHandlerDeclarations(runtimeSnapshotKey, refs);
+        if (!outcome.ok) {
+          return {
+            catalogStatus: 'missing' as const,
+            outcomes: refs.map((ref) => ({
+              ref,
+              status: 'catalog-missing' as const,
+              claimProvenance: 'author-declared' as const,
+              matchBasis: 'author-declared-exact-declaration' as const,
+              confidence: 'low' as const,
+            })),
+          };
+        }
+        return outcome.value;
+      },
     });
     const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
     const repairWrite = mutationEnabled

@@ -25,6 +25,18 @@ import {
 } from '@opensip-cli/graph/read';
 
 import {
+  DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS,
+  dedupeStaticHandlerRefs,
+  matchStaticHandlerCandidates,
+  MAX_STATIC_HANDLER_CACHE_ENTRIES,
+  MAX_STATIC_HANDLER_DESCRIPTORS,
+  preflightStaticHandlerRef,
+  type DeclarationCandidate,
+  type StaticHandlerBridgeOutcome,
+  type StaticHandlerRef,
+} from './static-handler-bridge.js';
+
+import {
   digestNormalizedQuery,
   groupRows,
   pageRows,
@@ -118,9 +130,216 @@ function toReferenceDto(ref: ReferenceSiteRef): ReferenceSiteDto {
   };
 }
 
-/** Implements paged declaration search and references-to operations. */
+interface StaticHandlerCacheEntry {
+  readonly runtimeSnapshotKey: string;
+  readonly catalogIdentity: string;
+  readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+  readonly outcomes: readonly StaticHandlerBridgeOutcome[];
+}
+
+/** Implements paged declaration search, references-to, and static-handler bridge. */
 export class SqliteGraphDeclarationQueries {
+  private readonly staticHandlerCache: StaticHandlerCacheEntry[] = [];
+
   constructor(private readonly context: SqliteGraphQueryContext) {}
+
+  /**
+   * Batch-join author-declared static handlers to declaration facts.
+   * Captures one catalog generation, caches completed successes by w1:+g1:.
+   */
+  async resolveStaticHandlerDeclarations(
+    runtimeSnapshotKey: string,
+    refs: readonly StaticHandlerRef[],
+  ): Promise<
+    Result<
+      {
+        readonly catalogIdentity?: string;
+        readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+        readonly outcomes: readonly StaticHandlerBridgeOutcome[];
+      },
+      McpReadError
+    >
+  > {
+    if (typeof runtimeSnapshotKey !== 'string' || !runtimeSnapshotKey.startsWith('w1:')) {
+      return err(
+        readError('invalid-query', 'runtimeSnapshotKey must be a validated w1: identity.'),
+      );
+    }
+    if (refs.length > MAX_STATIC_HANDLER_DESCRIPTORS) {
+      return err(
+        readError(
+          'invalid-query',
+          `static handler batch exceeds maxDescriptors (${String(MAX_STATIC_HANDLER_DESCRIPTORS)}).`,
+        ),
+      );
+    }
+
+    interface BridgeBatchPayload {
+      readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+      readonly catalogIdentity?: string;
+      readonly outcomes: readonly StaticHandlerBridgeOutcome[];
+    }
+
+    // Capture generation first (auto-swap visible on next get_runtime_wiring).
+    const captured = await this.context.runQuery<BridgeBatchPayload>(
+      'resolveStaticHandlerDeclarations',
+      { identityMode: 'occurrence', sourceScope: 'all' },
+      (gen, freshness) => {
+        if (gen === undefined) {
+          return this.context.envelope(
+            {
+              catalogStatus: 'missing' as const,
+              outcomes: [] as readonly StaticHandlerBridgeOutcome[],
+            },
+            gen,
+            freshness,
+            { coverage: completeInventoryCoverage() },
+          );
+        }
+        const bundle = gen.catalog.semanticFacts;
+        if (bundle === undefined) {
+          return this.context.envelope(
+            {
+              catalogStatus: 'unsupported' as const,
+              catalogIdentity: gen.key,
+              outcomes: [] as readonly StaticHandlerBridgeOutcome[],
+            },
+            gen,
+            freshness,
+            { coverage: completeInventoryCoverage() },
+          );
+        }
+        const candidates: DeclarationCandidate[] = bundle.declarations.map((d) => ({
+          declarationId: d.declarationId,
+          package: d.package,
+          filePath: d.filePath,
+          name: d.name,
+          qualifiedName: d.qualifiedName,
+        }));
+        const unique = dedupeStaticHandlerRefs(refs, DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS);
+        const outcomes = unique.map((ref) => {
+          const preflight = preflightStaticHandlerRef(ref);
+          if (preflight !== undefined) return preflight;
+          return matchStaticHandlerCandidates(ref, candidates, DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS);
+        });
+        return this.context.envelope(
+          {
+            catalogStatus: 'loaded' as const,
+            catalogIdentity: gen.key,
+            outcomes,
+          },
+          gen,
+          freshness,
+          { coverage: completeInventoryCoverage() },
+        );
+      },
+    );
+
+    if (!captured.ok) return captured;
+
+    const data: BridgeBatchPayload = captured.value.data;
+    // Expand outcomes to one per input ref (preserve caller order).
+    const byKey = new Map<string, StaticHandlerBridgeOutcome>();
+    for (const outcome of data.outcomes) {
+      byKey.set(
+        `${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`,
+        outcome,
+      );
+    }
+    const ordered: StaticHandlerBridgeOutcome[] = refs.map((ref) => {
+      const key = `${ref.package}\0${ref.path}\0${ref.declaration}`;
+      const hit = byKey.get(key);
+      if (hit !== undefined) return { ...hit, ref };
+      if (data.catalogStatus === 'missing') {
+        return {
+          ref,
+          status: 'catalog-missing' as const,
+          claimProvenance: 'author-declared' as const,
+          matchBasis: 'author-declared-exact-declaration' as const,
+          confidence: 'low' as const,
+        };
+      }
+      if (data.catalogStatus === 'unsupported') {
+        return {
+          ref,
+          status: 'declarations-unsupported' as const,
+          claimProvenance: 'author-declared' as const,
+          matchBasis: 'author-declared-exact-declaration' as const,
+          confidence: 'low' as const,
+        };
+      }
+      return {
+        ref,
+        status: 'not-found' as const,
+        claimProvenance: 'author-declared' as const,
+        matchBasis: 'author-declared-exact-declaration' as const,
+        confidence: 'low' as const,
+      };
+    });
+
+    const result = {
+      catalogIdentity: data.catalogIdentity,
+      catalogStatus: data.catalogStatus,
+      outcomes: ordered,
+    };
+
+    // Cache completed successes only; prune older g1: for same w1:; FIFO at 5.
+    if (
+      data.catalogStatus === 'loaded' &&
+      data.catalogIdentity !== undefined &&
+      ordered.every((o) => o.status === 'resolved' || o.status === 'not-found' || o.status === 'ambiguous' || o.status === 'provenance-mismatch' || o.status === 'candidate-cap' || o.status === 'metadata-missing')
+    ) {
+      this.insertStaticHandlerCache({
+        runtimeSnapshotKey,
+        catalogIdentity: data.catalogIdentity,
+        catalogStatus: data.catalogStatus,
+        outcomes: ordered,
+      });
+    }
+
+    // Serve from cache when available (after insert this is a hit for retries).
+    const cached = this.staticHandlerCache.find(
+      (entry) =>
+        entry.runtimeSnapshotKey === runtimeSnapshotKey &&
+        entry.catalogIdentity === data.catalogIdentity,
+    );
+    if (cached !== undefined && data.catalogIdentity !== undefined) {
+      return ok({
+        catalogIdentity: cached.catalogIdentity,
+        catalogStatus: cached.catalogStatus,
+        outcomes: cached.outcomes,
+      });
+    }
+
+    return ok(result);
+  }
+
+  private insertStaticHandlerCache(entry: StaticHandlerCacheEntry): void {
+    // Prune older g1: entries for the same w1: after a generation swap.
+    for (let i = this.staticHandlerCache.length - 1; i >= 0; i--) {
+      const existing = this.staticHandlerCache[i];
+      if (
+        existing !== undefined &&
+        existing.runtimeSnapshotKey === entry.runtimeSnapshotKey &&
+        existing.catalogIdentity !== entry.catalogIdentity
+      ) {
+        this.staticHandlerCache.splice(i, 1);
+      }
+    }
+    const dup = this.staticHandlerCache.findIndex(
+      (e) =>
+        e.runtimeSnapshotKey === entry.runtimeSnapshotKey &&
+        e.catalogIdentity === entry.catalogIdentity,
+    );
+    if (dup >= 0) {
+      this.staticHandlerCache[dup] = entry;
+      return;
+    }
+    this.staticHandlerCache.push(entry);
+    while (this.staticHandlerCache.length > MAX_STATIC_HANDLER_CACHE_ENTRIES) {
+      this.staticHandlerCache.shift();
+    }
+  }
 
   async searchDeclarations(
     query: string,

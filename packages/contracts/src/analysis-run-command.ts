@@ -353,6 +353,24 @@ async function runAnalysisCommand<TOptions extends AnalysisRunCommandOptions, TR
   }
 }
 
+/**
+ * Fixed static-handler descriptor for every analysis-run primary mount.
+ *
+ * The mounted wrapper is the contracts-owned {@link runAnalysisCommand}
+ * dispatch, not a tool-specific analyzer. Callers must not override this —
+ * tool-specific entry points declare their own descriptors on direct
+ * `definePrimaryRunCommand` / worker specs instead.
+ */
+export const ANALYSIS_RUN_COMMAND_STATIC_HANDLER: {
+  readonly package: string;
+  readonly path: string;
+  readonly declaration: string;
+} = Object.freeze({
+  package: '@opensip-cli/contracts',
+  path: 'packages/contracts/src/analysis-run-command.ts',
+  declaration: 'runAnalysisCommand',
+});
+
 /** Build a primary run command whose lifecycle, delivery, gates, SARIF, and session return are host owned. */
 export function defineAnalysisRunCommand<
   TOptions extends AnalysisRunCommandOptions,
@@ -365,6 +383,8 @@ export function defineAnalysisRunCommand<
     description: input.description,
     ...(input.options === undefined ? {} : { options: input.options }),
     ...(input.args === undefined ? {} : { args: input.args }),
+    // Fixed contracts-owned wrapper identity — never a tool-supplied override.
+    staticHandler: ANALYSIS_RUN_COMMAND_STATIC_HANDLER,
     handler: (rawOptions, cli) => runAnalysisCommand(input, rawOptions, cli),
   });
 }

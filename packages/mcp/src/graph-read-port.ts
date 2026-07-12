@@ -410,6 +410,30 @@ export interface GraphReadPort {
   packageCycles(
     query: PackageCyclesQuery,
   ): Promise<Result<GraphToolResult<PackageCyclesDto>, McpReadError>>;
+  /**
+   * Batch-join author-declared static handler descriptors to declaration
+   * facts for one immutable catalog generation (P2 Phase 4.7).
+   * The runtime snapshot key must be a validated `w1:` identity.
+   */
+  resolveStaticHandlerDeclarations(
+    runtimeSnapshotKey: string,
+    refs: readonly {
+      readonly package: string;
+      readonly path: string;
+      readonly declaration: string;
+      readonly admittedPackageIdentity?: string;
+      readonly owner?: 'host' | 'tool';
+    }[],
+  ): Promise<
+    Result<
+      {
+        readonly catalogIdentity?: string;
+        readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+        readonly outcomes: readonly import('./static-handler-bridge.js').StaticHandlerBridgeOutcome[];
+      },
+      McpReadError
+    >
+  >;
 }
 
 export interface PackageDependenciesQuery {

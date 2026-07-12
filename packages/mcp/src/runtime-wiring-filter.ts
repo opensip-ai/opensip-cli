@@ -138,7 +138,11 @@ export function filterRuntimeSnapshot(
     }
     if (
       command !== undefined &&
-      !(node.kind === 'command' && node.label.toLowerCase().includes(command))
+      !(
+        (node.kind === 'command' || node.kind === 'handler' || node.kind === 'host-mount') &&
+        (node.label.toLowerCase().includes(command) ||
+          (node.commandPath?.toLowerCase().includes(command) ?? false))
+      )
     ) {
       return false;
     }
@@ -173,7 +177,9 @@ export function groupRuntimeNodes(
     const key =
       groupBy === 'tool'
         ? (node.tool ?? 'unattributed')
-        : (node.provenanceSource ?? node.source ?? 'unattributed');
+        : groupBy === 'owner'
+          ? (node.owner ?? 'unattributed')
+          : (node.provenanceSource ?? node.source ?? 'unattributed');
     const count = counts.get(key);
     if (count !== undefined) {
       counts.set(key, count + 1);

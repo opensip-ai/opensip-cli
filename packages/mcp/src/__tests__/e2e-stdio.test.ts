@@ -789,18 +789,20 @@ describe('MCP e2e over real stdio', () => {
 
       const wiring = await call(conn, 'get_runtime_wiring', {
         tool: 'graph',
-        groupBy: 'tool',
+        detail: 'nodes',
         limit: 100,
       });
       expect(wiring.context).toMatchObject({
+        project: { scope: 'project' },
+        runtime: { kind: 'runtime-wiring', identity: expect.stringMatching(/^w1:/) },
         projectKey: expect.any(String),
-        snapshotKey: expect.stringMatching(/^g1:[a-f0-9]{64}$/),
+        snapshotKey: expect.stringMatching(/^w1:/),
       });
       expect(Array.isArray(wiring.nodes)).toBe(true);
       expect(wiring.coverage).toMatchObject({
-        scope: 'captured-admitted-tool-registry',
+        scope: 'captured-admitted-registry-and-command-inventory',
       });
-      expect((wiring.coverage as { reasons: string[] }).reasons).toContain(
+      expect((wiring.coverage as { reasons: string[] }).reasons).not.toContain(
         'top-level-host-commands-outside-port',
       );
       const wiringEdges = wiring.edges as {
@@ -989,7 +991,7 @@ describe('MCP e2e over real stdio', () => {
       expect(badCursor.isError).toBe(true);
       expect(JSON.stringify(badCursor.content)).toContain('cursor-invalid');
 
-      const runtimePage = await call(conn, 'get_runtime_wiring', { limit: 1 });
+      const runtimePage = await call(conn, 'get_runtime_wiring', { detail: 'nodes', limit: 1 });
       const runtimeCursor = (runtimePage.page as { nextCursor?: string }).nextCursor;
       expect(runtimeCursor).toBeTypeOf('string');
       if (runtimeCursor === undefined) throw new Error('runtime wiring did not page');
@@ -997,7 +999,7 @@ describe('MCP e2e over real stdio', () => {
       try {
         const wrongProject = await otherProject.client.callTool({
           name: 'get_runtime_wiring',
-          arguments: { limit: 1, cursor: runtimeCursor },
+          arguments: { detail: 'nodes', limit: 1, cursor: runtimeCursor },
         });
         expect(wrongProject.isError).toBe(true);
         expect(JSON.stringify(wrongProject.content)).toContain('cursor-project-mismatch');

@@ -15,45 +15,262 @@ import {
   buildRuntimeWiringSnapshot,
   type RuntimeWiringSnapshot,
 } from './runtime-wiring-snapshot.js';
+import {
+  overlayStaticHandlerBridge,
+  type ResolveStaticHandlers,
+  type StaticHandlerBridgeOutcome,
+  type StaticHandlerRef,
+} from './static-handler-bridge.js';
 
 import type {
+  RuntimeWiringDetail,
   RuntimeWiringQuery,
   RuntimeWiringReadPort,
   RuntimeWiringResult,
+  RuntimeWiringSummary,
 } from './runtime-wiring-read-port.js';
 
 const MAX_PAGE_EDGES_PER_NODE = 4;
 
 export type { LiveRuntimeWiringDeps } from './runtime-wiring-capture.js';
 
+export interface LiveRuntimeWiringReadPortOptions extends LiveRuntimeWiringDeps {
+  /**
+   * Optional batch static-handler bridge. Production wires
+   * GraphReadPort.resolveStaticHandlerDeclarations; unit tests inject a fake.
+   * The live port owns no graph-generation cache — the collaborator does.
+   */
+  readonly resolveStaticHandlers?: ResolveStaticHandlers;
+}
+
+function validateDetail(
+  detail: RuntimeWiringDetail,
+  groupBy: RuntimeWiringQuery['groupBy'],
+): Result<void, McpReadError> {
+  if (detail === 'groups' && (groupBy === undefined || groupBy === 'none')) {
+    return err(readError('invalid-query', 'detail=groups requires groupBy tool, source, or owner.'));
+  }
+  if ((detail === 'summary' || detail === 'nodes') && groupBy !== undefined && groupBy !== 'none') {
+    return err(
+      readError(
+        'invalid-query',
+        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
+      ),
+    );
+  }
+  return ok(undefined);
+}
+
+function summarize(
+  nodes: RuntimeWiringResult['nodes'],
+  edges: RuntimeWiringResult['edges'],
+): RuntimeWiringSummary {
+  let toolCount = 0;
+  let commandCount = 0;
+  let handlerCount = 0;
+  let hostCommandCount = 0;
+  let groupCount = 0;
+  let resolvedBridgeCount = 0;
+  let unresolvedBridgeCount = 0;
+  for (const node of nodes) {
+    if (node.kind === 'tool') toolCount += 1;
+    if (node.kind === 'command') {
+      commandCount += 1;
+      if (node.owner === 'host') hostCommandCount += 1;
+    }
+    if (node.kind === 'handler') handlerCount += 1;
+    if (node.kind === 'command-group') groupCount += 1;
+  }
+  for (const edge of edges) {
+    if (edge.kind !== 'command-dispatches-handler') continue;
+    if (edge.staticBridge === 'resolved') resolvedBridgeCount += 1;
+    else if (edge.staticBridge === 'unresolved') unresolvedBridgeCount += 1;
+  }
+  return {
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    toolCount,
+    commandCount,
+    handlerCount,
+    hostCommandCount,
+    groupCount,
+    resolvedBridgeCount,
+    unresolvedBridgeCount,
+  };
+}
+
+function collectHandlerRefs(snapshot: RuntimeWiringSnapshot): {
+  readonly refs: StaticHandlerRef[];
+  readonly pathByKey: Map<string, string[]>;
+} {
+  const refs: StaticHandlerRef[] = [];
+  const pathByKey = new Map<string, string[]>();
+  for (const node of snapshot.nodes) {
+    if (node.kind !== 'handler') continue;
+    if (
+      node.staticHandlerPackage === undefined ||
+      node.staticHandlerPath === undefined ||
+      node.staticHandlerDeclaration === undefined ||
+      node.commandPath === undefined
+    ) {
+      continue;
+    }
+    const ref: StaticHandlerRef = {
+      package: node.staticHandlerPackage,
+      path: node.staticHandlerPath,
+      declaration: node.staticHandlerDeclaration,
+      ...(node.packageName === undefined ? {} : { admittedPackageIdentity: node.packageName }),
+      ...(node.owner === undefined ? {} : { owner: node.owner }),
+    };
+    const key = `${ref.package}\0${ref.path}\0${ref.declaration}`;
+    const paths = pathByKey.get(key) ?? [];
+    paths.push(node.commandPath);
+    pathByKey.set(key, paths);
+    if (paths.length === 1) refs.push(ref);
+  }
+  return { refs, pathByKey };
+}
+
 /** Deterministic, session-free runtime-wiring reader for the captured host state. */
 export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
   private readonly snapshot: RuntimeWiringSnapshot;
   private readonly identityIndex: RuntimeToolIdentityIndex;
+  private readonly resolveStaticHandlers: ResolveStaticHandlers | undefined;
 
-  constructor(deps: LiveRuntimeWiringDeps) {
+  constructor(deps: LiveRuntimeWiringReadPortOptions) {
     this.snapshot = buildRuntimeWiringSnapshot(deps);
     this.identityIndex = this.snapshot.identityIndex;
+    this.resolveStaticHandlers = deps.resolveStaticHandlers;
   }
 
   async query(input: RuntimeWiringQuery): Promise<Result<RuntimeWiringResult, McpReadError>> {
-    await Promise.resolve();
     try {
-      const limit = Math.max(1, Math.min(500, Math.trunc(input.limit ?? 100)));
+      const detail: RuntimeWiringDetail = input.detail ?? 'summary';
       const groupBy = input.groupBy ?? 'none';
+      const detailOk = validateDetail(detail, groupBy);
+      if (!detailOk.ok) return detailOk;
+
+      const limit = Math.max(1, Math.min(500, Math.trunc(input.limit ?? 100)));
       const canonicalTool =
         input.tool === undefined
           ? undefined
           : resolveCanonicalRuntimeTool(input.tool, this.identityIndex);
+
+      // Bridge on every request; collaborator caches by w1:+g1:.
+      let bridgedNodes = this.snapshot.nodes;
+      let bridgedEdges = this.snapshot.edges;
+      let staticBridgeComplete = this.snapshot.coverage.staticBridgeComplete ?? false;
+      if (this.resolveStaticHandlers !== undefined) {
+        const { refs, pathByKey } = collectHandlerRefs(this.snapshot);
+        if (refs.length > 0) {
+          const batch = await this.resolveStaticHandlers(this.snapshot.snapshotKey, refs);
+          const byPath = new Map<string, StaticHandlerBridgeOutcome>();
+          for (const outcome of batch.outcomes) {
+            const key = `${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`;
+            for (const path of pathByKey.get(key) ?? []) {
+              byPath.set(path, outcome);
+            }
+          }
+          // Also mark metadata-missing handlers.
+          for (const node of this.snapshot.nodes) {
+            if (
+              node.kind === 'handler' &&
+              node.commandPath !== undefined &&
+              node.staticHandlerDeclaration === undefined
+            ) {
+              byPath.set(node.commandPath, {
+                ref: {
+                  package: '',
+                  path: '',
+                  declaration: '',
+                },
+                status: 'metadata-missing',
+                claimProvenance: 'author-declared',
+                matchBasis: 'author-declared-exact-declaration',
+                confidence: 'low',
+              });
+            }
+          }
+          const overlaid = overlayStaticHandlerBridge(bridgedNodes, bridgedEdges, byPath);
+          bridgedNodes = overlaid.nodes;
+          bridgedEdges = overlaid.edges;
+          staticBridgeComplete =
+            batch.catalogStatus === 'loaded' && overlaid.unresolvedCount === 0;
+        } else {
+          staticBridgeComplete = true;
+        }
+      }
+
+      const filtered = filterRuntimeSnapshot(
+        { nodes: bridgedNodes, edges: bridgedEdges },
+        input,
+        canonicalTool,
+      );
       const effectiveFilters = {
         tool: canonicalTool,
         command: input.command?.toLowerCase(),
         provenanceSource: input.provenanceSource,
         limit,
         groupBy,
+        detail,
       };
-      const filtered = filterRuntimeSnapshot(this.snapshot, input, canonicalTool);
       const queryDigest = digestNormalizedQuery(effectiveFilters);
+      const coverageBase = {
+        ...this.snapshot.coverage,
+        staticBridgeComplete,
+      };
+
+      const context: RuntimeWiringResult['context'] = {
+        project: {
+          root: this.snapshot.projectRoot,
+          scope: 'project',
+          configPath: this.snapshot.configPath,
+        },
+        runtime: {
+          kind: 'runtime-wiring',
+          identity: this.snapshot.snapshotKey,
+          capturedAt: this.snapshot.capturedAt,
+        },
+        projectKey: this.snapshot.projectKey,
+        snapshotKey: this.snapshot.snapshotKey,
+      };
+
+      if (detail === 'summary') {
+        const summary = summarize(filtered.nodes, filtered.edges);
+        return ok({
+          context,
+          summary,
+          nodes: [],
+          edges: [],
+          page: { limit, hasMore: false, edgeTruncated: false },
+          groupTruncated: false,
+          coverage: coverageBase,
+          effectiveFilters,
+        });
+      }
+
+      if (detail === 'groups') {
+        const grouped = groupRuntimeNodes(filtered.nodes, groupBy);
+        return ok({
+          context,
+          nodes: [],
+          edges: [],
+          page: { limit, hasMore: false, edgeTruncated: false },
+          groups: grouped.groups,
+          groupTruncated: grouped.groupTruncated,
+          coverage: {
+            ...coverageBase,
+            complete: coverageBase.complete && !grouped.groupTruncated,
+            truncated: coverageBase.truncated || grouped.groupTruncated,
+            reasons: grouped.groupTruncated
+              ? [...new Set([...coverageBase.reasons, 'group-key-cap'])]
+              : coverageBase.reasons,
+          },
+          effectiveFilters,
+        });
+      }
+
+      // detail === 'nodes'
       const page = pageRows(
         filtered.nodes,
         {
@@ -72,25 +289,18 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
       );
       const edgeLimit = Math.min(MAX_RUNTIME_EDGES, limit * MAX_PAGE_EDGES_PER_NODE);
       const edgeTruncated = pageEdges.length > edgeLimit;
-      const grouped = groupRuntimeNodes(filtered.nodes, groupBy);
-      const pageReasons = [
-        ...(edgeTruncated ? ['page-edge-cap'] : []),
-        ...(grouped.groupTruncated ? ['group-key-cap'] : []),
-      ];
+      const pageReasons = [...(edgeTruncated ? ['page-edge-cap'] : [])];
       const coverage =
         pageReasons.length > 0
           ? {
-              ...this.snapshot.coverage,
+              ...coverageBase,
               complete: false,
               truncated: true,
-              reasons: [...new Set([...this.snapshot.coverage.reasons, ...pageReasons])],
+              reasons: [...new Set([...coverageBase.reasons, ...pageReasons])],
             }
-          : this.snapshot.coverage;
+          : coverageBase;
       return ok({
-        context: {
-          projectKey: this.snapshot.projectKey,
-          snapshotKey: this.snapshot.snapshotKey,
-        },
+        context,
         nodes: page.value.rows,
         edges: pageEdges.slice(0, edgeLimit),
         page: {
@@ -99,8 +309,7 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
           nextCursor: page.value.nextCursor,
           edgeTruncated,
         },
-        groups: grouped.groups,
-        groupTruncated: grouped.groupTruncated,
+        groupTruncated: false,
         coverage,
         effectiveFilters,
       });

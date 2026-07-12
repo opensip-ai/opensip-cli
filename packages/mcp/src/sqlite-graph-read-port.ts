@@ -215,6 +215,28 @@ export class SqliteGraphReadPort implements GraphReadPort {
     return this.declarationQueries.referencesTo(declarationId, opts);
   }
 
+  async resolveStaticHandlerDeclarations(
+    runtimeSnapshotKey: string,
+    refs: readonly {
+      readonly package: string;
+      readonly path: string;
+      readonly declaration: string;
+      readonly admittedPackageIdentity?: string;
+      readonly owner?: 'host' | 'tool';
+    }[],
+  ): Promise<
+    Result<
+      {
+        readonly catalogIdentity?: string;
+        readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+        readonly outcomes: readonly import('./static-handler-bridge.js').StaticHandlerBridgeOutcome[];
+      },
+      McpReadError
+    >
+  > {
+    return this.declarationQueries.resolveStaticHandlerDeclarations(runtimeSnapshotKey, refs);
+  }
+
   async findBySpan(
     file: string,
     line: number,

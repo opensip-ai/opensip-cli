@@ -30,6 +30,7 @@ import {
   resolveUserPaths,
   RunScope,
   resolveToolHooks,
+  type RuntimeCommandInventory,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
@@ -95,6 +96,11 @@ export interface BuildPerRunScopeInput {
   readonly apiKey?: string;
   readonly noCloud?: boolean;
   readonly logger: Logger;
+  /**
+   * Plain host+Tool command inventory projected by the composition root.
+   * Defaults to the empty inventory when omitted (bailout / test paths).
+   */
+  readonly runtimeCommands?: RuntimeCommandInventory;
   /**
    * Presentation state resolved by the hook before the scope is built:
    * the CLI package version and the cached newer-version string (if any).
@@ -243,6 +249,7 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     // uninstall`) read them via `currentScope()` — the single source of truth.
     toolManifests: manifests,
     toolProvenance: provenance,
+    ...(input.runtimeCommands === undefined ? {} : { runtimeCommands: input.runtimeCommands }),
     bootstrapDiagnostics: scopeBootstrapDiagnostics.list(),
     // B2: the cloud-aware correlation bag, read downstream via
     // `currentScope()?.correlation` and forwarded into spawned/forked children.

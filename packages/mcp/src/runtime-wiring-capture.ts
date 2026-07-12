@@ -5,6 +5,7 @@ import { hasControlCharacter } from './control-text.js';
 import type { RuntimeWiringEdge, RuntimeWiringNode } from './runtime-wiring-read-port.js';
 import type {
   buildToolIdentityIndex,
+  RuntimeCommandInventory,
   Tool,
   ToolPluginManifest,
   ToolProvenance,
@@ -19,9 +20,16 @@ const MAX_RUNTIME_TEXT = 256;
 /** Captured host state used to build one immutable runtime-wiring snapshot. */
 export interface LiveRuntimeWiringDeps {
   readonly projectRoot: string;
+  /** Project-relative config path for canonical context (default opensip-cli.config.yml). */
+  readonly configPath?: string;
   readonly tools: ToolRegistry;
   readonly manifests: readonly ToolPluginManifest[];
   readonly provenance: readonly ToolProvenance[];
+  /**
+   * Plain host+Tool command inventory from RunScope. Commands/handlers are
+   * projected from this only — never from live CommandSpec inspection.
+   */
+  readonly runtimeCommands?: RuntimeCommandInventory;
 }
 
 /** Original command source paired with its immutable, validated identity facts. */

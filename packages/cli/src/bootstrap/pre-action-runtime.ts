@@ -4,6 +4,7 @@ import type { ResolvedTrustPolicy } from '@opensip-cli/config';
 import type {
   CliDiagnostic,
   LanguageRegistry,
+  RuntimeCommandInventory,
   ToolPluginManifest,
   ToolProvenance,
   ToolRegistry,
@@ -19,4 +20,10 @@ export interface PreActionRuntime {
   readonly startupTimings?: readonly StartupTimingEvent[];
   readonly trustPolicy: ResolvedTrustPolicy;
   readonly policyAudit: PolicyAuditCollector;
+  /**
+   * Plain host+Tool command inventory projected once at composition-root
+   * startup. Stored on each {@link RunScope} so MCP runtime wiring never
+   * retains live CommandSpecs or CLI closures.
+   */
+  readonly runtimeCommands?: RuntimeCommandInventory;
 }
