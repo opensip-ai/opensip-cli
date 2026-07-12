@@ -46,7 +46,6 @@ const EXPECTED = [
   'makeFacet',
   'mergeFacet',
   'rollupFacets',
-  'facetsFromFlatCoverage',
   'UNREQUESTED_FACET',
   'buildOccurrenceCallView',
   'buildPackageEvidence',

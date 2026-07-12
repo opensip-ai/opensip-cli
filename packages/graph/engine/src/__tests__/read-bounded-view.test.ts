@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  facetsFromFlatCoverage,
   makeFacet,
   mergeFacet,
   rollupFacets,
@@ -105,23 +104,3 @@ describe('rollupFacets (P2 Phase 2.1)', () => {
   });
 });
 
-describe('facetsFromFlatCoverage (phase-local bridge, P2 Phase 2.1)', () => {
-  it('maps a flat triple onto the requested inventory facet, others unrequested', () => {
-    const coverage = facetsFromFlatCoverage({
-      complete: false,
-      truncated: true,
-      reasons: ['package-edge-cap'],
-    });
-    expect(coverage.inventory).toEqual({
-      requested: true,
-      complete: false,
-      truncated: true,
-      reasons: ['package-edge-cap'],
-    });
-    expect(coverage.evidence.requested).toBe(false);
-    expect(coverage.grouping.requested).toBe(false);
-    expect(coverage.projection.requested).toBe(false);
-    // Top-level preserves the flat semantics (inventory is the only requested facet).
-    expect(coverage).toMatchObject({ complete: false, truncated: true, reasons: ['package-edge-cap'] });
-  });
-});

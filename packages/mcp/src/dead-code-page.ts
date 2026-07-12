@@ -1,35 +1,41 @@
 /** Bounded filter-first projection over canonical graph orphan findings. */
 
+import { err, ok, type Result } from '@opensip-cli/core';
 import {
   codePointSortKey,
   compareCodePointStrings,
   continuationToken,
   deriveGraphReadFeatures,
   evaluateGraphOrphans,
+  makeFacet,
   matchesGraphSourceFilterWithRoles,
+  rollupFacets,
   symbolSearchStableKey,
+  UNREQUESTED_FACET,
   type FeatureTable,
   type GraphConfig,
-  type GraphReadCoverage,
   type GraphSourceFilter,
   type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
 
-import { boundedTopRows, groupRows, type GroupSummary } from './graph-query-page.js';
+import { boundedTopRows, groupRows, pageRows, type GroupSummary } from './graph-query-page.js';
 import { toDeadCodeDto } from './graph-read-projection.js';
+import { readError } from './mcp-error.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
-import type { DeadCodeDto } from './graph-read-port.js';
+import type { CompactQueryDetail, DeadCodeDto, DeadCodeResultDto } from './graph-read-port.js';
+import type { McpReadError } from './mcp-error.js';
+import type { GraphCoverage } from './symbol-dto.js';
 
 /** Hard cap separating incomplete orphan evaluation from ordinary pagination. */
 export const MAX_ORPHAN_EVALUATION = 10_000;
 
 export interface DeadCodePage {
-  readonly rows: readonly DeadCodeDto[];
+  readonly data: DeadCodeResultDto;
   readonly hasMore: boolean;
-  /** Flat intermediate coverage; envelope converts via facetsFromFlatCoverage (Task 2.8). */
-  readonly coverage: GraphReadCoverage;
+  readonly coverage: GraphCoverage;
   readonly groups?: readonly GroupSummary[];
+  readonly nextCursor?: string;
   readonly anchorFound: boolean;
 }
 
@@ -41,6 +47,10 @@ export interface DeadCodePageInput {
   readonly limit: number;
   readonly afterKey: string | undefined;
   readonly groupBy: 'none' | 'package' | 'file';
+  readonly detail: CompactQueryDetail;
+  readonly projectKey: string;
+  readonly queryDigest: string;
+  readonly cursor?: string;
   readonly cachedFeatures?: FeatureTable;
 }
 
@@ -52,6 +62,38 @@ export function deadCodeStableKey(row: DeadCodeDto): string {
     codePointSortKey(row.message),
     codePointSortKey(row.suggestion ?? ''),
   ].join('|');
+}
+
+function validateDetail(
+  detail: CompactQueryDetail,
+  groupBy: 'none' | 'package' | 'file',
+): Result<void, McpReadError> {
+  if (detail === 'groups' && groupBy === 'none') {
+    return err(readError('invalid-query', 'detail=groups requires groupBy package or file.'));
+  }
+  if ((detail === 'summary' || detail === 'nodes') && groupBy !== 'none') {
+    return err(
+      readError(
+        'invalid-query',
+        'detail=summary and detail=nodes require groupBy none (or omit groupBy).',
+      ),
+    );
+  }
+  return ok(undefined);
+}
+
+function countDistribution(
+  rows: readonly DeadCodeDto[],
+  keyOf: (row: DeadCodeDto) => string,
+): readonly { readonly key: string; readonly count: number }[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => compareCodePointStrings(a.key, b.key));
 }
 
 function resolveDeadAnchor(
@@ -81,38 +123,143 @@ function sliceDeadPage(
   return { rows, hasMore: false };
 }
 
-export function pageDeadCode(input: DeadCodePageInput): DeadCodePage {
-  const { generation, config, filter, matcher, limit, afterKey, groupBy, cachedFeatures } = input;
+export function pageDeadCode(input: DeadCodePageInput): Result<DeadCodePage, McpReadError> {
+  const {
+    generation,
+    config,
+    filter,
+    matcher,
+    limit,
+    afterKey,
+    groupBy,
+    detail,
+    projectKey,
+    queryDigest,
+    cursor,
+    cachedFeatures,
+  } = input;
+  const detailOk = validateDetail(detail, groupBy);
+  if (!detailOk.ok) return detailOk;
+
   const features =
     cachedFeatures ??
     deriveGraphReadFeatures(generation.catalog, generation.indexes, config, ['reachableFromEntry']);
   const signals = evaluateGraphOrphans(generation.catalog, generation.indexes, config, features);
-  const reasons = new Set<string>();
-  const filteredRows = () => projectFilteredRows(signals, generation, filter, matcher, reasons);
+  const inventoryReasons = new Set<string>();
+  const filteredRows = () =>
+    projectFilteredRows(signals, generation, filter, matcher, inventoryReasons);
   const selected = boundedTopRows(filteredRows(), MAX_ORPHAN_EVALUATION, (a, b) =>
     compareCodePointStrings(deadCodeStableKey(a), deadCodeStableKey(b)),
   );
-  if (selected.total > MAX_ORPHAN_EVALUATION) reasons.add('orphan-evaluation-cap');
-  const grouped = groupRows(selected.rows, groupBy, (row, mode) =>
-    mode === 'package' ? row.symbol.package : row.symbol.filePath,
-  );
-  if (grouped.groupTruncated) reasons.add('group-key-cap');
+  if (selected.total > MAX_ORPHAN_EVALUATION) inventoryReasons.add('orphan-evaluation-cap');
 
+  const reasonCounts = countDistribution(selected.rows, (row) => row.reason).map((entry) => ({
+    reason: entry.key,
+    count: entry.count,
+  }));
+  const ruleCounts = countDistribution(selected.rows, (row) => row.ruleId).map((entry) => ({
+    ruleId: entry.key,
+    count: entry.count,
+  }));
+  const totalOrphans = selected.rows.length;
+
+  if (detail === 'summary') {
+    return ok({
+      data: {
+        detail: 'summary',
+        rows: [],
+        totalOrphans,
+        reasonCounts,
+        ruleCounts,
+      },
+      hasMore: false,
+      anchorFound: true,
+      coverage: rollupFacets({
+        inventory: makeFacet(true, inventoryReasons),
+        evidence: UNREQUESTED_FACET,
+        grouping: UNREQUESTED_FACET,
+        projection: UNREQUESTED_FACET,
+      }),
+    });
+  }
+
+  if (detail === 'groups') {
+    const grouped = groupRows(selected.rows, groupBy, (row, mode) =>
+      mode === 'package' ? row.symbol.package : row.symbol.filePath,
+    );
+    const groupingReasons = new Set(grouped.groupTruncated ? ['group-key-cap'] : []);
+    const paged = pageRows(
+      grouped.groups ?? [],
+      {
+        projectKey,
+        generationKey: generation.key,
+        queryDigest,
+        limit,
+        ...(cursor === undefined ? {} : { cursor }),
+      },
+      (group) => group.key,
+    );
+    if (!paged.ok) return paged;
+    return ok({
+      data: {
+        detail: 'groups',
+        rows: [],
+        totalOrphans,
+        reasonCounts,
+        ruleCounts,
+      },
+      hasMore: paged.value.hasMore,
+      anchorFound: true,
+      coverage: rollupFacets({
+        inventory: makeFacet(true, inventoryReasons),
+        evidence: UNREQUESTED_FACET,
+        grouping: makeFacet(true, groupingReasons),
+        projection: makeFacet(true, new Set()),
+      }),
+      ...(paged.value.rows.length === 0 ? {} : { groups: paged.value.rows }),
+      ...(paged.value.nextCursor === undefined ? {} : { nextCursor: paged.value.nextCursor }),
+    });
+  }
+
+  // detail === 'nodes'
   const anchor = resolveDeadAnchor(selected.rows, afterKey);
+  if (!anchor.found) {
+    return ok({
+      data: {
+        detail: 'nodes',
+        rows: [],
+        totalOrphans,
+        reasonCounts,
+        ruleCounts,
+      },
+      hasMore: false,
+      anchorFound: false,
+      coverage: rollupFacets({
+        inventory: makeFacet(true, inventoryReasons),
+        evidence: UNREQUESTED_FACET,
+        grouping: UNREQUESTED_FACET,
+        projection: makeFacet(true, new Set()),
+      }),
+    });
+  }
   const page = sliceDeadPage(selected.rows, anchor.stableKey, limit);
-
-  const uniqueReasons = [...reasons].sort(compareCodePointStrings);
-  return {
-    rows: page.rows,
-    hasMore: page.hasMore,
-    anchorFound: anchor.found,
-    coverage: {
-      complete: uniqueReasons.length === 0,
-      truncated: uniqueReasons.some((reason) => reason.endsWith('-cap')),
-      reasons: uniqueReasons,
+  return ok({
+    data: {
+      detail: 'nodes',
+      rows: page.rows,
+      totalOrphans,
+      reasonCounts,
+      ruleCounts,
     },
-    ...(grouped.groups === undefined ? {} : { groups: grouped.groups }),
-  };
+    hasMore: page.hasMore,
+    anchorFound: true,
+    coverage: rollupFacets({
+      inventory: makeFacet(true, inventoryReasons),
+      evidence: UNREQUESTED_FACET,
+      grouping: UNREQUESTED_FACET,
+      projection: makeFacet(true, new Set()),
+    }),
+  });
 }
 
 function* projectFilteredRows(

@@ -59,7 +59,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/a/a.ts:1:0',
       filter: { sourceScope: 'all', generated: 'include' },
-      options: { limit: 1 },
+      options: { limit: 1, detail: 'nodes' },
       projectKey: 'b'.repeat(24),
     });
     expect(first.ok).toBe(true);
@@ -77,7 +77,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/b/b.ts:1:0',
       filter: { sourceScope: 'all', generated: 'include' },
-      options: { limit: 1 },
+      options: { limit: 1, detail: 'nodes' },
       projectKey: 'b'.repeat(24),
     });
     expect(result.ok).toBe(true);
@@ -93,7 +93,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'missing-body',
       symbolId: 'packages/a/a.ts:1:0',
       filter: { sourceScope: 'all', generated: 'include' },
-      options: { limit: 10, groupBy: 'package' },
+      options: { limit: 10, detail: 'groups', groupBy: 'package' },
       projectKey: 'b'.repeat(24),
     });
     expect(unknown.ok).toBe(true);
@@ -107,12 +107,13 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/other/o.ts:1:0',
       filter: { sourceScope: 'all', generated: 'include' },
-      options: { groupBy: 'file' },
+      options: { detail: 'groups', groupBy: 'file' },
       projectKey: 'b'.repeat(24),
     });
     expect(wrongBody.ok).toBe(true);
     if (!wrongBody.ok) return;
     expect(wrongBody.value.requested).toBeUndefined();
+    expect(wrongBody.value.members).toEqual([]);
     expect(wrongBody.value.options.groups?.length).toBeGreaterThan(0);
 
     const badCursor = projectBlastMembers({
@@ -120,7 +121,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/a/a.ts:1:0',
       filter: { sourceScope: 'all', generated: 'include' },
-      options: { cursor: 'not-a-valid-cursor' },
+      options: { detail: 'nodes', cursor: 'not-a-valid-cursor' },
       projectKey: 'b'.repeat(24),
     });
     expect(badCursor.ok).toBe(false);
@@ -132,7 +133,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/a/a.ts:1:0',
       filter: { packages: ['a'], sourceScope: 'all', generated: 'include' },
-      options: undefined,
+      options: { detail: 'nodes' },
       projectKey: 'b'.repeat(24),
     });
     expect(result.ok).toBe(true);
@@ -148,7 +149,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/b/b.ts:1:0',
       filter: { packages: ['a'], sourceScope: 'all', generated: 'include' },
-      options: undefined,
+      options: { detail: 'nodes' },
       projectKey: 'b'.repeat(24),
     });
     expect(result.ok).toBe(true);
@@ -176,7 +177,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: 'packages/a/a.ts:1:0',
       filter: { sourceScope: 'all', generated: 'include' },
-      options: undefined,
+      options: { detail: 'summary' },
       projectKey: 'b'.repeat(24),
     });
     expect(result.ok).toBe(true);
@@ -186,6 +187,7 @@ describe('projectBlastMembers', () => {
       truncated: false,
     });
     expect(result.value.options.coverage.reasons).toContain('malformed-symbol-omitted');
+    expect(result.value.members).toEqual([]);
   });
 
   it('hard-caps projected membership while preserving the exact requested identity', () => {
@@ -207,7 +209,7 @@ describe('projectBlastMembers', () => {
       bodyHash: 'same-body',
       symbolId: requestedId,
       filter: { sourceScope: 'all', generated: 'include' },
-      options: { limit: 500 },
+      options: { limit: 500, detail: 'nodes' },
       projectKey: 'b'.repeat(24),
     });
 

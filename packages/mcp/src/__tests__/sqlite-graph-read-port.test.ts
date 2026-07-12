@@ -296,6 +296,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             symbolId,
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'summary',
           }),
         }),
       ],
@@ -306,6 +307,7 @@ describe('SqliteGraphReadPort (async cutover)', () => {
             op: 'deadCode',
             filter: discoverFilter,
             groupBy: 'none',
+            detail: 'summary',
           }),
         }),
       ],
@@ -756,14 +758,16 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     const port = makePort(store);
     const first = await port.deadCode({
       limit: 1,
+      detail: 'nodes',
       filter: { sourceScope: 'all', generated: 'include' },
     });
     expect(first.ok).toBe(true);
     if (!first.ok) return;
-    expect(first.value.data.length).toBeLessThanOrEqual(1);
+    expect(first.value.data.rows.length).toBeLessThanOrEqual(1);
     if (first.value.page?.nextCursor !== undefined) {
       const stale = await port.deadCode({
         limit: 1,
+        detail: 'nodes',
         cursor: first.value.page.nextCursor,
         filter: { sourceScope: 'production', generated: 'exclude' },
       });

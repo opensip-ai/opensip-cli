@@ -156,9 +156,9 @@ describe('MCP integration — adapter load + real catalog', () => {
     expect(blast.ok && (blast.value.data?.direct ?? 0)).toBeGreaterThanOrEqual(1);
 
     // dead_code: `unused` is unreachable.
-    const dead = await graph.deadCode();
+    const dead = await graph.deadCode({ detail: 'nodes' });
     expect(dead.ok).toBe(true);
-    const deadNames = dead.ok ? dead.value.data.map((d) => d.symbol.qualifiedName) : [];
+    const deadNames = dead.ok ? dead.value.data.rows.map((d) => d.symbol.qualifiedName) : [];
     expect(deadNames.some((n) => n.includes('unused'))).toBe(true);
   });
 });

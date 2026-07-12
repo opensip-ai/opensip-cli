@@ -2,11 +2,7 @@
 
 import { compareCodePointStrings } from '../code-point-order.js';
 
-import type {
-  CoverageFacet,
-  GraphReadCoverage,
-  GraphReadFacetCoverage,
-} from './query-contracts.js';
+import type { CoverageFacet, GraphReadCoverage, GraphReadFacetCoverage } from './query-contracts.js';
 
 export interface ReadGroupSummary {
   readonly key: string;
@@ -93,27 +89,6 @@ export function rollupFacets(facets: CoverageFacetSet): GraphReadFacetCoverage {
     truncated: requested.some((facet) => facet.truncated),
     reasons,
   };
-}
-
-/**
- * PHASE-LOCAL flat coverage bridge (P2 Phase 2.1). Maps a legacy flat
- * {@link GraphReadCoverage} onto facet coverage: the flat triple becomes the
- * requested `inventory` facet with the other three unrequested, preserving the
- * flat top-level semantics. Bridges pre-facet callers until Tasks 2.2-2.8
- * migrate every query family; DELETED in Task 2.8. Do NOT add new callers.
- */
-export function facetsFromFlatCoverage(coverage: GraphReadCoverage): GraphReadFacetCoverage {
-  return rollupFacets({
-    inventory: {
-      requested: true,
-      complete: coverage.complete,
-      truncated: coverage.truncated,
-      reasons: coverage.reasons,
-    },
-    evidence: UNREQUESTED_FACET,
-    grouping: UNREQUESTED_FACET,
-    projection: UNREQUESTED_FACET,
-  });
 }
 
 function insertionIndex<T>(
