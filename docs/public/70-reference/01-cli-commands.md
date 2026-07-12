@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-11
 release: v0.5.3
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -424,7 +424,7 @@ first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
 
 **Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
 
-The default protocol inventory is exactly **19 tools**: 12 graph tools, one
+The default protocol inventory is exactly **21 tools**: 12 graph tools, one
 separate live runtime-wiring tool, and six persisted result/review tools.
 Starting with `--allow-mutations` adds only `repair_apply_verify` for 20.
 
@@ -449,7 +449,7 @@ Starting with `--allow-mutations` adds only `repair_apply_verify` for 20.
 
 | Tool | Purpose |
 |------|---------|
-| `get_runtime_wiring` | Project admitted manifest, provenance, registry, parent/child CommandSpec, host-mount, handler-dispatch, and external-worker posture. Every edge carries source/confidence and unresolved static bridges remain explicit. |
+| `get_runtime_wiring`, `search_declarations`, `references_to` | Project admitted manifest, provenance, registry, parent/child CommandSpec, host-mount, handler-dispatch, and external-worker posture. Every edge carries source/confidence and unresolved static bridges remain explicit. |
 
 ### Result and review tools (6 — replay stored runs, never re-run)
 
@@ -1455,3 +1455,5 @@ If you installed via a version manager (volta, asdf) or Homebrew, use that tool'
 - **[`../50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md)** — write a check, recipe, scenario, or full Tool plugin.
 - **[`06-dashboard.md`](./06-dashboard.md)** — the HTML report's structure and lifecycle.
 - **[`../70-reference/03-configuration.md`](../70-reference/03-configuration.md)** — every field of `opensip-cli.config.yml`.
+
+MCP compact audit surface: see [Connect MCP clients](../60-guides/08-connect-mcp-clients.md) and ADR-0152..0154.

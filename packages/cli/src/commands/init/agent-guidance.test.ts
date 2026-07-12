@@ -108,14 +108,47 @@ describe('buildManagedAgentGuidance', () => {
     expect(guidance).toContain('complete` versus `partial');
     expect(guidance).toContain('effective filters');
     expect(guidance).toContain('evidence kind/confidence');
-    expect(guidance).toContain('hard-cap reasons');
+    expect(guidance).toContain('four coverage facets');
+    expect(guidance).toContain('inventory / evidence / grouping / projection');
     expect(guidance).toContain('returned cursor');
     expect(guidance).toContain('auto-load a newer catalog');
+    expect(guidance).toContain('get_agent_catalog');
+    expect(guidance).toContain('get_architecture');
+    expect(guidance).toContain('search_declarations');
+    expect(guidance).toContain('references_to');
     expect(guidance).toContain('package_dependencies');
     expect(guidance).toContain('why_depends');
     expect(guidance).toContain('package_cycles');
     expect(guidance).toContain('get_runtime_wiring');
+    expect(guidance).toContain('default to 20 nodes');
+    expect(guidance).toContain('exclusive compact detail modes');
+    expect(guidance).toContain('runtime edges, not call edges');
+    expect(guidance).toContain('cannot repair a stale connector inventory');
+    expect(guidance).toContain('never to fix a stale connector');
     expect(guidance).not.toMatch(/pinned in-memory generation|refresh_graph once so its pinned/i);
+    // Negative: project key is not response context; declarations are not callable.
+    expect(guidance).toContain('never treat it as response context');
+    expect(guidance).toContain('declaration IDs are not callable symbolIds');
+    // Forbid affirmative "use refresh_graph to repair connector" guidance.
+    expect(guidance).not.toMatch(
+      /use `refresh_graph` to (repair|fix|update) (a |the )?(stale )?connector/i,
+    );
+    expect(guidance).not.toMatch(/reconnect.*(via|with|using) `refresh_graph`/i);
+  });
+
+  it('matches the checked-in AGENTS.md / CLAUDE.md managed blocks', () => {
+    const expected = buildManagedAgentGuidance();
+    // Repo root is three levels above this test file (packages/cli/src/commands/init).
+    const repoRoot = join(import.meta.dirname, '..', '..', '..', '..', '..');
+    for (const name of ['AGENTS.md', 'CLAUDE.md'] as const) {
+      const content = readFileSync(join(repoRoot, name), 'utf8');
+      const start = content.indexOf(AGENT_GUIDANCE_START);
+      const end = content.indexOf(AGENT_GUIDANCE_END);
+      expect(start, name).toBeGreaterThanOrEqual(0);
+      expect(end, name).toBeGreaterThan(start);
+      const block = content.slice(start, end + AGENT_GUIDANCE_END.length);
+      expect(block, name).toBe(expected);
+    }
   });
 });
 
