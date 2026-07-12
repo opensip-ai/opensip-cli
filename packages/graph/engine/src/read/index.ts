@@ -20,7 +20,15 @@ export {
   codePointSortKey,
   continuationToken,
 } from '../code-point-order.js';
-export { matchesGraphSourceFilter, matchesFilePrefix } from './source-filter.js';
+export {
+  matchesGraphSourceFilter,
+  matchesGraphSourceFilterWithRoles,
+  matchesFilePrefix,
+  compileSourceRoleMatcher,
+  effectiveTestSource,
+  MAX_AUDIT_SOURCE_ROLE_FILES,
+} from './source-filter.js';
+export type { SourceRoleMatcher, SourceRoleLimits } from './source-filter.js';
 export {
   toGraphSymbolRef,
   graphPackageOf,
@@ -71,6 +79,7 @@ export type {
   PackageEdgeKind,
   GraphSourceFilter,
   EffectiveGraphSourceFilter,
+  AuditSourceRolePolicy,
   GraphReadCoverage,
   GraphSymbolRef,
   CallEdgeEvidence,

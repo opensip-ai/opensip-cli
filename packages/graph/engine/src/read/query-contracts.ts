@@ -67,6 +67,21 @@ export interface FreshnessVerification {
 }
 
 /**
+ * Bounded, PLAIN-DATA audit source-role policy (P2 Phase 1.4). This is the sole
+ * source-role shape that crosses the read boundary: it is echoed on responses,
+ * normalized into cursor digests, and carries ONLY the validated audit-test glob
+ * strings plus a versioned evaluation mode. The compiled runtime matcher that
+ * evaluates these globs is a separate non-serializable type in `source-filter.ts`
+ * and NEVER appears in a DTO.
+ */
+export interface AuditSourceRolePolicy {
+  /** The validated audit-test source-role globs (see graph.auditTestSourceGlobs). */
+  readonly testGlobs: readonly string[];
+  /** Versioned role-evaluation contract — the only mode currently defined. */
+  readonly mode: 'audit-test-globs-v1';
+}
+
+/**
  * Shared source filter applied before projection/paging in every graph read view.
  * Exact `filePath` and segment-aware `filePrefix` are both project-relative POSIX.
  */
@@ -80,6 +95,13 @@ export interface GraphSourceFilter {
   readonly visibilities?: readonly Visibility[];
   readonly sourceScope: SourceScope;
   readonly generated: GeneratedPolicy;
+  /**
+   * Audit source-role policy (P2 Phase 1.4). Absent (or empty `testGlobs`) means
+   * adapter `inTestFile` classification only. The compiled matcher is supplied
+   * separately as an explicit execution dependency; only THIS plain policy is
+   * serialized into responses / cursor digests.
+   */
+  readonly sourceRoles?: AuditSourceRolePolicy;
 }
 
 /** Effective filter echoed on every graph response (always fully populated). */
