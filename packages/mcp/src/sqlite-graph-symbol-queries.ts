@@ -111,14 +111,21 @@ export class SqliteGraphSymbolQueries {
         };
         const after = this.context.resolveAfterKey(opts?.cursor, binding);
         if (!after.ok) return after;
-        const searched = searchSymbolOccurrences(gen.catalog, gen.indexes, {
-          query,
-          match,
-          filter,
-          limit,
-          groupBy,
-          ...(after.value === undefined ? {} : { afterKey: after.value }),
-        });
+        const matcher = this.context.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
+        const searched = searchSymbolOccurrences(
+          gen.catalog,
+          gen.indexes,
+          {
+            query,
+            match,
+            filter,
+            limit,
+            groupBy,
+            ...(after.value === undefined ? {} : { afterKey: after.value }),
+          },
+          matcher.value,
+        );
         if (!searched.ok) return err(fromGraphReadError(searched.error));
 
         const symbols = searched.value.symbols;

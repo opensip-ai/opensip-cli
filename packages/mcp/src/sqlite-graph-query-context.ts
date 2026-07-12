@@ -1,6 +1,7 @@
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
+import { compileSourceRoleMatcher, MAX_AUDIT_SOURCE_ROLE_FILES } from '@opensip-cli/graph/read';
 
 import { freshnessFromVerification, missingFreshness } from './freshness.js';
 import { bindCursor, decodeCursor, encodeCursor, type GroupSummary } from './graph-query-page.js';
@@ -15,7 +16,12 @@ import type {
   GraphEvidenceContext,
   GraphToolResult,
 } from './symbol-dto.js';
-import type { GraphSourceFilter } from '@opensip-cli/graph/read';
+import type {
+  AuditSourceRolePolicy,
+  Catalog,
+  GraphSourceFilter,
+  SourceRoleMatcher,
+} from '@opensip-cli/graph/read';
 
 const CURSOR_VERSION = 1 as const;
 const LOG_QUERY_FAILED = 'mcp.graph.query.failed';
@@ -41,6 +47,14 @@ function resultDataCount(data: unknown): number {
   return 1;
 }
 
+/** Unique-ish stream of catalog occurrence file paths (the compiler dedups). */
+function* catalogFilePaths(catalog: Catalog): Generator<string> {
+  for (const occs of Object.values(catalog.functions)) {
+    if (!occs) continue;
+    for (const occ of occs) yield occ.filePath;
+  }
+}
+
 function projectRelativeConfigPath(projectRoot: string, configPath: string): string {
   if (/\p{Cc}/u.test(configPath)) return '<invalid-config-path>';
   const root = resolve(projectRoot);
@@ -56,6 +70,12 @@ function projectRelativeConfigPath(projectRoot: string, configPath: string): str
 export interface SqliteGraphQueryContextDeps {
   readonly projectRoot: string;
   readonly configPath?: string;
+  /**
+   * The plain audit source-role policy resolved from `graph.auditTestSourceGlobs`
+   * (P2 Phase 1.4). Absent when no globs are configured. The context echoes this
+   * policy on filters and compiles it into a matcher once per generation.
+   */
+  readonly sourceRolePolicy?: AuditSourceRolePolicy;
   readonly log?: (
     evt: string,
     fields: Record<string, string | number | boolean | undefined>,
@@ -71,6 +91,9 @@ export class SqliteGraphQueryContext {
   private readonly projectRoot: string;
   private readonly configPath: string;
   private readonly log: SqliteGraphQueryContextDeps['log'];
+  private readonly sourceRolePolicy?: AuditSourceRolePolicy;
+  /** Per-generation compiled matcher cache (instance-scoped; keyed by g1 identity). */
+  private sourceRoleCache?: { readonly generationKey: string; readonly matcher: SourceRoleMatcher };
 
   constructor(
     private readonly controller: GraphGenerationController,
@@ -83,6 +106,45 @@ export class SqliteGraphQueryContext {
     );
     this.projectKey = ephemeralProjectCacheKey(deps.projectRoot);
     this.log = deps.log;
+    this.sourceRolePolicy = deps.sourceRolePolicy;
+  }
+
+  /**
+   * Compile the audit source-role matcher for a generation (P2 Phase 1.4).
+   * Classification runs ONCE per `g1:` identity and is retained on this context
+   * instance; a new generation reclassifies its own catalog paths. Fails the
+   * read with a typed error when a glob cannot compile or the catalog exceeds
+   * MAX_AUDIT_SOURCE_ROLE_FILES. No global/singleton/WeakMap cache.
+   */
+  sourceRoleMatcherFor(
+    gen: CatalogGeneration | undefined,
+  ): Result<SourceRoleMatcher, McpReadError> {
+    const policy = this.sourceRolePolicy;
+    if (gen === undefined || policy === undefined || policy.testGlobs.length === 0) {
+      // No configured globs → the no-op matcher (this compile path never fails).
+      const empty = compileSourceRoleMatcher(undefined, [], {
+        maxFiles: MAX_AUDIT_SOURCE_ROLE_FILES,
+      });
+      return empty.ok
+        ? empty
+        : err(readError('graph-source-role-failed', 'Audit source-role setup failed.'));
+    }
+    if (this.sourceRoleCache?.generationKey === gen.key) {
+      return ok(this.sourceRoleCache.matcher);
+    }
+    const compiled = compileSourceRoleMatcher(policy, catalogFilePaths(gen.catalog), {
+      maxFiles: MAX_AUDIT_SOURCE_ROLE_FILES,
+    });
+    if (!compiled.ok) {
+      return err(
+        readError(
+          'graph-source-role-failed',
+          'Audit source-role classification failed for this catalog.',
+        ),
+      );
+    }
+    this.sourceRoleCache = { generationKey: gen.key, matcher: compiled.value };
+    return ok(compiled.value);
   }
 
   async runQuery<T>(
@@ -160,6 +222,11 @@ export class SqliteGraphQueryContext {
     };
   }
 
+  /** The plain source-role policy echoed into every resolved filter, when set. */
+  private get sourceRolesEcho(): Pick<GraphSourceFilter, 'sourceRoles'> {
+    return this.sourceRolePolicy === undefined ? {} : { sourceRoles: this.sourceRolePolicy };
+  }
+
   resolveFilter(
     partial: Partial<GraphSourceFilter> | undefined,
     defaults: 'discover' | 'production',
@@ -173,6 +240,7 @@ export class SqliteGraphQueryContext {
       ...(partial?.filePrefix === undefined ? {} : { filePrefix: partial.filePrefix }),
       ...(partial?.kinds === undefined ? {} : { kinds: partial.kinds }),
       ...(partial?.visibilities === undefined ? {} : { visibilities: partial.visibilities }),
+      ...this.sourceRolesEcho,
     };
   }
 
@@ -185,6 +253,7 @@ export class SqliteGraphQueryContext {
       ...(partial?.filePrefix === undefined ? {} : { filePrefix: partial.filePrefix }),
       ...(partial?.kinds === undefined ? {} : { kinds: partial.kinds }),
       ...(partial?.visibilities === undefined ? {} : { visibilities: partial.visibilities }),
+      ...this.sourceRolesEcho,
     };
   }
 

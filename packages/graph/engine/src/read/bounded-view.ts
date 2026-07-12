@@ -2,7 +2,11 @@
 
 import { compareCodePointStrings } from '../code-point-order.js';
 
-import type { GraphReadCoverage } from './query-contracts.js';
+import type {
+  CoverageFacet,
+  GraphReadCoverage,
+  GraphReadFacetCoverage,
+} from './query-contracts.js';
 
 export interface ReadGroupSummary {
   readonly key: string;
@@ -17,6 +21,99 @@ export function coverageFromReasons(reasons: ReadonlySet<string>): GraphReadCove
     truncated: values.some((reason) => reason.endsWith('-cap')),
     reasons: values,
   };
+}
+
+// ── P2 Phase 2.1: facet coverage helpers ─────────────────────────
+
+/** A facet the caller did not request — complete, untruncated, contributes nothing. */
+export const UNREQUESTED_FACET: CoverageFacet = Object.freeze({
+  requested: false,
+  complete: true,
+  truncated: false,
+  reasons: Object.freeze([]),
+});
+
+/**
+ * Build one {@link CoverageFacet} from its requested flag + accumulated reasons.
+ * `-cap` reasons mark truncation; any reason marks incompleteness. Reasons are
+ * deduplicated and code-point sorted for deterministic output.
+ */
+export function makeFacet(requested: boolean, reasons: ReadonlySet<string>): CoverageFacet {
+  const values = [...new Set(reasons)].sort(compareCodePointStrings);
+  return {
+    requested,
+    complete: values.length === 0,
+    truncated: values.some((reason) => reason.endsWith('-cap')),
+    reasons: values,
+  };
+}
+
+/**
+ * Merge two facets of the SAME name (e.g. a view's evidence facet with the MCP
+ * pager's projection facet): requested if either is, complete only if both are,
+ * truncated if either is, reasons unioned + sorted.
+ */
+export function mergeFacet(a: CoverageFacet, b: CoverageFacet): CoverageFacet {
+  const values = [...new Set([...a.reasons, ...b.reasons])].sort(compareCodePointStrings);
+  return {
+    requested: a.requested || b.requested,
+    complete: a.complete && b.complete,
+    truncated: a.truncated || b.truncated,
+    reasons: values,
+  };
+}
+
+/** The four facets that compose a graph read's coverage. */
+export interface CoverageFacetSet {
+  readonly inventory: CoverageFacet;
+  readonly evidence: CoverageFacet;
+  readonly grouping: CoverageFacet;
+  readonly projection: CoverageFacet;
+}
+
+/**
+ * Roll a {@link CoverageFacetSet} into full {@link GraphReadFacetCoverage}. The
+ * top-level summary aggregates ONLY the requested facets: complete when every
+ * requested facet is complete, truncated when any requested facet is, reasons
+ * unioned across requested facets. An unrequested facet never leaks into it.
+ */
+export function rollupFacets(facets: CoverageFacetSet): GraphReadFacetCoverage {
+  const requested = [
+    facets.inventory,
+    facets.evidence,
+    facets.grouping,
+    facets.projection,
+  ].filter((facet) => facet.requested);
+  const reasons = [...new Set(requested.flatMap((facet) => [...facet.reasons]))].sort(
+    compareCodePointStrings,
+  );
+  return {
+    ...facets,
+    complete: requested.every((facet) => facet.complete),
+    truncated: requested.some((facet) => facet.truncated),
+    reasons,
+  };
+}
+
+/**
+ * PHASE-LOCAL flat coverage bridge (P2 Phase 2.1). Maps a legacy flat
+ * {@link GraphReadCoverage} onto facet coverage: the flat triple becomes the
+ * requested `inventory` facet with the other three unrequested, preserving the
+ * flat top-level semantics. Bridges pre-facet callers until Tasks 2.2-2.8
+ * migrate every query family; DELETED in Task 2.8. Do NOT add new callers.
+ */
+export function facetsFromFlatCoverage(coverage: GraphReadCoverage): GraphReadFacetCoverage {
+  return rollupFacets({
+    inventory: {
+      requested: true,
+      complete: coverage.complete,
+      truncated: coverage.truncated,
+      reasons: coverage.reasons,
+    },
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
 }
 
 function insertionIndex<T>(

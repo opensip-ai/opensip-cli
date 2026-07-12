@@ -9,7 +9,10 @@ import {
   type SymbolSearchQuery,
 } from '../read/symbol-search.js';
 
+import type { SourceRoleMatcher } from '../read/index.js';
 import type { Catalog, FunctionOccurrence } from '../types.js';
+
+const noMatcher: SourceRoleMatcher = { matches: () => false };
 
 function occ(
   partial: Partial<FunctionOccurrence> &
@@ -61,12 +64,17 @@ function search(
   over: Partial<SymbolSearchQuery> & Pick<SymbolSearchQuery, 'query'>,
 ) {
   const indexes = buildIndexes(catalog);
-  return searchSymbolOccurrences(catalog, indexes, {
-    match: 'substring',
-    filter: allFilter(),
-    limit: 50,
-    ...over,
-  });
+  return searchSymbolOccurrences(
+    catalog,
+    indexes,
+    {
+      match: 'substring',
+      filter: allFilter(),
+      limit: 50,
+      ...over,
+    },
+    noMatcher,
+  );
 }
 
 describe('searchSymbolOccurrences', () => {

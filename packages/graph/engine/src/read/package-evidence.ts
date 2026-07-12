@@ -22,11 +22,16 @@ import {
   type PackageImportEvidence,
   type SourceScope,
 } from './query-contracts.js';
-import { isCanonicalProductionFilter, matchesGraphSourceFilter } from './source-filter.js';
+import {
+  isCanonicalProductionFilter,
+  matchesGraphSourceFilterWithRoles,
+  type SourceRoleMatcher,
+} from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type {
   Catalog,
+  DependencyClassification,
   DependencyEdge,
   FeatureTable,
   FunctionOccurrence,
@@ -270,6 +275,7 @@ interface CallCollectionState {
   readonly evidence: PackageCallEvidence[];
   readonly evidenceCount: { value: number };
   readonly reasons: Set<string>;
+  readonly matcher: SourceRoleMatcher;
 }
 
 function collectResolvedCallEdge(
@@ -278,8 +284,8 @@ function collectResolvedCallEdge(
   state: CallCollectionState,
 ): void {
   if (
-    !matchesGraphSourceFilter(edge.owner, query.filter) ||
-    !matchesGraphSourceFilter(edge.target, query.filter)
+    !matchesGraphSourceFilterWithRoles(edge.owner, query.filter, state.matcher) ||
+    !matchesGraphSourceFilterWithRoles(edge.target, query.filter, state.matcher)
   ) {
     return;
   }
@@ -314,6 +320,7 @@ function collectCallBuckets(
   indexes: Indexes,
   query: PackageEvidenceQuery,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): {
   buckets: BoundedBucketState<MutableCallBucket>;
   evidence: PackageCallEvidence[];
@@ -326,7 +333,7 @@ function collectCallBuckets(
   const evidence: PackageCallEvidence[] = [];
   const evidenceCount = { value: 0 };
   const graph = occurrenceCallGraphFor(indexes);
-  const state = { buckets, evidence, evidenceCount, reasons };
+  const state = { buckets, evidence, evidenceCount, reasons, matcher };
   if (graph.malformedCalls > 0) addReason(reasons, 'malformed-call-edge-omitted');
 
   for (const edge of graph.edges) {
@@ -386,12 +393,13 @@ function buildCallRows(
   query: PackageEvidenceQuery,
   reasons: Set<string>,
   cachedFeatures: FeatureTable | undefined,
+  matcher: SourceRoleMatcher,
 ): {
   rows: PackageCallEvidenceRow[];
   evidence: PackageCallEvidence[];
   totalEvidence: number;
 } {
-  const collected = collectCallBuckets(catalog, indexes, query, reasons);
+  const collected = collectCallBuckets(catalog, indexes, query, reasons, matcher);
   const buckets = applyCanonicalCounts({
     catalog,
     indexes,
@@ -449,48 +457,108 @@ interface ImportResolutionContext {
   readonly indexes: Indexes;
   readonly reasons: Set<string>;
   readonly sourcePackage: string;
-  readonly workspacePackages: ReadonlySet<string>;
   readonly catalogLanguage: string;
 }
 
+interface ImportTargetResult {
+  readonly toPackage: string | null;
+  readonly target: string;
+  readonly resolution: PackageImportEvidence['resolution'];
+  readonly classification?: DependencyClassification;
+  readonly confidence?: 'high';
+}
+
+/**
+ * Resolve one persisted dependency edge to package-import evidence (P2 Phase 0.3).
+ * Target hashes → the unique catalog package (`catalog-target`, high confidence).
+ * No hashes but a persisted `resolvedPackage` (a `.d.ts` declaration entry the
+ * adapter/global-merge attributed to a unique workspace package) → internal
+ * `workspace-manifest` evidence. Everything else — ambiguous targets, external,
+ * or a relative miss — is `unresolved`/`external`, carrying the persisted
+ * classification and reason. No leaf-name / first-wins inference.
+ */
+interface ClassificationSpread {
+  readonly classification?: DependencyClassification;
+}
+
 function importTargets(
+  dependency: {
+    readonly to: readonly string[];
+    readonly specifier: string;
+    readonly classification?: DependencyClassification;
+  },
+  context: ImportResolutionContext,
+): readonly ImportTargetResult[] {
+  const classification = dependency.classification;
+  const withClass: ClassificationSpread =
+    classification === undefined ? {} : { classification };
+  return dependency.to.length > 0
+    ? resolveFromTargetHashes(dependency, context, withClass)
+    : resolveFromEmptyTargets(dependency, classification, context.catalogLanguage, withClass);
+}
+
+/** Attribute a dependency whose target body hashes are present in the catalog. */
+function resolveFromTargetHashes(
   dependency: { readonly to: readonly string[]; readonly specifier: string },
   context: ImportResolutionContext,
-): readonly {
-  toPackage: string | null;
-  target: string;
-  resolution: PackageImportEvidence['resolution'];
-}[] {
-  const { indexes, reasons, sourcePackage, workspacePackages, catalogLanguage } = context;
-  if (dependency.to.length === 0) {
-    const resolution =
-      catalogLanguage !== 'typescript' ||
-      isRelativeSpecifier(dependency.specifier) ||
-      workspacePackageForSpecifier(dependency.specifier, workspacePackages) !== undefined
-        ? 'unresolved'
-        : 'external';
-    return [{ toPackage: null, target: dependency.specifier, resolution }];
-  }
+  withClass: ClassificationSpread,
+): readonly ImportTargetResult[] {
+  const { indexes, reasons, sourcePackage } = context;
   const { packages, targetMissing } = collectImportTargetPackages(dependency.to, indexes, reasons);
-  if (!targetMissing && packages.size > 0) {
-    const selected = disambiguateImportPackage(
-      packages,
-      dependency.specifier,
-      sourcePackage,
-      workspacePackages,
-    );
-    if (selected !== undefined) {
-      return [{ toPackage: selected, target: selected, resolution: 'internal' }];
-    }
-    addReason(reasons, 'ambiguous-import-target');
+  if (!targetMissing && packages.size === 1) {
+    const selected = packages.values().next().value!;
+    return [{ toPackage: selected, target: selected, resolution: 'internal', ...withClass, confidence: 'high' }];
   }
-  return [
-    {
-      toPackage: null,
-      target: dependency.specifier,
-      resolution: 'unresolved',
-    },
-  ];
+  // A relative same-package import whose body-twin resolves into several
+  // packages is attributed to its own source package — not first-wins.
+  if (packages.size > 1 && isRelativeSpecifier(dependency.specifier) && packages.has(sourcePackage)) {
+    return [{ toPackage: sourcePackage, target: sourcePackage, resolution: 'internal', ...withClass, confidence: 'high' }];
+  }
+  if (packages.size > 1) addReason(reasons, 'ambiguous-import-target');
+  return [{ toPackage: null, target: dependency.specifier, resolution: 'unresolved', ...withClass }];
+}
+
+/**
+ * Attribute a dependency with no catalog target body hashes: a `.d.ts`
+ * declaration entry the adapter/global-merge attributed to a unique workspace
+ * package resolves internal on its persisted `resolvedPackage`; everything else
+ * is external or unresolved per the persisted classification (or, for a
+ * pre-feature edge, the language/specifier heuristic).
+ */
+function resolveFromEmptyTargets(
+  dependency: { readonly specifier: string },
+  classification: DependencyClassification | undefined,
+  catalogLanguage: string,
+  withClass: ClassificationSpread,
+): readonly ImportTargetResult[] {
+  if (classification?.resolvedPackage !== undefined) {
+    return [
+      {
+        toPackage: classification.resolvedPackage,
+        target: classification.resolvedPackage,
+        resolution: 'internal',
+        classification,
+        confidence: 'high',
+      },
+    ];
+  }
+  const resolution = emptyTargetResolution(classification, dependency.specifier, catalogLanguage);
+  return [{ toPackage: null, target: dependency.specifier, resolution, ...withClass }];
+}
+
+function emptyTargetResolution(
+  classification: DependencyClassification | undefined,
+  specifier: string,
+  catalogLanguage: string,
+): PackageImportEvidence['resolution'] {
+  if (classification !== undefined) {
+    return classification.targetKind === 'external' ? 'external' : 'unresolved';
+  }
+  // Pre-feature edge (no classification): a bare TypeScript specifier is external;
+  // a relative miss or any non-TypeScript specifier is unresolved.
+  return catalogLanguage === 'typescript' && !isRelativeSpecifier(specifier)
+    ? 'external'
+    : 'unresolved';
 }
 
 function collectImportTargetPackages(
@@ -522,42 +590,6 @@ function isRelativeSpecifier(specifier: string): boolean {
     specifier.startsWith('/') ||
     specifier.startsWith('\\')
   );
-}
-
-function workspacePackageForSpecifier(
-  specifier: string,
-  workspacePackages: ReadonlySet<string>,
-): string | undefined {
-  if (isRelativeSpecifier(specifier)) return undefined;
-  const parts = specifier.split('/');
-  const root = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : (parts[0] ?? '');
-  const leaf = specifier.startsWith('@') ? (parts[1] ?? '') : root;
-  const rootMatch = workspacePackages.has(root) ? root : undefined;
-  const leafMatch = workspacePackages.has(leaf) ? leaf : undefined;
-  // An exact scoped package name is stronger evidence than its compatibility
-  // leaf fallback (used by legacy catalogs that stamped only the last segment).
-  return rootMatch ?? leafMatch;
-}
-
-function disambiguateImportPackage(
-  packages: ReadonlySet<string>,
-  specifier: string,
-  sourcePackage: string,
-  workspacePackages: ReadonlySet<string>,
-): string | undefined {
-  if (packages.size === 1) return packages.values().next().value;
-  if (isRelativeSpecifier(specifier) && packages.has(sourcePackage)) return sourcePackage;
-  const namedPackage = workspacePackageForSpecifier(specifier, workspacePackages);
-  return namedPackage !== undefined && packages.has(namedPackage) ? namedPackage : undefined;
-}
-
-function catalogPackageNames(indexes: Indexes): ReadonlySet<string> {
-  const packages = new Set<string>();
-  for (const occurrence of indexes.byOccId.values()) {
-    const packageName = toGraphPackageName(graphPackageOf(occurrence));
-    if (packageName !== undefined) packages.add(packageName);
-  }
-  return packages;
 }
 
 function getImportBucket(
@@ -596,9 +628,13 @@ function appendImportEvidence(
   insertUniqueBoundedTopK(allEvidence, evidence, MAX_EVIDENCE, compareImportEvidence);
 }
 
-function moduleMatchesImportFilter(occurrence: FunctionOccurrence, filter: GraphSourceFilter) {
+function moduleMatchesImportFilter(
+  occurrence: FunctionOccurrence,
+  filter: GraphSourceFilter,
+  matcher: SourceRoleMatcher,
+) {
   if (filter.kinds !== undefined && !filter.kinds.includes('module-init')) return false;
-  return matchesGraphSourceFilter(occurrence, filter);
+  return matchesGraphSourceFilterWithRoles(occurrence, filter, matcher);
 }
 
 interface ImportCollectionState {
@@ -613,8 +649,8 @@ interface ImportCollectionContext {
   readonly evidence: PackageImportEvidence[];
   readonly reasons: Set<string>;
   readonly evidenceCount: { value: number };
-  readonly workspacePackages: ReadonlySet<string>;
   readonly catalogLanguage: string;
+  readonly matcher: SourceRoleMatcher;
 }
 
 function collectDependencyImports(
@@ -643,7 +679,6 @@ function collectDependencyImports(
       indexes: context.indexes,
       reasons,
       sourcePackage: source.fromPackage,
-      workspacePackages: context.workspacePackages,
       catalogLanguage: context.catalogLanguage,
     },
   )) {
@@ -663,6 +698,8 @@ function collectDependencyImports(
           line: dependency.line,
           column: dependency.column,
         },
+        ...(target.classification === undefined ? {} : { classification: target.classification }),
+        ...(target.confidence === undefined ? {} : { confidence: target.confidence }),
       },
       reasons,
       evidenceCount,
@@ -697,7 +734,10 @@ function collectOccurrenceImports(
   state: ImportCollectionState,
 ): void {
   const { query, reasons } = context;
-  if (occurrence.kind !== 'module-init' || !moduleMatchesImportFilter(occurrence, query.filter)) {
+  if (
+    occurrence.kind !== 'module-init' ||
+    !moduleMatchesImportFilter(occurrence, query.filter, context.matcher)
+  ) {
     return;
   }
   state.moduleCount++;
@@ -725,6 +765,7 @@ function buildImportRows(
   indexes: Indexes,
   query: PackageEvidenceQuery,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): {
   rows: PackageImportEvidenceRow[];
   evidence: PackageImportEvidence[];
@@ -736,7 +777,6 @@ function buildImportRows(
   };
   const evidence: PackageImportEvidence[] = [];
   const evidenceCount = { value: 0 };
-  const workspacePackages = catalogPackageNames(indexes);
   const state: ImportCollectionState = {
     moduleCount: 0,
     missingDependencyPayload: false,
@@ -748,8 +788,8 @@ function buildImportRows(
     evidence,
     reasons,
     evidenceCount,
-    workspacePackages,
     catalogLanguage: catalog.language,
+    matcher,
   };
 
   for (const occurrence of indexes.byOccId.values()) {
@@ -791,6 +831,7 @@ export function buildPackageEvidence(
   catalog: Catalog,
   indexes: Indexes,
   query: PackageEvidenceQuery,
+  matcher: SourceRoleMatcher,
   cachedFeatures?: FeatureTable,
 ): Result<PackageEvidenceView, GraphReadError> {
   try {
@@ -798,11 +839,11 @@ export function buildPackageEvidence(
     const importReasons = new Set<string>();
     const calls =
       query.edgeKind === 'call' || query.edgeKind === 'combined'
-        ? buildCallRows(catalog, indexes, query, callReasons, cachedFeatures)
+        ? buildCallRows(catalog, indexes, query, callReasons, cachedFeatures, matcher)
         : { rows: [], evidence: [], totalEvidence: 0 };
     const imports =
       query.edgeKind === 'import' || query.edgeKind === 'combined'
-        ? buildImportRows(catalog, indexes, query, importReasons)
+        ? buildImportRows(catalog, indexes, query, importReasons, matcher)
         : { rows: [], evidence: [], totalEvidence: 0 };
     const reasons = new Set([...callReasons, ...importReasons]);
     return ok({

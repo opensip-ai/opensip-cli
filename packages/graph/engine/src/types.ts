@@ -785,7 +785,26 @@ export interface GraphConfig {
   readonly cycleSize2Severity?: 'off' | 'low';
   /** Per-rule severity overrides. */
   readonly severityOverrides?: Readonly<Record<string, 'error' | 'warning'>>;
+  /**
+   * Additive read-time audit source-role globs (P2 Phase 1.3). An occurrence is
+   * classified as a TEST source when the adapter's `inTestFile` bit is set OR its
+   * project-relative POSIX path matches one of these globs. It is a layer OVER
+   * the adapter classification for repositories whose support/test code uses
+   * nonconventional paths the adapter heuristics do not recognize — never a
+   * replacement, and never inferred from `private: true`, package names, or
+   * workspace layout. Package privacy is not a source-role signal. Default empty
+   * (adapter classification only). Bounded by {@link MAX_AUDIT_TEST_SOURCE_GLOBS}
+   * / {@link MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH} / {@link MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS}.
+   */
+  readonly auditTestSourceGlobs?: readonly string[];
 }
+
+/** Max audit-test source-role glob patterns accepted in one `graph:` block. */
+export const MAX_AUDIT_TEST_SOURCE_GLOBS = 64;
+/** Max characters in one audit-test source-role glob pattern. */
+export const MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH = 256;
+/** Max wildcard/character-class tokens (`* ? [ ]`) in one audit-test glob. */
+export const MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS = 32;
 
 /** Resolution-stat counters returned alongside the catalog by stage 2. */
 export interface ResolutionStats {

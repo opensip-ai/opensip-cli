@@ -20,7 +20,14 @@ export {
   codePointSortKey,
   continuationToken,
 } from '../code-point-order.js';
-export { matchesGraphSourceFilter, matchesFilePrefix } from './source-filter.js';
+export {
+  matchesGraphSourceFilterWithRoles,
+  matchesFilePrefix,
+  compileSourceRoleMatcher,
+  effectiveTestSource,
+  MAX_AUDIT_SOURCE_ROLE_FILES,
+} from './source-filter.js';
+export type { SourceRoleMatcher, SourceRoleLimits } from './source-filter.js';
 export {
   toGraphSymbolRef,
   graphPackageOf,
@@ -30,6 +37,14 @@ export {
   GRAPH_SYMBOL_PACKAGE_MAX,
 } from './query-contracts.js';
 export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
+export {
+  makeFacet,
+  mergeFacet,
+  rollupFacets,
+  facetsFromFlatCoverage,
+  UNREQUESTED_FACET,
+} from './bounded-view.js';
+export type { CoverageFacetSet } from './bounded-view.js';
 export { buildOccurrenceCallView } from './occurrence-call-view.js';
 export {
   buildPackageEvidence,
@@ -71,7 +86,11 @@ export type {
   PackageEdgeKind,
   GraphSourceFilter,
   EffectiveGraphSourceFilter,
+  AuditSourceRolePolicy,
   GraphReadCoverage,
+  CoverageFacet,
+  CoverageFacetName,
+  GraphReadFacetCoverage,
   GraphSymbolRef,
   CallEdgeEvidence,
   PackageCallEvidence,

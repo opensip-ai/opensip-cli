@@ -15,6 +15,7 @@ import { pkgOf } from '../resolve-callee.js';
 import type {
   CallConfidence,
   CallResolution,
+  DependencyClassification,
   FunctionKind,
   FunctionOccurrence,
   Visibility,
@@ -66,6 +67,21 @@ export interface FreshnessVerification {
 }
 
 /**
+ * Bounded, PLAIN-DATA audit source-role policy (P2 Phase 1.4). This is the sole
+ * source-role shape that crosses the read boundary: it is echoed on responses,
+ * normalized into cursor digests, and carries ONLY the validated audit-test glob
+ * strings plus a versioned evaluation mode. The compiled runtime matcher that
+ * evaluates these globs is a separate non-serializable type in `source-filter.ts`
+ * and NEVER appears in a DTO.
+ */
+export interface AuditSourceRolePolicy {
+  /** The validated audit-test source-role globs (see graph.auditTestSourceGlobs). */
+  readonly testGlobs: readonly string[];
+  /** Versioned role-evaluation contract — the only mode currently defined. */
+  readonly mode: 'audit-test-globs-v1';
+}
+
+/**
  * Shared source filter applied before projection/paging in every graph read view.
  * Exact `filePath` and segment-aware `filePrefix` are both project-relative POSIX.
  */
@@ -79,6 +95,13 @@ export interface GraphSourceFilter {
   readonly visibilities?: readonly Visibility[];
   readonly sourceScope: SourceScope;
   readonly generated: GeneratedPolicy;
+  /**
+   * Audit source-role policy (P2 Phase 1.4). Absent (or empty `testGlobs`) means
+   * adapter `inTestFile` classification only. The compiled matcher is supplied
+   * separately as an explicit execution dependency; only THIS plain policy is
+   * serialized into responses / cursor digests.
+   */
+  readonly sourceRoles?: AuditSourceRolePolicy;
 }
 
 /** Effective filter echoed on every graph response (always fully populated). */
@@ -86,6 +109,40 @@ export type EffectiveGraphSourceFilter = GraphSourceFilter;
 
 /** Coverage for a single read: complete vs hard-cap truncated. */
 export interface GraphReadCoverage {
+  readonly complete: boolean;
+  readonly truncated: boolean;
+  readonly reasons: readonly string[];
+}
+
+/** The four named coverage facets a graph read reports on (P2 Phase 2.1). */
+export type CoverageFacetName = 'inventory' | 'evidence' | 'grouping' | 'projection';
+
+/**
+ * One coverage facet (P2 Phase 2.1). `requested` states whether the caller asked
+ * for this family at all — an UNrequested facet is `complete: true`,
+ * `truncated: false` and never contributes to the top-level summary, so an
+ * intentionally omitted sample/group/detail is not mistaken for truncation.
+ */
+export interface CoverageFacet {
+  readonly requested: boolean;
+  readonly complete: boolean;
+  readonly truncated: boolean;
+  readonly reasons: readonly string[];
+}
+
+/**
+ * Facet-specific coverage (P2 Phase 2.1). Each facet carries its own
+ * completeness; the top-level `complete`/`truncated`/`reasons` is a deliberately
+ * redefined CONSERVATIVE summary over the REQUESTED facets only (not a
+ * compatibility adapter). A complete inventory can therefore report complete
+ * even when a bounded evidence sample was capped, provided that sample was not
+ * requested.
+ */
+export interface GraphReadFacetCoverage {
+  readonly inventory: CoverageFacet;
+  readonly evidence: CoverageFacet;
+  readonly grouping: CoverageFacet;
+  readonly projection: CoverageFacet;
   readonly complete: boolean;
   readonly truncated: boolean;
   readonly reasons: readonly string[];
@@ -147,6 +204,18 @@ export interface PackageImportEvidence {
     readonly line: number;
     readonly column: number;
   };
+  /**
+   * The persisted atomic dependency classification (form/role/target-kind/basis/
+   * reason/resolvedPackage) of the underlying edge, when the producing catalog
+   * carried one (P2 Phase 0.3). Absent for a pre-feature edge.
+   */
+  readonly classification?: DependencyClassification;
+  /**
+   * Attribution confidence (P2 Phase 0.3): `'high'` for a unique catalog-target
+   * or a unique workspace-manifest declaration entry; absent for weaker /
+   * unresolved / external outcomes.
+   */
+  readonly confidence?: 'high' | 'medium' | 'low';
 }
 
 /** Canonical concrete proof row for one package dependency. */

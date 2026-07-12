@@ -21,7 +21,11 @@ import {
   type GraphSymbolRef,
   type SourceScope,
 } from './query-contracts.js';
-import { isCanonicalProductionFilter, matchesGraphSourceFilter } from './source-filter.js';
+import {
+  isCanonicalProductionFilter,
+  matchesGraphSourceFilterWithRoles,
+  type SourceRoleMatcher,
+} from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
@@ -178,12 +182,16 @@ function countArchitectureNodes(
   indexes: Indexes,
   filter: GraphSourceFilter,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): ArchitectureCounts {
   const bodyHashes = new Set<string>();
   const packageNames = new Set<string>();
   let occurrenceCount = 0;
   for (const occurrence of indexes.byOccId.values()) {
-    if (occurrence.kind === 'module-init' || !matchesGraphSourceFilter(occurrence, filter))
+    if (
+      occurrence.kind === 'module-init' ||
+      !matchesGraphSourceFilterWithRoles(occurrence, filter, matcher)
+    )
       continue;
     const symbol = toGraphSymbolRef(occurrence);
     if (symbol === undefined) {
@@ -197,8 +205,31 @@ function countArchitectureNodes(
   return { occurrenceCount, bodyHashes, packageNames };
 }
 
-function increment(values: Record<string, number>, key: string): void {
-  values[key] = (values[key] ?? 0) + 1;
+/**
+ * Own-key-only counter increment (P2 Phase 1.2). A `Map` treats every label —
+ * including hostile ones from a malformed catalog (`__proto__`, `constructor`,
+ * `toString`, `prototype`) — as pure data: no prototype walk (so a label never
+ * reads an inherited function and string-concats) and no `__proto__` setter.
+ */
+function increment(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/** Fold `source` counts into `target` with the SAME safe own-key semantics. */
+function mergeCounts(target: Map<string, number>, source: ReadonlyMap<string, number>): void {
+  for (const [key, value] of source) target.set(key, (target.get(key) ?? 0) + value);
+}
+
+/**
+ * Materialize a counter `Map` as a deterministically ordered plain output record
+ * at the DTO boundary. `Object.fromEntries` uses CreateDataProperty, so a
+ * `__proto__` label becomes an OWN enumerable data property — never a prototype
+ * mutation — and the serialized DTO stays a plain JSON object.
+ */
+function toCountRecord(counts: ReadonlyMap<string, number>): Record<string, number> {
+  return Object.fromEntries(
+    [...counts.entries()].sort((a, b) => compareCodePointStrings(a[0], b[0])),
+  );
 }
 
 function noteMalformedCalls(malformedCalls: number, reasons: Set<string>): void {
@@ -210,13 +241,14 @@ function buildCallMetrics(
   indexes: Indexes,
   filter: GraphSourceFilter,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): CallEvidenceMetrics {
   const graph = occurrenceCallGraphFor(indexes);
   noteMalformedCalls(graph.malformedCalls, reasons);
-  const resolvedConfidence: Record<string, number> = {};
-  const resolvedResolution: Record<string, number> = {};
-  const unresolvedConfidence: Record<string, number> = {};
-  const unresolvedResolution: Record<string, number> = {};
+  const resolvedConfidence = new Map<string, number>();
+  const resolvedResolution = new Map<string, number>();
+  const unresolvedConfidence = new Map<string, number>();
+  const unresolvedResolution = new Map<string, number>();
   const resolvedSiteKeys = new Set<string>();
   const unresolvedSites = new Map<
     string,
@@ -226,8 +258,8 @@ function buildCallMetrics(
 
   for (const edge of graph.edges) {
     if (
-      !matchesGraphSourceFilter(edge.owner, filter) ||
-      !matchesGraphSourceFilter(edge.target, filter)
+      !matchesGraphSourceFilterWithRoles(edge.owner, filter, matcher) ||
+      !matchesGraphSourceFilterWithRoles(edge.target, filter, matcher)
     ) {
       continue;
     }
@@ -245,7 +277,7 @@ function buildCallMetrics(
     increment(resolvedResolution, edge.resolution);
   }
   for (const unresolved of graph.unresolved) {
-    if (!matchesGraphSourceFilter(unresolved.owner, filter)) continue;
+    if (!matchesGraphSourceFilterWithRoles(unresolved.owner, filter, matcher)) continue;
     const owner = toGraphSymbolRef(unresolved.owner);
     if (owner === undefined) {
       reasons.add(MALFORMED_SYMBOL_REASON);
@@ -274,30 +306,34 @@ function buildCallMetrics(
     increment(unresolvedResolution, unresolved.resolution);
   }
 
-  const confidence = { ...resolvedConfidence };
-  const resolution = { ...resolvedResolution };
-  for (const [key, value] of Object.entries(unresolvedConfidence)) {
-    confidence[key] = (confidence[key] ?? 0) + value;
-  }
-  for (const [key, value] of Object.entries(unresolvedResolution)) {
-    resolution[key] = (resolution[key] ?? 0) + value;
-  }
+  // Combined distributions = resolved + unresolved, folded through the ONE safe
+  // merge helper (no duplicated inline key handling for the two label kinds).
+  const confidence = new Map(resolvedConfidence);
+  mergeCounts(confidence, unresolvedConfidence);
+  const resolution = new Map(resolvedResolution);
+  mergeCounts(resolution, unresolvedResolution);
 
   return {
     resolvedCallSites: resolvedSiteKeys.size,
     resolvedTargets,
     unresolvedCallSites: unresolvedSites.size,
-    confidence,
-    resolution,
+    confidence: toCountRecord(confidence),
+    resolution: toCountRecord(resolution),
     distributionCountUnit: 'resolved-targets-plus-unresolved-call-sites',
-    resolvedTargetConfidence: { values: resolvedConfidence, countUnit: 'resolved-targets' },
-    resolvedTargetResolution: { values: resolvedResolution, countUnit: 'resolved-targets' },
+    resolvedTargetConfidence: {
+      values: toCountRecord(resolvedConfidence),
+      countUnit: 'resolved-targets',
+    },
+    resolvedTargetResolution: {
+      values: toCountRecord(resolvedResolution),
+      countUnit: 'resolved-targets',
+    },
     unresolvedCallSiteConfidence: {
-      values: unresolvedConfidence,
+      values: toCountRecord(unresolvedConfidence),
       countUnit: 'unresolved-call-sites',
     },
     unresolvedCallSiteResolution: {
-      values: unresolvedResolution,
+      values: toCountRecord(unresolvedResolution),
       countUnit: 'unresolved-call-sites',
     },
     nodeIdentity: 'occurrence',
@@ -354,14 +390,15 @@ function filteredPackageEdges(
   indexes: Indexes,
   filter: GraphSourceFilter,
   reasons: Set<string>,
+  matcher: SourceRoleMatcher,
 ): ArchitecturePackageEdgeRow[] {
   const buckets = new Map<string, ArchitecturePackageEdgeRow>();
   const graph = occurrenceCallGraphFor(indexes);
   noteMalformedCalls(graph.malformedCalls, reasons);
   for (const edge of graph.edges) {
     if (
-      !matchesGraphSourceFilter(edge.owner, filter) ||
-      !matchesGraphSourceFilter(edge.target, filter)
+      !matchesGraphSourceFilterWithRoles(edge.owner, filter, matcher) ||
+      !matchesGraphSourceFilterWithRoles(edge.target, filter, matcher)
     ) {
       continue;
     }
@@ -390,10 +427,11 @@ function buildPackageEdges(
   filter: GraphSourceFilter,
   reasons: Set<string>,
   cachedFeatures: FeatureTable | undefined,
+  matcher: SourceRoleMatcher,
 ): ArchitecturePackageEdgeRow[] {
   const rows = isCanonicalProductionFilter(filter)
     ? canonicalPackageEdges(catalog, indexes, filter, reasons, cachedFeatures)
-    : filteredPackageEdges(catalog, indexes, filter, reasons);
+    : filteredPackageEdges(catalog, indexes, filter, reasons, matcher);
   const selected = boundedArchitectureRows(rows, MAX_ORIENTATION_ROWS, comparePackageEdges);
   if (selected.truncated) reasons.add('package-edge-cap');
   return [...selected.rows];
@@ -405,6 +443,7 @@ function buildHotspots(
   filter: GraphSourceFilter,
   reasons: Set<string>,
   cachedFeatures: FeatureTable | undefined,
+  matcher: SourceRoleMatcher,
 ): ArchitectureHotspot[] {
   const features = cachedFeatures ?? buildFeatures(catalog, indexes, {}, ['blast']);
   const allTwinCounts = new Map<string, number>();
@@ -418,7 +457,7 @@ function buildHotspots(
       continue;
     }
     allTwinCounts.set(symbol.bodyHash, (allTwinCounts.get(symbol.bodyHash) ?? 0) + 1);
-    if (matchesGraphSourceFilter(symbol, filter)) {
+    if (matchesGraphSourceFilterWithRoles(symbol, filter, matcher)) {
       matchingTwinCounts.set(symbol.bodyHash, (matchingTwinCounts.get(symbol.bodyHash) ?? 0) + 1);
       const prior = representatives.get(symbol.bodyHash);
       if (prior === undefined || compareCodePointStrings(symbol.symbolId, prior.symbolId) < 0) {
@@ -513,6 +552,7 @@ export function buildArchitectureView(
   catalog: Catalog,
   indexes: Indexes,
   query: ArchitectureViewQuery,
+  matcher: SourceRoleMatcher,
   cachedFeatures?: FeatureTable,
 ): Result<ArchitectureView, GraphReadError> {
   try {
@@ -520,9 +560,9 @@ export function buildArchitectureView(
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
     const reasons = new Set<string>();
     if (resolutionMode(catalog) === 'fast') reasons.add('fast-resolution-approximate');
-    const counts = countArchitectureNodes(indexes, filter, reasons);
-    const packageEdges = buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures);
-    const hotspots = buildHotspots(catalog, indexes, filter, reasons, cachedFeatures);
+    const counts = countArchitectureNodes(indexes, filter, reasons, matcher);
+    const packageEdges = buildPackageEdges(catalog, indexes, filter, reasons, cachedFeatures, matcher);
+    const hotspots = buildHotspots(catalog, indexes, filter, reasons, cachedFeatures, matcher);
     const packageAfter = resolveStableAnchor(
       packageEdges,
       query.afterPackageEdgeKey,
@@ -558,7 +598,7 @@ export function buildArchitectureView(
     );
     const grouped = architectureGroups(packageEdges, hotspots, query.groupBy ?? 'none');
     if (grouped?.truncated === true) reasons.add('group-key-cap');
-    const callEvidence = buildCallMetrics(catalog, indexes, filter, reasons);
+    const callEvidence = buildCallMetrics(catalog, indexes, filter, reasons, matcher);
     const reasonValues = [...reasons].sort(compareCodePointStrings);
 
     return ok({

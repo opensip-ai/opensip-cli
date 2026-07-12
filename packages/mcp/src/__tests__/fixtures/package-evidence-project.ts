@@ -33,7 +33,10 @@ export const PACKAGE_EVIDENCE_FILES: readonly FixtureFile[] = [
     path: 'packages/b/src/index.ts',
     content: [
       "import { fromA } from '../../a/src/index.js';",
-      'export function fromB(): number { return 1; }',
+      // Bare external builtin: exercises the external-specifier classification
+      // path end-to-end (target kept as the specifier, toPackage null).
+      "import { sep } from 'node:path';",
+      'export function fromB(): number { return sep.length; }',
       'export function cycleB(): number { return fromA(); }',
       '',
     ].join('\n'),

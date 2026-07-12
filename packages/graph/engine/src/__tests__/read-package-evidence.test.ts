@@ -2,10 +2,38 @@ import { describe, expect, it } from 'vitest';
 
 import { buildFeatures } from '../pipeline/features.js';
 import { buildIndexes } from '../pipeline/indexes.js';
-import { buildPackageEvidence } from '../read/package-evidence.js';
-import { buildPackageScc } from '../read/package-scc.js';
+import { buildPackageEvidence as rawBuildPackageEvidence } from '../read/package-evidence.js';
+import { buildPackageScc as rawBuildPackageScc } from '../read/package-scc.js';
 
-import type { Catalog, DependencyEdge, FunctionOccurrence } from '../types.js';
+import type { SourceRoleMatcher } from '../read/index.js';
+import type {
+  Catalog,
+  DependencyClassification,
+  DependencyEdge,
+  FunctionOccurrence,
+} from '../types.js';
+
+// Task 1.5 threads a required source-role matcher through the package views;
+// these tests exercise no audit globs, so a no-op matcher is used everywhere.
+const noMatcher: SourceRoleMatcher = { matches: () => false };
+type PkgEvidenceArgs = Parameters<typeof rawBuildPackageEvidence>;
+type PkgSccArgs = Parameters<typeof rawBuildPackageScc>;
+function buildPackageEvidence(
+  catalog: PkgEvidenceArgs[0],
+  indexes: PkgEvidenceArgs[1],
+  query: PkgEvidenceArgs[2],
+  cachedFeatures?: PkgEvidenceArgs[4],
+): ReturnType<typeof rawBuildPackageEvidence> {
+  return rawBuildPackageEvidence(catalog, indexes, query, noMatcher, cachedFeatures);
+}
+function buildPackageScc(
+  catalog: PkgSccArgs[0],
+  indexes: PkgSccArgs[1],
+  query: PkgSccArgs[2],
+  cachedFeatures?: PkgSccArgs[4],
+): ReturnType<typeof rawBuildPackageScc> {
+  return rawBuildPackageScc(catalog, indexes, query, noMatcher, cachedFeatures);
+}
 
 function occurrence(
   partial: Partial<FunctionOccurrence> &
@@ -40,8 +68,29 @@ function call(to: string, line = 2): NonNullable<FunctionOccurrence['calls']>[nu
   };
 }
 
-function dependency(to: readonly string[], specifier: string, line: number): DependencyEdge {
-  return { to, specifier, line, column: 0 };
+function dependency(
+  to: readonly string[],
+  specifier: string,
+  line: number,
+  classification?: DependencyClassification,
+): DependencyEdge {
+  return { to, specifier, line, column: 0, ...(classification && { classification }) };
+}
+
+/**
+ * Build a persisted {@link DependencyClassification} for a to-`[]` declaration /
+ * external / relative edge. Defaults `form`/`role` to a runtime import so tests
+ * exercise the target-kind/basis/resolvedPackage attribution path directly.
+ */
+function cls(partial: Partial<DependencyClassification>): DependencyClassification {
+  return {
+    form: 'import-declaration',
+    role: 'runtime',
+    targetKind: 'catalog-source',
+    basis: 'catalog-target',
+    reason: 'test-classification',
+    ...partial,
+  };
 }
 
 function catalogOf(
@@ -273,7 +322,10 @@ describe('buildPackageEvidence', () => {
     expect(result.value.imports.every((row) => row.countUnit === 'import-statements')).toBe(true);
   });
 
-  it('classifies empty relative and known-workspace targets as unresolved', () => {
+  it('resolves empty-target imports from the persisted classification', () => {
+    // A `.d.ts` declaration entry that global-merge attributed to a unique
+    // workspace package resolves internal on its persisted resolvedPackage —
+    // NOT by re-inferring a package from the specifier's leaf name.
     const catalog = catalogOf({
       moduleA: [
         occurrence({
@@ -283,9 +335,9 @@ describe('buildPackageEvidence', () => {
           package: 'pkg-a',
           kind: 'module-init',
           dependencies: [
-            dependency([], './missing.js', 1),
-            dependency([], '@scope/pkg-b', 2),
-            dependency([], 'clearly-external', 3),
+            dependency([], './missing.js', 1, cls({ targetKind: 'unresolved', basis: 'unresolved', reason: 'relative-target-unresolved' })),
+            dependency([], '@scope/pkg-b', 2, cls({ targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-b' })),
+            dependency([], 'clearly-external', 3, cls({ targetKind: 'external', basis: 'external-specifier', reason: 'external-package' })),
           ],
         }),
       ],
@@ -306,13 +358,63 @@ describe('buildPackageEvidence', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(
-      Object.fromEntries(result.value.imports.map((row) => [row.target, row.resolution])),
-    ).toMatchObject({
-      './missing.js': 'unresolved',
-      '@scope/pkg-b': 'unresolved',
-      'clearly-external': 'external',
+    // Aggregated rows key by resolved `target`: unresolved/external keep the
+    // specifier; the workspace declaration resolves to its `resolvedPackage`.
+    const byTarget = Object.fromEntries(result.value.imports.map((row) => [row.target, row]));
+    expect(byTarget['./missing.js']?.resolution).toBe('unresolved');
+    expect(byTarget['clearly-external']?.resolution).toBe('external');
+    expect(byTarget['pkg-b']?.resolution).toBe('internal');
+    expect(byTarget['pkg-b']?.toPackage).toBe('pkg-b');
+    // Concrete evidence samples carry the persisted classification + confidence.
+    const workspaceEvidence = result.value.importEvidence.find(
+      (row) => row.specifier === '@scope/pkg-b',
+    );
+    expect(workspaceEvidence?.resolution).toBe('internal');
+    expect(workspaceEvidence?.confidence).toBe('high');
+    expect(workspaceEvidence?.classification?.basis).toBe('workspace-manifest');
+    expect(workspaceEvidence?.classification?.resolvedPackage).toBe('pkg-b');
+  });
+
+  it('carries form/role and resolves subpath, type-only, and re-export declarations', () => {
+    // Root and subpath declaration entries both resolve on their persisted
+    // resolvedPackage; an undeclared subpath fails closed; type-only imports and
+    // re-exports preserve their form/role while still resolving internally.
+    const catalog = catalogOf({
+      moduleA: [
+        occurrence({
+          bodyHash: 'module-a',
+          simpleName: '<module-init:a>',
+          filePath: 'packages/a/src/index.ts',
+          package: 'pkg-a',
+          kind: 'module-init',
+          dependencies: [
+            dependency([], '@scope/pkg-b/sub', 1, cls({ targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-subpath-declaration-entry', resolvedPackage: 'pkg-b' })),
+            dependency([], '@scope/pkg-b/undeclared', 2, cls({ targetKind: 'unresolved', basis: 'unresolved', reason: 'undeclared-exports-subpath' })),
+            dependency([], '@scope/pkg-b', 3, cls({ form: 'import-declaration', role: 'type-only', targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-b' })),
+            dependency([], '@scope/pkg-c', 4, cls({ form: 're-export', role: 'runtime', targetKind: 'declaration-file', basis: 'workspace-manifest', reason: 'workspace-declaration-entry', resolvedPackage: 'pkg-c' })),
+          ],
+        }),
+      ],
     });
+    const result = buildPackageEvidence(catalog, buildIndexes(catalog), {
+      edgeKind: 'import',
+      filter: productionFilter,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const byTarget = Object.fromEntries(result.value.imports.map((row) => [row.target, row]));
+    // The subpath and the type-only import both attribute to pkg-b (one row).
+    expect(byTarget['pkg-b']?.resolution).toBe('internal');
+    expect(byTarget['pkg-c']?.resolution).toBe('internal');
+    expect(byTarget['@scope/pkg-b/undeclared']?.resolution).toBe('unresolved');
+    const bySpecifier = Object.fromEntries(
+      result.value.importEvidence.map((row) => [row.specifier, row]),
+    );
+    expect(bySpecifier['@scope/pkg-b']?.classification?.role).toBe('type-only');
+    expect(bySpecifier['@scope/pkg-c']?.classification?.form).toBe('re-export');
+    expect(bySpecifier['@scope/pkg-b/sub']?.classification?.reason).toBe(
+      'workspace-subpath-declaration-entry',
+    );
   });
 
   it('does not fan a colliding module body hash into invented package edges', () => {
@@ -365,7 +467,10 @@ describe('buildPackageEvidence', () => {
     expect(result.value.coverage.reasons).toContain('ambiguous-import-target');
   });
 
-  it('prefers an exact scoped package over a colliding legacy leaf name', () => {
+  it('fails a colliding multi-package body twin closed to unresolved', () => {
+    // A bare-specifier import whose target body hash exists in two packages is
+    // ambiguous — the removed leaf-name path would have invented an edge to the
+    // package matching the specifier's leaf. It now fails closed to unresolved.
     const catalog = catalogOf({
       source: [
         occurrence({
@@ -407,9 +512,9 @@ describe('buildPackageEvidence', () => {
     expect(result.value.imports).toEqual([
       expect.objectContaining({
         fromPackage: 'pkg-a',
-        toPackage: '@scope/pkg-b',
+        toPackage: null,
         target: '@scope/pkg-b',
-        resolution: 'internal',
+        resolution: 'unresolved',
       }),
     ]);
   });
@@ -581,7 +686,7 @@ describe('buildPackageEvidence', () => {
 });
 
 describe('buildPackageScc', () => {
-  it('finds deterministic call/import self and multi-package cycles with labelled proofs', () => {
+  it('finds deterministic multi-package call/import cycles with labelled proofs', () => {
     const catalog = fixture();
     const callCycles = buildPackageScc(catalog, buildIndexes(catalog), {
       edgeKind: 'call',
@@ -608,6 +713,11 @@ describe('buildPackageScc', () => {
         }),
       ]),
     );
+    // No returned component is a singleton, and no proof edge is a self edge.
+    for (const component of callCycles.value.components) {
+      expect(component.packages.length).toBeGreaterThanOrEqual(2);
+      for (const edge of component.proofEdges) expect(edge.from).not.toBe(edge.to);
+    }
 
     const importCycles = buildPackageScc(catalog, buildIndexes(catalog), {
       edgeKind: 'import',
@@ -620,6 +730,37 @@ describe('buildPackageScc', () => {
       importCycles.ok &&
         importCycles.value.components[0]?.proofEdges.every((edge) => edge.kind === 'import'),
     ).toBe(true);
+  });
+
+  it('returns no components for a self-edges-only graph (P2 Phase 1.1)', () => {
+    // Two packages, each with ONLY intra-package edges — a package depending on
+    // itself is not a package cycle, so no SCC is returned.
+    const catalog = catalogOf({
+      aOne: [occurrence({ bodyHash: 'a1', simpleName: 'a1', filePath: 'packages/a/src/one.ts', package: 'pkg-a', calls: [call('a2')] })],
+      aTwo: [occurrence({ bodyHash: 'a2', simpleName: 'a2', filePath: 'packages/a/src/two.ts', package: 'pkg-a', calls: [call('a1')] })],
+      bOne: [occurrence({ bodyHash: 'b1', simpleName: 'b1', filePath: 'packages/b/src/one.ts', package: 'pkg-b', calls: [call('b2')] })],
+      bTwo: [occurrence({ bodyHash: 'b2', simpleName: 'b2', filePath: 'packages/b/src/two.ts', package: 'pkg-b', calls: [call('b1')] })],
+    });
+    for (const edgeKind of ['call', 'import', 'combined'] as const) {
+      const result = buildPackageScc(catalog, buildIndexes(catalog), { edgeKind, filter: productionFilter });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.components).toEqual([]);
+    }
+  });
+
+  it('preserves both call and import proof kinds for a combined multi-package cycle', () => {
+    const combined = buildPackageScc(fixture(), buildIndexes(fixture()), {
+      edgeKind: 'combined',
+      filter: productionFilter,
+    });
+    expect(combined.ok).toBe(true);
+    if (!combined.ok) return;
+    const cycle = combined.value.components.find((c) => c.packages.join(',') === 'pkg-a,pkg-b');
+    expect(cycle).toBeDefined();
+    const kinds = new Set(cycle?.proofEdges.map((e) => e.kind));
+    expect(kinds.has('call')).toBe(true);
+    expect(kinds.has('import')).toBe(true);
   });
 
   it('caps proving edges independently and propagates partial coverage', () => {
@@ -643,7 +784,9 @@ describe('buildPackageScc', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.components[0]?.totalProofEdges).toBe(64);
+    // 8 packages each call all 8 targets; the 8 self edges are excluded from the
+    // SCC (P2 Phase 1.1), leaving 8x7 = 56 cross-package proof edges.
+    expect(result.value.components[0]?.totalProofEdges).toBe(56);
     expect(result.value.components[0]?.proofEdges).toHaveLength(50);
     expect(result.value.coverage).toMatchObject({
       complete: false,

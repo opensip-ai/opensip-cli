@@ -1,15 +1,42 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  compileSourceRoleMatcher,
+  effectiveTestSource,
   GRAPH_SYMBOL_NAME_MAX,
   GRAPH_SYMBOL_PATH_MAX,
   matchesFilePrefix,
-  matchesGraphSourceFilter,
+  matchesGraphSourceFilterWithRoles,
+  MAX_AUDIT_SOURCE_ROLE_FILES,
   toGraphSymbolRef,
+  type AuditSourceRolePolicy,
   type GraphSourceFilter,
+  type SourceRoleMatcher,
 } from '../read/index.js';
 
 import type { FunctionOccurrence } from '../types.js';
+
+const policy = (testGlobs: readonly string[]): AuditSourceRolePolicy => ({
+  testGlobs,
+  mode: 'audit-test-globs-v1',
+});
+
+// The matcher-less overload was deleted in Task 1.6; these scope/narrowing tests
+// exercise the canonical role-aware filter with an empty (no-op) matcher.
+const emptyMatcher: SourceRoleMatcher = { matches: () => false };
+function matchesGraphSourceFilter(
+  row: Parameters<typeof matchesGraphSourceFilterWithRoles>[0],
+  filter: GraphSourceFilter,
+): boolean {
+  return matchesGraphSourceFilterWithRoles(row, filter, emptyMatcher);
+}
+
+function unwrapMatcher(
+  result: ReturnType<typeof compileSourceRoleMatcher>,
+): SourceRoleMatcher {
+  if (!result.ok) throw new Error(`expected ok matcher, got ${result.error.code}`);
+  return result.value;
+}
 
 function occ(
   partial: Partial<FunctionOccurrence> & Pick<FunctionOccurrence, 'filePath'>,
@@ -160,5 +187,97 @@ describe('toGraphSymbolRef', () => {
       ),
     ).toBeUndefined();
     expect(toGraphSymbolRef(occ({ filePath: 'src/a.ts', line: 10, endLine: 9 }))).toBeUndefined();
+  });
+});
+
+describe('compileSourceRoleMatcher (P2 Phase 1.4)', () => {
+  const limit = (maxFiles: number) => ({ maxFiles });
+
+  it('returns a no-op matcher when no policy or empty globs are configured', () => {
+    const files = ['packages/test-support/src/harness.ts', 'src/index.ts'];
+    for (const p of [undefined, policy([])]) {
+      const matcher = unwrapMatcher(compileSourceRoleMatcher(p, files, limit(10)));
+      expect(matcher.matches('packages/test-support/src/harness.ts')).toBe(false);
+    }
+  });
+
+  it('classifies only the matching catalog paths, once, into the matched set', () => {
+    const files = [
+      'packages/test-support/src/harness.ts',
+      'packages/test-support/src/harness.ts', // duplicate — classified once
+      'packages/core/src/index.ts',
+    ];
+    const matcher = unwrapMatcher(
+      compileSourceRoleMatcher(policy(['packages/test-support/**']), files, limit(10)),
+    );
+    expect(matcher.matches('packages/test-support/src/harness.ts')).toBe(true);
+    expect(matcher.matches('packages/core/src/index.ts')).toBe(false);
+    // A path never seen at compile time is not in the matched set (classify-once).
+    expect(matcher.matches('packages/test-support/src/late.ts')).toBe(false);
+  });
+
+  it('fails closed with a typed resource-limit error past maxFiles', () => {
+    const globs = policy(['packages/**']);
+    // 2/3/4 injected-file limits instead of allocating 250,001 paths.
+    const files3 = ['packages/a.ts', 'packages/b.ts', 'packages/c.ts'];
+    expect(compileSourceRoleMatcher(globs, files3, limit(3)).ok).toBe(true);
+    const over = compileSourceRoleMatcher(globs, files3, limit(2));
+    expect(over.ok).toBe(false);
+    if (!over.ok) expect(over.error.code).toBe('GRAPH.READ.SOURCE_ROLE_LIMIT');
+    const files4 = ['packages/a.ts', 'packages/b.ts', 'packages/c.ts', 'packages/d.ts'];
+    expect(compileSourceRoleMatcher(globs, files4, limit(4)).ok).toBe(true);
+    expect(compileSourceRoleMatcher(globs, files4, limit(3)).ok).toBe(false);
+  });
+
+  it('pins the production file-classification limit constant', () => {
+    expect(MAX_AUDIT_SOURCE_ROLE_FILES).toBe(250_000);
+  });
+
+  it('keeps the policy JSON-safe and the compiled matcher out of any DTO', () => {
+    const p = policy(['packages/test-support/**']);
+    // The plain policy is round-trippable through JSON (a deliberate
+    // serialization proof, not a clone — the matcher must never be a DTO).
+    // eslint-disable-next-line unicorn/prefer-structured-clone
+    expect(JSON.parse(JSON.stringify(p))).toEqual(p);
+    // …while the matcher is a live object carrying a function (never serialized).
+    const matcher = unwrapMatcher(compileSourceRoleMatcher(p, ['x.ts'], limit(10)));
+    expect(typeof matcher.matches).toBe('function');
+  });
+});
+
+describe('matchesGraphSourceFilterWithRoles (P2 Phase 1.4)', () => {
+  const supportFile = occ({
+    filePath: 'packages/test-support/src/harness.ts',
+    inTestFile: false,
+    package: 'test-support',
+  });
+
+  it('reclassifies a glob-matched non-test file as a test source', () => {
+    const matcher = unwrapMatcher(
+      compileSourceRoleMatcher(
+        policy(['packages/test-support/**']),
+        [supportFile.filePath],
+        { maxFiles: 10 },
+      ),
+    );
+    expect(effectiveTestSource(supportFile, matcher)).toBe(true);
+    // production scope now EXCLUDES the reclassified support file…
+    expect(
+      matchesGraphSourceFilterWithRoles(supportFile, { ...baseFilter(), sourceScope: 'production' }, matcher),
+    ).toBe(false);
+    // …and test scope INCLUDES it.
+    expect(
+      matchesGraphSourceFilterWithRoles(supportFile, { ...baseFilter(), sourceScope: 'test' }, matcher),
+    ).toBe(true);
+  });
+
+  it('is exactly the matcher-less filter when the policy is empty', () => {
+    const matcher = unwrapMatcher(compileSourceRoleMatcher(policy([]), [supportFile.filePath], { maxFiles: 10 }));
+    for (const scope of ['all', 'production', 'test'] as const) {
+      const filter: GraphSourceFilter = { ...baseFilter(), sourceScope: scope };
+      expect(matchesGraphSourceFilterWithRoles(supportFile, filter, matcher)).toBe(
+        matchesGraphSourceFilter(supportFile, filter),
+      );
+    }
   });
 });

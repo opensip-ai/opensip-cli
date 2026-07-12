@@ -6,11 +6,12 @@ import {
   continuationToken,
   deriveGraphReadFeatures,
   evaluateGraphOrphans,
-  matchesGraphSourceFilter,
+  matchesGraphSourceFilterWithRoles,
   symbolSearchStableKey,
   type FeatureTable,
   type GraphConfig,
   type GraphSourceFilter,
+  type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
 
 import { boundedTopRows, groupRows, type GroupSummary } from './graph-query-page.js';
@@ -35,6 +36,7 @@ export interface DeadCodePageInput {
   readonly generation: CatalogGeneration;
   readonly config: GraphConfig;
   readonly filter: GraphSourceFilter;
+  readonly matcher: SourceRoleMatcher;
   readonly limit: number;
   readonly afterKey: string | undefined;
   readonly groupBy: 'none' | 'package' | 'file';
@@ -79,13 +81,13 @@ function sliceDeadPage(
 }
 
 export function pageDeadCode(input: DeadCodePageInput): DeadCodePage {
-  const { generation, config, filter, limit, afterKey, groupBy, cachedFeatures } = input;
+  const { generation, config, filter, matcher, limit, afterKey, groupBy, cachedFeatures } = input;
   const features =
     cachedFeatures ??
     deriveGraphReadFeatures(generation.catalog, generation.indexes, config, ['reachableFromEntry']);
   const signals = evaluateGraphOrphans(generation.catalog, generation.indexes, config, features);
   const reasons = new Set<string>();
-  const filteredRows = () => projectFilteredRows(signals, generation, filter, reasons);
+  const filteredRows = () => projectFilteredRows(signals, generation, filter, matcher, reasons);
   const selected = boundedTopRows(filteredRows(), MAX_ORPHAN_EVALUATION, (a, b) =>
     compareCodePointStrings(deadCodeStableKey(a), deadCodeStableKey(b)),
   );
@@ -116,6 +118,7 @@ function* projectFilteredRows(
   signals: ReturnType<typeof evaluateGraphOrphans>,
   generation: CatalogGeneration,
   filter: GraphSourceFilter,
+  matcher: SourceRoleMatcher,
   reasons: Set<string>,
 ): Generator<DeadCodeDto> {
   for (const signal of signals) {
@@ -124,6 +127,6 @@ function* projectFilteredRows(
       reasons.add('malformed-dead-code-omitted');
       continue;
     }
-    if (matchesGraphSourceFilter(row.symbol, filter)) yield row;
+    if (matchesGraphSourceFilterWithRoles(row.symbol, filter, matcher)) yield row;
   }
 }

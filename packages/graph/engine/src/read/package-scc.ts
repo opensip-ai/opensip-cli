@@ -14,6 +14,7 @@ import {
 } from './package-evidence.js';
 
 import type { GraphReadCoverage } from './query-contracts.js';
+import type { SourceRoleMatcher } from './source-filter.js';
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
@@ -41,17 +42,26 @@ export interface PackageSccView {
 const MAX_PROOF = 50;
 
 function cycleProofRows(view: PackageEvidenceView): PackageCycleProofEdge[] {
+  // Intra-package (self) aggregate edges are excluded from the SCC adjacency
+  // (P2 Phase 1.1): a package depending on itself is not a package cycle, and
+  // `graph:unexpected-coupling` already ignores package self loops. Same-package
+  // rows remain queryable through buildPackageEvidence / package_dependencies —
+  // only this SCC projection drops them.
   return [
-    ...view.calls.map((row) => ({
-      from: row.fromPackage,
-      to: row.toPackage,
-      kind: 'call' as const,
-      count: row.count,
-    })),
+    ...view.calls
+      .filter((row) => row.fromPackage !== row.toPackage)
+      .map((row) => ({
+        from: row.fromPackage,
+        to: row.toPackage,
+        kind: 'call' as const,
+        count: row.count,
+      })),
     ...view.imports
       .filter(
         (row): row is PackageImportEvidenceRow & { toPackage: string } =>
-          row.toPackage !== null && row.resolution === 'internal',
+          row.toPackage !== null &&
+          row.resolution === 'internal' &&
+          row.fromPackage !== row.toPackage,
       )
       .map((row) => ({
         from: row.fromPackage,
@@ -79,15 +89,18 @@ function packageAdjacency(proof: readonly PackageCycleProofEdge[]) {
   return adjacency;
 }
 
-function isCycle(members: readonly string[], adjacency: ReadonlyMap<string, ReadonlySet<string>>) {
-  if (members.length > 1) return true;
-  const member = members[0];
-  return member !== undefined && adjacency.get(member)?.has(member) === true;
+/**
+ * A returned package SCC must contain at least two DISTINCT package labels
+ * (P2 Phase 1.1). Self edges are already excluded from the adjacency by
+ * {@link cycleProofRows}, so no singleton can carry a self-loop; a lone package
+ * is therefore never promoted to a cycle.
+ */
+function isCycle(members: readonly string[]): boolean {
+  return members.length > 1;
 }
 
 function projectComponents(
   components: readonly (readonly string[])[],
-  adjacency: ReadonlyMap<string, ReadonlySet<string>>,
   proof: readonly PackageCycleProofEdge[],
   reasons: Set<string>,
 ): PackageCycleComponent[] {
@@ -98,7 +111,7 @@ function projectComponents(
   }[] = [];
   const componentByPackage = new Map<string, (typeof projected)[number]>();
   for (const members of components) {
-    if (!isCycle(members, adjacency)) continue;
+    if (!isCycle(members)) continue;
     const component: (typeof projected)[number] = {
       packages: members,
       proofEdges: [],
@@ -125,10 +138,11 @@ export function buildPackageScc(
   catalog: Catalog,
   indexes: Indexes,
   query: PackageEvidenceQuery,
+  matcher: SourceRoleMatcher,
   cachedFeatures?: FeatureTable,
 ): Result<PackageSccView, GraphReadError> {
   try {
-    const evidence = buildPackageEvidence(catalog, indexes, query, cachedFeatures);
+    const evidence = buildPackageEvidence(catalog, indexes, query, matcher, cachedFeatures);
     if (!evidence.ok) return evidence;
     const proof = cycleProofRows(evidence.value);
     const adjacency = packageAdjacency(proof);
@@ -138,7 +152,7 @@ export function buildPackageScc(
     );
     const reasons = new Set(evidence.value.coverage.reasons);
     return ok({
-      components: projectComponents(components, adjacency, proof, reasons),
+      components: projectComponents(components, proof, reasons),
       coverage: coverageFromReasons(reasons),
     });
   } catch {

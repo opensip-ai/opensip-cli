@@ -11,6 +11,7 @@
 
 import ts from 'typescript';
 
+import { buildCrossPackageContext } from '../edge-helpers/cross-package-context.js';
 import { resolveEdgesFromRecords } from '../edges.js';
 import { parseProject } from '../parse.js';
 import { walkProgram } from '../walk.js';
@@ -89,6 +90,7 @@ export async function resolveCatalogEdges(
     program: result.program,
     projectDirAbs,
     callSites: result.callSites,
+    crossPackage: buildCrossPackageContext(result.catalog, projectDirAbs),
   });
   return resolved.catalog;
 }

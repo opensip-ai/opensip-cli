@@ -25,7 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { typescriptGraphAdapter } from '../index.js';
 
-import type { Catalog, DependencyEdge, FunctionOccurrence } from '@opensip-cli/graph';
+import type { CallEdge, Catalog, DependencyEdge, FunctionOccurrence } from '@opensip-cli/graph';
 
 const FIXTURE_TSCONFIG = JSON.stringify({
   compilerOptions: {
@@ -64,6 +64,15 @@ function findModuleInit(catalog: Catalog, filePath: string): FunctionOccurrence 
   return undefined;
 }
 
+function findOccurrence(catalog: Catalog, simpleName: string): FunctionOccurrence | undefined {
+  for (const occs of Object.values(catalog.functions)) {
+    for (const o of occs) {
+      if (o.simpleName === simpleName) return o;
+    }
+  }
+  return undefined;
+}
+
 function depsFor(
   dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined,
   mi: FunctionOccurrence,
@@ -74,6 +83,7 @@ function depsFor(
 async function runAdapter(): Promise<{
   catalog: Catalog;
   dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined;
+  edgesByOwner: ReadonlyMap<string, readonly CallEdge[]>;
 }> {
   const discovery = await typescriptGraphAdapter.discoverFiles({
     cwd: fixtureRoot,
@@ -108,7 +118,11 @@ async function runAdapter(): Promise<{
     projectDirAbs: discovery.projectDirAbs,
     resolutionMode: 'exact',
   });
-  return { catalog: initialCatalog, dependenciesByOwner: resolved.dependenciesByOwner };
+  return {
+    catalog: initialCatalog,
+    dependenciesByOwner: resolved.dependenciesByOwner,
+    edgesByOwner: resolved.edgesByOwner,
+  };
 }
 
 describe('TypeScript adapter — depends_on emission (Phase 4)', () => {
@@ -325,5 +339,34 @@ describe('TypeScript adapter — dependency classification (P2 Phase 0)', () => 
     const deps = depsFor(dependenciesByOwner, findModuleInit(catalog, 'src/dynamic.ts')!)!;
     expect(deps.map((e) => e.specifier)).toEqual(['./real.js']);
     expect(deps[0].classification!.form).toBe('dynamic-import');
+  });
+
+  it('resolves call and dependency edges from a single shared cross-package context', async () => {
+    // One adapter run builds ONE CrossPackageContext (P2 Phase 0.4) and threads
+    // it into BOTH call-edge resolution and dependency resolution. A file that
+    // imports (dependency edge) AND calls into (call edge) an internal module
+    // must resolve both — neither resolver rebuilds or clobbers the other's
+    // context.
+    writeFile('src/dep.ts', `export function used(): number { return 1; }\n`);
+    writeFile(
+      'src/main.ts',
+      `import { used } from './dep.js';\nexport function callsUsed(): number { return used(); }\n`,
+    );
+    const { catalog, dependenciesByOwner, edgesByOwner } = await runAdapter();
+
+    // Dependency edge: main.ts's module-init depends on the internal ./dep.js.
+    const depEdge = depsFor(dependenciesByOwner, findModuleInit(catalog, 'src/main.ts')!)!.find(
+      (e) => e.specifier === './dep.js',
+    )!;
+    expect(depEdge.classification!.targetKind).toBe('catalog-source');
+    expect(depEdge.to).toHaveLength(1);
+
+    // Call edge: callsUsed → used, resolved off the SAME run's shared context.
+    const callsUsed = findOccurrence(catalog, 'callsUsed')!;
+    const used = findOccurrence(catalog, 'used')!;
+    const callEdges = edgesByOwner.get(
+      ownerEdgeKey(callsUsed.bodyHash, callsUsed.filePath, callsUsed.line, callsUsed.column),
+    );
+    expect(callEdges?.some((e) => e.to.includes(used.bodyHash))).toBe(true);
   });
 });

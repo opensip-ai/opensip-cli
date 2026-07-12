@@ -10,6 +10,7 @@ import type {
   EffectiveGraphSourceFilter,
   FreshnessChangeSummary,
   FreshnessReasonCode,
+  GraphReadFacetCoverage,
   GraphSymbolRef,
 } from '@opensip-cli/graph/read';
 
@@ -58,11 +59,13 @@ export interface GraphPageMeta {
   readonly nextCursor?: string;
 }
 
-export interface GraphCoverage {
-  readonly complete: boolean;
-  readonly truncated: boolean;
-  readonly reasons: readonly string[];
-}
+/**
+ * MCP graph coverage — the compact top-level summary PROJECTED from the
+ * graph/read facet coverage (P2 Phase 2.1), not a duplicated triple. Task 2.2
+ * migrates the envelope to carry the full four-facet {@link GraphReadFacetCoverage};
+ * this alias keeps the summary shape tied to the single graph/read roll-up.
+ */
+export type GraphCoverage = Pick<GraphReadFacetCoverage, 'complete' | 'truncated' | 'reasons'>;
 
 /** Group summary from bounded `groupBy` projection. */
 export interface GraphGroupSummary {

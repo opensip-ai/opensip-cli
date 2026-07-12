@@ -7,7 +7,10 @@ import {
 } from '../pipeline/occurrence-call-graph.js';
 import { buildOccurrenceCallView } from '../read/occurrence-call-view.js';
 
+import type { SourceRoleMatcher } from '../read/index.js';
 import type { Catalog, FunctionOccurrence } from '../types.js';
+
+const noMatcher: SourceRoleMatcher = { matches: () => false };
 
 function occurrence(
   partial: Partial<FunctionOccurrence> &
@@ -98,13 +101,18 @@ function fixture(): Catalog {
 describe('buildOccurrenceCallView', () => {
   it('filters both twin edge endpoints before grouping and exposes every matching member', () => {
     const catalog = fixture();
-    const result = buildOccurrenceCallView(catalog, buildIndexes(catalog), {
-      identity: 'body-twin-union',
-      filter: { sourceScope: 'production', generated: 'exclude' },
-      startSymbolId: 'src/owner.ts:1:0',
-      direction: 'callees',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      catalog,
+      buildIndexes(catalog),
+      {
+        identity: 'body-twin-union',
+        filter: { sourceScope: 'production', generated: 'exclude' },
+        startSymbolId: 'src/owner.ts:1:0',
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -149,13 +157,18 @@ describe('buildOccurrenceCallView', () => {
       ]),
     );
 
-    const view = buildOccurrenceCallView(catalog, indexes, {
-      identity: 'occurrence',
-      filter: { sourceScope: 'all', generated: 'include' },
-      startSymbolId: 'src/owner.ts:1:0',
-      direction: 'callees',
-      depth: 1,
-    });
+    const view = buildOccurrenceCallView(
+      catalog,
+      indexes,
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'all', generated: 'include' },
+        startSymbolId: 'src/owner.ts:1:0',
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
     expect(view.ok).toBe(true);
     if (!view.ok) return;
     expect(view.value.totalUnresolved).toBe(1);
@@ -183,13 +196,18 @@ describe('buildOccurrenceCallView', () => {
         ],
       },
     };
-    const result = buildOccurrenceCallView(withProvenance, buildIndexes(withProvenance), {
-      identity: 'occurrence',
-      filter: { sourceScope: 'production', generated: 'exclude' },
-      startSymbolId: 'src/owner.ts:1:0',
-      direction: 'callees',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      withProvenance,
+      buildIndexes(withProvenance),
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'production', generated: 'exclude' },
+        startSymbolId: 'src/owner.ts:1:0',
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.edges.map((edge) => edge.crossShard)).toEqual([false, true]);
@@ -211,13 +229,18 @@ describe('buildOccurrenceCallView', () => {
         owner: [{ ...owner, calls: [call(targetHashes, 9)] }],
       },
     };
-    const result = buildOccurrenceCallView(boundedCatalog, buildIndexes(boundedCatalog), {
-      identity: 'occurrence',
-      filter: { sourceScope: 'production', generated: 'exclude' },
-      startSymbolId: 'src/owner.ts:1:0',
-      direction: 'callees',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      boundedCatalog,
+      buildIndexes(boundedCatalog),
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'production', generated: 'exclude' },
+        startSymbolId: 'src/owner.ts:1:0',
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -229,13 +252,18 @@ describe('buildOccurrenceCallView', () => {
 
   it('labels the unresolved reverse-attribution limitation for caller queries', () => {
     const catalog = fixture();
-    const result = buildOccurrenceCallView(catalog, buildIndexes(catalog), {
-      identity: 'occurrence',
-      filter: { sourceScope: 'production', generated: 'exclude' },
-      startSymbolId: 'src/target.ts:1:0',
-      direction: 'callers',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      catalog,
+      buildIndexes(catalog),
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'production', generated: 'exclude' },
+        startSymbolId: 'src/target.ts:1:0',
+        direction: 'callers',
+        depth: 1,
+      },
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.unresolvedAttribution).toBe('owner-only');
@@ -267,13 +295,18 @@ describe('buildOccurrenceCallView', () => {
         owner: [{ ...owner, calls: [malformedCall] }],
       },
     };
-    const result = buildOccurrenceCallView(malformedCatalog, buildIndexes(malformedCatalog), {
-      identity: 'occurrence',
-      filter: { sourceScope: 'production', generated: 'exclude' },
-      startSymbolId: 'src/owner.ts:1:0',
-      direction: 'callees',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      malformedCatalog,
+      buildIndexes(malformedCatalog),
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'production', generated: 'exclude' },
+        startSymbolId: 'src/owner.ts:1:0',
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.edges).toEqual([]);
@@ -300,12 +333,17 @@ describe('buildOccurrenceCallView', () => {
       cacheKey: 'malformed-owner',
       functions: { malformedOwner: [malformedOwner] },
     };
-    const result = buildOccurrenceCallView(catalog, buildIndexes(catalog), {
-      identity: 'occurrence',
-      filter: { sourceScope: 'all', generated: 'include' },
-      direction: 'callees',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      catalog,
+      buildIndexes(catalog),
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'all', generated: 'include' },
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -358,13 +396,18 @@ describe('buildOccurrenceCallView', () => {
       cacheKey: 'dense',
       functions: { dense },
     };
-    const result = buildOccurrenceCallView(catalog, buildIndexes(catalog), {
-      identity: 'occurrence',
-      filter: { sourceScope: 'all', generated: 'include' },
-      startSymbolId: 'src/node-0.ts:1:0',
-      direction: 'callees',
-      depth: 1,
-    });
+    const result = buildOccurrenceCallView(
+      catalog,
+      buildIndexes(catalog),
+      {
+        identity: 'occurrence',
+        filter: { sourceScope: 'all', generated: 'include' },
+        startSymbolId: 'src/node-0.ts:1:0',
+        direction: 'callees',
+        depth: 1,
+      },
+      noMatcher,
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.edges).toHaveLength(20_000);

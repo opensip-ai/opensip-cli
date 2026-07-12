@@ -690,7 +690,7 @@ describe('MCP e2e over real stdio', () => {
       const packageData = packageDeps.data as {
         edgeKind: string;
         calls: { fromPackage: string; toPackage: string }[];
-        imports: { fromPackage: string; target: string }[];
+        imports: { fromPackage: string; target: string; toPackage: string | null; resolution: string }[];
       };
       expect(packageData.edgeKind).toBe('combined');
       expect(packageData.calls).toEqual(
@@ -714,6 +714,13 @@ describe('MCP e2e over real stdio', () => {
           expect.objectContaining({
             fromPackage: '@fixture/b',
             target: '@fixture/a',
+          }),
+          // The bare `node:path` builtin resolves external end-to-end.
+          expect.objectContaining({
+            fromPackage: '@fixture/b',
+            target: 'node:path',
+            toPackage: null,
+            resolution: 'external',
           }),
         ]),
       );
