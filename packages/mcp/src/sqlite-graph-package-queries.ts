@@ -3,10 +3,13 @@ import {
   buildPackageEvidence,
   buildPackageScc,
   compareCodePointStrings,
-  facetsFromFlatCoverage,
+  makeFacet,
+  mergeFacet,
   packageDependencyStableKey,
+  rollupFacets,
+  UNREQUESTED_FACET,
   type FeatureTable,
-  type GraphReadCoverage,
+  type GraphReadFacetCoverage,
   type PackageCallEvidenceRow,
   type PackageEvidenceView,
   type PackageImportEvidenceRow,
@@ -39,15 +42,20 @@ import type { GraphCoverage, GraphToolResult } from './symbol-dto.js';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 
-/** Flat package coverage until Task 2.3 migrates package facets. */
-function withGroupCoverage(coverage: GraphReadCoverage, groupTruncated: boolean): GraphReadCoverage {
-  if (!groupTruncated) return coverage;
-  const reasons = [...new Set([...coverage.reasons, 'group-key-cap'])].sort();
-  return { complete: false, truncated: true, reasons };
-}
-
-function packageEnvelopeCoverage(coverage: GraphReadCoverage): GraphCoverage {
-  return facetsFromFlatCoverage(coverage);
+/** Merge grouping/projection facets over package inventory+evidence coverage. */
+function withPageFacets(
+  coverage: GraphReadFacetCoverage,
+  groupTruncated: boolean,
+): GraphCoverage {
+  return rollupFacets({
+    inventory: coverage.inventory,
+    evidence: coverage.evidence,
+    grouping: mergeFacet(
+      coverage.grouping,
+      makeFacet(true, new Set(groupTruncated ? ['group-key-cap'] : [])),
+    ),
+    projection: mergeFacet(coverage.projection, makeFacet(true, new Set())),
+  });
 }
 
 function mergePackageRows<T extends PackageCallEvidenceRow | PackageImportEvidenceRow>(
@@ -60,15 +68,23 @@ function mergePackageRows<T extends PackageCallEvidenceRow | PackageImportEviden
   );
 }
 
-function mergeCoverage(coverages: readonly GraphReadCoverage[]): GraphReadCoverage {
-  const reasons = [...new Set(coverages.flatMap((coverage) => coverage.reasons))].sort(
-    compareCodePointStrings,
+function mergeFacetCoverage(coverages: readonly GraphReadFacetCoverage[]): GraphReadFacetCoverage {
+  if (coverages.length === 0) {
+    return rollupFacets({
+      inventory: makeFacet(true, new Set()),
+      evidence: UNREQUESTED_FACET,
+      grouping: UNREQUESTED_FACET,
+      projection: UNREQUESTED_FACET,
+    });
+  }
+  return coverages.reduce((acc, next) =>
+    rollupFacets({
+      inventory: mergeFacet(acc.inventory, next.inventory),
+      evidence: mergeFacet(acc.evidence, next.evidence),
+      grouping: mergeFacet(acc.grouping, next.grouping),
+      projection: mergeFacet(acc.projection, next.projection),
+    }),
   );
-  return {
-    complete: coverages.every((coverage) => coverage.complete),
-    truncated: coverages.some((coverage) => coverage.truncated),
-    reasons,
-  };
 }
 
 function packageSelectors(
@@ -99,6 +115,7 @@ export class SqliteGraphPackageQueries {
     const filter = this.deps.context.defaultProductionFilter(query.filter);
     const groupBy = query.groupBy ?? 'none';
     const limit = clampLimit(query.limit, DEFAULT_SEARCH_LIMIT);
+    const sampleLimit = query.sampleLimit;
     const queryDigest = digestNormalizedQuery({
       op: 'packageDependencies',
       edgeKind,
@@ -106,6 +123,7 @@ export class SqliteGraphPackageQueries {
       package: query.package,
       filter,
       groupBy,
+      sampleLimit: sampleLimit ?? null,
     });
     return this.deps.context.runQuery(
       'packageDependencies',
@@ -130,7 +148,12 @@ export class SqliteGraphPackageQueries {
           const view = buildPackageEvidence(
             gen.catalog,
             gen.indexes,
-            { edgeKind, filter, ...selector },
+            {
+              edgeKind,
+              filter,
+              ...selector,
+              ...(sampleLimit === undefined ? {} : { sampleLimit }),
+            },
             matcher.value,
             this.deps.features(gen),
           );
@@ -139,7 +162,7 @@ export class SqliteGraphPackageQueries {
         }
         const calls = mergePackageRows(views.flatMap((view) => view.calls));
         const imports = mergePackageRows(views.flatMap((view) => view.imports));
-        const coverage = mergeCoverage(views.map((view) => view.coverage));
+        const coverage = mergeFacetCoverage(views.map((view) => view.coverage));
         const page = pagePackageDependencies(
           [...calls, ...imports],
           {
@@ -161,7 +184,7 @@ export class SqliteGraphPackageQueries {
           gen,
           freshness,
           {
-            coverage: packageEnvelopeCoverage(withGroupCoverage(coverage, page.value.groupTruncated)),
+            coverage: withPageFacets(coverage, page.value.groupTruncated),
             page: {
               limit,
               ...(page.value.nextCursor === undefined ? {} : { nextCursor: page.value.nextCursor }),
@@ -181,6 +204,7 @@ export class SqliteGraphPackageQueries {
     const filter = this.deps.context.defaultProductionFilter(query.filter);
     const groupBy = query.groupBy ?? 'none';
     const limit = clampLimit(query.limit, DEFAULT_SEARCH_LIMIT);
+    const evidenceLimit = query.evidenceLimit;
     const queryDigest = digestNormalizedQuery({
       op: 'whyDepends',
       edgeKind,
@@ -188,6 +212,7 @@ export class SqliteGraphPackageQueries {
       toPackage: query.toPackage,
       filter,
       groupBy,
+      evidenceLimit: evidenceLimit ?? null,
     });
     return this.deps.context.runQuery(
       'whyDepends',
@@ -216,6 +241,7 @@ export class SqliteGraphPackageQueries {
             filter,
             fromPackage: query.fromPackage,
             toPackage: query.toPackage,
+            ...(evidenceLimit === undefined ? {} : { evidenceLimit }),
           },
           matcher.value,
           this.deps.features(gen),
@@ -243,9 +269,7 @@ export class SqliteGraphPackageQueries {
           gen,
           freshness,
           {
-            coverage: packageEnvelopeCoverage(
-              withGroupCoverage(view.value.coverage, page.value.groupTruncated),
-            ),
+            coverage: withPageFacets(view.value.coverage, page.value.groupTruncated),
             page: {
               limit,
               ...(page.value.nextCursor === undefined ? {} : { nextCursor: page.value.nextCursor }),
@@ -265,7 +289,14 @@ export class SqliteGraphPackageQueries {
     const filter = this.deps.context.defaultProductionFilter(query.filter);
     const groupBy = query.groupBy ?? 'none';
     const limit = clampLimit(query.limit, DEFAULT_SEARCH_LIMIT);
-    const queryDigest = digestNormalizedQuery({ op: 'packageCycles', edgeKind, filter, groupBy });
+    const proofLimit = query.proofLimit;
+    const queryDigest = digestNormalizedQuery({
+      op: 'packageCycles',
+      edgeKind,
+      filter,
+      groupBy,
+      proofLimit: proofLimit ?? null,
+    });
     return this.deps.context.runQuery(
       'packageCycles',
       { identityMode: 'package', sourceScope: filter.sourceScope },
@@ -287,7 +318,12 @@ export class SqliteGraphPackageQueries {
         const view = buildPackageScc(
           gen.catalog,
           gen.indexes,
-          { edgeKind, filter },
+          {
+            edgeKind,
+            filter,
+            // proofLimit maps onto evidenceLimit for the SCC proof sample bound.
+            ...(proofLimit === undefined ? {} : { evidenceLimit: proofLimit }),
+          },
           matcher.value,
           this.deps.features(gen),
         );
@@ -314,9 +350,7 @@ export class SqliteGraphPackageQueries {
           gen,
           freshness,
           {
-            coverage: packageEnvelopeCoverage(
-              withGroupCoverage(view.value.coverage, page.value.groupTruncated),
-            ),
+            coverage: withPageFacets(view.value.coverage, page.value.groupTruncated),
             page: {
               limit,
               ...(page.value.nextCursor === undefined ? {} : { nextCursor: page.value.nextCursor }),

@@ -267,6 +267,8 @@ export interface PackageDependenciesQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /** Nested evidence samples per inventory row (0–5). Graph default 5 until Task 2.4. */
+  readonly sampleLimit?: number;
 }
 
 export interface WhyDependsQuery {
@@ -277,6 +279,8 @@ export interface WhyDependsQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /** Max concrete evidence sites retained (0–100). Bound into the cursor digest. */
+  readonly evidenceLimit?: number;
 }
 
 export interface PackageCyclesQuery {
@@ -285,6 +289,8 @@ export interface PackageCyclesQuery {
   readonly limit?: number;
   readonly cursor?: string;
   readonly groupBy?: GroupByMode;
+  /** Max proof edges per component (0–50). Bound into the cursor digest. */
+  readonly proofLimit?: number;
 }
 
 export interface PackageDependenciesDto {

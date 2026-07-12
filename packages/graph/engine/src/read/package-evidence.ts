@@ -9,13 +9,20 @@ import {
   type ResolvedOccurrenceEdge,
 } from '../pipeline/occurrence-call-graph.js';
 
-import { coverageFromReasons, insertBoundedTopK, insertUniqueBoundedTopK } from './bounded-view.js';
+import {
+  makeFacet,
+  rollupFacets,
+  UNREQUESTED_FACET,
+  insertBoundedTopK,
+  insertUniqueBoundedTopK,
+} from './bounded-view.js';
 import {
   graphPackageOf,
   toGraphPackageName,
   toGraphSymbolRef,
+  type CoverageFacet,
   type GeneratedPolicy,
-  type GraphReadCoverage,
+  type GraphReadFacetCoverage,
   type GraphSourceFilter,
   type PackageCallEvidence,
   type PackageEdgeKind,
@@ -43,6 +50,13 @@ export interface PackageEvidenceQuery {
   readonly filter: GraphSourceFilter;
   readonly fromPackage?: string;
   readonly toPackage?: string;
+  /**
+   * Nested sample size per dependency row (P2 Phase 2.3/2.4). Default 5 for the
+   * graph/read builder; MCP defaults to 0 (opt-in) at the tool boundary.
+   */
+  readonly sampleLimit?: number;
+  /** Max concrete evidence sites retained for why-depends style inventories. */
+  readonly evidenceLimit?: number;
 }
 
 interface PackageEvidenceLabels {
@@ -51,7 +65,14 @@ interface PackageEvidenceLabels {
   readonly catalogResolutionMode: 'exact' | 'fast';
 }
 
-export interface PackageCallEvidenceRow extends PackageEvidenceLabels {
+/** Per-row sample metadata: empty sample is not "no evidence exists". */
+export interface PackageSampleMeta {
+  readonly sampleReturned: number;
+  readonly sampleAvailable: number;
+  readonly sampleLimit: number;
+}
+
+export interface PackageCallEvidenceRow extends PackageEvidenceLabels, PackageSampleMeta {
   readonly fromPackage: string;
   readonly toPackage: string;
   readonly kind: 'call';
@@ -61,10 +82,11 @@ export interface PackageCallEvidenceRow extends PackageEvidenceLabels {
   /** Unique owner/call-site locations contributing to this package pair. */
   readonly callSiteCount: number;
   readonly sample: readonly PackageCallEvidence[];
-  readonly coverage: GraphReadCoverage;
+  /** Inventory completeness for this row's count (not global evidence caps). */
+  readonly coverage: CoverageFacet;
 }
 
-export interface PackageImportEvidenceRow extends PackageEvidenceLabels {
+export interface PackageImportEvidenceRow extends PackageEvidenceLabels, PackageSampleMeta {
   readonly fromPackage: string;
   readonly toPackage: string | null;
   /** Internal package name, otherwise the bounded external/unresolved specifier. */
@@ -74,7 +96,8 @@ export interface PackageImportEvidenceRow extends PackageEvidenceLabels {
   readonly count: number;
   readonly countUnit: 'import-statements';
   readonly sample: readonly PackageImportEvidence[];
-  readonly coverage: GraphReadCoverage;
+  /** Inventory completeness for this row's count (not global evidence caps). */
+  readonly coverage: CoverageFacet;
 }
 
 export interface PackageEvidenceView {
@@ -86,8 +109,12 @@ export interface PackageEvidenceView {
   readonly totalCallEvidence: number;
   /** Matching projectable import evidence before the representative-evidence cap. */
   readonly totalImportEvidence: number;
-  readonly coverage: GraphReadCoverage;
+  /** Facet-specific coverage: inventory vs retained evidence are independent. */
+  readonly coverage: GraphReadFacetCoverage;
 }
+
+/** Reasons that truncate the retained concrete evidence array only. */
+const EVIDENCE_CAP_REASONS = new Set(['call-evidence-cap', 'import-evidence-cap', 'proof-edge-cap']);
 
 interface MutableCallBucket {
   readonly fromPackage: string;
@@ -114,9 +141,49 @@ interface BoundedBucketState<T> {
 const MAX_SPECIFIER = 512;
 const MAX_EDGE_GROUPS = 10_000;
 const MAX_EVIDENCE = 10_000;
+const DEFAULT_SAMPLE_LIMIT = 5;
 const MAX_SAMPLE = 5;
 const MAX_IMPORT_TARGETS = 10_000;
 const MAX_TARGET_HASH_LENGTH = 128;
+
+function resolveSampleLimit(query: PackageEvidenceQuery): number {
+  const raw = query.sampleLimit;
+  if (raw === undefined || !Number.isFinite(raw)) return DEFAULT_SAMPLE_LIMIT;
+  return Math.min(MAX_SAMPLE, Math.max(0, Math.trunc(raw)));
+}
+
+function resolveEvidenceLimit(query: PackageEvidenceQuery): number {
+  const raw = query.evidenceLimit;
+  if (raw === undefined || !Number.isFinite(raw)) return MAX_EVIDENCE;
+  return Math.min(MAX_EVIDENCE, Math.max(0, Math.trunc(raw)));
+}
+
+function partitionPackageReasons(reasons: ReadonlySet<string>): {
+  readonly inventory: Set<string>;
+  readonly evidence: Set<string>;
+} {
+  const inventory = new Set<string>();
+  const evidence = new Set<string>();
+  for (const reason of reasons) {
+    if (EVIDENCE_CAP_REASONS.has(reason)) evidence.add(reason);
+    else inventory.add(reason);
+  }
+  return { inventory, evidence };
+}
+
+function facetsFromPackageReasons(reasons: ReadonlySet<string>): GraphReadFacetCoverage {
+  const parts = partitionPackageReasons(reasons);
+  return rollupFacets({
+    inventory: makeFacet(true, parts.inventory),
+    evidence: makeFacet(parts.evidence.size > 0, parts.evidence),
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
+}
+
+function completeRowInventory(): CoverageFacet {
+  return makeFacet(true, new Set());
+}
 
 function addReason(reasons: Set<string>, reason: string): void {
   reasons.add(reason);
@@ -276,6 +343,8 @@ interface CallCollectionState {
   readonly evidenceCount: { value: number };
   readonly reasons: Set<string>;
   readonly matcher: SourceRoleMatcher;
+  readonly sampleLimit: number;
+  readonly evidenceLimit: number;
 }
 
 function collectResolvedCallEdge(
@@ -308,11 +377,13 @@ function collectResolvedCallEdge(
     addReason(state.reasons, 'malformed-symbol-omitted');
     return;
   }
-  if (bucket !== undefined) {
-    insertUniqueBoundedTopK(bucket.sample, projected, MAX_SAMPLE, compareCallEvidence);
+  if (bucket !== undefined && state.sampleLimit > 0) {
+    insertUniqueBoundedTopK(bucket.sample, projected, state.sampleLimit, compareCallEvidence);
   }
   state.evidenceCount.value++;
-  insertUniqueBoundedTopK(state.evidence, projected, MAX_EVIDENCE, compareCallEvidence);
+  if (state.evidenceLimit > 0) {
+    insertUniqueBoundedTopK(state.evidence, projected, state.evidenceLimit, compareCallEvidence);
+  }
 }
 
 function collectCallBuckets(
@@ -325,6 +396,7 @@ function collectCallBuckets(
   buckets: BoundedBucketState<MutableCallBucket>;
   evidence: PackageCallEvidence[];
   totalEvidence: number;
+  sampleLimit: number;
 } {
   const buckets: BoundedBucketState<MutableCallBucket> = {
     buckets: new Map(),
@@ -332,16 +404,27 @@ function collectCallBuckets(
   };
   const evidence: PackageCallEvidence[] = [];
   const evidenceCount = { value: 0 };
+  const sampleLimit = resolveSampleLimit(query);
+  const evidenceLimit = resolveEvidenceLimit(query);
   const graph = occurrenceCallGraphFor(indexes);
-  const state = { buckets, evidence, evidenceCount, reasons, matcher };
+  const state: CallCollectionState = {
+    buckets,
+    evidence,
+    evidenceCount,
+    reasons,
+    matcher,
+    sampleLimit,
+    evidenceLimit,
+  };
   if (graph.malformedCalls > 0) addReason(reasons, 'malformed-call-edge-omitted');
 
   for (const edge of graph.edges) {
     collectResolvedCallEdge(edge, query, state);
   }
-  if (evidenceCount.value > MAX_EVIDENCE) addReason(reasons, 'call-evidence-cap');
+  // Cap reason is evidence-only: bucket counts remain complete from the full walk.
+  if (evidenceCount.value > evidenceLimit) addReason(reasons, 'call-evidence-cap');
   if (modeOf(catalog) === 'fast') addReason(reasons, 'fast-resolution-approximate');
-  return { buckets, evidence, totalEvidence: evidenceCount.value };
+  return { buckets, evidence, totalEvidence: evidenceCount.value, sampleLimit };
 }
 
 interface CanonicalCountInput {
@@ -409,20 +492,26 @@ function buildCallRows(
     cachedFeatures,
   });
   const common = labels(catalog, query.filter);
-  const candidates = [...buckets.buckets.values()].map((bucket): PackageCallEvidenceRow => ({
-    ...common,
-    fromPackage: bucket.fromPackage,
-    toPackage: bucket.toPackage,
-    kind: 'call',
-    count: bucket.resolvedTargets,
-    countUnit: 'resolved-targets',
-    callSiteCount: bucket.callSites.size,
-    sample: bucket.sample,
-    coverage: { complete: true, truncated: false, reasons: [] },
-  }));
-  const coverage = coverageFromReasons(reasons);
-  const rows = candidates
-    .map((candidate) => ({ ...candidate, coverage }))
+  const sampleLimit = collected.sampleLimit;
+  const rows = [...buckets.buckets.values()]
+    .map(
+      (bucket): PackageCallEvidenceRow => ({
+        ...common,
+        fromPackage: bucket.fromPackage,
+        toPackage: bucket.toPackage,
+        kind: 'call',
+        count: bucket.resolvedTargets,
+        countUnit: 'resolved-targets',
+        callSiteCount: bucket.callSites.size,
+        sample: bucket.sample,
+        sampleReturned: bucket.sample.length,
+        sampleAvailable: bucket.callSites.size,
+        sampleLimit,
+        // Row inventory is complete whenever the bucket was retained; global caps
+        // never stamp onto individual row coverage.
+        coverage: completeRowInventory(),
+      }),
+    )
     .sort((a, b) =>
       compareCodePointStrings(packageDependencyStableKey(a), packageDependencyStableKey(b)),
     );
@@ -618,14 +707,19 @@ function appendImportEvidence(
   evidence: PackageImportEvidence,
   reasons: Set<string>,
   count: { value: number },
+  limits: { readonly sampleLimit: number; readonly evidenceLimit: number },
 ): void {
   const bucket = getImportBucket(buckets, evidence, reasons);
   if (bucket !== undefined) {
     bucket.count++;
-    insertUniqueBoundedTopK(bucket.sample, evidence, MAX_SAMPLE, compareImportEvidence);
+    if (limits.sampleLimit > 0) {
+      insertUniqueBoundedTopK(bucket.sample, evidence, limits.sampleLimit, compareImportEvidence);
+    }
   }
   count.value++;
-  insertUniqueBoundedTopK(allEvidence, evidence, MAX_EVIDENCE, compareImportEvidence);
+  if (limits.evidenceLimit > 0) {
+    insertUniqueBoundedTopK(allEvidence, evidence, limits.evidenceLimit, compareImportEvidence);
+  }
 }
 
 function moduleMatchesImportFilter(
@@ -651,6 +745,8 @@ interface ImportCollectionContext {
   readonly evidenceCount: { value: number };
   readonly catalogLanguage: string;
   readonly matcher: SourceRoleMatcher;
+  readonly sampleLimit: number;
+  readonly evidenceLimit: number;
 }
 
 function collectDependencyImports(
@@ -703,6 +799,7 @@ function collectDependencyImports(
       },
       reasons,
       evidenceCount,
+      { sampleLimit: context.sampleLimit, evidenceLimit: context.evidenceLimit },
     );
   }
 }
@@ -777,6 +874,8 @@ function buildImportRows(
   };
   const evidence: PackageImportEvidence[] = [];
   const evidenceCount = { value: 0 };
+  const sampleLimit = resolveSampleLimit(query);
+  const evidenceLimit = resolveEvidenceLimit(query);
   const state: ImportCollectionState = {
     moduleCount: 0,
     missingDependencyPayload: false,
@@ -790,6 +889,8 @@ function buildImportRows(
     evidenceCount,
     catalogLanguage: catalog.language,
     matcher,
+    sampleLimit,
+    evidenceLimit,
   };
 
   for (const occurrence of indexes.byOccId.values()) {
@@ -802,24 +903,27 @@ function buildImportRows(
     addReason(reasons, 'dependency-edges-unavailable');
   }
   if (modeOf(catalog) === 'fast') addReason(reasons, 'fast-import-coverage-partial');
-  if (evidenceCount.value > MAX_EVIDENCE) addReason(reasons, 'import-evidence-cap');
+  if (evidenceCount.value > evidenceLimit) addReason(reasons, 'import-evidence-cap');
 
   const common = labels(catalog, query.filter);
-  const candidates = [...buckets.buckets.values()].map((bucket): PackageImportEvidenceRow => ({
-    ...common,
-    fromPackage: bucket.fromPackage,
-    toPackage: bucket.toPackage,
-    target: bucket.target,
-    kind: 'import',
-    resolution: bucket.resolution,
-    count: bucket.count,
-    countUnit: 'import-statements',
-    sample: bucket.sample,
-    coverage: { complete: true, truncated: false, reasons: [] },
-  }));
-  const coverage = coverageFromReasons(reasons);
-  const rows = candidates
-    .map((candidate) => ({ ...candidate, coverage }))
+  const rows = [...buckets.buckets.values()]
+    .map(
+      (bucket): PackageImportEvidenceRow => ({
+        ...common,
+        fromPackage: bucket.fromPackage,
+        toPackage: bucket.toPackage,
+        target: bucket.target,
+        kind: 'import',
+        resolution: bucket.resolution,
+        count: bucket.count,
+        countUnit: 'import-statements',
+        sample: bucket.sample,
+        sampleReturned: bucket.sample.length,
+        sampleAvailable: bucket.count,
+        sampleLimit,
+        coverage: completeRowInventory(),
+      }),
+    )
     .sort((a, b) =>
       compareCodePointStrings(packageDependencyStableKey(a), packageDependencyStableKey(b)),
     );
@@ -853,7 +957,7 @@ export function buildPackageEvidence(
       importEvidence: imports.evidence,
       totalCallEvidence: calls.totalEvidence,
       totalImportEvidence: imports.totalEvidence,
-      coverage: coverageFromReasons(reasons),
+      coverage: facetsFromPackageReasons(reasons),
     });
   } catch {
     return err(peError('Failed to build package evidence'));

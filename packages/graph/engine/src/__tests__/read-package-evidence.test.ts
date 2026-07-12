@@ -539,11 +539,13 @@ describe('buildPackageEvidence', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.imports).toEqual([]);
-    expect(result.value.coverage).toEqual({
+    expect(result.value.coverage).toMatchObject({
       complete: false,
       truncated: false,
       reasons: ['malformed-import-evidence-omitted'],
     });
+    expect(result.value.coverage.inventory.reasons).toEqual(['malformed-import-evidence-omitted']);
+    expect(result.value.coverage.evidence.requested).toBe(false);
   });
 
   it('reports partial import coverage for absent dependencies and fast catalogs', () => {
@@ -597,11 +599,12 @@ describe('buildPackageEvidence', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.importEvidence[0]?.specifier).toBe('safename');
-    expect(result.value.coverage).toEqual({
+    expect(result.value.coverage).toMatchObject({
       complete: false,
       truncated: false,
       reasons: ['specifier-sanitized'],
     });
+    expect(result.value.coverage.inventory.reasons).toEqual(['specifier-sanitized']);
   });
 
   it('bounds import specifiers by Unicode code points', () => {
@@ -793,5 +796,51 @@ describe('buildPackageScc', () => {
       truncated: true,
     });
     expect(result.value.coverage.reasons).toContain('proof-edge-cap');
+    // Proof caps are evidence-only; inventory remains complete for SCC detection.
+    expect(result.value.coverage.evidence.requested).toBe(true);
+    expect(result.value.coverage.evidence.reasons).toContain('proof-edge-cap');
+    expect(result.value.coverage.inventory.complete).toBe(true);
+  });
+
+  it('keeps inventory complete when only concrete evidence is capped (P2 Phase 2.3)', () => {
+    // When more than MAX_EVIDENCE concrete sites exist, the evidence facet is
+    // truncated but package-row inventory/counts remain complete.
+    const functions: Record<string, FunctionOccurrence[]> = {};
+    for (let index = 0; index < 12_000; index++) {
+      functions[`fn${String(index)}`] = [
+        occurrence({
+          bodyHash: `h-${String(index)}`,
+          simpleName: `fn${String(index)}`,
+          filePath: `packages/a/src/f${String(index)}.ts`,
+          package: 'pkg-a',
+          calls: [call('h-target')],
+        }),
+      ];
+    }
+    functions.target = [
+      occurrence({
+        bodyHash: 'h-target',
+        simpleName: 'target',
+        filePath: 'packages/b/src/target.ts',
+        package: 'pkg-b',
+      }),
+    ];
+    const catalog = catalogOf(functions);
+    const result = buildPackageEvidence(catalog, buildIndexes(catalog), {
+      edgeKind: 'call',
+      filter: productionFilter,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.calls.length).toBeGreaterThan(0);
+    expect(result.value.calls[0]?.count).toBeGreaterThan(0);
+    expect(result.value.calls[0]?.sampleReturned).toBeLessThanOrEqual(
+      result.value.calls[0]?.sampleLimit ?? 5,
+    );
+    expect(result.value.coverage.inventory.complete).toBe(true);
+    expect(result.value.coverage.evidence.truncated).toBe(true);
+    expect(result.value.coverage.evidence.reasons).toContain('call-evidence-cap');
+    // Top-level complete is false because evidence was requested (cap hit).
+    expect(result.value.coverage.complete).toBe(false);
   });
 });
