@@ -1,6 +1,6 @@
 ---
-status: active
-last_verified: 2026-07-10
+status: superseded
+last_verified: 2026-07-11
 owner: opensip-cli
 ---
 
@@ -10,9 +10,9 @@ owner: opensip-cli
 id: ADR-0149
 title: Bounded labelled MCP audit evidence
 date: 2026-07-09
-status: active
+status: superseded
 supersedes: []
-superseded_by: null
+superseded_by: ADR-0153
 related: [ADR-0003, ADR-0084, ADR-0109, ADR-0123, ADR-0130, ADR-0147, ADR-0148]
 tags: [mcp, graph, audit, package, runtime-wiring]
 enforcement: mechanizable
@@ -21,6 +21,9 @@ enforcement-reason: >
   Public API locks, SDK handler and hostile runtime-wiring tests, built stdio
   inventory tests, dependency-cruiser, and the MCP currentScope import rule
   enforce the evidence, bounds, injection, and package-boundary contracts.
+  Superseded by ADR-0153 for faceted exclusive compact projections and live
+  surface diagnosis; carried-forward occurrence/package/runtime bounds remain
+  authoritative via ADR-0153.
 ```
 
 ## Decision

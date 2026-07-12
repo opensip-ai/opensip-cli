@@ -37,9 +37,12 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0154](ADR-0154-declarative-runtime-handler-bridge.md) — Plain host+Tool RunScope command inventory and provenance-bound static-handler declaration bridge without inventing call edges.
+- [ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md) — Four-facet exclusive compact MCP graph projections, identity-search default 20, 21/22 surface diagnosis via `get_agent_catalog`, reconnect-versus-refresh (supersedes ADR-0149).
+- [ADR-0152](ADR-0152-dependency-and-declaration-audit-evidence.md) — Absence-sensitive dependency evidence, optional cross-file declaration/reference semantic plane, independent producer cache ABIs, no SQLite migration.
 - [ADR-0151](ADR-0151-manifest-derived-package-and-export-boundaries.md) — Manifest-derived Tool/fit-pack classification, fail-closed dependency allowlists, dynamic CLI Tool loading, complete internal file/dir matching, and exact TypeScript value+type export locks.
 - [ADR-0150](ADR-0150-production-builds-publish-runtime-artifacts-only.md) — Production `tsc` output + real `pnpm pack` packlists jointly define the publish boundary; per-package no-emit test projects keep excluded test sources semantically checked.
-- [ADR-0149](ADR-0149-bounded-labelled-mcp-audit-evidence.md) — Occurrence-default traversal, labelled package/runtime evidence, and bounded MCP audit queries (19 tools).
+- [ADR-0149](ADR-0149-bounded-labelled-mcp-audit-evidence.md) — ~~Occurrence-default traversal, labelled package/runtime evidence, and bounded MCP audit queries (19 tools).~~ **Superseded by [ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md).**
 - [ADR-0148](ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md) — `g1:` catalog identity, persisted auto-swap, complete freshness verification, refresh-only rebuild.
 - [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md) — Public `@opensip-cli/graph/read` free functions, complete export-source maps, manifest Tool inventory, and allowlist-shaped peer boundaries.
 - [ADR-0146](ADR-0146-host-plane-reserved-state-namespace.md) — Reserved `@opensip-cli/host-plane:<toolId>` state identities, copy-only migration 0009, shared reserved-prefix admission, reduced host-plane surface.
