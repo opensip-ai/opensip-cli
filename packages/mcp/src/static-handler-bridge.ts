@@ -78,8 +78,18 @@ export const REVIEWED_CROSS_PACKAGE_HANDLERS: readonly StaticHandlerDescriptor[]
   }),
 ]);
 
-function descriptorKey(ref: Pick<StaticHandlerRef, 'package' | 'path' | 'declaration'>): string {
-  return `${ref.package}\0${ref.path}\0${ref.declaration}`;
+/**
+ * Identity key for a static-handler claim. MUST include `owner` +
+ * `admittedPackageIdentity` alongside `package`/`path`/`declaration` — those
+ * are the fields {@link preflightStaticHandlerRef} inspects to catch
+ * cross-package impersonation. Two refs that share the descriptor triple but
+ * differ in provenance are DIFFERENT claims and must never be collapsed into
+ * one dedup/broadcast key, or a legitimately-provenanced command could
+ * silently inherit another command's resolved verdict without ever having
+ * its own provenance check run.
+ */
+export function descriptorKey(ref: StaticHandlerRef): string {
+  return `${ref.package}\0${ref.path}\0${ref.declaration}\0${ref.owner ?? ''}\0${ref.admittedPackageIdentity ?? ''}`;
 }
 
 function isReviewedCrossPackage(ref: StaticHandlerRef): boolean {

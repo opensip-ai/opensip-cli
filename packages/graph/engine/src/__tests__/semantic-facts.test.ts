@@ -112,6 +112,49 @@ describe('applySemanticFactCaps', () => {
   });
 
   it('caps declarations deterministically and never leaves dangling target ids', () => {
+    // maxDeclarations=2 and modest-overflow budget = 2 + min(1000, 2) = 4, so
+    // 5 total declarations exceeds even the closure-preserving overflow: the
+    // hard-cap-and-downgrade path must fire and leave no dangling target ids.
+    const d1 = decl('d-a', { name: 'A', filePath: 'src/a.ts', line: 1 });
+    const d2 = decl('d-b', { name: 'B', filePath: 'src/b.ts', line: 1 });
+    const d3 = decl('d-c', { name: 'C', filePath: 'src/c.ts', line: 1 });
+    const d4 = decl('d-d', { name: 'D', filePath: 'src/d.ts', line: 1 });
+    const d5 = decl('d-e', { name: 'E', filePath: 'src/e.ts', line: 1 });
+    const r1 = ref('r-1', {
+      targetDeclarationId: d3.declarationId,
+      targetName: 'C',
+      targetPackage: 'pkg',
+      targetKind: 'interface',
+    });
+    const out = applySemanticFactCaps(
+      [d1, d2, d3, d4, d5],
+      [r1],
+      {
+        status: 'complete',
+        inspectedDeclarations: 5,
+        emittedDeclarations: 5,
+        omittedDeclarations: 0,
+        inspectedReferences: 1,
+        emittedReferences: 1,
+        omittedReferences: 0,
+        reasons: [],
+      },
+      tinyLimits,
+    );
+    expect(out.declarations.length).toBeLessThanOrEqual(tinyLimits.maxDeclarations + 1000);
+    for (const r of out.references) {
+      if (r.targetDeclarationId !== undefined) {
+        expect(out.declarations.some((d) => d.declarationId === r.targetDeclarationId)).toBe(true);
+      }
+    }
+    expect(out.coverage.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('preserves referential closure when a lone overflow declaration fits the modest-overflow budget', () => {
+    // maxDeclarations=2, so d3 (sorted third) falls outside the primary top-K,
+    // but r1 targets it and 3 <= maxDeclarations + min(1000, maxDeclarations)
+    // (2 + 2 = 4), so the closure-preserving path should keep d3 and leave r1
+    // resolved instead of downgrading it.
     const d1 = decl('d-a', { name: 'A', filePath: 'src/a.ts', line: 1 });
     const d2 = decl('d-b', { name: 'B', filePath: 'src/b.ts', line: 1 });
     const d3 = decl('d-c', { name: 'C', filePath: 'src/c.ts', line: 1 });
@@ -136,13 +179,9 @@ describe('applySemanticFactCaps', () => {
       },
       tinyLimits,
     );
-    expect(out.declarations.length).toBeLessThanOrEqual(tinyLimits.maxDeclarations + 1000);
-    for (const r of out.references) {
-      if (r.targetDeclarationId !== undefined) {
-        expect(out.declarations.some((d) => d.declarationId === r.targetDeclarationId)).toBe(true);
-      }
-    }
-    expect(out.coverage.reasons.length).toBeGreaterThan(0);
+    expect(out.declarations.some((d) => d.declarationId === d3.declarationId)).toBe(true);
+    expect(out.references[0]?.targetDeclarationId).toBe(d3.declarationId);
+    expect(out.references[0]?.basis).not.toBe('unresolved');
   });
 
   it('enforces reference cap N/N+1', () => {

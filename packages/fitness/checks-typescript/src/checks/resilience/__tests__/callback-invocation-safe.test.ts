@@ -58,6 +58,22 @@ describe('callback-invocation-safe', () => {
     expect(analyzeCallbackInvocationSafe(src, SRC_FILE)).toHaveLength(0);
   });
 
+  it('still flags an unwrapped forEach when an earlier identifier merely contains the substring "try"', () => {
+    const src = `
+      class NotificationBus {
+        private entryPoints: string[] = [];
+        private listeners: ((x: number) => void)[] = [];
+
+        notify(x: number) {
+          this.listeners.forEach((cb) => cb(x))
+        }
+      }
+    `;
+    const v = analyzeCallbackInvocationSafe(src, SRC_FILE);
+    expect(v.length).toBeGreaterThanOrEqual(1);
+    expect(v[0]?.message).toMatch(/Direct callback invocation/);
+  });
+
   it('skips test files', () => {
     const src = `this.subscribers.forEach((cb) => cb())\n`;
     expect(analyzeCallbackInvocationSafe(src, 'packages/foo/src/__tests__/x.test.ts')).toHaveLength(

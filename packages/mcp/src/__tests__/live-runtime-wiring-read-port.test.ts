@@ -433,6 +433,80 @@ describe('LiveRuntimeWiringReadPort', () => {
     );
   });
 
+  it('resolves each command by its own provenance even when two commands share a static-handler descriptor triple', async () => {
+    // Two commands claim the exact same {package, path, declaration} static
+    // handler, but with different packageIdentity — one is legitimately
+    // owned by that package, the other impersonates it. The dedup/broadcast
+    // key used to route batch outcomes back onto command paths must include
+    // provenance (owner + admittedPackageIdentity), or the impersonator
+    // silently inherits whichever outcome the legitimate command receives
+    // (or vice versa) instead of failing its own preflight check.
+    const sharedHandler = {
+      package: '@fixture/alpha',
+      path: 'packages/alpha/src/cmd.ts',
+      declaration: 'sharedHandler',
+    };
+    const legitLeaf = leaf({
+      path: 'alpha legit',
+      name: 'legit',
+      packageIdentity: '@fixture/alpha',
+      staticHandler: sharedHandler,
+    });
+    const impersonatorLeaf = leaf({
+      path: 'alpha evil',
+      name: 'evil',
+      packageIdentity: '@evil/other',
+      staticHandler: sharedHandler,
+    });
+    const resolveStaticHandlers: ResolveStaticHandlers = async (_key, refs) => {
+      await Promise.resolve();
+      return {
+        catalogStatus: 'loaded',
+        catalogIdentity: `g1:${'b'.repeat(64)}`,
+        outcomes: refs.map((ref) => {
+          if (ref.owner === 'tool' && ref.package !== ref.admittedPackageIdentity) {
+            return {
+              ref,
+              status: 'provenance-mismatch' as const,
+              claimProvenance: 'author-declared' as const,
+              matchBasis: 'author-declared-exact-declaration' as const,
+              confidence: 'low' as const,
+              reason: 'claimed-package-differs-from-admitted-plugin-identity',
+            };
+          }
+          return {
+            ref,
+            status: 'resolved' as const,
+            declarationId: `d1:${ref.declaration}`,
+            declarationQualifiedName: ref.declaration,
+            claimProvenance: 'author-declared' as const,
+            matchBasis: 'author-declared-exact-declaration' as const,
+            confidence: 'medium' as const,
+          };
+        }),
+      };
+    };
+
+    const outcome = await port({
+      resolveStaticHandlers,
+      runtimeCommands: inventory([legitLeaf, impersonatorLeaf]),
+    }).query({ detail: 'nodes', limit: 100 });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const legitEdge = outcome.value.edges.find(
+      (e) => e.kind === 'command-dispatches-handler' && e.from.includes('legit'),
+    );
+    const evilEdge = outcome.value.edges.find(
+      (e) => e.kind === 'command-dispatches-handler' && e.from.includes('evil'),
+    );
+    expect(legitEdge).toMatchObject({ staticBridge: 'resolved' });
+    expect(evilEdge).toMatchObject({
+      staticBridge: 'unresolved',
+      reason: 'claimed-package-differs-from-admitted-plugin-identity',
+    });
+  });
+
   it('binds continuation cursors to project, w1 snapshot, and normalized query', async () => {
     // Same port instance = same immutable w1 snapshot (cursor generationKey).
     const runtime = port();

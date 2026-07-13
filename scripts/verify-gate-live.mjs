@@ -470,7 +470,7 @@ function verifyWorkspaceReaderGuards() {
       process.exit(1);
     }
 
-    rmSync(join(root, 'packages', 'escape'), { force: true });
+    rmSync(join(root, 'packages', 'escape'), { recursive: true, force: true });
     const manifestEscapeDir = join(root, 'packages', 'manifest-escape');
     mkdirSync(manifestEscapeDir, { recursive: true });
     symlinkSync(join(outside, 'package.json'), join(manifestEscapeDir, 'package.json'));

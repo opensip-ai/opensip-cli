@@ -93,9 +93,11 @@ function attributeMissingFiles(
 /**
  * When a next-line directive is itself preceded by other directive lines, the
  * scanner skips over up to this many stacked directives to find the line the
- * suppression actually targets.
+ * suppression actually targets. Exported so downstream reconstructions of the
+ * resolved target line (e.g. fitness's directive audit) stay in lockstep with
+ * this bound instead of hardcoding their own.
  */
-const MAX_DIRECTIVE_SKIP = 3;
+export const MAX_DIRECTIVE_SKIP = 3;
 
 /**
  * File-level directives are only honored in the first N lines of a file (they
@@ -201,8 +203,14 @@ function extractDirectiveId(line: string, directiveKeyword: string): string | nu
   return id.length > 0 ? id : null;
 }
 
-/** True when a line is a known directive comment (used to skip stacked directives). */
-function isKnownDirectiveLine(line: string): boolean {
+/**
+ * True when a line is a known directive comment (used to skip stacked
+ * directives). Exported so downstream directive-audit reconstructions (e.g.
+ * fitness's `appliedDirectives` list) resolve the same target line as this
+ * module's own suppression scan, instead of re-deriving a divergent
+ * approximation (only `//`-style stacked directives, no keyword check).
+ */
+export function isKnownDirectiveLine(line: string): boolean {
   const trimmed = line.trimStart();
   // Support //, /*, #, and <!-- openers (stacked next-line directives).
   let content: string | undefined;

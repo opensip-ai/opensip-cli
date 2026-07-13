@@ -16,6 +16,7 @@ import {
   type RuntimeWiringSnapshot,
 } from './runtime-wiring-snapshot.js';
 import {
+  descriptorKey,
   overlayStaticHandlerBridge,
   type ResolveStaticHandlers,
   type StaticHandlerBridgeOutcome,
@@ -136,7 +137,7 @@ function collectHandlerRefs(snapshot: RuntimeWiringSnapshot): {
       ...(node.packageName === undefined ? {} : { admittedPackageIdentity: node.packageName }),
       ...(node.owner === undefined ? {} : { owner: node.owner }),
     };
-    const key = `${ref.package}\0${ref.path}\0${ref.declaration}`;
+    const key = descriptorKey(ref);
     const paths = pathByKey.get(key) ?? [];
     paths.push(node.commandPath);
     pathByKey.set(key, paths);
@@ -156,7 +157,7 @@ function mapOutcomesByPath(
 ): Map<string, StaticHandlerBridgeOutcome> {
   const byPath = new Map<string, StaticHandlerBridgeOutcome>();
   for (const outcome of outcomes) {
-    const key = `${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`;
+    const key = descriptorKey(outcome.ref);
     for (const path of pathByKey.get(key) ?? []) {
       byPath.set(path, outcome);
     }

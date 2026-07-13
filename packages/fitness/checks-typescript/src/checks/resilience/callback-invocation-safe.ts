@@ -86,10 +86,15 @@ function bodyHasSafeWrapper(body: string): boolean {
   return /\bsafe[A-Z][\w$]*\s*\(/.test(body);
 }
 
+const TRY_KEYWORD_RE = /\btry\b/g;
+
 function isInsideTryBlock(stripped: string, idx: number): boolean {
   const start = Math.max(0, idx - 400);
   const slice = stripped.slice(start, idx);
-  const lastTry = slice.lastIndexOf('try');
+  let lastTry = -1;
+  for (const m of slice.matchAll(TRY_KEYWORD_RE)) {
+    lastTry = m.index;
+  }
   if (lastTry === -1) return false;
   let depth = 0;
   let saw = false;
