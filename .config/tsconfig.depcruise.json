@@ -54,6 +54,7 @@
       "@opensip-cli/simulation": ["packages/simulation/engine/src/index.ts"],
       "@opensip-cli/simulation/internal": ["packages/simulation/engine/src/internal.ts"],
       "@opensip-cli/targeting": ["packages/targeting/src/index.ts"],
+      "@opensip-cli/agent-eval": ["packages/agent-eval/src/index.ts"],
       "@opensip-cli/test-support": ["packages/test-support/src/index.ts"],
       "@opensip-cli/tool-ast-grep": ["packages/tool-ast-grep/src/index.ts"],
       "@opensip-cli/tool-bandit": ["packages/tool-bandit/src/index.ts"],

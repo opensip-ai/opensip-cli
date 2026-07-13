@@ -102,6 +102,11 @@
       "reason": "Environment governance needs explicit pre-scope and registry primitive readers."
     },
     {
+      "file": "opensip-cli/fit/checks/env-via-registry.mjs",
+      "name": "ALLOWLISTED_PATHS",
+      "reason": "The black-box agent evaluation harness must inherit a narrow OS child environment without importing workspace EnvRegistry code."
+    },
+    {
       "file": "opensip-cli/fit/checks/graph-signal-stamped.mjs",
       "name": "EXEMPT_BASENAMES",
       "reason": "Graph signal identity guard excludes the factory and rule infrastructure files it validates."

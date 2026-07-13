@@ -1,0 +1,13 @@
+{
+  "name": "@fixture/ws-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fixture/ws-core": "workspace:*"
+  }
+}

@@ -55,6 +55,21 @@ const ALLOWLISTED_BASENAMES = new Set([
   'heap-preflight.ts',
 ]);
 
+/**
+ * Exact pre-scope readers whose architecture prevents a core EnvRegistry edge.
+ * agent-eval is deliberately a zero-workspace-import black-box instrument; its
+ * child-env adapter forwards a narrow OS allowlist while dropping OpenSIP and
+ * telemetry authority (ADR-0157/0158).
+ */
+const ALLOWLISTED_PATHS = new Set(['packages/agent-eval/src/runner/env.ts']);
+
+function isAllowlistedPath(filePath) {
+  const normalized = filePath.replaceAll('\\', '/');
+  return [...ALLOWLISTED_PATHS].some(
+    (path) => normalized === path || normalized.endsWith(`/${path}`),
+  );
+}
+
 /** Pure analysis. Exported for direct exercise if this check grows a test harness. */
 export function analyzeEnvViaRegistry(content) {
   const violations = [];
@@ -177,7 +192,7 @@ export const checks = [
     analyze: (content, filePath) => {
       if (CHECK_PACK_PATH.test(filePath) || TEST_PATH.test(filePath)) return [];
       const basename = filePath.split('/').at(-1) ?? '';
-      if (ALLOWLISTED_BASENAMES.has(basename)) return [];
+      if (ALLOWLISTED_BASENAMES.has(basename) || isAllowlistedPath(filePath)) return [];
       return analyzeEnvViaRegistry(content);
     },
   }),

@@ -100,8 +100,9 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 ### 1. Version fields (hand-set, lockstep)
 
 All 56 publishable packages **plus** the private root (`@opensip-cli/root`) and
-the private `@opensip-cli/test-support` and `@opensip-cli/checks-dogfood` carry
-one shared version — 59 `package.json` files. The bump script matches
+the private `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
+`@opensip-cli/checks-dogfood` carry one shared version —
+60 `package.json` files. The bump script matches
 `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
@@ -154,7 +155,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
    derived ones (see "Version Surfaces" above):
 
    ```bash
-   node scripts/bump-version.mjs <new-version>   # 59 package.json + docs + SECURITY + prose
+   node scripts/bump-version.mjs <new-version>   # 60 package.json + docs + SECURITY + prose
    pnpm install --lockfile-only                  # refresh the lockfile
    pnpm docs:readmes && pnpm docs:build          # regenerate version-pinned READMEs + web docs
    node scripts/bump-version.mjs --check         # assert no surface drifted

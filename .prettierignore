@@ -48,6 +48,10 @@ slo-report.json
 compatibility-matrix-report.json
 detection-quality-report.json
 
+# Immutable, gitignored agent-evaluation output. The report schema owns this
+# serialization; running the harness before lint must not make format:check red.
+packages/agent-eval/results/**
+
 # CLI-bundled adapter catalog (generated projection of adapter manifests)
 **/first-party-adapters.generated.ts
 

@@ -165,6 +165,7 @@ Imports every layer below. The published binary.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
+| `@opensip-cli/agent-eval` | `packages/agent-eval/` | Black-box agent-usability gold-task evaluation harness. `private: true`; never published. It spawns the built CLI and has zero workspace source imports or consumers. | `AGENT_EVAL_VERSION` |
 | `@opensip-cli/test-support` | `packages/test-support/` | Cross-package TEST scaffolding (ADR-0040): `RunScope` test sugar + the per-check fixture-coverage harness consumed by each check pack's `fixture-coverage.test.ts`. `private: true` — excluded from the release order; production source may not import it (`no-prod-import-of-test-support` depcruise rule) | `makeTestScope`, `withScope`, `withScopeSync`, `runCheckOnFixture`, `planCoverageCases`, `buildFixtureManifest` |
 | `@opensip-cli/checks-dogfood` | `packages/fitness/checks-dogfood/` | Repository-only architecture checks used to dogfood OpenSIP's own boundaries. `private: true`; never published or imported by production source. | `checks` |
 
@@ -182,10 +183,11 @@ Imports every layer below. The published binary.
 Last verified at v0.6.0 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **58 workspace packages** total: **56 publishable** (all at `0.6.0`) and two
-  private packages, `@opensip-cli/test-support` and
+- **59 workspace packages** total: **56 publishable** (all at `0.6.0`) and three
+  private packages: `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
   `@opensip-cli/checks-dogfood`. The root manifest is tooling metadata, not a
-  workspace package:
+  workspace package. The six runtime-layer counts below cover the 56
+  publishable packages; the three private packages are listed separately above:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + format + cli-ui): 7 —
     `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `format`, `cli-ui`

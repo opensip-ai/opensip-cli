@@ -20,7 +20,7 @@ related-docs:
 ---
 # Layered package graph
 
-Fifty-eight workspace packages: 56 publishable and two private. Six layers. One
+Fifty-nine workspace packages: 56 publishable and three private. Six runtime layers. One
 enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
@@ -98,11 +98,13 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 
 **Layer 6 — `opensip-cli`.** The composition root. Discovers every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-The generated architecture map is the inventory source of truth: 58 workspace
-packages, 56 publishable, and two private. `@opensip-cli/test-support` carries
-cross-package test scaffolding; `@opensip-cli/checks-dogfood` carries this
-repository's architecture checks. Neither is published or importable from
-production source.
+The generated architecture map is the inventory source of truth: 59 workspace
+packages, 56 publishable, and three private. `@opensip-cli/agent-eval` is a
+black-box agent-usability harness outside the runtime layers;
+`@opensip-cli/test-support` carries cross-package test scaffolding; and
+`@opensip-cli/checks-dogfood` carries this repository's architecture checks.
+None is published. The eval harness has zero workspace source edges in either
+direction, while the support packages are unavailable to production source.
 
 ---
 
@@ -175,15 +177,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 58 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 59 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 58-package workspace is more expensive in three places:
+Trade-offs are real. The 59-package workspace is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 56 publishable packages; `test-support` and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 56 publishable packages; `agent-eval`, `test-support`, and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/)) is the antidote.
 

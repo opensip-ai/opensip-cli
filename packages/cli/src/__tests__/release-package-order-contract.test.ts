@@ -268,7 +268,7 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
       versionedProse,
       `RELEASING.md must state ${versionedJsonCount} package.json files (derived: ${count} publishable + ${governanceFacts.privateWorkspaceNames.length} private workspace + the private root)`,
     ).toBe(true);
-    // RELEASING.md must name both private workspace packages and the private root.
+    // RELEASING.md must name every private workspace package and the private root.
     for (const name of [
       ...governanceFacts.privateWorkspaceNames,
       governanceFacts.privateRootName,

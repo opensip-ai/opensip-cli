@@ -240,8 +240,9 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 This v0.6.0 doc set was rechecked against the source on 2026-07-11:
 
 - 160 built-in fitness checks across seven packs.
-- 56 publishable workspace packages, plus the two private workspace packages
-  `@opensip-cli/test-support` and `@opensip-cli/checks-dogfood`; the generated
+- 56 publishable workspace packages, plus the three private workspace packages
+  `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
+  `@opensip-cli/checks-dogfood`; the generated
   `80-implementation/architecture-map.md` is the authoritative current inventory.
 - Five bundled first-party tools (declared in
   `packages/cli/src/bootstrap/bundled-tools.manifest.json`): `fit`, `graph`,
