@@ -147,6 +147,7 @@ async function main(): Promise<void> {
     setExitCode: ctx.setExitCode,
     getExitCode,
     render: renderResult,
+    reportFailure: ctx.reportFailure,
     emitJson: ctx.emitJson,
     emitRaw: ctx.emitRaw,
     emitError: ctx.emitError,

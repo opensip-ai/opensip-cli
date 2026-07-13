@@ -370,7 +370,10 @@ describe('runCommandSpecAction', () => {
     expect(ctx.render).not.toHaveBeenCalled();
   });
 
-  it('maps ToolError through setExitCode when no reportFailure seam exists', async () => {
+  it('presents ToolError through render when no reportFailure seam exists', async () => {
+    // A typed failure must never exit silently: contexts without the
+    // reportFailure seam still get the error view through the guaranteed
+    // render seam (and setExitCode).
     const error = new ConfigurationError('bad config');
     const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
@@ -387,7 +390,11 @@ describe('runCommandSpecAction', () => {
     await runCommandSpecAction(spec, { _args: [] }, [], ctx);
 
     expect(ctx.setExitCode).toHaveBeenCalledWith(mapToolErrorToExitCode(error));
-    expect(ctx.render).not.toHaveBeenCalled();
+    expect(ctx.render).toHaveBeenCalledWith({
+      type: 'error',
+      message: 'bad config',
+      exitCode: mapToolErrorToExitCode(error),
+    });
   });
 
   it('routes ToolError through reportFailure when available', async () => {

@@ -86,7 +86,17 @@ export async function runCommandSpecAction<TCtx extends CommandMountContext>(
         });
         return;
       }
-      ctx.setExitCode(mapToolErrorToExitCode(error));
+      // No reportFailure seam on this context (lean host/test contexts): still
+      // PRESENT the failure — a typed error must never exit silently. `--json`
+      // rides the structured emitError seam when present; human mode renders
+      // through the guaranteed `render` seam.
+      const exitCode = mapToolErrorToExitCode(error);
+      ctx.setExitCode(exitCode);
+      if (optsWithArgs.json === true && ctx.emitError !== undefined) {
+        ctx.emitError({ message: error.message, exitCode, code: error.code });
+      } else {
+        await ctx.render({ type: 'error', message: error.message, exitCode });
+      }
       persistStandaloneRun({
         spec,
         opts: optsWithArgs,
