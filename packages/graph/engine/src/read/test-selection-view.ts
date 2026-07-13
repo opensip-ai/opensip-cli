@@ -222,6 +222,15 @@ interface OccurrenceEvidenceSite {
   readonly column: number;
 }
 
+interface ReverseEvidenceTargetContext {
+  readonly reverse: Map<string, ReverseEvidence[]>;
+  readonly seen: Map<string, Set<string>>;
+  readonly occurrence: FunctionOccurrence;
+  readonly fromOccurrence: string;
+  readonly state: ReverseBuildState;
+  readonly signal?: AbortSignal;
+}
+
 function isEvidenceCoordinate(value: unknown, minimum: number): value is number {
   return Number.isSafeInteger(value) && typeof value === 'number' && value >= minimum;
 }
@@ -268,39 +277,35 @@ async function advanceReverseWork(
 }
 
 async function addEvidenceTarget(
-  reverse: Map<string, ReverseEvidence[]>,
-  seen: Map<string, Set<string>>,
-  occurrence: FunctionOccurrence,
-  fromOccurrence: string,
+  context: ReverseEvidenceTargetContext,
   site: OccurrenceEvidenceSite,
   targetHash: unknown,
-  state: ReverseBuildState,
-  signal: AbortSignal | undefined,
 ): Promise<boolean> {
-  throwIfAborted(signal);
-  if (state.edges >= MAX_TEST_SELECTION_VISITED_EDGES) {
-    state.capped = true;
+  throwIfAborted(context.signal);
+  if (context.state.edges >= MAX_TEST_SELECTION_VISITED_EDGES) {
+    context.state.capped = true;
     return false;
   }
-  state.edges++;
+  context.state.edges++;
   const proof = safeEvidenceScalar(
-    `${occurrence.filePath.replaceAll('\\', '/')}:${String(site.line)}:${String(site.column)}`,
+    `${context.occurrence.filePath.replaceAll('\\', '/')}:${String(site.line)}:${String(site.column)}`,
   );
   const safeTargetHash =
     typeof targetHash === 'string' && targetHash.length <= GRAPH_SYMBOL_NAME_MAX
       ? safeEvidenceScalar(targetHash)
       : undefined;
-  if (proof === undefined || safeTargetHash === undefined) state.malformedEvidence = true;
-  else {
-    addReverse(reverse, seen, safeTargetHash, {
-      fromHash: occurrence.bodyHash,
-      fromOccurrence,
+  if (proof === undefined || safeTargetHash === undefined) {
+    context.state.malformedEvidence = true;
+  } else {
+    addReverse(context.reverse, context.seen, safeTargetHash, {
+      fromHash: context.occurrence.bodyHash,
+      fromOccurrence: context.fromOccurrence,
       basis: site.basis,
       confidence: site.confidence,
       proof,
     });
   }
-  await advanceReverseWork(state, signal);
+  await advanceReverseWork(context.state, context.signal);
   return true;
 }
 
@@ -317,20 +322,17 @@ async function addOccurrenceEvidence(
     state.malformedEvidence = true;
     return true;
   }
+  const context: ReverseEvidenceTargetContext = {
+    reverse,
+    seen,
+    occurrence,
+    fromOccurrence,
+    state,
+    signal,
+  };
   for (const site of sites) {
     for (const targetHash of site.targets) {
-      if (
-        !(await addEvidenceTarget(
-          reverse,
-          seen,
-          occurrence,
-          fromOccurrence,
-          site,
-          targetHash,
-          state,
-          signal,
-        ))
-      ) {
+      if (!(await addEvidenceTarget(context, site, targetHash))) {
         return false;
       }
     }
@@ -701,37 +703,43 @@ function addConventionCandidate(
   return true;
 }
 
+interface ConventionCandidateContext {
+  readonly inventory: ProjectInventorySnapshot;
+  readonly candidates: Map<string, Candidate>;
+  readonly limits: Pick<SelectionLimits, 'maxCandidates' | 'maxProofNodes'>;
+  readonly reasons: Set<string>;
+  readonly sourceRoleMatcher?: SourceRoleMatcher;
+  readonly signal?: AbortSignal;
+}
+
 async function addConventionCandidates(
   files: readonly string[],
-  inventory: ProjectInventorySnapshot,
-  candidates: Map<string, Candidate>,
-  maxCandidates: number,
-  reasons: Set<string>,
-  maxProofNodes: number,
-  sourceRoleMatcher: SourceRoleMatcher | undefined,
-  signal: AbortSignal | undefined,
+  context: ConventionCandidateContext,
 ): Promise<void> {
-  const byPath = new Map(inventory.files.map((fact) => [fact.path, fact]));
-  const tests = inventory.files
-    .filter((fact) => fact.roles.includes('test') || sourceRoleMatcher?.matches(fact.path) === true)
+  const byPath = new Map(context.inventory.files.map((fact) => [fact.path, fact]));
+  const tests = context.inventory.files
+    .filter(
+      (fact) =>
+        fact.roles.includes('test') || context.sourceRoleMatcher?.matches(fact.path) === true,
+    )
     .sort((left, right) => compareCodePointStrings(left.path, right.path));
   let work = 0;
   for (const changedFile of files) {
     const changed = byPath.get(changedFile);
     for (const test of tests) {
-      throwIfAborted(signal);
+      throwIfAborted(context.signal);
       const hasCapacity = addConventionCandidate(
         changedFile,
         changed,
         test,
-        candidates,
-        maxCandidates,
-        reasons,
-        maxProofNodes,
+        context.candidates,
+        context.limits.maxCandidates,
+        context.reasons,
+        context.limits.maxProofNodes,
       );
       if (!hasCapacity) return;
       work++;
-      if (work % ASYNC_BATCH_SIZE === 0) await yieldToEventLoop(signal);
+      if (work % ASYNC_BATCH_SIZE === 0) await yieldToEventLoop(context.signal);
     }
   }
 }
@@ -1193,16 +1201,14 @@ async function projectSelection(
   limits: SelectionLimits,
   options: StaticTestSelectionOptions,
 ): Promise<StaticTestSelectionView> {
-  await addConventionCandidates(
-    requestedFiles,
+  await addConventionCandidates(requestedFiles, {
     inventory,
-    state.candidates,
-    limits.maxCandidates,
-    state.evidenceReasons,
-    limits.maxProofNodes,
-    state.sourceRoleMatcher,
-    options.signal,
-  );
+    candidates: state.candidates,
+    limits,
+    reasons: state.evidenceReasons,
+    sourceRoleMatcher: state.sourceRoleMatcher,
+    signal: options.signal,
+  });
   const orderedCandidates = [...state.candidates.values()].sort((left, right) =>
     compareSelected(left.selected, right.selected),
   );

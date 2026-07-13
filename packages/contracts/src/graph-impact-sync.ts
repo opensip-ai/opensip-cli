@@ -131,22 +131,39 @@ function collectSynchronousChangedOccurrences(
   return { occurrences, truncated: false };
 }
 
+interface SynchronousCallerQueueEntry {
+  readonly ordinal: number;
+  readonly depth: number;
+}
+
+interface SynchronousCallerTraversal {
+  readonly index: SynchronousImpactIndex;
+  readonly changedOrdinals: ReadonlySet<number>;
+  readonly visited: Set<number>;
+  readonly queue: SynchronousCallerQueueEntry[];
+  readonly maxDepth: number;
+  readonly resultLimit: number | undefined;
+}
+
+interface SynchronousCallerSeed {
+  readonly bodyHash: string;
+  readonly depth: number;
+}
+
 function enqueueSynchronousCallers(
-  index: SynchronousImpactIndex,
-  changedOrdinals: ReadonlySet<number>,
-  visited: Set<number>,
-  queue: { readonly ordinal: number; readonly depth: number }[],
-  bodyHash: string,
-  depth: number,
-  maxDepth: number,
-  resultLimit: number | undefined,
+  traversal: SynchronousCallerTraversal,
+  seed: SynchronousCallerSeed,
 ): boolean {
-  if (depth > maxDepth) return false;
-  for (const caller of index.reverseAdjacency.get(bodyHash) ?? []) {
-    if (changedOrdinals.has(caller) || visited.has(caller)) continue;
-    if (resultLimit !== undefined && visited.size >= resultLimit) return true;
-    visited.add(caller);
-    queue.push({ ordinal: caller, depth });
+  if (seed.depth > traversal.maxDepth) return false;
+  for (const caller of traversal.index.reverseAdjacency.get(seed.bodyHash) ?? []) {
+    if (traversal.changedOrdinals.has(caller) || traversal.visited.has(caller)) {
+      continue;
+    }
+    if (traversal.resultLimit !== undefined && traversal.visited.size >= traversal.resultLimit) {
+      return true;
+    }
+    traversal.visited.add(caller);
+    traversal.queue.push({ ordinal: caller, depth: seed.depth });
   }
   return false;
 }
@@ -157,47 +174,41 @@ function collectSynchronousImpactedOrdinals(
   maxDepth: number,
   resultLimit: number | undefined,
 ): { readonly ordinals: readonly number[]; readonly truncated: boolean } {
-  const visited = new Set<number>();
-  const queue: { readonly ordinal: number; readonly depth: number }[] = [];
+  const traversal: SynchronousCallerTraversal = {
+    index,
+    changedOrdinals,
+    visited: new Set<number>(),
+    queue: [],
+    maxDepth,
+    resultLimit,
+  };
   let truncated = false;
   for (const ordinal of changedOrdinals) {
     const occurrence = index.occurrences[ordinal];
     if (
       occurrence !== undefined &&
       typeof occurrence.bodyHash === 'string' &&
-      enqueueSynchronousCallers(
-        index,
-        changedOrdinals,
-        visited,
-        queue,
-        occurrence.bodyHash,
-        1,
-        maxDepth,
-        resultLimit,
-      )
+      enqueueSynchronousCallers(traversal, {
+        bodyHash: occurrence.bodyHash,
+        depth: 1,
+      })
     ) {
       truncated = true;
       break;
     }
   }
   const ordinals: number[] = [];
-  for (const current of queue) {
+  for (const current of traversal.queue) {
     const occurrence = index.occurrences[current.ordinal];
     if (occurrence === undefined) continue;
     ordinals.push(current.ordinal);
     if (
       !truncated &&
       typeof occurrence.bodyHash === 'string' &&
-      enqueueSynchronousCallers(
-        index,
-        changedOrdinals,
-        visited,
-        queue,
-        occurrence.bodyHash,
-        current.depth + 1,
-        maxDepth,
-        resultLimit,
-      )
+      enqueueSynchronousCallers(traversal, {
+        bodyHash: occurrence.bodyHash,
+        depth: current.depth + 1,
+      })
     ) {
       truncated = true;
     }
