@@ -482,10 +482,8 @@ describe('buildAgentCatalog', () => {
       expect(p.name).toBeTruthy();
       expect(p.example).toMatch(/^opensip /);
     }
-    expect(
-      c.commonPatterns.some((p) => p.example === 'opensip suite run audit --changed --json'),
-    ).toBe(true);
-    expect(JSON.stringify(c)).not.toContain('opensip audit');
+    expect(c.commonPatterns.some((p) => p.example === 'opensip audit --json')).toBe(true);
+    expect(c.entryPoints.filter((entry) => entry.command === 'audit')).toHaveLength(1);
     expect(c.outputShapes.signalEnvelope).toMatch(/SignalEnvelope|schemaVersion/);
     expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(c.outputShapes.reviewBrief).toMatch(/correlatedRisks/);
@@ -499,7 +497,7 @@ describe('buildAgentCatalog', () => {
     const c = buildAgentCatalog({ tools: await makeRegistry() });
     expect(c.commonPatterns.some((p) => p.name.toLowerCase().includes('read-latest'))).toBe(true);
     expect(c.commonPatterns.some((p) => p.example.includes('agent-fast'))).toBe(true);
-    expect(c.commonPatterns.some((p) => p.example.includes('suite run audit'))).toBe(true);
+    expect(c.commonPatterns.some((p) => p.example.includes('opensip audit'))).toBe(true);
     expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
     expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
     expect(c.notes.some((n) => n.includes('fullyVerified'))).toBe(true);

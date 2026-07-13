@@ -10,10 +10,7 @@ import {
   type SourceRoleMatcher,
 } from '@opensip-cli/graph/read';
 
-import {
-  validateCompactQueryDetail,
-  type CompactGroupBy,
-} from './compact-query-detail.js';
+import { validateCompactQueryDetail, type CompactGroupBy } from './compact-query-detail.js';
 import { digestNormalizedQuery, groupRows, pageRows } from './graph-query-page.js';
 import { toSymbolRef } from './graph-read-projection.js';
 

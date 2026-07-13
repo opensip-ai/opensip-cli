@@ -21,8 +21,28 @@ describe('command-label', () => {
     expect(resolvedCommandLabel()).toBe('unknown');
   });
 
-  it('returns the resolved command name once the pre-action hook stamps it', () => {
-    setResolvedCommandLabel('fit');
-    expect(resolvedCommandLabel()).toBe('fit');
+  it('returns the bounded resolved command name rather than argv values', () => {
+    setResolvedCommandLabel('audit');
+    expect(resolvedCommandLabel()).toBe('audit');
+  });
+
+  it('never derives metric labels from file paths or refs in argv', () => {
+    const previousArgv = process.argv;
+    process.argv = [
+      'node',
+      'opensip',
+      'audit',
+      '--files',
+      '/private/project/src/change.ts',
+      '--since',
+      'secret-review-ref',
+    ];
+    try {
+      setResolvedCommandLabel('audit');
+      expect(resolvedCommandLabel()).toBe('audit');
+      expect(resolvedCommandLabel()).not.toMatch(/private|change\.ts|secret-review-ref/u);
+    } finally {
+      process.argv = previousArgv;
+    }
   });
 });

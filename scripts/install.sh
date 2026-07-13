@@ -210,4 +210,5 @@ else
 fi
 
 printf '\n%s\n' "${SUCCESS_MARKER} OpenSIP CLI installed successfully."
-info "Run ${BOLD}opensip init${RESET} in your project to get started."
+info "Run ${BOLD}opensip audit${RESET} in your project for a changed-code review."
+info "Then run ${BOLD}opensip init${RESET} when you want to customize targets and checks."

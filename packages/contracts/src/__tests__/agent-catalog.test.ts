@@ -29,6 +29,7 @@ describe('buildAgentCatalog', () => {
     const catalog = buildAgentCatalog();
     expect(catalog.version).toBe('1.0.0');
     expect(catalog.entryPoints.map((entry) => entry.command)).toEqual([
+      'audit',
       'suite run',
       'sessions list',
       'sessions show',
@@ -42,13 +43,15 @@ describe('buildAgentCatalog', () => {
       catalog.commonPatterns.some((pattern) => pattern.description.includes('review_change')),
     ).toBe(true);
     expect(JSON.stringify(catalog)).toContain('MCP review_change');
-    expect(JSON.stringify(catalog)).toContain('opensip suite run audit --changed --json');
-    expect(JSON.stringify(catalog)).not.toContain('opensip audit');
+    expect(JSON.stringify(catalog)).toContain('opensip audit --json');
+    expect(JSON.stringify(catalog)).toContain('opensip audit --files src/server.ts --json');
+    expect(JSON.stringify(catalog)).toContain('opensip suite run security --json');
     expect(JSON.stringify(catalog)).toContain('opensip policy explain installed-tool:audit-sec');
     expect(catalog.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(catalog.outputShapes.reviewBrief).toContain(
       'scope?: { mode, source, ref?, changedFiles?, notice? }',
     );
+    expect(catalog.outputShapes.reviewBrief).toContain('runId?');
     expect(catalog.notes.length).toBeGreaterThan(0);
   });
 
@@ -206,7 +209,12 @@ describe('buildAgentCatalog', () => {
       tools,
       projectContext: {
         targetConventions: [
-          { target: 'src', entrypointCount: 0, alwaysUsedCount: 1, usedExportCount: 0 },
+          {
+            target: 'src',
+            entrypointCount: 0,
+            alwaysUsedCount: 1,
+            usedExportCount: 0,
+          },
         ],
       },
     });

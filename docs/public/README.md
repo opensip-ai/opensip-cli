@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-12
 release: v0.6.0
 owner: opensip-cli
 indexable: true
@@ -20,7 +20,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 |---|---|
 | Enforce project-specific quality, security, and architecture rules | `opensip fit` with 160 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
-| Run a multi-tool review in one command | `opensip suite run audit` for changed-scope fit, graph, and review-brief evidence |
+| Run a multi-tool review in one command | `opensip audit` for changed-scope fit, graph impact, and review-brief evidence |
 | Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and eleven built-in graph rules |
 | Review evidence-backed code-reduction opportunities (advisory) | `opensip yagni` with bundled detectors and optional graph evidence |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
@@ -35,7 +35,7 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 ```bash
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
-opensip suite run audit
+opensip audit
 opensip init
 opensip fit --recipe example
 opensip report
@@ -65,7 +65,7 @@ The most common commands:
 
 ```bash
 opensip init
-opensip suite run audit
+opensip audit
 opensip fit
 opensip fit list
 opensip fit recipes
@@ -83,6 +83,12 @@ opensip agent-catalog --json
 opensip mcp --cwd /path/to/repo
 opensip report
 ```
+
+`opensip audit` is the stable, host-owned shortcut for the curated built-in
+review. Add `--open` for the human Change Impact report or `--json` for CI and
+agents. Use `opensip suite run <name>` for configured multi-tool workflows; a
+configured `suites.audit` changes `suite run audit`, not the canonical top-level
+command.
 
 Whole Tool plugins are managed through the `tools` group:
 

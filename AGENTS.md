@@ -14,6 +14,12 @@ Source precedence:
 3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.
 4. Raw logs or direct datastore inspection only as a last-resort debugging path.
 
+Fresh review workflow:
+
+- Use `opensip audit --json` for the canonical changed-code review when fresh execution is explicitly needed. Inspect step `verification` before claiming complete coverage.
+- `--open` is human-only and is suppressed in JSON, non-TTY, and CI execution.
+- Use `opensip suite run <name> --json` for configured multi-tool workflows; configured suites do not replace the canonical top-level audit.
+
 Graph audit notes:
 
 - Call `get_agent_catalog` first for live surface diagnosis (version, surface epoch, registered names/count, mutation posture, project root). Compare with initialize/listTools. A mismatched surface epoch or tool names means reconnect the MCP client/process — `refresh_graph` cannot repair a stale connector inventory.
@@ -268,6 +274,7 @@ tools load by package name through the same plugin path as installed tools.
 
 Subcommands available out of the box:
 
+- `opensip audit` — Run the canonical changed-code review (`--json`, `--open`, `--full`, `--since`, `--files`)
 - `opensip fit` — Run fitness checks (with --gate-save, --gate-compare,
   --recipe, --check, --tags, --json, --report-to)
 - `opensip fit list` — List available checks

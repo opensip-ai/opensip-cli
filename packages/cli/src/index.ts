@@ -42,6 +42,7 @@ import {
   buildCommandRegistrationInput,
   resolveStartupExecutionMode,
 } from './bootstrap/index.js';
+import { rejectHostCommandCollisions } from './bootstrap/reject-host-command-collisions.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import { buildTopLevelHostSpecs } from './commands/host-command-specs.js';
@@ -124,6 +125,7 @@ async function main(): Promise<void> {
       argv: userArgv,
       runtimeMode,
     });
+  rejectHostCommandCollisions(toolRegistry);
 
   const { ctx, runActionHooks, getExitCode } = buildToolCliContext({
     render: renderResult,

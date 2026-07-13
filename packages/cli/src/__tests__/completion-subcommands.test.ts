@@ -146,6 +146,30 @@ describe('completion subcommand parity', () => {
       ).toContain(sub);
     }
   });
+
+  it('surfaces one canonical audit entry while retaining generic suite run', async () => {
+    const { inventory, program } = await buildLiveInventory();
+    const mountedAudit = program.commands.filter((command) => command.name() === 'audit');
+
+    expect(mountedAudit).toHaveLength(1);
+    expect(inventory.subcommands.filter((name) => name === 'audit')).toEqual(['audit']);
+    expect(inventory.groupSubcommands.suite).toContain('run');
+    expect(inventory.commandFlags.audit).toEqual(
+      expect.arrayContaining([
+        '--cwd',
+        '--json',
+        '--quiet',
+        '--verbose',
+        '--debug',
+        '--open',
+        '--config',
+        '--changed',
+        '--since',
+        '--files',
+        '--full',
+      ]),
+    );
+  });
 });
 
 describe('completion flag parity', () => {

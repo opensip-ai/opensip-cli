@@ -8,6 +8,7 @@ import { currentRules } from '../rules/registry.js';
 
 import type { FinalizedSignals } from './apply-suppressions.js';
 import type { GraphCommandOptions } from './graph-options.js';
+import type { GraphSessionPayload } from '../persistence/session-payload.js';
 import type { Rule } from '../types.js';
 import type { Signal, ToolSessionContribution } from '@opensip-cli/core';
 
@@ -66,6 +67,18 @@ export function contributionFromSignals(
   evaluatedSlugs: readonly string[] = evaluatedRuleSlugs(),
 ): ToolSessionContribution {
   const payload = buildGraphSessionPayload(signals, evaluatedSlugs);
+  return contributionFromGraphPayload(opts, payload);
+}
+
+/**
+ * Finalize a graph-owned payload into the host's generic session contribution.
+ * Ordinary graph and impact runs share this score/verdict assembly while
+ * retaining explicit payload construction at their two call sites.
+ */
+export function contributionFromGraphPayload(
+  opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
+  payload: GraphSessionPayload,
+): ToolSessionContribution {
   const passed = payload.summary.errors === 0;
   return {
     tool: GRAPH_LAYOUT_KEY,

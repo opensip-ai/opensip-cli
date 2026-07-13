@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-07-12
 release: v0.6.0
 title: "Wire into CI"
 audience: [ci-integrators, getting-started]
@@ -35,9 +35,23 @@ jobs:
       - uses: opensip-ai/opensip-cli@v1
 ```
 
-The action runs `opensip suite run audit --changed --json` by default, so a
-supported repository gets changed-code PR feedback without an
-`opensip-cli.config.yml` or an OpenSIP Cloud account.
+For a direct CLI workflow, the recommended public command is:
+
+```yaml
+- run: opensip audit --json
+```
+
+The Action currently invokes the built-in review as `opensip suite run audit
+--changed --json` internally. That explicit spelling is an Action implementation
+detail, not a different analysis path: both forms use the same built-in suite
+executor, Run ledger, review brief, and exit policy. This documentation change
+does not change Action inputs or outputs. A supported repository gets
+changed-code PR feedback without an `opensip-cli.config.yml` or an OpenSIP Cloud
+account.
+
+Do not add `--open` in CI. JSON, CI, non-TTY, and remote-shell execution suppress
+browser launch. Archive the generated report separately if a human-readable CI
+artifact is required; see the [report reference](/docs/opensip-cli/70-reference/06-dashboard/).
 
 That's the floor. The rest of this page is the polish: PR comments, SARIF upload,
 failure policy, and the lower-level manual baseline flow.

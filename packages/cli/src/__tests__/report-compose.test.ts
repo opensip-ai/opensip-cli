@@ -25,16 +25,19 @@ import {
   resolveProjectPaths,
   runWithScope,
 } from '@opensip-cli/core';
-import { type DataStore } from '@opensip-cli/datastore';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { RunRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as dispatchHookMod from '../bootstrap/dispatch-external-tool-hook.js';
 import * as openReportMod from '../open-report.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
+import type { StoredRun } from '@opensip-cli/contracts';
 import type { ProjectContext, Tool, ToolProvenance, ToolScope } from '@opensip-cli/core';
 
 let projectRoot: string;
+const openDatastores: DataStore[] = [];
 
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'opensip-dash-compose-'));
@@ -42,8 +45,37 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  for (const datastore of openDatastores.splice(0)) datastore.close();
   rmSync(projectRoot, { recursive: true, force: true });
 });
+
+function openMemoryDatastore(): DataStore {
+  const datastore = DataStoreFactory.open({ backend: 'memory' });
+  openDatastores.push(datastore);
+  return datastore;
+}
+
+function storedRun(id = 'run-parent-1'): StoredRun {
+  return {
+    id,
+    name: 'audit',
+    source: 'built-in-suite',
+    cwd: projectRoot,
+    startedAt: '2026-07-01T00:00:00.000Z',
+    completedAt: '2026-07-01T00:00:01.000Z',
+    durationMs: 1000,
+    exitCode: 0,
+    aggregate: {
+      steps: 0,
+      passed: 0,
+      failed: 0,
+      faulted: 0,
+      errors: 0,
+      warnings: 0,
+    },
+    legacySuiteRunId: 'suite-1',
+  };
+}
 
 function makeTool(id: string, contribution?: Record<string, unknown>): Tool {
   return {
@@ -195,6 +227,85 @@ describe('composeAndWriteReport', () => {
     expect(opened.opened).toBe(true);
   });
 
+  it('embeds and launches a matching stored-run selection without changing the result path', async () => {
+    const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const info = vi.fn();
+    const datastore = openMemoryDatastore();
+    new RunRepo(datastore).saveRun(storedRun());
+    const scope = makeScope([makeTool('fitness')], datastore, [], {
+      debug: vi.fn(),
+      info,
+      warn: vi.fn(),
+      error: vi.fn(),
+    });
+
+    const result = await runWithScope(scope, () =>
+      composeAndWriteReport({
+        open: true,
+        selection: { view: 'change-impact', runId: 'run-parent-1' },
+      }),
+    );
+
+    expect(result.path).toBe(join(resolveProjectPaths(projectRoot).reportsDir, 'latest.html'));
+    expect(launch).toHaveBeenCalledWith(`file://${result.path}#change-impact/run-parent-1`);
+    expect(readFileSync(result.path, 'utf8')).toContain(
+      'const REPORT_SELECTION = {"view":"change-impact","runId":"run-parent-1"};',
+    );
+    expect(info).toHaveBeenCalledWith({
+      evt: 'cli.report.compose.selection',
+      module: 'cli:report',
+      view: 'change-impact',
+      hasRunId: true,
+      matchedStoredRun: true,
+    });
+  });
+
+  it('drops an unknown run identity from both embedded data and the launch fragment', async () => {
+    const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const info = vi.fn();
+    const datastore = openMemoryDatastore();
+    new RunRepo(datastore).saveRun(storedRun());
+    const scope = makeScope([], datastore, [], {
+      debug: vi.fn(),
+      info,
+      warn: vi.fn(),
+      error: vi.fn(),
+    });
+
+    const result = await runWithScope(scope, () =>
+      composeAndWriteReport({
+        open: true,
+        selection: { view: 'change-impact', runId: 'run-missing' },
+      }),
+    );
+
+    expect(launch).toHaveBeenCalledWith(`file://${result.path}#change-impact`);
+    expect(readFileSync(result.path, 'utf8')).toContain(
+      'const REPORT_SELECTION = {"view":"change-impact"};',
+    );
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ hasRunId: true, matchedStoredRun: false }),
+    );
+  });
+
+  it('omits malformed or oversized run identity text before embedding and launch', async () => {
+    const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const scope = makeScope([]);
+    const maliciousRunId = `${'a'.repeat(129)}/#fragment`;
+
+    const result = await runWithScope(scope, () =>
+      composeAndWriteReport({
+        open: true,
+        selection: { view: 'change-impact', runId: maliciousRunId },
+      }),
+    );
+
+    expect(launch).toHaveBeenCalledWith(`file://${result.path}#change-impact`);
+    const html = readFileSync(result.path, 'utf8');
+    expect(html).not.toContain(maliciousRunId);
+    expect(html).toContain('const REPORT_SELECTION = {"view":"change-impact"};');
+  });
+
   it('throws when invoked outside an entered RunScope', async () => {
     // No runWithScope wrapper ⇒ currentScope() is undefined ⇒ composition
     // refuses with a clear "requires an entered RunScope" error.
@@ -253,13 +364,15 @@ describe('composeAndWriteReport', () => {
     expect(html).toContain('legit');
   });
 
-  it('ignores a reserved host key (`sessions`) returned from collectReportData', async () => {
+  it('ignores host-owned sessions, runs, and selection returned from collectReportData', async () => {
     vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
-    // A misbehaving tool tries to clobber the host-owned `sessions` history via
-    // collectReportData — it must be stripped before merge (warn + drop). Its
-    // legitimate (non-reserved) catalog still merges.
+    // A misbehaving tool tries to clobber host evidence/navigation via
+    // collectReportData. Reserved keys are stripped while its legitimate catalog
+    // contribution still merges.
     const evil = makeTool('evil', {
-      sessions: [{ id: 'forged' }],
+      sessions: [{ id: 'forged-session' }],
+      runs: [{ id: 'forged-run' }],
+      selection: { view: 'change-impact', runId: 'forged-selection' },
       checkCatalog: [{ slug: 'legit' }],
     });
 
@@ -267,8 +380,36 @@ describe('composeAndWriteReport', () => {
     const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
     const html = readFileSync(result.path, 'utf8');
 
-    expect(html).not.toContain('forged');
+    expect(html).not.toContain('forged-session');
+    expect(html).not.toContain('forged-run');
+    expect(html).not.toContain('forged-selection');
     expect(html).toContain('legit');
+  });
+
+  it('rejects prototype-mutating contribution keys without inheriting report selection', async () => {
+    const warn = vi.fn();
+    const contribution = JSON.parse(
+      '{"__proto__":{"selection":{"view":"change-impact","runId":"forged-prototype"}},"checkCatalog":[{"slug":"legit"}]}',
+    ) as Record<string, unknown>;
+    const scope = makeScope([makeTool('evil-prototype', contribution)], undefined, [], {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn,
+      error: vi.fn(),
+    });
+
+    const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+    const html = readFileSync(result.path, 'utf8');
+
+    expect(html).not.toContain('forged-prototype');
+    expect(html).toContain('const REPORT_SELECTION = null;');
+    expect(html).toContain('legit');
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.report.compose.reserved_key_ignored',
+        keys: ['__proto__'],
+      }),
+    );
   });
 
   it('warns and keeps the first value when two tools contribute the same report key', async () => {

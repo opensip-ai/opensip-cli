@@ -1,11 +1,14 @@
 /**
  * `opensip graph impact` — read-only changed→impact analysis (ADR-0085, spec §5.3).
  */
+import { createHash } from 'node:crypto';
+
 import {
   buildSignalEnvelope,
   computeImpact,
   EXIT_CODES,
   gitWarningsToImpactUncertainties,
+  type GraphImpactCatalogIdentity,
   type GraphImpactResult,
   type ImpactUncertainty,
   type SignalEnvelope,
@@ -29,8 +32,14 @@ import {
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
+import {
+  fitProjectionToByteBudget,
+  MAX_IMPACT_REPORT_PROJECTION_BYTES,
+  projectImpactForReport,
+} from '../persistence/impact-report-projection.js';
+import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 
-import { contributionFromSignals } from './graph-session-contribution.js';
+import { contributionFromGraphPayload } from './graph-session-contribution.js';
 import { runGraph } from './orchestrate.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
@@ -158,6 +167,7 @@ function buildImpactEnvelope(result: GraphImpactResult, durationMs: number): Sig
     policy: resolveVerdictPolicy('graph'),
     runFaulted: false,
     fingerprintStrategy: graphFingerprintStrategy,
+    verification: result.trust,
   });
 }
 
@@ -166,7 +176,77 @@ export function buildImpactSessionContribution(
   opts: Pick<ImpactCommandOptions, 'cwd'>,
   result: GraphImpactResult,
 ): ToolSessionContribution {
-  return contributionFromSignals({ cwd: opts.cwd }, buildImpactSignals(result), [IMPACT_RULE_ID]);
+  const ordinaryPayload = buildGraphSessionPayload(buildImpactSignals(result), [IMPACT_RULE_ID]);
+  const projected = projectImpactForReport(result);
+  const impact = fitProjectionToByteBudget(projected, MAX_IMPACT_REPORT_PROJECTION_BYTES);
+  const retained = impact ?? projected;
+  log.info({
+    evt: 'graph.cli.impact.session_projection',
+    retainedChangedFiles: impact?.changedFiles.length ?? 0,
+    retainedChangedFunctions: impact?.changedFunctions.length ?? 0,
+    retainedImpactedFunctions: impact?.impactedFunctions.length ?? 0,
+    retainedImpactedFiles: impact?.impactedFiles.length ?? 0,
+    retainedImpactedPackages: impact?.impactedPackages.length ?? 0,
+    retainedRecommendedCommands: impact?.recommendedCommands.length ?? 0,
+    omittedChangedFiles:
+      retained.omitted.changedFiles + (impact === undefined ? retained.changedFiles.length : 0),
+    omittedChangedFunctions:
+      retained.omitted.changedFunctions +
+      (impact === undefined ? retained.changedFunctions.length : 0),
+    omittedImpactedFunctions:
+      retained.omitted.impactedFunctions +
+      (impact === undefined ? retained.impactedFunctions.length : 0),
+    omittedImpactedFiles:
+      retained.omitted.impactedFiles + (impact === undefined ? retained.impactedFiles.length : 0),
+    omittedImpactedPackages:
+      retained.omitted.impactedPackages +
+      (impact === undefined ? retained.impactedPackages.length : 0),
+    omittedRecommendedCommands:
+      retained.omitted.recommendedCommands +
+      (impact === undefined ? retained.recommendedCommands.length : 0),
+    trustCoverage: result.trust.coverage,
+    sourceTruncated: result.truncated,
+    ...(impact === undefined ? { omittedReason: 'projection-overflow' } : {}),
+  });
+  const payload = {
+    ...ordinaryPayload,
+    ...(impact === undefined
+      ? { impactStatus: 'omitted-overflow' as const }
+      : { impactStatus: 'available' as const, impact }),
+  };
+  return contributionFromGraphPayload({ cwd: opts.cwd }, payload);
+}
+
+function digestIdentity(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function boundedCatalogIdentity(catalog: {
+  readonly builtAt: string;
+  readonly language: string;
+  readonly filesFingerprint?: string;
+  readonly resolutionMode?: 'exact' | 'fast';
+  readonly cacheKey?: string;
+}): GraphImpactCatalogIdentity | undefined {
+  if (
+    catalog.filesFingerprint === undefined ||
+    catalog.cacheKey === undefined ||
+    catalog.builtAt.length > 64 ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u.test(catalog.builtAt) ||
+    !Number.isFinite(Date.parse(catalog.builtAt)) ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/u.test(catalog.language)
+  ) {
+    return undefined;
+  }
+  return {
+    builtAt: catalog.builtAt,
+    language: catalog.language,
+    // Raw file fingerprints contain absolute paths. A digest preserves
+    // equality while keeping result/session evidence project-root-free.
+    filesFingerprint: digestIdentity(catalog.filesFingerprint),
+    ...(catalog.resolutionMode === undefined ? {} : { resolutionMode: catalog.resolutionMode }),
+    cacheKeyDigest: digestIdentity(catalog.cacheKey),
+  };
 }
 
 function resolveImpactBasis(opts: ImpactCommandOptions): {
@@ -265,9 +345,11 @@ export async function executeImpact(
       changedFileEntries: entries,
       uncertainties,
     });
+    const catalogIdentity = boundedCatalogIdentity(catalog);
 
     const result: GraphImpactResult = {
       type: 'graph-impact',
+      ...(catalogIdentity === undefined ? {} : { catalog: catalogIdentity }),
       basis,
       changedFiles,
       changedFunctions: computation.changedFunctions,

@@ -154,7 +154,9 @@ describe('buildManagedAgentGuidance', () => {
 
 describe('ensureOpenSipAgentGuidance', () => {
   it('creates AGENTS.md with MCP-first guidance when absent', () => {
-    const result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     expect(result.changed).toBe(true);
     expect(result.targets.find((target) => target.path.endsWith('AGENTS.md'))?.action).toBe(
@@ -162,16 +164,18 @@ describe('ensureOpenSipAgentGuidance', () => {
     );
     expect(agents).toContain('OpenSIP MCP First');
     expect(agents).toContain('list_runs');
-    expect(agents).toContain('opensip suite run audit --json');
+    expect(agents).toContain('opensip audit --json');
     expect(agents).toContain('agent-fast');
-    expect(agents.indexOf('opensip suite run audit --json')).toBeLessThan(
+    expect(agents.indexOf('opensip audit --json')).toBeLessThan(
       agents.indexOf('opensip fit --recipe agent-fast'),
     );
   });
 
   it('updates existing AGENTS.md and preserves custom content', () => {
     writeFileSync(join(testDir, 'AGENTS.md'), '# Custom\n\nKeep me.\n', 'utf8');
-    const result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     expect(result.targets.find((target) => target.path.endsWith('AGENTS.md'))?.action).toBe(
       'updated',
@@ -205,13 +209,17 @@ describe('ensureOpenSipAgentGuidance', () => {
   });
 
   it('updates existing CLAUDE.md but skips it when absent', () => {
-    let result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    let result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     expect(result.targets.find((target) => target.path.endsWith('CLAUDE.md'))?.action).toBe(
       'skipped',
     );
 
     writeFileSync(join(testDir, 'CLAUDE.md'), '# Claude\n\nCustom.\n', 'utf8');
-    result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     const claude = readFileSync(join(testDir, 'CLAUDE.md'), 'utf8');
     expect(result.targets.find((target) => target.path.endsWith('CLAUDE.md'))?.action).toBe(
       'updated',
@@ -236,7 +244,9 @@ describe('ensureOpenSipAgentGuidance', () => {
       'utf8',
     );
 
-    const first = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const first = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     const claude = readFileSync(join(testDir, 'CLAUDE.md'), 'utf8');
     const expected = buildManagedAgentGuidance();
@@ -249,14 +259,18 @@ describe('ensureOpenSipAgentGuidance', () => {
       'updated',
     );
 
-    const second = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const second = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     expect(second.changed).toBe(false);
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe(agents);
     expect(readFileSync(join(testDir, 'CLAUDE.md'), 'utf8')).toBe(claude);
   });
 
   it('creates Cursor rule only when the parent directory already exists', () => {
-    let result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    let result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     const rulePath = join(testDir, '.cursor', 'rules', 'opensip.mdc');
     expect(result.targets.find((target) => target.path === rulePath)?.reason).toBe(
       'parent-missing',
@@ -264,7 +278,9 @@ describe('ensureOpenSipAgentGuidance', () => {
     expect(existsSync(rulePath)).toBe(false);
 
     mkdirSync(join(testDir, '.cursor', 'rules'), { recursive: true });
-    result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     expect(result.targets.find((target) => target.path === rulePath)?.action).toBe('created');
     expect(readFileSync(rulePath, 'utf8')).toContain('OpenSIP MCP First');
   });
@@ -272,7 +288,9 @@ describe('ensureOpenSipAgentGuidance', () => {
   it('skips oversized existing instruction files without returning content', () => {
     const large = `${'x'.repeat(1024 * 1024 + 1)}\n`;
     writeFileSync(join(testDir, 'CLAUDE.md'), large, 'utf8');
-    const result = ensureOpenSipAgentGuidance(testDir, { toolScaffolds: [FIT_SCAFFOLD] });
+    const result = ensureOpenSipAgentGuidance(testDir, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
     const target = result.targets.find((item) => item.path.endsWith('CLAUDE.md'));
     expect(target?.action).toBe('skipped');
     expect(target?.reason).toBe('too-large');

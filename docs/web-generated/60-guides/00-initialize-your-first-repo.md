@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-12
 release: v0.6.0
 title: "Initialize your first repo"
 audience: [getting-started, ci-integrators]
@@ -55,13 +55,19 @@ opensip init --language typescript,python
 Before you scaffold, the built-in analysis commands can still run:
 
 ```bash
-opensip suite run audit
+opensip audit
 ```
 
 In a git repo, the built-in audit suite runs changed-scope by default and prints
 the resolved scope, for example `Scope: changed (working tree, 14 files)`. Use
-`opensip suite run audit --full` when you want the whole repo. Outside git, the
+`opensip audit --full` when you want the whole repo. Outside git, the
 same command falls back to full scope with one suite-level notice.
+
+Use `opensip audit --open` for a human Change Impact report or `opensip audit
+--json` for machine output. Browser launch is suppressed for JSON, CI, non-TTY,
+and remote-shell execution. Configured multi-tool workflows continue to use
+`opensip suite run <name>`; configured `suites.audit` does not replace the
+canonical top-level audit.
 
 For lower-level inspection:
 

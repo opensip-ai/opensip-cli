@@ -205,8 +205,8 @@ export function buildAgentCatalog(
       {
         name: 'Read audit review brief',
         description:
-          'For PR review workflows, use MCP review_change when available; fall back to the host-owned suite review brief over CLI JSON.',
-        example: 'opensip suite run audit --changed --json',
+          'For PR review workflows, use MCP review_change when available; use the canonical host-owned audit review brief when fresh execution is needed.',
+        example: 'opensip audit --json',
       },
       {
         name: 'Apply and verify a structured repair',
@@ -250,7 +250,7 @@ export function buildAgentCatalog(
         'The canonical cross-tool currency (schemaVersion, tool, runId, verdict, units, signals). ' +
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
-        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, scope?: { mode, source, ref?, changedFiles?, notice? }, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
+        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For audit or suite run: { type: "suite-run", suite, suiteRunId, runId?, scope?: { mode, source, ref?, changedFiles?, notice? }, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
       repairApplyVerify:
         'For repair apply --verify: { type: "repair-apply-verify", status, session, signal, action, changes, force, verification: { status: "verified" | "partial" | "unverified" | "skipped", coverage, scope: { tool, ruleId, files, checkRan, fallback }, commands, remainingFindings, trust? } }',
       sessionReplay:
@@ -265,6 +265,8 @@ export function buildAgentCatalog(
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',
       'graph impact answers changed→impacted without a separate git diff dance.',
+      'Use opensip audit --json for a fresh canonical review. --open is human-only and is suppressed by JSON/non-TTY/CI execution.',
+      'Configured multi-tool workflows remain under opensip suite run <name>; they do not replace the canonical top-level audit.',
       'graph impact JSON includes trust.coverage/trust.fullyVerified/trust.uncertainties; do not claim targeted verification when fullyVerified is false.',
       'fit --changed --include-impacted falls back to the full target set when graph/git impact trust is partial or unknown.',
       'repair apply --verify and MCP repair_apply_verify are mutating. MCP repair_apply_verify is absent unless the server starts with --allow-mutations or OPENSIP_MCP_ALLOW_MUTATIONS=1.',

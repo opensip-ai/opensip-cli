@@ -1,7 +1,7 @@
 name: OpenSIP CLI
 description: >-
   Run OpenSIP CLI in GitHub Actions without an OpenSIP Cloud account. The action
-  runs the built-in audit suite by default and emits PR annotations, optional
+  runs the same built-in suite as the canonical `opensip audit` workflow by default and emits PR annotations, optional
   SARIF, optional sticky PR comments, and stable step outputs.
 author: OpenSIP
 branding:
@@ -16,7 +16,7 @@ inputs:
   command:
     description: >-
       Alternative OpenSIP CLI command to run instead of a suite, for example
-      "fit --changed" or "graph --recipe agent-risk".
+      "audit --changed", "fit --changed", or "graph --recipe agent-risk".
     required: false
     default: ''
   changed:

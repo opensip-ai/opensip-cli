@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 release: v0.6.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -8,6 +8,9 @@ purpose: "Lookup-shaped reference for user-facing CLI commands, important machin
 source-files:
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/commands/audit-command-spec.ts
+  - packages/cli/src/commands/suite/execute-suite-command.ts
+  - packages/cli/src/commands/suite/suite-run-options.ts
   - packages/cli/src/commands/host-subcommand-config.ts
   - packages/cli/src/commands/config-migrate.ts
   - packages/cli/src/commands/configure.ts
@@ -49,7 +52,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](../50-extend/07-command-taxonomy.md).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`audit`, `suite`, `init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](../50-extend/07-command-taxonomy.md).
 
 ---
 
@@ -67,7 +70,7 @@ tool run commands (`fit`/`sim`/`graph`/`yagni`) — `--json`, `--cwd`, `-q/--qui
 `-v/--verbose`, `--debug`, `--report-to`, and `--api-key` — are declared
 **once** in a common-flag registry and applied via `applyCommonFlags`, so their
 names, short aliases, descriptions, and defaults are identical where applied and
-cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for HTML report
+cannot drift (ADR-0021). `fit`, `sim`, and the host-owned `audit` workflow also expose `--open` for HTML report
 auto-open; `graph` writes report data and uses the separate `report`
 command to open the report. `-v/--verbose` is a uniform "show the detailed
 report body" flag whose output is identical in a TTY and a pipe.
@@ -571,6 +574,15 @@ opensip graph impact --files packages/core/src/index.ts --json
 `trust.fallback`, and bounded `trust.uncertainties[]`. See
 [Impact analysis and trust](../40-graph/05-impact-analysis.md).
 
+Current results also include optional-for-legacy `catalog` identity: bounded
+`builtAt`, `language`, optional resolution mode, and fixed-length SHA-256
+digests for the opaque cache key and file fingerprint. Raw keys/fingerprints are
+not copied because they can contain absolute local paths. Graph stamps
+`result.trust` onto the delivered envelope's authoritative `verification`
+field and returns a generic session contribution in human, wrapped JSON, and
+raw JSON modes. The linked session contains only the bounded report projection
+described in the [report reference](./06-dashboard.md), not the unbounded result.
+
 **Agent recipes:** `agent-risk`, `agent-final` on `graph --recipe`.
 
 ---
@@ -761,7 +773,7 @@ opensip init --remove
 
 ### No-init first runs
 
-`fit`, `graph`, `graph impact`, and the built-in `suite run audit` can run from
+`audit`, `fit`, `graph`, `graph impact`, and the built-in `suite run audit` can run from
 a supported project before `opensip init`. The CLI synthesizes an in-memory
 config from language markers, validates it through the normal config schema, and
 stores rebuildable runtime state under `~/.opensip-cli/cache/ephemeral/`.
@@ -1076,6 +1088,59 @@ The default MCP server remains read-only and does not register mutating tools.
 
 ---
 
+## `audit` — canonical changed-code review
+
+Host-owned. `opensip audit` always runs the curated built-in audit definition
+through the same concrete executor, suite orchestrator, output seams, Run
+ledger, sessions, and exit policy as generic `suite run`. It is not a Tool and
+configured `suites.audit` cannot replace it.
+
+```bash
+opensip audit
+opensip audit --files src/server.ts --json
+opensip audit --since main --json
+opensip audit --full
+opensip audit --open
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | path | current directory | Shared project root for all audit steps. |
+| `--config <path>` | path | discovered config | Override project-config discovery without changing the curated audit definition. |
+| `--changed` | bool | implicit when no selector | Use Git changed-file selection for compatible steps. |
+| `--since <ref>` | string | — | Use a Git diff base for compatible steps. |
+| `--files <path>` | repeatable | `[]` | Use explicit project-relative changed files; works without Git. |
+| `--full` | bool | `false` | Run the whole repo. Conflicts with `--changed`, `--since`, and `--files`. |
+| `--json` | bool | `false` | Emit the ordinary `SuiteRunResult` in a host `CommandOutcome`. |
+| `--quiet` | bool | `false` | Use compact human output. |
+| `--verbose` | bool | `false` | Include detailed review-brief and per-step human tables. |
+| `--debug` | bool | `false` | Enable debug diagnostics. |
+| `--open` | bool | `false` | After persistence, generate and open the selected Change Impact report for an interactive human. |
+
+With no explicit selector, Git repositories use changed scope. If Git scope
+cannot be resolved, audit falls back once to full scope and records a fallback
+notice/trust degradation; it never silently labels that run changed-only.
+Selectors propagate only to steps whose command declares the corresponding
+option. The command exits with the same numeric worst-step policy as `suite
+run`.
+
+`--json` returns `data.scope`, aggregate counts, step verdicts and
+`steps[].verification`, and the host-owned `reviewBrief`. It also returns
+optional `data.runId`: the authoritative persisted parent Run ID when ledger
+persistence succeeded. Absence means persistence was unavailable;
+`suiteRunId` remains legacy correlation identity and is not a replacement.
+
+`--open` is presentation-only and best effort. JSON, CI, non-TTY, and
+remote-shell execution suppresses browser launch. Report generation or launch
+failure cannot revise the completed audit result or exit code. Agents and CI
+should use `--json`, never depend on `--open`.
+
+To run a project-defined audit override, use `opensip suite run audit`. For all
+other configured workflows, use `opensip suite run <name>`. See
+[ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md).
+
+---
+
 ## `suite run/list/add` — run configured multi-tool suites
 
 CLI-owned. A suite runs several existing tool commands in one project scope.
@@ -1108,18 +1173,22 @@ opensip suite add security --tool fitness --command fitness --arg recipe=securit
 | `add` | `--command <name>` | Tool command to run for the step. |
 | `add` | `--arg <key=value>` | Add a tool option to the step. Repeat for multiple options. |
 
-Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
-`sessions list --json` and reports can group the step rows from one suite run.
+Suite runs persist a host-owned parent Run and ordered RunSteps. Current JSON
+returns optional `runId`, the authoritative parent identity when persistence
+succeeds; each step's optional `sessionId` is the durable link to tool detail.
+`suiteRunId` and `suiteName` remain legacy correlation fields on stored sessions.
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
 
-`audit` is a built-in suite preset for PR review. It runs fitness `agent-risk`,
+`audit` is also a built-in suite preset for generic suite resolution. It runs fitness `agent-risk`,
 `graph impact`, and high-confidence YAGNI reduction checks through the same suite
 plane as user-authored suites. In a git repo, `opensip suite run audit` runs
 changed-scope by default and prints a line such as `Scope: changed (working
 tree, 14 files)`. Use `--full` for a whole-repo run; outside git, the default
 falls back to full scope with one suite-level notice. Define `suites.audit` in
-config to replace the built-in preset. Suite-level selectors (`--changed`,
+config to replace the preset only for this generic `suite run audit` form. The
+reserved top-level `opensip audit` continues to use the curated built-in
+definition. Suite-level selectors (`--changed`,
 `--since`, `--files`) reach only steps whose command declares the matching
 option; per-step `args` still override propagated values.
 
@@ -1162,6 +1231,9 @@ and [ADR-0110](../../decisions/ADR-0110-host-owned-review-brief-contract.md).
 See [ADR-0111](../../decisions/ADR-0111-built-in-audit-suite-preset.md) for the
 built-in `audit` preset decision and [ADR-0129](../../decisions/ADR-0129-audit-suite-scope-defaults.md)
 for the changed-scope default, `--full`, and fallback semantics.
+See [ADR-0143](../../decisions/ADR-0143-host-owned-run-step-ledger.md) for Run
+identity and [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md) for
+the reserved root command/configured-override distinction.
 
 **See also:** [`03-configuration.md#suites`](./03-configuration.md#suites),
 [`04-json-output-schema.md#suite-run-results`](./04-json-output-schema.md#suite-run-results).

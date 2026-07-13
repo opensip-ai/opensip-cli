@@ -255,15 +255,17 @@ describe('gitleaks as a suite step (04↔05) — external adapter over the worke
     expect(gitleaksRow?.payload?.findings).toBe(2);
   });
 
-  it('upholds the secret-egress guarantee inside the suite (masked preview only)', () => {
+  it('upholds the secret-egress guarantee inside the suite parent result', () => {
     for (const raw of RAW_SECRETS) {
       expect(suiteRun.stdout).not.toContain(raw);
     }
     expect(suiteRun.stdout).not.toContain('"Match"');
     expect(suiteRun.stdout).not.toContain('"Secret"');
-    // The masked preview IS present (the finding stays identifiable in the suite).
-    expect(suiteRun.stdout).toContain('AKIA…');
-    expect(suiteRun.stdout).toContain('glpa…');
+    // Embedded step presentation is suppressed: the suite result keeps bounded
+    // finding identity (rule, location, fingerprint) without replaying even the
+    // masked scanner preview as a second child output document.
+    expect(suiteRun.stdout).not.toContain('AKIA…');
+    expect(suiteRun.stdout).not.toContain('glpa…');
   });
 });
 

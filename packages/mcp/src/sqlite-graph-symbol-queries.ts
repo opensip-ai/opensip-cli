@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 import {
   compareCodePointStrings,
   compareSymbolRefs,
@@ -28,7 +28,6 @@ import {
   type SymbolSearchDto,
 } from './graph-read-port.js';
 import { clampLimit, toSymbolRef } from './graph-read-projection.js';
-import { readError } from './mcp-error.js';
 import {
   completeInventoryCoverage,
   inventoryCoverage,

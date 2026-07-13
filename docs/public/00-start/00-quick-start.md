@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-08
+last_verified: 2026-07-12
 release: v0.6.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
@@ -67,8 +67,8 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 # 2. Enter your project
 cd your-project
 
-# 3. Try the built-in audit suite before writing project files
-opensip suite run audit
+# 3. Review changed code before writing project files
+opensip audit
 
 # 4. Scaffold config + example check/scenario (language auto-detected)
 opensip init
@@ -80,12 +80,17 @@ opensip fit --recipe example
 opensip sim --recipe example
 ```
 
-`fit`, `graph`, `graph impact`, and `suite run audit` work in supported projects
-before `init`. In a git repo, `suite run audit` is changed-scope by default and
+`fit`, `graph`, `graph impact`, and `audit` work in supported projects before
+`init`. In a git repo, `audit` is changed-scope by default and
 prints the resolved scope; pass `--full` for a whole-repo run. The CLI uses a
 validated in-memory config and stores rebuildable runtime state in your user
 cache. `init` makes the setup explicit by writing the config, examples,
 `.gitignore`, and agent guidance into the project.
+
+For a human review with the stored Change Impact report, run `opensip audit
+--open`. For CI or an agent, run `opensip audit --json`; JSON, CI, non-TTY, and
+remote-shell execution never opens a browser. Initialization is customization
+after first value, not a prerequisite for the built-in audit.
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
 
@@ -135,8 +140,11 @@ opensip fit recipes
 # See what graph would analyze without building a catalog
 opensip graph --list-files
 
-# Run changed-scope fit + graph evidence in one host-owned suite
-opensip suite run audit --json
+# Run changed-scope fit + graph evidence in one canonical host-owned review
+opensip audit --json
+
+# Open the same run's stored Change Impact evidence for a human
+opensip audit --open
 
 # Ask graph which symbols are impacted by your current git diff
 opensip graph impact --changed --json --top 20
@@ -158,6 +166,9 @@ opensip agent-catalog --json
 ```
 
 The full command tree is at [`../70-reference/01-cli-commands.md`](../70-reference/01-cli-commands.md).
+Configured suites remain available through `opensip suite run <name>`. In
+particular, configured `suites.audit` intentionally affects `suite run audit`
+but never replaces the curated top-level `audit` workflow.
 
 ## Optional: add a local security scanner
 

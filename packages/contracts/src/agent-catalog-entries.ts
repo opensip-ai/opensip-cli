@@ -58,10 +58,17 @@ const TOOL_ENTRY_OVERLAYS: ToolEntryOverlays = {
 
 const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
   {
+    command: 'audit',
+    description:
+      'Run the canonical changed-code review workflow. --json yields a suite result with scope, step verification, and reviewBrief; --open is human-only.',
+    examples: ['opensip audit --json', 'opensip audit --files src/server.ts --json'],
+    tier: 'platform' as const,
+  },
+  {
     command: 'suite run',
     description:
       'Run a configured or built-in multi-tool suite. --json yields a command result with reviewBrief when the suite steps emit SignalEnvelopes.',
-    examples: ['opensip suite run audit --changed --json'],
+    examples: ['opensip suite run security --json'],
     tier: 'platform' as const,
   },
   {

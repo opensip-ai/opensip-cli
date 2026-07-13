@@ -2,8 +2,8 @@
  * @fileoverview Welcome message printed when `opensip` is invoked
  * with no subcommand and no flags.
  *
- * Design goal: a new user typing `opensip` sees the two primary
- * subcommands (fit / sim), a minimal quickstart, and a pointer at
+ * Design goal: a new user typing `opensip` sees the canonical audit
+ * workflow, the individual analysis tools, a minimal quickstart, and a pointer at
  * `--help` for everything else. Progressive disclosure: the tool
  * decides what to show first rather than dumping the full help dump
  * produced by commander.
@@ -72,13 +72,14 @@ export function buildWelcome(opts: WelcomeOptions): string {
     `${bold('OpenSIP CLI')} ${dim(opts.version)} — codebase intelligence from your terminal`,
     '',
     `${bold('Primary commands:')}`,
+    `  ${accent('opensip audit')}      Review changed-code risk, impact, and evidence quality`,
     `  ${accent('opensip fit')}        Run fitness checks against your codebase`,
     `  ${accent('opensip sim')}        Run simulation scenarios`,
     '',
     `${bold('Getting started:')}`,
     `  $ cd your-project`,
-    `  $ opensip init       ${dim('# create a targets config')}`,
-    `  $ opensip fit        ${dim('# run every registered check')}`,
+    `  $ opensip audit      ${dim('# review the current change')}`,
+    `  $ opensip init       ${dim('# customize targets and checks')}`,
     '',
     `${dim('Full reference: opensip --help')}`,
     `${dim('Docs:           https://github.com/opensip-ai/opensip-cli')}`,

@@ -11,13 +11,16 @@
 // `renderFitnessTab`) resolve for them and for the render block below. The
 // subtab-bar / overview / sessions / checks / recipes / tool-tabs renderers now
 // live in that bundle (src/client/*.ts).
+import { boundChangeImpactRuns, projectChangeImpactRuns } from './change-impact/project.js';
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
 import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
 import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
+import { normalizeReportViewSelection } from './report-selection.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
+import type { ReportViewSelection } from './report-selection.js';
 import type {
   StoredRun,
   StoredRunStep,
@@ -47,6 +50,8 @@ export interface DashboardRun extends StoredRun {
 export interface DashboardInput {
   sessions: StoredSession[];
   runs?: readonly DashboardRun[];
+  /** Initial report navigation. Absence retains the current Overview default. */
+  selection?: ReportViewSelection;
   declaredInputs?: DeclaredInputs;
   // Tool-owned catalog data, consumed structurally by the dashboard's
   // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry
@@ -86,6 +91,7 @@ const EXTERNAL_TAB_ID = 'external';
 const EXTERNAL_TAB_LABEL = 'External Tools';
 // Shield icon (lucide) — external adapters are typically secret/vuln scanners.
 const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
+const CHANGE_IMPACT_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>`;
 const OPENSIP_CLI_REPOSITORY_URL = 'https://github.com/opensip-ai/opensip-cli';
 const RELEASE_VERSION_RE = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 
@@ -202,6 +208,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
     yagniSummary = null,
     yagniCatalog = [],
     editorProtocol = null,
+    selection,
     declaredInputs,
   } = input;
 
@@ -232,6 +239,15 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
   const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
+  const reportSelectionJs = serializeOptionalBlob(
+    'REPORT_SELECTION',
+    normalizeReportViewSelection(selection),
+    'literal',
+  );
+  const normalizedSelection = normalizeReportViewSelection(selection);
+  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graphCatalog);
+  const boundedImpact = boundChangeImpactRuns(projectedImpactRuns, normalizedSelection?.runId);
+  const safeChangeImpactJson = escapeForScriptContext(JSON.stringify(boundedImpact.runs));
 
   // Overview is a cross-tool aggregate kept fixed at position 0. The HTML tab
   // buttons, panel containers, renderXxxTab() invocation list, and overview maps
@@ -243,16 +259,26 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const claimedTools = new Set<string>(toolTabs.map((t) => t.tool));
   const hasExternalSessions = sessions.some((s) => !claimedTools.has(s.tool));
   const toolTabButtons = [
-    ...toolTabs.map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`),
+    ...toolTabs.map(
+      (t) =>
+        `  <button type="button" id="tab-${t.id}" class="tab" role="tab" aria-selected="false" aria-controls="panel-${t.id}" tabindex="-1" data-tab="${t.id}">${t.icon} ${t.label}</button>`,
+    ),
     ...(hasExternalSessions
       ? [
-          `  <div class="tab" data-tab="${EXTERNAL_TAB_ID}">${EXTERNAL_TAB_ICON} ${EXTERNAL_TAB_LABEL}</div>`,
+          `  <button type="button" id="tab-${EXTERNAL_TAB_ID}" class="tab" role="tab" aria-selected="false" aria-controls="panel-${EXTERNAL_TAB_ID}" tabindex="-1" data-tab="${EXTERNAL_TAB_ID}">${EXTERNAL_TAB_ICON} ${EXTERNAL_TAB_LABEL}</button>`,
         ]
       : []),
   ].join('\n');
   const toolTabPanels = [
-    ...toolTabs.map((t) => `<div id="panel-${t.id}" class="tab-panel"></div>`),
-    ...(hasExternalSessions ? [`<div id="panel-${EXTERNAL_TAB_ID}" class="tab-panel"></div>`] : []),
+    ...toolTabs.map(
+      (t) =>
+        `<div id="panel-${t.id}" class="tab-panel" role="tabpanel" aria-labelledby="tab-${t.id}" hidden></div>`,
+    ),
+    ...(hasExternalSessions
+      ? [
+          `<div id="panel-${EXTERNAL_TAB_ID}" class="tab-panel" role="tabpanel" aria-labelledby="tab-${EXTERNAL_TAB_ID}" hidden></div>`,
+        ]
+      : []),
   ].join('\n');
   const toolTabRenderCalls = [
     ...toolTabs.map((t) => `${t.renderFunctionName}();`),
@@ -288,12 +314,14 @@ ${dashboardCss()}
   ${renderDeclaredInputs(declaredInputs)}
 </div>
 
-<div class="tab-bar" id="tab-bar">
-  <div class="tab active" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</div>
+<div class="tab-bar" id="tab-bar" role="tablist" aria-label="Report views">
+  <button type="button" id="tab-overview" class="tab active" role="tab" aria-selected="true" aria-controls="panel-overview" tabindex="0" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</button>
+  <button type="button" id="tab-change-impact" class="tab" role="tab" aria-selected="false" aria-controls="panel-change-impact" tabindex="-1" data-tab="change-impact">${CHANGE_IMPACT_ICON} Change Impact</button>
 ${toolTabButtons}
 </div>
 
-<div id="panel-overview" class="tab-panel active"></div>
+<div id="panel-overview" class="tab-panel active" role="tabpanel" aria-labelledby="tab-overview"></div>
+<div id="panel-change-impact" class="tab-panel" role="tabpanel" aria-labelledby="tab-change-impact" hidden></div>
 ${toolTabPanels}
 
 <div class="footer">Generated by <strong>OpenSIP CLI</strong> &mdash; <a href="https://opensip.ai">opensip.ai</a></div>
@@ -303,6 +331,8 @@ ${graphViewModelBlock}
 <script>
 const sessions = ${safeDataJson};
 const runs = ${safeRunsJson};
+const changeImpactRuns = ${safeChangeImpactJson};
+const changeImpactOmittedRuns = ${String(boundedImpact.omittedRuns)};
 const checkCatalog = ${safeCatalogJson};
 const recipeCatalog = ${safeRecipeJson};
 const graphRuleCatalog = ${safeGraphRuleCatalogJson};
@@ -312,6 +342,7 @@ const simRecipeCatalog = ${safeSimRecipeCatalogJson};
 const yagniSummary = ${safeYagniSummaryJson};
 const yagniCatalog = ${safeYagniCatalogJson};
 ${editorProtocolJs}
+${reportSelectionJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
 const yagniSessions = sessions.filter(s => s.tool === 'yagni');
@@ -336,6 +367,7 @@ ${DASHBOARD_CLIENT_BUNDLE}
 // =======================================================
 renderOverview();
 ${toolTabRenderCalls}
+renderChangeImpact();
 </script>
 </body>
 </html>`;

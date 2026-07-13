@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0156](ADR-0156-bounded-stored-impact-proof.md) — Graph-owned bounded impact proof in opaque sessions, authoritative RunStep session joins, explicit overflow/legacy states, and report-time no-recompute/privacy boundaries.
+- [ADR-0155](ADR-0155-canonical-audit-command.md) — Reserved host-owned `opensip audit` backed by the one suite executor; configured `suites.audit` remains explicit through generic `suite run audit`.
 - [ADR-0154](ADR-0154-declarative-runtime-handler-bridge.md) — Plain host+Tool RunScope command inventory and provenance-bound static-handler declaration bridge without inventing call edges.
 - [ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md) — Four-facet exclusive compact MCP graph projections, identity-search default 20, 21/22 surface diagnosis via `get_agent_catalog`, reconnect-versus-refresh (supersedes ADR-0149).
 - [ADR-0152](ADR-0152-dependency-and-declaration-audit-evidence.md) — Absence-sensitive dependency evidence, optional cross-file declaration/reference semantic plane, independent producer cache ABIs, no SQLite migration.
