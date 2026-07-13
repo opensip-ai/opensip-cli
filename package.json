@@ -52,6 +52,7 @@
     "graph:ci": "node packages/cli/dist/index.js graph --gate-save",
     "graph:catalog-diff": "pnpm build && node scripts/graph-catalog-diff.mjs",
     "bench:fork-cost": "pnpm build && node scripts/bench-fork-cost.mjs",
+    "agent-eval": "pnpm build && node packages/agent-eval/dist/cli.js",
     "bench:partition": "pnpm build && node scripts/bench-partition-strategies.mjs",
     "bench:slo": "node scripts/build-ci.mjs && node scripts/bench-slo.mjs",
     "bench:slo:ci": "node scripts/bench-slo.mjs",

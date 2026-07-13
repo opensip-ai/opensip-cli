@@ -119,7 +119,7 @@ export function collectPackageFactDocProblems(docName, text, facts) {
     const missing = facts.privateWorkspaceNames.filter((name) => !text.includes(name));
     problems.push(
       `${docName} names a private workspace package but omits ${missing.join(', ')}; ` +
-        `name both private workspace packages.`,
+        `name every private workspace package.`,
     );
   }
   return problems;

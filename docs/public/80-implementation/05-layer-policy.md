@@ -7,6 +7,7 @@ audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the six-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
 source-files:
   - .config/dependency-cruiser.cjs
+  - .config/eslint.config.mjs
   - pnpm-workspace.yaml
 related-docs:
   - ../10-concepts/03-modular-monolith.md
@@ -138,6 +139,19 @@ future-proof:
 - **`lang-adapters-disjoint`** — `@opensip-cli/lang-*` packages may not import
   sibling `lang-*` packages from production source; shared parser helpers belong
   in core or tree-sitter.
+
+### Workspace-private black-box harness
+
+`@opensip-cli/agent-eval` sits outside the six runtime layers
+([ADR-0157](../../decisions/ADR-0157-agent-eval-black-box-harness.md)). It
+measures the built CLI as a customer would, so it has zero workspace source
+edges in either direction; its `opensip-cli` development dependency exists only
+to order Turbo builds. `agent-eval-imports-nothing-workspace` rejects
+production edges out,
+while `no-import-of-agent-eval` rejects production consumers. Dependency-cruiser
+excludes test sources, so package-scoped ESLint restrictions also reject
+workspace imports (including deep subpaths) from harness tests and reject
+agent-eval imports from every other package's tests.
 
 ### `fitness-no-cli` and `simulation-no-cli`
 

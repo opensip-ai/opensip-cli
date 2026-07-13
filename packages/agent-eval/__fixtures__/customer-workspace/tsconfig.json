@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@fixture/ws-api": ["./packages/ws-api/src/index.ts"],
+      "@fixture/ws-core": ["./packages/ws-core/src/index.ts"],
+      "@fixture/ws-tools": ["./packages/ws-tools/src/index.ts"],
+      "@fixture/ws-web": ["./packages/ws-web/src/index.ts"]
+    }
+  },
+  "include": ["packages/**/*.ts"]
+}

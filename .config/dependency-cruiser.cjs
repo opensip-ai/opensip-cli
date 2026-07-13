@@ -31,8 +31,10 @@
  *   5. @opensip-cli/graph-*        — graph adapter packs (depend on graph)
  *   6. opensip-cli                 — CLI composition root (loads Tools dynamically, no static Tool imports)
  *
- *   (workspace-private, outside the runtime layers: @opensip-cli/test-support —
- *   cross-package test scaffolding, ADR-0040; only test files may import it.)
+ *   (workspace-private, outside the runtime layers: @opensip-cli/agent-eval —
+ *   black-box evaluation harness with zero workspace source edges; and
+ *   @opensip-cli/test-support — cross-package test scaffolding, ADR-0040, which
+ *   only test files may import.)
  *
  * Forbidden edges pin these import boundaries package by package; adjacent
  * packages at the same displayed layer can still have stricter allowlists.
@@ -456,6 +458,25 @@ module.exports = {
         'pull runtime implementation details into the helper surface.',
       from: { path: '^packages/tool-test-kit/src/' },
       to: { path: '^packages/(?!core/|contracts/|tool-test-kit/)' },
+    },
+    {
+      name: 'agent-eval-imports-nothing-workspace',
+      severity: 'error',
+      comment:
+        '@opensip-cli/agent-eval is a black-box instrument (ADR-0157). Zero workspace-source ' +
+        'edges keep its measurements valid while the MCP surface evolves. Its ' +
+        'opensip-cli devDependency is for Turbo build ordering only, never a source import.',
+      from: { path: '^packages/agent-eval/src/' },
+      to: { path: '^packages/(?!agent-eval/)' },
+    },
+    {
+      name: 'no-import-of-agent-eval',
+      severity: 'error',
+      comment:
+        '@opensip-cli/agent-eval is workspace-private development tooling (ADR-0157) with zero ' +
+        'sanctioned consumers. No other workspace package may import it.',
+      from: { pathNot: ['^packages/agent-eval/'] },
+      to: { path: '^packages/agent-eval/' },
     },
     {
       name: 'no-prod-import-of-test-support',

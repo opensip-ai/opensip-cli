@@ -86,6 +86,8 @@ direction. Architecture rules are enforced by dependency-cruiser in CI.
 ```
 opensip-cli/
 ├── packages/
+│   ├── agent-eval/              # @opensip-cli/agent-eval — PRIVATE black-box
+│   │                            #   agent-usability gold-task evaluation harness
 │   ├── core/                    # @opensip-cli/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract

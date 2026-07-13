@@ -41,8 +41,8 @@ test('release order equals the derived publishable workspace set (no frozen coun
   );
   assert.deepEqual(
     [...facts.privateWorkspaceNames],
-    ['@opensip-cli/checks-dogfood', '@opensip-cli/test-support'],
-    'the two known private workspace packages',
+    ['@opensip-cli/agent-eval', '@opensip-cli/checks-dogfood', '@opensip-cli/test-support'],
+    'the known private workspace packages',
   );
 });
 
@@ -55,7 +55,7 @@ test('RELEASING.md version surfaces match the derived governance facts', () => {
     releasingMd,
     new RegExp(`${facts.versionedPackageJsonCount}\\s+\`package\\.json\` files`),
   );
-  // Must name both private workspace packages + the private root manifest.
+  // Must name every private workspace package + the private root manifest.
   for (const name of [...facts.privateWorkspaceNames, facts.privateRootName]) {
     assert.match(
       releasingMd,

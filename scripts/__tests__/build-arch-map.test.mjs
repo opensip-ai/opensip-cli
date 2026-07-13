@@ -82,8 +82,9 @@ export interface ToolCliContext { readonly b: 2 }
     const priv = records.filter((r) => r.private);
     // Relationship, not a frozen number: total = publishable + private.
     assert.equal(records.length, records.filter((r) => !r.private).length + priv.length);
-    // The two known private ownership packages (identity, not a literal count).
+    // The known private ownership packages (identity, not a literal count).
     assert.deepEqual(priv.map((r) => r.name).sort(), [
+      '@opensip-cli/agent-eval',
       '@opensip-cli/checks-dogfood',
       '@opensip-cli/test-support',
     ]);

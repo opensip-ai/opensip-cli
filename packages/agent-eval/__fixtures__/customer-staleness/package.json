@@ -1,0 +1,13 @@
+{
+  "name": "@fixture/customer-staleness",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) — Deterministic two-arm gold-task measurement: control-first scripted strategies, bytes as the cross-arm unit, frozen tasks with versioned strategies, and immutable file-plane EvalReports.
+- [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) — Workspace-private black-box agent-evaluation harness with zero workspace source imports in either direction; it spawns the built CLI and uses its devDependency only for build ordering.
 - [ADR-0156](ADR-0156-bounded-stored-impact-proof.md) — Graph-owned bounded impact proof in opaque sessions, authoritative RunStep session joins, explicit overflow/legacy states, and report-time no-recompute/privacy boundaries.
 - [ADR-0155](ADR-0155-canonical-audit-command.md) — Reserved host-owned `opensip audit` backed by the one suite executor; configured `suites.audit` remains explicit through generic `suite run audit`.
 - [ADR-0154](ADR-0154-declarative-runtime-handler-bridge.md) — Plain host+Tool RunScope command inventory and provenance-bound static-handler declaration bridge without inventing call edges.

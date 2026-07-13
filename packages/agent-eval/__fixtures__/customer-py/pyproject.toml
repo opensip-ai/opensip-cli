@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "customer-py"
+version = "1.0.0"
+description = "Small customer-shaped ledger service"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -48,6 +48,10 @@
     "packages/mcp": {
       "entry": ["src/sqlite-graph-read-port.ts", "src/session-results-read-port.ts"]
     },
+    "packages/agent-eval": {
+      "entry": ["src/cli.ts"],
+      "ignoreDependencies": ["opensip-cli"]
+    },
     "packages/tool-gitleaks": {
       "ignoreDependencies": ["opensip-cli"]
     },

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-12T22:38:38.675Z",
+  "generatedAt": "2026-07-13T07:56:24.345Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,15 +25,16 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 227,
+        "total": 235,
         "bySlug": {
+          "missing-type-exports": 3,
+          "async-waterfall-detection": 11,
           "file-length-limit": 8,
           "no-markdown-references": 5,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 4,
           "one-outcome-shape": 1,
           "context-leakage": 1,
-          "async-waterfall-detection": 5,
           "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
@@ -95,12 +96,12 @@
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
           "hot-paths-require-spans": 1,
-          "missing-type-exports": 1,
           "no-raw-fetch": 1,
           "array-validation": 1,
           "phantom-dependency-detection": 1
         },
         "byPackage": {
+          "agent-eval": 8,
           "cli": 8,
           "contracts": 2,
           "core": 5,
@@ -125,15 +126,16 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 55,
+        "total": 63,
         "bySlug": {
+          "missing-type-exports": 3,
+          "async-waterfall-detection": 11,
           "file-length-limit": 8,
           "no-markdown-references": 3,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 1,
           "one-outcome-shape": 1,
           "context-leakage": 1,
-          "async-waterfall-detection": 5,
           "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
@@ -151,11 +153,11 @@
           "env-via-registry": 2,
           "unsafe-secret-comparison": 2,
           "hot-paths-require-spans": 1,
-          "missing-type-exports": 1,
           "no-raw-fetch": 1,
           "array-validation": 1
         },
         "byPackage": {
+          "agent-eval": 8,
           "cli": 8,
           "contracts": 2,
           "core": 5,
@@ -284,8 +286,9 @@
     },
     "tests": {
       "fitness": {
-        "total": 61,
+        "total": 62,
         "bySlug": {
+          "module-coupling-fan-out": 1,
           "test-file-naming": 3,
           "no-generic-error": 1,
           "my-check": 2,
@@ -321,6 +324,7 @@
           "duplicate-utility-functions": 1
         },
         "byPackage": {
+          "agent-eval": 1,
           "cli": 3,
           "core": 2,
           "dashboard": 1,
@@ -454,16 +458,16 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 227,
+    "budgetGateFitness": 235,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 55,
+    "productRuntimeFitness": 63,
     "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 87,
+    "productRuntimeCombined": 95,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
-    "testsFitness": 61,
+    "testsFitness": 62,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
@@ -480,15 +484,21 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -250,
+      "productRuntimeFitness": -242,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -225,
-      "budgetGateFitness": -315,
+      "productRuntimeCombined": -217,
+      "budgetGateFitness": -307,
       "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
     },
     "reopenCandidates": [
+      {
+        "slug": "async-waterfall-detection",
+        "count": 11,
+        "disposition": "c",
+        "kind": "fitness"
+      },
       {
         "slug": "file-length-limit",
         "count": 8,

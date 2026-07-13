@@ -83,12 +83,15 @@ Turborepo + pnpm monorepo. Workspace scope: `@opensip-cli/*`. Layered —
 higher-level packages depend on lower-level substrates, never the other
 direction. Architecture rules are enforced by dependency-cruiser in CI.
 The generated inventory in `docs/public/80-implementation/architecture-map.md`
-is authoritative: 58 workspace packages, 56 publishable and two private
-(`@opensip-cli/test-support` and `@opensip-cli/checks-dogfood`).
+is authoritative: 59 workspace packages, 56 publishable and three private
+(`@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
+`@opensip-cli/checks-dogfood`).
 
 ```
 opensip-cli/
 ├── packages/
+│   ├── agent-eval/              # @opensip-cli/agent-eval — PRIVATE black-box
+│   │                            #   agent-usability gold-task evaluation harness
 │   ├── core/                    # @opensip-cli/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
