@@ -1,4 +1,4 @@
-import { computeImpact as computeImpactSync } from './graph-impact-sync.js';
+import { computeImpactSynchronousEngine } from './graph-impact-sync.js';
 
 import type { GraphCatalog } from './graph-catalog.js';
 import type { ComputeImpactOptions, ImpactComputation } from './graph-impact-model.js';
@@ -26,7 +26,7 @@ export function computeImpact(
   changedFiles: readonly string[],
   options?: ComputeImpactOptions,
 ): ImpactComputation {
-  return computeImpactSync(catalog, changedFiles, options);
+  return computeImpactSynchronousEngine(catalog, changedFiles, options);
 }
 
 export type {

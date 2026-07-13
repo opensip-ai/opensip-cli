@@ -293,7 +293,7 @@ function buildSynchronousImpactedFiles(
   return [...files].sort(compareImpactText);
 }
 
-export function computeImpact(
+export function computeImpactSynchronousEngine(
   catalog: GraphCatalog,
   changedFiles: readonly string[],
   options?: ComputeImpactOptions,
