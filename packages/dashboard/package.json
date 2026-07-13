@@ -34,6 +34,8 @@
   "scripts": {
     "build": "tsc -p src/client/tsconfig.json --noEmit && node scripts/bundle-client.mjs && tsc && node scripts/copy-vendor.mjs",
     "test": "vitest run --passWithNoTests",
+    "test:integration": "pnpm --workspace-root build && pnpm run test:integration:built",
+    "test:integration:built": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc -p src/client/tsconfig.json --noEmit && node scripts/bundle-client.mjs && tsc --noEmit",
     "vendor:cytoscape": "node scripts/vendor-cytoscape.mjs",
     "clean": "rm -rf dist"

@@ -183,6 +183,7 @@ declare global {
     aggregate: DashboardRun['aggregate'];
     scope?: DashboardRun['scope'];
     reviewBrief?: ChangeImpactReviewBrief;
+    reviewBriefState: 'available' | 'missing' | 'malformed';
     availability:
       | 'available'
       | 'projection-degraded'
@@ -235,6 +236,7 @@ declare global {
       recommendedCommands: number;
       uncertainties: number;
       risks: number;
+      newFindings: number;
       correlations: number;
       actions: number;
       degradations: number;

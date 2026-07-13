@@ -14,7 +14,9 @@
   },
   "scripts": {
     "build": "turbo run build && node scripts/sync-pnpm-injection-if-needed.mjs",
-    "test": "turbo run test && pnpm test:scripts",
+    "test": "turbo run test && pnpm test:scripts && pnpm test:integration",
+    "test:integration": "pnpm build && pnpm test:integration:built",
+    "test:integration:built": "pnpm --filter=@opensip-cli/dashboard test:integration:built",
     "test:coverage": "turbo run test --continue -- --coverage",
     "test:coverage:fresh": "turbo run test --continue --force -- --coverage",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",

@@ -1,11 +1,16 @@
+import { createHash } from 'node:crypto';
+
+import { scriptContextJsonBytes } from '../script-context-json.js';
+
 import type { BoundedChangeImpactRuns, ChangeImpactViewModel } from './types.js';
+import type { ReviewBrief, SuiteRunScope } from '@opensip-cli/contracts';
 
 const REPORT_MODEL_LIMIT = 5;
+const PLACEHOLDER_TEXT_LIMIT = 512;
+const PLACEHOLDER_IDENTITY_LIMIT = 128;
+const REPORT_BUDGET_PLACEHOLDER_REASON =
+  'Detailed Change Impact presentation was omitted by the report byte budget.';
 export const MAX_CHANGE_IMPACT_MODELS_BYTES = 2_097_152;
-
-function serializedBytes(value: unknown): number {
-  return Buffer.byteLength(JSON.stringify(value), 'utf8');
-}
 
 function removeLastEntity(model: ChangeImpactViewModel): ChangeImpactViewModel | undefined {
   const evidence = model.evidence;
@@ -57,7 +62,7 @@ function removeLastReviewBriefItem(
     K extends 'topRisks' | 'newFindings' | 'correlatedRisks' | 'recommendedActions' | 'degraded',
   >(
     key: K,
-    omittedKey: 'risks' | 'correlations' | 'actions' | 'degradations',
+    omittedKey: 'risks' | 'newFindings' | 'correlations' | 'actions' | 'degradations',
   ): ChangeImpactViewModel | undefined => {
     const values = brief[key] ?? [];
     if (values.length === 0) return undefined;
@@ -82,13 +87,102 @@ function removeLastReviewBriefItem(
     trim('correlatedRisks', 'correlations') ??
     trim('recommendedActions', 'actions') ??
     trim('degraded', 'degradations') ??
-    trim('newFindings', 'risks') ??
+    trim('newFindings', 'newFindings') ??
     trim('topRisks', 'risks')
   );
 }
 
+function boundedText(value: string, limit = PLACEHOLDER_TEXT_LIMIT): string {
+  return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
+}
+
+function boundedIdentity(value: string, label: string): string {
+  if (value.length <= PLACEHOLDER_IDENTITY_LIMIT) return value;
+  const digest = createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 24);
+  return `${label}-${digest}`;
+}
+
+function placeholderScope(scope: SuiteRunScope): SuiteRunScope {
+  return {
+    ...scope,
+    ...(scope.ref === undefined ? {} : { ref: boundedText(scope.ref) }),
+    ...(scope.notice === undefined ? {} : { notice: boundedText(scope.notice) }),
+  };
+}
+
+function placeholderBrief(brief: ReviewBrief): ReviewBrief {
+  return {
+    version: brief.version,
+    suite: boundedText(brief.suite),
+    suiteRunId: boundedIdentity(brief.suiteRunId, 'suite'),
+    verdict: brief.verdict,
+    changedFiles: brief.changedFiles,
+    topRisks: [],
+    newFindings: [],
+    baselineDelta: brief.baselineDelta,
+    degraded: [],
+    recommendedActions: [],
+    ...(brief.correlatedRisks === undefined ? {} : { correlatedRisks: [] }),
+  };
+}
+
+function reportBudgetPlaceholder(model: ChangeImpactViewModel): ChangeImpactViewModel | undefined {
+  if (model.availabilityReason === REPORT_BUDGET_PLACEHOLDER_REASON) return undefined;
+  const evidence = model.evidence;
+  const brief = model.reviewBrief;
+  const reportOmitted = {
+    changedFiles: model.reportOmitted.changedFiles + (evidence?.changedFiles.length ?? 0),
+    changedFunctions:
+      model.reportOmitted.changedFunctions + (evidence?.changedFunctions.length ?? 0),
+    impactedFunctions:
+      model.reportOmitted.impactedFunctions + (evidence?.impactedFunctions.length ?? 0),
+    impactedFiles: model.reportOmitted.impactedFiles + (evidence?.impactedFiles.length ?? 0),
+    impactedPackages:
+      model.reportOmitted.impactedPackages + (evidence?.impactedPackages.length ?? 0),
+    recommendedCommands:
+      model.reportOmitted.recommendedCommands + (evidence?.recommendedCommands.length ?? 0),
+    uncertainties: model.reportOmitted.uncertainties + (evidence?.trust.uncertainties.length ?? 0),
+    risks: model.reportOmitted.risks + (brief?.topRisks.length ?? 0),
+    newFindings: model.reportOmitted.newFindings + (brief?.newFindings.length ?? 0),
+    correlations: model.reportOmitted.correlations + (brief?.correlatedRisks?.length ?? 0),
+    actions: model.reportOmitted.actions + (brief?.recommendedActions.length ?? 0),
+    degradations: model.reportOmitted.degradations + (brief?.degraded.length ?? 0),
+  };
+  return {
+    ...model,
+    runId: boundedIdentity(model.runId, 'run'),
+    completedAt: boundedText(model.completedAt, 64),
+    ...(model.scope === undefined ? {} : { scope: placeholderScope(model.scope) }),
+    ...(brief === undefined ? {} : { reviewBrief: placeholderBrief(brief) }),
+    availabilityReason: REPORT_BUDGET_PLACEHOLDER_REASON,
+    zeroImpact: false,
+    sourceTruncated: true,
+    ...(evidence === undefined
+      ? {}
+      : {
+          evidence: {
+            ...evidence,
+            changedFiles: [],
+            changedFunctions: [],
+            impactedFunctions: [],
+            impactedFiles: [],
+            impactedPackages: [],
+            trust: {
+              ...evidence.trust,
+              fallback: boundedText(evidence.trust.fallback),
+              uncertainties: [],
+            },
+            recommendedCommands: [],
+          },
+        }),
+    reportOmitted,
+  };
+}
+
 function trimOneModel(model: ChangeImpactViewModel): ChangeImpactViewModel | undefined {
-  return removeLastEntity(model) ?? removeLastReviewBriefItem(model);
+  return (
+    removeLastEntity(model) ?? removeLastReviewBriefItem(model) ?? reportBudgetPlaceholder(model)
+  );
 }
 
 function selectedModelIndex(
@@ -138,7 +232,7 @@ export function boundChangeImpactRuns(
     retained[retained.length - 1] = selected;
   }
   let bounded = retained;
-  while (serializedBytes(bounded) > maxBytes) {
+  while (scriptContextJsonBytes(bounded) > maxBytes) {
     // `[]` itself occupies two bytes. An artificial test budget below that is
     // unsatisfiable; returning no models is the smallest safe representation.
     if (bounded.length === 0) break;

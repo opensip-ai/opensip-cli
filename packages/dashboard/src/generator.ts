@@ -18,6 +18,7 @@ import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { normalizeReportViewSelection } from './report-selection.js';
+import { serializeJsonForScriptContext } from './script-context-json.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
 import type { ReportViewSelection } from './report-selection.js';
@@ -32,6 +33,55 @@ import type {
 /** A persisted host-owned run plus its ordered steps for dashboard rendering. */
 export interface DashboardRun extends StoredRun {
   readonly steps: readonly StoredRunStep[];
+}
+
+type OverviewDashboardRun = Pick<
+  DashboardRun,
+  | 'aggregate'
+  | 'completedAt'
+  | 'durationMs'
+  | 'exitCode'
+  | 'id'
+  | 'legacySuiteRunId'
+  | 'name'
+  | 'source'
+  | 'startedAt'
+  | 'steps'
+>;
+
+/** Keep the Overview ledger lean; Change Impact owns the bounded ReviewBrief copy. */
+function projectOverviewRuns(runs: readonly DashboardRun[]): readonly OverviewDashboardRun[] {
+  return runs.map((run) => ({
+    id: run.id,
+    name: run.name,
+    source: run.source,
+    startedAt: run.startedAt,
+    completedAt: run.completedAt,
+    durationMs: run.durationMs,
+    exitCode: run.exitCode,
+    aggregate: run.aggregate,
+    steps: run.steps,
+    ...(run.legacySuiteRunId === undefined ? {} : { legacySuiteRunId: run.legacySuiteRunId }),
+  }));
+}
+
+/** Remove impact's duplicate opaque copy after the bounded Change Impact model is projected. */
+function projectBrowserSessions(sessions: readonly StoredSession[]): readonly StoredSession[] {
+  return sessions.map((session) => {
+    const payload = session.payload;
+    if (
+      session.tool !== 'graph' ||
+      typeof payload !== 'object' ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
+      return session;
+    }
+    const browserPayload = Object.fromEntries(
+      Object.entries(payload).filter(([key]) => key !== 'impact' && key !== 'impactStatus'),
+    );
+    return { ...session, payload: browserPayload };
+  });
 }
 
 /**
@@ -94,11 +144,6 @@ const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24
 const CHANGE_IMPACT_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>`;
 const OPENSIP_CLI_REPOSITORY_URL = 'https://github.com/opensip-ai/opensip-cli';
 const RELEASE_VERSION_RE = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
-
-// Escape all < and > to prevent script injection in HTML <script> context
-function escapeForScriptContext(json: string): string {
-  return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`);
-}
 
 // Coerce a session.score into a finite number safe for HTML interpolation
 // in the <title> tag. Returns 0 for non-finite values so the rendered
@@ -177,7 +222,7 @@ function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'liter
   switch (kind) {
     case 'json': {
       if (value === null || value === undefined) return '';
-      const escaped = escapeForScriptContext(JSON.stringify(value));
+      const escaped = serializeJsonForScriptContext(value);
       return `<script type="application/json" id="${id}">${escaped}</script>`;
     }
     case 'literal': {
@@ -185,9 +230,7 @@ function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'liter
       // a value containing the literal sequence `</script>` would close the
       // surrounding inline <script> block (JSON.stringify does not escape `<`).
       const rendered =
-        value === null || value === undefined
-          ? 'null'
-          : escapeForScriptContext(JSON.stringify(value));
+        value === null || value === undefined ? 'null' : serializeJsonForScriptContext(value);
       return `const ${id} = ${rendered};`;
     }
   }
@@ -219,16 +262,16 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // Number(NaN-ish) on a string still yields NaN; we substitute 0 to keep
   // the page title well-formed in the pathological case.
   const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0;
-  const safeDataJson = escapeForScriptContext(JSON.stringify(sessions));
-  const safeRunsJson = escapeForScriptContext(JSON.stringify(runs));
-  const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog));
-  const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog));
-  const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog));
-  const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog));
-  const safeSimScenarioCatalogJson = escapeForScriptContext(JSON.stringify(simScenarioCatalog));
-  const safeSimRecipeCatalogJson = escapeForScriptContext(JSON.stringify(simRecipeCatalog));
-  const safeYagniSummaryJson = escapeForScriptContext(JSON.stringify(yagniSummary));
-  const safeYagniCatalogJson = escapeForScriptContext(JSON.stringify(yagniCatalog));
+  const safeDataJson = serializeJsonForScriptContext(projectBrowserSessions(sessions));
+  const safeRunsJson = serializeJsonForScriptContext(projectOverviewRuns(runs));
+  const safeCatalogJson = serializeJsonForScriptContext(checkCatalog);
+  const safeRecipeJson = serializeJsonForScriptContext(recipeCatalog);
+  const safeGraphRuleCatalogJson = serializeJsonForScriptContext(graphRuleCatalog);
+  const safeGraphRecipeCatalogJson = serializeJsonForScriptContext(graphRecipeCatalog);
+  const safeSimScenarioCatalogJson = serializeJsonForScriptContext(simScenarioCatalog);
+  const safeSimRecipeCatalogJson = serializeJsonForScriptContext(simRecipeCatalog);
+  const safeYagniSummaryJson = serializeJsonForScriptContext(yagniSummary);
+  const safeYagniCatalogJson = serializeJsonForScriptContext(yagniCatalog);
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
@@ -247,7 +290,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const normalizedSelection = normalizeReportViewSelection(selection);
   const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graphCatalog);
   const boundedImpact = boundChangeImpactRuns(projectedImpactRuns, normalizedSelection?.runId);
-  const safeChangeImpactJson = escapeForScriptContext(JSON.stringify(boundedImpact.runs));
+  const safeChangeImpactJson = serializeJsonForScriptContext(boundedImpact.runs);
 
   // Overview is a cross-tool aggregate kept fixed at position 0. The HTML tab
   // buttons, panel containers, renderXxxTab() invocation list, and overview maps

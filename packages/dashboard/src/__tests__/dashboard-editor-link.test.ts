@@ -52,7 +52,11 @@ const CATALOG: GraphCatalog = {
 };
 
 /** Boot the bundle with the given EDITOR_PROTOCOL, open the card for h1, return its action anchor href (or null). */
-function editorHref(protocol: string | null, line = 42): string | null {
+function editorHref(
+  protocol: string | null,
+  line = 42,
+  filePath = 'packages/x/src/x.ts',
+): string | null {
   document.body.innerHTML = '';
   const protoSrc =
     protocol === null
@@ -61,7 +65,7 @@ function editorHref(protocol: string | null, line = 42): string | null {
   const cat: GraphCatalog = {
     ...CATALOG,
     functions: {
-      f: [{ ...CATALOG.functions.f[0], line }],
+      f: [{ ...CATALOG.functions.f[0], filePath, line }],
     },
   };
   const head =
@@ -89,6 +93,12 @@ describe('editorLinkUrl (via the Function Card action row)', () => {
 
   it('produces cursor://file/<path>:<line> for cursor', () => {
     expect(editorHref('cursor', 7)).toBe('cursor://file/packages/x/src/x.ts:7');
+  });
+
+  it('encodes URI-reserved filename characters instead of changing the target path', () => {
+    expect(editorHref('vscode', 9, 'src/risk#part?100%.ts')).toBe(
+      'vscode://file/src/risk%23part%3F100%25.ts:9',
+    );
   });
 
   it('renders no editor anchor (Copy path fallback) when EDITOR_PROTOCOL is null', () => {

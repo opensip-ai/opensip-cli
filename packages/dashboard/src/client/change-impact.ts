@@ -62,6 +62,18 @@ function renderSelected(panel: HTMLElement, model: ChangeImpactViewModel): void 
   );
 }
 
+function selectionAnnouncement(model: ChangeImpactViewModel): string {
+  return `Showing audit run ${model.runId}: ${model.verdict}, ${model.availability.replaceAll('-', ' ')} evidence.`;
+}
+
+function omittedRunsNotice(): HTMLElement | undefined {
+  if (changeImpactOmittedRuns <= 0) return undefined;
+  return el('p', {
+    class: 'text-muted change-impact-omitted-runs',
+    text: `${String(changeImpactOmittedRuns)} stored audit run(s) omitted from this report.`,
+  });
+}
+
 export function renderChangeImpact(): void {
   const panel = document.querySelector<HTMLElement>('#panel-change-impact');
   if (!panel) return;
@@ -78,7 +90,7 @@ export function renderChangeImpact(): void {
   }
   panel.replaceChildren();
   if (changeImpactRuns.length === 0) {
-    renderNoAuditState(panel);
+    renderNoAuditState(panel, changeImpactOmittedRuns);
     if (shouldActivate()) activateReportTab('change-impact');
     return;
   }
@@ -87,12 +99,13 @@ export function renderChangeImpact(): void {
   const selected =
     changeImpactRuns.find((model) => model.runId === requested) ?? changeImpactRuns[0];
   if (!selected) return;
-  const controls = el('div', { class: 'card change-impact-controls' }, [
+  const controls = el('section', { class: 'card change-impact-controls' }, [
     el('label', { for: 'change-impact-run-select', text: 'Audit run' }),
   ]);
   const select = el('select', {
     id: 'change-impact-run-select',
     'aria-label': 'Audit run',
+    'aria-describedby': 'change-impact-selection-status',
   }) as HTMLSelectElement;
   changeImpactRuns.forEach((model) => {
     const option = el('option', {
@@ -102,7 +115,15 @@ export function renderChangeImpact(): void {
     option.selected = model.runId === selected.runId;
     select.append(option);
   });
-  controls.append(select);
+  const liveStatus = el('p', {
+    id: 'change-impact-selection-status',
+    class: 'text-muted change-impact-selection-status',
+    role: 'status',
+    'aria-live': 'polite',
+    'aria-atomic': 'true',
+    text: selectionAnnouncement(selected),
+  });
+  controls.append(select, liveStatus);
   if (requested && requested !== selected.runId) {
     controls.append(
       el('p', {
@@ -111,20 +132,15 @@ export function renderChangeImpact(): void {
       }),
     );
   }
-  if (changeImpactOmittedRuns > 0) {
-    controls.append(
-      el('p', {
-        class: 'text-muted',
-        text: `${String(changeImpactOmittedRuns)} older audit run(s) omitted from this report.`,
-      }),
-    );
-  }
+  const omission = omittedRunsNotice();
+  if (omission) controls.append(omission);
   panel.append(controls);
   renderSelected(panel, selected);
   select.addEventListener('change', () => {
     const next = changeImpactRuns.find((model) => model.runId === select.value);
     if (!next) return;
     renderSelected(panel, next);
+    liveStatus.textContent = selectionAnnouncement(next);
     updateHash(next.runId);
   });
   if (shouldActivate()) {

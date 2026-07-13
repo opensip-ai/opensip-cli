@@ -20,6 +20,7 @@ export interface ChangeImpactOmittedCounts {
   readonly recommendedCommands: number;
   readonly uncertainties: number;
   readonly risks: number;
+  readonly newFindings: number;
   readonly correlations: number;
   readonly actions: number;
   readonly degradations: number;
@@ -76,7 +77,7 @@ export interface ChangeImpactEvidence {
   readonly truncated: boolean;
   readonly backendOmitted: Omit<
     ChangeImpactOmittedCounts,
-    'uncertainties' | 'risks' | 'correlations' | 'actions' | 'degradations'
+    'uncertainties' | 'risks' | 'newFindings' | 'correlations' | 'actions' | 'degradations'
   >;
   readonly detailTruncated: boolean;
   readonly metadataOmitted: boolean;
@@ -91,6 +92,7 @@ export interface ChangeImpactViewModel {
   readonly aggregate: StoredRunAggregate;
   readonly scope?: SuiteRunScope;
   readonly reviewBrief?: ReviewBrief;
+  readonly reviewBriefState: 'available' | 'missing' | 'malformed';
   readonly availability: ChangeImpactAvailability;
   readonly availabilityReason: string;
   readonly catalogMatch: ChangeImpactCatalogMatch;

@@ -1,3 +1,5 @@
+import { reviewBriefSchema } from '@opensip-cli/contracts';
+
 import {
   buildCatalogFunctionIndex,
   catalogMatch,
@@ -7,13 +9,21 @@ import {
 } from './evidence.js';
 
 import type { ChangeImpactOmittedCounts, ChangeImpactViewModel } from './types.js';
-import type { GraphCatalog, StoredRun, StoredRunStep, StoredSession } from '@opensip-cli/contracts';
+import type {
+  GraphCatalog,
+  ReviewBrief,
+  StoredRun,
+  StoredRunStep,
+  StoredSession,
+} from '@opensip-cli/contracts';
 
 export { boundChangeImpactRuns, MAX_CHANGE_IMPACT_MODELS_BYTES } from './bound-runs.js';
 
 type ImpactDashboardRun = StoredRun & {
   readonly steps: readonly StoredRunStep[];
 };
+
+const MAX_REVIEW_BRIEF_STRING_LENGTH = 131_072;
 
 const ZERO_OMITTED: ChangeImpactOmittedCounts = {
   changedFiles: 0,
@@ -24,6 +34,7 @@ const ZERO_OMITTED: ChangeImpactOmittedCounts = {
   recommendedCommands: 0,
   uncertainties: 0,
   risks: 0,
+  newFindings: 0,
   correlations: 0,
   actions: 0,
   degradations: 0,
@@ -42,17 +53,45 @@ function baseModel(
   ChangeImpactViewModel,
   'availability' | 'availabilityReason' | 'catalogMatch' | 'zeroImpact' | 'sourceTruncated'
 > {
+  const parsedReviewBrief = parseReviewBrief(run.reviewBrief);
+  const reviewBrief = parsedReviewBrief.value;
   return {
     runId: run.id,
     completedAt: run.completedAt,
     durationMs: run.durationMs,
     exitCode: run.exitCode,
-    verdict: run.reviewBrief?.verdict ?? (run.exitCode === 0 ? 'pass' : 'fail'),
+    verdict: projectedReviewVerdict(reviewBrief, run.exitCode),
     aggregate: run.aggregate,
     ...(run.scope === undefined ? {} : { scope: run.scope }),
-    ...(run.reviewBrief === undefined ? {} : { reviewBrief: run.reviewBrief }),
+    ...(reviewBrief === undefined ? {} : { reviewBrief }),
+    reviewBriefState: parsedReviewBrief.state,
     reportOmitted: { ...ZERO_OMITTED },
   };
+}
+
+function projectedReviewVerdict(
+  reviewBrief: ReviewBrief | undefined,
+  exitCode: number,
+): ChangeImpactViewModel['verdict'] {
+  if (reviewBrief) return reviewBrief.verdict;
+  return exitCode === 0 ? 'warn' : 'fail';
+}
+
+function hasOversizedReviewBriefString(value: unknown): boolean {
+  if (typeof value === 'string') return value.length > MAX_REVIEW_BRIEF_STRING_LENGTH;
+  if (Array.isArray(value)) return value.some(hasOversizedReviewBriefString);
+  if (typeof value !== 'object' || value === null) return false;
+  return Object.values(value).some(hasOversizedReviewBriefString);
+}
+
+function parseReviewBrief(value: unknown): {
+  readonly state: 'available' | 'missing' | 'malformed';
+  readonly value?: ReviewBrief;
+} {
+  if (value === undefined) return { state: 'missing' };
+  const parsed = reviewBriefSchema.safeParse(value);
+  if (!parsed.success || hasOversizedReviewBriefString(parsed.data)) return { state: 'malformed' };
+  return { state: 'available', value: parsed.data };
 }
 
 /** Join built-in audit runs to graph impact sessions only through RunStep.sessionId. */

@@ -26,9 +26,8 @@ const CAPS = {
 export const MISSING_STORED_CATALOG = 'missing-stored';
 
 export function record(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
 }
 
 function finiteCount(value: unknown): number | undefined {

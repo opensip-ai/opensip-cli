@@ -187,7 +187,23 @@ describe('projectChangeImpactRuns', () => {
         changedFunctions: [{ bodyHash: 'body-changed', navigation: 'available' }],
       },
     });
-    expect(result[0]?.reviewBrief).toBe(brief);
+    expect(result[0]?.reviewBrief).toEqual(brief);
+  });
+
+  it('never infers PASS when the authoritative ReviewBrief is missing', () => {
+    const models = projectChangeImpactRuns(
+      [
+        run({ id: 'run-success', reviewBrief: undefined }),
+        run({ id: 'run-failed', exitCode: 1, reviewBrief: undefined }),
+      ],
+      [session()],
+      catalog,
+    );
+    const successfulLegacy = models.find((model) => model.runId === 'run-success');
+    const failedLegacy = models.find((model) => model.runId === 'run-failed');
+
+    expect(successfulLegacy).toMatchObject({ reviewBriefState: 'missing', verdict: 'warn' });
+    expect(failedLegacy).toMatchObject({ reviewBriefState: 'missing', verdict: 'fail' });
   });
 
   it.each([
@@ -340,7 +356,7 @@ describe('projectChangeImpactRuns', () => {
     const hugeRisk = {
       source: 'fit',
       ruleId: 'huge-risk',
-      message: 'x'.repeat(120_000),
+      message: 'x'.repeat(3000),
       severity: 'high' as const,
       file: 'src/a.ts',
       isNew: true,
@@ -359,15 +375,117 @@ describe('projectChangeImpactRuns', () => {
       },
     });
     const models = projectChangeImpactRuns([oversizedRun], [session()], catalog);
-    const bounded = boundChangeImpactRuns(models, 'run-1');
+    const bounded = boundChangeImpactRuns(models, 'run-1', 20_000);
 
-    expect(Buffer.byteLength(JSON.stringify(bounded.runs), 'utf8')).toBeLessThanOrEqual(2_097_152);
+    expect(Buffer.byteLength(JSON.stringify(bounded.runs), 'utf8')).toBeLessThanOrEqual(20_000);
     expect(bounded.runs[0]?.runId).toBe('run-1');
     expect(bounded.runs[0]?.verdict).toBe('warn');
     expect(bounded.runs[0]?.reportOmitted.risks).toBeGreaterThan(0);
+    expect(bounded.runs[0]?.reportOmitted.newFindings).toBeGreaterThan(0);
 
     const impossible = boundChangeImpactRuns(models, 'run-1', 1);
     expect(impossible.runs).toEqual([]);
     expect(impossible.omittedRuns).toBe(1);
+  });
+
+  it('preserves a bounded audit placeholder when oversized scalar presentation text remains', () => {
+    const oversizedNotice = 'scope notice '.repeat(20_000);
+    const models = projectChangeImpactRuns(
+      [
+        run({
+          scope: {
+            mode: 'changed',
+            source: 'fallback',
+            changedFiles: 1,
+            notice: oversizedNotice,
+          },
+        }),
+      ],
+      [session()],
+      catalog,
+    );
+    const bounded = boundChangeImpactRuns(models, 'run-1', 5000);
+
+    expect(Buffer.byteLength(JSON.stringify(bounded.runs), 'utf8')).toBeLessThanOrEqual(5000);
+    expect(bounded.omittedRuns).toBe(0);
+    expect(bounded.runs).toHaveLength(1);
+    expect(bounded.runs[0]).toMatchObject({
+      runId: 'run-1',
+      availabilityReason:
+        'Detailed Change Impact presentation was omitted by the report byte budget.',
+      sourceTruncated: true,
+      zeroImpact: false,
+      evidence: {
+        changedFiles: [],
+        changedFunctions: [],
+        recommendedCommands: [],
+      },
+      reportOmitted: {
+        changedFiles: 1,
+        changedFunctions: 1,
+        recommendedCommands: 1,
+      },
+    });
+    expect(bounded.runs[0]?.scope?.notice).toHaveLength(512);
+    expect(bounded.runs[0]?.scope?.notice).toMatch(/…$/u);
+    expect(models[0]?.scope?.notice).toBe(oversizedNotice);
+  });
+
+  it('drops malformed or oversized ReviewBrief data without discarding valid impact evidence', () => {
+    const malformedBrief = {
+      ...brief,
+      topRisks: { blob: 'x'.repeat(600_000) },
+    } as unknown as ReviewBrief;
+
+    const [model] = projectChangeImpactRuns(
+      [run({ reviewBrief: malformedBrief })],
+      [session()],
+      catalog,
+    );
+
+    expect(model).toMatchObject({
+      availability: 'available',
+      reviewBriefState: 'malformed',
+      verdict: 'warn',
+      evidence: { changedFiles: ['src/a.ts'] },
+    });
+    expect(model?.reviewBrief).toBeUndefined();
+    expect(() => boundChangeImpactRuns(model ? [model] : [], 'run-1')).not.toThrow();
+  });
+
+  it('carries a valid brief above 512 KiB into the real 2 MiB deterministic trimmer', () => {
+    const largeRisk = {
+      source: 'fit',
+      ruleId: 'large-risk',
+      message: 'r'.repeat(12_000),
+      severity: 'high' as const,
+      file: 'src/a.ts',
+      isNew: true,
+      signalRef: {
+        tool: 'fit',
+        suiteRunId: 'suite-1',
+        stepIndex: 0,
+        signalIndex: 0,
+      },
+    };
+    const largeBrief: ReviewBrief = {
+      ...brief,
+      topRisks: Array.from({ length: 100 }, () => largeRisk),
+      newFindings: Array.from({ length: 100 }, () => largeRisk),
+    };
+    const models = projectChangeImpactRuns(
+      [run({ reviewBrief: largeBrief })],
+      [session()],
+      catalog,
+    );
+
+    expect(Buffer.byteLength(JSON.stringify(models), 'utf8')).toBeGreaterThan(2_097_152);
+    const bounded = boundChangeImpactRuns(models, 'run-1');
+    expect(Buffer.byteLength(JSON.stringify(bounded.runs), 'utf8')).toBeLessThanOrEqual(2_097_152);
+    expect(bounded.runs[0]?.reviewBriefState).toBe('available');
+    expect(bounded.runs[0]?.reportOmitted.newFindings).toBeGreaterThan(0);
+    expect(boundChangeImpactRuns(models, 'run-1')).toEqual(bounded);
+    expect(largeBrief.topRisks).toHaveLength(100);
+    expect(largeBrief.newFindings).toHaveLength(100);
   });
 });
