@@ -243,7 +243,11 @@ describe('audit acceptance through built CLI', () => {
     );
   }, 240_000);
 
-  it('keeps the root audit curated when generic suite execution selects a configured override', () => {
+  it('rejects a configured suites.audit at document validation for both spellings (ADR-0159)', () => {
+    // ADR-0159 amended ADR-0155: the reserved suite name can no longer exist
+    // in a valid config document, so instead of the old divergence (root audit
+    // curated, suite run audit overridden) BOTH spellings fail identically at
+    // config load with an actionable rename hint.
     writeConfig([
       'suites:',
       '  audit:',
@@ -277,21 +281,19 @@ describe('audit acceptance through built CLI', () => {
       ],
       options,
     );
-    const directOutcome = JSON.parse(direct.stdout) as {
-      readonly data: { readonly steps?: readonly unknown[] };
-    };
-    const genericOutcome = JSON.parse(generic.stdout) as {
-      readonly data: {
-        readonly steps?: readonly {
-          readonly command?: string;
-          readonly tool?: string;
-        }[];
-      };
-    };
 
-    expect(directOutcome.data.steps).toHaveLength(3);
-    expect(genericOutcome.data.steps).toEqual([
-      expect.objectContaining({ tool: 'graph', command: 'impact' }),
-    ]);
+    for (const outcome of [direct, generic]) {
+      expect(outcome.exitCode).toBe(2);
+      const parsed = JSON.parse(outcome.stdout) as {
+        readonly kind: string;
+        readonly errors: readonly { readonly message: string; readonly code: string }[];
+      };
+      expect(parsed.kind).toBe('command.error');
+      expect(parsed.errors[0]?.code).toBe('CONFIGURATION_ERROR');
+      expect(parsed.errors[0]?.message).toContain(
+        "Suite name 'audit' is reserved for the built-in audit suite",
+      );
+      expect(parsed.errors[0]?.message).toContain('opensip suite run audit-custom');
+    }
   }, 240_000);
 });

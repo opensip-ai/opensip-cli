@@ -542,7 +542,13 @@ describe('executeAgentCatalog', () => {
     const { catalog } = out as {
       catalog: ReturnType<typeof buildAgentCatalog>;
     };
-    expect(catalog).toEqual(buildAgentCatalog({ tools }));
+    // The host wrapper injects the reserved-name lists (ADR-0159) the bare
+    // contracts builder cannot know about.
+    const { reservedNames, ...rest } = catalog;
+    expect(rest).toEqual(buildAgentCatalog({ tools }));
+    expect(reservedNames?.rootCommands).toContain('audit');
+    expect(reservedNames?.rootCommands).toContain('init');
+    expect(reservedNames?.suiteNames).toEqual(['audit']);
   });
 
   it('returns a concise text summary in human mode (no --json)', async () => {

@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isReservedSuiteName, reservedSuiteNameMessage } from '@opensip-cli/config';
 import { ConfigurationError, currentLogger, type Tool } from '@opensip-cli/core';
 import { isMap, isSeq, parseDocument, type Document as YAMLDocument, type YAMLMap } from 'yaml';
 
@@ -25,6 +26,13 @@ export interface SuiteAddOutput {
 }
 
 export function addSuiteStep(input: SuiteAddInput): SuiteAddOutput {
+  // ADR-0159: refuse before any YAML edit — `suite add` must never author a
+  // config the document schema then rejects on every subsequent command.
+  if (isReservedSuiteName(input.suite)) {
+    throw new ConfigurationError(reservedSuiteNameMessage(input.suite), {
+      code: 'CONFIG.SUITE_ADD.RESERVED_NAME',
+    });
+  }
   const tool = resolveTool(input.tool, input.tools);
   const command = tool.commandSpecs?.find((spec) => spec.name === input.command);
   if (command === undefined) {

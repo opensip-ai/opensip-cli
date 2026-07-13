@@ -1092,8 +1092,9 @@ The default MCP server remains read-only and does not register mutating tools.
 
 Host-owned. `opensip audit` always runs the curated built-in audit definition
 through the same concrete executor, suite orchestrator, output seams, Run
-ledger, sessions, and exit policy as generic `suite run`. It is not a Tool and
-configured `suites.audit` cannot replace it.
+ledger, sessions, and exit policy as generic `suite run`. It is not a Tool, and
+the suite name `audit` is reserved (ADR-0159): config validation rejects a
+configured `suites.audit`, so nothing can shadow the canonical review.
 
 ```bash
 opensip audit
@@ -1185,10 +1186,11 @@ tools must scan different roots or target sets.
 plane as user-authored suites. In a git repo, `opensip suite run audit` runs
 changed-scope by default and prints a line such as `Scope: changed (working
 tree, 14 files)`. Use `--full` for a whole-repo run; outside git, the default
-falls back to full scope with one suite-level notice. Define `suites.audit` in
-config to replace the preset only for this generic `suite run audit` form. The
-reserved top-level `opensip audit` continues to use the curated built-in
-definition. Suite-level selectors (`--changed`,
+falls back to full scope with one suite-level notice. The suite name `audit`
+is reserved (ADR-0159): config validation rejects a configured `suites.audit`,
+so `suite run audit` always runs the same built-in preset as top-level
+`opensip audit` — use another name (for example `audit-custom`) for a custom
+workflow. Suite-level selectors (`--changed`,
 `--since`, `--files`) reach only steps whose command declares the matching
 option; per-step `args` still override propagated values.
 

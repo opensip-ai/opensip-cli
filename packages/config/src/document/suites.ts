@@ -1,5 +1,31 @@
 import { z } from 'zod';
 
+/**
+ * Suite names reserved for host-owned built-in suites (ADR-0159). A configured
+ * suite may not claim one: top-level `opensip audit` always runs the built-in
+ * definition (ADR-0155), so a configured `suites.audit` could only diverge from
+ * it through `suite run audit` — silently. Rejecting the key at document
+ * validation makes that divergence unrepresentable. Bundling a new built-in
+ * suite requires adding its name here in the same change.
+ */
+export const RESERVED_SUITE_NAMES = ['audit'] as const;
+
+const reservedSuiteNames: ReadonlySet<string> = new Set(RESERVED_SUITE_NAMES);
+
+/** True when `name` is reserved for a built-in suite (ADR-0159). */
+export function isReservedSuiteName(name: string): boolean {
+  return reservedSuiteNames.has(name);
+}
+
+/** Actionable rejection message for a reserved suite name, with a rename hint. */
+export function reservedSuiteNameMessage(name: string): string {
+  return (
+    `Suite name '${name}' is reserved for the built-in ${name} suite (ADR-0159). ` +
+    `Rename the configured suite (for example '${name}-custom') and run it with: ` +
+    `opensip suite run ${name}-custom`
+  );
+}
+
 export const suiteStepArgsSchema = z.record(z.string(), z.unknown()).default({});
 
 export const suiteStepSchema = z
@@ -46,6 +72,16 @@ export const suiteDefinitionSchema = z
 
 export const suitesConfigSchema = z
   .record(z.string().trim().min(1), suiteDefinitionSchema)
+  .superRefine((suites, ctx) => {
+    for (const name of Object.keys(suites)) {
+      if (!reservedSuiteNames.has(name)) continue;
+      ctx.addIssue({
+        code: 'custom',
+        path: [name],
+        message: reservedSuiteNameMessage(name),
+      });
+    }
+  })
   .default({});
 
 /** One UUID-addressed tool command invocation inside a configured suite. */

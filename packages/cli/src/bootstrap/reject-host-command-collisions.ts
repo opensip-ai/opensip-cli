@@ -1,32 +1,36 @@
 import { logger, type CommandSpec, type Tool, type ToolRegistry } from '@opensip-cli/core';
 
-import { BUILT_IN_AUDIT_SUITE_NAME } from '../commands/suite/built-in-suites.js';
+import { HOST_RESERVED_ROOT_COMMANDS } from './reserved-names.js';
 
-const HOST_RESERVED_TOOL_ROOT_COMMANDS = new Set<string>([BUILT_IN_AUDIT_SUITE_NAME]);
-
-/** True when a Tool spec would claim a host-reserved root command or one of its children. */
-export function isHostReservedToolCommandSpec(
+/** The host-reserved name a spec claims (root name, root alias, or parent), if any. */
+function reservedNameClaimedBySpec(
   spec: Pick<CommandSpec<unknown, unknown>, 'aliases' | 'name' | 'parent'>,
-): boolean {
-  if (spec.parent !== undefined) return HOST_RESERVED_TOOL_ROOT_COMMANDS.has(spec.parent);
-  return (
-    HOST_RESERVED_TOOL_ROOT_COMMANDS.has(spec.name) ||
-    (spec.aliases ?? []).some((alias) => HOST_RESERVED_TOOL_ROOT_COMMANDS.has(alias))
-  );
+): string | undefined {
+  if (spec.parent !== undefined) {
+    return HOST_RESERVED_ROOT_COMMANDS.has(spec.parent) ? spec.parent : undefined;
+  }
+  if (HOST_RESERVED_ROOT_COMMANDS.has(spec.name)) return spec.name;
+  return (spec.aliases ?? []).find((alias) => HOST_RESERVED_ROOT_COMMANDS.has(alias));
 }
 
-function collidesWithHost(tool: Tool): boolean {
-  return (tool.commandSpecs ?? []).some(isHostReservedToolCommandSpec);
+function reservedCollision(tool: Tool): string | undefined {
+  for (const spec of tool.commandSpecs ?? []) {
+    const reserved = reservedNameClaimedBySpec(spec);
+    if (reserved !== undefined) return reserved;
+  }
+  return undefined;
 }
 
 /**
  * Remove admitted Tools whose declarative surface attempts to claim a reserved
- * host root. The host command remains canonical; unrelated Tools remain loaded.
+ * host root (ADR-0159: the full host command surface, not just `audit`). The
+ * host command remains canonical; unrelated Tools remain loaded.
  */
 export function rejectHostCommandCollisions(registry: ToolRegistry): readonly string[] {
   const rejected: string[] = [];
   for (const tool of registry.list()) {
-    if (!collidesWithHost(tool)) continue;
+    const reservedCommand = reservedCollision(tool);
+    if (reservedCommand === undefined) continue;
     const name = tool.metadata.name ?? tool.metadata.id;
     if (!registry.remove(name)) continue;
     rejected.push(name);
@@ -35,8 +39,8 @@ export function rejectHostCommandCollisions(registry: ToolRegistry): readonly st
       module: 'cli:bootstrap',
       toolId: tool.metadata.id,
       toolName: name,
-      reservedCommand: BUILT_IN_AUDIT_SUITE_NAME,
-      msg: `Tool '${name}' was rejected because it declares the host-reserved '${BUILT_IN_AUDIT_SUITE_NAME}' command.`,
+      reservedCommand,
+      msg: `Tool '${name}' was rejected because it declares the host-reserved '${reservedCommand}' command.`,
     });
   }
   return rejected;

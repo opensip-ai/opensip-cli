@@ -66,8 +66,9 @@ same command falls back to full scope with one suite-level notice.
 Use `opensip audit --open` for a human Change Impact report or `opensip audit
 --json` for machine output. Browser launch is suppressed for JSON, CI, non-TTY,
 and remote-shell execution. Configured multi-tool workflows continue to use
-`opensip suite run <name>`; configured `suites.audit` does not replace the
-canonical top-level audit.
+`opensip suite run <name>`; the suite name `audit` is reserved for the built-in
+review (config validation rejects `suites.audit`), so name custom suites
+something else.
 
 For lower-level inspection:
 

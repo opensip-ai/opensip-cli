@@ -86,9 +86,11 @@ opensip report
 
 `opensip audit` is the stable, host-owned shortcut for the curated built-in
 review. Add `--open` for the human Change Impact report or `--json` for CI and
-agents. Use `opensip suite run <name>` for configured multi-tool workflows; a
-configured `suites.audit` changes `suite run audit`, not the canonical top-level
-command.
+agents. Use `opensip suite run <name>` for configured multi-tool workflows. The
+suite name `audit` is reserved for the built-in review (ADR-0159): a configured
+`suites.audit` fails config validation, so both spellings always run the same
+curated definition — pick another name (for example `audit-custom`) for a
+custom workflow.
 
 Whole Tool plugins are managed through the `tools` group:
 

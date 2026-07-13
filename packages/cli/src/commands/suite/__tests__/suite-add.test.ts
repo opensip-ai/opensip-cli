@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, mkdtempSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -85,5 +85,20 @@ describe('addSuiteStep', () => {
       command: 'fit',
       args: { recipe: 'security', gateCompare: true, count: 3 },
     });
+  });
+
+  it('refuses a reserved suite name before touching the config file (ADR-0159)', () => {
+    expect(() =>
+      addSuiteStep({
+        suite: 'audit',
+        tool: 'fitness',
+        command: 'fit',
+        argPairs: [],
+        tools: [fixtureTool()],
+        projectRoot: tmp,
+      }),
+    ).toThrow(/reserved for the built-in audit suite/);
+
+    expect(existsSync(join(tmp, 'opensip-cli.config.yml'))).toBe(false);
   });
 });

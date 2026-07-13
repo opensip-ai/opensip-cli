@@ -318,28 +318,24 @@ describe('buildSuiteGroupLeaves', () => {
     expect(runSuiteMock).not.toHaveBeenCalled();
   });
 
-  it('lets configured audit override the built-in suite', async () => {
+  it('rejects a configured suite named audit even when injected past document validation', async () => {
+    // ADR-0159: `suites.audit` is reserved and cannot exist in a valid config
+    // document. This scope bypasses document validation deliberately; the
+    // suite plane's own parse still rejects it, so a shadowed audit can never
+    // silently run.
     const host = makeDispatchHostCtx();
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
 
-    await withSuiteScope(() => runSpec.handler?.({ _args: ['audit'] }, ctx), {
-      audit: {
-        description: 'Custom audit',
-        steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
-      },
-    });
-
-    expect(runSuiteMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'audit',
-        defaultChanged: false,
-        suite: {
+    await expect(
+      withSuiteScope(() => runSpec.handler?.({ _args: ['audit'] }, ctx), {
+        audit: {
           description: 'Custom audit',
           steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
         },
       }),
-    );
+    ).rejects.toThrow(/reserved for the built-in audit suite/);
+    expect(runSuiteMock).not.toHaveBeenCalled();
   });
 
   it('lists configured suites with resolved steps', async () => {
@@ -393,30 +389,57 @@ describe('buildSuiteGroupLeaves', () => {
     });
   });
 
-  it('lists configured audit instead of the built-in audit suite', async () => {
+  it('always lists the built-in audit suite alongside configured suites', async () => {
+    // ADR-0159: configured suites can never claim the reserved `audit` name,
+    // so the built-in definition always appears in the listing.
     const ctx = hostCtx();
     const [, listSpec] = buildSuiteGroupLeaves(ctx);
 
     const result = await withSuiteScope(() => listSpec.handler?.({}, ctx), {
-      audit: {
-        description: 'Custom audit',
+      'audit-custom': {
+        description: 'Custom review',
         steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
       },
     });
 
     expect(result).toEqual({
       type: 'suite-list',
-      totalCount: 1,
+      totalCount: 2,
       suites: [
         {
-          name: 'audit',
-          description: 'Custom audit',
+          name: 'audit-custom',
+          description: 'Custom review',
           steps: [
             {
               tool: 'fitness',
               stableId: TOOL_ID,
               command: 'fit',
               args: { recipe: 'custom' },
+            },
+          ],
+        },
+        {
+          name: 'audit',
+          description:
+            'PR-review workflow: changed-code risk, graph impact, and high-confidence reduction candidates',
+          steps: [
+            {
+              tool: 'fitness',
+              stableId: TOOL_ID,
+              command: 'fitness',
+              args: { recipe: 'agent-risk' },
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'impact',
+              args: {},
+            },
+            {
+              tool: 'yagni',
+              stableId: YAGNI_ID,
+              command: 'yagni',
+              args: { minConfidence: 'high' },
             },
           ],
         },

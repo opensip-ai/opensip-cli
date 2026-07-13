@@ -166,9 +166,10 @@ opensip agent-catalog --json
 ```
 
 The full command tree is at [`../70-reference/01-cli-commands.md`](/docs/opensip-cli/70-reference/01-cli-commands/).
-Configured suites remain available through `opensip suite run <name>`. In
-particular, configured `suites.audit` intentionally affects `suite run audit`
-but never replaces the curated top-level `audit` workflow.
+Configured suites remain available through `opensip suite run <name>`. The
+suite name `audit` is reserved for the built-in workflow: a configured
+`suites.audit` fails config validation with a rename hint, so `opensip audit`
+and `opensip suite run audit` always mean the same curated review.
 
 ## Optional: add a local security scanner
 

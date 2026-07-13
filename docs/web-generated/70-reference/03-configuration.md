@@ -346,29 +346,23 @@ readability only. `command` is the `CommandSpec` name, not necessarily the
 shortest CLI alias: for example, the fitness primary command is `fitness` here
 even though users normally type `opensip fit`.
 
-`audit` is built in: `opensip suite run audit` works even when config omits a
-`suites.audit` block. A configured `suites.audit` replaces the preset only for
-that generic command. It never replaces the reserved top-level `opensip audit`,
-which always runs the curated built-in definition through the same executor.
-Use another suite name for a distinct workflow. The built-in preset runs
-changed-scope by default when Git scope resolves; pass `--full` for a whole-repo
-run.
+`audit` is built in: `opensip suite run audit` works even when config defines
+no suites at all, and it always runs the same curated definition as top-level
+`opensip audit`. The suite name `audit` is **reserved** for that built-in
+workflow: a configured `suites.audit` fails config validation with a rename
+hint, so the two spellings can never diverge. Use another suite name (for
+example `audit-custom`) for a distinct workflow. The built-in preset runs
+changed-scope by default when Git scope resolves; pass `--full` for a
+whole-repo run.
 
-This distinction is architectural, not naming advice: see
+This reservation is architectural, not naming advice: see
 [ADR-0111](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0111-built-in-audit-suite-preset.md),
-[ADR-0129](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0129-audit-suite-scope-defaults.md), and
-[ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0155-canonical-audit-command.md).
+[ADR-0129](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0129-audit-suite-scope-defaults.md),
+[ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0155-canonical-audit-command.md), and
+[ADR-0159](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0159-reserved-host-command-and-suite-names.md).
 
 ```yaml
 suites:
-  audit:
-    description: Custom override for suite run audit only
-    steps:
-      - tool: afd68bd3-ff3c-4935-a5b6-76d8fc7a5224
-        name: fitness
-        command: fitness
-        args:
-          recipe: agent-risk
   security:
     description: Run security checks and graph rules
     steps:

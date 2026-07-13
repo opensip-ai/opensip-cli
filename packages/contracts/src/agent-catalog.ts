@@ -88,6 +88,18 @@ export interface AgentCatalog {
     readonly history: string;
   };
   readonly projectContext?: AgentProjectContext;
+  /**
+   * Names no Tool or configured suite may claim (ADR-0159). Additive
+   * (optional): the composition root injects the live lists (it owns them —
+   * this contracts layer cannot import the cli or config packages), so
+   * catalogs built without them (e.g. over MCP) simply omit the field.
+   * `rootCommands` = host-owned root commands a Tool cannot mount;
+   * `suiteNames` = built-in suite names a configured suite cannot use.
+   */
+  readonly reservedNames?: {
+    readonly rootCommands: readonly string[];
+    readonly suiteNames: readonly string[];
+  };
   readonly notes: readonly string[];
 }
 
@@ -170,6 +182,7 @@ export function buildAgentCatalog(
     readonly internalCommands?: ReadonlySet<string>;
     readonly projectContext?: AgentProjectContext;
     readonly validateOverlays?: boolean;
+    readonly reservedNames?: AgentCatalog['reservedNames'];
   } = {},
 ): AgentCatalog {
   if (input.validateOverlays === true && input.tools !== undefined) {
@@ -261,6 +274,7 @@ export function buildAgentCatalog(
     ...(input.projectContext && input.projectContext.targetConventions.length > 0
       ? { projectContext: input.projectContext }
       : {}),
+    ...(input.reservedNames === undefined ? {} : { reservedNames: input.reservedNames }),
     notes: [
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',

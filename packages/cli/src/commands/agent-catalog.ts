@@ -8,8 +8,11 @@
  * keeps the host rendering wrapper (`executeAgentCatalog`).
  */
 
+import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
 import { buildAgentCatalog, summarizeTargetConventions } from '@opensip-cli/contracts';
 import { currentScope, type ToolRegistry } from '@opensip-cli/core';
+
+import { HOST_RESERVED_ROOT_COMMANDS } from '../bootstrap/reserved-names.js';
 
 export { buildAgentCatalog } from '@opensip-cli/contracts';
 export type { AgentCatalog, CommandTier } from '@opensip-cli/contracts';
@@ -26,6 +29,12 @@ export function executeAgentCatalog(
     tools: opts.tools,
     internalCommands: opts.internalCommands,
     validateOverlays: true,
+    // ADR-0159: advertise the reserved names so Tool authors and agents learn
+    // the constraint from discovery instead of an admission-time rejection.
+    reservedNames: {
+      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+      suiteNames: [...RESERVED_SUITE_NAMES],
+    },
     ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
   });
 
