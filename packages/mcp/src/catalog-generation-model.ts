@@ -18,6 +18,13 @@ export type GenerationSource = 'initial-load' | 'persisted-auto-swap' | 'refresh
 
 export { catalogGenerationKey } from '@opensip-cli/graph/read';
 
+interface ImpactIndexBuildFlight {
+  readonly controller: AbortController;
+  readonly promise: Promise<ComputeImpactIndex>;
+  waiters: number;
+  settled: boolean;
+}
+
 /** One immutable in-memory snapshot of the served catalog plus derived indexes. */
 export interface CatalogGeneration {
   readonly key: string;
@@ -29,36 +36,91 @@ export interface CatalogGeneration {
   readonly derived: {
     features?: FeatureTable;
     impactIndex?: ComputeImpactIndex;
-    impactIndexBuild?: Promise<ComputeImpactIndex>;
+    impactIndexBuild?: ImpactIndexBuildFlight;
   };
 }
 
+function releaseImpactIndexWaiter(
+  generation: CatalogGeneration,
+  flight: ImpactIndexBuildFlight,
+  waiterCancelled: boolean,
+): void {
+  flight.waiters = Math.max(0, flight.waiters - 1);
+  if (!waiterCancelled || flight.waiters > 0 || flight.settled) return;
+  flight.controller.abort();
+  if (generation.derived.impactIndexBuild === flight) {
+    generation.derived.impactIndexBuild = undefined;
+  }
+}
+
 function waitForImpactIndex(
-  flight: Promise<ComputeImpactIndex>,
+  generation: CatalogGeneration,
+  flight: ImpactIndexBuildFlight,
   signal: AbortSignal | undefined,
 ): Promise<ComputeImpactIndex> {
-  if (signal === undefined) return flight;
-  if (signal.aborted) return Promise.reject(new ComputeImpactCancelledError());
+  flight.waiters += 1;
   return new Promise((resolve, reject) => {
-    const onAbort = (): void => {
-      signal.removeEventListener('abort', onAbort);
-      reject(new ComputeImpactCancelledError());
+    let waiterSettled = false;
+    const settleWaiter = (waiterCancelled: boolean): boolean => {
+      if (waiterSettled) return false;
+      waiterSettled = true;
+      signal?.removeEventListener('abort', onAbort);
+      releaseImpactIndexWaiter(generation, flight, waiterCancelled);
+      return true;
     };
-    signal.addEventListener('abort', onAbort, { once: true });
-    void flight.then(
+    const onAbort = (): void => {
+      if (settleWaiter(true)) reject(new ComputeImpactCancelledError());
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    void flight.promise.then(
       (index) => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(index);
+        const waiterCancelled = signal?.aborted === true;
+        if (!settleWaiter(waiterCancelled)) return;
+        if (waiterCancelled) reject(new ComputeImpactCancelledError());
+        else resolve(index);
       },
       (error: unknown) => {
-        signal.removeEventListener('abort', onAbort);
-        reject(error instanceof Error ? error : new Error('Impact index construction failed.'));
+        const waiterCancelled = signal?.aborted === true;
+        if (!settleWaiter(waiterCancelled)) return;
+        if (waiterCancelled) reject(new ComputeImpactCancelledError());
+        else {
+          reject(error instanceof Error ? error : new Error('Impact index construction failed.'));
+        }
       },
     );
+    if (signal?.aborted === true) onAbort();
   });
 }
 
-/** Build an immutable generation's impact index once; requester cancellation never poisons it. */
+function startImpactIndexBuild(generation: CatalogGeneration): ImpactIndexBuildFlight {
+  const controller = new AbortController();
+  const flight: ImpactIndexBuildFlight = {
+    controller,
+    waiters: 0,
+    settled: false,
+    promise: buildComputeImpactIndex(generation.catalog, controller.signal).then(
+      (index) => {
+        flight.settled = true;
+        if (!controller.signal.aborted && generation.derived.impactIndexBuild === flight) {
+          generation.derived.impactIndex = index;
+          generation.derived.impactIndexBuild = undefined;
+        }
+        return index;
+      },
+      (error: unknown) => {
+        flight.settled = true;
+        if (generation.derived.impactIndexBuild === flight) {
+          generation.derived.impactIndexBuild = undefined;
+        }
+        throw error;
+      },
+    ),
+  };
+  generation.derived.impactIndexBuild = flight;
+  return flight;
+}
+
+/** Build one shared impact index; abort its work only after the final waiter cancels. */
 export function generationImpactIndex(
   generation: CatalogGeneration,
   signal?: AbortSignal,
@@ -67,20 +129,8 @@ export function generationImpactIndex(
   if (generation.derived.impactIndex !== undefined) {
     return Promise.resolve(generation.derived.impactIndex);
   }
-  let flight = generation.derived.impactIndexBuild;
-  if (flight === undefined) {
-    flight = buildComputeImpactIndex(generation.catalog)
-      .then((index) => {
-        generation.derived.impactIndex = index;
-        return index;
-      })
-      .catch((error: unknown) => {
-        generation.derived.impactIndexBuild = undefined;
-        throw error;
-      });
-    generation.derived.impactIndexBuild = flight;
-  }
-  return waitForImpactIndex(flight, signal);
+  const flight = generation.derived.impactIndexBuild ?? startImpactIndexBuild(generation);
+  return waitForImpactIndex(generation, flight, signal);
 }
 
 export function createGeneration(
