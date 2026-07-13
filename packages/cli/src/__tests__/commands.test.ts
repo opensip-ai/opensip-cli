@@ -71,6 +71,7 @@ describe('registerCliCommands', () => {
       '__capability-pack-worker',
       '__tool-command-worker',
       'agent-catalog',
+      'audit',
       'completion',
       'config',
       'configure',

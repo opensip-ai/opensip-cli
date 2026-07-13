@@ -2,16 +2,17 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ConfigurationError, SystemError } from '@opensip-cli/core';
+import { ConfigurationError, logger, SystemError } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import { graphImpactCommandSpec } from '../graph/graph-aux-command-specs.js';
-import { executeImpact } from '../impact.js';
+import { buildImpactSessionContribution, executeImpact } from '../impact.js';
 
 import type { Catalog } from '../../types.js';
-import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { ImpactUncertainty, SignalEnvelope, StoredSession } from '@opensip-cli/contracts';
 import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -112,6 +113,12 @@ describe('executeImpact', () => {
       fullyVerified: true,
     });
     expect(result.recommendedCommands.length).toBeGreaterThan(0);
+    expect(result.catalog).toEqual({
+      builtAt: '2026-05-22T00:00:00.000Z',
+      language: 'typescript',
+      filesFingerprint: '9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa',
+      cacheKeyDigest: 'f00a99cf844c0aaf94b027bf6f838176b6ada87ae8f9d5e23ee824c04aa36880',
+    });
     expect(cli.emitJson).toHaveBeenCalledWith(result);
     const delivered = (
       cli.deliverSignals as unknown as {
@@ -134,6 +141,7 @@ describe('executeImpact', () => {
       passed: true,
       summary: { errors: 0, warnings: 1 },
     });
+    expect(delivered?.verification).toEqual(result.trust);
     datastore.close();
   });
 
@@ -212,6 +220,7 @@ describe('executeImpact', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     new CatalogRepo(datastore).replaceAll(makeCatalog());
     const cli = mockCli(datastore);
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const completion = await graphImpactCommandSpec.handler(
       {
         cwd: '/proj',
@@ -229,6 +238,8 @@ describe('executeImpact', () => {
     });
     expect(session?.recipe).toBeUndefined();
     expect(session?.payload).toMatchObject({
+      __version: 1,
+      impactStatus: 'available',
       summary: {
         total: 1,
         passed: 1,
@@ -243,11 +254,75 @@ describe('executeImpact', () => {
           violationCount: 1,
         },
       ],
+      impact: {
+        changedFiles: ['src/callee.ts'],
+        impactedFiles: ['src/callee.ts', 'src/caller.ts'],
+        trust: {
+          coverage: 'full',
+          fallback: 'targeted',
+          fullyVerified: true,
+          uncertainties: [],
+        },
+        omitted: {
+          changedFiles: 0,
+          changedFunctions: 0,
+          impactedFunctions: 0,
+          impactedFiles: 0,
+          impactedPackages: 0,
+          recommendedCommands: 0,
+        },
+      },
+    });
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.cli.impact.session_projection',
+        retainedChangedFiles: 1,
+        retainedImpactedFunctions: 1,
+        omittedChangedFiles: 0,
+        omittedImpactedFunctions: 0,
+        trustCoverage: 'full',
+        sourceTruncated: false,
+      }),
+    );
+    info.mockRestore();
+    datastore.close();
+  });
+
+  it('round-trips the enriched opaque payload through the host session repository', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const completion = await graphImpactCommandSpec.handler(
+      { cwd: '/proj', json: true, files: ['src/callee.ts'] },
+      cli,
+    );
+    const contribution = (completion as ToolRunCompletion | undefined)?.session;
+    if (!contribution) throw new Error('expected graph impact session contribution');
+    const now = '2026-07-12T00:00:00.000Z';
+    const stored: StoredSession = {
+      id: 'GRAPH_IMPACT_ROUND_TRIP',
+      tool: contribution.tool,
+      cwd: contribution.cwd,
+      startedAt: now,
+      completedAt: now,
+      durationMs: 0,
+      score: contribution.score,
+      passed: contribution.passed,
+      payload: contribution.payload,
+    };
+    const repo = new SessionRepo(datastore);
+    repo.save(stored);
+
+    expect(repo.get(stored.id)?.payload).toEqual(contribution?.payload);
+    expect(repo.get(stored.id)?.payload).toMatchObject({
+      __version: 1,
+      impactStatus: 'available',
+      impact: { changedFiles: ['src/callee.ts'] },
     });
     datastore.close();
   });
 
-  it('does not build an impact session contribution for JSON carrier mode', async () => {
+  it('builds the same impact session contribution for JSON carrier mode', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     new CatalogRepo(datastore).replaceAll(makeCatalog());
     const cli = mockCli(datastore);
@@ -260,9 +335,130 @@ describe('executeImpact', () => {
       cli,
     );
 
-    expect(completion).toBeUndefined();
+    expect((completion as ToolRunCompletion | undefined)?.session?.payload).toMatchObject({
+      __version: 1,
+      impactStatus: 'available',
+      impact: {
+        changedFiles: ['src/callee.ts'],
+        impactedFiles: ['src/callee.ts', 'src/caller.ts'],
+      },
+    });
     datastore.close();
   });
+
+  it('builds an impact session contribution for raw JSON carrier mode', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const completion = await graphImpactCommandSpec.handler(
+      {
+        cwd: '/proj',
+        json: true,
+        raw: true,
+        files: ['src/callee.ts'],
+      },
+      cli,
+    );
+
+    expect(cli.emitRaw).toHaveBeenCalled();
+    expect((completion as ToolRunCompletion | undefined)?.session?.payload).toMatchObject({
+      impactStatus: 'available',
+    });
+    datastore.close();
+  });
+
+  it('preserves the ordinary session and logs bounded counts when the projection cannot fit', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    const base = await executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'] }, cli);
+    const uncertainties = Array.from({ length: 3000 }, (_, index): ImpactUncertainty => ({
+      code: 'changed-file-unmatched',
+      source: 'files',
+      message: `${String(index).padStart(4, '0')}:${'x'.repeat(507)}`,
+    }));
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const contribution = buildImpactSessionContribution(
+      { cwd: '/proj' },
+      {
+        ...base,
+        trust: {
+          coverage: 'unknown',
+          fallback: 'targeted',
+          fullyVerified: false,
+          uncertainties,
+        },
+      },
+    );
+
+    expect(contribution.passed).toBe(true);
+    expect(contribution.payload).toMatchObject({
+      __version: 1,
+      impactStatus: 'omitted-overflow',
+      summary: { total: 1, warnings: 1 },
+    });
+    expect((contribution.payload as { impact?: unknown }).impact).toBeUndefined();
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.cli.impact.session_projection',
+        omittedReason: 'projection-overflow',
+        trustCoverage: 'unknown',
+        sourceTruncated: false,
+      }),
+    );
+    info.mockRestore();
+    datastore.close();
+  });
+
+  it('never copies a path-bearing raw catalog cache key or file fingerprint into results', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(
+      makeCatalog({
+        cacheKey: 'missing-config:/private/repo/tsconfig.json',
+        filesFingerprint: '1\n/private/repo/src/a.ts|123|4',
+      }),
+    );
+    const cli = mockCli(datastore);
+    const result = await executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'] }, cli);
+
+    expect(result.catalog?.cacheKeyDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(result.catalog?.filesFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+    expect(JSON.stringify(result)).not.toContain('/private/repo');
+    datastore.close();
+  });
+
+  it.each(['cacheKey', 'filesFingerprint'] as const)(
+    'omits catalog identity when a legacy catalog has no %s',
+    async (missingField) => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      const complete = makeCatalog();
+      let incomplete;
+      if (missingField === 'cacheKey') {
+        const { cacheKey, ...catalog } = complete;
+        void cacheKey;
+        incomplete = catalog;
+      } else {
+        const { filesFingerprint, ...catalog } = complete;
+        void filesFingerprint;
+        incomplete = catalog;
+      }
+      const load = vi
+        .spyOn(CatalogRepo.prototype, 'loadCatalogContract')
+        .mockReturnValue(incomplete);
+
+      try {
+        const result = await executeImpact(
+          { cwd: '/proj', json: true, files: ['src/callee.ts'] },
+          mockCli(datastore),
+        );
+
+        expect(result.catalog).toBeUndefined();
+      } finally {
+        load.mockRestore();
+        datastore.close();
+      }
+    },
+  );
 
   it('--changed outside a git repo throws ConfigurationError', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'opensip-impact-nogit-'));

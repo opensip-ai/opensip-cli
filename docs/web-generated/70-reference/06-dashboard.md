@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-12
 release: v0.6.0
 title: "Report"
 audience: [users, contributors]
@@ -38,7 +38,7 @@ asset hosting — a single file you can email or commit, fully functional offlin
 
 Two triggers, both opt-in:
 
-1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the report if conditions allow.
+1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the report if conditions allow. `opensip audit --open` generates the report after audit persistence and selects that Run in Change Impact.
 2. **Explicit `report` command.** `opensip report` opens the most recent run's report regardless of any pending fit run.
 
 The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/cli/src/open-report.ts)) returns `shouldOpen: true` only when **all** of these hold:
@@ -49,13 +49,61 @@ The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](https://g
 - The `CI` environment variable is unset (GitHub Actions, GitLab CI, CircleCI, etc. — never open).
 - Not an SSH session without a display (`SSH_CONNECTION`/`SSH_CLIENT` set without `DISPLAY`/`WAYLAND_DISPLAY`).
 
-The HTML file is always written. If any guard skips the browser launch, the user can navigate to it manually.
+For fit/sim report hooks and the explicit `report` command, the HTML file is
+written even when browser launch is skipped. Canonical `audit --open` is a
+human-only convenience: when JSON/CI/non-TTY/remote-shell policy suppresses the
+request, audit does not require report generation. Run `opensip report` as a
+separate CI artifact step when a file is required. Browser/report failure never
+changes an audit verdict or exit code.
 
 ---
 
 ## What it shows
 
-Five first-party top-level tabs (`Overview`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`) are always available when their data exists. A sixth `External Tools` tab appears when the report includes sessions from installed Tool plugins that are not claimed by a first-party tab, such as `gitleaks`, `semgrep`, `ruff`, `osv-scanner`, or `trivy`. The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/client/tool-tabs.ts).
+Six first-party top-level tabs (`Overview`, `Change Impact`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`) are available when their data exists. An `External Tools` tab appears when the report includes sessions from installed Tool plugins that are not claimed by a first-party tab, such as `gitleaks`, `semgrep`, `ruff`, `osv-scanner`, or `trivy`. The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/client/tool-tabs.ts).
+
+### Change Impact
+
+Change Impact is a stored-evidence view of canonical audit Runs. It does not run
+Git, parse source, traverse the graph, or infer trust in the browser. Report
+composition selects a parent `StoredRun.id`, follows that Run's graph-impact
+`RunStep.sessionId`, and validates the linked graph-owned session projection.
+Latest/timestamp matching is never used. An optional `runId` in the report's
+closed `#change-impact/<id>` selection chooses a loaded Run; an invalid or
+missing ID falls back without becoming an arbitrary URL target.
+
+The panel renders the persisted review brief, exact step verification state,
+changed-to-impacted summary, bounded entity/package rows, risks, and recommended
+actions. Stored list caps are 200 changed files, 200 changed functions, 500
+impacted functions, 500 impacted files, 100 packages, and 20 commands; every
+list carries an exact omitted count and the whole UTF-8 projection is capped at
+1 MiB. Truncation and omitted metadata are visible states, never interpreted as
+zero.
+
+Code Paths drill-down is enabled only when the stored catalog identity matches
+the embedded current catalog and a qualified-name/path/line occurrence resolves
+uniquely. Missing, legacy, or mismatched identity leaves the stored rows
+readable but non-interactive. The identity compares bounded build/language/mode
+facets and SHA-256 digests, never raw path-bearing catalog keys or fingerprints.
+
+Availability and trust are separate. The panel distinguishes a faulted step,
+missing RunStep/session link, unavailable persistence, legacy payload,
+`impactStatus: omitted-overflow`, malformed projection, partial/unknown trust,
+source truncation, and verified zero impact. Only an available projection whose
+retained and omitted impacted counts are all zero can render zero impact; less
+than full trust still says “no stored impact found,” not complete safety. The
+full emitted envelope verification remains authoritative; stored trust is a
+bounded display copy.
+
+All evidence crosses the self-contained HTML boundary through safe JSON
+serialization and escaped/text-only DOM construction. The feature adds no
+network call, model call, source text, diff body, absolute project root,
+environment value, or secret. See
+[ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
+Canonical command selection and human-only `audit --open` behavior are defined
+by [ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0155-canonical-audit-command.md); Run and
+RunStep identity remains authoritative per
+[ADR-0143](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0143-host-owned-run-step-ledger.md).
 
 ### Overview
 
@@ -134,7 +182,7 @@ Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/o
 
 ### Tool tabs
 
-The report supports fit, sim, graph, yagni, and installed Tool plugin runs. The top-of-page tab switcher filters the panels by tool. Fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Installed external scanner adapters fall into `External Tools`: their sessions render with the same Overview rows, run detail, verdicts, timing, findings, and tool badges as built-in tools, without requiring a custom dashboard module for each scanner. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/tool-tabs-registrations.ts).
+The report supports audit Run evidence plus fit, sim, graph, yagni, and installed Tool plugin runs. The top-of-page tab switcher filters the panels by view/tool. Change Impact joins a parent Run to its graph session; fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Installed external scanner adapters fall into `External Tools`: their sessions render with the same Overview rows, run detail, verdicts, timing, findings, and tool badges as built-in tools, without requiring a custom dashboard module for each scanner. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/dashboard/src/tool-tabs-registrations.ts).
 
 ---
 

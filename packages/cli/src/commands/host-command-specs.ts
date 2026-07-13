@@ -16,6 +16,7 @@ import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-e
 import { composeAndWriteReport } from '../report-compose.js';
 
 import { executeAgentCatalog } from './agent-catalog.js';
+import { buildAuditCommandSpec } from './audit-command-spec.js';
 import {
   assembleCompletionInventory,
   printCompletionScript,
@@ -370,6 +371,7 @@ const COMPLETION_SELF_SPEC: SpecLike = { name: 'completion', commonFlags: [] };
 function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildInitSpec(ctx),
+    buildAuditCommandSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),
@@ -412,6 +414,7 @@ function buildHostCompletionSurface(ctx: CliCommandsContext): {
 export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildInitSpec(ctx),
+    buildAuditCommandSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),

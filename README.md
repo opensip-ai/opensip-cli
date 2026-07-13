@@ -54,12 +54,13 @@ Run OpenSIP in your project:
 
 ```bash
 cd your-project
-opensip suite run audit   # changed-code risk, impact, and cleanup candidates
+opensip audit   # changed-code risk, impact, evidence quality, and cleanup candidates
 ```
 
-The built-in audit suite composes `fit`'s `agent-risk` recipe, `graph impact`,
+The canonical audit workflow composes the built-in suite: `fit`'s `agent-risk` recipe, `graph impact`,
 and high-confidence `yagni` candidates into one PR-review pass. In a git repo it
-runs changed-scope by default; add `--full` when you want the whole repo.
+runs changed-scope by default; add `--full` when you want the whole repo or
+`--open` to open the local Change Impact report.
 
 Going further:
 
@@ -67,13 +68,12 @@ Going further:
 opensip fit
 opensip graph
 opensip init
-opensip fit
-opensip graph
+opensip sim
 opensip yagni
 opensip report
 ```
 
-`fit`, `graph`, `graph impact`, and `suite run audit` can run before `init`
+`audit`, `fit`, `graph`, and `graph impact` can run before `init`
 using an auto-detected in-memory config. Run `opensip init` when you are ready
 to save the config, commit custom checks or recipes, and keep baselines in the
 project runtime.

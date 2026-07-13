@@ -67,6 +67,11 @@ export class ToolRegistry {
     return this.inner.getById(id)?.tool;
   }
 
+  /** Remove one registered Tool by its registry key (normally metadata.name). */
+  remove(id: string): boolean {
+    return this.inner.remove(id);
+  }
+
   clear(): void {
     this.inner.clear();
   }

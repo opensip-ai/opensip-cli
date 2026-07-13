@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 release: v0.6.0
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
@@ -25,6 +25,8 @@ related-docs:
   - ../../decisions/ADR-0110-host-owned-review-brief-contract.md
   - ../../decisions/ADR-0123-impact-analysis-trust-foundation.md
   - ../../decisions/ADR-0124-review-brief-correlation-join.md
+  - ../../decisions/ADR-0155-canonical-audit-command.md
+  - ../../decisions/ADR-0156-bounded-stored-impact-proof.md
 ---
 # Use OpenSIP with AI agents
 
@@ -53,11 +55,14 @@ For PR review workflows, read the host-owned audit review brief before drilling
 into individual tool payloads:
 
 ```bash
-opensip suite run audit --json
+opensip audit --json
 ```
 
-In a git repo this is changed-scope by default; use `--full` only when the
-review needs whole-repo evidence.
+In a git repo this is changed-scope by default; use `--files <path>` for an
+explicit git-free edit set, `--since <ref>` for a branch base, and `--full` only
+when the review needs whole-repo evidence. `--full` conflicts with the three
+changed-scope selectors. A no-Git default falls back once to full scope and
+records that degradation instead of claiming changed-only coverage.
 
 The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
 optional `correlatedRisks[]`, baseline/degradation notes, and `signalRef`
@@ -68,6 +73,19 @@ only, then follow each member's `signalRef` before changing code. When MCP is
 available, prefer the `review_change` tool for the same read-side review shape
 over persisted suite evidence; do not re-run hidden analysis or inspect raw logs
 to answer a question that the brief/session evidence already answers.
+
+Also inspect `data.steps[].verification` before claiming complete scoped
+coverage. Current results return optional `data.runId`, the authoritative
+persisted parent Run ID; absence means persistence was unavailable, not that
+`suiteRunId` should be substituted. The linked graph session retains bounded
+impact detail and a catalog identity for the human report, while the emitted
+envelope verification remains the full trust authority.
+
+Top-level `audit` always uses the curated built-in definition. A configured
+`suites.audit` is reached explicitly with `opensip suite run audit --json`; use
+`suite run <name>` for every other configured multi-tool workflow. Agents never
+need `--open`: JSON, CI, non-TTY, and remote-shell execution suppresses browser
+launch, and machine evidence is complete without a browser.
 
 When the user says a tool **already reported findings**, use the OpenSIP MCP
 result tools first: `get_latest_findings`, `show_run`, or `list_runs`. If MCP is
@@ -80,6 +98,9 @@ opensip sessions show latest --tool fit --json --filter errors-only --filter top
 
 See [ADR-0085](../../decisions/ADR-0085-change-detection-substrate.md) for how
 change detection and filtering share one substrate.
+See [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md) for canonical
+audit placement and [ADR-0156](../../decisions/ADR-0156-bounded-stored-impact-proof.md)
+for the stored report-evidence boundary.
 
 ## Edit loop
 

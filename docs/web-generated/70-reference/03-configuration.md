@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 release: v0.6.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -347,14 +347,22 @@ shortest CLI alias: for example, the fitness primary command is `fitness` here
 even though users normally type `opensip fit`.
 
 `audit` is built in: `opensip suite run audit` works even when config omits a
-`suites.audit` block. Define `suites.audit` only when you want to replace the
-built-in PR-review workflow. The built-in preset runs changed-scope by default
-when git scope resolves; pass `--full` for a whole-repo run.
+`suites.audit` block. A configured `suites.audit` replaces the preset only for
+that generic command. It never replaces the reserved top-level `opensip audit`,
+which always runs the curated built-in definition through the same executor.
+Use another suite name for a distinct workflow. The built-in preset runs
+changed-scope by default when Git scope resolves; pass `--full` for a whole-repo
+run.
+
+This distinction is architectural, not naming advice: see
+[ADR-0111](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0111-built-in-audit-suite-preset.md),
+[ADR-0129](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0129-audit-suite-scope-defaults.md), and
+[ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0155-canonical-audit-command.md).
 
 ```yaml
 suites:
   audit:
-    description: Custom audit override
+    description: Custom override for suite run audit only
     steps:
       - tool: afd68bd3-ff3c-4935-a5b6-76d8fc7a5224
         name: fitness

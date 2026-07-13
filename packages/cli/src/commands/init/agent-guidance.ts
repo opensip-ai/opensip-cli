@@ -22,9 +22,17 @@ interface GuidanceTargetSpec {
 const GUIDANCE_TARGETS: readonly GuidanceTargetSpec[] = [
   { relativePath: 'AGENTS.md', create: 'always', kind: 'playbook' },
   { relativePath: 'CLAUDE.md', create: 'never', kind: 'block' },
-  { relativePath: '.github/copilot-instructions.md', create: 'never', kind: 'block' },
+  {
+    relativePath: '.github/copilot-instructions.md',
+    create: 'never',
+    kind: 'block',
+  },
   { relativePath: '.cursorrules', create: 'never', kind: 'block' },
-  { relativePath: '.cursor/rules/opensip.mdc', create: 'if-parent-exists', kind: 'block' },
+  {
+    relativePath: '.cursor/rules/opensip.mdc',
+    create: 'if-parent-exists',
+    kind: 'block',
+  },
   { relativePath: '.windsurfrules', create: 'never', kind: 'block' },
 ];
 
@@ -65,6 +73,12 @@ export function buildManagedAgentGuidance(): string {
     '2. `opensip sessions ...` replay commands when MCP is unavailable.',
     '3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.',
     '4. Raw logs or direct datastore inspection only as a last-resort debugging path.',
+    '',
+    'Fresh review workflow:',
+    '',
+    '- Use `opensip audit --json` for the canonical changed-code review when fresh execution is explicitly needed. Inspect step `verification` before claiming complete coverage.',
+    '- `--open` is human-only and is suppressed in JSON, non-TTY, and CI execution.',
+    '- Use `opensip suite run <name> --json` for configured multi-tool workflows; configured suites do not replace the canonical top-level audit.',
     '',
     'Graph audit notes:',
     '',
@@ -118,7 +132,7 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
       'Start PR review with the composed audit suite. It runs changed-code risk, graph impact, and high-confidence reduction candidates in one command.',
       '',
       '```bash',
-      'opensip suite run audit --json',
+      'opensip audit --json',
       'opensip fit --recipe agent-fast --json --filter errors-only',
       'opensip graph impact --changed --json --top 20',
       'opensip fit --changed --include-impacted --json',
@@ -131,7 +145,7 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
       'Start PR review with the composed audit suite. It runs changed-code risk, graph impact, and high-confidence reduction candidates in one command.',
       '',
       '```bash',
-      'opensip suite run audit --json',
+      'opensip audit --json',
       'opensip graph impact --changed --json --top 20',
       '```',
       '',
@@ -223,7 +237,10 @@ function readExistingContent(
 function writeTarget(
   cwd: string,
   spec: GuidanceTargetSpec,
-  opts: { readonly toolScaffolds: readonly ToolScaffold[]; readonly block: string },
+  opts: {
+    readonly toolScaffolds: readonly ToolScaffold[];
+    readonly block: string;
+  },
 ): AgentGuidanceTargetResult {
   const path = join(cwd, spec.relativePath);
   const exists = existsSync(path);

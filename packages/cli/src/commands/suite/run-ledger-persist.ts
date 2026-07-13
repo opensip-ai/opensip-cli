@@ -24,7 +24,7 @@ export interface PersistSuiteRunInput {
   readonly completedAt: string;
 }
 
-export function persistSuiteRun(input: PersistSuiteRunInput): void {
+export function persistSuiteRun(input: PersistSuiteRunInput): string | undefined {
   const scope = currentScope();
   const log = currentLogger();
   let datastore: DataStore | undefined;
@@ -96,6 +96,7 @@ export function persistSuiteRun(input: PersistSuiteRunInput): void {
       suiteRunId: input.result.suiteRunId,
       stepCount: steps.length,
     });
+    return runId;
   } catch (error) {
     log.warn?.({
       evt: 'cli.run-ledger.suite_record_failed',
@@ -103,5 +104,6 @@ export function persistSuiteRun(input: PersistSuiteRunInput): void {
       suiteRunId: input.result.suiteRunId,
       error: error instanceof Error ? error.message : String(error),
     });
+    return undefined;
   }
 }

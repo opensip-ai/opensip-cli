@@ -192,8 +192,18 @@ describe('buildSuiteGroupLeaves', () => {
     const host = makeDispatchHostCtx();
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
+    const completed = {
+      type: 'suite-run',
+      suite: 'security',
+      suiteRunId: 'suite-1',
+      runId: 'run-1',
+      exitCode: 0,
+      durationMs: 10,
+      steps: [],
+    } as const;
+    runSuiteMock.mockResolvedValueOnce(completed);
 
-    await withSuiteScope(() => runSpec.handler?.({ _args: ['security'] }, ctx));
+    const returned = await withSuiteScope(() => runSpec.handler?.({ _args: ['security'] }, ctx));
 
     expect(runSuiteMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,6 +213,9 @@ describe('buildSuiteGroupLeaves', () => {
         defaultChanged: false,
       }),
     );
+    expect(returned).toBe(completed);
+    expect(ctx.render).toHaveBeenCalledTimes(1);
+    expect(ctx.render).toHaveBeenCalledWith(completed);
     expect(ctx.exitCodes).toContain(0);
   });
 

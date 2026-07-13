@@ -757,7 +757,6 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
       noCache: opts.noCache,
     };
     const result = await executeImpact(commandOpts, cli);
-    if (commandOpts.json === true) return;
     return {
       session: buildImpactSessionContribution(commandOpts, result),
     };

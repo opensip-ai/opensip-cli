@@ -49,6 +49,9 @@ export interface SuiteStepSummary {
 export interface SuiteRunResult {
   type: 'suite-run';
   readonly suite: string;
+  /** Authoritative persisted parent Run identity; absent when persistence was unavailable. */
+  readonly runId?: string;
+  /** Legacy suite correlation identity retained for replay and existing joins. */
   readonly suiteRunId: string;
   readonly exitCode: number;
   readonly durationMs: number;

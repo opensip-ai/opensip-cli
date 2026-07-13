@@ -201,11 +201,7 @@ function getOrCreateOverlay(): HTMLElement {
   return overlay;
 }
 
-export function openFunctionCard(bodyHash: string): void {
-  if (!bodyHash) return;
-  const occ = graphIndexes.byBodyHash.get(bodyHash);
-  if (!occ) return;
-
+function renderFunctionCard(occ: OccLike): void {
   // Singleton: reuse the existing overlay if it's open, swapping its content.
   const overlay = getOrCreateOverlay();
   while (overlay.firstChild) overlay.firstChild.remove();
@@ -225,6 +221,17 @@ export function openFunctionCard(bodyHash: string): void {
 
   // Move keyboard focus to the close button (accessibility).
   closeBtn.focus();
+}
+
+export function openFunctionCard(bodyHash: string): void {
+  if (!bodyHash) return;
+  const occ = graphIndexes.byBodyHash.get(bodyHash);
+  if (occ) renderFunctionCard(occ);
+}
+
+/** Open one already-qualified occurrence without collapsing body twins by hash. */
+export function openFunctionOccurrence(occurrence: OccLike): void {
+  renderFunctionCard(occurrence);
 }
 
 function renderTraceInCard(card: HTMLElement, path: string[] | null): void {

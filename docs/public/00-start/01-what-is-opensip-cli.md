@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-12
 release: v0.6.0
 title: "What is opensip-cli?"
 audience: [getting-started, contributors]
@@ -73,7 +73,7 @@ gates into deterministic evidence.
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-cli can, in 15 lines.
 - **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 160 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
-- **Multi-tool review suites.** `opensip suite run audit` runs a changed-scope review across first-party tools and returns one aggregate JSON result with a review brief.
+- **Multi-tool review suites.** `opensip audit` runs the curated changed-scope review across first-party tools and returns one aggregate result with a review brief and durable Run evidence. `suite run <name>` runs configured workflows.
 - **Scanner consolidation.** Opt-in adapters wrap a user's existing scanner binary
   — Gitleaks, Semgrep, Ruff, golangci-lint, cargo-deny, Bandit, PMD, Cppcheck,
   OSV-Scanner, Trivy, and more — and normalize findings into the same sessions,
@@ -142,7 +142,7 @@ bodies (via graph `bodyHash` evidence), and future detectors — with confidence
 preservation arguments, and validation steps. Exit code is 0 by default; findings
 are recommendations, not gate failures. See [`../55-yagni/01-command-reference.md`](../55-yagni/01-command-reference.md).
 
-The CLI doesn't know what any of these four do internally — they're tools registered against a shared dispatcher. Same model lets future `lint`, `bench`, or domain-specific tools slot in without CLI changes. The `audit` name is already used by the built-in suite preset. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
+The CLI doesn't know what any of these four do internally — they're tools registered against a shared dispatcher. Same model lets future `lint`, `bench`, or domain-specific tools slot in without CLI changes. Top-level `audit` is a reserved host command, not another Tool: it drives the curated built-in suite through the same suite executor used by `suite run`. For the architecture behind that decoupling, see [`../10-concepts/02-tool-plugin-model.md`](../10-concepts/02-tool-plugin-model.md).
 
 ### Installed security adapters
 

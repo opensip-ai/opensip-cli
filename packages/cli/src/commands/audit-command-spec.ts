@@ -1,0 +1,101 @@
+import { currentLogger, currentScope } from '@opensip-cli/core';
+
+import { decideCurrentReportOpen } from '../bootstrap/report-open-policy.js';
+import { composeAndWriteReport } from '../report-compose.js';
+
+import {
+  PROJECT_SCOPE,
+  RAW_STREAM,
+  defineCommand,
+  type HostSpec,
+} from './host-subcommand-shared.js';
+import { BUILT_IN_AUDIT_SUITE, BUILT_IN_AUDIT_SUITE_NAME } from './suite/built-in-suites.js';
+import { executeSuiteCommand } from './suite/execute-suite-command.js';
+import { SUITE_RUN_OPTIONS } from './suite/suite-run-options.js';
+
+import type { CliCommandsContext } from './shared.js';
+
+const AUDIT_SUITE_OPTION_KEYS = [
+  'cwd',
+  'json',
+  'quiet',
+  'verbose',
+  'debug',
+  'config',
+  'changed',
+  'since',
+  'files',
+  'full',
+] as const;
+
+function suiteOptsForAudit(
+  opts: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const suiteOpts: Record<string, unknown> = {};
+  for (const key of AUDIT_SUITE_OPTION_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(opts, key)) suiteOpts[key] = opts[key];
+  }
+  return suiteOpts;
+}
+
+/** Build the curated changed-code review shortcut backed by the built-in audit suite. */
+export function buildAuditCommandSpec(ctx: CliCommandsContext): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/audit-command-spec.ts',
+      declaration: 'buildAuditCommandSpec',
+    },
+    name: BUILT_IN_AUDIT_SUITE_NAME,
+    description: 'Review changed-code risk, graph impact, and evidence quality',
+    commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'open'],
+    options: SUITE_RUN_OPTIONS,
+    scope: PROJECT_SCOPE,
+    output: RAW_STREAM,
+    rawStreamReason: 'runtime-render-dispatch',
+    handler: async (rawOpts) => {
+      const opts = rawOpts as Readonly<Record<string, unknown>>;
+      const result = await executeSuiteCommand({
+        name: BUILT_IN_AUDIT_SUITE_NAME,
+        resolved: { suite: BUILT_IN_AUDIT_SUITE, source: 'built-in' },
+        opts: suiteOptsForAudit(opts),
+        ctx,
+        tools: currentScope()?.tools.list() ?? [],
+        defaultChanged: true,
+      });
+      if (result === undefined) return;
+
+      const openDecision = decideCurrentReportOpen({
+        openRequested: opts.open === true,
+        jsonOutput: opts.json === true,
+      });
+      if (!openDecision.shouldOpen) return result;
+
+      try {
+        const report = await composeAndWriteReport({
+          open: true,
+          selection: {
+            view: 'change-impact',
+            ...(result.runId === undefined ? {} : { runId: result.runId }),
+          },
+        });
+        if (!report.opened) await ctx.render(report);
+      } catch (error) {
+        currentLogger().warn?.({
+          evt: 'cli.report.audit_open_failed',
+          module: 'cli:report',
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        });
+        await ctx.render({
+          type: 'text-lines',
+          title: 'Change Impact report unavailable',
+          lines: ['The audit completed, but its report could not be generated or opened.'],
+        });
+      }
+      // Report composition and browser launch are best-effort presentation. The
+      // completed suite remains the sole authority for the command verdict.
+      ctx.setExitCode(result.exitCode);
+      return result;
+    },
+  });
+}

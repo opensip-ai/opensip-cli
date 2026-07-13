@@ -10,6 +10,8 @@
  * (wraps macOS `open`, Linux `xdg-open`, Windows `start`).
  */
 
+import { pathToFileURL } from 'node:url';
+
 import open from 'open';
 
 export interface OpenReportDecision {
@@ -44,6 +46,18 @@ export function decideReportOpen(ctx: OpenReportContext): OpenReportDecision {
   const display = ctx.env.DISPLAY ?? ctx.env.WAYLAND_DISPLAY;
   if (ssh && !display) return { shouldOpen: false, reason: 'ssh-no-display' };
   return { shouldOpen: true, reason: 'ok' };
+}
+
+const SAFE_REPORT_FRAGMENT = /^#change-impact(?:\/[A-Za-z0-9_-]{1,128})?$/;
+
+/**
+ * Append only a dashboard-owned fragment to a generated local report path.
+ * Invalid caller text is ignored rather than becoming an arbitrary browser target.
+ */
+export function buildReportLaunchTarget(reportPath: string, fragment?: string): string {
+  return fragment !== undefined && SAFE_REPORT_FRAGMENT.test(fragment)
+    ? `${pathToFileURL(reportPath).href}${fragment}`
+    : reportPath;
 }
 
 /**

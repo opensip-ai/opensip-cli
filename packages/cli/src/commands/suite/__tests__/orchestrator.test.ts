@@ -26,6 +26,8 @@ import {
   type ToolError,
   type ToolProvenance,
 } from '@opensip-cli/core';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { RunRepo } from '@opensip-cli/session-store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeDispatchHostCtx } from '../../../__tests__/harness/dispatch-host-ctx.js';
@@ -180,6 +182,63 @@ function makeChangedGitFixture(): string {
 }
 
 describe('runSuite', () => {
+  it('returns the authoritative persisted run ID from the single ledger transaction', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const spec = helpCommand('fit', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'audit',
+          suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
+          source: 'built-in',
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {},
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      const runs = new RunRepo(datastore).listRuns();
+      expect(runs).toHaveLength(1);
+      expect(result.runId).toBe(runs[0]?.id);
+      expect(runs[0]?.legacySuiteRunId).toBe(result.suiteRunId);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('omits runId without failing the completed suite when persistence is unavailable', async () => {
+    const spec = helpCommand('fit', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
+    const scope = new RunScope({
+      datastore: () => {
+        throw new Error('datastore offline');
+      },
+    });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
+        source: 'built-in',
+        tools: [tool(TOOL_ID, 'fitness', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: { cwd: '/repo' },
+      }),
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODES.SUCCESS);
+    expect(result.runId).toBeUndefined();
+  });
+
   it('assembles step opts from CommandSpec options plus shared suite flags', async () => {
     const seen: Record<string, unknown>[] = [];
     const spec = defineCommand<unknown, ToolCliContext>({

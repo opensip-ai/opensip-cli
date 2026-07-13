@@ -142,7 +142,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   });
 
   const completedAt = new Date();
-  const result: SuiteRunResult = {
+  const baseResult: SuiteRunResult = {
     type: 'suite-run',
     suite: suite.name,
     suiteRunId,
@@ -154,15 +154,15 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     reviewBrief,
     verbose: input.suiteOpts.verbose === true,
   };
-  persistSuiteRun({
-    result,
+  const runId = persistSuiteRun({
+    result: baseResult,
     internalSteps,
     source: input.source ?? 'configured',
     cwd,
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
   });
-  return result;
+  return runId === undefined ? baseResult : { ...baseResult, runId };
 }
 
 export function deriveSuiteAggregate(

@@ -23,6 +23,8 @@
  * hand-rolled in each command body.
  */
 
+import { isEmbeddedRender } from '@opensip-cli/core';
+
 import type { CommandOutcome, CommandResult } from '@opensip-cli/contracts';
 
 /** Pretty-print width matches the legacy `formatSignalJson` / `emitJson` writers. */
@@ -50,6 +52,11 @@ export async function renderOutcome(
   outcome: CommandOutcome,
   opts: RenderOutcomeOptions,
 ): Promise<void> {
+  // Suite steps execute in embedded-render mode. Keep the suppression at this
+  // host-owned serialization boundary as well as the Ink/static render seams:
+  // a command-result step with the shared `--json` flag would otherwise bypass
+  // its capturing ToolCliContext and write a second document directly to stdout.
+  if (isEmbeddedRender()) return;
   if (opts.jsonRequested) {
     process.stdout.write(JSON.stringify(outcome, null, JSON_INDENT) + '\n');
     return;

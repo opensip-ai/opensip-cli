@@ -269,6 +269,7 @@ const PACKAGE_EXPORT_ALLOWLISTS = {
       'makeFacet',
       'matchesFilePrefix',
       'matchesGraphSourceFilterWithRoles',
+      'matchesSymbolSearchQuery',
       'mergeFacet',
       'packageCallEvidenceStableKey',
       'packageDependencyStableKey',

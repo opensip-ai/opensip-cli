@@ -115,7 +115,7 @@ export function createCapturingContext(
   const reportFailure = createReportFailure({
     getLogger: () => currentLogger(),
     setExitCode: writeExit,
-    render: (result) => base.render(result),
+    render: () => Promise.resolve(),
     emitError: captureErrorDetail,
     getDiagnostics: () => currentScope()?.diagnostics,
   });
@@ -125,6 +125,21 @@ export function createCapturingContext(
   ) as ToolCliContext;
 
   Object.defineProperties(context, {
+    render: {
+      // The parent suite owns the only visible result. Embedded steps may call
+      // their documented renderer, but cannot emit a second terminal body.
+      value: () => Promise.resolve(),
+    },
+    emitJson: {
+      value: () => {
+        // Parent suite JSON is emitted once after all steps complete.
+      },
+    },
+    emitRaw: {
+      value: () => {
+        // Raw step documents remain private to embedded execution.
+      },
+    },
     setExitCode: {
       value: (code: number) => {
         // OVERWRITE (last-write-wins): a later `setExitCode(SUCCESS)` — e.g. yagni's
@@ -167,7 +182,6 @@ export function createCapturingContext(
       value: (envelope: Parameters<ToolCliContext['emitEnvelope']>[0]) => {
         lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
         lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
-        base.emitEnvelope(envelope);
       },
     },
     // Isolate the public error seam: an external (ADR-0054 worker) step whose

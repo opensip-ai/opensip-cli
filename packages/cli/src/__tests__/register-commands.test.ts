@@ -63,6 +63,34 @@ describe('init wiring', () => {
   });
 });
 
+describe('audit wiring', () => {
+  it('registers exactly one canonical audit command with bounded workflow flags', () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    const matches = program.commands.filter((command) => command.name() === 'audit');
+
+    expect(matches).toHaveLength(1);
+    const flags = matches[0].options.map((option) => option.long);
+    expect(flags).toEqual(
+      expect.arrayContaining([
+        '--cwd',
+        '--json',
+        '--quiet',
+        '--verbose',
+        '--debug',
+        '--open',
+        '--config',
+        '--changed',
+        '--since',
+        '--files',
+        '--full',
+      ]),
+    );
+    expect(flags).not.toContain('--report-to');
+    expect(flags).not.toContain('--api-key');
+  });
+});
+
 describe('completion wiring', () => {
   it('registers `completion <shell>` and rejects an unknown shell with exit 2', async () => {
     const { ctx, getExitCode } = makeCtx();

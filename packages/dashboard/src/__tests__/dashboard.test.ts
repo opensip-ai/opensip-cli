@@ -15,7 +15,10 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     passed: true,
     durationMs: 100,
     // Tool-owned opaque detail; contracts no longer carries summary/checks.
-    payload: { summary: { total: 10, passed: 9, failed: 1, errors: 0, warnings: 0 }, checks: [] },
+    payload: {
+      summary: { total: 10, passed: 9, failed: 1, errors: 0, warnings: 0 },
+      checks: [],
+    },
     ...overrides,
   };
 }
@@ -62,7 +65,9 @@ describe('generateDashboardHtml', () => {
   });
 
   it('inlines the latest session score in the document title', () => {
-    const html = generateDashboardHtml({ sessions: [makeSession({ score: 85 })] });
+    const html = generateDashboardHtml({
+      sessions: [makeSession({ score: 85 })],
+    });
     expect(html).toContain('Pass Rate: 85%');
   });
 
@@ -83,7 +88,10 @@ describe('generateDashboardHtml', () => {
   });
 
   it('keeps declared input metadata behind the header report details disclosure', () => {
-    const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
+    const html = generateDashboardHtml({
+      sessions: [makeSession()],
+      declaredInputs,
+    });
     const headerStart = html.indexOf('<div class="header">');
     const detailsStart = html.indexOf('<details class="report-details">');
     const tabStart = html.indexOf('<div class="tab-bar"');
@@ -98,7 +106,10 @@ describe('generateDashboardHtml', () => {
   });
 
   it('links released CLI versions to the matching GitHub release tag', () => {
-    const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
+    const html = generateDashboardHtml({
+      sessions: [makeSession()],
+      declaredInputs,
+    });
     expect(html).toContain('href="https://github.com/opensip-ai/opensip-cli/releases/tag/v0.1.19"');
     expect(html).toContain('target="_blank" rel="noopener noreferrer"');
     expect(html).toContain('<span class="report-details-version">CLI 0.1.19</span>');
@@ -119,7 +130,10 @@ describe('generateDashboardHtml', () => {
   it('omits Engine and Baseline rows when they do not apply (host report run)', () => {
     // The report command is a host command with no tool engine and no baseline,
     // so those rows are omitted rather than rendered as a confusing "unknown".
-    const html = generateDashboardHtml({ sessions: [makeSession()], declaredInputs });
+    const html = generateDashboardHtml({
+      sessions: [makeSession()],
+      declaredInputs,
+    });
     expect(html).not.toContain('<dt>Engine</dt>');
     expect(html).not.toContain('<dt>Baseline</dt>');
     // No environment row should render an "unknown" value cell.
@@ -190,10 +204,17 @@ describe('generateDashboardHtml', () => {
 
   it('renders first-party tab panels in descriptor order', () => {
     const html = generateDashboardHtml({ sessions: [] });
-    const ids = [...html.matchAll(/class="tab(?: active)?" data-tab="([^"]+)"/g)].map(
-      (match) => match[1],
-    );
-    expect(ids).toEqual(['overview', 'fitness', 'simulation', 'code-paths', 'yagni']);
+    const ids = [
+      ...html.matchAll(/<button[^>]*class="tab(?: active)?"[^>]*data-tab="([^"]+)"/g),
+    ].map((match) => match[1]);
+    expect(ids).toEqual([
+      'overview',
+      'change-impact',
+      'fitness',
+      'simulation',
+      'code-paths',
+      'yagni',
+    ]);
   });
 
   it('includes inline CSS', () => {

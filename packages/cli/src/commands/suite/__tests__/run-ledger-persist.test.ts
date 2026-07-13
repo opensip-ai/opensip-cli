@@ -132,7 +132,7 @@ describe('persistSuiteRun', () => {
       runId: 'correlation-run-1',
     });
 
-    runWithScopeSync(scope, () =>
+    const persistedRunId = runWithScopeSync(scope, () =>
       persistSuiteRun({
         result: result({
           aggregate: {
@@ -187,6 +187,7 @@ describe('persistSuiteRun', () => {
 
     const repo = new RunRepo(datastore);
     const [run] = repo.listRuns();
+    expect(persistedRunId).toBe(run?.id);
     expect(run).toMatchObject({
       name: 'audit',
       source: 'built-in-suite',
@@ -256,7 +257,7 @@ describe('persistSuiteRun', () => {
     const datastore = openMemoryDatastore();
     const scope = new RunScope({ datastore: () => datastore, logger: logger() });
 
-    runWithScopeSync(scope, () =>
+    const persistedRunId = runWithScopeSync(scope, () =>
       persistSuiteRun({
         result: result({ suite: 'security', suiteRunId: 'suite-run-2', steps: [] }),
         internalSteps: [reviewStep()],
@@ -269,6 +270,7 @@ describe('persistSuiteRun', () => {
 
     const repo = new RunRepo(datastore);
     const [run] = repo.listRuns();
+    expect(persistedRunId).toBe(run?.id);
     expect(run).toMatchObject({
       name: 'security',
       source: 'configured-suite',
@@ -300,7 +302,7 @@ describe('persistSuiteRun', () => {
       logger: log,
     });
 
-    runWithScopeSync(scope, () =>
+    const persistedRunId = runWithScopeSync(scope, () =>
       persistSuiteRun({
         result: result(),
         internalSteps: [],
@@ -317,5 +319,6 @@ describe('persistSuiteRun', () => {
         error: 'datastore offline',
       }),
     );
+    expect(persistedRunId).toBeUndefined();
   });
 });

@@ -97,7 +97,9 @@ describe('agent-catalog parity contract', () => {
     for (const example of collectExamples(catalog)) {
       expect(example).toMatch(/^opensip\s/);
       expect(example).not.toMatch(/\s{2,}/);
-      expect(example).not.toContain('opensip audit');
     }
+
+    expect(catalog.entryPoints.filter((entry) => entry.command === 'audit')).toHaveLength(1);
+    expect(collectExamples(catalog)).toContain('opensip audit --json');
   });
 });
