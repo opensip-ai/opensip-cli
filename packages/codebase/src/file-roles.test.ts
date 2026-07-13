@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyFileRoles } from './file-roles.js';
+import {
+  buildFileRoleTargetProjection,
+  classifyFileRoles,
+  classifyProjectedFileRoles,
+} from './file-roles.js';
 
 import type { TargetView } from '@opensip-cli/core';
 
@@ -66,6 +70,33 @@ describe('classifyFileRoles', () => {
     });
     expect(classifyFileRoles('src/other.ts', [explicit]).roles).toEqual(['unknown']);
     expect(classifyFileRoles('src/export.ts', [explicit]).roles).toEqual(['production']);
+  });
+
+  it('classifies compact pre-tokenized evidence equivalently to the public target API', () => {
+    const raw = target('unit-tests', {
+      concerns: ['configuration'],
+      tags: ['generated'],
+      conventions: { entrypoints: ['src/main.ts', 'src/*.ts'] },
+    });
+    const projected = buildFileRoleTargetProjection({
+      name: raw.config.name,
+      tags: raw.config.tags ?? [],
+      concerns: raw.config.concerns ?? [],
+      hasLanguage: false,
+      conventionPaths: raw.config.conventions?.entrypoints ?? [],
+    });
+
+    expect(projected).toEqual({
+      name: 'unit-tests',
+      roles: ['configuration', 'generated', 'test'],
+      literalConventionPaths: ['src/main.ts'],
+    });
+    expect(classifyProjectedFileRoles('src/main.ts', [projected])).toEqual(
+      classifyFileRoles('src/main.ts', [raw]),
+    );
+    expect(Object.isFrozen(projected)).toBe(true);
+    expect(Object.isFrozen(projected.roles)).toBe(true);
+    expect(Object.isFrozen(projected.literalConventionPaths)).toBe(true);
   });
 
   it('returns unknown with explicit provenance when no target supplies a basis', () => {

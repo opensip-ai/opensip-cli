@@ -22,6 +22,7 @@ import {
   prepareTaskContext,
   resultWithPersistence,
   taskContextManifestFor,
+  taskContextPointersAvailable,
 } from './task-context-orchestration.js';
 import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
@@ -38,6 +39,13 @@ export interface RunSuiteInput {
   readonly defaultChanged?: boolean;
   /** Optional step-lifecycle sink — the suite live view wires this to progress events. */
   readonly onStepEvent?: (event: SuiteStepEvent) => void;
+}
+
+function contextPersistencePrecondition(manifest: SuiteRunResult['contextManifest']): {
+  readonly persistencePrecondition?: () => boolean;
+} {
+  if (manifest === undefined || manifest.readiness === 'unavailable') return {};
+  return { persistencePrecondition: () => taskContextPointersAvailable(manifest) };
 }
 
 export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
@@ -191,6 +199,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
     identity: ledgerIdentity,
+    ...contextPersistencePrecondition(contextManifest),
   });
   return resultWithPersistence(baseResult, runId);
 }

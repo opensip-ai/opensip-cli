@@ -37,9 +37,18 @@ export interface FileContextDto {
   readonly nextActions: readonly string[];
 }
 
+/** Freshness policy for a bounded inventory status read. */
+export interface InventoryStatusOptions {
+  /** Bypass the completed two-second read-burst cache. In-flight work may still be coalesced. */
+  readonly forceFresh?: boolean;
+}
+
 export interface CodebaseReadPort {
   /** Build or reuse the one bounded inventory captured by this served project. */
-  inventoryStatus(signal?: AbortSignal): Promise<Result<CodebaseInventoryStatus, McpReadError>>;
+  inventoryStatus(
+    signal?: AbortSignal,
+    options?: InventoryStatusOptions,
+  ): Promise<Result<CodebaseInventoryStatus, McpReadError>>;
   /** Project metadata for one exact path; never returns source text. */
   fileContext(file: string, signal?: AbortSignal): Promise<Result<FileContextDto, McpReadError>>;
 }

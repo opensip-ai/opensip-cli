@@ -5,10 +5,11 @@
  * The composition root reads the already-resolved config document, parses the
  * host-owned `targets:` / `globalExcludes:` blocks through the
  * `@opensip-cli/config` Zod field schemas, registers each target into the
- * substrate `TargetRegistry`, and returns a `TargetResolver` — the structural
- * scope-slot shape `core` declares — wrapping the registry plus the bound
- * `resolveTargets` / `applyGlobalExcludes` closures + the project
- * `globalExcludes`. The CLI bootstrap attaches the result as `scope.targets`,
+ * substrate `TargetRegistry`, and returns a `BoundedTargetResolver` — the
+ * additive bounded subtype of the structural scope-slot shape `core` declares
+ * — wrapping the registry plus the bound synchronous and cooperative closures,
+ * `applyGlobalExcludes`, and the project `globalExcludes`. The CLI bootstrap
+ * attaches the result as `scope.targets`,
  * mirroring how `composeAndValidateToolConfig` produces `scope.toolConfig`.
  *
  * The host build is the GENERIC half only: it does NOT validate `checkOverrides`
@@ -26,8 +27,19 @@ import {
   type Target,
   type TargetConventionsConfig,
 } from '@opensip-cli/config';
-import { ConfigurationError, isPlainRecord, type TargetResolver } from '@opensip-cli/core';
-import { TargetRegistry, applyGlobalExcludes, resolveTargets } from '@opensip-cli/targeting';
+import {
+  ConfigurationError,
+  isPlainRecord,
+  type BoundedTargetMembershipResolver,
+} from '@opensip-cli/core';
+import {
+  TargetRegistry,
+  applyGlobalExcludes,
+  applyGlobalExcludesBounded,
+  resolveTargets,
+  resolveTargetsBounded,
+  resolveTargetMembershipsBounded,
+} from '@opensip-cli/targeting';
 
 /**
  * Default per-target exclusion globs, applied when a target declares no
@@ -62,7 +74,9 @@ function toTarget(
     ...(entry.tags && { tags: Object.freeze([...entry.tags]) }),
     ...(entry.languages && { languages: Object.freeze([...entry.languages]) }),
     ...(entry.concerns && { concerns: Object.freeze([...entry.concerns]) }),
-    ...(entry.conventions && { conventions: freezeTargetConventions(entry.conventions) }),
+    ...(entry.conventions && {
+      conventions: freezeTargetConventions(entry.conventions),
+    }),
   });
   return Object.freeze({ config });
 }
@@ -94,15 +108,17 @@ function rejectUnsafeConventionPathsForTarget(
  * by the composed schema; they are re-parsed here through the same field schemas
  * only to recover their narrowed types (idempotent on already-validated data, no
  * I/O), then each target is registered into a substrate `TargetRegistry` and
- * wrapped in a `TargetResolver` with the bound `resolveTargets` /
- * `applyGlobalExcludes` closures.
+ * wrapped in a `BoundedTargetResolver` with the bound synchronous and bounded
+ * target resolution plus `applyGlobalExcludes` closures.
  *
  * @param args.document The validated config document from
  *   `composeAndValidateToolConfig`, or an empty object for a config-less run.
- * @returns The `TargetResolver` to attach to `scope.targets`, or `undefined`
+ * @returns The `BoundedTargetResolver` to attach to `scope.targets`, or `undefined`
  *   when there is no config document or no `targets:` block to resolve.
  */
-export function buildTargets(args: { readonly document: unknown }): TargetResolver | undefined {
+export function buildTargets(args: {
+  readonly document: unknown;
+}): BoundedTargetMembershipResolver | undefined {
   const { document } = args;
   if (!isPlainRecord(document)) return undefined;
 
@@ -153,6 +169,20 @@ export function buildTargets(args: { readonly document: unknown }): TargetResolv
         .filter((t): t is Target => t !== undefined);
       return resolveTargets(resolved, rootDir, globalExcludes);
     },
+    resolveTargetsBounded: (names, rootDir, options) => {
+      const resolved = names
+        .map((name) => registry.getByName(name))
+        .filter((target): target is Target => target !== undefined);
+      return resolveTargetsBounded(resolved, rootDir, globalExcludes, options);
+    },
+    resolveTargetMembershipsBounded: (names, rootDir, options) => {
+      const resolved = names
+        .map((name) => registry.getByName(name))
+        .filter((target): target is Target => target !== undefined);
+      return resolveTargetMembershipsBounded(resolved, rootDir, globalExcludes, options);
+    },
+    applyGlobalExcludesBounded: (files, rootDir, options) =>
+      applyGlobalExcludesBounded(files, rootDir, globalExcludes, options),
     applyGlobalExcludes: (files, rootDir) => applyGlobalExcludes(files, rootDir, globalExcludes),
     globalExcludes,
   };

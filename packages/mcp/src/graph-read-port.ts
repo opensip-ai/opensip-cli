@@ -293,7 +293,10 @@ export interface ReferencesToDto {
   readonly declarationId: string;
   readonly references: readonly ReferenceSiteDto[];
   readonly totalMatches: number;
-  readonly kindCounts?: readonly { readonly kind: string; readonly count: number }[];
+  readonly kindCounts?: readonly {
+    readonly kind: string;
+    readonly count: number;
+  }[];
 }
 
 /**
@@ -324,8 +327,14 @@ export interface DeadCodeResultDto {
   readonly detail: CompactQueryDetail;
   readonly rows: readonly DeadCodeDto[];
   readonly totalOrphans: number;
-  readonly reasonCounts: readonly { readonly reason: string; readonly count: number }[];
-  readonly ruleCounts: readonly { readonly ruleId: string; readonly count: number }[];
+  readonly reasonCounts: readonly {
+    readonly reason: string;
+    readonly count: number;
+  }[];
+  readonly ruleCounts: readonly {
+    readonly ruleId: string;
+    readonly count: number;
+  }[];
 }
 
 export interface ArchitectureQuery {
@@ -390,6 +399,12 @@ export interface ContextPointerStatus {
   readonly currentGraphIdentity?: string;
 }
 
+/** Freshness policy for exact context-pointer replay. */
+export interface ContextPointerStatusOptions {
+  /** Bypass a completed graph freshness verdict cached for an ordinary read burst. */
+  readonly forceFresh?: boolean;
+}
+
 export interface GraphReadPort {
   /** Project/catalog context + freshness without serving query data. */
   catalogStatus(): Promise<Result<CatalogStatus, McpReadError>>;
@@ -452,6 +467,7 @@ export interface GraphReadPort {
   contextPointerStatus(
     pointer: TaskContextSnapshotPointer,
     signal?: AbortSignal,
+    options?: ContextPointerStatusOptions,
   ): Promise<Result<ContextPointerStatus, McpReadError>>;
   /**
    * One-generation traversal (callers/callees/path). Phase 1 exposes the

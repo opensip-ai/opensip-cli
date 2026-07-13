@@ -139,7 +139,9 @@ async function readPointerStatuses(
     if (aborted(signal)) {
       return err(readError('cancelled', 'Task-context replay was cancelled.'));
     }
-    const status = await graph.contextPointerStatus(plane.pointer, signal);
+    const status = await graph.contextPointerStatus(plane.pointer, signal, {
+      forceFresh: true,
+    });
     if (!status.ok) return status;
     statuses.push(status.value);
   }
@@ -174,7 +176,7 @@ async function verifyCurrentInventory(
   );
   if (recorded === undefined) return ok(statuses);
 
-  const current = await codebase.inventoryStatus(signal);
+  const current = await codebase.inventoryStatus(signal, { forceFresh: true });
   if (!current.ok) {
     if (current.error.code === 'cancelled') return current;
     return ok(

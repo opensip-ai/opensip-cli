@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T07:56:24.345Z",
+  "generatedAt": "2026-07-13T20:58:13.246Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,10 +25,10 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 235,
+        "total": 238,
         "bySlug": {
           "missing-type-exports": 3,
-          "async-waterfall-detection": 11,
+          "async-waterfall-detection": 14,
           "file-length-limit": 8,
           "no-markdown-references": 5,
           "dogfood-one-config-document-ratchet": 2,
@@ -103,7 +103,7 @@
         "byPackage": {
           "agent-eval": 8,
           "cli": 8,
-          "contracts": 2,
+          "contracts": 4,
           "core": 5,
           "dashboard": 1,
           "fitness/checks-dogfood": 10,
@@ -115,6 +115,7 @@
           "languages/lang-typescript": 2,
           "mcp": 10,
           "simulation": 3,
+          "targeting": 1,
           "test-support": 2
         }
       },
@@ -126,10 +127,10 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 63,
+        "total": 66,
         "bySlug": {
           "missing-type-exports": 3,
-          "async-waterfall-detection": 11,
+          "async-waterfall-detection": 14,
           "file-length-limit": 8,
           "no-markdown-references": 3,
           "dogfood-one-config-document-ratchet": 2,
@@ -159,7 +160,7 @@
         "byPackage": {
           "agent-eval": 8,
           "cli": 8,
-          "contracts": 2,
+          "contracts": 4,
           "core": 5,
           "dashboard": 1,
           "fitness/engine": 12,
@@ -167,7 +168,8 @@
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 2,
           "mcp": 10,
-          "simulation": 3
+          "simulation": 3,
+          "targeting": 1
         }
       },
       "graph": {
@@ -458,13 +460,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 235,
+    "budgetGateFitness": 238,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 63,
+    "productRuntimeFitness": 66,
     "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 95,
+    "productRuntimeCombined": 98,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 62,
@@ -484,10 +486,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -242,
+      "productRuntimeFitness": -239,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -217,
-      "budgetGateFitness": -307,
+      "productRuntimeCombined": -214,
+      "budgetGateFitness": -304,
       "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
@@ -495,7 +497,7 @@
     "reopenCandidates": [
       {
         "slug": "async-waterfall-detection",
-        "count": 11,
+        "count": 14,
         "disposition": "c",
         "kind": "fitness"
       },

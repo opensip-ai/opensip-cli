@@ -16,6 +16,10 @@ import {
 import { discoverManifestFacts, packageFacts } from './inventory-manifests.js';
 import { emptyInventory, enforceSerializedBudget } from './inventory-snapshot.js';
 import {
+  asBoundedTargetResolver,
+  preflightBoundedTargetResolver,
+} from './target-resolver-bounds.js';
+import {
   DEFAULT_INVENTORY_LIMITS,
   MAX_FILE_TARGETS,
   MAX_INVENTORY_SERIALIZED_BYTES,
@@ -28,6 +32,7 @@ import {
 
 import type { InventoryLimits, ProjectInventory, ProjectInventoryInput } from './types.js';
 import type { ProjectInventorySnapshot } from '@opensip-cli/contracts';
+import type { BoundedTargetResolver } from '@opensip-cli/core';
 
 function boundedLimit(value: number | undefined, hardMaximum: number): number {
   if (value === undefined || !Number.isFinite(value) || value <= 0) return hardMaximum;
@@ -44,6 +49,21 @@ function resolveLimits(overrides: Partial<InventoryLimits> | undefined): Invento
     manifestDepth: boundedLimit(overrides?.manifestDepth, MAX_MANIFEST_DEPTH),
     serializedBytes: boundedLimit(overrides?.serializedBytes, MAX_INVENTORY_SERIALIZED_BYTES),
   });
+}
+
+function boundedTargetCapability(
+  input: ProjectInventoryInput,
+  reasons: Set<string>,
+): { readonly resolver?: BoundedTargetResolver; readonly stop: boolean } {
+  if (input.targets === undefined) return { stop: false };
+  const resolver = asBoundedTargetResolver(input.targets);
+  const cancelled = input.signal?.aborted === true;
+  if (cancelled) reasons.add(INVENTORY_CANCELLED_REASON);
+  if (resolver === undefined) reasons.add('bounded-target-resolution-unavailable');
+  return {
+    ...(resolver === undefined ? {} : { resolver }),
+    stop: cancelled || resolver === undefined,
+  };
 }
 
 /** Build one bounded, deterministic, content-free project inventory. */
@@ -64,14 +84,37 @@ export async function buildProjectInventory(
   }
 
   const limits = resolveLimits(input.limits ?? DEFAULT_INVENTORY_LIMITS);
+  const targetCapability = boundedTargetCapability(input, initialReasons);
+  if (targetCapability.stop) return emptyInventory(input, initialReasons);
+  const boundedResolver = targetCapability.resolver;
+  if (boundedResolver !== undefined) {
+    const preflightReasons = new Set<string>();
+    const ready = await preflightBoundedTargetResolver({
+      projectRoot,
+      resolver: boundedResolver,
+      reasons: preflightReasons,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+    if (!ready) {
+      for (const reason of preflightReasons) initialReasons.add(reason);
+      return emptyInventory(input, initialReasons);
+    }
+  }
   await yieldToEventLoop();
   if (input.signal?.aborted) {
     initialReasons.add(INVENTORY_CANCELLED_REASON);
     return emptyInventory(input, initialReasons);
   }
-  const manifests = await discoverManifestFacts(projectRoot, limits, input.signal, input.targets);
+  const manifests = await discoverManifestFacts(projectRoot, limits, input.signal, boundedResolver);
   const packages = packageFacts(manifests.facts);
-  const fileDiscovery = await discoverFiles(projectRoot, input, limits, packages, manifests.facts);
+  const fileDiscovery = await discoverFiles({
+    inventoryInput: input,
+    limits,
+    manifests: manifests.facts,
+    packages,
+    projectRoot,
+    resolver: boundedResolver,
+  });
   const allReasons = new Set([...initialReasons, ...manifests.reasons, ...fileDiscovery.reasons]);
   const languageBoundFiles = boundProjectLanguages(fileDiscovery.files, input, allReasons);
   const bounded = enforceSerializedBudget({

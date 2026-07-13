@@ -2,6 +2,8 @@
 
 import { currentScope, err, ok, type Result } from '@opensip-cli/core';
 
+import { catalogGenerationKey } from '../read/catalog-generation-key.js';
+
 import { CatalogRepo } from './catalog-repo.js';
 
 import type { ContextCatalogAccessor } from '../read/catalog.js';
@@ -48,6 +50,15 @@ export function createContextCatalogAccessor(): ContextCatalogAccessor {
         (repo) => repo.loadFullCatalog(),
         'GRAPH.CONTEXT_CATALOG.LOAD_FAILED',
         'Failed to load the graph context catalog.',
+      ),
+    generationIdentity: () =>
+      withCurrentRepo(
+        (repo) => {
+          const identity = repo.readIdentity();
+          return identity === null ? null : catalogGenerationKey(identity);
+        },
+        'GRAPH.CONTEXT_CATALOG.IDENTITY_FAILED',
+        'Failed to read the graph context catalog identity.',
       ),
     replace: (catalog: Catalog) =>
       withCurrentRepo(

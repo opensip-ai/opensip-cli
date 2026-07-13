@@ -1,6 +1,6 @@
 /** Catalog generation sync and refresh controller (MCP Graph Audit Phase 1). */
 
-import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
+import { err, ok, type Result } from '@opensip-cli/core';
 import {
   type Catalog,
   type CatalogIdentity,
@@ -8,7 +8,15 @@ import {
   type GraphAdapterRegistryReader,
 } from '@opensip-cli/graph/read';
 
-import { CatalogFreshnessController } from './catalog-freshness-controller.js';
+import {
+  CatalogFreshnessController,
+  type CatalogFreshnessVerifyOptions,
+} from './catalog-freshness-controller.js';
+import {
+  graphRefreshFailure,
+  logGenerationTransition,
+  mapCatalogLoadError,
+} from './catalog-generation-diagnostics.js';
 import {
   createGeneration,
   type CatalogGeneration,
@@ -20,7 +28,7 @@ import {
   mapCatalogIdentityError,
   safeCatalogGenerationKey,
 } from './catalog-identity.js';
-import { fromGraphReadError, readError, type McpReadError } from './mcp-error.js';
+import { readError, type McpReadError } from './mcp-error.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -163,7 +171,12 @@ export class GraphGenerationController {
           ),
         );
       }
-      this.logGenerationTransition(priorGeneration, this.generation, Date.now() - started);
+      logGenerationTransition(
+        this.deps.log,
+        priorGeneration,
+        this.generation,
+        Date.now() - started,
+      );
       return Promise.resolve(ok(this.generation));
     } catch {
       restore();
@@ -171,32 +184,6 @@ export class GraphGenerationController {
         err(readError('catalog-sync-failed', 'Failed to synchronize graph catalog generation.')),
       );
     }
-  }
-
-  private logGenerationTransition(
-    prior: CatalogGeneration | undefined,
-    next: CatalogGeneration | undefined,
-    durationMs: number,
-  ): void {
-    if (prior?.key === next?.key) return;
-    if (next === undefined) {
-      if (prior !== undefined) {
-        this.deps.log?.('mcp.graph.generation.removed', {
-          priorAvailable: true,
-          durationMs,
-        });
-      }
-      return;
-    }
-    this.deps.log?.(
-      prior === undefined ? 'mcp.graph.generation.loaded' : 'mcp.graph.generation.swapped',
-      {
-        source: next.source,
-        mode: next.catalog.resolutionMode ?? 'exact',
-        priorAvailable: prior !== undefined,
-        durationMs,
-      },
-    );
   }
 
   private probeAndMaybeLoad(
@@ -225,7 +212,7 @@ export class GraphGenerationController {
     }
     const loaded = this.deps.loadCatalog(this.deps.store);
     if (!loaded.ok) {
-      this.loadError = mapLoadError(loaded.error);
+      this.loadError = mapCatalogLoadError(loaded.error);
       return err(this.loadError);
     }
     if (loaded.value === null) {
@@ -268,8 +255,9 @@ export class GraphGenerationController {
   /** Coalesced freshness verification with 2s burst reuse. */
   async verifyCurrent(
     gen: CatalogGeneration,
+    options?: CatalogFreshnessVerifyOptions,
   ): Promise<Result<FreshnessVerification, McpReadError>> {
-    return await this.freshness.verify(gen);
+    return await this.freshness.verify(gen, options);
   }
 
   invalidateFreshness(): void {
@@ -292,8 +280,14 @@ export class GraphGenerationController {
       if (this.inFlightRefresh === active) this.inFlightRefresh = undefined;
       return await this.refresh(true);
     }
-    const control: RefreshControl = { forceRequested: forceRebuild, decision: 'pending' };
-    const flight: RefreshFlight = { control, promise: this.runRefresh(control) };
+    const control: RefreshControl = {
+      forceRequested: forceRebuild,
+      decision: 'pending',
+    };
+    const flight: RefreshFlight = {
+      control,
+      promise: this.runRefresh(control),
+    };
     this.inFlightRefresh = flight;
     try {
       return await flight.promise;
@@ -309,11 +303,20 @@ export class GraphGenerationController {
     const priorKey = priorGeneration?.key;
     let failureFallback = priorGeneration;
     let failedPhase = 'sync';
+    const refreshFailure = (cause: McpReadError | undefined): McpReadError =>
+      graphRefreshFailure({
+        cause,
+        currentGeneration: this.generation,
+        failedPhase,
+        projectRoot: this.deps.projectRoot,
+        retainedGeneration: failureFallback,
+        started,
+      });
     this.invalidateFreshness();
     try {
       const captured = await this.capture();
       if (!captured.ok) {
-        return err(this.refreshFailure(captured.error, failedPhase, started, failureFallback));
+        return err(refreshFailure(captured.error));
       }
       const gen = captured.value;
       failureFallback = gen ?? failureFallback;
@@ -327,7 +330,7 @@ export class GraphGenerationController {
       });
       if (!reusable.ok) {
         this.generation = failureFallback;
-        return err(this.refreshFailure(reusable.error, failedPhase, started, failureFallback));
+        return err(refreshFailure(reusable.error));
       }
       if (reusable.value !== undefined) return ok(reusable.value);
       control.decision = 'rebuild';
@@ -335,7 +338,7 @@ export class GraphGenerationController {
       const rebuilt = await this.deps.rebuild();
       if (!rebuilt.ok) {
         this.generation = failureFallback;
-        return err(this.refreshFailure(rebuilt.error, failedPhase, started, failureFallback));
+        return err(refreshFailure(rebuilt.error));
       }
       const next = createGeneration(rebuilt.value, 'refresh-rebuild');
       const hadGeneration = this.generation !== undefined;
@@ -359,7 +362,7 @@ export class GraphGenerationController {
       });
     } catch {
       this.generation = failureFallback;
-      return err(this.refreshFailure(undefined, failedPhase, started, failureFallback));
+      return err(refreshFailure(undefined));
     }
   }
 
@@ -386,34 +389,4 @@ export class GraphGenerationController {
       priorGenerationAvailable: input.priorAvailable,
     });
   }
-
-  private refreshFailure(
-    cause: McpReadError | undefined,
-    failedPhase: string,
-    started: number,
-    retainedGeneration: CatalogGeneration | undefined,
-  ): McpReadError {
-    return readError(
-      'graph-refresh-failed',
-      'Graph refresh failed due to an infrastructure error.',
-      {
-        failedPhase,
-        outcome: 'failed',
-        durationMs: Date.now() - started,
-        priorGenerationAvailable: retainedGeneration !== undefined,
-        projectKey: ephemeralProjectCacheKey(this.deps.projectRoot),
-        priorGenerationKey: retainedGeneration?.key ?? 'missing',
-        currentGenerationKey: this.generation?.key ?? 'missing',
-        ...(cause?.code === undefined ? {} : { causeCode: cause.code }),
-      },
-    );
-  }
-}
-
-function mapLoadError(error: { code: string; message: string }): McpReadError {
-  return fromGraphReadError({
-    code: error.code,
-    operation: 'catalog-generation',
-    message: error.message,
-  });
 }

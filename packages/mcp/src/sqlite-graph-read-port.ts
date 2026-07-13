@@ -80,6 +80,7 @@ import type {
   BlastDto,
   CatalogStatus,
   ContextPointerStatus,
+  ContextPointerStatusOptions,
   DeadCodeQuery,
   DeadCodeResultDto,
   DeclarationSearchDto,
@@ -640,6 +641,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   async contextPointerStatus(
     pointer: Parameters<GraphReadPort['contextPointerStatus']>[0],
     signal?: AbortSignal,
+    options?: ContextPointerStatusOptions,
   ): ReturnType<GraphReadPort['contextPointerStatus']> {
     if (aborted(signal)) {
       return err(readError('cancelled', 'Context pointer read was cancelled.'));
@@ -657,7 +659,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       if (pointerStatus.status !== 'available' || captured.value === undefined) {
         return ok(pointerStatus);
       }
-      const freshness = await this.queryContext.freshnessFor(captured.value);
+      const freshness = await this.queryContext.freshnessFor(captured.value, options);
       if (!freshness.ok) {
         return ok({
           pointer,

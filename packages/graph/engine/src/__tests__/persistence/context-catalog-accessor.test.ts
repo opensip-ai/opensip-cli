@@ -3,6 +3,7 @@ import { DataStoreFactory } from '@opensip-cli/datastore';
 import { describe, expect, it } from 'vitest';
 
 import { createContextCatalogAccessor } from '../../persistence/context-catalog-accessor.js';
+import { catalogGenerationKey } from '../../read/catalog-generation-key.js';
 
 import type { Catalog } from '../../types.js';
 
@@ -24,7 +25,17 @@ describe('context catalog RunScope accessor', () => {
       runWithScopeSync(scope, () => {
         const accessor = createContextCatalogAccessor();
         expect(accessor.load()).toEqual({ ok: true, value: null });
+        expect(accessor.generationIdentity()).toEqual({ ok: true, value: null });
         expect(accessor.replace(catalog)).toEqual({ ok: true, value: undefined });
+        expect(accessor.generationIdentity()).toEqual({
+          ok: true,
+          value: catalogGenerationKey({
+            language: catalog.language,
+            cacheKey: catalog.cacheKey,
+            filesFingerprint: catalog.filesFingerprint ?? '',
+            builtAt: catalog.builtAt,
+          }),
+        });
         expect(accessor.load()).toMatchObject({
           ok: true,
           value: {
@@ -40,14 +51,17 @@ describe('context catalog RunScope accessor', () => {
 
   it('returns a bounded error when no project datastore is entered', () => {
     runWithScopeSync(new RunScope(), () => {
-      expect(createContextCatalogAccessor().load()).toEqual({
+      const accessor = createContextCatalogAccessor();
+      const expected = {
         ok: false,
         error: {
           code: 'GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED',
           operation: 'catalog-generation',
           message: 'Graph context requires an entered project datastore.',
         },
-      });
+      };
+      expect(accessor.load()).toEqual(expected);
+      expect(accessor.generationIdentity()).toEqual(expected);
     });
   });
 });

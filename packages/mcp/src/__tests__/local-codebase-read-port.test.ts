@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { LocalCodebaseReadPort } from '../local-codebase-read-port.js';
 
-import type { TargetResolver, TargetView } from '@opensip-cli/core';
+import type { BoundedTargetResolver, TargetResolver, TargetView } from '@opensip-cli/core';
 
 const roots: string[] = [];
 
@@ -15,26 +15,40 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function countedResolver(targets: TargetResolver): {
-  readonly targets: TargetResolver;
+function countedResolver(targets: BoundedTargetResolver): {
+  readonly targets: BoundedTargetResolver;
   readonly calls: () => number;
 } {
   let calls = 0;
   return {
     targets: {
       ...targets,
-      resolveTargets: (names, rootDir) => {
+      resolveTargetsBounded: (names, rootDir, options) => {
         calls += 1;
-        return targets.resolveTargets(names, rootDir);
+        return targets.resolveTargetsBounded(names, rootDir, options);
       },
+      applyGlobalExcludesBounded: (files, rootDir, options) =>
+        targets.applyGlobalExcludesBounded(files, rootDir, options),
     },
     calls: () => calls,
   };
 }
 
+function baseOnlyResolver(targets: BoundedTargetResolver): TargetResolver {
+  return {
+    getByName: (name) => targets.getByName(name),
+    getAll: () => targets.getAll(),
+    getByTag: (tag) => targets.getByTag(tag),
+    has: (name) => targets.has(name),
+    resolveTargets: (names, rootDir) => targets.resolveTargets(names, rootDir),
+    applyGlobalExcludes: (files, rootDir) => targets.applyGlobalExcludes(files, rootDir),
+    globalExcludes: targets.globalExcludes,
+  };
+}
+
 function fixture(): {
   readonly root: string;
-  readonly targets: TargetResolver;
+  readonly targets: BoundedTargetResolver;
 } {
   const root = mkdtempSync(join(tmpdir(), 'opensip-mcp-inventory-'));
   roots.push(root);
@@ -60,12 +74,34 @@ function fixture(): {
       concerns: ['production'],
     },
   };
-  const targets: TargetResolver = {
+  const targets: BoundedTargetResolver = {
     getByName: (name) => (name === target.config.name ? target : undefined),
     getAll: () => [target],
     getByTag: () => [],
     has: (name) => name === target.config.name,
     resolveTargets: () => [join(root, 'src', 'a.ts')],
+    resolveTargetsBounded: (_names, _rootDir, options) => {
+      if (options.signal?.aborted === true) {
+        return Promise.resolve({ files: [], capped: false, cancelled: true });
+      }
+      const files = [join(root, 'src', 'a.ts')];
+      return Promise.resolve({
+        files: files.slice(0, options.maxResults),
+        capped: files.length > options.maxResults,
+        cancelled: false,
+      });
+    },
+    applyGlobalExcludesBounded: (files, _rootDir, options) => {
+      if (options.signal?.aborted === true) {
+        return Promise.resolve({ files: [], capped: false, cancelled: true });
+      }
+      const retained = files.filter((file) => !file.includes('/ignored/')).sort();
+      return Promise.resolve({
+        files: retained.slice(0, options.maxResults),
+        capped: retained.length > options.maxResults,
+        cancelled: false,
+      });
+    },
     applyGlobalExcludes: (files) => files.filter((file) => !file.includes('/ignored/')),
     globalExcludes: ['ignored/**'],
   };
@@ -142,6 +178,57 @@ describe('LocalCodebaseReadPort', () => {
       verification: 'complete',
     });
     expect(calls()).toBe(2);
+  });
+
+  it('bypasses the completed read-burst cache when freshness is required', async () => {
+    const fixtureResult = fixture();
+    const { targets, calls } = countedResolver(fixtureResult.targets);
+    const port = new LocalCodebaseReadPort({
+      projectRoot: fixtureResult.root,
+      configIdentity: 'sha256:config',
+      targets,
+    });
+    const first = await port.inventoryStatus();
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    writeFileSync(join(fixtureResult.root, 'src', 'a.ts'), 'export const a = 200;\n');
+    const reused = await port.inventoryStatus();
+    expect(reused.ok && reused.value.identity).toBe(first.value.identity);
+    expect(calls()).toBe(1);
+
+    const fresh = await port.inventoryStatus(undefined, { forceFresh: true });
+    expect(fresh.ok).toBe(true);
+    if (!fresh.ok) return;
+    expect(fresh.value.identity).not.toBe(first.value.identity);
+    expect(calls()).toBe(2);
+  });
+
+  it('reports bounded inventory unavailable for a base-only target resolver', async () => {
+    const { root, targets } = fixture();
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets: baseOnlyResolver(targets),
+    });
+
+    const result = await port.inventoryStatus();
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        coverage: {
+          status: 'unavailable',
+          reasonCodes: ['bounded-target-resolution-unavailable'],
+          observed: 0,
+        },
+        freshness: {
+          fresh: false,
+          verification: 'missing',
+          reasonCodes: ['bounded-target-resolution-unavailable'],
+        },
+      },
+    });
   });
 
   it('coalesces concurrent refreshes and isolates an aborted waiter', async () => {

@@ -153,8 +153,12 @@ describe('createGeneration', () => {
     const replacementPending = generationImpactIndex(generation);
     const replacementFlight = generation.derived.impactIndexBuild;
     expect(replacementFlight).not.toBe(abandonedFlight);
-    await expect(firstPending).rejects.toMatchObject({ name: 'ComputeImpactCancelledError' });
-    await expect(secondPending).rejects.toMatchObject({ name: 'ComputeImpactCancelledError' });
+    await expect(firstPending).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+    await expect(secondPending).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
     await expect(abandonedFlight?.promise).rejects.toMatchObject({
       name: 'ComputeImpactCancelledError',
     });
@@ -421,6 +425,24 @@ describe('GraphGenerationController', () => {
     expect(setup.verify).toHaveBeenCalledTimes(2);
     const stillCachedB = await setup.controller.verifyCurrent(capturedB.value);
     expect(stillCachedB.ok).toBe(true);
+    expect(setup.verify).toHaveBeenCalledTimes(2);
+  });
+
+  it('bypasses a completed freshness burst verdict when freshness is required', async () => {
+    const setup = harness();
+    const captured = await setup.controller.capture();
+    expect(captured.ok).toBe(true);
+    if (!captured.ok || captured.value === undefined) return;
+
+    const first = await setup.controller.verifyCurrent(captured.value);
+    const reused = await setup.controller.verifyCurrent(captured.value);
+    expect(first.ok && reused.ok).toBe(true);
+    expect(setup.verify).toHaveBeenCalledTimes(1);
+
+    const fresh = await setup.controller.verifyCurrent(captured.value, {
+      forceFresh: true,
+    });
+    expect(fresh.ok).toBe(true);
     expect(setup.verify).toHaveBeenCalledTimes(2);
   });
 

@@ -4,12 +4,13 @@ import {
   EXIT_CODES,
   buildTaskContextFileScope,
   buildTaskContextProjectIdentity,
+  parseTaskContextManifest,
   type SuiteRunResult,
   type TaskContextFileScope,
   type TaskContextManifest,
   type TaskContextSourceIdentity,
 } from '@opensip-cli/contracts';
-import { ConfigurationError, currentLogger, currentScope } from '@opensip-cli/core';
+import { ConfigurationError, currentLogger, currentScope, isRecord } from '@opensip-cli/core';
 
 import { validateBuiltInAgentContextAuthority } from './agent-context-authority.js';
 import { BUILT_IN_AGENT_CONTEXT_SUITE_NAME, type SuiteSource } from './built-in-suites.js';
@@ -19,6 +20,35 @@ import { captureTaskContextSourceIdentity } from './task-context-source-identity
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteLedgerIdentity } from './run-ledger-persist.js';
 import type { ValidatedSuite } from './validate-suite.js';
+
+interface TaskContextGraphReadScope {
+  readonly contextCatalog: {
+    generationIdentity():
+      { readonly ok: true; readonly value: string | null } | { readonly ok: false };
+  };
+  readonly contextSnapshots: {
+    get(id: string): {
+      readonly id: string;
+      readonly kind: string;
+      readonly schemaVersion: number;
+    } | null;
+  };
+}
+
+function taskContextGraphReadScope(): TaskContextGraphReadScope | undefined {
+  const scope: unknown = currentScope();
+  if (!isRecord(scope) || !isRecord(scope.graph)) return;
+  const graph = scope.graph;
+  if (
+    !isRecord(graph.contextCatalog) ||
+    typeof graph.contextCatalog.generationIdentity !== 'function' ||
+    !isRecord(graph.contextSnapshots) ||
+    typeof graph.contextSnapshots.get !== 'function'
+  ) {
+    return;
+  }
+  return graph as unknown as TaskContextGraphReadScope;
+}
 
 export type TaskContextPreparation =
   | { readonly aggregates: false; readonly cwd: string }
@@ -140,7 +170,7 @@ export async function taskContextManifestFor(input: {
 }): Promise<TaskContextManifest | undefined> {
   if (!input.preparation.aggregates) return;
   const sourceEnd = await captureContextSource(input.preparation.cwd);
-  return buildTaskContextManifest({
+  const manifest = buildTaskContextManifest({
     ledger: input.ledger,
     steps: input.steps,
     sourceStart: input.preparation.sourceStart,
@@ -149,6 +179,62 @@ export async function taskContextManifestFor(input: {
     fileScope: input.preparation.fileScope,
     createdAt: new Date().toISOString(),
     projectIdentity: input.preparation.projectIdentity,
+  });
+  return revalidateTaskContextPointers(manifest);
+}
+
+function rerunTaskContextAction(manifest: TaskContextManifest): string {
+  return manifest.fileScope.mode === 'explicit'
+    ? 'opensip suite run agent-context --files <same-explicit-files> --json'
+    : 'opensip suite run agent-context --json';
+}
+
+function taskContextPointerFailures(manifest: TaskContextManifest): readonly string[] {
+  const graph = taskContextGraphReadScope();
+  if (graph === undefined) return ['context-pointer-verification-unavailable'];
+  const failures: string[] = [];
+  try {
+    for (const plane of manifest.planes) {
+      const pointer = plane.pointer;
+      if (pointer === undefined) continue;
+      if (pointer.kind === 'graph') {
+        const identity = graph.contextCatalog.generationIdentity();
+        if (!identity.ok || identity.value !== pointer.id) {
+          failures.push('graph-pointer-missing-or-mismatched');
+        }
+        continue;
+      }
+      const snapshot = graph.contextSnapshots.get(pointer.id);
+      if (
+        snapshot?.id !== pointer.id ||
+        snapshot?.kind !== pointer.kind ||
+        snapshot?.schemaVersion !== pointer.schemaVersion
+      ) {
+        failures.push(`${pointer.kind}-pointer-missing-or-mismatched`);
+      }
+    }
+  } catch {
+    return ['context-pointer-verification-failed'];
+  }
+  return failures;
+}
+
+/** Recheck durable evidence while the caller holds the datastore write lock. */
+export function taskContextPointersAvailable(manifest: TaskContextManifest): boolean {
+  return taskContextPointerFailures(manifest).length === 0;
+}
+
+/** Fail closed if retention or another writer invalidated a just-produced exact pointer. */
+export function revalidateTaskContextPointers(manifest: TaskContextManifest): TaskContextManifest {
+  if (manifest.readiness === 'unavailable') return manifest;
+  const failures = taskContextPointerFailures(manifest);
+  if (failures.length === 0) return manifest;
+  const reasonCodes = [...new Set([...failures, ...manifest.reasonCodes])].slice(0, 32);
+  return parseTaskContextManifest({
+    ...manifest,
+    readiness: 'unavailable',
+    reasonCodes,
+    nextActions: [rerunTaskContextAction(manifest)],
   });
 }
 
@@ -184,12 +270,10 @@ export function resultWithPersistence(
     contextManifest: {
       ...base.contextManifest,
       readiness: 'unavailable',
-      reasonCodes: [...base.contextManifest.reasonCodes, 'ledger-persist-failed'],
-      nextActions: [
-        base.contextManifest.fileScope.mode === 'explicit'
-          ? 'opensip suite run agent-context --files <same-explicit-files> --json'
-          : 'opensip suite run agent-context --json',
-      ],
+      reasonCodes: [
+        ...new Set(['ledger-persist-failed', ...base.contextManifest.reasonCodes]),
+      ].slice(0, 32),
+      nextActions: [rerunTaskContextAction(base.contextManifest)],
     },
   };
 }

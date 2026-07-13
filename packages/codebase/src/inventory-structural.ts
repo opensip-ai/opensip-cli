@@ -5,11 +5,12 @@ import { isPathInside, toPosixRelative, tryCatch } from '@opensip-cli/core';
 
 import { byCodePoint } from './freeze.js';
 import { CONTROL_CHARACTER } from './inventory-helpers.js';
+import { applyBoundedGlobalExcludes } from './target-resolver-bounds.js';
 
 import type { PendingFile, StructuralFileDiscovery } from './inventory-file-model.js';
 import type { InventoryLimits, PackageManifestFacts, ProjectInventoryInput } from './types.js';
 import type { FactProvenance, FileRole } from '@opensip-cli/contracts';
-import type { TargetResolver } from '@opensip-cli/core';
+import type { BoundedTargetResolver } from '@opensip-cli/core';
 
 const ROOT_STRUCTURAL_MARKERS: readonly {
   readonly path: string;
@@ -124,41 +125,45 @@ function collectRootStructuralMarkers(
   }
 }
 
-function applyStructuralGlobalExcludes(
-  projectRoot: string,
-  pending: readonly PendingFile[],
-  resolver: TargetResolver | undefined,
-  candidates: ReadonlyMap<string, PendingFile>,
-  reasons: Set<string>,
-): readonly PendingFile[] {
-  if (resolver === undefined || pending.length === 0) return pending;
-  const filtered = tryCatch(() => {
-    const retained = resolver.applyGlobalExcludes(
-      pending.map((candidate) => candidate.absolutePath),
-      projectRoot,
-    );
-    const allowed = new Set<string>();
-    for (const filePath of retained) {
-      const canonical = canonicalFile(filePath, projectRoot);
-      if (canonical !== undefined && candidates.has(canonical.relativePath)) {
-        allowed.add(canonical.relativePath);
-      }
-    }
-    return pending.filter((candidate) => allowed.has(candidate.relativePath));
-  });
-  if (!filtered.ok) {
-    reasons.add('global-exclude-filter-failed');
-    return [];
-  }
-  return filtered.value;
+interface StructuralGlobalExcludeInput {
+  readonly candidates: ReadonlyMap<string, PendingFile>;
+  readonly pending: readonly PendingFile[];
+  readonly projectRoot: string;
+  readonly reasons: Set<string>;
+  readonly resolver: BoundedTargetResolver | undefined;
+  readonly signal: AbortSignal | undefined;
 }
 
-export function discoverStructuralFiles(
+async function applyStructuralGlobalExcludes(
+  input: StructuralGlobalExcludeInput,
+): Promise<readonly PendingFile[]> {
+  const { candidates, pending, projectRoot, reasons, resolver, signal } = input;
+  if (resolver === undefined || pending.length === 0) return pending;
+  const retained = await applyBoundedGlobalExcludes({
+    files: pending.map((candidate) => candidate.absolutePath),
+    maximumFiles: pending.length,
+    projectRoot,
+    reasons,
+    resolver,
+    ...(signal === undefined ? {} : { signal }),
+  });
+  const allowed = new Set<string>();
+  for (const filePath of retained) {
+    const canonical = canonicalFile(filePath, projectRoot);
+    if (canonical !== undefined && candidates.has(canonical.relativePath)) {
+      allowed.add(canonical.relativePath);
+    }
+  }
+  return pending.filter((candidate) => allowed.has(candidate.relativePath));
+}
+
+export async function discoverStructuralFiles(
   projectRoot: string,
   manifests: readonly PackageManifestFacts[],
   input: ProjectInventoryInput,
   limits: InventoryLimits,
-): StructuralFileDiscovery {
+  resolver: BoundedTargetResolver | undefined,
+): Promise<StructuralFileDiscovery> {
   const reasons = new Set<string>();
   const candidates = new Map<string, PendingFile>();
   collectManifestStructuralFiles(projectRoot, manifests, candidates, reasons);
@@ -166,13 +171,14 @@ export function discoverStructuralFiles(
   const sorted = [...candidates.values()].sort((left, right) =>
     byCodePoint(left.relativePath, right.relativePath),
   );
-  const pending = applyStructuralGlobalExcludes(
-    projectRoot,
-    sorted,
-    input.targets,
+  const pending = await applyStructuralGlobalExcludes({
     candidates,
+    pending: sorted,
+    projectRoot,
     reasons,
-  );
+    resolver,
+    signal: input.signal,
+  });
   if (pending.length > limits.files) reasons.add('file-cap-reached');
   return {
     pending: pending.slice(0, limits.files),

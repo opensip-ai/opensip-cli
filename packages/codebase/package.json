@@ -38,7 +38,6 @@
   "dependencies": {
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
-    "glob": "^13.0.0",
     "minimatch": "^10.2.5",
     "yaml": "^2.9.0"
   },

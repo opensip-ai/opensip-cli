@@ -175,11 +175,15 @@ export class ContextSnapshotRepo {
     this.datastore = requireDrizzleHandle(datastore);
   }
 
-  save(input: ContextSnapshotSaveInput): ContextSnapshotSaveResult {
+  save(
+    input: ContextSnapshotSaveInput,
+    retentionProtectedIds: readonly string[] = [],
+  ): ContextSnapshotSaveResult {
     const started = Date.now();
     const log = currentLogger();
     try {
       const validated = validateInput(input);
+      const protectedIds = new Set([input.id, ...retentionProtectedIds]);
       const outcome = this.datastore.withWriteLock('graph.context_snapshot.save', () =>
         this.datastore.transaction((tx) => {
           const existing = tx
@@ -212,7 +216,7 @@ export class ContextSnapshotRepo {
               payload: input.payload,
             })
             .run();
-          const pruned = this.pruneInTransaction(tx);
+          const pruned = this.pruneInTransaction(tx, protectedIds);
           const saved = tx
             .select()
             .from(graphContextSnapshot)
@@ -288,7 +292,10 @@ export class ContextSnapshotRepo {
     return row === undefined ? null : fromRow(row);
   }
 
-  private pruneInTransaction(tx: DrizzleDataStore['db']): readonly PruneSummary[] {
+  private pruneInTransaction(
+    tx: DrizzleDataStore['db'],
+    protectedIds: ReadonlySet<string>,
+  ): readonly PruneSummary[] {
     const removed = new Map<string, { rows: number; bytes: number }>();
     const recordRemoval = (kind: string, rows: number, bytes: number): void => {
       const current = removed.get(kind) ?? { rows: 0, bytes: 0 };
@@ -300,30 +307,71 @@ export class ContextSnapshotRepo {
       .groupBy(graphContextSnapshot.kind)
       .all();
     for (const { kind } of kinds) {
-      const overflow = tx
-        .select({ id: graphContextSnapshot.id, byteCount: graphContextSnapshot.byteCount })
-        .from(graphContextSnapshot)
-        .where(eq(graphContextSnapshot.kind, kind))
-        .orderBy(desc(graphContextSnapshot.createdAt), desc(graphContextSnapshot.id))
-        .limit(Number.MAX_SAFE_INTEGER)
-        .offset(MAX_CONTEXT_SNAPSHOTS_PER_KIND)
-        .all();
-      if (overflow.length > 0) {
-        tx.delete(graphContextSnapshot)
-          .where(
-            inArray(
-              graphContextSnapshot.id,
-              overflow.map((row) => row.id),
-            ),
-          )
-          .run();
-        recordRemoval(
-          kind,
-          overflow.length,
-          overflow.reduce((total, row) => total + row.byteCount, 0),
-        );
-      }
+      this.pruneKindInTransaction(tx, kind, protectedIds, recordRemoval);
     }
+    this.pruneTotalBytesInTransaction(tx, protectedIds, recordRemoval);
+    return [...removed.entries()]
+      .sort(([left], [right]) => compareKeys(left, right))
+      .map(([kind, summary]) => ({
+        kind,
+        rowsRemoved: summary.rows,
+        bytesRemoved: summary.bytes,
+      }));
+  }
+
+  /**
+   * @throws {ValidationError} When protected snapshots alone exceed the per-kind retention limit.
+   */
+  private pruneKindInTransaction(
+    tx: DrizzleDataStore['db'],
+    kind: string,
+    protectedIds: ReadonlySet<string>,
+    recordRemoval: (kind: string, rows: number, bytes: number) => void,
+  ): void {
+    const rowsForKind = tx
+      .select({ id: graphContextSnapshot.id, byteCount: graphContextSnapshot.byteCount })
+      .from(graphContextSnapshot)
+      .where(eq(graphContextSnapshot.kind, kind))
+      .orderBy(desc(graphContextSnapshot.createdAt), desc(graphContextSnapshot.id))
+      .all();
+    const retained = new Set(
+      rowsForKind.filter((row) => protectedIds.has(row.id)).map((row) => row.id),
+    );
+    if (retained.size > MAX_CONTEXT_SNAPSHOTS_PER_KIND) {
+      throw validation(
+        'Protected context snapshots exceed the per-kind retention limit.',
+        'GRAPH.CONTEXT_SNAPSHOT.RETENTION',
+      );
+    }
+    for (const row of rowsForKind) {
+      if (retained.size >= MAX_CONTEXT_SNAPSHOTS_PER_KIND) break;
+      retained.add(row.id);
+    }
+    const overflow = rowsForKind.filter((row) => !retained.has(row.id));
+    if (overflow.length === 0) return;
+    tx.delete(graphContextSnapshot)
+      .where(
+        inArray(
+          graphContextSnapshot.id,
+          overflow.map((row) => row.id),
+        ),
+      )
+      .run();
+    recordRemoval(
+      kind,
+      overflow.length,
+      overflow.reduce((total, row) => total + row.byteCount, 0),
+    );
+  }
+
+  /**
+   * @throws {ValidationError} When protected snapshots alone exceed the aggregate byte limit.
+   */
+  private pruneTotalBytesInTransaction(
+    tx: DrizzleDataStore['db'],
+    protectedIds: ReadonlySet<string>,
+    recordRemoval: (kind: string, rows: number, bytes: number) => void,
+  ): void {
     const rows = tx
       .select({
         id: graphContextSnapshot.id,
@@ -333,25 +381,30 @@ export class ContextSnapshotRepo {
       .from(graphContextSnapshot)
       .orderBy(desc(graphContextSnapshot.createdAt), desc(graphContextSnapshot.id))
       .all();
-    let bytes = 0;
+    let bytes = rows
+      .filter((row) => protectedIds.has(row.id))
+      .reduce((total, row) => total + row.byteCount, 0);
+    if (bytes > MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES) {
+      throw validation(
+        'Protected context snapshots exceed the total retention limit.',
+        'GRAPH.CONTEXT_SNAPSHOT.RETENTION',
+      );
+    }
     const remove: string[] = [];
     for (const row of rows) {
-      bytes += row.byteCount;
-      if (bytes > MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES) remove.push(row.id);
-    }
-    if (remove.length > 0) {
-      tx.delete(graphContextSnapshot).where(inArray(graphContextSnapshot.id, remove)).run();
-      for (const row of rows) {
-        if (remove.includes(row.id)) recordRemoval(row.kind, 1, row.byteCount);
+      if (protectedIds.has(row.id)) continue;
+      if (bytes + row.byteCount <= MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES) {
+        bytes += row.byteCount;
+      } else {
+        remove.push(row.id);
       }
     }
-    return [...removed.entries()]
-      .sort(([left], [right]) => compareKeys(left, right))
-      .map(([kind, summary]) => ({
-        kind,
-        rowsRemoved: summary.rows,
-        bytesRemoved: summary.bytes,
-      }));
+    if (remove.length === 0) return;
+    const removedIds = new Set(remove);
+    tx.delete(graphContextSnapshot).where(inArray(graphContextSnapshot.id, remove)).run();
+    for (const row of rows) {
+      if (removedIds.has(row.id)) recordRemoval(row.kind, 1, row.byteCount);
+    }
   }
 }
 
@@ -370,7 +423,8 @@ function currentRepo(): ContextSnapshotRepo {
 /** Lazy structural accessor installed on the graph RunScope contribution. */
 export function createContextSnapshotAccessor(): ContextSnapshotAccessor {
   return Object.freeze({
-    save: (input: ContextSnapshotSaveInput) => currentRepo().save(input),
+    save: (input: ContextSnapshotSaveInput) =>
+      currentRepo().save(input, currentScope()?.graph?.contextRun.protectedSnapshotIds() ?? []),
     get: (id: string) => currentRepo().get(id),
     latest: (kind: string) => currentRepo().latest(kind),
   });

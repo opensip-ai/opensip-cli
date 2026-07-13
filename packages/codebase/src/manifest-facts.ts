@@ -15,6 +15,7 @@ import {
   MAX_SCRIPT_NAME,
   MAX_WORKSPACE_PATTERNS,
 } from './types.js';
+import { projectWorkspacePatterns } from './workspace-patterns.js';
 
 import type {
   PackageManifestFacts,
@@ -69,6 +70,10 @@ const SAFE_PYTHON_MODULES = new Set(['mypy', 'pytest', 'ruff', 'unittest']);
 interface StringProjection {
   readonly values: readonly string[];
   readonly capped: boolean;
+}
+
+interface WorkspaceProjection extends StringProjection {
+  readonly invalid: boolean;
 }
 
 type ManifestFailure = Exclude<PackageManifestFactsResult, { ok: true }>;
@@ -153,15 +158,15 @@ function binProjection(value: unknown, packageName: string): StringProjection {
   return projectStrings(Object.keys(value), MAX_MANIFEST_BINS);
 }
 
-function workspaceProjection(value: unknown): StringProjection {
-  if (Array.isArray(value)) return projectStrings(value, MAX_WORKSPACE_PATTERNS);
+function workspaceProjection(value: unknown): WorkspaceProjection {
+  if (Array.isArray(value)) return projectWorkspacePatterns(value, MAX_WORKSPACE_PATTERNS);
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return { values: [], capped: false };
+    return { values: [], capped: false, invalid: false };
   }
   const packages = (value as Record<string, unknown>).packages;
   return Array.isArray(packages)
-    ? projectStrings(packages, MAX_WORKSPACE_PATTERNS)
-    : { values: [], capped: false };
+    ? projectWorkspacePatterns(packages, MAX_WORKSPACE_PATTERNS)
+    : { values: [], capped: false, invalid: false };
 }
 
 function allowlistedCommand(tokens: readonly string[]): boolean {
@@ -358,6 +363,7 @@ export function readPackageManifestFacts(
   if (exportsProjection.invalid) reasons.add('manifest-export-invalid');
   if (bins.capped) reasons.add('manifest-bin-cap-reached');
   if (workspaces.capped) reasons.add('manifest-workspace-cap-reached');
+  if (workspaces.invalid) reasons.add('workspace-pattern-invalid');
 
   const facts: PackageManifestFacts = {
     name: record.name,

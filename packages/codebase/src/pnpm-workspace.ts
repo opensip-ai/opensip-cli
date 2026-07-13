@@ -4,34 +4,10 @@ import { join } from 'node:path';
 import { isPathInside, tryCatch } from '@opensip-cli/core';
 import { parseDocument } from 'yaml';
 
-import { byCodePoint } from './freeze.js';
 import { MAX_WORKSPACE_PATTERNS } from './types.js';
+import { projectWorkspacePatterns } from './workspace-patterns.js';
 
-const CONTROL_CHARACTER = /\p{Cc}/u;
 const WORKSPACE_MANIFEST_INVALID = 'workspace-manifest-invalid';
-
-function safeWorkspacePattern(value: unknown): string | undefined {
-  if (
-    typeof value !== 'string' ||
-    value.length === 0 ||
-    value.length > 1024 ||
-    CONTROL_CHARACTER.test(value) ||
-    value.includes('\\')
-  ) {
-    return;
-  }
-  const negative = value.startsWith('!');
-  const normalized = (negative ? value.slice(1) : value).replace(/^\.\//u, '').replace(/\/+$/u, '');
-  if (
-    normalized.length === 0 ||
-    normalized.startsWith('/') ||
-    /^[A-Za-z]:/u.test(normalized) ||
-    normalized.split('/').some((part) => part === '' || part === '.' || part === '..')
-  ) {
-    return;
-  }
-  return negative ? `!${normalized}` : normalized;
-}
 
 /** Read only bounded package globs from pnpm's workspace manifest. */
 export function pnpmWorkspacePatterns(
@@ -62,12 +38,10 @@ export function pnpmWorkspacePatterns(
       reasons.add(WORKSPACE_MANIFEST_INVALID);
       return [];
     }
-    const patterns = packages
-      .map(safeWorkspacePattern)
-      .filter((pattern): pattern is string => pattern !== undefined);
-    if (patterns.length !== packages.length) reasons.add('workspace-pattern-invalid');
-    if (patterns.length > MAX_WORKSPACE_PATTERNS) reasons.add('manifest-workspace-cap-reached');
-    return [...new Set(patterns)].sort(byCodePoint).slice(0, MAX_WORKSPACE_PATTERNS);
+    const projection = projectWorkspacePatterns(packages, MAX_WORKSPACE_PATTERNS);
+    if (projection.invalid) reasons.add('workspace-pattern-invalid');
+    if (projection.capped) reasons.add('manifest-workspace-cap-reached');
+    return projection.values;
   });
   if (parsed.ok) return parsed.value;
   reasons.add(WORKSPACE_MANIFEST_INVALID);

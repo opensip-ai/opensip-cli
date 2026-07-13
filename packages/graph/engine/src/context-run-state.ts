@@ -15,16 +15,20 @@ export interface ContextRunState {
   completeInventory(snapshotId: string): void;
   beginGraph(): void;
   completeGraph(snapshotId: string): void;
+  completeTestSelection(snapshotId: string): void;
+  protectedSnapshotIds(): readonly string[];
   inputs(): ContextRunInputs | undefined;
 }
 
 export function createContextRunState(): ContextRunState {
   let inventorySnapshotId: string | undefined;
   let graphSnapshotId: string | undefined;
+  let testSelectionSnapshotId: string | undefined;
   return Object.freeze({
     beginInventory: () => {
       inventorySnapshotId = undefined;
       graphSnapshotId = undefined;
+      testSelectionSnapshotId = undefined;
     },
     completeInventory: (snapshotId: string) => {
       inventorySnapshotId = snapshotId;
@@ -35,6 +39,15 @@ export function createContextRunState(): ContextRunState {
     completeGraph: (snapshotId: string) => {
       graphSnapshotId = snapshotId;
     },
+    completeTestSelection: (snapshotId: string) => {
+      testSelectionSnapshotId = snapshotId;
+    },
+    protectedSnapshotIds: () =>
+      Object.freeze(
+        [inventorySnapshotId, testSelectionSnapshotId].filter(
+          (snapshotId): snapshotId is string => snapshotId !== undefined,
+        ),
+      ),
     inputs: () =>
       inventorySnapshotId === undefined || graphSnapshotId === undefined
         ? undefined

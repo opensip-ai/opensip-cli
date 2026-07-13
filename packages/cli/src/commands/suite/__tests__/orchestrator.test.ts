@@ -21,6 +21,7 @@ import {
   TimeoutError,
   ValidationError,
   defineCommand,
+  ok,
   runWithScope,
   type EvidenceSnapshotContribution,
   type Tool,
@@ -63,6 +64,45 @@ function contextSnapshotId(kind: (typeof BUILT_IN_AGENT_CONTEXT_PLANES)[number][
   if (kind === 'inventory') return CONTEXT_INVENTORY_ID;
   if (kind === 'graph') return CONTEXT_GRAPH_ID;
   return CONTEXT_SELECTION_ID;
+}
+
+function contextSnapshotKind(id: string): 'inventory' | 'test-selection' | undefined {
+  if (id === CONTEXT_INVENTORY_ID) return 'inventory';
+  if (id === CONTEXT_SELECTION_ID) return 'test-selection';
+  return undefined;
+}
+
+function contextPointerGraphScope(options: { readonly evictAfterValidation?: boolean } = {}) {
+  let inventoryReads = 0;
+  return {
+    contextCatalog: {
+      generationIdentity: () => ok(CONTEXT_GRAPH_ID),
+    },
+    contextSnapshots: {
+      get: (id: string) => {
+        const kind = contextSnapshotKind(id);
+        let evicted = false;
+        if (kind === 'inventory') {
+          inventoryReads += 1;
+          evicted = options.evictAfterValidation === true && inventoryReads > 1;
+        }
+        if (kind !== undefined && !evicted) {
+          return {
+            id,
+            kind,
+            schemaVersion: 1,
+            producerVersion: '0.6.0',
+            createdAt: '2026-07-13T00:00:00.000Z',
+            sourceIdentity: 'fixture-source',
+            configIdentity: 'fixture-config',
+            byteCount: 2,
+            payload: {},
+          };
+        }
+        return null;
+      },
+    },
+  };
 }
 
 function tool(id: string, name: string, specs: Tool['commandSpecs']): Tool {
@@ -407,6 +447,7 @@ describe('runSuite', () => {
     });
     Object.assign(scope, {
       projectContext: { projectRoot: cwd, scope: 'project' },
+      graph: contextPointerGraphScope(),
     });
     let snapshots: readonly EvidenceSnapshotContribution[] = [];
     const runActionHooks = {
@@ -447,6 +488,64 @@ describe('runSuite', () => {
       expect(new RunRepo(datastore).getRun(result.runId ?? '')?.cwd).toBe(realpathSync(cwd));
       const serializedLogs = JSON.stringify([info.mock.calls, warn.mock.calls, error.mock.calls]);
       expect(serializedLogs).not.toContain(privatePath);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('withholds a ready ledger when a pointer disappears before the locked commit check', async () => {
+    const cwd = makeChangedGitFixture();
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const graph = contextGraphTool();
+    const scope = new RunScope({
+      datastore: () => datastore,
+      toolProvenance: [
+        {
+          source: 'bundled',
+          id: 'graph',
+          stableId: BUILT_IN_GRAPH_TOOL_ID,
+          version: '0.6.0',
+          packageName: BUILT_IN_GRAPH_PACKAGE_NAME,
+          manifestHash: 'fixture-manifest-hash',
+        },
+      ],
+    });
+    Object.assign(scope, {
+      projectContext: { projectRoot: cwd, scope: 'project' },
+      graph: contextPointerGraphScope({ evictAfterValidation: true }),
+    });
+    let snapshots: readonly EvidenceSnapshotContribution[] = [];
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'agent-context',
+          suite: BUILT_IN_AGENT_CONTEXT_SUITE,
+          source: 'built-in',
+          tools: [graph],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {
+            resetRun: () => {
+              snapshots = [];
+            },
+            completeRun: (value: unknown) => {
+              snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
+            },
+            currentEvidenceSnapshots: () => snapshots,
+          },
+          suiteOpts: { cwd, files: ['src/a.ts'] },
+        }),
+      );
+
+      expect(result).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        contextManifest: {
+          readiness: 'unavailable',
+          reasonCodes: expect.arrayContaining(['ledger-persist-failed']),
+        },
+      });
+      expect(result.runId).toBeUndefined();
+      expect(new RunRepo(datastore).listRuns()).toEqual([]);
     } finally {
       datastore.close();
     }

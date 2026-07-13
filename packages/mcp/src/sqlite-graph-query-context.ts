@@ -14,6 +14,7 @@ import { freshnessFromVerification, missingFreshness } from './freshness.js';
 import { bindCursor, decodeCursor, encodeCursor, type GroupSummary } from './graph-query-page.js';
 import { readError } from './mcp-error.js';
 
+import type { CatalogFreshnessVerifyOptions } from './catalog-freshness-controller.js';
 import type { CatalogGeneration, GraphGenerationController } from './catalog-generation.js';
 import type { ArchitectureSummaryDto, CatalogStatus } from './graph-read-port.js';
 import type { McpReadError } from './mcp-error.js';
@@ -233,9 +234,12 @@ export class SqliteGraphQueryContext {
     }
   }
 
-  async freshnessFor(gen: CatalogGeneration | undefined): Promise<Result<Freshness, McpReadError>> {
+  async freshnessFor(
+    gen: CatalogGeneration | undefined,
+    options?: CatalogFreshnessVerifyOptions,
+  ): Promise<Result<Freshness, McpReadError>> {
     if (gen === undefined) return ok(missingFreshness());
-    const verified = await this.controller.verifyCurrent(gen);
+    const verified = await this.controller.verifyCurrent(gen, options);
     if (!verified.ok) return verified;
     return ok(freshnessFromVerification(verified.value, gen.builtAt));
   }

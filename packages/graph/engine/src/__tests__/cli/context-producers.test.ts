@@ -208,13 +208,14 @@ function context(input: {
         contextRun: run,
         contextCatalog: {
           load: () => ok(input.catalog),
+          generationIdentity: () => ok(generation(input.catalog)),
           replace: vi.fn(() => ok(undefined)),
         },
         contextSnapshots: { get, save, latest: vi.fn(() => null) },
       },
     },
   } as unknown as ToolCliContext;
-  return { cli, datastore, get, save };
+  return { cli, datastore, get, run, save };
 }
 
 describe('graph context producer bindings', () => {
@@ -343,6 +344,10 @@ describe('graph context producer bindings', () => {
     ]);
     expect(harness.get).toHaveBeenCalledWith(inventoryValue.snapshotId);
     expect(harness.save).toHaveBeenCalledTimes(1);
+    expect(harness.run.protectedSnapshotIds()).toEqual([
+      inventoryValue.snapshotId,
+      result.evidenceSnapshots?.[0]?.snapshotId,
+    ]);
     expect(harness.datastore).not.toHaveBeenCalled();
   });
 
@@ -445,12 +450,15 @@ describe('graph context producer bindings', () => {
     run.completeInventory('inventory-old');
     run.beginGraph();
     run.completeGraph('graph-old');
+    run.completeTestSelection('selection-old');
+    expect(run.protectedSnapshotIds()).toEqual(['inventory-old', 'selection-old']);
     expect(run.inputs()).toEqual({
       inventorySnapshotId: 'inventory-old',
       graphSnapshotId: 'graph-old',
     });
     run.beginInventory();
     expect(run.inputs()).toBeUndefined();
+    expect(run.protectedSnapshotIds()).toEqual([]);
     run.completeInventory('inventory-new');
     run.beginGraph();
     expect(run.inputs()).toBeUndefined();

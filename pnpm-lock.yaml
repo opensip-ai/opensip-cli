@@ -397,9 +397,6 @@ importers:
       '@opensip-cli/core':
         specifier: workspace:*
         version: link:../core
-      glob:
-        specifier: ^13.0.0
-        version: 13.0.6
       minimatch:
         specifier: ^10.2.5
         version: 10.2.5
@@ -5812,7 +5809,6 @@ snapshots:
     dependencies:
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
-      glob: 13.0.6
       minimatch: 10.2.5
       yaml: 2.9.0
     transitivePeerDependencies:

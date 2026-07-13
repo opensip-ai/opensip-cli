@@ -2,7 +2,7 @@ import { statSync } from 'node:fs';
 
 import { tryCatch } from '@opensip-cli/core';
 
-import { classifyFileRoles } from './file-roles.js';
+import { classifyProjectedFileRoles } from './file-roles.js';
 import { byCodePoint, deepFreeze } from './freeze.js';
 import {
   compareBoundedTargets,
@@ -24,6 +24,7 @@ import type {
   FileRole,
   PackageFact,
 } from '@opensip-cli/contracts';
+import type { BoundedTargetResolver } from '@opensip-cli/core';
 
 const UNKNOWN_EVIDENCE_SUPPORT: FileEvidenceSupport = deepFreeze({
   callable: 'unknown',
@@ -119,10 +120,7 @@ function materializeFile(
   const classification =
     targets.length === 0 && candidate.structuralRoles !== undefined
       ? { roles: [], provenance: [] }
-      : classifyFileRoles(
-          candidate.relativePath,
-          targets.map((target) => target.view),
-        );
+      : classifyProjectedFileRoles(candidate.relativePath, targets);
   const roles = new Set<FileRole>([...(candidate.structuralRoles ?? []), ...classification.roles]);
   if (roles.size > 1) roles.delete('unknown');
   const provenanceByIdentity = new Map<string, FactProvenance>();
@@ -155,18 +153,34 @@ function nonnegativeSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-export async function discoverFiles(
-  projectRoot: string,
-  input: ProjectInventoryInput,
-  limits: InventoryLimits,
-  packages: readonly PackageFact[],
-  manifests: readonly PackageManifestFacts[],
-): Promise<FileDiscovery> {
-  const structural = discoverStructuralFiles(projectRoot, manifests, input, limits);
+interface DiscoverFilesInput {
+  readonly inventoryInput: ProjectInventoryInput;
+  readonly limits: InventoryLimits;
+  readonly manifests: readonly PackageManifestFacts[];
+  readonly packages: readonly PackageFact[];
+  readonly projectRoot: string;
+  readonly resolver: BoundedTargetResolver | undefined;
+}
+
+export async function discoverFiles(input: DiscoverFilesInput): Promise<FileDiscovery> {
+  const { inventoryInput, limits, manifests, packages, projectRoot, resolver } = input;
+  const structural = await discoverStructuralFiles(
+    projectRoot,
+    manifests,
+    inventoryInput,
+    limits,
+    resolver,
+  );
   await yieldToEventLoop();
-  const resolution = await resolveTargetFiles(projectRoot, input, limits, structural.pending);
+  const resolution = await resolveTargetFiles(
+    projectRoot,
+    inventoryInput,
+    limits,
+    structural.pending,
+    resolver,
+  );
   const reasons = new Set([...structural.reasons, ...resolution.reasons]);
-  const files = await materializeFiles(resolution.pending, packages, input, reasons);
+  const files = await materializeFiles(resolution.pending, packages, inventoryInput, reasons);
   return deepFreeze({
     files,
     reasons: [...reasons].sort(byCodePoint),

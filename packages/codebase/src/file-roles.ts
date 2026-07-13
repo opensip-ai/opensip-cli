@@ -9,6 +9,21 @@ export interface FileRoleClassification {
   readonly provenance: readonly FactProvenance[];
 }
 
+/** One bounded, pre-tokenized target projection used by inventory classification. */
+export interface FileRoleTargetProjection {
+  readonly name: string;
+  readonly roles: readonly FileRole[];
+  readonly literalConventionPaths: readonly string[];
+}
+
+interface FileRoleTargetProjectionInput {
+  readonly name: string;
+  readonly tags: readonly string[];
+  readonly concerns: readonly string[];
+  readonly hasLanguage: boolean;
+  readonly conventionPaths: readonly string[];
+}
+
 const ROLE_TOKENS: Readonly<Record<Exclude<FileRole, 'unknown'>, ReadonlySet<string>>> = {
   production: new Set([
     'api',
@@ -47,8 +62,9 @@ function addRolesForTokens(tokens: readonly string[], roles: Set<FileRole>): voi
   }
 }
 
-function literalConventionMatches(relativePath: string, pattern: string): boolean {
-  return !/[?*{}[\]]/u.test(pattern) && pattern.replace(/^\.\//u, '') === relativePath;
+function literalConventionPath(pattern: string): string | undefined {
+  if (/[?*{}[\]]/u.test(pattern)) return undefined;
+  return pattern.replace(/^\.\//u, '');
 }
 
 /** Exhaustive label projection keeps the closed role vocabulary reviewable. */
@@ -71,43 +87,68 @@ function roleLabel(role: FileRole): FileRole {
 }
 
 /**
- * Classify a file only from target metadata and explicit target conventions.
- * File-name/path heuristics are intentionally absent: an unlabelled file is
- * `unknown`, not guessed to be source or test code.
+ * Build the compact role evidence inventory carries for one target.
+ *
+ * Callers on bounded paths must validate the supplied array and string limits
+ * before invoking this projection. No raw target metadata is retained.
  */
-export function classifyFileRoles(
+export function buildFileRoleTargetProjection(
+  input: FileRoleTargetProjectionInput,
+): FileRoleTargetProjection {
+  const roles = new Set<FileRole>();
+  for (const value of [input.name, ...input.tags, ...input.concerns]) {
+    addRolesForTokens(splitTokens(value), roles);
+  }
+  if (roles.size === 0 && input.hasLanguage) roles.add('production');
+  const literalConventionPaths = [
+    ...new Set(
+      input.conventionPaths
+        .map(literalConventionPath)
+        .filter((path): path is string => path !== undefined),
+    ),
+  ].sort(byCodePoint);
+  return deepFreeze({
+    name: input.name,
+    roles: [...roles].map(roleLabel).sort(byCodePoint),
+    literalConventionPaths,
+  });
+}
+
+function hasLiteralConventionPath(paths: readonly string[], relativePath: string): boolean {
+  let lower = 0;
+  let upper = paths.length - 1;
+  while (lower <= upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    const candidate = paths[middle];
+    if (candidate === undefined) return false;
+    const comparison = byCodePoint(candidate, relativePath);
+    if (comparison === 0) return true;
+    if (comparison < 0) lower = middle + 1;
+    else upper = middle - 1;
+  }
+  return false;
+}
+
+/** Classify one file from already bounded, pre-tokenized target evidence. */
+export function classifyProjectedFileRoles(
   relativePath: string,
-  targets: readonly TargetView[],
+  targets: readonly FileRoleTargetProjection[],
 ): FileRoleClassification {
   const roles = new Set<FileRole>();
   const provenance = new Map<string, FactProvenance>();
   for (const target of targets) {
-    const { config } = target;
-    const metadata = [config.name, ...(config.tags ?? []), ...(config.concerns ?? [])];
-    const targetRoles = new Set<FileRole>();
-    addRolesForTokens(metadata.flatMap(splitTokens), targetRoles);
-    if (targetRoles.size === 0 && (config.languages?.length ?? 0) > 0) {
-      targetRoles.add('production');
-    }
-    for (const role of targetRoles) roles.add(role);
+    for (const role of target.roles) roles.add(role);
     provenance.set(
-      `target:${config.name}`,
-      deepFreeze({ source: 'target', detail: `target:${config.name}` }),
+      `target:${target.name}`,
+      deepFreeze({ source: 'target', detail: `target:${target.name}` }),
     );
-
-    const conventions = config.conventions;
-    const conventionPaths = [
-      ...(conventions?.entrypoints ?? []),
-      ...(conventions?.alwaysUsed ?? []),
-      ...(conventions?.usedExports?.map((entry) => entry.file) ?? []),
-    ];
-    if (conventionPaths.some((pattern) => literalConventionMatches(relativePath, pattern))) {
+    if (hasLiteralConventionPath(target.literalConventionPaths, relativePath)) {
       roles.add('production');
       provenance.set(
-        `convention:${config.name}`,
+        `convention:${target.name}`,
         deepFreeze({
           source: 'convention',
-          detail: `target-convention:${config.name}`,
+          detail: `target-convention:${target.name}`,
         }),
       );
     }
@@ -124,4 +165,36 @@ export function classifyFileRoles(
       byCodePoint(`${left.source}:${left.detail}`, `${right.source}:${right.detail}`),
     ),
   });
+}
+
+function conventionPaths(target: TargetView): readonly string[] {
+  const conventions = target.config.conventions;
+  return [
+    ...(conventions?.entrypoints ?? []),
+    ...(conventions?.alwaysUsed ?? []),
+    ...(conventions?.usedExports?.map((entry) => entry.file) ?? []),
+  ];
+}
+
+/**
+ * Classify a file only from target metadata and explicit target conventions.
+ * File-name/path heuristics are intentionally absent: an unlabelled file is
+ * `unknown`, not guessed to be source or test code.
+ */
+export function classifyFileRoles(
+  relativePath: string,
+  targets: readonly TargetView[],
+): FileRoleClassification {
+  return classifyProjectedFileRoles(
+    relativePath,
+    targets.map((target) =>
+      buildFileRoleTargetProjection({
+        name: target.config.name,
+        tags: target.config.tags ?? [],
+        concerns: target.config.concerns ?? [],
+        hasLanguage: (target.config.languages?.length ?? 0) > 0,
+        conventionPaths: conventionPaths(target),
+      }),
+    ),
+  );
 }

@@ -264,7 +264,12 @@ function seed(runId = CONTEXT_RUN_ID, cwd = root, withInventory = false): void {
                   version: '1.0.0',
                 },
                 freshness: { status: 'current', reasonCodes: [] },
-                coverage: { status: 'complete', items: 1, total: 1, reasonCodes: [] },
+                coverage: {
+                  status: 'complete',
+                  items: 1,
+                  total: 1,
+                  reasonCodes: [],
+                },
                 reasonCodes: [],
                 followUpReads: ['get_file_context'],
               },
@@ -310,6 +315,7 @@ describe('SqliteContextReadPort', () => {
     expect(contextPointerStatus).toHaveBeenCalledWith(
       { owner: 'graph', kind: 'graph', id: GRAPH_ID, schemaVersion: 3 },
       undefined,
+      { forceFresh: true },
     );
     expect(result.value).toMatchObject({
       status: 'available',
@@ -362,6 +368,9 @@ describe('SqliteContextReadPort', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(inventoryStatus).toHaveBeenCalledTimes(1);
+    expect(inventoryStatus).toHaveBeenCalledWith(undefined, {
+      forceFresh: true,
+    });
     expect(result.value.pointers).toContainEqual({
       pointer: {
         owner: 'graph',

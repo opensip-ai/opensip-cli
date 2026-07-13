@@ -6,17 +6,19 @@ import {
   buildTaskContextProjectIdentity,
   projectInventorySnapshotSchema,
 } from '@opensip-cli/contracts';
-import { logger } from '@opensip-cli/core';
+import { RunScope, logger, runWithScopeSync } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { readTaskContextRun, RunRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createContextRunState } from '../../context-run-state.js';
 import {
   ContextSnapshotRepo,
   MAX_CONTEXT_SNAPSHOT_PAYLOAD_BYTES,
   MAX_CONTEXT_SNAPSHOTS_PER_KIND,
   MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES,
+  createContextSnapshotAccessor,
 } from '../../persistence/context-snapshot-repo.js';
 import { graphContextSnapshot } from '../../persistence/schema.js';
 import { readContextSnapshot } from '../../read/context-snapshot.js';
@@ -448,6 +450,41 @@ describe('ContextSnapshotRepo', () => {
     expect(repo.get(retainedInventoryIds[0] ?? '')).not.toBeNull();
     expect(repo.get(retainedInventoryIds[1] ?? '')).not.toBeNull();
     expect(repo.get(selectionPayload.snapshotId)?.byteCount).toBe(selectionBytes);
+    const rows = requireDrizzleHandle(datastore).db.select().from(graphContextSnapshot).all();
+    expect(rows.reduce((sum, row) => sum + row.byteCount, 0)).toBeLessThanOrEqual(
+      MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES,
+    );
+  }, 20_000);
+
+  it('retains an old snapshot reused by the in-progress run when a later plane triggers pruning', () => {
+    const payloads = ['inventory-protected', 'inventory-newer-a', 'inventory-newer-b'].map((id) =>
+      largeInventory(id),
+    );
+    const [protectedInventory, newerA, newerB] = payloads;
+    if (protectedInventory === undefined || newerA === undefined || newerB === undefined) {
+      throw new Error('near-limit inventory fixtures were not created');
+    }
+    repo.save(snapshotInput(protectedInventory, '2026-07-10T00:00:00.000Z'));
+    repo.save(snapshotInput(newerA, '2026-07-11T00:00:00.000Z'));
+    repo.save(snapshotInput(newerB, '2026-07-12T00:00:00.000Z'));
+
+    const run = createContextRunState();
+    const scope = new RunScope({ datastore: () => datastore });
+    Object.assign(scope, { graph: { contextRun: run } });
+    const accessor = createContextSnapshotAccessor();
+    const selectionPayload = selection('selection-current', 1024);
+
+    runWithScopeSync(scope, () => {
+      run.beginInventory();
+      const reused = accessor.save(snapshotInput(protectedInventory, '2026-07-13T00:00:00.000Z'));
+      expect(reused.status).toBe('reused');
+      run.completeInventory(reused.snapshot.id);
+      accessor.save(snapshotInput(selectionPayload, '2026-07-14T00:00:00.000Z'));
+    });
+
+    expect(repo.get(protectedInventory.snapshotId)).not.toBeNull();
+    expect(repo.get(selectionPayload.snapshotId)).not.toBeNull();
+    expect([repo.get(newerA.snapshotId), repo.get(newerB.snapshotId)]).toContain(null);
     const rows = requireDrizzleHandle(datastore).db.select().from(graphContextSnapshot).all();
     expect(rows.reduce((sum, row) => sum + row.byteCount, 0)).toBeLessThanOrEqual(
       MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES,

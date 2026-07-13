@@ -496,6 +496,7 @@ export async function produceContextTestSelection(
       configIdentity: inventory.project.configIdentity,
       payload: snapshot,
     });
+    scope.contextRun.completeTestSelection(saved.snapshot.id);
     const complete = snapshot.trust.status === 'complete';
     return completeContribution({
       kind: TEST_SELECTION_KIND,

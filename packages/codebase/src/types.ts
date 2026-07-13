@@ -21,6 +21,18 @@ export const MAX_COMMAND_ARGV = 32;
 export const MAX_COMMAND_ARG_LENGTH = 256;
 export const MAX_SCRIPT_NAME = 128;
 export const MAX_TARGET_NAME = 128;
+/** Hard ceiling on target definitions inventory will enumerate. */
+export const MAX_INVENTORY_TARGETS = 128;
+/** Hard ceiling on tags, concerns, or languages retained from one target. */
+export const MAX_TARGET_METADATA_VALUES = 128;
+/** Hard ceiling on code units in one target tag, concern, or language. */
+export const MAX_TARGET_METADATA_TEXT = 128;
+/** Hard ceiling on convention paths inspected from one target. */
+export const MAX_TARGET_CONVENTION_PATHS = 128;
+/** Hard ceiling on code units in one target convention path. */
+export const MAX_TARGET_CONVENTION_PATH_LENGTH = 1024;
+/** Hard ceiling on code units in one path returned by a host targeting capability. */
+export const MAX_TARGET_RESOLVED_PATH_LENGTH = 4096;
 export const MAX_FILE_LANGUAGES = 32;
 export const MAX_PROJECT_LANGUAGES = 256;
 /** Leaves 2 MiB of headroom below graph's 8 MiB persisted-payload ceiling. */
@@ -54,7 +66,11 @@ export interface ProjectInventoryInput {
   readonly projectRoot: string;
   /** Identity supplied by the one host config reader; the substrate never rereads config. */
   readonly configIdentity: string;
-  /** Captured structural resolver. Absent means file inventory is unavailable. */
+  /**
+   * Captured structural resolver. File inventory requires the additive
+   * `BoundedTargetResolver` capability at runtime; a base-only resolver fails
+   * closed instead of falling back to synchronous unbounded expansion.
+   */
   readonly targets?: TargetResolver;
   /** Test/smaller-project overrides can reduce, but never increase, hard limits. */
   readonly limits?: Partial<InventoryLimits>;

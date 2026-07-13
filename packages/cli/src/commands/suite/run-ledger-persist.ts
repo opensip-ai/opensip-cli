@@ -52,6 +52,8 @@ export interface PersistSuiteRunInput {
   readonly startedAt: string;
   readonly completedAt: string;
   readonly identity: SuiteLedgerIdentity;
+  /** Read-only guard evaluated under the datastore write lock before ledger insertion. */
+  readonly persistencePrecondition?: () => boolean;
 }
 
 export interface SuiteLedgerStepIdentity {
@@ -341,7 +343,20 @@ export function persistSuiteRun(input: PersistSuiteRunInput): string | undefined
         })(),
       };
     });
-    new RunRepo(datastore).saveRunWithSteps(run, steps);
+    const saved = new RunRepo(datastore).saveRunWithStepsIf(
+      run,
+      steps,
+      input.persistencePrecondition ?? (() => true),
+    );
+    if (!saved) {
+      log.warn?.({
+        evt: 'cli.run-ledger.suite_record_failed',
+        module: 'cli:suite-run-ledger',
+        suiteRunId: input.result.suiteRunId,
+        reason: 'ledger-precondition-failed',
+      });
+      return;
+    }
     log.info?.({
       evt: 'cli.run-ledger.suite_recorded',
       module: 'cli:suite-run-ledger',

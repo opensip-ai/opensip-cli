@@ -16,12 +16,14 @@ import type {
   CodebaseInventoryStatus,
   CodebaseReadPort,
   FileContextDto,
+  InventoryStatusOptions,
 } from './codebase-read-port.js';
 import type { PackageFact } from '@opensip-cli/contracts';
 
 export interface LocalCodebaseReadPortDeps {
   readonly projectRoot: string;
   readonly configIdentity: string;
+  /** Base scope seam; inventory feature-detects bounded expansion and fails closed if absent. */
   readonly targets?: TargetResolver;
   readonly languageEvidenceSupport?: LanguageEvidenceSupport;
   readonly log?: (
@@ -134,9 +136,14 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
 
   async inventoryStatus(
     signal?: AbortSignal,
+    options?: InventoryStatusOptions,
   ): Promise<Result<CodebaseInventoryStatus, McpReadError>> {
     if (aborted(signal)) return cancelledResult();
-    if (this.cache !== undefined && reusableDuringBurst(this.cache, Date.now())) {
+    if (
+      options?.forceFresh !== true &&
+      this.cache !== undefined &&
+      reusableDuringBurst(this.cache, Date.now())
+    ) {
       return ok(this.projectStatus(this.cache));
     }
     const result = await this.waitForRefresh(this.getOrStartRefresh(), signal);

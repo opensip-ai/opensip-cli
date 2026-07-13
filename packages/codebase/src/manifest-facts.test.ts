@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { readPackageManifestFacts } from './manifest-facts.js';
+import { MAX_WORKSPACE_AUTHORED_PATTERNS } from './workspace-patterns.js';
 
 const roots: string[] = [];
 
@@ -26,6 +27,22 @@ afterEach(() => {
 });
 
 describe('readPackageManifestFacts', () => {
+  it('qualifies authored workspace truncation even when every omitted entry is a duplicate', () => {
+    const root = tempRoot();
+    const packageRoot = packageAt(root, '.', {
+      name: 'root',
+      workspaces: Array.from({ length: MAX_WORKSPACE_AUTHORED_PATTERNS + 1 }, () => 'packages/*'),
+    });
+
+    const result = readPackageManifestFacts({ packageRoot, projectRoot: root });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.facts.workspacePatterns).toEqual(['packages/*']);
+    expect(result.facts.reasonCodes).toContain('manifest-workspace-cap-reached');
+    expect(result.facts.reasonCodes).not.toContain('workspace-pattern-invalid');
+  });
+
   it('projects bounded package, workspace, export, bin, and safe script facts', () => {
     const root = tempRoot();
     const packageRoot = packageAt(root, '.', {

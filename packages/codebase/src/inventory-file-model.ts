@@ -1,11 +1,9 @@
 import { byCodePoint } from './freeze.js';
 
+import type { FileRoleTargetProjection } from './file-roles.js';
 import type { FactProvenance, FileFact, FileRole } from '@opensip-cli/contracts';
-import type { TargetView } from '@opensip-cli/core';
 
-export interface BoundedTarget {
-  readonly view: TargetView;
-  readonly name: string;
+export interface BoundedTarget extends FileRoleTargetProjection {
   readonly languages: readonly string[];
 }
 

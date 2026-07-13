@@ -9,7 +9,8 @@ import {
   taskContextManifestSchema,
 } from '@opensip-cli/contracts';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RunRepo } from '../run-repo.js';
 import { SessionRepo } from '../session-repo.js';
@@ -250,6 +251,45 @@ describe('RunRepo', () => {
 
     expect(repo.getRun(run.id)).toEqual(run);
     expect(repo.listStepsForRun(run.id).map((step) => step.id)).toEqual(['step-1', 'step-2']);
+  });
+
+  it('writes neither parent nor steps when the locked transactional precondition fails', () => {
+    const handle = requireDrizzleHandle(datastore);
+    const originalLock = handle.withWriteLock.bind(handle);
+    const originalTransaction = handle.transaction.bind(handle);
+    let lockHeld = false;
+    let transactionEntered = false;
+    vi.spyOn(handle, 'withWriteLock').mockImplementation((operation, fn) =>
+      originalLock(operation, () => {
+        lockHeld = true;
+        try {
+          return fn();
+        } finally {
+          lockHeld = false;
+        }
+      }),
+    );
+    vi.spyOn(handle, 'transaction').mockImplementation((fn) =>
+      originalTransaction((tx) => {
+        transactionEntered = true;
+        try {
+          return fn(tx);
+        } finally {
+          transactionEntered = false;
+        }
+      }),
+    );
+    const precondition = vi.fn(() => {
+      expect(lockHeld).toBe(true);
+      expect(transactionEntered).toBe(true);
+      expect(repo.getRun('missing-before-commit')).toBeNull();
+      return false;
+    });
+
+    expect(repo.saveRunWithStepsIf(makeRun(), [makeStep()], precondition)).toBe(false);
+    expect(precondition).toHaveBeenCalledOnce();
+    expect(repo.listRuns()).toEqual([]);
+    expect(repo.listStepsForRun('run-test-1')).toEqual([]);
   });
 
   it('round-trips both evidence vocabularies without interpreting their fields', () => {

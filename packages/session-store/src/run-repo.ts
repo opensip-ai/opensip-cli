@@ -35,6 +35,26 @@ export class RunRepo {
   }
 
   saveRunWithSteps(run: StoredRun, steps: readonly StoredRunStep[]): void {
+    this.persistRunWithSteps(run, steps, () => true);
+  }
+
+  /**
+   * Atomically persist only when a synchronous read-only guard still holds
+   * after the datastore write lock and transaction have both been entered.
+   */
+  saveRunWithStepsIf(
+    run: StoredRun,
+    steps: readonly StoredRunStep[],
+    precondition: () => boolean,
+  ): boolean {
+    return this.persistRunWithSteps(run, steps, precondition);
+  }
+
+  private persistRunWithSteps(
+    run: StoredRun,
+    steps: readonly StoredRunStep[],
+    precondition: () => boolean,
+  ): boolean {
     if (steps.some((step) => step.runId !== run.id)) {
       throw new ValidationError(`Run ${run.id} has a step with a mismatched runId.`, {
         code: 'VALIDATION.RUN_STEP.RUN_ID_MISMATCH',
@@ -43,8 +63,10 @@ export class RunRepo {
     this.validateRun(run);
     for (const step of steps) this.validateStep(step);
 
+    let saved = false;
     this.datastore.withWriteLock('run.save', () => {
       this.datastore.transaction((tx) => {
+        if (!precondition()) return;
         tx.insert(runs)
           .values(runToRow(run))
           .onConflictDoUpdate({
@@ -61,8 +83,10 @@ export class RunRepo {
             })
             .run();
         }
+        saved = true;
       });
     });
+    return saved;
   }
 
   saveRun(run: StoredRun): void {

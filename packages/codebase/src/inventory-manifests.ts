@@ -2,8 +2,6 @@ import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { isPathInside, toPosixRelative, tryCatch } from '@opensip-cli/core';
-import { globIterate } from 'glob';
-import { minimatch } from 'minimatch';
 
 import { byCodePoint, deepFreeze } from './freeze.js';
 import {
@@ -14,26 +12,20 @@ import {
   yieldToEventLoop,
 } from './inventory-helpers.js';
 import { readPackageManifestFacts } from './manifest-facts.js';
+import { walkManifestFilesystem } from './manifest-filesystem-walk.js';
 import { pnpmWorkspacePatterns } from './pnpm-workspace.js';
-import { MAX_INVENTORY_PACKAGES } from './types.js';
+import { applyBoundedGlobalExcludes } from './target-resolver-bounds.js';
+import { MAX_INVENTORY_PACKAGES, MAX_WORKSPACE_PATTERNS } from './types.js';
+import { compileWorkspacePatterns } from './workspace-patterns.js';
 
 import type {
   InventoryLimits,
   PackageManifestFacts,
   PackageManifestFailureReason,
 } from './types.js';
+import type { CompiledWorkspacePatterns } from './workspace-patterns.js';
 import type { PackageFact } from '@opensip-cli/contracts';
-import type { TargetResolver } from '@opensip-cli/core';
-
-const MANIFEST_IGNORE = [
-  '**/.git/**',
-  '**/.opensip-cli/**',
-  '**/coverage/**',
-  '**/dist/**',
-  '**/node_modules/**',
-  '**/opensip-cli/.runtime/**',
-];
-const MAX_WORKSPACE_PATTERNS = 128;
+import type { BoundedTargetResolver } from '@opensip-cli/core';
 
 export interface ManifestDiscovery {
   readonly facts: readonly PackageManifestFacts[];
@@ -48,6 +40,7 @@ interface ManifestRootDiscovery {
     readonly canonicalManifestPath: string;
   }[];
   readonly reasons: readonly string[];
+  readonly workspacePatterns: readonly string[];
 }
 
 function manifestReason(reason: PackageManifestFailureReason): string {
@@ -149,25 +142,24 @@ function retainManifestRoots(
   }
 }
 
-function applyManifestGlobalExcludes(
+async function applyManifestGlobalExcludes(
   projectRoot: string,
   candidates: readonly ManifestRoot[],
-  resolver: TargetResolver | undefined,
+  resolver: BoundedTargetResolver | undefined,
   reasons: Set<string>,
-): readonly ManifestRoot[] {
+  signal: AbortSignal | undefined,
+): Promise<readonly ManifestRoot[]> {
   if (resolver === undefined || candidates.length === 0) return candidates;
-  const filtered = tryCatch(() =>
-    resolver.applyGlobalExcludes(
-      candidates.map((candidate) => candidate.manifestPath),
-      projectRoot,
-    ),
-  );
-  if (!filtered.ok) {
-    reasons.add('global-exclude-filter-failed');
-    return [];
-  }
+  const filtered = await applyBoundedGlobalExcludes({
+    files: candidates.map((candidate) => candidate.manifestPath),
+    maximumFiles: candidates.length,
+    projectRoot,
+    reasons,
+    resolver,
+    ...(signal === undefined ? {} : { signal }),
+  });
   const allowed = new Set<string>();
-  for (const filePath of filtered.value) {
+  for (const filePath of filtered) {
     const canonical = tryCatch(() => realpathSync(filePath));
     if (!canonical.ok) {
       reasons.add('manifest-read-failed');
@@ -178,21 +170,6 @@ function applyManifestGlobalExcludes(
   return candidates.filter((candidate) => allowed.has(candidate.canonicalManifestPath));
 }
 
-function workspaceMember(path: string, patterns: readonly string[]): boolean {
-  const positives = patterns.filter((pattern) => !pattern.startsWith('!'));
-  const negatives = patterns
-    .filter((pattern) => pattern.startsWith('!'))
-    .map((pattern) => pattern.slice(1));
-  return (
-    positives.some((pattern) => minimatch(path, pattern, { dot: false })) &&
-    !negatives.some((pattern) => minimatch(path, pattern, { dot: false }))
-  );
-}
-
-function workspaceManifestGlob(pattern: string): string {
-  return `${pattern.replace(/\/+$/u, '')}/package.json`;
-}
-
 interface ManifestScanState {
   readonly selected: Map<string, ManifestRoot>;
   readonly reasons: Set<string>;
@@ -200,68 +177,70 @@ interface ManifestScanState {
   visited: number;
 }
 
-function flushManifestBatch(input: {
+async function flushManifestBatch(input: {
   readonly projectRoot: string;
-  readonly resolver: TargetResolver | undefined;
+  readonly resolver: BoundedTargetResolver | undefined;
+  readonly signal: AbortSignal | undefined;
   readonly maximum: number;
   readonly state: ManifestScanState;
-}): void {
-  const allowed = applyManifestGlobalExcludes(
+}): Promise<void> {
+  const allowed = await applyManifestGlobalExcludes(
     input.projectRoot,
     input.state.batch,
     input.resolver,
     input.state.reasons,
+    input.signal,
   );
   retainManifestRoots(input.state.selected, allowed, input.maximum, input.state.reasons);
   input.state.batch = [];
 }
 
-async function scanWorkspacePattern(input: {
-  readonly pattern: string;
+async function scanWorkspaceManifests(input: {
+  readonly compiledPatterns: CompiledWorkspacePatterns;
   readonly projectRoot: string;
   readonly limits: InventoryLimits;
   readonly signal: AbortSignal | undefined;
-  readonly resolver: TargetResolver | undefined;
-  readonly workspacePatterns: readonly string[];
+  readonly resolver: BoundedTargetResolver | undefined;
   readonly maximum: number;
   readonly visitLimit: number;
   readonly state: ManifestScanState;
-}): Promise<boolean> {
-  for await (const manifestPath of globIterate(workspaceManifestGlob(input.pattern), {
-    cwd: input.projectRoot,
-    absolute: true,
-    nodir: true,
-    follow: false,
-    maxDepth: input.limits.manifestDepth,
-    ignore: MANIFEST_IGNORE,
-  })) {
-    if (cancelled(input.signal, input.state.reasons)) return false;
-    input.state.visited += 1;
-    if (input.state.visited > input.visitLimit) {
-      input.state.reasons.add('package-discovery-cap-reached');
-      return false;
-    }
-    const candidate = canonicalManifestRoot(manifestPath, input.projectRoot, input.state.reasons);
-    if (
-      candidate !== undefined &&
-      candidate.relativePath !== '.' &&
-      workspaceMember(candidate.relativePath, input.workspacePatterns)
-    ) {
-      input.state.batch.push(candidate);
-    }
-    if (input.state.batch.length < INVENTORY_BATCH_SIZE) continue;
-    flushManifestBatch(input);
-    await yieldToEventLoop();
-    if (cancelled(input.signal, input.state.reasons)) return false;
+}): Promise<void> {
+  if (!input.compiledPatterns.hasPositivePatterns) return;
+  const walk = await walkManifestFilesystem(
+    input.projectRoot,
+    input.limits.manifestDepth,
+    (relativeDirectory) => input.compiledPatterns.couldMatchDescendant(relativeDirectory),
+    async ({ manifestPath, packageRoot }) => {
+      if (cancelled(input.signal, input.state.reasons)) return false;
+      input.state.visited += 1;
+      if (input.state.visited > input.visitLimit) {
+        input.state.reasons.add('package-discovery-cap-reached');
+        return false;
+      }
+      if (!input.compiledPatterns.matches(packageRoot)) return;
+      const candidate = canonicalManifestRoot(manifestPath, input.projectRoot, input.state.reasons);
+      if (candidate !== undefined && candidate.relativePath !== '.') {
+        input.state.batch.push(candidate);
+      }
+      if (input.state.batch.length < INVENTORY_BATCH_SIZE) return;
+      await flushManifestBatch(input);
+      await yieldToEventLoop();
+      return !cancelled(input.signal, input.state.reasons);
+    },
+    input.signal,
+  );
+  if (walk.cancelled) input.state.reasons.add(INVENTORY_CANCELLED_REASON);
+  if (walk.capped || (walk.stoppedByVisitor && !walk.cancelled)) {
+    input.state.reasons.add('package-discovery-cap-reached');
   }
-  return true;
+  if (walk.readFailed) input.state.reasons.add('manifest-read-failed');
 }
 
 async function discoverManifestRoots(
   projectRoot: string,
   limits: InventoryLimits,
   signal: AbortSignal | undefined,
-  resolver: TargetResolver | undefined,
+  resolver: BoundedTargetResolver | undefined,
   workspacePatterns: readonly string[],
   maximum: number,
 ): Promise<ManifestRootDiscovery> {
@@ -275,30 +254,28 @@ async function discoverManifestRoots(
     MAX_INVENTORY_PACKAGES * 4,
     Math.max(INVENTORY_BATCH_SIZE, maximum * 4),
   );
-  const positivePatterns = workspacePatterns
-    .filter((pattern) => !pattern.startsWith('!'))
-    .sort(byCodePoint);
-  // @sequential-ok — At most 128 sorted workspace patterns mutate one shared
-  // retained-prefix budget and cancellation state. Parallel scans would make
-  // package caps and cancellation timing nondeterministic.
-  for (const pattern of positivePatterns) {
-    const completed = await scanWorkspacePattern({
-      pattern,
+  const compiledPatterns = compileWorkspacePatterns(workspacePatterns);
+  for (const reason of compiledPatterns.reasonCodes) state.reasons.add(reason);
+  if (maximum === 0 && compiledPatterns.hasPositivePatterns) {
+    state.reasons.add('package-cap-reached');
+  } else if (maximum > 0) {
+    await scanWorkspaceManifests({
+      compiledPatterns,
       projectRoot,
       limits,
       signal,
       resolver,
-      workspacePatterns,
       maximum,
       visitLimit,
       state,
     });
-    if (!completed) break;
+    if (cancelled(signal, state.reasons)) state.batch = [];
+    else await flushManifestBatch({ projectRoot, resolver, signal, maximum, state });
   }
-  flushManifestBatch({ projectRoot, resolver, maximum, state });
   return {
     roots: [...state.selected.values()].sort(manifestRootSort),
     reasons: [...state.reasons].sort(byCodePoint),
+    workspacePatterns: compiledPatterns.patterns,
   };
 }
 
@@ -329,7 +306,7 @@ export async function discoverManifestFacts(
   projectRoot: string,
   limits: InventoryLimits,
   signal: AbortSignal | undefined,
-  resolver: TargetResolver | undefined,
+  resolver: BoundedTargetResolver | undefined,
 ): Promise<ManifestDiscovery> {
   const reasons = new Set<string>();
   const facts: PackageManifestFacts[] = [];
@@ -337,7 +314,9 @@ export async function discoverManifestFacts(
   if (existsSync(rootManifestPath)) {
     const root = canonicalManifestRoot(rootManifestPath, projectRoot, reasons);
     const allowed =
-      root === undefined ? [] : applyManifestGlobalExcludes(projectRoot, [root], resolver, reasons);
+      root === undefined
+        ? []
+        : await applyManifestGlobalExcludes(projectRoot, [root], resolver, reasons, signal);
     if (allowed[0] !== undefined) {
       collectManifestFact(allowed[0], projectRoot, limits, signal, facts, reasons);
     }
@@ -353,9 +332,6 @@ export async function discoverManifestFacts(
     reasons.add('manifest-workspace-cap-reached');
   }
   const workspacePatterns = combinedWorkspacePatterns.slice(0, MAX_WORKSPACE_PATTERNS);
-  if (rootFact !== undefined && workspacePatterns.length !== rootFact.workspacePatterns.length) {
-    facts[facts.indexOf(rootFact)] = deepFreeze({ ...rootFact, workspacePatterns });
-  }
   const discovery = await discoverManifestRoots(
     projectRoot,
     limits,
@@ -365,6 +341,18 @@ export async function discoverManifestFacts(
     Math.max(0, limits.packages - facts.length),
   );
   for (const reason of discovery.reasons) reasons.add(reason);
+  if (
+    rootFact !== undefined &&
+    (discovery.workspacePatterns.length !== rootFact.workspacePatterns.length ||
+      discovery.workspacePatterns.some(
+        (pattern, index) => pattern !== rootFact.workspacePatterns[index],
+      ))
+  ) {
+    facts[facts.indexOf(rootFact)] = deepFreeze({
+      ...rootFact,
+      workspacePatterns: discovery.workspacePatterns,
+    });
+  }
   for (const [index, root] of discovery.roots.entries()) {
     if (index > 0 && index % INVENTORY_BATCH_SIZE === 0) await yieldToEventLoop();
     if (cancelled(signal, reasons)) break;
