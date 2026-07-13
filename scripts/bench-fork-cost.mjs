@@ -17,6 +17,8 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { median } from './perf/statistics.mjs';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cli = join(repoRoot, 'packages', 'cli', 'dist', 'index.js');
 
@@ -78,12 +80,6 @@ function runOne(command, mode) {
 
 function mean(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
 function stdev(values) {

@@ -58,6 +58,7 @@
     "bench:partition": "pnpm build && node scripts/bench-partition-strategies.mjs",
     "bench:slo": "node scripts/build-ci.mjs && node scripts/bench-slo.mjs",
     "bench:slo:ci": "node scripts/bench-slo.mjs",
+    "distribution:measure": "node scripts/measure-distribution-footprint.mjs",
     "quality:measure": "node scripts/build-ci.mjs && node scripts/measure-detection-quality.mjs",
     "quality:measure:ci": "node scripts/measure-detection-quality.mjs",
     "quality:measure:check": "node scripts/measure-detection-quality.mjs --check",

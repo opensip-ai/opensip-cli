@@ -81,6 +81,8 @@ import { basename, dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { median } from './perf/statistics.mjs';
+
 const KNOWN_STRATEGIES = new Set(['directory-depth', 'file-count-chunks', 'hybrid']);
 /** Equal-heap conditions for every child run (also what the exact oracle needs). */
 const CHILD_NODE_OPTIONS = '--max-old-space-size=12288';
@@ -224,12 +226,6 @@ function readProfile(path) {
     summary: run.summary ?? {},
     partitionStage: stages.find((s) => s.name === 'partition'),
   };
-}
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 /** Balance statistics over a (desc-sorted) shardSizes array. */

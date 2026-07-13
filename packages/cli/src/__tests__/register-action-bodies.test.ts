@@ -16,6 +16,15 @@
  * simulate the hook (the same way they set `projectContext`).
  */
 
+import {
+  LanguageRegistry,
+  RunScope,
+  ToolRegistry,
+  runWithScope,
+  type Logger,
+  type ToolPluginManifest,
+  type ToolProvenance,
+} from '@opensip-cli/core';
 import { Command } from 'commander';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -83,8 +92,18 @@ vi.mock('../commands/init.js', () => ({
         cwd: args.cwd,
         configFilename: 'opensip-cli.config.yml',
         created: true,
+        state: 'pristine',
+        languages: ['python'],
       }) as never,
   ),
+}));
+
+vi.mock('../commands/tools/list.js', () => ({
+  toolsList: vi.fn(() => ({
+    type: 'tools-list',
+    tools: [{ id: 'ruff' }],
+    totalCount: 1,
+  })),
 }));
 
 vi.mock('../commands/uninstall.js', () => ({
@@ -115,10 +134,11 @@ import {
 import { executeInit } from '../commands/init.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plugin.js';
 import { executeSessionShow } from '../commands/session-show.js';
+import { toolsList } from '../commands/tools/list.js';
 import { executeUninstall } from '../commands/uninstall.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
-import type { CommandResult } from '@opensip-cli/contracts';
+import type { CommandOutcome, CommandResult, InitResult } from '@opensip-cli/contracts';
 
 interface MakeCtxResult {
   ctx: CliCommandsContext;
@@ -148,6 +168,50 @@ function makeCtx(): MakeCtxResult {
     toolScaffolds: [],
   };
   return { ctx, rendered, setExitCode, datastore };
+}
+
+interface InitScopeHarness {
+  readonly debug: ReturnType<typeof vi.fn>;
+  readonly manifests: readonly ToolPluginManifest[];
+  readonly provenance: readonly ToolProvenance[];
+  readonly scope: RunScope;
+}
+
+function makeInitScope(): InitScopeHarness {
+  const debug = vi.fn();
+  const logger: Logger = {
+    debug,
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+  const manifests = [{ id: 'scope-manifest' }] as unknown as readonly ToolPluginManifest[];
+  const provenance: readonly ToolProvenance[] = [
+    {
+      source: 'bundled',
+      id: 'scope-tool',
+      version: '1.0.0',
+      manifestHash: 'scope-manifest-hash',
+    },
+  ];
+  const scope = new RunScope({
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+    logger,
+    toolManifests: manifests,
+    toolProvenance: provenance,
+  });
+  return { debug, manifests, provenance, scope };
+}
+
+async function dispatchInit(
+  program: Command,
+  args: readonly string[],
+  harness: InitScopeHarness = makeInitScope(),
+): Promise<void> {
+  await runWithScope(harness.scope, async () => {
+    await program.parseAsync([...args], { from: 'user' });
+  });
 }
 
 /** Mount the host commands and return the freshly-built program. */
@@ -520,11 +584,12 @@ describe('configure spec — action body', () => {
 // --- init ---------------------------------------------------------------------
 
 describe('init spec — action body', () => {
-  it('init: invokes executeInit with parsed flags + cwdExplicit=false when default', async () => {
+  it('init: enriches an eligible result from the entered scope inventory', async () => {
     const { ctx, rendered } = makeCtx();
     const program = mount(ctx);
+    const harness = makeInitScope();
 
-    await program.parseAsync(['init'], { from: 'user' });
+    await dispatchInit(program, ['init'], harness);
     expect(executeInit).toHaveBeenCalledTimes(1);
     const callArgs = vi.mocked(executeInit).mock.calls[0]?.[0] as {
       cwd: string;
@@ -535,6 +600,22 @@ describe('init spec — action body', () => {
     expect(callArgs.json).toBe(false);
     expect(callArgs.cwdExplicit).toBe(false);
     expect(rendered).toHaveLength(1);
+    expect(toolsList).toHaveBeenCalledWith({
+      cwd: callArgs.cwd,
+      provenance: harness.provenance,
+      manifests: harness.manifests,
+    });
+    const projected = rendered[0] as InitResult;
+    expect(projected.optionalTools?.map((row) => row.id)).toContain('bandit');
+    expect(projected.optionalTools?.map((row) => row.id)).not.toContain('ruff');
+    expect(harness.debug).toHaveBeenCalledTimes(1);
+    expect(harness.debug).toHaveBeenCalledWith({
+      evt: 'cli.init.optional_tools_projected',
+      module: 'cli:init',
+      languageCount: 1,
+      installedCount: 1,
+      recommendedCount: projected.optionalTools?.length,
+    });
   });
 
   it('init: cwdExplicit=true when the pre-action hook stashed it (—cwd typed on the CLI)', async () => {
@@ -545,7 +626,7 @@ describe('init spec — action body', () => {
     // computing `getOptionValueSource('cwd') === 'cli'`.
     topCmd(program, 'init').setOptionValue('cwdExplicit', true);
 
-    await program.parseAsync(['init', '--cwd', '/explicit'], { from: 'user' });
+    await dispatchInit(program, ['init', '--cwd', '/explicit']);
     const callArgs = vi.mocked(executeInit).mock.calls.at(-1)?.[0] as {
       cwd: string;
       cwdExplicit: boolean;
@@ -567,8 +648,11 @@ describe('init spec — action body', () => {
     const { ctx, setExitCode } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['init'], { from: 'user' });
+    const harness = makeInitScope();
+    await dispatchInit(program, ['init'], harness);
     expect(setExitCode).toHaveBeenCalledWith(2);
+    expect(toolsList).not.toHaveBeenCalled();
+    expect(harness.debug).not.toHaveBeenCalled();
   });
 
   it('init: sets exit-code 2 when result.partialStateError is set', async () => {
@@ -588,8 +672,11 @@ describe('init spec — action body', () => {
     const { ctx, setExitCode } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['init'], { from: 'user' });
+    const harness = makeInitScope();
+    await dispatchInit(program, ['init'], harness);
     expect(setExitCode).toHaveBeenCalledWith(2);
+    expect(toolsList).not.toHaveBeenCalled();
+    expect(harness.debug).not.toHaveBeenCalled();
   });
 
   it('init: sets exit-code 2 when result.insideExistingProject is set', async () => {
@@ -605,8 +692,11 @@ describe('init spec — action body', () => {
     const { ctx, setExitCode } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['init'], { from: 'user' });
+    const harness = makeInitScope();
+    await dispatchInit(program, ['init'], harness);
     expect(setExitCode).toHaveBeenCalledWith(2);
+    expect(toolsList).not.toHaveBeenCalled();
+    expect(harness.debug).not.toHaveBeenCalled();
   });
 
   it('init: does not set exit-code when result is a refresh success', async () => {
@@ -623,13 +713,67 @@ describe('init spec — action body', () => {
     const { ctx, setExitCode } = makeCtx();
     const program = mount(ctx);
 
-    await program.parseAsync(['init'], { from: 'user' });
+    const harness = makeInitScope();
+    await dispatchInit(program, ['init'], harness);
     expect(setExitCode).not.toHaveBeenCalled();
+    expect(toolsList).not.toHaveBeenCalled();
+    expect(harness.debug).not.toHaveBeenCalled();
+  });
+
+  it.each(['fully-initialized', 'partial-config-only', 'partial-dir-only'] as const)(
+    'init: leaves a created %s recovery result footer-free',
+    async (state) => {
+      vi.mocked(executeInit).mockReturnValueOnce({
+        type: 'init',
+        path: '/project/opensip-cli.config.yml',
+        cwd: '/project',
+        configFilename: 'opensip-cli.config.yml',
+        created: true,
+        state,
+        languages: ['python'],
+      } as never);
+      const { ctx, rendered } = makeCtx();
+      const program = mount(ctx);
+      const harness = makeInitScope();
+
+      await dispatchInit(program, ['init'], harness);
+
+      expect(toolsList).not.toHaveBeenCalled();
+      expect(harness.debug).not.toHaveBeenCalled();
+      expect(rendered[0]).not.toHaveProperty('optionalTools');
+    },
+  );
+
+  it('init: treats denied manifest-only inventory rows as identity-only installed evidence', async () => {
+    vi.mocked(toolsList).mockReturnValueOnce({
+      type: 'tools-list',
+      tools: [
+        {
+          id: 'bandit',
+          version: '1.0.0',
+          source: 'project',
+          commands: ['bandit'],
+          status: 'manifest-only',
+          trustReason: 'denied',
+          policyOutcome: 'deny',
+          policyReasons: ['fixture-policy-denial'],
+        },
+      ],
+      totalCount: 1,
+    });
+    const { ctx, rendered, datastore } = makeCtx();
+    const program = mount(ctx);
+
+    await dispatchInit(program, ['init']);
+
+    expect((rendered[0] as InitResult).optionalTools?.map((row) => row.id)).not.toContain('bandit');
+    expect(datastore).not.toHaveBeenCalled();
   });
 
   it('init --json: short-circuits render and emits JSON', async () => {
     const { ctx, rendered } = makeCtx();
     const program = mount(ctx);
+    const harness = makeInitScope();
 
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c) => {
@@ -637,12 +781,16 @@ describe('init spec — action body', () => {
       return true;
     });
     try {
-      await program.parseAsync(['init', '--json'], { from: 'user' });
+      await dispatchInit(program, ['init', '--json'], harness);
     } finally {
       spy.mockRestore();
     }
     expect(rendered).toHaveLength(0);
-    expect(writes.join('')).toContain('"type": "init"');
+    const stdout = writes.join('');
+    const outcome = JSON.parse(stdout) as CommandOutcome<InitResult>;
+    expect(outcome.data?.optionalTools?.map((row) => row.id)).toContain('bandit');
+    expect(outcome.data?.optionalTools?.map((row) => row.id)).not.toContain('ruff');
+    expect(stdout).not.toContain('Optional tools for this project');
   });
 });
 

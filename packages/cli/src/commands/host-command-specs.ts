@@ -9,7 +9,12 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  currentScope,
+  defineCommand,
+  type ProjectContext,
+} from '@opensip-cli/core';
 
 import { capabilityWorkerCommandSpec } from '../bootstrap/capability-worker/entry.js';
 import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-entry.js';
@@ -33,9 +38,14 @@ import {
   mountToolPluginGroups,
   type HostSpec,
 } from './host-subcommand-groups.js';
+import {
+  attachOptionalToolRecommendations,
+  isOptionalToolRecommendationEligible,
+} from './init/optional-tools.js';
 import { executeInit } from './init.js';
 import { showInternalCommands } from './internal-command-visibility.js';
 import { mountCommandSpec } from './mount-command-spec.js';
+import { toolsList } from './tools/list.js';
 import { executeUninstall } from './uninstall.js';
 
 import type { CliCommandsContext } from './shared.js';
@@ -99,11 +109,28 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       // source for "was --cwd typed on the CLI?"); the former register-init
       // recomputed `cmd.getOptionValueSource('cwd') === 'cli'` on its own
       // Commander command — identical, since the hook's actionCommand IS init.
-      const result = executeInit({
+      let result = executeInit({
         ...opts,
         cwdExplicit: opts.cwdExplicit === true,
         toolScaffolds: ctx.toolScaffolds,
       });
+      if (isOptionalToolRecommendationEligible(result)) {
+        const scope = currentScope();
+        const inventory = toolsList({
+          cwd: result.cwd,
+          provenance: scope?.toolProvenance ?? [],
+          manifests: scope?.toolManifests ?? [],
+        });
+        const installedIds = new Set(inventory.tools.map((row) => row.id));
+        result = attachOptionalToolRecommendations(result, { installedIds });
+        scope?.logger.debug({
+          evt: 'cli.init.optional_tools_projected',
+          module: 'cli:init',
+          languageCount: result.languages?.length ?? 0,
+          installedCount: installedIds.size,
+          recommendedCount: result.optionalTools?.length ?? 0,
+        });
+      }
       // Exit 2 for any non-success path the user can act on: ambiguous-language
       // detection, partial-state refusal, mutex flag error, inside-existing-
       // project refusal.

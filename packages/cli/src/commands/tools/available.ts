@@ -23,17 +23,33 @@ export interface ToolsAvailableOptions {
   readonly catalog?: readonly FirstPartyAdapter[];
 }
 
-/** A polyglot adapter (`languages: []`) matches EVERY `--lang` filter; else exact id match. */
-function matchesLang(adapter: FirstPartyAdapter, lang: string | undefined): boolean {
-  if (lang === undefined) return true;
-  if (adapter.languages.length === 0) return true;
-  return adapter.languages.includes(lang);
+/** Options for the shared first-party adapter catalog selector. */
+export interface AdapterSelectionOptions {
+  /** Canonical language ids, undefined for no filter, or empty for polyglot-only. */
+  readonly languages?: ReadonlySet<string>;
+  /** Tool ids already installed (global or project), from the effective-set discovery. */
+  readonly installedIds: ReadonlySet<string>;
+  /** Injectable catalog for tests; defaults to the CLI-bundled one. */
+  readonly catalog?: readonly FirstPartyAdapter[];
 }
 
-export function toolsListAvailable(opts: ToolsAvailableOptions): ToolsAvailableResult {
-  const catalog = opts.catalog ?? FIRST_PARTY_ADAPTERS;
-  const adapters: ToolsAvailableRow[] = catalog
-    .filter((adapter) => matchesLang(adapter, opts.lang))
+/** A polyglot adapter (`languages: []`) matches every language selection. */
+function matchesLanguages(
+  adapter: FirstPartyAdapter,
+  languages: ReadonlySet<string> | undefined,
+): boolean {
+  if (languages === undefined) return true;
+  if (adapter.languages.length === 0) return true;
+  return adapter.languages.some((language) => languages.has(language));
+}
+
+/** Select and project adapter rows once, preserving generated catalog order. */
+export function selectAvailableAdapters(
+  options: AdapterSelectionOptions,
+): readonly ToolsAvailableRow[] {
+  const catalog = options.catalog ?? FIRST_PARTY_ADAPTERS;
+  return catalog
+    .filter((adapter) => matchesLanguages(adapter, options.languages))
     .map((adapter) => ({
       pkg: adapter.pkg,
       id: adapter.id,
@@ -41,8 +57,16 @@ export function toolsListAvailable(opts: ToolsAvailableOptions): ToolsAvailableR
       description: adapter.description,
       network: adapter.network,
       languages: adapter.languages,
-      installed: opts.installedIds.has(adapter.id),
+      installed: options.installedIds.has(adapter.id),
     }));
+}
+
+export function toolsListAvailable(opts: ToolsAvailableOptions): ToolsAvailableResult {
+  const adapters = selectAvailableAdapters({
+    ...(opts.lang === undefined ? {} : { languages: new Set([opts.lang]) }),
+    installedIds: opts.installedIds,
+    ...(opts.catalog === undefined ? {} : { catalog: opts.catalog }),
+  });
   return {
     type: 'tools-available',
     ...(opts.lang === undefined ? {} : { lang: opts.lang }),

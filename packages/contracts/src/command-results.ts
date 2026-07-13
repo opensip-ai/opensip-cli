@@ -69,6 +69,7 @@ export type {
   AgentGuidanceResult,
   AgentGuidanceTargetAction,
   AgentGuidanceTargetResult,
+  InitOptionalToolRecommendation,
   PreExistingFile,
   InitResult,
   SimNoticeResult,

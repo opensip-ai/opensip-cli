@@ -17,8 +17,26 @@ import {
 } from '../perf/render-slo-markdown.mjs';
 import { runMeasuredCommand } from '../perf/run-command.mjs';
 import { normalizeSloConfig } from '../perf/slo-config.mjs';
+import { median, nearestRankPercentile } from '../perf/statistics.mjs';
 
 const MEMORY_CONFIG_PATH = '<memory>/slo.json';
+
+test('shared performance statistics use median and nearest-rank percentile semantics', () => {
+  const even = [8, 2, 4, 6];
+  assert.equal(median([9, 1, 5]), 5);
+  assert.equal(median(even), 5);
+  assert.equal(median([Number.MAX_VALUE, Number.MAX_VALUE]), Number.MAX_VALUE);
+  assert.deepEqual(even, [8, 2, 4, 6], 'statistics must not mutate caller samples');
+  assert.equal(nearestRankPercentile([1, 2, 3, 4, 5], 95), 5);
+  assert.equal(nearestRankPercentile([1, 2, 3, 4, 5], 20), 1);
+
+  for (const invalid of [[], [Number.NaN], [Number.POSITIVE_INFINITY], [-1]]) {
+    assert.throws(() => median(invalid), /non-empty|finite non-negative/u);
+  }
+  for (const percentile of [0, -1, 101, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(() => nearestRankPercentile([1], percentile), /percentile must/u);
+  }
+});
 
 test('normalizeSloConfig indexes budgets and rejects duplicate tier/scenario rows', () => {
   const config = normalizeSloConfig(minimalRawConfig(), MEMORY_CONFIG_PATH);
