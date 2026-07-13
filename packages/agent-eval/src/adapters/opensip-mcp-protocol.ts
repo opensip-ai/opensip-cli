@@ -1,6 +1,16 @@
 import { realpathSync } from 'node:fs';
 
+import {
+  assessImpactTrust,
+  testSelectionGraphBindingIsValid,
+} from '../model/context-surface-trust.js';
 import { boundedUtf8Prefix, isUnknownRecord as isRecord } from '../model/value-helpers.js';
+
+import {
+  codebaseContextIsValid,
+  extractCodebaseCoverage,
+  extractCodebaseFreshness,
+} from './opensip-mcp-codebase-envelope.js';
 
 import type { StepCoverage, StepFreshness } from '../model/record.js';
 
@@ -10,17 +20,20 @@ const GRAPH_READ_TOOLS = new Set([
   'find_dead_code',
   'get_architecture',
   'get_symbol',
+  'impact_files',
   'package_cycles',
   'package_dependencies',
   'references_to',
   'refresh_graph',
   'search_declarations',
   'search_symbols',
+  'select_tests',
   'trace_path',
   'who_calls',
   'why_depends',
 ]);
 const RUNTIME_READ_TOOLS = new Set(['get_runtime_wiring']);
+const CODEBASE_READ_TOOLS = new Set(['get_file_context']);
 
 export interface DecodedResult {
   readonly payload?: Readonly<Record<string, unknown>>;
@@ -37,7 +50,8 @@ export interface ToolEnvelopeMetadata {
   readonly catalogIdentity?: string;
   readonly coverage?: StepCoverage;
   readonly failure?: {
-    readonly code: 'invalid-graph-envelope' | 'invalid-runtime-envelope';
+    readonly code:
+      'invalid-codebase-envelope' | 'invalid-graph-envelope' | 'invalid-runtime-envelope';
     readonly message: string;
   };
   readonly freshness?: StepFreshness;
@@ -256,6 +270,29 @@ function graphContextIsValid(
   );
 }
 
+function markImpactCoverageIncomplete(
+  coverage: StepCoverage,
+  reasonCodes: readonly string[],
+): StepCoverage {
+  const reasons = [...new Set([...(coverage.hardCapReasons ?? []), ...reasonCodes])];
+  const facets = coverage.facets?.map((facet) =>
+    facet.name === 'projection'
+      ? {
+          ...facet,
+          complete: false,
+          hardCapReasons: [...new Set([...(facet.hardCapReasons ?? []), ...reasonCodes])],
+          requested: true,
+        }
+      : facet,
+  );
+  return {
+    ...coverage,
+    complete: false,
+    ...(facets === undefined ? {} : { facets }),
+    hardCapReasons: reasons,
+  };
+}
+
 function extractRuntimeCoverage(
   payload: Readonly<Record<string, unknown>>,
 ): StepCoverage | undefined {
@@ -314,14 +351,25 @@ export function inspectToolEnvelope(
 ): ToolEnvelopeMetadata {
   const graphRead = GRAPH_READ_TOOLS.has(tool);
   const runtimeRead = RUNTIME_READ_TOOLS.has(tool);
-  const coverage = runtimeRead ? extractRuntimeCoverage(payload) : extractCoverage(payload);
-  const freshness = extractFreshness(payload);
+  const codebaseRead = CODEBASE_READ_TOOLS.has(tool);
+  let coverage = extractCoverage(payload);
+  let freshness = extractFreshness(payload);
+  if (runtimeRead) coverage = extractRuntimeCoverage(payload);
+  if (codebaseRead) {
+    coverage = extractCodebaseCoverage(payload);
+    freshness = extractCodebaseFreshness(payload);
+  }
+  const impactTrust = tool === 'impact_files' ? assessImpactTrust(payload) : undefined;
+  const selectionBindingValid =
+    tool !== 'select_tests' || testSelectionGraphBindingIsValid(payload);
   if (
     graphRead &&
     (coverage === undefined ||
       freshness === undefined ||
       !graphContextIsValid(payload, projectRoot, freshness) ||
-      !graphPageIsValid(payload))
+      !graphPageIsValid(payload) ||
+      impactTrust?.valid === false ||
+      !selectionBindingValid)
   ) {
     return {
       failure: {
@@ -329,6 +377,9 @@ export function inspectToolEnvelope(
         message: 'MCP graph read omitted or malformed required trust metadata.',
       },
     };
+  }
+  if (impactTrust?.valid === true && !impactTrust.fullyVerified && coverage !== undefined) {
+    coverage = markImpactCoverageIncomplete(coverage, impactTrust.reasonCodes);
   }
   if (
     runtimeRead &&
@@ -338,6 +389,14 @@ export function inspectToolEnvelope(
       failure: {
         code: 'invalid-runtime-envelope',
         message: 'MCP runtime wiring read omitted or malformed required trust metadata.',
+      },
+    };
+  }
+  if (codebaseRead && !codebaseContextIsValid(payload, coverage, freshness)) {
+    return {
+      failure: {
+        code: 'invalid-codebase-envelope',
+        message: 'MCP codebase read omitted or malformed required trust metadata.',
       },
     };
   }

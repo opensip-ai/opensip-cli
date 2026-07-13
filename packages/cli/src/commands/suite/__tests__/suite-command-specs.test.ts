@@ -40,6 +40,23 @@ function command(name: string, options: NonNullable<Tool['commandSpecs']>[number
   });
 }
 
+function evidenceCommand(
+  name: string,
+  options: NonNullable<Tool['commandSpecs']>[number]['options'] = [],
+) {
+  return defineCommand<unknown, ToolCliContext>({
+    name,
+    description: 'fixture evidence producer',
+    commonFlags: [],
+    options,
+    scope: 'project',
+    output: 'raw-stream',
+    rawStreamReason: 'host-orchestrated-evidence',
+    producesEvidenceSnapshot: true,
+    handler: () => ({}),
+  });
+}
+
 function fixtureTool(
   id = TOOL_ID,
   name = 'fitness',
@@ -79,6 +96,17 @@ function auditTools(): readonly Tool[] {
       command('impact', [
         { flag: '--changed', description: 'changed', default: false },
         { flag: '--since', value: '<ref>', description: 'since' },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ]),
+      evidenceCommand('graph-context-inventory'),
+      evidenceCommand('graph-context-ensure'),
+      evidenceCommand('graph-context-select-tests', [
         {
           flag: '--files',
           value: '<path>',
@@ -311,7 +339,8 @@ describe('buildSuiteGroupLeaves', () => {
     expect(ctx.render).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'error',
-        message: "suite run without opensip init only supports the built-in 'audit' suite.",
+        message:
+          "suite run without opensip init only supports the built-in 'audit' or 'agent-context' suite.",
       }),
     );
     expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
@@ -346,7 +375,7 @@ describe('buildSuiteGroupLeaves', () => {
 
     expect(result).toEqual({
       type: 'suite-list',
-      totalCount: 2,
+      totalCount: 3,
       suites: [
         {
           name: 'security',
@@ -385,6 +414,31 @@ describe('buildSuiteGroupLeaves', () => {
             },
           ],
         },
+        {
+          name: 'agent-context',
+          description:
+            'Before-edit project inventory, graph generation, and labelled static test-selection evidence',
+          steps: [
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-inventory',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-ensure',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-select-tests',
+              args: {},
+            },
+          ],
+        },
       ],
     });
   });
@@ -404,7 +458,7 @@ describe('buildSuiteGroupLeaves', () => {
 
     expect(result).toEqual({
       type: 'suite-list',
-      totalCount: 2,
+      totalCount: 3,
       suites: [
         {
           name: 'audit-custom',
@@ -440,6 +494,31 @@ describe('buildSuiteGroupLeaves', () => {
               stableId: YAGNI_ID,
               command: 'yagni',
               args: { minConfidence: 'high' },
+            },
+          ],
+        },
+        {
+          name: 'agent-context',
+          description:
+            'Before-edit project inventory, graph generation, and labelled static test-selection evidence',
+          steps: [
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-inventory',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-ensure',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-select-tests',
+              args: {},
             },
           ],
         },

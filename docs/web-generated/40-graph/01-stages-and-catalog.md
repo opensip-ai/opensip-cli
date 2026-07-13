@@ -34,6 +34,10 @@ source-files:
   - packages/graph/engine/src/types.ts
   - packages/graph/graph-typescript/src/semantic-reference-facts.ts
   - packages/graph/engine/src/read/declaration-reference-view.ts
+  - packages/graph/engine/src/read/entity-detail-view.ts
+  - packages/graph/engine/src/read/impact-view.ts
+  - packages/graph/engine/src/read/test-selection-view.ts
+  - packages/graph/engine/src/persistence/context-snapshot-repo.ts
 related-docs:
   - ./02-rules-and-gating.md
   - ./03-adding-a-language.md
@@ -186,6 +190,31 @@ For the TypeScript adapter, a single `ts.Program` is created in `parseProject` a
 - `importedPackagesByFile`: filePath → package groups the file imports (from module-init `dependencies[]`; empty in `fast` mode)
 
 Indexes are in-memory only — never persisted. They rebuild on every run from the catalog, and the cost (~50ms) is negligible compared to stages 1+2.
+
+#### Bounded context read views
+
+The public `@opensip-cli/graph/read` facade projects impact, entity detail, and
+test selection from the frozen catalog/indexes. Entity detail reuses existing
+occurrence fields (end span, at most 64 parameters, return type, enclosing
+class, at most 32 decorator/annotation/attribute **names**) plus derived test
+reachability. Decorator arguments and literal bodies are stripped; the view does
+not expose source-shaped parameter patterns or literal/compound return-type text,
+and it does not read source or expose compiler/parser handles. Oversized or malformed identity rows
+are omitted with partial projection coverage rather than truncated into another
+identity.
+
+Current catalogs retain a privacy-safe build-coverage summary: exact input-file
+set identity, discovered-file count, and parse-error file count. The
+`agent-context` graph plane compares this evidence with the complete inventory
+and degrades on parse errors, approximate resolution, unproven adapter selection,
+unsupported/omitted languages, or a mismatched source-file set. Legacy catalogs
+without this summary are rebuilt before they can support a ready context claim.
+
+All answers bind to one exact `g1:` generation and report the four coverage
+facets independently. Inventory facts come from the persistence-free
+`@opensip-cli/codebase` substrate. Derived inventory/test-selection snapshots
+are graph-owned, numeric-versioned, immutable by id, and replayed only through
+the public read facade; MCP never imports graph repositories or internal paths.
 
 #### Package identity
 

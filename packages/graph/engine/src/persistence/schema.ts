@@ -16,7 +16,8 @@
  * note is the signpost. (Owning the schema here but the migration there is a known
  * inversion; centralizing migrations is the deliberate trade — see ADR-0036.)
  */
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // ADR-0036: the graph baseline tables (`graph_baseline_signals` /
 // `graph_baseline_meta`) moved to the generic host-owned `tool_baseline_entries`
@@ -71,3 +72,33 @@ export const graphShardFragment = sqliteTable('graph_shard_fragment', {
   shardFingerprint: text('shard_fingerprint').notNull(),
   payload: text('payload', { mode: 'json' }).notNull(),
 });
+
+/**
+ * Immutable, bounded derived context snapshots. Payload ownership remains with
+ * graph; parent Runs store only exact pointers to these rows.
+ */
+export const graphContextSnapshot = sqliteTable(
+  'graph_context_snapshot',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+    producerVersion: text('producer_version').notNull(),
+    createdAt: text('created_at').notNull(),
+    sourceIdentity: text('source_identity').notNull(),
+    configIdentity: text('config_identity').notNull(),
+    byteCount: integer('byte_count').notNull(),
+    payload: text('payload', { mode: 'json' }).notNull(),
+  },
+  (table) => [
+    index('graph_context_snapshot_kind_created_idx').on(
+      table.kind,
+      sql`${table.createdAt} DESC`,
+      sql`${table.id} DESC`,
+    ),
+    index('graph_context_snapshot_created_idx').on(
+      sql`${table.createdAt} DESC`,
+      sql`${table.id} DESC`,
+    ),
+  ],
+);

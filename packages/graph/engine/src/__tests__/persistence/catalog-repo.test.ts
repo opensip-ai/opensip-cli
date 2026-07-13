@@ -81,6 +81,12 @@ describe('CatalogRepo', () => {
         selectedId: 'typescript',
       },
       engineMode: 'exact' as const,
+      buildCoverage: {
+        status: 'complete',
+        discoveredFiles: 12,
+        parseErrorFiles: 0,
+        filesIdentity: `sha256:${'a'.repeat(64)}`,
+      },
     },
     {
       adapterSelection: { mode: 'auto' as const, selectedId: 'typescript' },
@@ -102,11 +108,14 @@ describe('CatalogRepo', () => {
         },
       ],
     },
-  ])('round-trips optional catalog provenance %#', (provenance) => {
-    const value = makeCatalog(provenance);
-    repo.replaceAll(value);
-    expect(repo.loadFullCatalog()).toEqual(value);
-  });
+  ] satisfies readonly Partial<Catalog>[])(
+    'round-trips optional catalog provenance %#',
+    (provenance) => {
+      const value = makeCatalog(provenance);
+      repo.replaceAll(value);
+      expect(repo.loadFullCatalog()).toEqual(value);
+    },
+  );
 
   it('loads a legacy payload without inventing provenance defaults', () => {
     repo.replaceAll(makeCatalog());
@@ -114,6 +123,7 @@ describe('CatalogRepo', () => {
     expect(loaded?.adapterSelection).toBeUndefined();
     expect(loaded?.engineMode).toBeUndefined();
     expect(loaded?.shardCacheInputs).toBeUndefined();
+    expect(loaded?.buildCoverage).toBeUndefined();
     expect(loaded?.semanticFacts).toBeUndefined();
   });
 
@@ -230,6 +240,25 @@ describe('CatalogRepo', () => {
     ['shardCacheInputs', [{ shardId: 'a', rootDir: 'C:/windows/escape' }]],
     ['shardCacheInputs', [{ shardId: 'a', rootDir: 'packages\\escape' }]],
     ['shardCacheInputs', [{ shardId: 'a', rootDir: '.', surprise: true }]],
+    [
+      'buildCoverage',
+      {
+        status: 'complete',
+        discoveredFiles: 1,
+        parseErrorFiles: 2,
+        filesIdentity: `sha256:${'a'.repeat(64)}`,
+      },
+    ],
+    [
+      'buildCoverage',
+      {
+        status: 'complete',
+        discoveredFiles: 1,
+        parseErrorFiles: 0,
+        filesIdentity: `sha256:${'a'.repeat(64)}`,
+        surprise: true,
+      },
+    ],
   ])('fails closed on malformed optional %s provenance', (field, value) => {
     repo.replaceAll(makeCatalog());
     const db = requireDrizzleHandle(datastore).db;

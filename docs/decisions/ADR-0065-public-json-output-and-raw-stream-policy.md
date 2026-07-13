@@ -24,16 +24,17 @@ enforcement-reason: >
   enforce host-owned public JSON and documented raw-stream transports.
 ```
 
-**Decision:** Public `--json` commands return data through host-stamped `CommandOutcome` seams (`command-result`, `signal-envelope`, `cli.emitJson`, `cli.emitEnvelope`, `cli.emitError`). `output: 'raw-stream'` is allowed only for reviewed transport categories (`completion-script`, `file-export`, `worker-ipc`, `runtime-render-dispatch`, `session-replay`, `diagnostic-gate`) with in-file justification.
+**Decision:** Public `--json` commands return data through host-stamped `CommandOutcome` seams (`command-result`, `signal-envelope`, `cli.emitJson`, `cli.emitEnvelope`, `cli.emitError`). `output: 'raw-stream'` is allowed only for reviewed transport categories (`completion-script`, `file-export`, `worker-ipc`, `runtime-render-dispatch`, `session-replay`, `diagnostic-gate`, `host-orchestrated-evidence`, `mcp-stdio`) with in-file justification. `host-orchestrated-evidence` is limited to internal evidence producers whose return value is captured by the host run hook while their parent suite owns the sole visible result; it is not permission for a public command to write an ad hoc stream.
 
 **Alternatives:**
 - Keep per-command `process.stdout.write(JSON.stringify(...))` — rejected; outer shape drifts per command.
 - Allow raw-stream for any machine output — rejected; bypasses diagnostics and exit-code stamping.
 - Require every command to use live views — rejected; incompatible with CI and file-export transports.
+- Render internal evidence producers as ordinary command results — rejected; the parent suite owns the sole result and the returned contribution is consumed by the host run hook, so rendering it would create a second per-step output document.
 
 **Rationale:** `graph lookup --json` previously wrote bare JSON to stdout while declaring `rawStreamReason: 'lookup'`. The host already owns `renderOutcome` and `CommandOutcome` assembly; routing lookup through `command-result` aligns every public JSON path with the documented contract ([`04-json-output-schema.md`](../public/70-reference/04-json-output-schema.md)).
 
-**Consequences:** Tool handlers with `commonFlags: ['json']` must not write machine JSON directly. Raw-stream reasons are a closed set; `lookup` is not a transport category.
+**Consequences:** Tool handlers with `commonFlags: ['json']` must not write machine JSON directly. Raw-stream reasons are a closed set; `lookup` is not a transport category. Evidence producers using `host-orchestrated-evidence` must be internal, declare `producesEvidenceSnapshot`, return only bounded `ToolRunCompletion` evidence, and rely on parent orchestration for visible output.
 
 **Fitness check:** Check warranted — `one-outcome-shape`, `raw-stream-output-guarded`, `command-handler-host-owned-output`.
 

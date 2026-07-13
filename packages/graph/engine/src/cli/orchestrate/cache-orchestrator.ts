@@ -11,6 +11,7 @@
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate.js';
 
+import { catalogBuildCoverage } from './catalog-build-coverage.js';
 import {
   buildAndResolveCatalog,
   buildAndResolveCatalogIncremental,
@@ -130,6 +131,12 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
       // legacy cache hits above return byte-unchanged.
       adapterSelection: input.adapterSelection,
       engineMode: 'exact',
+      buildCoverage: catalogBuildCoverage({
+        projectRoot: input.projectRoot,
+        files: input.discovery.files,
+        parseErrors: built.parseErrors,
+        status: verdict.kind === 'incremental' ? 'partial' : 'complete',
+      }),
     },
     input.projectRoot,
   );

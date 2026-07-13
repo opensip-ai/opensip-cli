@@ -23,6 +23,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 3 | `@opensip-cli/output` | signal-envelope formatters + sinks |
 | 3 | `@opensip-cli/config` | capability-configuration composer + schema registry (depends on core) |
 | 3 | `@opensip-cli/targeting` | host file-targeting runtime substrate (scope.targets; depends on core + config) |
+| 3 | `@opensip-cli/codebase` | bounded project inventory substrate (core + contracts) |
 | 3 | `@opensip-cli/lang-*` | language adapters |
 | 3 | `@opensip-cli/dashboard` | HTML report generator (core + contracts) |
 | 3 | `@opensip-cli/external-tool-adapter` | External Tool Adapter substrate (core + contracts; output devDep) |
@@ -36,7 +37,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (loads Tools dynamically, no static Tool imports) |
 
-## Workspace packages (59: 56 publishable, 3 private)
+## Workspace packages (60: 57 publishable, 3 private)
 
 - `@opensip-cli/agent-eval`
 - `@opensip-cli/checks-cpp`
@@ -50,6 +51,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/cli-live`
 - `@opensip-cli/cli-ui`
 - `@opensip-cli/clone-detection`
+- `@opensip-cli/codebase`
 - `@opensip-cli/config`
 - `@opensip-cli/contracts`
 - `@opensip-cli/core`

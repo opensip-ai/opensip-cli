@@ -127,8 +127,9 @@ export async function runCommandSpecAction<TCtx extends CommandMountContext>(
  *   - `signal-envelope` — the run-envelope machine-output path: `--json` emits
  *                         through `ctx.emitEnvelope` (the shared ADR-0011
  *                         formatter), otherwise `ctx.render`.
- *   - `raw-stream`      — explicit raw output (no Ink): the handler already
- *                         wrote its file + line; the host renders nothing.
+ *   - `raw-stream`      — host renders nothing: the handler already wrote its
+ *                         transport/file output, or a host run hook captured an
+ *                         internal evidence completion for parent orchestration.
  *   - `live-view`       — the interactive Ink path: `ctx.renderLive(key, args)`
  *                         against the tool's registered renderer.
  *
@@ -175,9 +176,9 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       return;
     }
     case 'raw-stream': {
-      // The handler is responsible for its own stdout / file IO (a documented
-      // exception: completion scripts, baseline/SARIF exports). Nothing to
-      // render — the host does not touch the stream.
+      // The handler owns stdout/file IO, or a host run hook already captured an
+      // internal evidence completion for its parent suite. Either way there is
+      // no standalone result to render here.
       return;
     }
     case 'live-view': {

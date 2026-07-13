@@ -5,7 +5,13 @@
  * public graph/read functions + captured adapters, and never calls
  * `currentScope()` from handlers or ports.
  */
-import { EXIT_CODES, summarizeTargetConventions } from '@opensip-cli/contracts';
+import { realpathSync } from 'node:fs';
+
+import {
+  EXIT_CODES,
+  summarizeTargetConventions,
+  type FileEvidenceSupport,
+} from '@opensip-cli/contracts';
 import {
   definePrimaryCommand,
   EnvRegistry,
@@ -19,11 +25,14 @@ import {
 } from '@opensip-cli/core';
 import { loadGraphReadConfig, rebuildCatalog, type Catalog } from '@opensip-cli/graph/read';
 
+import { capturedConfigIdentity } from './captured-config-identity.js';
 import { LiveRuntimeWiringReadPort } from './live-runtime-wiring-read-port.js';
+import { LocalCodebaseReadPort } from './local-codebase-read-port.js';
 import { fromGraphReadError } from './mcp-error.js';
 import { CliRepairWritePort } from './repair-write-port.js';
 import { McpStdioServer } from './server.js';
 import { SessionResultsReadPort } from './session-results-read-port.js';
+import { SqliteContextReadPort } from './sqlite-context-read-port.js';
 import { SqliteGraphReadPort } from './sqlite-graph-read-port.js';
 import { MCP_SURFACE_EPOCH, registerMcpTools } from './tools/register.js';
 
@@ -65,8 +74,17 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     return;
   }
 
+  // Keep persistence reads bound to the exact root captured by the host:
+  // existing stored rows may predate canonical-root advertisement. Filesystem
+  // and response-context seams use the physical root so every live MCP context
+  // agrees without rebinding historical session rows.
   const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
+  const canonicalProjectRoot = realpathSync(projectRoot);
   const configPath = scope.projectContext?.configPath ?? 'opensip-cli.config.yml';
+  const canonicalConfigPath =
+    scope.projectContext?.configPath === undefined
+      ? configPath
+      : realpathSync(scope.projectContext.configPath);
   const graphConfig = loadGraphReadConfig(projectRoot, configPath);
   // Capture graph adapters once from the entered scope — never currentScope().
   const graphScope = scope.graph;
@@ -81,6 +99,19 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     return;
   }
   const adapters = graphScope.adapters;
+  const languageEvidenceSupport = new Map<string, FileEvidenceSupport>(
+    adapters.getAll().map((entry) => {
+      const semantic = entry.id === 'typescript' ? 'supported' : 'unsupported';
+      return [
+        entry.id,
+        {
+          callable: 'supported',
+          declaration: semantic,
+          reference: semantic,
+        },
+      ];
+    }),
+  );
 
   async function rebuild(): Promise<Result<Catalog, McpReadError>> {
     const outcome = await rebuildCatalog({
@@ -96,7 +127,8 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   const graph = new SqliteGraphReadPort({
     store,
     projectRoot,
-    configPath,
+    contextProjectRoot: canonicalProjectRoot,
+    configPath: canonicalConfigPath,
     adapters,
     languageAdapters: scope.languages.list(),
     config: graphConfig,
@@ -110,9 +142,27 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     projectRoot,
     tools: scope.tools,
   });
-  const runtimeWiring = new LiveRuntimeWiringReadPort({
+  const codebase = new LocalCodebaseReadPort({
     projectRoot,
-    configPath,
+    configIdentity: capturedConfigIdentity(scope.configDocument),
+    languageEvidenceSupport,
+    ...(scope.targets === undefined ? {} : { targets: scope.targets }),
+    log: (event, fields) => {
+      logger.info({ evt: event, module: 'mcp:codebase', ...fields });
+    },
+  });
+  const context = new SqliteContextReadPort({
+    store,
+    projectRoot,
+    graph,
+    codebase,
+    log: (event, fields) => {
+      logger.info({ evt: event, module: 'mcp:context', ...fields });
+    },
+  });
+  const runtimeWiring = new LiveRuntimeWiringReadPort({
+    projectRoot: canonicalProjectRoot,
+    configPath: canonicalConfigPath,
     tools: scope.tools,
     manifests: scope.toolManifests,
     provenance: scope.toolProvenance,
@@ -146,6 +196,7 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     graph,
     results,
     version: readPackageVersion(import.meta.url),
+    projectRoot: canonicalProjectRoot,
     surfaceEpoch: MCP_SURFACE_EPOCH,
     mutationsEnabled: mutationEnabled,
   });
@@ -158,6 +209,8 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   // not a detached async job — fire-and-forget without awaiting is intentional.
   void registerMcpTools(server, {
     graph,
+    codebase,
+    context,
     results,
     runtimeWiring,
     validToolIds,

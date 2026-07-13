@@ -36,6 +36,11 @@ export interface FreshnessSnapshot {
   readonly verdict: FreshnessVerification;
 }
 
+export interface CatalogFreshnessVerifyOptions {
+  /** Bypass a completed verdict cached for an ordinary read burst. */
+  readonly forceFresh?: boolean;
+}
+
 export class CatalogFreshnessController {
   private cache: FreshnessSnapshot | undefined;
   private readonly inFlight = new Map<
@@ -57,9 +62,16 @@ export class CatalogFreshnessController {
     this.cache = undefined;
   }
 
-  async verify(gen: CatalogGeneration): Promise<Result<FreshnessVerification, McpReadError>> {
+  async verify(
+    gen: CatalogGeneration,
+    options?: CatalogFreshnessVerifyOptions,
+  ): Promise<Result<FreshnessVerification, McpReadError>> {
     const now = Date.now();
-    if (this.cache?.key === gen.key && now - this.cache.verifiedAtMs < FRESHNESS_BURST_MS) {
+    if (
+      options?.forceFresh !== true &&
+      this.cache?.key === gen.key &&
+      now - this.cache.verifiedAtMs < FRESHNESS_BURST_MS
+    ) {
       return ok(this.cache.verdict);
     }
     const active = this.inFlight.get(gen.key);

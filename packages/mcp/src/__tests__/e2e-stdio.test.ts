@@ -14,7 +14,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -22,6 +22,10 @@ import { fileURLToPath } from 'node:url';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import {
+  buildProjectInventorySnapshotIdentities,
+  projectInventorySnapshotSchema,
+} from '@opensip-cli/contracts';
 import {
   applyToolContributeScope,
   resolveProjectPaths,
@@ -32,13 +36,17 @@ import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { CatalogRepo, runGraph } from '@opensip-cli/graph/internal';
 import { typescriptGraphAdapter } from '@opensip-cli/graph-typescript';
-import { SessionRepo } from '@opensip-cli/session-store';
+import { RunRepo, SessionRepo } from '@opensip-cli/session-store';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { BASE_PROJECT_SOURCE, highFanInProjectSource } from './fixtures/high-fan-in-project.js';
 import { PACKAGE_EVIDENCE_FILES } from './fixtures/package-evidence-project.js';
 
-import type { StoredSession } from '@opensip-cli/contracts';
+import type {
+  StoredSession,
+  TaskContextManifest,
+  TaskContextSnapshotPointer,
+} from '@opensip-cli/contracts';
 import type { Catalog } from '@opensip-cli/graph';
 
 const CLI_DIST = fileURLToPath(new URL('../../../../packages/cli/dist/index.js', import.meta.url));
@@ -128,6 +136,15 @@ async function runBuiltCli(root: string, args: readonly string[]): Promise<void>
 function scaffold(): string {
   const root = mkdtempSync(join(tmpdir(), 'mcp-e2e-'));
   mkdirSync(join(root, 'opensip-cli', '.runtime'), { recursive: true });
+  writeFileSync(
+    join(root, 'package.json'),
+    JSON.stringify({
+      name: '@fixture/root',
+      private: true,
+      workspaces: ['packages/*'],
+    }),
+    'utf8',
+  );
   writeFileSync(join(root, 'opensip-cli.config.yml'), CONFIG_YML, 'utf8');
   writeFileSync(join(root, 'tsconfig.json'), TSCONFIG, 'utf8');
   writeFileSync(join(root, 'index.ts'), SOURCE, 'utf8');
@@ -173,6 +190,91 @@ function withRawProjectDatabase<T>(root: string, use: (database: DatabaseSync) =
   } finally {
     database.close();
   }
+}
+
+/**
+ * Model retention eviction while leaving a newer valid snapshot of the same
+ * kind behind. The MCP assertion can then prove an exact pointer is not
+ * rebound to that newer row.
+ */
+function evictContextSnapshotAndSeedNewer(
+  root: string,
+  pointer: TaskContextSnapshotPointer,
+): string {
+  return withRawProjectDatabase(root, (database) => {
+    const row = database
+      .prepare(
+        'SELECT kind, schema_version, producer_version, source_identity, config_identity, payload ' +
+          'FROM graph_context_snapshot WHERE id = ?',
+      )
+      .get(pointer.id) as
+      | {
+          kind?: unknown;
+          schema_version?: unknown;
+          producer_version?: unknown;
+          source_identity?: unknown;
+          config_identity?: unknown;
+          payload?: unknown;
+        }
+      | undefined;
+    if (
+      typeof row?.kind !== 'string' ||
+      typeof row.schema_version !== 'number' ||
+      typeof row.producer_version !== 'string' ||
+      typeof row.source_identity !== 'string' ||
+      typeof row.config_identity !== 'string' ||
+      typeof row.payload !== 'string'
+    ) {
+      throw new TypeError('task-context snapshot row is missing or malformed');
+    }
+    if (row.kind !== 'inventory' || row.schema_version !== 1) {
+      throw new TypeError('expected an inventory context snapshot');
+    }
+    const previous = projectInventorySnapshotSchema.parse(JSON.parse(row.payload));
+    const firstFile = previous.files[0];
+    if (firstFile === undefined) {
+      throw new TypeError('inventory snapshot fixture has no file facts');
+    }
+    const content = {
+      schemaVersion: previous.schemaVersion,
+      project: previous.project,
+      packages: previous.packages,
+      files: previous.files.map((file, index) =>
+        index === 0 ? { ...file, modifiedMs: file.modifiedMs + 1 } : file,
+      ),
+      coverage: previous.coverage,
+    };
+    const identities = buildProjectInventorySnapshotIdentities(content);
+    const payload = { ...content, ...identities };
+    const newerId = payload.snapshotId;
+    const encoded = JSON.stringify(payload);
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      database
+        .prepare(
+          `INSERT INTO graph_context_snapshot
+            (id, kind, schema_version, producer_version, created_at, source_identity,
+             config_identity, byte_count, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          newerId,
+          row.kind,
+          row.schema_version,
+          row.producer_version,
+          '2099-01-01T00:00:00.000Z',
+          payload.metadataIdentity,
+          row.config_identity,
+          Buffer.byteLength(encoded, 'utf8'),
+          encoded,
+        );
+      database.prepare('DELETE FROM graph_context_snapshot WHERE id = ?').run(pointer.id);
+      database.exec('COMMIT');
+    } catch (error) {
+      database.exec('ROLLBACK');
+      throw error;
+    }
+    return newerId;
+  });
 }
 
 function countLogEvent(stderr: string, event: string): number {
@@ -255,6 +357,9 @@ async function expectValidationError(
 let fixtureA: string;
 let fixtureB: string;
 let lifecycleFixture: string;
+let contextFixture: string;
+let contextRunId: string;
+let contextManifest: TaskContextManifest;
 let entrySymbolId: string;
 let helperSymbolId: string;
 let helperFile: string;
@@ -467,20 +572,51 @@ beforeAll(async () => {
   // Dedicated fixture for destructive/transient catalog lifecycle faults.
   lifecycleFixture = scaffold();
   await seedLifecycleFixture(lifecycleFixture);
+
+  // Dedicated fixture produced through the real hidden graph commands and
+  // host-owned agent-context ledger. Later tests can destructively replace
+  // its graph/snapshot evidence without coupling to fixture A.
+  contextFixture = scaffold();
+  await runBuiltCli(contextFixture, [
+    'suite',
+    'run',
+    'agent-context',
+    '--cwd',
+    contextFixture,
+    '--files',
+    'packages/b/src/index.ts',
+    '--json',
+  ]);
+  const contextStore = openProjectStore(contextFixture);
+  try {
+    const contextRun = new RunRepo(contextStore).listRuns({
+      cwd: realpathSync(contextFixture),
+      name: 'agent-context',
+      limit: 1,
+    })[0];
+    if (contextRun?.contextManifest === undefined) {
+      throw new Error('task-context e2e seeding failed: parent Run manifest not found');
+    }
+    contextRunId = contextRun.id;
+    contextManifest = contextRun.contextManifest;
+  } finally {
+    contextStore.close();
+  }
 }, 120_000);
 
 afterAll(() => {
   if (fixtureA) rmSync(fixtureA, { recursive: true, force: true });
   if (fixtureB) rmSync(fixtureB, { recursive: true, force: true });
   if (lifecycleFixture) rmSync(lifecycleFixture, { recursive: true, force: true });
+  if (contextFixture) rmSync(contextFixture, { recursive: true, force: true });
 });
 
 describe('MCP e2e over real stdio', () => {
-  it('handshakes and lists all 21 tools', async () => {
+  it('handshakes and lists the complete default tool surface', async () => {
     const conn = await connect(fixtureA);
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(21);
+      expect(tools.tools).toHaveLength(25);
       const names = tools.tools.map((t) => t.name).sort();
       expect(names).toEqual(
         [
@@ -490,10 +626,13 @@ describe('MCP e2e over real stdio', () => {
           'find_dead_code',
           'get_agent_catalog',
           'get_architecture',
+          'get_context_status',
+          'get_file_context',
           'get_latest_findings',
           'get_runtime_wiring',
           'get_symbol',
           'list_runs',
+          'impact_files',
           'package_cycles',
           'package_dependencies',
           'references_to',
@@ -501,6 +640,7 @@ describe('MCP e2e over real stdio', () => {
           'review_change',
           'search_declarations',
           'search_symbols',
+          'select_tests',
           'show_run',
           'trace_path',
           'who_calls',
@@ -522,15 +662,21 @@ describe('MCP e2e over real stdio', () => {
         ['find_dead_code', {}],
         ['get_agent_catalog', {}],
         ['get_architecture', {}],
+        ['get_context_status', {}],
+        ['get_file_context', { file: 'src/a.ts' }],
         ['get_latest_findings', { tool: 'fit' }],
         ['get_runtime_wiring', {}],
         ['get_symbol', { file: 'src/a.ts', line: 1 }],
         ['list_runs', {}],
+        ['impact_files', { files: ['src/a.ts'] }],
         ['package_cycles', {}],
         ['package_dependencies', {}],
+        ['references_to', { declarationId: 'd1|fixture' }],
         ['refresh_graph', {}],
         ['review_change', {}],
+        ['search_declarations', { query: 'a' }],
         ['search_symbols', { query: 'a' }],
+        ['select_tests', { files: ['src/a.ts'] }],
         ['show_run', { ref: 'latest', tool: 'fit' }],
         ['trace_path', { fromSymbolId: 'src/a.ts:1:0', toSymbolId: 'src/b.ts:1:0' }],
         ['who_calls', { symbolId: 'src/a.ts:1:0' }],
@@ -564,6 +710,22 @@ describe('MCP e2e over real stdio', () => {
           /packages|array|50/i,
         ],
         ['search_symbols', { query: 'helper', limit: 501 }, /limit|500|number/i],
+        [
+          'get_context_status',
+          {
+            files: Array.from({ length: 129 }, (_, index) => `src/${String(index)}.ts`),
+          },
+          /files|array|128/i,
+        ],
+        ['impact_files', { files: ['src\\a.ts', 'src/a.ts'] }, /files|unique|normalization/i],
+        ['impact_files', { files: ['src/a.ts'], depth: 6 }, /depth|5|number/i],
+        ['impact_files', { files: ['src/a.ts'], top: 501 }, /top|500|number/i],
+        ['get_symbol', { file: 'src/a.ts', line: 1, detail: 'nodes' }, /detail|enum|option/i],
+        ['select_tests', { files: ['src/a.ts'], tier: 'repository' }, /tier|enum|option/i],
+        ['select_tests', { files: ['src/a.ts'], proofDetail: 'full' }, /proofDetail|enum|option/i],
+        ['select_tests', { files: ['src/a.ts'], limit: 501 }, /limit|500|number/i],
+        ['select_tests', { files: ['src/a.ts'], commandLimit: 101 }, /commandLimit|100|number/i],
+        ['select_tests', { files: ['src/a.ts'], proofLimit: 7 }, /proofLimit|6|number/i],
       ];
 
       for (const [name, args, expected] of hostileCalls) {
@@ -583,7 +745,7 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(fixtureA, { allowMutations: true });
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(22);
+      expect(tools.tools).toHaveLength(26);
       const names = tools.tools.map((tool) => tool.name);
       expect(new Set(names)).toEqual(
         new Set([
@@ -593,10 +755,13 @@ describe('MCP e2e over real stdio', () => {
           'find_dead_code',
           'get_agent_catalog',
           'get_architecture',
+          'get_context_status',
+          'get_file_context',
           'get_latest_findings',
           'get_runtime_wiring',
           'get_symbol',
           'list_runs',
+          'impact_files',
           'package_cycles',
           'package_dependencies',
           'references_to',
@@ -605,6 +770,7 @@ describe('MCP e2e over real stdio', () => {
           'review_change',
           'search_declarations',
           'search_symbols',
+          'select_tests',
           'show_run',
           'trace_path',
           'who_calls',
@@ -652,6 +818,253 @@ describe('MCP e2e over real stdio', () => {
     }
   }, 60_000);
 
+  it('serves positive bounded task context through the captured stdio ports', async () => {
+    const conn = await connect(contextFixture);
+    try {
+      const agentCatalog = await call(conn, 'get_agent_catalog', {});
+      expect(agentCatalog).toMatchObject({
+        mcp: {
+          project: { root: realpathSync(contextFixture), scope: 'project' },
+          surfaceEpoch: 7,
+          mutationPosture: 'read-only',
+          toolNames: expect.arrayContaining([
+            'get_context_status',
+            'get_file_context',
+            'impact_files',
+            'select_tests',
+          ]),
+        },
+      });
+      const graphPointer = contextManifest.planes.find((plane) => plane.kind === 'graph')?.pointer;
+      const inventoryPointer = contextManifest.planes.find(
+        (plane) => plane.kind === 'inventory',
+      )?.pointer;
+      if (graphPointer === undefined || inventoryPointer === undefined) {
+        throw new Error('task-context fixture is missing graph or inventory pointers');
+      }
+
+      const file = await call(conn, 'get_file_context', {
+        file: 'packages/b/src/index.ts',
+      });
+      expect(file).toMatchObject({
+        status: 'found',
+        file: {
+          path: 'packages/b/src/index.ts',
+          roles: expect.arrayContaining(['production']),
+          packageName: '@fixture/b',
+        },
+        package: { name: '@fixture/b', root: 'packages/b' },
+        inventoryIdentity: inventoryPointer.id,
+        freshness: { fresh: true, verification: 'complete' },
+      });
+      expect(JSON.stringify(file)).not.toContain('export function fromB');
+
+      const impact = await call(conn, 'impact_files', {
+        files: ['packages/b/src/index.ts'],
+        depth: 3,
+        top: 50,
+      });
+      const impactData = impact.data as {
+        changedFunctions: { qualifiedName: string }[];
+        impactedFunctions: { qualifiedName: string }[];
+        matchedFiles: string[];
+        requestedFiles: string[];
+        trust: { fullyVerified: boolean };
+      };
+      expect(impactData.requestedFiles).toEqual(['packages/b/src/index.ts']);
+      expect(impactData.matchedFiles).toEqual(['packages/b/src/index.ts']);
+      expect(
+        impactData.changedFunctions.some((item) => item.qualifiedName.endsWith('.fromB')),
+      ).toBe(true);
+      expect(
+        impactData.changedFunctions.some((item) => item.qualifiedName.endsWith('.cycleB')),
+      ).toBe(true);
+      expect(
+        impactData.impactedFunctions.some((item) => item.qualifiedName.endsWith('.target')),
+      ).toBe(true);
+      expect(impactData.trust.fullyVerified).toBe(true);
+      expect((impact.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        graphPointer.id,
+      );
+
+      const selection = await call(conn, 'select_tests', {
+        files: ['packages/b/src/index.ts'],
+        tier: 'focused',
+        depth: 3,
+        proofDetail: 'paths',
+        limit: 50,
+        commandLimit: 10,
+        proofLimit: 4,
+      });
+      const selectionData = selection.data as {
+        files: string[];
+        tests: {
+          path: string;
+          basis: string;
+          observed: boolean;
+          proof: string[];
+        }[];
+        graphIdentity: string;
+        inventoryIdentity: string;
+      };
+      expect(selectionData.files).toEqual(['packages/b/src/index.ts']);
+      expect(selectionData.tests).toContainEqual(
+        expect.objectContaining({
+          path: 'packages/b/src/twin.test.ts',
+          observed: false,
+          proof: expect.any(Array),
+        }),
+      );
+      expect(selectionData.graphIdentity).toBe(graphPointer.id);
+      expect(selectionData.inventoryIdentity).toBe(inventoryPointer.id);
+      expect((selection.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        graphPointer.id,
+      );
+
+      const entity = await call(conn, 'get_symbol', {
+        file: 'index.ts',
+        line: 2,
+        detail: 'entity',
+      });
+      expect(entity.data).toMatchObject({
+        symbol: {
+          simpleName: 'helper',
+          filePath: 'index.ts',
+          line: 2,
+        },
+        endLine: 2,
+        parameters: [],
+        returnType: 'number',
+        decorators: [],
+      });
+      expect(entity.data).not.toHaveProperty('source');
+      expect((entity.context as { catalog: { identity?: string } }).catalog.identity).toBe(
+        graphPointer.id,
+      );
+
+      const status = await call(conn, 'get_context_status', {
+        runId: contextRunId,
+        files: ['packages/b/src/index.ts'],
+      });
+      expect(status).toMatchObject({
+        status: 'available',
+        run: {
+          id: contextRunId,
+          name: 'agent-context',
+          source: 'built-in-suite',
+        },
+        manifest: {
+          runId: contextRunId,
+          graphIdentity: graphPointer.id,
+          inventoryIdentity: inventoryPointer.id,
+          fileScope: {
+            mode: 'explicit',
+            fileCount: 1,
+            filesIdentity: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+          },
+        },
+        fileScope: {
+          status: 'matched',
+          requested: {
+            mode: 'explicit',
+            fileCount: 1,
+            filesIdentity: contextManifest.fileScope.filesIdentity,
+          },
+          recorded: contextManifest.fileScope,
+        },
+      });
+      expect(JSON.stringify(status)).not.toContain('packages/b/src/index.ts');
+      const pointers = status.pointers as {
+        pointer: TaskContextSnapshotPointer;
+        status: string;
+        reasonCodes: string[];
+      }[];
+      expect(pointers).toHaveLength(contextManifest.planes.length);
+      expect(pointers.every((pointer) => pointer.status === 'available')).toBe(true);
+      expect(pointers.map((pointer) => pointer.pointer.id)).toEqual(
+        contextManifest.planes.flatMap((plane) =>
+          plane.pointer === undefined ? [] : [plane.pointer.id],
+        ),
+      );
+    } finally {
+      await conn.client.close();
+    }
+  }, 120_000);
+
+  it('keeps an exact context Run bound to stale and evicted pointers without latest rebinding', async () => {
+    const graphPointer = contextManifest.planes.find((plane) => plane.kind === 'graph')?.pointer;
+    const inventoryPointer = contextManifest.planes.find(
+      (plane) => plane.kind === 'inventory',
+    )?.pointer;
+    if (graphPointer === undefined || inventoryPointer === undefined) {
+      throw new Error('task-context fixture is missing graph or inventory pointers');
+    }
+    const conn = await connect(contextFixture);
+    try {
+      writeFileSync(
+        join(contextFixture, 'index.ts'),
+        `${SOURCE}export function replacementGeneration(): number { return helper(); }\n`,
+        'utf8',
+      );
+      await runBuiltCli(contextFixture, [
+        'graph',
+        '--cwd',
+        contextFixture,
+        '--language',
+        'typescript',
+        '--exact',
+        '--no-cache',
+      ]);
+      const newerInventoryId = evictContextSnapshotAndSeedNewer(contextFixture, inventoryPointer);
+
+      const status = await call(conn, 'get_context_status', {
+        runId: contextRunId,
+        files: ['packages/b/src/index.ts'],
+      });
+      expect(status).toMatchObject({
+        status: 'available',
+        run: { id: contextRunId },
+        fileScope: { status: 'matched' },
+        manifest: {
+          runId: contextRunId,
+          graphIdentity: graphPointer.id,
+          inventoryIdentity: inventoryPointer.id,
+        },
+      });
+      const pointers = status.pointers as {
+        pointer: TaskContextSnapshotPointer;
+        status: string;
+        reasonCodes: string[];
+        currentGraphIdentity?: string;
+      }[];
+      const graphStatus = pointers.find((pointer) => pointer.pointer.kind === 'graph');
+      expect(graphStatus).toMatchObject({
+        pointer: { id: graphPointer.id },
+        status: 'stale',
+        reasonCodes: ['graph-generation-replaced'],
+        currentGraphIdentity: expect.stringMatching(/^g1:[a-f0-9]{64}$/),
+      });
+      expect(graphStatus?.currentGraphIdentity).not.toBe(graphPointer.id);
+
+      const inventoryStatus = pointers.find((pointer) => pointer.pointer.kind === 'inventory');
+      expect(inventoryStatus).toMatchObject({
+        pointer: { id: inventoryPointer.id },
+        status: 'missing',
+        reasonCodes: ['context-snapshot-missing'],
+      });
+      expect(JSON.stringify(status)).not.toContain(newerInventoryId);
+      withRawProjectDatabase(contextFixture, (database) => {
+        const newer = database
+          .prepare('SELECT id FROM graph_context_snapshot WHERE id = ?')
+          .get(newerInventoryId) as { id?: unknown } | undefined;
+        expect(newer?.id).toBe(newerInventoryId);
+      });
+    } finally {
+      writeFileSync(join(contextFixture, 'index.ts'), SOURCE, 'utf8');
+      await conn.client.close();
+    }
+  }, 120_000);
+
   it('preserves mixed-confidence and cross-shard evidence through a built stdio trace', async () => {
     const conn = await connect(fixtureA);
     try {
@@ -698,7 +1111,9 @@ describe('MCP e2e over real stdio', () => {
       expect(afterCatalog.identity).toMatch(/^g1:[a-f0-9]{64}$/);
       expect(afterCatalog.identity).not.toBe(beforeCatalog.identity);
       expect(afterCatalog.generationSource).toBe('persisted-auto-swap');
-      expect((after.context as { project: { root: string } }).project.root).toBe(fixtureA);
+      expect((after.context as { project: { root: string } }).project.root).toBe(
+        realpathSync(fixtureA),
+      );
       expect(conn.stderr).not.toContain('mcp.graph.refresh.completed');
 
       const packageDeps = await call(conn, 'package_dependencies', {
@@ -804,8 +1219,11 @@ describe('MCP e2e over real stdio', () => {
         limit: 100,
       });
       expect(wiring.context).toMatchObject({
-        project: { scope: 'project' },
-        runtime: { kind: 'runtime-wiring', identity: expect.stringMatching(/^w1:/) },
+        project: { root: realpathSync(fixtureA), scope: 'project' },
+        runtime: {
+          kind: 'runtime-wiring',
+          identity: expect.stringMatching(/^w1:/),
+        },
         projectKey: expect.any(String),
         snapshotKey: expect.stringMatching(/^w1:/),
       });
@@ -1003,7 +1421,10 @@ describe('MCP e2e over real stdio', () => {
       expect(badCursor.isError).toBe(true);
       expect(JSON.stringify(badCursor.content)).toContain('cursor-invalid');
 
-      const runtimePage = await call(conn, 'get_runtime_wiring', { detail: 'nodes', limit: 1 });
+      const runtimePage = await call(conn, 'get_runtime_wiring', {
+        detail: 'nodes',
+        limit: 1,
+      });
       const runtimeCursor = (runtimePage.page as { nextCursor?: string }).nextCursor;
       expect(runtimeCursor).toBeTypeOf('string');
       if (runtimeCursor === undefined) throw new Error('runtime wiring did not page');

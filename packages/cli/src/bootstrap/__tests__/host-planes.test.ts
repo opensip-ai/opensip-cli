@@ -7,7 +7,7 @@
  * fallbacks. The lazy repo + Date.now() stamps are exercised by construction.
  */
 
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,13 +24,19 @@ const MIGRATIONS_DIR = fileURLToPath(new URL('../../../../datastore/migrations',
 
 function copyPreHostPlaneMigrations(destination: string): void {
   cpSync(MIGRATIONS_DIR, destination, { recursive: true });
-  rmSync(join(destination, '0009_host_plane_namespace.sql'));
-  rmSync(join(destination, 'meta', '0009_snapshot.json'));
+  for (const name of readdirSync(destination)) {
+    if (/^(?:0009|001\d)_.*\.sql$/.test(name)) rmSync(join(destination, name));
+  }
+  for (const name of readdirSync(join(destination, 'meta'))) {
+    if (/^(?:0009|001\d)_snapshot\.json$/.test(name)) {
+      rmSync(join(destination, 'meta', name));
+    }
+  }
   const journalPath = join(destination, 'meta', '_journal.json');
   const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
-    entries: { tag: string }[];
+    entries: { idx: number; tag: string }[];
   };
-  journal.entries = journal.entries.filter((entry) => entry.tag !== '0009_host_plane_namespace');
+  journal.entries = journal.entries.filter((entry) => entry.idx < 9);
   writeFileSync(journalPath, `${JSON.stringify(journal, null, 2)}\n`, 'utf8');
 }
 

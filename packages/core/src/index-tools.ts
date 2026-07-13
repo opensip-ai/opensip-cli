@@ -50,6 +50,15 @@ export type {
   LiveViewContext,
   ToolSessionContribution,
   ToolRunCompletion,
+  EvidenceSnapshotContribution,
+  EvidenceSnapshotInput,
+  EvidenceSnapshotProducer,
+  EvidenceSnapshotReason,
+  EvidenceSnapshotStatus,
+  EvidenceCoverageStatus,
+  EvidenceCoverageSummary,
+  EvidenceFreshnessStatus,
+  EvidenceFreshnessSummary,
   RecordedToolRunSession,
   ToolRunSessions,
   ToolRunOutcome,
@@ -93,6 +102,7 @@ export {
   definePrimaryCommand,
   validateCommandSpec,
   commandProducesVerdict,
+  commandProducesEvidenceSnapshot,
   COMMON_FLAG_KEYS,
   RAW_STREAM_REASONS,
   MAX_STATIC_HANDLER_DECLARATION,
@@ -110,6 +120,7 @@ export {
   RUNTIME_COMMAND_INVENTORY_VERSION,
   createRuntimeCommandInventory,
 } from './tools/index.js';
+export { EVIDENCE_SNAPSHOT_CONTRIBUTION_VERSION } from './tools/index.js';
 export type {
   CommandSpec,
   OptionSpec,

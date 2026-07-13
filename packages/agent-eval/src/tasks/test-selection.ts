@@ -1,23 +1,14 @@
 import { customerPyGroundTruth } from '../ground-truth/customer-py.js';
 import { customerTsGroundTruth } from '../ground-truth/customer-ts.js';
-import {
-  deepFreeze,
-  escapeRegularExpression,
-  isUnknownRecord as isRecord,
-} from '../model/value-helpers.js';
+import { deepFreeze, escapeRegularExpression } from '../model/value-helpers.js';
 
+import {
+  createTestSelectionProofAssessor,
+  extractTestSelection,
+} from './context-surface-extractors.js';
 import { createTestAndCallerFrontierProjection } from './native-frontier-extractors.js';
-import {
-  assessJsonManifestProofDomain,
-  assessNativeReadProofDomain,
-  createExactSymbolSearchProofAssessor,
-} from './proof-closure.js';
-import {
-  extractFallbackFromManifest,
-  extractSymbolSearch,
-  extractTestCallers,
-  projectTestCallers,
-} from './task-response-extractors.js';
+import { assessJsonManifestProofDomain, assessNativeReadProofDomain } from './proof-closure.js';
+import { extractFallbackFromManifest } from './task-response-extractors.js';
 
 import type { TestMappingFact } from '../ground-truth/types.js';
 import type {
@@ -26,14 +17,12 @@ import type {
   ArgumentTemplateValue,
   FactBinding,
   GoldTask,
-  ProofClosureAssessment,
   StrategyStep,
 } from '../model/task.js';
 
-const SEARCH_LIMIT = 20;
 const PAGE_LIMIT = 500;
 const CONTROL_STRATEGY_VERSION = 'control-native-v4-lexical-proof-closure';
-const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-4-v4-exact-proof-closure';
+const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-7-v1-select-tests';
 const NATIVE_MAX_MATCHES = 200;
 const NATIVE_MAX_WALKED_FILES = 20_000;
 const NATIVE_MAX_FILE_BYTES = 1024 * 1024;
@@ -41,24 +30,14 @@ const NATIVE_MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 const NATIVE_CONTEXT_LINES = 40;
 const STALE_MOCHA_COMMAND = 'npx mocha "test/**/*.spec.ts"';
 const OPENSIP_CALLER_DEPTH = 5;
+const CUSTOMER_TS_FIXTURE = 'customer-ts';
 
 interface TestSelectionConfig {
   readonly controlCallerHops: number;
-  readonly fixture: 'customer-py' | 'customer-ts';
+  readonly fixture: 'customer-py' | typeof CUSTOMER_TS_FIXTURE;
   readonly manifestPath: string;
   readonly mapping: TestMappingFact;
   readonly testGlobs: readonly string[];
-}
-
-function symbolBinding(stepId: string, name: string): FactBinding {
-  return {
-    $fact: {
-      field: 'symbolId',
-      match: { kind: 'symbol-handle', name },
-      select: 'only',
-      stepId,
-    },
-  };
 }
 
 function nativeSearchArguments(pattern: ArgumentTemplateValue): ArgumentTemplate {
@@ -83,47 +62,17 @@ function callerPatternBinding(stepId: string): FactBinding {
   };
 }
 
-function closure(
-  projectionComplete: boolean,
-  domainExhausted: boolean,
-  reasonCodes: readonly string[],
-): ProofClosureAssessment {
-  return { domainExhausted, projectionComplete, reasonCodes };
-}
-
-function assessMcpTestTraversal(payload: unknown): ProofClosureAssessment {
-  if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.nodes)) {
-    return closure(false, false, ['malformed-test-traversal']);
-  }
-  const nodes = payload.data.nodes;
-  const callerProjection = projectTestCallers(payload);
-  const malformedNode = !callerProjection.projectionComplete;
-  const unresolved = payload.data.unresolved;
-  const malformedUnresolved = !Array.isArray(unresolved);
-  const hasUnresolved = Array.isArray(unresolved) && unresolved.length > 0;
-  const depthBoundary = nodes.some(
-    (node) =>
-      isRecord(node) && typeof node.depth === 'number' && node.depth >= OPENSIP_CALLER_DEPTH,
-  );
-  const projectionComplete = !malformedNode && !malformedUnresolved && !hasUnresolved;
-  return closure(projectionComplete, projectionComplete && !depthBoundary, [
-    ...(malformedNode || malformedUnresolved ? ['malformed-test-traversal'] : []),
-    ...(hasUnresolved ? ['unresolved-test-caller'] : []),
-    ...(depthBoundary ? ['caller-depth-boundary'] : []),
-  ]);
-}
-
 function fallbackManifestStep(config: TestSelectionConfig, prefix: string): StrategyStep {
   return {
     arguments: { maxBytes: NATIVE_MAX_FILE_BYTES, path: config.manifestPath },
     assessProofClosure:
-      config.fixture === 'customer-ts'
+      config.fixture === CUSTOMER_TS_FIXTURE
         ? assessJsonManifestProofDomain
         : assessNativeReadProofDomain,
     expectedNonEmpty: true,
     extract: extractFallbackFromManifest,
     id: `${prefix}.fallback-manifest`,
-    ...(config.fixture === 'customer-ts'
+    ...(config.fixture === CUSTOMER_TS_FIXTURE
       ? {
           provesAbsence: [{ kind: 'command' as const, purpose: 'test-script' }],
         }
@@ -180,47 +129,34 @@ function controlSteps(config: TestSelectionConfig): readonly StrategyStep[] {
 
 function opensipSteps(config: TestSelectionConfig): readonly StrategyStep[] {
   const prefix = `test-selection.${config.fixture}.opensip`;
-  const searchId = `${prefix}.search-target`;
   return [
     {
       arguments: {
-        detail: 'nodes',
-        generated: 'include',
-        limit: SEARCH_LIMIT,
-        match: 'exact',
-        query: config.mapping.targetSymbol,
-        sourceScope: 'all',
-      },
-      assessProofClosure: createExactSymbolSearchProofAssessor({
-        query: config.mapping.targetSymbol,
-      }),
-      expectedNonEmpty: true,
-      extract: extractSymbolSearch,
-      id: searchId,
-      rationale: 'Resolve the changed function to a response-derived symbol identity.',
-      tool: 'search_symbols',
-    },
-    {
-      arguments: {
+        commandLimit: 100,
         depth: OPENSIP_CALLER_DEPTH,
-        detail: 'nodes',
-        generated: 'include',
-        identity: 'occurrence',
+        files: [config.mapping.targetFile],
         limit: PAGE_LIMIT,
-        sourceScope: 'all',
-        symbolId: symbolBinding(searchId, config.mapping.targetSymbol),
+        proofDetail: 'paths',
+        proofLimit: 6,
+        tier: 'focused',
       },
-      assessProofClosure: assessMcpTestTraversal,
+      assessProofClosure: createTestSelectionProofAssessor([config.mapping.targetFile]),
       expectedNonEmpty: true,
-      extract: extractTestCallers,
-      id: `${prefix}.test-callers`,
-      provesAbsence: (config.mapping.irrelevantTestFiles ?? []).map((path) => ({
-        kind: 'file' as const,
-        path,
-        role: 'test',
-      })),
-      rationale: 'Filter bounded caller nodes by their catalog-provided inTestFile metadata.',
-      tool: 'who_calls',
+      extract: extractTestSelection,
+      id: `${prefix}.select-tests`,
+      provesAbsence: [
+        ...(config.mapping.irrelevantTestFiles ?? []).map((path) => ({
+          kind: 'file' as const,
+          path,
+          role: 'test',
+        })),
+        ...(config.fixture === CUSTOMER_TS_FIXTURE
+          ? [{ kind: 'command' as const, purpose: 'test-script' }]
+          : []),
+      ],
+      rationale:
+        'Use the explicit changed file to select bounded static test evidence and conservative commands.',
+      tool: 'select_tests',
     },
   ];
 }
@@ -243,7 +179,7 @@ function makeTestSelectionTask(config: TestSelectionConfig): GoldTask {
           path,
           role: 'test',
         })),
-        ...(config.fixture === 'customer-ts'
+        ...(config.fixture === CUSTOMER_TS_FIXTURE
           ? [
               {
                 command: STALE_MOCHA_COMMAND,
@@ -277,7 +213,7 @@ function makeTestSelectionTask(config: TestSelectionConfig): GoldTask {
 export const testSelectionTasks: readonly GoldTask[] = deepFreeze([
   makeTestSelectionTask({
     controlCallerHops: 4,
-    fixture: 'customer-ts',
+    fixture: CUSTOMER_TS_FIXTURE,
     manifestPath: 'package.json',
     mapping: customerTsGroundTruth.testMappings[0],
     testGlobs: ['**/*.test.ts', '**/*.spec.ts'],

@@ -52,7 +52,19 @@ describe('buildAgentCatalog', () => {
       'scope?: { mode, source, ref?, changedFiles?, notice? }',
     );
     expect(catalog.outputShapes.reviewBrief).toContain('runId?');
+    expect(catalog.outputShapes.taskContext).toContain('contextManifest');
+    expect(catalog.outputShapes.taskContext).toContain('fileScope.status');
+    expect(catalog.outputShapes.taskContext).toContain('createdAt');
+    expect(catalog.outputShapes.taskContext).toContain('projectIdentity');
+    expect(catalog.outputShapes.taskContext).toContain('producer:{toolId,command,version}');
+    expect(catalog.outputShapes.taskContext).toContain('freshness,coverage,caps');
+    expect(catalog.outputShapes.taskContext).toContain('available + matched + ready');
+    expect(catalog.outputShapes.taskContext).toContain('raw paths are never stored');
+    expect(catalog.outputShapes.taskContext).toContain('not a finding');
     expect(catalog.notes.length).toBeGreaterThan(0);
+    expect(
+      catalog.notes.some((note) => note.includes('same explicit project-relative files')),
+    ).toBe(true);
   });
 
   it('derives sorted tool entry points with overlays and excludes internal commands', () => {

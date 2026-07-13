@@ -7,13 +7,19 @@ import { createNativeInvoker } from '../adapters/native-tools.js';
 import { customerPyGroundTruth } from '../ground-truth/customer-py.js';
 import { customerTsGroundTruth } from '../ground-truth/customer-ts.js';
 import { factMatches } from '../model/argument-resolution.js';
+import { makeStepRecord } from '../model/record.js';
 import { executeArm } from '../runner/execute-arm.js';
+import { evaluateAssertions } from '../scorer/assertions.js';
 
 import { testSelectionTasks } from './test-selection.js';
 
+import type { ArmRunRecord } from '../model/record.js';
 import type { FactBinding, GoldTask, StrategyStep } from '../model/task.js';
 
 const FIXTURES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../__fixtures__');
+const GRAPH_IDENTITY = `g1:${'a'.repeat(64)}`;
+const INVENTORY_IDENTITY = `i1:${'b'.repeat(64)}`;
+const SELECTION_IDENTITY = `ts1:${'c'.repeat(64)}`;
 
 function task(id: string): GoldTask {
   const result = testSelectionTasks.find((candidate) => candidate.id === id);
@@ -34,34 +40,41 @@ function factBinding(value: unknown): FactBinding {
   return value as FactBinding;
 }
 
-function graphSymbol(symbolId: string, simpleName: string, filePath: string, inTestFile: boolean) {
+function selectionData(overrides: Readonly<Record<string, unknown>> = {}) {
   return {
-    bodyHash: `hash:${symbolId}`,
-    column: 0,
-    definedInGenerated: false,
-    filePath,
-    inTestFile,
-    kind: 'function-declaration',
-    line: 1,
-    package: '@fixture/test',
-    qualifiedName: simpleName,
-    simpleName,
-    symbolId,
-    visibility: 'module-local',
+    commands: [],
+    files: [customerTsGroundTruth.testMappings[0].targetFile],
+    graphIdentity: GRAPH_IDENTITY,
+    inventoryIdentity: INVENTORY_IDENTITY,
+    schemaVersion: 1,
+    snapshotId: SELECTION_IDENTITY,
+    tests: [
+      {
+        basis: 'direct-call',
+        confidence: 'high',
+        observed: false,
+        path: customerTsGroundTruth.testMappings[0].testFiles[0],
+        proof: [`${customerTsGroundTruth.testMappings[0].targetFile}:1:0`],
+      },
+    ],
+    trust: { fallbackTier: 'full', reasonCodes: [], status: 'complete' },
+    uncoveredFiles: [],
+    ...overrides,
   };
 }
 
-function traversalNode(depth: number, symbol: ReturnType<typeof graphSymbol>) {
+function selectionPayload(
+  overrides: Readonly<Record<string, unknown>> = {},
+  graphIdentity = GRAPH_IDENTITY,
+) {
   return {
-    depth,
-    groupId: `group:${symbol.symbolId}`,
-    groupTotal: 1,
-    symbol,
+    context: { catalog: { identity: graphIdentity, status: 'loaded' } },
+    data: selectionData(overrides),
   };
 }
 
 describe('test-selection gold tasks', () => {
-  it('freezes the TypeScript and Python epoch-4 before-baselines', () => {
+  it('freezes the TypeScript and Python epoch-7 OpenSIP strategies', () => {
     expect(testSelectionTasks.map(({ id }) => id)).toEqual([
       'test-selection.customer-ts',
       'test-selection.customer-py',
@@ -72,7 +85,7 @@ describe('test-selection gold tasks', () => {
       expect(Object.isFrozen(taskValue.assertions)).toBe(true);
       expect(Object.isFrozen(taskValue.strategies.opensip.steps)).toBe(true);
       expect(taskValue.strategies.control.version).toBe('control-native-v4-lexical-proof-closure');
-      expect(taskValue.strategies.opensip.version).toContain('epoch-4');
+      expect(taskValue.strategies.opensip.version).toContain('epoch-7');
     }
   });
 
@@ -196,67 +209,57 @@ describe('test-selection gold tasks', () => {
     ).toEqual([{ command: 'pytest', kind: 'command', purpose: 'fallback' }]);
   });
 
-  it('uses only a response-derived symbol identity after search_symbols', () => {
+  it('uses one bounded explicit-file select_tests request', () => {
     for (const taskValue of testSelectionTasks) {
-      const search = stepByTool(taskValue, 'opensip', 'search_symbols');
-      const callers = stepByTool(taskValue, 'opensip', 'who_calls');
-      expect(factBinding(callers.arguments.symbolId).$fact).toEqual({
-        field: 'symbolId',
-        match: { kind: 'symbol-handle', name: search.arguments.query },
-        select: 'only',
-        stepId: search.id,
-      });
-      expect(search.arguments).toMatchObject({
-        detail: 'nodes',
-        limit: 20,
-        match: 'exact',
-      });
-      expect(callers.arguments).toMatchObject({
+      const selection = stepByTool(taskValue, 'opensip', 'select_tests');
+      const mapping =
+        taskValue.fixture === 'customer-ts'
+          ? customerTsGroundTruth.testMappings[0]
+          : customerPyGroundTruth.testMappings[0];
+      expect(selection.arguments).toEqual({
+        commandLimit: 100,
         depth: 5,
-        detail: 'nodes',
+        files: [mapping.targetFile],
         limit: 500,
-        sourceScope: 'all',
+        proofDetail: 'paths',
+        proofLimit: 6,
+        tier: 'focused',
       });
     }
   });
 
-  it('preserves catalog test metadata and edge provenance without inventing a fallback', () => {
+  it('projects labelled static tests and safe fallback commands from select_tests', () => {
     const tsTask = task('test-selection.customer-ts');
-    expect(tsTask.strategies.opensip.steps.map(({ tool }) => tool)).toEqual([
-      'search_symbols',
-      'who_calls',
-    ]);
+    expect(tsTask.strategies.opensip.steps.map(({ tool }) => tool)).toEqual(['select_tests']);
     expect(JSON.stringify(tsTask.strategies.opensip.steps)).not.toContain('pnpm test');
     expect(
       JSON.stringify(task('test-selection.customer-py').strategies.opensip.steps),
     ).not.toContain('pytest');
 
-    const callers = stepByTool(tsTask, 'opensip', 'who_calls');
-    const facts = callers.extract({
+    const selection = stepByTool(tsTask, 'opensip', 'select_tests');
+    const facts = selection.extract({
       data: {
-        nodes: [
+        commands: [
           {
-            depth: 1,
-            incomingEvidence: {
-              confidence: 'low',
-              kind: 'call',
-              resolution: 'syntactic',
-            },
-            symbol: {
-              filePath: 'test/invoice.spec.ts',
-              inTestFile: true,
-              simpleName: 'coversInvoice',
-              symbolId: 'test/invoice.spec.ts:4:0',
-            },
+            argv: ['pnpm', 'test'],
+            basis: 'package-manager-script:test',
+            cwd: '.',
+            tier: 'full',
           },
           {
-            depth: 1,
-            symbol: {
-              filePath: 'src/caller.ts',
-              inTestFile: false,
-              simpleName: 'caller',
-              symbolId: 'src/caller.ts:2:0',
-            },
+            argv: ['vitest', 'run'],
+            basis: 'manifest-script:test',
+            cwd: '.',
+            tier: 'full',
+          },
+        ],
+        tests: [
+          {
+            basis: 'direct-call',
+            confidence: 'high',
+            observed: false,
+            path: 'test/invoice.spec.ts',
+            proof: ['src/target.ts:1:0'],
           },
         ],
       },
@@ -267,34 +270,28 @@ describe('test-selection gold tasks', () => {
       path: 'test/invoice.spec.ts',
       role: 'test',
     });
-    expect(facts).toContainEqual(
-      expect.objectContaining({
-        filePath: 'test/invoice.spec.ts',
-        inTestFile: true,
-        kind: 'symbol-handle',
-      }),
-    );
     expect(facts).toContainEqual({
-      confidence: 'low',
-      evidenceKind: 'call',
-      filePath: 'test/invoice.spec.ts',
-      kind: 'evidence',
-      resolution: 'syntactic',
-      subject: 'test/invoice.spec.ts#coversInvoice',
+      command: 'pnpm test',
+      kind: 'command',
+      purpose: 'fallback',
+    });
+    expect(facts).toContainEqual({
+      command: 'vitest run',
+      kind: 'command',
+      purpose: 'test-script',
     });
     expect(facts).not.toContainEqual(expect.objectContaining({ path: 'src/caller.ts' }));
-    expect(facts).not.toContainEqual(expect.objectContaining({ kind: 'command' }));
   });
 
-  it('returns empty facts for empty or malformed caller responses', () => {
-    const callers = stepByTool(task('test-selection.customer-py'), 'opensip', 'who_calls');
-    expect(callers.extract({ data: { nodes: [] } })).toEqual([]);
+  it('returns empty facts for empty or malformed selection responses', () => {
+    const selection = stepByTool(task('test-selection.customer-py'), 'opensip', 'select_tests');
+    expect(selection.extract({ data: { commands: [], tests: [] } })).toEqual([]);
     expect(
-      callers.extract({
-        data: { nodes: [{ depth: 1, symbol: { inTestFile: true } }] },
+      selection.extract({
+        data: { commands: [{ argv: 42 }], tests: [{ path: 42 }] },
       }),
     ).toEqual([]);
-    expect(callers.extract(null)).toEqual([]);
+    expect(selection.extract(null)).toEqual([]);
   });
 
   it.each([
@@ -521,95 +518,201 @@ describe('test-selection gold tasks', () => {
     }
   });
 
-  it('rejects OpenSIP negative proof for unresolved or depth-boundary caller frontiers', () => {
-    const callers = stepByTool(task('test-selection.customer-ts'), 'opensip', 'who_calls');
-    const closedPayload = {
-      data: {
-        nodes: [
-          traversalNode(0, graphSymbol('src/target.ts:1:0', 'target', 'src/target.ts', false)),
-          traversalNode(
-            1,
-            graphSymbol('test/target.test.ts:1:0', 'targetTest', 'test/target.test.ts', true),
-          ),
-        ],
-        unresolved: [],
-      },
-    };
-    expect(callers.assessProofClosure?.(closedPayload)).toMatchObject({
+  it('accepts negative proof only for a complete selection with no uncovered files', () => {
+    const selection = stepByTool(task('test-selection.customer-ts'), 'opensip', 'select_tests');
+    const closedPayload = selectionPayload();
+    expect(selection.assessProofClosure?.(closedPayload)).toMatchObject({
       domainExhausted: true,
       projectionComplete: true,
     });
     expect(
-      callers.assessProofClosure?.({
-        data: {
-          ...closedPayload.data,
-          unresolved: [{ callSite: { filePath: 'src/x.ts' } }],
-        },
-      }),
-    ).toMatchObject({ domainExhausted: false, projectionComplete: false });
-    expect(
-      callers.assessProofClosure?.({
-        data: {
-          nodes: [
-            ...closedPayload.data.nodes,
-            traversalNode(
-              5,
-              graphSymbol('src/frontier.ts:1:0', 'frontier', 'src/frontier.ts', false),
-            ),
-          ],
-          unresolved: [],
-        },
-      }),
+      selection.assessProofClosure?.(
+        selectionPayload({
+          trust: {
+            fallbackTier: 'full',
+            reasonCodes: ['test-selection-depth-cap'],
+            status: 'partial',
+          },
+          uncoveredFiles: [customerTsGroundTruth.testMappings[0].targetFile],
+        }),
+      ),
     ).toMatchObject({
       domainExhausted: false,
       projectionComplete: true,
-      reasonCodes: ['caller-depth-boundary'],
-    });
-    expect(
-      callers.assessProofClosure?.({
-        data: {
-          nodes: [
-            ...closedPayload.data.nodes,
-            traversalNode(
-              5,
-              graphSymbol(
-                'test/frontier.test.ts:1:0',
-                'testFrontier',
-                'test/frontier.test.ts',
-                true,
-              ),
-            ),
-          ],
-          unresolved: [],
-        },
-      }),
-    ).toMatchObject({
-      domainExhausted: false,
-      projectionComplete: true,
-      reasonCodes: ['caller-depth-boundary'],
+      reasonCodes: ['test-selection-depth-cap'],
     });
   });
 
-  it('fails closed when an MCP caller node cannot be projected exactly', () => {
-    const callers = stepByTool(task('test-selection.customer-ts'), 'opensip', 'who_calls');
-    const valid = traversalNode(
-      1,
-      graphSymbol('test/target.test.ts:1:0', 'targetTest', 'test/target.test.ts', true),
-    );
-    for (const node of [
-      { ...valid, depth: 1.5 },
-      { ...valid, symbol: { ...valid.symbol, filePath: undefined } },
-      { ...valid, symbol: { ...valid.symbol, inTestFile: undefined } },
-      { ...valid, symbol: { ...valid.symbol, symbolId: '' } },
+  it('binds complete selection proof to the exact request, catalog, identities, and unique rows', () => {
+    const selection = stepByTool(task('test-selection.customer-ts'), 'opensip', 'select_tests');
+    const selected = selectionData().tests as readonly unknown[];
+    const command = {
+      argv: ['pnpm', 'test'],
+      basis: 'package-manager-script:test',
+      cwd: '.',
+      tier: 'full',
+    };
+
+    expect(selection.assessProofClosure?.(selectionPayload())).toEqual({
+      domainExhausted: true,
+      projectionComplete: true,
+      reasonCodes: [],
+    });
+    for (const payload of [
+      selectionPayload({ files: ['src/wrong.ts'] }),
+      selectionPayload({}, `g1:${'d'.repeat(64)}`),
+      selectionPayload({ tests: [...selected, ...selected] }),
+      selectionPayload({ commands: [command, command] }),
+      selectionPayload({ snapshotId: 'ts1:fixture' }),
+      selectionPayload({ inventoryIdentity: 'i1:fixture' }),
+      selectionPayload({ uncoveredFiles: ['src/not-requested.ts'] }),
+    ]) {
+      expect(selection.assessProofClosure?.(payload)).toEqual({
+        domainExhausted: false,
+        projectionComplete: false,
+        reasonCodes: ['malformed-test-selection'],
+      });
+    }
+  });
+
+  it('proves the frozen stale manifest command absent from a complete response projection', async () => {
+    const taskValue = task('test-selection.customer-ts');
+    const selection = stepByTool(taskValue, 'opensip', 'select_tests');
+    const mapping = customerTsGroundTruth.testMappings[0];
+    const payload = selectionPayload({
+      commands: [
+        {
+          argv: ['pnpm', 'test'],
+          basis: 'package-manager-script:test',
+          cwd: '.',
+          tier: 'full',
+        },
+        {
+          argv: ['vitest', 'run'],
+          basis: 'manifest-script:test',
+          cwd: '.',
+          tier: 'full',
+        },
+      ],
+      tests: mapping.testFiles.map((path) => ({
+        basis: 'direct-call',
+        confidence: 'high',
+        observed: false,
+        path,
+        proof: [`${mapping.targetFile}:1:0`],
+      })),
+    });
+    const leg = await executeArm({
+      assertions: {
+        leg: 'main',
+        mustExclude: taskValue.assertions.mustExclude,
+        mustInclude: taskValue.assertions.mustInclude,
+      },
+      invoker: (resolved) =>
+        Promise.resolve(
+          makeStepRecord({
+            catalogIdentity: GRAPH_IDENTITY,
+            coverage: {
+              complete: true,
+              facets: [
+                {
+                  complete: true,
+                  name: 'inventory',
+                  requested: true,
+                  truncated: false,
+                },
+                {
+                  complete: true,
+                  name: 'evidence',
+                  requested: true,
+                  truncated: false,
+                },
+                {
+                  complete: true,
+                  name: 'grouping',
+                  requested: false,
+                  truncated: false,
+                },
+                {
+                  complete: true,
+                  name: 'projection',
+                  requested: true,
+                  truncated: false,
+                },
+              ],
+              truncated: false,
+            },
+            facts: resolved.extract(payload),
+            freshness: { fresh: true, verification: 'complete' },
+            leg: 'main',
+            proofClosure: resolved.assessProofClosure?.(payload),
+            renderedResponse: JSON.stringify(payload),
+            step: resolved,
+            wallMs: 1,
+          }),
+        ),
+      steps: [selection],
+    });
+    const record: ArmRunRecord = {
+      arm: 'opensip',
+      legs: [leg],
+      setup: { mode: 'reuse-existing', stages: [] },
+      strategyVersion: taskValue.strategies.opensip.version,
+      taskId: taskValue.id,
+    };
+
+    expect(leg.steps[0]).toMatchObject({
+      completeness: 'complete',
+      noneOutcome: 'nonempty',
+      proofClosure: { domainExhausted: true, projectionComplete: true },
+    });
+    expect(leg.steps[0]?.facts).toContainEqual({
+      command: 'vitest run',
+      kind: 'command',
+      purpose: 'test-script',
+    });
+    expect(evaluateAssertions(record, taskValue.assertions)).toMatchObject({
+      incorrectNone: 0,
+      passed: true,
+    });
+  });
+
+  it('fails closed when selection trust metadata is malformed', () => {
+    const selection = stepByTool(task('test-selection.customer-ts'), 'opensip', 'select_tests');
+    for (const data of [
+      {},
+      { trust: {}, uncoveredFiles: 42 },
+      { trust: null, uncoveredFiles: [] },
     ]) {
       expect(
-        callers.assessProofClosure?.({
-          data: { nodes: [node], unresolved: [] },
+        selection.assessProofClosure?.({
+          context: { catalog: { identity: GRAPH_IDENTITY, status: 'loaded' } },
+          data,
         }),
       ).toMatchObject({
         domainExhausted: false,
         projectionComplete: false,
-        reasonCodes: expect.arrayContaining(['malformed-test-traversal']),
+        reasonCodes: ['malformed-test-selection'],
+      });
+    }
+  });
+
+  it('fails closed when a complete selection contains malformed evidence rows', () => {
+    const selection = stepByTool(task('test-selection.customer-ts'), 'opensip', 'select_tests');
+    for (const data of [
+      selectionData({ tests: [{ path: 'test/a.ts' }] }),
+      selectionData({ commands: [{ argv: ['pnpm', 'test'] }] }),
+      selectionData({ schemaVersion: 2 }),
+    ]) {
+      expect(
+        selection.assessProofClosure?.({
+          context: { catalog: { identity: GRAPH_IDENTITY, status: 'loaded' } },
+          data,
+        }),
+      ).toEqual({
+        domainExhausted: false,
+        projectionComplete: false,
+        reasonCodes: ['malformed-test-selection'],
       });
     }
   });

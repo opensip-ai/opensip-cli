@@ -224,6 +224,7 @@ export async function buildAndResolveCatalogIncremental(
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
+  readonly parseErrors: readonly ParseError[];
 }> {
   const {
     runStage,
@@ -341,6 +342,7 @@ export async function buildAndResolveCatalogIncremental(
     catalog: resolved.catalog,
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
+    parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
   };
 }
 

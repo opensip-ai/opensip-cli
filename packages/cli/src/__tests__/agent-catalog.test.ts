@@ -488,6 +488,15 @@ describe('buildAgentCatalog', () => {
     expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(c.outputShapes.reviewBrief).toMatch(/correlatedRisks/);
     expect(c.outputShapes.reviewBrief).toMatch(/verification/);
+    expect(c.outputShapes.taskContext).toMatch(/contextManifest/);
+    expect(c.outputShapes.taskContext).toMatch(/fileScope\.status/);
+    expect(c.outputShapes.taskContext).toMatch(/createdAt/);
+    expect(c.outputShapes.taskContext).toMatch(/projectIdentity/);
+    expect(c.outputShapes.taskContext).toMatch(/freshness,coverage,caps/);
+    expect(c.outputShapes.taskContext).toMatch(/available \+ matched \+ ready/);
+    expect(c.notes.some((note) => note.includes('same explicit project-relative files'))).toBe(
+      true,
+    );
     expect(c.outputShapes.sessionReplay).toMatch(/fidelity/);
     expect(c.outputShapes.history).toMatch(/history/);
     expect(c.notes.length).toBeGreaterThan(0);
@@ -548,7 +557,7 @@ describe('executeAgentCatalog', () => {
     expect(rest).toEqual(buildAgentCatalog({ tools }));
     expect(reservedNames?.rootCommands).toContain('audit');
     expect(reservedNames?.rootCommands).toContain('init');
-    expect(reservedNames?.suiteNames).toEqual(['audit']);
+    expect(reservedNames?.suiteNames).toEqual(['audit', 'agent-context']);
   });
 
   it('returns a concise text summary in human mode (no --json)', async () => {

@@ -83,6 +83,8 @@ export interface McpStdioServerDeps {
   readonly results: ResultsReadPort;
   /** Server version advertised in the handshake (the `@opensip-cli/mcp` version). */
   readonly version: string;
+  /** Canonical served-project root for the MCP surface overlay. */
+  readonly projectRoot?: string;
   /**
    * Surface epoch for connector diagnosis. Bump when the default registered
    * tool set changes (e.g. Phase 3 search_declarations/references_to).
@@ -104,6 +106,7 @@ export class McpStdioServer {
   private readonly transport: StdioServerTransport;
   private readonly scope: RunScope;
   private readonly version: string;
+  private readonly projectRoot: string;
   private readonly surfaceEpoch: number;
   private readonly mutationsEnabled: boolean;
   private readonly registeredNames: string[] = [];
@@ -117,8 +120,10 @@ export class McpStdioServer {
     this.graph = deps.graph;
     this.results = deps.results;
     this.version = deps.version;
-    // Phase 3 tools (search_declarations + references_to) are in the default surface.
-    this.surfaceEpoch = deps.surfaceEpoch ?? 3;
+    this.projectRoot = deps.projectRoot ?? this.scope.projectContext?.projectRoot ?? process.cwd();
+    // Keep direct/test construction aligned with the current default surface.
+    // The composition root still passes the authoritative exported epoch.
+    this.surfaceEpoch = deps.surfaceEpoch ?? 7;
     this.mutationsEnabled = deps.mutationsEnabled === true;
     this.mcp = new McpServer({ name: SERVER_NAME, version: deps.version });
     // Default stdin/stdout; the transport owns stdout for JSON-RPC frames.
@@ -130,7 +135,6 @@ export class McpStdioServer {
    * Names are code-point sorted; root is the canonical project root only.
    */
   describeSurface(): McpSurfaceSnapshot {
-    const root = this.scope.projectContext?.projectRoot ?? process.cwd();
     const sorted = [...this.registeredNames].sort(compareCodePointStrings);
     return Object.freeze({
       version: this.version,
@@ -138,7 +142,7 @@ export class McpStdioServer {
       toolNames: Object.freeze(sorted),
       toolCount: sorted.length,
       mutationPosture: this.mutationsEnabled ? 'mutations-enabled' : 'read-only',
-      projectRoot: root,
+      projectRoot: this.projectRoot,
       projectScope: 'project' as const,
     });
   }

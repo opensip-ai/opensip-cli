@@ -5,11 +5,13 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { testSelectionSnapshotSchema, type ProjectInventorySnapshot } from '@opensip-cli/contracts';
 import { ephemeralProjectCacheKey, ok } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { CatalogRepo } from '@opensip-cli/graph/internal';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { catalogGenerationKey } from '../catalog-generation-model.js';
 import { decodeCursor, digestNormalizedQuery, encodeCursor } from '../graph-query-page.js';
 import { SqliteGraphReadPort } from '../sqlite-graph-read-port.js';
 
@@ -90,6 +92,52 @@ function seededCatalog(builtAt = BUILT_AT): Catalog {
           filePath: 'src/l1.ts',
         }),
       ],
+    },
+  };
+}
+
+function wideCatalog(count: number): Catalog {
+  const source = seededCatalog();
+  return {
+    ...source,
+    functions: {
+      target: source.functions.target,
+      callers: Array.from({ length: count }, (_, index) =>
+        fnOcc({
+          bodyHash: `wide-${String(index)}`,
+          simpleName: `wide${String(index)}`,
+          filePath: `tests/wide-${String(index)}.ts`,
+          inTestFile: true,
+          calls: [
+            {
+              to: ['h-target'],
+              line: 2,
+              column: 1,
+              resolution: 'static',
+              confidence: 'high',
+              text: 'target()',
+            },
+          ],
+        }),
+      ),
+    },
+  };
+}
+
+function wideSpanCatalog(count: number): Catalog {
+  return {
+    ...seededCatalog(),
+    functions: {
+      spans: Array.from({ length: count }, (_, index) =>
+        fnOcc({
+          bodyHash: `span-${String(index)}`,
+          simpleName: `span${String(index)}`,
+          filePath: 'src/span.ts',
+          line: 1,
+          column: index,
+          endLine: 2,
+        }),
+      ),
     },
   };
 }
@@ -216,6 +264,65 @@ function makePort(store: DataStore): SqliteGraphReadPort {
   });
 }
 
+const INVENTORY: ProjectInventorySnapshot = {
+  schemaVersion: 1,
+  snapshotId: `i1:${'1'.repeat(64)}`,
+  metadataIdentity: `m1:${'2'.repeat(64)}`,
+  project: {
+    configIdentity: 'sha256:config',
+    workspacePatterns: [],
+    languages: ['typescript'],
+    fileCount: 2,
+    packageCount: 1,
+  },
+  packages: [
+    {
+      name: 'pkg',
+      root: '.',
+      private: true,
+      exports: [],
+      bins: [],
+      verificationCommands: [
+        { tier: 'full', cwd: '.', argv: ['vitest', 'run'], basis: 'manifest-script:test' },
+      ],
+      provenance: [{ source: 'manifest', detail: 'package.json' }],
+    },
+  ],
+  files: [
+    {
+      path: 'src/target.ts',
+      size: 10,
+      modifiedMs: 1,
+      roles: ['production'],
+      targets: ['source'],
+      languages: ['typescript'],
+      evidenceSupport: {
+        callable: 'supported',
+        declaration: 'supported',
+        reference: 'supported',
+      },
+      packageName: 'pkg',
+      provenance: [{ source: 'target', detail: 'target:source' }],
+    },
+    {
+      path: 'src/target.test.ts',
+      size: 10,
+      modifiedMs: 1,
+      roles: ['test'],
+      targets: ['tests'],
+      languages: ['typescript'],
+      evidenceSupport: {
+        callable: 'supported',
+        declaration: 'supported',
+        reference: 'supported',
+      },
+      packageName: 'pkg',
+      provenance: [{ source: 'target', detail: 'target:tests' }],
+    },
+  ],
+  coverage: { status: 'complete', reasonCodes: [], observed: 2, total: 2 },
+};
+
 describe('SqliteGraphReadPort (async cutover)', () => {
   let store: DataStore;
 
@@ -234,6 +341,172 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     if (!status.ok) return;
     expect(status.value.context.catalog.status).toBe('missing');
     expect(status.value.freshness.verification).toBe('missing');
+  });
+
+  it('returns explicit missing-graph fallbacks for impact and test selection', async () => {
+    const port = makePort(store);
+    const impact = await port.impactFiles(['src/target.ts']);
+    expect(impact.ok).toBe(true);
+    if (!impact.ok) return;
+    expect(impact.value.context.catalog.status).toBe('missing');
+    expect(impact.value.data).toMatchObject({
+      matchedFiles: [],
+      unmatchedFiles: ['src/target.ts'],
+      trust: { fallback: 'full-run', fullyVerified: false },
+    });
+    expect(impact.value.data.nextActions.join(' ')).toContain('refresh_graph');
+
+    const selection = await port.selectTests(['src/target.ts'], INVENTORY);
+    expect(selection.ok).toBe(true);
+    if (!selection.ok) return;
+    expect(selection.value.data).toMatchObject({
+      tests: [],
+      uncoveredFiles: ['src/target.ts'],
+      trust: { status: 'fallback' },
+      graphIdentity: 'graph:missing',
+      inventoryIdentity: INVENTORY.snapshotId,
+      durable: false,
+    });
+    expect(testSelectionSnapshotSchema.safeParse(selection.value.data).success).toBe(false);
+    expect(selection.value.data.commands).not.toHaveLength(0);
+    expect(selection.value.coverage.complete).toBe(false);
+  });
+
+  it('serves impact, entity detail, test selection, and exact generation status', async () => {
+    const baseCatalog = seededCatalog();
+    const catalog: Catalog = {
+      ...baseCatalog,
+      functions: {
+        ...baseCatalog.functions,
+        targetTest: [
+          fnOcc({
+            bodyHash: 'h-target-test',
+            simpleName: 'targetTest',
+            filePath: 'src/target.test.ts',
+            inTestFile: true,
+            calls: [
+              {
+                to: ['h-target'],
+                line: 2,
+                column: 2,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+      },
+    };
+    new CatalogRepo(store).replaceAll(catalog);
+    const port = makePort(store);
+
+    const impact = await port.impactFiles(['src/target.ts'], { maxDepth: 2, top: 20 });
+    expect(impact.ok).toBe(true);
+    if (!impact.ok) return;
+    expect(impact.value.data.changedFunctions.map((item) => item.qualifiedName)).toContain(
+      'target',
+    );
+    expect(impact.value.data.impactedFunctions.map((item) => item.qualifiedName)).toEqual(
+      expect.arrayContaining(['caller', 'targetTest']),
+    );
+
+    const entity = await port.entityDetail('src/caller.ts:10:2');
+    expect(entity.ok).toBe(true);
+    if (!entity.ok) return;
+    expect(entity.value.data).toMatchObject({
+      symbol: { symbolId: 'src/caller.ts:10:2', qualifiedName: 'caller' },
+      endLine: 20,
+    });
+
+    const location = await port.symbolAtLocation('src/caller.ts', 10, 'entity');
+    expect(location.ok).toBe(true);
+    if (!location.ok) return;
+    expect(location.value).toMatchObject({
+      data: {
+        candidates: [{ symbolId: 'src/caller.ts:10:2' }],
+        entity: { symbol: { symbolId: 'src/caller.ts:10:2' }, endLine: 20 },
+      },
+      context: { catalog: { identity: impact.value.context.catalog.identity } },
+    });
+
+    const selection = await port.selectTests(['src/target.ts'], INVENTORY, {
+      maxDepth: 2,
+      limit: 20,
+      commandLimit: 10,
+      proofDetail: 'paths',
+      proofLimit: 4,
+    });
+    expect(selection.ok).toBe(true);
+    if (!selection.ok) return;
+    expect(selection.value.data.graphIdentity).toBe(impact.value.context.catalog.identity);
+    expect(selection.value.data.inventoryIdentity).toBe(INVENTORY.snapshotId);
+    expect(selection.value.data.tests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'src/target.test.ts', observed: false }),
+      ]),
+    );
+
+    const identity = impact.value.context.catalog.identity!;
+    const exact = await port.contextPointerStatus({
+      owner: 'graph',
+      kind: 'graph',
+      id: identity,
+      schemaVersion: 3,
+    });
+    const stale = await port.contextPointerStatus({
+      owner: 'graph',
+      kind: 'graph',
+      id: 'g1:recorded-older-generation',
+      schemaVersion: 3,
+    });
+    expect(exact.ok && exact.value).toMatchObject({
+      status: 'stale',
+      reasonCodes: expect.arrayContaining(['graph-generation-not-current']),
+      currentGraphIdentity: identity,
+    });
+    expect(stale.ok && stale.value).toMatchObject({
+      status: 'stale',
+      reasonCodes: ['graph-generation-replaced'],
+      currentGraphIdentity: identity,
+    });
+    expect(stale.ok && stale.value.pointer.id).toBe('g1:recorded-older-generation');
+  });
+
+  it('propagates impact cancellation after bounded index work has started', async () => {
+    new CatalogRepo(store).replaceAll(wideCatalog(12_000));
+    const port = makePort(store);
+    const controller = new AbortController();
+    const pending = port.impactFiles(['src/target.ts'], undefined, controller.signal);
+    setImmediate(() => controller.abort());
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    });
+  });
+
+  it('propagates test-selection cancellation after reverse indexing has started', async () => {
+    new CatalogRepo(store).replaceAll(wideCatalog(12_000));
+    const port = makePort(store);
+    const controller = new AbortController();
+    const pending = port.selectTests(['src/target.ts'], INVENTORY, undefined, controller.signal);
+    setImmediate(() => controller.abort());
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    });
+  });
+
+  it('cancels the get_symbol span scan after the request has started', async () => {
+    new CatalogRepo(store).replaceAll(wideSpanCatalog(12_000));
+    const port = makePort(store);
+    const controller = new AbortController();
+    const pending = port.symbolAtLocation('src/span.ts', 1, 'summary', controller.signal);
+    setImmediate(() => controller.abort());
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    });
   });
 
   it('rejects a prior generation cursor for every paged graph operation when the catalog is missing', async () => {
@@ -497,6 +770,46 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     });
   });
 
+  it('marks an exact recorded graph pointer stale when source freshness cannot be verified', async () => {
+    new CatalogRepo(store).replaceAll(seededCatalog());
+    const adapters: GraphAdapterRegistryReader = {
+      size: 1,
+      getAll: () => {
+        throw new Error('private registry failure');
+      },
+      getById: () => undefined,
+    };
+    const port = new SqliteGraphReadPort({
+      store,
+      projectRoot: PROJECT,
+      adapters,
+      languageAdapters: [],
+      rebuild: () => Promise.resolve(ok(seededCatalog())),
+    });
+    const catalog = seededCatalog();
+    const identity = catalogGenerationKey({
+      language: catalog.language,
+      cacheKey: catalog.cacheKey,
+      filesFingerprint: catalog.filesFingerprint ?? '',
+      builtAt: catalog.builtAt,
+    });
+
+    const pointer = await port.contextPointerStatus({
+      owner: 'graph',
+      kind: 'graph',
+      id: identity,
+      schemaVersion: 3,
+    });
+
+    expect(pointer).toMatchObject({
+      ok: true,
+      value: {
+        status: 'stale',
+        reasonCodes: ['graph-generation-not-current', 'graph-freshness-verification-failed'],
+      },
+    });
+  });
+
   it('auto-swaps when a newer catalog is persisted externally', async () => {
     new CatalogRepo(store).replaceAll(seededCatalog('2026-01-01T00:00:00.000Z'));
     const port = makePort(store);
@@ -755,6 +1068,50 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(arch.value.filter?.sourceRoles).toEqual({
       testGlobs: ['packages/test-support/**'],
       mode: 'audit-test-globs-v1',
+    });
+  });
+
+  it('uses configured test roots for static test selection', async () => {
+    const source = seededCatalog();
+    const customTest = fnOcc({
+      bodyHash: 'h-custom-test',
+      simpleName: 'customTest',
+      filePath: 'quality/custom-check.ts',
+      inTestFile: false,
+      calls: [
+        {
+          to: ['h-target'],
+          line: 2,
+          column: 1,
+          resolution: 'static',
+          confidence: 'high',
+          text: 'target()',
+        },
+      ],
+    });
+    const roleCatalog: Catalog = {
+      ...source,
+      functions: { target: source.functions.target, custom: [customTest] },
+    };
+    new CatalogRepo(store).replaceAll(roleCatalog);
+    const port = new SqliteGraphReadPort({
+      store,
+      projectRoot: PROJECT,
+      adapters: stubAdapters(),
+      languageAdapters: [],
+      rebuild: () => Promise.resolve(ok(roleCatalog)),
+      config: { auditTestSourceGlobs: ['quality/**'] },
+    });
+    const result = await port.selectTests(['src/target.ts'], INVENTORY);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        data: {
+          tests: expect.arrayContaining([
+            expect.objectContaining({ path: 'quality/custom-check.ts' }),
+          ]),
+        },
+      },
     });
   });
 

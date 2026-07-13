@@ -24,8 +24,10 @@ import {
   type Span,
 } from '@opensip-cli/core';
 
-import { buildShardedCatalogCacheKey } from '../../cache/sharded-cache-key.js';
-import { compareCodePointStrings } from '../../code-point-order.js';
+import {
+  buildShardedCatalogCacheKey,
+  sortShardedCatalogAnchors,
+} from '../../cache/sharded-cache-key.js';
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
 import {
@@ -37,6 +39,7 @@ import { buildIndexes } from '../../pipeline/indexes.js';
 import { evaluateRules, resolveRuleSet } from '../../rules/evaluate-rules.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
+import { catalogBuildCoverage } from './catalog-build-coverage.js';
 import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
 import {
   mergeShardFragments,
@@ -195,18 +198,19 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   );
   const stamped = stampAndConstrainPackages(resolved, projectRoot);
   const successfulShardIds = new Set(fragments.map((fragment) => fragment.shardId));
-  const shardCacheInputs = shards
-    .filter((shard) => successfulShardIds.has(shard.id))
-    .map((shard) => ({
-      shardId: shard.id,
-      rootDir: projectRelativePath(projectRoot, shard.rootDir),
-      ...(shard.configPathAbs === undefined
-        ? {}
-        : {
-            configPath: projectRelativePath(projectRoot, shard.configPathAbs),
-          }),
-    }))
-    .sort((a, b) => compareCodePointStrings(a.shardId, b.shardId));
+  const shardCacheInputs = sortShardedCatalogAnchors(
+    shards
+      .filter((shard) => successfulShardIds.has(shard.id))
+      .map((shard) => ({
+        shardId: shard.id,
+        rootDir: projectRelativePath(projectRoot, shard.rootDir),
+        ...(shard.configPathAbs === undefined
+          ? {}
+          : {
+              configPath: projectRelativePath(projectRoot, shard.configPathAbs),
+            }),
+      })),
+  );
   const fragmentCacheKeys = new Map(
     fragments.map((fragment) => [fragment.shardId, fragment.fragment.cacheKey]),
   );
@@ -230,6 +234,12 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
         : { mode: 'auto', selectedId: stamped.language },
     engineMode: 'sharded',
     shardCacheInputs,
+    buildCoverage: catalogBuildCoverage({
+      projectRoot,
+      files: allFiles,
+      parseErrors: fragments.flatMap((fragment) => fragment.parseErrors),
+      status: built.failures.length === 0 ? 'complete' : 'partial',
+    }),
   };
   emitStage(
     onProgress,

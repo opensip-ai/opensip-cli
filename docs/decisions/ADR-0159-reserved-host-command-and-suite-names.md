@@ -26,7 +26,8 @@ enforcement-reason: >
 ```
 
 **Decision:** Reserve well-known names on both configurable planes. (a) A
-configured suite may not use a built-in suite name (today: `audit`) — the
+configured suite may not use a built-in suite name (today: `audit` and
+`agent-context`) — the
 strict config document rejects it at validation, so `opensip audit` and
 `opensip suite run audit` can never diverge. (b) A Tool may not claim any
 host-owned root command name or alias (the full host surface — `init`,
@@ -52,7 +53,7 @@ rejected at admission, before Commander mounting.
 - **Static reserved-command list in `@opensip-cli/contracts`.** Rejected: a
   hand-synced duplicate of the mounted host surface drifts. Command
   reservation stays CLI-local next to the host specs with a parity test.
-  (Suite-name reservation is static — a one-element list owned by
+  (Suite-name reservation is static — a short list owned by
   `@opensip-cli/config`, which owns the suites schema; the CLI imports the
   constant so the built-in suite name and the reserved list cannot drift.)
 

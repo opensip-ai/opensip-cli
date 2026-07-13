@@ -14,6 +14,7 @@ import { orientCustomerTsTask, orientCustomerWorkspaceTask, orientTasks } from '
 import type { GoldTask, StrategyStep } from '../model/task.js';
 
 const fixturesRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../__fixtures__');
+const STALE_MOCHA_COMMAND = 'npx mocha "test/**/*.spec.ts"';
 
 function step(task: GoldTask, arm: 'control' | 'opensip', id: string): StrategyStep {
   const found = task.strategies[arm].steps.find((candidate) => candidate.id === id);
@@ -117,27 +118,78 @@ describe('orient gold tasks', () => {
     ).toEqual([]);
   });
 
-  it('normalizes only package rows present in an MCP response', () => {
+  it('projects top-level file-context inventory facts without fixture injection', () => {
     const extract = step(
-      orientCustomerWorkspaceTask,
+      orientCustomerTsTask,
       'opensip',
-      'opensip-read-package-dependencies',
+      'opensip-read-root-manifest-context',
     ).extract;
     const facts = extract({
-      data: {
-        calls: [{ fromPackage: '@alternative/api', toPackage: '@alternative/core' }],
-        imports: [],
+      status: 'found',
+      file: { path: 'package.json' },
+      project: { packageCount: 7, packageManager: 'yarn@4.5.0' },
+      package: {
+        name: '@alternative/project',
+        verificationCommands: [
+          {
+            argv: ['node', '--test'],
+            basis: 'manifest-script:test',
+            cwd: '.',
+            tier: 'full',
+          },
+        ],
       },
     });
 
     expect(facts).toEqual([
-      { kind: 'package', name: '@alternative/api' },
-      { kind: 'package', name: '@alternative/core' },
+      { kind: 'file', path: 'package.json', role: 'inventory' },
+      { kind: 'count', label: 'packages', value: 7 },
+      { kind: 'text', label: 'package-manager', value: 'yarn' },
+      {
+        kind: 'text',
+        label: 'package-manager-declaration',
+        value: 'yarn@4.5.0',
+      },
+      { kind: 'package', name: '@alternative/project' },
+      { command: 'node --test', kind: 'command', purpose: 'test' },
     ]);
-    expect(facts).not.toContainEqual({
-      kind: 'package',
-      name: '@fixture/ws-api',
-    });
+    expect(facts).not.toContainEqual({ kind: 'package', name: '@fixture/customer-ts' });
+  });
+
+  it('does not fabricate a requested file when file-context evidence is missing or mismatched', () => {
+    const extract = step(
+      orientCustomerTsTask,
+      'opensip',
+      'opensip-read-root-manifest-context',
+    ).extract;
+
+    expect(extract({ status: 'found', project: {} })).toEqual([]);
+    expect(extract({ status: 'found', file: { path: 'other.json' }, project: {} })).toEqual([]);
+    expect(extract({ data: { status: 'found', file: { path: 'package.json' } } })).toEqual([]);
+  });
+
+  it('uses exact file-context requests while leaving setup discovery unmeasured', () => {
+    expect(
+      orientCustomerTsTask.strategies.opensip.steps
+        .filter(({ tool }) => tool === 'get_file_context')
+        .map(({ arguments: args }) => args),
+    ).toEqual([{ file: 'package.json' }, { file: 'pnpm-lock.yaml' }]);
+    expect(
+      orientCustomerWorkspaceTask.strategies.opensip.steps
+        .filter(({ tool }) => tool === 'get_file_context')
+        .map(({ arguments: args }) => args),
+    ).toEqual([
+      { file: 'package.json' },
+      { file: 'pnpm-lock.yaml' },
+      { file: 'pnpm-workspace.yaml' },
+    ]);
+    expect(orientCustomerTsTask.strategies.opensip.steps.map(({ tool }) => tool)).toEqual([
+      'get_file_context',
+      'get_file_context',
+    ]);
+    expect(
+      step(orientCustomerTsTask, 'opensip', 'opensip-read-root-manifest-context').provesAbsence,
+    ).toEqual([{ command: STALE_MOCHA_COMMAND, kind: 'command', purpose: 'test' }]);
   });
 
   it.each(orientTasks)(
@@ -163,7 +215,7 @@ describe('orient gold tasks', () => {
       expect(Object.isFrozen(task)).toBe(true);
       expect(Object.isFrozen(task.strategies)).toBe(true);
       expect(Object.isFrozen(task.strategies.opensip.steps)).toBe(true);
-      expect(task.strategies.opensip.version).toContain('epoch-4');
+      expect(task.strategies.opensip.version).toContain('epoch-7');
       expect(
         Object.values(task.strategies).flatMap(({ steps }) => steps.map(({ tool }) => tool)),
       ).not.toContain('get_agent_catalog');

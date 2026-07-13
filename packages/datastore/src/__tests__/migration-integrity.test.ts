@@ -41,13 +41,35 @@ interface JournalEntry {
 
 function copyPreHostPlaneMigrations(destination: string): void {
   cpSync(MIGRATIONS_DIR, destination, { recursive: true });
-  rmSync(join(destination, '0009_host_plane_namespace.sql'));
-  rmSync(join(destination, 'meta', '0009_snapshot.json'));
+  for (const name of readdirSync(destination)) {
+    if (/^(?:0009|001\d)_.*\.sql$/.test(name)) {
+      rmSync(join(destination, name));
+    }
+  }
+  for (const name of readdirSync(join(destination, 'meta'))) {
+    if (/^(?:0009|001\d)_snapshot\.json$/.test(name)) {
+      rmSync(join(destination, 'meta', name));
+    }
+  }
   const journalPath = join(destination, 'meta', '_journal.json');
   const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
     entries: JournalEntry[];
   };
-  journal.entries = journal.entries.filter((entry) => entry.tag !== '0009_host_plane_namespace');
+  journal.entries = journal.entries.filter((entry) => entry.idx < 9);
+  writeFileSync(journalPath, `${JSON.stringify(journal, null, 2)}\n`, 'utf8');
+}
+
+function copyPreTaskContextMigrations(destination: string): void {
+  cpSync(MIGRATIONS_DIR, destination, { recursive: true });
+  for (const name of readdirSync(destination)) {
+    if (/^0010_.*\.sql$/.test(name)) rmSync(join(destination, name));
+  }
+  rmSync(join(destination, 'meta', '0010_snapshot.json'));
+  const journalPath = join(destination, 'meta', '_journal.json');
+  const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+    entries: JournalEntry[];
+  };
+  journal.entries = journal.entries.filter((entry) => entry.idx < 10);
   writeFileSync(journalPath, `${JSON.stringify(journal, null, 2)}\n`, 'utf8');
 }
 
@@ -165,11 +187,33 @@ describe('fresh database fully realizes the ORM schema', () => {
       expect(cols('sessions').has('suite_name')).toBe(true); // 0004 (suite grouping)
       expect(cols('session_tool_payload').has('payload_version')).toBe(true); // 0010
       expect(cols('runs').has('legacy_suite_run_id')).toBe(true); // 0007 (run ledger)
+      expect(cols('runs').has('context_manifest')).toBe(true); // 0010 (task context)
       expect(cols('run_steps').has('logical_step_key')).toBe(true); // 0007 (run ledger)
       expect(cols('run_steps').has('session_id')).toBe(true); // 0007 (run ledger)
+      expect(cols('graph_context_snapshot')).toEqual(
+        new Set([
+          'id',
+          'kind',
+          'schema_version',
+          'producer_version',
+          'created_at',
+          'source_identity',
+          'config_identity',
+          'byte_count',
+          'payload',
+        ]),
+      );
       expect(indexes('sessions').has('sessions_timestamp_idx')).toBe(true); // 0008
       expect(indexes('run_steps').has('run_steps_session_id_unique_idx')).toBe(true); // 0008
       expect(indexes('run_steps').has('run_steps_session_id_idx')).toBe(false); // replaced in 0008
+      expect(indexes('runs').has('runs_cwd_name_completed_at_idx')).toBe(true); // 0010
+      expect(indexes('graph_context_snapshot')).toEqual(
+        new Set([
+          'graph_context_snapshot_created_idx',
+          'graph_context_snapshot_kind_created_idx',
+          'sqlite_autoindex_graph_context_snapshot_1',
+        ]),
+      );
       // `stable_id` was added (ADR-0048) but never read/written; removed as dead.
       // Assert the squashed migration no longer carries it (no accidental reintro).
       expect(cols('tool_state').has('stable_id')).toBe(false);
@@ -177,6 +221,101 @@ describe('fresh database fully realizes the ORM schema', () => {
       expect(cols('tool_baseline_meta').has('stable_id')).toBe(false);
     } finally {
       ds.close();
+    }
+  });
+});
+
+describe('0010 task-context additive migration', () => {
+  it('upgrades a real pre-0010 SQLite file without rewriting existing ledger or catalog rows', () => {
+    const root = mkdtempSync(join(tmpdir(), 'task-context-migration-'));
+    const oldMigrations = join(root, 'migrations-0009');
+    const dbPath = join(root, 'datastore.sqlite');
+    copyPreTaskContextMigrations(oldMigrations);
+
+    try {
+      const legacy = DataStoreFactory.open({
+        backend: 'sqlite',
+        path: dbPath,
+        migrationsFolder: oldMigrations,
+      });
+      const legacyDb = requireDrizzleHandle(legacy).db;
+      legacyDb.run(
+        sql.raw(`
+          INSERT INTO graph_catalog
+            (id, language, cache_key, files_fingerprint, built_at, payload)
+          VALUES
+            (1, 'typescript', 'cache:legacy', 'files:legacy',
+             '2026-07-12T00:00:00.000Z', '{"version":1,"functions":[]}');
+        `),
+      );
+      legacyDb.run(
+        sql.raw(`
+          INSERT INTO runs
+            (id, name, source, correlation_run_id, cwd, started_at, started_at_iso,
+             completed_at, completed_at_iso, duration_ms, exit_code, aggregate,
+             scope, review_brief, legacy_suite_run_id, cli_version, engine_versions)
+          VALUES
+            ('legacy-run', 'audit', 'built-in-suite', NULL, '/repo', 1000,
+             '1970-01-01T00:00:01.000Z', 2000, '1970-01-01T00:00:02.000Z',
+             1000, 0,
+             '{"steps":1,"passed":1,"failed":0,"faulted":0,"errors":0,"warnings":0}',
+             NULL, NULL, 'legacy-suite', '0.5.0', '{"fit":"0.5.0"}');
+        `),
+      );
+      legacyDb.run(
+        sql.raw(`
+          INSERT INTO run_steps
+            (id, run_id, logical_step_key, ordinal, attempt, tool, command, stable_id,
+             effective_args, exit_code, outcome, duration_ms, verdict_summary,
+             session_id, evidence, parent_step_id, dependency)
+          VALUES
+            ('legacy-step', 'legacy-run', '0:fit:fitness', 0, 1, 'fit', 'fitness',
+             'fit-id', NULL, 0, 'passed', 10,
+             '{"passed":true,"errors":0,"warnings":0,"findings":0}',
+             NULL, '{"signalCount":0}', NULL, NULL);
+        `),
+      );
+      legacy.close();
+
+      const migrated = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
+      const handle = requireDrizzleHandle(migrated);
+      const run = handle.db.get<{
+        id: string;
+        context_manifest: string | null;
+        aggregate: string;
+      }>(sql.raw("SELECT id, context_manifest, aggregate FROM runs WHERE id = 'legacy-run'"));
+      const step = handle.db.get<{ id: string; evidence: string }>(
+        sql.raw("SELECT id, evidence FROM run_steps WHERE id = 'legacy-step'"),
+      );
+      const catalog = handle.db.get<{ cache_key: string; payload: string }>(
+        sql.raw('SELECT cache_key, payload FROM graph_catalog WHERE id = 1'),
+      );
+      const snapshots = handle.db.get<{ count: number }>(
+        sql.raw('SELECT COUNT(*) AS count FROM graph_context_snapshot'),
+      );
+      migrated.close();
+
+      expect(run).toEqual({
+        id: 'legacy-run',
+        context_manifest: null,
+        aggregate: '{"steps":1,"passed":1,"failed":0,"faulted":0,"errors":0,"warnings":0}',
+      });
+      expect(step).toEqual({ id: 'legacy-step', evidence: '{"signalCount":0}' });
+      expect(catalog).toEqual({
+        cache_key: 'cache:legacy',
+        payload: '{"version":1,"functions":[]}',
+      });
+      expect(snapshots?.count).toBe(0);
+
+      const reopened = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
+      expect(
+        requireDrizzleHandle(reopened).db.get<{ context_manifest: string | null }>(
+          sql.raw("SELECT context_manifest FROM runs WHERE id = 'legacy-run'"),
+        ),
+      ).toEqual({ context_manifest: null });
+      reopened.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

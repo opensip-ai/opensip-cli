@@ -1,15 +1,16 @@
 import { deepFreeze, isUnknownRecord as isRecord, uniqueStrings } from '../model/value-helpers.js';
 
+import { extractFileContext } from './context-surface-extractors.js';
 import { asNativeReadPayload, nativeSearchMatches } from './native-response.js';
 import { projectJsonManifest } from './native-task-response-extractors.js';
-import { extractArchitecture, extractPackageDependencies } from './orient-mcp-extractors.js';
 import { assessJsonManifestProofDomain, assessNativeGlobProofDomain } from './proof-closure.js';
 
 import type { AnswerFact, GoldTask, ResponseExtractor, StrategyStep } from '../model/task.js';
 
 const CONTROL_STRATEGY_VERSION = 'control-native-v4-manifest-proof-closure';
-const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-4';
+const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-7-v1-file-context';
 const STALE_MOCHA_COMMAND = 'npx mocha "test/**/*.spec.ts"';
+const PACKAGE_MANIFEST = 'package.json';
 
 function globPaths(payload: unknown): readonly string[] | undefined {
   if (!isRecord(payload) || !Array.isArray(payload.paths)) return undefined;
@@ -31,7 +32,7 @@ function extractPackageManifestInventory(payload: unknown): readonly AnswerFact[
   const paths = globPaths(payload);
   if (paths === undefined) return [];
   const manifests = uniqueStrings(
-    paths.filter((path) => path === 'package.json' || path.endsWith('/package.json')),
+    paths.filter((path) => path === PACKAGE_MANIFEST || path.endsWith(`/${PACKAGE_MANIFEST}`)),
   );
   return [
     ...manifests.map((path): AnswerFact => ({
@@ -152,7 +153,7 @@ function controlCustomerTsSteps(): readonly StrategyStep[] {
       tool: 'globList',
     },
     {
-      arguments: { maxResults: 5, pattern: 'package.json' },
+      arguments: { maxResults: 5, pattern: PACKAGE_MANIFEST },
       assessProofClosure: assessNativeGlobProofDomain,
       expectedNonEmpty: true,
       extract: extractPackageManifestInventory,
@@ -168,7 +169,7 @@ function controlCustomerTsSteps(): readonly StrategyStep[] {
             field: 'path',
             match: {
               kind: 'file',
-              path: 'package.json',
+              path: PACKAGE_MANIFEST,
               role: 'package-manifest',
             },
             select: 'only',
@@ -200,7 +201,7 @@ function controlWorkspaceSteps(): readonly StrategyStep[] {
     {
       arguments: {
         maxBytes: 65_536,
-        path: rootFileBinding('package.json', 'control-discover-root'),
+        path: rootFileBinding(PACKAGE_MANIFEST, 'control-discover-root'),
       },
       expectedNonEmpty: true,
       extract: manifestExtractor({ includePackageName: false }),
@@ -236,37 +237,31 @@ function controlWorkspaceSteps(): readonly StrategyStep[] {
   ];
 }
 
-function opensipOrientSteps(expectDependencies: boolean): readonly StrategyStep[] {
+function fileContextStep(
+  path: string,
+  suffix: string,
+  provesAbsence?: readonly AnswerFact[],
+): StrategyStep {
+  return {
+    arguments: { file: path },
+    expectedNonEmpty: true,
+    extract: extractFileContext(path),
+    id: `opensip-read-${suffix}-context`,
+    ...(provesAbsence === undefined ? {} : { provesAbsence }),
+    rationale: `Use bounded inventory metadata for the explicit ${suffix} path.`,
+    tool: 'get_file_context',
+  };
+}
+
+function opensipOrientSteps(workspace: boolean): readonly StrategyStep[] {
   return [
-    {
-      arguments: {
-        generated: 'exclude',
-        limit: 100,
-        sections: ['metrics'],
-        sourceScope: 'production',
-        topN: 20,
-      },
-      expectedNonEmpty: true,
-      extract: extractArchitecture,
-      id: 'opensip-read-architecture',
-      rationale: 'Use the published architecture read for labelled package and language counts.',
-      tool: 'get_architecture',
-    },
-    {
-      arguments: {
-        direction: 'both',
-        edgeKind: 'combined',
-        generated: 'exclude',
-        limit: 100,
-        sampleLimit: 0,
-        sourceScope: 'production',
-      },
-      expectedNonEmpty: expectDependencies,
-      extract: extractPackageDependencies,
-      id: 'opensip-read-package-dependencies',
-      rationale: 'Use labelled package edges to recover package identities visible in the graph.',
-      tool: 'package_dependencies',
-    },
+    fileContextStep(
+      PACKAGE_MANIFEST,
+      'root-manifest',
+      workspace ? undefined : [{ command: STALE_MOCHA_COMMAND, kind: 'command', purpose: 'test' }],
+    ),
+    fileContextStep('pnpm-lock.yaml', 'lockfile'),
+    ...(workspace ? [fileContextStep('pnpm-workspace.yaml', 'workspace-definition')] : []),
   ];
 }
 

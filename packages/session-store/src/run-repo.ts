@@ -1,6 +1,6 @@
-import { ValidationError } from '@opensip-cli/core';
+import { isPlainRecord, tryCatch, ValidationError } from '@opensip-cli/core';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
-import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 
 import { runs, runSteps } from './schema/runs.js';
 
@@ -8,10 +8,22 @@ import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 
+const MAX_OPAQUE_RUN_CONTEXT_BYTES = 64 * 1024;
+
+function opaqueRunContextIsBounded(value: unknown): boolean {
+  if (!isPlainRecord(value)) return false;
+  const bounded = tryCatch(
+    () => Buffer.byteLength(JSON.stringify(value), 'utf8') <= MAX_OPAQUE_RUN_CONTEXT_BYTES,
+  );
+  return bounded.ok && bounded.value;
+}
+
 /** Filters for querying the host-owned run ledger. */
 export interface RunListOptions {
   readonly limit?: number;
   readonly source?: StoredRun['source'];
+  readonly name?: string;
+  readonly cwd?: string;
 }
 
 /** Repository for persisted host-owned runs and ordered run steps. */
@@ -23,6 +35,26 @@ export class RunRepo {
   }
 
   saveRunWithSteps(run: StoredRun, steps: readonly StoredRunStep[]): void {
+    this.persistRunWithSteps(run, steps, () => true);
+  }
+
+  /**
+   * Atomically persist only when a synchronous read-only guard still holds
+   * after the datastore write lock and transaction have both been entered.
+   */
+  saveRunWithStepsIf(
+    run: StoredRun,
+    steps: readonly StoredRunStep[],
+    precondition: () => boolean,
+  ): boolean {
+    return this.persistRunWithSteps(run, steps, precondition);
+  }
+
+  private persistRunWithSteps(
+    run: StoredRun,
+    steps: readonly StoredRunStep[],
+    precondition: () => boolean,
+  ): boolean {
     if (steps.some((step) => step.runId !== run.id)) {
       throw new ValidationError(`Run ${run.id} has a step with a mismatched runId.`, {
         code: 'VALIDATION.RUN_STEP.RUN_ID_MISMATCH',
@@ -31,8 +63,10 @@ export class RunRepo {
     this.validateRun(run);
     for (const step of steps) this.validateStep(step);
 
+    let saved = false;
     this.datastore.withWriteLock('run.save', () => {
       this.datastore.transaction((tx) => {
+        if (!precondition()) return;
         tx.insert(runs)
           .values(runToRow(run))
           .onConflictDoUpdate({
@@ -49,8 +83,10 @@ export class RunRepo {
             })
             .run();
         }
+        saved = true;
       });
     });
+    return saved;
   }
 
   saveRun(run: StoredRun): void {
@@ -74,23 +110,26 @@ export class RunRepo {
   }
 
   listRuns(opts: RunListOptions = {}): readonly StoredRun[] {
-    const base =
-      opts.source === undefined
-        ? this.datastore.db.select().from(runs)
-        : this.datastore.db.select().from(runs).where(eq(runs.source, opts.source));
-    const ordered = base.orderBy(desc(runs.completed_at));
+    const conditions = [
+      ...(opts.source === undefined ? [] : [eq(runs.source, opts.source)]),
+      ...(opts.name === undefined ? [] : [eq(runs.name, opts.name)]),
+      ...(opts.cwd === undefined ? [] : [eq(runs.cwd, opts.cwd)]),
+    ];
+    const query = this.datastore.db.select().from(runs);
+    const base = conditions.length === 0 ? query : query.where(and(...conditions));
+    const ordered = base.orderBy(desc(runs.completed_at), desc(runs.id));
     const rows = opts.limit === undefined ? ordered.all() : ordered.limit(opts.limit).all();
     return rows.map(runFromRow);
   }
 
-  listStepsForRun(runId: string): readonly StoredRunStep[] {
-    return this.datastore.db
+  listStepsForRun(runId: string, limit?: number): readonly StoredRunStep[] {
+    const ordered = this.datastore.db
       .select()
       .from(runSteps)
       .where(eq(runSteps.run_id, runId))
-      .orderBy(runSteps.ordinal, runSteps.attempt)
-      .all()
-      .map(stepFromRow);
+      .orderBy(asc(runSteps.ordinal), asc(runSteps.attempt), asc(runSteps.id));
+    const rows = limit === undefined ? ordered.all() : ordered.limit(limit).all();
+    return rows.map(stepFromRow);
   }
 
   listStepsForRuns(runIds: readonly string[]): ReadonlyMap<string, readonly StoredRunStep[]> {
@@ -170,6 +209,11 @@ export class RunRepo {
         { code: 'VALIDATION.RUN.INVALID_TIMESTAMP' },
       );
     }
+    if (run.contextManifest !== undefined && !opaqueRunContextIsBounded(run.contextManifest)) {
+      throw new ValidationError(`Invalid bounded run context for run ${run.id}.`, {
+        code: 'VALIDATION.RUN.INVALID_CONTEXT_MANIFEST',
+      });
+    }
   }
 
   private validateStep(step: StoredRunStep): void {
@@ -204,6 +248,7 @@ function runToRow(run: StoredRun): typeof runs.$inferInsert {
     aggregate: run.aggregate,
     scope: run.scope ?? null,
     review_brief: run.reviewBrief ?? null,
+    context_manifest: run.contextManifest ?? null,
     legacy_suite_run_id: run.legacySuiteRunId ?? null,
     cli_version: run.cliVersion ?? null,
     engine_versions: run.engineVersions ?? null,
@@ -226,6 +271,9 @@ function runFromRow(row: typeof runs.$inferSelect): StoredRun {
     ...(row.review_brief == null
       ? {}
       : { reviewBrief: row.review_brief as StoredRun['reviewBrief'] }),
+    ...(row.context_manifest == null
+      ? {}
+      : { contextManifest: row.context_manifest as StoredRun['contextManifest'] }),
     ...(row.legacy_suite_run_id === null ? {} : { legacySuiteRunId: row.legacy_suite_run_id }),
     ...(row.cli_version === null ? {} : { cliVersion: row.cli_version }),
     ...(row.engine_versions == null

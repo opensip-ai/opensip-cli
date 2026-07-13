@@ -125,6 +125,29 @@ export function fromGraphReadError(error: GraphReadError): McpReadError {
     case 'GRAPH.READ.CURSOR_INVALID': {
       return readError('cursor-invalid', 'Cursor continuation anchor is invalid.');
     }
+    case 'GRAPH.READ.IMPACT_FILES_CAP':
+    case 'GRAPH.READ.TEST_SELECTION_FILES_CAP': {
+      return readError('input-cap-exceeded', 'The request exceeds a bounded graph-read cap.');
+    }
+    case 'GRAPH.READ.IMPACT_FILE_INVALID':
+    case 'GRAPH.READ.ENTITY_ID_INVALID':
+    case 'GRAPH.READ.TEST_SELECTION_FILE_INVALID': {
+      return readError('invalid-input', 'The graph-read input is invalid.');
+    }
+    case 'GRAPH.READ.IMPACT_CANCELLED':
+    case 'GRAPH.READ.TEST_SELECTION_CANCELLED': {
+      return readError('cancelled', 'The graph read was cancelled.');
+    }
+    case 'GRAPH.READ.IMPACT_FAILED': {
+      return readError('impact-read-failed', 'Graph impact could not be projected safely.');
+    }
+    case 'GRAPH.READ.ENTITY_MALFORMED':
+    case 'GRAPH.READ.ENTITY_FAILED': {
+      return readError('entity-read-failed', 'Graph entity detail could not be projected safely.');
+    }
+    case 'GRAPH.READ.TEST_SELECTION_FAILED': {
+      return readError('test-selection-failed', 'Static test selection could not be projected.');
+    }
     default: {
       return readError('graph-read-failed', 'Graph read failed.');
     }

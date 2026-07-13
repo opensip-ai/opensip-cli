@@ -120,6 +120,13 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
       Promise.resolve(ok(wrap(id === 'src/a.ts:10:2' ? symRef() : undefined))),
     searchSymbols: () => Promise.resolve(ok(wrap(searchDto()))),
     findBySpan: () => Promise.resolve(ok(wrap([symRef()] as readonly SymbolRef[]))),
+    symbolAtLocation: () =>
+      Promise.resolve(ok(wrap({ candidates: [symRef()] as readonly SymbolRef[] }))),
+    impactFiles: () => Promise.resolve(ok(wrap({} as never))),
+    entityDetail: () => Promise.resolve(ok(wrap(null))),
+    selectTests: () => Promise.resolve(ok(wrap({} as never))),
+    contextPointerStatus: (pointer) =>
+      Promise.resolve(ok({ pointer, status: 'available' as const, reasonCodes: [] })),
     traverse: (query) => {
       const nodes = [
         { symbol: symRef(), depth: 0, groupId: 'src/a.ts:10:2', groupTotal: 1 },
@@ -306,6 +313,8 @@ function fakePort(overrides: Partial<GraphReadPort> = {}): GraphReadPort {
 function deps(graph: GraphReadPort): McpToolDeps {
   return {
     graph,
+    codebase: {} as McpToolDeps['codebase'],
+    context: {} as McpToolDeps['context'],
     results: {} as McpToolDeps['results'],
     runtimeWiring: {} as McpToolDeps['runtimeWiring'],
     validToolIds: new Set(['fit', 'graph']),
@@ -378,7 +387,7 @@ describe('graph handlers (async GraphToolResult)', () => {
         server,
         deps(
           fakePort({
-            findBySpan: () => Promise.resolve(ok(wrap([] as readonly SymbolRef[]))),
+            symbolAtLocation: () => Promise.resolve(ok(wrap({ candidates: [] }))),
           }),
         ),
       );
@@ -401,10 +410,10 @@ describe('graph handlers (async GraphToolResult)', () => {
         server,
         deps(
           fakePort({
-            findBySpan: () =>
+            symbolAtLocation: () =>
               Promise.resolve(
                 ok({
-                  data: [] as readonly SymbolRef[],
+                  data: { candidates: [] },
                   context: CONTEXT,
                   freshness: staleFreshness,
                   coverage: COVERAGE,
@@ -424,9 +433,16 @@ describe('graph handlers (async GraphToolResult)', () => {
         server,
         deps(
           fakePort({
-            findBySpan: () =>
+            symbolAtLocation: () =>
               Promise.resolve(
-                ok(wrap([symRef(), symRef({ symbolId: 'src/a.ts:12:0' })] as readonly SymbolRef[])),
+                ok(
+                  wrap({
+                    candidates: [
+                      symRef(),
+                      symRef({ symbolId: 'src/a.ts:12:0' }),
+                    ] as readonly SymbolRef[],
+                  }),
+                ),
               ),
           }),
         ),

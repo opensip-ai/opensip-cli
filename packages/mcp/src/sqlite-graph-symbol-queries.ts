@@ -1,21 +1,23 @@
-import { ok, type Result } from '@opensip-cli/core';
+import { err, ok, type Result } from '@opensip-cli/core';
 import {
-  compareCodePointStrings,
   compareSymbolRefs,
   makeFacet,
+  mergeFacet,
   matchesGraphSourceFilterWithRoles,
   matchesSymbolSearchQuery,
+  projectEntityDetail,
   rollupFacets,
   symbolSearchStableKey,
   UNREQUESTED_FACET,
   type GraphSourceFilter,
+  type FeatureTable,
+  type GraphEntityDetail,
   type SourceRoleMatcher,
   type SymbolSearchMatch,
 } from '@opensip-cli/graph/read';
 
 import { validateCompactQueryDetail } from './compact-query-detail.js';
 import {
-  boundedTopRows,
   digestNormalizedQuery,
   groupRows,
   pageRows,
@@ -25,40 +27,21 @@ import {
   DEFAULT_IDENTITY_SEARCH_LIMIT,
   type CompactQueryDetail,
   type SearchSymbolsOptions,
+  type GraphSymbolLocationDto,
   type SymbolSearchDto,
 } from './graph-read-port.js';
 import { clampLimit, toSymbolRef } from './graph-read-projection.js';
+import { fromGraphReadError, readError } from './mcp-error.js';
 import {
   completeInventoryCoverage,
   inventoryCoverage,
   type SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
+import { projectSpanCandidates } from './sqlite-graph-span-query.js';
 
 import type { CatalogGeneration } from './catalog-generation.js';
 import type { McpReadError } from './mcp-error.js';
 import type { GraphToolResult, SymbolRef } from './symbol-dto.js';
-
-const MAX_SPAN_CANDIDATES = 500;
-
-interface SpanCandidateState {
-  malformed: boolean;
-}
-
-function* spanCandidates(
-  generation: CatalogGeneration,
-  file: string,
-  line: number,
-  state: SpanCandidateState,
-): Generator<SymbolRef> {
-  for (const occurrence of generation.indexes.byOccId.values()) {
-    if (occurrence.filePath !== file || occurrence.line > line || line > occurrence.endLine) {
-      continue;
-    }
-    const ref = toSymbolRef(occurrence);
-    if (ref === undefined) state.malformed = true;
-    else yield ref;
-  }
-}
 
 interface MatchingSearchRefsInput {
   readonly generation: CatalogGeneration;
@@ -212,7 +195,10 @@ function projectExclusiveSearch(
 
 /** Implements occurrence resolution, search, and source-span lookup. */
 export class SqliteGraphSymbolQueries {
-  constructor(private readonly context: SqliteGraphQueryContext) {}
+  constructor(
+    private readonly context: SqliteGraphQueryContext,
+    private readonly features: (generation: CatalogGeneration) => FeatureTable,
+  ) {}
 
   async resolveSymbolId(
     symbolId: string,
@@ -238,6 +224,39 @@ export class SqliteGraphSymbolQueries {
             symbol === undefined
               ? inventoryCoverage(['malformed-symbol-omitted'])
               : completeInventoryCoverage(),
+        });
+      },
+    );
+  }
+
+  async entityDetail(
+    symbolId: string,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<GraphEntityDetail | null>, McpReadError>> {
+    if (signal?.aborted === true) {
+      return err(readError('cancelled', 'Entity detail read was cancelled.'));
+    }
+    return this.context.runQuery(
+      'entityDetail',
+      { identityMode: 'occurrence', sourceScope: 'all' },
+      (gen, freshness) => {
+        if (signal?.aborted === true) {
+          return err(readError('cancelled', 'Entity detail read was cancelled.'));
+        }
+        if (gen === undefined) {
+          return this.context.envelope(null, gen, freshness, {
+            coverage: completeInventoryCoverage(),
+          });
+        }
+        const projected = projectEntityDetail(
+          gen.catalog,
+          gen.indexes,
+          symbolId,
+          this.features(gen),
+        );
+        if (!projected.ok) return err(fromGraphReadError(projected.error));
+        return this.context.envelope(projected.value, gen, freshness, {
+          coverage: projected.value?.coverage ?? completeInventoryCoverage(),
         });
       },
     );
@@ -311,30 +330,71 @@ export class SqliteGraphSymbolQueries {
   async findBySpan(
     file: string,
     line: number,
+    signal?: AbortSignal,
   ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
+    const outcome = await this.symbolAtLocation(file, line, 'summary', signal);
+    if (!outcome.ok) return outcome;
+    return ok({ ...outcome.value, data: outcome.value.data.candidates });
+  }
+
+  async symbolAtLocation(
+    file: string,
+    line: number,
+    detail: 'summary' | 'entity',
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<GraphSymbolLocationDto>, McpReadError>> {
+    if (signal?.aborted === true) {
+      return err(readError('cancelled', 'Symbol location read was cancelled.'));
+    }
     return this.context.runQuery(
-      'findBySpan',
+      'symbolAtLocation',
       { identityMode: 'occurrence', sourceScope: 'all' },
-      (gen, freshness) => {
+      async (gen, freshness) => {
         if (gen === undefined) {
-          return this.context.envelope([] as readonly SymbolRef[], gen, freshness, {
-            coverage: completeInventoryCoverage(),
+          return this.context.envelope(
+            {
+              candidates: [],
+              ...(detail === 'entity' ? { entity: null } : {}),
+            },
+            gen,
+            freshness,
+            {
+              coverage: completeInventoryCoverage(),
+            },
+          );
+        }
+        const span = await projectSpanCandidates(gen, file, line, signal);
+        if (!span.ok) return span;
+        if (detail === 'summary' || span.value.candidates.length !== 1) {
+          return this.context.envelope({ candidates: span.value.candidates }, gen, freshness, {
+            coverage: inventoryCoverage(span.value.reasons),
           });
         }
-        const state: SpanCandidateState = { malformed: false };
-        const selected = boundedTopRows(
-          spanCandidates(gen, file, line, state),
-          MAX_SPAN_CANDIDATES + 1,
-          (left, right) => compareCodePointStrings(left.symbolId, right.symbolId),
+        const entity = projectEntityDetail(
+          gen.catalog,
+          gen.indexes,
+          span.value.candidates[0].symbolId,
+          this.features(gen),
         );
-        const capped = selected.total > MAX_SPAN_CANDIDATES;
-        const reasons = [
-          ...(state.malformed ? ['malformed-symbol-omitted'] : []),
-          ...(capped ? ['span-candidate-cap'] : []),
-        ];
-        return this.context.envelope(selected.rows.slice(0, MAX_SPAN_CANDIDATES), gen, freshness, {
-          coverage: inventoryCoverage(reasons),
-        });
+        if (!entity.ok) return err(fromGraphReadError(entity.error));
+        const coverage =
+          entity.value === null
+            ? inventoryCoverage(span.value.reasons)
+            : rollupFacets({
+                inventory: mergeFacet(
+                  entity.value.coverage.inventory,
+                  inventoryCoverage(span.value.reasons).inventory,
+                ),
+                evidence: entity.value.coverage.evidence,
+                grouping: entity.value.coverage.grouping,
+                projection: entity.value.coverage.projection,
+              });
+        return this.context.envelope(
+          { candidates: span.value.candidates, entity: entity.value },
+          gen,
+          freshness,
+          { coverage },
+        );
       },
     );
   }

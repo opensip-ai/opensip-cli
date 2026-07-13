@@ -54,6 +54,9 @@ describe('graphTool contract conformance (AC-2)', () => {
       'list',
       'impact',
       'graph-equivalence-check',
+      'graph-context-inventory',
+      'graph-context-ensure',
+      'graph-context-select-tests',
     ]);
     // The legacy flat-root aliases are gone.
     for (const legacy of [
@@ -85,6 +88,9 @@ describe('graphTool contract conformance (AC-2)', () => {
       'list',
       'impact',
       'graph-equivalence-check',
+      'graph-context-inventory',
+      'graph-context-ensure',
+      'graph-context-select-tests',
     ]);
   });
 });

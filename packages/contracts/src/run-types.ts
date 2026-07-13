@@ -1,6 +1,9 @@
-import type { SuiteRunScope } from './command-results-variants/suite-results.js';
 import type { ReviewBrief } from './review-brief.js';
+import type { SuiteRunScope } from './run-context.js';
 import type { RunOutcome } from './run-outcome.js';
+import type { TaskContextManifest } from './task-context.js';
+
+export type { RunStepReference } from './run-context.js';
 
 export type StoredRunSource =
   | 'implicit-tool'
@@ -33,6 +36,7 @@ export interface StoredRun {
   readonly aggregate: StoredRunAggregate;
   readonly scope?: SuiteRunScope;
   readonly reviewBrief?: ReviewBrief;
+  readonly contextManifest?: TaskContextManifest;
   readonly legacySuiteRunId?: string;
   readonly cliVersion?: string;
   readonly engineVersions?: Readonly<Record<string, string>>;
@@ -63,12 +67,4 @@ export interface StoredRunStep {
   readonly evidence?: unknown;
   readonly parentStepId?: string;
   readonly dependency?: unknown;
-}
-
-export interface RunStepReference {
-  readonly runId: string;
-  readonly stepId: string;
-  readonly logicalStepKey: string;
-  readonly ordinal: number;
-  readonly attempt: number;
 }

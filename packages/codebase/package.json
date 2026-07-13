@@ -1,0 +1,49 @@
+{
+  "name": "@opensip-cli/codebase",
+  "version": "0.6.0",
+  "license": "Apache-2.0",
+  "description": "Bounded deterministic project inventory and package-manifest facts for OpenSIP CLI evidence consumers",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "codebase-intelligence",
+    "project-inventory"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/codebase"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*",
+    "minimatch": "^10.2.5",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

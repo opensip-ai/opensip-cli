@@ -11,6 +11,7 @@
  * DTOs carry symbol METADATA only; none of these inputs accept raw file bodies.
  */
 
+import { MAX_TASK_CONTEXT_FILES } from '@opensip-cli/contracts';
 import { z } from 'zod';
 
 import { DEFAULT_IDENTITY_SEARCH_LIMIT } from '../graph-read-port.js';
@@ -40,6 +41,8 @@ export { DEFAULT_IDENTITY_SEARCH_LIMIT } from '../graph-read-port.js';
 export const MAX_QUERY_LEN = 200;
 /** Hard cap on a file-path argument length. */
 export const MAX_PATH_LEN = 1024;
+/** Maximum explicit files accepted by impact and test-selection reads. */
+export const MAX_CONTEXT_FILES = MAX_TASK_CONTEXT_FILES;
 /** Hard cap on a cursor (base64url). */
 export const MAX_CURSOR_LEN = 4096;
 /** Hard cap on package/tool/command value length. */
@@ -137,6 +140,16 @@ export const filePath = () =>
     )
     .overwrite((raw) => raw.replaceAll('\\', '/'));
 
+/** Non-empty explicit project-relative file set, unique after POSIX normalization. */
+export const contextFiles = () =>
+  z
+    .array(filePath())
+    .min(1)
+    .max(MAX_CONTEXT_FILES)
+    .refine((items) => new Set(items).size === items.length, {
+      message: 'files must be unique after normalization',
+    });
+
 /** Exact project-relative path filter (alias of {@link filePath}). */
 export const exactFilePath = () => filePath();
 
@@ -151,6 +164,24 @@ export const query = () => controlFreeString(MAX_QUERY_LEN, 'query');
 
 /** A walk depth, clamped to `[1, MAX_DEPTH]`, defaulting to {@link DEFAULT_DEPTH}. */
 export const depth = () => z.number().int().min(1).max(MAX_DEPTH).default(DEFAULT_DEPTH);
+
+/** Impact projection cap. */
+export const top = () => z.number().int().positive().max(MAX_LIMIT).optional();
+
+/** Existing-symbol output detail. */
+export const symbolDetail = () => z.enum(['summary', 'entity']).default('summary');
+
+/** Static test-selection fallback tier. */
+export const testTier = () => z.enum(['focused', 'package', 'full']).default('focused');
+
+/** Test-selection proof detail. */
+export const testProofDetail = () => z.enum(['none', 'summary', 'paths']).default('summary');
+
+/** Maximum commands returned independently of candidate rows. */
+export const commandLimit = () => z.number().int().min(1).max(100).default(20);
+
+/** Maximum proof nodes retained for each selected test. */
+export const proofLimit = () => z.number().int().min(0).max(6).default(3);
 
 /** An optional result cap, clamped to `[1, MAX_LIMIT]`. */
 export const limit = () => z.number().int().positive().max(MAX_LIMIT).optional();

@@ -8,18 +8,36 @@
  * to public graph/read functions — never accesses `.db` or graph persistence.
  */
 
+import { createHash } from 'node:crypto';
+
+import {
+  buildImpactTrust,
+  ComputeImpactCancelledError,
+  TEST_SELECTION_SCHEMA_VERSION,
+  type ComputeImpactIndex,
+  type ProjectInventorySnapshot,
+  type TaskContextSnapshotPointer,
+  type TestSelectionSnapshot,
+  type VerificationCommand,
+} from '@opensip-cli/contracts';
 import { err, ok, type LanguageAdapter, type Result } from '@opensip-cli/core';
 import {
   buildArchitectureView,
+  buildImpactView,
+  compareCodePointStrings,
   continuationToken,
   deriveGraphReadFeatures,
   loadCatalogGeneration,
   makeFacet,
+  mergeFacet,
   rollupFacets,
   UNREQUESTED_FACET,
   readCatalogIdentity,
+  readContextSnapshot,
+  selectStaticTests,
   verifyCatalogInputs,
   type Catalog,
+  type ContextSnapshotLookup,
   type AuditSourceRolePolicy,
   type FeatureColumn,
   type FeatureTable,
@@ -31,7 +49,11 @@ import {
   decodeArchitectureCursorState,
   nextArchitectureAfterKey,
 } from './architecture-query-page.js';
-import { GraphGenerationController, type CatalogGeneration } from './catalog-generation.js';
+import {
+  generationImpactIndex,
+  GraphGenerationController,
+  type CatalogGeneration,
+} from './catalog-generation.js';
 import { deadCodeStableKey, pageDeadCode } from './dead-code-page.js';
 import { unavailableGraphStatus } from './freshness.js';
 import { blastQueryDigest, projectBlastMembers } from './graph-blast-projection.js';
@@ -57,10 +79,14 @@ import type {
   ArchitectureSummaryDto,
   BlastDto,
   CatalogStatus,
+  ContextPointerStatus,
+  ContextPointerStatusOptions,
   DeadCodeQuery,
   DeadCodeResultDto,
   DeclarationSearchDto,
   GraphReadPort,
+  ImpactFilesDto,
+  ImpactFilesOptions,
   PackageCyclesDto,
   PackageCyclesQuery,
   PackageDependenciesDto,
@@ -70,6 +96,8 @@ import type {
   RefreshResult,
   SearchDeclarationsOptions,
   SearchSymbolsOptions,
+  SelectTestsOptions,
+  MissingGraphTestSelectionDto,
   SymbolSearchDto,
   TraversalQuery,
   TraversalSnapshot,
@@ -83,6 +111,347 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
+const MAX_CONTEXT_FILES = 128;
+const MAX_CONTEXT_DEPTH = 5;
+const MAX_CONTEXT_ROWS = 500;
+const INVALID_INPUT = 'invalid-input';
+
+function aborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
+
+function safeProjectFile(file: string): boolean {
+  const normalized = file.replaceAll('\\', '/');
+  return (
+    normalized.length > 0 &&
+    normalized.length <= 1024 &&
+    !normalized.startsWith('/') &&
+    !/^[A-Za-z]:/u.test(normalized) &&
+    !/\p{Cc}/u.test(normalized) &&
+    normalized.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
+  );
+}
+
+function validateImpactInput(
+  files: readonly string[],
+  options: ImpactFilesOptions | undefined,
+): Result<void, McpReadError> {
+  if (files.length === 0) {
+    return err(readError(INVALID_INPUT, 'Impact reads require at least one explicit file.'));
+  }
+  if (files.length > MAX_CONTEXT_FILES) {
+    return err(
+      readError('input-cap-exceeded', 'Impact file count exceeds the supported maximum.', {
+        maximum: MAX_CONTEXT_FILES,
+      }),
+    );
+  }
+  const normalized = files.map((file) => file.replaceAll('\\', '/'));
+  if (normalized.some((file) => !safeProjectFile(file))) {
+    return err(readError(INVALID_INPUT, 'Impact files must be project-relative paths.'));
+  }
+  if (new Set(normalized).size !== normalized.length) {
+    return err(readError(INVALID_INPUT, 'Impact files must be unique after normalization.'));
+  }
+  if (
+    options?.maxDepth !== undefined &&
+    (!Number.isSafeInteger(options.maxDepth) ||
+      options.maxDepth < 1 ||
+      options.maxDepth > MAX_CONTEXT_DEPTH)
+  ) {
+    return err(readError(INVALID_INPUT, 'Impact depth is outside the supported range.'));
+  }
+  if (
+    options?.top !== undefined &&
+    (!Number.isSafeInteger(options.top) || options.top < 1 || options.top > MAX_CONTEXT_ROWS)
+  ) {
+    return err(readError(INVALID_INPUT, 'Impact top is outside the supported range.'));
+  }
+  return ok(undefined);
+}
+
+function missingImpact(files: readonly string[]): ImpactFilesDto {
+  const requestedFiles = [...files].map((file) => file.replaceAll('\\', '/')).sort();
+  const coverage = rollupFacets({
+    inventory: makeFacet(true, new Set(['graph-catalog-missing'])),
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
+  const trust = buildImpactTrust({
+    fallback: 'full-run',
+    uncertainties: [
+      {
+        code: 'graph-catalog-unavailable',
+        source: 'catalog',
+        message: 'No graph catalog is loaded; impact cannot be computed safely.',
+      },
+    ],
+  });
+  return {
+    changedFunctions: [],
+    impactedFunctions: [],
+    impactedPackages: [],
+    impactedFiles: [],
+    requestedFiles,
+    matchedFiles: [],
+    unmatchedFiles: requestedFiles,
+    trust,
+    truncated: false,
+    coverage,
+    nextActions: [
+      'Run refresh_graph, then retry impact_files.',
+      'Run the full verification suite.',
+    ],
+  };
+}
+
+function impactNextActions(
+  impact: Omit<ImpactFilesDto, 'nextActions'>,
+  fresh: boolean,
+): readonly string[] {
+  const actions: string[] = [];
+  if (!fresh) actions.push('Run refresh_graph, then retry impact_files.');
+  if (impact.trust.fallback === 'full-run') actions.push('Run the full verification suite.');
+  else if (impact.unmatchedFiles.length > 0) {
+    actions.push('Run package or full verification for unmatched files.');
+  }
+  return actions;
+}
+
+function selectionSnapshotId(snapshot: object): string {
+  return `ts1:${createHash('sha256').update(JSON.stringify(snapshot), 'utf8').digest('hex')}`;
+}
+
+function selectionCommandKey(command: VerificationCommand): string {
+  return `${command.cwd}\u0000${command.argv.join('\u0000')}`;
+}
+
+function fallbackCommands(
+  inventory: ProjectInventorySnapshot,
+  files: readonly string[],
+  tier: NonNullable<SelectTestsOptions['tier']>,
+  maximum: number,
+): readonly VerificationCommand[] {
+  const byPath = new Map(inventory.files.map((file) => [file.path, file]));
+  const packageNames = new Set(
+    files.flatMap((file) => {
+      const name = byPath.get(file)?.packageName;
+      return name === undefined ? [] : [name];
+    }),
+  );
+  const allowed = tier === 'full' ? new Set(['full']) : new Set(['package', 'full']);
+  const candidates = inventory.packages
+    .filter((item) => packageNames.size === 0 || packageNames.has(item.name) || item.root === '.')
+    .flatMap((item) => item.verificationCommands)
+    .filter((command) => allowed.has(command.tier));
+  const unique = new Map<string, VerificationCommand>();
+  for (const command of candidates) unique.set(selectionCommandKey(command), command);
+  return [...unique.values()]
+    .sort((left, right) =>
+      compareCodePointStrings(selectionCommandKey(left), selectionCommandKey(right)),
+    )
+    .slice(0, maximum);
+}
+
+function missingSelection(
+  files: readonly string[],
+  inventory: ProjectInventorySnapshot,
+  options: SelectTestsOptions | undefined,
+): MissingGraphTestSelectionDto {
+  const normalized = files.map((file) => file.replaceAll('\\', '/')).sort();
+  const commands = fallbackCommands(
+    inventory,
+    normalized,
+    options?.tier ?? 'focused',
+    options?.commandLimit ?? 20,
+  );
+  const reasonCodes = [
+    'graph-catalog-unavailable',
+    ...(inventory.coverage.status === 'complete' ? [] : ['inventory-incomplete']),
+  ];
+  const withoutId: Omit<MissingGraphTestSelectionDto, 'snapshotId'> = {
+    schemaVersion: TEST_SELECTION_SCHEMA_VERSION,
+    files: normalized,
+    tests: [],
+    commands,
+    uncoveredFiles: normalized,
+    trust: {
+      status: 'fallback',
+      reasonCodes,
+      fallbackTier: commands.some((command) => command.tier === 'package') ? 'package' : 'full',
+    },
+    graphIdentity: 'graph:missing',
+    inventoryIdentity: inventory.snapshotId,
+    durable: false,
+  };
+  return { ...withoutId, snapshotId: selectionSnapshotId(withoutId) };
+}
+
+function qualifySelection(
+  snapshot: TestSelectionSnapshot,
+  reasons: readonly string[],
+): TestSelectionSnapshot {
+  const reasonCodes = [...new Set([...snapshot.trust.reasonCodes, ...reasons])].sort().slice(0, 32);
+  if (reasonCodes.length === snapshot.trust.reasonCodes.length) return snapshot;
+  const withoutId: Omit<TestSelectionSnapshot, 'snapshotId'> = {
+    schemaVersion: snapshot.schemaVersion,
+    files: snapshot.files,
+    tests: snapshot.tests,
+    commands: snapshot.commands,
+    uncoveredFiles: snapshot.uncoveredFiles,
+    trust: {
+      ...snapshot.trust,
+      status: snapshot.tests.length === 0 ? 'fallback' : 'partial',
+      reasonCodes,
+    },
+    graphIdentity: snapshot.graphIdentity,
+    inventoryIdentity: snapshot.inventoryIdentity,
+  };
+  return { ...withoutId, snapshotId: selectionSnapshotId(withoutId) };
+}
+
+function validateSelectionInput(
+  files: readonly string[],
+  options: SelectTestsOptions | undefined,
+): Result<void, McpReadError> {
+  if (files.length === 0) {
+    return err(readError(INVALID_INPUT, 'Test selection requires explicit files.'));
+  }
+  if (files.length > MAX_CONTEXT_FILES) {
+    return err(
+      readError('input-cap-exceeded', 'Test-selection file count exceeds the maximum.', {
+        maximum: MAX_CONTEXT_FILES,
+      }),
+    );
+  }
+  const normalized = files.map((file) => file.replaceAll('\\', '/'));
+  if (normalized.some((file) => !safeProjectFile(file))) {
+    return err(readError(INVALID_INPUT, 'Test-selection files must be project-relative paths.'));
+  }
+  if (new Set(normalized).size !== normalized.length) {
+    return err(readError(INVALID_INPUT, 'Test-selection files must be unique.'));
+  }
+  if (
+    options?.maxDepth !== undefined &&
+    (!Number.isSafeInteger(options.maxDepth) ||
+      options.maxDepth < 1 ||
+      options.maxDepth > MAX_CONTEXT_DEPTH)
+  ) {
+    return err(readError(INVALID_INPUT, 'Test-selection depth is outside the supported range.'));
+  }
+  if (
+    options?.limit !== undefined &&
+    (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > MAX_CONTEXT_ROWS)
+  ) {
+    return err(readError(INVALID_INPUT, 'Test-selection limit is outside the supported range.'));
+  }
+  if (
+    options?.commandLimit !== undefined &&
+    (!Number.isSafeInteger(options.commandLimit) ||
+      options.commandLimit < 1 ||
+      options.commandLimit > 100)
+  ) {
+    return err(readError(INVALID_INPUT, 'Command limit is outside the supported range.'));
+  }
+  if (
+    options?.proofLimit !== undefined &&
+    (!Number.isSafeInteger(options.proofLimit) || options.proofLimit < 0 || options.proofLimit > 6)
+  ) {
+    return err(readError(INVALID_INPUT, 'Proof limit is outside the supported range.'));
+  }
+  return ok(undefined);
+}
+
+function validContextPointer(pointer: TaskContextSnapshotPointer): boolean {
+  return (
+    pointer.owner === 'graph' &&
+    pointer.id.length > 0 &&
+    pointer.id.length <= 256 &&
+    pointer.kind.length > 0 &&
+    pointer.kind.length <= 128 &&
+    Number.isSafeInteger(pointer.schemaVersion) &&
+    pointer.schemaVersion >= 1
+  );
+}
+
+function graphGenerationPointerStatus(
+  pointer: TaskContextSnapshotPointer,
+  generation: CatalogGeneration | undefined,
+): ContextPointerStatus {
+  if (generation === undefined) {
+    return {
+      pointer,
+      status: 'missing',
+      reasonCodes: ['graph-catalog-missing'],
+    };
+  }
+  const current = generation.key;
+  if (current !== pointer.id) {
+    return {
+      pointer,
+      status: 'stale',
+      reasonCodes: ['graph-generation-replaced'],
+      currentGraphIdentity: current,
+    };
+  }
+  const schemaVersion = Number.parseInt(generation.catalog.version.split('.')[0] ?? '', 10);
+  if (schemaVersion !== pointer.schemaVersion) {
+    return {
+      pointer,
+      status: 'unsupported',
+      reasonCodes: ['graph-schema-version-unsupported'],
+      currentGraphIdentity: current,
+    };
+  }
+  return {
+    pointer,
+    status: 'available',
+    reasonCodes: [],
+    currentGraphIdentity: current,
+  };
+}
+
+function snapshotPointerStatus(
+  pointer: TaskContextSnapshotPointer,
+  lookup: ContextSnapshotLookup,
+): ContextPointerStatus {
+  if (lookup.status === 'missing') {
+    return {
+      pointer,
+      status: 'missing',
+      reasonCodes: ['context-snapshot-missing'],
+    };
+  }
+  if (lookup.status === 'unsupported-version') {
+    return {
+      pointer,
+      status: 'unsupported',
+      reasonCodes: ['context-snapshot-version-unsupported'],
+    };
+  }
+  if (
+    lookup.snapshot.kind !== pointer.kind ||
+    lookup.snapshot.schemaVersion !== pointer.schemaVersion
+  ) {
+    return {
+      pointer,
+      status: 'unsupported',
+      reasonCodes: ['context-snapshot-pointer-mismatch'],
+    };
+  }
+  return { pointer, status: 'available', reasonCodes: [] };
+}
+
+function selectionProofOptions(options: SelectTestsOptions | undefined): {
+  readonly includeProof: boolean;
+  readonly maxProofNodes: number | undefined;
+} {
+  const detail = options?.proofDetail ?? 'summary';
+  if (detail === 'none') return { includeProof: false, maxProofNodes: 0 };
+  if (detail === 'summary') return { includeProof: true, maxProofNodes: 1 };
+  return { includeProof: true, maxProofNodes: options?.proofLimit };
+}
 
 function toArchitectureSummaryDto(view: {
   readonly languages: ArchitectureSummaryDto['languages'];
@@ -125,7 +494,9 @@ function toArchitectureSummaryDto(view: {
  * (P2 Phase 1.4). Returns `{}` (no `sourceRolePolicy` key) when no globs are
  * configured, so the query context echoes nothing and compiles the no-op matcher.
  */
-function sourceRolePolicyDep(config: GraphConfig): { sourceRolePolicy?: AuditSourceRolePolicy } {
+function sourceRolePolicyDep(config: GraphConfig): {
+  sourceRolePolicy?: AuditSourceRolePolicy;
+} {
   const testGlobs = config.auditTestSourceGlobs ?? [];
   if (testGlobs.length === 0) return {};
   return { sourceRolePolicy: { testGlobs, mode: 'audit-test-globs-v1' } };
@@ -133,7 +504,10 @@ function sourceRolePolicyDep(config: GraphConfig): { sourceRolePolicy?: AuditSou
 
 export interface SqliteGraphReadPortDeps {
   readonly store: DataStore;
+  /** Root used for catalog storage/freshness compatibility. */
   readonly projectRoot: string;
+  /** Canonical root advertised in response context; defaults to projectRoot. */
+  readonly contextProjectRoot?: string;
   readonly configPath?: string;
   readonly adapters: GraphAdapterRegistryReader;
   readonly languageAdapters: readonly LanguageAdapter[];
@@ -146,6 +520,7 @@ export interface SqliteGraphReadPortDeps {
 }
 
 export class SqliteGraphReadPort implements GraphReadPort {
+  private readonly store: DataStore;
   private readonly controller: GraphGenerationController;
   private readonly queryContext: SqliteGraphQueryContext;
   private readonly packageQueries: SqliteGraphPackageQueries;
@@ -153,6 +528,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
   private readonly declarationQueries: SqliteGraphDeclarationQueries;
   private readonly config: GraphConfig;
   constructor(deps: SqliteGraphReadPortDeps) {
+    this.store = deps.store;
     this.config = deps.config ?? {};
     this.controller = new GraphGenerationController({
       store: deps.store,
@@ -170,7 +546,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       log: deps.log,
     });
     this.queryContext = new SqliteGraphQueryContext(this.controller, {
-      projectRoot: deps.projectRoot,
+      projectRoot: deps.contextProjectRoot ?? deps.projectRoot,
       ...(deps.configPath === undefined ? {} : { configPath: deps.configPath }),
       ...sourceRolePolicyDep(this.config),
       ...(deps.log === undefined ? {} : { log: deps.log }),
@@ -179,7 +555,9 @@ export class SqliteGraphReadPort implements GraphReadPort {
       context: this.queryContext,
       features: (generation) => this.generationFeatures(generation),
     });
-    this.symbolQueries = new SqliteGraphSymbolQueries(this.queryContext);
+    this.symbolQueries = new SqliteGraphSymbolQueries(this.queryContext, (generation) =>
+      this.generationFeatures(generation),
+    );
     this.declarationQueries = new SqliteGraphDeclarationQueries(this.queryContext);
   }
 
@@ -239,8 +617,208 @@ export class SqliteGraphReadPort implements GraphReadPort {
   async findBySpan(
     file: string,
     line: number,
+    signal?: AbortSignal,
   ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>> {
-    return this.symbolQueries.findBySpan(file, line);
+    return this.symbolQueries.findBySpan(file, line, signal);
+  }
+
+  async symbolAtLocation(
+    file: string,
+    line: number,
+    detail: 'summary' | 'entity',
+    signal?: AbortSignal,
+  ): ReturnType<GraphReadPort['symbolAtLocation']> {
+    return this.symbolQueries.symbolAtLocation(file, line, detail, signal);
+  }
+
+  async entityDetail(
+    symbolId: string,
+    signal?: AbortSignal,
+  ): ReturnType<GraphReadPort['entityDetail']> {
+    return this.symbolQueries.entityDetail(symbolId, signal);
+  }
+
+  async contextPointerStatus(
+    pointer: Parameters<GraphReadPort['contextPointerStatus']>[0],
+    signal?: AbortSignal,
+    options?: ContextPointerStatusOptions,
+  ): ReturnType<GraphReadPort['contextPointerStatus']> {
+    if (aborted(signal)) {
+      return err(readError('cancelled', 'Context pointer read was cancelled.'));
+    }
+    if (!validContextPointer(pointer)) {
+      return err(readError(INVALID_INPUT, 'Context pointer is invalid.'));
+    }
+    if (pointer.kind === 'graph') {
+      const captured = await this.controller.capture();
+      if (!captured.ok) return captured;
+      if (aborted(signal)) {
+        return err(readError('cancelled', 'Context pointer read was cancelled.'));
+      }
+      const pointerStatus = graphGenerationPointerStatus(pointer, captured.value);
+      if (pointerStatus.status !== 'available' || captured.value === undefined) {
+        return ok(pointerStatus);
+      }
+      const freshness = await this.queryContext.freshnessFor(captured.value, options);
+      if (!freshness.ok) {
+        return ok({
+          pointer,
+          status: 'stale',
+          reasonCodes: ['graph-generation-not-current', 'graph-freshness-verification-failed'],
+          currentGraphIdentity: captured.value.key,
+        });
+      }
+      if (!freshness.value.fresh) {
+        return ok({
+          pointer,
+          status: 'stale',
+          reasonCodes: [
+            'graph-generation-not-current',
+            `graph-freshness-${freshness.value.reasonCode ?? freshness.value.verification}`,
+          ],
+          currentGraphIdentity: captured.value.key,
+        });
+      }
+      return ok(pointerStatus);
+    }
+    const lookup = readContextSnapshot(this.store, pointer.id);
+    if (!lookup.ok) return err(fromGraphReadError(lookup.error));
+    if (aborted(signal)) {
+      return err(readError('cancelled', 'Context pointer read was cancelled.'));
+    }
+    return ok(snapshotPointerStatus(pointer, lookup.value));
+  }
+
+  async impactFiles(
+    files: readonly string[],
+    options?: ImpactFilesOptions,
+    signal?: AbortSignal,
+  ): ReturnType<GraphReadPort['impactFiles']> {
+    if (signal?.aborted === true) {
+      return err(readError('cancelled', 'Impact read was cancelled.'));
+    }
+    const checked = validateImpactInput(files, options);
+    if (!checked.ok) return checked;
+    return this.queryContext.runQuery(
+      'impactFiles',
+      { identityMode: 'occurrence', sourceScope: 'all' },
+      async (gen, freshness) => {
+        if (aborted(signal)) {
+          return err(readError('cancelled', 'Impact read was cancelled.'));
+        }
+        if (gen === undefined) {
+          const missing = missingImpact(files);
+          return this.queryContext.envelope(missing, gen, freshness, {
+            coverage: missing.coverage,
+          });
+        }
+        let index: ComputeImpactIndex;
+        try {
+          index = await generationImpactIndex(gen, signal);
+        } catch (error) {
+          if (error instanceof ComputeImpactCancelledError) {
+            return err(readError('cancelled', 'Impact read was cancelled.'));
+          }
+          throw error;
+        }
+        const projected = await buildImpactView(gen.catalog, files, {
+          maxDepth: options?.maxDepth,
+          top: options?.top,
+          index,
+          signal,
+        });
+        if (!projected.ok) return err(fromGraphReadError(projected.error));
+        const data: ImpactFilesDto = {
+          ...projected.value,
+          nextActions: impactNextActions(projected.value, freshness.fresh),
+        };
+        return this.queryContext.envelope(data, gen, freshness, {
+          coverage: projected.value.coverage,
+        });
+      },
+    );
+  }
+
+  async selectTests(
+    files: readonly string[],
+    inventory: ProjectInventorySnapshot,
+    options?: SelectTestsOptions,
+    signal?: AbortSignal,
+  ): ReturnType<GraphReadPort['selectTests']> {
+    if (aborted(signal)) {
+      return err(readError('cancelled', 'Test selection was cancelled.'));
+    }
+    const checked = validateSelectionInput(files, options);
+    if (!checked.ok) return checked;
+    return this.queryContext.runQuery(
+      'selectTests',
+      { identityMode: 'occurrence', sourceScope: 'all' },
+      async (gen, freshness) => {
+        if (aborted(signal)) {
+          return err(readError('cancelled', 'Test selection was cancelled.'));
+        }
+        if (gen === undefined) {
+          const data = missingSelection(files, inventory, options);
+          const coverage = rollupFacets({
+            inventory: makeFacet(
+              true,
+              new Set(
+                inventory.coverage.status === 'complete'
+                  ? []
+                  : ['inventory-incomplete', ...inventory.coverage.reasonCodes],
+              ),
+            ),
+            evidence: makeFacet(true, new Set(['graph-catalog-missing'])),
+            grouping: UNREQUESTED_FACET,
+            projection: makeFacet(
+              true,
+              new Set(data.commands.length === 0 ? ['verification-command-unavailable'] : []),
+            ),
+          });
+          return this.queryContext.envelope(data, gen, freshness, { coverage });
+        }
+        const proof = selectionProofOptions(options);
+        const matcher = this.queryContext.sourceRoleMatcherFor(gen);
+        if (!matcher.ok) return matcher;
+        const projected = await selectStaticTests(gen.catalog, gen.indexes, inventory, files, {
+          tier: options?.tier,
+          graphIdentity: gen.key,
+          maxDepth: options?.maxDepth,
+          maxCandidates: options?.limit,
+          maxCommands: options?.commandLimit,
+          includeProof: proof.includeProof,
+          maxProofNodes: proof.maxProofNodes,
+          sourceRoleMatcher: matcher.value,
+          signal,
+        });
+        if (!projected.ok) return err(fromGraphReadError(projected.error));
+        if (aborted(signal)) {
+          return err(readError('cancelled', 'Test selection was cancelled.'));
+        }
+        const inventoryReasons =
+          inventory.coverage.status === 'complete'
+            ? []
+            : ['inventory-incomplete', ...inventory.coverage.reasonCodes];
+        const freshnessReasons = freshness.fresh ? [] : ['graph-catalog-stale'];
+        const data = qualifySelection(projected.value.snapshot, [
+          ...inventoryReasons,
+          ...freshnessReasons,
+        ]);
+        const coverage = rollupFacets({
+          inventory: mergeFacet(
+            projected.value.coverage.inventory,
+            makeFacet(true, new Set(inventoryReasons)),
+          ),
+          evidence: mergeFacet(
+            projected.value.coverage.evidence,
+            makeFacet(true, new Set(freshnessReasons)),
+          ),
+          grouping: projected.value.coverage.grouping,
+          projection: projected.value.coverage.projection,
+        });
+        return this.queryContext.envelope(data, gen, freshness, { coverage });
+      },
+    );
   }
 
   async traverse(

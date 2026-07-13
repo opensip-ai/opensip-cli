@@ -5,7 +5,16 @@
  * orchestration remain private. MCP and other consumers import this subpath only.
  */
 
+export { buildComputeImpactIndex } from '@opensip-cli/contracts';
+export type {
+  ComputeImpactAsyncOptions,
+  ComputeImpactIndex,
+  ComputeImpactOptions,
+} from '@opensip-cli/contracts';
+
 export { readCatalogIdentity, loadCatalogGeneration } from './catalog.js';
+export { catalogGenerationKey } from './catalog-generation-key.js';
+export { readContextSnapshot } from './context-snapshot.js';
 export { loadGraphReadConfig } from './config.js';
 export {
   buildGraphReadIndexes,
@@ -58,6 +67,18 @@ export {
   packageEdgeStableKey,
   hotspotStableKey,
 } from './architecture-view.js';
+export { buildImpactView, MAX_IMPACT_VIEW_FILES, MAX_IMPACT_VIEW_ROWS } from './impact-view.js';
+export { projectEntityDetail } from './entity-detail-view.js';
+export {
+  selectStaticTests,
+  MAX_TEST_SELECTION_FILES,
+  MAX_TEST_SELECTION_DEPTH,
+  MAX_TEST_SELECTION_CANDIDATES,
+  MAX_TEST_SELECTION_COMMANDS,
+  MAX_TEST_SELECTION_PROOF_NODES,
+  MAX_TEST_SELECTION_VISITED_NODES,
+  MAX_TEST_SELECTION_VISITED_EDGES,
+} from './test-selection-view.js';
 
 export type {
   GraphReadError,
@@ -99,6 +120,15 @@ export type {
 } from './query-contracts.js';
 
 export type { VerifyCatalogInputsInput } from './catalog-freshness.js';
+export type {
+  ContextSnapshotAccessor,
+  ContextSnapshotKind,
+  ContextSnapshotLookup,
+  ContextSnapshotPayload,
+  ContextSnapshotRecord,
+  ContextSnapshotSaveInput,
+  ContextSnapshotSaveResult,
+} from './context-snapshot.js';
 
 export type { OccurrenceCallViewQuery, OccurrenceCallView } from './occurrence-call-view.js';
 
@@ -146,3 +176,6 @@ export type {
   ArchitectureHotspot,
   ArchitectureView,
 } from './architecture-view.js';
+export type { GraphImpactView, ImpactViewOptions } from './impact-view.js';
+export type { GraphEntityDetail, GraphEntityParameter } from './entity-detail-view.js';
+export type { StaticTestSelectionOptions, StaticTestSelectionView } from './test-selection-view.js';

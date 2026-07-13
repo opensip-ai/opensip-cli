@@ -7,12 +7,10 @@
  * registering a target with a name that's already taken is a no-op
  * (the historical behaviour).
  *
- * The entire targets module uses a synchronous API because target definitions
- * are loaded once at startup from a small YAML config file and then held
- * in-memory for fast, repeated lookups throughout the process lifetime. The
- * resolver (resolve.ts) similarly uses synchronous glob expansion. Since the
- * data set is small and bounded by project configuration, async I/O offers no
- * practical benefit and would complicate every call site that queries targets.
+ * Registry queries remain synchronous because target definitions are loaded
+ * once from a small YAML config and then held in memory. Target expansion keeps
+ * the legacy synchronous resolver for established callers and also exposes a
+ * cooperative, deterministic bounded resolver for inventory-scale walks.
  *
  * This is the **generic** half of file targeting (ADR-0037): register/get/byTag
  * over the host-owned `Target` shape. The scope-matching `findByScope`

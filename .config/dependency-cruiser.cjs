@@ -18,6 +18,7 @@
  *   3. @opensip-cli/output         — signal-envelope formatters + sinks
  *   3. @opensip-cli/config         — capability-configuration composer + schema registry (depends on core)
  *   3. @opensip-cli/targeting      — host file-targeting runtime substrate (scope.targets; depends on core + config)
+ *   3. @opensip-cli/codebase       — bounded project inventory substrate (core + contracts)
  *   3. @opensip-cli/lang-*         — language adapters
  *   3. @opensip-cli/dashboard      — HTML report generator (core + contracts)
  *   3. @opensip-cli/external-tool-adapter — External Tool Adapter substrate (core + contracts; output devDep)
@@ -126,6 +127,7 @@ const TOOL_ALLOWED_PACKAGES = Object.freeze({
     '@opensip-cli/cli-live',
     '@opensip-cli/cli-ui',
     '@opensip-cli/clone-detection',
+    '@opensip-cli/codebase',
     '@opensip-cli/config',
     '@opensip-cli/datastore',
     '@opensip-cli/session-store',
@@ -133,6 +135,7 @@ const TOOL_ALLOWED_PACKAGES = Object.freeze({
   '@opensip-cli/mcp': Object.freeze([
     '@opensip-cli/core',
     '@opensip-cli/contracts',
+    '@opensip-cli/codebase',
     '@opensip-cli/datastore',
     '@opensip-cli/graph',
     '@opensip-cli/session-store',
@@ -748,6 +751,21 @@ module.exports = {
         'pack, graph, simulation, session-store, or output.',
       from: { path: '^packages/targeting/src/' },
       to: { path: '^packages/(?!core/|config/|targeting/)' },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — codebase depends only on core + contracts.
+    // -------------------------------------------------------------------
+    {
+      name: 'codebase-imports-core-contracts-targeting-only',
+      severity: 'error',
+      comment:
+        'codebase is the persistence-free bounded inventory substrate. It may ' +
+        'consume core structural targeting/path contracts, contracts evidence ' +
+        'DTOs, and (when needed) the targeting substrate — never graph, MCP, ' +
+        'CLI, datastore, session-store, tools, languages, or check packs.',
+      from: { path: '^packages/codebase/src/' },
+      to: { path: '^packages/(?!core/|contracts/|targeting/|codebase/)' },
     },
 
     // -------------------------------------------------------------------

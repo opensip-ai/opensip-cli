@@ -44,6 +44,11 @@ test('release order equals the derived publishable workspace set (no frozen coun
     ['@opensip-cli/agent-eval', '@opensip-cli/checks-dogfood', '@opensip-cli/test-support'],
     'the known private workspace packages',
   );
+  const orderedNames = RELEASE_PACKAGE_ORDER.map((entry) => entry.name);
+  const codebaseIndex = orderedNames.indexOf('@opensip-cli/codebase');
+  assert.ok(codebaseIndex > orderedNames.indexOf('@opensip-cli/targeting'));
+  assert.ok(codebaseIndex < orderedNames.indexOf('@opensip-cli/graph'));
+  assert.ok(codebaseIndex < orderedNames.indexOf('@opensip-cli/mcp'));
 });
 
 test('RELEASING.md version surfaces match the derived governance facts', () => {

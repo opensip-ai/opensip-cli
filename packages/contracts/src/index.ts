@@ -110,6 +110,28 @@ export {
 
 // Command result types (the CommandResult union + per-command variants)
 export type * from './command-results.js';
+export type * from './task-context.js';
+export {
+  MAX_TASK_CONTEXT_MANIFEST_BYTES,
+  MAX_TASK_CONTEXT_FILES,
+  MAX_TASK_CONTEXT_PLANES,
+  PROJECT_INVENTORY_SCHEMA_VERSION,
+  TEST_SELECTION_SCHEMA_VERSION,
+  TASK_CONTEXT_MANIFEST_SCHEMA_VERSION,
+  contextCoverageSchema,
+  buildProjectInventorySnapshotIdentities,
+  buildTaskContextFileScope,
+  buildTaskContextProjectIdentity,
+  buildTestSelectionSnapshotIdentity,
+  parseTaskContextManifest,
+  projectInventorySnapshotSchema,
+  projectInventorySnapshotIdentityMatches,
+  taskContextManifestSchema,
+  taskContextFileScopeSchema,
+  taskContextPlaneSchema,
+  testSelectionSnapshotSchema,
+  testSelectionSnapshotIdentityMatches,
+} from './task-context.js';
 
 // Render-only run-presentation adjunct (envelope-first-presentation plan). The
 // single run variant on `CommandResult`: it carries the SignalEnvelope (the
@@ -363,8 +385,24 @@ export {
 export type { AgentCatalog, CommandTier } from './agent-catalog.js';
 export { summarizeTargetConventions } from './target-conventions.js';
 export type { AgentProjectContext, TargetConventionSummary } from './target-conventions.js';
-export { computeImpact } from './graph-impact-compute.js';
-export type { ImpactComputation, ImpactFunction, ImpactPackage } from './graph-impact-compute.js';
+export {
+  buildComputeImpactIndex,
+  computeImpact,
+  computeImpactAsync,
+  computeImpactCatalogGenerationIdentity,
+  computeImpactIndexMatchesCatalog,
+  ComputeImpactCancelledError,
+  ComputeImpactIndexGenerationMismatchError,
+} from './graph-impact-compute.js';
+export type {
+  ComputeImpactChangedFileEntry,
+  ComputeImpactAsyncOptions,
+  ComputeImpactIndex,
+  ComputeImpactOptions,
+  ImpactComputation,
+  ImpactFunction,
+  ImpactPackage,
+} from './graph-impact-compute.js';
 
 // SARIF + cloud reporting moved to @opensip-cli/output (audit
 // 2026-05-29, contracts split; package renamed reporting→output in Phase 2,

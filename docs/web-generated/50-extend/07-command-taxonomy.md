@@ -156,18 +156,19 @@ orchestration locally. See
 ## Long-lived stream commands (`output: 'raw-stream'`)
 
 Most tool primaries use `output: 'command-result'` (the host renders a
-`CommandResult` / delivers a `SignalEnvelope`). A few commands instead own stdout
-directly and declare `output: 'raw-stream'` with a **`rawStreamReason`** that
-records *why* the host renders nothing. The reason is a closed enum (members
+`CommandResult` / delivers a `SignalEnvelope`). A few commands instead require
+the host to render nothing and declare `output: 'raw-stream'` with a
+**`rawStreamReason`** that records why. The reason is a closed enum (members
 include `completion-script`, `file-export`, `worker-ipc`,
-`runtime-render-dispatch`, `session-replay`, `diagnostic-gate`, and
-`mcp-stdio`), each pinned to a real command by the `raw-stream-parity` inventory
-test. The three most relevant to this taxonomy:
+`runtime-render-dispatch`, `session-replay`, `diagnostic-gate`,
+`host-orchestrated-evidence`, and `mcp-stdio`), each pinned to a real command by
+the `raw-stream-parity` inventory test. The four most relevant to this taxonomy:
 
 | `rawStreamReason` | Owner | Why it owns stdout |
 |-------------------|-------|--------------------|
 | `file-export` | `fit export`, `graph export` | The byte stream is a file artifact (SARIF / JSON), not a render. |
 | `worker-ipc` | `fit-run-worker`, `graph-*-worker` (Tier 3) | An internal worker pipes structured IPC frames to its parent. |
+| `host-orchestrated-evidence` | `graph-context-*` (Tier 3) | The host run hook captures a bounded evidence completion while the parent suite owns the only visible result. |
 | `mcp-stdio` | `mcp` (Tier 2) | A genuine JSON-RPC **transport** — see below. |
 
 `opensip mcp` (the bundled [`@opensip-cli/mcp`](/docs/opensip-cli/70-reference/01-cli-commands/#mcp--serve-the-call-graph--results-to-agents-over-stdio)

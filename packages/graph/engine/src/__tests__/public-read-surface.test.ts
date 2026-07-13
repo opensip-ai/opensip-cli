@@ -20,9 +20,12 @@ vi.mock('../cli/orchestrate.js', () => ({ runGraph: runGraphMock }));
 const EXPECTED = [
   'readCatalogIdentity',
   'loadCatalogGeneration',
+  'catalogGenerationKey',
+  'readContextSnapshot',
   'loadGraphReadConfig',
   'rebuildCatalog',
   'buildGraphReadIndexes',
+  'buildComputeImpactIndex',
   'deriveGraphReadFeatures',
   'evaluateGraphOrphans',
   'classifyGraphReadCatalog',
@@ -32,6 +35,15 @@ const EXPECTED = [
   'compileSourceRoleMatcher',
   'effectiveTestSource',
   'MAX_AUDIT_SOURCE_ROLE_FILES',
+  'MAX_IMPACT_VIEW_FILES',
+  'MAX_IMPACT_VIEW_ROWS',
+  'MAX_TEST_SELECTION_FILES',
+  'MAX_TEST_SELECTION_DEPTH',
+  'MAX_TEST_SELECTION_CANDIDATES',
+  'MAX_TEST_SELECTION_COMMANDS',
+  'MAX_TEST_SELECTION_PROOF_NODES',
+  'MAX_TEST_SELECTION_VISITED_NODES',
+  'MAX_TEST_SELECTION_VISITED_EDGES',
   'compareCodePointStrings',
   'codePointSortKey',
   'continuationToken',
@@ -66,6 +78,9 @@ const EXPECTED = [
   'buildArchitectureView',
   'packageEdgeStableKey',
   'hotspotStableKey',
+  'buildImpactView',
+  'projectEntityDetail',
+  'selectStaticTests',
 ].sort();
 
 const BUILT_AT = '2026-07-09T00:00:00.000Z';

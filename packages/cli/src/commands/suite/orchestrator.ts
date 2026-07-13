@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 
+import { EXIT_CODES, type SuiteRunResult, type SuiteStepSummary } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
@@ -11,15 +12,21 @@ import {
 import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabilities.js';
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 
+import { type SuiteSource } from './built-in-suites.js';
 import { buildReviewBrief } from './review-brief-builder.js';
-import { persistSuiteRun } from './run-ledger-persist.js';
+import { allocateSuiteLedgerIdentity, persistSuiteRun } from './run-ledger-persist.js';
 import { resolveSuiteScope } from './suite-scope.js';
 import { runStepsSerially, type SuiteStepEvent } from './suite-step-runner.js';
+import {
+  logTaskContextManifest,
+  prepareTaskContext,
+  resultWithPersistence,
+  taskContextManifestFor,
+  taskContextPointersAvailable,
+} from './task-context-orchestration.js';
 import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
-import type { SuiteSource } from './built-in-suites.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
-import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
 
 export interface RunSuiteInput {
   readonly name: string;
@@ -34,6 +41,13 @@ export interface RunSuiteInput {
   readonly onStepEvent?: (event: SuiteStepEvent) => void;
 }
 
+function contextPersistencePrecondition(manifest: SuiteRunResult['contextManifest']): {
+  readonly persistencePrecondition?: () => boolean;
+} {
+  if (manifest === undefined || manifest.readiness === 'unavailable') return {};
+  return { persistencePrecondition: () => taskContextPointersAvailable(manifest) };
+}
+
 export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   const suite = validateSuite({
     name: input.name,
@@ -44,10 +58,14 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   const started = performance.now();
   const startedAt = new Date();
   const log = currentLogger();
-  const cwd = typeof input.suiteOpts.cwd === 'string' ? input.suiteOpts.cwd : process.cwd();
+  const requestedCwd =
+    typeof input.suiteOpts.cwd === 'string' ? input.suiteOpts.cwd : process.cwd();
+  const context = await prepareTaskContext(input, suite, requestedCwd);
+  const cwd = context.cwd;
+  const suiteOpts = context.aggregates ? { ...input.suiteOpts, cwd } : input.suiteOpts;
   const scope = resolveSuiteScope({
     cwd,
-    suiteOpts: input.suiteOpts,
+    suiteOpts,
     defaultChanged: input.defaultChanged === true,
   });
 
@@ -75,7 +93,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     });
   }
 
-  await loadSuiteStepCapabilities(suite);
+  await loadSuiteStepCapabilities(suite, context.aggregates ? cwd : undefined);
 
   const internalSteps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
     runStepsSerially({
@@ -83,7 +101,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
       suiteRunId,
       ctx: input.ctx,
       runActionHooks: input.runActionHooks,
-      suiteOpts: input.suiteOpts,
+      suiteOpts,
       defaultChanged: scope.mode === 'changed' && scope.source === 'default',
       fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
         defaultChanged: input.defaultChanged === true,
@@ -112,25 +130,44 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   const isNonBlockingFault = (step: SuiteStepSummary): boolean =>
     step.outcome === 'faulted' && step.verdict !== undefined;
   const blockingSteps = failOnFault ? steps : steps.filter((step) => !isNonBlockingFault(step));
-  const exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
+  let exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
   const aggregate = deriveSuiteAggregate(steps);
-  const reviewBrief = buildReviewBrief({
-    suite: suite.name,
-    suiteRunId,
-    steps: internalSteps,
-    changedFiles: scope.mode === 'changed' ? (scope.changedFiles ?? null) : null,
-  });
-  const durationMs = Math.max(0, performance.now() - started);
+  const reviewBrief = context.aggregates
+    ? undefined
+    : buildReviewBrief({
+        suite: suite.name,
+        suiteRunId,
+        steps: internalSteps,
+        changedFiles: scope.mode === 'changed' ? (scope.changedFiles ?? null) : null,
+      });
+  if (reviewBrief !== undefined) {
+    log.info?.({
+      evt: 'cli.suite.brief.built',
+      suite: suite.name,
+      suiteRunId,
+      verdict: reviewBrief.verdict,
+      risks: reviewBrief.topRisks.length,
+      correlatedRisks: reviewBrief.correlatedRisks?.length ?? 0,
+      degraded: reviewBrief.degraded.length,
+    });
+  }
 
-  log.info?.({
-    evt: 'cli.suite.brief.built',
-    suite: suite.name,
-    suiteRunId,
-    verdict: reviewBrief.verdict,
-    risks: reviewBrief.topRisks.length,
-    correlatedRisks: reviewBrief.correlatedRisks?.length ?? 0,
-    degraded: reviewBrief.degraded.length,
+  const ledgerIdentity = allocateSuiteLedgerIdentity(internalSteps);
+  const contextManifest = await taskContextManifestFor({
+    preparation: context,
+    ledger: ledgerIdentity,
+    steps: internalSteps,
   });
+  if (contextManifest?.readiness === 'unavailable' && input.suite.execution?.failOnFault === true) {
+    exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
+  }
+  logTaskContextManifest(suite.name, contextManifest);
+
+  // Source-end capture is part of the context run's evidence work. Freeze both
+  // completion clocks only after it finishes so persisted wall time and the
+  // reported monotonic duration cover the same operation boundary.
+  const completedAt = new Date();
+  const durationMs = Math.max(0, performance.now() - started);
 
   log.info?.({
     evt: 'cli.suite.run.complete',
@@ -141,7 +178,6 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     aggregate,
   });
 
-  const completedAt = new Date();
   const baseResult: SuiteRunResult = {
     type: 'suite-run',
     suite: suite.name,
@@ -151,7 +187,8 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     scope,
     aggregate,
     steps,
-    reviewBrief,
+    ...(reviewBrief === undefined ? {} : { reviewBrief }),
+    ...(contextManifest === undefined ? {} : { contextManifest }),
     verbose: input.suiteOpts.verbose === true,
   };
   const runId = persistSuiteRun({
@@ -161,8 +198,10 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     cwd,
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
+    identity: ledgerIdentity,
+    ...contextPersistencePrecondition(contextManifest),
   });
-  return runId === undefined ? baseResult : { ...baseResult, runId };
+  return resultWithPersistence(baseResult, runId);
 }
 
 export function deriveSuiteAggregate(
@@ -209,11 +248,14 @@ export function deriveSuiteAggregate(
   };
 }
 
-async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
+async function loadSuiteStepCapabilities(
+  suite: ValidatedSuite,
+  projectRoot?: string,
+): Promise<void> {
   const loaded = new Set<string>();
   const scope = currentScope();
   if (scope?.capabilities === undefined) return;
-  const projectDir = scope?.projectContext?.projectRoot ?? process.cwd();
+  const projectDir = projectRoot ?? scope?.projectContext?.projectRoot ?? process.cwd();
   const pluginsConfig = scope?.configDocument?.plugins ?? {};
   const log = currentLogger();
 

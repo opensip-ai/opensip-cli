@@ -16,6 +16,7 @@
       "@opensip-cli/cli-live": ["packages/cli-live/src/index.ts"],
       "@opensip-cli/cli-ui": ["packages/cli-ui/src/index.ts"],
       "@opensip-cli/clone-detection": ["packages/clone-detection/src/index.ts"],
+      "@opensip-cli/codebase": ["packages/codebase/src/index.ts"],
       "@opensip-cli/config": ["packages/config/src/index.ts"],
       "@opensip-cli/contracts": ["packages/contracts/src/index.ts"],
       "@opensip-cli/core": ["packages/core/src/index.ts"],

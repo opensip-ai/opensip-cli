@@ -34,13 +34,10 @@
  * linchpin holds on any layout.
  */
 
-import { readFileSync } from 'node:fs';
-import { posix, relative } from 'node:path';
-
+import { readPackageManifestFacts } from '@opensip-cli/codebase';
 import { logger } from '@opensip-cli/core';
 
 import { packageGroupOf } from './package-group.js';
-import { toPosixPath } from './posix-path.js';
 
 import type { PackageManifest, PackageManifestIndex } from './package-group.js';
 import type { Shard } from '../cli/orchestrate/shard-model.js';
@@ -284,50 +281,31 @@ export function buildPackageManifestIndexFromRoots(
 
 /** Read + parse one package's `package.json`; `undefined` on any failure. */
 function readManifest(rootDirAbs: string, projectRoot: string): PackageManifest | undefined {
-  const manifestPath = posix.join(toPosixPath(rootDirAbs), 'package.json');
-  let raw: string;
-  try {
-    raw = readFileSync(manifestPath, 'utf8');
-  } catch {
-    // Best-effort: a shard without a readable package.json is simply not
-    // specifier-resolvable. Note the skip so the swallow isn't silent.
+  const result = readPackageManifestFacts({
+    packageRoot: rootDirAbs,
+    projectRoot,
+  });
+  if (!result.ok) {
+    const parseFailure = result.reason === 'parse-failed' || result.reason === 'invalid-shape';
     logger.debug({
-      evt: 'graph.export_index.manifest_read_skipped',
+      evt: parseFailure
+        ? 'graph.export_index.manifest_parse_skipped'
+        : 'graph.export_index.manifest_read_skipped',
       module: 'graph:export-index',
-      reason: 'read-failed',
+      reason: result.reason,
     });
     return undefined;
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    // Best-effort: an unparseable package.json is not specifier-resolvable.
-    // Note the skip so the swallow isn't silent.
-    logger.debug({
-      evt: 'graph.export_index.manifest_parse_skipped',
-      module: 'graph:export-index',
-      reason: 'parse-failed',
-    });
-    return undefined;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return undefined;
-  const record = parsed as Record<string, unknown>;
-  const name = record.name;
-  if (typeof name !== 'string' || name.length === 0) return undefined;
-  const exportsField = record.exports;
+  const { facts } = result;
   const exportsMap =
-    typeof exportsField === 'object' && exportsField !== null
-      ? (exportsField as Record<string, unknown>)
-      : undefined;
-  return { name, dir: relativeDir(rootDirAbs, projectRoot), exportsMap };
-}
-
-/** Project-relative POSIX dir for a shard's absolute rootDir — the prefix
- *  {@link packageGroupOf} matches file paths against (`''` when the package IS
- *  the project root, i.e. a single-package repo). */
-function relativeDir(rootDirAbs: string, projectRoot: string): string {
-  return toPosixPath(relative(projectRoot, rootDirAbs));
+    facts.exportMapKeys === undefined
+      ? undefined
+      : Object.fromEntries(facts.exportMapKeys.map((key) => [key, true]));
+  return {
+    name: facts.name,
+    dir: facts.root === '.' ? '' : facts.root,
+    ...(exportsMap === undefined ? {} : { exportsMap }),
+  };
 }
 
 /** The outcome of resolving a bare import specifier to a workspace package. */

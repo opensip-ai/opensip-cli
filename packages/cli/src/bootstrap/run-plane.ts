@@ -33,12 +33,14 @@ import {
   type RunLifecycle,
   type RunTimingSnapshot,
   type ToolRunCompletion,
+  type EvidenceSnapshotContribution,
   type ToolRunSessions,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
 import { SessionRepo } from '@opensip-cli/session-store';
 
 import { manifestVersionFor } from './declared-inputs.js';
+import { captureEvidenceSnapshots } from './evidence-snapshot-capture.js';
 import {
   enforceSessionRetention,
   resolveCurrentSessionRetentionPolicy,
@@ -131,6 +133,8 @@ export interface RunActionHooks {
   readonly resetRun?: () => void;
   /** Current persisted session id for this command/step invocation, when one exists. */
   readonly currentSessionId?: () => string | undefined;
+  /** Validated evidence returned by the current in-process command invocation. */
+  readonly currentEvidenceSnapshots?: () => readonly EvidenceSnapshotContribution[];
   /**
    * ADR-0054 out-of-process dispatch seam. When present AND the owning tool is
    * EXTERNAL-provenance, the command action calls this INSTEAD of invoking
@@ -391,12 +395,18 @@ export function createRunSessionSeam(factory: RunPlaneFactory): ToolRunSessions 
  * `CommandResult` (no `session`) is a no-op.
  */
 export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
+  let evidenceSnapshots: readonly EvidenceSnapshotContribution[] = Object.freeze([]);
   return {
     beginRun: () => {
+      evidenceSnapshots = Object.freeze([]);
       factory.beginRun();
     },
     completeRun: (result) => {
       const completion = result as ToolRunCompletion | undefined;
+      evidenceSnapshots =
+        completion?.evidenceSnapshots === undefined
+          ? Object.freeze([])
+          : captureEvidenceSnapshots(completion.evidenceSnapshots);
       const session = completion?.session;
       // host-owned-run-timing Phase 3: the host freezes the lifecycle and
       // persists the returned session contribution. Best-effort.
@@ -404,7 +414,9 @@ export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
     },
     resetRun: () => {
       factory.reset();
+      evidenceSnapshots = Object.freeze([]);
     },
     currentSessionId: () => factory.current().sessionId(),
+    currentEvidenceSnapshots: () => evidenceSnapshots,
   };
 }

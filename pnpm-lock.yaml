@@ -163,6 +163,9 @@ importers:
       '@opensip-cli/cli-ui':
         specifier: workspace:*
         version: link:../cli-ui
+      '@opensip-cli/codebase':
+        specifier: workspace:*
+        version: link:../codebase
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../config
@@ -375,6 +378,31 @@ importers:
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/clone-detection:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/codebase:
+    dependencies:
+      '@opensip-cli/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
+      minimatch:
+        specifier: ^10.2.5
+        version: 10.2.5
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -790,6 +818,9 @@ importers:
       '@opensip-cli/clone-detection':
         specifier: workspace:*
         version: link:../../clone-detection
+      '@opensip-cli/codebase':
+        specifier: workspace:*
+        version: link:../../codebase
       '@opensip-cli/config':
         specifier: workspace:*
         version: link:../../config
@@ -1094,6 +1125,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
+      '@opensip-cli/codebase':
+        specifier: workspace:*
+        version: link:../codebase
       '@opensip-cli/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -2227,6 +2261,9 @@ packages:
 
   '@opensip-cli/clone-detection@file:packages/clone-detection':
     resolution: {directory: packages/clone-detection, type: directory}
+
+  '@opensip-cli/codebase@file:packages/codebase':
+    resolution: {directory: packages/codebase, type: directory}
 
   '@opensip-cli/config@file:packages/config':
     resolution: {directory: packages/config, type: directory}
@@ -5768,6 +5805,15 @@ snapshots:
 
   '@opensip-cli/clone-detection@file:packages/clone-detection': {}
 
+  '@opensip-cli/codebase@file:packages/codebase(commander@15.0.0)':
+    dependencies:
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
+      '@opensip-cli/core': file:packages/core
+      minimatch: 10.2.5
+      yaml: 2.9.0
+    transitivePeerDependencies:
+      - commander
+
   '@opensip-cli/config@file:packages/config':
     dependencies:
       '@opensip-cli/core': file:packages/core
@@ -6125,6 +6171,7 @@ snapshots:
       '@opensip-cli/cli-live': file:packages/cli-live(@types/react@19.2.17)(commander@15.0.0)
       '@opensip-cli/cli-ui': file:packages/cli-ui(@types/react@19.2.17)
       '@opensip-cli/clone-detection': file:packages/clone-detection
+      '@opensip-cli/codebase': file:packages/codebase(commander@15.0.0)
       '@opensip-cli/config': file:packages/config
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
@@ -6199,6 +6246,7 @@ snapshots:
   '@opensip-cli/mcp@file:packages/mcp(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)(commander@15.0.0)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@opensip-cli/codebase': file:packages/codebase(commander@15.0.0)
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)

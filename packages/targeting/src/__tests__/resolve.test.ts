@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { resolveTargetsBounded } from '../bounded-resolve.js';
 import { applyGlobalExcludes, preResolveAllTargets, resolveTargets } from '../resolve.js';
 import { TargetRegistry } from '../target-registry.js';
 
@@ -95,6 +96,25 @@ describe('resolveTargets', () => {
       ['**/generated/**'], // not in the target's own exclude — only a globalExclude
     );
     expect(rel(out)).toEqual(['src/keep.ts']);
+  });
+});
+
+describe('resolveTargetsBounded with the real glob walker', () => {
+  it('matches the uncapped resolver while applying target and global excludes', async () => {
+    fixture('src/keep.ts');
+    fixture('src/drop.test.ts');
+    fixture('src/generated/drop.ts');
+    const source = makeTarget('src', {
+      include: ['src/**/*.ts'],
+      exclude: ['**/*.test.ts'],
+    });
+    const globals = ['**/generated/**'];
+
+    const bounded = await resolveTargetsBounded([source], testDir, globals, { maxResults: 10 });
+    const unbounded = resolveTargets([source], testDir, globals);
+
+    expect(bounded).toEqual({ files: unbounded, capped: false, cancelled: false });
+    expect(rel(bounded.files)).toEqual(['src/keep.ts']);
   });
 });
 

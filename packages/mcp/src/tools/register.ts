@@ -8,6 +8,8 @@
  */
 
 import { registerGetRuntimeWiring } from './get-runtime-wiring.js';
+import { registerCodebaseTools } from './register-codebase-tools.js';
+import { registerContextTools } from './register-context-tools.js';
 import { registerGraphTools } from './register-graph-tools.js';
 import { registerResultTools } from './register-result-tools.js';
 import { registerRepairApplyVerify } from './repair-apply-verify.js';
@@ -17,23 +19,28 @@ import type { McpStdioServer } from '../server.js';
 
 /**
  * Default protocol surface epoch. Increment when the registered default tool
- * set changes (Phase 3 added search_declarations + references_to → epoch 3;
- * Phase 4 added get_runtime_wiring and Phase 6 added get_agent_catalog → epoch 4).
+ * set changes. Historical increments are intentionally not repeated here;
+ * the exported value and the registered names are the protocol authority.
  * Actual registration names remain authoritative via server.describeSurface().
  */
-export const MCP_SURFACE_EPOCH = 4;
+export const MCP_SURFACE_EPOCH = 7;
 
 /**
- * Register the default protocol inventory (21 tools with Phase 3 declaration
- * tools). `refresh_graph` is the sole graph mutation; explicit mutation mode
- * adds only `repair_apply_verify` (22 tools).
+ * Register the default protocol inventory. `refresh_graph` is the sole graph
+ * mutation; explicit mutation mode adds only `repair_apply_verify`.
  */
 export function registerMcpTools(server: McpStdioServer, deps: McpToolDeps): void {
   // ── Graph tools (over GraphReadPort) ──────────────────────────────
   registerGraphTools(server, deps);
 
+  // ── Captured project inventory ────────────────────────────────────
+  registerCodebaseTools(server, deps);
+
   // ── Live wiring (not static graph) ────────────────────────────────
   registerGetRuntimeWiring(server, deps);
+
+  // ── Recorded agent task context ───────────────────────────────────
+  registerContextTools(server, deps);
 
   registerResultTools(server, deps);
   if (deps.mutationsEnabled === true && deps.repairWrite !== undefined) {

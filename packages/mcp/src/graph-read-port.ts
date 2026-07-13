@@ -11,6 +11,11 @@
 import type { McpReadError } from './mcp-error.js';
 import type { StaticHandlerBridgeOutcome } from './static-handler-bridge.js';
 import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
+import type {
+  ProjectInventorySnapshot,
+  TaskContextSnapshotPointer,
+  TestSelectionSnapshot,
+} from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
 import type {
   ArchitectureHotspot,
@@ -25,6 +30,8 @@ import type {
   PackageImportEvidence,
   PackageImportEvidenceRow,
   GraphSourceFilter,
+  GraphEntityDetail,
+  GraphImpactView,
   TraversalIdentity,
 } from '@opensip-cli/graph/read';
 
@@ -42,6 +49,19 @@ export type CompactQueryDetail = 'summary' | 'groups' | 'nodes';
  * Intentionally smaller than the shared paged-tool default (100). Caller range 1–500.
  */
 export const DEFAULT_IDENTITY_SEARCH_LIMIT = 20;
+
+/**
+ * Ephemeral `select_tests` fallback returned only when no graph generation is
+ * loaded. The explicit discriminator prevents this response from being
+ * mistaken for a durable {@link TestSelectionSnapshot}.
+ */
+export interface MissingGraphTestSelectionDto extends Omit<TestSelectionSnapshot, 'graphIdentity'> {
+  readonly graphIdentity: 'graph:missing';
+  readonly durable: false;
+}
+
+/** Durable test-selection evidence or an explicitly non-durable missing-graph fallback. */
+export type TestSelectionReadDto = TestSelectionSnapshot | MissingGraphTestSelectionDto;
 
 /** Identity of the in-memory catalog generation a read was served from. */
 export interface GraphGeneration {
@@ -273,7 +293,10 @@ export interface ReferencesToDto {
   readonly declarationId: string;
   readonly references: readonly ReferenceSiteDto[];
   readonly totalMatches: number;
-  readonly kindCounts?: readonly { readonly kind: string; readonly count: number }[];
+  readonly kindCounts?: readonly {
+    readonly kind: string;
+    readonly count: number;
+  }[];
 }
 
 /**
@@ -304,8 +327,14 @@ export interface DeadCodeResultDto {
   readonly detail: CompactQueryDetail;
   readonly rows: readonly DeadCodeDto[];
   readonly totalOrphans: number;
-  readonly reasonCounts: readonly { readonly reason: string; readonly count: number }[];
-  readonly ruleCounts: readonly { readonly ruleId: string; readonly count: number }[];
+  readonly reasonCounts: readonly {
+    readonly reason: string;
+    readonly count: number;
+  }[];
+  readonly ruleCounts: readonly {
+    readonly ruleId: string;
+    readonly count: number;
+  }[];
 }
 
 export interface ArchitectureQuery {
@@ -329,6 +358,51 @@ export interface RefreshResult {
 export interface CatalogStatus {
   readonly context: GraphToolResult<null>['context'];
   readonly freshness: Freshness;
+}
+
+/** Bounded options for an explicit-file impact read. */
+export interface ImpactFilesOptions {
+  readonly maxDepth?: number;
+  readonly top?: number;
+}
+
+/**
+ * Canonical graph impact projection with machine-actionable follow-up guidance.
+ * The impact fields remain flat so agents can consume the graph/read DTO without
+ * an MCP-specific nesting layer.
+ */
+export interface ImpactFilesDto extends GraphImpactView {
+  readonly nextActions: readonly string[];
+}
+
+/** One source-location lookup projected from exactly one immutable graph generation. */
+export interface GraphSymbolLocationDto {
+  readonly candidates: readonly SymbolRef[];
+  readonly entity?: GraphEntityDetail | null;
+}
+
+/** Bounded static-test selection controls. */
+export interface SelectTestsOptions {
+  readonly tier?: 'focused' | 'package' | 'full';
+  readonly maxDepth?: number;
+  readonly limit?: number;
+  readonly commandLimit?: number;
+  readonly proofDetail?: 'none' | 'summary' | 'paths';
+  readonly proofLimit?: number;
+}
+
+/** Exact recorded context-pointer availability; never a latest-pointer lookup. */
+export interface ContextPointerStatus {
+  readonly pointer: TaskContextSnapshotPointer;
+  readonly status: 'available' | 'missing' | 'stale' | 'unsupported';
+  readonly reasonCodes: readonly string[];
+  readonly currentGraphIdentity?: string;
+}
+
+/** Freshness policy for exact context-pointer replay. */
+export interface ContextPointerStatusOptions {
+  /** Bypass a completed graph freshness verdict cached for an ordinary read burst. */
+  readonly forceFresh?: boolean;
 }
 
 export interface GraphReadPort {
@@ -362,7 +436,39 @@ export interface GraphReadPort {
   findBySpan(
     file: string,
     line: number,
+    signal?: AbortSignal,
   ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>>;
+  /** Resolve candidates and optional entity detail inside one generation capture. */
+  symbolAtLocation(
+    file: string,
+    line: number,
+    detail: 'summary' | 'entity',
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<GraphSymbolLocationDto>, McpReadError>>;
+  /** Impact of explicit project-relative files in one immutable generation. */
+  impactFiles(
+    files: readonly string[],
+    options?: ImpactFilesOptions,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<ImpactFilesDto>, McpReadError>>;
+  /** Source-free detail for one exact callable occurrence. */
+  entityDetail(
+    symbolId: string,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<GraphEntityDetail | null>, McpReadError>>;
+  /** Static test candidates bound to one graph and one inventory identity. */
+  selectTests(
+    files: readonly string[],
+    inventory: ProjectInventorySnapshot,
+    options?: SelectTestsOptions,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<TestSelectionReadDto>, McpReadError>>;
+  /** Verify one recorded snapshot pointer exactly, without rebinding to latest. */
+  contextPointerStatus(
+    pointer: TaskContextSnapshotPointer,
+    signal?: AbortSignal,
+    options?: ContextPointerStatusOptions,
+  ): Promise<Result<ContextPointerStatus, McpReadError>>;
   /**
    * One-generation traversal (callers/callees/path). Phase 1 exposes the
    * currently shipped body-twin walk; Phase 2 adds occurrence identity.

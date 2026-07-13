@@ -41,38 +41,3 @@ export function isCompleteSymbolSearchProjection(payload: unknown): boolean {
     data.totalMatches === data.symbols.length
   );
 }
-
-function isSourceProjection(source: unknown): boolean {
-  return (
-    isRecord(source) &&
-    nonEmptyString(source.file) &&
-    sourceCoordinate(source.line, 1) &&
-    sourceCoordinate(source.column, 0)
-  );
-}
-
-function isCallEvidenceProjection(evidence: unknown): boolean {
-  return (
-    isRecord(evidence) &&
-    evidence.kind === 'call' &&
-    isGraphSymbolProjection(evidence.from) &&
-    isGraphSymbolProjection(evidence.to) &&
-    isSourceProjection(evidence.source) &&
-    nonEmptyString(evidence.resolution) &&
-    nonEmptyString(evidence.confidence) &&
-    typeof evidence.crossShard === 'boolean'
-  );
-}
-
-/** Validate every public traversal-node field consumed or discarded by test projection. */
-export function isTestTraversalNodeProjection(node: unknown): node is UnknownRecord {
-  return (
-    isRecord(node) &&
-    sourceCoordinate(node.depth, 0) &&
-    nonEmptyString(node.groupId) &&
-    sourceCoordinate(node.groupTotal, 1) &&
-    isGraphSymbolProjection(node.symbol) &&
-    (node.incomingEvidence === undefined || isCallEvidenceProjection(node.incomingEvidence)) &&
-    (node.anyTwinMaySupplyHop === undefined || typeof node.anyTwinMaySupplyHop === 'boolean')
-  );
-}

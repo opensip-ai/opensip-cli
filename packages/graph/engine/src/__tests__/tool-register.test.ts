@@ -262,6 +262,9 @@ describe('graphTool command surface', () => {
       'list',
       'impact',
       'graph-equivalence-check',
+      'graph-context-inventory',
+      'graph-context-ensure',
+      'graph-context-select-tests',
     ]);
     // The legacy flat-root aliases are gone.
     expect(names).not.toContain('graph-lookup');

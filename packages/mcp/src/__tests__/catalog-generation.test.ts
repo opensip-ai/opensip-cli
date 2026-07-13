@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   catalogGenerationKey,
   createGeneration,
+  generationImpactIndex,
   GraphGenerationController,
   type GenerationControllerDeps,
 } from '../catalog-generation.js';
@@ -92,6 +93,99 @@ describe('createGeneration', () => {
     expect(gen.indexes).toBeDefined();
     expect(gen).not.toHaveProperty('identity');
   });
+
+  it('builds one impact index per immutable generation and isolates requester cancellation', async () => {
+    const firstGeneration = createGeneration(catalog('01'), 'initial-load');
+    const [first, joined] = await Promise.all([
+      generationImpactIndex(firstGeneration),
+      generationImpactIndex(firstGeneration),
+    ]);
+    expect(joined).toBe(first);
+    expect(firstGeneration.derived.impactIndex).toBe(first);
+    expect(await generationImpactIndex(firstGeneration)).toBe(first);
+
+    const cancelled = new AbortController();
+    cancelled.abort();
+    await expect(generationImpactIndex(firstGeneration, cancelled.signal)).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+    expect(await generationImpactIndex(firstGeneration)).toBe(first);
+
+    const nextGeneration = createGeneration(catalog('02'), 'persisted-auto-swap');
+    expect(await generationImpactIndex(nextGeneration)).not.toBe(first);
+  });
+
+  it('keeps a shared impact build alive for an active waiter when its peer cancels', async () => {
+    const generation = createGeneration(impactCatalog('03'), 'initial-load');
+    const cancelled = new AbortController();
+    const cancelledPending = generationImpactIndex(generation, cancelled.signal);
+    const livePending = generationImpactIndex(generation);
+    const flight = generation.derived.impactIndexBuild;
+
+    expect(flight?.waiters).toBe(2);
+    cancelled.abort();
+    expect(flight?.controller.signal.aborted).toBe(false);
+
+    await expect(cancelledPending).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+    const live = await livePending;
+    expect(generation.derived.impactIndex).toBe(live);
+    expect(generation.derived.impactIndexBuild).toBeUndefined();
+    expect(await generationImpactIndex(generation)).toBe(live);
+  });
+
+  it('aborts after the final waiter cancels and lets a replacement flight cache', async () => {
+    const generation = createGeneration(impactCatalog('04'), 'initial-load');
+    const first = new AbortController();
+    const second = new AbortController();
+    const firstPending = generationImpactIndex(generation, first.signal);
+    const secondPending = generationImpactIndex(generation, second.signal);
+    const abandonedFlight = generation.derived.impactIndexBuild;
+
+    first.abort();
+    expect(abandonedFlight?.controller.signal.aborted).toBe(false);
+    second.abort();
+    expect(abandonedFlight?.controller.signal.aborted).toBe(true);
+    expect(generation.derived.impactIndexBuild).toBeUndefined();
+    expect(generation.derived.impactIndex).toBeUndefined();
+
+    const replacementPending = generationImpactIndex(generation);
+    const replacementFlight = generation.derived.impactIndexBuild;
+    expect(replacementFlight).not.toBe(abandonedFlight);
+    await expect(firstPending).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+    await expect(secondPending).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+    await expect(abandonedFlight?.promise).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+
+    const replacement = await replacementPending;
+    expect(generation.derived.impactIndex).toBe(replacement);
+    expect(await generationImpactIndex(generation)).toBe(replacement);
+  });
+
+  it('clears a failed impact build so a corrected generation can retry', async () => {
+    const generation = createGeneration(impactCatalog('05', 1), 'initial-load');
+    const occurrences = generation.catalog.functions.f0;
+    expect(occurrences).toHaveLength(1);
+    const original = occurrences?.[0];
+    if (original === undefined || occurrences === undefined) return;
+    const mutableOccurrences = occurrences as CatalogOccurrence[];
+    mutableOccurrences[0] = { ...original, calls: undefined as never };
+
+    await expect(generationImpactIndex(generation)).rejects.toBeInstanceOf(TypeError);
+    expect(generation.derived.impactIndexBuild).toBeUndefined();
+    expect(generation.derived.impactIndex).toBeUndefined();
+
+    mutableOccurrences[0] = original;
+    const retry = await generationImpactIndex(generation);
+    expect(generation.derived.impactIndex).toBe(retry);
+    expect(await generationImpactIndex(generation)).toBe(retry);
+  });
 });
 
 const FRESH: FreshnessVerification = {
@@ -110,6 +204,48 @@ function catalog(suffix: string): Catalog {
     filesFingerprint: `files-${suffix}`,
     functions: {},
   };
+}
+
+type CatalogOccurrence = NonNullable<Catalog['functions'][string]>[number];
+
+function impactCatalog(suffix: string, functionCount = 2048): Catalog {
+  const functions: Record<string, CatalogOccurrence[]> = {};
+  for (let index = 0; index < functionCount; index++) {
+    const calls: CatalogOccurrence['calls'] =
+      index === 0
+        ? []
+        : [
+            {
+              to: [`hash-${String(index - 1)}`],
+              line: 1,
+              column: 0,
+              resolution: 'static',
+              confidence: 'high',
+              text: `f${String(index - 1)}()`,
+            },
+          ];
+    functions[`f${String(index)}`] = [
+      {
+        bodyHash: `hash-${String(index)}`,
+        simpleName: `f${String(index)}`,
+        qualifiedName: `f${String(index)}`,
+        filePath: `src/f${String(index)}.ts`,
+        line: 1,
+        column: 0,
+        endLine: 2,
+        kind: 'function-declaration',
+        params: [],
+        returnType: null,
+        enclosingClass: null,
+        decorators: [],
+        visibility: 'module-local',
+        inTestFile: false,
+        definedInGenerated: false,
+        calls,
+      },
+    ];
+  }
+  return { ...catalog(suffix), functions };
 }
 
 function identityOf(value: Catalog): CatalogIdentity {
@@ -289,6 +425,24 @@ describe('GraphGenerationController', () => {
     expect(setup.verify).toHaveBeenCalledTimes(2);
     const stillCachedB = await setup.controller.verifyCurrent(capturedB.value);
     expect(stillCachedB.ok).toBe(true);
+    expect(setup.verify).toHaveBeenCalledTimes(2);
+  });
+
+  it('bypasses a completed freshness burst verdict when freshness is required', async () => {
+    const setup = harness();
+    const captured = await setup.controller.capture();
+    expect(captured.ok).toBe(true);
+    if (!captured.ok || captured.value === undefined) return;
+
+    const first = await setup.controller.verifyCurrent(captured.value);
+    const reused = await setup.controller.verifyCurrent(captured.value);
+    expect(first.ok && reused.ok).toBe(true);
+    expect(setup.verify).toHaveBeenCalledTimes(1);
+
+    const fresh = await setup.controller.verifyCurrent(captured.value, {
+      forceFresh: true,
+    });
+    expect(fresh.ok).toBe(true);
     expect(setup.verify).toHaveBeenCalledTimes(2);
   });
 

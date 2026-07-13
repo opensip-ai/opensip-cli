@@ -136,6 +136,7 @@ describe('run ledger projection', () => {
           }),
         ),
       ).toEqual({
+        kind: 'signal-envelope',
         schemaVersion: SIGNAL_ENVELOPE_SCHEMA_VERSION,
         tool: 'fit',
         runId: 'run-1',
@@ -166,6 +167,7 @@ describe('run ledger projection', () => {
           }),
         ),
       ).toEqual({
+        kind: 'signal-envelope',
         schemaVersion: SIGNAL_ENVELOPE_SCHEMA_VERSION,
         tool: 'fit',
         runId: 'run-1',

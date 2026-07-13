@@ -2,8 +2,9 @@
  * @fileoverview raw-stream-output-guarded — primary tool command specs that
  * declare `output: 'raw-stream'` must document the exception in-file.
  *
- * `raw-stream` is a sanctioned escape hatch (handler owns full IO). Fitness,
- * graph, and simulation all use it for multi-mode primary commands. This
+ * `raw-stream` is a sanctioned escape hatch (normal host rendering is disabled).
+ * Fitness, graph, and simulation use it for multi-mode primary commands;
+ * internal evidence producers use it when a parent suite owns the result. See
  * ADR-0065: Public --json output and raw-stream policy.
  *
  * check prevents silent spread: any production command-spec file with
@@ -18,7 +19,7 @@ const TOOL_COMMAND_SPEC = toolEngineCliPathRe('.*command-spec.*\\.ts$');
 const RAW_STREAM = /output:\s*['"]raw-stream['"]/;
 
 const REASON_CATEGORY =
-  /completion-script|file-export|worker-ipc|runtime-render-dispatch|session-replay|diagnostic-gate/i;
+  /completion-script|file-export|worker-ipc|runtime-render-dispatch|session-replay|diagnostic-gate|host-orchestrated-evidence|mcp-stdio/i;
 
 const DOCUMENTED =
   /raw-stream|RAW_STREAM|handler owns|owns its (entire )?output|documented.*exception|reason category/i;
@@ -47,7 +48,7 @@ export const rawStreamOutputGuarded = defineCheck({
             'Command spec declares output: raw-stream without an in-file reason-category justification',
           severity: 'error',
           suggestion:
-            'Add a block comment naming the raw-stream reason category (completion-script, file-export, worker-ipc, runtime-render-dispatch, session-replay, diagnostic-gate) and why the handler owns IO.',
+            'Add a block comment naming a RawStreamReason category and why normal host output dispatch must remain disabled.',
         },
       ];
     }

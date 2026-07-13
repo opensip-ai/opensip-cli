@@ -6,7 +6,7 @@
  * narrower language-mismatch + tool-register suites don't reach.
  */
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -216,7 +216,8 @@ let projectDir: string;
 
 beforeEach(() => {
   enterScope(makeGraphTestScope());
-  projectDir = mkdtempSync(join(tmpdir(), 'graph-exec-'));
+  // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
+  projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-exec-')));
   mkdirSync(join(projectDir, 'src'), { recursive: true });
   writeFileSync(join(projectDir, 'src', 'a.ts'), 'export const x = 1;\n', 'utf8');
   // Suppress (don't capture) stdout noise — the `--json` mode now routes
