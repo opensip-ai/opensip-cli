@@ -231,6 +231,11 @@ pnpm install && pnpm build
 # Run fitness checks against this repo (must build first)
 pnpm fit            # shortcut for: node packages/cli/dist/index.js fit
 
+# Run the canonical changed-code review against this repo
+pnpm opensip:audit  # NOT `pnpm audit` — that is pnpm's built-in dependency
+                    # vulnerability scanner and cannot be shadowed by a script.
+pnpm opensip <any>  # generic passthrough, e.g. pnpm opensip suite list
+
 # Run all tests
 pnpm test
 
@@ -734,15 +739,23 @@ CLI package dependency, refresh the bundled-tool test utilities, and
 regenerate the command-surface parity snapshot. The npm package is
 `opensip-cli`; the installed command is `opensip`.
 
-The new-customer flow is three commands: `init` (language detection
-
-- scaffolded layout) → `fit --recipe example` → `sim --recipe
+The new-customer flow leads with first value: `opensip audit` (and
+`fit`, `graph`, `graph impact`) work in a supported project **before**
+`init` — the CLI composes a validated in-memory default config and
+keeps rebuildable runtime state in the user cache, so nothing lands in
+the customer's repo. Initialization is customization after first
+value, not a prerequisite (`audit` is the canonical changed-code
+review, ADR-0155; posture documented in
+`docs/public/00-start/00-quick-start.md`). When the user wants
+explicit setup, `init` (language detection + scaffolded layout) writes
+the config, examples, `.gitignore`, and agent guidance; the
+post-init smoke path is `fit --recipe example` → `sim --recipe
 example`. Project layout is local: user-authored content under
-  `<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
-  (tracked) and tool-generated state under
-  `<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
-  auto-discovers `.mjs` files by directory presence; npm packages
-  must be explicitly listed in `plugins.<domain>` to load.
+`<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
+(tracked) and tool-generated state under
+`<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
+auto-discovers `.mjs` files by directory presence; npm packages
+must be explicitly listed in `plugins.<domain>` to load.
 
 Re-running `init` on a non-pristine project refuses with exit 2 by
 default. Two explicit flags express user intent:
