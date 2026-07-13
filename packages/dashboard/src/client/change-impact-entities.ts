@@ -1,4 +1,7 @@
+import { CHANGE_IMPACT_CLIENT_CAPS, boundClientRows } from './change-impact-bounds.js';
 import { el } from './el.js';
+
+const MUTED_CLASS = 'text-muted';
 
 export type OpenCodePath = (
   identity: ChangeImpactFunctionModel & { readonly bodyHash: string },
@@ -16,56 +19,91 @@ function navigationReason(
   return 'Code Paths unavailable: stored and current catalogs do not match.';
 }
 
-function functionTable(
-  title: string,
-  rows: readonly ChangeImpactFunctionModel[],
-  openCodePath?: OpenCodePath,
-): HTMLElement {
-  const section = el('div', { class: 'card' }, [el('h3', { text: title })]);
-  if (rows.length === 0) {
+interface FunctionTableOptions {
+  readonly backendOmitted: number;
+  readonly clientCap: number;
+  readonly openCodePath?: OpenCodePath;
+  readonly reportOmitted: number;
+  readonly rows: readonly ChangeImpactFunctionModel[];
+  readonly title: string;
+}
+
+function functionTable(options: FunctionTableOptions): HTMLElement {
+  const { backendOmitted, clientCap, openCodePath, reportOmitted, rows, title } = options;
+  const section = el('section', { class: 'card change-impact-entity-card' }, [
+    el('h3', { text: title }),
+  ]);
+  const bounded = boundClientRows(rows, clientCap);
+  if (bounded.rows.length === 0) {
     section.append(el('div', { class: 'empty', text: 'No stored functions.' }));
-    return section;
-  }
-  const table = el('table', { class: 'data-table' });
-  const header = el('tr');
-  ['Function', 'Package', 'Location', 'Evidence', 'Code Paths'].forEach((label) =>
-    header.append(el('th', { text: label })),
-  );
-  table.append(el('thead', {}, [header]));
-  const body = el('tbody');
-  rows.forEach((value) => {
-    const row = el('tr');
-    row.append(
-      el('td', { text: value.qualifiedName }),
-      el('td', { text: value.package ?? '—' }),
-      el('td', { text: `${value.filePath}:${String(value.line)}` }),
-      el('td', { text: value.reason }),
+  } else {
+    const table = el('table', { class: 'data-table' });
+    table.append(el('caption', { text: title }));
+    const header = el('tr');
+    ['Function', 'Package', 'Location', 'Evidence', 'Code Paths'].forEach((label) =>
+      header.append(el('th', { scope: 'col', text: label })),
     );
-    const navigation = el('td');
-    if (value.navigation === 'available' && value.bodyHash && openCodePath) {
-      const identity = { ...value, bodyHash: value.bodyHash };
-      navigation.append(
-        el('button', {
-          type: 'button',
-          class: 'fc-action',
-          text: 'Open',
-          onclick: () => openCodePath(identity),
-        }),
+    table.append(el('thead', {}, [header]));
+    const body = el('tbody');
+    bounded.rows.forEach((value) => {
+      const row = el('tr');
+      row.append(
+        el('th', { scope: 'row', text: value.qualifiedName }),
+        el('td', { text: value.package ?? '—' }),
+        el('td', { text: `${value.filePath}:${String(value.line)}` }),
+        el('td', { text: value.reason }),
       );
-    } else {
-      navigation.append(
-        el('span', {
-          class: 'text-muted',
-          'aria-disabled': 'true',
-          text: navigationReason(value, openCodePath !== undefined),
-        }),
-      );
-    }
-    row.append(navigation);
-    body.append(row);
-  });
-  table.append(body);
-  section.append(table);
+      const navigation = el('td');
+      if (value.navigation === 'available' && value.bodyHash && openCodePath) {
+        const identity = { ...value, bodyHash: value.bodyHash };
+        navigation.append(
+          el('button', {
+            type: 'button',
+            class: 'fc-action',
+            text: 'Open',
+            'aria-label': `Open Code Paths for ${value.qualifiedName}`,
+            onclick: () => openCodePath(identity),
+          }),
+        );
+      } else {
+        navigation.append(
+          el('span', {
+            class: MUTED_CLASS,
+            'aria-disabled': 'true',
+            text: navigationReason(value, openCodePath !== undefined),
+          }),
+        );
+      }
+      row.append(navigation);
+      body.append(row);
+    });
+    table.append(body);
+    section.append(table);
+  }
+  if (backendOmitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(backendOmitted)} function row(s) omitted by the backend projection.`,
+      }),
+    );
+  }
+  if (reportOmitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(reportOmitted)} function row(s) omitted by the report budget.`,
+      }),
+    );
+  }
+  if (bounded.omitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(bounded.omitted)} function row(s) omitted by the defensive client limit.`,
+      }),
+    );
+  }
   return section;
 }
 
@@ -75,16 +113,37 @@ export function renderImpactEntities(
   openCodePath?: OpenCodePath,
 ): void {
   if (!model.evidence) return;
+  const evidence = model.evidence;
   container.append(
-    functionTable('Changed functions', model.evidence.changedFunctions, openCodePath),
-    functionTable('Impacted functions', model.evidence.impactedFunctions, openCodePath),
+    functionTable({
+      backendOmitted: evidence.backendOmitted.changedFunctions,
+      clientCap: CHANGE_IMPACT_CLIENT_CAPS.changedFunctions,
+      openCodePath,
+      reportOmitted: model.reportOmitted.changedFunctions,
+      rows: evidence.changedFunctions,
+      title: 'Changed functions',
+    }),
+    functionTable({
+      backendOmitted: evidence.backendOmitted.impactedFunctions,
+      clientCap: CHANGE_IMPACT_CLIENT_CAPS.impactedFunctions,
+      openCodePath,
+      reportOmitted: model.reportOmitted.impactedFunctions,
+      rows: evidence.impactedFunctions,
+      title: 'Impacted functions',
+    }),
   );
-  const packages = el('div', { class: 'card' }, [el('h3', { text: 'Impacted packages' })]);
-  if (model.evidence.impactedPackages.length === 0)
+  const packages = el('section', { class: 'card change-impact-entity-card' }, [
+    el('h3', { text: 'Impacted packages' }),
+  ]);
+  const boundedPackages = boundClientRows(
+    evidence.impactedPackages,
+    CHANGE_IMPACT_CLIENT_CAPS.impactedPackages,
+  );
+  if (boundedPackages.rows.length === 0)
     packages.append(el('div', { class: 'empty', text: 'No stored packages.' }));
   else {
     const list = el('ul', { class: 'change-impact-list' });
-    model.evidence.impactedPackages.forEach((item) =>
+    boundedPackages.rows.forEach((item) =>
       list.append(
         el('li', {
           text: `${item.name}: ${String(item.functionCount)} function(s)`,
@@ -93,5 +152,26 @@ export function renderImpactEntities(
     );
     packages.append(list);
   }
+  if (evidence.backendOmitted.impactedPackages > 0)
+    packages.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(evidence.backendOmitted.impactedPackages)} package row(s) omitted by the backend projection.`,
+      }),
+    );
+  if (model.reportOmitted.impactedPackages > 0)
+    packages.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(model.reportOmitted.impactedPackages)} package row(s) omitted by the report budget.`,
+      }),
+    );
+  if (boundedPackages.omitted > 0)
+    packages.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(boundedPackages.omitted)} package row(s) omitted by the defensive client limit.`,
+      }),
+    );
   container.append(packages);
 }

@@ -1,12 +1,7 @@
+import { CHANGE_IMPACT_CLIENT_CAPS, boundClientRows } from './change-impact-bounds.js';
 import { editorLinkUrl } from './editor-link.js';
 import { el } from './el.js';
 
-const RISK_GUARD = 100;
-const CORRELATION_GUARD = 50;
-const CORRELATION_MEMBER_GUARD = 50;
-const CORRELATION_REASON_GUARD = 20;
-const DEGRADATION_GUARD = 50;
-const ACTION_GUARD = 50;
 const MUTED_CLASS = 'text-muted';
 
 function locationText(file: string, line?: number): string {
@@ -46,20 +41,27 @@ function appendRisks(
   brief: ChangeImpactReviewBrief,
   omittedByReport: number,
 ): void {
-  const risks = brief.topRisks.slice(0, RISK_GUARD);
-  if (risks.length === 0)
+  const risks = boundClientRows(brief.topRisks, CHANGE_IMPACT_CLIENT_CAPS.risks);
+  if (risks.rows.length === 0)
     section.append(el('div', { class: 'empty', text: 'No stored review risks.' }));
   else {
     const list = el('ul', { class: 'change-impact-list' });
-    risks.forEach((risk) => list.append(riskRow(risk)));
+    risks.rows.forEach((risk) => list.append(riskRow(risk)));
     section.append(list);
   }
-  const omittedRisks = brief.topRisks.length - risks.length + omittedByReport;
-  if (omittedRisks > 0) {
+  if (omittedByReport > 0) {
     section.append(
       el('p', {
         class: MUTED_CLASS,
-        text: `${String(omittedRisks)} additional risk entry/entries omitted.`,
+        text: `${String(omittedByReport)} risk entry/entries omitted by the report budget.`,
+      }),
+    );
+  }
+  if (risks.omitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(risks.omitted)} risk entry/entries omitted by the defensive client limit.`,
       }),
     );
   }
@@ -70,8 +72,11 @@ function appendCorrelations(
   brief: ChangeImpactReviewBrief,
   omittedByReport: number,
 ): void {
-  const correlations = (brief.correlatedRisks ?? []).slice(0, CORRELATION_GUARD);
-  for (const group of correlations) {
+  const correlations = boundClientRows(
+    brief.correlatedRisks ?? [],
+    CHANGE_IMPACT_CLIENT_CAPS.correlations,
+  );
+  for (const group of correlations.rows) {
     const details = el('details', { class: 'change-impact-correlation' }, [
       el('summary', {
         text: `${group.title} · ${group.severity}${group.isNew ? ' · NEW' : ''}`,
@@ -80,7 +85,7 @@ function appendCorrelations(
         text: `Primary: ${group.primary.source} ${group.primary.ruleId} at ${locationText(group.primary.file, group.primary.line)}`,
       }),
     ]);
-    const members = group.members.slice(0, CORRELATION_MEMBER_GUARD);
+    const members = group.members.slice(0, CHANGE_IMPACT_CLIENT_CAPS.correlationMembers);
     const memberList = el('ul', { class: 'change-impact-list' });
     members.forEach((member) =>
       memberList.append(
@@ -98,7 +103,7 @@ function appendCorrelations(
         }),
       );
     }
-    const reasons = group.reasons.slice(0, CORRELATION_REASON_GUARD);
+    const reasons = group.reasons.slice(0, CHANGE_IMPACT_CLIENT_CAPS.correlationReasons);
     reasons.forEach((reason) =>
       details.append(
         el('p', {
@@ -123,13 +128,19 @@ function appendCorrelations(
       );
     section.append(details);
   }
-  const omittedCorrelations =
-    (brief.correlatedRisks?.length ?? 0) - correlations.length + omittedByReport;
-  if (omittedCorrelations > 0) {
+  if (omittedByReport > 0) {
     section.append(
       el('p', {
         class: MUTED_CLASS,
-        text: `${String(omittedCorrelations)} correlation group(s) omitted.`,
+        text: `${String(omittedByReport)} correlation group(s) omitted by the report budget.`,
+      }),
+    );
+  }
+  if (correlations.omitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(correlations.omitted)} correlation group(s) omitted by the defensive client limit.`,
       }),
     );
   }
@@ -140,8 +151,8 @@ function appendDegradations(
   brief: ChangeImpactReviewBrief,
   omittedByReport: number,
 ): void {
-  const degradations = brief.degraded.slice(0, DEGRADATION_GUARD);
-  degradations.forEach((degradation) => {
+  const degradations = boundClientRows(brief.degraded, CHANGE_IMPACT_CLIENT_CAPS.degradations);
+  degradations.rows.forEach((degradation) => {
     section.append(
       el('p', {
         class: MUTED_CLASS,
@@ -149,12 +160,19 @@ function appendDegradations(
       }),
     );
   });
-  const omittedDegradations = brief.degraded.length - degradations.length + omittedByReport;
-  if (omittedDegradations > 0) {
+  if (omittedByReport > 0) {
     section.append(
       el('p', {
         class: MUTED_CLASS,
-        text: `${String(omittedDegradations)} degradation detail(s) omitted.`,
+        text: `${String(omittedByReport)} degradation detail(s) omitted by the report budget.`,
+      }),
+    );
+  }
+  if (degradations.omitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(degradations.omitted)} degradation detail(s) omitted by the defensive client limit.`,
       }),
     );
   }
@@ -165,11 +183,14 @@ function appendActions(
   brief: ChangeImpactReviewBrief,
   omittedByReport: number,
 ): void {
-  const retainedActions = brief.recommendedActions.slice(0, ACTION_GUARD);
-  if (retainedActions.length > 0) {
+  const retainedActions = boundClientRows(
+    brief.recommendedActions,
+    CHANGE_IMPACT_CLIENT_CAPS.actions,
+  );
+  if (retainedActions.rows.length > 0) {
     section.append(el('h4', { text: 'Recommended actions' }));
     const actions = el('ol', { class: 'change-impact-list' });
-    retainedActions.forEach((action) => {
+    retainedActions.rows.forEach((action) => {
       const command = action.command ? ` — ${action.command}` : '';
       actions.append(
         el('li', {
@@ -179,22 +200,32 @@ function appendActions(
     });
     section.append(actions);
   }
-  const omittedActions = brief.recommendedActions.length - retainedActions.length + omittedByReport;
-  if (omittedActions > 0) {
+  if (omittedByReport > 0) {
     section.append(
       el('p', {
         class: MUTED_CLASS,
-        text: `${String(omittedActions)} recommended action(s) omitted.`,
+        text: `${String(omittedByReport)} recommended action(s) omitted by the report budget.`,
+      }),
+    );
+  }
+  if (retainedActions.omitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(retainedActions.omitted)} recommended action(s) omitted by the defensive client limit.`,
       }),
     );
   }
 }
 
 function appendVerificationCommands(section: HTMLElement, model: ChangeImpactViewModel): void {
-  const commands = model.evidence?.recommendedCommands ?? [];
-  if (commands.length > 0) {
+  const commands = boundClientRows(
+    model.evidence?.recommendedCommands ?? [],
+    CHANGE_IMPACT_CLIENT_CAPS.recommendedCommands,
+  );
+  if (commands.rows.length > 0) {
     section.append(el('h4', { text: 'Verification commands' }));
-    commands.forEach((command) =>
+    commands.rows.forEach((command) =>
       section.append(el('code', { class: 'change-impact-command', text: command })),
     );
   }
@@ -206,15 +237,31 @@ function appendVerificationCommands(section: HTMLElement, model: ChangeImpactVie
       }),
     );
   }
+  if (commands.omitted > 0) {
+    section.append(
+      el('p', {
+        class: MUTED_CLASS,
+        text: `${String(commands.omitted)} verification command(s) omitted by the defensive client limit.`,
+      }),
+    );
+  }
 }
 
 export function renderImpactRisks(container: HTMLElement, model: ChangeImpactViewModel): void {
   const brief = model.reviewBrief;
-  const section = el('div', { class: 'card change-impact-risks' }, [
+  const section = el('section', { class: 'card change-impact-risks' }, [
     el('h3', { text: 'Review risks and actions' }),
   ]);
   if (!brief) {
-    section.append(el('div', { class: 'empty', text: 'Stored review brief unavailable.' }));
+    section.append(
+      el('div', {
+        class: 'empty',
+        text:
+          model.reviewBriefState === 'malformed'
+            ? 'Stored review brief is malformed and was not rendered. Treat this review as incomplete.'
+            : 'Stored review brief unavailable.',
+      }),
+    );
     container.append(section);
     return;
   }
@@ -226,7 +273,11 @@ export function renderImpactRisks(container: HTMLElement, model: ChangeImpactVie
         : 'Baseline delta unavailable.',
     }),
     el('p', {
-      text: `${String(brief.newFindings.length)} retained new finding(s).`,
+      text: `${String(brief.newFindings.length)} retained new finding(s).${
+        model.reportOmitted.newFindings > 0
+          ? ` ${String(model.reportOmitted.newFindings)} new finding(s) omitted by the report budget.`
+          : ''
+      }`,
     }),
   );
   appendRisks(section, brief, model.reportOmitted.risks);

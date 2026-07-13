@@ -6,6 +6,10 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['src/**/*.test.ts'],
+      // The built-CLI report test has its own post-build lane. Keeping it out
+      // of the ordinary package task prevents Turbo from racing dashboard
+      // tests against the independent CLI build task or accepting stale dist.
+      exclude: ['src/__tests__/dashboard-graph-offline.integration.test.ts'],
       passWithNoTests: true,
       // Integration tests boot jsdom against the generated dashboard HTML
       // (large vendored document). vitest 4 + vite 7's slower jsdom warm

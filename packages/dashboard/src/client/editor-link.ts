@@ -30,7 +30,8 @@ export function editorLinkUrl(filePath: string, line: number): string | null {
   if (!isSafeEditorLinkPath(filePath)) return null;
   if (typeof EDITOR_PROTOCOL !== 'string' || !EDITOR_PROTOCOL) return null;
   if (EDITOR_PROTOCOL === 'vscode' || EDITOR_PROTOCOL === 'cursor') {
-    return EDITOR_PROTOCOL + '://file/' + filePath + ':' + (line || 1);
+    const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+    return EDITOR_PROTOCOL + '://file/' + encodedPath + ':' + (line || 1);
   }
   return null;
 }
