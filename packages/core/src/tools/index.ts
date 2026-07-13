@@ -25,6 +25,15 @@ export type {
   LiveViewContext,
   ToolSessionContribution,
   ToolRunCompletion,
+  EvidenceSnapshotContribution,
+  EvidenceSnapshotInput,
+  EvidenceSnapshotProducer,
+  EvidenceSnapshotReason,
+  EvidenceSnapshotStatus,
+  EvidenceCoverageStatus,
+  EvidenceCoverageSummary,
+  EvidenceFreshnessStatus,
+  EvidenceFreshnessSummary,
   RecordedToolRunSession,
   ToolRunSessions,
   ToolExtensionPoints,
@@ -51,7 +60,9 @@ export {
   MAX_STATIC_HANDLER_PATH,
   RAW_STREAM_REASONS,
   commandProducesVerdict,
+  commandProducesEvidenceSnapshot,
 } from './command-spec.js';
+export { EVIDENCE_SNAPSHOT_CONTRIBUTION_VERSION } from './tool-sessions.js';
 export type { StaticHandlerDescriptor } from './command-spec.js';
 // The runtime admission guard for the command contract lives beside the types
 // in ./command-spec-validate.ts (kept separate so each file stays one concern).

@@ -20,13 +20,13 @@ related-docs:
 ---
 # Layered package graph
 
-Fifty-nine workspace packages: 56 publishable and three private. Six runtime layers. One
+Sixty workspace packages: 57 publishable and three private. Six runtime layers. One
 enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](../80-implementation/05-layer-policy.md).
 
 > **What you'll understand after this:**
-> - Why opensip-cli ships as 56 publishable packages instead of one.
+> - Why opensip-cli ships as 57 publishable packages instead of one.
 > - The six layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
@@ -81,13 +81,14 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 - **`@opensip-cli/tree-sitter`** (ADR-0010) is the grammar-agnostic `web-tree-sitter` substrate: the WASM parser lifecycle and grammar-neutral node accessors (`createParser`, `walkNodes`, `findEnclosing`, …). It imports `core` only (plus `web-tree-sitter`) and is consumed from above — by the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (through `graph-adapter-common`) — so the WASM lifecycle lives in exactly one place. A dedicated dependency-cruiser rule (`tree-sitter-imports-core-only`) holds it at this substrate position.
 - **`@opensip-cli/cli-ui`** is the Ink/React presentational primitives kit (`Banner`, `Spinner`, `RunHeader`, `theme`) — extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher.
 
-**Layer 3 — persistence/output/config libraries and language adapters.** Packages above the substrate, depending on `core`/`contracts`/`datastore` (and lower siblings within this layer), never on a tool.
+**Layer 3 — persistence/output/config/codebase libraries and language adapters.** Packages above the substrate, depending on `core`/`contracts`/`datastore` (and lower siblings within this layer), never on a tool.
 
 - **`@opensip-cli/cli-live`** owns the shared live-run state machine and `produce()` seam used by bundled Tools without pulling in the CLI dispatcher.
 - **`@opensip-cli/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_tool_payload` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
 - **`@opensip-cli/output`** (renamed from `@opensip-cli/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
 - **`@opensip-cli/config`** is the capability-configuration substrate (ADR-0023): the `composeConfigSchema` composer that folds each tool's namespaced Zod schema into one strict whole-document schema, the resolver, and the `ToolConfigDeclaration` declaration type. The dependency-cruiser rule here is **directional**: `config` must not import a tool. Tools, by contrast, **do** import `@opensip-cli/config` — for the `ToolConfigDeclaration` type they use to declare their config namespace. So the edge runs tool → config, never config → tool. Depends on `core`.
 - **`@opensip-cli/targeting`** is the host file-targeting runtime substrate (ADR-0037): the `TargetRegistry`, the uniform glob expansion (`resolveTargets`, always applying per-target `exclude` **and** `globalExcludes`), and `applyGlobalExcludes`. The CLI bootstrap builds it once per run from the validated config document and exposes it as `scope.targets`; any tool resolves named file sets without importing fitness. Depends on `config` (targeting types) and `core` (the generic `Registry<T>` base) — never a tool engine. The check-domain half (`checkOverrides`, scope matching, the content `fileCache`) stays in `fitness` as a thin consumer.
+- **`@opensip-cli/codebase`** is the persistence-free project inventory substrate: it projects bounded target membership, file metadata, package manifests, and conservative verification commands into deterministic evidence facts. It reads through the captured structural target resolver and retains no source or raw manifest content. Graph and MCP consume it from above.
 - **`@opensip-cli/dashboard`** is the self-contained HTML report renderer; consumed by the CLI-owned `report` command and each tool's auto-open hook. It does not implement the `Tool` contract; it is a library the composition root consumes.
 - **`@opensip-cli/external-tool-adapter`** is the shared normalization and command substrate for external scanner Tools.
 - **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. (The graph engine has its own `GraphLanguageAdapter` contract, implemented by the publishable `graph-*` adapter packs at Layer 5.) See [`50-extend/05-language-adapters.md`](../50-extend/05-language-adapters.md) for the distinction.
@@ -98,8 +99,8 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 
 **Layer 6 — `opensip-cli`.** The composition root. Discovers every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-The generated architecture map is the inventory source of truth: 59 workspace
-packages, 56 publishable, and three private. `@opensip-cli/agent-eval` is a
+The generated architecture map is the inventory source of truth: 60 workspace
+packages, 57 publishable, and three private. `@opensip-cli/agent-eval` is a
 black-box agent-usability harness outside the runtime layers;
 `@opensip-cli/test-support` carries cross-package test scaffolding; and
 `@opensip-cli/checks-dogfood` carries this repository's architecture checks.
@@ -157,7 +158,7 @@ The upshot: there is **no** standing "you may `import type` upward" allowance. A
 
 ---
 
-## Why 56 publishable packages and not 1
+## Why 57 publishable packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -169,7 +170,7 @@ A check pack like `@opensip-cli/checks-python` has to be installable on its own.
 opensip fit plugin add @opensip-cli/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 56 publishable packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 57 publishable packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -177,15 +178,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 59 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 60 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 59-package workspace is more expensive in three places:
+Trade-offs are real. The 60-package workspace is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 56 publishable packages; `agent-eval`, `test-support`, and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 57 publishable packages; `agent-eval`, `test-support`, and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)) is the antidote.
 

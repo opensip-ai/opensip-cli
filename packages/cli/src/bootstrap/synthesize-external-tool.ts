@@ -61,6 +61,9 @@ function manifestCommandToSpec(cmd: ToolCommandManifest): CommandSpec<unknown, T
     output: cmd.output ?? 'command-result',
     ...(cmd.rawStreamReason === undefined ? {} : { rawStreamReason: cmd.rawStreamReason }),
     ...(cmd.producesVerdict === undefined ? {} : { producesVerdict: cmd.producesVerdict }),
+    ...(cmd.producesEvidenceSnapshot === undefined
+      ? {}
+      : { producesEvidenceSnapshot: cmd.producesEvidenceSnapshot }),
     handler: externalDispatchStub(cmd.name),
   };
   assertCommandSpec(spec);

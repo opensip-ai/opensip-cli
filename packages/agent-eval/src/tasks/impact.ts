@@ -5,14 +5,13 @@ import { customerTsGroundTruth } from '../ground-truth/customer-ts.js';
 import { customerWorkspaceGroundTruth } from '../ground-truth/customer-workspace.js';
 import { deepFreeze, escapeRegularExpression } from '../model/value-helpers.js';
 
+import { extractImpactFiles } from './context-surface-extractors.js';
 import {
   callerEvidenceSubject,
   extractAliasSourcePaths,
-  extractBlastSummary,
   extractCallableAliasesFromSource,
   extractDeclaredFunctionSymbols,
   extractNativeCallerCandidates,
-  extractPackageDependencies,
   extractPackageManifestFacts,
   extractPackageManifestPaths,
   extractPackageNamesFromManifestMatches,
@@ -27,11 +26,13 @@ import type { AnswerFactPattern, FactBinding, GoldTask, StrategyStep } from '../
 const SEARCH_LIMIT = 20;
 const PAGE_LIMIT = 500;
 const CONTROL_STRATEGY_VERSION = 'control-native-v1';
-const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-4-v2-no-transitive-negative';
+const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-7-v1-impact-files';
 const NATIVE_MAX_MATCHES = 200;
 const NATIVE_MAX_WALKED_FILES = 20_000;
 const NATIVE_MAX_FILE_BYTES = 1024 * 1024;
 const NATIVE_MAX_TOTAL_BYTES = 8 * 1024 * 1024;
+const OPENSIP_IMPACT_DEPTH = 2;
+const OPENSIP_IMPACT_LIMIT = 50;
 
 interface ImpactTaskConfig {
   readonly aliasExpected: boolean;
@@ -46,17 +47,6 @@ function symbolBinding(stepId: string, name: string): FactBinding {
   return {
     $fact: {
       field: 'symbolId',
-      match: { kind: 'symbol-handle', name },
-      select: 'only',
-      stepId,
-    },
-  };
-}
-
-function packageBinding(stepId: string, name: string): FactBinding {
-  return {
-    $fact: {
-      field: 'package',
       match: { kind: 'symbol-handle', name },
       select: 'only',
       stepId,
@@ -226,6 +216,25 @@ function opensipSteps(config: ImpactTaskConfig): readonly StrategyStep[] {
   const steps: StrategyStep[] = [
     {
       arguments: {
+        depth: OPENSIP_IMPACT_DEPTH,
+        files: [config.target.targetFile],
+        top: OPENSIP_IMPACT_LIMIT,
+      },
+      expectedNonEmpty: true,
+      extract: extractImpactFiles,
+      id: `${prefix}.impact-files`,
+      rationale:
+        'Use the explicit changed file to recover the bounded caller-file and package impact projection.',
+      tool: 'impact_files',
+    },
+  ];
+  // The Python fixture's current graph explicitly cannot close its dynamic
+  // reverse frontier. Appending expected-nonempty identity/traversal reads
+  // would convert that known limitation into an incorrect-none result.
+  if (config.fixture === 'customer-py') return steps;
+  steps.push(
+    {
+      arguments: {
         detail: 'nodes',
         generated: 'include',
         limit: SEARCH_LIMIT,
@@ -242,11 +251,11 @@ function opensipSteps(config: ImpactTaskConfig): readonly StrategyStep[] {
     },
     {
       arguments: {
-        depth: 5,
+        depth: OPENSIP_IMPACT_DEPTH,
         detail: 'nodes',
         generated: 'include',
         identity: 'occurrence',
-        limit: PAGE_LIMIT,
+        limit: OPENSIP_IMPACT_LIMIT,
         sourceScope: 'all',
         symbolId: binding,
       },
@@ -257,41 +266,7 @@ function opensipSteps(config: ImpactTaskConfig): readonly StrategyStep[] {
         'Page bounded occurrence-precise caller nodes from the response-derived symbol identity.',
       tool: 'who_calls',
     },
-    {
-      arguments: {
-        detail: 'nodes',
-        generated: 'include',
-        limit: PAGE_LIMIT,
-        sourceScope: 'all',
-        symbolId: binding,
-      },
-      expectedNonEmpty: true,
-      extract: extractBlastSummary,
-      id: `${prefix}.blast-radius`,
-      rationale:
-        'Record blast score and body-twin membership without treating twins as caller files.',
-      tool: 'blast_radius',
-    },
-  ];
-  if (config.fixture === 'customer-workspace') {
-    steps.push({
-      arguments: {
-        direction: 'both',
-        edgeKind: 'combined',
-        generated: 'include',
-        limit: PAGE_LIMIT,
-        package: packageBinding(searchId, config.target.targetSymbol),
-        sampleLimit: 0,
-        sourceScope: 'all',
-      },
-      expectedNonEmpty: true,
-      extract: extractPackageDependencies,
-      id: `${prefix}.package-dependencies`,
-      rationale:
-        "Use the target symbol's observed package to enumerate bounded cross-package impact evidence.",
-      tool: 'package_dependencies',
-    });
-  }
+  );
   return steps;
 }
 

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   catalogGenerationKey,
   createGeneration,
+  generationImpactIndex,
   GraphGenerationController,
   type GenerationControllerDeps,
 } from '../catalog-generation.js';
@@ -91,6 +92,27 @@ describe('createGeneration', () => {
     expect(gen.source).toBe('initial-load');
     expect(gen.indexes).toBeDefined();
     expect(gen).not.toHaveProperty('identity');
+  });
+
+  it('builds one impact index per immutable generation and isolates requester cancellation', async () => {
+    const firstGeneration = createGeneration(catalog('01'), 'initial-load');
+    const [first, joined] = await Promise.all([
+      generationImpactIndex(firstGeneration),
+      generationImpactIndex(firstGeneration),
+    ]);
+    expect(joined).toBe(first);
+    expect(firstGeneration.derived.impactIndex).toBe(first);
+    expect(await generationImpactIndex(firstGeneration)).toBe(first);
+
+    const cancelled = new AbortController();
+    cancelled.abort();
+    await expect(generationImpactIndex(firstGeneration, cancelled.signal)).rejects.toMatchObject({
+      name: 'ComputeImpactCancelledError',
+    });
+    expect(await generationImpactIndex(firstGeneration)).toBe(first);
+
+    const nextGeneration = createGeneration(catalog('02'), 'persisted-auto-swap');
+    expect(await generationImpactIndex(nextGeneration)).not.toBe(first);
   });
 });
 

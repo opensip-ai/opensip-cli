@@ -2,7 +2,12 @@
  * `get_symbol` — resolve a symbol by file + line.
  */
 
-import { filePath as filePathSchema, line as lineSchema, strictInput } from './schemas.js';
+import {
+  filePath as filePathSchema,
+  line as lineSchema,
+  strictInput,
+  symbolDetail,
+} from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -21,12 +26,14 @@ export function registerGetSymbol(server: McpStdioServer, deps: McpToolDeps): vo
       inputSchema: strictInput({
         file: filePathSchema(),
         line: lineSchema(),
+        detail: symbolDetail(),
       }),
     },
-    async ({ file, line }) => {
-      const outcome = await deps.graph.findBySpan(file, line);
+    async ({ file, line, detail }, request) => {
+      const outcome = await deps.graph.symbolAtLocation(file, line, detail, request?.signal);
       if (!outcome.ok) return errorResult(outcome.error);
-      const { data: candidates, freshness, context, coverage } = outcome.value;
+      const { data, freshness, context, coverage } = outcome.value;
+      const { candidates, entity } = data;
       if (candidates.length === 0) {
         const message =
           `No symbol declaration encloses ${file}:${String(line)}. ` +
@@ -34,7 +41,10 @@ export function registerGetSymbol(server: McpStdioServer, deps: McpToolDeps): vo
             ? 'Check the file/line, or use search_symbols by name.'
             : 'The catalog is stale/missing — run refresh_graph, then retry.');
         return jsonResult({
-          ...outcome.value,
+          data: candidates,
+          context,
+          freshness,
+          coverage,
           found: false,
           error: {
             code: 'symbol-not-found',
@@ -43,7 +53,25 @@ export function registerGetSymbol(server: McpStdioServer, deps: McpToolDeps): vo
         });
       }
       if (candidates.length === 1) {
-        return jsonResult({ data: candidates[0], context, freshness, coverage });
+        if (detail === 'summary') {
+          return jsonResult({ data: candidates[0], context, freshness, coverage });
+        }
+        if (entity === null || entity === undefined) {
+          return jsonResult({
+            data: null,
+            context,
+            freshness,
+            coverage,
+            found: false,
+            error: {
+              code: 'entity-not-found',
+              message:
+                'The resolved symbol is not present in the captured graph generation. ' +
+                'Retry get_symbol and inspect catalog identity/freshness.',
+            },
+          });
+        }
+        return jsonResult({ data: entity, context, freshness, coverage });
       }
       return jsonResult({ ambiguous: true, candidates, context, freshness, coverage });
     },

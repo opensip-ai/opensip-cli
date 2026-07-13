@@ -13,12 +13,16 @@ source-files:
   - packages/datastore/src/factory.ts
   - packages/contracts/src/session-types.ts
   - packages/contracts/src/graph-catalog.ts
+  - packages/contracts/src/task-context.ts
   - packages/session-store/src/session-repo.ts
   - packages/session-store/src/store.ts
   - packages/session-store/src/schema/sessions.ts
+  - packages/session-store/src/schema/runs.ts
+  - packages/session-store/src/context-manifest-read.ts
   - packages/cli/src/report-compose.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
+  - packages/graph/engine/src/persistence/context-snapshot-repo.ts
   - packages/datastore/src/baseline-repo.ts
   - packages/datastore/src/schema/baseline.ts
   - packages/datastore/src/policy-audit-repo.ts
@@ -271,6 +275,36 @@ The persistence policy is **materialize only when forced** (ADR-0006): features 
 The `--workspace` runner spawns one child process per workspace unit (per adapter `discoverWorkspaceUnits`). Each child opens its own `DataStore` against the shared `datastore.sqlite` file. WAL mode permits concurrent readers + one writer, so the parallelism is safe but serialized at the catalog write boundary — per-unit incremental writes are deferred to a follow-up `graph-catalog-perf` plan.
 
 The `--no-cache` flag forces a cache miss; the existing fingerprint-based invalidation path runs even when `datastore.sqlite` is present and current.
+
+### Task-context derived snapshots and parent manifests
+
+Task context spans two deliberately separate owners. Graph persists immutable
+inventory and test-selection payloads in `graph_context_snapshot`; each row has
+an exact id/kind/payload version, source/config identity, byte count, and JSON
+payload. Writes reject payloads above 8 MiB, retain at most three rows per kind,
+and prune deterministically until total retained bytes are at most 24 MiB.
+Snapshot payloads contain facts and labelled static evidence, never source,
+raw manifests, environment values, or unsafe script text.
+
+The CLI aggregates only bounded contribution metadata. It preallocates the
+parent Run and RunStep identities, builds `TaskContextManifest`, then writes the
+same ids to `runs.context_manifest` and ordered `run_steps.evidence`. The parent
+manifest is capped at 16 planes/64 KiB. Snapshot write precedes parent write, so
+a failed parent transaction can leave an orphan; bounded age/size retention can
+eventually remove old rows, including orphans and referenced snapshots. A
+failed snapshot write cannot yield a successful contribution. There is no
+cross-owner transaction and no context Tool session.
+
+`get_context_status` reads the exact project-root/name parent Run through
+session-store, validates its stored step references, and asks graph only whether
+each recorded pointer is still available. For a retained inventory pointer it
+also compares a freshly computed, content-free inventory identity; a mismatch
+is stale and the newer identity is not disclosed. It never substitutes latest.
+Old Runs have no manifest; an evicted snapshot leaves the parent Run available
+but marks that exact pointer missing with a conservative rerun action. Callers
+must require response `status: available`, `fileScope.status: matched`,
+`manifest.readiness: ready`, and current, complete, uncapped required planes
+whose exact pointers all replay as `available` before trusting the context.
 
 ---
 

@@ -11,6 +11,8 @@ source-files:
   - packages/contracts/src/command-results-variants/graph-impact-result.ts
   - packages/core/src/lib/git-changed-files.ts
   - packages/graph/engine/src/cli/impact.ts
+  - packages/graph/engine/src/read/impact-view.ts
+  - packages/graph/engine/src/read/test-selection-view.ts
   - packages/fitness/engine/src/cli/fit/changed-targeting.ts
   - packages/cli/src/commands/suite/orchestrator.ts
 related-docs:
@@ -51,3 +53,32 @@ Suite runs project impact trust onto `data.steps[].verification` when a step emi
 it. The host-owned review brief also records partial impact verification in
 `reviewBrief.degraded[]`, which turns an otherwise clean suite into a warning
 rather than a false pass.
+
+## MCP explicit-file impact
+
+`impact_files` accepts only normalized project-relative `files[]` (maximum 128)
+and projects the same canonical `computeImpact` result inside one immutable
+`g1:` generation. The generation caches a caller-owned impact index so repeated
+queries do not rescan the whole catalog. The response keeps `ImpactTrust`
+unchanged and adds the standard inventory/evidence/grouping/projection coverage
+facets. Missing or stale graph evidence, unmatched files, caps, and approximate
+edges return explicit uncertainty plus `full-run`; a bare empty answer is never
+treated as complete.
+
+## Labelled static test selection
+
+`select_tests` combines the exact graph generation with one immutable codebase
+inventory snapshot. It walks bounded reverse call/import evidence to test files,
+then may add weaker target/convention or co-location candidates only when the
+inventory records that basis. Every candidate states its basis, weakest-edge
+confidence, bounded proof, and `observed: false`. Body-twin ambiguity lowers
+confidence; static reachability never claims observed coverage.
+
+Runnable suggestions come only from package/project script text that parses as
+a direct, non-mutating allowlisted verification command, and are returned as
+`cwd + argv[]`. Package-manager script wrappers, lifecycle hooks, unsafe shell,
+interactive/watch/update flags, and secret-looking arguments are omitted with a
+reason. The selector never executes a command and never invents a framework invocation. Uncovered inputs, depth/node/
+candidate/command caps, and unsupported evidence carry package/full fallback
+tiers. The existing CLI `graph impact` `recommendedCommands` shape is unchanged;
+`select_tests` is a separate labelled contract.

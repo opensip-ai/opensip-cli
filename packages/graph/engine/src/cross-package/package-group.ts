@@ -29,8 +29,9 @@ import { packageOf } from '../resolve-callee.js';
  * `dir` is the package's PROJECT-RELATIVE root (e.g. `packages/core`, `apps/web`,
  * or `''` for a single-package repo rooted at the project) — derived from the
  * shard's absolute `rootDir` against the common project root. It is the prefix
- * {@link packageGroupOf} matches file paths against. `exportsMap` is the raw
- * `exports` field (when an object), used to gate subpath resolution.
+ * {@link packageGroupOf} matches file paths against. `exportsMap` is a
+ * value-free key-set projection of object-form `exports`, used only to gate
+ * subpath resolution; raw manifest values are never retained.
  */
 export interface PackageManifest {
   readonly name: string;

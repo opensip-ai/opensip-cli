@@ -55,7 +55,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 | `@opensip-cli/format` | `packages/format/` | Pure presentation formatters + narrow display projectors (ADR-0144) — shared duration/score human labels for CLI, report, and host history. Leaf package; no workspace imports. Labels only; no suite aggregation. | `formatDuration`, `formatScore`, `projectDurationDisplay`, `projectSessionDisplay` |
 | `@opensip-cli/cli-ui` | `packages/cli-ui/` | Shared Ink/React presentational primitives — Banner, Spinner, RunHeader, theme. Extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher. | `Banner`, `Spinner`, `RunHeader`, `theme` |
 
-## Layer 3 — config, session/output/dashboard libraries, external-tool substrate, and fitness language adapters
+## Layer 3 — config, codebase, session/output/dashboard libraries, external-tool substrate, and fitness language adapters
 
 Packages above the substrate, below tool engines. These are shared libraries consumed by the CLI and tools but not tools themselves; the external-tool substrate turns local scanner descriptors into Tool implementations, and fitness language adapters implement `LanguageAdapter`.
 
@@ -70,6 +70,7 @@ Packages above the substrate, below tool engines. These are shared libraries con
 | `@opensip-cli/cli-live` | `packages/cli-live/` | Shared live-run runtime — host glue, `produce()` lifecycle, and error scrubbing over the `cli-ui` LiveRun shell. Extracted so tool packages can render live progress without depending on `opensip-cli`. | `runToolLiveView`, `HostGlue`, `LiveRunSpec`, `LiveRunOutcome` |
 | `@opensip-cli/config` | `packages/config/` | Project-config schema composer and document loaders — validates host-owned blocks plus tool-contributed namespaces as one strict document before dispatch | `composeConfigSchema`, `validateConfigDocument`, `resolveConfig`, `loadCliDefaults`, `cliConfigSchema`, `ToolConfigDeclaration`, `hostConfigDeclarations`, `resolveEffectiveCloudConfig` |
 | `@opensip-cli/targeting` | `packages/targeting/` | Host file-targeting runtime substrate (ADR-0037) — `TargetRegistry`, uniform glob expansion with `globalExcludes`, built once per run by the CLI bootstrap and exposed as `scope.targets`. Depends on `config` + `core` only (`targeting-imports-config-core-only`) | `TargetRegistry`, `resolveTargets`, `preResolveAllTargets`, `applyGlobalExcludes` |
+| `@opensip-cli/codebase` | `packages/codebase/` | Persistence-free bounded project inventory — deterministic target-backed file metadata, package-manifest facts, conservative verification argv, and read-optimized lookup maps. Retains no source or raw manifest content. | `buildProjectInventory`, `readPackageManifestFacts`, `classifyFileRoles`, `ProjectInventory` |
 | `@opensip-cli/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_tool_payload` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-cli/output` | `packages/output/` | Machine output layer (renamed from `@opensip-cli/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
 | `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders fit/sim/graph/yagni sessions plus tool catalog data. Consumed by the CLI-owned `report` command and each tool's auto-open hook. | `generateDashboardHtml` |
@@ -183,16 +184,16 @@ Imports every layer below. The published binary.
 Last verified at v0.6.0 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **59 workspace packages** total: **56 publishable** (all at `0.6.0`) and three
+- **60 workspace packages** total: **57 publishable** (all at `0.6.0`) and three
   private packages: `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
   `@opensip-cli/checks-dogfood`. The root manifest is tooling metadata, not a
-  workspace package. The six runtime-layer counts below cover the 56
+  workspace package. The six runtime-layer counts below cover the 57
   publishable packages; the three private packages are listed separately above:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + format + cli-ui): 7 —
     `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `format`, `cli-ui`
-  - Layer 3 (cli-live + config + targeting + session-store + output + dashboard + external-tool substrate + fitness language adapters): 13 —
-    `cli-live`, `config`, `targeting`, `session-store`, `output`, `dashboard`, `lang-typescript`,
+  - Layer 3 (cli-live + config + targeting + codebase + session-store + output + dashboard + external-tool substrate + fitness language adapters): 14 —
+    `cli-live`, `config`, `targeting`, `codebase`, `session-store`, `output`, `dashboard`, `lang-typescript`,
     `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`, `external-tool-adapter`
   - Layer 4 Tools/tool adapters: 21 — `fitness`, `simulation`, `graph`, `yagni`,
     `mcp`, `tool-gitleaks`, `tool-osv-scanner`, `tool-trivy`, `tool-semgrep`,

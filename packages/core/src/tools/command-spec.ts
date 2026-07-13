@@ -130,14 +130,17 @@ export interface ArgSpec {
  * - `signal-envelope` — handler yields a `SignalEnvelope` (fit/graph runs); the
  *   host renders it (`--json` → emitEnvelope, else render).
  * - `command-result` — handler yields a `CommandResult` variant (list/export/host).
- * - `raw-stream` — the host renders NOTHING; the handler owns its entire output
- *   surface. Covers two cases: (a) a handler that writes directly to stdout/a
+ * - `raw-stream` — the host renders NOTHING. Covers three cases: (a) a handler
+ *   that writes directly to stdout/a
  *   file (completion script, SARIF/baseline export, shard-worker); and (b) a
  *   handler that owns a runtime-conditional render+egress flow no single static
  *   mode captures — e.g. `sim`, which branches between an interactive Ink live
  *   view and a static render/JSON path depending on the TTY, then performs its
- *   own cloud egress, report auto-open, and exit-code decision. In both cases
- *   the handler returns `void` and the host does not touch the stream.
+ *   own cloud egress, report auto-open, and exit-code decision; and (c) an
+ *   internal evidence producer whose bounded completion is captured by a host
+ *   run hook while its parent suite owns the sole visible result. In the first
+ *   two cases the handler returns `void`; in the third, output dispatch ignores
+ *   the returned completion after the run hook captures it.
  * - `live-view` — interactive Ink view path (graph/fit live default on a TTY)
  *   where the command is UNCONDITIONALLY a live view; the host dispatches to the
  *   tool's registered renderer via `renderLive(name, …)`.
@@ -155,6 +158,7 @@ export type RawStreamReason =
   | 'runtime-render-dispatch'
   | 'session-replay'
   | 'diagnostic-gate'
+  | 'host-orchestrated-evidence'
   | 'mcp-stdio';
 
 export const RAW_STREAM_REASONS: readonly RawStreamReason[] = [
@@ -164,6 +168,7 @@ export const RAW_STREAM_REASONS: readonly RawStreamReason[] = [
   'runtime-render-dispatch',
   'session-replay',
   'diagnostic-gate',
+  'host-orchestrated-evidence',
   'mcp-stdio',
 ];
 
@@ -195,7 +200,9 @@ export type CommandContext = Readonly<Record<string, unknown>>;
  * A command handler: pure-ish business logic the host invokes after parsing.
  * Receives the parsed, typed options and the host {@link CommandContext}; returns
  * whatever the declared {@link CommandSpec.output} mode dispatches (sync or a
- * promise), or void for `raw-stream` / `live-view`, which side-effect directly.
+ * promise). Most `raw-stream` / `live-view` handlers return void and side-effect
+ * directly; an internal host-orchestrated evidence command returns a bounded
+ * completion for capture before raw-stream output dispatch ignores it.
  */
 export type CommandHandler<TOpts = unknown, TCtx = CommandContext> = (
   opts: TOpts,
@@ -257,6 +264,12 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
    * not a verdict command (list/report/info/raw commands).
    */
   readonly producesVerdict?: boolean;
+  /**
+   * Declares that this command returns one or more bounded
+   * `EvidenceSnapshotContribution`s for host capture. This capability is
+   * independent of rendering and does not imply a gate verdict or finding.
+   */
+  readonly producesEvidenceSnapshot?: boolean;
   /** The business-logic handler the host invokes after parse. */
   readonly handler: CommandHandler<TOpts, TCtx>;
   /**
@@ -309,4 +322,11 @@ export function commandProducesVerdict(
   spec: Pick<CommandSpec, 'producesVerdict' | 'output'>,
 ): boolean {
   return spec.producesVerdict === true || spec.output === 'signal-envelope';
+}
+
+/** Whether a command declares the generic evidence-snapshot capability. */
+export function commandProducesEvidenceSnapshot(
+  spec: Pick<CommandSpec, 'producesEvidenceSnapshot'>,
+): boolean {
+  return spec.producesEvidenceSnapshot === true;
 }

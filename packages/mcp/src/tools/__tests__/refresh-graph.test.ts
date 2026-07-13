@@ -104,6 +104,22 @@ function fakeGraph(refresh: GraphReadPort['refresh']): GraphReadPort {
 function deps(graph: GraphReadPort): McpToolDeps {
   return {
     graph,
+    codebase: {
+      inventoryStatus: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+        ),
+      fileContext: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+        ),
+    },
+    context: {
+      contextStatus: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Context reads are not under test.' }),
+        ),
+    },
     results: {} as McpToolDeps['results'],
     runtimeWiring: {} as McpToolDeps['runtimeWiring'],
     validToolIds: new Set(),

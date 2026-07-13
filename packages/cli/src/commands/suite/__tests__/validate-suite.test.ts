@@ -1,8 +1,11 @@
 import {
   ConfigurationError,
   defineCommand,
+  RunScope,
+  runWithScopeSync,
   type Tool,
   type ToolCliContext,
+  type ToolProvenance,
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
@@ -59,6 +62,26 @@ function fixtureTool(): Tool {
         scope: 'project',
         output: 'command-result',
         handler: () => ({ type: 'help' }),
+      }),
+      defineCommand<unknown, ToolCliContext>({
+        name: 'context',
+        description: 'fixture evidence',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'host-orchestrated-evidence',
+        producesEvidenceSnapshot: true,
+        handler: () => undefined,
+      }),
+      defineCommand<unknown, ToolCliContext>({
+        name: 'dual',
+        description: 'invalid combined fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        producesVerdict: true,
+        producesEvidenceSnapshot: true,
+        handler: () => undefined,
       }),
     ],
   };
@@ -123,7 +146,44 @@ describe('validateSuite', () => {
         tools: [fixtureTool()],
         suite: { steps: [{ tool: TOOL_ID, command: 'list' }] },
       }),
-    ).toThrow(/does not produce a gate verdict[\s\S]*verdict-producing run commands/);
+    ).toThrow(/does not produce a gate verdict[\s\S]*verdict or an evidence snapshot/);
+  });
+
+  it('admits evidence-only commands and rejects combined v1 markers', () => {
+    const validated = validateSuite({
+      name: 'context',
+      tools: [fixtureTool()],
+      suite: { steps: [{ tool: TOOL_ID, command: 'context' }] },
+    });
+    expect(validated.steps[0]?.kind).toBe('evidence');
+    expect(() =>
+      validateSuite({
+        name: 'bad',
+        tools: [fixtureTool()],
+        suite: { steps: [{ tool: TOOL_ID, command: 'dual' }] },
+      }),
+    ).toThrow(/declares both verdict and evidence snapshot capabilities/);
+  });
+
+  it('rejects evidence producers selected for external-worker dispatch', () => {
+    const provenance: ToolProvenance = {
+      source: 'installed',
+      id: 'fitness',
+      stableId: TOOL_ID,
+      version: '0.0.0',
+      manifestHash: 'fixture-hash',
+    };
+    const scope = new RunScope({ toolProvenance: [provenance] });
+
+    expect(() =>
+      runWithScopeSync(scope, () =>
+        validateSuite({
+          name: 'external-context',
+          tools: [fixtureTool()],
+          suite: { steps: [{ tool: TOOL_ID, command: 'context' }] },
+        }),
+      ),
+    ).toThrow(/external worker transport.*does not carry evidence snapshots/u);
   });
 
   it('rejects run-scope flags, reserved deferred fields, unknown args, and parser failures', () => {

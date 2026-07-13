@@ -426,6 +426,50 @@
         "scope": "project",
         "output": "raw-stream",
         "rawStreamReason": "diagnostic-gate"
+      },
+      {
+        "name": "graph-context-inventory",
+        "description": "[internal] Persist bounded project inventory context evidence",
+        "visibility": "internal",
+        "commonFlags": [
+          "cwd"
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "host-orchestrated-evidence",
+        "producesEvidenceSnapshot": true
+      },
+      {
+        "name": "graph-context-ensure",
+        "description": "[internal] Reuse or rebuild one current graph context generation",
+        "visibility": "internal",
+        "commonFlags": [
+          "cwd"
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "host-orchestrated-evidence",
+        "producesEvidenceSnapshot": true
+      },
+      {
+        "name": "graph-context-select-tests",
+        "description": "[internal] Persist static test-selection context for explicit files",
+        "visibility": "internal",
+        "commonFlags": [
+          "cwd"
+        ],
+        "options": [
+          {
+            "flag": "--files",
+            "value": "<path>",
+            "description": "Explicit changed file (repeatable; project-relative)",
+            "arrayDefault": []
+          }
+        ],
+        "scope": "project",
+        "output": "raw-stream",
+        "rawStreamReason": "host-orchestrated-evidence",
+        "producesEvidenceSnapshot": true
       }
     ],
     "capabilities": [
@@ -465,6 +509,7 @@
     "@opensip-cli/cli-live": "workspace:*",
     "@opensip-cli/cli-ui": "workspace:*",
     "@opensip-cli/clone-detection": "workspace:*",
+    "@opensip-cli/codebase": "workspace:*",
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",

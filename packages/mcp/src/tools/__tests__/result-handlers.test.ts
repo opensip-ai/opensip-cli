@@ -92,6 +92,22 @@ function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])
           }),
         ),
     } as unknown as McpToolDeps['graph'],
+    codebase: {
+      inventoryStatus: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+        ),
+      fileContext: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+        ),
+    },
+    context: {
+      contextStatus: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Context reads are not under test.' }),
+        ),
+    },
     results,
     runtimeWiring: {} as McpToolDeps['runtimeWiring'],
     validToolIds,

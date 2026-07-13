@@ -77,6 +77,14 @@ function commandSpecValidationError(value: unknown): Error | undefined {
   const flagsError = commonFlagsError(name, commonFlags);
   if (flagsError !== undefined) return flagsError;
 
+  for (const marker of ['producesVerdict', 'producesEvidenceSnapshot'] as const) {
+    if (own[marker] !== undefined && typeof own[marker] !== 'boolean') {
+      return new TypeError(
+        `defineCommand: command '${name}' ${marker} must be a boolean when declared.`,
+      );
+    }
+  }
+
   if (Object.hasOwn(own, 'staticHandler')) {
     const descriptorError = staticHandlerValidationError(own.staticHandler, name);
     if (descriptorError !== undefined) return descriptorError;
@@ -354,6 +362,9 @@ function freezeCommandSpec<TOpts, TCtx>(spec: CommandSpec<TOpts, TCtx>): Command
         }),
     ...(spec.rawStreamReason === undefined ? {} : { rawStreamReason: spec.rawStreamReason }),
     ...(spec.producesVerdict === undefined ? {} : { producesVerdict: spec.producesVerdict }),
+    ...(spec.producesEvidenceSnapshot === undefined
+      ? {}
+      : { producesEvidenceSnapshot: spec.producesEvidenceSnapshot }),
     ...(spec.staticHandler === undefined
       ? {}
       : { staticHandler: freezeStaticHandlerDescriptor(spec.staticHandler) }),

@@ -14,6 +14,8 @@ source-files:
   - packages/graph/engine/src/cli/impact.ts
   - packages/fitness/engine/src/cli/fit/changed-targeting.ts
   - packages/mcp/src/command.ts
+  - packages/contracts/src/task-context.ts
+  - packages/cli/src/commands/suite/task-context-manifest.ts
 related-docs:
   - ../70-reference/01-cli-commands.md
   - ../70-reference/04-json-output-schema.md
@@ -27,6 +29,8 @@ related-docs:
   - ../../decisions/ADR-0124-review-brief-correlation-join.md
   - ../../decisions/ADR-0155-canonical-audit-command.md
   - ../../decisions/ADR-0156-bounded-stored-impact-proof.md
+  - ../../decisions/ADR-0160-deterministic-task-context-evidence-plane.md
+  - ../../decisions/ADR-0161-codebase-inventory-and-context-snapshot-ownership.md
 ---
 # Use OpenSIP with AI agents
 
@@ -50,6 +54,35 @@ opensip agent-catalog --json
 
 The catalog lists tool entry points, common patterns, agent recipes, and notes
 about `--filter` / `--raw` / `graph impact`.
+
+### Prepare before editing
+
+When the task names one or more files, prepare deterministic context before the
+first edit:
+
+```bash
+opensip suite run agent-context --files packages/mcp/src/command.ts --json
+```
+
+The built-in suite records package/file inventory, the exact graph generation,
+and labelled static test-selection evidence in one parent Run
+`contextManifest`. It does not execute selected tests, emit findings, create a
+ReviewBrief, or call a model. Inventory and graph are required; test selection
+is required when `--files` is supplied. Read `readiness`, each plane's
+`coverage`/reason codes, and `nextActions` before relying on it.
+
+With MCP, call `get_agent_catalog` and verify root/surface epoch/tool names,
+then call `get_context_status` with the same explicit `files`. Trust the replay
+only when the response is `available`, `fileScope.status` is `matched`,
+`manifest.readiness` is `ready`, and every required plane is current, complete,
+uncapped, and backed by a pointer whose replay status is `available`. Run the
+suite whenever one of those conditions fails. During the edit use
+`get_file_context`, `impact_files`, `select_tests`, and entity-detail
+`get_symbol` as needed. Ordinary reads never build a graph, invoke Git, execute
+tests, or start the suite, and recorded snapshot pointers are never silently
+rebound to newer evidence. Status replay also compares the recorded inventory
+identity with a newly computed bounded metadata inventory, but never returns or
+substitutes the replacement identity.
 
 For PR review workflows, read the host-owned audit review brief before drilling
 into individual tool payloads:
@@ -172,10 +205,9 @@ Projects can override built-in recipes in `opensip-cli.config.yml`.
 
 For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
 register `opensip mcp` as a stdio server instead of shelling out for every graph
-or findings query. By default the server exposes exactly 19 tools: 12 graph
-tools (with `refresh_graph` the sole graph mutation), one read-only live
-runtime-wiring tool, and six persisted result/review tools. Mutation opt-in adds
-only `repair_apply_verify` for 20.
+or findings query. Treat live `listTools` and `get_agent_catalog.mcp.names` as
+the inventory authority. Mutation opt-in adds only `repair_apply_verify`; the
+default server remains read-only apart from explicit `refresh_graph` rebuilds.
 
 Before using graph evidence, verify the canonical project context, distinct
 project and `g1:` generation identities, generation source, complete/partial
@@ -207,3 +239,4 @@ See **[Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/)
 Cursor, Claude Code, and Codex.
 
 See also [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) and ADR-0152..0154 for the compact audit surface.
+Task-context evidence ownership is recorded in ADR-0160 and ADR-0161.

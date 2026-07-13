@@ -10,7 +10,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const BUDGET = 63;
+// ADR-0160 admits three hidden, host-orchestrated context evidence producers.
+const BUDGET = 66;
 
 const RAW_STREAM_REASONS = [
   'completion-script',
@@ -20,6 +21,7 @@ const RAW_STREAM_REASONS = [
   'session-replay',
   'diagnostic-gate',
   'mcp-stdio',
+  'host-orchestrated-evidence',
 ];
 
 const log = (msg) => console.error(`[verify-raw-stream-inventory] ${msg}`);

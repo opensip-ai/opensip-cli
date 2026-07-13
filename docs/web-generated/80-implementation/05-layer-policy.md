@@ -68,7 +68,7 @@ Production code can't import test files, and source code can't import undeclared
 
 ## Layer enforcement rules
 
-The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). From-side layer rules are authored as negative-lookahead allowlists ([ADR-0133](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0133-allowlist-form-layer-rules.md)): a rule names the package family it governs and the workspace packages it may import, then forbids every other `packages/` target by construction. Several runtime packages carry their own narrow allowlists in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058), `mcp-imports-allowlist`, `tool-test-kit-imports-core-contracts-only`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit.
+The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). From-side layer rules are authored as negative-lookahead allowlists ([ADR-0133](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0133-allowlist-form-layer-rules.md)): a rule names the package family it governs and the workspace packages it may import, then forbids every other `packages/` target by construction. Several runtime packages carry their own narrow allowlists in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058), `codebase-imports-core-contracts-targeting-only`, `mcp-imports-allowlist`, `tool-test-kit-imports-core-contracts-only`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit.
 
 ### `core-imports-nothing-workspace`
 
@@ -127,9 +127,16 @@ The reasoning: contracts exists to define the contract facade (`SignalEnvelope`,
 These rules follow the same negative-lookahead form and are intentionally
 future-proof:
 
+- **`codebase-imports-core-contracts-targeting-only`** — the layer-3
+  `@opensip-cli/codebase` substrate may import only core/contracts/targeting
+  contracts and itself. It builds bounded, persistence-free inventory facts; it
+  owns no Tool registration, datastore, graph state, MCP handler, or host Run.
+  Graph and MCP consume it downward, while the rule prevents a reverse edge into
+  either consumer.
 - **`mcp-imports-allowlist`** — MCP production source may import only core,
-  contracts, datastore, session-store, the public `@opensip-cli/graph/read`
-  surface, and itself — never `@opensip-cli/graph/internal`. The sole exception is
+  contracts, datastore, session-store, codebase, the public
+  `@opensip-cli/graph/read` surface, and itself — never
+  `@opensip-cli/graph/internal`. The sole exception is
   the single adapter-registrar root file, allowed the graph root by
   **`mcp-graph-root-registrar-only`**. MCP must not reach into the CLI
   composition root, other tool engines, check packs, language packs, or graph

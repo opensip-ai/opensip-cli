@@ -11,7 +11,11 @@
 
 import { runToolLiveView } from '@opensip-cli/cli-live';
 
-import { suiteReviewLine, suiteVerboseDetail } from '../../ui/views/suite-views.js';
+import {
+  suiteContextLine,
+  suiteReviewLine,
+  suiteVerboseDetail,
+} from '../../ui/views/suite-views.js';
 
 import { runSuite, type RunSuiteInput } from './orchestrator.js';
 
@@ -97,7 +101,8 @@ export async function renderSuiteLive(
       // §4 the canonical RunSummary headline, a one-line review verdict under it
       // (`summaryNote`), and the per-step + risk tables only under `--verbose`
       // (`verboseExtra`). The per-step outcome list is §3 (the checklist above).
-      const reviewLine = suiteReviewLine(result.reviewBrief);
+      const reviewLine =
+        suiteContextLine(result.contextManifest) ?? suiteReviewLine(result.reviewBrief);
       return {
         kind: 'done',
         done: {

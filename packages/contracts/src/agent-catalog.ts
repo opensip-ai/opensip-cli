@@ -83,6 +83,7 @@ export interface AgentCatalog {
   readonly outputShapes: {
     readonly signalEnvelope: string; // high-level note + reference
     readonly reviewBrief: string;
+    readonly taskContext: string;
     readonly repairApplyVerify: string;
     readonly sessionReplay: string;
     readonly history: string;
@@ -209,6 +210,12 @@ export function buildAgentCatalog(
           'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
       },
       {
+        name: 'Prepare before-edit task context',
+        description:
+          'Call MCP get_context_status with files: ["src/server.ts"] first. Trust it only when status is available, fileScope.status is matched, manifest.readiness is ready, and every required plane is current, complete, uncapped, and backed by an available durable pointer; otherwise recapture bounded inventory, graph, and static test-selection evidence.',
+        example: 'opensip suite run agent-context --files src/server.ts --json',
+      },
+      {
         name: 'Agent edit loop',
         description:
           'Fast check → impact analysis → changed/impacted fit with trust metadata → final gate.',
@@ -264,6 +271,8 @@ export function buildAgentCatalog(
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
         'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For audit or suite run: { type: "suite-run", suite, suiteRunId, runId?, scope?: { mode, source, ref?, changedFiles?, notice? }, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
+      taskContext:
+        'For suite run agent-context: { type: "suite-run", runId, contextManifest: { schemaVersion, createdAt, projectIdentity, readiness, sourceStart, sourceEnd, fileScope: {mode,fileCount,filesIdentity}, graphIdentity?, inventoryIdentity?, planes: [{kind,status,required,producer:{toolId,command,version},pointer?,step,freshness,coverage,caps,reasonCodes,followUpReads}], reasonCodes, nextActions } }. get_context_status accepts the same explicit files and returns status, fileScope.status, the manifest, and exact pointer replay statuses. Trust requires available + matched + ready and every required plane current, complete, uncapped, and pointer-available. Context evidence is not a finding or ReviewBrief; raw paths are never stored in fileScope, and project roots are never stored in projectIdentity.',
       repairApplyVerify:
         'For repair apply --verify: { type: "repair-apply-verify", status, session, signal, action, changes, force, verification: { status: "verified" | "partial" | "unverified" | "skipped", coverage, scope: { tool, ruleId, files, checkRan, fallback }, commands, remainingFindings, trust? } }',
       sessionReplay:
@@ -279,6 +288,8 @@ export function buildAgentCatalog(
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',
       'graph impact answers changed→impacted without a separate git diff dance.',
+      'Before editing, call MCP get_context_status with the same explicit project-relative files. Trust it only when status is available, fileScope.status is matched, manifest.readiness is ready, and every required plane is current, complete, uncapped, and has an available durable pointer; run opensip suite run agent-context with the same --files set and --json when any condition fails.',
+      'impact_files and select_tests accept explicit project-relative files; ordinary MCP reads never build a graph, invoke Git, or execute tests.',
       'Use opensip audit --json for a fresh canonical review. --open is human-only and is suppressed by JSON/non-TTY/CI execution.',
       'Configured multi-tool workflows remain under opensip suite run <name>; they do not replace the canonical top-level audit.',
       'graph impact JSON includes trust.coverage/trust.fullyVerified/trust.uncertainties; do not claim targeted verification when fullyVerified is false.',

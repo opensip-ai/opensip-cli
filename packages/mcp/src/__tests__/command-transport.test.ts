@@ -73,6 +73,22 @@ describe('mcp command — raw-stream transport contract', () => {
     expect(mcpCommandSpec.rawStreamReason).toBe('mcp-stdio');
     expect(mcpCommandSpec.scope).toBe('project');
   });
+
+  it('uses the current context-read surface epoch when constructed directly', () => {
+    expect(serverWithScope(new RunScope()).describeSurface().surfaceEpoch).toBe(7);
+  });
+
+  it('advertises an explicitly captured canonical project root', () => {
+    const server = new McpStdioServer({
+      scope: new RunScope(),
+      graph: {} as ConstructorParameters<typeof McpStdioServer>[0]['graph'],
+      results: {} as ConstructorParameters<typeof McpStdioServer>[0]['results'],
+      version: '0.0.0-test',
+      projectRoot: '/canonical/project',
+    });
+
+    expect(server.describeSurface().projectRoot).toBe('/canonical/project');
+  });
 });
 
 describe('mcp source — no session-record writer (transport, not a run)', () => {

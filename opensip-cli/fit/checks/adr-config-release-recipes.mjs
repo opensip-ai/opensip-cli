@@ -135,6 +135,11 @@ const CONFIG_READER_ALLOWLIST = new Set([
   'packages/core/src/lib/config-version.ts',
   'packages/core/src/lib/yaml.ts',
   'packages/core/src/plugins/discover.ts',
+  // ADR-0161 inventory metadata bridge: this dedicated reader accepts only the
+  // bounded `pnpm-workspace.yaml` package-glob document. It never reads or
+  // projects opensip-cli.config.yml; keeping the parser isolated here prevents
+  // it from becoming a second OpenSIP config seam.
+  'packages/codebase/src/pnpm-workspace.ts',
   'packages/cli/src/bootstrap/config-and-capabilities.ts',
   // Pre-RunScope startup trust reader: reads only `tools.trusted` before the
   // composed config document exists, then per-run scope uses the normal composed

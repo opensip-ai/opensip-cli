@@ -1,11 +1,14 @@
 import {
+  commandProducesEvidenceSnapshot,
   commandProducesVerdict,
   ConfigurationError,
+  currentScope,
   type CommandSpec,
   type Tool,
   type ToolCliContext,
 } from '@opensip-cli/core';
 
+import { isExternalToolProvenance } from '../../bootstrap/tool-provenance.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
 
 import type { SuiteDefinition, SuiteStep } from '@opensip-cli/config';
@@ -31,6 +34,7 @@ export interface ValidatedSuiteStep {
   readonly config: SuiteStep;
   readonly args: Readonly<Record<string, unknown>>;
   readonly positionals: readonly unknown[];
+  readonly kind: 'verdict' | 'evidence';
 }
 
 export interface ValidatedSuite {
@@ -62,7 +66,9 @@ export function validateSuite(args: {
     }
   });
   if (errors.length > 0) {
-    throw new ConfigurationError(errors.join('\n'), { code: 'CONFIG.SUITE.INVALID' });
+    throw new ConfigurationError(errors.join('\n'), {
+      code: 'CONFIG.SUITE.INVALID',
+    });
   }
   return {
     name: args.name,
@@ -91,25 +97,66 @@ function validateStep(
       { code: 'CONFIG.SUITE.UNKNOWN_COMMAND' },
     );
   }
+  const kind = validateStepCapability(suiteName, step, index, tool, spec);
+  const { rawArgs, positionals } = validateStepArguments(suiteName, step, index, spec);
+
+  return {
+    index,
+    tool,
+    spec,
+    config: step,
+    args: rawArgs,
+    positionals,
+    kind,
+  };
+}
+
+function validateStepCapability(
+  suiteName: string,
+  step: SuiteStep,
+  index: number,
+  tool: Tool,
+  spec: CommandSpec<unknown, ToolCliContext>,
+): ValidatedSuiteStep['kind'] {
   if (spec.output === 'live-view') {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} command '${step.command}' is a live-view command; suites require non-interactive commands in v1.`,
       { code: 'CONFIG.SUITE.LIVE_VIEW_UNSUPPORTED' },
     );
   }
-  // A suite composes gate VERDICTS, so every step must be a verdict-producing run
-  // command (fit/graph/sim/yagni or an external scanner). A non-verdict command
-  // (list/report/info/raw) would run but contribute nothing to the aggregate
-  // verdict — reject it fail-closed before any step executes, rather than
-  // silently producing an unaccounted step at runtime. (ADR-0093.)
-  if (!commandProducesVerdict(spec)) {
+  const producesVerdict = commandProducesVerdict(spec);
+  const producesEvidence = commandProducesEvidenceSnapshot(spec);
+  if (producesVerdict && producesEvidence) {
+    throw new ConfigurationError(
+      `Suite '${suiteName}' step ${index + 1} command '${step.command}' declares both verdict and evidence snapshot capabilities. Combined semantics are unsupported in v1.`,
+      { code: 'CONFIG.SUITE.AMBIGUOUS_CAPABILITY' },
+    );
+  }
+  if (!producesVerdict && !producesEvidence) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} command '${step.command}' does not produce a gate verdict. ` +
-        `Suite steps must be verdict-producing run commands (e.g. fit, graph, sim, yagni, or an external ` +
-        `scanner). Remove this step or point it at a run command.`,
+        `Suite steps must produce a verdict or an evidence snapshot. Remove this step or point it at a run/evidence command.`,
       { code: 'CONFIG.SUITE.NOT_A_RUN_COMMAND' },
     );
   }
+  if (producesEvidence && isExternalToolProvenance(tool, currentScope()?.toolProvenance ?? [])) {
+    throw new ConfigurationError(
+      `Suite '${suiteName}' step ${index + 1} evidence command '${step.command}' would use the external worker transport, which does not carry evidence snapshots in v1.`,
+      { code: 'CONFIG.SUITE.EVIDENCE_EXTERNAL_UNSUPPORTED' },
+    );
+  }
+  return producesEvidence ? 'evidence' : 'verdict';
+}
+
+function validateStepArguments(
+  suiteName: string,
+  step: SuiteStep,
+  index: number,
+  spec: CommandSpec<unknown, ToolCliContext>,
+): {
+  readonly rawArgs: Readonly<Record<string, unknown>>;
+  readonly positionals: readonly unknown[];
+} {
   if (step.cwd !== undefined) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} declares reserved per-step cwd. Put run-scope flags on 'suite run' instead.`,
@@ -141,15 +188,7 @@ function validateStep(
       );
     }
   }
-
-  return {
-    index,
-    tool,
-    spec: spec,
-    config: step,
-    args: rawArgs,
-    positionals,
-  };
+  return { rawArgs, positionals };
 }
 
 function positionalArgs(args: Readonly<Record<string, unknown>>): readonly unknown[] {

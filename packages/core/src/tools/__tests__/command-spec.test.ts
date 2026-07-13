@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineCommand, validateCommandSpec } from '../command-spec-validate.js';
 import {
   COMMON_FLAG_KEYS,
+  commandProducesEvidenceSnapshot,
   commandProducesVerdict,
   type ArgSpec,
   type CommandSpec,
@@ -410,5 +411,27 @@ describe('commandProducesVerdict', () => {
 
   it('returns false for non-verdict output modes', () => {
     expect(commandProducesVerdict({ output: 'raw-stream' })).toBe(false);
+  });
+});
+
+describe('evidence snapshot command capability', () => {
+  it('survives command admission and is discoverable independently of output', () => {
+    const spec = defineCommand(
+      baseSpec({
+        output: 'command-result',
+        producesVerdict: false,
+        producesEvidenceSnapshot: true,
+      }),
+    );
+    expect(spec.producesEvidenceSnapshot).toBe(true);
+    expect(commandProducesEvidenceSnapshot(spec)).toBe(true);
+    expect(commandProducesVerdict(spec)).toBe(false);
+  });
+
+  it('defaults to false and rejects a non-boolean marker', () => {
+    expect(commandProducesEvidenceSnapshot({})).toBe(false);
+    expect(() => defineCommand(baseSpec({ producesEvidenceSnapshot: 'yes' as never }))).toThrow(
+      /producesEvidenceSnapshot must be a boolean/,
+    );
   });
 });

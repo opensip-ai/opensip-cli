@@ -37,7 +37,9 @@ distinct from:
 
 ## Index (most recent first)
 
-- [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md) — Reserved names on both configurable planes: configured suites cannot use built-in suite names (`audit` never diverges between its two spellings) and Tools cannot claim any host-owned root command.
+- [ADR-0161](ADR-0161-codebase-inventory-and-context-snapshot-ownership.md) — Persistence-free layer-3 codebase facts, graph-owned immutable derived snapshots, explicit-file input, and exact captured-port replay with labelled fallbacks.
+- [ADR-0160](ADR-0160-deterministic-task-context-evidence-plane.md) — Bounded non-finding Tool evidence, mutually exclusive evidence/verdict commands, and host-only TaskContextManifest aggregation on exact parent Run/RunStep identities.
+- [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md) — Reserved names on both configurable planes: configured suites cannot shadow built-in suites (`audit` or `agent-context`) and Tools cannot claim any host-owned root command.
 - [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) — Deterministic two-arm gold-task measurement: control-first scripted strategies, bytes as the cross-arm unit, frozen tasks with versioned strategies, and immutable file-plane EvalReports.
 - [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) — Workspace-private black-box agent-evaluation harness with zero workspace source imports in either direction; it spawns the built CLI and uses its devDependency only for build ordering.
 - [ADR-0156](ADR-0156-bounded-stored-impact-proof.md) — Graph-owned bounded impact proof in opaque sessions, authoritative RunStep session joins, explicit overflow/legacy states, and report-time no-recompute/privacy boundaries.

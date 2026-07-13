@@ -67,8 +67,11 @@ const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
   {
     command: 'suite run',
     description:
-      'Run a configured or built-in multi-tool suite. --json yields a command result with reviewBrief when the suite steps emit SignalEnvelopes.',
-    examples: ['opensip suite run security --json'],
+      'Run a configured or built-in suite. agent-context records privacy-safe, file-scope-bound non-finding evidence before editing; verdict suites produce reviewBrief when steps emit SignalEnvelopes.',
+    examples: [
+      'opensip suite run agent-context --files src/server.ts --json',
+      'opensip suite run security --json',
+    ],
     tier: 'platform' as const,
   },
   {

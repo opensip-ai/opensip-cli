@@ -127,7 +127,10 @@ export class SqliteGraphQueryContext {
   private readonly log: SqliteGraphQueryContextDeps['log'];
   private readonly sourceRolePolicy?: AuditSourceRolePolicy;
   /** Per-generation compiled matcher cache (instance-scoped; keyed by g1 identity). */
-  private sourceRoleCache?: { readonly generationKey: string; readonly matcher: SourceRoleMatcher };
+  private sourceRoleCache?: {
+    readonly generationKey: string;
+    readonly matcher: SourceRoleMatcher;
+  };
 
   constructor(
     private readonly controller: GraphGenerationController,
@@ -187,7 +190,10 @@ export class SqliteGraphQueryContext {
     project: (
       gen: CatalogGeneration | undefined,
       freshness: Freshness,
-    ) => GraphToolResult<T> | Result<GraphToolResult<T>, McpReadError>,
+    ) =>
+      | GraphToolResult<T>
+      | Result<GraphToolResult<T>, McpReadError>
+      | Promise<GraphToolResult<T> | Result<GraphToolResult<T>, McpReadError>>,
   ): Promise<Result<GraphToolResult<T>, McpReadError>> {
     const started = Date.now();
     try {
@@ -202,7 +208,7 @@ export class SqliteGraphQueryContext {
         this.logQueryFailure(operation, started, metadata);
         return freshness;
       }
-      const projected = project(gen, freshness.value);
+      const projected = await project(gen, freshness.value);
       if ('ok' in projected && !projected.ok) {
         this.logQueryFailure(operation, started, metadata);
         return projected;
@@ -449,13 +455,21 @@ export function emptyArchitecture(
     ...(sections.includes('packageEdges')
       ? {
           packageEdges: [],
-          packageEdgesSummary: { totalAvailable: 0, selectedCount: 0, pageReturned: 0 },
+          packageEdgesSummary: {
+            totalAvailable: 0,
+            selectedCount: 0,
+            pageReturned: 0,
+          },
         }
       : {}),
     ...(sections.includes('hotspots')
       ? {
           hotspots: [],
-          hotspotsSummary: { totalAvailable: 0, selectedCount: 0, pageReturned: 0 },
+          hotspotsSummary: {
+            totalAvailable: 0,
+            selectedCount: 0,
+            pageReturned: 0,
+          },
         }
       : {}),
   };

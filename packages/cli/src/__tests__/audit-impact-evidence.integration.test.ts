@@ -3,7 +3,10 @@ import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { RunRepo, SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { persistSuiteRun } from '../commands/suite/run-ledger-persist.js';
+import {
+  allocateSuiteLedgerIdentity,
+  persistSuiteRun,
+} from '../commands/suite/run-ledger-persist.js';
 
 import type { StoredSession, SuiteRunResult } from '@opensip-cli/contracts';
 
@@ -108,16 +111,18 @@ describe('audit Run to graph-session evidence join', () => {
       ],
     };
 
+    const internalSteps = [
+      {
+        stepIndex: 0,
+        summary: result.steps[0],
+        sessionId: 'session-linked',
+      },
+    ];
     const runId = runWithScopeSync(scope, () =>
       persistSuiteRun({
         result,
-        internalSteps: [
-          {
-            stepIndex: 0,
-            summary: result.steps[0],
-            sessionId: 'session-linked',
-          },
-        ],
+        internalSteps,
+        identity: allocateSuiteLedgerIdentity(internalSteps),
         source: 'built-in',
         cwd: '/repo',
         startedAt: '2026-07-01T00:00:00.000Z',

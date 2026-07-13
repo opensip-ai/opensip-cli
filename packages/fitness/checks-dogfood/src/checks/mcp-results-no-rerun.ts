@@ -6,10 +6,11 @@
  * (`get_latest_findings`, `show_run`, …) replays a persisted session through the
  * injected `ResultsReadPort`, and a graph tool reads the persisted catalog through
  * the injected `GraphReadPort`. A handler that imports a run-command ENTRY POINT
- * (`runFit` / `runGraph` / `runSim` / `runYagni`, or a tool's `execute*` command
- * handler) re-executes the underlying tool inline — the exact coupling ADR-0084
- * forbids: it bypasses the replay contract, can spawn an unbounded build per
- * agent query, and re-privileges a tool runtime inside MCP.
+ * (`runFit` / `runGraph` / `runSim` / `runYagni`, a tool's `execute*` command
+ * handler, or one of the graph-owned context producer services) re-executes the
+ * underlying tool inline — the exact coupling ADR-0084 forbids: it bypasses the
+ * replay contract, can spawn an unbounded build per agent query, and re-privileges
+ * a tool runtime inside MCP.
  *
  * The single sanctioned re-run is `refresh_graph`, and it does NOT import a run
  * command: it goes through `GraphReadPort.refresh()`, whose rebuild thunk is wired
@@ -26,10 +27,12 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitne
 import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
-/** MCP source subtrees this check guards: the tool handlers + the results read port. */
+/** MCP source subtrees this check guards: handlers plus result/context read ports. */
 const GUARDED_PATHS: readonly string[] = [
   'packages/mcp/src/tools/',
   'packages/mcp/src/session-results-read-port',
+  'packages/mcp/src/context-read-port',
+  'packages/mcp/src/sqlite-context-read-port',
 ];
 
 /**
@@ -47,6 +50,9 @@ const RUN_COMMAND_SYMBOLS: ReadonlySet<string> = new Set([
   'executeSimulation',
   'executeSim',
   'executeYagni',
+  'produceContextInventory',
+  'produceContextGraph',
+  'produceContextTestSelection',
 ]);
 
 function normalized(path: string): string {
@@ -72,7 +78,7 @@ export function analyzeMcpResultsNoRerun(content: string, filePath: string): Che
         filePath,
         line,
         message:
-          `MCP tool handler imports the run-command entry point '${imported}' from ` +
+          `MCP read surface imports the mutation/producer entry point '${imported}' from ` +
           `'${stmt.moduleSpecifier.text}'. MCP tools are replay/read-only (ADR-0084): a result ` +
           `tool replays a persisted session through ResultsReadPort and a graph tool reads the ` +
           `catalog through GraphReadPort — never re-running the underlying tool inline.`,
@@ -92,7 +98,7 @@ export const mcpResultsNoRerun = defineCheck({
   slug: 'mcp-results-no-rerun',
   contentFilter: 'raw',
   description:
-    'MCP tool handlers must replay/read through their injected port — never import a run-command entry point (runFit/runGraph/runSim/runYagni) to re-run the underlying tool (ADR-0084)',
+    'MCP handlers and read ports must replay/read through injected ports — never import run-command or context-producer entry points to re-run work (ADR-0084)',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   tags: ['architecture'],
   fileTypes: ['ts', 'tsx'],

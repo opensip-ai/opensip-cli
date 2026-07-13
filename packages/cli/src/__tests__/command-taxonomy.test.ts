@@ -163,12 +163,15 @@ describe('command taxonomy — metadata.name parity (Step 4)', () => {
 });
 
 describe('command taxonomy — internal descriptors carry visibility:internal (Step 5)', () => {
-  /** The five Tier-3 internal command names and the tool that owns each. */
+  /** The Tier-3 internal command names and the tool that owns each. */
   const INTERNAL: readonly { tool: Tool; name: string }[] = [
     { tool: fitnessTool, name: 'fit-run-worker' },
     { tool: graphTool, name: 'graph-run-worker' },
     { tool: graphTool, name: 'graph-shard-worker' },
     { tool: graphTool, name: 'graph-equivalence-check' },
+    { tool: graphTool, name: 'graph-context-inventory' },
+    { tool: graphTool, name: 'graph-context-ensure' },
+    { tool: graphTool, name: 'graph-context-select-tests' },
     { tool: simulationTool, name: 'sim-run-worker' },
     { tool: yagniTool, name: 'yagni-run-worker' },
   ];

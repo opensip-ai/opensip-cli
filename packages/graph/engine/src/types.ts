@@ -94,6 +94,18 @@ export type ResolutionMode = 'exact' | 'fast';
  */
 export type CatalogEngineMode = 'exact' | 'sharded';
 
+/** Bounded producer coverage retained so warm context reads stay honest. */
+export interface CatalogBuildCoverage {
+  /** Complete only when every canonical input went through a fully evidenced build. */
+  readonly status: 'complete' | 'partial';
+  /** Canonical source files handed to the producing graph build. */
+  readonly discoveredFiles: number;
+  /** Unique files that reported a parse or walk error. */
+  readonly parseErrorFiles: number;
+  /** SHA-256 identity of the exact normalized project-relative input set. */
+  readonly filesIdentity: string;
+}
+
 /**
  * One producing shard's cache-input anchor. Paths are project-relative POSIX;
  * `.` denotes the configured project root.
@@ -620,6 +632,8 @@ export interface Catalog {
   readonly engineMode?: CatalogEngineMode;
   /** Producing shard inputs; absent on exact and legacy catalogs. */
   readonly shardCacheInputs?: readonly CatalogShardCacheInput[];
+  /** Absent on legacy catalogs; context consumers then degrade conservatively. */
+  readonly buildCoverage?: CatalogBuildCoverage;
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
   /**
    * Re-export facts captured at walk time (see {@link ReExportRecord}). Present

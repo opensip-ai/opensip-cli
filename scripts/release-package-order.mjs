@@ -134,6 +134,14 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/targeting',
     publishReason: 'Target registry and glob resolution substrate shared by tool engines',
   },
+  // Layer 3 — bounded project inventory substrate
+  {
+    unscoped: 'codebase',
+    name: '@opensip-cli/codebase',
+    dir: 'packages/codebase',
+    filter: '@opensip-cli/codebase',
+    publishReason: 'Bounded deterministic project inventory and package-manifest facts',
+  },
   // Layer 3 — shared Ink/React UI primitives
   {
     unscoped: 'cli-ui',

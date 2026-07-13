@@ -427,16 +427,18 @@ first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
 
 **Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
 
-The default protocol inventory is exactly **21 tools**: 12 graph tools, one
-separate live runtime-wiring tool, and six persisted result/review tools.
-Starting with `--allow-mutations` adds only `repair_apply_verify` for 20.
+The protocol inventory is surface-epoch versioned. Treat initialize/listTools
+and `get_agent_catalog.mcp.names` as authority; reconnect after an executable
+surface change. Starting with `--allow-mutations` adds only
+`repair_apply_verify`.
 
-### Graph tools (12 — 11 reads plus the explicit refresh mutation)
+### Graph tools
 
 | Tool | Purpose |
 |------|---------|
 | `search_symbols` | Find functions/methods by name. `match: "substring"` (default) is case-insensitive on `simpleName`; `"exact"` is case-sensitive on `simpleName`; `"qualified"` is case-sensitive on `qualifiedName`. Returns a `symbolId` + `bodyHash` per match to feed the other tools. |
-| `get_symbol` | Resolve the function/method declared at a file + line into a stable `symbolId` + `bodyHash`; ambiguity returns a candidate list, never a silent pick. |
+| `get_symbol` | Resolve the function/method declared at a file + line into a stable `symbolId` + `bodyHash`; `detail: "entity"` adds bounded callable fields after unique resolution. Ambiguity returns candidates, never a silent pick. |
+| `impact_files` | Compute bounded changed-to-impacted functions/files/packages for explicit project-relative files against one immutable generation. |
 | `who_calls` | Callers of a symbol (reverse call graph), out to `depth` (default 5, max 5). Occurrence-precise by default; large fan-in is node-capped with coverage reasons. |
 | `callees_of` | Symbols a symbol calls (forward call graph), out to `depth`. |
 | `trace_path` | A forward call path from one symbol to another within `depth`; returns the ordered path or `{ found: false }`. |
@@ -448,13 +450,21 @@ Starting with `--allow-mutations` adds only `repair_apply_verify` for 20.
 | `package_cycles` | Package SCCs/cycles for call, import, or combined edges. |
 | `refresh_graph` | Ensure a fresh catalog: auto-loads a newer persisted generation, rebuilds only when missing/stale or `forceRebuild` — the **only** state-changing graph tool. |
 
-### Live runtime evidence (1 — read-only, not a call graph)
+### Codebase and context reads
+
+| Tool | Purpose |
+|------|---------|
+| `get_file_context` | Read bounded inventory facts and role/target/package provenance for one explicit file without source contents. |
+| `select_tests` | Return labelled static test candidates and conservative allowlisted package/project commands for explicit files; never executes them. |
+| `get_context_status` | Replay the latest or named parent-Run task-context manifest and check its recorded graph/snapshot pointers exactly, without rebuilding or rebinding. |
+
+### Live runtime evidence (read-only, not a call graph)
 
 | Tool | Purpose |
 |------|---------|
 | `get_runtime_wiring`, `search_declarations`, `references_to` | Project admitted manifest, provenance, registry, parent/child CommandSpec, host-mount, handler-dispatch, and external-worker posture. Every edge carries source/confidence and unresolved static bridges remain explicit. |
 
-### Result and review tools (6 — replay stored runs, never re-run)
+### Result and review tools (replay stored runs, never re-run)
 
 | Tool | Purpose |
 |------|---------|
@@ -465,7 +475,7 @@ Starting with `--allow-mutations` adds only `repair_apply_verify` for 20.
 | `review_change` | Rebuild the v1 `ReviewBrief` from persisted suite step sessions. Inputs: `suiteRunId`, `suite`, `files`, and `limit`. Includes graph freshness and source session ids; does not refresh the graph. |
 | `compare_to_baseline` | Compare a replayed stored run (`tool`, optional `ref`) to that tool's stored baseline fingerprints. Returns added/unchanged/resolved counts, bounded finding details, and missing-baseline degradation. |
 
-The six result/review tools **replay persisted sessions only** — they never re-run
+The result/review tools **replay persisted sessions only** — they never re-run
 `fit`/`graph`/`sim`/`yagni`. They are the preferred first source for existing
 run/finding/history questions. Agents should not grep `.runtime/logs`, read
 `datastore.sqlite` directly, or re-run a tool to answer a stored-result question
@@ -1136,8 +1146,8 @@ remote-shell execution suppresses browser launch. Report generation or launch
 failure cannot revise the completed audit result or exit code. Agents and CI
 should use `--json`, never depend on `--open`.
 
-To run a project-defined audit override, use `opensip suite run audit`. For all
-other configured workflows, use `opensip suite run <name>`. See
+For project-defined review workflows, use another configured name such as
+`audit-custom` with `opensip suite run audit-custom`. See
 [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md).
 
 ---
@@ -1148,8 +1158,17 @@ CLI-owned. A suite runs several existing tool commands in one project scope.
 The suite invocation owns `--cwd`, `--config`, targeting, JSON/report flags, and
 cloud/report delivery; individual steps may only set tool-behavior options.
 
+The built-in `agent-context` preset is the before-edit evidence workflow. It
+returns `contextManifest` with `ready | degraded | unavailable`, exact parent
+Run/RunStep references, source identities, and graph-owned snapshot pointers.
+It creates no findings or ReviewBrief and does not execute selected tests.
+Inventory and graph are required; selection is required when explicit files are
+present. The `agent-context` name is reserved, so a configured suite cannot
+shadow or acquire the host aggregation workflow.
+
 ```
 opensip suite list
+opensip suite run agent-context --files src/server.ts --json
 opensip suite run audit
 opensip suite run audit --full
 opensip suite run audit --since main --json
@@ -1163,7 +1182,7 @@ opensip suite add security --tool fitness --command fitness --arg recipe=securit
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
 | `run` | `--config <path>` | Override the discovered `opensip-cli.config.yml` for the shared suite run scope. |
-| `run` | `--json` | Emit the suite summary as JSON, including `scope`, additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including `scope`, additive aggregate counts, per-step verdict/evidence readiness, and either a host-owned `reviewBrief` or built-in `agent-context` manifest. Step output still flows through each step's own output seams. |
 | `run` | `--changed` | Propagate changed-file selection to compatible steps. Built-in `audit` defaults to changed semantics when no selector is supplied and git scope resolves. |
 | `run` | `--since <ref>` | Propagate a git diff base to compatible changed-file steps. |
 | `run` | `--files <path>` | Propagate explicit changed files to compatible steps. Repeat for multiple files. |
@@ -1234,8 +1253,10 @@ See [ADR-0111](../../decisions/ADR-0111-built-in-audit-suite-preset.md) for the
 built-in `audit` preset decision and [ADR-0129](../../decisions/ADR-0129-audit-suite-scope-defaults.md)
 for the changed-scope default, `--full`, and fallback semantics.
 See [ADR-0143](../../decisions/ADR-0143-host-owned-run-step-ledger.md) for Run
-identity and [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md) for
-the reserved root command/configured-override distinction.
+identity, [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md) for
+the reserved root command, and
+[ADR-0159](../../decisions/ADR-0159-reserved-host-command-and-suite-names.md)
+for built-in suite-name reservation.
 
 **See also:** [`03-configuration.md#suites`](./03-configuration.md#suites),
 [`04-json-output-schema.md#suite-run-results`](./04-json-output-schema.md#suite-run-results).

@@ -44,6 +44,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@opensip-cli/codebase": "workspace:*",
     "@opensip-cli/checks-cpp": "workspace:*",
     "@opensip-cli/checks-go": "workspace:*",
     "@opensip-cli/checks-java": "workspace:*",

@@ -67,7 +67,7 @@ interface ToolPackageJson {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..', '..');
-const RAW_STREAM_MANIFEST_BUDGET = 63;
+const RAW_STREAM_MANIFEST_BUDGET = 66;
 
 function workspacePackageDirs(): readonly string[] {
   const packagesDir = join(REPO_ROOT, 'packages');

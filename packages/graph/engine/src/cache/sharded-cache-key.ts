@@ -13,6 +13,12 @@ export interface ShardedCatalogCacheKeyInput {
   readonly cacheKey: string;
 }
 
+interface ShardedCatalogAnchor {
+  readonly shardId: string;
+  readonly rootDir: string;
+  readonly configPath?: string;
+}
+
 /**
  * Validate a bounded project-relative POSIX anchor stored in sharded cache
  * provenance. `.` represents the configured project root.
@@ -31,6 +37,18 @@ export function isSafeShardedCacheAnchor(value: unknown, maxLength: number): val
     return false;
   }
   return value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+}
+
+/** Return shard provenance in deterministic identity order before persistence. */
+export function sortShardedCatalogAnchors<T extends ShardedCatalogAnchor>(
+  inputs: readonly T[],
+): T[] {
+  return [...inputs].sort((left, right) =>
+    compareCodePointStrings(
+      JSON.stringify([left.shardId, left.rootDir, left.configPath ?? null]),
+      JSON.stringify([right.shardId, right.rootDir, right.configPath ?? null]),
+    ),
+  );
 }
 
 /**

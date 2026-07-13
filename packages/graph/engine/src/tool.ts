@@ -29,6 +29,7 @@ import { createToolScope, defineTool, logger, readPackageVersion } from '@opensi
 // gone.
 import { graphFingerprintStrategy } from './baseline-strategy.js';
 import { isolatedGraphAdapterBridge } from './capability/isolated-graph-adapter.js';
+import { graphContextCommandSpecs } from './cli/context/context-command-specs.js';
 import {
   graphEquivalenceCheckCommandSpec,
   graphExportCommandSpec,
@@ -43,10 +44,13 @@ import { graphCommandSpec } from './cli/graph/graph-command-spec.js';
 import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
+import { createContextRunState } from './context-run-state.js';
 import { createGraphCatalogThunk } from './graph-catalog-thunk.js';
-import { GRAPH_IDENTITY } from './identity.js';
+import { GRAPH_IDENTITY, GRAPH_STABLE_ID } from './identity.js';
 import { createAdapterRegistry, currentAdapterRegistry } from './lang-adapter/registry.js';
 import { CatalogRepo } from './persistence/catalog-repo.js';
+import { createContextCatalogAccessor } from './persistence/context-catalog-accessor.js';
+import { createContextSnapshotAccessor } from './persistence/context-snapshot-repo.js';
 import { graphReplayFromSession } from './persistence/session-replay.js';
 import { createRecipeRegistry } from './recipes/registry.js';
 import { createRulesRegistry } from './rules/registry.js';
@@ -86,6 +90,7 @@ const graphCommandSpecs = [
   graphListCommandSpec,
   graphImpactCommandSpec,
   graphEquivalenceCheckCommandSpec,
+  ...graphContextCommandSpecs,
 ];
 
 /**
@@ -107,6 +112,9 @@ const graphScope = createToolScope({
     adapters: createAdapterRegistry(),
     rules: createRulesRegistry(),
     recipes: createRecipeRegistry(),
+    contextCatalog: createContextCatalogAccessor(),
+    contextSnapshots: createContextSnapshotAccessor(),
+    contextRun: createContextRunState(),
   }),
 });
 
@@ -160,7 +168,7 @@ function collectReportData(scope: ToolScope): Record<string, unknown> {
  */
 export const GRAPH_CONTRACT_VERSION = '1.0.0';
 
-export const GRAPH_STABLE_ID = '3873f1c2-02a9-4719-930a-bca74b62b706';
+export { GRAPH_STABLE_ID } from './identity.js';
 
 export const graphTool: Tool = defineTool({
   identity: GRAPH_IDENTITY,

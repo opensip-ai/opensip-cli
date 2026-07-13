@@ -10,7 +10,12 @@ import {
   type HostSpec,
 } from '../host-subcommand-shared.js';
 
-import { BUILT_IN_AUDIT_SUITE_NAME, listSuites, resolveSuite } from './built-in-suites.js';
+import {
+  BUILT_IN_AGENT_CONTEXT_SUITE_NAME,
+  BUILT_IN_AUDIT_SUITE_NAME,
+  listSuites,
+  resolveSuite,
+} from './built-in-suites.js';
 import { emitSuiteCommandFailure, executeSuiteCommand } from './execute-suite-command.js';
 import { addSuiteStep } from './suite-add.js';
 import { SUITE_RUN_OPTIONS } from './suite-run-options.js';
@@ -58,13 +63,14 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
       const name = String(opts._args?.[0] ?? '');
       if (
         currentScope()?.projectContext?.scope === 'ephemeral' &&
-        name !== BUILT_IN_AUDIT_SUITE_NAME
+        name !== BUILT_IN_AUDIT_SUITE_NAME &&
+        name !== BUILT_IN_AGENT_CONTEXT_SUITE_NAME
       ) {
         return emitSuiteCommandFailure(
           ctx,
           opts,
           `suite run without opensip init only supports the built-in ` +
-            `'${BUILT_IN_AUDIT_SUITE_NAME}' suite.`,
+            `'${BUILT_IN_AUDIT_SUITE_NAME}' or '${BUILT_IN_AGENT_CONTEXT_SUITE_NAME}' suite.`,
         );
       }
       const resolved = resolveSuite(name, configuredSuites());

@@ -25,7 +25,11 @@ import { fromGraphReadError, readError, type McpReadError } from './mcp-error.js
 import type { DataStore } from '@opensip-cli/datastore';
 
 export { FRESHNESS_BURST_MS } from './catalog-freshness-controller.js';
-export { catalogGenerationKey, createGeneration } from './catalog-generation-model.js';
+export {
+  catalogGenerationKey,
+  createGeneration,
+  generationImpactIndex,
+} from './catalog-generation-model.js';
 export type {
   CatalogGeneration,
   GenerationSource,

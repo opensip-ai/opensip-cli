@@ -141,6 +141,8 @@ export interface ToolCommandManifest {
    * importing the runtime — knows an external scan command is suite-eligible.
    */
   readonly producesVerdict?: boolean;
+  /** Mirrors {@link CommandSpec.producesEvidenceSnapshot}. */
+  readonly producesEvidenceSnapshot?: boolean;
 }
 
 /**

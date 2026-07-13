@@ -189,6 +189,8 @@ function deriveCommandShell(spec) {
   // Carry the verdict-capability so the host (which synthesizes external tools
   // from the manifest, no runtime import) knows a scan command is suite-eligible.
   if (spec.producesVerdict !== undefined) shell.producesVerdict = spec.producesVerdict;
+  if (spec.producesEvidenceSnapshot !== undefined)
+    shell.producesEvidenceSnapshot = spec.producesEvidenceSnapshot;
   return shell;
 }
 

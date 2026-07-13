@@ -2,13 +2,12 @@ import { z } from 'zod';
 
 /**
  * Suite names reserved for host-owned built-in suites (ADR-0159). A configured
- * suite may not claim one: top-level `opensip audit` always runs the built-in
- * definition (ADR-0155), so a configured `suites.audit` could only diverge from
- * it through `suite run audit` — silently. Rejecting the key at document
- * validation makes that divergence unrepresentable. Bundling a new built-in
- * suite requires adding its name here in the same change.
+ * suite may not claim one, so a built-in workflow cannot diverge from generic
+ * `suite run <name>` resolution. Rejecting the key at document validation makes
+ * shadowing unrepresentable. Bundling a new built-in suite requires adding its
+ * name here in the same change.
  */
-export const RESERVED_SUITE_NAMES = ['audit'] as const;
+export const RESERVED_SUITE_NAMES = ['audit', 'agent-context'] as const;
 
 const reservedSuiteNames: ReadonlySet<string> = new Set(RESERVED_SUITE_NAMES);
 

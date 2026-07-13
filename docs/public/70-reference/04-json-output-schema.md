@@ -286,6 +286,7 @@ fields keep their names and types.
 | `aggregate` | object | no | Additive roll-up over step summaries. Present on current CLI output; optional for compatibility. |
 | `steps` | `SuiteStepSummary[]` | yes | One summary per configured step, in execution order. |
 | `reviewBrief` | `ReviewBrief` | no | Host-owned v1 review aggregate. Present on current suite runs; optional for compatibility. |
+| `contextManifest` | `TaskContextManifest` | no | Present only for the built-in `agent-context` evidence suite. It is mutually exclusive with finding-oriented `reviewBrief`. |
 
 ### `SuiteRunScope`
 
@@ -321,10 +322,67 @@ fields keep their names and types.
 | `errorCode` | string | no | Machine-readable `ToolError` or `reportFailure` code for the step failure, when available. |
 | `verdict` | object | no | Counts-only projection of the step's last emitted `SignalEnvelope`. Absent means the step emitted no envelope. |
 | `verification` | `ImpactTrust` | no | Authoritative scoped-verification projection copied from the step envelope. Inspect before claiming changed/impacted coverage is complete. |
+| `kind` | `"verdict"` \| `"evidence"` | no | Additive step discriminator. Absent on older rows means verdict-style legacy behavior. |
+| `readiness` | `"ready"` \| `"degraded"` \| `"unavailable"` | no | Evidence-step readiness. Never a finding verdict. |
 
 `steps[].verdict` contains only `passed`, `errors`, `warnings`, and `findings`
 (`SignalEnvelope.signals.length`). It intentionally excludes signal messages,
 file paths, symbols, match snippets, and raw scanner output.
+
+### `TaskContextManifest`
+
+`opensip suite run agent-context --files <path> --json` adds a numeric-versioned
+manifest to the parent suite result and persisted Run:
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "suite": "agent-context",
+  "runId": "RUN_...",
+  "createdAt": "2026-07-12T12:00:00.000Z",
+  "projectIdentity": "sha256:...",
+  "readiness": "ready",
+  "sourceStart": { "configIdentity": "sha256:...", "status": "captured", "reasonCodes": [] },
+  "sourceEnd": { "configIdentity": "sha256:...", "status": "captured", "reasonCodes": [] },
+  "fileScope": { "mode": "explicit", "fileCount": 1, "filesIdentity": "sha256:..." },
+  "graphIdentity": "g1:...",
+  "inventoryIdentity": "i1:...",
+  "planes": [
+    {
+      "kind": "inventory",
+      "required": true,
+      "status": "rebuilt",
+      "producer": { "toolId": "...", "command": "graph-context-inventory", "version": "0.6.0" },
+      "pointer": { "owner": "graph", "kind": "inventory", "id": "i1:...", "schemaVersion": 1 },
+      "step": { "runId": "RUN_...", "stepId": "STEP_...", "logicalStepKey": "0:...", "ordinal": 0, "attempt": 1 },
+      "freshness": { "status": "current", "reasonCodes": [] },
+      "coverage": { "status": "complete", "reasonCodes": [], "observed": 42, "total": 42 },
+      "caps": { "status": "not-hit", "reasonCodes": [] },
+      "reasonCodes": [],
+      "followUpReads": ["get_file_context"]
+    }
+  ],
+  "reasonCodes": [],
+  "nextActions": ["get_context_status", "impact_files", "select_tests"]
+}
+```
+
+The manifest is capped at 16 planes and 64 KiB. `fileScope` persists only a
+mode, count, and SHA-256 set identity—never raw task paths. `projectIdentity`
+is a SHA-256 identity of the canonical project root, never the path. Absent means an
+ordinary or pre-feature Run. Plane pointers name exact immutable graph-owned
+evidence; an evicted pointer is reported as missing and a retained-but-replaced
+inventory is reported as stale, without exposing or substituting the newer
+identity. The parent Run can still be replayed in either case. Context evidence
+does not appear in `reviewBrief`, fingerprints, baselines, SARIF, or generic
+Tool sessions. `run_steps.evidence` is explicitly discriminated as
+`signal-envelope` or `evidence-snapshots` and stores only bounded projections,
+never snapshot payloads or source text.
+
+For `get_context_status`, do not trust `fileScope.status: matched` alone. Require
+response `status: available`, `manifest.readiness: ready`, and every required
+plane to be current, complete, uncapped, and backed by an exact pointer whose
+replay status is `available`.
 
 ### `ReviewBrief`
 

@@ -6,6 +6,7 @@ import { logger } from '../lib/logger.js';
 import { validateToolIdentity, type ToolIdentity } from '../tools/identity.js';
 
 import { isRecord, isStringArray } from './json-guards.js';
+import { normalizeCommands } from './manifest-command-normalizer.js';
 import { normalizeDiscovery } from './manifest-discovery.js';
 
 import type { PluginLayout } from './types.js';
@@ -13,7 +14,6 @@ import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../t
 import type { ToolConfigManifestDescriptor } from '../tools/manifest-config.js';
 import type {
   RawToolPluginManifest,
-  ToolCommandManifest,
   ToolResourceClass,
   ToolResourceRequirement,
   ToolSource,
@@ -322,65 +322,6 @@ export function normalizeResourceRequirements(
   return out;
 }
 
-const COMMAND_OUTPUT_MODES = new Set([
-  'signal-envelope',
-  'command-result',
-  'raw-stream',
-  'live-view',
-]);
-const COMMAND_SCOPE_REQUIREMENTS = new Set(['project', 'none']);
-
-function isRecordArray(v: unknown): boolean {
-  return Array.isArray(v) && v.every((e) => isRecord(e));
-}
-
-const COMMAND_SHELL_VALIDATORS: Readonly<Record<string, (v: unknown) => boolean>> = {
-  visibility: (v) => v === 'public' || v === 'internal',
-  parent: (v) => typeof v === 'string' && v !== '',
-  commonFlags: (v) => isStringArray(v),
-  options: isRecordArray,
-  args: isRecordArray,
-  scope: (v) => typeof v === 'string' && COMMAND_SCOPE_REQUIREMENTS.has(v),
-  output: (v) => typeof v === 'string' && COMMAND_OUTPUT_MODES.has(v),
-  rawStreamReason: (v) => typeof v === 'string',
-  producesVerdict: (v) => typeof v === 'boolean',
-};
-
-function normalizeCommandShell(
-  entry: Record<string, unknown>,
-): Partial<ToolCommandManifest> | undefined {
-  const shell: Record<string, unknown> = {};
-  for (const [field, isValid] of Object.entries(COMMAND_SHELL_VALIDATORS)) {
-    const value = entry[field];
-    if (value === undefined) continue;
-    if (!isValid(value)) return undefined;
-    shell[field] = value;
-  }
-  return shell;
-}
-
-function normalizeCommands(value: unknown): readonly ToolCommandManifest[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const out: ToolCommandManifest[] = [];
-  // Small per-plugin manifest list (batch limit irrelevant).
-  for (const entry of value) {
-    if (!isRecord(entry)) return undefined;
-    if (typeof entry.name !== 'string' || entry.name === '') return undefined;
-    if (typeof entry.description !== 'string') return undefined;
-    const { aliases } = entry;
-    if (aliases !== undefined && !isStringArray(aliases)) return undefined;
-    const shell = normalizeCommandShell(entry);
-    if (shell === undefined) return undefined;
-    out.push({
-      name: entry.name,
-      description: entry.description,
-      ...(aliases === undefined ? {} : { aliases }),
-      ...shell,
-    });
-  }
-  return out;
-}
-
 function normalizePluginLayout(value: unknown): PluginLayout | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) return undefined;
@@ -415,6 +356,15 @@ export function hashManifest(manifest: RawToolPluginManifest): string {
       name: c.name,
       description: c.description,
       aliases: c.aliases ?? null,
+      // Keep the legacy command fingerprint byte-for-byte compatible when the
+      // additive evidence marker is absent. Unlike the older shell fields
+      // (which the historical hash intentionally omitted), this capability
+      // changes how the host orchestrates the command and therefore belongs in
+      // the fingerprint when the manifest explicitly declares it. Preserve an
+      // explicit `false`; absence and declaration are distinct manifest bytes.
+      ...(c.producesEvidenceSnapshot === undefined
+        ? {}
+        : { producesEvidenceSnapshot: c.producesEvidenceSnapshot }),
     })),
   });
   return createHash('sha256').update(canonical, 'utf8').digest('hex');

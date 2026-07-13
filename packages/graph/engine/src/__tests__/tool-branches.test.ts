@@ -15,7 +15,7 @@
  * through.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -145,7 +145,8 @@ beforeEach(() => {
   enterScope(makeGraphTestScope());
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-  workDir = mkdtempSync(join(tmpdir(), 'tool-branch-'));
+  // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
+  workDir = realpathSync(mkdtempSync(join(tmpdir(), 'tool-branch-')));
 });
 
 afterEach(() => {
@@ -381,6 +382,9 @@ describe('contributeScope + collectReportData hooks', () => {
     expect(contribution.graph?.adapters).toBeDefined();
     expect(contribution.graph?.rules).toBeDefined();
     expect(contribution.graph?.recipes).toBeDefined();
+    expect(contribution.graph?.contextCatalog).toBeDefined();
+    expect(contribution.graph?.contextSnapshots).toBeDefined();
+    expect(contribution.graph?.contextRun).toBeDefined();
   });
 
   it('collectReportData returns empty rule/recipe catalogs when no datastore and no graph subscope', () => {

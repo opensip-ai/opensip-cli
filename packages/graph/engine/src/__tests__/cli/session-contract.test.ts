@@ -14,7 +14,7 @@
  * through the StoredSession contract.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -43,14 +43,14 @@ import type {
   WorkspaceUnit,
 } from '@opensip-cli/core';
 
-function fakeAdapter(projectDir: string): GraphLanguageAdapter {
+function fakeAdapter(): GraphLanguageAdapter {
   return {
     id: 'fake',
     fileExtensions: ['.ts'],
     displayName: 'Fake',
-    discoverFiles: (): DiscoverOutput => ({
-      projectDirAbs: projectDir,
-      files: [join(projectDir, 'src', 'a.ts')],
+    discoverFiles: ({ cwd }): DiscoverOutput => ({
+      projectDirAbs: cwd,
+      files: [join(cwd, 'src', 'a.ts')],
     }),
     parseProject: (): ParseOutput => ({
       project: { dummy: true },
@@ -155,9 +155,10 @@ let datastore: DataStore;
 
 beforeEach(() => {
   enterScope(makeGraphTestScope());
-  projectDir = mkdtempSync(join(tmpdir(), 'graph-session-'));
+  // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
+  projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-session-')));
   datastore = DataStoreFactory.open({ backend: 'memory' });
-  currentAdapterRegistry().register(fakeAdapter(projectDir));
+  currentAdapterRegistry().register(fakeAdapter());
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });

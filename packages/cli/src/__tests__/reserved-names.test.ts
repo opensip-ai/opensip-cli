@@ -26,7 +26,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { rejectHostCommandCollisions } from '../bootstrap/reject-host-command-collisions.js';
 import { HOST_RESERVED_ROOT_COMMANDS } from '../bootstrap/reserved-names.js';
 import { registerCliCommands } from '../commands/index.js';
-import { BUILT_IN_AUDIT_SUITE_NAME } from '../commands/suite/built-in-suites.js';
+import {
+  BUILT_IN_AGENT_CONTEXT_SUITE_NAME,
+  BUILT_IN_AUDIT_SUITE_NAME,
+} from '../commands/suite/built-in-suites.js';
 
 const noopHandler = (): { type: 'text-lines'; lines: string[] } => ({
   type: 'text-lines',
@@ -125,6 +128,9 @@ describe('host-reserved root commands (ADR-0159)', () => {
 
 describe('reserved suite names (ADR-0159)', () => {
   it('reserves every built-in suite name', () => {
-    expect(RESERVED_SUITE_NAMES).toContain(BUILT_IN_AUDIT_SUITE_NAME);
+    expect(RESERVED_SUITE_NAMES).toEqual([
+      BUILT_IN_AUDIT_SUITE_NAME,
+      BUILT_IN_AGENT_CONTEXT_SUITE_NAME,
+    ]);
   });
 });

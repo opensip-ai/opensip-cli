@@ -18,6 +18,8 @@ import {
   boundedName,
   boundedText,
   compactDetail,
+  commandLimit,
+  contextFiles,
   cursor,
   depth,
   filePath,
@@ -31,10 +33,15 @@ import {
   packageProofLimit,
   packageSampleLimit,
   pageLimit,
+  proofLimit,
   query,
   sourceScope,
   strictInput,
+  symbolDetail,
   symbolId,
+  testProofDetail,
+  testTier,
+  top,
   traversalIdentity,
 } from '../schemas.js';
 
@@ -118,6 +125,32 @@ describe('filePrefix schema', () => {
   });
 });
 
+describe('task-context input schemas', () => {
+  it('bounds explicit files and rejects duplicates after path normalization', () => {
+    expect(contextFiles().safeParse(['src/a.ts']).success).toBe(true);
+    expect(contextFiles().safeParse([]).success).toBe(false);
+    expect(
+      contextFiles().safeParse(
+        Array.from({ length: 129 }, (_value, index) => `src/${String(index)}.ts`),
+      ).success,
+    ).toBe(false);
+    expect(contextFiles().safeParse(['src\\a.ts', 'src/a.ts']).success).toBe(false);
+  });
+
+  it('rejects unsupported detail, tier, and proof modes', () => {
+    expect(symbolDetail().safeParse('nodes').success).toBe(false);
+    expect(testTier().safeParse('repository').success).toBe(false);
+    expect(testProofDetail().safeParse('full').success).toBe(false);
+  });
+
+  it('enforces independent impact, command, and proof caps', () => {
+    expect(top().safeParse(501).success).toBe(false);
+    expect(commandLimit().safeParse(101).success).toBe(false);
+    expect(proofLimit().safeParse(7).success).toBe(false);
+    expect(proofLimit().safeParse(0).success).toBe(true);
+  });
+});
+
 describe('query schema', () => {
   it('accepts a normal search term', () => {
     expect(query().safeParse('saveBaseline').success).toBe(true);
@@ -176,9 +209,18 @@ describe('pageLimit schema', () => {
 
 describe('package detail limits (P2 Phase 2.4)', () => {
   it('defaults sample/evidence/proof limits to 0 (compact opt-in)', () => {
-    expect(packageSampleLimit().safeParse(undefined)).toMatchObject({ success: true, data: 0 });
-    expect(packageEvidenceLimit().safeParse(undefined)).toMatchObject({ success: true, data: 0 });
-    expect(packageProofLimit().safeParse(undefined)).toMatchObject({ success: true, data: 0 });
+    expect(packageSampleLimit().safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 0,
+    });
+    expect(packageEvidenceLimit().safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 0,
+    });
+    expect(packageProofLimit().safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 0,
+    });
   });
 
   it('accepts the inclusive max bounds', () => {
@@ -234,7 +276,10 @@ describe('identitySearchLimit and compactDetail (P2 Phase 2/3)', () => {
     });
     expect(architectureSections().safeParse(['metrics', 'metrics']).success).toBe(false);
     expect(architectureSections().safeParse([]).success).toBe(false);
-    expect(architectureTopN().safeParse(undefined)).toMatchObject({ success: true, data: 20 });
+    expect(architectureTopN().safeParse(undefined)).toMatchObject({
+      success: true,
+      data: 20,
+    });
     expect(architectureTopN().safeParse(1).success).toBe(true);
     expect(architectureTopN().safeParse(100).success).toBe(true);
     expect(architectureTopN().safeParse(0).success).toBe(false);

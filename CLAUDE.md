@@ -9,10 +9,17 @@ When answering questions about existing OpenSIP results, prior `fit` / `graph` /
 
 Source precedence:
 
-1. OpenSIP MCP tools: `get_agent_catalog`, `list_runs`, `show_run`, `get_latest_findings`, `get_architecture`, `search_symbols`, `search_declarations`, `references_to`, `who_calls`, `callees_of`, `blast_radius`, `package_dependencies`, `why_depends`, `package_cycles`, `get_runtime_wiring`.
+1. OpenSIP MCP tools: `get_agent_catalog`, `get_context_status`, `get_file_context`, `impact_files`, `select_tests`, `list_runs`, `show_run`, `get_latest_findings`, `get_architecture`, `search_symbols`, `search_declarations`, `references_to`, `who_calls`, `callees_of`, `blast_radius`, `package_dependencies`, `why_depends`, `package_cycles`, `get_runtime_wiring`.
 2. `opensip sessions ...` replay commands when MCP is unavailable.
 3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.
 4. Raw logs or direct datastore inspection only as a last-resort debugging path.
+
+Task lifecycle:
+
+- Before editing, call `get_context_status` with the same explicit project-relative `files` array as the task. Trust the recorded context only when the response is `available`, `fileScope.status` is `matched`, `manifest.readiness` is `ready`, every required plane is current, complete, uncapped, and has a durable pointer whose replay status is `available`. Run `opensip suite run agent-context` with that same `--files` set and `--json` when any condition fails.
+- During editing, use `get_file_context`, `impact_files`, `select_tests`, and `get_symbol` with `detail: "entity"` as needed. `impact_files` and `select_tests` accept explicit project-relative files only.
+- Ordinary MCP reads never build a graph, invoke Git, run tests, or start the context suite. Inspect freshness, all four coverage facets, evidence labels, caps, and fallback actions before claiming completeness.
+- After editing, use `opensip audit --changed --json` for the canonical finding-oriented review.
 
 Fresh review workflow:
 

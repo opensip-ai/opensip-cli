@@ -120,6 +120,18 @@ describe('buildManagedAgentGuidance', () => {
     expect(guidance).toContain('why_depends');
     expect(guidance).toContain('package_cycles');
     expect(guidance).toContain('get_runtime_wiring');
+    expect(guidance).toContain('get_context_status');
+    expect(guidance).toContain('same explicit project-relative `files` array');
+    expect(guidance).toContain('`fileScope.status` is `matched`');
+    expect(guidance).toContain('`manifest.readiness` is `ready`');
+    expect(guidance).toContain('current, complete, uncapped');
+    expect(guidance).toContain('replay status is `available`');
+    expect(guidance).toContain('get_file_context');
+    expect(guidance).toContain('impact_files');
+    expect(guidance).toContain('select_tests');
+    expect(guidance).toContain('suite run agent-context');
+    expect(guidance).toContain('same `--files` set');
+    expect(guidance).toContain('Ordinary MCP reads never build a graph');
     expect(guidance).toContain('default to 20 nodes');
     expect(guidance).toContain('exclusive compact detail modes');
     expect(guidance).toContain('runtime edges, not call edges');
@@ -165,6 +177,7 @@ describe('ensureOpenSipAgentGuidance', () => {
     expect(agents).toContain('OpenSIP MCP First');
     expect(agents).toContain('list_runs');
     expect(agents).toContain('opensip audit --json');
+    expect(agents).toContain('opensip suite run agent-context');
     expect(agents).toContain('agent-fast');
     expect(agents.indexOf('opensip audit --json')).toBeLessThan(
       agents.indexOf('opensip fit --recipe agent-fast'),

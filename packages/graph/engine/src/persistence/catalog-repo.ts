@@ -68,6 +68,8 @@ interface CatalogRowPayload {
   readonly engineMode?: CatalogEngineMode;
   /** Optional project-relative sharded cache inputs (no migration; payload-only). */
   readonly shardCacheInputs?: Catalog['shardCacheInputs'];
+  /** Optional bounded build coverage (absent on legacy catalogs). */
+  readonly buildCoverage?: Catalog['buildCoverage'];
   readonly functions: Catalog['functions'];
   /**
    * Re-export facts (re-export-chain resolution). Present only when the adapter
@@ -158,6 +160,28 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
   }
   if (payload.shardCacheInputs !== undefined && !isSafeShardCacheInputs(payload.shardCacheInputs)) {
     throw new Error('Malformed catalog shard-cache provenance');
+  }
+  if (
+    payload.buildCoverage !== undefined &&
+    (!isRecord(payload.buildCoverage) ||
+      Object.keys(payload.buildCoverage).some(
+        (key) =>
+          key !== 'status' &&
+          key !== 'discoveredFiles' &&
+          key !== 'parseErrorFiles' &&
+          key !== 'filesIdentity',
+      ) ||
+      (payload.buildCoverage.status !== 'complete' && payload.buildCoverage.status !== 'partial') ||
+      !Number.isSafeInteger(payload.buildCoverage.discoveredFiles) ||
+      (payload.buildCoverage.discoveredFiles as number) < 0 ||
+      !Number.isSafeInteger(payload.buildCoverage.parseErrorFiles) ||
+      (payload.buildCoverage.parseErrorFiles as number) < 0 ||
+      (payload.buildCoverage.parseErrorFiles as number) >
+        (payload.buildCoverage.discoveredFiles as number) ||
+      typeof payload.buildCoverage.filesIdentity !== 'string' ||
+      !/^sha256:[a-f0-9]{64}$/u.test(payload.buildCoverage.filesIdentity))
+  ) {
+    throw new Error('Malformed catalog build coverage');
   }
 }
 
@@ -366,6 +390,7 @@ export class CatalogRepo {
           adapterSelection: catalog.adapterSelection,
           engineMode: catalog.engineMode,
           shardCacheInputs: catalog.shardCacheInputs,
+          buildCoverage: catalog.buildCoverage,
           functions: catalog.functions,
           // Carries through whatever the caller attached; `undefined` when none
           // (a lean run) so the key is omitted from the persisted JSON.
@@ -453,6 +478,7 @@ export class CatalogRepo {
         adapterSelection: payload.adapterSelection,
         engineMode: payload.engineMode,
         shardCacheInputs: payload.shardCacheInputs,
+        buildCoverage: payload.buildCoverage,
         functions: payload.functions,
         reExports: payload.reExports,
         semanticFacts: payload.semanticFacts,

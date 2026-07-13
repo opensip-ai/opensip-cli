@@ -42,6 +42,11 @@ export function uniqueStrings(values: readonly string[]): readonly string[] {
   return [...new Set(values)];
 }
 
+/** Return whether every string occurs exactly once. */
+export function stringsAreUnique(values: readonly string[]): boolean {
+  return new Set(values).size === values.length;
+}
+
 /** Escape one literal for interpolation into a JavaScript regular expression. */
 export function escapeRegularExpression(value: string): string {
   return value.replace(/[|\\{}()[\]^$+*?.]/gu, '\\$&');

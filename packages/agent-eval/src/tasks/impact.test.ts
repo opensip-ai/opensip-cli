@@ -11,6 +11,7 @@ import { executeArm } from '../runner/execute-arm.js';
 
 import { impactTasks } from './impact.js';
 
+import type { ImpactTargetFact } from '../ground-truth/types.js';
 import type { FactBinding, GoldTask, StrategyStep } from '../model/task.js';
 
 const FIXTURES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../__fixtures__');
@@ -35,7 +36,7 @@ function factBinding(value: unknown): FactBinding {
 }
 
 describe('impact-estimate gold tasks', () => {
-  it('freezes the three customer instances at the epoch-4 before-baseline', () => {
+  it('freezes the three customer instances with the epoch-7 OpenSIP strategy', () => {
     expect(impactTasks.map(({ id }) => id)).toEqual([
       'impact-estimate.customer-ts',
       'impact-estimate.customer-py',
@@ -47,7 +48,7 @@ describe('impact-estimate gold tasks', () => {
       expect(Object.isFrozen(taskValue.strategies)).toBe(true);
       expect(Object.isFrozen(taskValue.strategies.control.steps)).toBe(true);
       expect(taskValue.strategies.control.version).toBe('control-native-v1');
-      expect(taskValue.strategies.opensip.version).toContain('epoch-4');
+      expect(taskValue.strategies.opensip.version).toContain('epoch-7');
     }
   });
 
@@ -97,24 +98,36 @@ describe('impact-estimate gold tasks', () => {
     }
   });
 
-  it('binds every symbol-dependent read to the prior normalized search handle', () => {
+  it('uses the compact impact read and binds supported traversals to a normalized search handle', () => {
     for (const taskValue of impactTasks) {
+      const impact = stepByTool(taskValue, 'opensip', 'impact_files');
+      let target: ImpactTargetFact = customerWorkspaceGroundTruth.impactTargets[0];
+      if (taskValue.fixture === 'customer-ts') target = customerTsGroundTruth.impactTargets[0];
+      else if (taskValue.fixture === 'customer-py') target = customerPyGroundTruth.impactTargets[0];
+      expect(impact.arguments).toEqual({
+        depth: 2,
+        files: [target.targetFile],
+        top: 50,
+      });
+      if (taskValue.fixture === 'customer-py') {
+        expect(taskValue.strategies.opensip.steps.map(({ tool }) => tool)).toEqual([
+          'impact_files',
+        ]);
+        continue;
+      }
       const search = stepByTool(taskValue, 'opensip', 'search_symbols');
       const whoCalls = stepByTool(taskValue, 'opensip', 'who_calls');
-      const blast = stepByTool(taskValue, 'opensip', 'blast_radius');
-      for (const dependent of [whoCalls, blast]) {
-        const binding = factBinding(dependent.arguments.symbolId);
-        expect(binding.$fact).toEqual({
-          field: 'symbolId',
-          match: {
-            kind: 'symbol-handle',
-            name: search.arguments.query,
-          },
-          select: 'only',
-          stepId: search.id,
-        });
-        expect(dependent.arguments.limit).toBe(500);
-      }
+      const binding = factBinding(whoCalls.arguments.symbolId);
+      expect(binding.$fact).toEqual({
+        field: 'symbolId',
+        match: {
+          kind: 'symbol-handle',
+          name: search.arguments.query,
+        },
+        select: 'only',
+        stepId: search.id,
+      });
+      expect(whoCalls.arguments).toMatchObject({ depth: 2, limit: 50 });
       expect(search.arguments).toMatchObject({
         detail: 'nodes',
         limit: 20,
@@ -123,27 +136,15 @@ describe('impact-estimate gold tasks', () => {
       });
       expect(JSON.stringify(whoCalls.arguments)).not.toContain(':1:0');
     }
-    const workspace = task('impact-estimate.customer-workspace');
-    const search = stepByTool(workspace, 'opensip', 'search_symbols');
-    const packages = stepByTool(workspace, 'opensip', 'package_dependencies');
-    expect(factBinding(packages.arguments.package).$fact).toEqual({
-      field: 'package',
-      match: { kind: 'symbol-handle', name: 'normalizeAccount' },
-      select: 'only',
-      stepId: search.id,
-    });
-    expect(packages.arguments).toMatchObject({ limit: 500, sampleLimit: 0 });
   });
 
-  it('does not turn incident package edges into a transitive non-impact proof', () => {
+  it('does not turn the impact projection into a transitive non-impact proof', () => {
     const workspace = task('impact-estimate.customer-workspace');
-    const packages = stepByTool(workspace, 'opensip', 'package_dependencies');
+    const impact = stepByTool(workspace, 'opensip', 'impact_files');
 
     expect(workspace.assertions.mustExclude).toBeUndefined();
-    expect(packages.provesAbsence).toBeUndefined();
-    expect(workspace.strategies.opensip.version).toBe(
-      'opensip-mcp-epoch-4-v2-no-transitive-negative',
-    );
+    expect(impact.provesAbsence).toBeUndefined();
+    expect(workspace.strategies.opensip.version).toBe('opensip-mcp-epoch-7-v1-impact-files');
   });
 
   it('discovers workspace manifests without injecting exact package topology', () => {
@@ -285,7 +286,9 @@ describe('impact-estimate gold tasks', () => {
       targetHashes: ['unrelated-body'],
     });
     expect(facts).not.toContainEqual(
-      expect.objectContaining({ evidenceKind: 'target-linked-unresolved-call-site' }),
+      expect.objectContaining({
+        evidenceKind: 'target-linked-unresolved-call-site',
+      }),
     );
   });
 
@@ -319,7 +322,7 @@ describe('impact-estimate gold tasks', () => {
   it('normalizes only symbol and package identities present in MCP payloads', () => {
     const taskValue = task('impact-estimate.customer-workspace');
     const search = stepByTool(taskValue, 'opensip', 'search_symbols');
-    const packages = stepByTool(taskValue, 'opensip', 'package_dependencies');
+    const impact = stepByTool(taskValue, 'opensip', 'impact_files');
     const searchFacts = search.extract({
       data: {
         symbols: [
@@ -333,15 +336,26 @@ describe('impact-estimate gold tasks', () => {
         ],
       },
     });
-    const packageFacts = packages.extract({
+    const impactFacts = impact.extract({
       data: {
-        calls: [
+        impactedFiles: ['alternative/caller.ts'],
+        impactedFunctions: [
           {
-            fromPackage: '@alternative/api',
-            toPackage: '@alternative/core',
+            filePath: 'alternative/caller.ts',
+            package: '@alternative/api',
+            qualifiedName: 'alternativeCaller',
           },
         ],
-        imports: [],
+        impactedPackages: [
+          { functionCount: 1, name: '@alternative/api' },
+          { functionCount: 1, name: '@alternative/core' },
+        ],
+        trust: {
+          coverage: 'full',
+          fallback: 'targeted',
+          fullyVerified: true,
+          uncertainties: [],
+        },
       },
     });
 
@@ -352,45 +366,85 @@ describe('impact-estimate gold tasks', () => {
         symbolId: 'alternative/target.ts:2:0',
       }),
     );
-    expect(packageFacts).toEqual([
-      { kind: 'package', name: '@alternative/api' },
-      { kind: 'package', name: '@alternative/core' },
-    ]);
-    expect([...searchFacts, ...packageFacts]).not.toContainEqual(
+    expect(impactFacts).toContainEqual({
+      kind: 'package',
+      name: '@alternative/api',
+    });
+    expect(impactFacts).toContainEqual({
+      kind: 'package',
+      name: '@alternative/core',
+    });
+    expect(impactFacts).toContainEqual({
+      filePath: 'alternative/caller.ts',
+      kind: 'symbol',
+      name: 'alternativeCaller',
+      package: '@alternative/api',
+    });
+    expect([...searchFacts, ...impactFacts]).not.toContainEqual(
       expect.objectContaining({ name: '@fixture/ws-core' }),
     );
   });
 
-  it('keeps blast body twins distinct from caller files', () => {
-    const blast = stepByTool(task('impact-estimate.customer-ts'), 'opensip', 'blast_radius');
-    const facts = blast.extract({
+  it('projects impact rows without inventing edge-confidence evidence', () => {
+    const impact = stepByTool(task('impact-estimate.customer-ts'), 'opensip', 'impact_files');
+    const facts = impact.extract({
       data: {
-        direct: 2,
-        members: [
+        impactedFiles: ['src/caller.ts'],
+        impactedFunctions: [
           {
-            filePath: 'src/twin.ts',
-            inTestFile: false,
-            simpleName: 'calculateInvoice',
-            symbolId: 'src/twin.ts:3:0',
+            filePath: 'src/caller.ts',
+            package: '@fixture/customer-ts',
+            qualifiedName: 'billing.repriceInvoice',
           },
         ],
-        score: 3,
-        totalMembership: 1,
-        transitive: 2,
+        impactedPackages: [{ functionCount: 1, name: '@fixture/customer-ts' }],
+        trust: {
+          coverage: 'full',
+          fallback: 'targeted',
+          fullyVerified: true,
+          uncertainties: [],
+        },
       },
     });
 
     expect(facts).toContainEqual({
       kind: 'file',
-      path: 'src/twin.ts',
-      role: 'body-twin',
+      path: 'src/caller.ts',
+      role: 'caller',
     });
-    expect(facts).not.toContainEqual(expect.objectContaining({ role: 'caller' }));
-    expect(facts).toContainEqual({
-      kind: 'count',
-      label: 'blast.direct',
-      value: 2,
-    });
+    expect(facts).toContainEqual(
+      expect.objectContaining({ kind: 'symbol', name: 'repriceInvoice' }),
+    );
+    expect(facts).not.toContainEqual(expect.objectContaining({ kind: 'evidence' }));
+  });
+
+  it('keeps qualified positive facts under valid partial trust and rejects malformed trust', () => {
+    const impact = stepByTool(task('impact-estimate.customer-ts'), 'opensip', 'impact_files');
+    const data = {
+      impactedFiles: ['src/caller.ts'],
+      impactedFunctions: [],
+      impactedPackages: [],
+    };
+    expect(impact.extract({ data })).toEqual([]);
+    expect(
+      impact.extract({
+        data: {
+          ...data,
+          trust: {
+            coverage: 'unknown',
+            fallback: 'targeted',
+            fullyVerified: false,
+            uncertainties: [
+              {
+                code: 'graph-catalog-approximate',
+                message: 'The graph contains approximate evidence.',
+                source: 'catalog',
+              },
+            ],
+          },
+        },
+      }),
+    ).toEqual([{ kind: 'file', path: 'src/caller.ts', role: 'impacted' }]);
   });
 
   it('returns honest MCP empties and makes native dynamic discovery a broad target search', () => {

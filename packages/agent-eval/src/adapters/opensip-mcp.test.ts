@@ -6,6 +6,7 @@ import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HarnessPrerequisiteError } from '../runner/spawn.js';
+import { extractImpactFiles } from '../tasks/context-surface-extractors.js';
 import { taskRegistry } from '../tasks/index.js';
 
 import {
@@ -24,9 +25,12 @@ const TOOL_NAMES = [
   'find_dead_code',
   'get_agent_catalog',
   'get_architecture',
+  'get_context_status',
+  'get_file_context',
   'get_latest_findings',
   'get_runtime_wiring',
   'get_symbol',
+  'impact_files',
   'list_runs',
   'package_cycles',
   'package_dependencies',
@@ -35,13 +39,18 @@ const TOOL_NAMES = [
   'review_change',
   'search_declarations',
   'search_symbols',
+  'select_tests',
   'show_run',
   'trace_path',
   'who_calls',
   'why_depends',
 ] as const;
 
-const MCP_SETUP_TOOL_NAMES = ['get_agent_catalog', 'get_architecture'] as const;
+const MCP_SETUP_TOOL_NAMES = [
+  'get_agent_catalog',
+  'get_architecture',
+  'get_context_status',
+] as const;
 
 interface FakeConnectionOptions {
   readonly catalog?: Readonly<Record<string, unknown>>;
@@ -244,7 +253,7 @@ describe('McpArmSession handshake', () => {
       projectRootVerified: true,
       projectScope: 'project',
       stderr: { bytes: 9, truncated: true },
-      surfaceEpoch: 4,
+      surfaceEpoch: 7,
       surfaceVerified: true,
       toolCount: TOOL_NAMES.length,
       toolNames: [...TOOL_NAMES].sort(),
@@ -298,7 +307,10 @@ describe('McpArmSession handshake', () => {
     const root = temporaryRoot();
     const names = TOOL_NAMES.filter((name) => name !== 'get_symbol');
     const harness = fakeConnection(root, {
-      catalog: validCatalog(root, { toolCount: names.length, toolNames: names }),
+      catalog: validCatalog(root, {
+        toolCount: names.length,
+        toolNames: names,
+      }),
       listedNames: names,
     });
 
@@ -310,7 +322,10 @@ describe('McpArmSession handshake', () => {
     const root = temporaryRoot();
     const names = [...TOOL_NAMES, 'future_read_tool'];
     const harness = fakeConnection(root, {
-      catalog: validCatalog(root, { toolCount: names.length, toolNames: names }),
+      catalog: validCatalog(root, {
+        toolCount: names.length,
+        toolNames: names,
+      }),
       listedNames: names,
     });
 
@@ -644,6 +659,209 @@ describe('McpArmSession tool record mapping', () => {
 
     expect(record.failure?.code).toBe('invalid-graph-envelope');
     expect(extract).not.toHaveBeenCalled();
+    await session.close();
+  });
+
+  it.each(['impact_files', 'select_tests'] as const)(
+    'validates %s with the graph-envelope trust contract',
+    async (tool) => {
+      const root = temporaryRoot();
+      const payload = { ...graphPayload(root, {}), coverage: undefined };
+      const harness = fakeConnection(root, {
+        toolResults: [textResult(payload)],
+      });
+      const { session } = await connectFake(root, harness);
+      const extract = vi.fn(() => []);
+
+      const record = await session.callTool({ ...resolvedStep(extract), tool });
+
+      expect(record.failure?.code).toBe('invalid-graph-envelope');
+      expect(extract).not.toHaveBeenCalled();
+      await session.close();
+    },
+  );
+
+  it.each([
+    ['missing', undefined],
+    [
+      'inconsistent',
+      {
+        coverage: 'full',
+        fallback: 'targeted',
+        fullyVerified: false,
+        uncertainties: [],
+      },
+    ],
+    [
+      'malformed uncertainty',
+      {
+        coverage: 'unknown',
+        fallback: 'targeted',
+        fullyVerified: false,
+        uncertainties: [{ code: 'unknown-code', message: 'unknown', source: 'catalog' }],
+      },
+    ],
+  ] as const)('rejects %s nested impact trust before extraction', async (_label, trust) => {
+    const root = temporaryRoot();
+    const payload = graphPayload(root, {
+      impactedFiles: ['src/caller.ts'],
+      impactedFunctions: [],
+      impactedPackages: [],
+      ...(trust === undefined ? {} : { trust }),
+    });
+    const harness = fakeConnection(root, {
+      toolResults: [textResult(payload)],
+    });
+    const { session } = await connectFake(root, harness);
+    const extract = vi.fn(() => [{ kind: 'file' as const, path: 'src/caller.ts' }]);
+
+    const record = await session.callTool({
+      ...resolvedStep(extract),
+      tool: 'impact_files',
+    });
+
+    expect(record.failure?.code).toBe('invalid-graph-envelope');
+    expect(extract).not.toHaveBeenCalled();
+    await session.close();
+  });
+
+  it('records honest unverified impact as incomplete while retaining positive facts', async () => {
+    const root = temporaryRoot();
+    const payload = graphPayload(root, {
+      impactedFiles: ['src/caller.ts'],
+      impactedFunctions: [],
+      impactedPackages: [],
+      trust: {
+        coverage: 'unknown',
+        fallback: 'targeted',
+        fullyVerified: false,
+        uncertainties: [
+          {
+            code: 'graph-catalog-approximate',
+            message: 'The graph contains approximate evidence.',
+            source: 'catalog',
+          },
+        ],
+      },
+    });
+    const harness = fakeConnection(root, {
+      toolResults: [textResult(payload)],
+    });
+    const { session } = await connectFake(root, harness);
+
+    const record = await session.callTool({
+      ...resolvedStep(extractImpactFiles),
+      tool: 'impact_files',
+    });
+
+    expect(record).toMatchObject({
+      completeness: 'incomplete',
+      facts: [{ kind: 'file', path: 'src/caller.ts', role: 'impacted' }],
+      failure: undefined,
+      noneOutcome: 'nonempty',
+    });
+    expect(record.coverage).toMatchObject({
+      complete: false,
+      hardCapReasons: ['graph-catalog-approximate'],
+    });
+    expect(record.coverage?.facets).toContainEqual(
+      expect.objectContaining({
+        complete: false,
+        hardCapReasons: ['graph-catalog-approximate'],
+        name: 'projection',
+        requested: true,
+      }),
+    );
+    await session.close();
+  });
+
+  it('projects impact facts normally when nested trust is fully verified', async () => {
+    const root = temporaryRoot();
+    const payload = graphPayload(root, {
+      impactedFiles: ['src/caller.ts'],
+      impactedFunctions: [],
+      impactedPackages: [],
+      trust: {
+        coverage: 'full',
+        fallback: 'targeted',
+        fullyVerified: true,
+        uncertainties: [],
+      },
+    });
+    const harness = fakeConnection(root, {
+      toolResults: [textResult(payload)],
+    });
+    const { session } = await connectFake(root, harness);
+
+    const record = await session.callTool({
+      ...resolvedStep(extractImpactFiles),
+      tool: 'impact_files',
+    });
+
+    expect(record).toMatchObject({
+      completeness: 'complete',
+      facts: [{ kind: 'file', path: 'src/caller.ts', role: 'impacted' }],
+      failure: undefined,
+      noneOutcome: 'nonempty',
+    });
+    await session.close();
+  });
+
+  it('rejects a select_tests graph identity that differs from its outer catalog', async () => {
+    const root = temporaryRoot();
+    const payload = graphPayload(root, { graphIdentity: 'g1:stale' });
+    const harness = fakeConnection(root, {
+      toolResults: [textResult(payload)],
+    });
+    const { session } = await connectFake(root, harness);
+    const extract = vi.fn(() => []);
+
+    const record = await session.callTool({
+      ...resolvedStep(extract),
+      tool: 'select_tests',
+    });
+
+    expect(record.failure?.code).toBe('invalid-graph-envelope');
+    expect(extract).not.toHaveBeenCalled();
+    await session.close();
+  });
+
+  it('retains file-context inventory coverage and rejects malformed codebase metadata', async () => {
+    const root = temporaryRoot();
+    const valid = {
+      status: 'found',
+      file: { path: 'package.json' },
+      inventoryIdentity: 'i1:fixture',
+      project: { configIdentity: 'sha256:fixture', workspacePatterns: [] },
+      coverage: { status: 'complete', reasonCodes: [], observed: 4, total: 4 },
+      freshness: {
+        capturedAt: '2026-07-13T00:00:00.000Z',
+        fresh: true,
+        reasonCodes: [],
+        verification: 'complete',
+      },
+      reasonCodes: [],
+      nextActions: [],
+    };
+    const harness = fakeConnection(root, {
+      toolResults: [textResult(valid), textResult({ ...valid, freshness: undefined })],
+    });
+    const { session } = await connectFake(root, harness);
+    const step = {
+      ...resolvedStep(() => [{ kind: 'file', path: 'package.json' }]),
+      tool: 'get_file_context',
+    };
+
+    const record = await session.callTool(step);
+    expect(record).toMatchObject({
+      completeness: 'complete',
+      coverage: { complete: true, truncated: false },
+      freshness: { fresh: true, verification: 'complete' },
+      noneOutcome: 'nonempty',
+    });
+
+    const malformed = await session.callTool(step);
+    expect(malformed.failure?.code).toBe('invalid-codebase-envelope');
     await session.close();
   });
 

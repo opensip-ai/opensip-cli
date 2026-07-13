@@ -1,7 +1,5 @@
 import { isUnknownRecord as isRecord, uniqueFacts } from '../model/value-helpers.js';
 
-import { isTestTraversalNodeProjection } from './graph-projection-validation.js';
-
 export {
   extractAliasSourcePaths,
   extractCallableAliasesFromSource,
@@ -112,15 +110,15 @@ function evidenceForCaller(
   ];
 }
 
-function callerNodeFacts(node: UnknownRecord, testsOnly: boolean): readonly AnswerFact[] {
+function callerNodeFacts(node: UnknownRecord): readonly AnswerFact[] {
   if (typeof node.depth !== 'number' || node.depth <= 0 || !isRecord(node.symbol)) return [];
   const handle = symbolHandle(node.symbol);
-  if (!handle?.filePath || (testsOnly && handle.inTestFile !== true)) return [];
+  if (!handle?.filePath) return [];
   return [
     {
       kind: 'file',
       path: handle.filePath,
-      role: testsOnly ? 'test' : 'caller',
+      role: 'caller',
     },
     ...factsForSymbol(node.symbol),
     ...evidenceForCaller(handle, node.incomingEvidence),
@@ -187,79 +185,20 @@ function unresolvedCallerFacts(
   });
 }
 
-function extractCallerNodes(payload: unknown, testsOnly: boolean): readonly AnswerFact[] {
+function extractCallerNodes(payload: unknown): readonly AnswerFact[] {
   if (!isRecord(payload) || !isRecord(payload.data)) return [];
   const nodes = payload.data.nodes;
-  const nodeFacts = records(nodes).flatMap((node) => callerNodeFacts(node, testsOnly));
-  return uniqueFacts(
-    testsOnly
-      ? nodeFacts
-      : [
-          ...nodeFacts,
-          ...unresolvedCallerFacts(
-            payload.data.unresolved,
-            targetBodyHashes(nodes),
-            payload.data.unresolvedAttribution,
-          ),
-        ],
-  );
-}
-
-export function extractWhoCallers(payload: unknown): readonly AnswerFact[] {
-  return extractCallerNodes(payload, false);
-}
-
-export interface TestCallerProjection {
-  readonly facts: readonly AnswerFact[];
-  readonly projectionComplete: boolean;
-}
-
-/** Share the exact traversal-node projection between extraction and proof assessment. */
-export function projectTestCallers(payload: unknown): TestCallerProjection {
-  if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.nodes)) {
-    return { facts: [], projectionComplete: false };
-  }
-  return {
-    facts: extractCallerNodes(payload, true),
-    projectionComplete: payload.data.nodes.every(isTestTraversalNodeProjection),
-  };
-}
-
-export function extractTestCallers(payload: unknown): readonly AnswerFact[] {
-  return projectTestCallers(payload).facts;
-}
-
-function countFact(label: string, value: unknown): readonly AnswerFact[] {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? [{ kind: 'count', label, value }]
-    : [];
-}
-
-/** Blast members are body twins, never caller-impact evidence. */
-export function extractBlastSummary(payload: unknown): readonly AnswerFact[] {
-  if (!isRecord(payload) || !isRecord(payload.data)) return [];
-  const data = payload.data;
-  const members = records(data.members).flatMap((member): readonly AnswerFact[] => {
-    const filePath = optionalString(member.filePath);
-    return filePath ? [{ kind: 'file', path: filePath, role: 'body-twin' }] : [];
-  });
+  const nodeFacts = records(nodes).flatMap(callerNodeFacts);
   return uniqueFacts([
-    ...countFact('blast.direct', data.direct),
-    ...countFact('blast.transitive', data.transitive),
-    ...countFact('blast.score', data.score),
-    ...countFact('blast.totalMembership', data.totalMembership),
-    ...members,
+    ...nodeFacts,
+    ...unresolvedCallerFacts(
+      payload.data.unresolved,
+      targetBodyHashes(nodes),
+      payload.data.unresolvedAttribution,
+    ),
   ]);
 }
 
-export function extractPackageDependencies(payload: unknown): readonly AnswerFact[] {
-  if (!isRecord(payload) || !isRecord(payload.data)) return [];
-  const names = new Set<string>();
-  for (const row of [...records(payload.data.calls), ...records(payload.data.imports)]) {
-    for (const field of ['fromPackage', 'toPackage'] as const) {
-      const name = optionalString(row[field]);
-      if (name) names.add(name);
-    }
-  }
-  return [...names].sort().map((name) => ({ kind: 'package', name }));
+export function extractWhoCallers(payload: unknown): readonly AnswerFact[] {
+  return extractCallerNodes(payload);
 }

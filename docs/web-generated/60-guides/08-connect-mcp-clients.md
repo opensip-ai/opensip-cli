@@ -75,8 +75,8 @@ that project root: runs recorded under another root are treated as not found
 
 The server is read-only by default. To opt in to `repair_apply_verify`, append
 `--allow-mutations` to the registered args or set
-`OPENSIP_MCP_ALLOW_MUTATIONS=1` in the server environment. This adds only that
-20th tool; it does not change graph/result query parameters.
+`OPENSIP_MCP_ALLOW_MUTATIONS=1` in the server environment. This adds only
+`repair_apply_verify`; it does not change graph/result query parameters.
 
 ---
 
@@ -108,7 +108,7 @@ team standardizes in docs/onboarding.
 ### Verify
 
 1. Restart Cursor or reload MCP servers from Settings.
-2. Open the MCP panel — `opensip` should appear with exactly **21 tools** by default (graph + declaration/reference + package + runtime + results/review). Mutating repair apply/verify is off by default; starting the server with `--allow-mutations` adds only `repair_apply_verify` as a **22nd** tool. Treat the live `listTools` / `get_agent_catalog.mcp` names as authority (defensive registration caps: 256 tools / 128-character names — not targets).
+2. Open the MCP panel and compare initialize/listTools with `get_agent_catalog.mcp`. Treat those live names and the surface epoch as authority. Mutating repair apply/verify is off by default; `--allow-mutations` adds only `repair_apply_verify` (defensive registration caps: 256 tools / 128-character names — not targets).
 3. Ask the agent: *"Use OpenSIP to call `get_agent_catalog`, then `get_architecture`, and summarize the graph."*
 4. Ask a result replay question: *"Use OpenSIP MCP to show the latest `fit`
    findings before deciding whether to re-run fit."*
@@ -151,6 +151,22 @@ for the public graph-read boundary.
 7. Continue pages with the returned cursor and stable filters. Externally
    persisted newer catalogs auto-swap on ordinary reads (including runtime-only
    follow-ups).
+
+### Task-context workflow
+
+1. Call `get_context_status` with the same explicit `files` before editing.
+   Trust the recorded evidence only when the response is `available`,
+   `fileScope.status` is `matched`, `manifest.readiness` is `ready`, and every
+   required plane is current, complete, uncapped, and backed by a pointer whose
+   replay status is `available`. An evicted, stale, or current-inventory-mismatched
+   pointer is never replaced with latest.
+2. If any trust condition fails, run
+   `opensip suite run agent-context --files <path> --json` outside MCP, then
+   reconnect only if the MCP surface itself changed.
+3. Use `get_file_context`, `impact_files`, `select_tests`, and `get_symbol` with
+   `detail: "entity"` for the explicit project-relative files. Inspect
+   freshness, all four coverage facets, evidence confidence, caps, and fallback
+   commands. These reads never run Git, graph builds, or tests.
 
 ---
 

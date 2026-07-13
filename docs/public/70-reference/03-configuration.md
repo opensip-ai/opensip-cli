@@ -355,7 +355,15 @@ example `audit-custom`) for a distinct workflow. The built-in preset runs
 changed-scope by default when Git scope resolves; pass `--full` for a
 whole-repo run.
 
-This reservation is architectural, not naming advice: see
+`agent-context` is also built in. It runs the bundled graph Tool's internal
+inventory, graph-ensure, and test-selection evidence producers serially and
+persists a bounded non-finding `TaskContextManifest` on the parent Run. Pass
+repeatable `--files` on `suite run`; the host propagates them only to the
+declaring selector step. Like `audit`, the `agent-context` name is reserved; use
+a different name for a configured workflow. The built-in preset accepts only
+the exact bundled graph Tool provenance.
+
+These reservations are architectural, not naming advice: see
 [ADR-0111](../../decisions/ADR-0111-built-in-audit-suite-preset.md),
 [ADR-0129](../../decisions/ADR-0129-audit-suite-scope-defaults.md),
 [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md), and
