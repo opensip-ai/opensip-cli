@@ -173,21 +173,21 @@ if [ -n "$OPEN_CMD" ]; then
 
   if [ "${OPENSIP_CLI_SKIP_SMOKE:-}" != "1" ]; then
     SMOKE_DIR="$(mktemp -d -t opensip-cli-smoke.XXXXXX)"
-    if ! run_with_spinner "Running install smoke test" "$OPEN_CMD" init --cwd "$SMOKE_DIR" --language typescript --json; then
-      error "Smoke test failed while scaffolding a temporary project."
+    if ! run_with_spinner "Verifying the CLI runs" "$OPEN_CMD" init --cwd "$SMOKE_DIR" --language typescript --json; then
+      error "Install verification failed while scaffolding a temporary project."
       if [ -s "$LOG_FILE" ]; then
         printf '\n%s\n' "opensip output:" >&2
         cat "$LOG_FILE" >&2
       fi
-      printf '\n%s\n' "You can skip the smoke test with OPENSIP_CLI_SKIP_SMOKE=1, but the CLI may not be usable until this is resolved." >&2
+      printf '\n%s\n' "You can skip this check with OPENSIP_CLI_SKIP_SMOKE=1, but the CLI may not be usable until this is resolved." >&2
       exit 1
     fi
     # The single-quoted string is the BODY passed to `sh -c`; $1/$2 are
     # positional params expanded by THAT inner shell (supplied by the trailing
     # `sh "$SMOKE_DIR" "$OPEN_CMD"`), not here — so single quotes are correct.
     # shellcheck disable=SC2016
-    if ! run_with_spinner "Verifying install data store" sh -c 'cd "$1" && "$2" sessions list --json' sh "$SMOKE_DIR" "$OPEN_CMD"; then
-      error "Smoke test failed while opening the SQLite data store."
+    if ! run_with_spinner "Verifying the data store opens" sh -c 'cd "$1" && "$2" sessions list --json' sh "$SMOKE_DIR" "$OPEN_CMD"; then
+      error "Install verification failed while opening the SQLite data store."
       if [ -s "$LOG_FILE" ]; then
         printf '\n%s\n' "opensip output:" >&2
         cat "$LOG_FILE" >&2
@@ -197,9 +197,9 @@ if [ -n "$OPEN_CMD" ]; then
     fi
     rm -rf "$SMOKE_DIR"
     SMOKE_DIR=""
-    ok "Install smoke test passed."
+    ok "Verified: the CLI runs and its data store opens."
   else
-    warn "Skipping install smoke test because OPENSIP_CLI_SKIP_SMOKE=1."
+    warn "Skipping install verification because OPENSIP_CLI_SKIP_SMOKE=1."
   fi
 else
   ok "opensip is installed."
@@ -209,6 +209,17 @@ else
   fi
 fi
 
-printf '\n%s\n' "${SUCCESS_MARKER} OpenSIP CLI installed successfully."
-info "Run ${BOLD}opensip audit${RESET} in your project for a changed-code review."
-info "Then run ${BOLD}opensip init${RESET} when you want to customize targets and checks."
+# Final banner. The version step line above already says "installed", so this
+# line claims the stronger, verified state instead of repeating it — except in
+# the PATH-warning branch, where "ready" would not be true yet.
+if [ -n "$OPEN_CMD" ]; then
+  printf '\n%s\n' "${SUCCESS_MARKER} OpenSIP CLI is ready."
+else
+  printf '\n%s\n' "${SUCCESS_MARKER} OpenSIP CLI installed. Restart your shell before running the commands below."
+fi
+
+printf '\n%s\n' "Next steps (run in your project):"
+printf '  %s\n' "${BOLD}opensip audit${RESET}          ${DIM}# review your changed code before you commit${RESET}"
+printf '  %s\n' "${BOLD}opensip audit --full${RESET}   ${DIM}# or review the whole repo right now${RESET}"
+printf '  %s\n' "${BOLD}opensip init${RESET}           ${DIM}# optional: customize what gets checked${RESET}"
+printf '\n%s\n' "${DIM}Docs: https://opensip.ai/docs/opensip-cli${RESET}"
