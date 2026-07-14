@@ -583,4 +583,31 @@ describe('RunRepo', () => {
     expect(byRun.get('run-a')?.map((step) => step.id)).toEqual(['a-0']);
     expect(byRun.get('run-b')?.map((step) => step.id)).toEqual(['b-0', 'b-1']);
   });
+
+  it('upserts a step via saveStep without rewriting the parent run', () => {
+    repo.saveRun(makeRun());
+    const step = makeStep({ id: 'orphan-save', ordinal: 3, logicalStepKey: '3:fit:extra' });
+    repo.saveStep(step);
+    repo.saveStep({ ...step, outcome: 'failed', exitCode: 1 });
+
+    expect(repo.listStepsForRun(step.runId)).toEqual([
+      expect.objectContaining({ id: 'orphan-save', outcome: 'failed', exitCode: 1 }),
+    ]);
+    expect(repo.getRun(step.runId)?.exitCode).toBe(0);
+  });
+
+  it('rejects run/step validation failures before writing', () => {
+    expect(() =>
+      repo.saveRunWithSteps(makeRun(), [makeStep({ runId: 'other-run' })]),
+    ).toThrow(/mismatched runId/);
+
+    expect(() =>
+      repo.saveRun(makeRun({ startedAt: 'not-a-date', completedAt: 'also-bad' })),
+    ).toThrow(/Invalid run timing/);
+
+    expect(() => repo.saveStep(makeStep({ ordinal: -1 }))).toThrow(/Invalid ordinal/);
+    expect(() => repo.saveStep(makeStep({ attempt: 0 }))).toThrow(/Invalid attempt/);
+    expect(repo.listRuns()).toEqual([]);
+    expect(repo.listStepsForRun('run-test-1')).toEqual([]);
+  });
 });

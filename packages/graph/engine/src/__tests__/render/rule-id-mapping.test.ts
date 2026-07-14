@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   mapEngineSlugToOpenSipRuleId,
+  mapOpenSipRuleIdToEngineSlug,
   OPENSIP_RULE_ID_REGEX,
   RULE_ID_MAPPING,
 } from '../../render/rule-id-mapping.js';
@@ -72,5 +73,16 @@ describe('mapEngineSlugToOpenSipRuleId', () => {
         `mapping entry "${mappedSlug}" has no matching rule in currentRules() — stale entry?`,
       ).toBe(true);
     }
+  });
+});
+
+describe('mapOpenSipRuleIdToEngineSlug', () => {
+  it('inverts mapped OpenSIP ids and passes through unmapped values', () => {
+    expect(mapOpenSipRuleIdToEngineSlug('graph.dead-code.orphan-subtree')).toBe(
+      'graph:orphan-subtree',
+    );
+    expect(mapOpenSipRuleIdToEngineSlug('graph:already-an-engine-slug')).toBe(
+      'graph:already-an-engine-slug',
+    );
   });
 });

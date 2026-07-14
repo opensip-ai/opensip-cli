@@ -254,6 +254,149 @@ describe('task-context contracts', () => {
     ).toBe(false);
   });
 
+  it('rejects inventory duplicates and non-conservative multi-language verification argv', () => {
+    const baseFile = {
+      path: 'src/example.ts',
+      size: 1,
+      modifiedMs: 1,
+      roles: ['unknown'],
+      targets: ['source'],
+      languages: ['typescript'],
+      evidenceSupport: {
+        callable: 'unknown' as const,
+        declaration: 'unsupported' as const,
+        reference: 'unsupported' as const,
+      },
+      provenance: [{ source: 'target' as const, detail: 'target:source' }],
+    };
+    const inventoryBase = {
+      schemaVersion: 1,
+      snapshotId: INVENTORY_ID,
+      metadataIdentity: INVENTORY_METADATA_ID,
+      project: {
+        workspacePatterns: [],
+        languages: ['typescript'],
+        fileCount: 1,
+        packageCount: 0,
+        configIdentity: 'sha256:config',
+      },
+      packages: [],
+      files: [baseFile],
+      coverage: { status: 'complete' as const, reasonCodes: [], observed: 1, total: 1 },
+    };
+
+    expect(
+      projectInventorySnapshotSchema.safeParse({
+        ...inventoryBase,
+        files: [baseFile, { ...baseFile, path: 'src/example.ts' }],
+        project: { ...inventoryBase.project, fileCount: 2 },
+      }).success,
+    ).toBe(false);
+    expect(
+      projectInventorySnapshotSchema.safeParse({
+        ...inventoryBase,
+        files: [{ ...baseFile, roles: ['unknown', 'unknown'] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      projectInventorySnapshotSchema.safeParse({
+        ...inventoryBase,
+        files: [{ ...baseFile, targets: ['source', 'source'] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      projectInventorySnapshotSchema.safeParse({
+        ...inventoryBase,
+        files: [{ ...baseFile, languages: ['typescript', 'typescript'] }],
+      }).success,
+    ).toBe(false);
+
+    const withVerificationArgv = (argv: readonly string[]): boolean =>
+      projectInventorySnapshotSchema.safeParse({
+        ...inventoryBase,
+        project: {
+          ...inventoryBase.project,
+          packageCount: 1,
+          languages: [],
+          fileCount: 0,
+        },
+        files: [],
+        packages: [
+          {
+            name: 'root',
+            root: '.',
+            private: true,
+            exports: [],
+            bins: [],
+            verificationCommands: [{ tier: 'full', cwd: '.', argv, basis: 'probe' }],
+            provenance: [{ source: 'manifest', detail: 'package.json' }],
+          },
+        ],
+        coverage: { status: 'complete', reasonCodes: [], observed: 0, total: 0 },
+      }).success;
+
+    // Conservative multi-language executables accepted by the shared argv gate.
+    for (const argv of [
+      ['python3', '-m', 'pytest', 'tests'],
+      ['go', 'test', './...'],
+      ['cargo', 'test'],
+      ['mvn', 'test'],
+      ['./gradlew', 'check'],
+    ]) {
+      expect(withVerificationArgv(argv)).toBe(true);
+    }
+    // Unsafe executable/verb combinations, absolute paths, and empty argv rejected.
+    for (const argv of [
+      ['python3', '-m', 'unknown-module'],
+      ['go', 'build'],
+      ['cargo', 'run'],
+      ['mvn', 'clean'],
+      ['gradle', 'assemble'],
+      ['vitest', 'run', '/abs/path'],
+      ['vitest', 'run', 'C:/windows/path'],
+      ['vitest', 'run', '--config=/etc/secret'],
+      [],
+    ]) {
+      expect(withVerificationArgv(argv)).toBe(false);
+    }
+
+    const selection = {
+      schemaVersion: 1,
+      snapshotId: TEST_SELECTION_ID,
+      files: ['src/a.ts', 'src/a.ts'],
+      tests: [
+        {
+          path: 'src/a.test.ts',
+          basis: 'co-located' as const,
+          confidence: 'high' as const,
+          proof: [],
+          observed: false as const,
+        },
+        {
+          path: 'src/a.test.ts',
+          basis: 'co-located' as const,
+          confidence: 'high' as const,
+          proof: [],
+          observed: false as const,
+        },
+      ],
+      commands: [],
+      uncoveredFiles: ['src/b.ts', 'src/b.ts'],
+      trust: { status: 'fallback' as const, reasonCodes: [], fallbackTier: 'full' as const },
+      graphIdentity: GRAPH_ID,
+      inventoryIdentity: INVENTORY_ID,
+    };
+    expect(testSelectionSnapshotSchema.safeParse(selection).success).toBe(false);
+    expect(
+      testSelectionSnapshotSchema.safeParse({
+        ...selection,
+        files: ['src/a.ts'],
+        tests: [selection.tests[0]],
+        uncoveredFiles: ['src/b.ts'],
+      }).success,
+    ).toBe(true);
+  });
+
   it('derives immutable inventory and selection IDs from canonical complete content', () => {
     const inventoryInput: Omit<ProjectInventorySnapshot, 'snapshotId' | 'metadataIdentity'> = {
       schemaVersion: 1,

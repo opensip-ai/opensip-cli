@@ -39,6 +39,57 @@ describe('fromGraphReadError', () => {
     });
     expect(JSON.stringify(mapped)).not.toMatch(/secret|private|sqlite/i);
   });
+
+  it.each([
+    ['GRAPH.READ.CURSOR_INVALID', 'cursor-invalid', 'Cursor continuation anchor is invalid.'],
+    [
+      'GRAPH.READ.IMPACT_FILES_CAP',
+      'input-cap-exceeded',
+      'The request exceeds a bounded graph-read cap.',
+    ],
+    [
+      'GRAPH.READ.TEST_SELECTION_FILES_CAP',
+      'input-cap-exceeded',
+      'The request exceeds a bounded graph-read cap.',
+    ],
+    ['GRAPH.READ.IMPACT_FILE_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
+    ['GRAPH.READ.ENTITY_ID_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
+    [
+      'GRAPH.READ.TEST_SELECTION_FILE_INVALID',
+      'invalid-input',
+      'The graph-read input is invalid.',
+    ],
+    ['GRAPH.READ.IMPACT_CANCELLED', 'cancelled', 'The graph read was cancelled.'],
+    ['GRAPH.READ.TEST_SELECTION_CANCELLED', 'cancelled', 'The graph read was cancelled.'],
+    [
+      'GRAPH.READ.IMPACT_FAILED',
+      'impact-read-failed',
+      'Graph impact could not be projected safely.',
+    ],
+    [
+      'GRAPH.READ.ENTITY_MALFORMED',
+      'entity-read-failed',
+      'Graph entity detail could not be projected safely.',
+    ],
+    [
+      'GRAPH.READ.ENTITY_FAILED',
+      'entity-read-failed',
+      'Graph entity detail could not be projected safely.',
+    ],
+    [
+      'GRAPH.READ.TEST_SELECTION_FAILED',
+      'test-selection-failed',
+      'Static test selection could not be projected.',
+    ],
+  ] as const)('maps %s to fixed code %s', (code, mappedCode, message) => {
+    expect(
+      fromGraphReadError({
+        code,
+        operation: 'analysis',
+        message: 'secret token at /private/project/datastore.sqlite',
+      }),
+    ).toEqual({ code: mappedCode, message });
+  });
 });
 
 describe('unexpectedRefreshError', () => {
@@ -47,6 +98,14 @@ describe('unexpectedRefreshError', () => {
       code: 'graph-refresh-failed',
       message: 'Graph refresh failed due to an infrastructure error.',
       details: { failedPhase: 'handler', outcome: 'failed' },
+    });
+  });
+
+  it('includes durationMs when provided', () => {
+    expect(unexpectedRefreshError(42)).toEqual({
+      code: 'graph-refresh-failed',
+      message: 'Graph refresh failed due to an infrastructure error.',
+      details: { failedPhase: 'handler', outcome: 'failed', durationMs: 42 },
     });
   });
 });

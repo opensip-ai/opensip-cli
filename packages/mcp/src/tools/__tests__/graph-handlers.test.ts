@@ -4,7 +4,7 @@
 
 import { err, ok, type Result } from '@opensip-cli/core';
 import { makeFacet, rollupFacets, UNREQUESTED_FACET } from '@opensip-cli/graph/read';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   registerBlastRadius,
@@ -352,11 +352,44 @@ describe('graph handlers (async GraphToolResult)', () => {
       const { handlers, server } = captureServer();
       registerReferencesTo(server, deps(fakePort()));
       const parsed = parseResult(
-        await handlers.get('references_to')!({ declarationId: 'd1:none' }),
+        await handlers.get('references_to')!({ declarationId: 'd1|none' }),
       );
       expect(parsed.isError).toBe(false);
       expect(parsed.body).toMatchObject({
         data: { detail: 'nodes', referenceScope: 'cross-file' },
+      });
+    }
+    {
+      const referencesTo = vi.fn(() => Promise.resolve(ok(wrap({ detail: 'summary', sites: [] }))));
+      const graph = fakePort({ referencesTo });
+      const { handlers, server } = captureServer();
+      registerReferencesTo(server, deps(graph));
+      const parsed = parseResult(
+        await handlers.get('references_to')!({
+          declarationId: 'd1|Foo',
+          kinds: ['type', 'import'],
+          packages: ['pkg'],
+          filePath: 'src/a.ts',
+          filePrefix: 'src/',
+          sourceScope: 'production',
+          generated: 'include',
+          limit: 10,
+        }),
+      );
+      expect(parsed.isError).toBe(false);
+      expect(referencesTo).toHaveBeenCalledWith('d1|Foo', {
+        kinds: ['type', 'import'],
+        limit: 10,
+        cursor: undefined,
+        groupBy: undefined,
+        detail: 'summary',
+        filter: {
+          packages: ['pkg'],
+          filePath: 'src/a.ts',
+          filePrefix: 'src/',
+          sourceScope: 'production',
+          generated: 'include',
+        },
       });
     }
     {
@@ -368,6 +401,16 @@ describe('graph handlers (async GraphToolResult)', () => {
       expect(parseResult(await handlers.get('search_declarations')!({ query: 'x' })).isError).toBe(
         true,
       );
+    }
+    {
+      const graph = fakePort({
+        referencesTo: () => Promise.resolve(err({ code: 'not-found', message: 'missing' })),
+      });
+      const { handlers, server } = captureServer();
+      registerReferencesTo(server, deps(graph));
+      expect(
+        parseResult(await handlers.get('references_to')!({ declarationId: 'd1|missing' })).isError,
+      ).toBe(true);
     }
   });
 

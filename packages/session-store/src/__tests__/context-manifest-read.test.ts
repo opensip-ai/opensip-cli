@@ -4,7 +4,7 @@ import { buildTaskContextProjectIdentity } from '@opensip-cli/contracts';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { readTaskContextRun } from '../context-manifest-read.js';
 import { RunRepo } from '../run-repo.js';
@@ -851,6 +851,51 @@ describe('readTaskContextRun', () => {
     expect(readTaskContextRun({ datastore: store, cwd: '/repo' })).toMatchObject({
       ok: false,
       error: { reason: 'invalid-manifest' },
+    });
+  });
+
+  it('returns missing when no agent-context run exists for the project', () => {
+    const store = open();
+    expect(readTaskContextRun({ datastore: store, cwd: '/repo' })).toMatchObject({
+      ok: false,
+      error: { reason: 'missing' },
+    });
+    expect(
+      readTaskContextRun({ datastore: store, cwd: '/repo', runId: 'RUN_DOES_NOT_EXIST' }),
+    ).toMatchObject({
+      ok: false,
+      error: { reason: 'missing' },
+    });
+  });
+
+  it('rejects a non-agent-context run kind by name', () => {
+    const store = open();
+    const contextManifest = readyManifest();
+    new RunRepo(store).saveRunWithSteps(
+      readyRun(contextManifest, { name: 'audit' }),
+      readySteps(),
+    );
+    expect(
+      readTaskContextRun({
+        datastore: store,
+        cwd: '/repo',
+        runId: contextManifest.runId,
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { reason: 'wrong-run-kind' },
+    });
+  });
+
+  it('fails closed when datastore reads throw', () => {
+    const store = open();
+    const handle = requireDrizzleHandle(store);
+    vi.spyOn(handle.db, 'select').mockImplementation(() => {
+      throw new Error('db-offline');
+    });
+    expect(readTaskContextRun({ datastore: store, cwd: '/repo' })).toMatchObject({
+      ok: false,
+      error: { reason: 'storage-failed' },
     });
   });
 });

@@ -350,4 +350,203 @@ describe('LocalCodebaseReadPort', () => {
     expect(JSON.stringify(result)).not.toContain('/private/path');
     expect(JSON.stringify(result)).not.toContain('secret token');
   });
+
+  it('rejects absolute, traversal, empty, and control-character paths', async () => {
+    const { root, targets } = fixture();
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets,
+    });
+    for (const file of [
+      '',
+      '/abs/path.ts',
+      'C:\\windows\\path.ts',
+      '../escape.ts',
+      'src//double.ts',
+      'src/./dot.ts',
+      `src/\u0000bad.ts`,
+      'x'.repeat(1025),
+    ]) {
+      const result = await port.fileContext(file);
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: 'invalid-input' },
+      });
+    }
+  });
+
+  it('returns cancelled before refresh when the signal is already aborted', async () => {
+    const { root, targets } = fixture();
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets,
+    });
+    const controller = new AbortController();
+    controller.abort();
+    const result = await port.inventoryStatus(controller.signal);
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    });
+  });
+
+  it('returns cancelled for fileContext when the signal aborts after inventory', async () => {
+    const { root, targets } = fixture();
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets,
+    });
+    await port.inventoryStatus();
+    const controller = new AbortController();
+    controller.abort();
+    const result = await port.fileContext('src/a.ts', controller.signal);
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    });
+  });
+
+  it('reports unavailable file context when inventory coverage is unavailable', async () => {
+    const { root, targets } = fixture();
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets: baseOnlyResolver(targets),
+    });
+    const result = await port.fileContext('src/a.ts');
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        status: 'unavailable',
+        reasonCodes: expect.arrayContaining(['bounded-target-resolution-unavailable']),
+        nextActions: expect.arrayContaining([
+          expect.stringMatching(/targets|inventory|coverage/i),
+        ]),
+      },
+    });
+    expect(result.ok && 'file' in result.value ? result.value.file : undefined).toBeUndefined();
+  });
+
+  it('falls back to the status snapshot when cache identity no longer matches', async () => {
+    const { root, targets } = fixture();
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets,
+    });
+    const first = await port.inventoryStatus();
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const original = port.inventoryStatus.bind(port);
+    vi.spyOn(port, 'inventoryStatus').mockImplementation(async (signal, options) => {
+      const result = await original(signal, options);
+      if (result.ok) {
+        // Publish a mismatched cache after the status DTO is built so
+        // lookupFileFact must scan status.snapshot.files instead of fileByPath.
+        (
+          port as unknown as {
+            cache: {
+              inventory: {
+                snapshot: { snapshotId: string };
+                fileByPath: Map<string, never>;
+              };
+              capturedAt: string;
+              verifiedAtMs: number;
+            };
+          }
+        ).cache = {
+          inventory: {
+            snapshot: { snapshotId: 'i1:stale-identity' },
+            fileByPath: new Map(),
+          },
+          capturedAt: result.value.freshness.capturedAt,
+          verifiedAtMs: Date.now(),
+        };
+      }
+      return result;
+    });
+
+    const found = await port.fileContext('src/a.ts');
+    expect(found).toMatchObject({
+      ok: true,
+      value: {
+        status: 'found',
+        file: { path: 'src/a.ts' },
+        inventoryIdentity: first.value.identity,
+      },
+    });
+  });
+
+  it('prefers package facts matched by name and nested package roots', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-mcp-nested-pkg-'));
+    roots.push(root);
+    mkdirSync(join(root, 'packages', 'app', 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ name: 'workspace', private: true, workspaces: ['packages/*'] }),
+    );
+    writeFileSync(
+      join(root, 'packages', 'app', 'package.json'),
+      JSON.stringify({ name: '@scope/app', private: true, scripts: { test: 'vitest run' } }),
+    );
+    writeFileSync(join(root, 'packages', 'app', 'src', 'a.ts'), 'export const a = 1;\n');
+    const target: TargetView = {
+      config: {
+        name: 'source',
+        description: 'source',
+        include: ['packages/app/src/**/*.ts'],
+        exclude: [],
+        languages: ['typescript'],
+        concerns: ['production'],
+      },
+    };
+    const targets: BoundedTargetResolver = {
+      getByName: (name) => (name === target.config.name ? target : undefined),
+      getAll: () => [target],
+      getByTag: () => [],
+      has: (name) => name === target.config.name,
+      resolveTargets: () => [join(root, 'packages', 'app', 'src', 'a.ts')],
+      resolveTargetsBounded: (_names, _rootDir, options) =>
+        Promise.resolve({
+          files: [join(root, 'packages', 'app', 'src', 'a.ts')].slice(0, options.maxResults),
+          capped: false,
+          cancelled: false,
+        }),
+      applyGlobalExcludesBounded: (files, _rootDir, options) =>
+        Promise.resolve({
+          files: files.slice(0, options.maxResults),
+          capped: false,
+          cancelled: false,
+        }),
+      applyGlobalExcludes: (files) => files,
+      globalExcludes: [],
+    };
+    const port = new LocalCodebaseReadPort({
+      projectRoot: root,
+      configIdentity: 'sha256:config',
+      targets,
+      languageEvidenceSupport: new Map([
+        [
+          'typescript',
+          {
+            callable: 'supported',
+            declaration: 'supported',
+            reference: 'supported',
+          },
+        ],
+      ]),
+    });
+    const result = await port.fileContext('packages/app/src/a.ts');
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        status: 'found',
+        package: { name: '@scope/app', root: 'packages/app' },
+      },
+    });
+  });
 });

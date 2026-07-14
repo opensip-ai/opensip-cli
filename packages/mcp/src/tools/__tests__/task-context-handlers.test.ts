@@ -1,4 +1,4 @@
-import { ok } from '@opensip-cli/core';
+import { err, ok } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerGetContextStatus } from '../get-context-status.js';
@@ -311,5 +311,138 @@ describe('task-context MCP handlers', () => {
       fileScope: { status: 'mismatched' },
       nextActions: ['Run the suite.'],
     });
+  });
+
+  it('omits options for get_context_status when neither runId nor files are set', async () => {
+    const contextStatus = vi.fn(() =>
+      Promise.resolve(
+        ok({
+          status: 'available' as const,
+          fileScope: { status: 'matched' as const },
+          steps: [],
+          pointers: [],
+          reasonCodes: [],
+          nextActions: [],
+        }),
+      ),
+    );
+    const { handlers, server } = capture();
+    registerGetContextStatus(server, deps({ context: { contextStatus } }));
+    const result = await handlers.get('get_context_status')!({});
+    expect(contextStatus).toHaveBeenCalledWith(undefined, undefined);
+    expect(body(result)).toMatchObject({ status: 'available' });
+  });
+
+  it('threads only files when runId is omitted from get_context_status', async () => {
+    const contextStatus = vi.fn(() =>
+      Promise.resolve(
+        ok({
+          status: 'stale' as const,
+          fileScope: { status: 'matched' as const },
+          steps: [],
+          pointers: [],
+          reasonCodes: ['stale'],
+          nextActions: [],
+        }),
+      ),
+    );
+    const { handlers, server } = capture();
+    registerGetContextStatus(server, deps({ context: { contextStatus } }));
+    await handlers.get('get_context_status')!({ files: ['src/a.ts'] });
+    expect(contextStatus).toHaveBeenCalledWith({ files: ['src/a.ts'] }, undefined);
+  });
+
+  it('surfaces inventory and graph failures from select_tests', async () => {
+    {
+      const inventoryStatus = vi.fn(() =>
+        Promise.resolve(err({ code: 'cancelled', message: 'stopped' })),
+      );
+      const selectTests = vi.fn();
+      const { handlers, server } = capture();
+      registerSelectTests(server, deps({ graph: { selectTests }, codebase: { inventoryStatus } }));
+      const result = await handlers.get('select_tests')!({
+        files: ['src/a.ts'],
+        tier: 'package',
+        depth: 1,
+        proofDetail: 'counts',
+        limit: 10,
+        commandLimit: 5,
+        proofLimit: 2,
+      });
+      expect(result.isError).toBe(true);
+      expect(selectTests).not.toHaveBeenCalled();
+    }
+    {
+      const inventoryStatus = vi.fn(() =>
+        Promise.resolve(
+          ok({
+            snapshot: INVENTORY,
+            identity: INVENTORY.snapshotId,
+            coverage: INVENTORY.coverage,
+            freshness: {
+              fresh: true,
+              capturedAt: '2026-07-13T00:00:00.000Z',
+              verification: 'complete' as const,
+              reasonCodes: [],
+            },
+            nextActions: [],
+          }),
+        ),
+      );
+      const selectTests = vi.fn(() =>
+        Promise.resolve(err({ code: 'test-selection-failed', message: 'nope' })),
+      );
+      const { handlers, server } = capture();
+      registerSelectTests(server, deps({ graph: { selectTests }, codebase: { inventoryStatus } }));
+      const result = await handlers.get('select_tests')!({
+        files: ['src/a.ts'],
+        tier: 'package',
+        depth: 1,
+        proofDetail: 'counts',
+        limit: 10,
+        commandLimit: 5,
+        proofLimit: 2,
+      });
+      expect(result.isError).toBe(true);
+    }
+  });
+
+  it('omits top from impact_files when unset and surfaces graph errors', async () => {
+    const impactFiles = vi.fn<GraphReadPort['impactFiles']>(() =>
+      Promise.resolve(ok(envelope(IMPACT))),
+    );
+    const { handlers, server } = capture();
+    registerImpactFiles(server, deps({ graph: { impactFiles } }));
+    await handlers.get('impact_files')!({ files: ['src/a.ts'], depth: 1 });
+    expect(impactFiles).toHaveBeenCalledWith(['src/a.ts'], { maxDepth: 1 }, undefined);
+
+    const failing = vi.fn<GraphReadPort['impactFiles']>(() =>
+      Promise.resolve(err({ code: 'impact-read-failed', message: 'boom' })),
+    );
+    const second = capture();
+    registerImpactFiles(second.server, deps({ graph: { impactFiles: failing } }));
+    const result = await second.handlers.get('impact_files')!({ files: ['src/a.ts'], depth: 1 });
+    expect(result.isError).toBe(true);
+  });
+
+  it('surfaces get_file_context port errors', async () => {
+    const fileContext = vi.fn(() =>
+      Promise.resolve(err({ code: 'invalid-input', message: 'bad path' })),
+    );
+    const { handlers, server } = capture();
+    registerGetFileContext(server, deps({ codebase: { fileContext } }));
+    const result = await handlers.get('get_file_context')!({ file: '../escape.ts' });
+    expect(result.isError).toBe(true);
+  });
+
+  it('surfaces get_context_status port errors', async () => {
+    const contextStatus = vi.fn(() =>
+      Promise.resolve(err({ code: 'context-read-failed', message: 'unavailable' })),
+    );
+    const { handlers, server } = capture();
+    registerGetContextStatus(server, deps({ context: { contextStatus } }));
+    const result = await handlers.get('get_context_status')!({ runId: 'run-x' });
+    expect(result.isError).toBe(true);
+    expect(contextStatus).toHaveBeenCalledWith({ runId: 'run-x' }, undefined);
   });
 });

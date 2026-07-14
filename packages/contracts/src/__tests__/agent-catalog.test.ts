@@ -1,7 +1,12 @@
-import { defineCommand, ToolRegistry, type Tool } from '@opensip-cli/core';
+import { defineCommand, ToolRegistry, ValidationError, type Tool } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildAgentCatalog } from '../agent-catalog.js';
+import {
+  agentCatalogOverlayKeys,
+  compareCodePoint,
+  publicPrimaryCommand,
+} from '../agent-catalog-entries.js';
 
 const noopHandler = (): Promise<{ type: 'text-lines'; lines: string[] }> =>
   Promise.resolve({ type: 'text-lines', lines: [] });
@@ -235,5 +240,110 @@ describe('buildAgentCatalog', () => {
     expect(plain?.examples).toEqual(['opensip plain']);
     expect(plain?.description).toContain('does not declare --json');
     expect(catalog.projectContext?.targetConventions).toHaveLength(1);
+  });
+
+  it('validates curated overlay keys when validateOverlays is enabled', () => {
+    const tools = new ToolRegistry();
+    tools.register(
+      fixtureTool({
+        metadata: {
+          id: '00000000-0000-4000-8000-000000000207',
+          name: 'fitness',
+          version: '0.0.0',
+          description: 'fitness tool',
+        },
+      }),
+    );
+    tools.register(
+      fixtureTool({
+        metadata: {
+          id: '00000000-0000-4000-8000-000000000208',
+          name: 'graph',
+          version: '0.0.0',
+          description: 'graph tool',
+        },
+      }),
+    );
+    tools.register(
+      fixtureTool({
+        metadata: {
+          id: '00000000-0000-4000-8000-000000000209',
+          name: 'sim',
+          version: '0.0.0',
+          description: 'sim tool',
+        },
+      }),
+    );
+    tools.register(
+      fixtureTool({
+        metadata: {
+          id: '00000000-0000-4000-8000-000000000210',
+          name: 'yagni',
+          version: '0.0.0',
+          description: 'yagni tool',
+        },
+      }),
+    );
+
+    expect(() => buildAgentCatalog({ tools, validateOverlays: true })).not.toThrow();
+    expect(() => buildAgentCatalog({ validateOverlays: true })).not.toThrow();
+  });
+
+  it('includes reservedNames when provided', () => {
+    const catalog = buildAgentCatalog({
+      reservedNames: {
+        rootCommands: ['audit', 'suite'],
+        suiteNames: ['agent-context'],
+      },
+    });
+    expect(catalog.reservedNames).toEqual({
+      rootCommands: ['audit', 'suite'],
+      suiteNames: ['agent-context'],
+    });
+  });
+});
+
+describe('agent-catalog-entries helpers', () => {
+  it('orders overlay keys by code point and compares strings inclusively', () => {
+    expect(compareCodePoint('a', 'b')).toBe(-1);
+    expect(compareCodePoint('b', 'a')).toBe(1);
+    expect(compareCodePoint('same', 'same')).toBe(0);
+    expect(agentCatalogOverlayKeys()).toEqual(['fitness', 'graph', 'sim', 'yagni']);
+  });
+
+  it('returns undefined when a tool has no public primary command', () => {
+    const tool: Tool = {
+      identity: { name: 'worker-only' },
+      metadata: {
+        id: '00000000-0000-4000-8000-000000000211',
+        name: 'worker-only',
+        version: '0.0.0',
+        description: 'worker only',
+      },
+      commands: [],
+      commandSpecs: [
+        defineCommand({
+          name: 'worker-only-run-worker',
+          description: 'internal',
+          visibility: 'internal',
+          commonFlags: [],
+          scope: 'project',
+          output: 'raw-stream',
+          rawStreamReason: 'worker-ipc',
+          handler: noopHandler,
+        }),
+      ],
+    };
+    expect(publicPrimaryCommand(tool, new Set())).toBeUndefined();
+
+    const tools = new ToolRegistry();
+    tools.register(tool);
+    // Tool with no public primary contributes no overlay keys; stale curated keys still fail.
+    expect(() =>
+      buildAgentCatalog({
+        tools,
+        validateOverlays: true,
+      }),
+    ).toThrow(ValidationError);
   });
 });

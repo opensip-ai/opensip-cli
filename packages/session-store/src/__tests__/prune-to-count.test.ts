@@ -1,6 +1,6 @@
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { sessionHostMetrics, sessionToolPayload } from '../schema/sessions.js';
 import { SessionRepo } from '../session-repo.js';
@@ -74,6 +74,18 @@ describe('SessionRepo.pruneToCount', () => {
       expect(repo.pruneToCount(4)).toBe(1);
       expect(repo.purge(new Date('2026-01-04T00:00:00.000Z'))).toBe(2);
       expect(repo.list().map((session) => session.id)).toEqual(['s4', 's3']);
+    });
+  });
+
+  it('rethrows prune failures after logging', () => {
+    withRepo((repo, datastore) => {
+      repo.save(makeSession('a', 1));
+      const handle = requireDrizzleHandle(datastore);
+      vi.spyOn(handle.db, 'select').mockImplementation(() => {
+        throw new Error('select-failed');
+      });
+
+      expect(() => repo.pruneToCount(1)).toThrow(/select-failed/);
     });
   });
 });

@@ -38,4 +38,15 @@ describe('graph context producer CommandSpecs', () => {
       }),
     ]);
   });
+
+  it('accumulates --files through the option parse helper', () => {
+    const filesOption = graphContextSelectTestsCommandSpec.options?.[0];
+    expect(filesOption?.flag).toBe('--files');
+    const parse = filesOption?.parse;
+    expect(parse).toBeTypeOf('function');
+    if (parse === undefined) return;
+    expect(parse('src/a.ts', undefined)).toEqual(['src/a.ts']);
+    expect(parse('src/b.ts', ['src/a.ts'])).toEqual(['src/a.ts', 'src/b.ts']);
+    expect(parse('src/c.ts', 'not-an-array')).toEqual(['src/c.ts']);
+  });
 });

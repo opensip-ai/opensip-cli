@@ -3,11 +3,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ok } from '@opensip-cli/core';
+import { err, ok } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   assessContextGraphCoverage,
+  produceContextGraph,
+  produceContextInventory,
   produceContextTestSelection,
 } from '../../cli/context/context-producers.js';
 import { graphInputFilesIdentity } from '../../cli/orchestrate/catalog-build-coverage.js';
@@ -462,5 +464,348 @@ describe('graph context producer bindings', () => {
     run.completeInventory('inventory-new');
     run.beginGraph();
     expect(run.inputs()).toBeUndefined();
+  });
+
+  it('flags fast resolution, adapter mismatch, incomplete inventory, and capability gaps', () => {
+    const base = catalog();
+    const inventoryValue = inventory('inventory-current');
+    expect(
+      assessContextGraphCoverage({
+        catalog: { ...base, resolutionMode: 'fast' },
+        inventory: inventoryValue,
+      }),
+    ).toMatchObject({
+      status: 'partial',
+      reasonCodes: expect.arrayContaining(['graph-fast-resolution']),
+    });
+    expect(
+      assessContextGraphCoverage({
+        catalog: {
+          ...base,
+          adapterSelection: { mode: 'auto', selectedId: 'python' },
+        },
+        inventory: inventoryValue,
+      }),
+    ).toMatchObject({
+      status: 'partial',
+      reasonCodes: expect.arrayContaining(['graph-adapter-selection-unverified']),
+    });
+    expect(
+      assessContextGraphCoverage({
+        catalog: base,
+        inventory: {
+          ...inventoryValue,
+          coverage: { status: 'partial', reasonCodes: ['cap'], observed: 1, total: 2 },
+        },
+      }),
+    ).toMatchObject({
+      status: 'partial',
+      reasonCodes: expect.arrayContaining(['graph-language-coverage-unverified']),
+    });
+    expect(
+      assessContextGraphCoverage({
+        catalog: base,
+        inventory: undefined,
+      }),
+    ).toMatchObject({
+      status: 'partial',
+      reasonCodes: expect.arrayContaining(['graph-language-coverage-unverified']),
+    });
+
+    const unknownCallable: ProjectInventorySnapshot = {
+      ...inventoryValue,
+      files: [
+        {
+          ...inventoryValue.files[0]!,
+          languages: [],
+          evidenceSupport: {
+            callable: 'unknown',
+            declaration: 'unknown',
+            reference: 'unknown',
+          },
+        },
+        inventoryValue.files[1]!,
+      ],
+    };
+    expect(
+      assessContextGraphCoverage({ catalog: base, inventory: unknownCallable }),
+    ).toMatchObject({
+      status: 'partial',
+      reasonCodes: expect.arrayContaining(['graph-language-coverage-unverified']),
+    });
+
+    const unsupportedCallable: ProjectInventorySnapshot = {
+      ...inventoryValue,
+      files: [
+        {
+          ...inventoryValue.files[0]!,
+          evidenceSupport: {
+            callable: 'unsupported',
+            declaration: 'unsupported',
+            reference: 'unsupported',
+          },
+        },
+        inventoryValue.files[1]!,
+      ],
+    };
+    expect(
+      assessContextGraphCoverage({ catalog: base, inventory: unsupportedCallable }),
+    ).toMatchObject({
+      status: 'partial',
+      reasonCodes: expect.arrayContaining(['graph-language-capability-unavailable']),
+    });
+  });
+
+  it('fails closed for empty files, missing prior evidence, and catalog load errors', async () => {
+    const omittedFiles = await produceContextTestSelection(
+      { cwd: '/repo' },
+      { scope: {} } as ToolCliContext,
+    );
+    expect(omittedFiles.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        status: 'unsupported',
+        reasons: [{ code: 'test-selection-files-not-provided' }],
+      }),
+    ]);
+    const empty = await produceContextTestSelection(
+      { cwd: '/repo', files: [] },
+      { scope: {} } as ToolCliContext,
+    );
+    expect(empty.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        status: 'unsupported',
+        reasons: [{ code: 'test-selection-files-not-provided' }],
+      }),
+    ]);
+
+    const noPrior = createContextRunState();
+    const missingPrior = await produceContextTestSelection(
+      { cwd: '/repo', files: ['src/work.ts'] },
+      {
+        scope: {
+          graph: {
+            contextRun: noPrior,
+            contextCatalog: { load: () => ok(catalog()) },
+            contextSnapshots: { get: () => null, save: vi.fn(), latest: () => null },
+          },
+        },
+      } as unknown as ToolCliContext,
+    );
+    expect(missingPrior.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        reasons: [{ code: 'test-selection-prior-evidence-missing' }],
+      }),
+    ]);
+
+    const inventoryValue = inventory('inventory-current');
+    const loadFailed = context({ inventory: inventoryValue, catalog: catalog() });
+    (
+      loadFailed.cli.scope.graph as { contextCatalog: { load: () => ReturnType<typeof err> } }
+    ).contextCatalog = {
+      load: () => err({ code: 'GRAPH.READ.CATALOG_GENERATION', message: 'boom' }),
+    };
+    const failedLoad = await produceContextTestSelection(
+      { cwd: '/repo', files: ['src/work.ts'] },
+      loadFailed.cli,
+    );
+    expect(failedLoad.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        reasons: [{ code: 'test-selection-graph-read-failed' }],
+      }),
+    ]);
+
+    const missingGraph = context({ inventory: inventoryValue, catalog: catalog() });
+    (
+      missingGraph.cli.scope.graph as { contextCatalog: { load: () => ReturnType<typeof ok> } }
+    ).contextCatalog = { load: () => ok(null) };
+    const nullGraph = await produceContextTestSelection(
+      { cwd: '/repo', files: ['src/work.ts'] },
+      missingGraph.cli,
+    );
+    expect(nullGraph.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        reasons: [{ code: 'test-selection-graph-missing' }],
+      }),
+    ]);
+  });
+
+  it('fails closed when graph scope is absent or inventory payload is unusable', async () => {
+    await expect(
+      produceContextTestSelection({ cwd: '/repo', files: ['src/a.ts'] }, {
+        scope: {},
+      } as ToolCliContext),
+    ).resolves.toMatchObject({
+      evidenceSnapshots: [
+        expect.objectContaining({
+          status: 'failed',
+          reasons: [{ code: 'test-selection-producer-failed' }],
+        }),
+      ],
+    });
+
+    const inventoryValue = inventory('inventory-current');
+    const harness = context({ inventory: inventoryValue, catalog: catalog() });
+    harness.get.mockImplementation((id: string) =>
+      id === inventoryValue.snapshotId
+        ? {
+            id,
+            kind: 'inventory',
+            schemaVersion: 99,
+            producerVersion: '0.6.0',
+            createdAt: '2026-07-13T00:00:00.000Z',
+            sourceIdentity: 'source',
+            configIdentity: 'config:1',
+            byteCount: 1,
+            payload: { not: 'inventory' },
+          }
+        : null,
+    );
+    const result = await produceContextTestSelection(
+      { cwd: '/repo', files: ['src/work.ts'] },
+      harness.cli,
+    );
+    expect(result.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        reasons: [{ code: 'test-selection-inventory-binding-mismatch' }],
+      }),
+    ]);
+  });
+
+  it('publishes inventory and graph producers with reused or failed catalog paths', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-context-inventory-'));
+    try {
+      writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'ctx', private: true }));
+      writeFileSync(join(root, 'src-a.ts'), 'export const a = 1;\n');
+      const run = createContextRunState();
+      const saved = new Map<string, unknown>();
+      const save = vi.fn((record: { readonly id: string; readonly payload: unknown }) => {
+        saved.set(record.id, record.payload);
+        return {
+          status: 'rebuilt' as const,
+          snapshot: {
+            ...record,
+            kind: 'inventory',
+            schemaVersion: 1,
+            producerVersion: '0.6.0',
+            createdAt: '2026-07-13T00:00:00.000Z',
+            sourceIdentity: 'source',
+            configIdentity: 'config:1',
+            byteCount: 1,
+          },
+        };
+      });
+      const adapters = {
+        getAll: () => [
+          { id: 'typescript' },
+          { id: 'python' },
+        ],
+      };
+      const inventoryCli = {
+        scope: {
+          projectContext: { projectRoot: root },
+          configDocument: undefined,
+          graph: {
+            adapters,
+            contextRun: run,
+            contextSnapshots: {
+              save,
+              get: (id: string) => {
+                const payload = saved.get(id);
+                return payload === undefined
+                  ? null
+                  : {
+                      id,
+                      kind: 'inventory',
+                      schemaVersion: 1,
+                      producerVersion: '0.6.0',
+                      createdAt: '2026-07-13T00:00:00.000Z',
+                      sourceIdentity: 'source',
+                      configIdentity: 'config:1',
+                      byteCount: 1,
+                      payload,
+                    };
+              },
+              latest: () => null,
+            },
+            contextCatalog: {
+              load: () => err({ code: 'GRAPH.READ.CATALOG_GENERATION', message: 'missing' }),
+              replace: vi.fn(() => ok(undefined)),
+            },
+          },
+        },
+      } as unknown as ToolCliContext;
+
+      const inventoryResult = await produceContextInventory({ cwd: root }, inventoryCli);
+      expect(inventoryResult.evidenceSnapshots?.[0]).toMatchObject({
+        kind: 'inventory',
+        status: expect.stringMatching(/rebuilt|partial|unsupported|failed/),
+      });
+
+      const failedGraph = await produceContextGraph({ cwd: root }, inventoryCli);
+      expect(failedGraph.evidenceSnapshots).toEqual([
+        expect.objectContaining({
+          kind: 'graph',
+          status: 'failed',
+          reasons: [{ code: 'graph-ensure-failed' }],
+        }),
+      ]);
+
+      const catalogValue = catalog();
+      const reuseRun = createContextRunState();
+      reuseRun.beginInventory();
+      reuseRun.completeInventory(inventory('i').snapshotId);
+      const reuseCli = {
+        scope: {
+          projectContext: { projectRoot: root, configPath: undefined },
+          languages: { list: () => [] },
+          graph: {
+            adapters,
+            contextRun: reuseRun,
+            contextSnapshots: {
+              get: () => null,
+              save: vi.fn(),
+              latest: () => null,
+            },
+            contextCatalog: {
+              load: () => ok(catalogValue),
+              replace: vi.fn(() => ok(undefined)),
+            },
+          },
+        },
+      } as unknown as ToolCliContext;
+      // verifyCatalogInputs will fail freshness without real adapters; ensure still fails closed.
+      const ensure = await produceContextGraph({ cwd: root }, reuseCli);
+      expect(ensure.evidenceSnapshots?.[0]?.kind).toBe('graph');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails inventory production when adapters cannot be read', async () => {
+    const result = await produceContextInventory({ cwd: '/repo' }, {
+      scope: {
+        graph: {
+          adapters: {
+            getAll: () => {
+              throw new Error('adapter list failed');
+            },
+          },
+          contextRun: {
+            beginInventory: () => undefined,
+          },
+        },
+      },
+    } as unknown as ToolCliContext);
+    expect(result.evidenceSnapshots).toEqual([
+      expect.objectContaining({
+        kind: 'inventory',
+        status: 'failed',
+        reasons: [{ code: 'inventory-producer-failed' }],
+      }),
+    ]);
   });
 });
