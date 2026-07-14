@@ -18,7 +18,7 @@ import type {
   FileContextDto,
   InventoryStatusOptions,
 } from './codebase-read-port.js';
-import type { PackageFact } from '@opensip-cli/contracts';
+import type { FileFact, PackageFact } from '@opensip-cli/contracts';
 
 export interface LocalCodebaseReadPortDeps {
   readonly projectRoot: string;
@@ -279,84 +279,102 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
     if (aborted(signal)) {
       return err(readError('cancelled', 'File context read was cancelled.'));
     }
-    // Keep the lookup on the exact snapshot returned by this call. Prefer the
-    // substrate's O(1) fileByPath map only when the live cache still carries
-    // the same inventory identity; otherwise fall back to the status snapshot
-    // files list so concurrent refresh cannot mix identities.
-    const snapshot = status.value.snapshot;
-    const cachedInventory = this.cache?.inventory;
-    const fact =
-      cachedInventory !== undefined &&
-      cachedInventory.snapshot.snapshotId === status.value.identity
-        ? cachedInventory.fileByPath.get(normalized)
-        : snapshot.files.find((candidate) => candidate.path === normalized);
+    const fact = this.lookupFileFact(normalized, status.value);
     if (fact !== undefined) {
-      let packageFact = owningPackage(normalized, snapshot.packages);
-      if (fact.packageName !== undefined) {
-        packageFact =
-          snapshot.packages.find((item) => item.name === fact.packageName) ?? packageFact;
-      }
-      return ok({
-        status: 'found',
-        file: fact,
-        ...(packageFact === undefined ? {} : { package: packageFact }),
-        inventoryIdentity: status.value.identity,
-        project: snapshot.project,
-        coverage: status.value.coverage,
-        freshness: status.value.freshness,
-        reasonCodes: [],
-        nextActions: [],
-      });
+      return ok(this.foundFileContext(normalized, fact, status.value));
     }
-    if (status.value.coverage.status === 'unavailable') {
-      const packageFact = owningPackage(normalized, snapshot.packages);
-      return ok({
+    return ok(this.missingFileContext(normalized, status.value));
+  }
+
+  /**
+   * Prefer the substrate's O(1) fileByPath map only when the live cache still
+   * carries the same inventory identity; otherwise fall back to the status
+   * snapshot files list so concurrent refresh cannot mix identities.
+   */
+  private lookupFileFact(
+    normalized: string,
+    status: CodebaseInventoryStatus,
+  ): FileFact | undefined {
+    const cachedInventory = this.cache?.inventory;
+    if (cachedInventory?.snapshot.snapshotId === status.identity) {
+      return cachedInventory.fileByPath.get(normalized);
+    }
+    return status.snapshot.files.find((candidate) => candidate.path === normalized);
+  }
+
+  private foundFileContext(
+    normalized: string,
+    fact: FileFact,
+    status: CodebaseInventoryStatus,
+  ): FileContextDto {
+    let packageFact = owningPackage(normalized, status.snapshot.packages);
+    if (fact.packageName !== undefined) {
+      packageFact =
+        status.snapshot.packages.find((item) => item.name === fact.packageName) ?? packageFact;
+    }
+    return {
+      status: 'found',
+      file: fact,
+      ...(packageFact === undefined ? {} : { package: packageFact }),
+      inventoryIdentity: status.identity,
+      project: status.snapshot.project,
+      coverage: status.coverage,
+      freshness: status.freshness,
+      reasonCodes: [],
+      nextActions: [],
+    };
+  }
+
+  private missingFileContext(normalized: string, status: CodebaseInventoryStatus): FileContextDto {
+    if (status.coverage.status === 'unavailable') {
+      const packageFact = owningPackage(normalized, status.snapshot.packages);
+      return {
         status: 'unavailable',
         ...(packageFact === undefined ? {} : { package: packageFact }),
-        inventoryIdentity: status.value.identity,
-        project: snapshot.project,
-        coverage: status.value.coverage,
-        freshness: status.value.freshness,
-        reasonCodes: status.value.coverage.reasonCodes,
-        nextActions: status.value.nextActions,
-      });
+        inventoryIdentity: status.identity,
+        project: status.snapshot.project,
+        coverage: status.coverage,
+        freshness: status.freshness,
+        reasonCodes: status.coverage.reasonCodes,
+        nextActions: status.nextActions,
+      };
     }
-    const packageFact = owningPackage(normalized, snapshot.packages);
+    const packageFact = owningPackage(normalized, status.snapshot.packages);
     const shared = {
       ...(packageFact === undefined ? {} : { package: packageFact }),
-      inventoryIdentity: status.value.identity,
-      project: snapshot.project,
-      coverage: status.value.coverage,
-      freshness: status.value.freshness,
+      inventoryIdentity: status.identity,
+      project: status.snapshot.project,
+      coverage: status.coverage,
+      freshness: status.freshness,
     };
     let excluded = false;
     try {
       const absolute = resolve(this.projectRoot, normalized);
       excluded = this.targets?.applyGlobalExcludes([absolute], this.projectRoot).length === 0;
     } catch {
-      return ok({
+      return {
         status: 'unavailable',
         ...shared,
-        reasonCodes: [...status.value.coverage.reasonCodes, 'target-exclusion-failed'],
+        reasonCodes: [...status.coverage.reasonCodes, 'target-exclusion-failed'],
         nextActions: [
           'Review configured target exclusions before relying on this negative file lookup.',
         ],
-      });
+      };
     }
     if (excluded) {
-      return ok({
+      return {
         status: 'excluded',
         ...shared,
         reasonCodes: ['file-excluded'],
         nextActions: ['Review global exclusions if this file should be analyzed.'],
-      });
+      };
     }
-    return ok({
+    return {
       status: 'unknown',
       ...shared,
       reasonCodes: ['file-not-in-inventory'],
       nextActions: ['Verify the path or add the file to a configured target.'],
-    });
+    };
   }
 
   private projectStatus(cache: InventoryCache): CodebaseInventoryStatus {
