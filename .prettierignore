@@ -48,6 +48,11 @@ slo-report.json
 compatibility-matrix-report.json
 detection-quality-report.json
 
+# Packed distribution measurement inputs and schema-owned report artifacts.
+# The measurement writer, not Prettier, owns their serialized bytes and hash.
+.opensip-distribution/**
+distribution-footprint-report*.json
+
 # Immutable, gitignored agent-evaluation output. The report schema owns this
 # serialization; running the harness before lint must not make format:check red.
 packages/agent-eval/results/**

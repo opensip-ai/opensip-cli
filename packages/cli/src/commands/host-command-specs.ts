@@ -114,7 +114,11 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
         cwdExplicit: opts.cwdExplicit === true,
         toolScaffolds: ctx.toolScaffolds,
       });
-      if (isOptionalToolRecommendationEligible(result)) {
+      if (
+        opts.keep !== true &&
+        opts.remove !== true &&
+        isOptionalToolRecommendationEligible(result)
+      ) {
         const scope = currentScope();
         const inventory = toolsList({
           cwd: result.cwd,

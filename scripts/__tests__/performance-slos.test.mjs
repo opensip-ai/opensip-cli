@@ -6,10 +6,16 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runBenchSlo } from '../bench-slo.mjs';
+import { createChildProcessTerminator } from '../perf/child-process-lifecycle.mjs';
 import { compareBudgets } from '../perf/compare-budgets.mjs';
 import { cleanupOwnedCorpus, corpusMarkerPath, materializeCorpus } from '../perf/corpus.mjs';
 import { signalsFromComparisons } from '../perf/performance-signals.mjs';
-import { parseProcessTable, sumProcessTreeRss } from '../perf/process-tree-rss.mjs';
+import {
+  killProcessTree,
+  parseProcessTable,
+  readProcessTable,
+  sumProcessTreeRss,
+} from '../perf/process-tree-rss.mjs';
 import {
   renderBudgetTable,
   renderTierTable,
@@ -117,6 +123,109 @@ test('process-table helpers sum root and descendant RSS', () => {
   assert.equal(sumProcessTreeRss(rows, 10), 130 * 1024);
 });
 
+test('readProcessTable bounds and force-kills the ps subprocess', async () => {
+  let invocation;
+  const rows = await readProcessTable({
+    platform: 'linux',
+    timeoutMs: 37,
+    execFileAsync: async (command, args, options) => {
+      invocation = { command, args, options };
+      return { stdout: '10 1 100\n' };
+    },
+  });
+
+  assert.deepEqual(rows, [{ pid: 10, ppid: 1, rssBytes: 100 * 1024 }]);
+  assert.equal(invocation.command, 'ps');
+  assert.deepEqual(invocation.args, ['-eo', 'pid=,ppid=,rss=']);
+  assert.equal(invocation.options.timeout, 37);
+  assert.equal(invocation.options.killSignal, 'SIGKILL');
+});
+
+test('killProcessTree uses bounded taskkill tree termination on Windows', async () => {
+  let invocation;
+  await killProcessTree(4312, 'SIGTERM', {
+    platform: 'win32',
+    timeoutMs: 73,
+    execFileAsync: async (command, args, options) => {
+      invocation = { command, args, options };
+      return { stdout: '' };
+    },
+  });
+
+  assert.equal(invocation.command, 'taskkill');
+  assert.deepEqual(invocation.args, ['/pid', '4312', '/t', '/f']);
+  assert.equal(invocation.options.timeout, 73);
+  assert.equal(invocation.options.killSignal, 'SIGKILL');
+  assert.equal(invocation.options.windowsHide, true);
+});
+
+test('killProcessTree falls back to direct root termination when taskkill fails', async () => {
+  const killed = [];
+  const result = await killProcessTree(4312, 'SIGTERM', {
+    platform: 'win32',
+    execFileAsync: async () => {
+      throw new Error('taskkill failed');
+    },
+    killProcess: (pid, signal) => {
+      killed.push({ pid, signal });
+    },
+  });
+
+  assert.equal(result, false);
+  assert.deepEqual(killed, [{ pid: 4312, signal: 'SIGTERM' }]);
+});
+
+for (const [outcome, terminateTree] of [
+  ['returns false', async () => false],
+  [
+    'rejects',
+    async () => {
+      throw new Error('taskkill failed');
+    },
+  ],
+]) {
+  test(`child terminator falls back to the root handle when Windows tree termination ${outcome}`, async () => {
+    const childSignals = [];
+    const terminator = createChildProcessTerminator({
+      child: {
+        pid: 9471,
+        kill: (signal) => {
+          childSignals.push(signal);
+        },
+      },
+      killProcessTree: terminateTree,
+      platform: 'win32',
+    });
+
+    await terminator.signal('SIGKILL');
+
+    assert.deepEqual(childSignals, ['SIGKILL']);
+  });
+}
+
+test('child terminator avoids PID-based Windows cleanup after confirmed root close', async () => {
+  let treeKillCalls = 0;
+  const childSignals = [];
+  const terminator = createChildProcessTerminator({
+    child: {
+      pid: 9471,
+      kill: (signal) => {
+        childSignals.push(signal);
+      },
+    },
+    killProcessTree: async () => {
+      treeKillCalls += 1;
+      return true;
+    },
+    platform: 'win32',
+  });
+
+  await terminator.signalAfterRootClose('SIGKILL');
+
+  assert.equal(treeKillCalls, 0);
+  assert.deepEqual(childSignals, []);
+});
+
 test('runMeasuredCommand captures bounded output and exit status', async () => {
   const result = await runMeasuredCommand({
     command: [process.execPath, '-e', "process.stdout.write('abcdef');"],
@@ -130,6 +239,26 @@ test('runMeasuredCommand captures bounded output and exit status', async () => {
   assert.equal(result.status, 0);
   assert.equal(result.stdoutTail, 'def');
   assert.equal(result.timedOut, false);
+});
+
+test('runMeasuredCommand stays bounded when the RSS sampler never settles', async () => {
+  const started = Date.now();
+  const neverSettles = new Promise(Function.prototype);
+  const result = await runMeasuredCommand({
+    command: [process.execPath, '-e', ''],
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 5000,
+    sampleIntervalMs: 1,
+    rssSampleTimeoutMs: 25,
+    readProcessTable: () => neverSettles,
+    stdoutTailBytes: 0,
+    stderrTailBytes: 0,
+  });
+
+  assert.equal(result.status, 0);
+  assert.equal(result.maxRssBytes, undefined);
+  assert.ok(Date.now() - started < 1000, 'never-settling sampler must not hold command open');
 });
 
 test('compareBudgets reports command, duration, and required-memory failures', () => {
@@ -152,6 +281,31 @@ test('compareBudgets reports command, duration, and required-memory failures', (
   assert.deepEqual(
     comparisons.map((comparison) => comparison.status),
     ['fail', 'fail', 'fail'],
+  );
+});
+
+test('runMeasuredCommand excludes final RSS sampling latency from command duration', async () => {
+  const started = Date.now();
+  const result = await runMeasuredCommand({
+    command: [process.execPath, '-e', ''],
+    cwd: process.cwd(),
+    env: process.env,
+    timeoutMs: 5000,
+    sampleIntervalMs: 1,
+    rssSampleTimeoutMs: 1000,
+    readProcessTable: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return [];
+    },
+    stdoutTailBytes: 0,
+    stderrTailBytes: 0,
+  });
+  const observedWallMs = Date.now() - started;
+
+  assert.ok(observedWallMs >= 175, 'test must observe the delayed final sampler');
+  assert.ok(
+    result.durationMs < observedWallMs - 100,
+    'reported command duration must end before the delayed final sampler',
   );
 });
 

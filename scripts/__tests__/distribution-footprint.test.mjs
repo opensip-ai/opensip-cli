@@ -21,11 +21,14 @@ import {
   DISTRIBUTION_FOOTPRINT_SCHEMA_VERSION,
   DISTRIBUTION_LANGUAGE_FAMILIES,
   DISTRIBUTION_MEASURE_DEFAULT_REPEATS,
+  DISTRIBUTION_RELEASE_SET_MAX_COMPRESSED_BYTES,
+  DISTRIBUTION_TARBALL_MAX_COMPRESSED_BYTES,
   calculateInstalledCliClosureCompressedBytes,
   collectReleaseTarballRows,
   createDistributionFootprintReport,
   groupLanguageFamilyFootprints,
   languageFamilyForPackage,
+  normalizeDistributionVersion,
   normalizeDistributionFootprintReport,
   normalizeReleaseTarballRows,
   parseDistributionMeasureArgs,
@@ -87,6 +90,22 @@ test('schema-v1 reports reject invalid roots, required fields, versions, and der
     /environment must be an object/u,
   );
 
+  for (const generatedAt of [
+    '1',
+    'July 13, 2026',
+    '2026-07-13',
+    '2026-07-13T00:00:00Z',
+    '2026-07-13T00:00:00.000+00:00',
+    '2026-02-30T00:00:00.000Z',
+  ]) {
+    const invalidTimestamp = minimumReport();
+    invalidTimestamp.generatedAt = generatedAt;
+    assert.throws(
+      () => normalizeDistributionFootprintReport(invalidTimestamp),
+      /canonical ISO timestamp/u,
+    );
+  }
+
   const negative = minimumReport();
   negative.startup.help.samplesMs = [-1, 2];
   assert.throws(() => normalizeDistributionFootprintReport(negative), /finite and non-negative/u);
@@ -124,6 +143,32 @@ test('schema-v1 reports reject invalid roots, required fields, versions, and der
     () => normalizeDistributionFootprintReport(hostileFamilyLength),
     /exactly six canonical language groups/u,
   );
+});
+
+test('distribution versions use the strict SemVer grammar', () => {
+  for (const valid of [
+    '0.0.0',
+    '1.2.3',
+    '1.2.3-0',
+    '1.2.3-alpha.1',
+    '1.2.3-001alpha',
+    '1.2.3+001.sha',
+    '1.2.3-alpha+build.7',
+  ]) {
+    assert.equal(normalizeDistributionVersion(valid), valid);
+  }
+  for (const invalid of [
+    '1.2.3-.',
+    '1.2.3-..',
+    '1.2.3-alpha..beta',
+    '1.2.3-01',
+    '1.2.3+..',
+    '01.2.3',
+    '1.02.3',
+    '1.2.03',
+  ]) {
+    assert.throws(() => normalizeDistributionVersion(invalid), /semantic version/u);
+  }
 });
 
 test('duration summaries expose raw samples plus median and nearest-rank p95', () => {
@@ -179,7 +224,7 @@ test('language package mapping is exact and family grouping is deterministic', (
   );
 });
 
-test('release tarball rows require the exact canonical identity set and safe totals', () => {
+test('release tarball rows require exact identities and bounded compressed inputs', () => {
   const rows = canonicalRows();
   assert.deepEqual(
     normalizeReleaseTarballRows(rows.toReversed(), VERSION).map((entry) => entry.packageName),
@@ -203,7 +248,30 @@ test('release tarball rows require the exact canonical identity set and safe tot
 
   const overflow = canonicalRows();
   overflow[0] = { ...overflow[0], compressedBytes: Number.MAX_SAFE_INTEGER };
-  assert.throws(() => sumReleaseSetCompressedBytes(overflow), /MAX_SAFE_INTEGER/u);
+  assert.throws(
+    () => sumReleaseSetCompressedBytes(overflow),
+    new RegExp(`must not exceed ${String(DISTRIBUTION_TARBALL_MAX_COMPRESSED_BYTES)} bytes`, 'u'),
+  );
+
+  const perTarballBytes =
+    Math.floor(DISTRIBUTION_RELEASE_SET_MAX_COMPRESSED_BYTES / rows.length) + 1;
+  const aggregateOverflow = canonicalRows().map((row) => ({
+    ...row,
+    compressedBytes: perTarballBytes,
+  }));
+  assert.equal(
+    aggregateOverflow.every(
+      (row) => row.compressedBytes <= DISTRIBUTION_TARBALL_MAX_COMPRESSED_BYTES,
+    ),
+    true,
+  );
+  assert.throws(
+    () => normalizeReleaseTarballRows(aggregateOverflow, VERSION),
+    new RegExp(
+      `aggregate compressed bytes must not exceed ${String(DISTRIBUTION_RELEASE_SET_MAX_COMPRESSED_BYTES)} bytes`,
+      'u',
+    ),
+  );
 });
 
 test('complete tarball collection rejects missing, extra, and symlinked release artifacts', () => {
@@ -234,7 +302,10 @@ test('complete tarball collection rejects missing, extra, and symlinked release 
 });
 
 test('installed CLI closure totals include only installed canonical OpenSIP packages', () => {
-  const rows = canonicalRows().map((row, index) => ({ ...row, compressedBytes: index + 1 }));
+  const rows = canonicalRows().map((row, index) => ({
+    ...row,
+    compressedBytes: index + 1,
+  }));
   const byName = new Map(rows.map((row) => [row.packageName, row.compressedBytes]));
   const closure = [
     { name: 'third-party', version: '9.0.0' },
@@ -598,7 +669,10 @@ function canonicalRows() {
 function attributableRows(tarballs) {
   return tarballs
     .filter((row) => languageFamilyForPackage(row.packageName) !== undefined)
-    .map((row, index) => ({ packageName: row.packageName, unpackedBytes: index + 1 }));
+    .map((row, index) => ({
+      packageName: row.packageName,
+      unpackedBytes: index + 1,
+    }));
 }
 
 function temporaryDirectory(prefix) {

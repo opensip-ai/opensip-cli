@@ -71,8 +71,12 @@ export function optionalSha256(value, source) {
 
 export function isoTimestamp(value, source) {
   const timestamp = requiredString(value, source);
-  if (!Number.isFinite(Date.parse(timestamp))) {
-    throw new TypeError(`${source} must be an ISO timestamp`);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(timestamp)) {
+    throw new TypeError(`${source} must be a canonical ISO timestamp`);
+  }
+  const parsed = new Date(timestamp);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== timestamp) {
+    throw new TypeError(`${source} must be a valid canonical ISO timestamp`);
   }
   return timestamp;
 }

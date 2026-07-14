@@ -1,10 +1,16 @@
 import { spawn } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 
-import { killProcessTree, readProcessTable, sumProcessTreeRss } from './process-tree-rss.mjs';
+import {
+  createChildProcessTerminator,
+  parentSignalCoordinator,
+  reserveParentSignalCleanup,
+} from './child-process-lifecycle.mjs';
+import { readProcessTable, sumProcessTreeRss } from './process-tree-rss.mjs';
 
 const TERMINATION_GRACE_MS = 1000;
 const FORCE_KILL_SETTLEMENT_MS = 1000;
+const RSS_SAMPLE_TIMEOUT_MS = 1000;
 
 export async function runMeasuredCommand(input) {
   const [command, ...args] = input.command;
@@ -12,6 +18,11 @@ export async function runMeasuredCommand(input) {
 
   const stdout = new TailBuffer(input.stdoutTailBytes);
   const stderr = new TailBuffer(input.stderrTailBytes);
+  const sampleProcessTable = input.readProcessTable ?? readProcessTable;
+  const sampleTimeoutMs = input.rssSampleTimeoutMs ?? RSS_SAMPLE_TIMEOUT_MS;
+  if (!Number.isSafeInteger(sampleTimeoutMs) || sampleTimeoutMs <= 0) {
+    throw new RangeError('rssSampleTimeoutMs must be a positive safe integer');
+  }
   const startedAt = new Date().toISOString();
   const start = performance.now();
   let maxRssBytes;
@@ -20,13 +31,41 @@ export async function runMeasuredCommand(input) {
   let terminationHandle;
   let forceKillSettlementHandle;
   let sampleHandle;
+  let sampleInFlight;
+  let samplingDisabled = false;
+  let commandCompletedAt;
+  let commandDurationMs;
 
   const spawnChild = input.spawnChild ?? spawn;
-  const child = spawnChild(command, args, {
-    cwd: input.cwd,
-    env: input.env,
-    shell: false,
-    stdio: ['ignore', 'pipe', 'pipe'],
+  const useProcessGroup = input.useProcessGroup ?? process.platform !== 'win32';
+  const parentReservation = reserveParentSignalCleanup(
+    input.parentSignalCoordinator ?? parentSignalCoordinator,
+  );
+  if (parentReservation.interrupted()) {
+    const signal = parentReservation.signal();
+    parentReservation.complete();
+    throw new Error(`Command interrupted by parent ${String(signal)} before spawn.`);
+  }
+  let child;
+  try {
+    child = spawnChild(command, args, {
+      cwd: input.cwd,
+      detached: useProcessGroup,
+      env: input.env,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    parentReservation.complete();
+    throw error;
+  }
+  const terminator = createChildProcessTerminator({
+    captureProcessDescendants: input.captureProcessDescendants,
+    child,
+    killProcess: input.killProcess,
+    killProcessTree: input.killProcessTree,
+    platform: input.platform,
+    useProcessGroup,
   });
 
   const onStdout = (chunk) => stdout.push(chunk);
@@ -34,20 +73,48 @@ export async function runMeasuredCommand(input) {
   child.stdout?.on('data', onStdout);
   child.stderr?.on('data', onStderr);
 
-  const sample = async () => {
-    if (child.pid === undefined) return;
-    const rows = await readProcessTable().catch(() => []);
-    const rss = sumProcessTreeRss(rows, child.pid);
-    if (rss > 0) maxRssBytes = Math.max(maxRssBytes ?? 0, rss);
+  const sample = () => {
+    if (child.pid === undefined || samplingDisabled) return Promise.resolve();
+    if (sampleInFlight !== undefined) return sampleInFlight;
+    sampleInFlight = sampleRssWithinDeadline(sampleProcessTable, sampleTimeoutMs)
+      .then((rows) => {
+        if (rows === undefined) {
+          samplingDisabled = true;
+          return;
+        }
+        terminator.observeProcessTable(rows);
+        const rss = sumProcessTreeRss(rows, child.pid);
+        if (rss > 0) maxRssBytes = Math.max(maxRssBytes ?? 0, rss);
+      })
+      .catch(() => {
+        samplingDisabled = true;
+      })
+      .finally(() => {
+        sampleInFlight = undefined;
+      });
+    return sampleInFlight;
   };
 
   sampleHandle = setInterval(() => {
-    void sample();
+    sample();
   }, input.sampleIntervalMs);
-  void sample();
+  sample();
+
+  const noteCommandCompletion = () => {
+    if (commandCompletedAt !== undefined) return;
+    commandCompletedAt = new Date().toISOString();
+    commandDurationMs = Math.round(performance.now() - start);
+  };
 
   const exit = await new Promise((resolve) => {
     let settled = false;
+    let closeResult;
+    let forceSignalPromise;
+    let terminationReason;
+    let resolveTerminationComplete;
+    const terminationComplete = new Promise((resolveComplete) => {
+      resolveTerminationComplete = resolveComplete;
+    });
     const cleanup = () => {
       clearTimeout(timeoutHandle);
       clearTimeout(terminationHandle);
@@ -56,74 +123,118 @@ export async function runMeasuredCommand(input) {
       child.stderr?.off('data', onStderr);
       child.off('error', onError);
       child.off('close', onClose);
+      parentReservation.complete();
+      terminator.dispose();
     };
     const settle = (result) => {
       if (settled) return;
       settled = true;
+      noteCommandCompletion();
       cleanup();
+      resolveTerminationComplete();
       resolve(result);
     };
-    const signalTree = (signal) => {
-      if (child.pid === undefined) return;
-      try {
-        Promise.resolve(killProcessTree(child.pid, signal)).catch(() => false);
-      } catch {
-        // Process-tree termination is best-effort; hard settlement stays bounded.
-      }
-    };
-    const forceKill = () => {
+    const forceKill = (rootClosed = false) => {
+      if (forceSignalPromise !== undefined) return forceSignalPromise;
+      clearTimeout(terminationHandle);
       forceKillSettlementHandle = setTimeout(
-        () => settle({ code: undefined, signal: 'SIGKILL', error: undefined }),
+        () =>
+          settle(
+            closeResult ?? {
+              code: undefined,
+              signal: 'SIGKILL',
+              error: undefined,
+            },
+          ),
         input.forceKillSettlementMs ?? FORCE_KILL_SETTLEMENT_MS,
       );
       child.stdout?.destroy();
       child.stderr?.destroy();
-      try {
-        child.kill('SIGKILL');
-      } catch {
-        // The root may already have exited; still escalate across its known tree.
-      }
-      signalTree('SIGKILL');
+      const finalObservation = rootClosed ? sampleInFlight : undefined;
+      forceSignalPromise = Promise.resolve()
+        .then(() => finalObservation)
+        .catch(() => false)
+        .then(() =>
+          rootClosed ? terminator.signalAfterRootClose('SIGKILL') : terminator.signal('SIGKILL'),
+        )
+        .catch(() => false);
+      return forceSignalPromise;
     };
-    const beginTermination = () => {
-      timedOut = true;
+    const beginTermination = (reason) => {
+      if (terminationReason !== undefined) return terminationComplete;
+      terminationReason = reason;
+      clearTimeout(timeoutHandle);
+      timedOut = reason === 'timeout';
       terminationHandle = setTimeout(forceKill, input.terminationGraceMs ?? TERMINATION_GRACE_MS);
-      signalTree('SIGTERM');
+      Promise.resolve()
+        .then(() => terminator.signal('SIGTERM'))
+        .catch(() => false);
+      return terminationComplete;
     };
     function onError(error) {
-      settle({ code: undefined, signal: undefined, error });
+      clearTimeout(timeoutHandle);
+      if (sampleHandle !== undefined) clearInterval(sampleHandle);
+      terminator.markRootClosed();
+      noteCommandCompletion();
+      closeResult = { code: undefined, signal: undefined, error };
+      forceKill().finally(() => settle(closeResult));
     }
     function onClose(code, signal) {
-      settle({ code, signal, error: undefined });
+      clearTimeout(timeoutHandle);
+      if (sampleHandle !== undefined) clearInterval(sampleHandle);
+      terminator.markRootClosed();
+      noteCommandCompletion();
+      closeResult = { code, signal, error: undefined };
+      forceKill(true).finally(() => settle(closeResult));
     }
 
     child.once('error', onError);
     // `close` follows stdio closure, preserving complete bounded output tails.
     child.once('close', onClose);
+    parentReservation.activate(() => beginTermination('parent-signal'));
     if (input.timeoutMs !== undefined) {
-      timeoutHandle = setTimeout(beginTermination, input.timeoutMs);
+      timeoutHandle = setTimeout(() => beginTermination('timeout'), input.timeoutMs);
     }
   });
 
+  // Command duration ends with the child/stdio settlement. The final best-effort
+  // RSS sample below must not inflate startup or install wall-time measurements.
   if (sampleHandle !== undefined) clearInterval(sampleHandle);
   await sample();
 
-  const completedAt = new Date().toISOString();
-  const durationMs = Math.round(performance.now() - start);
   return {
     command: input.command,
     cwd: input.cwd,
     startedAt,
-    completedAt,
+    completedAt: commandCompletedAt,
     status: exit.code ?? (exit.signal === undefined ? 1 : 128),
     signal: exit.signal ?? undefined,
     error: exit.error === undefined ? undefined : String(exit.error.message ?? exit.error),
     timedOut,
-    durationMs,
+    durationMs: commandDurationMs,
     maxRssBytes,
     stdoutTail: stdout.toString(),
     stderrTail: stderr.toString(),
   };
+}
+
+function sampleRssWithinDeadline(readTable, timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      resolve(value);
+    };
+    const deadline = setTimeout(() => settle(), timeoutMs);
+    Promise.resolve()
+      .then(() => readTable())
+      .then(
+        (rows) => settle(rows),
+        () => settle(),
+      );
+  });
 }
 
 class TailBuffer {

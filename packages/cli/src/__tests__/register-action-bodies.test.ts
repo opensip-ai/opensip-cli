@@ -744,6 +744,26 @@ describe('init spec — action body', () => {
     },
   );
 
+  it.each(['--keep', '--remove'] as const)(
+    'init %s: leaves even a pristine created result footer-free',
+    async (flag) => {
+      const { ctx, rendered } = makeCtx();
+      const program = mount(ctx);
+      const harness = makeInitScope();
+
+      await dispatchInit(program, ['init', flag], harness);
+
+      expect(executeInit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          [flag === '--keep' ? 'keep' : 'remove']: true,
+        }),
+      );
+      expect(toolsList).not.toHaveBeenCalled();
+      expect(harness.debug).not.toHaveBeenCalled();
+      expect(rendered[0]).not.toHaveProperty('optionalTools');
+    },
+  );
+
   it('init: treats denied manifest-only inventory rows as identity-only installed evidence', async () => {
     vi.mocked(toolsList).mockReturnValueOnce({
       type: 'tools-list',

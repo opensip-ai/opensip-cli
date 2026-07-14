@@ -11,6 +11,8 @@ import {
   DISTRIBUTION_LANGUAGE_FAMILIES,
   DISTRIBUTION_MAX_DEPENDENCY_ROWS,
   DISTRIBUTION_MEASURE_MAX_REPEATS,
+  DISTRIBUTION_RELEASE_SET_MAX_COMPRESSED_BYTES,
+  DISTRIBUTION_TARBALL_MAX_COMPRESSED_BYTES,
 } from './distribution-footprint-constants.mjs';
 import {
   arraysEqual,
@@ -29,15 +31,41 @@ import {
 } from './release-artifacts.mjs';
 import { median, nearestRankPercentile } from '../perf/statistics.mjs';
 
-const DISTRIBUTION_VERSION_PATTERN =
-  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
-
 export function normalizeDistributionVersion(value, source = 'version') {
   const version = normalizeVersion(value);
-  if (version.length > 128 || !DISTRIBUTION_VERSION_PATTERN.test(version)) {
+  if (version.length > 128 || !isStrictSemanticVersion(version)) {
     throw new Error(`${source} must be a release semantic version`);
   }
   return version;
+}
+
+function isStrictSemanticVersion(version) {
+  const match = /^(?<core>[^+-]+)(?:-(?<prerelease>[^+]*))?(?:\+(?<build>.*))?$/u.exec(version);
+  if (match?.groups === undefined) return false;
+  const core = match.groups.core.split('.');
+  if (core.length !== 3 || !core.every((part) => isNumericIdentifier(part))) return false;
+  const prerelease = match.groups.prerelease;
+  if (
+    prerelease !== undefined &&
+    (prerelease.length === 0 ||
+      !prerelease.split('.').every((part) => isPrereleaseIdentifier(part)))
+  ) {
+    return false;
+  }
+  const build = match.groups.build;
+  return (
+    build === undefined ||
+    (build.length > 0 && build.split('.').every((part) => /^[0-9A-Za-z-]+$/u.test(part)))
+  );
+}
+
+function isNumericIdentifier(value) {
+  return /^(?:0|[1-9]\d*)$/u.test(value);
+}
+
+function isPrereleaseIdentifier(value) {
+  if (/^\d+$/u.test(value)) return isNumericIdentifier(value);
+  return /^[0-9A-Za-z-]+$/u.test(value) && /[A-Za-z-]/u.test(value);
 }
 
 /** Identify exact first-party packages attributable to one of the six language families. */
@@ -113,6 +141,7 @@ export function normalizeReleaseTarballRows(rows, expectedVersion, source = 'rel
   }
   const expectedByName = new Map(expected.map((entry) => [entry.packageName, entry]));
   const byName = new Map();
+  let releaseSetCompressedBytes = 0;
   for (const index of numericIndices(rowCount)) {
     const rawRow = rows[index];
     const row = requireRecord(rawRow, `${source}[${String(index)}]`);
@@ -133,14 +162,29 @@ export function normalizeReleaseTarballRows(rows, expectedVersion, source = 'rel
     if (fileName !== expectedByName.get(packageName).fileName) {
       throw new Error(`${source}[${String(index)}].fileName is not canonical for ${packageName}`);
     }
+    const compressedBytes = positiveSafeInteger(
+      row.compressedBytes,
+      `${source}[${String(index)}].compressedBytes`,
+    );
+    if (compressedBytes > DISTRIBUTION_TARBALL_MAX_COMPRESSED_BYTES) {
+      throw new RangeError(
+        `${source}[${String(index)}].compressedBytes must not exceed ${String(DISTRIBUTION_TARBALL_MAX_COMPRESSED_BYTES)} bytes`,
+      );
+    }
+    releaseSetCompressedBytes = sumSafeIntegers(
+      [releaseSetCompressedBytes, compressedBytes],
+      `${source} compressed bytes`,
+    );
+    if (releaseSetCompressedBytes > DISTRIBUTION_RELEASE_SET_MAX_COMPRESSED_BYTES) {
+      throw new RangeError(
+        `${source} aggregate compressed bytes must not exceed ${String(DISTRIBUTION_RELEASE_SET_MAX_COMPRESSED_BYTES)} bytes`,
+      );
+    }
     byName.set(packageName, {
       packageName,
       version,
       fileName,
-      compressedBytes: positiveSafeInteger(
-        row.compressedBytes,
-        `${source}[${String(index)}].compressedBytes`,
-      ),
+      compressedBytes,
     });
   }
 
