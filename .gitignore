@@ -35,6 +35,10 @@ slo-report*.json
 .opensip-quality/
 detection-quality-report*.json
 
+# Packed distribution measurement artifacts
+.opensip-distribution/
+/distribution-footprint-report*.json
+
 # Agent-usability evaluation reports
 packages/agent-eval/results/
 

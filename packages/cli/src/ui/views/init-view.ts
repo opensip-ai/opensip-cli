@@ -9,6 +9,7 @@ import { line, group, type Tone, type ViewNode } from '@opensip-cli/cli-ui';
 import type {
   AgentGuidanceTargetAction,
   AgentGuidanceTargetResult,
+  InitOptionalToolRecommendation,
   InitResult,
 } from '@opensip-cli/contracts';
 
@@ -42,6 +43,35 @@ function createdHeadline(state: InitResult['state']): string {
 
 function preExistingSummary(fileCount: number): string {
   return `${String(fileCount)} file(s) preserved under opensip-cli/.`;
+}
+
+function optionalToolsFooter(
+  recommendations: readonly InitOptionalToolRecommendation[] | undefined,
+): ViewNode[] {
+  if (recommendations === undefined || recommendations.length === 0) return [];
+  const idWidth = Math.max(...recommendations.map((row) => row.id.length));
+  return [
+    { kind: 'spacer' },
+    line([{ text: '  Optional tools for this project (not installed):', bold: true }]),
+    ...recommendations.map((row) =>
+      line([
+        { text: '    ' },
+        { text: row.id.padEnd(idWidth) },
+        { text: '  ' },
+        { text: row.installCommand, tone: 'brand' },
+        ...(row.network === 'networked'
+          ? [{ text: '  [networked]', tone: 'warning' as const }]
+          : []),
+      ]),
+    ),
+    { kind: 'spacer' },
+    line([
+      { text: '  Use ' },
+      { text: '--project', tone: 'brand' },
+      { text: ' on tools install for repo-local installation.' },
+    ]),
+    line([{ text: '  Full catalog: ' }, { text: 'opensip tools list --available', tone: 'brand' }]),
+  ];
 }
 
 function guidanceActionTone(action: AgentGuidanceTargetAction): Tone | undefined {
@@ -166,6 +196,7 @@ function createdView(result: InitResult): ViewNode {
     line([{ text: '  Try it:', dim: true }]),
     line([{ text: '    ' }, { text: 'opensip fit --recipe example', tone: 'brand' }]),
     line([{ text: '    ' }, { text: 'opensip sim --recipe example', tone: 'brand' }]),
+    ...optionalToolsFooter(result.optionalTools),
   );
   return group(children, 2);
 }

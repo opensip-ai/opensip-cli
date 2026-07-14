@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { toolsListAvailable } from '../available.js';
+import { selectAvailableAdapters, toolsListAvailable } from '../available.js';
 
 import type { FirstPartyAdapter } from '../first-party-adapters.generated.js';
 
@@ -50,6 +50,42 @@ describe('toolsListAvailable', () => {
     expect(result.adapters.map((a) => a.id)).toEqual(['cppcheck', 'semgrep']);
   });
 
+  it('preserves the singular wrapper JSON shape and property order byte-for-byte', () => {
+    const result = toolsListAvailable({
+      lang: 'cpp',
+      installedIds: new Set(['semgrep']),
+      catalog: CATALOG,
+    });
+
+    expect(JSON.stringify(result)).toBe(
+      JSON.stringify({
+        type: 'tools-available',
+        lang: 'cpp',
+        adapters: [
+          {
+            pkg: '@opensip-cli/tool-cppcheck',
+            id: 'cppcheck',
+            command: 'opensip cppcheck',
+            description: 'C/C++ static analysis',
+            network: 'local-only',
+            languages: ['cpp'],
+            installed: false,
+          },
+          {
+            pkg: '@opensip-cli/tool-semgrep',
+            id: 'semgrep',
+            command: 'opensip semgrep',
+            description: 'Polyglot SAST',
+            network: 'networked',
+            languages: [],
+            installed: true,
+          },
+        ],
+        totalCount: 2,
+      }),
+    );
+  });
+
   it('a polyglot-only filter still returns just polyglot adapters when nothing else matches', () => {
     const result = toolsListAvailable({ lang: 'go', installedIds: new Set(), catalog: CATALOG });
     expect(result.adapters.map((a) => a.id)).toEqual(['semgrep']);
@@ -62,6 +98,50 @@ describe('toolsListAvailable', () => {
     });
     const byId = Object.fromEntries(result.adapters.map((a) => [a.id, a.installed]));
     expect(byId).toEqual({ cppcheck: false, ruff: true, semgrep: false });
+  });
+
+  it('selects a stable Python+Go union with polyglot rows and no duplicates', () => {
+    const dualLanguage: FirstPartyAdapter = {
+      pkg: '@opensip-cli/tool-dual-language',
+      id: 'dual-language',
+      command: 'opensip dual-language',
+      description: 'Python and Go analysis',
+      network: 'local-only',
+      languages: ['python', 'go'],
+      aliases: [],
+    };
+    const go: FirstPartyAdapter = {
+      pkg: '@opensip-cli/tool-golangci-lint',
+      id: 'golangci-lint',
+      command: 'opensip golangci-lint',
+      description: 'Go lint',
+      network: 'local-only',
+      languages: ['go'],
+      aliases: [],
+    };
+    const rows = selectAvailableAdapters({
+      languages: new Set(['python', 'go']),
+      installedIds: new Set(['dual-language']),
+      catalog: [CATALOG[0], CATALOG[1], dualLanguage, CATALOG[2], go],
+    });
+
+    expect(rows.map((row) => row.id)).toEqual([
+      'ruff',
+      'dual-language',
+      'semgrep',
+      'golangci-lint',
+    ]);
+    expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
+    expect(rows.find((row) => row.id === 'dual-language')?.installed).toBe(true);
+  });
+
+  it('treats an empty language set as polyglot-only', () => {
+    const rows = selectAvailableAdapters({
+      languages: new Set(),
+      installedIds: new Set(),
+      catalog: CATALOG,
+    });
+    expect(rows.map((row) => row.id)).toEqual(['semgrep']);
   });
 
   it('carries package / command / network / languages through to the rows', () => {
