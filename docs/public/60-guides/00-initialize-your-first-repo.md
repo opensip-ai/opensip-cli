@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Initialize your first repo"
 audience: [getting-started, ci-integrators]
@@ -114,6 +114,24 @@ opensip fit --recipe example
 ```
 
 That run proves the project wiring end to end: config loading, target detection, plugin discovery, recipe selection, check execution, rendering, and exit-code policy.
+
+### Optional tools after a pristine init
+
+A successful **pristine** `opensip init` (first scaffold for a project with at
+least one selected language) may also print an **Optional tools for this project
+(not installed)** footer after the **Try it** block. Rows are language-relevant
+first-party adapter recommendations from the same catalog as
+`opensip tools list --available`: multi-language union plus polyglot adapters,
+already-installed adapters omitted, exact install commands only.
+
+- Advice only — `init` never prompts, installs, or executes adapter code.
+- Repeat init, `--keep`, `--remove`, recovery, and error paths do **not** emit
+  recommendations.
+- With `--json`, the same rows appear under `data.optionalTools` (field absent
+  when ineligible or nothing remains to recommend).
+
+See the [init optional-tools reference](../70-reference/01-cli-commands.md#optional-tools-after-pristine-init)
+for the full field list and eligibility rules.
 
 If you also want to smoke-test the scaffolded simulation files:
 

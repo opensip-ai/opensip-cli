@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
@@ -98,14 +98,18 @@ changed-scope selectors. A no-Git default falls back once to full scope and
 records that degradation instead of claiming changed-only coverage.
 
 The `data.reviewBrief` payload gives one verdict, bounded `topRisks[]`,
-optional `correlatedRisks[]`, baseline/degradation notes, and `signalRef`
-pointers back to the source envelopes. Inspect `correlatedRisks[]` first when it
-is present: it shows when multiple tools are pointing at the same symbol, graph
-node, file range, package, or fingerprint. Treat those groups as navigation
-only, then follow each member's `signalRef` before changing code. When MCP is
-available, prefer the `review_change` tool for the same read-side review shape
-over persisted suite evidence; do not re-run hidden analysis or inspect raw logs
-to answer a question that the brief/session evidence already answers.
+bounded `newFindings[]` (baseline-marked net-new risks; can diverge from
+`topRisks` when older high-severity risks fill the top cap), optional
+`correlatedRisks[]`, baseline/degradation notes, and `signalRef` pointers back
+to the source envelopes. Inspect `correlatedRisks[]` first when it is present:
+it shows when multiple tools are pointing at the same symbol, graph node, file
+range, package, or fingerprint. Treat those groups as navigation only, then
+follow each member's `signalRef` before changing code. When the human report is
+open, Change Impact lists **Top risks** and **New findings** as separate
+sections so net-new findings are not lost. When MCP is available, prefer the
+`review_change` tool for the same read-side review shape over persisted suite
+evidence; do not re-run hidden analysis or inspect raw logs to answer a question
+that the brief/session evidence already answers.
 
 Also inspect `data.steps[].verification` before claiming complete scoped
 coverage. Current results return optional `data.runId`, the authoritative

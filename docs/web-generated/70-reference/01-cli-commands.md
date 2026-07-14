@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 release: v0.6.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -1254,6 +1254,7 @@ opensip suite add security --tool fitness --command fitness --arg recipe=securit
 | `run` | `--since <ref>` | Propagate a git diff base to compatible changed-file steps. |
 | `run` | `--files <path>` | Propagate explicit changed files to compatible steps. Repeat for multiple files. |
 | `run` | `--full` | Run the whole repo. This disables the built-in `audit` changed-scope default and conflicts with `--changed`, `--since`, and `--files`. |
+| `run` | `--open` | After the suite completes, generate and open the HTML report when browser launch is allowed. For built-in `audit`, selects the Change Impact surface for the persisted parent Run (same path as top-level `opensip audit --open`). Other suite names open the ordinary report without inventing a Change Impact selection. JSON, CI, non-TTY, and remote-shell execution suppress browser launch; report failure never changes the suite exit code. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |

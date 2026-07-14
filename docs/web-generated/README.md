@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 owner: opensip-cli
 indexable: true
@@ -27,8 +27,8 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 | Bring existing scanners into the same report and gate | Opt in to one of 16 adapters, including Gitleaks, Semgrep, Ruff, golangci-lint, cargo-deny, Bandit, PMD, Cppcheck, OSV-Scanner, and Trivy |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
 | Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
-| Give coding agents deterministic repo evidence | `opensip agent-catalog --json`, `opensip mcp`, filtered JSON, sessions, and graph impact |
-| Show results to humans and CI systems | Open the local HTML report or export SARIF for code scanning |
+| Give coding agents deterministic repo evidence | `opensip agent-catalog --json`, `opensip mcp` (`impact_files`, `select_tests`, `get_file_context`, `get_context_status`), `suite run agent-context`, filtered JSON, sessions, and graph impact |
+| Show results to humans and CI systems | Open the local HTML report (including Change Impact for audit runs) or export SARIF for code scanning |
 
 ## Start Here
 
@@ -59,6 +59,8 @@ scaffold, one passing fitness run, and the local HTML report. From there:
 | Audit contract/version compatibility | [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/) |
 | Profile or compare performance work | [Performance profiling](/docs/opensip-cli/70-reference/16-performance-profiling/) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) |
+| Run agent Discover / Edit / Final loops | [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) |
+| Understand Change Impact and the offline HTML report | [Report](/docs/opensip-cli/70-reference/06-dashboard/) |
 
 ## Command Map
 

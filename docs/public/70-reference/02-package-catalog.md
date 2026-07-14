@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-11
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
@@ -166,7 +166,7 @@ Imports every layer below. The published binary.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-cli/agent-eval` | `packages/agent-eval/` | Black-box agent-usability gold-task evaluation harness. `private: true`; never published. It spawns the built CLI and has zero workspace source imports or consumers. | `AGENT_EVAL_VERSION` |
+| `@opensip-cli/agent-eval` | `packages/agent-eval/` | Black-box agent-usability gold-task evaluation harness (ADR-0157/0158). `private: true`; never published. Spawns the built CLI + MCP over stdio; zero workspace source imports. Measures OpenSIP vs native search/read/glob on frozen gold tasks (`pnpm agent-eval`, `--smoke`). Quality-baseline tasks exercise completeness/trust of context surfaces, not tool absence. | `AGENT_EVAL_VERSION` |
 | `@opensip-cli/test-support` | `packages/test-support/` | Cross-package TEST scaffolding (ADR-0040): `RunScope` test sugar + the per-check fixture-coverage harness consumed by each check pack's `fixture-coverage.test.ts`. `private: true` — excluded from the release order; production source may not import it (`no-prod-import-of-test-support` depcruise rule) | `makeTestScope`, `withScope`, `withScopeSync`, `runCheckOnFixture`, `planCoverageCases`, `buildFixtureManifest` |
 | `@opensip-cli/checks-dogfood` | `packages/fitness/checks-dogfood/` | Repository-only architecture checks used to dogfood OpenSIP's own boundaries. `private: true`; never published or imported by production source. | `checks` |
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 title: "What is opensip-cli?"
 audience: [getting-started, contributors]
@@ -73,14 +73,16 @@ gates into deterministic evidence.
 - **Architectural rules.** "No module under `packages/cli/` may import from `packages/fitness/checks-*`." Linters can't say this; opensip-cli can, in 15 lines.
 - **Cross-language gates in one runner.** A polyglot repo gets one CI step, not six. 160 checks ship in the box across seven packs; most are language-agnostic, and the rest target a specific language.
 - **CI surfacing.** Outputs SARIF for GitHub PR annotations. Baselines for "fail only on *new* violations" so you can adopt incrementally without rewriting the codebase first.
-- **Multi-tool review suites.** `opensip audit` runs the curated changed-scope review across first-party tools and returns one aggregate result with a review brief and durable Run evidence. `suite run <name>` runs configured workflows.
+- **Multi-tool review suites.** `opensip audit` runs the curated changed-scope review across first-party tools and returns one aggregate result with a review brief and durable Run evidence. The human report's **Change Impact** tab shows that stored evidence (including top risks and net-new findings). `suite run <name>` runs configured workflows.
 - **Scanner consolidation.** Opt-in adapters wrap a user's existing scanner binary
   — Gitleaks, Semgrep, Ruff, golangci-lint, cargo-deny, Bandit, PMD, Cppcheck,
   OSV-Scanner, Trivy, and more — and normalize findings into the same sessions,
-  report, JSON, and gate path as built-in tools.
-- **AI-agent guardrails.** Structured JSON, sessions, `agent-catalog`, MCP, and
-  agent recipes give coding agents deterministic feedback without making the CLI
-  an AI runtime.
+  report, JSON, and gate path as built-in tools. Pristine `init` may recommend
+  language-relevant adapters; it never installs them for you.
+- **AI-agent guardrails.** Structured JSON, sessions, `agent-catalog`, MCP task
+  context (`impact_files`, `select_tests`, `get_file_context`,
+  `get_context_status`), `suite run agent-context`, and agent recipes give coding
+  agents deterministic feedback without making the CLI an AI runtime.
 
 ## What it deliberately isn't
 

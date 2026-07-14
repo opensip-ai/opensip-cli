@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
@@ -398,7 +398,7 @@ per-tool output.
 | `verdict` | `"pass"` \| `"warn"` \| `"fail"` | yes | `fail` for error-severity risks, `warn` for warning-only risks or degraded evidence, `pass` when clean. |
 | `changedFiles` | number \| `null` | yes | Changed-file count when trustworthy; `null` when unavailable. |
 | `topRisks` | `ReviewBriefRisk[]` | yes | Deterministically ranked current risks, capped by the host. |
-| `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. |
+| `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. Can diverge from `topRisks` when older high-severity risks fill the top cap — the Change Impact report lists both sections so net-new findings are not lost. |
 | `correlatedRisks` | `ReviewBriefCorrelationGroup[]` | no | Bounded, explainable groups of related risks. Additive and absent when no group has at least two risks. |
 | `baselineDelta` | object | yes | `{ available, added, removed, unchanged }`; `available:false` means the suite did not capture compare evidence. |
 | `degraded` | object[] | yes | Evidence-quality notes such as missing envelopes, step faults, missing fingerprints, partial impact verification, or failing verdicts without signals. |

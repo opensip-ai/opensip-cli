@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -17,14 +17,19 @@ source-files:
   - packages/fitness/engine/src/targets/types.ts
   - packages/graph/engine/src/rules/define-rule.ts
   - packages/graph/engine/src/rules/registry.ts
+  - packages/contracts/src/review-brief.ts
+  - packages/contracts/src/task-context.ts
+  - packages/cli/src/commands/audit-command-spec.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./06-system-context.md
   - ../10-concepts/01-fitness-loop.md
+  - ../60-guides/use-opensip-with-ai-agents.md
+  - ../70-reference/06-dashboard.md
 ---
 # Vocabulary
 
-The codebase has thirteen load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
+The codebase has a small set of load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
 
 If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom, expect each entry to be ~3-6 sentences with a source pointer.
 
@@ -142,6 +147,59 @@ A **gate** is the host-owned baseline workflow. `opensip fit --gate-save` stores
 
 The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/fitness/engine/src/baseline-strategy.ts) and [`../10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
 
+## Audit
+
+**Audit** is the host-owned canonical changed-code review: `opensip audit` (and
+the equivalent `opensip suite run audit`). It is not a Tool. It runs the curated
+built-in suite (fit risk recipe, graph impact, high-confidence YAGNI) through
+one suite executor, returns a `SuiteRunResult` with host-owned `reviewBrief` and
+optional parent `runId`, and may open the human **Change Impact** report with
+`--open`. The suite name `audit` is reserved (ADR-0159). See
+[CLI commands — audit](/docs/opensip-cli/70-reference/01-cli-commands/#audit--canonical-changed-code-review)
+and [ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0155-canonical-audit-command.md).
+
+## Review brief
+
+A **review brief** is the host-owned aggregate over a multi-tool suite run:
+verdict, bounded `topRisks[]` and `newFindings[]`, optional correlated groups,
+baseline delta, degradations, and recommended actions. It is finding-oriented —
+it summarizes `SignalEnvelope` evidence. It never appears on the built-in
+`agent-context` suite (that suite uses a **context manifest** instead). Shape
+and JSON fields: [JSON output schema](/docs/opensip-cli/70-reference/04-json-output-schema/).
+
+## Change Impact
+
+**Change Impact** is the self-contained HTML report tab that renders *stored*
+audit evidence only: the parent Run, graph-impact session projection, review
+brief, and verification trust. The browser never re-runs Git, graph, or the
+suite. `opensip audit --open` selects the completed run on this tab. See
+[Report — Change Impact](/docs/opensip-cli/70-reference/06-dashboard/#change-impact) and
+[ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
+
+## Task context / agent-context
+
+**Task context** is the before-edit evidence plane for agents and humans:
+
+- CLI: `opensip suite run agent-context --files <path> --json` writes a
+  versioned **TaskContextManifest** on the parent Run (inventory, graph
+  generation, labelled static test selection).
+- MCP: `get_context_status`, `get_file_context`, `impact_files`, `select_tests`,
+  and entity-detail `get_symbol` read that evidence without building a graph,
+  invoking Git, running tests, or starting the suite.
+
+Task context is **evidence, not findings**: contributions are typed snapshots,
+not `SignalEnvelope` findings and not a ReviewBrief. See
+[Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) and
+[ADR-0160](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0160-deterministic-task-context-evidence-plane.md).
+
+## Impact trust
+
+**Impact trust** is the machine-readable coverage verdict on `graph impact` /
+`impact_files` and suite step `verification`: `coverage`, `fullyVerified`,
+`fallback`, and `uncertainties[]`. Targeted verification is only trustworthy
+when `fullyVerified` is true. See
+[Impact analysis and trust](/docs/opensip-cli/40-graph/05-impact-analysis/).
+
 ---
 
 ## Words you'll see but that aren't load-bearing
@@ -152,6 +210,7 @@ A few terms that appear in the codebase or docs but aren't kernel concepts:
 - **Finding** — user-facing synonym for `Signal`. Prefer `Signal` in platform code.
 - **Violation** — what a check returns to the framework (`CheckViolation[]`). The framework converts each violation into a Signal. Use `violation` inside a check, `Signal` everywhere else.
 - **Selector** — the discriminated-union type a recipe uses to pick checks (`all | tags | pattern | explicit`). Lives in [`packages/fitness/engine/src/recipes/types.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/packages/fitness/engine/src/recipes/types.ts).
+- **agent-eval** — private black-box gold-task harness (`@opensip-cli/agent-eval`) that measures whether the CLI/MCP surface beats native search/read/glob on fixed tasks. Contributor promotion instrument, not a customer command.
 
 ---
 

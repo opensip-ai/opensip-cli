@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-14
 release: v0.6.0
 title: "FAQ"
 audience: [getting-started]
@@ -65,6 +65,40 @@ See [vs. other tools](./03-vs-other-tools.md) for the full comparison.
 `graph` when they want static call-graph analysis, run `yagni` when they want an
 advisory reduction audit, and only use `sim` if they have a workload to
 simulate. You can run `opensip fit` and never touch the others.
+
+---
+
+### What is `opensip audit` vs `opensip suite run audit`?
+
+**The same curated built-in review.** Top-level `opensip audit` is the memorable
+host command; `opensip suite run audit` is the generic suite spelling. Both
+share one executor and always use the built-in definition — the suite name
+`audit` is reserved, so a configured `suites.audit` is rejected. Use
+`--json` for agents/CI and `--open` for the human Change Impact report. Custom
+multi-tool workflows use another suite name (`audit-custom`, …). See
+[audit command reference](../70-reference/01-cli-commands.md#audit--canonical-changed-code-review).
+
+---
+
+### How should coding agents prepare before editing?
+
+**Record task context, then read it.** Run
+`opensip suite run agent-context --files <path> --json` (or trust a prior Run
+via MCP `get_context_status` when readiness checks pass). During the edit use
+`get_file_context`, `impact_files`, `select_tests`, and entity-detail
+`get_symbol`. Ordinary MCP reads never rebuild the graph, invoke Git, run tests,
+or start the suite. After edits, prefer `opensip audit --json` for the
+finding-oriented review. Full loop:
+[Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md).
+
+---
+
+### Does `init` install scanner adapters for me?
+
+**No.** A successful pristine init may *recommend* language-relevant optional
+adapters (`optionalTools` in JSON, a footer in human mode) with the exact
+install commands. It never prompts, installs, or runs adapter code. Install
+what you want with `opensip tools install …`.
 
 ---
 

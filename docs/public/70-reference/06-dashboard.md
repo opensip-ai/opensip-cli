@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Report"
 audience: [users, contributors]
@@ -38,7 +38,7 @@ asset hosting — a single file you can email or commit, fully functional offlin
 
 Two triggers, both opt-in:
 
-1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the report if conditions allow. `opensip audit --open` generates the report after audit persistence and selects that Run in Change Impact.
+1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the report if conditions allow. `opensip audit --open` and `opensip suite run audit --open` generate the report after suite persistence and select that parent Run in Change Impact. Other `opensip suite run <name> --open` runs open the ordinary report without inventing a Change Impact selection.
 2. **Explicit `report` command.** `opensip report` opens the most recent run's report regardless of any pending fit run.
 
 The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](../../../packages/cli/src/open-report.ts)) returns `shouldOpen: true` only when **all** of these hold:
@@ -73,12 +73,22 @@ closed `#change-impact/<id>` selection chooses a loaded Run; an invalid or
 missing ID falls back without becoming an arbitrary URL target.
 
 The panel renders the persisted review brief, exact step verification state,
-changed-to-impacted summary, bounded entity/package rows, risks, and recommended
-actions. Stored list caps are 200 changed files, 200 changed functions, 500
-impacted functions, 500 impacted files, 100 packages, and 20 commands; every
-list carries an exact omitted count and the whole UTF-8 projection is capped at
-1 MiB. Truncation and omitted metadata are visible states, never interpreted as
-zero.
+changed-to-impacted summary, bounded entity/package rows, review risks, and
+recommended actions. Under **Review risks and actions** it shows two capped
+lists from the host-owned brief:
+
+- **Top risks** — severity-ordered `reviewBrief.topRisks[]` (may include retained
+  findings that are not net-new).
+- **New findings** — `reviewBrief.newFindings[]`, the baseline-marked net-new
+  list. These two lists can diverge: a lower-severity net-new finding can fall
+  out of the top-risk cap while still appearing under New findings.
+
+Exact step verification, correlations, degradations, recommended actions, and
+verification commands follow the same stored-only rule. Stored impact list caps
+are 200 changed files, 200 changed functions, 500 impacted functions, 500
+impacted files, 100 packages, and 20 commands; every list carries an exact
+omitted count and the whole UTF-8 projection is capped at 1 MiB. Truncation and
+omitted metadata are visible states, never interpreted as zero.
 
 Code Paths drill-down is enabled only when the stored catalog identity matches
 the embedded current catalog and a qualified-name/path/line occurrence resolves

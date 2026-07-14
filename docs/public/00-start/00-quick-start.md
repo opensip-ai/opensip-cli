@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
@@ -145,6 +145,9 @@ opensip audit --json
 
 # Open the same run's stored Change Impact evidence for a human
 opensip audit --open
+
+# Prepare before-edit task context for agents (explicit files; no findings)
+opensip suite run agent-context --files src/server.ts --json
 
 # Ask graph which symbols are impacted by your current git diff
 opensip graph impact --changed --json --top 20

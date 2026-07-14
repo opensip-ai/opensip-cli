@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-02
+last_verified: 2026-07-14
 release: v0.6.0
 title: "Impact analysis and trust"
 audience: [contributors, ci-integrators, agent-builders]
@@ -53,6 +53,15 @@ Suite runs project impact trust onto `data.steps[].verification` when a step emi
 it. The host-owned review brief also records partial impact verification in
 `reviewBrief.degraded[]`, which turns an otherwise clean suite into a warning
 rather than a false pass.
+
+Every graph impact run (including JSON mode) also persists a **bounded impact
+report projection** on the graph session payload: capped changed/impacted
+lists, explicit omitted counts, catalog identity digests for report drill-down,
+and `impactStatus` (`available` or `omitted-overflow`). The human Change Impact
+tab joins that session through the parent Run's `RunStep.sessionId` and never
+recomputes impact. See
+[Report — Change Impact](../70-reference/06-dashboard.md#change-impact) and
+[ADR-0156](../../decisions/ADR-0156-bounded-stored-impact-proof.md).
 
 ## MCP explicit-file impact
 
