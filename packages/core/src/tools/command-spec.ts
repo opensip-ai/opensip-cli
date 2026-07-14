@@ -245,6 +245,23 @@ export interface CommandSpec<TOpts = unknown, TCtx = CommandContext> {
   readonly args?: readonly ArgSpec[];
   /** Whether the host enters a project scope before the handler. */
   readonly scope: CommandScopeRequirement;
+  /**
+   * Declares that this `scope: 'project'` command may also run in a directory
+   * that has NO opensip-cli project (no `opensip-cli.config.yml`). The host then
+   * synthesizes an in-memory config, promotes the project context to
+   * `'ephemeral'`, and backs the run with a user-cache runtime
+   * (`~/.opensip-cli/cache/ephemeral/<project-hash>/`) instead of
+   * `<project>/opensip-cli/.runtime/` — so a first run writes nothing into the
+   * user's repository. `opensip init` later MOVES that runtime into the project.
+   *
+   * Ignored for `scope: 'none'` commands, which never need a project at all.
+   *
+   * This is a DECLARATION on the command, not a host-side allowlist: the
+   * no-init surface is derived from the mounted specs (see
+   * `buildCommandScopeIndex`), so a first-run-capable command cannot silently
+   * drift out of the surface when it is renamed or re-mounted.
+   */
+  readonly noInit?: boolean;
   /** How the host dispatches the handler's return value. */
   readonly output: CommandOutputMode;
   /** Required when `output` is `raw-stream`, forbidden otherwise. */

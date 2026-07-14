@@ -96,6 +96,10 @@ export function buildFitCommandSpec(setUpLiveView: (cli: ToolCliContext) => void
       declaration: 'runFit',
     },
     description: 'Run fitness checks',
+    // Runs on a repo with no opensip-cli project: the host synthesizes a config
+    // from detected languages and backs the run with an ephemeral user-cache
+    // runtime. Covers the `fit` alias too — the scope index keys aliases.
+    noInit: true,
     options: [
       {
         flag: '--recipe',

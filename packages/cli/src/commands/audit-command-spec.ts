@@ -51,6 +51,12 @@ export function buildAuditCommandSpec(ctx: CliCommandsContext): HostSpec {
     commonFlags: ['cwd', 'json', 'quiet', 'verbose', 'debug', 'open'],
     options: SUITE_RUN_OPTIONS,
     scope: PROJECT_SCOPE,
+    // First value before first config: `audit` is the canonical first-run
+    // command (ADR-0155) and must work on a repo that has never been
+    // initialized, exactly like the `suite run audit` spelling it is equivalent
+    // to (ADR-0159). The run is backed by an ephemeral user-cache runtime, so
+    // nothing is written into the user's project until they run `init`.
+    noInit: true,
     output: RAW_STREAM,
     rawStreamReason: 'runtime-render-dispatch',
     handler: async (rawOpts) => {

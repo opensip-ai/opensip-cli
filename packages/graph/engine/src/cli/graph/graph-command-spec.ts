@@ -541,6 +541,10 @@ export const graphCommandSpec = definePrimaryRunCommand<unknown>({
   },
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
+  // First-run capable: builds the catalog from detected sources with a
+  // synthesized config; the catalog cache lives in the ephemeral user-cache
+  // runtime until `opensip init` moves it into the project.
+  noInit: true,
   options: [
     {
       flag: '--no-cache',

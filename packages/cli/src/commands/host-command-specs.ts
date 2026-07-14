@@ -183,6 +183,9 @@ function buildReportSpec(): HostSpec {
     },
     name: 'report',
     description: 'Generate the cross-tool HTML report and open it in your browser',
+    // First-run capable: `audit --open` and `report` must work on a pre-init
+    // run. The HTML lands in the ephemeral runtime's reports dir, not the repo.
+    noInit: true,
     commonFlags: ['json'],
     options: [
       {

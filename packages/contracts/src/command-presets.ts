@@ -40,6 +40,14 @@ interface PrimaryRunCommandPresetInput<TOpts> {
   readonly args?: readonly ArgSpec[];
   readonly handler: PresetHandler<TOpts>;
   /**
+   * Opt this primary run command into first-run (no-init) execution — see
+   * {@link CommandSpec.noInit}. Opt-in per tool rather than a preset default:
+   * a command is only first-run-capable if it can produce a meaningful result
+   * from a synthesized config alone (`fit`/`graph` can; `sim` needs authored
+   * scenarios).
+   */
+  readonly noInit?: boolean;
+  /**
    * Optional author-declared static handler identity for audit bridging.
    * First-party direct callers supply an exact package+path+declaration
    * descriptor; omission remains allowed for third-party compatibility.
@@ -118,6 +126,7 @@ export function definePrimaryRunCommand<TOpts>(
     ...(input.options === undefined ? {} : { options: input.options }),
     ...(input.args === undefined ? {} : { args: input.args }),
     ...(input.staticHandler === undefined ? {} : { staticHandler: input.staticHandler }),
+    ...(input.noInit === undefined ? {} : { noInit: input.noInit }),
     scope: 'project',
     output: 'raw-stream',
     rawStreamReason: 'runtime-render-dispatch',

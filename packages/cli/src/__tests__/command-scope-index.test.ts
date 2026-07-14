@@ -40,13 +40,13 @@ describe('command scope index', () => {
       ],
     });
 
-    expect(scopes.get('tool-free')).toBe('none');
-    expect(scopes.get('tf')).toBe('none');
-    expect(scopes.get('agent-catalog')).toBe('none');
-    expect(scopes.get('uninstall')).toBe('none');
-    expect(scopes.get('data-purge')).toBe('none');
-    expect(scopes.get('tools uninstall')).toBe('none');
-    expect(scopes.get('tools data-purge')).toBe('project');
+    expect(scopes.get('tool-free')?.scope).toBe('none');
+    expect(scopes.get('tf')?.scope).toBe('none');
+    expect(scopes.get('agent-catalog')?.scope).toBe('none');
+    expect(scopes.get('uninstall')?.scope).toBe('none');
+    expect(scopes.get('data-purge')?.scope).toBe('none');
+    expect(scopes.get('tools uninstall')?.scope).toBe('none');
+    expect(scopes.get('tools data-purge')?.scope).toBe('project');
   });
 
   it('derives the invoked Commander path instead of only the leaf name', () => {

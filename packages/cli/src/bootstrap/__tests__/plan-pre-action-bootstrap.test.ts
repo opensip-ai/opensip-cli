@@ -32,12 +32,13 @@ import { POST_BAILOUT_PHASE_ORDER, PRE_ACTION_PHASES } from '../pre-action-boots
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
 
-function scopeSpec(name: string, scope: CommandScopeRequirement): HostSpec {
+function scopeSpec(name: string, scope: CommandScopeRequirement, noInit = false): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     name,
     description: `${name} command`,
     commonFlags: [],
     scope,
+    ...(noInit ? { noInit: true } : {}),
     output: 'command-result',
     handler: () => undefined,
   });
@@ -65,7 +66,8 @@ const COMMAND_SCOPES = buildCommandScopeIndex({
     scopeSpec('configure', 'none'),
     scopeSpec('completion', 'none'),
     scopeSpec('agent-catalog', 'none'),
-    scopeSpec('fit', 'project'),
+    // `fit` is first-run capable (declares noInit); `fit-list` is not.
+    scopeSpec('fit', 'project', true),
     scopeSpec('fit-list', 'project'),
   ],
   hostGroups: [

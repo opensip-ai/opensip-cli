@@ -45,6 +45,39 @@ describe('defineCommand', () => {
     expect(defined.handler).toBe(handler);
   });
 
+  it('carries EVERY declared optional field through the frozen copy', () => {
+    // freezeCommandSpec hand-enumerates the fields it copies, so a field added
+    // to the CommandSpec type but forgotten there is silently DROPPED at
+    // runtime — the declaration type-checks and then does nothing. That is not
+    // hypothetical: `noInit` was dropped exactly this way, which made
+    // `opensip audit` fail on the zero-config first run it was built for.
+    // Populate every optional field; if the frozen copy loses one, fail here.
+    const spec = baseSpec({
+      aliases: ['g'],
+      visibility: 'internal',
+      parent: 'graph',
+      noInit: true,
+      options: [{ flag: '--changed', description: 'Changed files only' }],
+      args: [{ name: 'paths', description: 'Paths' }],
+      output: 'raw-stream',
+      rawStreamReason: 'runtime-render-dispatch',
+      producesVerdict: true,
+      producesEvidenceSnapshot: true,
+      staticHandler: {
+        package: '@opensip-cli/graph',
+        path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+        declaration: 'runGraphCommand',
+      },
+    });
+
+    const defined = defineCommand(spec);
+
+    for (const key of Object.keys(spec) as (keyof CommandSpec)[]) {
+      expect(defined[key], `frozen spec dropped the '${key}' field`).toBeDefined();
+    }
+    expect(defined).toEqual(spec);
+  });
+
   it('accepts and freezes a valid staticHandler descriptor', () => {
     const defined = defineCommand(
       baseSpec({

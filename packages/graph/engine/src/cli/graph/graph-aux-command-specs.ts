@@ -697,6 +697,9 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   name: 'impact',
   description:
     'Analyze what changed and what depends on it (git --changed/--since or explicit --files)',
+  // First-run capable (`graph impact` is a documented pre-init command and an
+  // audit suite step): the ephemeral runtime backs the catalog it reads.
+  noInit: true,
   commonFlags: ['cwd', 'json'],
   options: [
     {

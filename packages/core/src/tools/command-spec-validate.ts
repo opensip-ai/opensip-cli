@@ -360,6 +360,7 @@ function freezeCommandSpec<TOpts, TCtx>(spec: CommandSpec<TOpts, TCtx>): Command
             TCtx
           >['args'],
         }),
+    ...(spec.noInit === undefined ? {} : { noInit: spec.noInit }),
     ...(spec.rawStreamReason === undefined ? {} : { rawStreamReason: spec.rawStreamReason }),
     ...(spec.producesVerdict === undefined ? {} : { producesVerdict: spec.producesVerdict }),
     ...(spec.producesEvidenceSnapshot === undefined

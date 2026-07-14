@@ -12,8 +12,7 @@ import { existsSync } from 'node:fs';
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   resolveProjectContext,
-  resolveEphemeralProjectPaths,
-  resolveProjectPaths,
+  resolveRuntimePathsForScope,
   type LoggerOptions,
   type ProjectContext,
 } from '@opensip-cli/core';
@@ -59,13 +58,8 @@ export interface PreActionBootstrapPlan {
 }
 
 function logDirForProject(project: ProjectContext): { readonly logDir?: string } {
-  if (project.scope === 'project' && existsSync(project.projectRoot)) {
-    return { logDir: resolveProjectPaths(project.projectRoot).logsDir };
-  }
-  if (project.scope === 'ephemeral' && existsSync(project.projectRoot)) {
-    return { logDir: resolveEphemeralProjectPaths(project.projectRoot).logsDir };
-  }
-  return {};
+  if (project.scope === 'none' || !existsSync(project.projectRoot)) return {};
+  return { logDir: resolveRuntimePathsForScope(project).logsDir };
 }
 
 /**
@@ -110,7 +104,7 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   if (
     project.scope === 'none' &&
     explicitConfigPath === undefined &&
-    isNoInitEligibleCommand(commandPath)
+    isNoInitEligibleCommand(commandPath, commandScopes)
   ) {
     const synthesized = synthesizeNoInitConfigDocument(project.projectRoot);
     if (synthesized !== undefined) {

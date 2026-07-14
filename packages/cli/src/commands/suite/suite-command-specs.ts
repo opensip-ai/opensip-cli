@@ -45,6 +45,10 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
     args: [{ name: 'name', description: 'Configured suite name' }],
     options: SUITE_RUN_OPTIONS,
     scope: PROJECT_SCOPE,
+    // Built-in suites (`audit`) resolve without a config file, so the generic
+    // spelling must run on an uninitialized repo too — otherwise it diverges
+    // from top-level `audit` on the first run (ADR-0159).
+    noInit: true,
     // `raw-stream`: the handler owns its whole output surface — it renders the
     // TTY suite live view itself, and reuses `emitCommandResult` for --json /
     // non-TTY (keeping the exact command-result shape) — so the host renders
