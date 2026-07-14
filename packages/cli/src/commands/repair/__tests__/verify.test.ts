@@ -1,7 +1,11 @@
 import { buildImpactTrust, buildSignalEnvelope } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { verifyRepair, type ProcessRunRequest } from '../verify-runner.js';
+import {
+  repairVerificationChildEnv,
+  verifyRepair,
+  type ProcessRunRequest,
+} from '../verify-runner.js';
 import { classifyVerification, parseVerificationEnvelope } from '../verify.js';
 
 import type {
@@ -88,6 +92,26 @@ function envelope(input: {
 }
 
 describe('repair verification classifier', () => {
+  it('forwards the complete profiling contract to nested verification runs', () => {
+    const savedGate = process.env.OPENSIP_PROFILING;
+    const savedDirectory = process.env.OPENSIP_PROFILE_DIR;
+    try {
+      process.env.OPENSIP_PROFILING = '1';
+      process.env.OPENSIP_PROFILE_DIR = '/opt/opensip/profiles';
+
+      expect(repairVerificationChildEnv()).toMatchObject({
+        OPENSIP_REPAIR_VERIFY_CHILD: '1',
+        OPENSIP_PROFILING: '1',
+        OPENSIP_PROFILE_DIR: '/opt/opensip/profiles',
+      });
+    } finally {
+      if (savedGate === undefined) delete process.env.OPENSIP_PROFILING;
+      else process.env.OPENSIP_PROFILING = savedGate;
+      if (savedDirectory === undefined) delete process.env.OPENSIP_PROFILE_DIR;
+      else process.env.OPENSIP_PROFILE_DIR = savedDirectory;
+    }
+  });
+
   it('classifies a fully trusted run with no remaining finding as verified', () => {
     const result = classifyVerification({
       tool: 'fit',

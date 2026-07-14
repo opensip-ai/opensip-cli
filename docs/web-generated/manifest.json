@@ -724,6 +724,17 @@
       "purpose": "The public compatibility contract classes, version markers, deprecation posture, and migration/check lanes for opensip-cli."
     },
     {
+      "file": "docs/web-generated/70-reference/16-performance-profiling.md",
+      "path": "/docs/opensip-cli/70-reference/16-performance-profiling/",
+      "section": "70-reference",
+      "title": "Performance profiling",
+      "audience": [
+        "contributors",
+        "ci-integrators"
+      ],
+      "purpose": "Contributor workflow for clean-wall benchmarks, CPU profiles, graph stage evidence, toolchain throughput, and performance PR proof."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -924,7 +935,8 @@
         "/docs/opensip-cli/70-reference/12-tools-command/",
         "/docs/opensip-cli/70-reference/13-verifiable-releases/",
         "/docs/opensip-cli/70-reference/14-detection-quality/",
-        "/docs/opensip-cli/70-reference/15-compatibility-policy/"
+        "/docs/opensip-cli/70-reference/15-compatibility-policy/",
+        "/docs/opensip-cli/70-reference/16-performance-profiling/"
       ]
     },
     {
@@ -1053,7 +1065,8 @@
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
         "/docs/opensip-cli/70-reference/13-verifiable-releases/",
         "/docs/opensip-cli/70-reference/14-detection-quality/",
-        "/docs/opensip-cli/70-reference/15-compatibility-policy/"
+        "/docs/opensip-cli/70-reference/15-compatibility-policy/",
+        "/docs/opensip-cli/70-reference/16-performance-profiling/"
       ]
     },
     {
@@ -1105,6 +1118,7 @@
         "/docs/opensip-cli/70-reference/13-verifiable-releases/",
         "/docs/opensip-cli/70-reference/14-detection-quality/",
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
+        "/docs/opensip-cli/70-reference/16-performance-profiling/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
         "/docs/opensip-cli/80-implementation/03-session-and-persistence/",

@@ -281,13 +281,56 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         enterScope: () => undefined,
         isScopeEntered: () => true,
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
         maybeInitializeOwningTool: () => Promise.resolve(),
         loadOwningToolCapabilities: () => Promise.resolve(0),
       },
     );
 
     expect(phases).toEqual([...POST_BAILOUT_PHASE_ORDER]);
+  });
+
+  it('awaits profiler startup before running tool preflight', async () => {
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: process.cwd(),
+      cwdExplicit: false,
+      runId: 'RUN_profile_order',
+      commandName: 'init',
+      commandPath: 'init',
+      commandScopes: COMMAND_SCOPES,
+    });
+    let releaseProfile: (() => void) | undefined;
+    const startProfiling = vi.fn(
+      () =>
+        new Promise<undefined>((resolve) => {
+          releaseProfile = () => resolve(undefined);
+        }),
+    );
+    const maybeInitializeOwningTool = vi.fn(() => Promise.resolve());
+
+    const execution = executePostBailoutBootstrap(
+      {
+        plan,
+        runtime: runtimeWith([]),
+        version: '0.0.0-test',
+        noCloud: true,
+      },
+      {
+        enterScope: () => undefined,
+        isScopeEntered: () => true,
+        checkForUpdate: () => undefined,
+        startProfiling,
+        maybeInitializeOwningTool,
+        loadOwningToolCapabilities: () => Promise.resolve(0),
+      },
+    );
+
+    expect(startProfiling).toHaveBeenCalledOnce();
+    expect(maybeInitializeOwningTool).not.toHaveBeenCalled();
+    releaseProfile?.();
+    await execution;
+    expect(maybeInitializeOwningTool).toHaveBeenCalledOnce();
   });
 
   it('builds a real project RunScope before tool preflight', async () => {
@@ -332,7 +375,7 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         enterScope: () => undefined,
         isScopeEntered: () => true,
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
         maybeInitializeOwningTool: () => Promise.resolve(),
         loadOwningToolCapabilities: () => Promise.resolve(0),
       },
@@ -407,7 +450,7 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         enterScope: () => undefined,
         isScopeEntered: () => true,
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
         maybeInitializeOwningTool,
         loadOwningToolCapabilities,
       },

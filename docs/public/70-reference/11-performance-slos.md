@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-13
 release: v0.6.0
 title: "Performance SLOs"
 audience: [contributors, ci-integrators]
@@ -13,6 +13,7 @@ related-docs:
   - ../60-guides/03-wire-into-ci.md
   - ./01-cli-commands.md
   - ./12-public-benchmarks.md
+  - ./16-performance-profiling.md
 ---
 # Performance SLOs
 
@@ -36,6 +37,12 @@ pnpm bench:slo:ci -- --profile pr --require-memory --out slo-report.json
 The benchmark never reads `.runtime` logs or datastore internals. It treats the
 CLI as a black box, and each scenario runs in a generated project with its own
 `opensip-cli.config.yml`.
+
+The SLO lane is always `measurementMode: "clean-wall"`. Its child environment
+removes inherited profiling, every `OTEL_*` exporter setting, and trace context
+before invoking the CLI. CPU-profile and OTLP experiments use the separate
+[performance profiling](./16-performance-profiling.md) lane and cannot feed
+budget comparisons.
 
 For published measurements from this lane, see
 [Public benchmarks](./12-public-benchmarks.md).
@@ -61,25 +68,38 @@ For published measurements from this lane, see
 | small | Graph warm build | 12 s | 1.5 GiB |
 | small | Graph impact files | 8 s | 1 GiB |
 | small | Audit changed suite | 18 s | 1.5 GiB |
+| small | Graph exact resolution | Not budgeted | Not budgeted |
+| small | Graph fast resolution | Not budgeted | Not budgeted |
+| small | CLI help startup | Not budgeted | Not budgeted |
+| small | HTML report generation | Not budgeted | Not budgeted |
 | medium | Fit full run | 60 s | 3 GiB |
 | medium | Fit changed run | 18 s | 2 GiB |
 | medium | Graph cold build | 90 s | 4 GiB |
 | medium | Graph warm build | 25 s | 3 GiB |
 | medium | Graph impact files | 15 s | 2 GiB |
 | medium | Audit changed suite | 45 s | 3 GiB |
+| medium | Graph exact resolution | Not budgeted | Not budgeted |
+| medium | Graph fast resolution | Not budgeted | Not budgeted |
+| medium | CLI help startup | Not budgeted | Not budgeted |
+| medium | HTML report generation | Not budgeted | Not budgeted |
 | large | Fit full run | Not budgeted | Not budgeted |
 | large | Fit changed run | 40 s | 3 GiB |
 | large | Graph cold build | 240 s | 8 GiB |
 | large | Graph warm build | 60 s | 6 GiB |
 | large | Graph impact files | 30 s | 3 GiB |
 | large | Audit changed suite | Not budgeted | Not budgeted |
+| large | Graph exact resolution | Not budgeted | Not budgeted |
+| large | Graph fast resolution | Not budgeted | Not budgeted |
+| large | CLI help startup | Not budgeted | Not budgeted |
+| large | HTML report generation | Not budgeted | Not budgeted |
 <!-- opensip:performance-slo-budgets end -->
 
 ## Report Shape
 
 The report is JSON and includes:
 
-- environment facts: Node version, platform, CPU count, and CI flag
+- measurement mode plus Node, pnpm, architecture, OS, CPU model/count, CI,
+  branch, and commit facts
 - corpus facts: tier, generated file count, changed-file set, and git availability
 - one row per measured scenario with command, cwd, exit status, timeout flag,
   duration, RSS, bounded stdout/stderr tails, and graph profile summary when present
@@ -89,3 +109,5 @@ The report is JSON and includes:
 
 Warnings do not fail the lane. A failed command, timeout, missing required RSS
 measurement, or over-budget metric sets `verdict: "fail"` and exits non-zero.
+Selected scenarios without budgets still execute and must exit successfully;
+they simply omit duration/RSS comparisons.

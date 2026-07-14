@@ -179,7 +179,7 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
         maybeInitializeOwningTool: vi.fn(),
         loadOwningToolCapabilities: vi.fn(() => Promise.resolve(0)),
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
       },
     );
 

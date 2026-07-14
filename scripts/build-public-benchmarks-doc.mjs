@@ -94,6 +94,7 @@ function renderSummaryTable(snapshot) {
     '|---|---|',
     `| Measured at | ${snapshot.createdAt} |`,
     `| Source | \`${snapshot.source}\` |`,
+    `| Measurement mode | \`${snapshot.measurementMode}\` |`,
     `| Profile | \`${snapshot.profile}\` |`,
     `| Quick mode | ${snapshot.quick ? 'yes' : 'no'} |`,
     `| Verdict | ${snapshot.verdict} |`,
@@ -142,9 +143,14 @@ function renderEnvironmentTable(snapshot) {
     '| Field | Value |',
     '|---|---|',
     `| Node.js | \`${snapshot.environment.node}\` |`,
+    `| pnpm | \`${snapshot.environment.pnpm ?? 'not recorded'}\` |`,
+    `| Architecture | \`${snapshot.environment.arch ?? 'not recorded'}\` |`,
     `| Platform | \`${snapshot.environment.platform}\` |`,
     `| OS release | \`${snapshot.environment.release}\` |`,
+    `| CPU model | ${snapshot.environment.cpuModel ?? 'not recorded'} |`,
     `| CPU count | ${formatBenchmarkInteger(snapshot.environment.cpuCount)} |`,
+    `| Git commit | \`${snapshot.environment.gitSha ?? 'not recorded'}\` |`,
+    `| Git branch | \`${snapshot.environment.gitBranch ?? 'not recorded'}\` |`,
     `| CI | ${snapshot.environment.ci ? 'yes' : 'no'} |`,
   ];
   return `${rows.join('\n')}\n`;

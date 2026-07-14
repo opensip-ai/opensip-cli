@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-13
 release: v0.6.0
 title: "Public benchmarks"
 audience: [getting-started, ci-integrators, contributors]
@@ -14,6 +14,7 @@ related-docs:
   - ./11-performance-slos.md
   - ../60-guides/03-wire-into-ci.md
   - ../00-start/03-vs-other-tools.md
+  - ./16-performance-profiling.md
 ---
 # Public Benchmarks
 
@@ -22,6 +23,11 @@ generates deterministic TypeScript corpora, runs the built CLI as an external
 process, measures wall-clock duration and process-tree RSS, and writes a JSON
 report. This page renders a committed snapshot of that report so the public docs
 have concrete, reproducible numbers.
+
+Snapshot generation accepts only an explicit `clean-wall` SLO report. CPU
+profiles and OTLP experiments are useful for locating work, but their overhead
+cannot become a published runtime number. See
+[Performance profiling](./16-performance-profiling.md).
 
 Reproduce the snapshot locally:
 

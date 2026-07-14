@@ -71,7 +71,7 @@ function captureDeps(onBuild: (input: BuildPerRunScopeInput) => void): PostBailo
     },
     enterScope: () => undefined,
     isScopeEntered: () => true,
-    startProfiling: () => undefined,
+    startProfiling: () => Promise.resolve(undefined),
     maybeInitializeOwningTool: () => Promise.resolve(),
     loadOwningToolCapabilities: () => Promise.resolve(0),
     checkForUpdate: () => undefined,

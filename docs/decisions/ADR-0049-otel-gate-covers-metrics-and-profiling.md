@@ -1,6 +1,6 @@
 ---
-status: active
-last_verified: 2026-06-12
+status: superseded
+last_verified: 2026-07-13
 owner: opensip-cli
 ---
 
@@ -10,9 +10,9 @@ owner: opensip-cli
 id: ADR-0049
 title: OTel Gate Covers Metrics and (Optional) Profiling
 date: 2026-06-12
-status: active
+status: superseded
 supersedes: []
-superseded_by: null
+superseded_by: ADR-0163
 related: [ADR-0004]
 tags: [observability, telemetry, layering, packaging]
 enforcement: mechanizable

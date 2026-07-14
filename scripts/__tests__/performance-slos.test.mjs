@@ -6,6 +6,10 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { runBenchSlo } from '../bench-slo.mjs';
+import {
+  collectBenchmarkEnvironment,
+  createCleanWallChildEnv,
+} from '../perf/benchmark-environment.mjs';
 import { createChildProcessTerminator } from '../perf/child-process-lifecycle.mjs';
 import { compareBudgets } from '../perf/compare-budgets.mjs';
 import { cleanupOwnedCorpus, corpusMarkerPath, materializeCorpus } from '../perf/corpus.mjs';
@@ -21,11 +25,120 @@ import {
   renderTierTable,
   replaceMarkedSection,
 } from '../perf/render-slo-markdown.mjs';
+import { summarizeGraphProfile } from '../perf/report-schema.mjs';
 import { runMeasuredCommand } from '../perf/run-command.mjs';
 import { normalizeSloConfig } from '../perf/slo-config.mjs';
 import { median, nearestRankPercentile } from '../perf/statistics.mjs';
 
 const MEMORY_CONFIG_PATH = '<memory>/slo.json';
+
+test('clean-wall child environments remove profiling and every OpenTelemetry input', () => {
+  const source = {
+    PATH: '/usr/bin',
+    OPENSIP_PROFILE_DIR: '/private/profiles',
+    OPENSIP_PROFILING: '1',
+    OPENSIP_CLI_SKIP_BUNDLED: 'fit,graph',
+    NODE_OPTIONS: '--cpu-prof --max-old-space-size=4096',
+    NODE_PATH: '/private/node_modules',
+    otel_exporter_otlp_endpoint: 'https://collector.example',
+    OTEL_EXPORTER_OTLP_TRACES_HEADERS: 'authorization=secret',
+    OTEL_TRACES_SAMPLER: 'always_on',
+    TRACEPARENT: '00-abc-def-01',
+    TRACESTATE: 'vendor=value',
+    BAGGAGE: 'tenant=private',
+    KEEP_ME: 'yes',
+    UNDEFINED_VALUE: undefined,
+  };
+
+  const sanitized = createCleanWallChildEnv(source);
+
+  assert.deepEqual(sanitized, { PATH: '/usr/bin', KEEP_ME: 'yes' });
+  assert.equal(source.OPENSIP_PROFILING, '1', 'the caller environment must not be mutated');
+});
+
+test('benchmark environment metadata uses bounded commands and records reproducibility facts', async () => {
+  const invocations = [];
+  const environment = await collectBenchmarkEnvironment({
+    repoRoot: '/repo',
+    env: { CI: 'true' },
+    nodeVersion: 'v24.16.0',
+    arch: () => 'arm64',
+    platform: () => 'darwin',
+    release: () => '25.5.0',
+    cpus: () => [{ model: 'Test CPU' }, { model: 'Test CPU' }],
+    execFileAsync: async (command, args, options) => {
+      invocations.push({ command, args, options });
+      if (command === 'pnpm') return { stdout: '11.10.0\n' };
+      if (args[0] === 'rev-parse') return { stdout: 'abc123\n' };
+      return { stdout: 'codex/perf\n' };
+    },
+  });
+
+  assert.deepEqual(environment, {
+    node: 'v24.16.0',
+    pnpm: '11.10.0',
+    arch: 'arm64',
+    platform: 'darwin',
+    release: '25.5.0',
+    cpuModel: 'Test CPU',
+    cpuCount: 2,
+    ci: true,
+    gitSha: 'abc123',
+    gitBranch: 'codex/perf',
+  });
+  assert.equal(invocations.length, 3);
+  for (const invocation of invocations) {
+    assert.equal(invocation.options.cwd, '/repo');
+    assert.equal(invocation.options.killSignal, 'SIGKILL');
+    assert.equal(invocation.options.timeout, 2000);
+    assert.equal(invocation.options.maxBuffer, 64 * 1024);
+  }
+});
+
+test('graph profile summaries normalize runs, stages, and cache facts without raw paths', () => {
+  const summary = summarizeGraphProfile({
+    mode: 'graph',
+    resolutionMode: 'exact',
+    durationMs: 42,
+    cwd: '/private/repository',
+    runs: [
+      {
+        label: 'root',
+        cwd: '/private/repository',
+        mode: 'exact',
+        durationMs: 40,
+        stages: [
+          {
+            name: 'discover',
+            status: 'done',
+            durationMs: 5,
+            detail: '/private/repository/src',
+          },
+        ],
+        summary: {
+          cacheHit: false,
+          files: 12,
+          functions: 34,
+          unresolved: 7,
+        },
+      },
+      {
+        label: 'nested',
+        mode: 'exact',
+        durationMs: 10,
+        stages: [{ name: 'discover', status: 'done', durationMs: 7 }],
+        summary: { cacheHit: false, files: 1, functions: 2 },
+      },
+    ],
+  });
+
+  assert.equal(summary.cache, 'miss');
+  assert.equal(summary.files, 13);
+  assert.equal(summary.functions, 36);
+  assert.deepEqual(summary.stages, [{ name: 'discover', status: 'done', durationMs: 12 }]);
+  assert.equal(summary.runs.length, 2);
+  assert.doesNotMatch(JSON.stringify(summary), /private|detail|unresolved/u);
+});
 
 test('shared performance statistics use median and nearest-rank percentile semantics', () => {
   const even = [8, 2, 4, 6];
@@ -284,6 +397,28 @@ test('compareBudgets reports command, duration, and required-memory failures', (
   );
 });
 
+test('compareBudgets rejects explicit profiled reports but accepts legacy reports without a mode', () => {
+  const config = normalizeSloConfig(minimalRawConfig(), MEMORY_CONFIG_PATH);
+  const report = {
+    scenarios: [
+      {
+        tier: 'small',
+        scenario: 'fit-full',
+        status: 0,
+        timedOut: false,
+        durationMs: 100,
+        maxRssBytes: 512,
+      },
+    ],
+  };
+
+  assert.doesNotThrow(() => compareBudgets(report, config));
+  assert.throws(
+    () => compareBudgets({ ...report, measurementMode: 'cpu-profile' }, config),
+    /require measurementMode 'clean-wall'/u,
+  );
+});
+
 test('runMeasuredCommand excludes final RSS sampling latency from command duration', async () => {
   const started = Date.now();
   const result = await runMeasuredCommand({
@@ -341,6 +476,18 @@ test('runBenchSlo supports fake dependencies and writes a report', async () => {
     {
       repoRoot,
       loadSloConfig: () => Promise.resolve(config),
+      collectBenchmarkEnvironment: async () => ({
+        node: 'v24.16.0',
+        pnpm: '11.10.0',
+        arch: 'arm64',
+        platform: 'darwin',
+        release: '25.5.0',
+        cpuModel: 'Test CPU',
+        cpuCount: 2,
+        ci: false,
+        gitSha: 'abc123',
+        gitBranch: 'codex/perf',
+      }),
       existsSync: () => true,
       mkdir,
       rm,
@@ -372,7 +519,117 @@ test('runBenchSlo supports fake dependencies and writes a report', async () => {
   assert.equal(result.exitCode, 0);
   const report = JSON.parse(reportText);
   assert.equal(report.verdict, 'pass');
+  assert.equal(report.measurementMode, 'clean-wall');
+  assert.equal(report.environment.pnpm, '11.10.0');
+  assert.equal(report.environment.gitSha, 'abc123');
   assert.equal(report.scenarios[0].scenario, 'fit-full');
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
+test('runBenchSlo executes unbudgeted scenarios and fails on their exit status', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'opensip-slo-unbudgeted-'));
+  const config = normalizeSloConfig(
+    { ...minimalRawConfig(), budgets: [] },
+    join(repoRoot, '.config/performance-slos.json'),
+  );
+  const result = await runBenchSlo(
+    ['--', '--profile', 'pr', '--out', 'report.json', '--work-root', 'work'],
+    {
+      repoRoot,
+      loadSloConfig: () => Promise.resolve(config),
+      collectBenchmarkEnvironment: async () => ({ node: 'v24.16.0' }),
+      existsSync: () => true,
+      mkdir,
+      rm,
+      materializeCorpus: async ({ root }) => ({
+        root,
+        tier: 'small',
+        fileCount: 2,
+        changedFiles: ['src/module-0.ts'],
+        gitReady: true,
+      }),
+      runMeasuredCommand: async ({ command, cwd, env }) => {
+        assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, undefined);
+        assert.equal(env.OPENSIP_PROFILING, undefined);
+        return {
+          command,
+          cwd,
+          startedAt: '2026-07-02T00:00:00.000Z',
+          completedAt: '2026-07-02T00:00:00.100Z',
+          status: 9,
+          timedOut: false,
+          durationMs: 100,
+          maxRssBytes: 512,
+          stdoutTail: '',
+          stderrTail: 'failed',
+        };
+      },
+      writeFile: () => Promise.resolve(),
+      consoleLog: () => null,
+    },
+  );
+
+  assert.equal(result.report.scenarios.length, 1);
+  assert.equal(result.comparisons.length, 1);
+  assert.equal(result.comparisons[0].metric, 'exitCode');
+  assert.equal(result.report.verdict, 'fail');
+  assert.equal(result.exitCode, 1);
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
+test('runBenchSlo primes report generation with a deterministic fit session', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'opensip-slo-report-prime-'));
+  const raw = minimalRawConfig();
+  raw.profiles.pr.scenarios = ['report-generate'];
+  raw.scenarios['report-generate'] = {
+    label: 'HTML report generation',
+    description: 'test',
+  };
+  raw.budgets = [];
+  const config = normalizeSloConfig(raw, join(repoRoot, '.config/performance-slos.json'));
+  const commands = [];
+  const result = await runBenchSlo(
+    ['--', '--profile', 'pr', '--out', 'report.json', '--work-root', 'work'],
+    {
+      repoRoot,
+      loadSloConfig: () => Promise.resolve(config),
+      collectBenchmarkEnvironment: async () => ({ node: 'v24.16.0' }),
+      existsSync: () => true,
+      mkdir,
+      rm,
+      materializeCorpus: async ({ root }) => ({
+        root,
+        tier: 'small',
+        fileCount: 2,
+        changedFiles: ['src/module-0.ts'],
+        gitReady: true,
+      }),
+      runMeasuredCommand: async ({ command, cwd }) => {
+        commands.push(command);
+        return {
+          command,
+          cwd,
+          startedAt: '2026-07-02T00:00:00.000Z',
+          completedAt: '2026-07-02T00:00:00.100Z',
+          status: 0,
+          timedOut: false,
+          durationMs: 100,
+          maxRssBytes: 512,
+          stdoutTail: '',
+          stderrTail: '',
+        };
+      },
+      writeFile: () => Promise.resolve(),
+      consoleLog: () => null,
+    },
+  );
+
+  assert.equal(commands.length, 2);
+  assert.deepEqual(commands[0].slice(-2), ['fit', '--json']);
+  assert.deepEqual(commands[1].slice(-3), ['report', '--no-open', '--json']);
+  assert.equal(result.report.scenarios.length, 1);
+  assert.equal(result.report.scenarios[0].scenario, 'report-generate');
+  assert.equal(result.exitCode, 0);
   await rm(repoRoot, { recursive: true, force: true });
 });
 

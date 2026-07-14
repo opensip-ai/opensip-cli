@@ -5,15 +5,14 @@
  *
  * ## Opt-in gate (the load-bearing contract)
  *
- * The entire SDK (traces + metrics + optional profiling) is gated on
- * `OTEL_EXPORTER_OTLP_ENDPOINT` (see ADR-0049 and observability plan for details).
+ * The OTel SDK (traces + metrics) is gated on `OTEL_EXPORTER_OTLP_ENDPOINT`.
+ * Local CPU profiling is a separate, explicit artifact path.
  *
  *   - **Set** ⇒ register NodeTracerProvider + (Phase 2) MeterProvider.
  *     `core`'s `getTracer`/`withSpan`/`getMeter` resolve to real implementations.
- *   - Profiling uses the same endpoint (recommended with dedicated
- *     `OPENSIP_PROFILING=1` flag for cost control; "OTEL endpoint alone" mode
- *     is supported with warnings).
- *   - **Unset** ⇒ hard no-op for everything. Standalone CLI pays nothing.
+ *   - `OPENSIP_PROFILING=1` independently enables local CPU artifacts without a
+ *     collector; an OTLP endpoint alone does not enable profiling.
+ *   - **Unset** ⇒ traces and metrics are hard no-ops. Standalone CLI pays nothing.
  *
  * ## Layering
  *
@@ -224,18 +223,21 @@ export function runWithTelemetryContext<T>(fn: () => T): T {
 /**
  * Flush and shut down the tracer + meter providers (and stop profiling if active)
  * so batched data export before the short-lived process exits.
- * No-op when telemetry was never started. Swallows shutdown errors — a dead
- * collector must not crash the CLI on the way out.
+ * OTel-provider shutdown is a no-op when telemetry was never started; local
+ * profiling is still flushed independently. Swallows shutdown errors — a dead
+ * collector or profiler must not crash the CLI on the way out.
  */
 export async function shutdownTelemetry(): Promise<void> {
-  if (!started) return;
-
-  // Stop profiling first (it may write files and is cheap).
+  // Profiling has an independent local-only gate and may be active when the OTel
+  // SDK never started. Flush it before the SDK guard so the artifact is complete
+  // when this short-lived process exits.
   try {
-    void stopProfiling();
+    await stopProfiling();
   } catch {
     // @swallow-ok best-effort profiling stop during SDK shutdown
   }
+
+  if (!started) return;
 
   const shutdowns: Promise<void>[] = [];
 

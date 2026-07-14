@@ -8,29 +8,38 @@ export function normalizeBenchmarkSnapshot(raw, sourcePath = '<memory>') {
     throw new Error(`Invalid benchmark snapshot at ${sourcePath}: version must be 1.`);
   }
 
-  return {
+  const snapshot = {
     version: 1,
+    reportKind: optionalString(raw.reportKind),
     source: stringValue(raw.source, 'source'),
     createdAt: stringValue(raw.createdAt, 'createdAt'),
+    measurementMode: stringValue(raw.measurementMode, 'measurementMode'),
     profile: stringValue(raw.profile, 'profile'),
     quick: booleanValue(raw.quick, 'quick'),
     verdict: stringValue(raw.verdict, 'verdict'),
+    config: normalizeSnapshotConfig(raw.config),
     environment: normalizeEnvironment(raw.environment),
     corpora: normalizeCorpora(raw.corpora),
     scenarios: normalizeScenarios(raw.scenarios),
     budgets: normalizeBudgetRows(raw.budgets),
   };
+  assertPublishableSnapshot(snapshot);
+  return snapshot;
 }
 
 export function snapshotFromSloReport(report, options = {}) {
   if (!isRecord(report)) throw new Error('Invalid SLO report: root must be an object.');
+  assertPublishableSloReport(report);
   const snapshot = {
     version: 1,
+    reportKind: 'opensip-performance-slo',
     source: options.source ?? `pnpm bench:slo -- --profile ${String(report.profile ?? 'pr')}`,
     createdAt: stringValue(report.createdAt, 'createdAt'),
+    measurementMode: 'clean-wall',
     profile: stringValue(report.profile, 'profile'),
     quick: booleanValue(report.quick, 'quick'),
     verdict: stringValue(report.verdict, 'verdict'),
+    config: normalizeSnapshotConfig(report.config),
     environment: normalizeEnvironment(report.environment),
     corpora: normalizeCorpora(report.corpora).map((corpus) => ({
       tier: corpus.tier,
@@ -55,8 +64,106 @@ export function snapshotFromSloReport(report, options = {}) {
   return normalizeBenchmarkSnapshot(snapshot);
 }
 
+function assertPublishableSloReport(report) {
+  if (report.kind !== 'opensip-performance-slo') {
+    throw new Error('Public benchmark snapshots require an opensip-performance-slo report.');
+  }
+  if (report.measurementMode !== 'clean-wall') {
+    throw new Error('Public benchmark snapshots require measurementMode "clean-wall".');
+  }
+  assertPublishableFields({
+    reportKind: report.kind,
+    profile: report.profile,
+    quick: report.quick,
+    verdict: report.verdict,
+    config: report.config,
+    environment: report.environment,
+    corpora: report.corpora,
+    scenarios: report.scenarios,
+    budgets: report.budgets,
+    otlpExport: report.otlpExport,
+  });
+}
+
+function assertPublishableSnapshot(snapshot) {
+  if (snapshot.measurementMode !== 'clean-wall') {
+    throw new Error('Public benchmark snapshots require measurementMode "clean-wall".');
+  }
+  assertPublishableFields(snapshot);
+}
+
+function assertPublishableFields(value) {
+  if (value.reportKind !== 'opensip-performance-slo') {
+    throw new Error('Public benchmark snapshots require reportKind opensip-performance-slo.');
+  }
+  if (value.profile !== 'pr') {
+    throw new Error('Public benchmark snapshots require the pr profile.');
+  }
+  if (value.quick !== false) {
+    throw new Error('Public benchmark snapshots require a non-quick report.');
+  }
+  if (value.verdict !== 'pass') {
+    throw new Error('Public benchmark snapshots require a passing report.');
+  }
+  if (value.otlpExport === true) {
+    throw new Error('Public benchmark snapshots must not contain OTLP-export measurements.');
+  }
+  if (!/^v?24\./u.test(String(value.environment?.node ?? ''))) {
+    throw new Error('Public benchmark snapshots require a Node 24 report.');
+  }
+  for (const key of ['pnpm', 'arch', 'platform', 'release', 'cpuModel', 'gitSha']) {
+    const fact = optionalString(value.environment?.[key]);
+    if (fact === undefined || fact === 'unavailable') {
+      throw new Error(`Public benchmark snapshots require environment.${key}.`);
+    }
+  }
+  if (value.environment?.ci !== false) {
+    throw new Error('Public benchmark snapshots require a non-CI reference run.');
+  }
+  if (!/^[a-f\d]{64}$/u.test(String(value.config?.fingerprint ?? ''))) {
+    throw new Error('Public benchmark snapshots require a 64-hex config.fingerprint.');
+  }
+  if (!Array.isArray(value.corpora) || value.corpora.length === 0) {
+    throw new Error('Public benchmark snapshots require at least one corpus.');
+  }
+  if (!Array.isArray(value.scenarios) || value.scenarios.length === 0) {
+    throw new Error('Public benchmark snapshots require at least one scenario.');
+  }
+  if (
+    value.scenarios.some(
+      (scenario) =>
+        scenario?.skipped === true || scenario?.timedOut === true || scenario?.status !== 0,
+    )
+  ) {
+    throw new Error('Public benchmark snapshots reject skipped, timed-out, or failed scenarios.');
+  }
+  if (
+    !Array.isArray(value.budgets) ||
+    value.budgets.length === 0 ||
+    value.budgets.some((row) => row?.status !== 'pass')
+  ) {
+    throw new Error('Public benchmark snapshots require passing budget rows.');
+  }
+  const budgetKeys = new Set(
+    value.budgets.map((row) => `${String(row.tier)}:${String(row.scenario)}:${String(row.metric)}`),
+  );
+  for (const scenario of value.scenarios) {
+    for (const metric of ['exitCode', 'durationMs', 'maxRssBytes']) {
+      const key = `${String(scenario.tier)}:${String(scenario.scenario)}:${metric}`;
+      if (!budgetKeys.has(key)) {
+        throw new Error(`Public benchmark snapshots require passing budget coverage for ${key}.`);
+      }
+    }
+  }
+}
+
 export function rowsFromSnapshot(snapshot, sloConfig) {
   const normalized = normalizeBenchmarkSnapshot(snapshot);
+  if (normalized.config?.fingerprint !== sloConfig.fingerprint) {
+    throw new Error(
+      'Public benchmark snapshot config fingerprint does not match .config/performance-slos.json.',
+    );
+  }
   const comparisonsByKey = new Map();
   for (const comparison of normalized.budgets) {
     comparisonsByKey.set(
@@ -149,10 +256,27 @@ function normalizeEnvironment(value) {
     throw new Error('Invalid benchmark snapshot: environment must be an object.');
   return {
     node: stringValue(value.node, 'environment.node'),
+    pnpm: optionalString(value.pnpm),
+    arch: optionalString(value.arch),
     platform: stringValue(value.platform, 'environment.platform'),
     release: stringValue(value.release, 'environment.release'),
+    cpuModel: optionalString(value.cpuModel),
     cpuCount: positiveInteger(value.cpuCount, 'environment.cpuCount'),
-    ci: typeof value.ci === 'boolean' ? value.ci : false,
+    ci: typeof value.ci === 'boolean' ? value.ci : undefined,
+    gitSha: optionalString(value.gitSha),
+    gitBranch: optionalString(value.gitBranch),
+  };
+}
+
+function normalizeSnapshotConfig(value) {
+  if (value === undefined || value === null) return;
+  if (!isRecord(value)) {
+    throw new Error('Invalid benchmark snapshot: config must be an object.');
+  }
+  return {
+    sourcePath: optionalString(value.sourcePath),
+    fingerprint: optionalString(value.fingerprint),
+    sampleIntervalMs: optionalPositiveInteger(value.sampleIntervalMs, 'config.sampleIntervalMs'),
   };
 }
 
@@ -232,6 +356,10 @@ function stringValue(value, name) {
     throw new Error(`Invalid benchmark snapshot: ${name} must be a non-empty string.`);
   }
   return value;
+}
+
+function optionalString(value) {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function booleanValue(value, name) {

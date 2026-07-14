@@ -235,6 +235,13 @@ budgets are documented in [Performance SLOs](../70-reference/11-performance-slos
 and the current published measurements are in
 [Public benchmarks](../70-reference/12-public-benchmarks.md).
 
+The CI SLO report is clean-wall evidence: the harness removes inherited
+profiling and OpenTelemetry export variables. Contributors investigate a
+regression locally with `pnpm bench:profile`, compare repeated before/after
+reports with `pnpm bench:compare`, and use `--cpu-profile` only as a separate
+experiment. The complete workflow and artifact-handling rules are in
+[Performance profiling](../70-reference/16-performance-profiling.md).
+
 If `fit` is slow on a large repo, the usual culprits:
 
 - A specific check has an `O(n²)` scan. Run with `--verbose` locally to see per-check timing.

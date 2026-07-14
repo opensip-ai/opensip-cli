@@ -1,14 +1,19 @@
 import { budgetKey } from './slo-config.mjs';
 
 export function compareBudgets(report, config, opts = {}) {
+  if (report.measurementMode !== undefined && report.measurementMode !== 'clean-wall') {
+    throw new Error(
+      `Performance budgets require measurementMode 'clean-wall'; received '${String(report.measurementMode)}'.`,
+    );
+  }
   const comparisons = [];
   for (const scenario of report.scenarios) {
     if (scenario.skipped === true) continue;
+    comparisons.push(compareExitCode(scenario));
     const budget = config.budgetByKey.get(budgetKey(scenario.tier, scenario.scenario));
     if (budget === undefined) continue;
 
     comparisons.push(
-      compareExitCode(scenario),
       compareMetric(scenario, budget, 'durationMs', scenario.durationMs, budget.maxDurationMs),
       compareMetric(scenario, budget, 'maxRssBytes', scenario.maxRssBytes, budget.maxRssBytes, {
         requireValue: opts.requireMemory === true,

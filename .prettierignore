@@ -45,6 +45,11 @@ pnpm-lock.yaml
 # `format:check` (which globs **/*.json) trips on the unformatted output and
 # reddens build-and-test. These are tool output, not authored source.
 slo-report.json
+profile-report*.json
+profile-report*.md
+toolchain-report*.json
+toolchain-report*.md
+.opensip-profile/**
 compatibility-matrix-report.json
 detection-quality-report.json
 

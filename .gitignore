@@ -31,6 +31,15 @@ coverage/
 .opensip-slo/
 slo-report*.json
 
+# Local performance profiling and toolchain benchmark artifacts
+.opensip-profile/
+profile-report*.json
+profile-report*.md
+toolchain-report*.json
+toolchain-report*.md
+*.cpuprofile
+opensip-profile-*.labels.json
+
 # Detection quality measurement artifacts
 .opensip-quality/
 detection-quality-report*.json
