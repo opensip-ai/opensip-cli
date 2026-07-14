@@ -667,9 +667,7 @@ if (invokedDirectly) {
     // Surface the fail-loud reason from pure/arg/runtime layers. Do not dump
     // stacks or environment values here — the message is the operator signal.
     const detail = error instanceof Error ? error.message : String(error);
-    process.stderr.write(
-      `[distribution-measure] failed; no report was written. ${detail}\n`,
-    );
+    process.stderr.write(`[distribution-measure] failed; no report was written. ${detail}\n`);
     process.exitCode = 1;
   }
 }

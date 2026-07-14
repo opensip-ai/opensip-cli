@@ -16,6 +16,10 @@ offline, skipped-init, fail-closed repair, version/ABI, and ADR design work has
 not been done. The independently shipped init footer improves discovery without
 weakening the closed, host-wired language substrate.
 
+The evaluated alternatives, shipped init outcome, and reopening gates are
+preserved in the
+[Deferred Language Capability And Init UX Decision Record](./2026-07-13-deferred-language-capability-decision.md).
+
 ## Raw evidence identity
 
 The authoritative raw artifact remains intentionally ignored at
