@@ -128,6 +128,16 @@ export interface DashboardInput {
   yagniSummary?: unknown;
   yagniCatalog?: readonly unknown[];
   editorProtocol?: string | null;
+  /**
+   * Byte budget for the inlined graph catalog (see `code-paths/bound-catalog.ts`).
+   *
+   * Omitted ⇒ {@link MAX_GRAPH_CATALOG_BYTES}, which keeps the report a size you
+   * can attach to a PR or email. A caller that is producing a report to explore
+   * LOCALLY rather than to send someone (`opensip report --max-catalog-mb 64`)
+   * raises it — that intent is per-invocation, which is why it is an argument
+   * here and a flag there, not a project-wide setting.
+   */
+  maxGraphCatalogBytes?: number;
 }
 
 // Host-owned catch-all tab for sessions whose `tool` is NOT claimed by any
@@ -249,6 +259,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
     graphRecipeCatalog = [],
     simScenarioCatalog = [],
     simRecipeCatalog = [],
+    maxGraphCatalogBytes,
     yagniSummary = null,
     yagniCatalog = [],
     editorProtocol = null,
@@ -277,7 +288,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // one. Inlining it whole produced a 293 MB report on this repo. Project it to
   // the client's contract and bound what remains — truncation is surfaced to
   // the page (see `graphCatalogOmittedFunctions`), never silent.
-  const boundedCatalog = boundGraphCatalog(graphCatalog);
+  const boundedCatalog = boundGraphCatalog(graphCatalog, maxGraphCatalogBytes);
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', boundedCatalog.catalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the

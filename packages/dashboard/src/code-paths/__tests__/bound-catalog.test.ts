@@ -169,3 +169,15 @@ describe('boundGraphCatalog', () => {
     expect(MAX_GRAPH_CATALOG_BYTES).toBeLessThanOrEqual(16 * 1024 * 1024);
   });
 });
+
+describe('boundGraphCatalog — caller-supplied budget', () => {
+  it('honours a raised budget so a local explorer can see the whole catalog', () => {
+    // The default would truncate this catalog; a bigger budget must not.
+    const tight = boundGraphCatalog(catalog(120), 4000);
+    expect(tight.omittedFunctions).toBeGreaterThan(0);
+
+    const generous = boundGraphCatalog(catalog(120), 64 * 1024 * 1024);
+    expect(generous.omittedFunctions).toBe(0);
+    expect(Object.keys(generous.catalog?.functions ?? {})).toHaveLength(120);
+  });
+});

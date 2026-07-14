@@ -72,6 +72,13 @@ const REPORT_MODULE = 'cli:report';
 interface ComposeReportOptions {
   readonly open: boolean;
   readonly selection?: ReportViewSelection;
+  /**
+   * Byte budget for the inlined graph catalog. Omitted ⇒ the dashboard's
+   * shareable default. Raised by `opensip report --max-catalog-mb` when the
+   * reader wants the full catalog for LOCAL exploration rather than a report
+   * small enough to send someone.
+   */
+  readonly maxGraphCatalogBytes?: number;
 }
 
 /**
@@ -279,7 +286,11 @@ function mergeContribution(
  */
 export async function composeAndWriteReport(opts: ComposeReportOptions): Promise<ReportResult> {
   const input = await composeReportInput(opts.selection);
-  const html = generateDashboardHtml(input);
+  const html = generateDashboardHtml(
+    opts.maxGraphCatalogBytes === undefined
+      ? input
+      : { ...input, maxGraphCatalogBytes: opts.maxGraphCatalogBytes },
+  );
 
   // Scope-aware: an ephemeral (no-init) run must write its report into the user
   // cache, never into the user's repository.

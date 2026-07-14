@@ -35,10 +35,13 @@ const REPORT = join(REPO_ROOT, 'opensip-cli', '.runtime', 'reports', 'latest.htm
  * file and failing the package lane, with no indication of why. No heap setting
  * survives it (8 GB dies the same way); the only fix is not to load it.
  *
- * 64 MB is far above any report a bounded generator should produce (an empty
- * report is ~700 KB) and far below what wedges jsdom.
+ * 24 MB sits above any DEFAULT report (the catalog budget is 8 MiB, so a real
+ * one lands ~9 MB) and below what wedges jsdom. It deliberately excludes a
+ * report generated with `opensip report --max-catalog-mb 64` — that artifact is
+ * for exploring a big repo locally, not the shareable default this test
+ * validates, and booting it would put the suite back where it started.
  */
-const MAX_BOOTABLE_REPORT_BYTES = 64 * 1024 * 1024;
+const MAX_BOOTABLE_REPORT_BYTES = 24 * 1024 * 1024;
 
 function readReportOrSkip(): string | null {
   if (!existsSync(REPORT)) return null;

@@ -2191,6 +2191,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
         {
           "choices": undefined,
+          "defaultValue": undefined,
+          "description": "Raise the inlined graph-catalog budget (default 8 MB). Use when exploring a large repo locally; a bigger report is slower to open and may be too large to share.",
+          "flags": "--max-catalog-mb <mb>",
+          "negate": false,
+          "optional": false,
+          "required": true,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
           "defaultValue": true,
           "description": "Write the report but do not launch a browser",
           "flags": "--no-open",

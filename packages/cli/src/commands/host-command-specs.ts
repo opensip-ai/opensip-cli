@@ -174,6 +174,28 @@ function buildConfigureSpec(): HostSpec {
 // report (CLI-owned composition root)
 // ---------------------------------------------------------------------------
 
+/**
+ * `--max-catalog-mb <mb>` → a byte budget for the inlined graph catalog.
+ *
+ * The default keeps the report a size you can attach to a PR or email. Raising
+ * it is a per-invocation decision — "this report is for me to explore, not to
+ * send you" — which is why it is a flag rather than a project-wide config key:
+ * the same repo wants both shapes on different days.
+ *
+ * @throws {ConfigurationError} When the value is not a positive number.
+ */
+function parseMaxCatalogMb(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const mb = Number(raw);
+  if (!Number.isFinite(mb) || mb <= 0) {
+    throw new ConfigurationError(
+      `report: --max-catalog-mb must be a positive number of megabytes (got '${raw}').`,
+      { code: 'CONFIG.REPORT.INVALID_CATALOG_BUDGET' },
+    );
+  }
+  return Math.floor(mb * 1024 * 1024);
+}
+
 function buildReportSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
@@ -193,16 +215,26 @@ function buildReportSpec(): HostSpec {
         description: 'Write the report but do not launch a browser',
         negatable: true,
       },
+      {
+        flag: '--max-catalog-mb',
+        value: '<mb>',
+        description:
+          'Raise the inlined graph-catalog budget (default 8 MB). Use when exploring a large repo locally; a bigger report is slower to open and may be too large to share.',
+      },
     ],
     scope: 'project',
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as { open: boolean; json: boolean };
+      const opts = rawOpts as { open: boolean; json: boolean; maxCatalogMb?: string };
       // Commander stores `--no-open` as `opts.open === false`; default true.
       // In `--json` mode we never launch a browser (machine-output contract).
       // ADR-0054 M4-F: composeAndWriteReport runs an EXTERNAL tool's
       // collectReportData in a forked hook worker (its runtime never runs in-host).
-      return composeAndWriteReport({ open: opts.open === true && opts.json !== true });
+      const maxGraphCatalogBytes = parseMaxCatalogMb(opts.maxCatalogMb);
+      return composeAndWriteReport({
+        open: opts.open === true && opts.json !== true,
+        ...(maxGraphCatalogBytes === undefined ? {} : { maxGraphCatalogBytes }),
+      });
     },
   });
 }

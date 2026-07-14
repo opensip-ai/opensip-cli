@@ -693,12 +693,32 @@ CLI-owned. The cross-tool `report` command lives at the CLI layer (not inside an
 opensip report
 opensip report --no-open
 opensip report --json
+opensip report --max-catalog-mb 64
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--no-open` | bool | `false` | Write the report but do not launch a browser. |
 | `--json` | bool | `false` | Emit a `{ type: 'report', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
+| `--max-catalog-mb` | number | `8` | Byte budget for the inlined graph catalog, in megabytes. |
+
+### Report size and the bounded graph catalog
+
+The report is a **single self-contained HTML file** you can attach to a PR or
+email, so the graph catalog it inlines is bounded — by default to 8 MB. On a
+large repository the report therefore ships the highest-blast-radius functions
+and omits the rest, and says so:
+
+```text
+Functions  4,925 of 31,932 (bounded)
+Bounded for sharing — opensip report --max-catalog-mb 64 for the full catalog
+```
+
+Truncation is always a visible state, never a silent one. Raise the budget when
+you are exploring a large repo **locally** rather than producing something to
+send someone — a bigger report is slower to open and may be too large to share.
+The exhaustive evidence always remains available through `opensip graph` and the
+MCP graph tools, which is the better path for an agent or a deep query.
 
 The report is a single self-contained HTML file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-cli installed, so you can email it directly to a teammate.
 

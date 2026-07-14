@@ -55,6 +55,19 @@ function provenanceRelTime(iso: string): string {
   return days + ' day' + (days === 1 ? '' : 's') + ' ago';
 }
 
+/**
+ * The command that would render THIS catalog in full, with a budget rounded up
+ * from what the untruncated catalog needs. Suggesting a concrete number beats
+ * `--max-catalog-mb <mb>`: the reader can paste it without doing arithmetic.
+ * Sized from the retained bytes-per-function, which is the only estimate we
+ * have on the page.
+ */
+function fullCatalogCommand(totalFunctions: number): string {
+  // ~2 KB per function in the projected shape, rounded up to a friendly step.
+  const estimatedMb = Math.max(16, Math.ceil((totalFunctions * 2048) / (1024 * 1024) / 8) * 8);
+  return `opensip report --max-catalog-mb ${String(estimatedMb)}`;
+}
+
 function provenanceChip(label: string, value: string, opts?: ChipOpts): HTMLElement {
   const o = opts ?? {};
   const chip = el('span', { style: 'display:inline-flex;align-items:baseline;gap:6px' });
@@ -121,9 +134,19 @@ export function renderCatalogProvenance(host: HTMLElement, catalog: CatalogLike 
         `${fnCount.toLocaleString()} of ${total.toLocaleString()} (bounded)`,
         {
           color: 'var(--warning)',
-          title: `${omitted.toLocaleString()} functions were omitted to keep this report a shareable size. The highest-blast-radius functions are retained. Use \`opensip graph\` or the MCP graph tools for complete evidence.`,
+          title: `${omitted.toLocaleString()} of ${total.toLocaleString()} functions were omitted to keep this report small enough to share. The highest-blast-radius functions are kept. Re-run with a bigger budget to see them all: ${fullCatalogCommand(total)}`,
         },
       ),
+    );
+    // The escape hatch belongs where the reader NOTICES something is missing —
+    // a config key they would have to already know about is not a discovery
+    // surface. Name the exact command, sized for this catalog.
+    bar.append(
+      el('span', {
+        class: 'catalog-bounded-hint',
+        text: `Bounded for sharing — ${fullCatalogCommand(total)} for the full catalog`,
+        style: 'flex-basis:100%;color:var(--text-dim);font-size:11px;margin-top:2px',
+      }),
     );
   } else {
     bar.append(provenanceChip('Functions', fnCount.toLocaleString()));
