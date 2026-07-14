@@ -18,7 +18,7 @@ import {
 } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { resolveEphemeralProjectPaths } from '@opensip-cli/core';
+import { EPHEMERAL_MARKER_FILE, resolveEphemeralProjectPaths } from '@opensip-cli/core';
 
 import { ensureOpenSipAgentGuidance } from './agents-md.js';
 import { generateConfig } from './config-templates.js';
@@ -158,6 +158,10 @@ function migrateEphemeralRuntime(paths: ProjectPaths): void {
     cpSync(source, paths.runtimeDir, { recursive: true, errorOnExist: true });
     rmSync(source, { recursive: true, force: true });
   }
+  // The cache marker is an ephemeral-plane artifact (it exists so an orphaned
+  // cache entry can be identified). The project runtime is addressed by path,
+  // not by hash, so the marker is meaningless once the tree lands here.
+  rmSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), { force: true });
 }
 
 export function runRefresh(

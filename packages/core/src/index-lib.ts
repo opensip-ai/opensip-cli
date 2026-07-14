@@ -207,10 +207,24 @@ export {
   ephemeralProjectCacheKey,
   resolveProjectPaths,
   resolveEphemeralProjectPaths,
+  resolveRuntimePathsForScope,
   resolveUserPaths,
   isPathInside,
   toPosixRelative,
 } from './lib/paths.js';
+export {
+  DEFAULT_EPHEMERAL_KEEP,
+  DEFAULT_EPHEMERAL_MAX_AGE_DAYS,
+  EPHEMERAL_MARKER_FILE,
+  pruneEphemeralRuntimes,
+  shouldPruneEphemeralRuntimes,
+  touchEphemeralRuntime,
+} from './lib/ephemeral-runtime.js';
+export type {
+  EphemeralMarker,
+  PruneEphemeralInput,
+  PruneEphemeralResult,
+} from './lib/ephemeral-runtime.js';
 export type {
   EphemeralProjectPaths,
   ProjectPaths,

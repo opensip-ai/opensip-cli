@@ -11,8 +11,13 @@ import {
   currentScope,
   enterScope,
   getMeter,
+  pruneEphemeralRuntimes,
+  resolveEphemeralProjectPaths,
+  shouldPruneEphemeralRuntimes,
   SystemError,
+  touchEphemeralRuntime,
   type Logger,
+  type ProjectContext,
   type RunScope,
 } from '@opensip-cli/core';
 
@@ -36,6 +41,37 @@ import type { PreActionRuntime } from './pre-action-runtime.js';
 
 const MODULE_TAG = 'cli:bootstrap';
 const CLI_PACKAGE_NAME = 'opensip-cli';
+
+/**
+ * Ephemeral (no-init) cache hygiene, on the side-effect phase of an ephemeral
+ * run only. Stamps this project's entry as used, then — at most once a day —
+ * drops orphaned/stale/overflow entries so the user cache cannot grow without
+ * bound (one directory per project path ever audited, kept forever).
+ *
+ * Best-effort by construction: cache hygiene must never fail a user's run.
+ */
+function maintainEphemeralCache(project: ProjectContext, logger: Logger): void {
+  if (project.scope !== 'ephemeral') return;
+  try {
+    const paths = resolveEphemeralProjectPaths(project.projectRoot);
+    touchEphemeralRuntime(paths);
+    if (!shouldPruneEphemeralRuntimes()) return;
+    const pruned = pruneEphemeralRuntimes({ keepCacheKey: paths.cacheKey });
+    const removed = pruned.removedOrphaned + pruned.removedStale + pruned.removedOverflow;
+    if (removed === 0) return;
+    logger.debug?.({
+      evt: 'cli.cache.ephemeral_pruned',
+      module: MODULE_TAG,
+      scanned: pruned.scanned,
+      removedOrphaned: pruned.removedOrphaned,
+      removedStale: pruned.removedStale,
+      removedOverflow: pruned.removedOverflow,
+      msg: `Pruned ${removed} unused no-init cache entr${removed === 1 ? 'y' : 'ies'}.`,
+    });
+  } catch {
+    // Hygiene only — never fail the run.
+  }
+}
 
 function noopPhaseRecord(): void {
   // Default when callers omit recordPhase (production hook path).
@@ -125,6 +161,9 @@ export async function executePostBailoutBootstrap(
     if (checkedUpdate && plan.jsonOutput) {
       process.stderr.write(formatUpdateNag(version, checkedUpdate));
     }
+    preActionTimer.measure('ephemeral-cache-maintenance', () =>
+      maintainEphemeralCache(plan.project, createdRunLogger),
+    );
     return { runLogger: createdRunLogger, update: checkedUpdate };
   });
 
