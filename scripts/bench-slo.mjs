@@ -19,6 +19,7 @@ import {
   scenarioResetsRuntime,
 } from './perf/benchmark-scenarios.mjs';
 import { cleanupOwnedCorpus, materializeCorpus } from './perf/corpus.mjs';
+import { isDirectInvocation } from './perf/direct-invocation.mjs';
 import {
   createEmptyReport,
   createScenarioResult,
@@ -83,6 +84,7 @@ export async function runBenchSlo(argv = process.argv.slice(2), deps = {}) {
         fileCount: corpus.fileCount,
         changedFiles: corpus.changedFiles,
         gitReady: corpus.gitReady,
+        contentSha256: corpus.contentSha256,
       });
       await runTierScenarios({
         repoRoot,
@@ -162,29 +164,16 @@ async function runOneScenario(input) {
   if (scenarioNeedsGraphCatalog(input.scenario) && input.context.graphPrimed !== true) {
     const prime = await runCommand(input, ['graph', '--json', '--profile', graphProfilePath]);
     input.context.graphPrimed = prime.status === 0 && prime.timedOut !== true;
+    if (input.context.graphPrimed !== true) {
+      recordSetupFailure(input, prime, ['graph', '--json', '--profile', graphProfilePath]);
+      return;
+    }
   }
 
   if (scenarioNeedsReportSession(input.scenario)) {
     const prime = await runCommand(input, ['fit', '--json']);
     if (prime.status !== 0 || prime.timedOut === true) {
-      input.report.scenarios.push(
-        createScenarioResult({
-          tier: input.tierId,
-          scenario: input.scenario,
-          label: input.config.scenarios[input.scenario]?.label ?? input.scenario,
-          command: [process.execPath, input.cliPath, '--no-cloud', 'fit', '--json'],
-          cwd: input.corpus.root,
-          startedAt: prime.startedAt,
-          completedAt: prime.completedAt,
-          status: prime.status,
-          signal: prime.signal,
-          timedOut: prime.timedOut,
-          durationMs: prime.durationMs,
-          maxRssBytes: prime.maxRssBytes,
-          stdoutTail: prime.stdoutTail,
-          stderrTail: prime.stderrTail,
-        }),
-      );
+      recordSetupFailure(input, prime, ['fit', '--json']);
       return;
     }
   }
@@ -198,6 +187,28 @@ async function runOneScenario(input) {
   if (input.scenario === 'graph-cold' || input.scenario === 'graph-warm') {
     input.context.graphPrimed = measured.status === 0;
   }
+}
+
+function recordSetupFailure(input, setup, args) {
+  input.report.scenarios.push(
+    createScenarioResult({
+      tier: input.tierId,
+      scenario: input.scenario,
+      label: input.config.scenarios[input.scenario]?.label ?? input.scenario,
+      command: [process.execPath, input.cliPath, '--no-cloud', ...args],
+      cwd: input.corpus.root,
+      startedAt: setup.startedAt,
+      completedAt: setup.completedAt,
+      status: setup.status,
+      signal: setup.signal,
+      timedOut: setup.timedOut,
+      durationMs: setup.durationMs,
+      maxRssBytes: setup.maxRssBytes,
+      stdoutTail: setup.stdoutTail,
+      stderrTail: setup.stderrTail,
+      setupFailure: true,
+    }),
+  );
 }
 
 async function runCommand(input, commandArgs, scenario) {
@@ -354,7 +365,7 @@ Options:
 `);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   runBenchSlo().then(
     ({ exitCode }) => {
       process.exitCode = exitCode;

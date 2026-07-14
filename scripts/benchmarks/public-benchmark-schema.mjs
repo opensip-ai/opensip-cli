@@ -1,4 +1,7 @@
+import { compareBudgets } from '../perf/compare-budgets.mjs';
 import { budgetKey } from '../perf/slo-config.mjs';
+
+const GIT_OBJECT_ID_PATTERN = /^(?:[a-f\d]{40}|[a-f\d]{64})$/iu;
 
 export function normalizeBenchmarkSnapshot(raw, sourcePath = '<memory>') {
   if (!isRecord(raw)) {
@@ -44,8 +47,10 @@ export function snapshotFromSloReport(report, options = {}) {
     corpora: normalizeCorpora(report.corpora).map((corpus) => ({
       tier: corpus.tier,
       fileCount: corpus.fileCount,
+      changedFiles: corpus.changedFiles,
       changedFileCount: corpus.changedFileCount,
       gitReady: corpus.gitReady,
+      contentSha256: corpus.contentSha256,
     })),
     scenarios: normalizeScenarios(report.scenarios).map((scenario) => ({
       tier: scenario.tier,
@@ -61,7 +66,11 @@ export function snapshotFromSloReport(report, options = {}) {
     })),
     budgets: normalizeBudgetRows(report.budgets),
   };
-  return normalizeBenchmarkSnapshot(snapshot);
+  const normalized = normalizeBenchmarkSnapshot(snapshot);
+  if (options.sloConfig !== undefined) {
+    assertSnapshotMatchesConfig(normalized, options.sloConfig);
+  }
+  return normalized;
 }
 
 function assertPublishableSloReport(report) {
@@ -111,11 +120,21 @@ function assertPublishableFields(value) {
   if (!/^v?24\./u.test(String(value.environment?.node ?? ''))) {
     throw new Error('Public benchmark snapshots require a Node 24 report.');
   }
-  for (const key of ['pnpm', 'arch', 'platform', 'release', 'cpuModel', 'gitSha']) {
+  for (const key of ['pnpm', 'arch', 'platform', 'release', 'cpuModel', 'gitBranch']) {
     const fact = optionalString(value.environment?.[key]);
-    if (fact === undefined || fact === 'unavailable') {
+    if (
+      fact === undefined ||
+      fact.trim().length === 0 ||
+      fact.trim().toLowerCase() === 'unavailable'
+    ) {
       throw new Error(`Public benchmark snapshots require environment.${key}.`);
     }
+  }
+  if (!GIT_OBJECT_ID_PATTERN.test(String(value.environment?.gitSha ?? ''))) {
+    throw new Error('Public benchmark snapshots require a 40- or 64-hex environment.gitSha.');
+  }
+  if (value.environment?.gitDirty !== false) {
+    throw new Error('Public benchmark snapshots require a clean Git worktree.');
   }
   if (value.environment?.ci !== false) {
     throw new Error('Public benchmark snapshots require a non-CI reference run.');
@@ -125,6 +144,12 @@ function assertPublishableFields(value) {
   }
   if (!Array.isArray(value.corpora) || value.corpora.length === 0) {
     throw new Error('Public benchmark snapshots require at least one corpus.');
+  }
+  if (value.corpora.some((corpus) => !/^[a-f\d]{64}$/u.test(corpus?.contentSha256 ?? ''))) {
+    throw new Error('Public benchmark snapshots require a 64-hex corpus contentSha256.');
+  }
+  if (value.corpora.some((corpus) => !Array.isArray(corpus?.changedFiles))) {
+    throw new Error('Public benchmark snapshots require exact corpus changedFiles.');
   }
   if (!Array.isArray(value.scenarios) || value.scenarios.length === 0) {
     throw new Error('Public benchmark snapshots require at least one scenario.');
@@ -159,11 +184,7 @@ function assertPublishableFields(value) {
 
 export function rowsFromSnapshot(snapshot, sloConfig) {
   const normalized = normalizeBenchmarkSnapshot(snapshot);
-  if (normalized.config?.fingerprint !== sloConfig.fingerprint) {
-    throw new Error(
-      'Public benchmark snapshot config fingerprint does not match .config/performance-slos.json.',
-    );
-  }
+  assertSnapshotMatchesConfig(normalized, sloConfig);
   const comparisonsByKey = new Map();
   for (const comparison of normalized.budgets) {
     comparisonsByKey.set(
@@ -202,6 +223,84 @@ export function rowsFromSnapshot(snapshot, sloConfig) {
       graphFunctions: scenario.graphProfile?.functions,
     };
   });
+}
+
+function assertSnapshotMatchesConfig(snapshot, sloConfig) {
+  if (snapshot.config?.fingerprint !== sloConfig.fingerprint) {
+    throw new Error(
+      'Public benchmark snapshot config fingerprint does not match .config/performance-slos.json.',
+    );
+  }
+  assertCompleteProfileCoverage(snapshot, sloConfig);
+  assertBudgetIntegrity(snapshot, sloConfig);
+}
+
+function assertBudgetIntegrity(snapshot, sloConfig) {
+  const expectedRows = compareBudgets(
+    { measurementMode: 'clean-wall', scenarios: snapshot.scenarios },
+    sloConfig,
+    { requireMemory: true },
+  );
+  const expectedByKey = new Map(
+    expectedRows.map((row) => [comparisonKey(row.tier, row.scenario, row.metric), row]),
+  );
+  for (const row of snapshot.budgets) {
+    const key = comparisonKey(row.tier, row.scenario, row.metric);
+    const expected = expectedByKey.get(key);
+    if (expected === undefined) {
+      throw new Error(`Public benchmark snapshot has no configured budget for ${key}.`);
+    }
+    for (const field of ['actual', 'budget', 'ratio', 'status']) {
+      if (!Object.is(row[field], expected[field])) {
+        throw new Error(
+          `Public benchmark snapshot budget ${key} ${field} does not match the measured scenario ` +
+            `and loaded SLO config (recorded=${String(row[field])}; ` +
+            `expected=${String(expected[field])}).`,
+        );
+      }
+    }
+  }
+}
+
+function assertCompleteProfileCoverage(snapshot, sloConfig) {
+  const profile = sloConfig.profiles[snapshot.profile];
+  if (profile === undefined) {
+    throw new Error(`Public benchmark snapshot references unknown profile '${snapshot.profile}'.`);
+  }
+  const expectedScenarios = new Set(
+    profile.tiers.flatMap((tier) => profile.scenarios.map((scenario) => `${tier}:${scenario}`)),
+  );
+  const actualScenarioKeys = snapshot.scenarios.map(
+    (scenario) => `${scenario.tier}:${scenario.scenario}`,
+  );
+  assertExactKeyCoverage('scenario', actualScenarioKeys, expectedScenarios);
+
+  const expectedTiers = new Set(profile.tiers);
+  const actualTiers = snapshot.corpora.map((corpus) => corpus.tier);
+  assertExactKeyCoverage('corpus tier', actualTiers, expectedTiers);
+
+  const expectedBudgets = new Set(
+    [...expectedScenarios].flatMap((key) =>
+      ['exitCode', 'durationMs', 'maxRssBytes'].map((metric) => `${key}:${metric}`),
+    ),
+  );
+  const actualBudgetKeys = snapshot.budgets.map(
+    (row) => `${row.tier}:${row.scenario}:${row.metric}`,
+  );
+  assertExactKeyCoverage('budget', actualBudgetKeys, expectedBudgets);
+}
+
+function assertExactKeyCoverage(label, actualKeys, expectedKeys) {
+  const actual = new Set(actualKeys);
+  const missing = [...expectedKeys].filter((key) => !actual.has(key));
+  const extra = [...actual].filter((key) => !expectedKeys.has(key));
+  const duplicateCount = actualKeys.length - actual.size;
+  if (missing.length === 0 && extra.length === 0 && duplicateCount === 0) return;
+  throw new Error(
+    `Public benchmark snapshot ${label} coverage is incomplete ` +
+      `(missing=${missing.join(',') || 'none'}; extra=${extra.join(',') || 'none'}; ` +
+      `duplicates=${String(duplicateCount)}).`,
+  );
 }
 
 export function formatBenchmarkDuration(ms) {
@@ -265,6 +364,7 @@ function normalizeEnvironment(value) {
     ci: typeof value.ci === 'boolean' ? value.ci : undefined,
     gitSha: optionalString(value.gitSha),
     gitBranch: optionalString(value.gitBranch),
+    gitDirty: typeof value.gitDirty === 'boolean' ? value.gitDirty : undefined,
   };
 }
 
@@ -286,15 +386,23 @@ function normalizeCorpora(value) {
   return value.map((entry, index) => {
     if (!isRecord(entry))
       throw new Error(`Invalid benchmark snapshot: corpora[${index}] must be an object.`);
-    const changedFileCount = Array.isArray(entry.changedFiles)
-      ? entry.changedFiles.length
-      : (optionalPositiveInteger(entry.changedFileCount, `corpora[${index}].changedFileCount`) ??
-        0);
+    const changedFiles = Array.isArray(entry.changedFiles)
+      ? entry.changedFiles.map((file, fileIndex) =>
+          stringValue(file, `corpora[${index}].changedFiles[${fileIndex}]`),
+        )
+      : undefined;
+    const changedFileCount =
+      changedFiles === undefined
+        ? (optionalPositiveInteger(entry.changedFileCount, `corpora[${index}].changedFileCount`) ??
+          0)
+        : changedFiles.length;
     return {
       tier: stringValue(entry.tier, `corpora[${index}].tier`),
       fileCount: positiveInteger(entry.fileCount, `corpora[${index}].fileCount`),
+      changedFiles,
       changedFileCount,
       gitReady: typeof entry.gitReady === 'boolean' ? entry.gitReady : false,
+      contentSha256: optionalString(entry.contentSha256),
     };
   });
 }

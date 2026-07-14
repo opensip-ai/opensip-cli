@@ -97,6 +97,7 @@ export async function runBenchProfile(argv = process.argv.slice(2), deps = {}) {
         fileCount: corpus.fileCount,
         changedFiles: corpus.changedFiles,
         gitReady: corpus.gitReady,
+        contentSha256: corpus.contentSha256,
       });
       for (const scenario of scenarios) {
         if (scenarioRequiresGit(scenario) && corpus.gitReady !== true) {
@@ -361,7 +362,9 @@ async function runProfileSample(input) {
     profileArtifactExpectation,
     profileArtifactFailure,
     ...(profileArtifactFailure
-      ? { profileArtifactFailureReason: 'CPU profiler produced no complete artifact pair.' }
+      ? {
+          profileArtifactFailureReason: 'CPU profiler produced no complete artifact pair.',
+        }
       : {}),
   };
 }

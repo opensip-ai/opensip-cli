@@ -10,6 +10,7 @@ import {
   rowsFromSnapshot,
   snapshotFromSloReport,
 } from './benchmarks/public-benchmark-schema.mjs';
+import { isDirectInvocation } from './perf/direct-invocation.mjs';
 import { replaceMarkedSection } from './perf/render-slo-markdown.mjs';
 import { loadSloConfig } from './perf/slo-config.mjs';
 
@@ -36,6 +37,7 @@ export async function buildPublicBenchmarksDoc(argv = process.argv.slice(2), dep
       source:
         options.source ??
         `pnpm bench:slo -- --profile ${String(report.profile ?? 'pr')} --out slo-report.json`,
+      sloConfig: config,
     });
     nextSnapshotText = `${JSON.stringify(snapshot, null, 2)}\n`;
   }
@@ -92,23 +94,29 @@ function renderSummaryTable(snapshot) {
   const rows = [
     '| Field | Value |',
     '|---|---|',
-    `| Measured at | ${snapshot.createdAt} |`,
-    `| Source | \`${snapshot.source}\` |`,
-    `| Measurement mode | \`${snapshot.measurementMode}\` |`,
-    `| Profile | \`${snapshot.profile}\` |`,
+    `| Measured at | ${escapeMarkdownTableCell(snapshot.createdAt)} |`,
+    `| Source | ${renderCodeTableCell(snapshot.source)} |`,
+    `| Measurement mode | ${renderCodeTableCell(snapshot.measurementMode)} |`,
+    `| SLO config SHA-256 | ${renderCodeTableCell(snapshot.config.fingerprint)} |`,
+    `| Profile | ${renderCodeTableCell(snapshot.profile)} |`,
     `| Quick mode | ${snapshot.quick ? 'yes' : 'no'} |`,
-    `| Verdict | ${snapshot.verdict} |`,
+    `| Verdict | ${escapeMarkdownTableCell(snapshot.verdict)} |`,
   ];
   return `${rows.join('\n')}\n`;
 }
 
 function renderCorporaTable(snapshot) {
-  const rows = ['| Tier | Generated files | Changed files | Git ready |', '|---|---:|---:|---|'];
+  const rows = [
+    '| Tier | Generated files | Changed files | Git ready | Content SHA-256 |',
+    '|---|---:|---:|---|---|',
+  ];
   for (const corpus of snapshot.corpora) {
     rows.push(
-      `| ${corpus.tier} | ${formatBenchmarkInteger(corpus.fileCount)} | ${formatBenchmarkInteger(
-        corpus.changedFileCount,
-      )} | ${corpus.gitReady ? 'yes' : 'no'} |`,
+      `| ${escapeMarkdownTableCell(corpus.tier)} | ${formatBenchmarkInteger(
+        corpus.fileCount,
+      )} | ${formatBenchmarkInteger(corpus.changedFileCount)} | ${
+        corpus.gitReady ? 'yes' : 'no'
+      } | ${renderCodeTableCell(corpus.contentSha256)} |`,
     );
   }
   return `${rows.join('\n')}\n`;
@@ -122,16 +130,16 @@ function renderResultsTable(snapshot, config) {
   for (const row of rowsFromSnapshot(snapshot, config)) {
     rows.push(
       [
-        `| ${row.tier}`,
-        row.label,
-        row.status,
+        `| ${escapeMarkdownTableCell(row.tier)}`,
+        escapeMarkdownTableCell(row.label),
+        escapeMarkdownTableCell(row.status),
         formatBenchmarkDuration(row.durationMs),
         formatBenchmarkDuration(row.durationBudgetMs),
         formatSignedDuration(row.durationMarginMs),
         formatBenchmarkBytes(row.maxRssBytes),
         formatBenchmarkBytes(row.rssBudgetBytes),
         formatSignedBytes(row.rssMarginBytes),
-        row.graphCache ?? '',
+        escapeMarkdownTableCell(row.graphCache ?? ''),
       ].join(' | ') + ' |',
     );
   }
@@ -142,15 +150,16 @@ function renderEnvironmentTable(snapshot) {
   const rows = [
     '| Field | Value |',
     '|---|---|',
-    `| Node.js | \`${snapshot.environment.node}\` |`,
-    `| pnpm | \`${snapshot.environment.pnpm ?? 'not recorded'}\` |`,
-    `| Architecture | \`${snapshot.environment.arch ?? 'not recorded'}\` |`,
-    `| Platform | \`${snapshot.environment.platform}\` |`,
-    `| OS release | \`${snapshot.environment.release}\` |`,
-    `| CPU model | ${snapshot.environment.cpuModel ?? 'not recorded'} |`,
+    `| Node.js | ${renderCodeTableCell(snapshot.environment.node)} |`,
+    `| pnpm | ${renderCodeTableCell(snapshot.environment.pnpm ?? 'not recorded')} |`,
+    `| Architecture | ${renderCodeTableCell(snapshot.environment.arch ?? 'not recorded')} |`,
+    `| Platform | ${renderCodeTableCell(snapshot.environment.platform)} |`,
+    `| OS release | ${renderCodeTableCell(snapshot.environment.release)} |`,
+    `| CPU model | ${escapeMarkdownTableCell(snapshot.environment.cpuModel ?? 'not recorded')} |`,
     `| CPU count | ${formatBenchmarkInteger(snapshot.environment.cpuCount)} |`,
-    `| Git commit | \`${snapshot.environment.gitSha ?? 'not recorded'}\` |`,
-    `| Git branch | \`${snapshot.environment.gitBranch ?? 'not recorded'}\` |`,
+    `| Git commit | ${renderCodeTableCell(snapshot.environment.gitSha ?? 'not recorded')} |`,
+    `| Git branch | ${renderCodeTableCell(snapshot.environment.gitBranch ?? 'not recorded')} |`,
+    `| Git worktree dirty | ${snapshot.environment.gitDirty ? 'yes' : 'no'} |`,
     `| CI | ${snapshot.environment.ci ? 'yes' : 'no'} |`,
   ];
   return `${rows.join('\n')}\n`;
@@ -166,6 +175,26 @@ function formatSignedBytes(bytes) {
   if (bytes === undefined) return 'not measured';
   const prefix = bytes >= 0 ? '+' : '-';
   return `${prefix}${formatBenchmarkBytes(Math.abs(bytes))}`;
+}
+
+export function escapeMarkdownTableCell(value) {
+  return String(value)
+    .replaceAll(/\r\n?|\n/gu, ' ⏎ ')
+    .replaceAll('&', '&amp;')
+    .replaceAll('\\', '&#92;')
+    .replaceAll('|', '&#124;')
+    .replaceAll('`', '&#96;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('*', '&#42;')
+    .replaceAll('_', '&#95;')
+    .replaceAll('[', '&#91;')
+    .replaceAll(']', '&#93;')
+    .replaceAll('~', '&#126;');
+}
+
+function renderCodeTableCell(value) {
+  return `<code>${escapeMarkdownTableCell(value)}</code>`;
 }
 
 function parseArgs(argv) {
@@ -233,7 +262,7 @@ Options:
 `);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   buildPublicBenchmarksDoc().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

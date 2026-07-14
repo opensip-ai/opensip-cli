@@ -12,7 +12,12 @@ import {
 } from '../perf/benchmark-environment.mjs';
 import { createChildProcessTerminator } from '../perf/child-process-lifecycle.mjs';
 import { compareBudgets } from '../perf/compare-budgets.mjs';
-import { cleanupOwnedCorpus, corpusMarkerPath, materializeCorpus } from '../perf/corpus.mjs';
+import {
+  cleanupOwnedCorpus,
+  corpusMarkerPath,
+  initializeGitCorpus,
+  materializeCorpus,
+} from '../perf/corpus.mjs';
 import { signalsFromComparisons } from '../perf/performance-signals.mjs';
 import {
   killProcessTree,
@@ -70,6 +75,7 @@ test('benchmark environment metadata uses bounded commands and records reproduci
       invocations.push({ command, args, options });
       if (command === 'pnpm') return { stdout: '11.10.0\n' };
       if (args[0] === 'rev-parse') return { stdout: 'abc123\n' };
+      if (args[0] === 'status') return { stdout: '' };
       return { stdout: 'codex/perf\n' };
     },
   });
@@ -85,14 +91,47 @@ test('benchmark environment metadata uses bounded commands and records reproduci
     ci: true,
     gitSha: 'abc123',
     gitBranch: 'codex/perf',
+    gitDirty: false,
   });
-  assert.equal(invocations.length, 3);
+  assert.equal(invocations.length, 4);
   for (const invocation of invocations) {
     assert.equal(invocation.options.cwd, '/repo');
     assert.equal(invocation.options.killSignal, 'SIGKILL');
     assert.equal(invocation.options.timeout, 2000);
     assert.equal(invocation.options.maxBuffer, 64 * 1024);
   }
+});
+
+test('benchmark environment recognizes common CI values and records Git dirtiness', async () => {
+  const collect = (env, status = '') =>
+    collectBenchmarkEnvironment({
+      repoRoot: '/repo',
+      env: { npm_config_user_agent: 'pnpm/11.10.0', ...env },
+      cpus: () => [{ model: 'Test CPU' }],
+      execFileAsync: async (_command, args) => {
+        if (args[0] === 'rev-parse') {
+          return { stdout: '0123456789abcdef0123456789abcdef01234567\n' };
+        }
+        if (args[0] === 'symbolic-ref') return { stdout: 'main\n' };
+        if (args[0] === 'status') return { stdout: status };
+        throw new Error(`unexpected metadata command: ${args.join(' ')}`);
+      },
+    });
+
+  for (const value of ['1', 'true', 'TRUE', 'yes', 'on', 'buildkite']) {
+    const result = await collect({ CI: value });
+    assert.equal(result.ci, true, `CI=${value} must be detected`);
+  }
+  for (const value of [undefined, '', '0', 'false', 'FALSE', 'no', 'off']) {
+    const result = await collect({ CI: value });
+    assert.equal(result.ci, false, `CI=${String(value)} must stay local`);
+  }
+  const providerCi = await collect({ CI: 'false', GITHUB_ACTIONS: '1' });
+  const dirty = await collect({}, ' M scripts/example.mjs\n');
+  const clean = await collect({}, '');
+  assert.equal(providerCi.ci, true);
+  assert.equal(dirty.gitDirty, true);
+  assert.equal(clean.gitDirty, false);
 });
 
 test('graph profile summaries normalize runs, stages, and cache facts without raw paths', () => {
@@ -207,14 +246,22 @@ test('render helpers replace generated sections from normalized config', () => {
 
 test('materializeCorpus writes a marker, deterministic files, and a changed probe', async () => {
   const root = mkdtempSync(join(tmpdir(), 'opensip-slo-corpus-'));
+  const secondRoot = mkdtempSync(join(tmpdir(), 'opensip-slo-corpus-'));
   await rm(root, { recursive: true, force: true });
-  const corpus = await materializeCorpus({
-    root,
+  await rm(secondRoot, { recursive: true, force: true });
+  const input = {
     tierId: 'small',
     tier: { fileCount: 4, quickFileCount: 2, maxFiles: 10, maxLoc: 1000 },
     quick: true,
+  };
+  const corpus = await materializeCorpus({
+    root,
+    ...input,
   });
+  const sameCorpus = await materializeCorpus({ root: secondRoot, ...input });
   assert.equal(corpus.fileCount, 2);
+  assert.match(corpus.contentSha256, /^[a-f\d]{64}$/u);
+  assert.equal(corpus.contentSha256, sameCorpus.contentSha256);
   assert.equal(existsSync(corpusMarkerPath(root)), true);
   assert.match(
     readFileSync(join(root, 'opensip-cli.config.yml'), 'utf8'),
@@ -222,7 +269,107 @@ test('materializeCorpus writes a marker, deterministic files, and a changed prob
   );
   assert.match(readFileSync(join(root, 'src', 'module-0.ts'), 'utf8'), /changedProbe/);
   await cleanupOwnedCorpus(root);
+  await cleanupOwnedCorpus(secondRoot);
   assert.equal(existsSync(root), false);
+  assert.equal(existsSync(secondRoot), false);
+});
+
+test('initializeGitCorpus uses bounded hermetic Git commands and fails closed', () => {
+  const root = join(tmpdir(), 'opensip-slo-hermetic-git');
+  const invocations = [];
+  const ready = initializeGitCorpus(root, {
+    env: {
+      Path: '/test/bin',
+      PATHEXT: '.EXE;.CMD',
+      SystemRoot: 'C:\\Windows',
+      TEMP: '/safe/tmp',
+      HOME: '/private/home',
+      GIT_CONFIG_GLOBAL: '/private/home/.gitconfig',
+      GIT_CONFIG_COUNT: '1',
+      GIT_TERMINAL_PROMPT: '1',
+      GIT_ASKPASS: '/private/askpass',
+      GPG_TTY: '/dev/tty',
+      UNRELATED_SECRET: 'private',
+    },
+    spawnSync: (command, args, options) => {
+      invocations.push({ command, args, options });
+      return { status: 0 };
+    },
+  });
+
+  const repositoryOptions = [
+    '-c',
+    `core.hooksPath=${join(root, '.git', 'opensip-disabled-hooks')}`,
+    '-c',
+    'core.autocrlf=false',
+    '-c',
+    'core.eol=lf',
+  ];
+  assert.equal(ready, true);
+  assert.deepEqual(
+    invocations.map(({ command, args }) => [command, args]),
+    [
+      ['git', ['--version']],
+      ['git', ['init', '--quiet', '--initial-branch=main', '--template=']],
+      ['git', [...repositoryOptions, 'add', '--all', '--', '.']],
+      [
+        'git',
+        [
+          ...repositoryOptions,
+          '-c',
+          'commit.gpgSign=false',
+          'commit',
+          '--quiet',
+          '--no-gpg-sign',
+          '--no-verify',
+          '-m',
+          'baseline',
+        ],
+      ],
+    ],
+  );
+
+  const childEnv = invocations[0].options.env;
+  for (const { options } of invocations) {
+    assert.equal(options.cwd, root);
+    assert.equal(options.env, childEnv);
+    assert.equal(options.stdio, 'ignore');
+    assert.equal(options.timeout, 10_000);
+    assert.equal(options.killSignal, 'SIGKILL');
+    assert.equal(options.maxBuffer, 64 * 1024);
+    assert.equal(options.windowsHide, true);
+  }
+  assert.equal(childEnv.Path, '/test/bin');
+  assert.equal(childEnv.PATHEXT, '.EXE;.CMD');
+  assert.equal(childEnv.SystemRoot, 'C:\\Windows');
+  assert.equal(childEnv.TEMP, '/safe/tmp');
+  assert.equal(childEnv.HOME, root);
+  assert.equal(childEnv.USERPROFILE, root);
+  assert.equal(childEnv.GIT_CONFIG_GLOBAL, join(root, '.git', 'opensip-disabled-global-config'));
+  assert.equal(childEnv.GIT_CONFIG_NOSYSTEM, '1');
+  assert.equal(childEnv.GIT_ATTR_NOSYSTEM, '1');
+  assert.equal(childEnv.GIT_TERMINAL_PROMPT, '0');
+  assert.equal(childEnv.GCM_INTERACTIVE, 'Never');
+  assert.equal(childEnv.SSH_ASKPASS_REQUIRE, 'never');
+  assert.equal(childEnv.GIT_AUTHOR_DATE, '2000-01-01T00:00:00Z');
+  assert.equal(childEnv.GIT_COMMITTER_DATE, '2000-01-01T00:00:00Z');
+  assert.equal(childEnv.GIT_CONFIG_COUNT, undefined);
+  assert.equal(childEnv.GIT_ASKPASS, undefined);
+  assert.equal(childEnv.GPG_TTY, undefined);
+  assert.equal(childEnv.UNRELATED_SECRET, undefined);
+
+  let failedCalls = 0;
+  assert.equal(
+    initializeGitCorpus(root, {
+      env: { PATH: '/test/bin' },
+      spawnSync: () => {
+        failedCalls += 1;
+        return { status: 127 };
+      },
+    }),
+    false,
+  );
+  assert.equal(failedCalls, 1);
 });
 
 test('cleanupOwnedCorpus refuses unmarked directories', async () => {
@@ -485,8 +632,9 @@ test('runBenchSlo supports fake dependencies and writes a report', async () => {
         cpuModel: 'Test CPU',
         cpuCount: 2,
         ci: false,
-        gitSha: 'abc123',
+        gitSha: '0123456789abcdef0123456789abcdef01234567',
         gitBranch: 'codex/perf',
+        gitDirty: false,
       }),
       existsSync: () => true,
       mkdir,
@@ -497,6 +645,7 @@ test('runBenchSlo supports fake dependencies and writes a report', async () => {
         fileCount: 2,
         changedFiles: ['src/module-0.ts'],
         gitReady: true,
+        contentSha256: 'b'.repeat(64),
       }),
       runMeasuredCommand: async ({ command, cwd }) => ({
         command,
@@ -521,7 +670,9 @@ test('runBenchSlo supports fake dependencies and writes a report', async () => {
   assert.equal(report.verdict, 'pass');
   assert.equal(report.measurementMode, 'clean-wall');
   assert.equal(report.environment.pnpm, '11.10.0');
-  assert.equal(report.environment.gitSha, 'abc123');
+  assert.equal(report.environment.gitSha, '0123456789abcdef0123456789abcdef01234567');
+  assert.equal(report.environment.gitDirty, false);
+  assert.equal(report.corpora[0].contentSha256, 'b'.repeat(64));
   assert.equal(report.scenarios[0].scenario, 'fit-full');
   await rm(repoRoot, { recursive: true, force: true });
 });
@@ -630,6 +781,58 @@ test('runBenchSlo primes report generation with a deterministic fit session', as
   assert.equal(result.report.scenarios.length, 1);
   assert.equal(result.report.scenarios[0].scenario, 'report-generate');
   assert.equal(result.exitCode, 0);
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
+test('runBenchSlo fails closed when a graph setup command times out', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'opensip-slo-graph-prime-timeout-'));
+  const raw = minimalRawConfig();
+  raw.profiles.pr.scenarios = ['graph-impact-files'];
+  raw.scenarios['graph-impact-files'] = {
+    label: 'Graph impact',
+    description: 'test',
+  };
+  raw.budgets = [];
+  const config = normalizeSloConfig(raw, join(repoRoot, '.config/performance-slos.json'));
+  let invocations = 0;
+  const result = await runBenchSlo(
+    ['--', '--profile', 'pr', '--out', 'report.json', '--work-root', 'work'],
+    {
+      repoRoot,
+      loadSloConfig: () => Promise.resolve(config),
+      collectBenchmarkEnvironment: async () => ({ node: 'v24.16.0' }),
+      existsSync: () => true,
+      mkdir,
+      rm,
+      materializeCorpus: async ({ root }) => ({
+        root,
+        tier: 'small',
+        fileCount: 2,
+        changedFiles: ['src/module-0.ts'],
+        gitReady: true,
+      }),
+      runMeasuredCommand: async () => {
+        invocations += 1;
+        return {
+          status: 0,
+          timedOut: true,
+          durationMs: 100,
+          maxRssBytes: 512,
+          stdoutTail: '',
+          stderrTail: 'timed out',
+        };
+      },
+      writeFile: () => Promise.resolve(),
+      consoleLog: () => null,
+    },
+  );
+
+  assert.equal(invocations, 1);
+  assert.equal(result.report.scenarios.length, 1);
+  assert.equal(result.report.scenarios[0].setupFailure, true);
+  assert.equal(result.report.scenarios[0].timedOut, true);
+  assert.equal(result.report.verdict, 'fail');
+  assert.equal(result.exitCode, 1);
   await rm(repoRoot, { recursive: true, force: true });
 });
 

@@ -54,6 +54,23 @@ test('normalization uses repeated-run medians and does not claim metrics for fai
   assert.match(comparison.rows[0].warnings[0], /failed sample/u);
 });
 
+test('raw scenario rows require an explicit successful status', () => {
+  const base = report('clean-wall', [scenario('small', 20, 200)]);
+  const missingStatus = scenario('small', 10, 100);
+  delete missingStatus.status;
+  missingStatus.sampleCount = 1;
+  missingStatus.failedSamples = 0;
+
+  const comparison = compareReports(base, report('clean-wall', [missingStatus]));
+
+  assert.equal(comparison.comparable, false);
+  assert.equal(comparison.rows[0].comparable, false);
+  assert.equal(comparison.rows[0].failedSamples.head, 1);
+  assert.equal(comparison.rows[0].durationMs.head, undefined);
+  assert.equal(comparison.rows[0].durationMs.percentChange, undefined);
+  assert.match(comparison.rows[0].warnings.join(' '), /failed sample/u);
+});
+
 test('compareReports rejects mode mismatch unless explicitly allowed', () => {
   const clean = report('clean-wall', [scenario('small', 100, 1000)]);
   const profiled = report('cpu-profile', [scenario('small', 120, 1100)]);
@@ -82,6 +99,8 @@ test('scenario summary samples and median-shaped fields are accepted', () => {
         tier: 'small',
         scenario: 'cli-help',
         label: 'CLI help',
+        sampleCount: 2,
+        failedSamples: 0,
         durationMs: { median: 12 },
         maxRssBytes: { median: 2048 },
         samples: [
@@ -93,6 +112,68 @@ test('scenario summary samples and median-shaped fields are accepted', () => {
   });
   assert.equal(normalized.rows.get('small:cli-help').durationMs, 12);
   assert.equal(normalized.rows.get('small:cli-help').maxRssBytes, 2048);
+});
+
+test('aggregate summaries require explicit zero-failure metadata', () => {
+  const normalized = normalizeBenchmarkReport({
+    measurementMode: 'clean-wall',
+    scenarioSummaries: [
+      {
+        tier: 'small',
+        scenario: 'cli-help',
+        sampleCount: 2,
+        durationMs: { median: 12 },
+        maxRssBytes: { median: 2048 },
+      },
+    ],
+  });
+  const row = normalized.rows.get('small:cli-help');
+
+  assert.equal(row.durationMs, undefined);
+  assert.equal(row.maxRssBytes, undefined);
+  assert.match(row.statusIssue, /failedSamples metadata/u);
+});
+
+test('aggregate summary medians are accepted when zero failures are explicitly proven', () => {
+  const normalized = normalizeBenchmarkReport({
+    measurementMode: 'clean-wall',
+    scenarioSummaries: [
+      {
+        tier: 'small',
+        scenario: 'cli-help',
+        sampleCount: 3,
+        failedSamples: 0,
+        durationMs: { median: 12 },
+        maxRssBytes: { median: 2048 },
+      },
+    ],
+  });
+  const row = normalized.rows.get('small:cli-help');
+
+  assert.equal(row.durationMs, 12);
+  assert.equal(row.maxRssBytes, 2048);
+  assert.equal(row.statusIssue, undefined);
+});
+
+test('aggregate summary metadata must agree with its explicit samples', () => {
+  const normalized = normalizeBenchmarkReport({
+    measurementMode: 'clean-wall',
+    scenarioSummaries: [
+      {
+        tier: 'small',
+        scenario: 'cli-help',
+        sampleCount: 2,
+        failedSamples: 0,
+        durationMs: { median: 12 },
+        samples: [{ status: 0, durationMs: 10 }, { durationMs: 14 }],
+      },
+    ],
+  });
+  const row = normalized.rows.get('small:cli-help');
+
+  assert.equal(row.durationMs, undefined);
+  assert.equal(row.failedSamples, 1);
+  assert.match(row.statusIssue, /inconsistent/u);
 });
 
 test('declared failed aggregate samples suppress comparison metrics', () => {
@@ -165,6 +246,51 @@ test('comparison rejects changed benchmark context and diagnostic override suppr
   assert.equal(diagnostic.rows[0].durationMs.percentChange, undefined);
 });
 
+test('comparison rejects a different selected scenario matrix', () => {
+  const base = report('clean-wall', [scenario('small', 100, 1000)]);
+  const head = report('clean-wall', [
+    scenario('small', 80, 900),
+    { ...scenario('small', 20, 200), scenario: 'cli-help' },
+  ]);
+
+  assert.throws(() => compareReports(base, head), /Selected scenario matrix mismatch/u);
+  const diagnostic = compareReports(base, head, { allowContextMismatch: true });
+  assert.equal(diagnostic.comparable, false);
+  assert.equal(diagnostic.rows[0].durationMs.percentChange, undefined);
+});
+
+test('missing pnpm and TypeScript identity suppress performance deltas', () => {
+  const base = report('clean-wall', [scenario('small', 100, 1000)]);
+  const missingPnpm = report('clean-wall', [scenario('small', 80, 900)]);
+  missingPnpm.environment.pnpm = 'unavailable';
+  const runtimeComparison = compareReports(base, missingPnpm);
+  assert.equal(runtimeComparison.comparable, false);
+  assert.equal(runtimeComparison.rows[0].durationMs.percentChange, undefined);
+  assert.match(runtimeComparison.warnings.join(' '), /pnpm runtime/u);
+
+  const toolchainBase = toolchainReport('force', ['pnpm', 'build']);
+  const missingTypescript = toolchainReport('force', ['pnpm', 'build']);
+  missingTypescript.environment.typescript = 'unavailable';
+  const toolchainComparison = compareReports(toolchainBase, missingTypescript);
+  assert.equal(toolchainComparison.comparable, false);
+  assert.equal(toolchainComparison.rows[0].durationMs.percentChange, undefined);
+  assert.match(toolchainComparison.warnings.join(' '), /TypeScript toolchain/u);
+});
+
+test('corpus content SHA is required and content changes reject deltas', () => {
+  const base = report('clean-wall', [scenario('small', 100, 1000)]);
+  const changed = report('clean-wall', [scenario('small', 80, 900)]);
+  changed.corpora[0].contentSha256 = 'c'.repeat(64);
+  assert.throws(() => compareReports(base, changed), /Generated corpus mismatch/u);
+
+  const missing = report('clean-wall', [scenario('small', 80, 900)]);
+  delete missing.corpora[0].contentSha256;
+  const legacy = compareReports(base, missing);
+  assert.equal(legacy.comparable, false);
+  assert.equal(legacy.rows[0].durationMs.percentChange, undefined);
+  assert.match(legacy.warnings.join(' '), /generated corpus fingerprint/u);
+});
+
 test('toolchain comparisons reject cache and protocol changes', () => {
   const base = toolchainReport('force', ['pnpm', 'build']);
   assert.throws(
@@ -195,7 +321,15 @@ function report(measurementMode, scenarios) {
     quick: false,
     otlpExport: false,
     config: { fingerprint: 'a'.repeat(64) },
-    corpora: [{ tier: 'small', fileCount: 10, changedFileCount: 1, gitReady: true }],
+    corpora: [
+      {
+        tier: 'small',
+        fileCount: 10,
+        changedFiles: ['src/module-0.ts'],
+        gitReady: true,
+        contentSha256: 'b'.repeat(64),
+      },
+    ],
     createdAt: '2026-07-13T00:00:00.000Z',
     environment: {
       node: 'v24.16.0',
@@ -221,6 +355,7 @@ function toolchainReport(cacheMode, command) {
     otlpExport: undefined,
     config: undefined,
     corpora: undefined,
+    environment: { ...base.environment, typescript: '6.0.3' },
     cache: { mode: cacheMode },
     repetitions: 1,
     iterationOrder: ['build'],

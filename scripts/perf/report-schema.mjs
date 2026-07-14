@@ -48,6 +48,7 @@ export function createScenarioResult(input) {
     graphProfile: input.graphProfile,
     skipped: input.skipped,
     skipReason: input.skipReason,
+    setupFailure: input.setupFailure,
   };
 }
 

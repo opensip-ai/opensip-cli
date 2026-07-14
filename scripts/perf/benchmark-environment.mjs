@@ -13,6 +13,17 @@ const CLEAN_WALL_EXACT_ENV_KEYS = new Set([
   'TRACEPARENT',
   'TRACESTATE',
 ]);
+const CI_ENV_KEYS = [
+  'CI',
+  'CONTINUOUS_INTEGRATION',
+  'GITHUB_ACTIONS',
+  'GITLAB_CI',
+  'BUILDKITE',
+  'TF_BUILD',
+  'JENKINS_URL',
+  'TEAMCITY_VERSION',
+];
+const FALSE_ENV_VALUES = new Set(['', '0', 'false', 'no', 'off']);
 
 /**
  * Return a copy of an environment with every OpenTelemetry/profiling input removed.
@@ -35,12 +46,13 @@ export async function collectBenchmarkEnvironment(input = {}) {
   const processors = (input.cpus ?? cpus)();
   const execute = input.execFileAsync ?? execFileAsync;
   const pnpmFromUserAgent = parsePnpmVersion(environment.npm_config_user_agent);
-  const [pnpmFromCommand, gitSha, gitBranch] = await Promise.all([
+  const [pnpmFromCommand, gitSha, gitBranch, gitDirty] = await Promise.all([
     pnpmFromUserAgent === undefined
       ? readCommandText(execute, 'pnpm', ['--version'], input.repoRoot)
       : undefined,
     readCommandText(execute, 'git', ['rev-parse', 'HEAD'], input.repoRoot),
     readCommandText(execute, 'git', ['symbolic-ref', '--quiet', '--short', 'HEAD'], input.repoRoot),
+    readGitDirty(execute, input.repoRoot),
   ]);
 
   return {
@@ -51,9 +63,10 @@ export async function collectBenchmarkEnvironment(input = {}) {
     release: (input.release ?? release)(),
     cpuModel: normalizeOptionalText(processors[0]?.model),
     cpuCount: processors.length,
-    ci: environment.CI === 'true',
+    ci: isCiEnvironment(environment),
     gitSha,
     gitBranch,
+    gitDirty,
   };
 }
 
@@ -73,18 +86,44 @@ function parsePnpmVersion(userAgent) {
 
 async function readCommandText(execute, command, args, cwd) {
   try {
-    const result = await execute(command, args, {
-      cwd,
-      encoding: 'utf8',
-      killSignal: 'SIGKILL',
-      maxBuffer: METADATA_COMMAND_MAX_BUFFER_BYTES,
-      timeout: METADATA_COMMAND_TIMEOUT_MS,
-      windowsHide: true,
-    });
+    const result = await execute(command, args, metadataCommandOptions(cwd));
     return normalizeOptionalText(result.stdout);
   } catch {
     return;
   }
+}
+
+async function readGitDirty(execute, cwd) {
+  try {
+    const result = await execute(
+      'git',
+      ['status', '--porcelain=v1', '--untracked-files=normal'],
+      metadataCommandOptions(cwd),
+    );
+    return String(result.stdout ?? '').trim().length > 0;
+  } catch {
+    return;
+  }
+}
+
+function metadataCommandOptions(cwd) {
+  return {
+    cwd,
+    encoding: 'utf8',
+    killSignal: 'SIGKILL',
+    maxBuffer: METADATA_COMMAND_MAX_BUFFER_BYTES,
+    timeout: METADATA_COMMAND_TIMEOUT_MS,
+    windowsHide: true,
+  };
+}
+
+function isCiEnvironment(environment) {
+  return CI_ENV_KEYS.some((key) => isTruthyEnvironmentValue(environment[key]));
+}
+
+function isTruthyEnvironmentValue(value) {
+  if (value === undefined || value === null) return false;
+  return !FALSE_ENV_VALUES.has(String(value).trim().toLowerCase());
 }
 
 function normalizeOptionalText(value) {

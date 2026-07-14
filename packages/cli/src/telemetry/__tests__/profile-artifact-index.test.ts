@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   statSync,
@@ -76,6 +77,23 @@ describe('profile artifact index', () => {
 
     expect(() => writeProfileArtifactLabels(artifacts)).toThrow('not a real directory');
     expect(readdirSync(outside)).toEqual([]);
+  });
+
+  it('canonicalizes a trusted symlinked containment root', () => {
+    const actualRoot = join(root, 'actual');
+    const aliasRoot = join(root, 'alias');
+    mkdirSync(actualRoot);
+    symlinkSync(actualRoot, aliasRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    const artifacts = metadata({
+      baseDir: join(aliasRoot, 'profiles'),
+      containmentRoot: aliasRoot,
+    });
+
+    writeProfileArtifactLabels(artifacts);
+
+    expect(artifacts.containmentRoot).toBe(realpathSync(aliasRoot));
+    expect(artifacts.directory).toBe(join(realpathSync(aliasRoot), 'profiles'));
+    expect(existsSync(artifacts.labelsPath)).toBe(true);
   });
 
   it('returns new complete metadata only after publication', () => {

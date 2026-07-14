@@ -55,6 +55,12 @@ export function compareReports(baseReport, headReport, options = {}) {
     base.protocolFingerprint,
     head.protocolFingerprint,
   );
+  addContextMismatch(
+    incompatibilities,
+    'Selected scenario matrix',
+    base.scenarioMatrix,
+    head.scenarioMatrix,
+  );
   for (const [label, key] of [
     ['Architecture', 'arch'],
     ['Platform', 'platform'],
@@ -158,39 +164,54 @@ export function normalizeBenchmarkReport(report) {
     throw new TypeError('benchmark report must be an object');
   }
   let sourceRows = [];
+  let sourceKind = 'raw';
   if (Array.isArray(report.scenarioSummaries)) {
     sourceRows = report.scenarioSummaries;
+    sourceKind = 'summary';
   } else if (Array.isArray(report.scenarios)) {
     sourceRows = report.scenarios;
   }
   const grouped = new Map();
   for (const sourceRow of sourceRows) {
-    if (sourceRow === null || typeof sourceRow !== 'object' || sourceRow.skipped === true) continue;
+    if (sourceRow === null || typeof sourceRow !== 'object') continue;
     const tier = optionalString(sourceRow.tier) ?? UNKNOWN;
     const scenario = optionalString(sourceRow.scenario) ?? UNKNOWN;
     const key = `${tier}:${scenario}`;
-    const group = grouped.get(key) ?? [];
-    const samples = Array.isArray(sourceRow.samples) ? sourceRow.samples : [sourceRow];
-    for (const sample of samples) group.push({ ...sample, aggregateSource: sourceRow });
+    const group = grouped.get(key) ?? { entries: [], samples: [], sourceKind };
+    const hasExplicitSamples = Array.isArray(sourceRow.samples);
+    const samples = hasExplicitSamples ? sourceRow.samples : [sourceRow];
+    group.entries.push({ source: sourceRow, hasExplicitSamples });
+    group.samples.push(
+      ...samples.map((sample) =>
+        sample !== null && typeof sample === 'object' && !Array.isArray(sample) ? sample : {},
+      ),
+    );
     grouped.set(key, group);
   }
 
   const rows = new Map();
-  for (const [key, samples] of grouped) {
+  for (const [key, group] of grouped) {
+    const { samples } = group;
     const successful = samples.filter((sample) => sampleSucceeded(sample));
-    const aggregateSource = samples[0]?.aggregateSource;
-    const declaredFailedSamples = nonNegativeInteger(aggregateSource?.failedSamples);
-    const failedSamples = declaredFailedSamples ?? samples.length - successful.length;
-    const durationMs =
-      failedSamples > 0 ? undefined : aggregateMetric(aggregateSource, successful, 'durationMs');
-    const maxRssBytes =
-      failedSamples > 0 ? undefined : aggregateMetric(aggregateSource, successful, 'maxRssBytes');
-    const graphStages = failedSamples > 0 ? new Map() : aggregateGraphStages(successful);
-    const cachePosture = aggregateCachePosture(successful);
+    const aggregateSource = group.entries[0]?.source;
+    const statusEvidence =
+      group.sourceKind === 'summary'
+        ? validateSummaryStatusEvidence(group.entries, samples)
+        : validateRawStatusEvidence(samples);
+    const metricSamples = group.sourceKind === 'summary' ? samples : successful;
+    const durationMs = statusEvidence.valid
+      ? aggregateMetric(aggregateSource, metricSamples, 'durationMs')
+      : undefined;
+    const maxRssBytes = statusEvidence.valid
+      ? aggregateMetric(aggregateSource, metricSamples, 'maxRssBytes')
+      : undefined;
+    const graphStages = statusEvidence.valid ? aggregateGraphStages(metricSamples) : new Map();
+    const cachePosture = aggregateCachePosture(metricSamples);
     rows.set(key, {
       label: optionalString(aggregateSource?.label),
-      sampleCount: nonNegativeInteger(aggregateSource?.sampleCount) ?? samples.length,
-      failedSamples,
+      sampleCount: statusEvidence.sampleCount,
+      failedSamples: statusEvidence.failedSamples,
+      statusIssue: statusEvidence.issue,
       durationMs,
       maxRssBytes,
       graphStages,
@@ -208,6 +229,7 @@ export function normalizeBenchmarkReport(report) {
     corporaFingerprint: fingerprintCorpora(report.corpora),
     cacheMode: optionalString(report.cache?.mode),
     protocolFingerprint: toolchainProtocolFingerprint(report),
+    scenarioMatrix: fingerprintScenarioMatrix(grouped.keys()),
     createdAt: optionalString(report.createdAt),
     environment: normalizeEnvironment(report.environment),
     rows,
@@ -401,7 +423,10 @@ function aggregateRunStages(runs) {
       totals.set(name, (totals.get(name) ?? 0) + durationMs);
     }
   }
-  return [...totals.entries()].map(([name, durationMs]) => ({ name, durationMs }));
+  return [...totals.entries()].map(([name, durationMs]) => ({
+    name,
+    durationMs,
+  }));
 }
 
 function compareGraphStages(baseStages = new Map(), headStages = new Map(), comparable = true) {
@@ -429,11 +454,79 @@ function createDelta(base, head, comparable = true) {
 }
 
 function sampleSucceeded(sample) {
-  if (sample.skipped === true || sample.timedOut === true) return false;
-  return sample.status === undefined || sample.status === 0;
+  if (
+    sample.skipped === true ||
+    sample.timedOut === true ||
+    sample.profileArtifactFailure === true
+  ) {
+    return false;
+  }
+  return sample.status === 0;
+}
+
+function validateRawStatusEvidence(samples) {
+  const failedSamples = samples.length - samples.filter((sample) => sampleSucceeded(sample)).length;
+  return {
+    valid: samples.length > 0 && failedSamples === 0,
+    sampleCount: samples.length,
+    failedSamples,
+    issue: samples.length === 0 ? 'contains no raw samples' : undefined,
+  };
+}
+
+function validateSummaryStatusEvidence(entries, samples) {
+  if (entries.length !== 1) {
+    return invalidSummaryEvidence('contains duplicate aggregate summaries');
+  }
+  const [{ source, hasExplicitSamples }] = entries;
+  const sampleCount = nonNegativeInteger(source.sampleCount);
+  const failedSamples = nonNegativeInteger(source.failedSamples);
+  if (sampleCount === undefined || sampleCount === 0 || failedSamples === undefined) {
+    return invalidSummaryEvidence(
+      'lacks explicit positive sampleCount and non-negative failedSamples metadata',
+      sampleCount,
+      failedSamples,
+    );
+  }
+  if (failedSamples > sampleCount) {
+    return invalidSummaryEvidence(
+      'declares more failed samples than total samples',
+      sampleCount,
+      failedSamples,
+    );
+  }
+  if (hasExplicitSamples) {
+    const observedFailedSamples =
+      samples.length - samples.filter((sample) => sampleSucceeded(sample)).length;
+    if (samples.length !== sampleCount || observedFailedSamples !== failedSamples) {
+      return invalidSummaryEvidence(
+        'has inconsistent sampleCount or failedSamples metadata',
+        sampleCount,
+        observedFailedSamples,
+      );
+    }
+  }
+  return {
+    valid: failedSamples === 0,
+    sampleCount,
+    failedSamples,
+    issue: undefined,
+  };
+}
+
+function invalidSummaryEvidence(issue, sampleCount, failedSamples) {
+  return {
+    valid: false,
+    sampleCount,
+    failedSamples,
+    issue,
+  };
 }
 
 function addFailedSampleWarning(warnings, side, row) {
+  if (row?.statusIssue !== undefined) {
+    warnings.push(`${side} report ${row.statusIssue}; metrics are not compared.`);
+  }
   if ((row?.failedSamples ?? 0) > 0) {
     warnings.push(
       `${side} report has ${String(row.failedSamples)} failed sample(s); metrics are not compared.`,
@@ -458,7 +551,11 @@ function addAxisMismatch(input) {
 }
 
 function knownMismatch(base, head) {
-  return base !== undefined && head !== undefined && base !== head;
+  return isKnownContextValue(base) && isKnownContextValue(head) && base !== head;
+}
+
+function isKnownContextValue(value) {
+  return value !== undefined && value !== UNKNOWN && value !== 'unavailable';
 }
 
 function reportIdentity(report) {
@@ -472,6 +569,7 @@ function reportIdentity(report) {
     corporaFingerprint: report.corporaFingerprint,
     cacheMode: report.cacheMode,
     protocolFingerprint: report.protocolFingerprint,
+    scenarioMatrix: report.scenarioMatrix,
     createdAt: report.createdAt,
     environment: report.environment,
   };
@@ -518,13 +616,37 @@ function fingerprintCorpora(corpora) {
     .map((entry) => ({
       tier: optionalString(entry.tier) ?? UNKNOWN,
       fileCount: nonNegativeInteger(entry.fileCount),
-      changedFileCount: Array.isArray(entry.changedFiles)
-        ? entry.changedFiles.length
-        : nonNegativeInteger(entry.changedFileCount),
+      changedFiles: normalizeChangedFiles(entry.changedFiles),
       gitReady: typeof entry.gitReady === 'boolean' ? entry.gitReady : undefined,
+      contentSha256: sha256OrUndefined(entry.contentSha256),
     }))
     .sort((left, right) => left.tier.localeCompare(right.tier));
-  return normalized.length === 0 ? undefined : JSON.stringify(normalized);
+  if (
+    normalized.length === 0 ||
+    normalized.some(
+      (entry) =>
+        entry.tier === UNKNOWN ||
+        entry.fileCount === undefined ||
+        entry.changedFiles === undefined ||
+        entry.gitReady === undefined ||
+        entry.contentSha256 === undefined,
+    )
+  ) {
+    return;
+  }
+  return JSON.stringify(normalized);
+}
+
+function normalizeChangedFiles(value) {
+  if (!Array.isArray(value)) return;
+  const normalized = value.map((entry) => optionalString(entry));
+  if (normalized.includes(undefined)) return;
+  return [...new Set(normalized)].sort((left, right) => left.localeCompare(right));
+}
+
+function fingerprintScenarioMatrix(keys) {
+  const values = [...keys].sort((left, right) => left.localeCompare(right));
+  return values.length === 0 ? undefined : JSON.stringify(values);
 }
 
 function aggregateCachePosture(samples) {
@@ -563,13 +685,15 @@ function toolchainProtocolFingerprint(report) {
 function missingContextWarnings(report, side) {
   const missing = [];
   const requireField = (label, value) => {
-    if (value === undefined || value === UNKNOWN) missing.push(label);
+    if (value === undefined || value === UNKNOWN || value === 'unavailable') missing.push(label);
   };
   requireField('report kind', report.kind);
   requireField('measurement mode', report.measurementMode);
   requireField('profile', report.profile);
+  requireField('selected scenario matrix', report.scenarioMatrix);
   for (const [label, value] of [
     ['Node runtime', report.environment.node],
+    ['pnpm runtime', report.environment.pnpm],
     ['architecture', report.environment.arch],
     ['platform', report.environment.platform],
     ['OS release', report.environment.release],
@@ -580,6 +704,7 @@ function missingContextWarnings(report, side) {
     requireField(label, value);
   }
   if (report.kind === 'opensip-toolchain-benchmark') {
+    requireField('TypeScript toolchain', report.environment.typescript);
     requireField('cache posture', report.cacheMode);
     requireField('toolchain protocol', report.protocolFingerprint);
   } else {
@@ -605,6 +730,10 @@ function nonNegativeInteger(value) {
 
 function optionalString(value) {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function sha256OrUndefined(value) {
+  return typeof value === 'string' && /^[a-f\d]{64}$/u.test(value) ? value : undefined;
 }
 
 function isDefined(value) {

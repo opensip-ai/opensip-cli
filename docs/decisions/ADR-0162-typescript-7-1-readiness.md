@@ -125,6 +125,26 @@ explicit Turbo cache semantics, bounded child execution, and Node/pnpm/
 TypeScript/CPU/OS/Git metadata. It is intentionally separate from runtime SLO
 reports and budgets.
 
+## Measured TypeScript 6 baseline
+
+At source commit `68d76fd501babebc274721d55c35a620e270be4c`, Node
+`v24.16.0`, pnpm `11.10.0`, TypeScript `6.0.3`, Darwin `25.5.0`, and an Apple M5
+Max, the forced-cache protocol ran three repetitions in fixed
+build/typecheck/type-aware-ESLint order. These medians are a future toolchain
+comparison baseline only and make no built-runtime claim.
+
+| Command | Median | p95 |
+|---|---:|---:|
+| Workspace build | 15.192 s | 17.832 s |
+| Workspace typecheck | 25.514 s | 25.797 s |
+| Type-aware ESLint | 144.848 s | 234.131 s |
+
+The report records `cache.mode=force`, `turboForce=true`, and
+`eslintCache=false`: Turbo cache reads are bypassed while writes remain enabled,
+and ESLint runs without `--cache`. A future comparison must preserve that
+protocol, the command order, and the three-repetition sample count, or declare
+the difference as a separate comparison axis.
+
 ## Deferred stricter-checker candidates
 
 Evaluate these only after the API gate passes and a same-machine toolchain

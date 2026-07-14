@@ -107,6 +107,7 @@ test('profile driver uses the built CLI semantics and aggregates fake repeated r
         fileCount: 2,
         changedFiles: ['src/module-0.ts'],
         gitReady: true,
+        contentSha256: 'b'.repeat(64),
       }),
       mkdir: () => Promise.resolve(),
       rm: () => Promise.resolve(),
@@ -133,6 +134,7 @@ test('profile driver uses the built CLI semantics and aggregates fake repeated r
   assert.equal(invocations.length, 2);
   assert.deepEqual(invocations[0].command.slice(-2), ['--no-cloud', '--help']);
   assert.equal(result.report.scenarioSummaries[0].durationMs.median, 15);
+  assert.equal(result.report.corpora[0].contentSha256, 'b'.repeat(64));
   assert.equal(writes.size, 2);
 });
 
@@ -284,7 +286,10 @@ test('a timed-out graph setup cannot prime a measured profile sample', async () 
   const repoRoot = await mkdtemp(join(tmpdir(), 'opensip-bench-profile-timeout-'));
   const config = minimalProfileConfig(repoRoot);
   config.profiles.pr.scenarios = ['graph-impact-files'];
-  config.scenarios['graph-impact-files'] = { label: 'Graph impact', description: 'test' };
+  config.scenarios['graph-impact-files'] = {
+    label: 'Graph impact',
+    description: 'test',
+  };
   let invocations = 0;
   const result = await runBenchProfile(
     [

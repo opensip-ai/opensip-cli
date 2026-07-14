@@ -114,9 +114,14 @@ pnpm bench:compare -- \
 ```
 
 The comparison aligns tier/scenario metrics and graph stages, reports duration
-and RSS deltas, and warns about runtime or toolchain differences. It rejects
-clean-wall versus CPU-profile comparisons unless
-`--allow-mode-mismatch` is supplied for a diagnostic-only diff.
+and RSS deltas. By default it rejects mismatched measurement mode,
+report/profile/quick posture, OTLP posture, configuration or corpus
+fingerprint, cache/toolchain protocol, host context, Node runtime, pnpm, or
+TypeScript. `--allow-runtime-mismatch` and `--allow-toolchain-mismatch` opt into
+those intentional comparison axes. `--allow-context-mismatch` and
+`--allow-mode-mismatch` produce diagnostic output but suppress performance
+deltas. Legacy reports may parse, but missing required context also suppresses
+deltas.
 
 ## CPU profile experiments
 
@@ -155,7 +160,8 @@ runtime dependency or collector.
 
 The JSON report contains:
 
-- Node, pnpm, architecture, OS, CPU model/count, branch, and commit;
+- Node, pnpm, architecture, OS, CPU model/count, branch, commit, and worktree
+  cleanliness;
 - explicit clean-wall or CPU-profile mode and whether loopback OTLP was used;
 - raw bounded measurement rows plus min/median/nearest-rank-p95 summaries;
 - process-tree RSS median/max;
@@ -166,6 +172,15 @@ The JSON report contains:
 Raw command output remains bounded. Successful profile samples do not retain
 their output document after diagnostic extraction. Failed rows retain only the
 configured stdout/stderr tails.
+
+## Artifact handling
+
+Keep raw SLO, profile, toolchain, and comparison reports outside the repository.
+A PR should include the command, environment identity, and compact comparison
+summary. Commit `.config/performance-slos.json` only for a justified ratchet,
+and commit `benchmark-snapshot.json` plus generated docs only for an eligible
+reference refresh. Do not routinely upload `.cpuprofile` or labels sidecars;
+they may contain local paths and symbols.
 
 ## Node and TypeScript sequence
 
@@ -223,9 +238,62 @@ noise floor or a 3% clean-wall median improvement.
 
 ## Current hotspot ranking
 
-The initial Node 24 quick baseline identified bundled first-party tool admission
-as the largest named startup stage for short graph runs. Graph parse/resolve/walk
-was the next named block. Pre-action capability loading was material but smaller.
-The final before/after medians and closed ranking are recorded here when the
-optimization pass finishes; unprofiled process/module-loader time is kept
-explicit rather than being mislabelled as graph-engine work.
+The stable before/after experiment used seven quick `graph-cold` repeats on the
+same Node 24 host. Percentages below are shares of the before median, not a claim
+that every unattributed millisecond is one subsystem.
+
+| Hotspot | Stable Node 24 evidence | Disposition |
+|---|---|---|
+| Bundled first-party tool admission | Small: 222.6 ms of 1,157 ms (19.2%); medium: 219.7 ms of 1,259 ms (17.5%). Parallel admission raised the stage to 230.1/224.5 ms and overall medians to 1,181 ms (+2.1%) / 1,300 ms (+3.3%). | Reverted. `wontfix` for this cycle: the measured candidate regressed. |
+| Exact TypeScript parse | Small: 115 ms (9.9%); medium: 119 ms (9.5%). | `wontfix`: exact mode requires semantic program/checker construction, and the profile found no removable duplicate work that preserved equivalence. |
+| Exact TypeScript resolution | Medium: 77 ms (6.1%). | `wontfix`: required for exact call/reference evidence. `graph-fast` remains the explicit lower-fidelity alternative; default correctness is not weakened. |
+| AST walk | Medium: 63 ms (5.0%). | `wontfix`: required linear traversal with no isolated avoidable hotspot. |
+| Whole-process loader/runtime work | An external `node --cpu-prof` sample covered 1,149 ms of a 1,190 ms small graph-cold wall run. Node ESM/package loading plus its native file operations accounted for 642 ms (55.9% of sampled time); graph-owned work was 237 ms. | Explained and `wontfix` for this cycle. Reducing it requires a broad lazy-descriptor/module-graph redesign, not a safe one-leg graph-engine change. The whole-process profile closes the former >25% attribution gap. |
+| Targeting, fitness, and report/persistence | The final optimization profile measured `fit-changed` at 1,212 ms and `report-generate` at 993 ms; neither produced a new repeated named stage in the top band. | Not promoted. Keep the named diagnostics and revisit only if a same-scenario profile isolates a stable stage above the threshold. |
+| Worker/process boundary | Three alternating repeats on fresh 24-file corpora measured fit worker/in-process at 1,094/1,089 ms and graph at 1,083/1,082 ms. Structured result fingerprints matched across modes. | `wontfix`: the 0.1–0.5% differences are below the observed noise floor. The subprocess trust boundary stays intact. |
+| Real-repository dogfood | `fit --changed`: 17.58 s; graph: 11.59 s wall with 8.879 s graph work (8.248 s sharded build); audit: 18.30 s. | No additional synthetic blind spot was promoted. Repository scale changes total time, but the named evidence remains consistent with the ranked categories above. |
+
+No primary `pr` scenario produced a stable clean-wall improvement above the 3%
+stop threshold. The only focused candidate regressed and was reverted. The
+ranked list therefore closes as a measured noise-floor/no-win outcome. Existing
+SLO budgets were not tightened; the refreshed public snapshot records the
+current eligible Node 24 reference rather than claiming an optimization win.
+
+## Cycle validation evidence
+
+All retained raw reports were written under `/tmp` and were not committed.
+
+- The final non-quick Node `v24.16.0` `pr` SLO report passed all 12 scenarios in
+  `clean-wall` mode. Durations ranged from 938 ms to 2,769 ms and process-tree
+  RSS from 371 MiB to 580 MiB. Its semantic SLO-config SHA-256 is
+  `cd59beb0442d80b91ed99a16ad2b298d7d31be8b2ebce74c1c95c3aa13168528`;
+  this is the only report used for the public snapshot.
+- A three-repeat quick Node 24 clean profile passed all 36 samples. Graph-cold
+  medians were 1,169 ms small and 1,261 ms medium; all scenario medians ranged
+  from 951 ms to 1,641 ms.
+- The separate CPU-profile run passed both graph-cold tiers and produced a
+  same-basename `.cpuprofile` plus labels sidecar for each. The profile files
+  were 839,114 and 1,103,418 bytes, files were mode `0600`, and their artifact
+  directories were mode `0700`. This verifies artifact plumbing and hotspot
+  evidence only; it is not budget evidence.
+- The non-gating optimization profile passed 24 samples. Small-tier medians
+  included graph exact 1,129 ms, graph fast 982 ms, CLI help 896 ms, and report
+  generation 993 ms.
+- A whole-process external CPU profile covered 1,149 ms of a 1,190 ms
+  graph-cold command. Node ESM/package loading and native loader file operations
+  accounted for 642 ms (55.9% of samples), closing the prior unattributed
+  majority; graph-owned stage time was 237 ms.
+- The corrected fork-cost harness used a fresh deterministic corpus per sample,
+  alternating order and requiring matching structured-result fingerprints.
+  Three-repeat worker/in-process medians were 1,094/1,089 ms for fit and
+  1,083/1,082 ms for graph, both below the noise threshold.
+- A Node `v26.5.0` SLO and three-repeat clean profile passed only after
+  rebuilding the local `better-sqlite3` binding for that runtime. The explicit
+  `--allow-runtime-mismatch` comparison was directionally faster in most rows,
+  but Node 26 data is excluded from budgets and publication. The binding was
+  rebuilt for Node 24 before final validation.
+- The forced-cache TypeScript 6 toolchain baseline used three fixed-order
+  repetitions. Build/typecheck/type-aware-ESLint medians were 15.192 s,
+  25.514 s, and 144.848 s; p95 values were 17.832 s, 25.797 s, and 234.131 s.
+- Local OTLP export was skipped because no local collector was available. It is
+  optional by plan, and Pyroscope remains deferred.

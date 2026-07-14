@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { linkSync, lstatSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { linkSync, lstatSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
 const SERVICE_NAME = 'opensip-cli';
@@ -82,7 +82,10 @@ function safeProcessId(value: number): string {
   return String(value);
 }
 
-function safeStartedAt(value: Date): { readonly iso: string; readonly filename: string } {
+function safeStartedAt(value: Date): {
+  readonly iso: string;
+  readonly filename: string;
+} {
   if (Number.isNaN(value.getTime())) throw new RangeError('startedAt must be a valid date');
   const iso = value.toISOString();
   return { iso, filename: iso.replace(/[:.]/g, '-') };
@@ -166,10 +169,22 @@ export function createProfileArtifactIndex(
   input: CreateProfileArtifactIndexInput,
 ): ProfileArtifactMetadata {
   if (input.baseDir.trim().length === 0) throw new Error('profile artifact directory is empty');
-  const baseDir = resolve(input.baseDir.trim());
-  const containmentRoot = resolve(input.containmentRoot ?? dirname(baseDir));
+  let baseDir = resolve(input.baseDir.trim());
+  let containmentRoot = resolve(input.containmentRoot ?? dirname(baseDir));
   if (!isPathWithin(containmentRoot, baseDir)) {
     throw new Error('profile artifact directory escaped its containment root');
+  }
+  try {
+    if (lstatSync(containmentRoot).isSymbolicLink()) {
+      const canonicalRoot = realpathSync(containmentRoot);
+      baseDir = resolve(canonicalRoot, relative(containmentRoot, baseDir));
+      containmentRoot = canonicalRoot;
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    // A missing containment root is created privately below. Existing roots are
+    // canonicalized so trusted OS aliases such as macOS /tmp do not look like a
+    // symlink inside the caller-selected artifact subtree.
   }
   const command = boundedLabel(input.command, 'unknown');
   const runId = boundedLabel(input.runId, 'unknown');

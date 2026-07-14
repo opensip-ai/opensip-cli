@@ -98,9 +98,12 @@ For published measurements from this lane, see
 
 The report is JSON and includes:
 
-- measurement mode plus Node, pnpm, architecture, OS, CPU model/count, CI,
-  branch, and commit facts
-- corpus facts: tier, generated file count, changed-file set, and git availability
+- report kind `opensip-performance-slo`, measurement mode, and the semantic
+  SHA-256 fingerprint of the loaded SLO configuration
+- complete Node, pnpm, architecture, OS, CPU model/count, CI, branch, and
+  commit identity plus Git worktree cleanliness
+- corpus facts: tier, generated file count, exact changed-file set, Git
+  availability, and a deterministic content SHA-256
 - one row per measured scenario with command, cwd, exit status, timeout flag,
   duration, RSS, bounded stdout/stderr tails, and graph profile summary when present
 - budget comparisons for exit code, duration, and RSS
@@ -111,3 +114,8 @@ Warnings do not fail the lane. A failed command, timeout, missing required RSS
 measurement, or over-budget metric sets `verdict: "fail"` and exits non-zero.
 Selected scenarios without budgets still execute and must exit successfully;
 they simply omit duration/RSS comparisons.
+
+Public-snapshot eligibility is deliberately stricter than an SLO pass. The
+report must also be a non-quick Node 24 `pr` clean-wall run outside CI, retain
+complete environment/config/corpus identity, come from a clean Git worktree, and
+cover every configured budget with successful non-skipped scenarios.
