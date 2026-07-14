@@ -263,11 +263,17 @@ current eligible Node 24 reference rather than claiming an optimization win.
 
 All retained raw reports were written under `/tmp` and were not committed.
 
-- The final non-quick Node `v24.16.0` `pr` SLO report passed all 12 scenarios in
-  `clean-wall` mode. Durations ranged from 938 ms to 2,769 ms and process-tree
-  RSS from 371 MiB to 580 MiB. Its semantic SLO-config SHA-256 is
+- At source commit `9d56368a52404935a5e016986fd176f4bf44975d`, the final
+  non-quick Node `v24.16.0` `pr` SLO report passed all 12 scenarios in
+  `clean-wall` mode from a clean Git worktree. Durations ranged from 937 ms to
+  2,404 ms and process-tree RSS from 372 MiB to 581 MiB. Its semantic SLO-config
+  SHA-256 is
   `cd59beb0442d80b91ed99a16ad2b298d7d31be8b2ebce74c1c95c3aa13168528`;
-  this is the only report used for the public snapshot.
+  the small/medium corpus content SHA-256 values are
+  `34f41dce96376dd3c3652681f38eabd88d781c1c74b2c0b898427111c527cb0d` and
+  `df4837c5d2c151a6c0a8c6ca00fa5ac892c4d67ad190eb0792e851728964a60c`.
+  This publication-eligible report is the only report used for the public
+  snapshot.
 - A three-repeat quick Node 24 clean profile passed all 36 samples. Graph-cold
   medians were 1,169 ms small and 1,261 ms medium; all scenario medians ranged
   from 951 ms to 1,641 ms.

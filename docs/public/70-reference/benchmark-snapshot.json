@@ -2,7 +2,7 @@
   "version": 1,
   "reportKind": "opensip-performance-slo",
   "source": "pnpm bench:slo -- --profile pr --out slo-report.json",
-  "createdAt": "2026-07-14T04:42:30.628Z",
+  "createdAt": "2026-07-14T05:46:35.868Z",
   "measurementMode": "clean-wall",
   "profile": "pr",
   "quick": false,
@@ -21,21 +21,30 @@
     "cpuModel": "Apple M5 Max",
     "cpuCount": 18,
     "ci": false,
-    "gitSha": "68d76fd501babebc274721d55c35a620e270be4c",
-    "gitBranch": "codex/06-performance-optimization-program"
+    "gitSha": "9d56368a52404935a5e016986fd176f4bf44975d",
+    "gitBranch": "codex/06-performance-optimization-program",
+    "gitDirty": false
   },
   "corpora": [
     {
       "tier": "small",
       "fileCount": 120,
+      "changedFiles": [
+        "src/module-0.ts"
+      ],
       "changedFileCount": 1,
-      "gitReady": true
+      "gitReady": true,
+      "contentSha256": "34f41dce96376dd3c3652681f38eabd88d781c1c74b2c0b898427111c527cb0d"
     },
     {
       "tier": "medium",
       "fileCount": 750,
+      "changedFiles": [
+        "src/module-0.ts"
+      ],
       "changedFileCount": 1,
-      "gitReady": true
+      "gitReady": true,
+      "contentSha256": "df4837c5d2c151a6c0a8c6ca00fa5ac892c4d67ad190eb0792e851728964a60c"
     }
   ],
   "scenarios": [
@@ -45,8 +54,8 @@
       "label": "Fit full run",
       "status": 0,
       "timedOut": false,
-      "durationMs": 2769,
-      "maxRssBytes": 458964992,
+      "durationMs": 1169,
+      "maxRssBytes": 400719872,
       "skipped": false,
       "skipReason": ""
     },
@@ -56,8 +65,8 @@
       "label": "Fit changed run",
       "status": 0,
       "timedOut": false,
-      "durationMs": 1267,
-      "maxRssBytes": 413138944,
+      "durationMs": 1201,
+      "maxRssBytes": 391069696,
       "skipped": false,
       "skipReason": ""
     },
@@ -67,8 +76,8 @@
       "label": "Graph cold build",
       "status": 0,
       "timedOut": false,
-      "durationMs": 1395,
-      "maxRssBytes": 474562560,
+      "durationMs": 1353,
+      "maxRssBytes": 476102656,
       "graphProfile": {
         "mode": "graph",
         "cache": "miss",
@@ -84,8 +93,8 @@
       "label": "Graph warm build",
       "status": 0,
       "timedOut": false,
-      "durationMs": 964,
-      "maxRssBytes": 390135808,
+      "durationMs": 1003,
+      "maxRssBytes": 389545984,
       "graphProfile": {
         "mode": "graph",
         "cache": "hit",
@@ -101,8 +110,8 @@
       "label": "Graph impact files",
       "status": 0,
       "timedOut": false,
-      "durationMs": 938,
-      "maxRssBytes": 389103616,
+      "durationMs": 951,
+      "maxRssBytes": 391020544,
       "skipped": false,
       "skipReason": ""
     },
@@ -112,8 +121,8 @@
       "label": "Audit changed suite",
       "status": 0,
       "timedOut": false,
-      "durationMs": 1636,
-      "maxRssBytes": 565116928,
+      "durationMs": 1676,
+      "maxRssBytes": 556531712,
       "skipped": false,
       "skipReason": ""
     },
@@ -123,8 +132,8 @@
       "label": "Fit full run",
       "status": 0,
       "timedOut": false,
-      "durationMs": 1486,
-      "maxRssBytes": 449232896,
+      "durationMs": 1399,
+      "maxRssBytes": 492470272,
       "skipped": false,
       "skipReason": ""
     },
@@ -134,8 +143,8 @@
       "label": "Fit changed run",
       "status": 0,
       "timedOut": false,
-      "durationMs": 1397,
-      "maxRssBytes": 420495360,
+      "durationMs": 1500,
+      "maxRssBytes": 411074560,
       "skipped": false,
       "skipReason": ""
     },
@@ -145,8 +154,8 @@
       "label": "Graph cold build",
       "status": 0,
       "timedOut": false,
-      "durationMs": 2480,
-      "maxRssBytes": 514719744,
+      "durationMs": 2404,
+      "maxRssBytes": 584974336,
       "graphProfile": {
         "mode": "graph",
         "cache": "miss",
@@ -162,8 +171,8 @@
       "label": "Graph warm build",
       "status": 0,
       "timedOut": false,
-      "durationMs": 1177,
-      "maxRssBytes": 403587072,
+      "durationMs": 1124,
+      "maxRssBytes": 421789696,
       "graphProfile": {
         "mode": "graph",
         "cache": "hit",
@@ -179,8 +188,8 @@
       "label": "Graph impact files",
       "status": 0,
       "timedOut": false,
-      "durationMs": 999,
-      "maxRssBytes": 388562944,
+      "durationMs": 937,
+      "maxRssBytes": 391790592,
       "skipped": false,
       "skipReason": ""
     },
@@ -190,8 +199,8 @@
       "label": "Audit changed suite",
       "status": 0,
       "timedOut": false,
-      "durationMs": 2051,
-      "maxRssBytes": 608370688,
+      "durationMs": 2042,
+      "maxRssBytes": 608763904,
       "skipped": false,
       "skipReason": ""
     }
@@ -211,21 +220,21 @@
       "tier": "small",
       "scenario": "fit-full",
       "metric": "durationMs",
-      "actual": 2769,
+      "actual": 1169,
       "budget": 20000,
-      "ratio": 0.13845,
+      "ratio": 0.05845,
       "status": "pass",
-      "message": "durationMs 2769 / 20000"
+      "message": "durationMs 1169 / 20000"
     },
     {
       "tier": "small",
       "scenario": "fit-full",
       "metric": "maxRssBytes",
-      "actual": 458964992,
+      "actual": 400719872,
       "budget": 1610612736,
-      "ratio": 0.2849629720052083,
+      "ratio": 0.24879964192708334,
       "status": "pass",
-      "message": "maxRssBytes 458964992 / 1610612736"
+      "message": "maxRssBytes 400719872 / 1610612736"
     },
     {
       "tier": "small",
@@ -241,21 +250,21 @@
       "tier": "small",
       "scenario": "fit-changed",
       "metric": "durationMs",
-      "actual": 1267,
+      "actual": 1201,
       "budget": 8000,
-      "ratio": 0.158375,
+      "ratio": 0.150125,
       "status": "pass",
-      "message": "durationMs 1267 / 8000"
+      "message": "durationMs 1201 / 8000"
     },
     {
       "tier": "small",
       "scenario": "fit-changed",
       "metric": "maxRssBytes",
-      "actual": 413138944,
+      "actual": 391069696,
       "budget": 1073741824,
-      "ratio": 0.384765625,
+      "ratio": 0.3642120361328125,
       "status": "pass",
-      "message": "maxRssBytes 413138944 / 1073741824"
+      "message": "maxRssBytes 391069696 / 1073741824"
     },
     {
       "tier": "small",
@@ -271,21 +280,21 @@
       "tier": "small",
       "scenario": "graph-cold",
       "metric": "durationMs",
-      "actual": 1395,
+      "actual": 1353,
       "budget": 30000,
-      "ratio": 0.0465,
+      "ratio": 0.0451,
       "status": "pass",
-      "message": "durationMs 1395 / 30000"
+      "message": "durationMs 1353 / 30000"
     },
     {
       "tier": "small",
       "scenario": "graph-cold",
       "metric": "maxRssBytes",
-      "actual": 474562560,
+      "actual": 476102656,
       "budget": 2147483648,
-      "ratio": 0.22098541259765625,
+      "ratio": 0.22170257568359375,
       "status": "pass",
-      "message": "maxRssBytes 474562560 / 2147483648"
+      "message": "maxRssBytes 476102656 / 2147483648"
     },
     {
       "tier": "small",
@@ -301,21 +310,21 @@
       "tier": "small",
       "scenario": "graph-warm",
       "metric": "durationMs",
-      "actual": 964,
+      "actual": 1003,
       "budget": 12000,
-      "ratio": 0.08033333333333334,
+      "ratio": 0.08358333333333333,
       "status": "pass",
-      "message": "durationMs 964 / 12000"
+      "message": "durationMs 1003 / 12000"
     },
     {
       "tier": "small",
       "scenario": "graph-warm",
       "metric": "maxRssBytes",
-      "actual": 390135808,
+      "actual": 389545984,
       "budget": 1610612736,
-      "ratio": 0.24222819010416666,
+      "ratio": 0.24186197916666666,
       "status": "pass",
-      "message": "maxRssBytes 390135808 / 1610612736"
+      "message": "maxRssBytes 389545984 / 1610612736"
     },
     {
       "tier": "small",
@@ -331,21 +340,21 @@
       "tier": "small",
       "scenario": "graph-impact-files",
       "metric": "durationMs",
-      "actual": 938,
+      "actual": 951,
       "budget": 8000,
-      "ratio": 0.11725,
+      "ratio": 0.118875,
       "status": "pass",
-      "message": "durationMs 938 / 8000"
+      "message": "durationMs 951 / 8000"
     },
     {
       "tier": "small",
       "scenario": "graph-impact-files",
       "metric": "maxRssBytes",
-      "actual": 389103616,
+      "actual": 391020544,
       "budget": 1073741824,
-      "ratio": 0.3623809814453125,
+      "ratio": 0.364166259765625,
       "status": "pass",
-      "message": "maxRssBytes 389103616 / 1073741824"
+      "message": "maxRssBytes 391020544 / 1073741824"
     },
     {
       "tier": "small",
@@ -361,21 +370,21 @@
       "tier": "small",
       "scenario": "audit-changed",
       "metric": "durationMs",
-      "actual": 1636,
+      "actual": 1676,
       "budget": 18000,
-      "ratio": 0.0908888888888889,
+      "ratio": 0.09311111111111112,
       "status": "pass",
-      "message": "durationMs 1636 / 18000"
+      "message": "durationMs 1676 / 18000"
     },
     {
       "tier": "small",
       "scenario": "audit-changed",
       "metric": "maxRssBytes",
-      "actual": 565116928,
+      "actual": 556531712,
       "budget": 1610612736,
-      "ratio": 0.3508707682291667,
+      "ratio": 0.3455403645833333,
       "status": "pass",
-      "message": "maxRssBytes 565116928 / 1610612736"
+      "message": "maxRssBytes 556531712 / 1610612736"
     },
     {
       "tier": "medium",
@@ -391,21 +400,21 @@
       "tier": "medium",
       "scenario": "fit-full",
       "metric": "durationMs",
-      "actual": 1486,
+      "actual": 1399,
       "budget": 60000,
-      "ratio": 0.024766666666666666,
+      "ratio": 0.023316666666666666,
       "status": "pass",
-      "message": "durationMs 1486 / 60000"
+      "message": "durationMs 1399 / 60000"
     },
     {
       "tier": "medium",
       "scenario": "fit-full",
       "metric": "maxRssBytes",
-      "actual": 449232896,
+      "actual": 492470272,
       "budget": 3221225472,
-      "ratio": 0.13946024576822916,
+      "ratio": 0.15288289388020834,
       "status": "pass",
-      "message": "maxRssBytes 449232896 / 3221225472"
+      "message": "maxRssBytes 492470272 / 3221225472"
     },
     {
       "tier": "medium",
@@ -421,21 +430,21 @@
       "tier": "medium",
       "scenario": "fit-changed",
       "metric": "durationMs",
-      "actual": 1397,
+      "actual": 1500,
       "budget": 18000,
-      "ratio": 0.07761111111111112,
+      "ratio": 0.08333333333333333,
       "status": "pass",
-      "message": "durationMs 1397 / 18000"
+      "message": "durationMs 1500 / 18000"
     },
     {
       "tier": "medium",
       "scenario": "fit-changed",
       "metric": "maxRssBytes",
-      "actual": 420495360,
+      "actual": 411074560,
       "budget": 2147483648,
-      "ratio": 0.19580841064453125,
+      "ratio": 0.1914215087890625,
       "status": "pass",
-      "message": "maxRssBytes 420495360 / 2147483648"
+      "message": "maxRssBytes 411074560 / 2147483648"
     },
     {
       "tier": "medium",
@@ -451,21 +460,21 @@
       "tier": "medium",
       "scenario": "graph-cold",
       "metric": "durationMs",
-      "actual": 2480,
+      "actual": 2404,
       "budget": 90000,
-      "ratio": 0.027555555555555555,
+      "ratio": 0.026711111111111113,
       "status": "pass",
-      "message": "durationMs 2480 / 90000"
+      "message": "durationMs 2404 / 90000"
     },
     {
       "tier": "medium",
       "scenario": "graph-cold",
       "metric": "maxRssBytes",
-      "actual": 514719744,
+      "actual": 584974336,
       "budget": 4294967296,
-      "ratio": 0.119842529296875,
+      "ratio": 0.136199951171875,
       "status": "pass",
-      "message": "maxRssBytes 514719744 / 4294967296"
+      "message": "maxRssBytes 584974336 / 4294967296"
     },
     {
       "tier": "medium",
@@ -481,21 +490,21 @@
       "tier": "medium",
       "scenario": "graph-warm",
       "metric": "durationMs",
-      "actual": 1177,
+      "actual": 1124,
       "budget": 25000,
-      "ratio": 0.04708,
+      "ratio": 0.04496,
       "status": "pass",
-      "message": "durationMs 1177 / 25000"
+      "message": "durationMs 1124 / 25000"
     },
     {
       "tier": "medium",
       "scenario": "graph-warm",
       "metric": "maxRssBytes",
-      "actual": 403587072,
+      "actual": 421789696,
       "budget": 3221225472,
-      "ratio": 0.1252899169921875,
+      "ratio": 0.13094075520833334,
       "status": "pass",
-      "message": "maxRssBytes 403587072 / 3221225472"
+      "message": "maxRssBytes 421789696 / 3221225472"
     },
     {
       "tier": "medium",
@@ -511,21 +520,21 @@
       "tier": "medium",
       "scenario": "graph-impact-files",
       "metric": "durationMs",
-      "actual": 999,
+      "actual": 937,
       "budget": 15000,
-      "ratio": 0.0666,
+      "ratio": 0.06246666666666666,
       "status": "pass",
-      "message": "durationMs 999 / 15000"
+      "message": "durationMs 937 / 15000"
     },
     {
       "tier": "medium",
       "scenario": "graph-impact-files",
       "metric": "maxRssBytes",
-      "actual": 388562944,
+      "actual": 391790592,
       "budget": 2147483648,
-      "ratio": 0.180938720703125,
+      "ratio": 0.18244171142578125,
       "status": "pass",
-      "message": "maxRssBytes 388562944 / 2147483648"
+      "message": "maxRssBytes 391790592 / 2147483648"
     },
     {
       "tier": "medium",
@@ -541,21 +550,21 @@
       "tier": "medium",
       "scenario": "audit-changed",
       "metric": "durationMs",
-      "actual": 2051,
+      "actual": 2042,
       "budget": 45000,
-      "ratio": 0.04557777777777778,
+      "ratio": 0.04537777777777778,
       "status": "pass",
-      "message": "durationMs 2051 / 45000"
+      "message": "durationMs 2042 / 45000"
     },
     {
       "tier": "medium",
       "scenario": "audit-changed",
       "metric": "maxRssBytes",
-      "actual": 608370688,
+      "actual": 608763904,
       "budget": 3221225472,
-      "ratio": 0.18886311848958334,
+      "ratio": 0.18898518880208334,
       "status": "pass",
-      "message": "maxRssBytes 608370688 / 3221225472"
+      "message": "maxRssBytes 608763904 / 3221225472"
     }
   ]
 }
