@@ -249,6 +249,14 @@ declare global {
   const runs: readonly DashboardRun[];
   const changeImpactRuns: readonly ChangeImpactViewModel[];
   const changeImpactOmittedRuns: number;
+  /**
+   * Graph-catalog bounding (see `code-paths/bound-catalog.ts`). The inlined
+   * catalog is byte-bounded, so a very large repository ships a subset of its
+   * functions. Truncation MUST stay visible — a report that silently showed
+   * 5,000 of 28,327 functions would read as complete.
+   */
+  const graphCatalogTotalFunctions: number;
+  const graphCatalogOmittedFunctions: number;
   const REPORT_SELECTION: { view: 'change-impact'; runId?: string } | null;
   const fitSessions: readonly DashboardSession[];
   const simSessions: readonly DashboardSession[];

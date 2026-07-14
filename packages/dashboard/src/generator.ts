@@ -13,6 +13,7 @@
 // live in that bundle (src/client/*.ts).
 import { boundChangeImpactRuns, projectChangeImpactRuns } from './change-impact/project.js';
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
+import { boundGraphCatalog } from './code-paths/bound-catalog.js';
 import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
 import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
@@ -272,7 +273,12 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const safeSimRecipeCatalogJson = serializeJsonForScriptContext(simRecipeCatalog);
   const safeYagniSummaryJson = serializeJsonForScriptContext(yagniSummary);
   const safeYagniCatalogJson = serializeJsonForScriptContext(yagniCatalog);
-  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
+  // The catalog contract is a STORAGE shape; the browser reads a much smaller
+  // one. Inlining it whole produced a 293 MB report on this repo. Project it to
+  // the client's contract and bound what remains — truncation is surfaced to
+  // the page (see `graphCatalogOmittedFunctions`), never silent.
+  const boundedCatalog = boundGraphCatalog(graphCatalog);
+  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', boundedCatalog.catalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
   // function call graph up to PACKAGE nodes + package→package edges (with
@@ -376,6 +382,8 @@ const sessions = ${safeDataJson};
 const runs = ${safeRunsJson};
 const changeImpactRuns = ${safeChangeImpactJson};
 const changeImpactOmittedRuns = ${String(boundedImpact.omittedRuns)};
+const graphCatalogTotalFunctions = ${String(boundedCatalog.totalFunctions)};
+const graphCatalogOmittedFunctions = ${String(boundedCatalog.omittedFunctions)};
 const checkCatalog = ${safeCatalogJson};
 const recipeCatalog = ${safeRecipeJson};
 const graphRuleCatalog = ${safeGraphRuleCatalogJson};

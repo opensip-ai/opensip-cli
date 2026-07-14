@@ -103,7 +103,31 @@ export function renderCatalogProvenance(host: HTMLElement, catalog: CatalogLike 
     }),
   );
 
-  bar.append(provenanceChip('Functions', fnCount.toLocaleString()));
+  // The inlined catalog is byte-bounded (code-paths/bound-catalog.ts), so a very
+  // large repository ships only its highest-blast-radius functions. Say so, in
+  // warning colour, next to the count: a report that silently showed 5,000 of
+  // 28,327 functions would read as complete, which is the exact failure this
+  // product exists to prevent.
+  const omitted =
+    typeof graphCatalogOmittedFunctions === 'undefined' ? 0 : graphCatalogOmittedFunctions;
+  if (omitted > 0) {
+    const total =
+      typeof graphCatalogTotalFunctions === 'undefined'
+        ? fnCount + omitted
+        : graphCatalogTotalFunctions;
+    bar.append(
+      provenanceChip(
+        'Functions',
+        `${fnCount.toLocaleString()} of ${total.toLocaleString()} (bounded)`,
+        {
+          color: 'var(--warning)',
+          title: `${omitted.toLocaleString()} functions were omitted to keep this report a shareable size. The highest-blast-radius functions are retained. Use \`opensip graph\` or the MCP graph tools for complete evidence.`,
+        },
+      ),
+    );
+  } else {
+    bar.append(provenanceChip('Functions', fnCount.toLocaleString()));
+  }
 
   if (builtAtIso && builtAt && !Number.isNaN(builtAt.getTime())) {
     bar.append(
