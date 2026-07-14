@@ -13,6 +13,10 @@ vi.mock('../bootstrap/report-open-policy.js', () => ({
 }));
 
 import { buildAuditCommandSpec } from '../commands/audit-command-spec.js';
+import { maybeOpenSuiteReport } from '../commands/suite/open-suite-report.js';
+
+// maybeOpenSuiteReport is the shared open path used by top-level audit and
+// suite run. Keep direct coverage here so suite/audit entry points cannot drift.
 
 import type { CliCommandsContext } from '../commands/shared.js';
 import type { SuiteRunResult } from '@opensip-cli/contracts';
@@ -169,5 +173,31 @@ describe('audit report launch', () => {
       lines: ['The audit completed, but its report could not be generated or opened.'],
     });
     expect(ctx.exitCodes.at(-1)).toBe(RESULT.exitCode);
+  });
+
+  it('opens Change Impact for suite run audit through the shared helper', async () => {
+    const ctx = makeCtx();
+    const result = await maybeOpenSuiteReport({
+      name: 'audit',
+      result: RESULT,
+      opts: { open: true },
+      ctx,
+    });
+    expect(result).toBe(RESULT);
+    expect(composeAndWriteReport).toHaveBeenCalledWith({
+      open: true,
+      selection: { view: 'change-impact', runId: 'run-parent-1' },
+    });
+  });
+
+  it('opens a non-audit suite report without inventing a Change Impact selection', async () => {
+    const ctx = makeCtx();
+    await maybeOpenSuiteReport({
+      name: 'nightly',
+      result: { ...RESULT, suite: 'nightly' },
+      opts: { open: true },
+      ctx,
+    });
+    expect(composeAndWriteReport).toHaveBeenCalledWith({ open: true });
   });
 });

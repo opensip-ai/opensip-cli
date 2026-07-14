@@ -6,12 +6,22 @@ import {
   fitProjectionToByteBudget,
   projectImpactForReport,
 } from '../../persistence/impact-report-projection.js';
+import { CATALOG_IDENTITY_DIGEST_VECTORS } from '../catalog-identity-digest-vectors.js';
 
 import type { GraphImpactResult, ImpactFunction } from '@opensip-cli/contracts';
 
 function digest(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
+
+describe('catalog identity digest vectors', () => {
+  it.each(CATALOG_IDENTITY_DIGEST_VECTORS)(
+    'matches frozen SHA-256 for $input',
+    ({ input, digest: expected }) => {
+      expect(digest(input)).toBe(expected);
+    },
+  );
+});
 
 function fn(index: number, over: Partial<ImpactFunction> = {}): ImpactFunction {
   return {

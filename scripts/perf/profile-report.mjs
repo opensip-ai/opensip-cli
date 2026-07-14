@@ -38,30 +38,46 @@ export function finalizeProfileReport(report) {
   report.scenarioSummaries = [...grouped.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map((entry) => summarizeScenarioSamples(entry[1]));
+  // Intentional skips (e.g. git-unavailable fit-changed/audit-changed) must not
+  // fail the local profile lane — mirror SLO compareBudgets semantics.
   report.verdict = report.scenarioSummaries.some((summary) => summary.failedSamples > 0)
     ? 'fail'
     : 'pass';
   return report;
 }
 
+function sampleSucceeded(sample) {
+  return (
+    sample.status === 0 &&
+    sample.timedOut !== true &&
+    sample.skipped !== true &&
+    sample.profileArtifactFailure !== true
+  );
+}
+
+function sampleSkipped(sample) {
+  return sample.skipped === true;
+}
+
+function sampleFailed(sample) {
+  return !sampleSucceeded(sample) && !sampleSkipped(sample);
+}
+
 export function summarizeScenarioSamples(samples) {
   if (!Array.isArray(samples) || samples.length === 0) {
     throw new TypeError('scenario samples must be a non-empty array');
   }
-  const successful = samples.filter(
-    (sample) =>
-      sample.status === 0 &&
-      sample.timedOut !== true &&
-      sample.skipped !== true &&
-      sample.profileArtifactFailure !== true,
-  );
+  const successful = samples.filter((sample) => sampleSucceeded(sample));
+  const skippedSamples = samples.filter((sample) => sampleSkipped(sample)).length;
+  const failedSamples = samples.filter((sample) => sampleFailed(sample)).length;
   const first = samples[0];
   return {
     tier: first.tier,
     scenario: first.scenario,
     label: first.label,
     sampleCount: samples.length,
-    failedSamples: samples.length - successful.length,
+    failedSamples,
+    skippedSamples,
     durationMs: summarizeMetric(successful.map((sample) => sample.durationMs)),
     maxRssBytes: summarizeMetric(
       successful.map((sample) => sample.maxRssBytes),
@@ -85,13 +101,14 @@ export function renderProfileMarkdown(report) {
     `- Git: ${report.environment.gitSha ?? 'unavailable'}`,
     `- Verdict: ${report.verdict}`,
     '',
-    '| Tier / scenario | Samples | Failed | Duration median | Duration p95 | RSS median | RSS max |',
-    '|---|---:|---:|---:|---:|---:|---:|',
+    '| Tier / scenario | Samples | Failed | Skipped | Duration median | Duration p95 | RSS median | RSS max |',
+    '|---|---:|---:|---:|---:|---:|---:|---:|',
   ];
   for (const summary of report.scenarioSummaries) {
     lines.push(
       `| ${summary.tier} / ${summary.scenario} | ${String(summary.sampleCount)} | ` +
-        `${String(summary.failedSamples)} | ${formatDuration(summary.durationMs?.median)} | ` +
+        `${String(summary.failedSamples)} | ${String(summary.skippedSamples ?? 0)} | ` +
+        `${formatDuration(summary.durationMs?.median)} | ` +
         `${formatDuration(summary.durationMs?.p95)} | ${formatBytes(summary.maxRssBytes?.median)} | ` +
         `${formatBytes(summary.maxRssBytes?.max)} |`,
     );

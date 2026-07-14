@@ -328,7 +328,9 @@ function makeImpactTask(config: ImpactTaskConfig): GoldTask {
         version: OPENSIP_STRATEGY_VERSION,
       },
     },
-    tags: ['impact', 'before-baseline'],
+    // quality-baseline: impact_files is present on the current surface (epoch 7+).
+    // Remaining failures measure completeness/trust/confidence, not tool absence.
+    tags: ['impact', 'quality-baseline'],
   });
 }
 

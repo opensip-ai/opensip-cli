@@ -94,8 +94,10 @@ failed or inconclusive rather than receiving inferred graph confidence. Barrel
 and dynamic callers additionally require a response-derived symbol. Native text
 search is not allowed to synthesize graph confidence, so those structural
 assertions — and the workspace control arm's unrelated-package over-selection —
-preserve a measured before-baseline instead of being patched over with ground
-truth.
+preserve a measured **quality baseline** instead of being patched over with
+ground truth. Those tasks are tagged `quality-baseline`: the tools already
+exist on the current surface, and remaining failures measure completeness,
+confidence, and proof honesty — not tool absence.
 
 The two staleness tasks use the small `customer-staleness` fixture rather than
 the broader TypeScript customer. Its complete reverse inventory isolates the

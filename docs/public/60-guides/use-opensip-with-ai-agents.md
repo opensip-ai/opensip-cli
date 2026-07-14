@@ -114,11 +114,13 @@ persisted parent Run ID; absence means persistence was unavailable, not that
 impact detail and a catalog identity for the human report, while the emitted
 envelope verification remains the full trust authority.
 
-Top-level `audit` always uses the curated built-in definition. A configured
-`suites.audit` is reached explicitly with `opensip suite run audit --json`; use
-`suite run <name>` for every other configured multi-tool workflow. Agents never
-need `--open`: JSON, CI, non-TTY, and remote-shell execution suppresses browser
-launch, and machine evidence is complete without a browser.
+Top-level `audit` and `opensip suite run audit` always use the same curated
+built-in definition. The suite name `audit` is reserved (ADR-0159): config
+validation rejects a configured `suites.audit`, so nothing can shadow the
+canonical review. Name custom multi-tool workflows something else
+(`audit-custom`, `nightly-review`, …) and run them with `suite run <name>`.
+Agents never need `--open`: JSON, CI, non-TTY, and remote-shell execution
+suppresses browser launch, and machine evidence is complete without a browser.
 
 When the user says a tool **already reported findings**, use the OpenSIP MCP
 result tools first: `get_latest_findings`, `show_run`, or `list_runs`. If MCP is

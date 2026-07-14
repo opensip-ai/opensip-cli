@@ -400,9 +400,55 @@ test('profile finalization fails when any repeated sample fails and renders comp
   finalizeProfileReport(report);
   assert.equal(report.verdict, 'fail');
   assert.equal(report.scenarioSummaries[0].failedSamples, 1);
+  assert.equal(report.scenarioSummaries[0].skippedSamples, 0);
   assert.match(renderProfileMarkdown(report), /clean-wall/u);
   assert.match(renderProfileMarkdown(report), /small \/ cli-help/u);
   assert.match(renderProfileMarkdown(report), /Ranked hotspot evidence/u);
+});
+
+test('profile finalization treats intentional skips as pass, not failure', () => {
+  const report = createProfileReport({
+    measurementMode: 'clean-wall',
+    profile: 'pr',
+    quick: true,
+    runs: 1,
+    repoRoot: '/repo',
+    environment: { node: 'v24.16.0', gitSha: 'abc' },
+    config: {
+      sourcePath: '/repo/.config/performance-slos.json',
+      sampleIntervalMs: 25,
+      tailBytes: { stdout: 128, stderr: 128 },
+    },
+  });
+  report.scenarios.push(
+    {
+      tier: 'small',
+      scenario: 'fit-changed',
+      label: 'Fit changed',
+      status: 0,
+      skipped: true,
+      durationMs: 0,
+      maxRssBytes: 0,
+    },
+    {
+      tier: 'small',
+      scenario: 'graph-cold',
+      label: 'Graph cold',
+      status: 0,
+      skipped: false,
+      durationMs: 100,
+      maxRssBytes: 200,
+    },
+  );
+  finalizeProfileReport(report);
+  assert.equal(report.verdict, 'pass');
+  const fit = report.scenarioSummaries.find((row) => row.scenario === 'fit-changed');
+  const graph = report.scenarioSummaries.find((row) => row.scenario === 'graph-cold');
+  assert.equal(fit.failedSamples, 0);
+  assert.equal(fit.skippedSamples, 1);
+  assert.equal(graph.failedSamples, 0);
+  assert.equal(graph.skippedSamples, 0);
+  assert.match(renderProfileMarkdown(report), /Skipped/u);
 });
 
 function minimalProfileConfig(repoRoot) {

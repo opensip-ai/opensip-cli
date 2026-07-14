@@ -66,10 +66,11 @@ function functionTable(options: FunctionTableOptions): HTMLElement {
           }),
         );
       } else {
+        // Plain muted text: the reason is non-interactive and does not need a
+        // disabled control or aria-disabled on a non-interactive span.
         navigation.append(
           el('span', {
             class: MUTED_CLASS,
-            'aria-disabled': 'true',
             text: navigationReason(value, openCodePath !== undefined),
           }),
         );

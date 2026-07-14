@@ -36,14 +36,19 @@ function riskRow(risk: ChangeImpactRisk): HTMLElement {
   return row;
 }
 
-function appendRisks(
+function appendRiskList(
   section: HTMLElement,
-  brief: ChangeImpactReviewBrief,
+  title: string,
+  emptyText: string,
+  values: readonly ChangeImpactRisk[],
+  clientCap: number,
   omittedByReport: number,
+  reportOmissionLabel: string,
+  clientOmissionLabel: string,
 ): void {
-  const risks = boundClientRows(brief.topRisks, CHANGE_IMPACT_CLIENT_CAPS.risks);
-  if (risks.rows.length === 0)
-    section.append(el('div', { class: 'empty', text: 'No stored review risks.' }));
+  section.append(el('h4', { text: title }));
+  const risks = boundClientRows(values, clientCap);
+  if (risks.rows.length === 0) section.append(el('div', { class: 'empty', text: emptyText }));
   else {
     const list = el('ul', { class: 'change-impact-list' });
     risks.rows.forEach((risk) => list.append(riskRow(risk)));
@@ -53,7 +58,7 @@ function appendRisks(
     section.append(
       el('p', {
         class: MUTED_CLASS,
-        text: `${String(omittedByReport)} risk entry/entries omitted by the report budget.`,
+        text: `${String(omittedByReport)} ${reportOmissionLabel}`,
       }),
     );
   }
@@ -61,10 +66,44 @@ function appendRisks(
     section.append(
       el('p', {
         class: MUTED_CLASS,
-        text: `${String(risks.omitted)} risk entry/entries omitted by the defensive client limit.`,
+        text: `${String(risks.omitted)} ${clientOmissionLabel}`,
       }),
     );
   }
+}
+
+function appendRisks(
+  section: HTMLElement,
+  brief: ChangeImpactReviewBrief,
+  omittedByReport: number,
+): void {
+  appendRiskList(
+    section,
+    'Top risks',
+    'No stored review risks.',
+    brief.topRisks,
+    CHANGE_IMPACT_CLIENT_CAPS.risks,
+    omittedByReport,
+    'risk entry/entries omitted by the report budget.',
+    'risk entry/entries omitted by the defensive client limit.',
+  );
+}
+
+function appendNewFindings(
+  section: HTMLElement,
+  brief: ChangeImpactReviewBrief,
+  omittedByReport: number,
+): void {
+  appendRiskList(
+    section,
+    'New findings',
+    'No stored new findings.',
+    brief.newFindings,
+    CHANGE_IMPACT_CLIENT_CAPS.newFindings,
+    omittedByReport,
+    'new finding(s) omitted by the report budget.',
+    'new finding(s) omitted by the defensive client limit.',
+  );
 }
 
 function appendCorrelations(
@@ -272,15 +311,12 @@ export function renderImpactRisks(container: HTMLElement, model: ChangeImpactVie
         ? `Baseline: ${String(baseline.added)} added, ${String(baseline.removed)} removed, ${String(baseline.unchanged)} unchanged.`
         : 'Baseline delta unavailable.',
     }),
-    el('p', {
-      text: `${String(brief.newFindings.length)} retained new finding(s).${
-        model.reportOmitted.newFindings > 0
-          ? ` ${String(model.reportOmitted.newFindings)} new finding(s) omitted by the report budget.`
-          : ''
-      }`,
-    }),
   );
+  // Render both capped lists. topRisks and newFindings can diverge when older
+  // high-severity risks fill the top cap and lower-severity net-new findings
+  // only appear on the dedicated newFindings list.
   appendRisks(section, brief, model.reportOmitted.risks);
+  appendNewFindings(section, brief, model.reportOmitted.newFindings);
   appendCorrelations(section, brief, model.reportOmitted.correlations);
   appendDegradations(section, brief, model.reportOmitted.degradations);
   appendActions(section, brief, model.reportOmitted.actions);

@@ -259,6 +259,16 @@ ranked list therefore closes as a measured noise-floor/no-win outcome. Existing
 SLO budgets were not tightened; the refreshed public snapshot records the
 current eligible Node 24 reference rather than claiming an optimization win.
 
+### Next-cycle calibration note
+
+Measurement identity is trustworthy enough for a follow-up **absolute
+clean-wall calibration** cycle: multi-day same-host clean-wall medians, an
+explicit noise model, and budget tightening from the measured distribution (for
+example p95 × a documented safety factor)—never from cpu-profile or OTLP runs.
+Until that cycle lands, CI budgets may retain substantial headroom and only
+catch catastrophic regressions; that is intentional, not a license to ratchet
+from noisy experiments.
+
 ## Cycle validation evidence
 
 All retained raw reports were written under `/tmp` and were not committed.

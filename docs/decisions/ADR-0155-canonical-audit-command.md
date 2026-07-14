@@ -13,7 +13,7 @@ date: 2026-07-12
 status: active
 supersedes: []
 superseded_by: null
-related: [ADR-0093, ADR-0111, ADR-0129, ADR-0143]
+related: [ADR-0093, ADR-0111, ADR-0129, ADR-0143, ADR-0159]
 tags: [suite, agents, audit, cli, report]
 enforcement: mechanizable
 enforced-by: ['script:audit-command.test.ts', 'script:audit-command-contract.test.ts', 'script:suite-command-specs.test.ts', 'script:command-surface-parity.snapshot.test.ts', 'script:run-ledger-persist.test.ts', 'depcruise:cli-no-static-tool-package-import', 'depcruise:graph-no-cli']
@@ -29,12 +29,14 @@ option definition, suite-command executor, orchestrator, output policy, Run
 ledger, child-session plane, and exit policy; `audit` is not a Tool and is not a
 general root alias for configured suites.
 
-The two spellings intentionally differ only in suite resolution. Top-level
-`audit` always selects the curated built-in definition. Generic `suite run
-audit` retains ADR-0111's configured-override behavior: a configured
-`suites.audit` wins for that generic form. This prevents project configuration
-from silently replacing the stable first-use and agent workflow while preserving
-the extensible suite plane.
+The two spellings intentionally differ only in how the suite name is resolved at
+the call site: top-level `audit` supplies the built-in definition directly;
+generic `suite run audit` uses normal suite resolution. **Amendment
+(ADR-0159):** a configured `suites.audit` is no longer representable — the suite
+name is reserved — so both spellings always execute the same curated built-in
+definition. This prevents project configuration from silently replacing the
+stable first-use and agent workflow while preserving the extensible suite plane
+for non-reserved names.
 
 **Alternatives:**
 
@@ -72,18 +74,25 @@ resolution.
 - `--open` is best-effort human presentation. JSON, CI, non-TTY, and remote-shell
   suppression never launch a browser, and report failure never changes the
   completed audit verdict or exit code.
-- `suite run <name>` remains the general configured multi-tool workflow. A
-  configured `suites.audit` affects `suite run audit`, never top-level `audit`.
+- `suite run <name>` remains the general configured multi-tool workflow for
+  non-reserved suite names. ~~A configured `suites.audit` affects
+  `suite run audit`, never top-level `audit`.~~ **Superseded by
+  [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md):** the name
+  `audit` is reserved; both spellings always run the built-in definition.
 - A Tool that declares `audit` as a root command or root alias (or declares a
   child under that root) is rejected after discovery and before runtime inventory
   or Commander mounting. The canonical host command remains available and
   unshadowed.
 - Synthetic argv, Commander recursion, and another suite orchestrator are
   architectural regressions.
+- `--open` on top-level `audit` and on `suite run audit` opens the Change Impact
+  report for the completed parent run when browser launch is allowed; other
+  suites open the ordinary report without a closed Change Impact selection.
 
 **Related specs / ADRs:** Partially amends
 [ADR-0111](ADR-0111-built-in-audit-suite-preset.md) and
-[ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Scope semantics remain in
-[ADR-0129](ADR-0129-audit-suite-scope-defaults.md); the suite plane remains in
-[ADR-0093](ADR-0093-host-owned-suite-plane.md). Implementation specification:
-`docs/plans/specs/visual-proof-of-change.md` (local, gitignored).
+[ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Suite-name reservation is
+ratified by [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md). Scope
+semantics remain in [ADR-0129](ADR-0129-audit-suite-scope-defaults.md); the suite
+plane remains in [ADR-0093](ADR-0093-host-owned-suite-plane.md). Implementation
+specification: `docs/plans/specs/visual-proof-of-change.md` (local, gitignored).

@@ -17,10 +17,21 @@ Before/after artifacts must also carry the same `contractFingerprint`, which
 binds the selected task truth and committed fixture bytes while leaving
 versioned strategies independently visible on each arm.
 
-Some current-surface failures are intentional deliverables. The impact,
-test-selection, and staleness scenarios preserve before-baselines that a future
-context capability must beat; making those tasks pass by weakening assertions
-would erase the promotion evidence the package exists to provide.
+## Baseline vocabulary (epoch 7+)
+
+Do not treat remaining assertion failures as “the tool is missing.” The harness
+handshake requires the current context surface (`impact_files`, `select_tests`,
+and related reads). Distinguish:
+
+| Baseline class | Meaning | Example |
+|---|---|---|
+| **Tool-presence** | Required MCP tools / CLI surfaces exist and answer | Handshake requires `impact_files` and `select_tests` |
+| **Quality baseline** | Completeness, confidence labels, absence proof, or trust honesty still short of promotion | Impact structural proof, test-selection over-selection, stale-as-fresh honesty |
+
+Tasks tagged `quality-baseline` freeze the quality bar. Making them pass by
+weakening assertions erases the promotion evidence the package exists to
+provide. Staleness tasks similarly measure recovery honesty and cost after an
+invalidating edit, not whether `refresh_graph` exists.
 
 Negative findings are promotable evidence only when transport coverage, response
 projection, and semantic frontier closure all agree. Every projection-relevant
@@ -30,6 +41,15 @@ depth, an unresolved graph edge, an unprojectable native reference, or a remaini
 caller-frontier fact keeps the corresponding absence assertion inconclusive. A
 node at the requested traversal-depth cap is always an open frontier unless the
 surface explicitly attests that it has no successors.
+
+## Instrument size budget
+
+The harness must stay smaller than the product it measures. Prefer extending
+existing extractors, assessors, and adapters over new modules. New production
+source files under `packages/agent-eval/src/` need a proven measurement hole
+(incorrect none, missing proof-closure class, or transport incompleteness) — not
+general refactoring. Growth that only re-encodes MCP response shape increases
+epoch-bump cost without improving promotion signal.
 
 The local program source of truth is
 `docs/plans/backlog/agent-task-context-and-codebase-intelligence.md`, and

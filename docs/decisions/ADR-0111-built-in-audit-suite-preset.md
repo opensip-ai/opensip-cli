@@ -22,10 +22,13 @@ enforcement-reason: >
 ```
 
 **Decision:** Ship `audit` as a CLI-owned built-in suite preset. `opensip suite
-run audit` resolves to data shaped like `SuiteDefinition` when the user has not
-defined `suites.audit`; a user-defined `suites.audit` wins. The preset composes
-existing first-party tools through the host-owned suite plane and returns the
-same `SuiteRunResult` / `ReviewBrief` contract as any other suite.
+run audit` resolves to data shaped like `SuiteDefinition`. ~~When the user has
+not defined `suites.audit`; a user-defined `suites.audit` wins.~~ **Amended by
+[ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md):** the name is
+reserved, so a configured override is unrepresentable and both spellings always
+use the built-in definition. The preset composes existing first-party tools
+through the host-owned suite plane and returns the same `SuiteRunResult` /
+`ReviewBrief` contract as any other suite.
 
 **Alternatives:**
 
@@ -76,6 +79,11 @@ aliases.
 
 The original rejection of a top-level command and the consequence “There is
 still no top-level `opensip audit` command” are retired under that condition.
-The configured-override decision remains active for the generic form:
+
+~~The configured-override decision remains active for the generic form:
 `opensip suite run audit` selects configured `suites.audit` when present, while
-top-level `opensip audit` always selects the curated built-in suite.
+top-level `opensip audit` always selects the curated built-in suite.~~
+**Superseded by [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md):**
+the suite name `audit` is reserved at config validation, so both spellings
+always select the curated built-in suite. Custom multi-tool workflows must use
+a different suite name.

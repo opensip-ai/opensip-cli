@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
+import { CATALOG_IDENTITY_DIGEST_VECTORS } from './catalog-identity-digest-vectors.js';
 import { boundChangeImpactRuns, projectChangeImpactRuns } from './project.js';
 
 import type { DashboardRun } from '../generator.js';
@@ -15,6 +16,15 @@ import type {
 function digest(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
+
+describe('catalog identity digest vectors', () => {
+  it.each(CATALOG_IDENTITY_DIGEST_VECTORS)(
+    'matches frozen SHA-256 for $input',
+    ({ input, digest: expected }) => {
+      expect(digest(input)).toBe(expected);
+    },
+  );
+});
 
 const catalog: GraphCatalog = {
   version: '2.0',

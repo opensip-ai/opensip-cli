@@ -1,7 +1,4 @@
-import { currentLogger, currentScope } from '@opensip-cli/core';
-
-import { decideCurrentReportOpen } from '../bootstrap/report-open-policy.js';
-import { composeAndWriteReport } from '../report-compose.js';
+import { currentScope } from '@opensip-cli/core';
 
 import {
   PROJECT_SCOPE,
@@ -11,6 +8,7 @@ import {
 } from './host-subcommand-shared.js';
 import { BUILT_IN_AUDIT_SUITE, BUILT_IN_AUDIT_SUITE_NAME } from './suite/built-in-suites.js';
 import { executeSuiteCommand } from './suite/execute-suite-command.js';
+import { maybeOpenSuiteReport } from './suite/open-suite-report.js';
 import { SUITE_RUN_OPTIONS } from './suite/suite-run-options.js';
 
 import type { CliCommandsContext } from './shared.js';
@@ -70,38 +68,14 @@ export function buildAuditCommandSpec(ctx: CliCommandsContext): HostSpec {
         defaultChanged: true,
       });
       if (result === undefined) return;
-
-      const openDecision = decideCurrentReportOpen({
-        openRequested: opts.open === true,
-        jsonOutput: opts.json === true,
+      return maybeOpenSuiteReport({
+        name: BUILT_IN_AUDIT_SUITE_NAME,
+        result,
+        // Preserve the original opts so --open / --json are visible even though
+        // they are stripped from the suite executor option bag.
+        opts,
+        ctx,
       });
-      if (!openDecision.shouldOpen) return result;
-
-      try {
-        const report = await composeAndWriteReport({
-          open: true,
-          selection: {
-            view: 'change-impact',
-            ...(result.runId === undefined ? {} : { runId: result.runId }),
-          },
-        });
-        if (!report.opened) await ctx.render(report);
-      } catch (error) {
-        currentLogger().warn?.({
-          evt: 'cli.report.audit_open_failed',
-          module: 'cli:report',
-          errorName: error instanceof Error ? error.name : 'UnknownError',
-        });
-        await ctx.render({
-          type: 'text-lines',
-          title: 'Change Impact report unavailable',
-          lines: ['The audit completed, but its report could not be generated or opened.'],
-        });
-      }
-      // Report composition and browser launch are best-effort presentation. The
-      // completed suite remains the sole authority for the command verdict.
-      ctx.setExitCode(result.exitCode);
-      return result;
     },
   });
 }

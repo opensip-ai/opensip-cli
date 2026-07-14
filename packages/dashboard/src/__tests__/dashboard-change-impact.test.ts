@@ -711,11 +711,50 @@ describe('Change Impact generated report', () => {
     });
 
     const panel = document.querySelector<HTMLElement>('#panel-change-impact');
-    const unavailable = panel?.querySelector<HTMLElement>('[aria-disabled="true"]');
     expect(factValue(panel ?? document, 'Catalog qualification')).toBe('mismatched');
     expect(panel?.querySelector('button.fc-action')).toBeNull();
-    expect(unavailable?.textContent).toContain('stored and current catalogs do not match');
-    expect(unavailable?.tagName).toBe('SPAN');
+    expect(panel?.querySelector('[aria-disabled="true"]')).toBeNull();
+    expect(panel?.textContent).toContain('stored and current catalogs do not match');
+  });
+
+  it('renders newFindings as detail rows even when they diverge from topRisks', () => {
+    const template = reviewBrief().topRisks[0];
+    if (!template) throw new Error('review brief fixture requires one risk');
+    const topOnly = {
+      ...template,
+      ruleId: 'top-only-old-high',
+      severity: 'critical' as const,
+      isNew: false,
+      message: 'Old critical risk retained in top risks only.',
+    };
+    const newOnly = {
+      ...template,
+      ruleId: 'new-only-low',
+      severity: 'low' as const,
+      isNew: true,
+      message: 'Net-new low severity finding only on newFindings list.',
+    };
+    const brief = {
+      ...reviewBrief(),
+      topRisks: [topOnly],
+      newFindings: [newOnly],
+    };
+    const run = auditRun('RUN_new_findings', '2026-07-12T00:00:01.000Z', 'session-new', brief);
+    bootReport({
+      sessions: [impactSession('session-new')],
+      runs: [run],
+      graphCatalog,
+      selection: { view: 'change-impact', runId: run.id },
+    });
+
+    const panel = document.querySelector<HTMLElement>('#panel-change-impact');
+    const text = panel?.textContent ?? '';
+    expect(text).toContain('Top risks');
+    expect(text).toContain('New findings');
+    expect(text).toContain('top-only-old-high');
+    expect(text).toContain('new-only-low');
+    expect(text).toContain('Net-new low severity finding only on newFindings list.');
+    expect(text).not.toContain('retained new finding(s)');
   });
 
   it('renders malformed-present ReviewBrief data conservatively instead of inferring PASS', () => {

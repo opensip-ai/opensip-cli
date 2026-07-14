@@ -12,6 +12,8 @@ export const CHANGE_IMPACT_CLIENT_CAPS = {
   impactedPackages: 100,
   recommendedCommands: 20,
   risks: 100,
+  /** Separate client cap for the stored newFindings list (can diverge from topRisks). */
+  newFindings: 100,
   uncertainties: 100,
 } as const;
 
@@ -40,6 +42,7 @@ export function clientOmittedRowCount(model: ChangeImpactViewModel): number {
     [evidence?.recommendedCommands.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.recommendedCommands],
     [evidence?.trust.uncertainties.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.uncertainties],
     [brief?.topRisks.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.risks],
+    [brief?.newFindings.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.newFindings],
     [brief?.correlatedRisks?.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.correlations],
     [brief?.recommendedActions.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.actions],
     [brief?.degraded.length ?? 0, CHANGE_IMPACT_CLIENT_CAPS.degradations],

@@ -279,11 +279,17 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
     if (aborted(signal)) {
       return err(readError('cancelled', 'File context read was cancelled.'));
     }
-    // Keep the lookup on the exact snapshot returned by this call. Reading the
-    // mutable instance cache again could mix identities if concurrent requests
-    // refresh it between the status read and this projection.
+    // Keep the lookup on the exact snapshot returned by this call. Prefer the
+    // substrate's O(1) fileByPath map only when the live cache still carries
+    // the same inventory identity; otherwise fall back to the status snapshot
+    // files list so concurrent refresh cannot mix identities.
     const snapshot = status.value.snapshot;
-    const fact = snapshot.files.find((candidate) => candidate.path === normalized);
+    const cachedInventory = this.cache?.inventory;
+    const fact =
+      cachedInventory !== undefined &&
+      cachedInventory.snapshot.snapshotId === status.value.identity
+        ? cachedInventory.fileByPath.get(normalized)
+        : snapshot.files.find((candidate) => candidate.path === normalized);
     if (fact !== undefined) {
       let packageFact = owningPackage(normalized, snapshot.packages);
       if (fact.packageName !== undefined) {

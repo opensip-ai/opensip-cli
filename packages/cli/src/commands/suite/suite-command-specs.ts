@@ -17,6 +17,7 @@ import {
   resolveSuite,
 } from './built-in-suites.js';
 import { emitSuiteCommandFailure, executeSuiteCommand } from './execute-suite-command.js';
+import { maybeOpenSuiteReport } from './open-suite-report.js';
 import { addSuiteStep } from './suite-add.js';
 import { SUITE_RUN_OPTIONS } from './suite-run-options.js';
 import { validateSuite } from './validate-suite.js';
@@ -81,7 +82,7 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
       if (resolved === undefined) {
         return emitSuiteCommandFailure(ctx, opts, `Unknown suite '${name}'.`);
       }
-      return executeSuiteCommand({
+      const result = await executeSuiteCommand({
         name,
         resolved,
         opts,
@@ -89,6 +90,8 @@ function buildSuiteRunSpec(ctx: CliCommandsContext): HostSpec {
         tools: currentScope()?.tools.list() ?? [],
         defaultChanged: resolved.source === 'built-in' && name === BUILT_IN_AUDIT_SUITE_NAME,
       });
+      if (result === undefined) return;
+      return maybeOpenSuiteReport({ name, result, opts, ctx });
     },
   });
 }

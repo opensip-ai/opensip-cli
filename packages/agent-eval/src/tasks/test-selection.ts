@@ -205,7 +205,9 @@ function makeTestSelectionTask(config: TestSelectionConfig): GoldTask {
         version: OPENSIP_STRATEGY_VERSION,
       },
     },
-    tags: ['test-selection', 'before-baseline'],
+    // quality-baseline: select_tests is present on the current surface (epoch 7+).
+    // Remaining failures measure completeness/trust/confidence, not tool absence.
+    tags: ['test-selection', 'quality-baseline'],
   });
 }
 
