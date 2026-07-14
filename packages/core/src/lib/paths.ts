@@ -234,6 +234,28 @@ export function resolveEphemeralProjectPaths(projectDir: string): EphemeralProje
   };
 }
 
+/**
+ * THE seam for "where does this run's runtime state live?" — project-local when
+ * the project is initialized, user-cache when it is ephemeral (no-init).
+ *
+ * Every consumer of runtime state (datastore, logs, reports, artifacts, caches)
+ * MUST route through here rather than calling `resolveProjectPaths` directly,
+ * or an ephemeral run silently writes into the user's repository — which is
+ * exactly the promise a no-init first run makes: it writes nothing to your
+ * project. `report` did precisely that until this seam existed.
+ *
+ * Structural parameter (not `ProjectContext`) to keep `paths` free of a
+ * dependency on `project-context`.
+ */
+export function resolveRuntimePathsForScope(project: {
+  readonly scope: 'project' | 'ephemeral' | 'none';
+  readonly projectRoot: string;
+}): RuntimePaths {
+  return project.scope === 'ephemeral'
+    ? resolveEphemeralProjectPaths(project.projectRoot)
+    : resolveProjectPaths(project.projectRoot);
+}
+
 // =============================================================================
 // SAFE PATH CONTAINMENT
 // =============================================================================

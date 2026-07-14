@@ -26,7 +26,6 @@ import { join } from 'node:path';
 
 import {
   currentScope,
-  resolveProjectPaths,
   resolveToolHooks,
   SystemError,
   type Tool,
@@ -51,7 +50,11 @@ import {
   provenanceRecordFor,
   shouldRunHookInHost,
 } from './bootstrap/tool-provenance.js';
-import { buildHostDispatchCtx, getCurrentProjectRoot } from './cli-context.js';
+import {
+  buildHostDispatchCtx,
+  getCurrentProjectRoot,
+  getCurrentRuntimePaths,
+} from './cli-context.js';
 import { buildReportLaunchTarget, launchReport } from './open-report.js';
 
 import type { ReportResult, StoredRunStep } from '@opensip-cli/contracts';
@@ -278,7 +281,9 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
   const input = await composeReportInput(opts.selection);
   const html = generateDashboardHtml(input);
 
-  const paths = resolveProjectPaths(getCurrentProjectRoot());
+  // Scope-aware: an ephemeral (no-init) run must write its report into the user
+  // cache, never into the user's repository.
+  const paths = getCurrentRuntimePaths();
   mkdirSync(paths.reportsDir, { recursive: true });
   const reportPath = join(paths.reportsDir, 'latest.html');
   writeFileSync(reportPath, html, 'utf8');
