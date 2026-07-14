@@ -424,7 +424,7 @@ function currentRepo(): ContextSnapshotRepo {
 export function createContextSnapshotAccessor(): ContextSnapshotAccessor {
   return Object.freeze({
     save: (input: ContextSnapshotSaveInput) =>
-      currentRepo().save(input, currentScope()?.graph?.contextRun.protectedSnapshotIds() ?? []),
+      currentRepo().save(input, currentScope()?.graph?.contextRun.protectedSnapshotIds ?? []),
     get: (id: string) => currentRepo().get(id),
     latest: (kind: string) => currentRepo().latest(kind),
   });
