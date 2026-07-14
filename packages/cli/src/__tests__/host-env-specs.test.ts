@@ -17,7 +17,12 @@ import {
   hostEnv,
 } from '../env/host-env-specs.js';
 
-const TOUCHED = ['OPENSIP_NO_UPDATE', 'NO_UPDATE_NOTIFIER', 'OTEL_EXPORTER_OTLP_ENDPOINT'];
+const TOUCHED = [
+  'OPENSIP_NO_UPDATE',
+  'NO_UPDATE_NOTIFIER',
+  'OTEL_EXPORTER_OTLP_ENDPOINT',
+  'OPENSIP_PROFILE_DIR',
+];
 
 afterEach(() => {
   for (const key of TOUCHED) delete process.env[key];
@@ -85,12 +90,19 @@ describe('hostEnv reads (CLI infra)', () => {
     expect(hostEnv.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe('https://collector:4318');
   });
 
+  it('reads the caller-selected profile directory as a raw string', () => {
+    expect(hostEnv.get('OPENSIP_PROFILE_DIR')).toBeUndefined();
+    process.env.OPENSIP_PROFILE_DIR = '/opt/opensip/profiles';
+    expect(hostEnv.get('OPENSIP_PROFILE_DIR')).toBe('/opt/opensip/profiles');
+  });
+
   it('CLI_INFRA_ENV_SPECS covers the infra variables', () => {
     // ADR-0054 M4-E retired OPENSIP_CLI_EXTERNAL_WORKER (external tools now fork
     // by default; no opt-in gate) — it is no longer in the surface.
     expect(CLI_INFRA_ENV_SPECS.map((s) => s.canonical)).toEqual([
       'OTEL_EXPORTER_OTLP_ENDPOINT',
       'OPENSIP_PROFILING',
+      'OPENSIP_PROFILE_DIR',
       'TRACEPARENT',
       'OPENSIP_NO_UPDATE',
       'NO_UPDATE_NOTIFIER',

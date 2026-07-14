@@ -344,7 +344,7 @@ describe('graph context producer bindings', () => {
     ]);
     expect(harness.get).toHaveBeenCalledWith(inventoryValue.snapshotId);
     expect(harness.save).toHaveBeenCalledTimes(1);
-    expect(harness.run.protectedSnapshotIds()).toEqual([
+    expect(harness.run.protectedSnapshotIds).toEqual([
       inventoryValue.snapshotId,
       result.evidenceSnapshots?.[0]?.snapshotId,
     ]);
@@ -451,14 +451,14 @@ describe('graph context producer bindings', () => {
     run.beginGraph();
     run.completeGraph('graph-old');
     run.completeTestSelection('selection-old');
-    expect(run.protectedSnapshotIds()).toEqual(['inventory-old', 'selection-old']);
+    expect(run.protectedSnapshotIds).toEqual(['inventory-old', 'selection-old']);
     expect(run.inputs()).toEqual({
       inventorySnapshotId: 'inventory-old',
       graphSnapshotId: 'graph-old',
     });
     run.beginInventory();
     expect(run.inputs()).toBeUndefined();
-    expect(run.protectedSnapshotIds()).toEqual([]);
+    expect(run.protectedSnapshotIds).toEqual([]);
     run.completeInventory('inventory-new');
     run.beginGraph();
     expect(run.inputs()).toBeUndefined();

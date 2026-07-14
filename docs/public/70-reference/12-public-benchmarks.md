@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-13
 release: v0.6.0
 title: "Public benchmarks"
 audience: [getting-started, ci-integrators, contributors]
@@ -14,6 +14,7 @@ related-docs:
   - ./11-performance-slos.md
   - ../60-guides/03-wire-into-ci.md
   - ../00-start/03-vs-other-tools.md
+  - ./16-performance-profiling.md
 ---
 # Public Benchmarks
 
@@ -22,6 +23,19 @@ generates deterministic TypeScript corpora, runs the built CLI as an external
 process, measures wall-clock duration and process-tree RSS, and writes a JSON
 report. This page renders a committed snapshot of that report so the public docs
 have concrete, reproducible numbers.
+
+Snapshot generation accepts only an explicit `clean-wall` SLO report. CPU
+profiles and OTLP experiments are useful for locating work, but their overhead
+cannot become a published runtime number. See
+[Performance profiling](./16-performance-profiling.md).
+
+Publication requires a passing, non-quick `opensip-performance-slo` report
+using the `pr` profile, `clean-wall` mode, Node 24, and a non-CI environment with
+complete identity and a clean Git worktree. Its configuration fingerprint must
+match the checked-in SLO config; each deterministic corpus must retain its
+content SHA-256 and exact changed-file set; every scenario must succeed without
+being skipped or timed out; and all configured exit, duration, and RSS budget
+rows must be present, recomputed from the scenario measurements, and passing.
 
 Reproduce the snapshot locally:
 
@@ -39,9 +53,11 @@ they are not competitor benchmarks.
 <!-- opensip:public-benchmark-summary start -->
 | Field | Value |
 |---|---|
-| Measured at | 2026-07-02T11:31:24.608Z |
-| Source | `pnpm bench:slo -- --profile pr --out slo-report.json` |
-| Profile | `pr` |
+| Measured at | 2026-07-14T05:46:35.868Z |
+| Source | <code>pnpm bench:slo -- --profile pr --out slo-report.json</code> |
+| Measurement mode | <code>clean-wall</code> |
+| SLO config SHA-256 | <code>cd59beb0442d80b91ed99a16ad2b298d7d31be8b2ebce74c1c95c3aa13168528</code> |
+| Profile | <code>pr</code> |
 | Quick mode | no |
 | Verdict | pass |
 <!-- opensip:public-benchmark-summary end -->
@@ -49,10 +65,10 @@ they are not competitor benchmarks.
 ## Corpus Sizes
 
 <!-- opensip:public-benchmark-corpora start -->
-| Tier | Generated files | Changed files | Git ready |
-|---|---:|---:|---|
-| small | 120 | 1 | yes |
-| medium | 750 | 1 | yes |
+| Tier | Generated files | Changed files | Git ready | Content SHA-256 |
+|---|---:|---:|---|---|
+| small | 120 | 1 | yes | <code>34f41dce96376dd3c3652681f38eabd88d781c1c74b2c0b898427111c527cb0d</code> |
+| medium | 750 | 1 | yes | <code>df4837c5d2c151a6c0a8c6ca00fa5ac892c4d67ad190eb0792e851728964a60c</code> |
 <!-- opensip:public-benchmark-corpora end -->
 
 ## Results
@@ -60,18 +76,18 @@ they are not competitor benchmarks.
 <!-- opensip:public-benchmark-results start -->
 | Tier | Scenario | Status | Duration | Duration budget | Duration margin | Peak RSS | RSS budget | RSS margin | Graph cache |
 |---|---|---|---:|---:|---:|---:|---:|---:|---|
-| small | Fit full run | pass | 3.5 s | 20 s | +16.5 s | 397.8 MiB | 1.5 GiB | +1.1 GiB |  |
-| small | Fit changed run | pass | 1.1 s | 8 s | +6.9 s | 373.4 MiB | 1 GiB | +650.6 MiB |  |
-| small | Graph cold build | pass | 1.2 s | 30 s | +28.8 s | 429.9 MiB | 2 GiB | +1.6 GiB |  |
-| small | Graph warm build | pass | 845 ms | 12 s | +11.2 s | 358.2 MiB | 1.5 GiB | +1.2 GiB |  |
-| small | Graph impact files | pass | 829 ms | 8 s | +7.2 s | 356.6 MiB | 1 GiB | +667.4 MiB |  |
-| small | Audit changed suite | pass | 1.5 s | 18 s | +16.5 s | 529.3 MiB | 1.5 GiB | +1006.7 MiB |  |
-| medium | Fit full run | pass | 1.3 s | 60 s | +58.7 s | 435.6 MiB | 3 GiB | +2.6 GiB |  |
-| medium | Fit changed run | pass | 1.3 s | 18 s | +16.7 s | 369.6 MiB | 2 GiB | +1.6 GiB |  |
-| medium | Graph cold build | pass | 2.0 s | 90 s | +88.0 s | 487.7 MiB | 4 GiB | +3.5 GiB |  |
-| medium | Graph warm build | pass | 977 ms | 25 s | +24.0 s | 357.3 MiB | 3 GiB | +2.7 GiB |  |
-| medium | Graph impact files | pass | 840 ms | 15 s | +14.2 s | 358.1 MiB | 2 GiB | +1.7 GiB |  |
-| medium | Audit changed suite | pass | 1.8 s | 45 s | +43.2 s | 528.0 MiB | 3 GiB | +2.5 GiB |  |
+| small | Fit full run | pass | 1.2 s | 20 s | +18.8 s | 382.2 MiB | 1.5 GiB | +1.1 GiB |  |
+| small | Fit changed run | pass | 1.2 s | 8 s | +6.8 s | 373.0 MiB | 1 GiB | +651.0 MiB |  |
+| small | Graph cold build | pass | 1.4 s | 30 s | +28.6 s | 454.0 MiB | 2 GiB | +1.6 GiB | miss |
+| small | Graph warm build | pass | 1.0 s | 12 s | +11.0 s | 371.5 MiB | 1.5 GiB | +1.1 GiB | hit |
+| small | Graph impact files | pass | 951 ms | 8 s | +7.0 s | 372.9 MiB | 1 GiB | +651.1 MiB |  |
+| small | Audit changed suite | pass | 1.7 s | 18 s | +16.3 s | 530.8 MiB | 1.5 GiB | +1005.3 MiB |  |
+| medium | Fit full run | pass | 1.4 s | 60 s | +58.6 s | 469.7 MiB | 3 GiB | +2.5 GiB |  |
+| medium | Fit changed run | pass | 1.5 s | 18 s | +16.5 s | 392.0 MiB | 2 GiB | +1.6 GiB |  |
+| medium | Graph cold build | pass | 2.4 s | 90 s | +87.6 s | 557.9 MiB | 4 GiB | +3.5 GiB | miss |
+| medium | Graph warm build | pass | 1.1 s | 25 s | +23.9 s | 402.3 MiB | 3 GiB | +2.6 GiB | hit |
+| medium | Graph impact files | pass | 937 ms | 15 s | +14.1 s | 373.6 MiB | 2 GiB | +1.6 GiB |  |
+| medium | Audit changed suite | pass | 2.0 s | 45 s | +43.0 s | 580.6 MiB | 3 GiB | +2.4 GiB |  |
 <!-- opensip:public-benchmark-results end -->
 
 ## Environment
@@ -79,10 +95,16 @@ they are not competitor benchmarks.
 <!-- opensip:public-benchmark-environment start -->
 | Field | Value |
 |---|---|
-| Node.js | `v24.16.0` |
-| Platform | `darwin` |
-| OS release | `25.5.0` |
+| Node.js | <code>v24.16.0</code> |
+| pnpm | <code>11.10.0</code> |
+| Architecture | <code>arm64</code> |
+| Platform | <code>darwin</code> |
+| OS release | <code>25.5.0</code> |
+| CPU model | Apple M5 Max |
 | CPU count | 18 |
+| Git commit | <code>9d56368a52404935a5e016986fd176f4bf44975d</code> |
+| Git branch | <code>codex/06-performance-optimization-program</code> |
+| Git worktree dirty | no |
 | CI | no |
 <!-- opensip:public-benchmark-environment end -->
 

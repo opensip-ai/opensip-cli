@@ -57,6 +57,7 @@ scaffold, one passing fitness run, and the local HTML report. From there:
 | Verify release artifacts | [Verifiable releases](./70-reference/13-verifiable-releases.md) |
 | Inspect detection-quality methodology | [Detection quality](./70-reference/14-detection-quality.md) |
 | Audit contract/version compatibility | [Compatibility policy](./70-reference/15-compatibility-policy.md) |
+| Profile or compare performance work | [Performance profiling](./70-reference/16-performance-profiling.md) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
 
 ## Command Map
@@ -224,6 +225,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 57. [Verifiable releases](./70-reference/13-verifiable-releases.md)
 58. [Detection quality](./70-reference/14-detection-quality.md)
 59. [Compatibility policy](./70-reference/15-compatibility-policy.md)
+60. [Performance profiling](./70-reference/16-performance-profiling.md)
 
 ### 80 - Internals
 

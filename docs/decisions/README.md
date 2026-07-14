@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-06-01
+last_verified: 2026-07-13
 owner: opensip-cli
 ---
 
@@ -37,6 +37,8 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0163](ADR-0163-local-cpu-profiling-independent-of-otel-export.md) — Explicit local Node inspector profiling independent of OTel export, bounded owner-only artifacts, clean-wall-only performance claims, and Pyroscope deferred (supersedes ADR-0049).
+- [ADR-0162](ADR-0162-typescript-7-1-readiness.md) — Keep the 6.0.3 line and defer separate TypeScript 7 build-compiler/runtime-API migrations until a stable top-level `createProgram(rootFiles, compilerOptions)` (or equivalent) and the full capability/equivalence gates exist.
 - [ADR-0161](ADR-0161-codebase-inventory-and-context-snapshot-ownership.md) — Persistence-free layer-3 codebase facts, graph-owned immutable derived snapshots, explicit-file input, and exact captured-port replay with labelled fallbacks.
 - [ADR-0160](ADR-0160-deterministic-task-context-evidence-plane.md) — Bounded non-finding Tool evidence, mutually exclusive evidence/verdict commands, and host-only TaskContextManifest aggregation on exact parent Run/RunStep identities.
 - [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md) — Reserved names on both configurable planes: configured suites cannot shadow built-in suites (`audit` or `agent-context`) and Tools cannot claim any host-owned root command.

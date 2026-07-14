@@ -36,7 +36,11 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   },
   {
     canonical: 'OPENSIP_PROFILING',
-    docs: 'Explicit gate for the optional CPU profiling path (ADR-0049). "1" or "true" forces on when OTEL_EXPORTER_OTLP_ENDPOINT is set; "0"/"false" forces off. When omitted and the OTLP endpoint is present, falls back to the documented OTEL-only mode (with cost warnings emitted).',
+    docs: 'Explicit gate for local CPU-profile artifacts. "1" or "true" enables profiling without requiring an OTLP endpoint; unset, "0", and "false" are off. An OTLP endpoint alone never creates profile artifacts.',
+  },
+  {
+    canonical: 'OPENSIP_PROFILE_DIR',
+    docs: 'Optional caller-selected directory for local .cpuprofile and .labels.json artifacts. Relative paths resolve from the CLI process working directory; files are created exclusively with owner-only permissions.',
   },
   {
     canonical: 'TRACEPARENT',

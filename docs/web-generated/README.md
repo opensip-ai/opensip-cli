@@ -57,6 +57,7 @@ scaffold, one passing fitness run, and the local HTML report. From there:
 | Verify release artifacts | [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/) |
 | Inspect detection-quality methodology | [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/) |
 | Audit contract/version compatibility | [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/) |
+| Profile or compare performance work | [Performance profiling](/docs/opensip-cli/70-reference/16-performance-profiling/) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) |
 
 ## Command Map
@@ -224,6 +225,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 57. [Verifiable releases](/docs/opensip-cli/70-reference/13-verifiable-releases/)
 58. [Detection quality](/docs/opensip-cli/70-reference/14-detection-quality/)
 59. [Compatibility policy](/docs/opensip-cli/70-reference/15-compatibility-policy/)
+60. [Performance profiling](/docs/opensip-cli/70-reference/16-performance-profiling/)
 
 ### 80 - Internals
 

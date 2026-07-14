@@ -16,7 +16,7 @@ export interface ContextRunState {
   beginGraph(): void;
   completeGraph(snapshotId: string): void;
   completeTestSelection(snapshotId: string): void;
-  protectedSnapshotIds(): readonly string[];
+  readonly protectedSnapshotIds: readonly string[];
   inputs(): ContextRunInputs | undefined;
 }
 
@@ -42,12 +42,13 @@ export function createContextRunState(): ContextRunState {
     completeTestSelection: (snapshotId: string) => {
       testSelectionSnapshotId = snapshotId;
     },
-    protectedSnapshotIds: () =>
-      Object.freeze(
+    get protectedSnapshotIds() {
+      return Object.freeze(
         [inventorySnapshotId, testSelectionSnapshotId].filter(
           (snapshotId): snapshotId is string => snapshotId !== undefined,
         ),
-      ),
+      );
+    },
     inputs: () =>
       inventorySnapshotId === undefined || graphSnapshotId === undefined
         ? undefined

@@ -18,6 +18,10 @@ export async function runMeasuredCommand(input) {
 
   const stdout = new TailBuffer(input.stdoutTailBytes);
   const stderr = new TailBuffer(input.stderrTailBytes);
+  const stdoutCapture =
+    input.stdoutCaptureBytes === undefined
+      ? undefined
+      : new PrefixBuffer(input.stdoutCaptureBytes, 'stdoutCaptureBytes');
   const sampleProcessTable = input.readProcessTable ?? readProcessTable;
   const sampleTimeoutMs = input.rssSampleTimeoutMs ?? RSS_SAMPLE_TIMEOUT_MS;
   if (!Number.isSafeInteger(sampleTimeoutMs) || sampleTimeoutMs <= 0) {
@@ -68,7 +72,10 @@ export async function runMeasuredCommand(input) {
     useProcessGroup,
   });
 
-  const onStdout = (chunk) => stdout.push(chunk);
+  const onStdout = (chunk) => {
+    stdout.push(chunk);
+    stdoutCapture?.push(chunk);
+  };
   const onStderr = (chunk) => stderr.push(chunk);
   child.stdout?.on('data', onStdout);
   child.stderr?.on('data', onStderr);
@@ -215,6 +222,8 @@ export async function runMeasuredCommand(input) {
     maxRssBytes,
     stdoutTail: stdout.toString(),
     stderrTail: stderr.toString(),
+    stdoutCapture: stdoutCapture?.toString(),
+    stdoutTruncated: stdoutCapture?.truncated(),
   };
 }
 
@@ -260,5 +269,43 @@ class TailBuffer {
   toString() {
     if (this.#bytes === 0) return '';
     return Buffer.concat(this.#chunks, this.#bytes).toString('utf8');
+  }
+}
+
+class PrefixBuffer {
+  #limit;
+  #chunks = [];
+  #bytes = 0;
+  #truncated = false;
+
+  constructor(limit, name) {
+    if (!Number.isSafeInteger(limit) || limit <= 0) {
+      throw new RangeError(`${name} must be a positive safe integer`);
+    }
+    this.#limit = limit;
+  }
+
+  push(chunk) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+    const remaining = this.#limit - this.#bytes;
+    if (remaining <= 0) {
+      this.#truncated = true;
+      return;
+    }
+    const prefix = buffer.byteLength > remaining ? buffer.subarray(0, remaining) : buffer;
+    if (prefix.byteLength > 0) {
+      this.#chunks.push(prefix);
+      this.#bytes += prefix.byteLength;
+    }
+    if (buffer.byteLength > remaining) this.#truncated = true;
+  }
+
+  toString() {
+    if (this.#bytes === 0) return '';
+    return Buffer.concat(this.#chunks, this.#bytes).toString('utf8');
+  }
+
+  truncated() {
+    return this.#truncated;
   }
 }

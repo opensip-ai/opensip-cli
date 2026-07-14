@@ -245,7 +245,7 @@ export async function executePostBailoutBootstrap(
 
   record(PRE_ACTION_PHASES.hostStartEffects);
 
-  preActionTimer.measure(PRE_ACTION_PHASES.hostStartEffects, () => {
+  await preActionTimer.measureAsync(PRE_ACTION_PHASES.hostStartEffects, async () => {
     scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
     scope.diagnostics.counter('tools.loaded', tools.list().length);
 
@@ -279,7 +279,7 @@ export async function executePostBailoutBootstrap(
       });
     }
 
-    d.startProfiling(scope, plan.commandName);
+    await d.startProfiling(scope, plan.commandName);
   });
   emitNewTimings(scope);
 

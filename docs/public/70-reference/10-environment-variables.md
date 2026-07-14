@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-08
+last_verified: 2026-07-13
 release: v0.6.0
 title: "Environment variables"
 audience: [ci-integrators, operators]
@@ -29,12 +29,13 @@ bypasses the registry.
 |---|---|
 | `OPENSIP_API_KEY` | OpenSIP Cloud API key. Overrides the `apiKey` stored in `~/.opensip-cli/config.yml`. |
 
-## Observability (OpenTelemetry)
+## Observability and local profiling
 
 | Variable | Effect |
 |---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint. When set, the CLI enables OpenTelemetry tracing; unset is a hard no-op (standalone runs pay nothing). |
-| `OPENSIP_PROFILING` | Explicit gate for the optional CPU profiling path (ADR-0049). "1" or "true" forces on when OTEL_EXPORTER_OTLP_ENDPOINT is set; "0"/"false" forces off. When omitted and the OTLP endpoint is present, falls back to the documented OTEL-only mode (with cost warnings emitted). |
+| `OPENSIP_PROFILING` | Explicit gate for local CPU-profile artifacts ([ADR-0163](../../decisions/ADR-0163-local-cpu-profiling-independent-of-otel-export.md)). `1` or `true` enables profiling without requiring an OTLP endpoint; unset, `0`, and `false` are off. An OTLP endpoint alone never creates profile artifacts. |
+| `OPENSIP_PROFILE_DIR` | Optional caller-selected directory for local `.cpuprofile` and `.labels.json` artifacts. Relative paths resolve from the CLI process working directory; files are created exclusively with owner-only permissions. |
 | `TRACEPARENT` | W3C traceparent of a parent trace (read only when telemetry is on); run spans nest under it. |
 
 ## Update notifier

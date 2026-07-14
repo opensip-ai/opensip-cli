@@ -71,6 +71,18 @@ describe('buildExternalWorkerChildEnv', () => {
     expect(childEnv.OPENSIP_CLI_SKIP_INSTALLED).toBe('1');
   });
 
+  it('keeps worker profile artifacts in the caller-selected directory', () => {
+    const childEnv = buildExternalWorkerChildEnv({
+      parentEnv: {
+        OPENSIP_PROFILING: '1',
+        OPENSIP_PROFILE_DIR: '/opt/opensip/profile-run',
+      },
+    });
+
+    expect(childEnv.OPENSIP_PROFILING).toBe('1');
+    expect(childEnv.OPENSIP_PROFILE_DIR).toBe('/opt/opensip/profile-run');
+  });
+
   it('omits TRACEPARENT when no recording span is active', () => {
     const childEnv = buildExternalWorkerChildEnv({
       parentEnv: { PATH: '/bin' },

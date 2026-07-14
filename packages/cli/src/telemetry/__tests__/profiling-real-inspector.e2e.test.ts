@@ -91,7 +91,7 @@ describe('CPU profiling — real inspector session (uninstrumented child process
     expect(res.status, `driver stderr: ${res.stderr}`).toBe(0);
 
     const files = readdir();
-    expect(files.some((file) => file.includes('-cli-RUN_NO_PROJECT.'))).toBe(true);
+    expect(files.some((file) => file.includes('-unknown-RUN_NO_PROJECT-p'))).toBe(true);
     expect(files.some((file) => file.endsWith('.cpuprofile'))).toBe(true);
     const labels = JSON.parse(readFileSync(labelsFile(), 'utf8')) as Record<string, unknown>;
     expect(labels.runId).toBe('RUN_NO_PROJECT');

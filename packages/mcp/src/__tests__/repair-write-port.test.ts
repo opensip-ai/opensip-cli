@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { CliRepairWritePort } from '../repair-write-port.js';
+import { CliRepairWritePort, repairMutationChildEnv } from '../repair-write-port.js';
 
 let root: string;
 
@@ -32,6 +32,26 @@ function port(entrypoint: string | undefined, timeoutMs = 5000): CliRepairWriteP
 }
 
 describe('CliRepairWritePort', () => {
+  it('forwards the complete profiling contract to nested mutation runs', () => {
+    const savedGate = process.env.OPENSIP_PROFILING;
+    const savedDirectory = process.env.OPENSIP_PROFILE_DIR;
+    try {
+      process.env.OPENSIP_PROFILING = 'true';
+      process.env.OPENSIP_PROFILE_DIR = '/opt/opensip/profiles';
+
+      expect(repairMutationChildEnv()).toMatchObject({
+        OPENSIP_MCP_MUTATION_CHILD: '1',
+        OPENSIP_PROFILING: 'true',
+        OPENSIP_PROFILE_DIR: '/opt/opensip/profiles',
+      });
+    } finally {
+      if (savedGate === undefined) delete process.env.OPENSIP_PROFILING;
+      else process.env.OPENSIP_PROFILING = savedGate;
+      if (savedDirectory === undefined) delete process.env.OPENSIP_PROFILE_DIR;
+      else process.env.OPENSIP_PROFILE_DIR = savedDirectory;
+    }
+  });
+
   it('returns a structured error when no CLI entrypoint is available', async () => {
     const result = await port('').applyVerify({
       ref: 'session:0',
