@@ -1,13 +1,17 @@
 ---
 status: current
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 release: v0.6.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
 source-files:
   - packages/cli/src/index.ts
+  - packages/cli/src/commands/host-command-specs.ts
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/commands/init/optional-tools.ts
+  - packages/cli/src/ui/views/init-view.ts
+  - packages/contracts/src/command-results-variants/init-results.ts
   - packages/cli/src/commands/audit-command-spec.ts
   - packages/cli/src/commands/suite/execute-suite-command.ts
   - packages/cli/src/commands/suite/suite-run-options.ts
@@ -829,6 +833,69 @@ The scaffold output is loose `.mjs` files — the lightest-weight starting point
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |
 | `--json` | Emit a structured JSON result instead of the human-readable summary. |
 | `--debug` | Enable debug-level logging. |
+
+### Optional tools after pristine init
+
+After `init` successfully creates a pristine project, the human-readable result
+adds an **Optional tools for this project (not installed)** section after the
+existing **Try it** commands. The section appears only when the result has
+`type: "init"`, `created: true`, `state: "pristine"`, and at least one selected
+language.
+
+OpenSIP projects the generated first-party adapter catalog in its stable order.
+For a multi-language project, it forms one union across all selected languages;
+language-agnostic adapters (`languages: []`) are included once. Adapters already
+present in the effective global or project inventory are omitted. If every
+matching adapter is installed, the section is absent.
+
+Each row shows the exact existing global install command. A `[networked]` marker
+describes the adapter's catalog network posture; it does not perform or authorize
+network access. Use the second form for a repository-local installation:
+
+```bash
+opensip tools install @opensip-cli/tool-ruff
+opensip tools install @opensip-cli/tool-ruff --project
+```
+
+These rows are advice only. `init` does not prompt, install a package, execute an
+adapter, or change tool trust/configuration. Repeat init, `--keep`, `--remove`,
+partial-state recovery, guidance refresh, and refusal/error paths do not include
+the section. Use
+[`opensip tools list --available`](./12-tools-command.md#tools-list---available)
+to inspect the full catalog at any time.
+
+With `--json`, the same recommendations appear under
+`CommandOutcome.data.optionalTools`. The field is absent when the result is
+ineligible or no relevant uninstalled adapter remains; it is not emitted as an
+empty list. Each row has six fields: `id`, `pkg`, `network`, `languages`,
+`installCommand`, and `projectInstallCommand`.
+
+```json
+{
+  "kind": "init",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "init",
+    "created": true,
+    "path": "/repo/opensip-cli.config.yml",
+    "cwd": "/repo",
+    "configFilename": "opensip-cli.config.yml",
+    "state": "pristine",
+    "languages": ["python"],
+    "optionalTools": [
+      {
+        "id": "ruff",
+        "pkg": "@opensip-cli/tool-ruff",
+        "network": "local-only",
+        "languages": ["python"],
+        "installCommand": "opensip tools install @opensip-cli/tool-ruff",
+        "projectInstallCommand": "opensip tools install @opensip-cli/tool-ruff --project"
+      }
+    ]
+  }
+}
+```
 
 ### Partial-state handling
 

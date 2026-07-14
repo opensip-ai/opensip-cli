@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-08
+last_verified: 2026-07-13
 release: v0.6.0
 title: "`tools` command"
 audience: [plugin-authors, contributors]
@@ -100,6 +100,13 @@ network posture, and whether that adapter is already installed in the effective
 tool set. `--lang <language>` implies `--available`; language values are
 canonicalized (`c++`, `cxx`, and `cpp` all match C/C++ coverage), and
 language-agnostic adapters match every filter.
+
+A successful pristine [`opensip init`](/docs/opensip-cli/70-reference/01-cli-commands/#optional-tools-after-pristine-init)
+projects the relevant, not-yet-installed subset of this catalog after its
+**Try it** commands. Multi-language projects receive the stable union of all
+language matches plus each language-agnostic adapter once. The footer is advice
+only: `init` does not prompt for or install an adapter. Use
+`opensip tools list --available` whenever you need the complete catalog.
 
 Install the adapter package, then run that adapter's own `doctor` command before
 the first scan:
