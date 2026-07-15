@@ -107,6 +107,15 @@ describe('cpp stripStrings', () => {
     expect(out).toContain('abcL');
   });
 
+  it('does not mis-treat `R` as a raw-string prefix mid-identifier', () => {
+    // `abcR"(x)"` is identifier `abcR` then a regular `"…"` string (malformed
+    // as a raw string). The mid-identifier `R` must not open a raw string.
+    const src = 'auto x = abcR"(payload)";';
+    const out = stripStrings(src);
+    expect(out.length).toBe(src.length);
+    expect(out).toContain('abcR');
+  });
+
   it('does not mis-treat `L` as a char-literal prefix mid-identifier', () => {
     // `nameL'a'` should be parsed as the identifier `nameL` followed by
     // a bare apostrophe (malformed); the bare apostrophe falls through

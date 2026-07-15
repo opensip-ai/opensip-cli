@@ -375,7 +375,8 @@ function attachDependenciesIncremental(
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
       if (!closureRel.has(o.filePath)) return o; // unchanged file — keep cached
-      const deps = dependenciesByOwner.get(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column));
+      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
+      const deps = dependenciesByOwner.get(ownerKey) ?? dependenciesByOwner.get(o.bodyHash);
       return deps === undefined ? o : { ...o, dependencies: deps };
     });
   }
@@ -488,12 +489,16 @@ function stitchEdges(
   for (const [name, occs] of Object.entries(initial.functions)) {
     if (!occs) continue;
     next[name] = occs.map((o) => {
-      // Owner identity comes from the ONE shared module (ADR-0003/0136 canonical
-      // key) — the exact and cross-shard paths bucket/stitch through the same
-      // `ownerEdgeKey` (full occurrence identity), never a bare `bodyHash`.
+      // Prefer full occurrence identity (ADR-0003/0136). Fall back to bare
+      // bodyHash for polyglot adapters that still bucket by owner hash alone
+      // (pre-migration Go/Java/Python/Rust). Bare-hash twins may union edges —
+      // empty catalogs are worse than twin over-approx until adapters migrate.
       const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
-      const calls = edgesByOwner.get(ownerKey) ?? [];
-      const dependencies = dependenciesByOwner?.get(ownerKey);
+      const calls = edgesByOwner.get(ownerKey) ?? edgesByOwner.get(o.bodyHash) ?? [];
+      const dependencies =
+        dependenciesByOwner === undefined
+          ? undefined
+          : (dependenciesByOwner.get(ownerKey) ?? dependenciesByOwner.get(o.bodyHash));
       // Absent key → omit the field (unsupported / non-module-init). A present
       // `[]` is retained verbatim as "supported, no imports".
       return dependencies === undefined ? { ...o, calls } : { ...o, calls, dependencies };

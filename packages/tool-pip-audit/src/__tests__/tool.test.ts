@@ -85,16 +85,11 @@ describe('pip-audit tool — identity + metadata', () => {
 });
 
 describe('pip-audit tool — scan helper', () => {
-  it('audits the ACTIVE environment (no target args) when no requirements file exists', () => {
+  it('throws when neither a requirements file nor a project manifest exists', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pip-audit-empty-'));
-    expect(buildScanArgs(ctxFor(dir))).toEqual([
-      '--format',
-      'json',
-      '--output',
-      `${dir}/.runtime/artifacts/pip-audit/run1/pip-audit.json`,
-      '--progress-spinner',
-      'off',
-    ]);
+    expect(() => buildScanArgs(ctxFor(dir))).toThrow(
+      /requires a requirements file|project manifest/,
+    );
   });
 
   it('audits the discovered requirements file with -r', () => {
@@ -104,6 +99,20 @@ describe('pip-audit tool — scan helper', () => {
     expect(buildScanArgs(ctxFor(dir))).toEqual([
       '-r',
       reqs,
+      '--format',
+      'json',
+      '--output',
+      `${dir}/.runtime/artifacts/pip-audit/run1/pip-audit.json`,
+      '--progress-spinner',
+      'off',
+    ]);
+  });
+
+  it('audits the project root (positional path) when pyproject.toml is present', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pip-audit-pyproject-'));
+    writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "demo"\n');
+    expect(buildScanArgs(ctxFor(dir))).toEqual([
+      dir,
       '--format',
       'json',
       '--output',

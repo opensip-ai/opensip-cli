@@ -11,8 +11,13 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cl
 
 // Match a `packages/` or `services/` workspace segment whether the path is
 // repo-relative (`packages/a/package.json`) or absolute (`/abs/packages/a/…`).
+// Paths are normalized to `/` before matching so Windows `\` separators work.
 const WORKSPACE_SEGMENT = /(?:^|\/)(?:packages|services)\//;
 const PACKAGES_SEGMENT = /(?:^|\/)packages\//;
+
+function normalizePath(p: string): string {
+  return p.replaceAll('\\', '/');
+}
 
 export const packageJsonExportsField = defineCheck({
   id: 'b4203be3-3308-4fb1-8b20-44e23b8e3eff',
@@ -29,9 +34,14 @@ export const packageJsonExportsField = defineCheck({
 
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = [];
-    const packageJsonPaths = files.paths.filter(
-      (p) => p.endsWith('package.json') && !p.includes('node_modules') && WORKSPACE_SEGMENT.test(p), // only workspace packages/services (excludes the root)
-    );
+    const packageJsonPaths = files.paths.filter((p) => {
+      const normalized = normalizePath(p);
+      return (
+        normalized.endsWith('package.json') &&
+        !normalized.includes('node_modules') &&
+        WORKSPACE_SEGMENT.test(normalized) // only workspace packages/services (excludes the root)
+      );
+    });
 
     for (const filePath of packageJsonPaths) {
       const content = await files.read(filePath);
@@ -47,7 +57,7 @@ export const packageJsonExportsField = defineCheck({
       }
 
       // Skip private packages that aren't consumed by others
-      if (parsed.private === true && !PACKAGES_SEGMENT.test(filePath)) continue;
+      if (parsed.private === true && !PACKAGES_SEGMENT.test(normalizePath(filePath))) continue;
 
       if (!parsed.exports) {
         const name = (parsed.name as string) ?? filePath;

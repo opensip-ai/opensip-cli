@@ -49,13 +49,21 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 }
 
 /**
- * Build the exclude-path args for Semgrep by passing the host's exclude path
- * through Semgrep's `--exclude` flag.
+ * Build the exclude-path args for Semgrep. Semgrep's `--exclude` expects a
+ * relative gitignore-style pattern (absolute paths are ineffective). Prefer the
+ * project-relative runtime segment `opensip-cli/.runtime` when the host hands
+ * the absolute runtime dir.
  */
 export function buildSemgrepExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['--exclude', input.excludePath] };
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : normalized.split('/').filter(Boolean).slice(-2).join('/');
+  // Semgrep documents `--exclude` (not `--exclude-dir`); the relative segment is
+  // the effective directory exclude under the scan root.
+  return { args: ['--exclude', relativeSegment] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

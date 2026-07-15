@@ -10,6 +10,23 @@ export const BANDIT_IDENTITY: ToolIdentity = { name: 'bandit' };
 export const BANDIT_STABLE_ID = '9dccda56-64ca-4d54-9c59-fea8302bebfa';
 
 /**
+ * Bandit's built-in `-x` / `--exclude` defaults (from `bandit.core.constants.EXCLUDE`).
+ * Passing `-x` replaces that list, so A3 exclusions MUST re-include these or Bandit
+ * will start scanning VCS/cache trees that the stock CLI would skip.
+ */
+export const BANDIT_DEFAULT_EXCLUDES = [
+  '.svn',
+  'CVS',
+  '.bzr',
+  '.hg',
+  '.git',
+  '__pycache__',
+  '.tox',
+  '.eggs',
+  '*.egg',
+] as const;
+
+/**
  * Build the CLI args for a recursive Bandit scan of the project root, writing its
  * JSON report to the `bandit.json` artifact path for the parser to consume.
  */
@@ -17,11 +34,16 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return ['-r', ctx.projectRoot, '-f', 'json', '-o', ctx.artifactPath('bandit.json')];
 }
 
-/** Build the `-x <path>` args that exclude a path from a Bandit scan. */
+/**
+ * Build the `-x <paths>` args that exclude Bandit's defaults PLUS the host runtime
+ * path. Bandit takes a single comma-separated `-x` value and REPLACES its default
+ * exclude list, so both must be present.
+ */
 export function buildBanditExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['-x', input.excludePath] };
+  const excludes = [...BANDIT_DEFAULT_EXCLUDES, input.excludePath].join(',');
+  return { args: ['-x', excludes] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

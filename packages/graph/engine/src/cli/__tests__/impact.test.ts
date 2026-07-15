@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,9 +6,11 @@ import { join } from 'node:path';
 import { ConfigurationError, logger, SystemError } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
+import * as catalogFreshness from '../../read/catalog-freshness.js';
+import * as orchestrate from '../orchestrate.js';
 import { graphImpactCommandSpec } from '../graph/graph-aux-command-specs.js';
 import { buildImpactSessionContribution, executeImpact } from '../impact.js';
 
@@ -15,6 +18,13 @@ import type { Catalog } from '../../types.js';
 import type { ImpactUncertainty, SignalEnvelope, StoredSession } from '@opensip-cli/contracts';
 import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+
+const COMPLETE_BUILD_COVERAGE = {
+  status: 'complete' as const,
+  discoveredFiles: 2,
+  parseErrorFiles: 0,
+  filesIdentity: `sha256:${'a'.repeat(64)}`,
+};
 
 function makeCatalog(over: Partial<Catalog> = {}): Catalog {
   return {
@@ -24,6 +34,7 @@ function makeCatalog(over: Partial<Catalog> = {}): Catalog {
     builtAt: '2026-05-22T00:00:00.000Z',
     cacheKey: 'ts-test',
     filesFingerprint: '0\n',
+    buildCoverage: COMPLETE_BUILD_COVERAGE,
     functions: {
       callee: [
         {
@@ -86,11 +97,40 @@ function mockCli(datastore?: DataStore): ToolCliContext {
     emitRaw: vi.fn(),
     deliverSignals: vi.fn().mockResolvedValue({ cloudAccepted: 0 }),
     render: vi.fn().mockResolvedValue(undefined),
-    scope: { datastore: () => datastore },
+    scope: {
+      datastore: () => datastore,
+      languages: { list: () => [] },
+      graph: {
+        adapters: {
+          size: 0,
+          getAll: () => [],
+          getById: () => undefined,
+        },
+      },
+    },
   } as unknown as ToolCliContext;
 }
 
 describe('executeImpact', () => {
+  let verifySpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    // Unit tests inject in-memory catalogs; stub freshness so reuse is gated
+    // only by buildCoverage + this controlled verification result.
+    verifySpy = vi.spyOn(catalogFreshness, 'verifyCatalogInputs').mockResolvedValue({
+      ok: true,
+      value: {
+        fresh: true,
+        verifiedAt: '2026-05-22T00:00:00.000Z',
+        verification: 'complete',
+      },
+    });
+  });
+
+  afterEach(() => {
+    verifySpy.mockRestore();
+  });
+
   it('--files works without git and returns graph-impact result', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     new CatalogRepo(datastore).replaceAll(makeCatalog());
@@ -172,6 +212,7 @@ describe('executeImpact', () => {
       language: source.language,
       builtAt: source.builtAt,
       cacheKey: source.cacheKey,
+      buildCoverage: source.buildCoverage,
       functions: source.functions,
     });
     const cli = mockCli(datastore);
@@ -194,6 +235,82 @@ describe('executeImpact', () => {
     });
     datastore.close();
   });
+
+  it('rebuilds when the cached catalog fails freshness verification', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const stale = makeCatalog({ cacheKey: 'stale-key' });
+    const fresh = makeCatalog({ cacheKey: 'fresh-key' });
+    new CatalogRepo(datastore).replaceAll(stale);
+    verifySpy.mockResolvedValue({
+      ok: true,
+      value: {
+        fresh: false,
+        verifiedAt: '2026-05-22T00:00:00.000Z',
+        verification: 'complete',
+        reasonCode: 'cache-key-changed',
+        reason: 'Catalog cache inputs changed',
+      },
+    });
+    const runGraph = vi.spyOn(orchestrate, 'runGraph').mockImplementation(async () => {
+      new CatalogRepo(datastore).replaceAll(fresh);
+      return {
+        catalog: fresh,
+        indexes: null,
+        signals: [],
+        resolutionStats: null,
+        cacheHit: false,
+        features: null,
+      };
+    });
+    try {
+      const result = await executeImpact(
+        { cwd: '/proj', json: true, files: ['src/callee.ts'] },
+        mockCli(datastore),
+      );
+      expect(runGraph).toHaveBeenCalledOnce();
+      expect(result.catalog?.cacheKeyDigest).toBe(
+        createHash('sha256').update('fresh-key', 'utf8').digest('hex'),
+      );
+    } finally {
+      runGraph.mockRestore();
+      datastore.close();
+    }
+  });
+
+  it('rebuilds when build coverage is incomplete even if verification is fresh', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const incomplete = makeCatalog({
+      buildCoverage: {
+        status: 'partial',
+        discoveredFiles: 2,
+        parseErrorFiles: 1,
+        filesIdentity: `sha256:${'b'.repeat(64)}`,
+      },
+    });
+    const rebuilt = makeCatalog();
+    new CatalogRepo(datastore).replaceAll(incomplete);
+    const runGraph = vi.spyOn(orchestrate, 'runGraph').mockImplementation(async () => {
+      new CatalogRepo(datastore).replaceAll(rebuilt);
+      return {
+        catalog: rebuilt,
+        indexes: null,
+        signals: [],
+        resolutionStats: null,
+        cacheHit: false,
+        features: null,
+      };
+    });
+    try {
+      await executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'] }, mockCli(datastore));
+      expect(runGraph).toHaveBeenCalledOnce();
+      // Freshness should not be consulted when build coverage already fails the gate.
+      expect(verifySpy).not.toHaveBeenCalled();
+    } finally {
+      runGraph.mockRestore();
+      datastore.close();
+    }
+  });
+
 
   it('renders human impact lines and the truncation hint outside JSON mode', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
@@ -442,6 +559,10 @@ describe('executeImpact', () => {
         void filesFingerprint;
         incomplete = catalog;
       }
+      // Impact loads via loadFullCatalog for freshness; mock both entry points.
+      const loadFull = vi
+        .spyOn(CatalogRepo.prototype, 'loadFullCatalog')
+        .mockReturnValue(incomplete as never);
       const load = vi
         .spyOn(CatalogRepo.prototype, 'loadCatalogContract')
         .mockReturnValue(incomplete);
@@ -454,6 +575,7 @@ describe('executeImpact', () => {
 
         expect(result.catalog).toBeUndefined();
       } finally {
+        loadFull.mockRestore();
         load.mockRestore();
         datastore.close();
       }

@@ -210,6 +210,32 @@ export async function executeSim(
   // registry is read. Idempotent per project dir.
   await ensureScenariosLoaded(args.cwd);
 
+  // Fail closed on plugin load errors (mirror fitness): a broken plugin that
+  // silently suppressed its scenarios must not produce a green empty-or-partial
+  // run. Exit 2 = configuration/unavailable, not scenario failure.
+  const pluginLoadErrors = getPluginLoadErrors();
+  if (pluginLoadErrors.length > 0) {
+    const first = pluginLoadErrors[0] ?? 'unknown plugin error';
+    log.warn({
+      evt: 'cli.sim.plugin_load_failed',
+      module: 'cli:sim',
+      errorCount: pluginLoadErrors.length,
+      first,
+    });
+    return {
+      result: {
+        type: 'error',
+        message:
+          pluginLoadErrors.length === 1
+            ? `Simulation plugin failed to load: ${first}`
+            : `Simulation plugins failed to load (${String(pluginLoadErrors.length)} errors). First: ${first}`,
+        suggestion:
+          'Fix or remove the broken simulation plugin, then re-run `opensip sim`.',
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      },
+    };
+  }
+
   // Tool-scoped recipe resolution (ADR-0022): explicit --recipe >
   // simulation.recipe > built-in default. A config-sourced unknown name
   // tolerantly falls back to `default`; an explicit --recipe typo hard-fails.

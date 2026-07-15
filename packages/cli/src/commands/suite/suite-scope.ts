@@ -28,6 +28,7 @@ function fallbackNotice(message: string): string {
 function resolveExplicitSuiteScope(input: ResolveSuiteScopeInput): SuiteRunScope {
   const since = suiteScopeSince(input.suiteOpts);
   const fileCount = suiteScopeFileCount(input.suiteOpts);
+  // Explicit --files is self-contained: no git resolution required.
   if (fileCount !== undefined) {
     return {
       mode: 'changed',
@@ -37,11 +38,21 @@ function resolveExplicitSuiteScope(input: ResolveSuiteScopeInput): SuiteRunScope
   }
 
   const resolved = resolveChangedFiles(input.cwd, since === undefined ? undefined : { since });
+  // Never report mode:changed without a resolved file set — that would
+  // advertise a changed scope while steps actually run with nothing filtered.
+  // Mirror the default-changed path: full scope + fallback notice.
+  if (!resolved.ok) {
+    return {
+      mode: 'full',
+      source: 'fallback',
+      notice: fallbackNotice(resolved.message),
+    };
+  }
   return {
     mode: 'changed',
     source: 'explicit',
+    changedFiles: resolved.files.length,
     ...(since === undefined ? {} : { ref: since }),
-    ...(resolved.ok ? { changedFiles: resolved.files.length } : {}),
   };
 }
 

@@ -58,11 +58,19 @@ export function parseAstGrepSarif(
   return parseStdoutSarif(raw.raw, { source: ctx.tool });
 }
 
-/** Build the `--exclude <path>` args that keep ast-grep from scanning a path. */
+/**
+ * Build exclude args that keep ast-grep from scanning a path.
+ * ast-grep uses gitignore-style `--globs` (`!` = exclude); there is no `--exclude`.
+ */
 export function buildAstGrepExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['--exclude', input.excludePath] };
+  // Prefer a recursive glob under the runtime path so nested prior-run artifacts
+  // are skipped. Quote is not needed — args are passed as execFile argv.
+  const pattern = input.excludePath.endsWith('/**')
+    ? `!${input.excludePath}`
+    : `!${input.excludePath}/**`;
+  return { args: ['--globs', pattern] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

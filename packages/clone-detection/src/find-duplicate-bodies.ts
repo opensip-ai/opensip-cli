@@ -72,11 +72,14 @@ export function findDuplicateBodies(
   const groups: DuplicateGroup[] = [];
   for (const group of rawGroups) {
     if (group.length < 2) continue;
-    const primary = group[0];
+    // members[0] is the documented primary — lowest qualifiedName, then location
+    // (matches aggregate anchor policy; stable across discovery order).
+    const members = [...group].sort(compareCloneCandidates);
+    const primary = members[0];
     /* v8 ignore next */
     if (!primary) continue;
     if (suppressedHashes.has(primary.bodyHash)) continue;
-    groups.push({ bodyHash: primary.bodyHash, members: group });
+    groups.push({ bodyHash: primary.bodyHash, members });
   }
 
   return { aggregates, groups };
@@ -149,8 +152,24 @@ function groupByHashUnfloored(
   return buckets;
 }
 
+/**
+ * Stable primary/anchor order: lowest qualifiedName, then filePath / line /
+ * column. Used by the aggregate anchor path and to sort per-instance members
+ * so `members[0]` is the documented primary.
+ */
+function compareCloneCandidates(a: CloneCandidate, b: CloneCandidate): number {
+  if (a.qualifiedName !== b.qualifiedName) {
+    return a.qualifiedName < b.qualifiedName ? -1 : 1;
+  }
+  if (a.filePath !== b.filePath) {
+    return a.filePath < b.filePath ? -1 : 1;
+  }
+  if (a.line !== b.line) return a.line - b.line;
+  return a.column - b.column;
+}
+
 function lowestByQualifiedName(occs: readonly CloneCandidate[]): CloneCandidate {
-  return occs.reduce((lo, c) => (c.qualifiedName < lo.qualifiedName ? c : lo));
+  return occs.reduce((lo, c) => (compareCloneCandidates(c, lo) < 0 ? c : lo));
 }
 
 /**

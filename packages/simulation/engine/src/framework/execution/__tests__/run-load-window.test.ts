@@ -56,6 +56,20 @@ describe('runLoadWindow', () => {
     expect(ct.calls()).toBeGreaterThan(0);
   });
 
+  it('does not hang when concurrency is 0 (clamped to ≥ 1)', async () => {
+    const ct = countingTarget();
+    const r = await runLoadWindow(
+      { workload: { rps: 50, concurrency: 0 } },
+      ctx(new AbortController().signal),
+      {
+        windowMs: 250,
+        target: ct.target,
+      },
+    );
+    expect(r.metrics.totalRequests).toBeGreaterThan(0);
+    expect(ct.maxConcurrent()).toBeLessThanOrEqual(1);
+  });
+
   it('records real measured latency in the snapshot', async () => {
     const ct = countingTarget(20);
     const r = await runLoadWindow({ workload: { rps: 20 } }, ctx(new AbortController().signal), {

@@ -58,8 +58,11 @@ export function parseOsvVersion(stdout: string): string {
 /**
  * Build the osv-scanner scan argv (no shell — args are passed to `execFile`).
  * Scans the project recursively (`-r <root>`) and writes a JSON report to the
- * host-owned artifact path the substrate composes for this run. OSV-Scanner ships
- * an embedded/offline advisory DB, so the scan is local-only (no network, no auth).
+ * host-owned artifact path the substrate composes for this run.
+ *
+ * Network posture is `networked`: osv-scanner may reach OSV.dev when a local
+ * offline DB is not pre-provisioned. We do not pass offline flags that would
+ * fail runs without a guaranteed offline database.
  *
  * VERIFY-against-installed-binary: this is the stable v1.x flat invocation
  * (`osv-scanner --format json --output <path> -r <root>`). OSV-Scanner v2.x
@@ -96,9 +99,9 @@ export const tool: Tool = defineExternalToolAdapter({
     installHint:
       'Install osv-scanner: https://google.github.io/osv-scanner/installation/ (brew install osv-scanner)',
   },
-  // OSV-Scanner queries its embedded/offline advisory DB via execFile — no
-  // network, no credentials.
-  network: 'local-only',
+  // Honest network posture: osv-scanner may query OSV.dev unless an offline DB is
+  // pre-provisioned. Offline flags are not forced because the DB is not guaranteed.
+  network: 'networked',
   // Polyglot / language-agnostic: matches every --lang discovery filter.
   languages: [],
   commands: [

@@ -192,10 +192,11 @@ describe('osv-scanner tool — manifest ↔ runtime host-shape guards', () => {
     expect(PKG.opensipTools.requires).toEqual(deriveAdapterManifestRequires(tool));
   });
 
-  it('derives subprocess + filesystem only (local-only posture, no network)', () => {
+  it('derives subprocess + filesystem + network (networked posture)', () => {
     expect((PKG.opensipTools.requires as { resource: string }[]).map((r) => r.resource)).toEqual([
       'subprocess',
       'filesystem',
+      'network',
     ]);
   });
 

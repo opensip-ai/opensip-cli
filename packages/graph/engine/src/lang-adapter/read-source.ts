@@ -45,9 +45,13 @@ export function readSourceFileGuarded(
     throw new Error(`source file exceeds ${maxBytes}-byte size guard (${size} bytes): ${path}`);
   }
   const text = readFileSync(path, 'utf8');
-  if (text.length > maxBytes) {
+  // Use UTF-8 byte length, not JS string length: multi-byte code units make
+  // `text.length` underestimate on-disk size and would let a just-under-stat
+  // file slip past the post-read TOCTOU check.
+  const byteLength = Buffer.byteLength(text, 'utf8');
+  if (byteLength > maxBytes) {
     throw new Error(
-      `source file exceeds ${maxBytes}-byte size guard after read (${text.length} bytes): ${path}`,
+      `source file exceeds ${maxBytes}-byte size guard after read (${byteLength} bytes): ${path}`,
     );
   }
   return text;

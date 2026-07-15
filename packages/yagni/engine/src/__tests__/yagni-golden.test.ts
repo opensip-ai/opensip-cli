@@ -45,6 +45,12 @@ describe('yagni golden snapshots', () => {
     });
     expect(result.signals).toHaveLength(1);
     expect(result.signals[0]?.ruleId).toBe('yagni:unused-config-surface');
+    // Project-relative paths only (not absolute prop.filePath).
+    expect(result.signals[0]?.filePath).toBe('src/app-config.ts');
+    expect(result.signals[0]?.code?.file).toBe('src/app-config.ts');
+    expect(result.signals[0]?.repair?.patchHint).toMatchObject({
+      target: 'src/app-config.ts',
+    });
     expect(result.signals[0]?.metadata.yagni).toMatchObject({
       detector: 'unused-config-surface',
       reductionCategory: 'config',

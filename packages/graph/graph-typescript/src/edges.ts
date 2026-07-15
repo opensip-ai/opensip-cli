@@ -83,7 +83,7 @@ export async function resolveEdgesFromRecords(
     processed += 1;
     const ownerKey = ownerEdgeKey(
       r.ownerHash,
-      relative(input.projectDirAbs, r.sourceFile.fileName),
+      relative(input.projectDirAbs, r.sourceFile.fileName).split(sep).join('/'),
       r.ownerLine,
       r.ownerColumn,
     );
@@ -148,7 +148,7 @@ export async function resolveEdgesSyntactic(
     processed += 1;
     const ownerKey = ownerEdgeKey(
       r.ownerHash,
-      relative(input.projectDirAbs, r.sourceFile.fileName),
+      relative(input.projectDirAbs, r.sourceFile.fileName).split(sep).join('/'),
       r.ownerLine,
       r.ownerColumn,
     );

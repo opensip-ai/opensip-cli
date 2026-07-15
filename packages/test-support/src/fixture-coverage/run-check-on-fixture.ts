@@ -16,7 +16,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { makeFitnessTestScope, withScope } from '../with-scope.js';
 
@@ -25,6 +25,29 @@ import { buildFixtureManifest } from './manifest.js';
 import type { CheckFixtureRequirement, CoverageConfig } from './manifest.js';
 import type { Signal } from '@opensip-cli/core';
 import type { Check } from '@opensip-cli/fitness';
+
+/**
+ * Resolve a fixture-relative path under `root`, rejecting absolute paths and
+ * any `..` segment so fixture authors cannot write outside the temp tree.
+ */
+function resolveUnderRoot(root: string, relativePath: string): string {
+  if (relativePath.length === 0) {
+    throw new Error('fixture path must be non-empty');
+  }
+  if (isAbsolute(relativePath)) {
+    throw new Error(`fixture path must be relative to the temp root: ${relativePath}`);
+  }
+  const segments = relativePath.split(/[/\\]/u);
+  if (segments.includes('..')) {
+    throw new Error(`fixture path must not contain '..' segments: ${relativePath}`);
+  }
+  const abs = resolve(root, relativePath);
+  const rel = relative(resolve(root), abs);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(`fixture path escapes temp root: ${relativePath}`);
+  }
+  return abs;
+}
 
 /** One file written into the fixture temp root (path is relative to the root). */
 export interface FixtureFile {
@@ -62,7 +85,7 @@ export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Pro
   try {
     const written = await Promise.all(
       fixture.files.map(async (file) => {
-        const abs = join(root, file.path);
+        const abs = resolveUnderRoot(root, file.path);
         // mkdir({ recursive: true }) is safe to run concurrently for overlapping
         // parent dirs, so each independent file write can proceed in parallel.
         await mkdir(dirname(abs), { recursive: true });
@@ -71,7 +94,7 @@ export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Pro
       }),
     );
     const targetFiles = fixture.targetPaths
-      ? fixture.targetPaths.map((p) => join(root, p))
+      ? fixture.targetPaths.map((p) => resolveUnderRoot(root, p))
       : written;
     const result = await withScope(scope, () => check.run(root, { targetFiles }));
     const ruleId = `fit:${check.config.slug}`;

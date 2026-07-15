@@ -14,15 +14,19 @@ export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
 
 /**
  * Build the CLI args for `cargo clippy` with JSON diagnostics across all targets
- * and features. See the build-cache caveat below on why a warm target cache can
- * silently produce zero diagnostics.
+ * and features.
+ *
+ * DEGRADED / non-deterministic without a cold target dir: `cargo clippy` only
+ * emits `compiler-message` records for crates it actually (re)compiles. With a
+ * warm `target/` cache a repeat run can emit zero diagnostics even though the
+ * lints still hold — fingerprints then churn under `--gate-compare`. The
+ * external-tool substrate has no per-run env injection, so we cannot set
+ * `CARGO_TARGET_DIR` under `.runtime` from this adapter alone. Operators should
+ * use a fresh checkout / CI without target caching, or set
+ * `CARGO_TARGET_DIR` themselves for deterministic rechecks. See the package
+ * description / README determinism caveat.
  */
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
-  // NOTE (build cache): `cargo clippy` only emits `compiler-message` records for
-  // crates it actually (re)compiles. With a warm target cache a repeat run emits
-  // zero diagnostics even though the lints still hold — so a stable `--gate-compare`
-  // requires a cold cache (fresh checkout / CI without target caching). See the
-  // package README's determinism caveat.
   return ['clippy', '--message-format=json', '--all-targets', '--all-features'];
 }
 
@@ -31,7 +35,8 @@ export const tool: Tool = defineExternalToolAdapter({
   metadata: {
     id: CARGO_CLIPPY_STABLE_ID,
     version: readPackageVersion(import.meta.url),
-    description: 'Rust lint diagnostics via cargo clippy',
+    description:
+      'Rust lint diagnostics via cargo clippy (note: warm target/ cache can hide diagnostics — use a cold cache or CARGO_TARGET_DIR for deterministic gate-compare)',
     adapterPackage: '@opensip-cli/tool-cargo-clippy',
   },
   binary: {

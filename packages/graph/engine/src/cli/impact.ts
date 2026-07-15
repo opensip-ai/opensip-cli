@@ -38,10 +38,13 @@ import {
   projectImpactForReport,
 } from '../persistence/impact-report-projection.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
+import { verifyCatalogInputs } from '../read/catalog-freshness.js';
+import { loadGraphReadConfig } from '../read/config.js';
 
 import { contributionFromGraphPayload } from './graph-session-contribution.js';
 import { runGraph } from './orchestrate.js';
 
+import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const log = createToolLogger('graph:cli');
@@ -299,23 +302,72 @@ async function emitImpactOutput(
   });
 }
 
+/**
+ * Decide whether a persisted catalog is safe to reuse for impact analysis.
+ * - When graph adapters are available: require complete build coverage + complete
+ *   fresh input verification (mirror context producers).
+ * - When adapters are unavailable (unit tests / thin scopes): reuse any existing
+ *   catalog rather than forcing a rebuild that cannot run.
+ * - Explicit stale/incomplete verification forces rebuild when adapters exist.
+ */
+async function catalogReuseDecision(
+  cwd: string,
+  catalog: Catalog,
+  cli: ToolCliContext,
+): Promise<'reuse' | 'rebuild'> {
+  const adapters = cli.scope.graph?.adapters;
+  if (adapters === undefined) {
+    // Cannot verify — prefer reusing the persisted row over a doomed rebuild.
+    return 'reuse';
+  }
+  if (catalog.buildCoverage?.status !== 'complete') return 'rebuild';
+  const languages =
+    typeof cli.scope.languages?.list === 'function' ? cli.scope.languages.list() : [];
+  const verified = await verifyCatalogInputs({
+    projectRoot: cli.scope.projectContext?.projectRoot ?? cwd,
+    catalog,
+    adapters,
+    languageAdapters: languages,
+    graphConfig: loadGraphReadConfig(cwd, cli.scope.projectContext?.configPath),
+  });
+  if (
+    verified.ok &&
+    verified.value.verification === 'complete' &&
+    verified.value.fresh === true
+  ) {
+    return 'reuse';
+  }
+  return 'rebuild';
+}
+
 async function loadOrBuildCatalog(
   cwd: string,
   datastore: DataStore,
+  cli: ToolCliContext,
   noCache?: boolean,
 ): Promise<NonNullable<ReturnType<CatalogRepo['loadCatalogContract']>>> {
   const repo = new CatalogRepo(datastore);
-  let catalog = repo.loadCatalogContract();
-  if (catalog !== null && noCache !== true) return catalog;
+  // Use the internal Catalog (with buildCoverage / fingerprint fields) for
+  // freshness verification; return the contract view for impact compute.
+  const full = repo.loadFullCatalog();
+  if (full !== null && noCache !== true) {
+    const decision = await catalogReuseDecision(cwd, full, cli);
+    if (decision === 'reuse') return full;
+    log.info({
+      evt: 'graph.cli.impact.catalog_stale_or_incomplete',
+      module: 'graph:cli',
+      buildCoverage: full.buildCoverage?.status ?? 'missing',
+    });
+  }
 
   await runGraph({ cwd, noCache: noCache === true, datastore });
-  catalog = repo.loadCatalogContract();
-  if (!catalog) {
+  const rebuilt = repo.loadCatalogContract();
+  if (!rebuilt) {
     throw new ConfigurationError(
       'impact: No graph catalog found after rebuild. Run `opensip graph` first.',
     );
   }
-  return catalog;
+  return rebuilt;
 }
 
 /**
@@ -338,7 +390,7 @@ export async function executeImpact(
 
     const { changedFiles, basis, entries, uncertainties } = resolveImpactBasis(opts);
 
-    const catalog = await loadOrBuildCatalog(opts.cwd, datastore, opts.noCache);
+    const catalog = await loadOrBuildCatalog(opts.cwd, datastore, cli, opts.noCache);
     const topCap = parseTopCap(opts.top);
     const computation = computeImpact(catalog, changedFiles, {
       top: topCap,

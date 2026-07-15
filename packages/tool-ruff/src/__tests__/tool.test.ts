@@ -80,7 +80,7 @@ describe('ruff tool — binary + scan helpers', () => {
       'json',
       '--output-file',
       '/proj/.runtime/artifacts/ruff/run1/ruff.json',
-      '/proj',
+      '.',
     ]);
   });
 

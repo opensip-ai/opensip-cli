@@ -22,7 +22,7 @@ exports[`yagni golden snapshots > executeYagni matches its envelope + session sn
   },
   "signals": [
     {
-      "filePath": "<fixture>/src/app-config.ts",
+      "filePath": "src/app-config.ts",
       "line": 3,
       "message": "Unused public config key 'orphanKnob' in AppConfig (high confidence)",
       "metadata": {
@@ -66,7 +66,7 @@ exports[`yagni golden snapshots > executeYagni matches its envelope + session sn
         "patchHint": {
           "kind": "text",
           "summary": "Remove unused key \`orphanKnob\` from AppConfig.",
-          "target": "<fixture>/src/app-config.ts",
+          "target": "src/app-config.ts",
         },
         "repairKind": "manual",
       },

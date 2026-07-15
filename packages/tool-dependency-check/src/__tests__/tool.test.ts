@@ -138,12 +138,16 @@ describe('dependency-check tool — scan-arg + exclude builders', () => {
       '--out',
       dirname(artifact),
       '--noupdate',
+      '--disableOssIndex',
+      '--disableNodeAudit',
+      '--disableYarnAudit',
+      '--disablePnpmAudit',
     ]);
   });
 
-  it('excludes the .runtime store via --exclude (A3)', () => {
+  it('excludes the .runtime store via an Ant recursive --exclude pattern (A3)', () => {
     expect(buildDependencyCheckExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual(
-      ['--exclude', '/proj/opensip-cli/.runtime'],
+      ['--exclude', '**/opensip-cli/.runtime/**'],
     );
   });
 });

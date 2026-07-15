@@ -154,6 +154,27 @@ describe('findNearDuplicates branch behavior', () => {
     expect(clusters[0]?.exactMembers).toEqual(['a.same', 'z.same']);
     expect(clusters[0]?.nearMembers).toEqual(['a.same', 'm.bridge', 'z.same']);
   });
+
+  it('caps oversized clusters instead of dropping them', () => {
+    // Build a large near-identical component (> MAX_CLUSTER_SIZE=50) with a
+    // shared MinHash signature so every pair connects; expect a capped cluster
+    // rather than undefined/empty.
+    const sharedSignature = signature();
+    const members = Array.from({ length: 60 }, (_, i) =>
+      cand({
+        bodyHash: `h${String(i)}`,
+        bodySignature: sharedSignature,
+        filePath: `f${String(i).padStart(3, '0')}.ts`,
+        line: 1,
+        qualifiedName: `n${String(i).padStart(3, '0')}`,
+        language: 'typescript',
+      }),
+    );
+    const clusters = findNearDuplicates(members, { minBodySize: 1 });
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]?.clusterSize).toBe(50);
+    expect(clusters[0]?.nearMembers.length).toBeLessThanOrEqual(50);
+  });
 });
 
 describe('near-duplicate signature edge cases', () => {

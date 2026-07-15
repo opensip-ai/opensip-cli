@@ -66,6 +66,20 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
           killed?: boolean;
           signal?: NodeJS.Signals;
         };
+        // maxBuffer overflow kills with SIGTERM and sets ERR_CHILD_PROCESS_STDIO_MAXBUFFER —
+        // do not misclassify that as a wall-clock timeout (operators tune the wrong knob).
+        if (
+          failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ||
+          (typeof failure.message === 'string' &&
+            failure.message.includes('maxBuffer length exceeded'))
+        ) {
+          reject(
+            error instanceof Error
+              ? error
+              : new Error(`scanner '${input.command}' exceeded maxBuffer`),
+          );
+          return;
+        }
         if (failure.killed === true || failure.signal === 'SIGTERM') {
           resolve({ code: -1, stdout: out, stderr: err, timedOut: true });
           return;

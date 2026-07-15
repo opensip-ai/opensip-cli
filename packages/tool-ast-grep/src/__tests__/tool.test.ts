@@ -104,10 +104,10 @@ describe('ast-grep tool — scan helper', () => {
     );
   });
 
-  it('excludes the .runtime store via --exclude', () => {
+  it('excludes the .runtime store via --globs (!path/**)', () => {
     expect(buildAstGrepExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
-      '--exclude',
-      '/proj/opensip-cli/.runtime',
+      '--globs',
+      '!/proj/opensip-cli/.runtime/**',
     ]);
   });
 });

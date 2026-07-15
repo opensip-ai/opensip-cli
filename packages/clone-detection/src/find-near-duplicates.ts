@@ -211,26 +211,53 @@ function buildComponentCluster(
   component: readonly number[],
   componentEdges: readonly NearEdge[],
 ): NearDuplicateCluster | undefined {
-  const nearIndices = nearIndicesInComponent(componentEdges);
-  if (nearIndices.size < 2) return undefined;
-  if (component.length > MAX_CLUSTER_SIZE) return undefined;
+  // Cap oversized components rather than dropping them: keep the first
+  // MAX_CLUSTER_SIZE members sorted by location so the finding still surfaces.
+  const cappedIndices = capComponentIndices(eligible, component, MAX_CLUSTER_SIZE);
+  const cappedIndexSet = new Set(cappedIndices);
+  const cappedEdges = componentEdges.filter(
+    (e) => cappedIndexSet.has(e.a) && cappedIndexSet.has(e.b),
+  );
 
-  const members = component.map((i) => eligible[i]).filter((o): o is CloneCandidate => !!o);
+  const nearIndices = nearIndicesInComponent(cappedEdges);
+  if (nearIndices.size < 2) return undefined;
+
+  const members = cappedIndices.map((i) => eligible[i]).filter((o): o is CloneCandidate => !!o);
   const anchor = lowestByLocation(members);
   const nearMembers = [...nearIndices]
     .map((i) => eligible[i]?.qualifiedName)
     .filter((n): n is string => n !== undefined)
     .sort();
   const exactMembers = exactMembersInComponent(members);
-  const maxSim = maxSimilarityAmong(componentEdges);
+  const maxSim = maxSimilarityAmong(cappedEdges);
 
   return {
     anchor,
     nearMembers,
     exactMembers,
     estimatedSimilarity: maxSim,
-    clusterSize: component.length,
+    clusterSize: members.length,
   };
+}
+
+/** Stable location order, then keep at most `maxSize` member indices. */
+function capComponentIndices(
+  eligible: readonly CloneCandidate[],
+  component: readonly number[],
+  maxSize: number,
+): number[] {
+  if (component.length <= maxSize) return [...component];
+  return [...component]
+    .sort((ai, bi) => {
+      const a = eligible[ai];
+      const b = eligible[bi];
+      if (!a || !b) return 0;
+      if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
+      if (a.line !== b.line) return a.line - b.line;
+      if (a.column !== b.column) return a.column - b.column;
+      return a.qualifiedName < b.qualifiedName ? -1 : a.qualifiedName > b.qualifiedName ? 1 : 0;
+    })
+    .slice(0, maxSize);
 }
 
 function nearIndicesInComponent(edges: readonly NearEdge[]): Set<number> {

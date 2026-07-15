@@ -138,27 +138,50 @@ async function executeAnalyzeMode(
       throw new CheckAbortedError(config.slug);
     }
 
+    let rawContent: string;
     try {
-      const rawContent = await ctx.readFile(filePath);
-      // Dispatch the content filter through the LanguageAdapter for the
-      // file's extension. Falls back to raw content when no adapter is
-      // registered. See languages/content-filter-dispatch.ts.
-      const content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
-      const violations = config.analyze(content, filePath);
-
-      for (const violation of violations) {
-        void builder.addSignal(
-          toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider),
-        );
-      }
+      rawContent = await ctx.readFile(filePath);
     } catch (error) {
       if (error instanceof CheckAbortedError) throw error;
+      // Only filesystem/read failures are skippable. Analyze bugs must not
+      // silently green-pass the rest of the run.
       logger.debug('Skipping unreadable file', {
         evt: 'fitness.check.file.skip',
         module: 'fitness:framework',
         filePath,
         checkSlug: config.slug,
       });
+      continue;
+    }
+
+    let content: string;
+    try {
+      // Dispatch the content filter through the LanguageAdapter for the
+      // file's extension. Falls back to raw content when no adapter is
+      // registered. See languages/content-filter-dispatch.ts.
+      content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
+    } catch (error) {
+      if (error instanceof CheckAbortedError) throw error;
+      throw error instanceof Error
+        ? error
+        : new Error(`Content filter failed for ${filePath}: ${String(error)}`);
+    }
+
+    let violations: readonly CheckViolation[];
+    try {
+      violations = config.analyze(content, filePath);
+    } catch (error) {
+      if (error instanceof CheckAbortedError) throw error;
+      // Surface analyze-mode throws as check failure (parity with analyzeAll).
+      throw error instanceof Error
+        ? error
+        : new Error(`Check analyze failed for ${filePath}: ${String(error)}`);
+    }
+
+    for (const violation of violations) {
+      void builder.addSignal(
+        toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider),
+      );
     }
   }
 

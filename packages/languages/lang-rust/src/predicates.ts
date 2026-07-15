@@ -22,8 +22,9 @@ export const isImpl = (node: Node): boolean => node.type === 'impl_item';
 export const isComment = (node: Node): boolean =>
   node.type === 'line_comment' || node.type === 'block_comment';
 
-/** A string literal. */
-export const isString = (node: Node): boolean => node.type === 'string_literal';
+/** A string literal (including raw strings `r#"…"#`). */
+export const isString = (node: Node): boolean =>
+  node.type === 'string_literal' || node.type === 'raw_string_literal';
 
 /** An `if` expression. */
 export const isConditional = (node: Node): boolean => node.type === 'if_expression';

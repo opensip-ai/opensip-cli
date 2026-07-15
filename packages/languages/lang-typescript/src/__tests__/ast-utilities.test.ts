@@ -244,6 +244,22 @@ describe('isInComment', () => {
     const insideIdx = src.indexOf('block');
     expect(isInComment(insideIdx, sf)).toBe(true);
   });
+
+  it('returns true for a mid-line trailing line comment', () => {
+    const src = 'const x = 1; // mid-line comment\nconst y = 2;';
+    const sf = parse(src);
+    if (!sf) throw new Error('parse failed');
+    const insideIdx = src.indexOf('mid-line');
+    expect(isInComment(insideIdx, sf)).toBe(true);
+  });
+
+  it('returns true for the second line of a multi-line block comment', () => {
+    const src = '/* block\n   comment\n*/\nconst x = 1;';
+    const sf = parse(src);
+    if (!sf) throw new Error('parse failed');
+    const insideIdx = src.indexOf('comment');
+    expect(isInComment(insideIdx, sf)).toBe(true);
+  });
 });
 
 describe('countUnescapedBackticks', () => {

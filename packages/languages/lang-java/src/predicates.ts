@@ -33,8 +33,9 @@ export const isCatch = (node: Node): boolean => node.type === 'catch_clause';
 /** An `if` statement. */
 export const isConditional = (node: Node): boolean => node.type === 'if_statement';
 
-/** A `for`, `while`, or enhanced-`for` (for-each) loop. */
+/** A `for`, `while`, `do`-`while`, or enhanced-`for` (for-each) loop. */
 export const isLoop = (node: Node): boolean =>
   node.type === 'for_statement' ||
   node.type === 'while_statement' ||
+  node.type === 'do_statement' ||
   node.type === 'enhanced_for_statement';

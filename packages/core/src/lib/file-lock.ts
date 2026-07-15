@@ -107,8 +107,15 @@ function writeLockMetadata(lockPath: string, metadata: FileLockMetadata): void {
 }
 
 function isStale(metadata: FileLockMetadata, staleMs: number): boolean {
-  if (!isProcessAlive(metadata.pid)) return true;
-  return Date.now() - metadata.lastHeartbeatAt > staleMs;
+  // Heartbeat age is the only cross-host-safe signal. Dead local PID alone
+  // must not reclaim a lock owned by another machine (shared FS / NFS / CI
+  // workspace) — that host's process.kill(pid, 0) would always fail.
+  if (Date.now() - metadata.lastHeartbeatAt > staleMs) return true;
+  if (metadata.hostname !== hostname() && metadata.hostname.length > 0) {
+    // Different host: wait for heartbeat expiry only (already checked above).
+    return false;
+  }
+  return !isProcessAlive(metadata.pid);
 }
 
 function removeLockIfOwned(lockPath: string, ownerToken: string): void {
@@ -237,9 +244,12 @@ function startLockHeartbeat(
   heartbeatMs: number,
 ): ReturnType<typeof setInterval> {
   return setInterval(() => {
-    metadata.lastHeartbeatAt = Date.now();
     try {
-      writeLockMetadata(lockPath, { ...metadata, lastHeartbeatAt: Date.now() });
+      // Never overwrite a lock we no longer own (stale recovery / steal).
+      const current = readLockMetadata(lockPath);
+      if (current === undefined || current.ownerToken !== metadata.ownerToken) return;
+      metadata.lastHeartbeatAt = Date.now();
+      writeLockMetadata(lockPath, { ...metadata, lastHeartbeatAt: metadata.lastHeartbeatAt });
     } catch {
       // @swallow-ok heartbeat update is best-effort; stale recovery handles abandoned locks
     }

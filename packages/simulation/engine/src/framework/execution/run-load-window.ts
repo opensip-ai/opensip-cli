@@ -93,6 +93,14 @@ function dispatchRequest(state: DispatchState): void {
       metrics.successfulRequests++;
     } catch {
       metrics.failedRequests++;
+      // `errorsGenerated` currently mirrors every request throw (natural target
+      // failures and fault-injected failures alike). The load window is
+      // fault-agnostic — it does not distinguish client-side fault injections
+      // from ordinary target errors — so `recovery_rate`
+      // (`1 - failedRequests / errorsGenerated`) is only meaningful when a
+      // caller stamps `errorsGenerated` independently as a pure fault-injection
+      // count. Chaos assertions that need that distinction must not rely on
+      // this driver-side increment alone.
       metrics.errorsGenerated++;
     } finally {
       latencyTracker.record(Date.now() - t0);
@@ -108,7 +116,11 @@ async function awaitBelowCap(
   cap: number,
   signal: AbortSignal,
 ): Promise<void> {
-  while (inFlight.size >= cap && !signal.aborted) {
+  // Cap must be ≥ 1: with cap 0, `size >= 0` is always true and an empty
+  // `Promise.race` hangs forever. resolveConcurrency already clamps; this is
+  // defense in depth for any direct caller.
+  const effectiveCap = Math.max(1, cap);
+  while (inFlight.size >= effectiveCap && !signal.aborted) {
     await Promise.race(inFlight);
   }
 }

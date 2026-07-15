@@ -104,10 +104,10 @@ describe('semgrep tool — scan helper', () => {
     expect(buildScanArgs(ctxFor(dir))[2]).toBe(cfg);
   });
 
-  it('excludes the .runtime store via --exclude', () => {
+  it('excludes the .runtime store via a relative --exclude segment', () => {
     expect(buildSemgrepExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
       '--exclude',
-      '/proj/opensip-cli/.runtime',
+      'opensip-cli/.runtime',
     ]);
   });
 });

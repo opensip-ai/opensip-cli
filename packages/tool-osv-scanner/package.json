@@ -52,6 +52,10 @@
       {
         "resource": "filesystem",
         "reason": "Reads the project working tree and writes the raw scan artifact under .runtime/artifacts"
+      },
+      {
+        "resource": "network",
+        "reason": "Performs network I/O for the networked scanner posture"
       }
     ],
     "commands": [

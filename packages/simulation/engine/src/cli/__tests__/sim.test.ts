@@ -150,6 +150,36 @@ describe('executeSim', () => {
     }
   });
 
+  it('fails closed (exit 2) when simulation plugins failed to load', async () => {
+    // Mirror fitness: a broken plugin must not yield a green/partial run.
+    const load = (
+      await import('../../framework/registry.js')
+    ).currentSimulationLoadState();
+    load.pluginLoadErrors = ['broken-plugin.mjs: SyntaxError: unexpected token'];
+    load.loadedFor = process.cwd(); // skip re-load so the injected error sticks
+
+    currentScenarioRegistry().register(
+      defineLoadScenario({
+        id: 'would-run',
+        name: 'would-run',
+        description: 'registered despite plugin failure',
+        tags: [],
+        target: noopTarget,
+        workload: { rps: 1 },
+        duration: 1,
+        assertions: [ASSERTIONS.lowErrorRate(1)],
+      }),
+    );
+
+    const { result } = await executeSim(args());
+    expect(result.type).toBe('error');
+    if (result.type === 'error') {
+      expect(result.exitCode).toBe(2);
+      expect(result.message).toContain('broken-plugin.mjs');
+      expect(result.suggestion).toMatch(/plugin/i);
+    }
+  });
+
   it('preserves error messages on failed scenarios', async () => {
     currentScenarioRegistry().register({
       id: 'msg',

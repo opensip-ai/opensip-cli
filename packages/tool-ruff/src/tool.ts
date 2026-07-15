@@ -10,8 +10,10 @@ export const RUFF_IDENTITY: ToolIdentity = { name: 'ruff' };
 export const RUFF_STABLE_ID = '16419cb0-553b-4bcb-a544-3099c6092480';
 
 /**
- * Build the CLI args for a Ruff scan: `check` the project root and write JSON
- * diagnostics to the artifact path.
+ * Build the CLI args for a Ruff scan: `check` the project working tree (`.`,
+ * relative to the process cwd which the substrate sets to `projectRoot`) and
+ * write JSON diagnostics to the artifact path. Prefer `.` over an absolute root
+ * so reported paths stay project-relative.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
@@ -20,7 +22,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     'json',
     '--output-file',
     ctx.artifactPath('ruff.json'),
-    ctx.projectRoot,
+    '.',
   ];
 }
 

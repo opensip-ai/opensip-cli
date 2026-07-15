@@ -8,9 +8,63 @@
  */
 
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, isAbsolute, resolve } from 'node:path';
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+
+/** True when `extends` is a package-style reference (not a relative/absolute path). */
+function isPackageStyleExtends(value: string): boolean {
+  // Relative (./ ../) or absolute (/ C:\ …) paths are local filesystem targets.
+  if (value.startsWith('./') || value.startsWith('../')) return false;
+  if (isAbsolute(value)) return false;
+  return true;
+}
+
+/** Normalize `extends` to a string list (TS 5+ allows string | string[]). */
+function normalizeExtends(extendsValue: unknown): string[] | null {
+  if (typeof extendsValue === 'string' && extendsValue.length > 0) return [extendsValue];
+  if (Array.isArray(extendsValue)) {
+    const values = extendsValue.filter((v): v is string => typeof v === 'string' && v.length > 0);
+    return values.length > 0 ? values : null;
+  }
+  return null;
+}
+
+/**
+ * True when a package-style extends can be resolved via Node module resolution,
+ * or when we intentionally skip existence (resolution unavailable). Relative
+ * paths are checked on the filesystem.
+ */
+function baseExists(filePath: string, extendsValue: string): boolean {
+  if (isPackageStyleExtends(extendsValue)) {
+    // Package-style extends (e.g. "@tsconfig/node20/tsconfig.json") are not
+    // local relative files — resolve via require.resolve from the tsconfig's
+    // directory (or skip if Node cannot resolve). Never treat as a missing
+    // local relative path.
+    try {
+      const from = resolve(process.cwd(), filePath);
+      const req = createRequire(from);
+      req.resolve(extendsValue);
+      return true;
+    } catch {
+      try {
+        const from = resolve(process.cwd(), filePath);
+        const req = createRequire(from);
+        req.resolve(extendsValue.endsWith('.json') ? extendsValue : `${extendsValue}.json`);
+        return true;
+      } catch {
+        // Unresolvable package refs are not "missing local files" — skip.
+        return true;
+      }
+    }
+  }
+
+  const dir = dirname(filePath);
+  const resolvedBase = resolve(process.cwd(), dir, extendsValue);
+  const baseWithJson = resolvedBase.endsWith('.json') ? resolvedBase : `${resolvedBase}.json`;
+  return existsSync(resolvedBase) || existsSync(baseWithJson);
+}
 
 export const tsconfigExtendsValidation = defineCheck({
   id: '4a62d660-9d44-4877-94f8-2c4dc7f3aa40',
@@ -56,8 +110,8 @@ export const tsconfigExtendsValidation = defineCheck({
         continue;
       }
 
-      const extendsValue = parsed.extends;
-      if (!extendsValue || typeof extendsValue !== 'string') {
+      const extendsList = normalizeExtends(parsed.extends);
+      if (!extendsList) {
         violations.push({
           filePath,
           line: 1,
@@ -71,12 +125,11 @@ export const tsconfigExtendsValidation = defineCheck({
         continue;
       }
 
-      // Verify the extended file exists
-      const dir = dirname(filePath);
-      const resolvedBase = resolve(process.cwd(), dir, extendsValue);
-      const baseWithJson = resolvedBase.endsWith('.json') ? resolvedBase : `${resolvedBase}.json`;
+      for (const extendsValue of extendsList) {
+        if (baseExists(filePath, extendsValue)) continue;
 
-      if (!existsSync(resolvedBase) && !existsSync(baseWithJson)) {
+        const dir = dirname(filePath);
+        const resolvedBase = resolve(process.cwd(), dir, extendsValue);
         violations.push({
           filePath,
           line: 1,

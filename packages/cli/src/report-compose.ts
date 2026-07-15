@@ -21,8 +21,7 @@
  * `ToolScope` view as the `collectReportData` parameter.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import {
   currentScope,
@@ -41,10 +40,12 @@ import {
 } from '@opensip-cli/dashboard';
 import { orderSessionsForSuiteGrouping, RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
+import { writeArtifactAtomically } from './bootstrap/atomic-artifact-write.js';
 import { bindToolCliContext } from './bootstrap/bind-tool-context.js';
 import { collectDeclaredInputsForTool } from './bootstrap/declared-inputs.js';
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
 import { type DispatchHostCtx } from './bootstrap/dispatch-replay-result.js';
+import { resolveStateLockPolicy } from './bootstrap/state-lock-policy.js';
 import {
   isExternalToolProvenance,
   provenanceRecordFor,
@@ -293,11 +294,22 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
   );
 
   // Scope-aware: an ephemeral (no-init) run must write its report into the user
-  // cache, never into the user's repository.
+  // cache, never into the user's repository. Atomic write avoids concurrent
+  // audit --open / report races corrupting latest.html mid-write.
   const paths = getCurrentRuntimePaths();
-  mkdirSync(paths.reportsDir, { recursive: true });
   const reportPath = join(paths.reportsDir, 'latest.html');
-  writeFileSync(reportPath, html, 'utf8');
+  const scope = currentScope();
+  const logger = scope?.logger ?? defaultLogger;
+  writeArtifactAtomically(reportPath, html, {
+    policy: resolveStateLockPolicy(),
+    logger,
+    runId: scope?.runId,
+    command: 'report',
+    cwdBasename:
+      scope?.projectContext?.projectRoot === undefined
+        ? basename(process.cwd())
+        : basename(scope.projectContext.projectRoot),
+  });
 
   const fragment =
     input.selection === undefined ? undefined : encodeReportViewSelection(input.selection);

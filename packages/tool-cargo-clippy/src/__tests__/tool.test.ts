@@ -63,7 +63,8 @@ describe('cargo-clippy tool — identity + metadata', () => {
   it('carries the stable UUID, name, and description', () => {
     expect(tool.metadata.id).toBe(CARGO_CLIPPY_STABLE_ID);
     expect(tool.metadata.name).toBe('cargo-clippy');
-    expect(tool.metadata.description).toBe('Rust lint diagnostics via cargo clippy');
+    expect(tool.metadata.description).toMatch(/cargo clippy/i);
+    expect(tool.metadata.description).toMatch(/CARGO_TARGET_DIR|warm target/i);
   });
 
   it('defaults to the message-hash fingerprint strategy', () => {

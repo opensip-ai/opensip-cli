@@ -447,6 +447,65 @@ describe('yagni detectors and scoring helpers', () => {
     expect(detailedPayload.summary).not.toHaveProperty('graphDetail');
   });
 
+  it('counts object binding elements as property reads but ignores array patterns', async () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'fixture-binding',
+        type: 'module',
+        exports: { '.': './src/index.ts' },
+      }),
+    );
+    writeFileSync(
+      join(dir, 'src', 'index.ts'),
+      `export type { BindingConfig } from './binding-config.js';\n`,
+    );
+    writeFileSync(
+      join(dir, 'src', 'binding-config.ts'),
+      [
+        'export interface BindingConfig {',
+        '  readonly objectBound: string;',
+        '  readonly arrayOnly: string;',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(dir, 'src', 'consumer.ts'),
+      [
+        "import type { BindingConfig } from './binding-config.js';",
+        '',
+        'export function readObject(config: BindingConfig): string {',
+        '  const { objectBound } = config;',
+        '  return objectBound;',
+        '}',
+        '',
+        'export function readArray(items: string[]): string {',
+        '  const [arrayOnly] = items;',
+        '  return arrayOnly;',
+        '}',
+        '',
+      ].join('\n'),
+    );
+
+    const outcome = await unusedConfigSurfaceDetector.run({
+      cwd: dir,
+      config: {},
+      includeTests: false,
+    });
+    const properties = outcome.signals.map((s) => {
+      const data = (s.metadata.yagni as { evidence?: { data?: { property?: string } }[] })
+        ?.evidence?.[0]?.data;
+      return data?.property;
+    });
+    // objectBound is read via object destructuring → no finding.
+    // arrayOnly appears only in an array pattern → still unused as a config key.
+    expect(properties).toEqual(['arrayOnly']);
+    expect(outcome.signals[0]?.filePath).toBe('src/binding-config.ts');
+  });
+
   it('covers presentation variants and unreadable/oversized source skips', async () => {
     const outcome = await unusedConfigSurfaceDetector.run({
       cwd: FIXTURE_ROOT,

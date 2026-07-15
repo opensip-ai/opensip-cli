@@ -271,8 +271,12 @@ export function mergeResolvedAndCachedEdges(
     for (const o of occs) {
       const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
       if (closureRel.has(o.filePath)) {
-        // Closure files keep their freshly-resolved edges.
-        arr.push({ ...o, calls: edgesByOwner.get(ownerKey) ?? [] });
+        // Closure files keep their freshly-resolved edges. Dual-lookup covers
+        // polyglot bare-hash adapters until they migrate to ownerEdgeKey.
+        arr.push({
+          ...o,
+          calls: edgesByOwner.get(ownerKey) ?? edgesByOwner.get(o.bodyHash) ?? [],
+        });
       } else {
         // Unchanged files: restore cached calls. The key matched
         // because we lifted the cached occurrence into the merged

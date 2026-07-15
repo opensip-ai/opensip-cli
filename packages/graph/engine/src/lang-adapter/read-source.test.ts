@@ -38,6 +38,18 @@ describe('readSourceFileGuarded', () => {
     expect(() => readSourceFileGuarded(filePath, 16)).toThrow(/size guard/);
   });
 
+  it('post-read guard uses UTF-8 byte length, not string length', () => {
+    // Three multi-byte code points: each is 1 char but 3 UTF-8 bytes → 9 bytes.
+    const multiByte = '€€€';
+    expect(multiByte.length).toBe(3);
+    expect(Buffer.byteLength(multiByte, 'utf8')).toBe(9);
+    const filePath = tmpFile('utf8.ts', multiByte);
+    // Stat size is 9; with maxBytes=8 the pre-check throws. With maxBytes=9 it
+    // loads, and the post-check must also measure bytes (not length=3).
+    expect(() => readSourceFileGuarded(filePath, 8)).toThrow(/size guard/);
+    expect(readSourceFileGuarded(filePath, 9)).toBe(multiByte);
+  });
+
   it('defaults to the shared 10MB ceiling', () => {
     expect(MAX_SOURCE_FILE_BYTES).toBe(10_000_000);
   });
