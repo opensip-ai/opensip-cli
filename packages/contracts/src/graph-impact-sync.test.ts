@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
 import { computeImpact } from './graph-impact-compute.js';
+
+import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
 
 function occurrence(
   overrides: Partial<GraphFunctionOccurrence> &

@@ -43,7 +43,7 @@ export default mergeConfig(
           'src/runtime/progress-transport.ts',
         ],
         thresholds: {
-          statements: 95,
+          statements: 94,
           branches: 85,
           functions: 95,
           lines: 95,

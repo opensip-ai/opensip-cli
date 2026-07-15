@@ -6,6 +6,7 @@ import {
   compareReviewBriefCorrelationRisks,
   reviewBriefCorrelationMemberSignature,
 } from './review-brief-correlation-order.js';
+
 import type {
   ReviewBriefCorrelationGroup,
   ReviewBriefCorrelationRisk,

@@ -90,6 +90,19 @@ afterEach(() => {
  * SET of findings is what "identical behaviour" means.
  */
 function normalize(value: unknown): unknown {
+  if (typeof value === 'string') {
+    // npm embeds absolute, timestamped debug-log paths in stderr that differ
+    // between bundled and installed runs of the same check failure.
+    return value
+      .replace(/\/Users\/[^/\s]+/g, '/HOME')
+      .replace(/\\Users\\[^\\\s]+/g, '\\HOME')
+      .replace(/\/home\/[^/\s]+/g, '/HOME')
+      .replace(
+        /npm[_-]error[^\n]*_logs\/[^\n]+/gi,
+        'npm error A complete log of this run can be found in: /HOME/.npm/_logs/<volatile>.log',
+      )
+      .replace(/20\d{2}-\d{2}-\d{2}T\d{2}[_:]\d{2}[_:]\d{2}[^\s]*/g, '<timestamp>');
+  }
   if (Array.isArray(value)) {
     return value.map(normalize).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   }

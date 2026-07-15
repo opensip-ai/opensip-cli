@@ -10,8 +10,7 @@ const { opendirMock, lstatMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- Vitest typed importOriginal requires a module import type expression.
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof NodeFsPromises>();
   return { ...actual, opendir: opendirMock, lstat: lstatMock };
 });
 
@@ -21,21 +20,9 @@ import {
 } from './manifest-filesystem-walk.js';
 
 import type { Dir, Dirent } from 'node:fs';
+import type * as NodeFsPromises from 'node:fs/promises';
 
 let root: string;
-
-function directoryEntry(name: string): Dirent<string> {
-  return {
-    name,
-    isBlockDevice: () => false,
-    isCharacterDevice: () => false,
-    isDirectory: () => true,
-    isFIFO: () => false,
-    isFile: () => false,
-    isSocket: () => false,
-    isSymbolicLink: () => false,
-  } as Dirent<string>;
-}
 
 function fileEntry(name: string): Dirent<string> {
   return {
@@ -81,7 +68,7 @@ function fakeDirectory(input: {
   readonly read: () => Promise<Dirent<string> | null>;
 }): Dir {
   return {
-    close: input.close ?? (async () => undefined),
+    close: input.close ?? (() => Promise.resolve(undefined)),
     read: input.read,
   } as unknown as Dir;
 }
@@ -91,7 +78,7 @@ beforeEach(() => {
   opendirMock.mockReset();
   lstatMock.mockReset();
   lstatMock.mockImplementation(async (path: string) => {
-    const { lstat } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const { lstat } = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
     return lstat(path);
   });
 });
@@ -113,7 +100,7 @@ describe('walkManifestFilesystem edge cases', () => {
 
     // Use real fs for this integration-style walk.
     opendirMock.mockImplementation(async (path: string, options?: { bufferSize?: number }) => {
-      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
       return actual.opendir(path, options);
     });
 
@@ -138,7 +125,7 @@ describe('walkManifestFilesystem edge cases', () => {
     writeFileSync(join(root, 'packages/a/package.json'), '{}');
     writeFileSync(join(root, 'packages/b/package.json'), '{}');
     opendirMock.mockImplementation(async (path: string, options?: { bufferSize?: number }) => {
-      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
       return actual.opendir(path, options);
     });
 
@@ -182,13 +169,13 @@ describe('walkManifestFilesystem edge cases', () => {
       .mockResolvedValueOnce(unknownEntry('mystery-file'))
       .mockResolvedValueOnce(unknownEntry('broken'))
       .mockResolvedValueOnce(null);
-    const close = vi.fn(async () => undefined);
+    const close = vi.fn(() => Promise.resolve(undefined));
     opendirMock.mockResolvedValueOnce(fakeDirectory({ read, close }));
     // second open for mystery-dir
     opendirMock.mockResolvedValueOnce(
       fakeDirectory({
-        read: vi.fn(async () => null),
-        close: vi.fn(async () => undefined),
+        read: vi.fn(() => Promise.resolve(null)),
+        close: vi.fn(() => Promise.resolve(undefined)),
       }),
     );
 
@@ -223,7 +210,7 @@ describe('walkManifestFilesystem edge cases', () => {
     writeFileSync(join(root, 'keep/nested/package.json'), '{}');
     writeFileSync(join(root, 'skip/nested/package.json'), '{}');
     opendirMock.mockImplementation(async (path: string, options?: { bufferSize?: number }) => {
-      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
       return actual.opendir(path, options);
     });
 
@@ -256,7 +243,7 @@ describe('walkManifestFilesystem edge cases', () => {
     symlinkSync(realManifest, join(root, 'packages/linked/package.json'));
 
     opendirMock.mockImplementation(async (path: string, options?: { bufferSize?: number }) => {
-      const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
       return actual.opendir(path, options);
     });
 
@@ -270,7 +257,9 @@ describe('walkManifestFilesystem edge cases', () => {
       },
     );
 
-    expect(offered.sort()).toEqual(['packages/app', 'packages/linked']);
+    const sortedOffered = [...offered];
+    sortedOffered.sort();
+    expect(sortedOffered).toEqual(['packages/app', 'packages/linked']);
   });
 
   it('observes cancellation at checkpoints during large directory reads', async () => {
@@ -278,11 +267,11 @@ describe('walkManifestFilesystem edge cases', () => {
       fileEntry(`f-${String(index).padStart(3, '0')}.txt`),
     );
     let index = 0;
-    const read = vi.fn(async () => {
-      if (index >= entries.length) return null;
+    const read = vi.fn(() => {
+      if (index >= entries.length) return Promise.resolve(null);
       const entry = entries[index];
       index += 1;
-      return entry ?? null;
+      return Promise.resolve(entry ?? null);
     });
     opendirMock.mockResolvedValue(fakeDirectory({ read }));
     let checks = 0;
@@ -311,11 +300,11 @@ describe('walkManifestFilesystem edge cases', () => {
       fileEntry(`f-${String(index).padStart(5, '0')}.txt`),
     );
     let index = 0;
-    const read = vi.fn(async () => {
-      if (index >= entries.length) return null;
+    const read = vi.fn(() => {
+      if (index >= entries.length) return Promise.resolve(null);
       const entry = entries[index];
       index += 1;
-      return entry ?? null;
+      return Promise.resolve(entry ?? null);
     });
     opendirMock.mockResolvedValue(fakeDirectory({ read }));
 

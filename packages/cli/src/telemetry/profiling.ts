@@ -255,13 +255,15 @@ export function startProfiling(
         runId,
       });
       state.session = inspectorSessionFactory();
-      state.session.connect();
+      // connect() is synchronous; void silences detached-promises in async start.
+      void state.session.connect();
       await postWithoutResult(state.session, 'Profiler.enable');
       if (state.revision !== revision || !state.session) return undefined;
 
       // Reserve the sidecar before starting the expensive profiler. Exclusive
       // creation makes a collision or pre-existing symlink fail closed.
-      writeProfileArtifactLabels(artifacts);
+      // writeProfileArtifactLabels is synchronous; void silences detached-promises.
+      void writeProfileArtifactLabels(artifacts);
       reservedArtifacts = artifacts;
       state.artifacts = artifacts;
       await postWithoutResult(state.session, 'Profiler.start');

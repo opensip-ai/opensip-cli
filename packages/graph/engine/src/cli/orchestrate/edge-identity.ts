@@ -87,3 +87,43 @@ export function stitchEdgesByOwner(
   }
   return out;
 }
+
+/**
+ * Prefer full occurrence identity ({@link ownerEdgeKey}), falling back to bare
+ * `bodyHash` for polyglot adapters that still bucket by owner hash alone
+ * (pre-migration Go/Java/Python/Rust). Bare-hash twins may union edges — empty
+ * catalogs are worse than twin over-approx until adapters migrate. Bare-hash
+ * Map keys are allowed ONLY in this module.
+ */
+export function lookupByOwnerThenBodyHash<T>(
+  map: ReadonlyMap<string, T>,
+  occurrence: {
+    readonly bodyHash: string;
+    readonly filePath: string;
+    readonly line: number;
+    readonly column: number;
+  },
+): T | undefined {
+  const ownerKey = ownerEdgeKey(
+    occurrence.bodyHash,
+    occurrence.filePath,
+    occurrence.line,
+    occurrence.column,
+  );
+  return map.get(ownerKey) ?? map.get(occurrence.bodyHash);
+}
+
+/**
+ * {@link lookupByOwnerThenBodyHash} for edge lists, defaulting a miss to `[]`.
+ */
+export function lookupEdgesByOwnerThenBodyHash(
+  map: ReadonlyMap<string, readonly CallEdge[]>,
+  occurrence: {
+    readonly bodyHash: string;
+    readonly filePath: string;
+    readonly line: number;
+    readonly column: number;
+  },
+): readonly CallEdge[] {
+  return lookupByOwnerThenBodyHash(map, occurrence) ?? [];
+}

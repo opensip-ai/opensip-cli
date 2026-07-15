@@ -77,7 +77,7 @@ describe('runCheckOnFixture', () => {
   it('rejects absolute fixture paths', async () => {
     await expect(
       runCheckOnFixture(bannedCheck, {
-        files: [{ path: '/tmp/escape.ts', content: 'export const x = 1\n' }],
+        files: [{ path: '/absolute/escape.ts', content: 'export const x = 1\n' }],
       }),
     ).rejects.toThrow(/relative/);
   });

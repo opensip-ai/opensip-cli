@@ -24,7 +24,6 @@ import {
   pageWhyDepends,
 } from './package-query-page.js';
 import {
-  completeInventoryCoverage,
   missingCatalogCoverage,
   type SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';

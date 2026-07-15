@@ -87,7 +87,7 @@ export function touchEphemeralRuntime(paths: EphemeralProjectPaths, now = Date.n
     };
     writeFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), JSON.stringify(marker), 'utf8');
   } catch {
-    // Hygiene only — never fail a run because the cache marker could not be written.
+    // intentionally best-effort hygiene; never fail the user run
   }
 }
 
@@ -100,6 +100,7 @@ function readMarker(entryDir: string): EphemeralMarker | undefined {
     }
     return { projectDir: parsed.projectDir, lastUsedAt: parsed.lastUsedAt };
   } catch {
+    // intentionally best-effort hygiene; never fail the user run
     return undefined;
   }
 }
@@ -113,6 +114,7 @@ function lastUsedAt(entryDir: string, marker: EphemeralMarker | undefined): numb
   try {
     return statSync(entryDir).mtimeMs;
   } catch {
+    // intentionally best-effort hygiene; never fail the user run
     return 0;
   }
 }
@@ -122,6 +124,7 @@ function removeEntry(entryDir: string): boolean {
     rmSync(entryDir, { recursive: true, force: true });
     return true;
   } catch {
+    // intentionally best-effort hygiene; never fail the user run
     return false;
   }
 }
@@ -137,13 +140,13 @@ export function shouldPruneEphemeralRuntimes(now = Date.now()): boolean {
     const last = Date.parse(readFileSync(stampPath, 'utf8'));
     if (!Number.isNaN(last) && now - last < PRUNE_INTERVAL_MS) return false;
   } catch {
-    // No stamp (or unreadable) — treat as due.
+    // intentionally best-effort hygiene; never fail the user run
   }
   try {
     mkdirSync(resolveUserPaths().ephemeralProjectsDir, { recursive: true });
     writeFileSync(stampPath, new Date(now).toISOString(), 'utf8');
   } catch {
-    // If the stamp cannot be written we still prune; we just may prune again sooner.
+    // intentionally best-effort hygiene; never fail the user run
   }
   return true;
 }
@@ -155,6 +158,7 @@ function listEntries(root: string): string[] {
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
   } catch {
+    // intentionally best-effort hygiene; never fail the user run
     return [];
   }
 }

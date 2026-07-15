@@ -13,6 +13,7 @@ import {
   estimateJaccard,
   lshBandHashes,
 } from './near-duplicate-signature.js';
+import { UnionFind } from './near-duplicate-union-find.js';
 
 import type { CloneCandidate, NearDupOpts, NearDuplicateCluster } from './types.js';
 
@@ -332,9 +333,15 @@ function capComponentIndicesByDegree(
       if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
       if (a.line !== b.line) return a.line - b.line;
       if (a.column !== b.column) return a.column - b.column;
-      return a.qualifiedName < b.qualifiedName ? -1 : a.qualifiedName > b.qualifiedName ? 1 : 0;
+      return compareQualifiedNames(a.qualifiedName, b.qualifiedName);
     })
     .slice(0, maxSize);
+}
+
+function compareQualifiedNames(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 /** Stable location order, then keep at most `maxSize` member indices. */
@@ -352,7 +359,7 @@ function capComponentIndices(
       if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
       if (a.line !== b.line) return a.line - b.line;
       if (a.column !== b.column) return a.column - b.column;
-      return a.qualifiedName < b.qualifiedName ? -1 : a.qualifiedName > b.qualifiedName ? 1 : 0;
+      return compareQualifiedNames(a.qualifiedName, b.qualifiedName);
     })
     .slice(0, maxSize);
 }
@@ -395,38 +402,4 @@ function lowestByLocation(occs: readonly CloneCandidate[]): CloneCandidate {
 
 function pairKey(a: number, b: number): string {
   return a < b ? `${String(a)}:${String(b)}` : `${String(b)}:${String(a)}`;
-}
-
-class UnionFind {
-  private readonly parent: number[];
-  private readonly rank: number[];
-
-  constructor(size: number) {
-    this.parent = Array.from({ length: size }, (_, i) => i);
-    this.rank = Array.from({ length: size }, () => 0);
-  }
-
-  find(x: number): number {
-    const p = this.parent[x];
-    if (p === undefined || p === x) return x;
-    const root = this.find(p);
-    this.parent[x] = root;
-    return root;
-  }
-
-  union(a: number, b: number): void {
-    const ra = this.find(a);
-    const rb = this.find(b);
-    if (ra === rb) return;
-    const rankA = this.rank[ra] ?? 0;
-    const rankB = this.rank[rb] ?? 0;
-    if (rankA < rankB) {
-      this.parent[ra] = rb;
-    } else if (rankA > rankB) {
-      this.parent[rb] = ra;
-    } else {
-      this.parent[rb] = ra;
-      this.rank[ra] = rankA + 1;
-    }
-  }
 }

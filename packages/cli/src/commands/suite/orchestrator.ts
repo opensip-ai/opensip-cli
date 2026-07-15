@@ -1,6 +1,11 @@
 import { performance } from 'node:perf_hooks';
 
-import { EXIT_CODES, type SuiteRunResult, type SuiteStepSummary } from '@opensip-cli/contracts';
+import {
+  EXIT_CODES,
+  type SuiteRunResult,
+  type SuiteRunScope,
+  type SuiteStepSummary,
+} from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
@@ -48,6 +53,68 @@ function contextPersistencePrecondition(manifest: SuiteRunResult['contextManifes
   return { persistencePrecondition: () => taskContextPointersAvailable(manifest) };
 }
 
+function logSuiteScope(
+  log: ReturnType<typeof currentLogger>,
+  suiteName: string,
+  suiteRunId: string,
+  scope: SuiteRunScope,
+  stepCount: number,
+): void {
+  log.info?.({
+    evt: 'cli.suite.run.start',
+    suite: suiteName,
+    suiteRunId,
+    stepCount,
+  });
+  log.debug?.({
+    evt: 'cli.suite.scope.resolved',
+    suite: suiteName,
+    suiteRunId,
+    mode: scope.mode,
+    source: scope.source,
+    ...(scope.changedFiles === undefined ? {} : { changedFiles: scope.changedFiles }),
+    ...(scope.ref === undefined ? {} : { ref: scope.ref }),
+  });
+  if (scope.source === 'fallback') {
+    log.warn?.({
+      evt: 'cli.suite.scope.fallback',
+      suite: suiteName,
+      suiteRunId,
+      reason: scope.notice,
+    });
+  }
+}
+
+function computeSuiteExitCode(
+  steps: readonly SuiteStepSummary[],
+  failOnFault: boolean,
+  contextUnavailable: boolean,
+): number {
+  // Worst-of suite exit is deliberately a numeric `Math.max` over the ADR-0020
+  // code space (ratified in ADR-0093 / ADR-0100 — see ADR-0131): any failing
+  // step fails the suite. After Tasks 1.2/1.3 every step exit source (setExitCode,
+  // deliverSignals, reportFailure, emitError, process.exit) writes the per-step
+  // capture slot, so `step.exitCode` is the single source of truth here — no step
+  // touches the host holder mid-run for this aggregate to miss.
+  //
+  // A CHECK-level runtime fault (a unit threw but the tool still produced an
+  // envelope — `verdict` present) is "result unknown" and NON-blocking by default
+  // (#2 fault taxonomy): its exit is excluded from the worst-of so a crashed check
+  // doesn't fail the suite like a findings failure does — the fault is still
+  // raised in the aggregate counts + review brief. A STEP/APP-level failure (NO
+  // envelope: a thrown command, ConfigurationError, or ToolError before results,
+  // ADR-0060) keeps its ADR-0020 exit taxonomy and still blocks. `failOnFault`
+  // (suite execution policy, default false) opts every fault back into blocking.
+  const isNonBlockingFault = (step: SuiteStepSummary): boolean =>
+    step.outcome === 'faulted' && step.verdict !== undefined;
+  const blockingSteps = failOnFault ? steps : steps.filter((step) => !isNonBlockingFault(step));
+  let exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
+  if (contextUnavailable && failOnFault) {
+    exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
+  }
+  return exitCode;
+}
+
 export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   const suite = validateSuite({
     name: input.name,
@@ -76,29 +143,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   const stepSuiteOpts: Record<string, unknown> =
     scope.mode === 'full' ? { ...suiteOpts, full: true } : suiteOpts;
 
-  log.info?.({
-    evt: 'cli.suite.run.start',
-    suite: suite.name,
-    suiteRunId,
-    stepCount: suite.steps.length,
-  });
-  log.debug?.({
-    evt: 'cli.suite.scope.resolved',
-    suite: suite.name,
-    suiteRunId,
-    mode: scope.mode,
-    source: scope.source,
-    ...(scope.changedFiles === undefined ? {} : { changedFiles: scope.changedFiles }),
-    ...(scope.ref === undefined ? {} : { ref: scope.ref }),
-  });
-  if (scope.source === 'fallback') {
-    log.warn?.({
-      evt: 'cli.suite.scope.fallback',
-      suite: suite.name,
-      suiteRunId,
-      reason: scope.notice,
-    });
-  }
+  logSuiteScope(log, suite.name, suiteRunId, scope, suite.steps.length);
 
   await loadSuiteStepCapabilities(suite, context.aggregates ? cwd : undefined);
 
@@ -118,26 +163,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     }),
   );
   const steps = internalSteps.map((step) => step.summary);
-  // Worst-of suite exit is deliberately a numeric `Math.max` over the ADR-0020
-  // code space (ratified in ADR-0093 / ADR-0100 — see ADR-0131): any failing
-  // step fails the suite. After Tasks 1.2/1.3 every step exit source (setExitCode,
-  // deliverSignals, reportFailure, emitError, process.exit) writes the per-step
-  // capture slot, so `step.exitCode` is the single source of truth here — no step
-  // touches the host holder mid-run for this aggregate to miss.
-  //
-  // A CHECK-level runtime fault (a unit threw but the tool still produced an
-  // envelope — `verdict` present) is "result unknown" and NON-blocking by default
-  // (#2 fault taxonomy): its exit is excluded from the worst-of so a crashed check
-  // doesn't fail the suite like a findings failure does — the fault is still
-  // raised in the aggregate counts + review brief. A STEP/APP-level failure (NO
-  // envelope: a thrown command, ConfigurationError, or ToolError before results,
-  // ADR-0060) keeps its ADR-0020 exit taxonomy and still blocks. `failOnFault`
-  // (suite execution policy, default false) opts every fault back into blocking.
   const failOnFault = input.suite.execution?.failOnFault === true;
-  const isNonBlockingFault = (step: SuiteStepSummary): boolean =>
-    step.outcome === 'faulted' && step.verdict !== undefined;
-  const blockingSteps = failOnFault ? steps : steps.filter((step) => !isNonBlockingFault(step));
-  let exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
   const aggregate = deriveSuiteAggregate(steps);
   const reviewBrief = context.aggregates
     ? undefined
@@ -165,9 +191,11 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     ledger: ledgerIdentity,
     steps: internalSteps,
   });
-  if (contextManifest?.readiness === 'unavailable' && input.suite.execution?.failOnFault === true) {
-    exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
-  }
+  const exitCode = computeSuiteExitCode(
+    steps,
+    failOnFault,
+    contextManifest?.readiness === 'unavailable',
+  );
   logTaskContextManifest(suite.name, contextManifest);
 
   // Source-end capture is part of the context run's evidence work. Freeze both

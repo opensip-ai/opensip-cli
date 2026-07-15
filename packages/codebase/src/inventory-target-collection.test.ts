@@ -95,28 +95,28 @@ class SingleTargetResolver implements BoundedTargetResolver {
     return [];
   }
 
-  async resolveTargetsBounded(
+  resolveTargetsBounded(
     _names: readonly string[],
     _rootDir: string,
     options: BoundedTargetResolutionOptions,
   ): Promise<BoundedTargetResolution> {
-    return this.resolve(options);
+    return Promise.resolve(this.resolve(options));
   }
 
   applyGlobalExcludes(files: readonly string[]): readonly string[] {
     return files;
   }
 
-  async applyGlobalExcludesBounded(
+  applyGlobalExcludesBounded(
     files: readonly string[],
     _rootDir: string,
     options: BoundedTargetResolutionOptions,
   ): Promise<BoundedTargetResolution> {
-    return {
+    return Promise.resolve({
       files: files.slice(0, options.maxResults),
       capped: false,
       cancelled: options.signal?.aborted === true,
-    };
+    });
   }
 }
 
@@ -126,15 +126,15 @@ class MembershipResolver extends SingleTargetResolver implements BoundedTargetMe
       options: BoundedTargetMembershipResolutionOptions,
     ) => Promise<BoundedTargetMembershipResolution> | BoundedTargetMembershipResolution,
   ) {
-    super(async () => ({ files: [], capped: false, cancelled: false }));
+    super(() => Promise.resolve({ files: [], capped: false, cancelled: false }));
   }
 
-  async resolveTargetMembershipsBounded(
+  resolveTargetMembershipsBounded(
     _names: readonly string[],
     _rootDir: string,
     options: BoundedTargetMembershipResolutionOptions,
   ): Promise<BoundedTargetMembershipResolution> {
-    return this.membership(options);
+    return Promise.resolve(this.membership(options));
   }
 }
 
@@ -150,7 +150,7 @@ describe('targetFileResolution', () => {
       [
         'src/a.ts',
         {
-          absolutePath: '/tmp/a.ts',
+          absolutePath: '/fixture/a.ts',
           relativePath: 'src/a.ts',
           targets: [],
         },
@@ -181,11 +181,13 @@ describe('collectAllTargets single-target path', () => {
       ],
     ]);
     // First file already has the target (duplicate skip); second is newly admitted.
-    const resolver = new SingleTargetResolver(async () => ({
-      files: [absolutePath, second],
-      capped: false,
-      cancelled: false,
-    }));
+    const resolver = new SingleTargetResolver(() =>
+      Promise.resolve({
+        files: [absolutePath, second],
+        capped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({ root, resolver, pendingByPath });
 
     await collectAllTargets([target], ctx);
@@ -210,11 +212,13 @@ describe('collectAllTargets single-target path', () => {
         },
       ],
     ]);
-    const resolver = new SingleTargetResolver(async () => ({
-      files: [absolutePath],
-      capped: false,
-      cancelled: false,
-    }));
+    const resolver = new SingleTargetResolver(() =>
+      Promise.resolve({
+        files: [absolutePath],
+        capped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({
       root,
       resolver,
@@ -233,11 +237,13 @@ describe('collectAllTargets single-target path', () => {
     const outsideRoot = tempRoot();
     const outside = writeSource(outsideRoot, 'outside.ts');
     const keep = writeSource(root, 'src/keep.ts');
-    const resolver = new SingleTargetResolver(async () => ({
-      files: [outside, keep],
-      capped: false,
-      cancelled: false,
-    }));
+    const resolver = new SingleTargetResolver(() =>
+      Promise.resolve({
+        files: [outside, keep],
+        capped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({ root, resolver, limits: { files: 10 } });
 
     await collectAllTargets([boundedTarget('source')], ctx);
@@ -260,11 +266,13 @@ describe('collectAllTargets single-target path', () => {
         },
       ],
     ]);
-    const resolver = new SingleTargetResolver(async () => ({
-      files: [second],
-      capped: false,
-      cancelled: false,
-    }));
+    const resolver = new SingleTargetResolver(() =>
+      Promise.resolve({
+        files: [second],
+        capped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({
       root,
       resolver,
@@ -281,11 +289,13 @@ describe('collectAllTargets single-target path', () => {
   it('stops after a capped single-target resolution', async () => {
     const root = tempRoot();
     const file = writeSource(root, 'src/a.ts');
-    const resolver = new SingleTargetResolver(async () => ({
-      files: [file],
-      capped: true,
-      cancelled: false,
-    }));
+    const resolver = new SingleTargetResolver(() =>
+      Promise.resolve({
+        files: [file],
+        capped: true,
+        cancelled: false,
+      }),
+    );
     const ctx = context({ root, resolver });
 
     await collectAllTargets([boundedTarget('source')], ctx);
@@ -306,11 +316,13 @@ describe('collectAllTargets single-target path', () => {
         return checks > 20;
       },
     } as AbortSignal;
-    const resolver = new SingleTargetResolver(async () => ({
-      files,
-      capped: false,
-      cancelled: false,
-    }));
+    const resolver = new SingleTargetResolver(() =>
+      Promise.resolve({
+        files,
+        capped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({ root, resolver, signal });
 
     await collectAllTargets([boundedTarget('source')], ctx);
@@ -326,15 +338,17 @@ describe('collectAllTargets batched membership path', () => {
     const outsideRoot = tempRoot();
     const outside = writeSource(outsideRoot, 'outside.ts');
     const keep = writeSource(root, 'src/keep.ts');
-    const resolver = new MembershipResolver(async () => ({
-      memberships: [
-        { filePath: outside, targetNames: ['alpha'] },
-        { filePath: keep, targetNames: ['alpha'] },
-      ],
-      capped: false,
-      membershipCapped: false,
-      cancelled: false,
-    }));
+    const resolver = new MembershipResolver(() =>
+      Promise.resolve({
+        memberships: [
+          { filePath: outside, targetNames: ['alpha'] },
+          { filePath: keep, targetNames: ['alpha'] },
+        ],
+        capped: false,
+        membershipCapped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({
       root,
       resolver,
@@ -351,15 +365,17 @@ describe('collectAllTargets batched membership path', () => {
     const root = tempRoot();
     const keep = writeSource(root, 'src/keep.ts');
     const extra = writeSource(root, 'src/extra.ts');
-    const resolver = new MembershipResolver(async () => ({
-      memberships: [
-        { filePath: keep, targetNames: ['alpha'] },
-        { filePath: extra, targetNames: ['beta'] },
-      ],
-      capped: true,
-      membershipCapped: true,
-      cancelled: false,
-    }));
+    const resolver = new MembershipResolver(() =>
+      Promise.resolve({
+        memberships: [
+          { filePath: keep, targetNames: ['alpha'] },
+          { filePath: extra, targetNames: ['beta'] },
+        ],
+        capped: true,
+        membershipCapped: true,
+        cancelled: false,
+      }),
+    );
     const ctx = context({
       root,
       resolver,
@@ -387,12 +403,14 @@ describe('collectAllTargets batched membership path', () => {
         },
       ],
     ]);
-    const resolver = new MembershipResolver(async () => ({
-      memberships: [{ filePath: extra, targetNames: ['alpha'] }],
-      capped: false,
-      membershipCapped: false,
-      cancelled: false,
-    }));
+    const resolver = new MembershipResolver(() =>
+      Promise.resolve({
+        memberships: [{ filePath: extra, targetNames: ['alpha'] }],
+        capped: false,
+        membershipCapped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({
       root,
       resolver,
@@ -408,12 +426,14 @@ describe('collectAllTargets batched membership path', () => {
 
   it('returns early when membership resolution is cancelled', async () => {
     const root = tempRoot();
-    const resolver = new MembershipResolver(async () => ({
-      memberships: [],
-      capped: false,
-      membershipCapped: false,
-      cancelled: true,
-    }));
+    const resolver = new MembershipResolver(() =>
+      Promise.resolve({
+        memberships: [],
+        capped: false,
+        membershipCapped: false,
+        cancelled: true,
+      }),
+    );
     const ctx = context({ root, resolver });
 
     await collectAllTargets([boundedTarget('alpha'), boundedTarget('beta')], ctx);
@@ -435,12 +455,14 @@ describe('collectAllTargets batched membership path', () => {
         return checks > 25;
       },
     } as AbortSignal;
-    const resolver = new MembershipResolver(async () => ({
-      memberships,
-      capped: false,
-      membershipCapped: false,
-      cancelled: false,
-    }));
+    const resolver = new MembershipResolver(() =>
+      Promise.resolve({
+        memberships,
+        capped: false,
+        membershipCapped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({ root, resolver, signal, limits: { targetsPerFile: 1 } });
 
     await collectAllTargets([boundedTarget('alpha'), boundedTarget('beta')], ctx);
@@ -462,12 +484,14 @@ describe('collectAllTargets batched membership path', () => {
         },
       ],
     ]);
-    const resolver = new MembershipResolver(async () => ({
-      memberships: [{ filePath: keep, targetNames: ['beta'] }],
-      capped: false,
-      membershipCapped: false,
-      cancelled: false,
-    }));
+    const resolver = new MembershipResolver(() =>
+      Promise.resolve({
+        memberships: [{ filePath: keep, targetNames: ['beta'] }],
+        capped: false,
+        membershipCapped: false,
+        cancelled: false,
+      }),
+    );
     const ctx = context({
       root,
       resolver,

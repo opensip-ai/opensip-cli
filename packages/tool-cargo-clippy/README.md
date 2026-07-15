@@ -4,7 +4,7 @@
 
 # @opensip-cli/tool-cargo-clippy
 
-> External Tool Adapter for cargo clippy — wraps Rust lint diagnostics as an opensip-cli tool
+> External Tool Adapter for cargo clippy — wraps Rust lint diagnostics as an opensip-cli tool. Determinism caveat: cargo clippy only re-emits diagnostics for crates it recompiles; a warm target/ cache can yield zero findings. Use a cold cache or set CARGO_TARGET_DIR for stable --gate-compare rechecks.
 
 This package is an **opt-in external scanner adapter**. Install it alongside `opensip-cli` when you want OpenSIP to run the corresponding customer-installed tool.
 
@@ -25,8 +25,8 @@ This package is published for the CLI and advanced plugin authors; most users sh
 ## Documentation
 
 - 📚 Project docs: https://opensip.ai/docs/opensip-cli/
-- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/public/70-reference/02-package-catalog.md
-- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.6.0/packages/tool-cargo-clippy
+- 🧭 Package catalog (what every package does): https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/public/70-reference/02-package-catalog.md
+- 📦 Source: https://github.com/opensip-ai/opensip-cli/tree/v0.7.0/packages/tool-cargo-clippy
 
 ## License
 

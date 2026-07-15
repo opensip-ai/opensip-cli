@@ -9,8 +9,11 @@ import {
 import { ComputeImpactCancelledError } from './graph-impact-model.js';
 
 const compareNumber = (left: number, right: number): number => left - right;
-const compareString = (left: string, right: string): number =>
-  left < right ? -1 : left > right ? 1 : 0;
+const compareString = (left: string, right: string): number => {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+};
 
 describe('assertImpactNotCancelled / yieldImpactWork', () => {
   it('accepts an absent or live signal', async () => {
@@ -66,7 +69,7 @@ describe('sortInBoundedBatches', () => {
     expect(sorted[0]).toBe(1);
     expect(sorted.at(-1)).toBe(length);
     for (let index = 1; index < sorted.length; index++) {
-      expect(sorted[index]! >= sorted[index - 1]!).toBe(true);
+      expect(sorted[index] >= sorted[index - 1]).toBe(true);
     }
   });
 

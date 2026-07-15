@@ -39,14 +39,21 @@ const SKIP_DIR_NAMES = new Set([
  * top-level candidates, then a bounded walk for nested modules (e.g.
  * `modules/api/target/classes`).
  */
-export function classTargets(projectRoot: string): readonly string[] {
-  const found = new Set<string>();
+function matchesClassDirSuffix(relativePath: string): boolean {
+  for (const suffix of CLASS_DIR_SUFFIXES) {
+    if (relativePath === suffix || relativePath.endsWith(`/${suffix}`)) return true;
+  }
+  return false;
+}
 
+function collectWellKnownClassDirs(projectRoot: string, found: Set<string>): void {
   for (const candidate of CLASS_DIR_SUFFIXES) {
     const full = join(projectRoot, candidate);
     if (existsSync(full) && isDirectory(full)) found.add(full);
   }
+}
 
+function walkNestedClassDirs(projectRoot: string, found: Set<string>): void {
   // Bounded BFS for nested Maven/Gradle module layouts.
   const queue: { dir: string; depth: number }[] = [{ dir: projectRoot, depth: 0 }];
   let visited = 0;
@@ -56,31 +63,45 @@ export function classTargets(projectRoot: string): readonly string[] {
     const { dir, depth } = next;
     visited += 1;
     if (depth >= MAX_WALK_DEPTH) continue;
+    enqueueChildClassDirs(projectRoot, dir, depth, queue, found);
+  }
+}
 
-    let entries: string[];
-    try {
-      entries = readdirSync(dir);
-    } catch {
-      continue;
-    }
-
-    for (const name of entries) {
-      // Skip VCS / tooling / source trees we never need for class discovery.
-      if (name.startsWith('.') || SKIP_DIR_NAMES.has(name)) continue;
-      const child = join(dir, name);
-      if (!isDirectory(child)) continue;
-
-      const rel = relative(projectRoot, child).split(sep).join('/');
-      for (const suffix of CLASS_DIR_SUFFIXES) {
-        if (rel === suffix || rel.endsWith(`/${suffix}`)) {
-          found.add(child);
-        }
-      }
-
-      queue.push({ dir: child, depth: depth + 1 });
-    }
+function enqueueChildClassDirs(
+  projectRoot: string,
+  dir: string,
+  depth: number,
+  queue: { dir: string; depth: number }[],
+  found: Set<string>,
+): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    // intentionally skip unreadable dirs during class discovery
+    return;
   }
 
+  for (const name of entries) {
+    // Skip VCS / tooling / source trees we never need for class discovery.
+    if (name.startsWith('.') || SKIP_DIR_NAMES.has(name)) continue;
+    const child = join(dir, name);
+    if (!isDirectory(child)) continue;
+
+    const rel = relative(projectRoot, child).split(sep).join('/');
+    if (matchesClassDirSuffix(rel)) found.add(child);
+    queue.push({ dir: child, depth: depth + 1 });
+  }
+}
+
+/**
+ * Discover compiled class-output directories under `projectRoot` (well-known
+ * Maven/Gradle/IntelliJ layouts, then a bounded nested walk).
+ */
+export function classTargets(projectRoot: string): readonly string[] {
+  const found = new Set<string>();
+  collectWellKnownClassDirs(projectRoot, found);
+  walkNestedClassDirs(projectRoot, found);
   return [...found].sort();
 }
 

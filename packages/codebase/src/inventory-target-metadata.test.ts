@@ -31,9 +31,10 @@ function resolver(targets: readonly unknown[]): BoundedTargetResolver {
     getByTag: () => [],
     has: () => false,
     resolveTargets: () => [],
-    resolveTargetsBounded: async () => ({ files: [], capped: false, cancelled: false }),
+    resolveTargetsBounded: () => Promise.resolve({ files: [], capped: false, cancelled: false }),
     applyGlobalExcludes: (files) => files,
-    applyGlobalExcludesBounded: async () => ({ files: [], capped: false, cancelled: false }),
+    applyGlobalExcludesBounded: () =>
+      Promise.resolve({ files: [], capped: false, cancelled: false }),
   };
 }
 

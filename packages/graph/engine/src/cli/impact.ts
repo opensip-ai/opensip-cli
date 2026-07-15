@@ -40,7 +40,6 @@ import {
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { verifyCatalogInputs } from '../read/catalog-freshness.js';
 import { loadGraphReadConfig } from '../read/config.js';
-
 import { rebuildCatalog } from '../read/rebuild.js';
 
 import { contributionFromGraphPayload } from './graph-session-contribution.js';

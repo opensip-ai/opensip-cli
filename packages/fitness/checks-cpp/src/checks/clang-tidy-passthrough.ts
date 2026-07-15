@@ -45,6 +45,44 @@ function resolveFilePath(capturedPath: string, cwd: string): string {
  * where notes are first-class children of diagnostics rather than
  * standalone lines that need re-attachment.
  */
+function mergeClangTidyStreams(stdout: string, stderr: string): string {
+  // clang-tidy writes diagnostics to stderr (llvm::errs); --quiet only
+  // suppresses progress. Merge both streams so real findings are not dropped.
+  if (stderr.length === 0) return stdout;
+  if (stdout.length === 0) return stderr;
+  return `${stdout}\n${stderr}`;
+}
+
+function violationFromClangTidyMatch(
+  match: RegExpExecArray,
+  cwd: string,
+): CheckViolation | undefined {
+  const filePath = match[1];
+  const lineStr = match[2];
+  const colStr = match[3];
+  const severity = match[4];
+  const message = match[5];
+  const lintName = match[6];
+  if (severity === 'note') return undefined;
+  // The regex guarantees groups 1 (filePath), 2 (lineStr), 3 (colStr), 4
+  // (severity) and 5 (message) are non-empty captures when it matches; the
+  // `?` / `??` fallbacks below exist for type-narrowing of `match[n]` (which
+  // is typed `string | undefined`) and are not reachable at runtime. Only
+  // group 6 (lintName) is optional in the pattern and is exercised by tests.
+  return {
+    /* v8 ignore next */
+    message: lintName ? `[${lintName}] ${message}` : (message ?? 'clang-tidy diagnostic'),
+    severity: severity === 'error' ? 'error' : 'warning',
+    /* v8 ignore next */
+    line: lineStr ? Number.parseInt(lineStr, 10) : 1,
+    /* v8 ignore next */
+    column: colStr ? Number.parseInt(colStr, 10) : undefined,
+    /* v8 ignore next */
+    filePath: filePath ? resolveFilePath(filePath, cwd) : undefined,
+    suggestion: 'See clang-tidy docs for the named lint',
+  };
+}
+
 export function parseClangTidyOutput(
   stdout: string,
   stderr: string,
@@ -53,38 +91,12 @@ export function parseClangTidyOutput(
   cwd: string,
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  // clang-tidy writes diagnostics to stderr (llvm::errs); --quiet only
-  // suppresses progress. Merge both streams so real findings are not dropped.
-  const combined =
-    stderr.length === 0 ? stdout : stdout.length === 0 ? stderr : `${stdout}\n${stderr}`;
-  const lines = combined.split('\n');
+  const lines = mergeClangTidyStreams(stdout, stderr).split('\n');
   for (const line of lines) {
     const match = CLANG_TIDY_LINE.exec(line);
     if (!match) continue;
-    const filePath = match[1];
-    const lineStr = match[2];
-    const colStr = match[3];
-    const severity = match[4];
-    const message = match[5];
-    const lintName = match[6];
-    if (severity === 'note') continue;
-    // The regex guarantees groups 1 (filePath), 2 (lineStr), 3 (colStr), 4
-    // (severity) and 5 (message) are non-empty captures when it matches; the
-    // `?` / `??` fallbacks below exist for type-narrowing of `match[n]` (which
-    // is typed `string | undefined`) and are not reachable at runtime. Only
-    // group 6 (lintName) is optional in the pattern and is exercised by tests.
-    violations.push({
-      /* v8 ignore next */
-      message: lintName ? `[${lintName}] ${message}` : (message ?? 'clang-tidy diagnostic'),
-      severity: severity === 'error' ? 'error' : 'warning',
-      /* v8 ignore next */
-      line: lineStr ? Number.parseInt(lineStr, 10) : 1,
-      /* v8 ignore next */
-      column: colStr ? Number.parseInt(colStr, 10) : undefined,
-      /* v8 ignore next */
-      filePath: filePath ? resolveFilePath(filePath, cwd) : undefined,
-      suggestion: 'See clang-tidy docs for the named lint',
-    });
+    const violation = violationFromClangTidyMatch(match, cwd);
+    if (violation !== undefined) violations.push(violation);
   }
   return violations;
 }

@@ -29,6 +29,8 @@ import type { Check } from '@opensip-cli/fitness';
 /**
  * Resolve a fixture-relative path under `root`, rejecting absolute paths and
  * any `..` segment so fixture authors cannot write outside the temp tree.
+ *
+ * @throws {Error} When the path is empty, absolute, contains `..`, or escapes `root`.
  */
 function resolveUnderRoot(root: string, relativePath: string): string {
   if (relativePath.length === 0) {

@@ -145,10 +145,11 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
       // Array patterns (`const [foo] = items`) are not config property access.
       if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
         const nameNode = node.propertyName ?? node.name;
-        if (ts.isIdentifier(nameNode)) {
-          const propertyName = nameNode.text;
-          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
-        } else if (ts.isStringLiteral(nameNode) || ts.isNoSubstitutionTemplateLiteral(nameNode)) {
+        if (
+          ts.isIdentifier(nameNode) ||
+          ts.isStringLiteral(nameNode) ||
+          ts.isNoSubstitutionTemplateLiteral(nameNode)
+        ) {
           const propertyName = nameNode.text;
           accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
         }

@@ -34,6 +34,55 @@ export interface CommandExecutionResult {
 // EXECUTOR
 // =============================================================================
 
+function truncateStream(text: string, max = 500): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)} [truncated]`;
+}
+
+function notInstalledResult(bin: string, exitCode: number | null = null): CommandExecutionResult {
+  return {
+    violations: [],
+    aborted: false,
+    exitCode,
+    notInstalled: true,
+    error: `${bin} is not installed. Install it to enable this check.`,
+  };
+}
+
+function isMissingBinaryMessage(message: string): boolean {
+  return message.includes('ENOENT') || message.includes('not found');
+}
+
+function unexpectedExitResult(
+  exitCode: number | null,
+  expectedCodes: readonly number[],
+  stderr: string,
+): CommandExecutionResult {
+  return {
+    violations: [],
+    aborted: false,
+    exitCode,
+    error:
+      `Command exited with unexpected code ${exitCode}. ` +
+      `Expected one of: ${expectedCodes.join(', ')}. ` +
+      `stderr: ${truncateStream(stderr)}`,
+  };
+}
+
+function emptyFindingsOnNonzeroResult(
+  exitCode: number | null,
+  stderr: string,
+): CommandExecutionResult {
+  return {
+    violations: [],
+    aborted: false,
+    exitCode,
+    error:
+      `Command exited ${String(exitCode)} with no parseable findings. ` +
+      `stderr: ${truncateStream(stderr)}`,
+  };
+}
+
 const DEFAULT_EXPECTED_EXIT_CODES: readonly number[] = [0, 1];
 
 /**
@@ -57,14 +106,8 @@ export async function executeCommand(
   } catch (error) {
     // ENOENT = tool not installed (spawn fails before the process starts)
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('ENOENT') || message.includes('not found')) {
-      return {
-        violations: [],
-        aborted: false,
-        exitCode: null,
-        notInstalled: true,
-        error: `${config.bin} is not installed. Install it to enable this check.`,
-      };
+    if (isMissingBinaryMessage(message)) {
+      return notInstalledResult(config.bin);
     }
     throw error;
   }
@@ -75,26 +118,12 @@ export async function executeCommand(
 
   // Exit code 127 = command not found (shell mode)
   if (result.exitCode === 127) {
-    return {
-      violations: [],
-      aborted: false,
-      exitCode: 127,
-      notInstalled: true,
-      error: `${config.bin} is not installed. Install it to enable this check.`,
-    };
+    return notInstalledResult(config.bin, 127);
   }
 
   const expectedCodes = config.expectedExitCodes ?? DEFAULT_EXPECTED_EXIT_CODES;
   if (result.exitCode !== null && !expectedCodes.includes(result.exitCode)) {
-    return {
-      violations: [],
-      aborted: false,
-      exitCode: result.exitCode,
-      error:
-        `Command exited with unexpected code ${result.exitCode}. ` +
-        `Expected one of: ${expectedCodes.join(', ')}. ` +
-        `stderr: ${result.stderr.slice(0, 500)}${result.stderr.length > 500 ? ' [truncated]' : ''}`,
-    };
+    return unexpectedExitResult(result.exitCode, expectedCodes, result.stderr);
   }
 
   let violations: CheckViolation[];
@@ -113,14 +142,7 @@ export async function executeCommand(
   // Nonzero exit that is "allowed" as findings, but parse produced nothing —
   // do not green-wash (truncated JSON / wrong schema / silent scanner failure).
   if ((result.exitCode ?? 0) !== 0 && violations.length === 0) {
-    return {
-      violations: [],
-      aborted: false,
-      exitCode: result.exitCode,
-      error:
-        `Command exited ${String(result.exitCode)} with no parseable findings. ` +
-        `stderr: ${result.stderr.slice(0, 500)}${result.stderr.length > 500 ? ' [truncated]' : ''}`,
-    };
+    return emptyFindingsOnNonzeroResult(result.exitCode, result.stderr);
   }
 
   return { violations, aborted: false, exitCode: result.exitCode };

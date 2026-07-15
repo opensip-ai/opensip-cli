@@ -123,10 +123,15 @@ describe('agent workflow e2e', () => {
   });
 
   it('fit --json --raw --filter errors-only returns unwrapped payload', () => {
-    const { stdout, exitCode } = cli.run(['fit', '--json', '--raw', '--filter', 'errors-only'], {
-      cwd: testDir,
-      timeout: 120_000,
-    });
+    // Use agent-fast so the run stays on the agent recipe surface and does not
+    // hard-fail on full-suite checks (e.g. npm audit without a lockfile).
+    const { stdout, exitCode } = cli.run(
+      ['fit', '--recipe', 'agent-fast', '--json', '--raw', '--filter', 'errors-only'],
+      {
+        cwd: testDir,
+        timeout: 120_000,
+      },
+    );
     expect(exitCode).toBe(0);
     const parsed = parseStdout(stdout) as { type?: string; filtersApplied?: string[] };
     expect(parsed.type).toBe('agent-filtered');

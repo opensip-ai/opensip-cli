@@ -19,7 +19,7 @@
  * gitleaks id.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { readPackageVersion } from '@opensip-cli/core';
@@ -153,7 +153,12 @@ export function buildGitleaksExclude(input: {
   if (extend.kind === 'path') {
     let projectConfig = '';
     try {
-      projectConfig = readFileSync(extend.path, 'utf8').trimEnd();
+      // Config files are small TOML; reject oversized inputs before reading.
+      const MAX_GITLEAKS_CONFIG_BYTES = 1_048_576;
+      const size = statSync(extend.path).size;
+      if (size <= MAX_GITLEAKS_CONFIG_BYTES) {
+        projectConfig = readFileSync(extend.path, 'utf8').trimEnd();
+      }
     } catch {
       projectConfig = '';
     }

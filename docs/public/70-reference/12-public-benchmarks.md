@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-13
-release: v0.6.0
+release: v0.7.0
 title: "Public benchmarks"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "Published benchmark evidence for opensip-cli's synthetic SLO lane: measured commands, corpus sizes, environment, and SLO margins."

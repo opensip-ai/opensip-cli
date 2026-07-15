@@ -1,13 +1,12 @@
 {
   "name": "@opensip-cli/codebase",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "license": "Apache-2.0",
   "description": "Bounded deterministic project inventory and package-manifest facts for OpenSIP CLI evidence consumers",
   "keywords": [
     "opensip-cli",
     "static-analysis",
-    "codebase-intelligence",
-    "project-inventory"
+    "code-quality"
   ],
   "repository": {
     "type": "git",

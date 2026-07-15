@@ -2,6 +2,74 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.7.0] - 2026-07-15
+
+An agent-context, first-run, and proof-of-change release. `opensip audit` works
+before `init`, deterministic task-context evidence lands on MCP for agent edit
+loops, the HTML report adds a visual proof-of-change surface, and a measured
+performance program cuts large-repo cost without changing product contracts.
+Install UX, reserved host names, and a black-box agent-eval harness round out
+the control plane.
+
+While opensip-cli is pre-1.0, this **minor is potentially breaking** for
+consumers that assumed first-run always wrote project-local runtime state,
+relied on unbounded report catalog embedding, or treated host command / suite
+names as free for third-party tools.
+
+### Added
+
+- **Canonical audit visual proof** workflow: changed-code review with an HTML
+  proof surface so humans and agents can see what the run decided (ADR-0155).
+- **Deterministic agent task context** plane: bounded file-scoped context,
+  impact, and test-selection evidence over MCP for edit loops without ad-hoc
+  graph rebuilds (ADR-0160, ADR-0161).
+- **Agent-eval harness** (`@opensip-cli/agent-eval`, private): black-box gold
+  tasks that measure context-tool honesty and promotion readiness
+  (ADR-0157, ADR-0158).
+- **Visual proof-of-change** dashboard report and related suite presentation.
+- **Measured performance program**: contributor benchmark/SLO lane, evidence
+  docs, and optimizations for large inventories and sharded graph context
+  (ADR-0163 local CPU profiling posture).
+- **Init / capability UX**: optional tools and distribution footprint
+  measurement guidance so adopters can see install cost before enabling packs.
+- Host reservation of **command and built-in suite names** so plugins cannot
+  shadow audit and other host surfaces (ADR-0159).
+- Report control: `--max-catalog-mb` and a named escape hatch in truncation
+  notices when the inlined graph catalog would blow report size.
+- Installer: clearer download+install progress and upgrade messaging
+  (`Updated opensip from vA to vB` when a prior version is present).
+- DX: `pnpm opensip` / `pnpm opensip:audit` passthrough scripts and audit-first
+  docs flow.
+- ADRs 0155–0163 (audit command, impact proof, agent-eval, reserved names,
+  task context, inventory ownership, TypeScript readiness, local profiling).
+
+### Changed
+
+- **First run without init**: `opensip audit` and related surfaces work in a
+  supported project before scaffolding; rebuildable runtime state stays in the
+  user cache so a first run does not write into the customer repo.
+- No-init runtime cache is pruned instead of growing without bound.
+- Dashboard bounds the inlined graph catalog (multi-hundred-MB reports reduced
+  to single-digit MB class by default) and hardens oversized live-report paths
+  against OOM in tests and real runs.
+- Public docs cover plans 1–6 surfaces (audit, context, capability, perf,
+  report, install).
+- Tooling baseline: Prettier 3.9.4 format gate; TypeScript 6.0.3 test-typecheck
+  reconciliation.
+
+### Fixed
+
+- Multi-pass bug and correctness sweeps (green-wash holes for security/path
+  gates, silent host-command failures, faulting parity, coverage gaps).
+- Context plane: evidence production/freshness bounds, unambiguous impact
+  symbol identity, integrated graph policy gates, abandoned shared impact
+  index cancellation.
+- Graph: sharded context parity; wide-function and near-duplicate noise.
+- CLI: single scope-aware runtime-state seam; typed host-command failure
+  presentation instead of silent exit.
+- Distribution offline measurement hardening; post-landing review and lint
+  follow-ups across plans 1–6.
+
 ## [0.6.0] - 2026-07-12
 
 An MCP audit-evidence correctness and efficiency release. Graph catalogs and

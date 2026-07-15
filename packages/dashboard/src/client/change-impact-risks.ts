@@ -36,16 +36,28 @@ function riskRow(risk: ChangeImpactRisk): HTMLElement {
   return row;
 }
 
-function appendRiskList(
-  section: HTMLElement,
-  title: string,
-  emptyText: string,
-  values: readonly ChangeImpactRisk[],
-  clientCap: number,
-  omittedByReport: number,
-  reportOmissionLabel: string,
-  clientOmissionLabel: string,
-): void {
+interface AppendRiskListInput {
+  readonly section: HTMLElement;
+  readonly title: string;
+  readonly emptyText: string;
+  readonly values: readonly ChangeImpactRisk[];
+  readonly clientCap: number;
+  readonly omittedByReport: number;
+  readonly reportOmissionLabel: string;
+  readonly clientOmissionLabel: string;
+}
+
+function appendRiskList(input: AppendRiskListInput): void {
+  const {
+    section,
+    title,
+    emptyText,
+    values,
+    clientCap,
+    omittedByReport,
+    reportOmissionLabel,
+    clientOmissionLabel,
+  } = input;
   section.append(el('h4', { text: title }));
   const risks = boundClientRows(values, clientCap);
   if (risks.rows.length === 0) section.append(el('div', { class: 'empty', text: emptyText }));
@@ -77,16 +89,16 @@ function appendRisks(
   brief: ChangeImpactReviewBrief,
   omittedByReport: number,
 ): void {
-  appendRiskList(
+  appendRiskList({
     section,
-    'Top risks',
-    'No stored review risks.',
-    brief.topRisks,
-    CHANGE_IMPACT_CLIENT_CAPS.risks,
+    title: 'Top risks',
+    emptyText: 'No stored review risks.',
+    values: brief.topRisks,
+    clientCap: CHANGE_IMPACT_CLIENT_CAPS.risks,
     omittedByReport,
-    'risk entry/entries omitted by the report budget.',
-    'risk entry/entries omitted by the defensive client limit.',
-  );
+    reportOmissionLabel: 'risk entry/entries omitted by the report budget.',
+    clientOmissionLabel: 'risk entry/entries omitted by the defensive client limit.',
+  });
 }
 
 function appendNewFindings(
@@ -94,16 +106,16 @@ function appendNewFindings(
   brief: ChangeImpactReviewBrief,
   omittedByReport: number,
 ): void {
-  appendRiskList(
+  appendRiskList({
     section,
-    'New findings',
-    'No stored new findings.',
-    brief.newFindings,
-    CHANGE_IMPACT_CLIENT_CAPS.newFindings,
+    title: 'New findings',
+    emptyText: 'No stored new findings.',
+    values: brief.newFindings,
+    clientCap: CHANGE_IMPACT_CLIENT_CAPS.newFindings,
     omittedByReport,
-    'new finding(s) omitted by the report budget.',
-    'new finding(s) omitted by the defensive client limit.',
-  );
+    reportOmissionLabel: 'new finding(s) omitted by the report budget.',
+    clientOmissionLabel: 'new finding(s) omitted by the defensive client limit.',
+  });
 }
 
 function appendCorrelations(

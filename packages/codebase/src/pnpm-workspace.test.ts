@@ -70,10 +70,8 @@ describe('pnpmWorkspacePatterns', () => {
       { length: MAX_WORKSPACE_PATTERNS + 1 },
       (_, index) => `packages/pkg-${String(index).padStart(3, '0')}`,
     );
-    writeFileSync(
-      join(root, 'pnpm-workspace.yaml'),
-      `packages:\n${patterns.map((pattern) => `  - '${pattern}'\n`).join('')}`,
-    );
+    const packageLines = patterns.map((pattern) => `  - '${pattern}'\n`).join('');
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), `packages:\n${packageLines}`);
     const reasons = new Set<string>();
 
     const projected = pnpmWorkspacePatterns(root, 64 * 1024, reasons);

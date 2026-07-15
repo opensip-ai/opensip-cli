@@ -25,6 +25,7 @@ import type {
   BoundedTargetResolutionOptions,
   TargetView,
 } from '@opensip-cli/core';
+import type * as NodeFs from 'node:fs';
 
 const roots: string[] = [];
 
@@ -153,8 +154,14 @@ function fileFact(path: string, languages: readonly string[]): FileFact {
   };
 }
 
+function callableSupportForIndex(index: number): 'supported' | 'unsupported' | 'unknown' {
+  if (index === 0) return 'supported';
+  if (index === 1) return 'unsupported';
+  return 'unknown';
+}
+
 beforeEach(async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  const actual = await vi.importActual<typeof NodeFs>('node:fs');
   statSyncMock.mockImplementation((...args: Parameters<typeof actual.statSync>) =>
     actual.statSync(...args),
   );
@@ -225,12 +232,7 @@ describe('discoverFiles materialization edge cases', () => {
       languages.map((language, index) => [
         language,
         {
-          callable:
-            index === 0
-              ? ('supported' as const)
-              : index === 1
-                ? ('unsupported' as const)
-                : ('unknown' as const),
+          callable: callableSupportForIndex(index),
           declaration: 'unsupported' as const,
           reference: 'unknown' as const,
         },

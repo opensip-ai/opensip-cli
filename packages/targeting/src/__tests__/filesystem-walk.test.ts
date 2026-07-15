@@ -42,6 +42,7 @@ import {
 } from '../filesystem-walk.js';
 
 import type { Dir, Dirent, Stats } from 'node:fs';
+import type * as NodeFsPromises from 'node:fs/promises';
 
 let root: string;
 
@@ -64,14 +65,14 @@ function entry(
 function fakeDirectory(reads: readonly (Dirent<string> | null | Error)[]): Dir {
   let index = 0;
   return {
-    async read() {
-      if (index >= reads.length) return null;
+    read() {
+      if (index >= reads.length) return Promise.resolve(null);
       const next = reads[index++];
-      if (next instanceof Error) throw next;
-      return next;
+      if (next instanceof Error) return Promise.reject(next);
+      return Promise.resolve(next);
     },
-    async close() {
-      return undefined;
+    close() {
+      return Promise.resolve(undefined);
     },
   } as unknown as Dir;
 }
@@ -135,15 +136,15 @@ function pathInsideByPrefix(child: string, parent: string): boolean {
 
 function useRealFs(): void {
   opendirMock.mockImplementation(async (path: string, options?: { bufferSize?: number }) => {
-    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
     return actual.opendir(path, options);
   });
   statMock.mockImplementation(async (path: string) => {
-    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
     return actual.stat(path);
   });
   lstatMock.mockImplementation(async (path: string) => {
-    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const actual = await vi.importActual<typeof NodeFsPromises>('node:fs/promises');
     return actual.lstat(path);
   });
 }
@@ -415,22 +416,18 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
 
   it('stops mid-batch when the abort signal fires after a directory read', async () => {
     const controller = new AbortController();
-    const reads: Array<Dirent<string> | null> = [
-      entry('a.ts', 'file'),
-      entry('b.ts', 'file'),
-      null,
-    ];
+    const reads: (Dirent<string> | null)[] = [entry('a.ts', 'file'), entry('b.ts', 'file'), null];
     let readCount = 0;
     opendirMock.mockResolvedValueOnce({
-      async read() {
+      read() {
         const value = reads[readCount++] ?? null;
         if (readCount === 1) controller.abort();
-        return value;
+        return Promise.resolve(value);
       },
-      async close() {
-        return undefined;
+      close() {
+        return Promise.resolve(undefined);
       },
-    } as unknown as Dir);
+    });
 
     const walk = await walkTargetFilesystem(root, () => undefined, { signal: controller.signal });
 
@@ -441,9 +438,9 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
   it('cancels after stat when the abort signal fires during file validation', async () => {
     const controller = new AbortController();
     opendirMock.mockResolvedValueOnce(fakeDirectory([entry('a.ts', 'file'), null]));
-    statMock.mockImplementation(async () => {
+    statMock.mockImplementation(() => {
       controller.abort();
-      return fileStats();
+      return Promise.resolve(fileStats());
     });
 
     const visitor = vi.fn();
@@ -456,9 +453,9 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
   it('cancels after lstat when the abort signal fires during directory validation', async () => {
     const controller = new AbortController();
     opendirMock.mockResolvedValueOnce(fakeDirectory([entry('sub', 'directory'), null]));
-    lstatMock.mockImplementation(async () => {
+    lstatMock.mockImplementation(() => {
       controller.abort();
-      return directoryStats();
+      return Promise.resolve(directoryStats());
     });
 
     const walk = await walkTargetFilesystem(root, () => undefined, { signal: controller.signal });
@@ -469,9 +466,9 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
   it('cancels after lstat when the abort signal fires during DT_UNKNOWN classification', async () => {
     const controller = new AbortController();
     opendirMock.mockResolvedValueOnce(fakeDirectory([entry('mystery', 'unknown'), null]));
-    lstatMock.mockImplementation(async () => {
+    lstatMock.mockImplementation(() => {
       controller.abort();
-      return otherStats('file');
+      return Promise.resolve(otherStats('file'));
     });
 
     const walk = await walkTargetFilesystem(root, () => undefined, { signal: controller.signal });
@@ -488,16 +485,16 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
     );
     const resolvedRoot = resolvePath(root);
 
-    opendirMock.mockImplementation(async (directoryPath: string) => {
+    opendirMock.mockImplementation((directoryPath: string) => {
       const normalized = resolvePath(directoryPath);
       if (normalized === resolvedRoot) {
-        return fakeDirectory([...rootEntries, null]);
+        return Promise.resolve(fakeDirectory([...rootEntries, null]));
       }
       const base = normalized.slice(resolvedRoot.length + 1).replaceAll('\\', '/');
       if (!base.includes('/') && base.startsWith('d')) {
-        return fakeDirectory([...emptyChildEntries, null]);
+        return Promise.resolve(fakeDirectory([...emptyChildEntries, null]));
       }
-      return fakeDirectory([null]);
+      return Promise.resolve(fakeDirectory([null]));
     });
     lstatMock.mockResolvedValue(directoryStats());
 
@@ -513,7 +510,7 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
     );
     const resolvedRoot = resolvePath(root);
 
-    opendirMock.mockImplementation(async (directoryPath: string) => {
+    opendirMock.mockImplementation((directoryPath: string) => {
       const normalized = resolvePath(directoryPath);
       const relative =
         normalized === resolvedRoot
@@ -525,9 +522,9 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
         const children = Array.from({ length: TARGET_WALK_MAX_ENTRIES_PER_DIRECTORY }, (_, index) =>
           entry(`n${String(index).padStart(4, '0')}`, 'directory'),
         );
-        return fakeDirectory([...children, null]);
+        return Promise.resolve(fakeDirectory([...children, null]));
       }
-      return fakeDirectory([null]);
+      return Promise.resolve(fakeDirectory([null]));
     });
     lstatMock.mockResolvedValue(directoryStats());
 
@@ -549,11 +546,11 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
     );
     const resolvedRoot = resolvePath(root);
 
-    opendirMock.mockImplementation(async (directoryPath: string) => {
+    opendirMock.mockImplementation((directoryPath: string) => {
       if (resolvePath(directoryPath) === resolvedRoot) {
-        return fakeDirectory([...rootDirs, null]);
+        return Promise.resolve(fakeDirectory([...rootDirs, null]));
       }
-      return fakeDirectory([...fullBatch, null]);
+      return Promise.resolve(fakeDirectory([...fullBatch, null]));
     });
     lstatMock.mockResolvedValue(directoryStats());
     statMock.mockResolvedValue(fileStats());
@@ -566,10 +563,10 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
 
   it('caps when child depth would exceed the maximum', async () => {
     let openCount = 0;
-    opendirMock.mockImplementation(async () => {
+    opendirMock.mockImplementation(() => {
       openCount += 1;
       // Always expose one deeper directory until the depth guard trips.
-      return fakeDirectory([entry('deep', 'directory'), null]);
+      return Promise.resolve(fakeDirectory([entry('deep', 'directory'), null]));
     });
     lstatMock.mockResolvedValue(directoryStats());
 

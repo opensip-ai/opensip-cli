@@ -47,12 +47,14 @@ function baseExists(filePath: string, extendsValue: string): boolean {
       req.resolve(extendsValue);
       return true;
     } catch {
+      // intentionally probe for package resolution
       try {
         const from = resolve(process.cwd(), filePath);
         const req = createRequire(from);
         req.resolve(extendsValue.endsWith('.json') ? extendsValue : `${extendsValue}.json`);
         return true;
       } catch {
+        // intentionally probe for package resolution
         return false;
       }
     }

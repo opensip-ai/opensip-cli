@@ -14,7 +14,7 @@ import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.
 import { declarationFileIndex, mergeSemanticFactsIncremental } from '../../semantic-facts.js';
 
 import { countCatalogCallSites } from './catalog-stats.js';
-import { ownerEdgeKey } from './edge-identity.js';
+import { lookupByOwnerThenBodyHash, lookupEdgesByOwnerThenBodyHash } from './edge-identity.js';
 import {
   expandClosureToFixpoint,
   mergeOccurrences,
@@ -375,8 +375,7 @@ function attachDependenciesIncremental(
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
       if (!closureRel.has(o.filePath)) return o; // unchanged file — keep cached
-      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
-      const deps = dependenciesByOwner.get(ownerKey) ?? dependenciesByOwner.get(o.bodyHash);
+      const deps = lookupByOwnerThenBodyHash(dependenciesByOwner, o);
       return deps === undefined ? o : { ...o, dependencies: deps };
     });
   }
@@ -493,12 +492,12 @@ function stitchEdges(
       // bodyHash for polyglot adapters that still bucket by owner hash alone
       // (pre-migration Go/Java/Python/Rust). Bare-hash twins may union edges —
       // empty catalogs are worse than twin over-approx until adapters migrate.
-      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
-      const calls = edgesByOwner.get(ownerKey) ?? edgesByOwner.get(o.bodyHash) ?? [];
+      // Dual-lookup lives in edge-identity (the only allowed bare-hash home).
+      const calls = lookupEdgesByOwnerThenBodyHash(edgesByOwner, o);
       const dependencies =
         dependenciesByOwner === undefined
           ? undefined
-          : (dependenciesByOwner.get(ownerKey) ?? dependenciesByOwner.get(o.bodyHash));
+          : lookupByOwnerThenBodyHash(dependenciesByOwner, o);
       // Absent key → omit the field (unsupported / non-module-init). A present
       // `[]` is retained verbatim as "supported, no imports".
       return dependencies === undefined ? { ...o, calls } : { ...o, calls, dependencies };

@@ -117,6 +117,60 @@ function repairFromViolation(
 // ANALYSIS MODE EXECUTORS
 // =============================================================================
 
+/**
+ * @throws {CheckAbortedError} When the original error is an abort.
+ * @throws {Error} Always rethrows `error` (wrapped via `wrap` when not already an Error).
+ */
+function rethrowUnlessAbort(error: unknown, wrap: (message: string) => Error): never {
+  if (error instanceof CheckAbortedError) throw error;
+  throw error instanceof Error ? error : wrap(String(error));
+}
+
+async function analyzeSingleFile(
+  config: AnalyzeCheckConfig,
+  filePath: string,
+  ctx: ExecutionContext,
+): Promise<readonly CheckViolation[] | 'skip'> {
+  let rawContent: string;
+  try {
+    rawContent = await ctx.readFile(filePath);
+  } catch (error) {
+    if (error instanceof CheckAbortedError) throw error;
+    // Only filesystem/read failures are skippable. Analyze bugs must not
+    // silently green-pass the rest of the run.
+    logger.debug('Skipping unreadable file', {
+      evt: 'fitness.check.file.skip',
+      module: 'fitness:framework',
+      filePath,
+      checkSlug: config.slug,
+    });
+    return 'skip';
+  }
+
+  let content: string;
+  try {
+    // Dispatch the content filter through the LanguageAdapter for the
+    // file's extension. Falls back to raw content when no adapter is
+    // registered. See languages/content-filter-dispatch.ts.
+    content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
+  } catch (error) {
+    rethrowUnlessAbort(
+      error,
+      (message) => new Error(`Content filter failed for ${filePath}: ${message}`),
+    );
+  }
+
+  try {
+    return config.analyze(content, filePath);
+  } catch (error) {
+    // Surface analyze-mode throws as check failure (parity with analyzeAll).
+    rethrowUnlessAbort(
+      error,
+      (message) => new Error(`Check analyze failed for ${filePath}: ${message}`),
+    );
+  }
+}
+
 /** @throws {CheckAbortedError} When the check is aborted via AbortSignal */
 async function executeAnalyzeMode(
   config: AnalyzeCheckConfig,
@@ -138,45 +192,8 @@ async function executeAnalyzeMode(
       throw new CheckAbortedError(config.slug);
     }
 
-    let rawContent: string;
-    try {
-      rawContent = await ctx.readFile(filePath);
-    } catch (error) {
-      if (error instanceof CheckAbortedError) throw error;
-      // Only filesystem/read failures are skippable. Analyze bugs must not
-      // silently green-pass the rest of the run.
-      logger.debug('Skipping unreadable file', {
-        evt: 'fitness.check.file.skip',
-        module: 'fitness:framework',
-        filePath,
-        checkSlug: config.slug,
-      });
-      continue;
-    }
-
-    let content: string;
-    try {
-      // Dispatch the content filter through the LanguageAdapter for the
-      // file's extension. Falls back to raw content when no adapter is
-      // registered. See languages/content-filter-dispatch.ts.
-      content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
-    } catch (error) {
-      if (error instanceof CheckAbortedError) throw error;
-      throw error instanceof Error
-        ? error
-        : new Error(`Content filter failed for ${filePath}: ${String(error)}`);
-    }
-
-    let violations: readonly CheckViolation[];
-    try {
-      violations = config.analyze(content, filePath);
-    } catch (error) {
-      if (error instanceof CheckAbortedError) throw error;
-      // Surface analyze-mode throws as check failure (parity with analyzeAll).
-      throw error instanceof Error
-        ? error
-        : new Error(`Check analyze failed for ${filePath}: ${String(error)}`);
-    }
+    const violations = await analyzeSingleFile(config, filePath, ctx);
+    if (violations === 'skip') continue;
 
     for (const violation of violations) {
       void builder.addSignal(
@@ -273,7 +290,7 @@ async function executeCommandMode(
         metadata: {
           ...clean.metadata,
           extra: {
-            ...(clean.metadata.extra ?? {}),
+            ...clean.metadata.extra,
             skipped: true,
             skipReason: 'tool-not-installed',
             skipMessage: result.error,

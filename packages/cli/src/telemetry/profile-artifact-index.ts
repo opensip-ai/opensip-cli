@@ -75,6 +75,7 @@ function safeSlug(value: string, fallback: string, maxLength = MAX_SLUG_LENGTH):
   return `${readable.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
 }
 
+/** @throws {RangeError} When `value` is not a positive safe integer. */
 function safeProcessId(value: number): string {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new RangeError('processId must be a positive safe integer');
@@ -82,6 +83,7 @@ function safeProcessId(value: number): string {
   return String(value);
 }
 
+/** @throws {RangeError} When `value` is not a valid Date. */
 function safeStartedAt(value: Date): {
   readonly iso: string;
   readonly filename: string;
@@ -97,6 +99,7 @@ function sealMetadata(value: ProfileArtifactMetadata): ProfileArtifactMetadata {
   return metadata;
 }
 
+/** @throws {Error} When metadata is foreign or fails its directory binding. */
 function assertArtifactPair(metadata: ProfileArtifactMetadata): {
   readonly baseDir: string;
   readonly containmentRoot: string;
@@ -133,6 +136,7 @@ function isPathWithin(root: string, candidate: string): boolean {
   );
 }
 
+/** @throws {Error} When `baseDir` escapes the containment root or a component is not a real directory. */
 function ensurePrivateArtifactDirectory(baseDir: string, containmentRoot: string): void {
   if (!isPathWithin(containmentRoot, baseDir)) {
     throw new Error('profile artifact directory escaped its containment root');
@@ -146,6 +150,7 @@ function ensurePrivateArtifactDirectory(baseDir: string, containmentRoot: string
   }
 }
 
+/** @throws {Error} When `path` exists but is a symlink or non-directory. */
 function ensureDirectory(path: string, recursive: boolean): void {
   let stats;
   try {
@@ -164,6 +169,9 @@ function ensureDirectory(path: string, recursive: boolean): void {
  * Construct collision-resistant artifact paths beneath exactly one caller-selected
  * directory. Command/run labels never become path components without slugging and
  * bounding first; the original bounded values live only in the JSON sidecar.
+ *
+ * @throws {Error} When the directory is empty, escapes containment, or path construction fails.
+ * @throws {RangeError} When processId/startedAt inputs are invalid.
  */
 export function createProfileArtifactIndex(
   input: CreateProfileArtifactIndexInput,
@@ -224,6 +232,10 @@ export function createProfileArtifactIndex(
   });
 }
 
+/**
+ * @throws {Error} When metadata fails its directory binding.
+ * @throws {RangeError} When `completedAt` is not a valid Date.
+ */
 function completeProfileArtifactIndex(
   metadata: ProfileArtifactMetadata,
   completedAt = new Date(),
@@ -253,7 +265,13 @@ export function writeProfileArtifactLabels(metadata: ProfileArtifactMetadata): v
   });
 }
 
-/** Atomically publish the CPU profile and only then return complete metadata. */
+/**
+ * Atomically publish the CPU profile and only then return complete metadata.
+ *
+ * @throws {Error} When metadata fails its directory binding or the temp path escapes.
+ * @throws {TypeError} When `profile` is not JSON-serializable.
+ * @throws {RangeError} When `completedAt` is not a valid Date.
+ */
 export function writeCpuProfileArtifact(
   metadata: ProfileArtifactMetadata,
   profile: unknown,

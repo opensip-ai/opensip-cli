@@ -28,6 +28,8 @@ export interface ArtifactPathScope {
  *
  * `name` must be a basename (no path separators / `..`) so adapters cannot
  * escape the per-run artifact directory.
+ *
+ * @throws {Error} When `name` is empty or not a plain basename.
  */
 export function resolveScannerArtifactPath(
   scope: ArtifactPathScope,

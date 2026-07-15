@@ -391,6 +391,7 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
         stderr: `shard temp-dir setup failed: ${error instanceof Error ? error.message : String(error)}`,
         failureClass: 'spawn',
       });
+      // intentionally report failure via resolvePromise then return
       return;
       /* v8 ignore stop */
     }
@@ -425,6 +426,7 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
         stderr: `shard spec write failed: ${error instanceof Error ? error.message : String(error)}`,
         failureClass: 'spawn',
       });
+      // intentionally report failure via resolvePromise then return
       return;
       /* v8 ignore stop */
     }

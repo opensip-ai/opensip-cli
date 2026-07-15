@@ -10,9 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CatalogRepo } from '../../persistence/catalog-repo.js';
 import * as catalogFreshness from '../../read/catalog-freshness.js';
-import * as orchestrate from '../orchestrate.js';
 import { graphImpactCommandSpec } from '../graph/graph-aux-command-specs.js';
 import { buildImpactSessionContribution, executeImpact } from '../impact.js';
+import * as orchestrate from '../orchestrate.js';
 
 import type { Catalog } from '../../types.js';
 import type { ImpactUncertainty, SignalEnvelope, StoredSession } from '@opensip-cli/contracts';
@@ -251,16 +251,16 @@ describe('executeImpact', () => {
         reason: 'Catalog cache inputs changed',
       },
     });
-    const runGraph = vi.spyOn(orchestrate, 'runGraph').mockImplementation(async () => {
+    const runGraph = vi.spyOn(orchestrate, 'runGraph').mockImplementation(() => {
       new CatalogRepo(datastore).replaceAll(fresh);
-      return {
+      return Promise.resolve({
         catalog: fresh,
         indexes: null,
         signals: [],
         resolutionStats: null,
         cacheHit: false,
         features: null,
-      };
+      });
     });
     try {
       const result = await executeImpact(
@@ -289,16 +289,16 @@ describe('executeImpact', () => {
     });
     const rebuilt = makeCatalog();
     new CatalogRepo(datastore).replaceAll(incomplete);
-    const runGraph = vi.spyOn(orchestrate, 'runGraph').mockImplementation(async () => {
+    const runGraph = vi.spyOn(orchestrate, 'runGraph').mockImplementation(() => {
       new CatalogRepo(datastore).replaceAll(rebuilt);
-      return {
+      return Promise.resolve({
         catalog: rebuilt,
         indexes: null,
         signals: [],
         resolutionStats: null,
         cacheHit: false,
         features: null,
-      };
+      });
     });
     try {
       await executeImpact(

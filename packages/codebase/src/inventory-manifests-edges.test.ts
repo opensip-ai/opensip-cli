@@ -101,11 +101,8 @@ describe('discoverManifestFacts edge paths', () => {
       { length: MAX_WORKSPACE_PATTERNS },
       (_, index) => `packages/p-${String(index).padStart(3, '0')}`,
     );
-    writeText(
-      root,
-      'pnpm-workspace.yaml',
-      `packages:\n${patterns.map((pattern) => `  - '${pattern}'\n`).join('')}`,
-    );
+    const packageLines = patterns.map((pattern) => `  - '${pattern}'\n`).join('');
+    writeText(root, 'pnpm-workspace.yaml', `packages:\n${packageLines}`);
 
     const discovery = await discoverManifestFacts(
       root,
@@ -301,7 +298,7 @@ describe('discoverManifestFacts edge paths', () => {
     writeManifest(root, 'packages/ghost', { name: 'ghost' });
 
     class DeletingExcludes extends SignalExcludes {
-      override async applyGlobalExcludesBounded(
+      override applyGlobalExcludesBounded(
         files: readonly string[],
         _rootDir: string,
         options: BoundedTargetResolutionOptions,
@@ -311,11 +308,11 @@ describe('discoverManifestFacts edge paths', () => {
             rmSync(file, { force: true });
           }
         }
-        return {
+        return Promise.resolve({
           files: files.slice(0, options.maxResults),
           capped: false,
           cancelled: false,
-        };
+        });
       }
     }
 

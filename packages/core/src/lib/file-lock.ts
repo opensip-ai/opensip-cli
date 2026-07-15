@@ -6,6 +6,8 @@
  * imports — callers bridge events at the composition root.
  */
 
+// @fitness-ignore-file file-length-limit -- single lock state machine; splitting would scatter the lease protocol
+
 import {
   closeSync,
   openSync,
@@ -129,7 +131,7 @@ function writeLockMetadataIfOwner(
   writeFileSync(tmpPath, JSON.stringify(metadata), 'utf8');
   try {
     const current = readLockMetadata(lockPath);
-    if (current === undefined || current.ownerToken !== ownerToken) {
+    if (current?.ownerToken !== ownerToken) {
       try {
         unlinkSync(tmpPath);
       } catch {
@@ -338,12 +340,6 @@ function startLockHeartbeat(
   }, heartbeatMs);
 }
 
-/**
- * Acquire an exclusive file lock, run `fn`, and release the lock in `finally`.
- *
- * @throws {TimeoutError} when live contention exceeds `policy.waitMs`.
- * @throws {SystemError} when lock metadata is malformed and cannot be recovered.
- */
 function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
   // staleMs must outlive several heartbeats or a live owner is reclaimed mid-critical-section.
   const heartbeatMs = Math.max(1, Math.floor(policy.heartbeatMs));
@@ -353,6 +349,12 @@ function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
   return { waitMs, staleMs, heartbeatMs };
 }
 
+/**
+ * Acquire an exclusive file lock, run `fn`, and release the lock in `finally`.
+ *
+ * @throws {TimeoutError} when live contention exceeds `policy.waitMs`.
+ * @throws {SystemError} when lock metadata is malformed and cannot be recovered.
+ */
 export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, fn: () => T): T {
   const policy = normalizeLockPolicy(options.policy);
   const normalizedOptions: WithFileLockOptions = { ...options, policy };

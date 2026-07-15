@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T20:58:13.246Z",
+  "generatedAt": "2026-07-15T08:07:54.761Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,11 +25,11 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 238,
+        "total": 240,
         "bySlug": {
           "missing-type-exports": 3,
           "async-waterfall-detection": 14,
-          "file-length-limit": 8,
+          "file-length-limit": 9,
           "no-markdown-references": 5,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 4,
@@ -52,7 +52,7 @@
           "no-generic-error": 4,
           "numeric-validation": 11,
           "fitness-check-architecture": 4,
-          "unsafe-secret-comparison": 7,
+          "unsafe-secret-comparison": 8,
           "canonical-result-usage": 3,
           "logging-standards": 3,
           "error-handling-quality": 2,
@@ -104,7 +104,7 @@
           "agent-eval": 8,
           "cli": 8,
           "contracts": 4,
-          "core": 5,
+          "core": 6,
           "dashboard": 1,
           "fitness/checks-dogfood": 10,
           "fitness/checks-typescript": 57,
@@ -112,7 +112,7 @@
           "fitness/engine": 12,
           "graph/engine": 11,
           "graph/graph-typescript": 1,
-          "languages/lang-typescript": 2,
+          "languages/lang-typescript": 3,
           "mcp": 10,
           "simulation": 3,
           "targeting": 1,
@@ -127,11 +127,11 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 66,
+        "total": 68,
         "bySlug": {
           "missing-type-exports": 3,
           "async-waterfall-detection": 14,
-          "file-length-limit": 8,
+          "file-length-limit": 9,
           "no-markdown-references": 3,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 1,
@@ -152,7 +152,7 @@
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
-          "unsafe-secret-comparison": 2,
+          "unsafe-secret-comparison": 3,
           "hot-paths-require-spans": 1,
           "no-raw-fetch": 1,
           "array-validation": 1
@@ -161,12 +161,12 @@
           "agent-eval": 8,
           "cli": 8,
           "contracts": 4,
-          "core": 5,
+          "core": 6,
           "dashboard": 1,
           "fitness/engine": 12,
           "graph/engine": 11,
           "graph/graph-typescript": 1,
-          "languages/lang-typescript": 2,
+          "languages/lang-typescript": 3,
           "mcp": 10,
           "simulation": 3,
           "targeting": 1
@@ -381,7 +381,7 @@
     "cosmetic": {
       "file-length-limit": {
         "budget": 0,
-        "actual": 8
+        "actual": 9
       },
       "module-coupling-fan-out": {
         "budget": 4,
@@ -460,13 +460,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 238,
+    "budgetGateFitness": 240,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 66,
+    "productRuntimeFitness": 68,
     "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 98,
+    "productRuntimeCombined": 100,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 62,
@@ -486,10 +486,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -239,
+      "productRuntimeFitness": -237,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -214,
-      "budgetGateFitness": -304,
+      "productRuntimeCombined": -212,
+      "budgetGateFitness": -302,
       "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
@@ -503,7 +503,7 @@
       },
       {
         "slug": "file-length-limit",
-        "count": 8,
+        "count": 9,
         "disposition": "c",
         "kind": "fitness"
       }

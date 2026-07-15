@@ -232,6 +232,7 @@ function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
     case ts.SyntaxKind.NullKeyword:
     // Type keywords also appear as value names (`const number = 1; number / 2`)
     // and after `as` (`x as number / y`) — must not start a regex.
+    // falls through
     case ts.SyntaxKind.NumberKeyword:
     case ts.SyntaxKind.StringKeyword:
     case ts.SyntaxKind.BooleanKeyword:
@@ -249,10 +250,12 @@ function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
     case ts.SyntaxKind.PlusPlusToken:
     case ts.SyntaxKind.MinusMinusToken:
     case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
-    case ts.SyntaxKind.TemplateTail:
+    case ts.SyntaxKind.TemplateTail: {
       return false;
-    default:
+    }
+    default: {
       return true;
+    }
   }
 }
 
@@ -347,13 +350,13 @@ function filterContentImpl(content: string): FilteredContent {
     }
 
     // Trivia does not affect the regex-vs-division decision.
-    // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
-    if (
-      token !== ts.SyntaxKind.SingleLineCommentTrivia &&
-      token !== ts.SyntaxKind.MultiLineCommentTrivia &&
-      token !== ts.SyntaxKind.NewLineTrivia &&
-      token !== ts.SyntaxKind.WhitespaceTrivia
-    ) {
+    const triviaKinds = new Set([
+      ts.SyntaxKind.SingleLineCommentTrivia,
+      ts.SyntaxKind.MultiLineCommentTrivia,
+      ts.SyntaxKind.NewLineTrivia,
+      ts.SyntaxKind.WhitespaceTrivia,
+    ]);
+    if (!triviaKinds.has(token)) {
       prevSignificant = token;
     }
   }

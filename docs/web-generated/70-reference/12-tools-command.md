@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-13
-release: v0.6.0
+release: v0.7.0
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
@@ -122,7 +122,7 @@ The adapter package does not install the native scanner binary. Keep managing
 your normal OS/package-manager path, or pin the binary with
 `binaries.<tool>.path` / `OPENSIP_<TOOL>_BIN`. See
 [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/) for the full
-adapter table and prerequisites; [ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0141-external-scanner-binary-ownership.md)
+adapter table and prerequisites; [ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0141-external-scanner-binary-ownership.md)
 records the scanner-binary ownership boundary.
 
 ## `tools doctor`
@@ -190,7 +190,7 @@ Project-local tools remain deny-by-default unless the project config lists their
 tool id under `tools.trusted`. `tools create` adds that entry for the scaffolded
 tool. See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/) and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## `tools install <spec>`
 

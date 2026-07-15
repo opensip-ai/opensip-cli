@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-13
-release: v0.6.0
+release: v0.7.0
 title: "Performance profiling"
 audience: [contributors, ci-integrators]
 purpose: "Contributor workflow for clean-wall benchmarks, CPU profiles, graph stage evidence, toolchain throughput, and performance PR proof."

@@ -92,11 +92,11 @@ function buildImportedPackagesByFile(
   return out;
 }
 
-type DependencyLike = {
+interface DependencyLike {
   readonly to?: unknown;
   readonly specifier?: unknown;
   readonly classification?: { readonly resolvedPackage?: unknown };
-};
+}
 
 /**
  * Package groups one module-init occurrence imports.
@@ -114,7 +114,7 @@ function importedPackagesOf(
   const dependencies: readonly unknown[] = Array.isArray(occ.dependencies) ? occ.dependencies : [];
   for (const dep of dependencies) {
     if (typeof dep !== 'object' || dep === null) continue;
-    addDependencyPackages(set, dep as DependencyLike, byBodyHash);
+    addDependencyPackages(set, dep, byBodyHash);
   }
   return set;
 }

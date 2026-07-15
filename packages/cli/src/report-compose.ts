@@ -300,7 +300,8 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
   const reportPath = join(paths.reportsDir, 'latest.html');
   const scope = currentScope();
   const logger = scope?.logger ?? defaultLogger;
-  writeArtifactAtomically(reportPath, html, {
+  // Synchronous lock+write (void silences detached-promises on sync helpers in async fns).
+  void writeArtifactAtomically(reportPath, html, {
     policy: resolveStateLockPolicy(),
     logger,
     runId: scope?.runId,

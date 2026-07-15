@@ -3,7 +3,7 @@
  *
  * Graph impact and the Change Impact report both digest raw filesFingerprint
  * and cacheKey values with the same algorithm. Keep these vectors identical to
- * `packages/graph/engine/src/__tests__/catalog-identity-digest-vectors.ts` so
+ * `packages/graph/engine/src/__tests__/catalog-identity-digest-vectors.fixture.ts` so
  * package-local implementations cannot drift silently.
  */
 export const CATALOG_IDENTITY_DIGEST_VECTORS = [

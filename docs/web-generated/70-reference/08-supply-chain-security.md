@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-07
-release: v0.6.0
+release: v0.7.0
 title: "Supply-chain security"
 audience: [getting-started, ci-integrators, plugin-authors, contributors]
 purpose: "How opensip-cli reduces npm-family install risk for customers and how teams can use the package-supply-chain-policy check."
@@ -77,8 +77,8 @@ verification commands.
 
 **Consumption-side verification** (install/load provenance checks for third-party
 packages) is a separate trust gate coordinated with
-[ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0068-consumption-side-verification-policy.md) and
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
+[ADR-0068](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0068-consumption-side-verification-policy.md) and
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 It is **not** enforced by the reusable check or the release gate in this repo yet.
 
 The release workflow still installs npm 11 into a separate prefix because npm
@@ -89,7 +89,7 @@ dependency installs.
 ### Dependency update hygiene
 
 Dependency update PRs are opened by **Dependabot** (see
-[ADR-0069](https://github.com/opensip-ai/opensip-cli/blob/v0.6.0/docs/decisions/ADR-0069-dependency-hygiene-automation-policy.md)) on a
+[ADR-0069](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0069-dependency-hygiene-automation-policy.md)) on a
 weekly cadence. Automation is additive — it does not replace human review.
 
 Every dependency merge still passes:
@@ -129,7 +129,7 @@ For highly sensitive environments, prefer a pinned version and install through
 an internal mirror or vetted cache:
 
 ```bash
-curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=0.6.0 bash
+curl -fsSL https://opensip.ai/cli/install.sh | OPENSIP_CLI_VERSION=0.7.0 bash
 ```
 
 Customers who globally disable npm lifecycle scripts should test the CLI in

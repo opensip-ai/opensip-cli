@@ -152,7 +152,8 @@ describe('executeSim', () => {
 
   it('fails closed (exit 2) when simulation plugins failed to load', async () => {
     // Mirror fitness: a broken plugin must not yield a green/partial run.
-    const load = (await import('../../framework/registry.js')).currentSimulationLoadState();
+    const registry = await import('../../framework/registry.js');
+    const load = registry.currentSimulationLoadState();
     load.pluginLoadErrors = ['broken-plugin.mjs: SyntaxError: unexpected token'];
     load.loadedFor = process.cwd(); // skip re-load so the injected error sticks
 

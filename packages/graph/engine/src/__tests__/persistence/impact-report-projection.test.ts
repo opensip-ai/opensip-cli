@@ -6,7 +6,7 @@ import {
   fitProjectionToByteBudget,
   projectImpactForReport,
 } from '../../persistence/impact-report-projection.js';
-import { CATALOG_IDENTITY_DIGEST_VECTORS } from '../catalog-identity-digest-vectors.js';
+import { CATALOG_IDENTITY_DIGEST_VECTORS } from '../catalog-identity-digest-vectors.fixture.js';
 
 import type { GraphImpactResult, ImpactFunction } from '@opensip-cli/contracts';
 

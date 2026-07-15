@@ -7,9 +7,9 @@
 
 import { logger, SystemError } from '@opensip-cli/core';
 
+import { isFrameworkErrorResult } from '../framework/ignore-processing.js';
 import { type CheckMemoryProfile } from '../framework/memory-profiler.js';
 import { resolveMemoryProfiler } from '../framework/scope-registry.js';
-import { isFrameworkErrorResult } from '../framework/ignore-processing.js';
 import { countErrors, countWarnings } from '../types/severity.js';
 
 import type {
@@ -157,6 +157,51 @@ function updateSessionForError(
   session.totalErrors++;
 }
 
+function resolveFrameworkError(result: CheckResult): string | undefined {
+  if (!isFrameworkErrorResult(result)) return undefined;
+  const fromLabel = result.info?.label?.replace(/^Error:\s*/u, '');
+  if (fromLabel !== undefined) return fromLabel;
+  const original = result.metadata.extra?.originalError;
+  if (typeof original === 'string') return original;
+  return 'check failed';
+}
+
+function resolveSkipReason(result: CheckResult): string | undefined {
+  if (result.metadata.extra?.skipped !== true) return undefined;
+  const reason = result.metadata.extra.skipReason;
+  return typeof reason === 'string' ? reason : undefined;
+}
+
+function applyFileFilter(
+  result: CheckResult,
+  fileFilter: string | undefined,
+): {
+  readonly effectiveSignals: CheckResult['signals'];
+  readonly signalCount: number;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly passed: boolean;
+} {
+  if (!fileFilter) {
+    return {
+      effectiveSignals: result.signals,
+      signalCount: result.signals.length,
+      errorCount: result.errors,
+      warningCount: result.warnings,
+      passed: result.passed,
+    };
+  }
+  const effectiveSignals = result.signals.filter((s) => s.code?.file === fileFilter);
+  const errorCount = countErrors(effectiveSignals);
+  return {
+    effectiveSignals,
+    signalCount: effectiveSignals.length,
+    errorCount,
+    warningCount: countWarnings(effectiveSignals),
+    passed: errorCount === 0,
+  };
+}
+
 // =============================================================================
 // MAIN PROCESSORS
 // =============================================================================
@@ -170,16 +215,11 @@ export function processSuccessResult(
     input;
   const { session, callbacks, recipe } = ctx;
 
-  // Apply file filter if set
-  let effectiveSignals = result.signals;
-  if (recipe.fileFilter) {
-    effectiveSignals = result.signals.filter((s) => s.code?.file === recipe.fileFilter);
-  }
-  const signalCount = effectiveSignals.length;
-  const errorCount = recipe.fileFilter ? countErrors(effectiveSignals) : result.errors;
-  const warningCount = recipe.fileFilter ? countWarnings(effectiveSignals) : result.warnings;
+  const { effectiveSignals, signalCount, errorCount, warningCount, passed } = applyFileFilter(
+    result,
+    recipe.fileFilter,
+  );
   const ignoredCount = result.ignoredCount ?? 0;
-  const passed = recipe.fileFilter ? errorCount === 0 : result.passed;
 
   const memoryProfiler = resolveMemoryProfiler();
   const memoryProfile = memoryProfiler.recordCheckComplete(
@@ -204,26 +244,16 @@ export function processSuccessResult(
 
   // Framework/command faults arrive as CheckResult with empty signals and errors>0.
   // Promote them to RecipeCheckResult.error so the envelope unit faults and CI fails.
-  const frameworkError = isFrameworkErrorResult(result)
-    ? (result.info?.label?.replace(/^Error:\s*/u, '') ??
-      (typeof result.metadata.extra?.['originalError'] === 'string'
-        ? result.metadata.extra['originalError']
-        : 'check failed'))
-    : undefined;
-
-  const skipReason =
-    result.metadata.extra?.['skipped'] === true &&
-    typeof result.metadata.extra['skipReason'] === 'string'
-      ? result.metadata.extra['skipReason']
-      : undefined;
+  const frameworkError = resolveFrameworkError(result);
+  const skipReason = resolveSkipReason(result);
   const skipped = skipReason !== undefined;
 
   const checkResult: RecipeCheckResult = {
     checkId,
     checkSlug,
-    passed: frameworkError !== undefined ? false : passed,
+    passed: frameworkError === undefined ? passed : false,
     violationCount: signalCount,
-    errorCount: frameworkError !== undefined ? Math.max(errorCount, 1) : errorCount,
+    errorCount: frameworkError === undefined ? errorCount : Math.max(errorCount, 1),
     warningCount,
     ignoredCount,
     durationMs,
@@ -232,7 +262,7 @@ export function processSuccessResult(
     skipped,
     effectiveSignals,
     ...(skipped ? { skipReason } : {}),
-    ...(frameworkError !== undefined ? { error: frameworkError } : {}),
+    ...(frameworkError === undefined ? {} : { error: frameworkError }),
     ...(result.appliedDirectives && result.appliedDirectives.length > 0
       ? { appliedDirectives: result.appliedDirectives }
       : {}),
@@ -241,16 +271,8 @@ export function processSuccessResult(
   updateSessionForSuccess(session, checkResult, tags);
 
   const summary =
-    frameworkError !== undefined
-      ? createErrorSummary({
-          checkId,
-          checkSlug,
-          durationMs,
-          memoryProfile,
-          timedOut: false,
-          errorMessage: frameworkError,
-        })
-      : createCheckSummary({
+    frameworkError === undefined
+      ? createCheckSummary({
           checkId,
           checkSlug,
           passed,
@@ -260,6 +282,14 @@ export function processSuccessResult(
           memoryProfile,
           ignoredCount,
           filesScanned: result.metadata.filesScanned ?? 0,
+        })
+      : createErrorSummary({
+          checkId,
+          checkSlug,
+          durationMs,
+          memoryProfile,
+          timedOut: false,
+          errorMessage: frameworkError,
         });
   try {
     callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);

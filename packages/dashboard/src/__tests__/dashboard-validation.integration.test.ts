@@ -51,11 +51,11 @@ function readReportOrSkip(): string | null {
     // Skip LOUDLY. A silent skip here would hide the actual defect: a
     // self-contained report is meant to be opened in a browser and attached to
     // a PR, so one this large is a generator bug, not a test problem.
-    console.warn(
+    process.stderr.write(
       `[dashboard-validation] SKIPPED — ${REPORT} is ${Math.round(size / 1e6)} MB, ` +
         `above the ${MAX_BOOTABLE_REPORT_BYTES / 1e6} MB cap this test will boot. ` +
         `Booting it exhausts the jsdom worker heap. A report this size is itself a ` +
-        `defect: the embedded graph catalog is not bounded.`,
+        `defect: the embedded graph catalog is not bounded.\n`,
     );
     return null;
   }

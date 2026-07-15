@@ -1,12 +1,12 @@
 import { defineCommand, ToolRegistry, ValidationError, type Tool } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { buildAgentCatalog } from '../agent-catalog.js';
 import {
   agentCatalogOverlayKeys,
   compareCodePoint,
   publicPrimaryCommand,
 } from '../agent-catalog-entries.js';
+import { buildAgentCatalog } from '../agent-catalog.js';
 
 const noopHandler = (): Promise<{ type: 'text-lines'; lines: string[] }> =>
   Promise.resolve({ type: 'text-lines', lines: [] });

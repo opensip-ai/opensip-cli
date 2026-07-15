@@ -516,7 +516,7 @@ describe('graph context producer bindings', () => {
       ...inventoryValue,
       files: [
         {
-          ...inventoryValue.files[0]!,
+          ...inventoryValue.files[0],
           languages: [],
           evidenceSupport: {
             callable: 'unknown',
@@ -524,7 +524,7 @@ describe('graph context producer bindings', () => {
             reference: 'unknown',
           },
         },
-        inventoryValue.files[1]!,
+        inventoryValue.files[1],
       ],
     };
     expect(assessContextGraphCoverage({ catalog: base, inventory: unknownCallable })).toMatchObject(
@@ -538,14 +538,14 @@ describe('graph context producer bindings', () => {
       ...inventoryValue,
       files: [
         {
-          ...inventoryValue.files[0]!,
+          ...inventoryValue.files[0],
           evidenceSupport: {
             callable: 'unsupported',
             declaration: 'unsupported',
             reference: 'unsupported',
           },
         },
-        inventoryValue.files[1]!,
+        inventoryValue.files[1],
       ],
     };
     expect(

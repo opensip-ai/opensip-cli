@@ -11,7 +11,7 @@ import { join, relative, sep } from 'node:path';
 
 import { createToolLogger } from '@opensip-cli/core';
 
-import { ownerEdgeKey } from './edge-identity.js';
+import { lookupEdgesByOwnerThenBodyHash, ownerEdgeKey } from './edge-identity.js';
 
 import type {
   GraphLanguageAdapter,
@@ -275,7 +275,7 @@ export function mergeResolvedAndCachedEdges(
         // polyglot bare-hash adapters until they migrate to ownerEdgeKey.
         arr.push({
           ...o,
-          calls: edgesByOwner.get(ownerKey) ?? edgesByOwner.get(o.bodyHash) ?? [],
+          calls: lookupEdgesByOwnerThenBodyHash(edgesByOwner, o),
         });
       } else {
         // Unchanged files: restore cached calls. The key matched

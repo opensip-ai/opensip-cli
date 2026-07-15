@@ -125,7 +125,7 @@ export async function renderSuiteLive(
   let liveExitCode = 1;
   const outerSetExit = args.glue?.setExitCode;
   const glue = {
-    ...(args.glue ?? {}),
+    ...args.glue,
     setExitCode: (code: number) => {
       liveExitCode = code;
       outerSetExit?.(code);
