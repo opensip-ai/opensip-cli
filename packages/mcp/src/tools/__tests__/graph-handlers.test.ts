@@ -360,7 +360,19 @@ describe('graph handlers (async GraphToolResult)', () => {
       });
     }
     {
-      const referencesTo = vi.fn(() => Promise.resolve(ok(wrap({ detail: 'summary', sites: [] }))));
+      const referencesTo = vi.fn(() =>
+        Promise.resolve(
+          ok(
+            wrap({
+              detail: 'summary' as const,
+              referenceScope: 'cross-file' as const,
+              declarationId: 'd1|Foo',
+              references: [],
+              totalMatches: 0,
+            }),
+          ),
+        ),
+      );
       const graph = fakePort({ referencesTo });
       const { handlers, server } = captureServer();
       registerReferencesTo(server, deps(graph));

@@ -195,10 +195,7 @@ describe('boundProjectLanguages', () => {
         ]),
       ),
     };
-    const files = [
-      fileFact('a.ts', languages.slice(0, 40)),
-      fileFact('b.ts', languages.slice(40)),
-    ];
+    const files = [fileFact('a.ts', languages.slice(0, 40)), fileFact('b.ts', languages.slice(40))];
 
     const bounded = boundProjectLanguages(files, input, reasons);
     const retained = new Set(languages.slice(0, MAX_PROJECT_LANGUAGES));
@@ -229,9 +226,13 @@ describe('discoverFiles materialization edge cases', () => {
         language,
         {
           callable:
-            index === 0 ? ('supported' as const) : index === 1 ? ('unsupported' as const) : undefined,
+            index === 0
+              ? ('supported' as const)
+              : index === 1
+                ? ('unsupported' as const)
+                : ('unknown' as const),
           declaration: 'unsupported' as const,
-          reference: undefined,
+          reference: 'unknown' as const,
         },
       ]),
     );
@@ -246,7 +247,17 @@ describe('discoverFiles materialization edge cases', () => {
       },
       limits: DEFAULT_INVENTORY_LIMITS,
       manifests: [],
-      packages: [{ name: 'root', root: '.', private: false, exports: [], bins: [], verificationCommands: [], provenance: [] }],
+      packages: [
+        {
+          name: 'root',
+          root: '.',
+          private: false,
+          exports: [],
+          bins: [],
+          verificationCommands: [],
+          provenance: [],
+        },
+      ],
       projectRoot: root,
       resolver: targets,
     });

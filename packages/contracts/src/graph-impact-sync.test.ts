@@ -135,7 +135,12 @@ describe('computeImpact synchronous engine edge cases', () => {
     const proto = { inherited: functions.real };
     Object.setPrototypeOf(functions, proto);
 
-    const result = computeImpact(catalog(functions), ['src/real.ts']);
+    // `functions` intentionally carries an undefined occurrence bag (the `ghost`
+    // key above) to exercise the skip path; `catalog` types functions as
+    // non-undefined, so assert the narrower type at the boundary.
+    const result = computeImpact(catalog(functions as Record<string, GraphFunctionOccurrence[]>), [
+      'src/real.ts',
+    ]);
     expect(result.changedFunctions).toHaveLength(1);
     expect(result.changedFunctions[0]?.qualifiedName).toBe('real');
   });

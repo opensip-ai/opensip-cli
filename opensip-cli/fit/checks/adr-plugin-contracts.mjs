@@ -348,7 +348,7 @@ function analyzeCommandSurfaceParity(content, filePath) {
         ),
       );
     }
-    if (/^\s*register\s*:/.m.test(content)) {
+    if (/^\s*register\s*:/m.test(content)) {
       violations.push(
         violation(
           filePath,

@@ -58,7 +58,7 @@ describe('catalog-stats', () => {
               to: [],
               line: 2,
               column: 0,
-              resolution: 'unresolved',
+              resolution: 'unknown',
               confidence: 'low',
               text: 'missing()',
             },

@@ -337,7 +337,7 @@ describe('task-context MCP handlers', () => {
     const contextStatus = vi.fn(() =>
       Promise.resolve(
         ok({
-          status: 'stale' as const,
+          status: 'available' as const,
           fileScope: { status: 'matched' as const },
           steps: [],
           pointers: [],

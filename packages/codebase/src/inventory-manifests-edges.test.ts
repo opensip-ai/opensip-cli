@@ -1,11 +1,4 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -122,7 +115,9 @@ describe('discoverManifestFacts edge paths', () => {
     );
 
     expect(discovery.reasons).toContain('manifest-workspace-cap-reached');
-    expect(discovery.facts[0]?.workspacePatterns.length).toBeLessThanOrEqual(MAX_WORKSPACE_PATTERNS);
+    expect(discovery.facts[0]?.workspacePatterns.length).toBeLessThanOrEqual(
+      MAX_WORKSPACE_PATTERNS,
+    );
   });
 
   it('retains the deterministic package prefix when the package budget is exceeded', async () => {
@@ -262,7 +257,6 @@ describe('discoverManifestFacts edge paths', () => {
         workspacePatterns: [],
         reasonCodes: [],
         packageManager: undefined,
-        scripts: [],
       },
     ]);
 
@@ -374,10 +368,7 @@ describe('discoverManifestFacts edge paths', () => {
     mkdirSync(join(root, 'packages/linked'), { recursive: true });
     // Directory symlink is not followed by the walker; create a package whose
     // package.json is a file symlink to an outside-root manifest instead.
-    symlinkSync(
-      join(outside, 'escaped/package.json'),
-      join(root, 'packages/linked/package.json'),
-    );
+    symlinkSync(join(outside, 'escaped/package.json'), join(root, 'packages/linked/package.json'));
 
     const controller = new AbortController();
     controller.abort();

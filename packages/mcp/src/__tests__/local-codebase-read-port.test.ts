@@ -422,9 +422,7 @@ describe('LocalCodebaseReadPort', () => {
       value: {
         status: 'unavailable',
         reasonCodes: expect.arrayContaining(['bounded-target-resolution-unavailable']),
-        nextActions: expect.arrayContaining([
-          expect.stringMatching(/targets|inventory|coverage/i),
-        ]),
+        nextActions: expect.arrayContaining([expect.stringMatching(/targets|inventory|coverage/i)]),
       },
     });
     expect(result.ok && 'file' in result.value ? result.value.file : undefined).toBeUndefined();
@@ -461,7 +459,7 @@ describe('LocalCodebaseReadPort', () => {
         ).cache = {
           inventory: {
             snapshot: { snapshotId: 'i1:stale-identity' },
-            fileByPath: new Map(),
+            fileByPath: new Map<string, never>(),
           },
           capturedAt: result.value.freshness.capturedAt,
           verifiedAtMs: Date.now(),
