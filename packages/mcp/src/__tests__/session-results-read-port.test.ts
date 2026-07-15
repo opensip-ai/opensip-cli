@@ -11,6 +11,7 @@
  */
 
 import {
+  type AgentHostSupport,
   type StoredRun,
   type StoredRunStep,
   buildSignalEnvelope,
@@ -577,5 +578,42 @@ describe('SessionResultsReadPort — agentCatalog', () => {
   it('returns the self-describing agent catalog', () => {
     const out = port().agentCatalog();
     expect(out.ok).toBe(true);
+  });
+
+  it('omits hostSupport when the composition root injected none (absent-field)', () => {
+    const out = port().agentCatalog();
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.value.hostSupport).toBeUndefined();
+  });
+
+  it('forwards the INJECTED host-support projection verbatim and never re-observes the process', () => {
+    // The long-lived server computes hostSupport once at construction. The read
+    // port must forward exactly what it was handed — proven with a sentinel that
+    // the live process could never produce (an injected rowId + a match/status
+    // combination the real classifier would never emit for THIS host). If the
+    // port re-observed the ambient process it would overwrite this value.
+    const injected: AgentHostSupport = Object.freeze({
+      supportContractVersion: 1,
+      status: 'preview',
+      match: 'partial',
+      rowId: 'injected-sentinel-row-v1',
+      rowStatus: 'preview',
+      profile: { id: 'injected-sentinel-row-v1', version: 1 },
+      matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+      reasonCodes: [],
+      observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+      unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+    });
+    const out = new SessionResultsReadPort({
+      store,
+      replayFor: recordingResolver,
+      hostSupport: injected,
+    }).agentCatalog();
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.hostSupport).toEqual(injected);
+      // Byte-identical forwarding — the port is a pure conduit for the projection.
+      expect(JSON.stringify(out.value.hostSupport)).toBe(JSON.stringify(injected));
+    }
   });
 });

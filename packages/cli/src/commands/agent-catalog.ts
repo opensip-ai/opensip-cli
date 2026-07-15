@@ -9,13 +9,56 @@
  */
 
 import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
-import { buildAgentCatalog, summarizeTargetConventions } from '@opensip-cli/contracts';
-import { currentScope, type ToolRegistry } from '@opensip-cli/core';
+import {
+  buildAgentCatalog,
+  hostSupportFromRuntimeProjection,
+  summarizeTargetConventions,
+  type AgentHostSupport,
+} from '@opensip-cli/contracts';
+import {
+  currentScope,
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  projectRuntimeHostSupport,
+  type ToolRegistry,
+} from '@opensip-cli/core';
 
 import { HOST_RESERVED_ROOT_COMMANDS } from '../bootstrap/reserved-names.js';
 
 export { buildAgentCatalog } from '@opensip-cli/contracts';
 export type { AgentCatalog, CommandTier } from '@opensip-cli/contracts';
+
+/**
+ * Project the live host against the platform-support registry from
+ * process-observable facts only (platform / arch / Node version / Node ABI).
+ * Mapped through the shared contracts helper so the CLI and MCP catalogs emit a
+ * byte-identical `hostSupport` for identical facts (Plan 02 / Plan 03 handoff).
+ * npm, filesystem, case behavior, and OS/kernel version stay unobserved, so the
+ * result is never an exact match.
+ */
+function liveHostSupport(): AgentHostSupport {
+  return hostSupportFromRuntimeProjection(
+    projectRuntimeHostSupport({
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
+      nodeAbi: process.versions.modules,
+    }),
+    PLATFORM_SUPPORT_CONTRACT_VERSION,
+  );
+}
+
+/**
+ * One concise, non-alarming host-support line for the human summary. It reports
+ * the effective status, the local match level (never `exact` from process-only
+ * facts), and the public matrix URL — it is informational only and never prints
+ * a warning or changes the command's exit status.
+ */
+function hostSupportSummaryLine(hostSupport: AgentHostSupport | undefined): string {
+  if (hostSupport === undefined)
+    return 'Host support: unavailable (see the supported-platforms matrix).';
+  const where = hostSupport.matrixUrl ?? 'the supported-platforms matrix';
+  return `Host support: ${hostSupport.status} (local match: ${hostSupport.match}) — see ${where}`;
+}
 
 export function executeAgentCatalog(
   opts: {
@@ -35,6 +78,7 @@ export function executeAgentCatalog(
       rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
       suiteNames: [...RESERVED_SUITE_NAMES],
     },
+    hostSupport: liveHostSupport(),
     ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
   });
 
@@ -56,6 +100,8 @@ export function executeAgentCatalog(
     ...catalog.commonPatterns.map((p) => `  • ${p.name}: ${p.example}`),
     '',
     'Key entry points: ' + catalog.entryPoints.map((e) => e.command).join(', '),
+    '',
+    hostSupportSummaryLine(catalog.hostSupport),
     '',
     'See --json output or the docs for complete shapes and more examples.',
   ];

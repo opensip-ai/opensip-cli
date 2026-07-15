@@ -53,7 +53,12 @@ import type {
   ShowRunData,
 } from './result-dto.js';
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from './results-read-port.js';
-import type { AgentCatalog, HistorySession, StoredSession } from '@opensip-cli/contracts';
+import type {
+  AgentCatalog,
+  AgentHostSupport,
+  HistorySession,
+  StoredSession,
+} from '@opensip-cli/contracts';
 import type { Result, ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -73,6 +78,15 @@ export interface SessionResultsReadPortDeps {
   readonly replayFor?: (tool: ToolShortId) => SessionReplayFn | undefined;
   /** Tier-3 internal command names excluded from the agent catalog. */
   readonly internalCommands?: ReadonlySet<string>;
+  /**
+   * Honest, process-only host-support projection (Plan 02, macOS GA). The
+   * long-lived server computes it ONCE at construction from the same process
+   * facts and the same shared mapper the CLI uses, so `get_agent_catalog`
+   * reaches byte-identical parity with `opensip agent-catalog --json`. The read
+   * port only forwards it — it never re-observes the process or reads ambient
+   * scope in a method.
+   */
+  readonly hostSupport?: AgentHostSupport;
 }
 
 export class SessionResultsReadPort implements ResultsReadPort {
@@ -81,6 +95,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
   private readonly tools?: ToolRegistry;
   private readonly replayFor: (tool: ToolShortId) => SessionReplayFn | undefined;
   private readonly internalCommands?: ReadonlySet<string>;
+  private readonly hostSupport?: AgentHostSupport;
 
   constructor(deps: SessionResultsReadPortDeps) {
     this.store = deps.store;
@@ -88,6 +103,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     this.tools = deps.tools;
     this.replayFor = deps.replayFor ?? (deps.tools ? bundledReplayResolver(deps.tools) : noReplay);
     this.internalCommands = deps.internalCommands;
+    this.hostSupport = deps.hostSupport;
   }
 
   agentCatalog(): Result<AgentCatalog, McpReadError> {
@@ -95,6 +111,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       buildAgentCatalog({
         ...(this.tools ? { tools: this.tools } : {}),
         ...(this.internalCommands ? { internalCommands: this.internalCommands } : {}),
+        ...(this.hostSupport ? { hostSupport: this.hostSupport } : {}),
         validateOverlays: true,
       }),
     );

@@ -735,6 +735,18 @@
       "purpose": "Contributor workflow for clean-wall benchmarks, CPU profiles, graph stage evidence, toolchain throughput, and performance PR proof."
     },
     {
+      "file": "docs/web-generated/70-reference/17-supported-platforms.md",
+      "path": "/docs/opensip-cli/70-reference/17-supported-platforms/",
+      "section": "70-reference",
+      "title": "Supported platforms",
+      "audience": [
+        "getting-started",
+        "ci-integrators",
+        "contributors"
+      ],
+      "purpose": "The generated, authoritative host-support matrix: the exact qualified tuple, its status, explicitly unsupported hosts, and what unqualified means."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -936,7 +948,8 @@
         "/docs/opensip-cli/70-reference/13-verifiable-releases/",
         "/docs/opensip-cli/70-reference/14-detection-quality/",
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
-        "/docs/opensip-cli/70-reference/16-performance-profiling/"
+        "/docs/opensip-cli/70-reference/16-performance-profiling/",
+        "/docs/opensip-cli/70-reference/17-supported-platforms/"
       ]
     },
     {
@@ -981,7 +994,8 @@
         "/docs/opensip-cli/70-reference/05-checks-index/",
         "/docs/opensip-cli/70-reference/08-supply-chain-security/",
         "/docs/opensip-cli/70-reference/12-public-benchmarks/",
-        "/docs/opensip-cli/70-reference/13-verifiable-releases/"
+        "/docs/opensip-cli/70-reference/13-verifiable-releases/",
+        "/docs/opensip-cli/70-reference/17-supported-platforms/"
       ]
     },
     {
@@ -1066,7 +1080,8 @@
         "/docs/opensip-cli/70-reference/13-verifiable-releases/",
         "/docs/opensip-cli/70-reference/14-detection-quality/",
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
-        "/docs/opensip-cli/70-reference/16-performance-profiling/"
+        "/docs/opensip-cli/70-reference/16-performance-profiling/",
+        "/docs/opensip-cli/70-reference/17-supported-platforms/"
       ]
     },
     {
@@ -1119,6 +1134,7 @@
         "/docs/opensip-cli/70-reference/14-detection-quality/",
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
         "/docs/opensip-cli/70-reference/16-performance-profiling/",
+        "/docs/opensip-cli/70-reference/17-supported-platforms/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
         "/docs/opensip-cli/80-implementation/03-session-and-persistence/",

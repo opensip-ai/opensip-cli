@@ -679,4 +679,30 @@ describe('get_agent_catalog handler', () => {
     const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
     expect(out.isError).toBe(true);
   });
+
+  it('passes the catalog hostSupport projection through to the agent unchanged', () => {
+    // The macOS-GA host-support projection lives INSIDE the catalog the read port
+    // builds; the transport must forward it verbatim (never drop, rename, or
+    // recompute it) so an MCP agent sees the same honest projection as the CLI.
+    const hostSupport = {
+      supportContractVersion: 1,
+      status: 'preview',
+      match: 'partial',
+      rowId: 'macos-26-arm64-node24-npm11-v1',
+      rowStatus: 'preview',
+      profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+      matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+      reasonCodes: [],
+      observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+      unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+    };
+    const { server, handlers } = captureServer();
+    registerGetAgentCatalog(
+      server,
+      deps(fakeResults({ agentCatalog: () => ok({ hostSupport } as unknown as AgentCatalog) })),
+    );
+    const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
+    expect(out.isError).toBe(false);
+    expect(out.body.hostSupport).toEqual(hostSupport);
+  });
 });

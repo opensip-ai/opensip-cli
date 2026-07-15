@@ -6,6 +6,81 @@ workspace packages to npm with OIDC trusted publishing.
 
 The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 
+## Three-job release topology (macOS-gated)
+
+`.github/workflows/release.yml` runs **three jobs** so that verified
+exact-version macOS evidence is a hard dependency between npm staging publish and
+`latest` promotion (Plan 02 / ADR-0164; the normative sequence is Plan 02 §6):
+
+1. **`stage-release`** (ubuntu) — every pre-publication gate (consistency,
+   supply-chain, clean two-pass build, artifact boundary, typecheck, lint,
+   coverage tests, fit/graph/yagni dogfood, package preflight), then pack →
+   release-artifact generation/verification → provenance/checksum/SBOM
+   attestation → packed smoke → **STAGING publish** of the exact immutable
+   version to `release-candidate-<version>`. It resolves the currently promoted
+   `opensip-cli@latest` to an exact version (the upgrade source) **before**
+   publishing, exposes typed outputs (candidate version, tag, git SHA, staging
+   tag, manifest digest, previous exact version), and uploads the manifest +
+   `SHA256SUMS` + SBOM as one immutable `release-metadata-<tag>` artifact. It
+   holds `id-token` / `attestations` / `artifact-metadata` write and **does not**
+   promote to `latest`, verify `latest`, or create the GitHub Release. It holds
+   **no** promotion credential.
+2. **`qualify-macos`** (pinned `macos-26`, `contents: read`, **no** publish or
+   promotion secret) — checks out the exact staged SHA, downloads the staged
+   manifest metadata, polls npm for the exact staged version + complete package
+   set with bounded backoff, fetches each exact registry tarball and compares its
+   SHA-256/name/version to the manifest (never `latest`, a range, workspace
+   bytes, or another registry), installs the exact version through the canonical
+   `scripts/install.sh`, runs the full macOS profile in published-version mode
+   (upgrading from the prior exact version), and independently re-verifies the
+   sealed `opensip-cli-macos-qualification.v1.json` evidence. It uploads evidence
+   on every outcome (90-day retention) and exposes only a verified evidence
+   digest/artifact name.
+3. **`promote-release`** (ubuntu, `needs: [stage-release, qualify-macos]`,
+   `contents: write` + the `MACBOOKM5` promotion secret **only**) — GitHub's
+   default success dependency means any Mac failure/cancellation prevents this
+   job from starting. It downloads the release metadata + verified macOS
+   evidence, independently rechecks version/tag/SHA/manifest-digest and
+   re-verifies the evidence, promotes every exact staged package to `latest` in
+   `RELEASE_PACKAGE_ORDER` (idempotent), runs
+   `verify-release-publish-surface.mjs --tag latest`, and creates the GitHub
+   Release with the manifest, checksums, SBOM, and the macOS evidence artifact.
+
+**Least privilege:** the promotion token lives in `promote-release` only; the Mac
+job holds no publish/promotion credential and no OIDC/attestation permission. All
+action SHAs are pinned, all installs are frozen, and all versions are exact.
+
+**Never manually promote after a failed Mac gate.** A failed `qualify-macos` job
+may consume (burn) the immutable staged version, but `latest` must remain on the
+prior known-good release. Fix the defect and ship the corrective release under a
+**new** exact version — npm artifacts are immutable and are never overwritten or
+reused. Do not hand-run `npm dist-tag add` to force a promotion the gate refused.
+
+**Evidence location.** The sealed
+`opensip-cli-macos-qualification.v1.json` (plus the host preflight and the
+independent verifier result) is uploaded as the `qualify-macos` job artifact and
+attached to the GitHub Release by `promote-release`. Its version, git SHA, and
+support-profile digest are rechecked to match the released tag before the release
+is created.
+
+**Rerun semantics.** Re-running the workflow on the same tag is safe: staging
+publish is idempotent (already-published exact versions are skipped but their
+identities re-verified), the Mac gate re-runs against the same exact version, and
+promotion is idempotent. A rerun **cannot** overwrite or reuse an immutable
+staged version; if a version was burned, cut a new one.
+
+**Ongoing operations.** The durable decision — the exact qualified tuple, the
+`stage → Mac verify → latest promote` ordering, the burn-in gate, and the support
+suspension triggers — is
+[ADR-0165](docs/decisions/ADR-0165-macos-ga-support-qualification.md). The
+day-to-day maintainer playbook (14-day burn-in counting + resets, failure-class
+triage, burned-version recovery, runner/toolchain drift, the `preview → supported`
+promotion checklist, and reading `hostSupport` from the CLI/MCP catalogs) is kept
+locally under `docs/internal/` (private working context, not committed). The
+current, generated support-matrix STATUS is never restated in prose here — read it
+from [`docs/public/70-reference/17-supported-platforms.md`](docs/public/70-reference/17-supported-platforms.md),
+which is generated from the one core support registry.
+
 ### Producer provenance
 
 Ordinary tag releases publish every package with **OIDC trusted publishing** and
@@ -277,8 +352,8 @@ a different question:
    deeper maintainer note lives locally under `docs/internal/` (private working
    context, not committed).
 
-3. **OS support qualification.** Turning acceptance evidence into a *published
-   supported platform* is a separate, deliberate OS-specific plan that selects a
+3. **OS support qualification.** Turning acceptance evidence into a _published
+   supported platform_ is a separate, deliberate OS-specific plan that selects a
    profile, cadence, burn-in, and publication policy. A green acceptance run is
    evidence for the measured candidate/host/profile tuple only — **never** a
    support declaration
@@ -295,10 +370,11 @@ a different question:
 
 ## Partial publish recovery
 
-The release workflow publishes every package to a version-scoped staging dist-tag
-(`release-candidate-<version>`) first, then promotes the full set to `latest` in
-one batch. If the workflow fails mid-loop, `latest` should still point at the
-previous complete release.
+The `stage-release` job publishes every package to a version-scoped staging
+dist-tag (`release-candidate-<version>`) first; the separate `promote-release`
+job promotes the full set to `latest` in one batch **only after** the pinned
+`qualify-macos` gate verifies the exact staged version. If staging fails mid-loop
+— or the Mac gate fails — `latest` still points at the previous complete release.
 
 **Detect a partial publish:**
 
@@ -313,18 +389,23 @@ node scripts/verify-release-publish-surface.mjs --expected-version vX.Y.Z --tag 
 **Safe recovery:**
 
 1. Re-run the failed release workflow on the **same tag**. Publish is idempotent:
-   packages already on npm are skipped; promotion runs again for any version that
-   exists but is not yet on `latest`.
-2. If the workflow cannot be re-run, publish any missing tarballs manually with
-   the same staging tag, then promote each name to `latest` in dependency order
-   from `scripts/release-package-order.mjs`.
+   packages already on npm are skipped; the Mac gate re-runs against the same
+   exact version; promotion runs again for any version that exists but is not yet
+   on `latest`.
+2. If the workflow cannot be re-run and staging is complete **and** the Mac gate
+   verified, publish any missing tarballs manually with the same staging tag,
+   then promote each name to `latest` in dependency order from
+   `scripts/release-package-order.mjs`. Never hand-promote a version whose
+   `qualify-macos` gate did not pass.
 3. Do **not** bump a patch version just to “fix” a partial publish — npm versions
    are immutable. Finish `X.Y.Z` on the registry, or yank only as a last resort
    after operator review.
 
-**GitHub Release coupling:** the GitHub Release step runs only after staging
-publish + `latest` promotion succeed, so consumers never see a GitHub Release for
-a version whose CLI package is missing from `latest`.
+**macOS gate + GitHub Release coupling:** `promote-release` runs only after
+`stage-release` **and** `qualify-macos` succeed, so `latest` promotion and the
+GitHub Release never happen for a version that failed macOS qualification.
+Consumers never see a GitHub Release for a version whose CLI package is missing
+from `latest`.
 
 ## Publish Order
 

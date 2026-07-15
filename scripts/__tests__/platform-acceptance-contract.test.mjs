@@ -43,6 +43,13 @@ import {
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const COMMON_V1_PATH = join(REPO_ROOT, '.config', 'platform-acceptance', 'common-v1.json');
 const COMMON_V1_RAW = JSON.parse(readFileSync(COMMON_V1_PATH, 'utf8'));
+const MACOS_V1_PATH = join(
+  REPO_ROOT,
+  '.config',
+  'platform-acceptance',
+  'macos-26-arm64-node24-npm11-v1.json',
+);
+const MACOS_V1_RAW = JSON.parse(readFileSync(MACOS_V1_PATH, 'utf8'));
 
 function clone(value) {
   return structuredClone(value);
@@ -71,6 +78,9 @@ const VALID_HOST = Object.freeze({
   totalMemoryBytes: 1024,
   filesystem: { type: 'ext4', caseSensitive: true },
   shell: 'bash',
+  swVers: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+  kernelRelease: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+  unameArch: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
   capabilities: { pty: true, symlink: true, permissions: true, 'process-tree-rss': true },
 });
 
@@ -477,6 +487,88 @@ test('composeProfile rejects a derived profile that omits its base declaration',
   const raw = clone(COMMON_V1_RAW);
   raw.id = 'derived-v1';
   assert.throws(() => composeProfile(BASE_PROFILE, raw), /missing-base/);
+});
+
+// ---------------------------------------------------------------------------
+// supportRow binding (Plan 02, spec §4/§9) — a profile pins the exact public
+// platform-support row so acceptance evidence can never satisfy a different claim.
+// ---------------------------------------------------------------------------
+
+test('parseAcceptanceProfile parses, freezes, and digests a supportRow binding', () => {
+  const raw = clone(COMMON_V1_RAW);
+  raw.supportRow = { contractVersion: 1, rowId: 'macos-26-arm64-node24-npm11-v1' };
+  const profile = parseAcceptanceProfile(raw);
+  assert.deepEqual(profile.supportRow, {
+    contractVersion: 1,
+    rowId: 'macos-26-arm64-node24-npm11-v1',
+  });
+  assert.ok(Object.isFrozen(profile.supportRow));
+  // The binding is part of the profile identity: two profiles that differ ONLY
+  // in their supportRow have different digests, so evidence sealed for one can
+  // never verify against the other.
+  const other = parseAcceptanceProfile({
+    ...raw,
+    supportRow: { contractVersion: 1, rowId: 'some-other-row-v1' },
+  });
+  assert.notEqual(profileDigest(profile), profileDigest(other));
+  // A profile with no binding digests differently again.
+  assert.notEqual(profileDigest(profile), profileDigest(BASE_PROFILE));
+});
+
+test('parseAcceptanceProfile rejects a malformed supportRow', () => {
+  for (const [mutate, pattern] of [
+    [(row) => ({ ...row, rogue: true }), /unknown-key/],
+    [(row) => ({ contractVersion: row.contractVersion }), /rowId/],
+    [(row) => ({ ...row, contractVersion: 0 }), /contractVersion/],
+    [(row) => ({ ...row, contractVersion: 1.5 }), /contractVersion/],
+    [(row) => ({ ...row, rowId: 'Not A Row Id' }), /rowId/],
+  ]) {
+    const raw = clone(COMMON_V1_RAW);
+    raw.supportRow = mutate({ contractVersion: 1, rowId: 'macos-26-arm64-node24-npm11-v1' });
+    assert.throws(() => parseAcceptanceProfile(raw), pattern);
+  }
+});
+
+test('the committed macOS profile is a legitimate additive extension of common-v1', () => {
+  // Drift guard: the committed base.digest must equal the live common-v1 digest,
+  // so the derived profile can never point at a stale base.
+  assert.equal(MACOS_V1_RAW.base.digest, profileDigest(BASE_PROFILE));
+
+  const composed = composeProfile(BASE_PROFILE, MACOS_V1_RAW);
+  // The composed profile contains EVERY common-v1 journey exactly once, in base
+  // order, with no downgrade — then appends the macOS-specific journeys.
+  const composedIds = composed.journeys.map((journey) => journey.id);
+  const composedIdSet = new Set(composedIds);
+  assert.equal(composedIdSet.size, composedIds.length, 'composed journeys must be unique');
+  for (const base of BASE_PROFILE.journeys) {
+    const carried = composed.journeys.find((journey) => journey.id === base.id);
+    assert.ok(carried, `composed profile must carry base journey ${base.id}`);
+    assert.equal(
+      composedIds.filter((id) => id === base.id).length,
+      1,
+      `${base.id} must appear exactly once`,
+    );
+    // A required base journey stays required (never silently downgraded).
+    if (base.required) assert.equal(carried.required, true, `${base.id} must stay required`);
+  }
+  // The first common-v1 journeys keep their base order at the head of the list.
+  assert.deepEqual(
+    composedIds.slice(0, BASE_PROFILE.journeys.length),
+    BASE_PROFILE.journeys.map((journey) => journey.id),
+  );
+  // Every trailing (macOS-only) journey is namespaced and required.
+  const macosOnly = composed.journeys.slice(BASE_PROFILE.journeys.length);
+  assert.ok(macosOnly.length > 0, 'the macOS profile must add at least one native journey');
+  for (const journey of macosOnly) {
+    assert.match(journey.id, /^macos\./, `${journey.id} must be a macos.* journey`);
+    assert.equal(journey.required, true, `${journey.id} must be required`);
+  }
+  // The support-row binding is carried onto the composed profile + stays frozen.
+  assert.deepEqual(composed.supportRow, {
+    contractVersion: 1,
+    rowId: 'macos-26-arm64-node24-npm11-v1',
+  });
+  assert.ok(Object.isFrozen(composed));
 });
 
 // ---------------------------------------------------------------------------

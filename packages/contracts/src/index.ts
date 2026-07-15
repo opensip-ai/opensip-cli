@@ -386,6 +386,11 @@ export {
 export type { AgentCatalog, CommandTier } from './agent-catalog.js';
 export { summarizeTargetConventions } from './target-conventions.js';
 export type { AgentProjectContext, TargetConventionSummary } from './target-conventions.js';
+// Host-support projection (Plan 02, macOS GA). The serializable AgentCatalog
+// projection + the single core→contracts mapper both CLI and MCP call, so their
+// hostSupport output is byte-identical for identical process facts.
+export { hostSupportFromRuntimeProjection } from './host-support.js';
+export type { AgentHostSupport } from './host-support.js';
 export {
   buildComputeImpactIndex,
   computeImpact,

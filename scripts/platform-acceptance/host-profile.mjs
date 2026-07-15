@@ -112,6 +112,37 @@ function collectShell(platform) {
 }
 
 /**
+ * macOS product version from Apple's own `/usr/bin/sw_vers` — the sw_vers-family
+ * source the macOS support tuple cross-checks against Node/kernel facts. A
+ * darwin-only probe: every other host reports it as a tagged `unavailable` fact.
+ */
+function collectSwVers(platform) {
+  if (platform !== 'darwin') return unavailable('darwin-only-probe');
+  const out = runProbe('/usr/bin/sw_vers', ['-productVersion']);
+  return out && /^\d+(?:\.\d+)*$/.test(out) ? out : unavailable('sw-vers-unavailable');
+}
+
+/**
+ * Darwin kernel release from `/usr/bin/uname -r` — the sw_vers-independent kernel
+ * source (macOS 26.x must pair with Darwin 25.x). Darwin-only.
+ */
+function collectKernelRelease(platform) {
+  if (platform !== 'darwin') return unavailable('darwin-only-probe');
+  const out = runProbe('/usr/bin/uname', ['-r']);
+  return out && /^\d+(?:\.\d+)+$/.test(out) ? out : unavailable('uname-release-unavailable');
+}
+
+/**
+ * Machine architecture from `/usr/bin/uname -m` (e.g. `arm64`, `x86_64`) — the
+ * hardware source cross-checked against `process.arch`. Darwin-only.
+ */
+function collectUnameArch(platform) {
+  if (platform !== 'darwin') return unavailable('darwin-only-probe');
+  const out = runProbe('/usr/bin/uname', ['-m']);
+  return out && /^\w+$/.test(out) ? out : unavailable('uname-arch-unavailable');
+}
+
+/**
  * Resolve the filesystem type of the run root by parsing `mount` and selecting
  * the entry whose mount point is the longest prefix of `root`. Handles the
  * darwin form (`… on /path (apfs, …)`) and the linux form
@@ -292,6 +323,12 @@ export function collectHostProfile(root, requiredCapabilities = []) {
       caseSensitive: detectCaseSensitivity(root),
     },
     shell: collectShell(platform),
+    // macOS-independent tuple sources (darwin-only; tagged `unavailable`
+    // elsewhere). Cross-checked against Node facts by the macOS journeys and
+    // bound to the verifier's host constraints.
+    swVers: collectSwVers(platform),
+    kernelRelease: collectKernelRelease(platform),
+    unameArch: collectUnameArch(platform),
     capabilities,
   };
 }

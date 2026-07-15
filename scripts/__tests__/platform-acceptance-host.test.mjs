@@ -73,6 +73,11 @@ test('collects the allowlisted host shape with a closed capability vocabulary', 
     assertFact(host.packageManager, 'packageManager');
     assertFact(host.cpuModel, 'cpuModel');
     assertFact(host.shell, 'shell');
+    // macOS-independent tuple sources: darwin-only probes (tagged `unavailable`
+    // on any other host), always present as a tagged HostFact.
+    assertFact(host.swVers, 'swVers');
+    assertFact(host.kernelRelease, 'kernelRelease');
+    assertFact(host.unameArch, 'unameArch');
     assertFact(host.filesystem.type, 'filesystem.type');
     if (typeof host.filesystem.caseSensitive !== 'boolean') {
       assertFact(host.filesystem.caseSensitive, 'filesystem.caseSensitive');

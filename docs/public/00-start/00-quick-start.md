@@ -50,9 +50,11 @@ For the full per-language breakdown, see [`../70-reference/02-package-catalog.md
 
 ## Prerequisites
 
-- **Node.js 24+** — `node --version` should print `v24.x` or higher.
+- **Node.js 24+** — `node --version` should print `v24.x` or higher. This engine range is an install floor, not a support claim.
 - A project directory you don't mind a scaffold landing in.
 - *(Optional)* `pnpm` if you're building from source. The curl installer handles global CLI setup.
+
+Qualified support is narrower than the Node engine range: it names an exact host tuple (OS, architecture, Node ABI, npm major, and filesystem) with measured evidence. The generated [supported-platforms matrix](../70-reference/17-supported-platforms.md) is authoritative for each host's current status. Unlisted hosts are unqualified — they may work, with no promise, and the CLI never blocks them.
 
 If you don't have a project handy, `git clone https://github.com/opensip-ai/opensip-cli.git` and run these commands inside the clone — OpenSIP CLI runs checks against its own codebase as the smoke test.
 

@@ -10,9 +10,14 @@ import {
   agentCatalogOverlayKeys,
   agentCatalogPlatformEntryPoints,
   assertAgentCatalogOverlayKeys,
+  buildAgentCatalog as buildAgentCatalogFromContracts,
   commonFlags,
+  hostSupportFromRuntimeProjection,
+  type AgentHostSupport,
 } from '@opensip-cli/contracts';
 import {
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  projectRuntimeHostSupport,
   RunScope,
   ToolRegistry,
   runWithScopeSync,
@@ -551,13 +556,24 @@ describe('executeAgentCatalog', () => {
     const { catalog } = out as {
       catalog: ReturnType<typeof buildAgentCatalog>;
     };
-    // The host wrapper injects the reserved-name lists (ADR-0159) the bare
-    // contracts builder cannot know about.
-    const { reservedNames, ...rest } = catalog;
+    // The host wrapper injects the reserved-name lists (ADR-0159) and the
+    // process-only host-support projection (Plan 02) the bare contracts builder
+    // cannot know about; the rest must match the pure builder exactly.
+    const { reservedNames, hostSupport, ...rest } = catalog;
     expect(rest).toEqual(buildAgentCatalog({ tools }));
     expect(reservedNames?.rootCommands).toContain('audit');
     expect(reservedNames?.rootCommands).toContain('init');
     expect(reservedNames?.suiteNames).toEqual(['audit', 'agent-context']);
+    // hostSupport is always injected from live process facts. It is honest:
+    // never an exact match (npm/filesystem/install-channel are unobserved at
+    // runtime), it carries the support-contract version, and its status stays
+    // within the closed vocabulary. It never claims `supported` unless the
+    // registry row itself does (macOS is preview at launch).
+    expect(hostSupport).toBeDefined();
+    expect(hostSupport?.supportContractVersion).toBe(PLATFORM_SUPPORT_CONTRACT_VERSION);
+    expect(['partial', 'none']).toContain(hostSupport?.match);
+    expect(hostSupport?.match).not.toBe('exact');
+    expect(['supported', 'preview', 'unqualified', 'unsupported']).toContain(hostSupport?.status);
   });
 
   it('returns a concise text summary in human mode (no --json)', async () => {
@@ -592,5 +608,63 @@ describe('executeAgentCatalog', () => {
         usedExportCount: 2,
       },
     ]);
+  });
+});
+
+// The Plan 03 catalog-parity handoff: the CLI and MCP composition roots both
+// build their catalog from `buildAgentCatalog` and both derive `hostSupport` from
+// the SAME core projection via the SAME contracts mapper. Feeding identical
+// process facts must produce EQUAL full AgentCatalog objects (including
+// hostSupport) — not merely equal hostSupport payloads — so a future common
+// parity assembler can accept `hostSupport?: AgentHostSupport` with no adapter or
+// rename. (The MCP read port's forwarding half is proven in
+// packages/mcp/src/__tests__/session-results-read-port.test.ts.)
+describe('CLI↔MCP catalog parity (Plan 03 handoff)', () => {
+  /** The exact live-process projection both composition roots compute. */
+  function liveHostSupport(): AgentHostSupport {
+    return hostSupportFromRuntimeProjection(
+      projectRuntimeHostSupport({
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
+        nodeAbi: process.versions.modules,
+      }),
+      PLATFORM_SUPPORT_CONTRACT_VERSION,
+    );
+  }
+
+  /** Exactly what `SessionResultsReadPort.agentCatalog()` builds for these deps. */
+  function mcpCatalog(tools: ToolRegistry, hostSupport: AgentHostSupport) {
+    return buildAgentCatalogFromContracts({ tools, hostSupport, validateOverlays: true });
+  }
+
+  it('CLI executeAgentCatalog equals the MCP-composed catalog for identical facts (incl. hostSupport)', async () => {
+    const tools = await makeRegistry();
+    const out = executeAgentCatalog({ json: true, tools });
+    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
+
+    // The ONE documented CLI-only overlay is reservedNames (ADR-0159); MCP omits
+    // it. Everything else — including the honest process-only hostSupport — must
+    // be byte-for-byte identical to the MCP composition.
+    const { reservedNames, ...cliRest } = catalog;
+    expect(reservedNames).toBeDefined();
+
+    const mcp = mcpCatalog(tools, liveHostSupport());
+    expect(cliRest).toEqual(mcp);
+    // Prove the equality is not vacuous: hostSupport is present, additive, and
+    // identical on both sides (the load-bearing Plan 03 field).
+    expect(cliRest.hostSupport).toBeDefined();
+    expect(cliRest.hostSupport).toEqual(mcp.hostSupport);
+    expect(cliRest.hostSupport).toEqual(liveHostSupport());
+    expect(JSON.stringify(cliRest.hostSupport)).toBe(JSON.stringify(mcp.hostSupport));
+  });
+
+  it('the shared hostSupport is honest: contract-versioned, never exact, closed vocabulary', async () => {
+    const tools = await makeRegistry();
+    const hostSupport = mcpCatalog(tools, liveHostSupport()).hostSupport;
+    expect(hostSupport?.supportContractVersion).toBe(PLATFORM_SUPPORT_CONTRACT_VERSION);
+    expect(hostSupport?.match).not.toBe('exact');
+    expect(['partial', 'none']).toContain(hostSupport?.match);
+    expect(['supported', 'preview', 'unqualified', 'unsupported']).toContain(hostSupport?.status);
   });
 });

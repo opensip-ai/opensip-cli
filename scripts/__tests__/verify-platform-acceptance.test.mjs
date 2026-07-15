@@ -65,6 +65,9 @@ function makeValidBody() {
       totalMemoryBytes: 1024,
       filesystem: { type: 'ext4', caseSensitive: true },
       shell: 'bash',
+      swVers: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+      kernelRelease: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+      unameArch: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
       capabilities: { pty: true, symlink: true, permissions: true },
     },
     results,
@@ -299,6 +302,84 @@ test('expected version / host mismatches fail verification', () => {
     ]);
     assert.equal(fs.code, 1);
     assert.ok(JSON.parse(fs.stdout).failures.some((f) => f.code === 'host-fs-type-mismatch'));
+  });
+});
+
+test('matching node/npm major constraints pass; mismatches fail with their reason', () => {
+  withTempDir((dir) => {
+    const evidence = writeValid(dir);
+    // The fixture host reports Node v24.0.0 + npm 10.0.0.
+    const ok = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-node-major',
+      '24',
+      '--expected-npm-major',
+      '10',
+    ]);
+    assert.equal(ok.code, 0);
+
+    const nodeBad = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-node-major',
+      '20',
+      '--json',
+    ]);
+    assert.equal(nodeBad.code, 1);
+    assert.ok(
+      JSON.parse(nodeBad.stdout).failures.some((f) => f.code === 'host-node-major-mismatch'),
+    );
+
+    const npmBad = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-npm-major',
+      '11',
+      '--json',
+    ]);
+    assert.equal(npmBad.code, 1);
+    assert.ok(JSON.parse(npmBad.stdout).failures.some((f) => f.code === 'host-npm-major-mismatch'));
+  });
+});
+
+test('a support-row binding expectation fails when the profile carries no binding', () => {
+  withTempDir((dir) => {
+    const evidence = writeValid(dir);
+    // common-v1 has no supportRow binding, so expecting one is a mismatch.
+    const rowBad = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-support-row',
+      'macos-26-arm64-node24-npm11-v1',
+      '--json',
+    ]);
+    assert.equal(rowBad.code, 1);
+    assert.ok(
+      JSON.parse(rowBad.stdout).failures.some((f) => f.code === 'support-row-binding-mismatch'),
+    );
+
+    const versionBad = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-support-contract-version',
+      '1',
+      '--json',
+    ]);
+    assert.equal(versionBad.code, 1);
+    assert.ok(
+      JSON.parse(versionBad.stdout).failures.some((f) => f.code === 'support-row-binding-mismatch'),
+    );
   });
 });
 

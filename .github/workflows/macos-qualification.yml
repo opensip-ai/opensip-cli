@@ -1,0 +1,378 @@
+name: macOS Qualification
+
+# Pinned native (packed-candidate) qualification lane for the macOS GA support
+# tuple (Plan 02). This is NOT a second acceptance runner — it is a CONSUMER of
+# Plan 01's root pack/acceptance/verifier contracts and the Phase 0 macOS
+# profile. `runs-on: macos-26` alone is NEVER host evidence; a fail-closed tuple
+# preflight and the independent verifier establish the facts.
+#
+# Pinned action SHAs (bump via dependabot or deliberate review):
+#   actions/checkout@v7        → 9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+#   pnpm/action-setup@v6       → 0ebf47130e4866e96fce0953f49152a61190b271
+#   actions/setup-node@v6      → 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+#   actions/upload-artifact@v4 → b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 (v4.4.3)
+#     (ci.yml still floats upload-artifact@v7; this lane pins a reviewed v4 SHA
+#      because a native evidence lane must never run a mutable tag — align both
+#      on one reviewed SHA in a follow-up.)
+#
+# 14-DAY BURN-IN COUNTING RULE (Plan 02 §10; do NOT automate the ledger):
+#   Only COMPLETED daily-`schedule` or `workflow_dispatch` runs whose evidence
+#   verifies against the EXACT support tuple (this profile's id/digest, contract
+#   version 1) and the full required-journey count contribute ONE day each.
+#   • Fourteen must be CONSECUTIVE CALENDAR DAYS at the same profile contract
+#     version. A re-run of an earlier day does NOT backfill a missing calendar
+#     day, and multiple passes on one day still count as one.
+#   • A host-mismatch / journey-fail / verification-fail / candidate-fault /
+#     infrastructure-fault run breaks the streak; it does not count.
+#   • Any profile / runner-image / Node / npm change restarts the focused
+#     burn-in for the changed dimension. The release maintainer links runs and
+#     edits the support matrix through review — this workflow NEVER auto-opens
+#     issues, edits status, or sends credentialed notifications.
+
+on:
+  schedule:
+    # Daily at a fixed, non-peak UTC minute (avoids top-of-hour runner
+    # congestion). Only this cadence advances the burn-in clock.
+    - cron: '17 9 * * *'
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      # Qualification lane, macOS profile, native acceptance/verifier contracts,
+      # release pack authority, and the native install channel — a change to any
+      # of these can move the measured tuple and must re-qualify.
+      - '.github/workflows/macos-qualification.yml'
+      - '.config/platform-acceptance/**'
+      - 'scripts/run-platform-acceptance.mjs'
+      - 'scripts/verify-platform-acceptance.mjs'
+      - 'scripts/platform-acceptance/**'
+      - 'scripts/build-release-artifacts.mjs'
+      - 'scripts/verify-release-artifacts.mjs'
+      - 'scripts/release-package-order.mjs'
+      - 'scripts/lib/release-artifacts.mjs'
+      - 'scripts/install.sh'
+      - 'packages/agent-eval/**'
+      - '.nvmrc'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/macos-qualification.yml'
+      - '.config/platform-acceptance/**'
+      - 'scripts/run-platform-acceptance.mjs'
+      - 'scripts/verify-platform-acceptance.mjs'
+      - 'scripts/platform-acceptance/**'
+      - 'scripts/build-release-artifacts.mjs'
+      - 'scripts/verify-release-artifacts.mjs'
+      - 'scripts/release-package-order.mjs'
+      - 'scripts/lib/release-artifacts.mjs'
+      - 'scripts/install.sh'
+      - 'packages/agent-eval/**'
+      - '.nvmrc'
+
+concurrency:
+  # Keyed by event + ref so a PR push cancels its own stale run, but scheduled /
+  # main evidence runs never cancel each other.
+  group: macos-qualification-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  qualify:
+    name: Packed-candidate macOS qualification
+    # NEVER macos-latest or an Intel label — the GA tuple is Apple-silicon
+    # macOS 26 only, and a floating label can silently drift the image.
+    runs-on: macos-26
+    timeout-minutes: 120
+    permissions:
+      # Read-only: this lane reads code and packs local bytes. It holds no
+      # publish, promotion, or attestation credential of any kind.
+      contents: read
+
+    env:
+      # The pinned support profile + its public support-row identity. The
+      # verifier RECOMPUTES the profile digest from this file; the workflow
+      # never trusts a runner-printed value.
+      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+      SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
+      SUPPORT_CONTRACT_VERSION: '1'
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          # Single source of truth: the Node line is pinned in .nvmrc. The
+          # preflight below re-checks the exact major + module ABI at runtime.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # npm 11 to an isolated prefix if the hosted image ships a different major
+      # (same pattern as release.yml). Diagnostic only until the preflight asserts
+      # the exact major.
+      - name: Install npm 11 to a separate prefix if the image differs
+        run: |
+          set -eu
+          major="$(npm -v | cut -d. -f1)"
+          if [ "$major" != "11" ]; then
+            npm install --prefix "$HOME/.npm-cli" npm@11
+            echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+          fi
+
+      # Non-authoritative diagnostics — the preflight + verifier are the only
+      # authorities for host facts.
+      - name: Print runtime versions (diagnostic only)
+        run: |
+          node --version
+          npm --version
+          /usr/bin/sw_vers -productVersion || true
+          /usr/bin/uname -a || true
+
+      # Fail-closed tuple preflight BEFORE dependency install (Plan 02 §4). It
+      # also establishes the run-owned evidence/tarball directories under
+      # $RUNNER_TEMP (never under the workspace) and records a bounded JSON of
+      # authoritative host facts. The sealed evidence's own host block + the
+      # independent verifier re-establish these facts; the preflight is a cheap
+      # early guard, not the proof.
+      - name: Host tuple preflight (fail-closed)
+        id: preflight
+        run: |
+          set -uo pipefail
+          evidence_dir="$RUNNER_TEMP/qualification-evidence"
+          tarball_dir="$RUNNER_TEMP/qualification-tarballs"
+          mkdir -p "$evidence_dir" "$tarball_dir"
+          echo "EVIDENCE_DIR=$evidence_dir" >> "$GITHUB_ENV"
+          echo "TARBALL_DIR=$tarball_dir" >> "$GITHUB_ENV"
+          preflight_json="$evidence_dir/host-preflight.json"
+
+          os_ver="$(/usr/bin/sw_vers -productVersion 2>/dev/null || echo unknown)"
+          kernel="$(/usr/bin/uname -r 2>/dev/null || echo unknown)"
+          uname_arch="$(/usr/bin/uname -m 2>/dev/null || echo unknown)"
+          node_platform="$(node -p 'process.platform')"
+          node_arch="$(node -p 'process.arch')"
+          node_ver="$(node -p 'process.versions.node')"
+          node_abi="$(node -p 'process.versions.modules')"
+          npm_ver="$(npm -v 2>/dev/null || echo unknown)"
+          run_dev="$(df "$RUNNER_TEMP" | tail -1 | awk '{print $1}')"
+          fs_type="$(mount | awk -v d="$run_dev" '$1==d{print}' | grep -oE 'apfs|hfs|msdos|exfat|smbfs|nfs' | head -1)"
+          [ -n "$fs_type" ] || fs_type=unknown
+
+          fail=0
+          note() { echo "::error title=host-preflight::$1"; fail=1; }
+          case "$os_ver" in 26.*|26) ;; *) note "macOS productVersion $os_ver != 26.x" ;; esac
+          case "$kernel" in 25.*|25) ;; *) note "Darwin kernel $kernel != 25.x" ;; esac
+          [ "$uname_arch" = arm64 ] || note "uname -m $uname_arch != arm64"
+          [ "$node_platform" = darwin ] || note "process.platform $node_platform != darwin"
+          [ "$node_arch" = arm64 ] || note "process.arch $node_arch != arm64"
+          case "$node_ver" in 24.*) ;; *) note "Node $node_ver != 24.x" ;; esac
+          [ "$node_abi" = 137 ] || note "Node module ABI $node_abi != 137"
+          case "$npm_ver" in 11.*) ;; *) note "npm $npm_ver != 11.x" ;; esac
+          [ "$fs_type" = apfs ] || note "run-root filesystem $fs_type != apfs"
+
+          HOST_OS="$os_ver" HOST_KERNEL="$kernel" HOST_ARCH="$uname_arch" \
+          HOST_PLATFORM="$node_platform" HOST_NODE_ARCH="$node_arch" \
+          HOST_NODE="$node_ver" HOST_ABI="$node_abi" HOST_NPM="$npm_ver" HOST_FS="$fs_type" \
+          node -e 'const e=process.env;require("fs").writeFileSync(process.argv[1],JSON.stringify({schema:"macos-tuple-preflight.v1",runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,event:process.env.GITHUB_EVENT_NAME,runnerLabel:"macos-26",productVersion:e.HOST_OS,kernel:e.HOST_KERNEL,unameArch:e.HOST_ARCH,platform:e.HOST_PLATFORM,nodeArch:e.HOST_NODE_ARCH,nodeVersion:e.HOST_NODE,nodeModuleAbi:e.HOST_ABI,npmVersion:e.HOST_NPM,fsType:e.HOST_FS},null,2)+"\n")' "$preflight_json"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "host_ok=false" >> "$GITHUB_OUTPUT"
+            echo "::error::host tuple preflight failed — this runner does not match the supported tuple"
+            exit 1
+          fi
+          echo "host_ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Clean two-pass build so the packed bytes reflect current source, then the
+      # focused pre-pack correctness set (Plan 02 Phase 2 step 5). This lane does
+      # NOT replace Ubuntu CI's full lint/coverage/dogfood suite; it verifies just
+      # enough to trust the bytes it is about to pack.
+      - name: Clean dist
+        run: pnpm -r run clean
+
+      - name: Build (two-pass, re-sync injected workspace copies)
+        run: node scripts/build-ci.mjs
+
+      - name: Verify published artifact boundary
+        run: pnpm verify:published-artifacts
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test repo scripts (node:test)
+        run: pnpm test:scripts
+
+      # Pack every publishable package in dependency order (source of truth:
+      # release-package-order.mjs --print pack), then generate + verify the
+      # release manifest/checksums/SBOM over the COMPLETE packed set.
+      - name: Pack all workspace packages (resolves workspace:*)
+        run: |
+          set -eu
+          rm -rf "$TARBALL_DIR"
+          mkdir -p "$TARBALL_DIR"
+          while IFS= read -r filter; do
+            pnpm --filter "$filter" pack --pack-destination "$TARBALL_DIR"
+          done < <(node scripts/release-package-order.mjs --print pack)
+          ls -la "$TARBALL_DIR"
+
+      - name: Generate release verification artifacts
+        run: |
+          set -eu
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
+          node scripts/build-release-artifacts.mjs \
+            --dir "$TARBALL_DIR" \
+            --expected-version "v${VERSION}" \
+            --git-tag "v${VERSION}" \
+            --git-sha "$GITHUB_SHA"
+
+      - name: Verify release verification artifacts
+        run: |
+          set -eu
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
+          node scripts/verify-release-artifacts.mjs \
+            --dir "$TARBALL_DIR" \
+            --manifest "$TARBALL_DIR/opensip-cli-release-manifest.v1.json" \
+            --expected-version "v${VERSION}"
+
+      # Run the full macOS profile against the complete packed set. The runner's
+      # console exit is captured but NOT trusted — the independent verifier below
+      # is the authority. `set +e` so evidence still uploads on a journey failure.
+      - name: Run macOS platform acceptance (packed release)
+        id: acceptance
+        run: |
+          set -u
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          set +e
+          pnpm platform:acceptance -- \
+            --profile "$MACOS_PROFILE" \
+            --packed-release "$TARBALL_DIR" \
+            --expected-version "$VERSION" \
+            --out "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json"
+          rc=$?
+          set -e
+          echo "run_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "acceptance runner exit: $rc"
+
+      # Independent verifier as a SEPARATE process, with the exact expected host
+      # constraints, candidate version, and support-row binding. `set +e` so a
+      # verification failure still records + uploads evidence.
+      - name: Verify acceptance evidence (independent)
+        id: verify
+        if: always() && steps.preflight.outputs.host_ok == 'true'
+        env:
+          VERSION: ${{ steps.acceptance.outputs.version }}
+        run: |
+          set -u
+          set +e
+          node scripts/verify-platform-acceptance.mjs \
+            --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
+            --profile "$MACOS_PROFILE" \
+            --expected-version "$VERSION" \
+            --expect-platform darwin \
+            --expect-arch arm64 \
+            --expect-node-abi 137 \
+            --expect-fs-type apfs \
+            --expected-node-major 24 \
+            --expected-npm-major 11 \
+            --expected-support-row "$SUPPORT_ROW" \
+            --expected-support-contract-version "$SUPPORT_CONTRACT_VERSION" \
+            --json > "$EVIDENCE_DIR/verifier-result.json"
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/verifier-result.json" || true
+          echo "verify_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "verifier exit: $rc"
+
+      # Classify the run from stable evidence/verifier reason codes and write a
+      # bounded job summary. Runs even on failure so every run is classified.
+      - name: Classify and summarize
+        id: classify
+        if: always()
+        env:
+          HOST_OK: ${{ steps.preflight.outputs.host_ok }}
+          RUN_RC: ${{ steps.acceptance.outputs.run_rc }}
+          VERIFY_RC: ${{ steps.verify.outputs.verify_rc }}
+          CANDIDATE_VERSION: ${{ steps.acceptance.outputs.version }}
+        run: |
+          set -u
+          short_sha="${GITHUB_SHA:0:7}"
+          artifact="macos-qualification-c${SUPPORT_CONTRACT_VERSION}-v${CANDIDATE_VERSION:-unknown}-${short_sha}-macos26-arm64-node24-npm11-run${GITHUB_RUN_ATTEMPT}"
+          echo "artifact-name=$artifact" >> "$GITHUB_OUTPUT"
+
+          if [ "${HOST_OK:-false}" != "true" ]; then
+            classification=host-mismatch
+          elif [ "${RUN_RC:-3}" = "3" ]; then
+            classification=infrastructure-fault
+          elif [ "${RUN_RC:-3}" = "2" ]; then
+            classification=candidate-fault
+          elif [ "${RUN_RC:-3}" = "1" ]; then
+            classification=journey-fail
+          elif [ "${RUN_RC:-3}" = "0" ]; then
+            case "${VERIFY_RC:-2}" in
+              0) classification=pass ;;
+              1) classification=verification-fail ;;
+              *) classification=infrastructure-fault ;;
+            esac
+          else
+            classification=infrastructure-fault
+          fi
+          echo "classification=$classification" >> "$GITHUB_OUTPUT"
+
+          digest="$(node -e 'try{const e=require(process.argv[1]);process.stdout.write(String(e.completion?.evidenceDigest||"none").slice(0,16))}catch{process.stdout.write("none")}' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" 2>/dev/null || echo none)"
+          counts="$(node -e 'try{const r=require(process.argv[1]);const s=r.summary||{};process.stdout.write(String(s.requiredPassed??"?")+" "+String(s.requiredTotal??"?"))}catch{process.stdout.write("? ?")}' "$EVIDENCE_DIR/verifier-result.json" 2>/dev/null || echo "? ?")"
+          req_passed="${counts%% *}"
+          req_total="${counts##* }"
+
+          {
+            echo "## macOS qualification — $classification"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| classification | $classification |"
+            echo "| tuple | macOS 26 · arm64 · Node 24 (ABI 137) · npm 11 · APFS |"
+            echo "| candidate version | ${CANDIDATE_VERSION:-unknown} |"
+            echo "| git SHA | $short_sha |"
+            echo "| support row | $SUPPORT_ROW (contract v$SUPPORT_CONTRACT_VERSION) |"
+            echo "| required journeys | ${req_passed}/${req_total} |"
+            echo "| evidence digest | ${digest} |"
+            echo "| evidence artifact | $artifact |"
+            echo "| run attempt | $GITHUB_RUN_ATTEMPT |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Upload bounded, hygiene-safe evidence on EVERY outcome. Deterministic
+      # name (contract/version/short-SHA/tuple/run-attempt — never mutable
+      # `latest`). If no sealed evidence exists (e.g. host-mismatch), only the
+      # bounded preflight/verifier diagnostics upload. NEVER uploads temp homes,
+      # npm config/cache, raw SQLite, or unbounded logs — only the sealed
+      # evidence + preflight + verifier-result JSON from the run-owned dir.
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: ${{ steps.classify.outputs.artifact-name || format('macos-qualification-run{0}', github.run_attempt) }}
+          path: |
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v1.json
+            ${{ env.EVIDENCE_DIR }}/host-preflight.json
+            ${{ env.EVIDENCE_DIR }}/verifier-result.json
+          if-no-files-found: warn
+          # 90 days for manual burn-in capture; 30 for scheduled/PR.
+          retention-days: ${{ github.event_name == 'workflow_dispatch' && 90 || 30 }}
+
+      # Enforce the gate LAST so evidence always uploads first. A non-pass
+      # classification (host-mismatch, journey-fail, verification-fail,
+      # candidate-fault, or infrastructure-fault) fails the workflow. A required
+      # skip/unavailable surfaces as run_rc=1 (journey-fail) and fails here.
+      - name: Enforce qualification result
+        if: always()
+        env:
+          CLASSIFICATION: ${{ steps.classify.outputs.classification }}
+        run: |
+          set -eu
+          classification="${CLASSIFICATION:-infrastructure-fault}"
+          echo "classification: $classification"
+          if [ "$classification" != "pass" ]; then
+            echo "::error::macOS qualification did not pass (classification: $classification)"
+            exit 1
+          fi

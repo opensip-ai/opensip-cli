@@ -7,6 +7,7 @@ import {
   publicPrimaryCommand,
 } from '../agent-catalog-entries.js';
 import { buildAgentCatalog } from '../agent-catalog.js';
+import { hostSupportFromRuntimeProjection } from '../host-support.js';
 
 const noopHandler = (): Promise<{ type: 'text-lines'; lines: string[] }> =>
   Promise.resolve({ type: 'text-lines', lines: [] });
@@ -300,6 +301,121 @@ describe('buildAgentCatalog', () => {
       rootCommands: ['audit', 'suite'],
       suiteNames: ['agent-context'],
     });
+  });
+
+  it('omits hostSupport when the composition root does not inject it (absent-field)', () => {
+    expect(buildAgentCatalog().hostSupport).toBeUndefined();
+    expect(buildAgentCatalog({}).hostSupport).toBeUndefined();
+  });
+
+  it('includes the injected hostSupport projection additively', () => {
+    const hostSupport = hostSupportFromRuntimeProjection(
+      {
+        status: 'preview',
+        match: 'partial',
+        rowId: 'macos-26-arm64-node24-npm11-v1',
+        rowStatus: 'preview',
+        profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+        docsUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+        reasonCodes: [],
+        observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+        unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+      },
+      1,
+    );
+    const catalog = buildAgentCatalog({ hostSupport });
+    expect(catalog.hostSupport).toEqual(hostSupport);
+  });
+});
+
+describe('hostSupportFromRuntimeProjection', () => {
+  const previewProjection = {
+    status: 'preview',
+    match: 'partial',
+    rowId: 'macos-26-arm64-node24-npm11-v1',
+    rowStatus: 'preview',
+    profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+    docsUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+    reasonCodes: [],
+    observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+    unobserved: ['os-version', 'kernel-version', 'npm-major', 'filesystem-type', 'install-channel'],
+  } as const;
+
+  it('mirrors the core projection into the serializable shape (matrixUrl from docsUrl)', () => {
+    const mapped = hostSupportFromRuntimeProjection(previewProjection, 1);
+    expect(mapped).toEqual({
+      supportContractVersion: 1,
+      status: 'preview',
+      match: 'partial',
+      rowId: 'macos-26-arm64-node24-npm11-v1',
+      rowStatus: 'preview',
+      profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+      matrixUrl: previewProjection.docsUrl,
+      reasonCodes: [],
+      observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+      unobserved: [
+        'os-version',
+        'kernel-version',
+        'npm-major',
+        'filesystem-type',
+        'install-channel',
+      ],
+    });
+  });
+
+  it('is deterministic: identical inputs serialize byte-identically (CLI/MCP parity)', () => {
+    const a = hostSupportFromRuntimeProjection(previewProjection, 1);
+    const b = hostSupportFromRuntimeProjection(previewProjection, 1);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+
+  it('never yields an exact match and preserves null profile/matrix for unqualified hosts', () => {
+    const mapped = hostSupportFromRuntimeProjection(
+      {
+        status: 'unqualified',
+        match: 'none',
+        rowId: null,
+        rowStatus: null,
+        profile: null,
+        docsUrl: null,
+        reasonCodes: ['non-macos-host'],
+        observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+        unobserved: [],
+      },
+      1,
+    );
+    expect(mapped.match).not.toBe('exact');
+    expect(mapped.match).toBe('none');
+    expect(mapped.profile).toBeNull();
+    expect(mapped.matrixUrl).toBeNull();
+    expect(mapped.reasonCodes).toEqual(['non-macos-host']);
+  });
+
+  it('preserves the stable reason-code, observed, and unobserved ordering (copies, not aliases)', () => {
+    const reasonCodes = ['os-version-mismatch', 'node-abi-mismatch', 'npm-major-mismatch'];
+    const observed = ['os-platform', 'arch'];
+    const unobserved = ['npm-major', 'filesystem-type', 'install-channel'];
+    const mapped = hostSupportFromRuntimeProjection(
+      {
+        status: 'unqualified',
+        match: 'none',
+        rowId: null,
+        rowStatus: null,
+        profile: null,
+        docsUrl: null,
+        reasonCodes,
+        observed,
+        unobserved,
+      },
+      1,
+    );
+    // Order is carried through verbatim — agents rely on a stable reason order.
+    expect(mapped.reasonCodes).toEqual(reasonCodes);
+    expect(mapped.observed).toEqual(observed);
+    expect(mapped.unobserved).toEqual(unobserved);
+    // The mapper copies the arrays — mutating the source never mutates the output.
+    reasonCodes.push('mutated');
+    expect(mapped.reasonCodes).not.toContain('mutated');
   });
 });
 

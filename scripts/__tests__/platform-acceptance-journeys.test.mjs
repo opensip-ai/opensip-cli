@@ -34,6 +34,7 @@ const KNOWN_CATEGORIES = new Set([
   'agent',
   'extensions',
   'resilience',
+  'macos',
 ]);
 
 const roots = [];

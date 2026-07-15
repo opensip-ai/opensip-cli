@@ -12,6 +12,7 @@
 //   5. npm publish uses OIDC/provenance and not long-lived publish tokens.
 //   6. Dependency update automation stays bounded.
 //   7. The release workflow emits checksums/SBOM and pinned artifact attestations.
+//   8. The scheduled macOS qualification lane is pinned + least-privilege.
 
 import { promises as fs } from 'node:fs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -245,6 +246,59 @@ function checkDependencyAutomation() {
   }
 }
 
+/** Drop whole-line YAML comments so prose can't satisfy/violate a policy regex. */
+function stripComments(text) {
+  return text
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+}
+
+/**
+ * Slice a workflow into a `Map<jobId, segment>` by its top-level (2-space
+ * indented) job headers. String/regex based — no YAML dependency — so it runs on
+ * a bare checkout. Comment lines never match (`#` is not an identifier char).
+ */
+function sliceJobs(content) {
+  const headerRe = /^ {2}([A-Za-z0-9_-]+):[ \t]*$/gm;
+  const headers = [];
+  for (let match = headerRe.exec(content); match !== null; match = headerRe.exec(content)) {
+    headers.push({ name: match[1], start: match.index });
+  }
+  const jobs = new Map();
+  for (const [i, header] of headers.entries()) {
+    const end = i + 1 < headers.length ? headers[i + 1].start : content.length;
+    jobs.set(header.name, content.slice(header.start, end));
+  }
+  return jobs;
+}
+
+/** Ordered-step markers must appear in this order inside one job segment. */
+function collectOrderProblems(segment, jobName, orderedSteps) {
+  const problems = [];
+  let previousIndex = -1;
+  let previousMarker = '';
+  for (const marker of orderedSteps) {
+    const index = segment.indexOf(marker);
+    if (index === -1) {
+      problems.push(`${marker} is missing from ${jobName}`);
+    } else if (index < previousIndex) {
+      problems.push(`${marker} must run after ${previousMarker} in ${jobName}`);
+    } else {
+      previousIndex = index;
+      previousMarker = marker;
+    }
+  }
+  return problems;
+}
+
+/**
+ * Assert the three-job release topology (Plan 02 Phase 3): `stage-release` owns
+ * pack/attest/smoke/staging-publish and the attestation permissions; the pinned
+ * `qualify-macos` gate holds only `contents: read` with NO publish/promotion
+ * credential; `promote-release` is the ONLY job with the promotion secret +
+ * release write, needs both prior jobs, and holds no publish OIDC/attestation.
+ */
 function checkReleaseArtifactAttestations(workflows) {
   const workflow = workflows.find((entry) => entry.relPath === '.github/workflows/release.yml');
   if (workflow === undefined) {
@@ -253,32 +307,19 @@ function checkReleaseArtifactAttestations(workflows) {
   }
 
   const problems = [];
-  const content = workflow.content;
-  const orderedSteps = [
-    'scripts/build-release-artifacts.mjs',
-    'scripts/verify-release-artifacts.mjs',
-    'scripts/smoke-pack.mjs',
-    'Publish via npm',
-  ];
+  const content = stripComments(workflow.content);
+  const jobs = sliceJobs(workflow.content);
+  const stage = jobs.has('stage-release') ? stripComments(jobs.get('stage-release')) : undefined;
+  const macos = jobs.has('qualify-macos') ? stripComments(jobs.get('qualify-macos')) : undefined;
+  const promote = jobs.has('promote-release')
+    ? stripComments(jobs.get('promote-release'))
+    : undefined;
 
-  if (!/attestations:\s*write/u.test(content)) {
-    problems.push('permissions.attestations: write is missing');
-  }
-  if (!/artifact-metadata:\s*write/u.test(content)) {
-    problems.push('permissions.artifact-metadata: write is missing');
-  }
-  if (!/uses:\s*actions\/attest@[a-f0-9]{40}\b/u.test(content)) {
-    problems.push('actions/attest must be pinned to a full commit SHA');
-  }
-  if (!/subject-checksums:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(content)) {
-    problems.push('artifact attestation must use the generated SHA256SUMS subject list');
-  }
-  if (!/subject-path:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(content)) {
-    problems.push('SHA256SUMS must have its own artifact attestation');
-  }
-  if (!/sbom-path:\s*\/tmp\/tarballs\/opensip-cli-sbom\.cyclonedx\.json/u.test(content)) {
-    problems.push('SBOM attestation must use opensip-cli-sbom.cyclonedx.json');
-  }
+  if (stage === undefined) problems.push('stage-release job is missing');
+  if (macos === undefined) problems.push('qualify-macos job is missing');
+  if (promote === undefined) problems.push('promote-release job is missing');
+
+  // The release-metadata artifact names must be wired into the workflow.
   for (const required of [
     'opensip-cli-release-manifest.v1.json',
     'SHA256SUMS',
@@ -289,24 +330,135 @@ function checkReleaseArtifactAttestations(workflows) {
     }
   }
 
-  let previousIndex = -1;
-  let previousMarker = '';
-  for (const marker of orderedSteps) {
-    const index = content.indexOf(marker);
-    if (index === -1) {
-      problems.push(`${marker} is missing from the release workflow`);
-    } else if (index < previousIndex) {
-      problems.push(`${marker} must run after ${previousMarker}`);
-    } else {
-      previousIndex = index;
-      previousMarker = marker;
+  // stage-release: ordered pack/artifact/attest/smoke/staging-publish + perms.
+  if (stage !== undefined) {
+    problems.push(
+      ...collectOrderProblems(stage, 'stage-release', [
+        'scripts/build-release-artifacts.mjs',
+        'scripts/verify-release-artifacts.mjs',
+        'scripts/smoke-pack.mjs',
+        'Publish via npm',
+      ]),
+    );
+    if (!/attestations:\s*write/u.test(stage))
+      problems.push('stage-release permissions.attestations: write is missing');
+    if (!/artifact-metadata:\s*write/u.test(stage))
+      problems.push('stage-release permissions.artifact-metadata: write is missing');
+    if (!/id-token:\s*write/u.test(stage))
+      problems.push('stage-release permissions.id-token: write is missing (OIDC publish)');
+    if (!/uses:\s*actions\/attest@[a-f0-9]{40}\b/u.test(stage))
+      problems.push('actions/attest must be pinned to a full commit SHA in stage-release');
+    if (!/subject-checksums:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(stage))
+      problems.push('artifact attestation must use the generated SHA256SUMS subject list');
+    if (!/subject-path:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(stage))
+      problems.push('SHA256SUMS must have its own artifact attestation');
+    if (!/sbom-path:\s*\/tmp\/tarballs\/opensip-cli-sbom\.cyclonedx\.json/u.test(stage))
+      problems.push('SBOM attestation must use opensip-cli-sbom.cyclonedx.json');
+    if (/secrets\.MACBOOKM5/u.test(stage))
+      problems.push('stage-release must NOT reference the promotion secret MACBOOKM5');
+    if (/npm\s+dist-tag\s+add/u.test(stage))
+      problems.push(
+        'stage-release must NOT promote to latest (npm dist-tag add belongs in promote-release)',
+      );
+  }
+
+  // qualify-macos: least-privilege pinned gate, no publish/promotion credential.
+  if (macos !== undefined) {
+    if (!/runs-on:\s*macos-26\b/u.test(macos))
+      problems.push('qualify-macos must run on the pinned macos-26 runner');
+    if (!/contents:\s*read/u.test(macos))
+      problems.push('qualify-macos must use least-privilege contents: read');
+    if (/\bnpm\s+publish\b/u.test(macos)) problems.push('qualify-macos must NOT publish to npm');
+    if (/secrets\.MACBOOKM5/u.test(macos))
+      problems.push('qualify-macos must NOT hold the promotion secret MACBOOKM5');
+    if (/id-token:\s*write/u.test(macos))
+      problems.push('qualify-macos must NOT hold publish OIDC (id-token: write)');
+    if (!/needs:\s*stage-release\b/u.test(macos))
+      problems.push('qualify-macos must depend on stage-release');
+  }
+
+  // promote-release: the ONLY job with the promotion secret + release write.
+  if (promote !== undefined) {
+    if (
+      !/needs:\s*\[[^\]]*\bstage-release\b[^\]]*\]/u.test(promote) ||
+      !/needs:\s*\[[^\]]*\bqualify-macos\b[^\]]*\]/u.test(promote)
+    ) {
+      problems.push('promote-release must declare needs: [stage-release, qualify-macos]');
     }
+    if (!/contents:\s*write/u.test(promote))
+      problems.push('promote-release needs contents: write for the GitHub Release');
+    if (!/secrets\.MACBOOKM5/u.test(promote))
+      problems.push('promote-release must hold the promotion secret MACBOOKM5');
+    if (/id-token:\s*write/u.test(promote))
+      problems.push('promote-release must NOT hold publish OIDC (id-token: write)');
+    if (/attestations:\s*write/u.test(promote))
+      problems.push('promote-release must NOT hold attestation permission');
+    if (!/npm\s+dist-tag\s+add/u.test(promote))
+      problems.push('promote-release must promote to latest via npm dist-tag add');
+    if (!/softprops\/action-gh-release@[a-f0-9]{40}\b/u.test(promote))
+      problems.push(
+        'promote-release must create the GitHub Release via a pinned action-gh-release SHA',
+      );
   }
 
   if (problems.length === 0) {
-    pass(7, 'release workflow emits checksums/SBOM and pinned artifact attestations.');
+    pass(
+      7,
+      'release workflow enforces the staged→macOS-gate→promote topology with pinned attestations.',
+    );
   } else {
     fail(7, `release artifact attestation problems:\n    ${problems.join('\n    ')}`);
+  }
+}
+
+/**
+ * The scheduled macOS qualification lane (Plan 02) must PARTICIPATE in the same
+ * action-pin + least-privilege policy as the release workflow: every `uses:`
+ * pinned to a full commit SHA, the exact `macos-26` runner (never a floating
+ * label), `contents: read` only, and no publish/promotion/OIDC credential. It
+ * already participates in the frozen-install policy via checkFrozenInstalls
+ * (which scans every workflow); this makes its pinning + privilege explicit so a
+ * new native lane can never regress into a mutable, over-privileged runner.
+ */
+function checkMacosQualificationLane(workflows) {
+  const workflow = workflows.find(
+    (entry) => entry.relPath === '.github/workflows/macos-qualification.yml',
+  );
+  if (workflow === undefined) {
+    fail(8, '.github/workflows/macos-qualification.yml is missing.');
+    return;
+  }
+  const content = stripComments(workflow.content);
+  const problems = [];
+
+  const refs = [...content.matchAll(/uses:\s*[^@\s]+@([^\s#]+)/g)].map((m) => m[1]);
+  if (refs.length === 0) problems.push('no pinned actions found');
+  for (const ref of refs) {
+    if (!/^[a-f0-9]{40}$/.test(ref))
+      problems.push(`action ref "${ref}" must be a full 40-char commit SHA, not a tag`);
+  }
+  if (!/runs-on:\s*macos-26\b/u.test(content))
+    problems.push('the lane must pin the macos-26 runner');
+  if (/macos-latest/u.test(content))
+    problems.push('macos-latest is forbidden — it can silently drift the image');
+  if (!/permissions:\s*\n\s*contents:\s*read/u.test(content))
+    problems.push('the lane must be least-privilege (contents: read only)');
+  if (/id-token:\s*write/u.test(content))
+    problems.push('the qualification lane must NOT hold publish OIDC (id-token: write)');
+  if (/\bnpm\s+publish\b/u.test(content))
+    problems.push('the qualification lane must NOT publish to npm');
+  if (/npm\s+dist-tag\s+add/u.test(content))
+    problems.push('the qualification lane must NOT promote to latest');
+  if (/secrets\.MACBOOKM5/u.test(content))
+    problems.push('the qualification lane must NOT hold the promotion secret MACBOOKM5');
+
+  if (problems.length === 0) {
+    pass(
+      8,
+      'macOS qualification lane is pinned, least-privilege, and holds no publish/promotion credential.',
+    );
+  } else {
+    fail(8, `macOS qualification lane policy problems:\n    ${problems.join('\n    ')}`);
   }
 }
 
@@ -318,6 +470,7 @@ checkFrozenInstalls(workflows);
 checkTrustedPublish(workflows);
 checkDependencyAutomation();
 checkReleaseArtifactAttestations(workflows);
+checkMacosQualificationLane(workflows);
 
 for (const p of passes) console.log(`✓ [${p.id}] ${p.msg}`);
 if (failures.length > 0) {

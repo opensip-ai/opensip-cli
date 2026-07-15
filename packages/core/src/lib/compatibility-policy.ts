@@ -1,6 +1,7 @@
 import { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from '../tools/manifest.js';
 
 import { CLI_SUPPORTED_SCHEMA_VERSION } from './config-version.js';
+import { PLATFORM_SUPPORT_CONTRACT_VERSION } from './platform-support.js';
 
 export type CompatibilityContractClass =
   | 'cli-command-surface'
@@ -9,7 +10,8 @@ export type CompatibilityContractClass =
   | 'tool-plugin-api'
   | 'cloud-wire'
   | 'release-artifact'
-  | 'datastore-payload';
+  | 'datastore-payload'
+  | 'platform-support';
 
 export type CompatibilityStability = 'stable' | 'epoch' | 'schema-versioned' | 'policy-only';
 
@@ -37,6 +39,7 @@ export const COMPATIBILITY_CONTRACT_CLASSES: readonly CompatibilityContractClass
   'cloud-wire',
   'release-artifact',
   'datastore-payload',
+  'platform-support',
 ];
 
 export const COMPATIBILITY_POLICIES: readonly CompatibilityContractPolicy[] = [
@@ -132,6 +135,20 @@ export const COMPATIBILITY_POLICIES: readonly CompatibilityContractPolicy[] = [
       'session/persistence docs update',
     ],
     docsPath: 'docs/public/80-implementation/03-session-and-persistence.md',
+  },
+  {
+    class: 'platform-support',
+    version: PLATFORM_SUPPORT_CONTRACT_VERSION,
+    ownerPackage: '@opensip-cli/root',
+    stability: 'policy-only',
+    deprecationWindow:
+      'support rows are additive; changing a supported tuple restarts burn-in before re-promotion',
+    breakingChangeRequires: [
+      'PLATFORM_SUPPORT_CONTRACT_VERSION bump',
+      'qualification evidence and acceptance-profile review',
+      'supported-platforms docs update',
+    ],
+    docsPath: 'docs/public/70-reference/17-supported-platforms.md',
   },
 ];
 

@@ -151,6 +151,31 @@ Use the **baseline gate flow.** Run `opensip fit --gate-save` once to capture ev
 
 ---
 
+### What operating systems / hosts are qualified?
+
+**Language support and host support are different questions.** The package
+`engines.node: ">=24"` range is an install floor — it does not encode OS,
+architecture, Node ABI, npm major, filesystem, or case behavior, and it is not a
+support claim. Qualified *host* support names an exact tuple across those
+dimensions with measured evidence, and every host resolves to one of four
+statuses: `supported` (measured, past burn-in, every release evidence-gated),
+`preview` (published with evidence but documented gaps), `unqualified` (not
+measured — may work, no promise), or `unsupported` (intentionally excluded, like
+Intel/x64 macOS). The exact qualified tuple, the current status of each host,
+and the reporting instructions live in the generated, authoritative
+[supported-platforms matrix](/docs/opensip-cli/70-reference/17-supported-platforms/) — this
+page deliberately does not restate the mutable status so the two can't drift.
+
+Agents can read the same registry: `opensip agent-catalog --json` (and the MCP
+`get_agent_catalog` tool) include a `hostSupport` block. It is built only from
+process-observable facts, so its local `match` is never `exact` — `partial` on a
+clean match, `none` on a contradiction — and agents should read the registry
+row's `status` separately from that local `match`. To request a host, open a
+GitHub issue with your `hostSupport` block plus `node`/`npm`/`sw_vers`/`uname`
+output as described in the matrix.
+
+---
+
 ### Can I run only one check?
 
 **Yes.** `opensip fit --check <slug>` runs exactly one check. Useful for debugging a single rule or for pre-commit hooks that want one fast check.

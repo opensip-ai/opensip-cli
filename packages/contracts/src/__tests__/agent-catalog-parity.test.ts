@@ -6,6 +6,7 @@ import {
   buildAgentCatalog,
   type AgentCatalog,
 } from '../agent-catalog.js';
+import { hostSupportFromRuntimeProjection, type AgentHostSupport } from '../host-support.js';
 
 const noopHandler = (): { type: 'text-lines'; lines: string[] } => ({
   type: 'text-lines',
@@ -101,5 +102,44 @@ describe('agent-catalog parity contract', () => {
 
     expect(catalog.entryPoints.filter((entry) => entry.command === 'audit')).toHaveLength(1);
     expect(collectExamples(catalog)).toContain('opensip audit --json');
+  });
+});
+
+describe('agent-catalog host-support parity handoff (Plan 02 → Plan 03)', () => {
+  const projection = {
+    status: 'preview',
+    match: 'partial',
+    rowId: 'macos-26-arm64-node24-npm11-v1',
+    rowStatus: 'preview',
+    profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+    docsUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+    reasonCodes: [],
+    observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+    unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+  } as const;
+
+  it('two builds with identical facts + hostSupport are byte-identical full catalogs', () => {
+    const tools = new ToolRegistry();
+    tools.register(fixtureTool('graph'));
+    const hostSupport = hostSupportFromRuntimeProjection(projection, 1);
+    const a = buildAgentCatalog({ tools, hostSupport });
+    const b = buildAgentCatalog({ tools, hostSupport });
+    // Full-object determinism — the CLI/MCP composition roots feed identical
+    // inputs into this one builder, so their catalogs cannot diverge.
+    expect(a).toEqual(b);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.hostSupport).toEqual(hostSupport);
+  });
+
+  it('omits hostSupport when absent so the field is purely additive', () => {
+    expect(buildAgentCatalog().hostSupport).toBeUndefined();
+    // A future common parity assembler can accept the exact same optional input
+    // without an adapter or field rename: `AgentCatalog.hostSupport` IS
+    // `AgentHostSupport | undefined`, and the mapper output is assignable to it.
+    const assemblerInput: { readonly hostSupport?: AgentHostSupport } = {
+      hostSupport: hostSupportFromRuntimeProjection(projection, 1),
+    };
+    const catalog: AgentCatalog = buildAgentCatalog(assemblerInput);
+    expect(catalog.hostSupport).toEqual(assemblerInput.hostSupport);
   });
 });

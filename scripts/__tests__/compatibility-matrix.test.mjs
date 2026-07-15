@@ -95,6 +95,36 @@ test('runCompatibilityMatrix fails when a fixture drifts from the contract versi
   await rm(repoRoot, { recursive: true, force: true });
 });
 
+test('runCompatibilityMatrix fails when the platform-support constant drifts from its policy row', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'opensip-compat-matrix-'));
+  const files = fixtureFiles(repoRoot, { signalEnvelopeVersion: 2 });
+  const runtime = fakeRuntime();
+  // The code constant advances but the compatibility policy row does not: a
+  // silent platform-support drift that the policy.constants.current check must
+  // catch (mirrors the other contract-class drift guards).
+  runtime.core.PLATFORM_SUPPORT_CONTRACT_VERSION = 99;
+  let reportText = '';
+  const result = await runCompatibilityMatrix(['--out', 'report.json'], {
+    repoRoot,
+    runtime,
+    loadMatrixConfig: async () => matrixConfig(),
+    readFile: async (path) => files.get(String(path)) ?? '',
+    writeFile: async (_path, content) => {
+      reportText = content;
+    },
+    consoleLog: () => null,
+  });
+
+  assert.equal(result.exitCode, 1);
+  const report = JSON.parse(reportText);
+  assert.equal(report.verdict, 'fail');
+  assert.match(
+    report.checks.find((check) => check.id === 'policy.constants.current').details.message,
+    /platform-support policy version drifted from code constant/,
+  );
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
 function matrixConfig() {
   return {
     version: 1,
@@ -106,6 +136,7 @@ function matrixConfig() {
       { class: 'cloud-wire' },
       { class: 'release-artifact' },
       { class: 'datastore-payload' },
+      { class: 'platform-support' },
     ],
     fixtures: [
       {
@@ -143,6 +174,7 @@ function fakeRuntime() {
       ['cloud-wire', 1],
       ['release-artifact', 1],
       ['datastore-payload', 1],
+      ['platform-support', 1],
     ].map(([className, version]) => [className, { class: className, version }]),
   );
   return {
@@ -154,6 +186,7 @@ function fakeRuntime() {
       CLOUD_WIRE_CONTRACT_VERSION: 1,
       RELEASE_ARTIFACT_CONTRACT_VERSION: 1,
       DATASTORE_PAYLOAD_CONTRACT_VERSION: 1,
+      PLATFORM_SUPPORT_CONTRACT_VERSION: 1,
       SIGNAL_BATCH_SCHEMA_VERSION: 1,
       COMPATIBILITY_CONTRACT_CLASSES: [...policies.keys()],
       assertCompatibilityPoliciesComplete: () => policies.size,
