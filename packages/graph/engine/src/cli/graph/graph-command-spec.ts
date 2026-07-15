@@ -279,7 +279,11 @@ async function runGraphCommand(
   // show the staged "Code Graph" checklist in a terminal; both fall through to
   // the static path when piped. The live view is therefore eligible for any
   // rendering run — there is no `--exact` gate. Every non-rendering mode (json/
-  // gate/report/open/profile/workspace/positional-paths/language) is excluded.
+  // gate/report/open/profile/workspace/positional-paths/language/sarif) is
+  // excluded. `--sarif` MUST exclude live eligibility: the live-view dispatch
+  // returns before the static `executeGraph` path that performs the SARIF write,
+  // so a standalone `graph --sarif <path>` on a TTY would otherwise render the
+  // live view and silently produce no SARIF file.
   const isLiveViewEligible =
     opts.json !== true &&
     opts.gateSave !== true &&
@@ -290,6 +294,7 @@ async function runGraphCommand(
     (typeof opts.profile !== 'string' || opts.profile.length === 0) &&
     opts.workspace !== true &&
     paths.length === 0 &&
+    (typeof opts.sarif !== 'string' || opts.sarif.length === 0) &&
     /* v8 ignore next */
     typeof opts.language !== 'string';
 

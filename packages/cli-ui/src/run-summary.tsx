@@ -91,7 +91,10 @@ export function RunSummary(props: RunSummaryProps): React.ReactElement {
   // ADR-0144 live vs final: the final summary must use the same host-stamped
   // duration that is persisted as StoredSession.durationMs — never a second
   // wall-clock sample after tool return. Live spinners may still tick separately.
-  const resolvedDuration = props.durationMs ?? useRunDuration();
+  // Call the hook unconditionally (Rules of Hooks) — reading the timing
+  // context is side-effect-free and the explicit prop still wins when present.
+  const fallbackDuration = useRunDuration();
+  const resolvedDuration = props.durationMs ?? fallbackDuration;
   const viewProps: RunSummaryProps = { ...props, durationMs: resolvedDuration };
   return (
     <Box paddingTop={1} paddingLeft={2}>

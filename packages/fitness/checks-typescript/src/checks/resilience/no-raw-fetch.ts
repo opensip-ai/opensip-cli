@@ -94,10 +94,16 @@ export const noRawFetch = defineCheck({
       return violations;
     }
 
-    // Skip SSE/streaming implementations that require raw fetch for stream parsing
+    // Skip SSE/streaming implementations that require raw fetch for stream
+    // parsing. Detection keys on code-visible API identifiers ONLY: this check
+    // runs on strip-strings-filtered content (needed so the main `fetch(`
+    // detector below doesn't match `fetch(` inside string literals), so a
+    // `'text/event-stream'` header string literal is blanked before analyze()
+    // sees it and can never be matched here. The surviving identifiers
+    // (ReadableStream/EventSource/getReader) are what mark a stream consumer; a
+    // rare SSE consumer showing none of them uses the `skipPaths` recipe config.
     if (
       content.includes('ReadableStream') ||
-      content.includes('text/event-stream') ||
       content.includes('EventSource') ||
       content.includes('getReader()')
     ) {

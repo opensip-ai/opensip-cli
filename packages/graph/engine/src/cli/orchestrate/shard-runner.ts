@@ -374,7 +374,26 @@ interface ShardSpawnContext {
 function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOutcome> {
   const { projectRoot, cliScript, resolutionMode, language, hardKillTimeoutMs } = ctx;
   return new Promise((resolvePromise) => {
-    const specDir = mkdtempSync(join(tmpdir(), 'graph-shard-'));
+    // Pre-spawn filesystem setup runs synchronously inside the executor. Wrap it
+    // so a failure (read-only tmpdir, ENOSPC, EMFILE under the parallel pool) is
+    // COLLECTED as a per-shard failure — honoring runShardsInParallel's "always
+    // resolves; per-shard failures are never thrown" invariant — instead of
+    // rejecting the promise and sinking the entire build. A post-mkdtemp failure
+    // also removes the just-created temp dir so it is not leaked.
+    let specDir: string;
+    try {
+      specDir = mkdtempSync(join(tmpdir(), 'graph-shard-'));
+    } catch (error) {
+      /* v8 ignore start */
+      resolvePromise({
+        shardId: shard.id,
+        exitCode: -1,
+        stderr: `shard temp-dir setup failed: ${error instanceof Error ? error.message : String(error)}`,
+        failureClass: 'spawn',
+      });
+      return;
+      /* v8 ignore stop */
+    }
     const specPath = join(specDir, 'spec.json');
 
     // Build this shard's correlation from the parent run's bag (Phase 0,
@@ -395,7 +414,20 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
       // the worker stamps tool/parentCommand/traceId/shardId on its spans/logs.
       ...(correlation ? { correlation: stripRunId(correlation) } : {}),
     };
-    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+    try {
+      writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+    } catch (error) {
+      /* v8 ignore start */
+      rmSync(specDir, { recursive: true, force: true });
+      resolvePromise({
+        shardId: shard.id,
+        exitCode: -1,
+        stderr: `shard spec write failed: ${error instanceof Error ? error.message : String(error)}`,
+        failureClass: 'spawn',
+      });
+      return;
+      /* v8 ignore stop */
+    }
 
     // Propagate the active trace context (the parent's sharded-build span) to
     // the worker as TRACEPARENT, so the worker's per-stage spans nest under our
@@ -486,7 +518,12 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
       }
       try {
         const result = JSON.parse(stdout) as ShardBuildResult;
-        resolvePromise({ shardId: shard.id, result, exitCode: EXIT_CODES.SUCCESS, stderr });
+        resolvePromise({
+          shardId: shard.id,
+          result,
+          exitCode: EXIT_CODES.SUCCESS,
+          stderr,
+        });
       } catch (error) {
         /* v8 ignore start */
         resolvePromise({

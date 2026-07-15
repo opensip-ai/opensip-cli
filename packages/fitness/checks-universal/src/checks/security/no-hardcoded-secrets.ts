@@ -15,7 +15,7 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
 
 /**
  * Creates a pre-compiled RegExp for pattern matching.
@@ -117,7 +117,13 @@ export const noHardcodedSecrets = defineCheck({
     languages: ['typescript'],
     concerns: ['backend', 'frontend', 'cli'],
   },
-  contentFilter: 'strip-strings',
+  // 'raw' (NOT 'strip-strings'): every content-specific SECRET_PATTERN matches
+  // secret material that lives INSIDE string literals (e.g. 'AKIA…', 'sk_live_…',
+  // 'Bearer …'). strip-strings blanks string interiors before analyze() runs, so
+  // it would silently disable those detectors. The post-match filters below
+  // (isInsideRegexLiteral, lineHasRedactionPlaceholder) already operate on raw
+  // lines precisely to suppress the false positives raw content can produce.
+  contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detect hardcoded secrets, API keys, and credentials in source code',
   longDescription: `**Purpose:** Detects hardcoded secrets, API keys, and credentials in source code that should be stored in environment variables or a secrets manager.
@@ -138,10 +144,27 @@ export const noHardcodedSecrets = defineCheck({
   tags: ['security', 'secrets', 'credentials'],
   fileTypes: ['ts', 'tsx'],
 
-  analyze(content: string, filePath: string): CheckViolation[] {
-    return analyzeHardcodedSecrets(content, filePath);
-  },
+  analyze: analyzeHardcodedSecretsForCheck,
 });
+
+/**
+ * The check's file-level analyze: skip test files, then run the detector.
+ *
+ * Test files legitimately embed fake, well-formed secrets as fixtures (e.g.
+ * `AKIA…EXAMPLE`, sample bearer tokens for an egress test, the private-key
+ * header this very check's own test asserts on). Skipping them — mirroring the
+ * sibling no-raw-fetch check — targets PRODUCTION source, where a committed
+ * secret is the real exposure. Exported (and kept distinct from the test-file-
+ * agnostic {@link analyzeHardcodedSecrets}) so the production-only skip is
+ * unit-testable without standing up the full check-execution framework.
+ */
+export function analyzeHardcodedSecretsForCheck(
+  content: string,
+  filePath: string,
+): CheckViolation[] {
+  if (isTestFile(filePath)) return [];
+  return analyzeHardcodedSecrets(content, filePath);
+}
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
