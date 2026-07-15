@@ -24,8 +24,9 @@ export const isClass = (node: Node): boolean => node.type === 'class_declaration
 export const isComment = (node: Node): boolean =>
   node.type === 'line_comment' || node.type === 'block_comment';
 
-/** A string literal. */
-export const isString = (node: Node): boolean => node.type === 'string_literal';
+/** A string literal or text block (`"""…"""`). */
+export const isString = (node: Node): boolean =>
+  node.type === 'string_literal' || node.type === 'text_block';
 
 /** A `catch` clause — Java's error-handling node. */
 export const isCatch = (node: Node): boolean => node.type === 'catch_clause';

@@ -29,20 +29,27 @@ export const BANDIT_DEFAULT_EXCLUDES = [
 /**
  * Build the CLI args for a recursive Bandit scan of the project root, writing its
  * JSON report to the `bandit.json` artifact path for the parser to consume.
+ * Scan `.` (cwd is already projectRoot) so reported paths and `-x` basenames stay
+ * project-relative — absolute `-r` makes stock excludes like `.git` ineffective.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
-  return ['-r', ctx.projectRoot, '-f', 'json', '-o', ctx.artifactPath('bandit.json')];
+  return ['-r', '.', '-f', 'json', '-o', ctx.artifactPath('bandit.json')];
 }
 
 /**
  * Build the `-x <paths>` args that exclude Bandit's defaults PLUS the host runtime
  * path. Bandit takes a single comma-separated `-x` value and REPLACES its default
- * exclude list, so both must be present.
+ * exclude list, so both must be present. Runtime path is project-relative so it
+ * matches paths under a relative scan root.
  */
 export function buildBanditExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  const excludes = [...BANDIT_DEFAULT_EXCLUDES, input.excludePath].join(',');
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeRuntime = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+  const excludes = [...BANDIT_DEFAULT_EXCLUDES, relativeRuntime].join(',');
   return { args: ['-x', excludes] };
 }
 

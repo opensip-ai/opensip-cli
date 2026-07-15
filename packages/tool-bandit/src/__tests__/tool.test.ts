@@ -84,7 +84,7 @@ describe('bandit tool — binary + scan helpers', () => {
     } as unknown as AdapterRunContext;
     expect(buildScanArgs(ctx)).toEqual([
       '-r',
-      '/proj',
+      '.',
       '-f',
       'json',
       '-o',
@@ -92,7 +92,7 @@ describe('bandit tool — binary + scan helpers', () => {
     ]);
   });
 
-  it('excludes Bandit defaults PLUS the .runtime store via a single -x list', () => {
+  it('excludes Bandit defaults PLUS the relative .runtime store via a single -x list', () => {
     const { args } = buildBanditExclude({ excludePath: '/proj/opensip-cli/.runtime' });
     expect(args[0]).toBe('-x');
     const excludes = (args[1] ?? '').split(',');
@@ -103,10 +103,10 @@ describe('bandit tool — binary + scan helpers', () => {
         '__pycache__',
         '.tox',
         '*.egg',
-        '/proj/opensip-cli/.runtime',
+        'opensip-cli/.runtime',
       ]),
     );
-    expect(excludes.at(-1)).toBe('/proj/opensip-cli/.runtime');
+    expect(excludes.at(-1)).toBe('opensip-cli/.runtime');
   });
 });
 

@@ -42,7 +42,8 @@ export const tool: Tool = defineExternalToolAdapter({
       args: buildScanArgs,
       output: { kind: 'stdout', path: 'govulncheck.jsonl' },
       parse: parseGovulncheckJsonLines,
-      exitCodes: { ok: [0], findings: [3], errorFrom: 1 },
+      // -json mode always exits 0 regardless of vulns; findings come from parse.
+      exitCodes: { ok: [0], findings: [], errorFrom: 1 },
     },
   ],
   fingerprintStrategy: 'message-hash',

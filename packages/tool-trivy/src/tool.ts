@@ -94,7 +94,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     '--skip-java-db-update',
     '--offline-scan',
     '--skip-check-update',
-    ctx.projectRoot,
+    '.', // cwd is projectRoot — keep reported paths project-relative
   ];
 }
 

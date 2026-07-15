@@ -9,7 +9,7 @@
 
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 
@@ -32,16 +32,15 @@ function normalizeExtends(extendsValue: unknown): string[] | null {
 }
 
 /**
- * True when a package-style extends can be resolved via Node module resolution,
- * or when we intentionally skip existence (resolution unavailable). Relative
- * paths are checked on the filesystem.
+ * True when a package-style extends resolves via Node module resolution, or a
+ * relative/absolute path exists on disk. Unresolvable package refs fail closed
+ * (return false) so typos / missing installs surface as TSCONFIG_MISSING_BASE.
  */
 function baseExists(filePath: string, extendsValue: string): boolean {
   if (isPackageStyleExtends(extendsValue)) {
     // Package-style extends (e.g. "@tsconfig/node20/tsconfig.json") are not
     // local relative files — resolve via require.resolve from the tsconfig's
-    // directory (or skip if Node cannot resolve). Never treat as a missing
-    // local relative path.
+    // directory. Fail closed when resolution fails.
     try {
       const from = resolve(process.cwd(), filePath);
       const req = createRequire(from);
@@ -54,8 +53,7 @@ function baseExists(filePath: string, extendsValue: string): boolean {
         req.resolve(extendsValue.endsWith('.json') ? extendsValue : `${extendsValue}.json`);
         return true;
       } catch {
-        // Unresolvable package refs are not "missing local files" — skip.
-        return true;
+        return false;
       }
     }
   }
@@ -64,6 +62,13 @@ function baseExists(filePath: string, extendsValue: string): boolean {
   const resolvedBase = resolve(process.cwd(), dir, extendsValue);
   const baseWithJson = resolvedBase.endsWith('.json') ? resolvedBase : `${resolvedBase}.json`;
   return existsSync(resolvedBase) || existsSync(baseWithJson);
+}
+
+/** Project-root tsconfig.json (relative or absolute under cwd) does not need to extend. */
+function isRootTsconfig(filePath: string): boolean {
+  const abs = isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
+  const rel = relative(process.cwd(), abs).replaceAll('\\', '/');
+  return rel === 'tsconfig.json' || rel === './tsconfig.json';
 }
 
 export const tsconfigExtendsValidation = defineCheck({
@@ -102,11 +107,8 @@ export const tsconfigExtendsValidation = defineCheck({
         continue;
       }
 
-      // Root tsconfig doesn't need to extend
-      if (
-        filePath === 'tsconfig.json' ||
-        (filePath.endsWith('/tsconfig.json') && filePath.split('/').length === 2)
-      ) {
+      // Root tsconfig doesn't need to extend (works for absolute production paths)
+      if (isRootTsconfig(filePath)) {
         continue;
       }
 

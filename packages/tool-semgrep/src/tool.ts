@@ -44,7 +44,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     // `--error` makes semgrep exit nonzero on findings (spec 31a exit contract), so
     // the exit-code model and the SARIF report agree; without it findings exit 0.
     '--error',
-    ctx.projectRoot,
+    '.', // cwd is projectRoot — keep reported paths project-relative
   ];
 }
 

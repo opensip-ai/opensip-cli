@@ -6,7 +6,15 @@
  * imports — callers bridge events at the composition root.
  */
 
-import { closeSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { hostname } from 'node:os';
 import { basename } from 'node:path';
 
@@ -106,6 +114,52 @@ function writeLockMetadata(lockPath: string, metadata: FileLockMetadata): void {
   writeFileSync(lockPath, JSON.stringify(metadata), 'utf8');
 }
 
+/**
+ * Heartbeat update that refuses to clobber a stolen lock: write temp, re-check
+ * owner, then atomic rename. Still best-effort under extreme races, but avoids
+ * the classic read-then-blind-overwrite TOCTOU that restored a dead owner's
+ * metadata into a newly acquired lockfile.
+ */
+function writeLockMetadataIfOwner(
+  lockPath: string,
+  metadata: FileLockMetadata,
+  ownerToken: string,
+): void {
+  const tmpPath = `${lockPath}.hb.${ownerToken.slice(0, 8)}`;
+  writeFileSync(tmpPath, JSON.stringify(metadata), 'utf8');
+  try {
+    const current = readLockMetadata(lockPath);
+    if (current === undefined || current.ownerToken !== ownerToken) {
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // @swallow-ok temp cleanup after lost ownership
+      }
+      return;
+    }
+    try {
+      renameSync(tmpPath, lockPath);
+    } catch {
+      // Windows may refuse rename-over-existing; fall back to checked write.
+      const stillOurs = readLockMetadata(lockPath);
+      if (stillOurs?.ownerToken === ownerToken) {
+        writeLockMetadata(lockPath, metadata);
+      }
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // @swallow-ok temp cleanup after fallback write
+      }
+    }
+  } catch {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // @swallow-ok temp cleanup on unexpected failure
+    }
+  }
+}
+
 function isStale(metadata: FileLockMetadata, staleMs: number): boolean {
   // Heartbeat age is the only cross-host-safe signal. Dead local PID alone
   // must not reclaim a lock owned by another machine (shared FS / NFS / CI
@@ -191,7 +245,25 @@ function evaluateLockContention(
   if (tryAcquireLock(lockPath, metadata)) return 'acquired';
 
   const existing = readLockMetadata(lockPath);
-  if (!existing) return Date.now() >= deadline ? 'timeout' : 'retry';
+  // Lockfile exists but is unreadable/corrupt (bad JSON, oversize, wrong types).
+  // After the wait deadline, treat as recoverably stale so callers are not
+  // permanently wedged until manual deletion.
+  if (!existing) {
+    if (Date.now() >= deadline) {
+      try {
+        const st = statSync(lockPath);
+        // Only auto-unlink when the file itself looks abandoned by mtime.
+        if (Date.now() - st.mtimeMs > options.policy.staleMs) {
+          unlinkSync(lockPath);
+          return 'retry';
+        }
+      } catch {
+        // @swallow-ok missing between stat and unlink
+      }
+      return 'timeout';
+    }
+    return 'retry';
+  }
 
   if (
     recoverStaleLock({
@@ -245,11 +317,12 @@ function startLockHeartbeat(
 ): ReturnType<typeof setInterval> {
   return setInterval(() => {
     try {
-      // Never overwrite a lock we no longer own (stale recovery / steal).
-      const current = readLockMetadata(lockPath);
-      if (current === undefined || current.ownerToken !== metadata.ownerToken) return;
       metadata.lastHeartbeatAt = Date.now();
-      writeLockMetadata(lockPath, { ...metadata, lastHeartbeatAt: metadata.lastHeartbeatAt });
+      writeLockMetadataIfOwner(
+        lockPath,
+        { ...metadata, lastHeartbeatAt: metadata.lastHeartbeatAt },
+        metadata.ownerToken,
+      );
     } catch {
       // @swallow-ok heartbeat update is best-effort; stale recovery handles abandoned locks
     }

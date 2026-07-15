@@ -134,7 +134,10 @@ function appendLedgerStepCells(
       style: MUTED_STYLE,
     }),
   );
-  row.append(el('td', { text: step.outcome, style: DIM_STYLE }));
+  // Pass Rate column: unlinked steps have no session score — never put outcome
+  // text here (outcome belongs in Status). Show a dash for score parity with
+  // linked rows that use formatScore(session.score).
+  row.append(el('td', { text: '—', style: DIM_STYLE }));
   const statusCell = el('td');
   statusCell.append(statusBadge(stepStatus(step)));
   row.append(statusCell);

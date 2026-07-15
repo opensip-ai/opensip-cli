@@ -1,4 +1,4 @@
-import { basename, dirname } from 'node:path';
+import { basename } from 'node:path';
 
 import { readPackageVersion } from '@opensip-cli/core';
 import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
@@ -22,6 +22,9 @@ const LOCAL_ONLY_ANALYZER_FLAGS = [
   '--disableNodeAudit',
   '--disableYarnAudit',
   '--disablePnpmAudit',
+  // Maven Central enrichment phones home even with --noupdate; local-only
+  // posture requires disabling it (may reduce Java CPE identity quality).
+  '--disableCentral',
 ] as const;
 
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
@@ -33,8 +36,9 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     ctx.projectRoot,
     '--format',
     'SARIF',
+    // Full file path so the substrate always finds the expected SARIF name.
     '--out',
-    dirname(artifact),
+    artifact,
     '--noupdate',
     ...LOCAL_ONLY_ANALYZER_FLAGS,
   ];

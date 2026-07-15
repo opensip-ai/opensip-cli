@@ -227,7 +227,17 @@ async function collectAppliedDirectives(
 // =============================================================================
 
 /**
+ * True when the result is a framework/command failure (no signals to ignore).
+ * These must not be recomputed from filtered signals or they green-wash to PASS.
+ */
+export function isFrameworkErrorResult(result: CheckResult): boolean {
+  return result.passed === false && result.errors > 0 && result.signals.length === 0;
+}
+
+/**
  * Builds the filtered result from the original result and filtered signals.
+ * Framework error results (empty signals, errors > 0, passed false) are preserved
+ * so ignore processing cannot turn a check fault into a clean pass.
  */
 export function buildFilteredResult(
   result: CheckResult,
@@ -240,6 +250,19 @@ export function buildFilteredResult(
   }
 
   const durationMs = result.metadata.durationMs ?? Date.now() - start;
+
+  // Framework / command errors have no findings to filter; preserve the failure.
+  if (isFrameworkErrorResult(result)) {
+    return {
+      ...result,
+      metadata: {
+        ...result.metadata,
+        durationMs,
+      },
+      ...(ignoredCount > 0 ? { ignoredCount } : {}),
+    };
+  }
+
   const filteredErrors = countErrors(filteredSignals);
   const filteredWarnings = countWarnings(filteredSignals);
 

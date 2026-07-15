@@ -201,4 +201,20 @@ describe('filterContent', () => {
       expect(code).toContain('${b}');
     });
   });
+
+  describe('regular expressions (reScanSlashToken)', () => {
+    it('does not treat quote chars inside a regex as string openers', () => {
+      const src = 'const re = /"/; const after = 1;';
+      const { code } = filterContent(src);
+      // Regex body is code (not masked); code after the regex must survive.
+      expect(code).toContain('const after = 1');
+      expect(code).not.toMatch(/const after\s+=\s+\s+$/);
+    });
+
+    it('does not treat division as a regex', () => {
+      const src = 'const q = a / b;';
+      const { code } = filterContent(src);
+      expect(code).toBe(src);
+    });
+  });
 });

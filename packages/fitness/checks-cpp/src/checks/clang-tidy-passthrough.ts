@@ -47,13 +47,17 @@ function resolveFilePath(capturedPath: string, cwd: string): string {
  */
 export function parseClangTidyOutput(
   stdout: string,
-  _stderr: string,
+  stderr: string,
   _exitCode: number,
   _files: readonly string[],
   cwd: string,
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  const lines = stdout.split('\n');
+  // clang-tidy writes diagnostics to stderr (llvm::errs); --quiet only
+  // suppresses progress. Merge both streams so real findings are not dropped.
+  const combined =
+    stderr.length === 0 ? stdout : stdout.length === 0 ? stderr : `${stdout}\n${stderr}`;
+  const lines = combined.split('\n');
   for (const line of lines) {
     const match = CLANG_TIDY_LINE.exec(line);
     if (!match) continue;

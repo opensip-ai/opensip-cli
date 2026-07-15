@@ -45,6 +45,7 @@ import { clampLimit } from './graph-read-projection.js';
 import { readError } from './mcp-error.js';
 import {
   completeInventoryCoverage,
+  missingCatalogCoverage,
   type SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
 import {
@@ -183,7 +184,7 @@ export class SqliteGraphDeclarationQueries {
             },
             gen,
             freshness,
-            { coverage: completeInventoryCoverage() },
+            { coverage: missingCatalogCoverage() },
           );
         }
         const bundle = gen.catalog.semanticFacts;
@@ -373,7 +374,7 @@ export class SqliteGraphDeclarationQueries {
           });
           if (!cursor.ok) return cursor;
           return this.context.envelope(emptyDeclarationDto(detail), gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
             page: { limit },
             filter,
           });
@@ -467,7 +468,7 @@ export class SqliteGraphDeclarationQueries {
           });
           if (!cursor.ok) return cursor;
           return this.context.envelope(emptyReferencesDto(detail, declarationId), gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
             page: { limit },
             filter,
           });

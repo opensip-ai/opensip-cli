@@ -39,7 +39,8 @@ export function applyGlobalExcludes(
     // symlink / ../include / absolute-outside escape vectors.
     if (!isPathInside(filePath, rootDir)) return false;
     if (globalExcludes.length === 0) return true;
-    const relativePath = relative(rootDir, filePath);
+    // minimatch expects POSIX-style relative paths; Windows `relative()` yields `\`.
+    const relativePath = relative(rootDir, filePath).split('\\').join('/');
     return !globalExcludes.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
   });
 }

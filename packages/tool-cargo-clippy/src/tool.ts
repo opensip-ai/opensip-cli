@@ -27,7 +27,8 @@ export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
  * description / README determinism caveat.
  */
 export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
-  return ['clippy', '--message-format=json', '--all-targets', '--all-features'];
+  // --offline matches network: local-only — fail closed when registry deps missing.
+  return ['clippy', '--offline', '--message-format=json', '--all-targets', '--all-features'];
 }
 
 export const tool: Tool = defineExternalToolAdapter({

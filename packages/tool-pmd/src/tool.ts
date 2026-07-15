@@ -16,7 +16,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'check',
     '-d',
-    ctx.projectRoot,
+    '.', // cwd is projectRoot — keep reported paths project-relative
     '-R',
     DEFAULT_RULESET,
     '-f',

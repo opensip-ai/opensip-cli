@@ -45,11 +45,25 @@ interface EnvelopeOptions {
 
 /**
  * Complete inventory-only facet coverage for reads that inspected the full
- * candidate set with no truncation reasons (missing catalog, empty result, etc.).
+ * candidate set with no truncation reasons (empty-but-present catalog, etc.).
+ * Do NOT use for a missing catalog — use {@link missingCatalogCoverage}.
  */
 export function completeInventoryCoverage(): GraphCoverage {
   return rollupFacets({
     inventory: makeFacet(true, new Set()),
+    evidence: UNREQUESTED_FACET,
+    grouping: UNREQUESTED_FACET,
+    projection: UNREQUESTED_FACET,
+  });
+}
+
+/**
+ * Coverage for graph reads when no catalog generation is available.
+ * Inventory was requested but evidence is incomplete (graph-catalog-missing).
+ */
+export function missingCatalogCoverage(): GraphCoverage {
+  return rollupFacets({
+    inventory: makeFacet(true, new Set(['graph-catalog-missing'])),
     evidence: UNREQUESTED_FACET,
     grouping: UNREQUESTED_FACET,
     projection: UNREQUESTED_FACET,

@@ -113,7 +113,7 @@ describe('cppcheck tool — scan-arg + exclude builders', () => {
       '--inline-suppr',
       '--output-format=sarif',
       `--output-file=${projectRoot}/.runtime/artifacts/cppcheck/run1/cppcheck.sarif`,
-      projectRoot,
+      '.',
     ]);
   });
 
@@ -130,14 +130,14 @@ describe('cppcheck tool — scan-arg + exclude builders', () => {
       '--inline-suppr',
       '--output-format=sarif',
       `--output-file=${projectRoot}/.runtime/artifacts/cppcheck/run1/cppcheck.sarif`,
-      `--project=${cdb}`,
+      '--project=compile_commands.json',
     ]);
   });
 
-  it('excludes the .runtime store via -i (A3)', () => {
+  it('excludes the .runtime store via relative -i (A3)', () => {
     expect(buildCppcheckExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
       '-i',
-      '/proj/opensip-cli/.runtime',
+      'opensip-cli/.runtime',
     ]);
   });
 });

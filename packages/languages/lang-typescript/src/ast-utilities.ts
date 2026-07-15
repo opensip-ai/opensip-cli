@@ -107,17 +107,34 @@ export function isLiteral(node: ts.Node): boolean {
 }
 
 /**
- * Check if a node is inside a string literal or template literal.
+ * Check if a node is inside a string literal or template *literal* span.
+ * Code inside `${…}` interpolations is not treated as "in a string".
  */
 export function isInStringLiteral(node: ts.Node): boolean {
-  let current = node.parent;
-  while (!ts.isSourceFile(current)) {
+  let current: ts.Node | undefined = node.parent;
+  while (current && !ts.isSourceFile(current)) {
+    if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+      return true;
+    }
+    // Template head/middle/tail spans are string content; TemplateSpan.expression is code.
     if (
-      ts.isStringLiteral(current) ||
-      ts.isNoSubstitutionTemplateLiteral(current) ||
-      ts.isTemplateExpression(current)
+      ts.isTemplateHead(current) ||
+      ts.isTemplateMiddle(current) ||
+      ts.isTemplateTail(current)
     ) {
       return true;
+    }
+    if (ts.isTemplateSpan(current) && current.expression === node) {
+      return false;
+    }
+    // Inside a TemplateSpan's expression subtree — keep walking past the span.
+    if (ts.isTemplateSpan(current)) {
+      current = current.parent;
+      continue;
+    }
+    if (ts.isTemplateExpression(current)) {
+      // Only pure no-sub templates are fully string; with spans we only matched heads/tails above.
+      return false;
     }
     current = current.parent;
   }

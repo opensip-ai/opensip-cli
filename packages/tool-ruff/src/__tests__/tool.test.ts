@@ -84,10 +84,10 @@ describe('ruff tool — binary + scan helpers', () => {
     ]);
   });
 
-  it('excludes the .runtime store via --exclude (A3)', () => {
+  it('excludes the .runtime store via relative --exclude (A3)', () => {
     expect(buildRuffExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
       '--exclude',
-      '/proj/opensip-cli/.runtime',
+      'opensip-cli/.runtime',
     ]);
   });
 });

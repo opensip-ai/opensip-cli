@@ -168,11 +168,13 @@ export async function runScanLoop(
     );
   }
 
+  // Version probe must not consume the full scan budget (default 5 min).
+  const VERSION_PROBE_TIMEOUT_MS = 15_000;
   const version = deps.probeVersion({
     path: resolution.path,
     versionArgs: binary.versionArgs,
     parse: binary.versionParse,
-    timeoutMs: deps.timeoutMs,
+    timeoutMs: Math.min(deps.timeoutMs, VERSION_PROBE_TIMEOUT_MS),
   });
 
   const ctx = buildAdapterRunContext({

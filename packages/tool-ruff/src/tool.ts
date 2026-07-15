@@ -33,7 +33,12 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildRuffExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['--exclude', input.excludePath] };
+  // Ruff exclude patterns are project-relative globs; absolute host paths no-op.
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+  return { args: ['--exclude', relativeSegment] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

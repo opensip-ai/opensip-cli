@@ -159,7 +159,7 @@ describe('gitleaks tool — A3 .runtime exclusion (buildGitleaksExclude)', () =>
     expect(ex.configFile.contents).toContain('# opensip-cli A3 exclude: opensip-cli/.runtime');
   });
 
-  it('extends the project .gitleaks.toml when present (does not replace it with useDefault)', () => {
+  it('inlines the project .gitleaks.toml when present (no extra extend hop)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'gitleaks-cfg-'));
     const projectToml = join(dir, '.gitleaks.toml');
     writeFileSync(projectToml, '[extend]\nuseDefault = true\n');
@@ -167,9 +167,11 @@ describe('gitleaks tool — A3 .runtime exclusion (buildGitleaksExclude)', () =>
       excludePath: join(dir, 'opensip-cli', '.runtime'),
       configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
     });
-    expect(withProject.configFile.contents).toContain(`path = "${projectToml}"`);
-    expect(withProject.configFile.contents).not.toContain('useDefault = true');
+    // Flattened: project body is copied (preserves its own useDefault), no path= hop.
+    expect(withProject.configFile.contents).toContain('useDefault = true');
+    expect(withProject.configFile.contents).not.toMatch(/^path\s*=/m);
     expect(withProject.configFile.contents).toContain('opensip-cli/\\.runtime');
+    expect(withProject.configFile.contents).toContain('[[allowlists]]');
   });
 });
 

@@ -90,7 +90,7 @@ describe('semgrep tool — scan helper', () => {
       '--output',
       `${dir}/.runtime/artifacts/semgrep/run1/semgrep.sarif`,
       '--error',
-      dir,
+      '.',
     ]);
     // The exit contract (findings ⇒ nonzero) + the SARIF report both required.
     expect(args).toContain('--error');

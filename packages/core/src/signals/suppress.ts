@@ -204,8 +204,17 @@ function extractDirectiveId(line: string, directiveKeyword: string): string | nu
 /** True when a line is a known directive comment (used to skip stacked directives). */
 function isKnownDirectiveLine(line: string): boolean {
   const trimmed = line.trimStart();
-  if (!trimmed.startsWith('//') && !trimmed.startsWith('/*')) return false;
-  const content = trimmed.slice(2).trimStart();
+  // Support //, /*, #, and <!-- openers (stacked next-line directives).
+  let content: string | undefined;
+  if (trimmed.startsWith('//') || trimmed.startsWith('/*')) {
+    content = trimmed.slice(2).trimStart();
+  } else if (trimmed.startsWith('#')) {
+    content = trimmed.slice(1).trimStart();
+  } else if (trimmed.startsWith('<!--')) {
+    content = trimmed.slice(4).trimStart();
+  } else {
+    return false;
+  }
   return KNOWN_DIRECTIVE_KEYWORDS.some((keyword) => {
     if (!content.startsWith(keyword)) return false;
     const next = content[keyword.length];

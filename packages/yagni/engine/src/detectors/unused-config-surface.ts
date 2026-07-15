@@ -141,14 +141,17 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
         accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
       }
       // Object destructuring (`const { foo } = opts`) is a property read.
+      // Renames (`const { realKey: localName } = opts`) read `realKey`, not the local.
       // Array patterns (`const [foo] = items`) are not config property access.
-      if (
-        ts.isBindingElement(node) &&
-        ts.isObjectBindingPattern(node.parent) &&
-        ts.isIdentifier(node.name)
-      ) {
-        const propertyName = node.name.text;
-        accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+      if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
+        const nameNode = node.propertyName ?? node.name;
+        if (ts.isIdentifier(nameNode)) {
+          const propertyName = nameNode.text;
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+        } else if (ts.isStringLiteral(nameNode) || ts.isNoSubstitutionTemplateLiteral(nameNode)) {
+          const propertyName = nameNode.text;
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+        }
       }
       ts.forEachChild(node, visit);
     };

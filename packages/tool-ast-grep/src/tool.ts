@@ -65,11 +65,15 @@ export function parseAstGrepSarif(
 export function buildAstGrepExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  // Prefer a recursive glob under the runtime path so nested prior-run artifacts
-  // are skipped. Quote is not needed — args are passed as execFile argv.
-  const pattern = input.excludePath.endsWith('/**')
-    ? `!${input.excludePath}`
-    : `!${input.excludePath}/**`;
+  // gitignore-style globs are rooted at the scan root — absolute host paths do
+  // not match. Prefer the portable runtime segment (Semgrep-style).
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+  const pattern = relativeSegment.endsWith('/**')
+    ? `!${relativeSegment}`
+    : `!${relativeSegment}/**`;
   return { args: ['--globs', pattern] };
 }
 

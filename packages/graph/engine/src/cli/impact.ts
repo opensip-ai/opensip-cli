@@ -41,8 +41,9 @@ import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { verifyCatalogInputs } from '../read/catalog-freshness.js';
 import { loadGraphReadConfig } from '../read/config.js';
 
+import { rebuildCatalog } from '../read/rebuild.js';
+
 import { contributionFromGraphPayload } from './graph-session-contribution.js';
-import { runGraph } from './orchestrate.js';
 
 import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -360,7 +361,15 @@ async function loadOrBuildCatalog(
     });
   }
 
-  await runGraph({ cwd, noCache: noCache === true, datastore });
+  // Always force a real rebuild + durable persist. A plain runGraph with
+  // useCache:true can reload the same partial catalog that reuse rejected;
+  // noCache:true without replaceAll can leave the prior row in the store.
+  const outcome = await rebuildCatalog({ cwd, datastore });
+  if (!outcome.ok) {
+    throw new ConfigurationError(
+      `impact: Graph rebuild failed (${outcome.error.code}): ${outcome.error.message}`,
+    );
+  }
   const rebuilt = repo.loadCatalogContract();
   if (!rebuilt) {
     throw new ConfigurationError(

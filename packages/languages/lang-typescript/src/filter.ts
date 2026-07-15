@@ -212,6 +212,37 @@ export function filterContent(content: string): FilteredContent {
   /* v8 ignore stop */
 }
 
+/**
+ * Heuristic for `/` as regex start vs division (matches the classic scanner
+ * approach: not after values/identifiers that a binary `/` would follow).
+ */
+function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
+  if (prev === undefined) return true;
+  switch (prev) {
+    case ts.SyntaxKind.Identifier:
+    case ts.SyntaxKind.PrivateIdentifier:
+    case ts.SyntaxKind.StringLiteral:
+    case ts.SyntaxKind.NumericLiteral:
+    case ts.SyntaxKind.BigIntLiteral:
+    case ts.SyntaxKind.RegularExpressionLiteral:
+    case ts.SyntaxKind.ThisKeyword:
+    case ts.SyntaxKind.SuperKeyword:
+    case ts.SyntaxKind.TrueKeyword:
+    case ts.SyntaxKind.FalseKeyword:
+    case ts.SyntaxKind.NullKeyword:
+    case ts.SyntaxKind.CloseParenToken:
+    case ts.SyntaxKind.CloseBracketToken:
+    case ts.SyntaxKind.CloseBraceToken:
+    case ts.SyntaxKind.PlusPlusToken:
+    case ts.SyntaxKind.MinusMinusToken:
+    case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+    case ts.SyntaxKind.TemplateTail:
+      return false;
+    default:
+      return true;
+  }
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity -- TS scanner driver: token-by-token loop with per-kind handling; flatter shape would scatter token classification
 function filterContentImpl(content: string): FilteredContent {
   const scanner = ts.createScanner(
@@ -237,6 +268,11 @@ function filterContentImpl(content: string): FilteredContent {
   // and desync the scanner for the rest of the file (which silently wipes real
   // code to whitespace). Incremented at TemplateHead, decremented at TemplateTail.
   let templateDepth = 0;
+  // Previous non-trivia token — used to decide whether `/` starts a regex
+  // (reScanSlashToken) vs division. Without this, `/.../` is never emitted as
+  // RegularExpressionLiteral and quote/slash chars inside patterns desync the
+  // stripper (can blank the rest of the file).
+  let prevSignificant: ts.SyntaxKind | undefined;
 
   while (true) {
     let token = scanner.scan();
@@ -247,6 +283,12 @@ function filterContentImpl(content: string): FilteredContent {
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.CloseBraceToken && templateDepth > 0) {
       token = scanner.reScanTemplateToken(false);
+    }
+
+    // Bare scanner emits SlashToken for `/`; only reScanSlashToken yields regex.
+    // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
+    if (token === ts.SyntaxKind.SlashToken && canStartRegExpLiteral(prevSignificant)) {
+      token = scanner.reScanSlashToken();
     }
 
     const start = scanner.getTokenStart();
@@ -275,7 +317,7 @@ function filterContentImpl(content: string): FilteredContent {
 
       case ts.SyntaxKind.TemplateTail: {
         // }text` — replace text between } and `
-        templateDepth--;
+        templateDepth = Math.max(0, templateDepth - 1);
         replaceCharsInRange(chars, start + 1, end - 1, stringRegions);
         break;
       }
@@ -291,6 +333,17 @@ function filterContentImpl(content: string): FilteredContent {
       default: {
         break;
       }
+    }
+
+    // Trivia does not affect the regex-vs-division decision.
+    // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
+    if (
+      token !== ts.SyntaxKind.SingleLineCommentTrivia &&
+      token !== ts.SyntaxKind.MultiLineCommentTrivia &&
+      token !== ts.SyntaxKind.NewLineTrivia &&
+      token !== ts.SyntaxKind.WhitespaceTrivia
+    ) {
+      prevSignificant = token;
     }
   }
 

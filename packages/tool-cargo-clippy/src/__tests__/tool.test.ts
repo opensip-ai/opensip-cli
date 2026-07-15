@@ -104,6 +104,7 @@ describe('cargo-clippy tool — scan helper', () => {
     const ctx = { projectRoot: '/proj' } as unknown as AdapterRunContext;
     expect(buildScanArgs(ctx)).toEqual([
       'clippy',
+      '--offline',
       '--message-format=json',
       '--all-targets',
       '--all-features',

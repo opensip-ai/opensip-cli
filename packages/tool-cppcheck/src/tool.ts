@@ -12,8 +12,9 @@ export const CPPCHECK_STABLE_ID = 'dafe9acd-77c5-4055-a01c-05950c15d5f1';
 
 function projectInput(projectRoot: string): readonly string[] {
   const compileCommands = join(projectRoot, 'compile_commands.json');
-  if (existsSync(compileCommands)) return [`--project=${compileCommands}`];
-  return [projectRoot];
+  // Prefer relative --project so paths stay portable under cwd=projectRoot.
+  if (existsSync(compileCommands)) return ['--project=compile_commands.json'];
+  return ['.'];
 }
 
 /**
@@ -35,7 +36,12 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildCppcheckExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['-i', input.excludePath] };
+  // Relative path matches compile_commands entries and relative scan roots.
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+  return { args: ['-i', relativeSegment] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

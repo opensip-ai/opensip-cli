@@ -83,7 +83,9 @@ export function resolveMetric(
 ): number {
   switch (metric) {
     case 'error_rate': {
-      return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 0;
+      // Align with success_rate: zero requests is not a clean proof — treat as
+      // fully erroneous so lowErrorRate / zeroErrors assertions fail closed.
+      return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 1;
     }
     case 'success_rate': {
       // See module-level docs: `0` when totalRequests === 0 (tightening choice).

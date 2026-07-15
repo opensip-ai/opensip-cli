@@ -34,6 +34,7 @@ import { clampLimit, toSymbolRef } from './graph-read-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
 import {
   completeInventoryCoverage,
+  missingCatalogCoverage,
   inventoryCoverage,
   type SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
@@ -209,7 +210,7 @@ export class SqliteGraphSymbolQueries {
       (gen, freshness) => {
         if (gen === undefined) {
           return this.context.envelope(undefined, gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
           });
         }
         const occ = gen.indexes.byOccId.get(symbolId);
@@ -245,7 +246,7 @@ export class SqliteGraphSymbolQueries {
         }
         if (gen === undefined) {
           return this.context.envelope(null, gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
           });
         }
         const projected = projectEntityDetail(
@@ -293,7 +294,7 @@ export class SqliteGraphSymbolQueries {
           });
           if (!cursor.ok) return cursor;
           return this.context.envelope(emptySearchDto(detail), gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
             page: { limit },
             filter,
           });
@@ -359,7 +360,7 @@ export class SqliteGraphSymbolQueries {
             gen,
             freshness,
             {
-              coverage: completeInventoryCoverage(),
+              coverage: missingCatalogCoverage(),
             },
           );
         }

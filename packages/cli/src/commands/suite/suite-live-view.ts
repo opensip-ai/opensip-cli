@@ -120,10 +120,29 @@ export async function renderSuiteLive(
     },
   };
 
-  const completion = await runToolLiveView(spec, args.glue ?? {});
-  // `produce` always runs to completion before `runToolLiveView` resolves.
+  let completion: ToolRunCompletion;
+  try {
+    completion = await runToolLiveView(spec, args.glue ?? {});
+  } catch (error) {
+    // Live view may rethrow after painting; if produce never assigned, rethrow
+    // the original error rather than inventing a secondary message.
+    if (result === undefined) throw error;
+    throw error;
+  }
+  // Live view catches produce throws, paints error, and sets exit — if produce
+  // still left result unset, surface a structured empty failure instead of a
+  // secondary generic Error that obscures diagnostics.
   if (result === undefined) {
-    throw new Error('renderSuiteLive: suite produced no result');
+    const empty: SuiteRunResult = {
+      type: 'suite-run',
+      suite: args.suiteInput.name,
+      suiteRunId: '',
+      durationMs: 0,
+      exitCode: 1,
+      steps: [],
+      scope: { mode: 'full', source: 'fallback', notice: 'suite live produce did not complete' },
+    };
+    return { completion, result: empty };
   }
   return { completion, result };
 }

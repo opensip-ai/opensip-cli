@@ -213,23 +213,38 @@ function buildComponentCluster(
 ): NearDuplicateCluster | undefined {
   // Cap oversized components rather than dropping them: keep the first
   // MAX_CLUSTER_SIZE members sorted by location so the finding still surfaces.
+  // After the location slice, re-derive connectivity from remaining edges so
+  // we never report disconnected remnants as one cluster, and never drop a
+  // component solely because the hub fell outside the location window when
+  // residual edges still connect ≥2 nodes.
   const cappedIndices = capComponentIndices(eligible, component, MAX_CLUSTER_SIZE);
   const cappedIndexSet = new Set(cappedIndices);
   const cappedEdges = componentEdges.filter(
     (e) => cappedIndexSet.has(e.a) && cappedIndexSet.has(e.b),
   );
 
-  const nearIndices = nearIndicesInComponent(cappedEdges);
+  // Prefer degree-preserving selection: if the location cap severed all edges,
+  // re-cap by keeping highest-degree nodes from the original component.
+  let workingEdges = cappedEdges;
+  if (nearIndicesInComponent(cappedEdges).size < 2 && component.length > MAX_CLUSTER_SIZE) {
+    const degreeCap = capComponentIndicesByDegree(component, componentEdges, MAX_CLUSTER_SIZE);
+    const degreeSet = new Set(degreeCap);
+    workingEdges = componentEdges.filter((e) => degreeSet.has(e.a) && degreeSet.has(e.b));
+  }
+
+  const nearIndices = nearIndicesInComponent(workingEdges);
   if (nearIndices.size < 2) return undefined;
 
-  const members = cappedIndices.map((i) => eligible[i]).filter((o): o is CloneCandidate => !!o);
+  // Members and anchor only from edge-incident nodes (true residual CC).
+  const members = [...nearIndices]
+    .map((i) => eligible[i])
+    .filter((o): o is CloneCandidate => !!o);
   const anchor = lowestByLocation(members);
-  const nearMembers = [...nearIndices]
-    .map((i) => eligible[i]?.qualifiedName)
-    .filter((n): n is string => n !== undefined)
+  const nearMembers = members
+    .map((m) => m.qualifiedName)
     .sort();
   const exactMembers = exactMembersInComponent(members);
-  const maxSim = maxSimilarityAmong(cappedEdges);
+  const maxSim = maxSimilarityAmong(workingEdges);
 
   return {
     anchor,
@@ -238,6 +253,28 @@ function buildComponentCluster(
     estimatedSimilarity: maxSim,
     clusterSize: members.length,
   };
+}
+
+/** Cap by degree (desc) then location so hubs survive the size bound. */
+function capComponentIndicesByDegree(
+  component: readonly number[],
+  edges: readonly NearEdge[],
+  maxSize: number,
+): number[] {
+  if (component.length <= maxSize) return [...component];
+  const degree = new Map<number, number>();
+  for (const i of component) degree.set(i, 0);
+  for (const e of edges) {
+    if (degree.has(e.a)) degree.set(e.a, (degree.get(e.a) ?? 0) + 1);
+    if (degree.has(e.b)) degree.set(e.b, (degree.get(e.b) ?? 0) + 1);
+  }
+  return [...component]
+    .sort((ai, bi) => {
+      const d = (degree.get(bi) ?? 0) - (degree.get(ai) ?? 0);
+      if (d !== 0) return d;
+      return ai - bi;
+    })
+    .slice(0, maxSize);
 }
 
 /** Stable location order, then keep at most `maxSize` member indices. */

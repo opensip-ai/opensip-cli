@@ -19,7 +19,7 @@
  * gitleaks id.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { readPackageVersion } from '@opensip-cli/core';
@@ -132,22 +132,47 @@ export function buildGitleaksExclude(input: {
   const path = input.configPath('gitleaks-exclude.toml');
   const projectRoot = projectRootFromRuntimeExclude(input.excludePath);
   const extend = resolveExtendSource(projectRoot);
-  // TOML string for extend.path — absolute so cwd independence does not matter.
-  // Escape backslashes for Windows paths inside a double-quoted TOML string.
-  const extendBlock =
-    extend.kind === 'path'
-      ? `path = "${extend.path.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
-      : 'useDefault = true';
-  const contents = [
-    '# opensip-cli A3 exclude: opensip-cli/.runtime',
-    '[extend]',
-    extendBlock,
-    '',
-    '[allowlist]',
+  // Flatten: never wrap project config in `[extend] path = ...` — that burns one
+  // of gitleaks's maxExtendDepth=2 hops and can drop base/org rules. Inline the
+  // project file (preserving its own extends) and append our runtime allowlist.
+  const allowlistBlock = [
+    '[[allowlists]]',
     'description = "opensip-cli: skip the .runtime artifact store"',
     "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
     '',
   ].join('\n');
+  let contents: string;
+  if (extend.kind === 'path') {
+    let projectConfig = '';
+    try {
+      projectConfig = readFileSync(extend.path, 'utf8').trimEnd();
+    } catch {
+      projectConfig = '';
+    }
+    contents =
+      projectConfig.length > 0
+        ? [
+            '# opensip-cli A3 exclude: opensip-cli/.runtime (flattened project config)',
+            projectConfig,
+            '',
+            allowlistBlock,
+          ].join('\n')
+        : [
+            '# opensip-cli A3 exclude: opensip-cli/.runtime',
+            '[extend]',
+            'useDefault = true',
+            '',
+            allowlistBlock,
+          ].join('\n');
+  } else {
+    contents = [
+      '# opensip-cli A3 exclude: opensip-cli/.runtime',
+      '[extend]',
+      'useDefault = true',
+      '',
+      allowlistBlock,
+    ].join('\n');
+  }
   return { args: ['--config', path], configFile: { path, contents } };
 }
 

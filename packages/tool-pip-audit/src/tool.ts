@@ -18,7 +18,9 @@ const REQUIREMENTS_CANDIDATES = [
   'requirements.lock',
 ] as const;
 
-const PROJECT_MANIFEST_CANDIDATES = ['pyproject.toml', 'setup.py', 'setup.cfg'] as const;
+// Upstream pip-audit project-path resolution only accepts pyproject.toml
+// (and pylock with --locked). setup.py / setup.cfg are NOT valid project roots.
+const PROJECT_MANIFEST_CANDIDATES = ['pyproject.toml'] as const;
 
 function requirementsFile(projectRoot: string): string | undefined {
   for (const name of REQUIREMENTS_CANDIDATES) {
@@ -37,8 +39,8 @@ function hasProjectManifest(projectRoot: string): boolean {
  *
  * Target selection (never silently audits the ambient Python env):
  * 1. A requirements file (`-r`) when one is present.
- * 2. Otherwise a project path (positional) when `pyproject.toml` / `setup.py` /
- *    `setup.cfg` exists — pip-audit resolves project dependencies from that tree.
+ * 2. Otherwise a project path (positional) when `pyproject.toml` exists —
+ *    pip-audit resolves project dependencies from that tree.
  * 3. Otherwise {@link ConfigurationError}: there is no project-scoped dependency
  *    source, and auditing the active environment would be ambient and non-deterministic.
  */
@@ -52,7 +54,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     targetArgs = [ctx.projectRoot];
   } else {
     throw new ConfigurationError(
-      'pip-audit requires a requirements file (requirements.txt) or a Python project manifest (pyproject.toml / setup.py).',
+      'pip-audit requires a requirements file (requirements.txt) or a Python project manifest (pyproject.toml).',
       { code: 'ADAPTER.CONFIG.MISSING_DEPENDENCY_SOURCE' },
     );
   }

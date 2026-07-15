@@ -57,8 +57,9 @@ interface KnipOutput {
  * Create violation for unused file
  */
 function createUnusedFileViolation(file: string, cwd: string): CheckViolation {
-  const filePath = file.startsWith('/') ? file : `${cwd}/${file}`;
-  const fileName = file.split('/').pop() ?? file;
+  // Windows absolute paths are not `/`-prefixed; use path.isAbsolute.
+  const filePath = path.isAbsolute(file) ? file : path.join(cwd, file);
+  const fileName = path.basename(file);
   return {
     line: 1,
     message: `Unused file: ${file}`,
@@ -245,7 +246,7 @@ export function parseKnipOutput(output: string, cwd: string): CheckViolation[] {
 
   // Process issues
   for (const issue of data.issues ?? []) {
-    const filePath = issue.file.startsWith('/') ? issue.file : `${cwd}/${issue.file}`;
+    const filePath = path.isAbsolute(issue.file) ? issue.file : path.join(cwd, issue.file);
 
     violations.push(
       ...processExportsAndTypes(issue, filePath, cwd),

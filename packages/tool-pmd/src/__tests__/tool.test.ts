@@ -107,7 +107,7 @@ describe('pmd tool — scan-arg builder', () => {
     expect(buildScanArgs(ctx)).toEqual([
       'check',
       '-d',
-      '/proj',
+      '.',
       '-R',
       'rulesets/java/quickstart.xml',
       '-f',

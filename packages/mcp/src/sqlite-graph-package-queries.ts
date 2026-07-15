@@ -25,6 +25,7 @@ import {
 } from './package-query-page.js';
 import {
   completeInventoryCoverage,
+  missingCatalogCoverage,
   type SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
 
@@ -133,7 +134,7 @@ export class SqliteGraphPackageQueries {
           });
           if (!cursor.ok) return cursor;
           return this.deps.context.envelope({ edgeKind, calls: [], imports: [] }, gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
             page: { limit },
             filter,
           });
@@ -230,7 +231,7 @@ export class SqliteGraphPackageQueries {
             { edgeKind, calls: [], imports: [], totalMatchingEvidence: 0 },
             gen,
             freshness,
-            { coverage: completeInventoryCoverage(), page: { limit }, filter },
+            { coverage: missingCatalogCoverage(), page: { limit }, filter },
           );
         }
         const matcher = this.deps.context.sourceRoleMatcherFor(gen);
@@ -310,7 +311,7 @@ export class SqliteGraphPackageQueries {
           });
           if (!cursor.ok) return cursor;
           return this.deps.context.envelope({ edgeKind, components: [] }, gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
             page: { limit },
             filter,
           });

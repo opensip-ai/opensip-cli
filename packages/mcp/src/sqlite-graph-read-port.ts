@@ -69,6 +69,7 @@ import { SqliteGraphDeclarationQueries } from './sqlite-graph-declaration-querie
 import { SqliteGraphPackageQueries } from './sqlite-graph-package-queries.js';
 import {
   completeInventoryCoverage,
+  missingCatalogCoverage,
   emptyArchitecture,
   SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
@@ -866,7 +867,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
           });
           if (!cursor.ok) return cursor;
           return this.queryContext.envelope(undefined, gen, freshness, {
-            coverage: completeInventoryCoverage(),
+            coverage: missingCatalogCoverage(),
           });
         }
         const cursor = validateCursorBinding({
@@ -968,7 +969,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
             gen,
             freshness,
             {
-              coverage: completeInventoryCoverage(),
+              coverage: missingCatalogCoverage(),
               page: { limit },
               filter,
             },
@@ -1076,7 +1077,7 @@ export class SqliteGraphReadPort implements GraphReadPort {
       if (!missing.ok) return missing;
       return ok(
         this.queryContext.envelope(emptyArchitecture(filter, sections), gen, freshness, {
-          coverage: completeInventoryCoverage(),
+          coverage: missingCatalogCoverage(),
           page: { limit },
           filter,
         }),

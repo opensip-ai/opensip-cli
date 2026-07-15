@@ -69,6 +69,13 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     defaultChanged: input.defaultChanged === true,
   });
 
+  // When scope resolves to full (explicit --full or fallback from failed
+  // changed-file resolution), force full-mode step propagation so failed
+  // selectors (changed/since) are not re-sent and graph-impact full-file
+  // injection is not blocked by hasRuntimeSelector.
+  const stepSuiteOpts: Record<string, unknown> =
+    scope.mode === 'full' ? { ...suiteOpts, full: true } : suiteOpts;
+
   log.info?.({
     evt: 'cli.suite.run.start',
     suite: suite.name,
@@ -101,7 +108,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
       suiteRunId,
       ctx: input.ctx,
       runActionHooks: input.runActionHooks,
-      suiteOpts,
+      suiteOpts: stepSuiteOpts,
       defaultChanged: scope.mode === 'changed' && scope.source === 'default',
       fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
         defaultChanged: input.defaultChanged === true,

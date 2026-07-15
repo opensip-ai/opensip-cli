@@ -147,7 +147,7 @@ describe('trivy tool — binary helpers', () => {
       '--skip-java-db-update',
       '--offline-scan',
       '--skip-check-update',
-      '/proj',
+      '.',
     ]);
   });
 

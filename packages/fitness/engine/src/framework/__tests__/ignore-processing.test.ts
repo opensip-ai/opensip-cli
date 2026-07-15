@@ -208,4 +208,20 @@ describe('buildFilteredResult', () => {
     const out = buildFilteredResult(result, [], 0, Date.now());
     expect(out.metadata.durationMs).toBe(100);
   });
+
+  it('preserves framework error results (does not green-wash empty-signal failures)', () => {
+    const errorResult: CheckResult = {
+      passed: false,
+      errors: 1,
+      warnings: 0,
+      signals: [],
+      info: { label: 'Error: check exploded' },
+      metadata: { totalItems: 0, signals: [], durationMs: 5 },
+    };
+    const out = buildFilteredResult(errorResult, [], 0, Date.now());
+    expect(out.passed).toBe(false);
+    expect(out.errors).toBe(1);
+    expect(out.signals).toEqual([]);
+    expect(out.info?.label).toBe('Error: check exploded');
+  });
 });

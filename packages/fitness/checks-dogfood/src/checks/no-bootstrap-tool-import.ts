@@ -148,7 +148,8 @@ export const noBootstrapToolImport = defineCheck({
   tags: ['architecture'],
   fileTypes: ['ts', 'tsx'],
   analyze: (content, filePath) => {
-    if (!filePath.includes(CLI_HOST_PATH) || isTestFile(filePath)) return [];
+    const normalized = filePath.replaceAll('\\', '/');
+    if (!normalized.includes(CLI_HOST_PATH) || isTestFile(normalized)) return [];
     return analyzeBootstrapToolImport(content, filePath);
   },
 });

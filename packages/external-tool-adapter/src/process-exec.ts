@@ -80,7 +80,9 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
           );
           return;
         }
-        if (failure.killed === true || failure.signal === 'SIGTERM') {
+        // Only Node's own timeout kill sets `killed === true`. External SIGTERM
+        // (operator kill, OOM adj) must not be mislabeled as wall-clock timeout.
+        if (failure.killed === true) {
           resolve({ code: -1, stdout: out, stderr: err, timedOut: true });
           return;
         }

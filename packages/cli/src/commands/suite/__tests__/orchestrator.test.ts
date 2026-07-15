@@ -1041,7 +1041,9 @@ describe('runSuite', () => {
 
     expect(seen).toEqual([
       { changed: true, files: [], _args: [] },
-      { changed: false, since: 'origin/main', files: [], _args: [] },
+      // `since: origin/main` fails in this fixture (no remote) → full fallback.
+      // Full scope clears failed selectors so steps do not re-receive `since`.
+      { changed: false, files: [], _args: [] },
     ]);
   });
 
