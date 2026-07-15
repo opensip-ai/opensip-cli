@@ -105,6 +105,34 @@ require_command() {
   fi
 }
 
+# Strip a leading v/V and surrounding whitespace so "v0.6.0" and "0.6.0" compare equal.
+normalize_version() {
+  printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^[vV]//'
+}
+
+# Resolve the opensip binary: PATH first, then npm's global bin (may not be on PATH yet).
+resolve_opensip_cmd() {
+  if command -v opensip >/dev/null 2>&1; then
+    command -v opensip
+    return 0
+  fi
+  prefix="$(npm prefix -g 2>/dev/null || true)"
+  if [ -n "$prefix" ] && [ -x "${prefix%/}/bin/opensip" ]; then
+    printf '%s\n' "${prefix%/}/bin/opensip"
+    return 0
+  fi
+  return 1
+}
+
+# Best-effort version of a currently installed opensip binary (empty if missing/unreadable).
+read_opensip_version() {
+  cmd="$1"
+  if [ -z "$cmd" ] || [ ! -x "$cmd" ]; then
+    return 0
+  fi
+  "$cmd" --version 2>/dev/null || true
+}
+
 require_command node "Node.js is required. Install Node.js ${MIN_NODE_MAJOR}+ and run this installer again."
 require_command npm "npm is required. Install Node.js ${MIN_NODE_MAJOR}+ with npm and run this installer again."
 
@@ -139,7 +167,19 @@ cleanup() {
 trap cleanup EXIT
 trap 'cleanup; exit 1' INT TERM
 
-if ! run_with_spinner "Installing ${INSTALL_SPEC}" npm install -g "$INSTALL_SPEC" --loglevel=error --no-audit --no-fund; then
+# Snapshot any pre-existing install so the post-install line can say "updated
+# from A to B" instead of a bare "is installed" when this run is an upgrade.
+PREVIOUS_VERSION=""
+if PREVIOUS_OPEN_CMD="$(resolve_opensip_cmd)"; then
+  PREVIOUS_VERSION="$(read_opensip_version "$PREVIOUS_OPEN_CMD")"
+fi
+
+# `npm install -g` both fetches the package tree from the registry and links it
+# into the global prefix. On a cold cache the wall-clock is dominated by download
+# (opensip-cli pulls ~hundreds of packages); install/link is the tail. There is no
+# clean public npm split of those phases without a second full install, so the
+# progress label names both rather than claiming only "Installing".
+if ! run_with_spinner "Downloading and installing ${INSTALL_SPEC}" npm install -g "$INSTALL_SPEC" --loglevel=error --no-audit --no-fund; then
   error "Install failed."
   if [ -s "$LOG_FILE" ]; then
     printf '\n%s\n' "npm output:" >&2
@@ -157,15 +197,19 @@ if [ -n "$GLOBAL_PREFIX" ]; then
 fi
 
 OPEN_CMD=""
-if command -v opensip >/dev/null 2>&1; then
-  OPEN_CMD="$(command -v opensip)"
-elif [ -n "$GLOBAL_BIN" ] && [ -x "${GLOBAL_BIN%/}/opensip" ]; then
-  OPEN_CMD="${GLOBAL_BIN%/}/opensip"
+if OPEN_CMD="$(resolve_opensip_cmd)"; then
+  :
+else
+  OPEN_CMD=""
 fi
 
 if [ -n "$OPEN_CMD" ]; then
-  INSTALLED_VERSION="$("$OPEN_CMD" --version 2>/dev/null || true)"
-  if [ -n "$INSTALLED_VERSION" ]; then
+  INSTALLED_VERSION="$(read_opensip_version "$OPEN_CMD")"
+  PREV_NORM="$(normalize_version "$PREVIOUS_VERSION")"
+  NEW_NORM="$(normalize_version "$INSTALLED_VERSION")"
+  if [ -n "$PREV_NORM" ] && [ -n "$NEW_NORM" ] && [ "$PREV_NORM" != "$NEW_NORM" ]; then
+    ok "Updated opensip from v${PREV_NORM} to v${NEW_NORM}."
+  elif [ -n "$INSTALLED_VERSION" ]; then
     ok "opensip ${INSTALLED_VERSION} is installed."
   else
     ok "opensip is installed."
