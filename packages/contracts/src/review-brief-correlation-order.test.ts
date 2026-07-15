@@ -12,9 +12,7 @@ import type {
   ReviewBriefRiskRef,
 } from './review-brief-correlation-types.js';
 
-function risk(
-  overrides: Partial<ReviewBriefCorrelationRisk> = {},
-): ReviewBriefCorrelationRisk {
+function risk(overrides: Partial<ReviewBriefCorrelationRisk> = {}): ReviewBriefCorrelationRisk {
   return {
     source: 'fit',
     ruleId: 'rule-a',
@@ -155,14 +153,12 @@ describe('compareReviewBriefCorrelationRisks', () => {
       }),
     ].sort(compareReviewBriefCorrelationRisks);
 
-    expect(risks.map((item) => [item.severity, item.isNew, item.blastRadius?.dependents])).toEqual(
-      [
-        ['high', true, 5],
-        ['high', false, 5],
-        ['high', false, 1],
-        ['low', true, undefined],
-      ],
-    );
+    expect(risks.map((item) => [item.severity, item.isNew, item.blastRadius?.dependents])).toEqual([
+      ['high', true, 5],
+      ['high', false, 5],
+      ['high', false, 1],
+      ['low', true, undefined],
+    ]);
   });
 
   it('uses missing line/column as MAX_SAFE_INTEGER and fingerprints as the final key', () => {

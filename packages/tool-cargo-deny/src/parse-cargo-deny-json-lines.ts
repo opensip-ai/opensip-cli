@@ -95,8 +95,7 @@ function normalize(value: unknown): Signal | undefined {
   // defensive fallback.
   const severityLabel = getString(fields, 'severity') ?? getString(fields, 'level');
   const label = firstLabel(fields);
-  const code =
-    getString(asObject(fields.code), 'code') ?? getString(fields, 'code') ?? undefined;
+  const code = getString(asObject(fields.code), 'code') ?? getString(fields, 'code') ?? undefined;
   const ruleId = ruleIdOf(fields);
   return createSignal({
     source: 'cargo-deny',

@@ -213,10 +213,7 @@ describe('projectBoundedTargets', () => {
     const reasons = new Set<string>();
     const fatal = new Set<string>();
     const projection = projectBoundedTargets(
-      resolver([
-        target('source', { languages }),
-        target('source', { languages: ['typescript'] }),
-      ]),
+      resolver([target('source', { languages }), target('source', { languages: ['typescript'] })]),
       reasons,
       fatal,
     );

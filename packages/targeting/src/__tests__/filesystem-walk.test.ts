@@ -130,9 +130,7 @@ function enotdir(pathLabel: string): NodeJS.ErrnoException {
 function pathInsideByPrefix(child: string, parent: string): boolean {
   const normalizedParent = resolvePath(parent);
   const normalizedChild = resolvePath(child);
-  return (
-    normalizedChild === normalizedParent || normalizedChild.startsWith(normalizedParent + sep)
-  );
+  return normalizedChild === normalizedParent || normalizedChild.startsWith(normalizedParent + sep);
 }
 
 function useRealFs(): void {
@@ -417,7 +415,11 @@ describe('walkTargetFilesystem (mocked I/O)', () => {
 
   it('stops mid-batch when the abort signal fires after a directory read', async () => {
     const controller = new AbortController();
-    const reads: Array<Dirent<string> | null> = [entry('a.ts', 'file'), entry('b.ts', 'file'), null];
+    const reads: Array<Dirent<string> | null> = [
+      entry('a.ts', 'file'),
+      entry('b.ts', 'file'),
+      null,
+    ];
     let readCount = 0;
     opendirMock.mockResolvedValueOnce({
       async read() {

@@ -117,11 +117,7 @@ export function isInStringLiteral(node: ts.Node): boolean {
       return true;
     }
     // Template head/middle/tail spans are string content; TemplateSpan.expression is code.
-    if (
-      ts.isTemplateHead(current) ||
-      ts.isTemplateMiddle(current) ||
-      ts.isTemplateTail(current)
-    ) {
+    if (ts.isTemplateHead(current) || ts.isTemplateMiddle(current) || ts.isTemplateTail(current)) {
       return true;
     }
     if (ts.isTemplateSpan(current) && current.expression === node) {

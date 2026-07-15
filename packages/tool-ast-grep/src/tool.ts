@@ -66,7 +66,7 @@ export function buildAstGrepExclude(input: { readonly excludePath: string }): {
   const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
   const relativeSegment = normalized.includes('opensip-cli/.runtime')
     ? 'opensip-cli/.runtime'
-    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
   const pattern = relativeSegment.endsWith('/**')
     ? `!${relativeSegment}`
     : `!${relativeSegment}/**`;

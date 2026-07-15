@@ -16,14 +16,7 @@ export const RUFF_STABLE_ID = '16419cb0-553b-4bcb-a544-3099c6092480';
  * so reported paths stay project-relative.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
-  return [
-    'check',
-    '--output-format',
-    'json',
-    '--output-file',
-    ctx.artifactPath('ruff.json'),
-    '.',
-  ];
+  return ['check', '--output-format', 'json', '--output-file', ctx.artifactPath('ruff.json'), '.'];
 }
 
 /**
@@ -37,7 +30,7 @@ export function buildRuffExclude(input: { readonly excludePath: string }): {
   const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
   const relativeSegment = normalized.includes('opensip-cli/.runtime')
     ? 'opensip-cli/.runtime'
-    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
   // --extend-exclude ADDS to defaults/config; --exclude REPLACES them (would
   // scan .venv / node_modules / .git). Same class of footgun Bandit fixed for -x.
   return { args: ['--extend-exclude', relativeSegment] };

@@ -23,9 +23,7 @@ describe('assertImpactNotCancelled / yieldImpactWork', () => {
   it('throws ComputeImpactCancelledError when already aborted', async () => {
     const controller = new AbortController();
     controller.abort();
-    expect(() => assertImpactNotCancelled(controller.signal)).toThrow(
-      ComputeImpactCancelledError,
-    );
+    expect(() => assertImpactNotCancelled(controller.signal)).toThrow(ComputeImpactCancelledError);
     await expect(yieldImpactWork(controller.signal)).rejects.toBeInstanceOf(
       ComputeImpactCancelledError,
     );

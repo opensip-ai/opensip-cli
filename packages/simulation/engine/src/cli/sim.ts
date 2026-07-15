@@ -229,8 +229,7 @@ export async function executeSim(
           pluginLoadErrors.length === 1
             ? `Simulation plugin failed to load: ${first}`
             : `Simulation plugins failed to load (${String(pluginLoadErrors.length)} errors). First: ${first}`,
-        suggestion:
-          'Fix or remove the broken simulation plugin, then re-run `opensip sim`.',
+        suggestion: 'Fix or remove the broken simulation plugin, then re-run `opensip sim`.',
         exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       },
     };

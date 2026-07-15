@@ -50,7 +50,7 @@ describe('pnpmWorkspacePatterns', () => {
       { name: 'array root', body: "- 'packages/*'\n" },
       { name: 'scalar root', body: 'packages\n' },
       { name: 'null root', body: 'null\n' },
-      { name: 'missing packages', body: "name: monorepo\n" },
+      { name: 'missing packages', body: 'name: monorepo\n' },
       { name: 'packages not array', body: "packages: 'packages/*'\n" },
     ];
 

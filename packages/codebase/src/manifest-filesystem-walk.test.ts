@@ -118,9 +118,14 @@ describe('walkManifestFilesystem edge cases', () => {
     });
 
     const offered: string[] = [];
-    const result = await walkManifestFilesystem(root, 12, () => true, (candidate) => {
-      offered.push(candidate.packageRoot);
-    });
+    const result = await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      (candidate) => {
+        offered.push(candidate.packageRoot);
+      },
+    );
 
     expect(result.cancelled).toBe(false);
     expect(result.capped).toBe(false);
@@ -138,10 +143,15 @@ describe('walkManifestFilesystem edge cases', () => {
     });
 
     const offered: string[] = [];
-    const result = await walkManifestFilesystem(root, 12, () => true, (candidate) => {
-      offered.push(candidate.packageRoot);
-      return false;
-    });
+    const result = await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      (candidate) => {
+        offered.push(candidate.packageRoot);
+        return false;
+      },
+    );
 
     expect(result.stoppedByVisitor).toBe(true);
     expect(offered).toHaveLength(1);
@@ -149,7 +159,12 @@ describe('walkManifestFilesystem edge cases', () => {
 
   it('marks the walk capped when opendir fails', async () => {
     opendirMock.mockRejectedValue(new Error('permission denied'));
-    const result = await walkManifestFilesystem(root, 12, () => true, () => undefined);
+    const result = await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      () => undefined,
+    );
     expect(result).toMatchObject({
       cancelled: false,
       capped: true,
@@ -190,7 +205,12 @@ describe('walkManifestFilesystem edge cases', () => {
       })
       .mockRejectedValueOnce(new Error('lstat failed'));
 
-    const result = await walkManifestFilesystem(root, 12, () => true, () => undefined);
+    const result = await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      () => undefined,
+    );
 
     expect(result.readFailed).toBe(true);
     expect(result.capped).toBe(true);
@@ -241,9 +261,14 @@ describe('walkManifestFilesystem edge cases', () => {
     });
 
     const offered: string[] = [];
-    await walkManifestFilesystem(root, 12, () => true, (candidate) => {
-      offered.push(candidate.packageRoot);
-    });
+    await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      (candidate) => {
+        offered.push(candidate.packageRoot);
+      },
+    );
 
     expect(offered.sort()).toEqual(['packages/app', 'packages/linked']);
   });
@@ -268,7 +293,13 @@ describe('walkManifestFilesystem edge cases', () => {
       },
     } as AbortSignal;
 
-    const result = await walkManifestFilesystem(root, 12, () => true, () => undefined, signal);
+    const result = await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      () => undefined,
+      signal,
+    );
 
     expect(result.cancelled).toBe(true);
     expect(result.metrics.visitedEntries).toBeLessThan(200);
@@ -276,9 +307,8 @@ describe('walkManifestFilesystem edge cases', () => {
   });
 
   it('caps a directory that exceeds the retained-entry budget', async () => {
-    const entries = Array.from(
-      { length: MAX_MANIFEST_ENTRIES_PER_DIRECTORY + 2 },
-      (_, index) => fileEntry(`f-${String(index).padStart(5, '0')}.txt`),
+    const entries = Array.from({ length: MAX_MANIFEST_ENTRIES_PER_DIRECTORY + 2 }, (_, index) =>
+      fileEntry(`f-${String(index).padStart(5, '0')}.txt`),
     );
     let index = 0;
     const read = vi.fn(async () => {
@@ -289,7 +319,12 @@ describe('walkManifestFilesystem edge cases', () => {
     });
     opendirMock.mockResolvedValue(fakeDirectory({ read }));
 
-    const result = await walkManifestFilesystem(root, 12, () => true, () => undefined);
+    const result = await walkManifestFilesystem(
+      root,
+      12,
+      () => true,
+      () => undefined,
+    );
 
     expect(result.capped).toBe(true);
     expect(result.metrics.visitedEntries).toBe(MAX_MANIFEST_ENTRIES_PER_DIRECTORY);

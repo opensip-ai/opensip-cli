@@ -71,21 +71,21 @@ describe('preflightInputs', () => {
   });
 
   it('rejects a target whose config is missing or not an object', () => {
-    expect(() =>
-      preflightInputs([{ config: null } as unknown as TargetView], []),
-    ).toThrow(/must contain config objects/);
-    expect(() =>
-      preflightInputs([{ config: 'nope' } as unknown as TargetView], []),
-    ).toThrow(/must contain config objects/);
-    expect(() =>
-      preflightInputs([{} as unknown as TargetView], []),
-    ).toThrow(/must contain config objects/);
+    expect(() => preflightInputs([{ config: null } as unknown as TargetView], [])).toThrow(
+      /must contain config objects/,
+    );
+    expect(() => preflightInputs([{ config: 'nope' } as unknown as TargetView], [])).toThrow(
+      /must contain config objects/,
+    );
+    expect(() => preflightInputs([{} as unknown as TargetView], [])).toThrow(
+      /must contain config objects/,
+    );
   });
 
   it('rejects non-string glob patterns', () => {
-    expect(() =>
-      preflightInputs([target([1 as unknown as string])], []),
-    ).toThrow(/must be strings/);
+    expect(() => preflightInputs([target([1 as unknown as string])], [])).toThrow(
+      /must be strings/,
+    );
   });
 
   it('rejects empty, oversized, or control-bearing target names', () => {
@@ -123,9 +123,9 @@ describe('preflightInputs', () => {
 
 describe('preflightGlobalFilterCandidates', () => {
   it('rejects non-string candidate paths', () => {
-    expect(() =>
-      preflightGlobalFilterCandidates([1 as unknown as string]),
-    ).toThrow(/must be strings/);
+    expect(() => preflightGlobalFilterCandidates([1 as unknown as string])).toThrow(
+      /must be strings/,
+    );
   });
 
   it('rejects empty, oversized, or control-bearing candidate paths', () => {

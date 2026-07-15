@@ -301,7 +301,10 @@ describe('executeImpact', () => {
       };
     });
     try {
-      await executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'] }, mockCli(datastore));
+      await executeImpact(
+        { cwd: '/proj', json: true, files: ['src/callee.ts'] },
+        mockCli(datastore),
+      );
       expect(runGraph).toHaveBeenCalledOnce();
       // Freshness should not be consulted when build coverage already fails the gate.
       expect(verifySpy).not.toHaveBeenCalled();
@@ -310,7 +313,6 @@ describe('executeImpact', () => {
       datastore.close();
     }
   });
-
 
   it('renders human impact lines and the truncation hint outside JSON mode', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });

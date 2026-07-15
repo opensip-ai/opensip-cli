@@ -225,7 +225,8 @@ describe('filterContent', () => {
     });
 
     it('does not treat division after type keywords as a regex before http URLs', () => {
-      const src = 'const number = 10; const x = number / 2; const url = "http://example.com"; const after = 1;';
+      const src =
+        'const number = 10; const x = number / 2; const url = "http://example.com"; const after = 1;';
       const { code } = filterContent(src);
       expect(code).toContain('const after = 1');
     });

@@ -99,13 +99,7 @@ export async function executeCommand(
 
   let violations: CheckViolation[];
   try {
-    violations = config.parseOutput(
-      result.stdout,
-      result.stderr,
-      result.exitCode ?? 0,
-      files,
-      cwd,
-    );
+    violations = config.parseOutput(result.stdout, result.stderr, result.exitCode ?? 0, files, cwd);
   } catch (parseError) {
     const message = parseError instanceof Error ? parseError.message : String(parseError);
     return {

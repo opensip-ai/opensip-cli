@@ -261,12 +261,7 @@ function filterContentImpl(content: string): FilteredContent {
   // JSX variant so `</div>` closing tags are not re-scanned as regex openers
   // (Standard + reScanSlashToken treats `LessThan` + `/` as regex start and can
   // desync on same-line `http://` / string quotes). Matches TSX ScriptKind.
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    ts.LanguageVariant.JSX,
-    content,
-  );
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, content);
 
   const stringRegions: Region[] = [];
   const commentRegions: Region[] = [];

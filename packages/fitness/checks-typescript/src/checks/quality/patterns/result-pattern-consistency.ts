@@ -144,7 +144,11 @@ function isRecipeOrchestratorPath(filePath: string): boolean {
 }
 
 function isThrowAllowedPath(filePath: string): boolean {
-  if (buildEffectiveThrowAllowedPaths().some((pattern) => pattern.test(filePath.replaceAll('\\', '/')))) {
+  if (
+    buildEffectiveThrowAllowedPaths().some((pattern) =>
+      pattern.test(filePath.replaceAll('\\', '/')),
+    )
+  ) {
     return true;
   }
 

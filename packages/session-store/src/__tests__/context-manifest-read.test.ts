@@ -871,10 +871,7 @@ describe('readTaskContextRun', () => {
   it('rejects a non-agent-context run kind by name', () => {
     const store = open();
     const contextManifest = readyManifest();
-    new RunRepo(store).saveRunWithSteps(
-      readyRun(contextManifest, { name: 'audit' }),
-      readySteps(),
-    );
+    new RunRepo(store).saveRunWithSteps(readyRun(contextManifest, { name: 'audit' }), readySteps());
     expect(
       readTaskContextRun({
         datastore: store,

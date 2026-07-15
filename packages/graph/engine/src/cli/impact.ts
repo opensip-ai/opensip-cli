@@ -331,11 +331,7 @@ async function catalogReuseDecision(
     languageAdapters: languages,
     graphConfig: loadGraphReadConfig(cwd, cli.scope.projectContext?.configPath),
   });
-  if (
-    verified.ok &&
-    verified.value.verification === 'complete' &&
-    verified.value.fresh === true
-  ) {
+  if (verified.ok && verified.value.verification === 'complete' && verified.value.fresh === true) {
     return 'reuse';
   }
   return 'rebuild';

@@ -597,9 +597,9 @@ describe('RunRepo', () => {
   });
 
   it('rejects run/step validation failures before writing', () => {
-    expect(() =>
-      repo.saveRunWithSteps(makeRun(), [makeStep({ runId: 'other-run' })]),
-    ).toThrow(/mismatched runId/);
+    expect(() => repo.saveRunWithSteps(makeRun(), [makeStep({ runId: 'other-run' })])).toThrow(
+      /mismatched runId/,
+    );
 
     expect(() =>
       repo.saveRun(makeRun({ startedAt: 'not-a-date', completedAt: 'also-bad' })),

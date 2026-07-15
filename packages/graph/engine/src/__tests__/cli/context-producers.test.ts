@@ -527,12 +527,12 @@ describe('graph context producer bindings', () => {
         inventoryValue.files[1]!,
       ],
     };
-    expect(
-      assessContextGraphCoverage({ catalog: base, inventory: unknownCallable }),
-    ).toMatchObject({
-      status: 'partial',
-      reasonCodes: expect.arrayContaining(['graph-language-coverage-unverified']),
-    });
+    expect(assessContextGraphCoverage({ catalog: base, inventory: unknownCallable })).toMatchObject(
+      {
+        status: 'partial',
+        reasonCodes: expect.arrayContaining(['graph-language-coverage-unverified']),
+      },
+    );
 
     const unsupportedCallable: ProjectInventorySnapshot = {
       ...inventoryValue,
@@ -557,20 +557,18 @@ describe('graph context producer bindings', () => {
   });
 
   it('fails closed for empty files, missing prior evidence, and catalog load errors', async () => {
-    const omittedFiles = await produceContextTestSelection(
-      { cwd: '/repo' },
-      { scope: {} } as ToolCliContext,
-    );
+    const omittedFiles = await produceContextTestSelection({ cwd: '/repo' }, {
+      scope: {},
+    } as ToolCliContext);
     expect(omittedFiles.evidenceSnapshots).toEqual([
       expect.objectContaining({
         status: 'unsupported',
         reasons: [{ code: 'test-selection-files-not-provided' }],
       }),
     ]);
-    const empty = await produceContextTestSelection(
-      { cwd: '/repo', files: [] },
-      { scope: {} } as ToolCliContext,
-    );
+    const empty = await produceContextTestSelection({ cwd: '/repo', files: [] }, {
+      scope: {},
+    } as ToolCliContext);
     expect(empty.evidenceSnapshots).toEqual([
       expect.objectContaining({
         status: 'unsupported',
@@ -699,10 +697,7 @@ describe('graph context producer bindings', () => {
         };
       });
       const adapters = {
-        getAll: () => [
-          { id: 'typescript' },
-          { id: 'python' },
-        ],
+        getAll: () => [{ id: 'typescript' }, { id: 'python' }],
       };
       const inventoryCli = {
         scope: {

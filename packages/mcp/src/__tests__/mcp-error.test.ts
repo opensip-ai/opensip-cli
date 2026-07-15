@@ -54,11 +54,7 @@ describe('fromGraphReadError', () => {
     ],
     ['GRAPH.READ.IMPACT_FILE_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
     ['GRAPH.READ.ENTITY_ID_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
-    [
-      'GRAPH.READ.TEST_SELECTION_FILE_INVALID',
-      'invalid-input',
-      'The graph-read input is invalid.',
-    ],
+    ['GRAPH.READ.TEST_SELECTION_FILE_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
     ['GRAPH.READ.IMPACT_CANCELLED', 'cancelled', 'The graph read was cancelled.'],
     ['GRAPH.READ.TEST_SELECTION_CANCELLED', 'cancelled', 'The graph read was cancelled.'],
     [

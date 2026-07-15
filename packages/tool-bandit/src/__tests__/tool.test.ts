@@ -98,13 +98,7 @@ describe('bandit tool — binary + scan helpers', () => {
     const excludes = (args[1] ?? '').split(',');
     // Passing -x replaces Bandit's default exclude list — both must stay present.
     expect(excludes).toEqual(
-      expect.arrayContaining([
-        '.git',
-        '__pycache__',
-        '.tox',
-        '*.egg',
-        'opensip-cli/.runtime',
-      ]),
+      expect.arrayContaining(['.git', '__pycache__', '.tox', '*.egg', 'opensip-cli/.runtime']),
     );
     expect(excludes.at(-1)).toBe('opensip-cli/.runtime');
   });

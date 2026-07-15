@@ -235,7 +235,9 @@ describe('listSessionSummaries', () => {
     );
 
     const result = listSessionSummaries(datastore, { summaryOnly: true });
-    expect(result.sessions.find((session) => session.id === 'FIT_PARTIAL')?.summary).toBeUndefined();
+    expect(
+      result.sessions.find((session) => session.id === 'FIT_PARTIAL')?.summary,
+    ).toBeUndefined();
   });
 });
 

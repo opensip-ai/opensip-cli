@@ -48,7 +48,7 @@ export function buildBanditExclude(input: { readonly excludePath: string }): {
   const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
   const relativeRuntime = normalized.includes('opensip-cli/.runtime')
     ? 'opensip-cli/.runtime'
-    : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
+    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
   const excludes = [...BANDIT_DEFAULT_EXCLUDES, relativeRuntime].join(',');
   return { args: ['-x', excludes] };
 }

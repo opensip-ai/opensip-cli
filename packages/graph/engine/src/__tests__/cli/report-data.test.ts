@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  buildGraphRecipeCatalog,
-  buildGraphRuleCatalog,
-} from '../../cli/report-data.js';
+import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from '../../cli/report-data.js';
 
 import type { ToolScope } from '@opensip-cli/core';
 

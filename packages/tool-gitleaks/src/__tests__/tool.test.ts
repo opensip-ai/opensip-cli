@@ -182,7 +182,7 @@ describe('gitleaks tool — A3 .runtime exclusion (buildGitleaksExclude)', () =>
     const projectToml = join(dir, '.gitleaks.toml');
     writeFileSync(
       projectToml,
-      '[extend]\nuseDefault = true\n\n[allowlist]\npaths = [\'\'\'vendor\'\'\']\n',
+      "[extend]\nuseDefault = true\n\n[allowlist]\npaths = ['''vendor''']\n",
     );
     const withProject = buildGitleaksExclude({
       excludePath: join(dir, 'opensip-cli', '.runtime'),
