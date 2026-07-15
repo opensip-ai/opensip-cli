@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 release: v0.7.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
@@ -10,6 +10,8 @@ source-files:
   - packages/cli/src/commands/host-command-specs.ts
   - packages/cli/src/commands/init.ts
   - packages/cli/src/commands/init/optional-tools.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
   - packages/cli/src/ui/views/init-view.ts
   - packages/contracts/src/command-results-variants/init-results.ts
   - packages/cli/src/commands/audit-command-spec.ts
@@ -74,9 +76,10 @@ tool run commands (`fit`/`sim`/`graph`/`yagni`) — `--json`, `--cwd`, `-q/--qui
 `-v/--verbose`, `--debug`, `--report-to`, and `--api-key` — are declared
 **once** in a common-flag registry and applied via `applyCommonFlags`, so their
 names, short aliases, descriptions, and defaults are identical where applied and
-cannot drift (ADR-0021). `fit`, `sim`, and the host-owned `audit` workflow also expose `--open` for HTML report
-auto-open; `graph` writes report data and uses the separate `report`
-command to open the report. `-v/--verbose` is a uniform "show the detailed
+cannot drift (ADR-0021). The four first-party analysis primaries (`fit`, `sim`,
+`graph`, and `yagni`) plus the host-owned audit/suite workflows expose `--open`
+for HTML report generation and browser launch. The separate `report` command
+regenerates a report from stored evidence. `-v/--verbose` is a uniform "show the detailed
 report body" flag whose output is identical in a TTY and a pipe.
 
 **Host-guaranteed tool-primary surface.** The host mount layer guarantees a
@@ -120,11 +123,13 @@ OpenSIP Cloud sync is optional. This repo ships the CLI client and the
 compatible endpoint are configured. Without a key, the CLI remains fully local.
 
 When configured (an OpenSIP API key via `opensip configure` or
-`OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each deliverable
+`OPENSIP_API_KEY`) **and** entitled to Cloud signal storage, each deliverable
 `fit`, `sim`, `graph`, and `yagni` run additionally emits its **signals** (the
 findings it already produces) to OpenSIP Cloud for storage. This is **additive
-and best-effort**: results are always written to the local SQLite store first,
-and a cloud failure never blocks, slows, or fails a run. On a successful sync
+and best-effort**: it leaves whatever local artifacts and records the selected
+command mode normally writes unchanged and neither replaces the local runtime
+nor forces a generic session row. A Cloud failure never changes the local result
+or exit code, although an enabled delivery can add network latency. On a successful sync
 you'll see `✓ Sent N signals to OpenSIP Cloud`.
 
 `fit`, `sim`, and `yagni` deliver after normal run modes that produce a
@@ -199,7 +204,7 @@ opensip fit --gate-compare
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
-| `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'fitness'`, at `opensip-cli/.runtime/datastore.sqlite`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
+| `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the active local SQLite store (managed user cache before initialization, project `.runtime` afterward; host-owned `tool_baseline_entries`, scoped `tool = 'fitness'`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch the HTML report after run. |
@@ -313,7 +318,7 @@ opensip graph --list-files --workspace  # the per-unit fan-out set
 | `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph recipes`. |
 | `--show <session>` | string | — | Replay a stored graph session (by id, or `latest`) instead of building — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
-| `--gate-save` | bool | `false` | Save the current Signal fingerprint set as baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'graph'`; ADR-0036), then exit per graph's fail thresholds — the save happens before the exit. Mutually exclusive with `--gate-compare`. |
+| `--gate-save` | bool | `false` | Save the current Signal fingerprint set as baseline rows in the active local SQLite store (managed user cache before initialization, project `.runtime` afterward; host-owned `tool_baseline_entries`, scoped `tool = 'graph'`; ADR-0036), then exit per graph's fail thresholds — the save happens before the exit. Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `--sarif <path>` | path | — | Also write this run's findings as a SARIF 2.1.0 file (for GitHub Code Scanning) via the shared `cli.writeSarif` envelope→SARIF seam — the same producer `fit --report-to`/`fit export --format baseline` use. Composes with `--gate-save`: the SARIF is written in the action body after the gate sets its exit code, so the file lands even when the gate fails. Relative paths resolve against `--cwd`. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
@@ -356,8 +361,9 @@ opensip graph --workspace
 
 **`OPENSIP_HEAP_NO_MONITOR`** (env var): during a build, `graph` runs a V8 heap-pressure monitor that aborts with a readable `MemoryPressureError` when old-gen usage crosses ~90% of the heap limit — catching an impending OOM before V8 SIGABRTs the process. In unusual GC scenarios (REPL embedding, custom allocators) this guard can fire as a false positive before a real OOM is imminent. Set `OPENSIP_HEAP_NO_MONITOR=1` to disable it entirely. This is an escape hatch only: with the monitor off, an actual out-of-memory condition becomes a bare V8 abort instead of a structured error. Prefer raising the heap ceiling (above) or scoping the run (positional paths / `--workspace`) first.
 
-**Catalog storage:** graph stores the catalog in the project's SQLite database
-(`<project>/opensip-cli/.runtime/datastore.sqlite`, `graph_catalog` row). The
+**Catalog storage:** graph stores the catalog in the active local SQLite database
+(`<runtime-root>/datastore.sqlite`, `graph_catalog` row): managed user cache
+before initialization, project `.runtime` afterward. The
 wire format carries `language` (adapter id), `cacheKey` (an opaque per-adapter
 invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`;
 Python and Rust use language-id-prefixed keys), and a per-file mtime+size
@@ -720,7 +726,11 @@ send someone — a bigger report is slower to open and may be too large to share
 The exhaustive evidence always remains available through `opensip graph` and the
 MCP graph tools, which is the better path for an agent or a deep query.
 
-The report is a single self-contained HTML file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-cli installed, so you can email it directly to a teammate.
+The report is a single self-contained HTML file at
+`<runtime-root>/reports/latest.html`: managed user cache before initialization,
+project `.runtime` afterward. Each generation overwrites the previous file. The
+command launches the browser and exits; the file works without opensip-cli
+installed, so you can email it directly to a teammate.
 
 **See also:** [`70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/), [`80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/).
 
@@ -805,17 +815,27 @@ opensip init --keep
 opensip init --remove
 ```
 
-### No-init first runs
+### Zero-config first runs
 
-`audit`, `fit`, `graph`, `graph impact`, and the built-in `suite run audit` can run from
-a supported project before `opensip init`. The CLI synthesizes an in-memory
+`audit`, `fit`, `graph`, `graph impact`, the built-in `suite run audit` and
+`suite run agent-context`, `sessions list`, `sessions show`, and `report` can run from a supported project
+before `opensip init`. The CLI synthesizes an in-memory
 config from language markers, validates it through the normal config schema, and
-stores rebuildable runtime state under `~/.opensip-cli/cache/ephemeral/`.
+stores generated runtime state under `~/.opensip-cli/cache/ephemeral/`. The
+directory name is an implementation detail: this is file-backed,
+retention-managed cache storage, not process-temporary storage. It survives
+normal command exits and reboots, but a whole project entry can be evicted when
+orphaned, stale, or beyond the cache's project limit.
 
-No project files are written in no-init mode. Human output includes an adoption
-hint; JSON, help, and SARIF-oriented output stay quiet. Run `opensip init` when
-you want to persist the config, create example files, refresh agent guidance, and
-move the no-init runtime into `<project>/opensip-cli/.runtime/`.
+No implicit OpenSIP state is written into a zero-config project. An
+explicitly requested export, SARIF, or profile path is the exception. Human
+output includes an initialization hint; JSON, help, and SARIF-oriented output stay quiet. Run `opensip init` when
+you want to initialize the project: persist the config, create example files,
+refresh agent guidance, and make `<project>/opensip-cli/.runtime/` the
+project-local runtime location. `init` transitions a **zero-config project** to
+an **initialized project**; it is not a third storage location. The project
+runtime remains local and gitignored. It contains rebuildable caches and
+catalogs alongside retained evidence that is lost when the runtime is removed.
 
 Detects the project's primary language(s) from filesystem markers and writes one
 directory tree per **registered tool** — each tool owns its own example files and
@@ -1090,7 +1110,12 @@ packs run through the capability worker bridge with undeclared resources denied.
 
 ## `sessions list`, `sessions show`, and `sessions purge` — manage session records
 
-CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
+CLI-owned. Reads and replays session rows in the active local SQLite datastore
+via `SessionRepo`: the managed user cache before initialization, or
+`<project>/opensip-cli/.runtime/datastore.sqlite` afterward. `list` and `show`
+support zero-config first runs. `purge` requires an initialized project and
+is a row-level `DELETE` (the FK cascade drops each session's tool-payload row),
+not file removal.
 
 Primary surface for inspecting prior runs (especially from agents). See `agent-catalog` above for the recommended discovery entry point.
 
@@ -1581,9 +1606,9 @@ Two modes:
 
 | Mode | Targets removed | When to use |
 |---|---|---|
-| Default / `--user` | `~/.opensip-cli/` (user-level config dir) | Removing the cloud API key and per-user defaults. |
-| `--project [path]` | `<path>/opensip-cli/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
-| `--project [path] --purge` | `<path>/opensip-cli/` (authored content included) and `<path>/opensip-cli.config.yml` | Fully disengage from opensip-cli in one repo. Destructive if custom checks/recipes are not committed. |
+| Default / `--user` | All of `~/.opensip-cli/`: user config, global tools/plugins, and every managed user-cache runtime/database | Remove all per-user OpenSIP CLI state. |
+| `--project [path]` | `<path>/opensip-cli/.runtime/` and the matching zero-config user-cache runtime, when present | Remove generated local runtime state for one repo while preserving authored checks, recipes, scenarios, and config. Session/log history, baselines, tool state, and other retained evidence in those runtimes are lost. |
+| `--project [path] --purge` | The same two runtime targets, plus `<path>/opensip-cli/` (authored content included) and `<path>/opensip-cli.config.yml` | Fully disengage from opensip-cli in one repo. Destructive if custom checks/recipes are not committed. |
 
 | Flag | Effect |
 |---|---|
@@ -1599,12 +1624,14 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no OpenSIP CLI state is a no-op, not a destructive accident). In project mode without `--purge`, a repo that has only authored content and no `.runtime/` also becomes a no-op and tells you what it kept.
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-cli/` holds `config.yml` only.
-Persistence and logging modules throw when asked to write there (see
-[`paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/paths.ts),
-[`logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/logger.ts)). Anything else in that
-directory is considered extra user-level state and is swept up by the default
-`uninstall`.
+State contract enforced by code: `~/.opensip-cli/` is the user-level root. It
+can contain `config.yml`, `update-state.json`, managed zero-config runtimes under
+`cache/ephemeral/`, npm-installed global Tool plugins under `plugins/`, and
+global authored Tool sidecars under `tools/` (see
+[`paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/paths.ts)). Runtime persistence and
+logging stay inside the selected per-project runtime rather than writing loose
+database or log files at the user root. The default `uninstall` removes the
+whole user-level root.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -20,6 +20,9 @@ source-files:
   - packages/contracts/src/review-brief.ts
   - packages/contracts/src/task-context.ts
   - packages/cli/src/commands/audit-command-spec.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./06-system-context.md
@@ -32,6 +35,49 @@ related-docs:
 The codebase has a small set of load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
 
 If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom, expect each entry to be ~3-6 sentences with a source pointer.
+
+---
+
+## Runtime mode and initialization
+
+OpenSIP CLI has two local project states and two corresponding local evidence
+locations. These are separate concepts: `opensip init` is the transition command,
+not a storage location.
+
+| Customer state | Local evidence location | Configuration authority |
+|---|---|---|
+| **Zero-config project** (cache-backed; not initialized) | **Managed user cache** under `~/.opensip-cli/cache/ephemeral/<project-key>/` | Validated config synthesized in memory |
+| **Initialized project** | **Project-local runtime** under `<project>/opensip-cli/.runtime/` | Explicit project config and authored guardrails |
+
+```text
+Customer state   Zero-config project ── opensip init ──▶ Initialized project
+Evidence home    Managed user cache ───────────▶ Project-local runtime
+Optional Cloud   Disconnected ───── opt in ────▶ Cloud-connected (local runtime remains)
+```
+
+The Cloud row is orthogonal to local initialization; it is not a third local
+runtime mode.
+
+**Zero-config project** is the preferred customer-facing term. Implementation details may
+say `no-init`, `cache-backed`, or `ephemeral`; those describe the same customer
+state or its managed-cache storage, not additional modes.
+
+Both locations are file-backed and use the same SQLite/runtime formats. The
+managed user cache survives commands and reboots, but its whole project entry is
+automatically evictable; the internal `ephemeral` path/scope name means
+“not attached to an initialized project and retention-managed,” not “deleted
+when the process exits.” The project-local runtime has no whole-cache eviction
+policy, but it is still gitignored and local to one working copy. It contains
+rebuildable caches and catalogs alongside retained evidence—such as sessions,
+baselines, and tool state—that is lost when the runtime is removed.
+
+`opensip init` **initializes** the project: it persists commit-worthy
+configuration and authored guardrails and switches subsequent runs to the
+project-local runtime. On a successful scaffold path, it also migrates existing
+cache evidence when the cache runtime exists and the project runtime does not.
+Initialization persists project intent; it does not promise permanent evidence
+storage. OpenSIP Cloud is an optional additive connection, not a replacement for
+either local runtime.
 
 ---
 
@@ -135,15 +181,18 @@ The per-tool `opensip <tool> plugin` command surface (`add`/`remove`/`list`/`syn
 
 ## Session
 
-A **session** is one persisted run of a Tool such as `opensip fit`, `sim`, `graph`, `yagni`, or an installed scanner adapter like `gitleaks`. Each session is persisted as a row in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, alongside a structured log under `.runtime/logs/` and a rendered HTML report under `.runtime/reports/`.
+A **session** is one persisted run of a Tool such as `opensip fit`, `sim`, `graph`, `yagni`, or an installed scanner adapter like `gitleaks`. Each session is persisted through `SessionRepo` in the active local runtime: the managed user-cache datastore before initialization, or the project-local datastore afterward. Structured logs and rendered reports use that same active runtime root.
 
 Each session record is keyed by a UUID (`session.id`, generated via `randomUUID()`) and ordered by its `timestamp` column (newest first). The persisted row carries only the columns every tool shares; per-session detail rides in a companion `session_tool_payload` row as a tool-owned opaque JSON blob. The logger uses a separate per-process correlation id of the form `RUN_<ulid>` (`generatePrefixedId('run')`); it appears in every log entry as `runId`. The `sessions list` command (with `--summary-only` for agents) browses past sessions; `sessions purge` deletes the rows. See `agent-catalog` (in the CLI commands reference) for the recommended way for agents to discover these surfaces and the new ergonomics around historical inspection.
 
-The runtime dir is gitignored — sessions are local artifacts, not source. The path resolver lives in [`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/paths.ts).
+Runtime evidence is local state, not source. The project-local runtime is
+gitignored; the zero-config runtime stays outside the project in the managed
+user cache. The path resolver lives in
+[`packages/core/src/lib/paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/paths.ts).
 
 ## Gate
 
-A **gate** is the host-owned baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). `graph` and installed external scanner adapters use the same `--gate-save` / `--gate-compare` ratchet for their signal envelopes. Use `opensip fit export --format baseline` or graph's SARIF/export commands when CI needs files.
+A **gate** is the host-owned baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the active local runtime's SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). `graph` and installed external scanner adapters use the same `--gate-save` / `--gate-compare` ratchet for their signal envelopes. Use `opensip fit export --format baseline` or graph's SARIF/export commands when CI needs files.
 
 The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/baseline-strategy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/fitness/engine/src/baseline-strategy.ts) and [`../10-concepts/05-architecture-gate.md`](/docs/opensip-cli/10-concepts/05-architecture-gate/).
 

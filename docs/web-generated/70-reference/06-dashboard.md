@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Report"
 audience: [users, contributors]
@@ -14,6 +14,8 @@ source-files:
   - packages/dashboard/src/code-paths.ts
   - packages/dashboard/src/client/
   - packages/cli/src/open-report.ts
+  - packages/cli/src/report-compose.ts
+  - packages/core/src/lib/paths.ts
   - packages/fitness/engine/src/cli/report-data.ts
 related-docs:
   - ../80-implementation/03-session-and-persistence.md
@@ -22,9 +24,10 @@ related-docs:
 ---
 # Report
 
-The report is a self-contained HTML view of every fit, sim, graph, yagni, and
-installed external-tool run on the local machine. No server, no database, no
-asset hosting — a single file you can email or commit, fully functional offline.
+The report is a self-contained HTML snapshot generated from bounded locally
+stored evidence for fit, sim, graph, yagni, and installed external tools.
+Generation reads the active local datastore; viewing the finished file needs no
+server, database, asset hosting, or network connection.
 
 > **What you'll understand after this:**
 > - When the report opens automatically vs. manually.
@@ -36,10 +39,13 @@ asset hosting — a single file you can email or commit, fully functional offlin
 
 ## When it opens
 
-Two triggers, both opt-in:
+There are two triggers. Analysis-triggered generation is opt-in; the explicit
+report command opens by default:
 
 1. **`--open` flag.** `opensip fit --open` (or `sim --open`) runs the recipe, then launches the report if conditions allow. `opensip audit --open` and `opensip suite run audit --open` generate the report after suite persistence and select that parent Run in Change Impact. Other `opensip suite run <name> --open` runs open the ordinary report without inventing a Change Impact selection.
-2. **Explicit `report` command.** `opensip report` opens the most recent run's report regardless of any pending fit run.
+2. **Explicit `report` command.** `opensip report` regenerates the current
+   snapshot from stored evidence, writes it, and opens it by default unless
+   `--no-open` or `--json` is selected.
 
 The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/open-report.ts)) returns `shouldOpen: true` only when **all** of these hold:
 
@@ -49,12 +55,12 @@ The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](https://g
 - The `CI` environment variable is unset (GitHub Actions, GitLab CI, CircleCI, etc. — never open).
 - Not an SSH session without a display (`SSH_CONNECTION`/`SSH_CLIENT` set without `DISPLAY`/`WAYLAND_DISPLAY`).
 
-For fit/sim report hooks and the explicit `report` command, the HTML file is
-written even when browser launch is skipped. Canonical `audit --open` is a
-human-only convenience: when JSON/CI/non-TTY/remote-shell policy suppresses the
-request, audit does not require report generation. Run `opensip report` as a
-separate CI artifact step when a file is required. Browser/report failure never
-changes an audit verdict or exit code.
+Analysis and audit `--open` hooks apply that policy before composing the HTML;
+when the request is suppressed, they neither generate nor launch a report. The
+explicit `opensip report` command is different: it always composes the file and
+opens it by default unless `--no-open` or `--json` is selected. Use `opensip
+report --no-open` as a CI artifact step when a file is required. Browser/report
+failure never changes an audit verdict or exit code.
 
 ---
 
@@ -289,15 +295,24 @@ are available wherever any tab JS runs.
 
 ## Where it lives
 
-```
-<project>/opensip-cli/.runtime/reports/latest.html
-```
+| Project state | Report path |
+|---|---|
+| Zero-config project | `~/.opensip-cli/cache/ephemeral/<project-key>/reports/latest.html` |
+| Initialized project | `<project>/opensip-cli/.runtime/reports/latest.html` |
 
-Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the SQLite session store (`.runtime/datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/report-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/report-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until you run `sessions purge`.
+`opensip report` resolves the same active local runtime as analysis and session
+commands. A managed-cache report therefore works before initialization without
+creating project files. The internal `ephemeral` path name means the whole cache
+entry is automatically evictable, not that the report disappears when the
+process exits.
+
+Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the active runtime's SQLite session store (`datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/report-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/report-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until retention or `sessions purge` removes them.
 
 The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-cli installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 
-The runtime dir is gitignored. If you want to archive a specific snapshot, copy `latest.html` somewhere else before re-running.
+The project runtime is gitignored; the zero-config runtime lives outside the
+project in the managed user cache. Neither location is an archive. Copy
+`latest.html` somewhere else before re-running if you need a durable snapshot.
 
 ---
 
@@ -305,8 +320,14 @@ The runtime dir is gitignored. If you want to archive a specific snapshot, copy 
 
 A few common mis-expectations, listed once:
 
-- **Not real-time.** The dashboard reflects the most recent run on disk. Re-running fit produces a new session record; the dashboard re-reads on load. There's no streaming, no auto-refresh.
-- **Not multi-machine.** Sessions are local to the project's runtime dir. A team that wants centralized reporting points `--report-to` at OpenSIP Cloud, which is a separate product (and not open-source).
+- **Not real-time.** The dashboard is a self-contained snapshot of the data
+  inlined when it was generated; it cannot re-read SQLite when opened. Run
+  `opensip report` (or use a command mode that accepts `--open` and composes a
+  report) to refresh it. There is no streaming or auto-refresh.
+- **Not multi-machine.** Sessions are local to the active runtime on one
+  machine. Opt-in Cloud delivery sends bounded signals or SARIF through the
+  supported delivery paths; the local runtime, database, and generated HTML
+  remain local.
 - **Not authentication-aware.** The static file is readable by anyone who can read it. Treat the report as the same sensitivity as your project's source files.
 - **Not editable.** It's a generated artifact. Re-run fit to update; don't hand-edit the HTML.
 
@@ -314,13 +335,18 @@ A few common mis-expectations, listed once:
 
 ## Where the example lands
 
-For `acme-api` after the nightly CI run:
+For an initialized `acme-api` project after nightly CI runs the analysis and
+then `opensip report --no-open`:
 
 - The session row persisted in `<project>/opensip-cli/.runtime/datastore.sqlite` (tool `fit`, recipe `default`, timestamped `2026-05-17T03:15:22.123Z`) carries the full result in its companion `session_tool_payload` row.
 - The HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` is regenerated. The Sessions panel inside the HTML inlines the most recent 20 session records, so a developer opening it later sees the new run alongside its 19 immediate predecessors.
 - A developer running `opensip report` locally opens the file in their browser. The Sessions panel shows the run; the Overview panel shows the score trend.
 
-In CI, `--open` is suppressed (no TTY), so no browser opens — but the HTML file is still written. Teams that want a per-run archive copy `latest.html` to a build-artifact path with a run-scoped filename before the next pipeline run overwrites it.
+An analysis command's `--open` is suppressed in CI, which prevents both report
+composition and browser launch. The explicit `opensip report --no-open` step
+above generates the HTML without attempting to launch a browser. Teams that
+want a per-run archive can then copy `latest.html` to a build-artifact path with
+a run-scoped filename before the next report generation overwrites it.
 
 ---
 

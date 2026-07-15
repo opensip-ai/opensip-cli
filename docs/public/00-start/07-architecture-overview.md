@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Architecture overview"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -10,6 +10,7 @@ source-files:
   - package.json
   - packages/cli/src/index.ts
   - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
   - packages/core/src/tools/types.ts
   - packages/contracts/src/signal-envelope.ts
   - packages/datastore/src/data-store.ts
@@ -66,7 +67,7 @@ The important thing is the direction of knowledge. `packages/cli` knows everythi
 
 ## Runtime flow
 
-Every invocation starts in the CLI composition root. The CLI builds fresh registries, registers first-party tools and adapters, discovers plugin packages, mounts commands, and then lets the selected tool own the domain work. All first-party tools converge on the same `SignalEnvelope`, which the CLI renders, persists, or sends onward.
+Every invocation starts in the CLI composition root. The CLI builds fresh registries, registers first-party tools and adapters, discovers plugin packages, mounts commands, and then lets the selected tool own the domain work. First-party analysis tools converge on the same `SignalEnvelope`, which the CLI renders or sends onward; generic run history is persisted only when the command returns a session contribution.
 
 ```mermaid
 flowchart TB
@@ -74,8 +75,8 @@ flowchart TB
   browser["Dashboard browser"]
   cloud["OpenSIP Cloud<br/>optional"]
 
-  target["Target project<br/>source code<br/>opensip-cli.config.yml<br/>opensip-cli/fit<br/>opensip-cli/sim"]
-  runtime["Project runtime dir<br/>opensip-cli/.runtime<br/>datastore.sqlite<br/>logs/*.jsonl<br/>reports/latest.html<br/>plugins/*/node_modules"]
+  target["Target project<br/>source code<br/>optional project config<br/>authored fit/sim content"]
+  runtime["Resolved local runtime<br/>managed user cache before init<br/>project .runtime after init<br/>datastore.sqlite<br/>logs + reports + artifacts"]
 
   cli["opensip-cli CLI<br/>packages/cli<br/>argv, commands, composition"]
   core["core services<br/>paths + config<br/>ToolRegistry + LanguageRegistry<br/>plugin discovery<br/>logger + RunScope"]
@@ -117,7 +118,7 @@ flowchart TB
   graph --> envelope
 
   envelope -->|format or deliver| output
-  envelope -->|save run history| datastore
+  envelope -->|when paired with a session contribution, save run history| datastore
   fit -->|save/compare gate baseline| datastore
   graph -->|persist catalog and gate baseline| datastore
 
@@ -130,7 +131,12 @@ flowchart TB
   runtime -->|opens static report| browser
 ```
 
-The local-first rule from system context still holds: there is no daemon, no queue, no server database, and no background worker. The only durable local state is under `<project>/opensip-cli/.runtime/`.
+The local-first rule from system context still holds: there is no daemon, no
+queue, no server database, and no background worker. Local state uses the
+managed user-cache runtime for a zero-config project and the project-local
+`.runtime/` after initialization. Both are file-backed; the first is automatically
+evictable and the second is gitignored and retention-managed. `opensip init` is
+the transition between those project states, not another storage location.
 
 ---
 

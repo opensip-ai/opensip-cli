@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-07
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Ignore directives"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -132,11 +132,17 @@ Directives are line-local. They're explicit. They're greppable. They survive rev
 The check fires on dozens of legitimate sites because the rule landed late or because the team's view changed. Use the gate baseline (`--gate-save`) instead. The baseline grandfathers existing violations and only fails on new ones.
 
 ```bash
-opensip fit --gate-save                # capture today's reality into .runtime/datastore.sqlite
+opensip fit --gate-save                # capture today's reality into the active local datastore
 opensip fit --gate-compare             # CI gate from now on
 ```
 
-The baseline lives in `<project>/opensip-cli/.runtime/datastore.sqlite` (gitignored). For CI to share a baseline across runs, upload that file as a workflow artifact on main-branch builds and download it before `--gate-compare` on PR builds — see [`10-concepts/05-architecture-gate.md#ci-integration-patterns`](/docs/opensip-cli/10-concepts/05-architecture-gate/#ci-integration-patterns).
+Before initialization, the baseline lives in the managed user-cache runtime and
+is automatically evictable. For an adopted CI gate, initialize the project;
+then the baseline lives in
+`<project>/opensip-cli/.runtime/datastore.sqlite` (gitignored). To share it
+across CI runs, upload that file as a workflow artifact on main-branch builds
+and download it before `--gate-compare` on PR builds—see
+[`10-concepts/05-architecture-gate.md#ci-integration-patterns`](/docs/opensip-cli/10-concepts/05-architecture-gate/#ci-integration-patterns).
 
 ### When NOT to directive
 

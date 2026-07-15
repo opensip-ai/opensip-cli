@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-11
+last_verified: 2026-07-15
 release: v0.7.0
 title: "CLI dispatch"
 audience: [contributors]
@@ -12,6 +12,9 @@ source-files:
   - packages/cli/src/commands/plugin.ts
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/welcome.ts
+  - packages/cli/src/bootstrap/plan-pre-action-bootstrap.ts
+  - packages/cli/src/bootstrap/pre-action-guards.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
   - packages/contracts/src/exit-codes.ts
 related-docs:
   - ../10-concepts/02-tool-plugin-model.md
@@ -269,11 +272,16 @@ Things that can go wrong, and what the CLI does:
 | Tool command mounting throws (bundled) | `mountAllToolCommands()` | `PluginIncompatibleError` → exit 5; startup aborts. |
 | Tool command mounting throws (external) | `mountAllToolCommands()` | Warn + `cli.tool.register_failed`; the failing tool is skipped; CLI continues with remaining tools. |
 | Action handler throws | Inside Tool execution | Caught at the program level; rendered as `ErrorResult`; exit code from `error.exitCode` or 2. |
-| Missing config | Tool action calls `loadProjectConfig()` | Tool throws `ConfigurationError`; CLI surfaces the error and the suggestion. Exit 2. |
+| Required config unavailable | Pre-action finds no project config and the command is not zero-config-capable, or synthesis cannot identify supported project markers | Host bootstrap fails before action dispatch, renders the Init hint, and exits 2. Eligible commands continue with an in-memory config. |
 | Plugin failed to load | Inside the Tool's lazy plugin loader (e.g. `ensureChecksLoaded` in fitness) | Logged; the failing plugin is skipped; CLI continues. |
 | Missing baseline (gate) | `fit --gate-compare` with no baseline | Tool throws `GateBaselineMissingError`; CLI surfaces a hint to run `--gate-save`. Exit 2. |
 
-The principle is "log, fall back, keep moving" for non-fatal failures (a plugin couldn't load, a Tool couldn't register) and "surface and exit" for fatal ones (no config, broken baseline, action handler crash). The CLI never silently swallows an error — every failure produces either a log line or a rendered error.
+The principle is "log, fall back, keep moving" for non-fatal dispatch failures
+(a plugin could not load or a Tool could not register) and "surface and exit"
+for fatal dispatch/action failures (required config is unavailable for the
+selected command, a baseline is broken, or an action handler crashes). Those
+covered failures produce a log line or rendered error; separately documented
+best-effort maintenance and browser-launch paths may fail quietly by design.
 
 ---
 
@@ -382,4 +390,3 @@ Properties:
   shared mappings: `@opensip-cli/contracts`, `@opensip-cli/external-tool-adapter`.
 - Runtime edges remain runtime edges (never call edges). Inventory/bridge caps
   fail closed at bootstrap without implying an OS sandbox.
-

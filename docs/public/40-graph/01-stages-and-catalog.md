@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-11
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -48,7 +48,7 @@ related-docs:
 
 The `graph` command is the static call-graph tool. Where `fit` answers "is the codebase clean?" and `sim` answers "does it behave correctly under stress?", `graph` asks: **"what is reachable from where?"** Orphans, side-effect chains, duplicated bodies, and test-only reachable code are all questions about the call graph, not any single file.
 
-> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the project-local SQLite store at `<project>/opensip-cli/.runtime/datastore.sqlite` â€” see [Catalog in SQLite](#the-catalog-in-sqlite) below.
+> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the active local SQLite store: managed user cache for a zero-config project, project `.runtime` after initialization. See [Catalog in SQLite](#the-catalog-in-sqlite) below.
 
 > **What you'll understand after this:**
 > - The seven-stage pipeline graph uses to build its picture of the codebase.
@@ -264,7 +264,14 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` â€
 
 ## The catalog in SQLite
 
-The output of stages 1+2 is persisted to the project-local SQLite store at `<project>/opensip-cli/.runtime/datastore.sqlite` via [`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). The catalog rides a single row in the `graph_catalog` table: cache-validity fields (language, cacheKey, filesFingerprint) live in typed columns; the function/occurrence/edge data is stored as a JSON payload preserving the launch wire shape exactly.
+The output of stages 1+2 is persisted to the active local
+`<runtime-root>/datastore.sqlite` via
+[`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts).
+The runtime root is the managed user cache before initialization and the
+project-local `.runtime/` afterward. The catalog rides a single row in the
+`graph_catalog` table: cache-validity fields (language, cacheKey,
+filesFingerprint) live in typed columns; the function/occurrence/edge data is
+stored as a JSON payload preserving the launch wire shape exactly.
 
 The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()`
 is the same shape consumed by dashboard view derivations, rules, and indexes.

@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-06-25
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Rules and gating (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
@@ -247,21 +247,24 @@ The `ruleHints` surface ([`lang-adapter/types.ts`](../../../packages/graph/engin
 
 ## The gate
 
-The gate model: signal **fingerprints** are written to a baseline file with `--gate-save`; future runs compare current fingerprints against the baseline and exit non-zero on new ones.
+The gate model: signal **fingerprints** are written to baseline rows in the
+active local SQLite store with `--gate-save`; future runs compare current
+fingerprints against the baseline and exit non-zero on new ones.
 
 ```bash
-# Establish the baseline once (commit the resulting file).
+# Establish the baseline once.
 opensip graph --gate-save
 
 # In CI: fail the build if any new signal appeared.
 opensip graph --gate-compare
 ```
 
-The baseline lives in the project's SQLite store
-(`<project>/opensip-cli/.runtime/datastore.sqlite`, gitignored), as rows in the
-host-owned `tool_baseline_entries` table scoped `tool = 'graph'` (ADR-0036 —
-one generic table pair serves every tool's gate). There is exactly one baseline
-per tool per project.
+For a zero-config project, the baseline lives in the managed user-cache runtime and is
+automatically evictable. For an adopted CI gate, initialize the project; then it
+lives in `<project>/opensip-cli/.runtime/datastore.sqlite` (gitignored), as rows
+in the host-owned `tool_baseline_entries` table scoped `tool = 'graph'`
+(ADR-0036—one generic table pair serves every tool's gate). There is at most one
+saved baseline per tool per active local runtime.
 
 ### Signal fingerprints
 

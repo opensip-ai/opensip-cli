@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
@@ -9,6 +9,8 @@ source-files:
   - README.md
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./05-vocabulary.md
@@ -85,9 +87,15 @@ opensip sim --recipe example
 `fit`, `graph`, `graph impact`, and `audit` work in supported projects before
 `init`. In a git repo, `audit` is changed-scope by default and
 prints the resolved scope; pass `--full` for a whole-repo run. The CLI uses a
-validated in-memory config and stores rebuildable runtime state in your user
-cache. `init` makes the setup explicit by writing the config, examples,
-`.gitignore`, and agent guidance into the project.
+validated in-memory config and stores generated runtime state in a managed
+user cache. That cache is file-backed and survives normal command exits and
+reboots, but it is retention-managed and can be evicted; it is not permanent
+history.
+
+`opensip init` is a transition command, not a storage location. It changes the
+project state from **zero-config project** to **initialized project**: it writes
+the config, examples, `.gitignore`, and agent guidance into the project, and
+subsequent local runtime state belongs under `opensip-cli/.runtime/`.
 
 For a human review with the stored Change Impact report, run `opensip audit
 --open`. For CI or an agent, run `opensip audit --json`; JSON, CI, non-TTY, and
@@ -116,9 +124,19 @@ your-project/
         └── recipes/example-recipe.mjs      ← runs the demo scenario
 ```
 
-`opensip-cli.config.yml` is the only file the CLI *requires*. Everything under `opensip-cli/` is plugin source — auto-discovered at runtime, no opt-in needed. `opensip init` also appends `opensip-cli/.runtime/` to your `.gitignore` so the tool's own state files don't pollute commits.
+After initialization, `opensip-cli.config.yml` is the only persisted project
+configuration file the CLI requires. Commands eligible before initialization use
+a synthesized in-memory configuration instead. Recognized authored files under
+`opensip-cli/`—fit checks and recipes, sim scenarios and recipes, and Tool
+sidecars—are discovered at runtime with no extra opt-in. The `.runtime/`
+subdirectory is generated state, not plugin source. `opensip init` appends
+`opensip-cli/.runtime/` to your `.gitignore` so that state does not pollute
+commits.
 
-For a polyglot project (e.g. Rust + TypeScript), `init` writes one example check per detected language. To force a specific configuration: `opensip init --language rust,typescript`.
+For a polyglot project (for example, Rust + TypeScript), automatic detection
+reports the detected set and requires an explicit language list. Run `opensip
+init --language rust,typescript`; Init then writes one example check per selected
+language.
 
 ---
 

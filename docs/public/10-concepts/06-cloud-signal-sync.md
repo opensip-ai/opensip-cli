@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-07
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Cloud signal sync"
 audience: [getting-started, ci-integrators, contributors]
@@ -21,7 +21,13 @@ related-docs:
 ---
 # Cloud signal sync
 
-Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and a compatible endpoint, each deliverable first-party run (`fit`, `sim`, `graph`, `yagni`) and installed adapter run that emits a `SignalEnvelope` can *also* send the findings it already computes to OpenSIP Cloud for storage. It is **additive**: your results are always written to the local SQLite store first, and a cloud failure never blocks, slows, or fails a run. Decided in [ADR-0008](../../decisions/ADR-0008-opensip-cloud-signal-sync.md).
+Cloud signal sync is an **optional, entitlement-gated, best-effort** sidecar to a normal run. When you have an OpenSIP Cloud API key and a compatible endpoint, each deliverable first-party run (`fit`, `sim`, `graph`, `yagni`) and installed adapter run that emits a `SignalEnvelope` can *also* send the findings it already computes to OpenSIP Cloud for storage. It is **additive** to whatever local artifacts and records that command mode normally persists: it neither replaces the local runtime nor forces a generic session row. A Cloud failure never changes the local result or exit code, although an enabled delivery can add network latency. Decided in [ADR-0008](../../decisions/ADR-0008-opensip-cloud-signal-sync.md).
+
+Think of **Cloud-connected** as an optional service state, not as the next local
+runtime mode. Connecting Cloud does not replace the managed user cache or
+project-local runtime, and the CLI does not upload the complete SQLite database,
+logs, reports, catalogs, or raw artifacts. Only the bounded payloads documented
+below use this path.
 
 If you don't have a key, none of this runs — no network, no check, no cost. The keyless OSS majority can ignore this page.
 

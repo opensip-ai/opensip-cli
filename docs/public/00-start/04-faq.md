@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 release: v0.7.0
 title: "FAQ"
 audience: [getting-started]
@@ -8,6 +8,9 @@ purpose: "Common questions about adoption, edge cases, and what opensip-cli does
 source-files:
   - README.md
   - packages/cli/src/index.ts
+  - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
+  - packages/cli/src/commands/init/scaffold-writer.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./03-vs-other-tools.md
@@ -99,6 +102,31 @@ finding-oriented review. Full loop:
 adapters (`optionalTools` in JSON, a footer in human mode) with the exact
 install commands. It never prompts, installs, or runs adapter code. Install
 what you want with `opensip tools install …`.
+
+---
+
+### Is the zero-config cache really ephemeral? Does `init` make evidence permanent?
+
+**No to both.** The zero-config cache is persistent-on-disk, retention-managed local
+storage. It survives commands and reboots, but its whole project entry can be
+automatically removed when the project path disappears, after 30 days without
+use, or under the project-count policy. The active entry is protected while the
+policy retains up to 50 other survivors. Those are eviction defaults, not an
+archival guarantee.
+
+`opensip init` is a transition command, not a storage location. It changes the
+project state from **zero-config project** to **initialized project**, writes the
+project's explicit config and authored guardrails, and makes the gitignored
+project `.runtime/` authoritative for subsequent local evidence. On a
+successful scaffold path, when the cache runtime exists and the project
+runtime does not, initialization also moves the existing cache evidence there;
+otherwise it leaves both locations intact. Both project states use the same
+SQLite and runtime-file formats.
+
+Initialized evidence is not permanent or shared through Git: ordinary session
+and artifact retention still applies. What becomes durable and team-portable is
+the committed project intent—config, checks, recipes, scenarios, and guidance.
+See [Session and persistence](../80-implementation/03-session-and-persistence.md#runtime-mode-is-not-a-storage-tier).
 
 ---
 
@@ -246,7 +274,7 @@ See [Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md),
 
 ### How do I report a bug or request a feature?
 
-[GitHub issues](https://github.com/opensip-ai/opensip-cli/issues). Bug reports should include `opensip --version`, a minimal reproduction, and the run's `opensip-cli/.runtime/logs/<date>.jsonl` file if relevant.
+[GitHub issues](https://github.com/opensip-ai/opensip-cli/issues). Bug reports should include `opensip --version`, a minimal reproduction, and the run's `<runtime-root>/logs/<date>.jsonl` file if relevant. The runtime root is in the managed user cache before initialization and project `.runtime` afterward.
 
 ---
 
