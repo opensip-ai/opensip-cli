@@ -259,6 +259,39 @@ async function executeCommandMode(
   files: readonly string[],
   ctx: ExecutionContext,
 ): Promise<CheckResult> {
+  const builder = ResultBuilder.create({
+    checkId: config.id,
+    itemType: config.itemType ?? 'files',
+  })
+    .totalItems(files.length)
+    .filesScanned(0);
+
+  // File-list-driven scanners (`args: (files) => ...`) with zero matched files
+  // must not invoke the binary: tools like clang-tidy exit 1 with
+  // "no input files specified", and the green-wash fail-closed path promotes
+  // that to a unit fault. Project-wide command checks use `args: () => ...` or
+  // a static args array and still run with an empty file list.
+  if (
+    files.length === 0 &&
+    typeof config.command.args === 'function' &&
+    config.command.args.length > 0
+  ) {
+    const clean = builder.build();
+    return {
+      ...clean,
+      info: { label: 'Skipped: no matched files' },
+      metadata: {
+        ...clean.metadata,
+        extra: {
+          ...clean.metadata.extra,
+          skipped: true,
+          skipReason: 'no-matched-files',
+          skipMessage: 'no matched files for file-list command check',
+        },
+      },
+    };
+  }
+
   const result = await executeCommand(config.command, files, {
     cwd: ctx.cwd,
     signal: ctx.signal,
@@ -270,13 +303,6 @@ async function executeCommandMode(
     throw new CheckAbortedError(config.slug);
   }
   /* v8 ignore stop */
-
-  const builder = ResultBuilder.create({
-    checkId: config.id,
-    itemType: config.itemType ?? 'files',
-  })
-    .totalItems(files.length)
-    .filesScanned(0);
 
   if (result.error) {
     // Optional external tools that are not installed are a skip, not a
