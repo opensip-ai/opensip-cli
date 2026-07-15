@@ -383,7 +383,7 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
   }
 
   // Skip route handler files — parameters come from Zod-validated schemas
-  if (filePath.includes('routes/')) {
+  if (filePath.replaceAll('\\', '/').includes('routes/')) {
     return violations;
   }
 

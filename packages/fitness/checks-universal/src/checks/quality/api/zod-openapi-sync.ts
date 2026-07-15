@@ -97,8 +97,8 @@ export const zodOpenapiSync = defineCheck({
   fileTypes: ['ts', 'tsx'],
 
   analyze(content, filePath) {
-    // Focus on schema files
-    if (!filePath.includes('/schemas/')) {
+    // Focus on schema files (POSIX segments on OS paths)
+    if (!filePath.replaceAll('\\', '/').includes('/schemas/')) {
       return [];
     }
 

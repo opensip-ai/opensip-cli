@@ -16,19 +16,23 @@ export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
  * Build the CLI args for `cargo clippy` with JSON diagnostics across all targets
  * and features.
  *
- * DEGRADED / non-deterministic without a cold target dir: `cargo clippy` only
- * emits `compiler-message` records for crates it actually (re)compiles. With a
- * warm `target/` cache a repeat run can emit zero diagnostics even though the
- * lints still hold — fingerprints then churn under `--gate-compare`. The
- * external-tool substrate has no per-run env injection, so we cannot set
- * `CARGO_TARGET_DIR` under `.runtime` from this adapter alone. Operators should
- * use a fresh checkout / CI without target caching, or set
- * `CARGO_TARGET_DIR` themselves for deterministic rechecks. See the package
- * description / README determinism caveat.
+ * Uses a per-run `--target-dir` under the host artifact store so warm project
+ * `target/` caches cannot hide diagnostics (clippy only re-emits messages for
+ * crates it recompiles). Slightly slower; gate-honest.
  */
-export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
+export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   // --offline matches network: local-only — fail closed when registry deps missing.
-  return ['clippy', '--offline', '--message-format=json', '--all-targets', '--all-features'];
+  // --target-dir forces recompile under a cold per-run dir (deterministic findings).
+  const targetDir = ctx.artifactPath('cargo-target');
+  return [
+    'clippy',
+    '--offline',
+    '--message-format=json',
+    '--all-targets',
+    '--all-features',
+    '--target-dir',
+    targetDir,
+  ];
 }
 
 export const tool: Tool = defineExternalToolAdapter({

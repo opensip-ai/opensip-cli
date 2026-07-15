@@ -56,11 +56,12 @@ function createViolation(
  * Check if file is a repository/database file
  */
 function isRepositoryFile(filePath: string): boolean {
+  const normalized = filePath.replaceAll('\\', '/');
   return (
-    filePath.includes('/repositories/') ||
-    filePath.includes('/database/') ||
-    filePath.includes('-repository.ts') ||
-    filePath.includes('.repository.ts')
+    normalized.includes('/repositories/') ||
+    normalized.includes('/database/') ||
+    normalized.includes('-repository.ts') ||
+    normalized.includes('.repository.ts')
   );
 }
 

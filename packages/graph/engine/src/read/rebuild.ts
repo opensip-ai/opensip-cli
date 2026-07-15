@@ -60,7 +60,9 @@ interface CanonicalRebuildResult {
 async function runCanonicalRebuild(input: RebuildCatalogInput): Promise<CanonicalRebuildResult> {
   // F3 parity with the main graph CLI: realpath so multi-shard workers force
   // occurrence paths against the same canonical root as discovery (symlink cwd).
-  const root = realpathOrSelf(input.cwd, input.cwd);
+  // Resolve relative cwd against process.cwd() once — realpathOrSelf(cwd, cwd)
+  // double-nests relative roots (packages/app → packages/app/packages/app).
+  const root = realpathOrSelf(input.cwd, process.cwd());
   const rebuiltInput = { ...input, cwd: root };
   const scope = currentScope();
   if (scope === undefined) return runGraph({ ...rebuiltInput, noCache: true });

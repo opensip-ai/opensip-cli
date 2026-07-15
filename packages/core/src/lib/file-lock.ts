@@ -164,11 +164,14 @@ function isStale(metadata: FileLockMetadata, staleMs: number): boolean {
   // Heartbeat age is the only cross-host-safe signal. Dead local PID alone
   // must not reclaim a lock owned by another machine (shared FS / NFS / CI
   // workspace) — that host's process.kill(pid, 0) would always fail.
-  if (Date.now() - metadata.lastHeartbeatAt > staleMs) return true;
+  const ageStale = Date.now() - metadata.lastHeartbeatAt > staleMs;
   if (metadata.hostname !== hostname() && metadata.hostname.length > 0) {
-    // Different host: wait for heartbeat expiry only (already checked above).
-    return false;
+    // Different host: heartbeat age only.
+    return ageStale;
   }
+  // Same host: a live process still owns the lock even when the event loop is
+  // blocked in a sync critical section and heartbeats cannot fire. Reclaim only
+  // when the PID is gone (or never was valid).
   return !isProcessAlive(metadata.pid);
 }
 
@@ -214,6 +217,12 @@ function recoverStaleLock({
 }: StaleLockRecoveryContext): boolean {
   if (!metadata || !isStale(metadata, staleMs)) return false;
   try {
+    // Re-check ownership before unlink so a second waiter cannot delete a
+    // lock another contender already re-acquired after observing the same stale snapshot.
+    const current = readLockMetadata(lockPath);
+    if (current === undefined) return false;
+    if (current.ownerToken !== metadata.ownerToken) return false;
+    if (!isStale(current, staleMs)) return false;
     unlinkSync(lockPath);
     onEvent?.({
       kind: 'stale.recovered',

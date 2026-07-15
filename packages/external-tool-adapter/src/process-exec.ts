@@ -50,6 +50,9 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
       {
         cwd: input.cwd,
         timeout: input.timeoutMs,
+        // SIGKILL (not SIGTERM): scanners that trap SIGTERM would otherwise hang
+        // the promise forever until an outer worker timeout. Node fires once.
+        killSignal: 'SIGKILL',
         maxBuffer: input.maxBuffer,
         encoding: 'utf8',
         windowsHide: true,
@@ -119,6 +122,7 @@ export function probeBinaryVersion(input: ProbeVersionInput): string | undefined
     const stdout = execFileSync(input.path, [...input.versionArgs], {
       encoding: 'utf8',
       timeout: input.timeoutMs,
+      killSignal: 'SIGKILL',
       windowsHide: true,
     });
     const text = typeof stdout === 'string' ? stdout : String(stdout);

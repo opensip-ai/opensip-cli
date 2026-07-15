@@ -211,6 +211,13 @@ export function processSuccessResult(
         : 'check failed'))
     : undefined;
 
+  const skipReason =
+    result.metadata.extra?.['skipped'] === true &&
+    typeof result.metadata.extra['skipReason'] === 'string'
+      ? result.metadata.extra['skipReason']
+      : undefined;
+  const skipped = skipReason !== undefined;
+
   const checkResult: RecipeCheckResult = {
     checkId,
     checkSlug,
@@ -222,8 +229,9 @@ export function processSuccessResult(
     durationMs,
     totalItems: result.metadata.totalItems,
     itemType: result.metadata.itemType,
-    skipped: false,
+    skipped,
     effectiveSignals,
+    ...(skipped ? { skipReason } : {}),
     ...(frameworkError !== undefined ? { error: frameworkError } : {}),
     ...(result.appliedDirectives && result.appliedDirectives.length > 0
       ? { appliedDirectives: result.appliedDirectives }

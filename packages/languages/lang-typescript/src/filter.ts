@@ -230,6 +230,19 @@ function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
     case ts.SyntaxKind.TrueKeyword:
     case ts.SyntaxKind.FalseKeyword:
     case ts.SyntaxKind.NullKeyword:
+    // Type keywords also appear as value names (`const number = 1; number / 2`)
+    // and after `as` (`x as number / y`) — must not start a regex.
+    case ts.SyntaxKind.NumberKeyword:
+    case ts.SyntaxKind.StringKeyword:
+    case ts.SyntaxKind.BooleanKeyword:
+    case ts.SyntaxKind.AnyKeyword:
+    case ts.SyntaxKind.ObjectKeyword:
+    case ts.SyntaxKind.SymbolKeyword:
+    case ts.SyntaxKind.BigIntKeyword:
+    case ts.SyntaxKind.UndefinedKeyword:
+    case ts.SyntaxKind.NeverKeyword:
+    case ts.SyntaxKind.UnknownKeyword:
+    case ts.SyntaxKind.ConstKeyword:
     case ts.SyntaxKind.CloseParenToken:
     case ts.SyntaxKind.CloseBracketToken:
     case ts.SyntaxKind.CloseBraceToken:

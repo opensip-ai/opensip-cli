@@ -120,9 +120,21 @@ export async function renderSuiteLive(
     },
   };
 
+  // Capture the live-view exit so a synthetic empty result keeps ADR-0020 taxonomy
+  // (e.g. ConfigurationError → 2) instead of hard-coding 1 after glue.setExitCode.
+  let liveExitCode = 1;
+  const outerSetExit = args.glue?.setExitCode;
+  const glue = {
+    ...(args.glue ?? {}),
+    setExitCode: (code: number) => {
+      liveExitCode = code;
+      outerSetExit?.(code);
+    },
+  };
+
   let completion: ToolRunCompletion;
   try {
-    completion = await runToolLiveView(spec, args.glue ?? {});
+    completion = await runToolLiveView(spec, glue);
   } catch (error) {
     // Live view may rethrow after painting; if produce never assigned, rethrow
     // the original error rather than inventing a secondary message.
@@ -138,7 +150,7 @@ export async function renderSuiteLive(
       suite: args.suiteInput.name,
       suiteRunId: '',
       durationMs: 0,
-      exitCode: 1,
+      exitCode: liveExitCode,
       steps: [],
       scope: { mode: 'full', source: 'fallback', notice: 'suite live produce did not complete' },
     };

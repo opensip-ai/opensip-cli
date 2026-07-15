@@ -45,7 +45,7 @@ export function analyzeFileLength(content: string): CheckViolation[] {
  * Per-file entry point: skips test/fixture paths before line counting.
  */
 export function analyzeFileLengthForPath(content: string, filePath: string): CheckViolation[] {
-  if (isTestFile(filePath) || filePath.includes('/__fixtures__/')) {
+  if (isTestFile(filePath) || filePath.replaceAll('\\', '/').includes('/__fixtures__/')) {
     return [];
   }
   return analyzeFileLength(content);

@@ -172,7 +172,7 @@ describe('trivy tool — A3 .runtime exclusion (buildTrivyExclude)', () => {
   it('skips the opensip artifact store via --skip-dirs', () => {
     expect(buildTrivyExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
       '--skip-dirs',
-      '/proj/opensip-cli/.runtime',
+      'opensip-cli/.runtime',
     ]);
   });
 });

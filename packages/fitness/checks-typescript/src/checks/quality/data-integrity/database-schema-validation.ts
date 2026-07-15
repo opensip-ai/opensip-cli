@@ -356,11 +356,12 @@ function analyzeEntityClass(
  * Check if file is an entity/schema file
  */
 function isEntityFile(filePath: string): boolean {
+  const normalized = filePath.replaceAll('\\', '/');
   return (
-    filePath.includes('/entities/') ||
-    filePath.includes('/models/') ||
-    filePath.includes('.entity.ts') ||
-    filePath.includes('.model.ts')
+    normalized.includes('/entities/') ||
+    normalized.includes('/models/') ||
+    normalized.includes('.entity.ts') ||
+    normalized.includes('.model.ts')
   );
 }
 
