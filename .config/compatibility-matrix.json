@@ -7,7 +7,8 @@
     { "class": "tool-plugin-api" },
     { "class": "cloud-wire" },
     { "class": "release-artifact" },
-    { "class": "datastore-payload" }
+    { "class": "datastore-payload" },
+    { "class": "platform-support" }
   ],
   "fixtures": [
     {

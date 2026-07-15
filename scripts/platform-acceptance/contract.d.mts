@@ -64,6 +64,16 @@ export interface ProfileBaseRef {
   readonly digest: string;
 }
 
+/**
+ * Optional binding to the platform-support contract. Pins the profile to a
+ * platform-support contract version + support-row id so acceptance evidence can
+ * never match a different public support claim. Part of the profile digest.
+ */
+export interface ProfileSupportRowBinding {
+  readonly contractVersion: number;
+  readonly rowId: string;
+}
+
 /** The data-only acceptance profile loaded from `.config/platform-acceptance/*.json`. */
 export interface AcceptanceProfile {
   readonly schemaVersion: 1;
@@ -74,6 +84,7 @@ export interface AcceptanceProfile {
   readonly rssRequired: boolean;
   readonly bounds: AcceptanceBounds;
   readonly journeys: readonly ProfileJourneySelection[];
+  readonly supportRow?: ProfileSupportRowBinding;
 }
 
 /** Resolved, redacted identity of the exact bytes under test. */
@@ -113,6 +124,12 @@ export interface HostProfile {
   readonly totalMemoryBytes: number;
   readonly filesystem: FilesystemFacts;
   readonly shell: HostFact<string>;
+  /** macOS product version from `/usr/bin/sw_vers -productVersion` (darwin-only). */
+  readonly swVers: HostFact<string>;
+  /** Darwin kernel release from `/usr/bin/uname -r` (darwin-only). */
+  readonly kernelRelease: HostFact<string>;
+  /** Machine architecture from `/usr/bin/uname -m` (darwin-only). */
+  readonly unameArch: HostFact<string>;
   readonly capabilities: HostCapabilities;
 }
 

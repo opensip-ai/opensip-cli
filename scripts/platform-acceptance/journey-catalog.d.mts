@@ -270,6 +270,8 @@ export const KNOWN_CAPABILITIES: ReadonlySet<JourneyCapability>;
 
 /** The explicit common-v1 selection (all 46 ids, in profile order). */
 export const COMMON_V1_JOURNEY_IDS: readonly string[];
+/** The macOS-specific ids the macOS profile adds on top of common-v1 (spec §8). */
+export const MACOS_JOURNEY_IDS: readonly string[];
 /** The explicit release-smoke selection (command-only subset, in projection order). */
 export const RELEASE_SMOKE_JOURNEY_IDS: readonly string[];
 

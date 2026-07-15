@@ -23,6 +23,8 @@
  *     [--expected-candidate-digest <hex>]
  *     [--expect-platform <id>] [--expect-arch <id>]
  *     [--expect-node-abi <n>] [--expect-fs-type <type>]
+ *     [--expected-node-major <n>] [--expected-npm-major <n>]
+ *     [--expected-support-row <rowId>] [--expected-support-contract-version <n>]
  *     [--json]
  *
  * Exit codes:
@@ -70,6 +72,10 @@ const VALUE_FLAGS = new Set([
   '--expect-arch',
   '--expect-node-abi',
   '--expect-fs-type',
+  '--expected-node-major',
+  '--expected-npm-major',
+  '--expected-support-row',
+  '--expected-support-contract-version',
 ]);
 const BOOLEAN_FLAGS = new Set(['--json']);
 
@@ -80,6 +86,9 @@ const EXACT_SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const LOWER_TOKEN = /^[a-z][a-z0-9]*$/;
 const DIGITS = /^\d+$/;
 const FS_TOKEN = /^[A-Za-z][A-Za-z0-9._-]*$/;
+// A support-row id token (kebab, dotted segments allowed) — mirrors the
+// contract's id shape without importing the contract's private pattern.
+const ROW_ID_TOKEN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 
 const HELP = `verify-platform-acceptance — independently verify installed-artifact acceptance evidence
 
@@ -97,6 +106,10 @@ Optional expected-value cross-checks (each may appear at most once):
   --expect-arch <id>                  host.arch must equal this (e.g. arm64, x64)
   --expect-node-abi <n>               host Node module ABI must equal this (e.g. 137)
   --expect-fs-type <type>             run-root filesystem type must equal this (e.g. apfs, ext4)
+  --expected-node-major <n>           host Node version major must equal this (e.g. 24)
+  --expected-npm-major <n>            host npm version major must equal this (e.g. 11)
+  --expected-support-row <rowId>      the profile's support-row binding id must equal this
+  --expected-support-contract-version <n>  the profile's support-row contract version must equal this
 
 Options:
   --json              print exactly one machine-readable JSON result to stdout
@@ -141,6 +154,13 @@ function invalid(message) {
 function normalizeVersionInput(raw) {
   const trimmed = raw.trim().replace(/^v/, '');
   return EXACT_SEMVER.test(trimmed) ? trimmed : null;
+}
+
+/** Leading integer major of a version string (`v24.16.0`/`11.0.0` → "24"/"11"), else null. */
+function versionMajor(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^v?(\d+)(?:\.|$)/.exec(value.trim());
+  return match ? match[1] : null;
 }
 
 function parseArgs(argv) {
@@ -205,6 +225,26 @@ function parseArgs(argv) {
     if (!FS_TOKEN.test(flags['--expect-fs-type']))
       return invalid('--expect-fs-type must be a filesystem token');
     expected.fsType = flags['--expect-fs-type'];
+  }
+  if (flags['--expected-node-major'] !== undefined) {
+    if (!DIGITS.test(flags['--expected-node-major']))
+      return invalid('--expected-node-major must be a positive integer');
+    expected.nodeMajor = flags['--expected-node-major'];
+  }
+  if (flags['--expected-npm-major'] !== undefined) {
+    if (!DIGITS.test(flags['--expected-npm-major']))
+      return invalid('--expected-npm-major must be a positive integer');
+    expected.npmMajor = flags['--expected-npm-major'];
+  }
+  if (flags['--expected-support-row'] !== undefined) {
+    if (!ROW_ID_TOKEN.test(flags['--expected-support-row']))
+      return invalid('--expected-support-row must be a support-row id token');
+    expected.supportRowId = flags['--expected-support-row'];
+  }
+  if (flags['--expected-support-contract-version'] !== undefined) {
+    if (!DIGITS.test(flags['--expected-support-contract-version']))
+      return invalid('--expected-support-contract-version must be a positive integer');
+    expected.supportContractVersion = flags['--expected-support-contract-version'];
   }
 
   return {
@@ -461,6 +501,33 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
     (typeof fsType !== 'string' || fsType.toLowerCase() !== expected.fsType.toLowerCase())
   ) {
     fail('host-fs-type-mismatch');
+  }
+  if (expected.nodeMajor !== undefined) {
+    const major = versionMajor(evidence.host.nodeVersion);
+    if (major === null || major !== expected.nodeMajor) fail('host-node-major-mismatch');
+  }
+  if (expected.npmMajor !== undefined) {
+    // npmVersion is a tagged HostFact; an unavailable/malformed fact cannot prove
+    // a major, so it is a mismatch (never a silent pass).
+    const npm = evidence.host.npmVersion;
+    const major = typeof npm === 'string' ? versionMajor(npm) : null;
+    if (major === null || major !== expected.npmMajor) fail('host-npm-major-mismatch');
+  }
+
+  // 10b. Support-row binding: the loaded profile must pin the EXPECTED
+  //      platform-support row + contract version, so acceptance evidence can
+  //      never satisfy a different public support claim. A profile that carries
+  //      no binding (or the wrong one) fails when a binding is expected.
+  if (expected.supportRowId !== undefined || expected.supportContractVersion !== undefined) {
+    const binding = profile.supportRow;
+    const rowOk =
+      expected.supportRowId === undefined ||
+      (binding !== undefined && binding.rowId === expected.supportRowId);
+    const versionOk =
+      expected.supportContractVersion === undefined ||
+      (binding !== undefined &&
+        String(binding.contractVersion) === expected.supportContractVersion);
+    if (binding === undefined || !rowOk || !versionOk) fail('support-row-binding-mismatch');
   }
 
   // 11. Evidence byte bound (re-checked against the profile's own bound).

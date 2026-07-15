@@ -7,7 +7,7 @@
 // disagree with package.json, missing CHANGELOG entries, stale
 // generated docs, cross-package deps pointing at the wrong version.
 //
-// Thirteen checks (all run; any failure exits 1):
+// Fourteen checks (all run; any failure exits 1):
 //
 //   1. All @opensip-cli/* packages share the same `version`.
 //   2. Tag matches the package version (CI: --expected-version $TAG).
@@ -29,6 +29,9 @@
 //      (packages/cli/src/__tests__/release-package-order-contract.test.ts).
 //  13. Release governance docs/workflow comments match release-package-order.mjs
 //      (scripts/lib/release-governance-surface.mjs).
+//  14. The generated supported-platforms matrix
+//      (docs/public/70-reference/17-supported-platforms.md) is in sync with the
+//      core platform-support registry. build-supported-platforms-doc --check.
 //
 // Usage:
 //   node scripts/verify-release.mjs                     # local pre-flight
@@ -248,6 +251,12 @@ delegateGenerator(
   ['scripts/build-package-keywords.mjs', '--check'],
   'package keywords are in sync.',
   'Package keywords are stale. Run `pnpm docs:keywords`.',
+);
+delegateGenerator(
+  14,
+  ['scripts/build-supported-platforms-doc.mjs', '--check'],
+  'supported-platforms matrix is in sync with the policy registry.',
+  'The supported-platforms matrix is stale. Run `pnpm docs:platform-support`.',
 );
 // Checks index is a pipe (extract → build --check); feed the metadata via stdin.
 try {

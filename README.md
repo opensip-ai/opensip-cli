@@ -50,6 +50,15 @@ Or install from npm:
 npm install -g opensip-cli
 ```
 
+**Requirements:** Node.js `>=24`. That engine range is an install floor, not a
+support claim — qualified support is narrower and names an exact host tuple
+(Apple Silicon macOS, a specific Node ABI, npm major, and filesystem) with
+measured evidence. The generated
+[supported-platforms matrix](https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms)
+is authoritative for the current status of each host. Intel macOS is explicitly
+out of scope; other unlisted hosts are unqualified — they may work, with no
+promise, and the CLI never blocks them.
+
 Run OpenSIP in your project:
 
 ```bash

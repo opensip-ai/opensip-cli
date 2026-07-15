@@ -13,6 +13,7 @@ import { buildPackedSmokeScenarios } from '../smoke-pack-scenarios.mjs';
 import {
   COMMON_V1_JOURNEY_IDS,
   JOURNEY_REGISTRY,
+  MACOS_JOURNEY_IDS,
   RELEASE_SMOKE_JOURNEY_IDS,
   getJourney,
   projectReleaseSmokeScenarios,
@@ -33,15 +34,28 @@ const SMOKE_PARAMS = Object.freeze({
   fitPackTarball: '/acceptance-run/fit.tgz',
 });
 
-test('registry holds exactly the 46 common-v1 ids, once each', () => {
-  assert.equal(JOURNEY_REGISTRY.size, 46);
+test('registry holds exactly COMMON_V1 ∪ MACOS ids, once each', () => {
+  // The registry is the closed union of the common-v1 selection (46) and the
+  // macOS profile's additive journeys (spec §8). It never replaces a common id.
   assert.equal(COMMON_V1_JOURNEY_IDS.length, 46);
   assert.equal(new Set(COMMON_V1_JOURNEY_IDS).size, 46, 'COMMON_V1_JOURNEY_IDS has a duplicate');
-  for (const id of COMMON_V1_JOURNEY_IDS) {
+  assert.equal(
+    new Set(MACOS_JOURNEY_IDS).size,
+    MACOS_JOURNEY_IDS.length,
+    'MACOS_JOURNEY_IDS has a duplicate',
+  );
+  const union = new Set([...COMMON_V1_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
+  assert.equal(
+    union.size,
+    COMMON_V1_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length,
+    'COMMON_V1_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap',
+  );
+  assert.equal(JOURNEY_REGISTRY.size, union.size);
+  for (const id of union) {
     assert.ok(JOURNEY_REGISTRY.has(id), `missing registered journey ${id}`);
   }
   for (const id of JOURNEY_REGISTRY.keys()) {
-    assert.ok(COMMON_V1_JOURNEY_IDS.includes(id), `registry holds unselected journey ${id}`);
+    assert.ok(union.has(id), `registry holds unselected journey ${id}`);
   }
 });
 

@@ -284,6 +284,32 @@ export type {
   CompatibilityStability,
 } from './lib/compatibility-policy.js';
 
+// Lib — platform-support policy registry (Plan 02, macOS GA). Pure host-support
+// classification (no process/fs reads); consumed by CLI/MCP catalog projections,
+// the acceptance harness, docs, and the compatibility matrix. `supported` is
+// never implied by engine compatibility; macOS launches as `preview`.
+export {
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  PLATFORM_SUPPORT_ROWS,
+  assessHostSupport,
+  projectRuntimeHostSupport,
+} from './lib/platform-support.js';
+export type {
+  PlatformSupportStatus,
+  PlatformSupportTuple,
+  PlatformSupportProfileRef,
+  PlatformSupportEvidence,
+  PlatformQualification,
+  PlatformSupportRow,
+  PlatformDimension,
+  PlatformMismatchReason,
+  PlatformMatchLevel,
+  ObservedHost,
+  HostSupportAssessment,
+  RuntimeHostFacts,
+  RuntimeHostSupportProjection,
+} from './lib/platform-support.js';
+
 // Lib — phantom-dir detector. Warns about orphaned opensip-cli/
 // subtrees left over from pre-discovery runs. Returns paths; callers
 // surface them; never auto-deletes.

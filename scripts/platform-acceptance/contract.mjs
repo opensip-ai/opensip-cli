@@ -221,9 +221,11 @@ const PROFILE_KEY_SET = new Set([
   'rssRequired',
   'bounds',
   'journeys',
+  'supportRow',
 ]);
 const JOURNEY_SELECTION_KEY_SET = new Set(['id', 'required', 'capabilities']);
 const BASE_REF_KEY_SET = new Set(['id', 'digest']);
+const SUPPORT_ROW_KEY_SET = new Set(['contractVersion', 'rowId']);
 
 function parseBounds(raw) {
   const record = requireObject(raw, 'profile.bounds');
@@ -284,6 +286,24 @@ function parseBaseRef(raw) {
   });
 }
 
+/**
+ * Optional binding to the platform-support contract. It pins the profile to a
+ * platform-support contract version + support-row id so acceptance evidence can
+ * never satisfy a different public support claim. Part of the profile digest.
+ */
+function parseSupportRow(raw) {
+  if (raw === undefined) return;
+  const record = requireObject(raw, 'profile.supportRow');
+  rejectUnknownKeys(record, SUPPORT_ROW_KEY_SET, 'profile.supportRow');
+  return Object.freeze({
+    contractVersion: requirePositiveInt(
+      record.contractVersion,
+      'profile.supportRow.contractVersion',
+    ),
+    rowId: requireId(record.rowId, 'profile.supportRow.rowId'),
+  });
+}
+
 /** Validate and freeze a data-only acceptance profile. */
 export function parseAcceptanceProfile(input) {
   const record = requireObject(input, 'profile');
@@ -327,6 +347,8 @@ export function parseAcceptanceProfile(input) {
   };
   const base = parseBaseRef(record.base);
   if (base) profile.base = base;
+  const supportRow = parseSupportRow(record.supportRow);
+  if (supportRow) profile.supportRow = supportRow;
   return Object.freeze(profile);
 }
 
@@ -416,6 +438,10 @@ export function composeProfile(base, derived, options = {}) {
     bounds: parsedDerived.bounds,
     journeys: Object.freeze(journeys),
   };
+  // The support-row binding is OS-specific: carry the derived profile's binding
+  // (falling back to a base binding if one exists). It stays part of the digest.
+  const supportRow = parsedDerived.supportRow ?? base.supportRow;
+  if (supportRow) composed.supportRow = supportRow;
   return Object.freeze(composed);
 }
 
@@ -475,6 +501,9 @@ const HOST_KEY_SET = new Set([
   'totalMemoryBytes',
   'filesystem',
   'shell',
+  'swVers',
+  'kernelRelease',
+  'unameArch',
   'capabilities',
 ]);
 const FILESYSTEM_KEY_SET = new Set(['type', 'caseSensitive']);
@@ -525,6 +554,15 @@ function parseHostProfile(raw) {
       ),
     }),
     shell: parseHostFact(record.shell, 'host.shell', (v, l) => requireString(v, l)),
+    swVers: parseHostFact(record.swVers, 'host.swVers', (v, l) =>
+      requireString(v, l, { max: MAX_ID_LENGTH }),
+    ),
+    kernelRelease: parseHostFact(record.kernelRelease, 'host.kernelRelease', (v, l) =>
+      requireString(v, l, { max: MAX_ID_LENGTH }),
+    ),
+    unameArch: parseHostFact(record.unameArch, 'host.unameArch', (v, l) =>
+      requireString(v, l, { max: MAX_ID_LENGTH }),
+    ),
     capabilities: parseCapabilityMap(record.capabilities),
   });
 }

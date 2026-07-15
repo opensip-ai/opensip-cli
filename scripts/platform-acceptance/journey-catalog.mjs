@@ -19,6 +19,7 @@
 
 import { analysisJourneys } from './journeys/analysis.mjs';
 import { extensionsJourneys } from './journeys/extensions.mjs';
+import { macosJourneys } from './journeys/macos.mjs';
 import { agentJourneys, mcpJourneys } from './journeys/mcp.mjs';
 import { outputJourneys } from './journeys/output.mjs';
 import { persistenceJourneys } from './journeys/persistence.mjs';
@@ -169,6 +170,7 @@ const ALL_JOURNEYS = [
   ...agentJourneys,
   ...extensionsJourneys,
   ...resilienceJourneys,
+  ...macosJourneys,
 ];
 
 /**
@@ -225,6 +227,26 @@ export const COMMON_V1_JOURNEY_IDS = Object.freeze([
 ]);
 
 /**
+ * The macOS-specific journeys the macOS profile adds on top of `common-v1`
+ * (Plan 02, spec §8). The registry holds `COMMON_V1_JOURNEY_IDS ∪
+ * MACOS_JOURNEY_IDS`; a load-time assertion binds this union so drift fails fast.
+ */
+export const MACOS_JOURNEY_IDS = Object.freeze([
+  'macos.tuple-crosscheck',
+  'macos.filesystem',
+  'macos.installer-sh',
+  'macos.zsh-invocation',
+  'macos.npm-shim-containment',
+  'macos.path-semantics',
+  'macos.permissions',
+  'macos.pty-human-view',
+  'macos.signals',
+  'macos.browser-open',
+  'macos.native-sqlite',
+  'macos.contention-recovery',
+]);
+
+/**
  * The explicit `release-smoke` selection — the command-only subset the packed
  * smoke projects, in projection order. Heavier MCP / contention / TTY /
  * resilience journeys are intentionally excluded.
@@ -249,10 +271,19 @@ function buildRegistry(journeys) {
     }
     registry.set(journey.id, journey);
   }
-  // Bijection with the common-v1 selection: no missing, no extra id.
-  const selected = new Set(COMMON_V1_JOURNEY_IDS);
-  if (selected.size !== COMMON_V1_JOURNEY_IDS.length) {
+  // Bijection with the closed selection: the registry MUST equal
+  // COMMON_V1_JOURNEY_IDS ∪ MACOS_JOURNEY_IDS — every id in each list is
+  // registered, neither list overlaps the other, and no id is registered that
+  // neither list selects. (macOS journeys extend, never replace, the common set.)
+  if (new Set(COMMON_V1_JOURNEY_IDS).size !== COMMON_V1_JOURNEY_IDS.length) {
     throw new Error('journey-catalog: COMMON_V1_JOURNEY_IDS contains a duplicate id');
+  }
+  if (new Set(MACOS_JOURNEY_IDS).size !== MACOS_JOURNEY_IDS.length) {
+    throw new Error('journey-catalog: MACOS_JOURNEY_IDS contains a duplicate id');
+  }
+  const selected = new Set([...COMMON_V1_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
+  if (selected.size !== COMMON_V1_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length) {
+    throw new Error('journey-catalog: COMMON_V1_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap');
   }
   for (const id of COMMON_V1_JOURNEY_IDS) {
     if (!registry.has(id))
@@ -260,10 +291,16 @@ function buildRegistry(journeys) {
         `journey-catalog: common-v1 selects unregistered journey ${JSON.stringify(id)}`,
       );
   }
+  for (const id of MACOS_JOURNEY_IDS) {
+    if (!registry.has(id))
+      throw new Error(
+        `journey-catalog: macos profile selects unregistered journey ${JSON.stringify(id)}`,
+      );
+  }
   for (const id of registry.keys()) {
     if (!selected.has(id))
       throw new Error(
-        `journey-catalog: registry holds ${JSON.stringify(id)} which common-v1 does not select`,
+        `journey-catalog: registry holds ${JSON.stringify(id)} which no profile selects`,
       );
   }
   // Every release-smoke id must be a registered, command-only journey.

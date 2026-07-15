@@ -9,6 +9,7 @@ import { realpathSync } from 'node:fs';
 
 import {
   EXIT_CODES,
+  hostSupportFromRuntimeProjection,
   summarizeTargetConventions,
   type FileEvidenceSupport,
 } from '@opensip-cli/contracts';
@@ -17,6 +18,8 @@ import {
   EnvRegistry,
   err,
   logger,
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  projectRuntimeHostSupport,
   readPackageVersion,
   type EnvVarSpec,
   type Result,
@@ -137,10 +140,25 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
       logger.info({ evt, module: 'mcp:graph', ...fields });
     },
   });
+  // Compute the honest, process-only host-support projection ONCE at
+  // construction from the same process facts and shared contracts mapper the
+  // CLI uses, so get_agent_catalog is byte-identical to `agent-catalog --json`
+  // (Plan 02 / Plan 03 parity). A long-lived server never re-observes this per
+  // method. npm/filesystem/install-channel stay unobserved → never exact.
+  const hostSupport = hostSupportFromRuntimeProjection(
+    projectRuntimeHostSupport({
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
+      nodeAbi: process.versions.modules,
+    }),
+    PLATFORM_SUPPORT_CONTRACT_VERSION,
+  );
   const results = new SessionResultsReadPort({
     store,
     projectRoot,
     tools: scope.tools,
+    hostSupport,
   });
   const codebase = new LocalCodebaseReadPort({
     projectRoot,

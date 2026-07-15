@@ -36,6 +36,13 @@ const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VERIFIER = join(REPO_ROOT, 'scripts', 'verify-platform-acceptance.mjs');
 const PROFILE_PATH = join(REPO_ROOT, '.config', 'platform-acceptance', 'common-v1.json');
 const PROFILE = parseAcceptanceProfile(JSON.parse(readFileSync(PROFILE_PATH, 'utf8')));
+const MACOS_PROFILE_PATH = join(
+  REPO_ROOT,
+  '.config',
+  'platform-acceptance',
+  'macos-26-arm64-node24-npm11-v1.json',
+);
+const MACOS_PROFILE = parseAcceptanceProfile(JSON.parse(readFileSync(MACOS_PROFILE_PATH, 'utf8')));
 
 function runVerifier(args) {
   const proc = spawnSync(process.execPath, [VERIFIER, ...args], { encoding: 'utf8' });
@@ -80,6 +87,9 @@ function makeValidBody() {
       totalMemoryBytes: 1024,
       filesystem: { type: 'ext4', caseSensitive: true },
       shell: 'bash',
+      swVers: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+      kernelRelease: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+      unameArch: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
       capabilities: { pty: true, symlink: true, permissions: true },
     },
     results,
@@ -303,6 +313,153 @@ test('exit-class purity: --json prints exactly one JSON object to stdout and not
     assert.equal(parsed.verified, true);
     // Redaction holds under --json: no source path, no registry credentials.
     assert.ok(!stdout.includes('secret-user'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Support-row binding tamper (Plan 02, spec §4/§9). The macOS profile pins the
+// platform-support row + contract version; the verifier must reject evidence
+// whose profile binding does not match the expected public support claim.
+// ---------------------------------------------------------------------------
+
+/** A valid sealed body for the macOS profile (rssRequired → first result available). */
+function makeMacosValidBody() {
+  const results = MACOS_PROFILE.journeys.map((journey, index) => ({
+    id: journey.id,
+    category: journey.id.split('.')[0],
+    required: journey.required,
+    status: 'pass',
+    reasonCode: null,
+    durationMs: 5,
+    // The macOS profile requires a real RSS measurement somewhere; supply one.
+    rss:
+      index === 0
+        ? { status: 'available', peakBytes: 4096 }
+        : { status: 'unavailable', reasonCode: 'rss-not-sampled' },
+    diagnostics: [],
+  }));
+  const cleanup = { status: 'clean', reasonCode: null, removedRoots: 3, residualDescendants: 0 };
+  const body = {
+    schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
+    profile: {
+      id: MACOS_PROFILE.id,
+      version: MACOS_PROFILE.version,
+      digest: profileDigest(MACOS_PROFILE),
+    },
+    candidate: {
+      kind: 'published-version',
+      version: '0.7.0',
+      source: 'opensip-cli@0.7.0',
+      digest: 'c'.repeat(64),
+    },
+    harnessGitSha: 'abc1234',
+    startedAt: '2026-07-15T00:00:00.000Z',
+    completedAt: '2026-07-15T00:05:00.000Z',
+    host: {
+      platform: 'darwin',
+      arch: 'arm64',
+      osRelease: '25.5.0',
+      osVersion: '26.0.1',
+      nodeVersion: 'v24.16.0',
+      nodeModuleAbi: '137',
+      npmVersion: '11.0.0',
+      packageManager: 'npm',
+      cpuModel: 'Apple M-series',
+      cpuCount: 8,
+      totalMemoryBytes: 1024,
+      filesystem: { type: 'apfs', caseSensitive: false },
+      shell: 'zsh',
+      swVers: '26.0.1',
+      kernelRelease: '25.5.0',
+      unameArch: 'arm64',
+      capabilities: { pty: true, symlink: true, permissions: true, 'process-tree-rss': true },
+    },
+    results,
+    cleanup,
+    summary: computeSummary(MACOS_PROFILE, results),
+    verdict: computeVerdict(MACOS_PROFILE, results, cleanup),
+  };
+  return { ...body, completion: { state: 'completed', evidenceDigest: evidenceDigest(body) } };
+}
+
+function writeMacosEvidence(dir) {
+  const path = join(dir, 'macos-evidence.json');
+  writeFileSync(path, `${JSON.stringify(makeMacosValidBody(), null, 2)}\n`);
+  return path;
+}
+
+test('support-row binding: the macOS profile verifies with the exact expected row + contract version', () => {
+  withTempDir((dir) => {
+    const evidence = writeMacosEvidence(dir);
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--expected-support-row',
+      'macos-26-arm64-node24-npm11-v1',
+      '--expected-support-contract-version',
+      '1',
+      '--json',
+    ]);
+    assert.equal(code, 0, stdout);
+    assert.equal(JSON.parse(stdout).verified, true);
+  });
+});
+
+test('support-row binding: a wrong expected row is an independent verifier failure', () => {
+  withTempDir((dir) => {
+    const evidence = writeMacosEvidence(dir);
+    const wrongRow = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--expected-support-row',
+      'macos-26-intel-unsupported',
+      '--json',
+    ]);
+    assert.equal(wrongRow.code, 1);
+    assert.ok(
+      failuresOf(wrongRow.stdout).includes('support-row-binding-mismatch'),
+      wrongRow.stdout,
+    );
+
+    const wrongVersion = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--expected-support-row',
+      'macos-26-arm64-node24-npm11-v1',
+      '--expected-support-contract-version',
+      '2',
+      '--json',
+    ]);
+    assert.equal(wrongVersion.code, 1);
+    assert.ok(
+      failuresOf(wrongVersion.stdout).includes('support-row-binding-mismatch'),
+      wrongVersion.stdout,
+    );
+  });
+});
+
+test('support-row binding: a profile with NO binding fails when a support row is expected', () => {
+  withTempDir((dir) => {
+    // common-v1 carries no supportRow; expecting one must fail closed (an
+    // unbound profile can never satisfy a public support claim).
+    const evidence = writeValid(dir);
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-support-row',
+      'macos-26-arm64-node24-npm11-v1',
+      '--json',
+    ]);
+    assert.equal(code, 1);
+    assert.ok(failuresOf(stdout).includes('support-row-binding-mismatch'), stdout);
   });
 });
 

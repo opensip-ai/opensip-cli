@@ -33,6 +33,7 @@ import {
   publicPrimaryCommand,
 } from './agent-catalog-entries.js';
 
+import type { AgentHostSupport } from './host-support.js';
 import type { AgentProjectContext } from './target-conventions.js';
 import type { Tool, ToolRegistry } from '@opensip-cli/core';
 
@@ -101,6 +102,16 @@ export interface AgentCatalog {
     readonly rootCommands: readonly string[];
     readonly suiteNames: readonly string[];
   };
+  /**
+   * Honest, process-only host-support projection (Plan 02, macOS GA). Additive
+   * (optional): the composition root observes the live process, asks core to
+   * classify it, and injects the serializable projection here. Catalogs built
+   * without it (e.g. a bare contracts builder) simply omit the field. The
+   * value is NEVER an exact match — npm/filesystem/install-channel are
+   * unobserved at runtime — so agents must distinguish the row's published
+   * status from the local `match`.
+   */
+  readonly hostSupport?: AgentHostSupport;
   readonly notes: readonly string[];
 }
 
@@ -184,6 +195,7 @@ export function buildAgentCatalog(
     readonly projectContext?: AgentProjectContext;
     readonly validateOverlays?: boolean;
     readonly reservedNames?: AgentCatalog['reservedNames'];
+    readonly hostSupport?: AgentHostSupport;
   } = {},
 ): AgentCatalog {
   if (input.validateOverlays === true && input.tools !== undefined) {
@@ -284,6 +296,7 @@ export function buildAgentCatalog(
       ? { projectContext: input.projectContext }
       : {}),
     ...(input.reservedNames === undefined ? {} : { reservedNames: input.reservedNames }),
+    ...(input.hostSupport === undefined ? {} : { hostSupport: input.hostSupport }),
     notes: [
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',

@@ -103,6 +103,9 @@ function fakeHost({ symlink = false } = {}) {
     totalMemoryBytes: 0,
     filesystem: { type: 'ext4', caseSensitive: true },
     shell: 'bash',
+    swVers: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+    kernelRelease: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
+    unameArch: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
     capabilities: { pty: true, symlink, permissions: true, 'process-tree-rss': true },
   };
 }
