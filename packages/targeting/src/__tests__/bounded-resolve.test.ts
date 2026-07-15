@@ -335,11 +335,16 @@ describe('resolveTargetsBounded', () => {
       maxResults: 10,
     });
     const existing = resolveTargets([selectedTarget], testDir, []);
+    // Case-sensitive hosts (Linux): common-ignore matches exact basenames only
+    // (`node_modules`/`dist`/`.git`), so the UPPERCASE variants stay. Include
+    // matching uses minimatch `dot: false`, so `**/*.ts` does not enter the
+    // dotted `.GIT/` directory — only `files/.*` can surface `files/.GIT`.
+    // Case-insensitive hosts (darwin/win32): those basenames collide with the
+    // ignore set and nothing remains.
     const expected =
       platform() === 'darwin' || platform() === 'win32'
         ? []
         : [
-            '.GIT/value.ts',
             'DIST/value.ts',
             'NODE_MODULES/value.ts',
             'files/.GIT',

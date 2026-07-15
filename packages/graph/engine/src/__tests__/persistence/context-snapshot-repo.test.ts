@@ -454,8 +454,10 @@ describe('ContextSnapshotRepo', () => {
     expect(rows.reduce((sum, row) => sum + row.byteCount, 0)).toBeLessThanOrEqual(
       MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES,
     );
-  }, 20_000);
+  });
 
+  // Near-limit inventories (~8 MiB × N) are slow under CI load; do not pin a
+  // tight per-test timeout — inherit the shared 120s base testTimeout.
   it('retains an old snapshot reused by the in-progress run when a later plane triggers pruning', () => {
     const payloads = ['inventory-protected', 'inventory-newer-a', 'inventory-newer-b'].map((id) =>
       largeInventory(id),
@@ -489,7 +491,7 @@ describe('ContextSnapshotRepo', () => {
     expect(rows.reduce((sum, row) => sum + row.byteCount, 0)).toBeLessThanOrEqual(
       MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES,
     );
-  }, 20_000);
+  });
 
   it('eventually prunes an unreferenced orphan through ordinary retention', () => {
     repo.save(input('orphan', '2026-07-10T00:00:00.000Z'));
