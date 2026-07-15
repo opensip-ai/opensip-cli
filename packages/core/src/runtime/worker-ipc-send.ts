@@ -49,10 +49,7 @@ export function sendWorkerIpcMessage(msg: unknown, maxBytes?: number): void {
  * @throws {IpcPayloadTooLargeError} When the serialized message exceeds `maxBytes`.
  * @throws {Error} When `process.send` reports a channel error.
  */
-export async function sendWorkerIpcMessageAndDrain(
-  msg: unknown,
-  maxBytes?: number,
-): Promise<void> {
+export async function sendWorkerIpcMessageAndDrain(msg: unknown, maxBytes?: number): Promise<void> {
   assertUnderCap(msg, maxBytes);
   const send = process.send;
   if (send === undefined) return;

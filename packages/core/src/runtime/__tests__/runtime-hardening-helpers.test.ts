@@ -80,9 +80,9 @@ describe('runtime hardening helpers', () => {
 
     await sendWorkerIpcMessageAndDrain({ kind: 'result' }, 1024);
     expect(sent).toEqual([{ kind: 'ok' }, { kind: 'result' }]);
-    await expect(sendWorkerIpcMessageAndDrain({ value: 'x'.repeat(256) }, 8)).rejects.toBeInstanceOf(
-      IpcPayloadTooLargeError,
-    );
+    await expect(
+      sendWorkerIpcMessageAndDrain({ value: 'x'.repeat(256) }, 8),
+    ).rejects.toBeInstanceOf(IpcPayloadTooLargeError);
   });
 
   it('falls back to child.kill when pid is unavailable or taskkill is unavailable', () => {
