@@ -316,10 +316,39 @@ export async function runGateMode(
         reportTo: args.reportTo,
         apiKey: args.apiKey,
       },
-      renderSaveLines: ({ envelope }) => [
-        'Baseline saved (project SQLite store)',
-        `  ${envelope.units.length} check(s), ${envelope.signals.length} finding(s)`,
-      ],
+      renderSaveLines: ({ envelope, runFailed }) => {
+        // Gate-save used to print only unit/signal counts. A unit that
+        // faulted (command parse failure, timeout, thrown check) fails the
+        // host verdict with zero signals — which looked like a silent
+        // "0 findings" success then exit 1. Surface the verdict + unit
+        // errors so CI dogfood logs diagnose without re-running with --json.
+        const unitErrors = envelope.units
+          .filter((unit) => unit.error !== undefined && unit.error !== '')
+          .map((unit) => `  unit-error ${unit.slug}: ${unit.error}`);
+        const lines = [
+          'Baseline saved (project SQLite store)',
+          `  ${String(envelope.units.length)} check(s), ${String(envelope.signals.length)} finding(s)`,
+          `  verdict: ${envelope.verdict.passed ? 'passed' : 'failed'} (score ${String(envelope.verdict.score)}${envelope.verdict.faulted ? ', faulted' : ''})`,
+        ];
+        if (runFailed) {
+          lines.push('Fit gate FAILED: findings policy not satisfied (or unit faulted).');
+        }
+        lines.push(...unitErrors.slice(0, 20));
+        if (unitErrors.length > 20) {
+          lines.push(`  … ${String(unitErrors.length - 20)} more unit error(s)`);
+        }
+        if (envelope.signals.length > 0 && runFailed) {
+          const sample = envelope.signals.slice(0, 10).map((signal) => {
+            const file = signal.filePath;
+            return `  finding ${signal.ruleId}: ${signal.message}${file ? ` (${file})` : ''}`;
+          });
+          lines.push(...sample);
+          if (envelope.signals.length > 10) {
+            lines.push(`  … ${String(envelope.signals.length - 10)} more finding(s)`);
+          }
+        }
+        return lines;
+      },
       renderCompareLines: ({ result }) => renderGateCompareOutput(result).split('\n'),
     });
     return completion;

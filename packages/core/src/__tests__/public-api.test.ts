@@ -281,6 +281,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'getWorkerErrorFailureClass',
   'runJsonSpecWorker',
   'sendWorkerIpcMessage',
+  'sendWorkerIpcMessageAndDrain',
   'shouldPruneEphemeralRuntimes',
   'staticHandlerValidationError',
   'startWorkerHeartbeat',

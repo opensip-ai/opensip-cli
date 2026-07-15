@@ -20,8 +20,10 @@ function captureWorkerMessages(): unknown[] {
   const messages: unknown[] = [];
   Object.defineProperty(process, 'send', {
     configurable: true,
-    value: (msg: unknown) => {
+    // Mirror real process.send: optional callback after the message is "written".
+    value: (msg: unknown, cb?: (error: Error | null) => void) => {
       messages.push(msg);
+      cb?.(null);
       return true;
     },
   });

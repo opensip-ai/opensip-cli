@@ -200,15 +200,19 @@ export function createSubprocessProgressRun<TEvent, TResult>(
 
   handle.child.on('exit', (code: number | null) => {
     if (handle.isSettled()) return;
-    handle.done(() => {
-      logFailed('exit_nonzero');
-      settle.reject(
-        workerError(
-          `worker exited (code ${code ?? 'null'}) before producing a result`,
-          undefined,
-          handle.getStderrTail(),
-        ),
-      );
+    // Defer so a result/error already queued on the IPC channel wins over exit.
+    setImmediate(() => {
+      if (handle.isSettled()) return;
+      handle.done(() => {
+        logFailed('exit_nonzero');
+        settle.reject(
+          workerError(
+            `worker exited (code ${code ?? 'null'}) before producing a result`,
+            undefined,
+            handle.getStderrTail(),
+          ),
+        );
+      });
     });
   });
 

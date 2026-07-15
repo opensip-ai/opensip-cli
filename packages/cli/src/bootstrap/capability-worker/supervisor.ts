@@ -106,15 +106,27 @@ function forkAndAwait(args: {
     );
     handle.child.on('exit', (code: number | null) => {
       if (handle.isSettled()) return;
-      handle.done(() => {
-        recordDuration(args.spec, 'exit', started);
-        reject(
-          workerError(
-            args.spec,
-            `capability worker exited (code ${code ?? 'null'}) before producing a result`,
-            handle.getStderrTail(),
-          ),
-        );
+      // Defer the premature-exit rejection so a result/error message already
+      // queued on the IPC channel is processed first. Without this, Linux
+      // runners under load intermittently reject clean workers that drained
+      // their final `process.send` just before exiting (exit races message).
+      // Two macrotasks (setImmediate + short timer) covers both "already in
+      // the parent's queue" and "still crossing the kernel pipe" cases.
+      setImmediate(() => {
+        if (handle.isSettled()) return;
+        setTimeout(() => {
+          if (handle.isSettled()) return;
+          handle.done(() => {
+            recordDuration(args.spec, 'exit', started);
+            reject(
+              workerError(
+                args.spec,
+                `capability worker exited (code ${code ?? 'null'}) before producing a result`,
+                handle.getStderrTail(),
+              ),
+            );
+          });
+        }, 50);
       });
     });
   });
