@@ -119,8 +119,10 @@ beforeEach(() => {
   messages = [];
   // The worker posts via process.send (a no-op when not forked); stub it to capture.
   // process.send is undefined under vitest, so deleting it in afterEach restores state.
-  (process as { send?: unknown }).send = vi.fn((m: Msg) => {
+  // Callback-aware mock: terminal IPC drains await the process.send callback.
+  (process as { send?: unknown }).send = vi.fn((m: Msg, cb?: (error: Error | null) => void) => {
     messages.push(m);
+    cb?.(null);
     return true;
   });
 });
