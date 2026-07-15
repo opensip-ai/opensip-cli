@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { compareCodePoint as compareCodePoints } from './code-point-order.js';
+
 import type { RunStepReference } from './run-context.js';
 
 export const PROJECT_INVENTORY_SCHEMA_VERSION = 1 as const;
@@ -177,12 +179,6 @@ export interface TaskContextManifest {
   readonly planes: readonly TaskContextPlane[];
   readonly reasonCodes: readonly string[];
   readonly nextActions: readonly string[];
-}
-
-function compareCodePoints(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
 }
 
 function canonicalIdentityValue(value: unknown): unknown {

@@ -6,6 +6,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 
 import { projectConfigIdentity } from '@opensip-cli/codebase';
+import { compareCodePoint } from '@opensip-cli/contracts';
 import { resolveChangedFiles } from '@opensip-cli/core';
 
 import type { TaskContextSourceIdentity } from '@opensip-cli/contracts';
@@ -52,12 +53,6 @@ async function gitBytes(
     windowsHide: true,
   });
   return Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout);
-}
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
 }
 
 /**

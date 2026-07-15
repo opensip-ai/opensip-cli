@@ -2,15 +2,10 @@ import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
+import { compareCodePoint } from '@opensip-cli/contracts';
 import { tryCatch } from '@opensip-cli/core';
 
 import type { CatalogBuildCoverage, ParseError } from '../../types.js';
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 /** @throws {Error} When a build input cannot be represented as a safe project-relative path. */
 function safeRelativePath(value: string): string {

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
+import { compareCodePoint as compareCodePoints } from './code-point-order.js';
 import { MAX_TASK_CONTEXT_FILES } from './task-context-model.js';
 
 import type { TaskContextFileScope } from './task-context-model.js';
@@ -178,12 +179,6 @@ export const contextCoverageSchema = z
       });
     }
   });
-
-function compareCodePoints(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 /**
  * Normalize and deduplicate the privacy-bound task file set.

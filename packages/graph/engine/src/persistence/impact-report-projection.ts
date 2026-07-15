@@ -5,6 +5,8 @@
  * stores a lossy display projection inside graph's opaque session payload so
  * report composition never needs to rerun Git or graph traversal.
  */
+import { compareCodePoint } from '@opensip-cli/contracts';
+
 import type {
   GraphImpactCatalogIdentity,
   GraphImpactResult,
@@ -75,12 +77,6 @@ export interface GraphImpactReportProjection {
   readonly omitted: GraphImpactReportOmittedCounts;
   readonly detailTruncated: boolean;
   readonly metadataOmitted: boolean;
-}
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
 }
 
 function hasControl(value: string): boolean {

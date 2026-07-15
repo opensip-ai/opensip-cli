@@ -1,3 +1,5 @@
+import { compareCodePoint } from '@opensip-cli/contracts';
+
 import { toMcpFinding } from './signal-projection.js';
 
 import type { McpBaselineDelta, McpEvidenceDegradation, McpFinding } from './result-dto.js';
@@ -85,10 +87,4 @@ export function compareSignalsToBaseline(
       : {}),
     ...(degraded.length === 0 ? {} : { degraded }),
   };
-}
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
 }

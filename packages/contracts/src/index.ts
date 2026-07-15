@@ -69,6 +69,7 @@ export type {
   SignalToReviewBriefRiskInput,
 } from './review-brief.js';
 export type * from './review-brief-correlation.js';
+export { compareCodePoint, compareCodePointStrings } from './code-point-order.js';
 export {
   REVIEW_BRIEF_VERSION,
   buildReviewBriefBaselineDelta,

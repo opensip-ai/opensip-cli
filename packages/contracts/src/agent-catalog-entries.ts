@@ -1,6 +1,10 @@
 import { ValidationError } from '@opensip-cli/core';
 
+import { compareCodePoint } from './code-point-order.js';
+
 import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
+
+export { compareCodePoint } from './code-point-order.js';
 
 type CommandTier = 'platform' | 'tool' | 'internal';
 
@@ -18,13 +22,6 @@ type ToolEntryOverlays = Readonly<Record<string, Partial<EntryPoint>>>;
  * expose.
  */
 export const INTERNAL_COMMAND_NAME_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
-
-/** Compare command strings by raw code point for locale-independent sorting. */
-export function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 const TOOL_ENTRY_OVERLAYS: ToolEntryOverlays = {
   fitness: {
