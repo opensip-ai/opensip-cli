@@ -1,5 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 
@@ -158,6 +165,20 @@ describe('parseArgs', () => {
     });
   });
 
+  it('accepts an installed entrypoint in smoke and evaluation modes', () => {
+    expect(parseArgs(['--smoke', '--opensip-entrypoint', '/abs/cli/index.js'])).toEqual({
+      arm: 'both',
+      help: false,
+      list: false,
+      opensipEntrypoint: '/abs/cli/index.js',
+      smoke: true,
+      taskIds: [],
+    });
+    expect(
+      parseArgs(['--task', TASK_ONE.id, '--opensip-entrypoint', '/abs/cli/index.js']),
+    ).toMatchObject({ opensipEntrypoint: '/abs/cli/index.js' });
+  });
+
   it.each([
     { argv: ['--wat'], label: 'unknown options' },
     { argv: ['positional'], label: 'positional input' },
@@ -183,8 +204,33 @@ describe('parseArgs', () => {
       argv: ['--help', '--task', TASK_ONE.id],
       label: 'help evaluation options',
     },
+    {
+      argv: ['--list', '--opensip-entrypoint', '/abs/index.js'],
+      label: 'installed entrypoint in list mode',
+    },
+    {
+      argv: ['--help', '--opensip-entrypoint', '/abs/index.js'],
+      label: 'installed entrypoint in help mode',
+    },
+    {
+      argv: ['--opensip-entrypoint', '/a.js', '--opensip-entrypoint', '/b.js'],
+      label: 'duplicate installed entrypoints',
+    },
+    { argv: ['--opensip-entrypoint'], label: 'missing installed entrypoint value' },
+    { argv: Array.from({ length: 513 }, () => '--list'), label: 'an argv count over the bound' },
+    { argv: ['--json', 'x'.repeat(8193)], label: 'a single argument over the byte bound' },
   ])('rejects $label', ({ argv }) => {
     expect(() => parseArgs(argv)).toThrow(InvocationError);
+  });
+
+  it('accepts an argv exactly at the count and per-argument byte bounds', () => {
+    // 512 tokens total (256 --task/value pairs), each value at the 8 KiB ceiling.
+    const value = 'v'.repeat(8 * 1024);
+    const argv = Array.from({ length: 256 }, () => ['--task', value]).flat();
+    expect(argv).toHaveLength(512);
+    const parsed = parseArgs(argv);
+    expect(parsed.taskIds).toHaveLength(256);
+    expect(parsed.taskIds.every((id) => id === value)).toBe(true);
   });
 });
 
@@ -337,6 +383,72 @@ describe('main', () => {
     );
     expect(harness.stderr()).toContain(`${TASK_TWO.id} [control] starting`);
     expect(harness.stderr()).toContain('report artifacts complete');
+  });
+
+  it('records the installed CLI target and threads one target to version + arm runs', async () => {
+    const root = temporaryDirectory();
+    const entrypoint = join(root, 'cli.js');
+    writeFileSync(entrypoint, 'export default 1;\n', 'utf8');
+    const realEntrypoint = realpathSync(entrypoint);
+    const jsonPath = join(root, 'installed.json');
+    const targets: { entrypoint: string; phase: string; source: string }[] = [];
+    const harness = dependencyHarness(root, {
+      resolveCliVersion: (target) => {
+        targets.push({ entrypoint: target.entrypoint, phase: 'version', source: target.source });
+        return Promise.resolve(CLI_VERSION);
+      },
+      runArm: (task, arm, target) => {
+        targets.push({ entrypoint: target.entrypoint, phase: 'arm', source: target.source });
+        return Promise.resolve(armResult(task, arm));
+      },
+    });
+
+    await expect(
+      main(
+        [
+          '--task',
+          TASK_ONE.id,
+          '--arm',
+          'opensip',
+          '--opensip-entrypoint',
+          entrypoint,
+          '--json',
+          jsonPath,
+        ],
+        harness.dependencies,
+      ),
+    ).resolves.toBe(0);
+
+    const report = JSON.parse(readFileSync(jsonPath, 'utf8')) as EvalReport;
+    expect(report.cliTarget).toEqual({ entrypointName: 'cli.js', source: 'installed' });
+    expect(targets).toEqual([
+      { entrypoint: realEntrypoint, phase: 'version', source: 'installed' },
+      { entrypoint: realEntrypoint, phase: 'arm', source: 'installed' },
+    ]);
+  });
+
+  it('rejects an installed entrypoint that is not a usable JS bin with exit two', async () => {
+    const root = temporaryDirectory();
+    const harness = dependencyHarness(root);
+    await expect(
+      main(
+        ['--task', TASK_ONE.id, '--opensip-entrypoint', join(root, 'missing.js')],
+        harness.dependencies,
+      ),
+    ).resolves.toBe(2);
+    expect(harness.calls).toEqual([]);
+    expect(harness.stderr()).toContain('prerequisite');
+  });
+
+  it('records a workspace target source when no installed entrypoint is supplied', async () => {
+    const root = temporaryDirectory();
+    const jsonPath = join(root, 'workspace.json');
+    const harness = dependencyHarness(root);
+    await expect(
+      main(['--task', TASK_ONE.id, '--arm', 'control', '--json', jsonPath], harness.dependencies),
+    ).resolves.toBe(0);
+    const report = JSON.parse(readFileSync(jsonPath, 'utf8')) as EvalReport;
+    expect(report.cliTarget?.source).toBe('workspace');
   });
 
   it('runs only the requested arm without a hidden peer run', async () => {

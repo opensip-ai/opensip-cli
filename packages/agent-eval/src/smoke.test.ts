@@ -1,4 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -6,10 +13,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_CLI_DEPENDENCIES, main, markdownPathFor } from './cli.js';
 import { validateEvalReport } from './report/model.js';
+import { workspaceCliDistPath } from './runner/spawn.js';
 import { taskRegistry } from './tasks/index.js';
 
 import type { Arm, GoldTask } from './model/task.js';
 import type { EvaluatedArmRun } from './runner/run-task.js';
+import type { CliTarget } from './runner/spawn.js';
 
 const SMOKE_TASK_ID = 'entrypoint-trace.customer-ts';
 const temporaryDirectories: string[] = [];
@@ -110,6 +119,52 @@ describe('--smoke', () => {
 
     expect(exitCode).toBe(2);
     expect(stderr).toContain('Usage: pnpm agent-eval');
+  });
+
+  it('threads a fake installed JS bin target through smoke — never the workspace dist', async () => {
+    const root = temporaryDirectory();
+    const entrypoint = join(root, 'installed-cli.js');
+    writeFileSync(entrypoint, 'export default 1;\n', 'utf8');
+    const jsonPath = join(root, 'installed-smoke.json');
+    const targets: CliTarget[] = [];
+
+    const exitCode = await main(
+      ['--smoke', '--opensip-entrypoint', entrypoint, '--json', jsonPath],
+      {
+        ...DEFAULT_CLI_DEPENDENCIES,
+        cwd: () => root,
+        harnessVersion: '0.6.0',
+        nodeVersion: 'v24.0.0',
+        now: () => new Date('2026-07-12T20:00:00.000Z'),
+        platform: 'test-platform',
+        resolveCliVersion: (target) => {
+          targets.push(target);
+          return Promise.resolve('0.6.0');
+        },
+        resolveGitProvenance: () =>
+          Promise.resolve({ gitSha: 'abcdef123456', worktreeDirty: false }),
+        resultsRoot: join(root, 'results'),
+        runArm: (task, arm, target) => {
+          targets.push(target);
+          return Promise.resolve(armResult(task, arm));
+        },
+        stderr: () => undefined,
+        stdout: () => undefined,
+      },
+    );
+
+    expect(exitCode).toBe(0);
+    // Every version + arm run measured the SAME immutable installed target.
+    expect(targets.length).toBeGreaterThanOrEqual(3);
+    for (const target of targets) {
+      expect(target.source).toBe('installed');
+      expect(target.entrypoint).toBe(realpathSync(entrypoint));
+      expect(target.entrypoint).not.toBe(workspaceCliDistPath());
+    }
+    const report: unknown = JSON.parse(readFileSync(jsonPath, 'utf8'));
+    expect(report).toMatchObject({
+      cliTarget: { entrypointName: 'installed-cli.js', source: 'installed' },
+    });
   });
 
   it('pins the designated smoke task in the live registry', () => {

@@ -245,6 +245,48 @@ describe('ordinary task orchestration', () => {
     });
   });
 
+  it('threads a CLI target into MCP command and entrypoint resolution', () => {
+    const root = temporaryDirectory();
+    const target = {
+      command: '/node-bin',
+      entrypoint: '/installed/cli.js',
+      source: 'installed' as const,
+    };
+    const options = buildMcpSessionOptions(root, 'fixture', target);
+    expect(options.workspaceRoot).toBe(root);
+    expect(options.env).toEqual({ HOME: join(root, '.agent-eval-home') });
+    expect(options.cliCommand).toBe('/node-bin');
+    expect(options.cliDistResolver?.()).toBe('/installed/cli.js');
+  });
+
+  it('threads the run CLI target into fixture setup and the MCP session', async () => {
+    const events: string[] = [];
+    const root = temporaryDirectory('target-threading-');
+    const target = {
+      command: process.execPath,
+      entrypoint: '/installed/cli.js',
+      source: 'installed' as const,
+    };
+    let setupTarget: unknown;
+    let connectTarget: unknown;
+    await runTaskArm(ordinaryTask(), 'opensip', {
+      cliTarget: target,
+      dependencies: {
+        connectMcp: (workspaceRoot, _mode, injected) => {
+          connectTarget = injected;
+          return Promise.resolve(fakeSession(workspaceRoot, events));
+        },
+        setupFixture: (workspaceRoot, _language, injected) => {
+          setupTarget = injected;
+          return Promise.resolve(setupRecord(workspaceRoot));
+        },
+        withFixture: fakeFixtureCopies(events, [root]),
+      },
+    });
+    expect(setupTarget).toBe(target);
+    expect(connectTarget).toBe(target);
+  });
+
   it.each(['control', 'opensip'] as const)(
     'executes only the selected %s arm without fabricating its peer',
     async (arm) => {

@@ -1,5 +1,9 @@
 import { createNativeInvoker } from '../adapters/native-tools.js';
-import { fixtureHomePath, setupFixtureProject } from '../adapters/opensip-cli.js';
+import {
+  DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES,
+  fixtureHomePath,
+  setupFixtureProject,
+} from '../adapters/opensip-cli.js';
 import { McpArmSession } from '../adapters/opensip-mcp.js';
 import { evaluateAssertions } from '../scorer/assertions.js';
 import { computeArmMetrics, computeRecoveryMetrics } from '../scorer/metrics.js';
@@ -9,10 +13,12 @@ import { executeArm } from './execute-arm.js';
 import { listGitVisibleFixtureFiles } from './fixture-inventory.js';
 import { REUSE_EXISTING_MODE, resolveFixtureReference } from './fixture-resolution.js';
 import { withFixtureCopy } from './fixture-workspace.js';
-import { HarnessPrerequisiteError } from './spawn.js';
+import { HarnessPrerequisiteError, spawnCli } from './spawn.js';
 import { assertionsForLeg, validateTask } from './task-validation.js';
 
 import type { FixtureResolution, FixtureResolutionOptions } from './fixture-resolution.js';
+import type { CliTarget } from './spawn.js';
+import type { SetupFixtureProjectDependencies } from '../adapters/opensip-cli.js';
 import type { McpArmSessionOptions } from '../adapters/opensip-mcp.js';
 import type {
   ArmRunRecord,
@@ -37,17 +43,24 @@ export interface RunTaskDependencies {
   readonly connectMcp: (
     workspaceRoot: string,
     mode: SetupRecord['mode'],
+    target?: CliTarget,
   ) => Promise<TaskMcpSession>;
   readonly createControlInvoker: typeof createNativeInvoker;
   readonly execute: typeof executeArm;
   readonly listFixtureFiles: typeof listGitVisibleFixtureFiles;
   readonly now: () => Date;
-  readonly setupFixture: typeof setupFixtureProject;
+  readonly setupFixture: (
+    projectRoot: string,
+    language: string,
+    target?: CliTarget,
+  ) => Promise<SetupRecord>;
   readonly withFixture: typeof withFixtureCopy;
 }
 
 /** Fixture roots and optional effect overrides for task execution. */
 export interface RunTaskOptions extends FixtureResolutionOptions {
+  /** The immutable CLI target every init/graph/MCP spawn measures (workspace `dist` when absent). */
+  readonly cliTarget?: CliTarget;
   readonly dependencies?: Partial<RunTaskDependencies>;
 }
 
@@ -70,23 +83,39 @@ export interface EvaluatedArmRun {
 
 const DEFAULT_RUN_TASK_DEPENDENCIES: RunTaskDependencies = Object.freeze({
   applyEdit: applyEditScript,
-  connectMcp: (workspaceRoot: string, mode: SetupRecord['mode']) =>
-    McpArmSession.connect(buildMcpSessionOptions(workspaceRoot, mode)),
+  connectMcp: (workspaceRoot: string, mode: SetupRecord['mode'], target?: CliTarget) =>
+    McpArmSession.connect(buildMcpSessionOptions(workspaceRoot, mode, target)),
   createControlInvoker: createNativeInvoker,
   execute: executeArm,
   listFixtureFiles: listGitVisibleFixtureFiles,
   now: () => new Date(),
-  setupFixture: setupFixtureProject,
+  setupFixture: (projectRoot: string, language: string, target?: CliTarget) =>
+    setupFixtureProject(projectRoot, language, setupFixtureDependenciesForTarget(target)),
   withFixture: withFixtureCopy,
 });
 
-/** Keep fixture init/graph/MCP on the same isolated HOME without touching dogfood. */
+/** Bind an explicit CLI target into fixture setup's init/graph spawns (workspace `dist` when absent). */
+function setupFixtureDependenciesForTarget(
+  target: CliTarget | undefined,
+): SetupFixtureProjectDependencies {
+  if (target === undefined) return DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES;
+  return {
+    ...DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES,
+    spawnCli: (args, options) => spawnCli(args, { ...options, target }),
+  };
+}
+
+/** Keep fixture init/graph/MCP on the same isolated HOME and CLI target without touching dogfood. */
 export function buildMcpSessionOptions(
   workspaceRoot: string,
   mode: SetupRecord['mode'],
+  target?: CliTarget,
 ): McpArmSessionOptions {
   return {
     ...(mode === 'fixture' ? { env: { HOME: fixtureHomePath(workspaceRoot) } } : {}),
+    ...(target === undefined
+      ? {}
+      : { cliCommand: target.command, cliDistResolver: () => target.entrypoint }),
     workspaceRoot,
   };
 }
@@ -223,8 +252,9 @@ async function runOpenSipWithSession(
   workspaceRoot: string,
   setup: SetupRecord,
   dependencies: RunTaskDependencies,
+  target: CliTarget | undefined,
 ) {
-  const session = await dependencies.connectMcp(workspaceRoot, setup.mode);
+  const session = await dependencies.connectMcp(workspaceRoot, setup.mode, target);
   let legs: Awaited<ReturnType<typeof executeTaskLegs>>;
   let catalogProbe: CatalogProbeRecord;
   try {
@@ -244,6 +274,7 @@ async function runFixtureArm(
   arm: Arm,
   fixture: Extract<FixtureResolution, { readonly mode: 'fixture' }>,
   dependencies: RunTaskDependencies,
+  target: CliTarget | undefined,
 ): Promise<EvaluatedArmRun> {
   switch (arm) {
     case 'control': {
@@ -262,8 +293,8 @@ async function runFixtureArm(
           repositoryRoot: fixture.repositoryRoot,
         },
         async (root) => {
-          const setup = await dependencies.setupFixture(root, fixture.language);
-          return runOpenSipWithSession(task, root, setup, dependencies);
+          const setup = await dependencies.setupFixture(root, fixture.language, target);
+          return runOpenSipWithSession(task, root, setup, dependencies, target);
         },
       );
     }
@@ -279,6 +310,7 @@ async function runDogfoodArm(
   arm: Arm,
   workspaceRoot: string,
   dependencies: RunTaskDependencies,
+  target: CliTarget | undefined,
 ): Promise<EvaluatedArmRun> {
   switch (arm) {
     case 'control': {
@@ -297,6 +329,7 @@ async function runDogfoodArm(
         workspaceRoot,
         { mode: REUSE_EXISTING_MODE, stages: [] },
         dependencies,
+        target,
       );
     }
     default: {
@@ -318,10 +351,11 @@ function runResolvedTaskArm(
   arm: Arm,
   fixture: FixtureResolution,
   dependencies: RunTaskDependencies,
+  target: CliTarget | undefined,
 ): Promise<EvaluatedArmRun> {
   return fixture.mode === 'fixture'
-    ? runFixtureArm(task, arm, fixture, dependencies)
-    : runDogfoodArm(task, arm, fixture.workspaceRoot, dependencies);
+    ? runFixtureArm(task, arm, fixture, dependencies, target)
+    : runDogfoodArm(task, arm, fixture.workspaceRoot, dependencies, target);
 }
 
 /** Execute exactly one requested arm without constructing a synthetic peer record. */
@@ -332,7 +366,7 @@ export function runTaskArm(
 ): Promise<EvaluatedArmRun> {
   const fixture = resolveFixtureReference(task.fixture, options);
   validateTask(task, fixture);
-  return runResolvedTaskArm(task, arm, fixture, resolveDependencies(options));
+  return runResolvedTaskArm(task, arm, fixture, resolveDependencies(options), options.cliTarget);
 }
 
 /** Run both deterministic arms sequentially and return records plus scoring. */
@@ -344,8 +378,20 @@ export async function runTask(
   validateTask(task, fixture);
   const dependencies = resolveDependencies(options);
   // @fitness-ignore-next-line async-waterfall-detection -- Arms run serially to preserve deterministic order and prevent competing CLI/MCP processes from contaminating timing.
-  const control = await runResolvedTaskArm(task, 'control', fixture, dependencies);
-  const opensip = await runResolvedTaskArm(task, 'opensip', fixture, dependencies);
+  const control = await runResolvedTaskArm(
+    task,
+    'control',
+    fixture,
+    dependencies,
+    options.cliTarget,
+  );
+  const opensip = await runResolvedTaskArm(
+    task,
+    'opensip',
+    fixture,
+    dependencies,
+    options.cliTarget,
+  );
   const record: TaskRunRecord = {
     arms: { control: control.record, opensip: opensip.record },
     completedAt: dependencies.now().toISOString(),

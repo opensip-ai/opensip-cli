@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -23,6 +23,8 @@ import { resolveGitProvenance } from './runner/git-provenance.js';
 import { runTaskArm } from './runner/run-task.js';
 import {
   HarnessPrerequisiteError,
+  assertTargetRealpathStable,
+  buildCliTarget,
   resolveCliDist,
   spawnCli,
   tailForDiagnostics,
@@ -37,6 +39,7 @@ import type { Arm, GoldTask } from './model/task.js';
 import type { EvalArmResult, EvalReport, EvalTaskResult, SourceState } from './report/model.js';
 import type { GitProvenance } from './runner/git-provenance.js';
 import type { EvaluatedArmRun } from './runner/run-task.js';
+import type { CliTarget } from './runner/spawn.js';
 
 export { InvocationError, USAGE, parseArgs } from './cli-arguments.js';
 export type { ParsedCliOptions } from './cli-arguments.js';
@@ -60,23 +63,27 @@ export interface CliDependencies {
   readonly platform: string;
   readonly registry: Readonly<Record<string, GoldTask>>;
   readonly resolveContractFingerprint: (tasks: readonly GoldTask[]) => Promise<string>;
-  readonly resolveCliVersion: () => Promise<string>;
+  readonly resolveCliVersion: (target: CliTarget) => Promise<string>;
   readonly resolveGitProvenance: () => Promise<GitProvenance>;
   readonly resultsRoot: string;
-  readonly runArm: (task: GoldTask, arm: Arm) => Promise<EvaluatedArmRun>;
+  readonly runArm: (task: GoldTask, arm: Arm, target: CliTarget) => Promise<EvaluatedArmRun>;
   readonly stderr: (text: string) => void;
   readonly stdout: (text: string) => void;
 }
 
 /**
- * Resolve the built CLI's version through the harness's bounded CLI spawn seam.
+ * Resolve the target CLI's version through the harness's bounded CLI spawn seam.
+ * Uses the same immutable target as every other spawn in the run.
  *
  * @throws {HarnessPrerequisiteError} When the built CLI or a valid version is unavailable.
  */
-export async function resolveOpenSipCliVersion(): Promise<string> {
-  void resolveCliDist();
+export async function resolveOpenSipCliVersion(target: CliTarget): Promise<string> {
+  // The installed entrypoint was verified at target construction; only a workspace
+  // target needs the "run pnpm build" prerequisite check before spawning.
+  if (target.source === 'workspace') void resolveCliDist();
   const result = await spawnCli(['--version'], {
     maxOutputBytes: VERSION_OUTPUT_BYTES,
+    target,
     timeoutMs: VERSION_TIMEOUT_MS,
   });
   const version = result.stdout.trim();
@@ -112,7 +119,8 @@ export const DEFAULT_CLI_DEPENDENCIES: CliDependencies = Object.freeze({
   resolveCliVersion: resolveOpenSipCliVersion,
   resolveGitProvenance,
   resultsRoot: DEFAULT_RESULTS_ROOT,
-  runArm: (task: GoldTask, arm: Arm) => runTaskArm(task, arm),
+  runArm: (task: GoldTask, arm: Arm, target: CliTarget) =>
+    runTaskArm(task, arm, { cliTarget: target }),
   stderr: (text: string) => process.stderr.write(text),
   stdout: (text: string) => process.stdout.write(text),
 });
@@ -129,6 +137,7 @@ function buildRequestedPaths(
 async function executeTasks(
   tasks: readonly GoldTask[],
   arms: readonly Arm[],
+  target: CliTarget,
   dependencies: CliDependencies,
 ): Promise<readonly EvalTaskResult[]> {
   const results: EvalTaskResult[] = [];
@@ -136,7 +145,7 @@ async function executeTasks(
     const armResults: Partial<Record<Arm, EvalArmResult>> = {};
     for (const arm of arms) {
       void dependencies.stderr(`agent-eval: ${task.id} [${arm}] starting\n`);
-      armResults[arm] = await dependencies.runArm(task, arm);
+      armResults[arm] = await dependencies.runArm(task, arm, target);
       void dependencies.stderr(`agent-eval: ${task.id} [${arm}] complete\n`);
     }
     results.push({
@@ -173,12 +182,13 @@ async function runEvaluation(
   tasks: readonly GoldTask[],
   arms: readonly Arm[],
   requestedPaths: ArtifactPaths | undefined,
+  target: CliTarget,
   dependencies: CliDependencies,
 ): Promise<number> {
   const startedAtDate = dependencies.now();
   const startedAt = startedAtDate.toISOString();
   const [cliVersion, initialSource] = await Promise.all([
-    dependencies.resolveCliVersion(),
+    dependencies.resolveCliVersion(target),
     dependencies.resolveGitProvenance(),
   ]);
   const fingerprint = await dependencies.resolveContractFingerprint(tasks);
@@ -191,8 +201,10 @@ async function runEvaluation(
     `agent-eval: running ${String(tasks.length)} task(s) across ${arms.join(', ')}\n`,
   );
   // @fitness-ignore-next-line async-waterfall-detection -- The closing Git snapshot must observe the source state after every measured task has finished.
-  const taskResults = await executeTasks(tasks, arms, dependencies);
+  const taskResults = await executeTasks(tasks, arms, target, dependencies);
   const finalSource = await dependencies.resolveGitProvenance();
+  // Reject a target whose realpath changed mid-run before trusting its evidence.
+  assertTargetRealpathStable(target);
   const sourceState = classifySourceState(initialSource, finalSource);
   if (sourceState === 'changed-during-run') {
     void dependencies.stderr(
@@ -207,6 +219,7 @@ async function runEvaluation(
     sourceState,
   );
   const report: EvalReport = {
+    cliTarget: { entrypointName: basename(target.entrypoint), source: target.source },
     cliVersion,
     completedAt: dependencies.now().toISOString(),
     contractFingerprint: fingerprint,
@@ -270,11 +283,14 @@ async function mainImpl(argv: readonly string[], dependencies: CliDependencies):
   }
   const tasks = selectTasks(options, dependencies.registry);
   const arms = selectedArms(options);
+  // Construct the one immutable CLI target once, after help/list have returned, so
+  // every version/init/graph/MCP spawn in this run measures the same build.
+  const target = buildCliTarget(options.opensipEntrypoint);
   const requestedPaths = buildRequestedPaths(options, dependencies);
   if (requestedPaths !== undefined) {
     await requireExplicitPairAvailable(requestedPaths, dependencies.artifactFileSystem);
   }
-  return runEvaluation(tasks, arms, requestedPaths, dependencies);
+  return runEvaluation(tasks, arms, requestedPaths, target, dependencies);
 }
 
 /** Run the evaluation command without allowing task assertion failures to become process failures. */
