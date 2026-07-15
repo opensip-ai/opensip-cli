@@ -216,5 +216,12 @@ describe('filterContent', () => {
       const { code } = filterContent(src);
       expect(code).toBe(src);
     });
+
+    it('does not treat TSX closing tags as regex openers before http URLs', () => {
+      const src = 'const el = <div></div>; const url = "http://example.com"; const after = 1;';
+      const { code } = filterContent(src);
+      // Closing `</div>` must not start a regex that swallows `http://` and blanks the rest.
+      expect(code).toContain('const after = 1');
+    });
   });
 });

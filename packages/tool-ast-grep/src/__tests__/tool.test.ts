@@ -93,7 +93,7 @@ describe('ast-grep tool — scan helper', () => {
       cfg,
       '--format',
       'sarif',
-      dir,
+      '.',
     ]);
   });
 

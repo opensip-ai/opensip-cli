@@ -38,7 +38,9 @@ export function buildRuffExclude(input: { readonly excludePath: string }): {
   const relativeSegment = normalized.includes('opensip-cli/.runtime')
     ? 'opensip-cli/.runtime'
     : (normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized);
-  return { args: ['--exclude', relativeSegment] };
+  // --extend-exclude ADDS to defaults/config; --exclude REPLACES them (would
+  // scan .venv / node_modules / .git). Same class of footgun Bandit fixed for -x.
+  return { args: ['--extend-exclude', relativeSegment] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

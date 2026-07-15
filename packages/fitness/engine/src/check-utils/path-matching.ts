@@ -39,5 +39,12 @@ export type PathPattern = string | RegExp;
  * ```
  */
 export function createPathMatcher(patterns: readonly PathPattern[]): (path: string) => boolean {
-  return (path) => patterns.some((p) => (typeof p === 'string' ? path.includes(p) : p.test(path)));
+  // Production check paths are absolute OS-native; string/regex patterns are
+  // written with POSIX `/` segments. Normalize once so Windows `\` paths match.
+  return (path) => {
+    const normalized = path.replaceAll('\\', '/');
+    return patterns.some((p) =>
+      typeof p === 'string' ? normalized.includes(p) : p.test(normalized),
+    );
+  };
 }

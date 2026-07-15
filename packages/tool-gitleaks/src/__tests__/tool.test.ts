@@ -172,6 +172,25 @@ describe('gitleaks tool — A3 .runtime exclusion (buildGitleaksExclude)', () =>
     expect(withProject.configFile.contents).not.toMatch(/^path\s*=/m);
     expect(withProject.configFile.contents).toContain('opensip-cli/\\.runtime');
     expect(withProject.configFile.contents).toContain('[[allowlists]]');
+    expect(withProject.configFile.contents).toContain(
+      '# opensip-cli A3 exclude: opensip-cli/.runtime',
+    );
+  });
+
+  it('uses legacy [allowlist] when the project config uses the deprecated form', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-legacy-al-'));
+    const projectToml = join(dir, '.gitleaks.toml');
+    writeFileSync(
+      projectToml,
+      '[extend]\nuseDefault = true\n\n[allowlist]\npaths = [\'\'\'vendor\'\'\']\n',
+    );
+    const withProject = buildGitleaksExclude({
+      excludePath: join(dir, 'opensip-cli', '.runtime'),
+      configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
+    });
+    // Must not mix singular + plural allowlist forms (gitleaks hard-fails).
+    expect(withProject.configFile.contents).toContain('[allowlist]');
+    expect(withProject.configFile.contents).not.toContain('[[allowlists]]');
   });
 });
 

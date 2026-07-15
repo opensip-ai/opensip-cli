@@ -26,7 +26,9 @@ const CLI_OUTPUT_PATTERNS = [
  * Check if a file is a CLI output file where console.* is acceptable.
  */
 function isCliOutputFile(filePath: string): boolean {
-  return CLI_OUTPUT_PATTERNS.some((p) => p.test(filePath));
+  // Production paths are absolute OS-native; patterns use POSIX `/` segments.
+  const normalized = filePath.replaceAll('\\', '/');
+  return CLI_OUTPUT_PATTERNS.some((p) => p.test(normalized));
 }
 
 /**

@@ -37,14 +37,10 @@ function requiredConfig(projectRoot: string): string {
  * built-in ruleset, so a scan without a config would be a no-op.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
-  return [
-    'scan',
-    '--config',
-    requiredConfig(ctx.projectRoot),
-    '--format',
-    'sarif',
-    ctx.projectRoot,
-  ];
+  // Scan `.` under cwd=projectRoot so SARIF paths stay project-relative
+  // (message-hash fingerprints are otherwise machine-path-specific).
+  const config = requiredConfig(ctx.projectRoot);
+  return ['scan', '--config', config, '--format', 'sarif', '.'];
 }
 
 /**

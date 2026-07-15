@@ -135,8 +135,16 @@ export function buildGitleaksExclude(input: {
   // Flatten: never wrap project config in `[extend] path = ...` — that burns one
   // of gitleaks's maxExtendDepth=2 hops and can drop base/org rules. Inline the
   // project file (preserving its own extends) and append our runtime allowlist.
-  const allowlistBlock = [
+  // Prefer modern [[allowlists]]; if the project still uses deprecated singular
+  // [allowlist], use the same form so gitleaks does not hard-fail on mix.
+  const modernAllowlist = [
     '[[allowlists]]',
+    'description = "opensip-cli: skip the .runtime artifact store"',
+    "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
+    '',
+  ].join('\n');
+  const legacyAllowlist = [
+    '[allowlist]',
     'description = "opensip-cli: skip the .runtime artifact store"',
     "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
     '',
@@ -149,28 +157,36 @@ export function buildGitleaksExclude(input: {
     } catch {
       projectConfig = '';
     }
-    contents =
-      projectConfig.length > 0
-        ? [
-            '# opensip-cli A3 exclude: opensip-cli/.runtime (flattened project config)',
-            projectConfig,
-            '',
-            allowlistBlock,
-          ].join('\n')
-        : [
-            '# opensip-cli A3 exclude: opensip-cli/.runtime',
-            '[extend]',
-            'useDefault = true',
-            '',
-            allowlistBlock,
-          ].join('\n');
+    if (projectConfig.length > 0) {
+      // Match project allowlist form (singular vs plural) to avoid gitleaks
+      // "cannot be used alongside" config rejection.
+      const usesLegacyAllowlist =
+        /(?:^|\n)\s*\[allowlist\]\s*(?:\n|$)/.test(projectConfig) &&
+        !/(?:^|\n)\s*\[\[allowlists\]\]\s*(?:\n|$)/.test(projectConfig);
+      const allowlistBlock = usesLegacyAllowlist ? legacyAllowlist : modernAllowlist;
+      contents = [
+        // Marker text after the colon must stay a bare path for the walking fake.
+        '# opensip-cli A3 exclude: opensip-cli/.runtime',
+        projectConfig,
+        '',
+        allowlistBlock,
+      ].join('\n');
+    } else {
+      contents = [
+        '# opensip-cli A3 exclude: opensip-cli/.runtime',
+        '[extend]',
+        'useDefault = true',
+        '',
+        modernAllowlist,
+      ].join('\n');
+    }
   } else {
     contents = [
       '# opensip-cli A3 exclude: opensip-cli/.runtime',
       '[extend]',
       'useDefault = true',
       '',
-      allowlistBlock,
+      modernAllowlist,
     ].join('\n');
   }
   return { args: ['--config', path], configFile: { path, contents } };

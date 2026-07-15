@@ -55,7 +55,13 @@ export function findDuplicateBodies(
   const aggregates: CrossPackageAggregate[] = [];
 
   for (const [bodyHash, occs] of aggregateBuckets) {
-    const packages = [...new Set(occs.map((o) => o.package ?? ''))].sort();
+    const packages = [
+      ...new Set(
+        occs
+          .map((o) => o.package)
+          .filter((p): p is string => typeof p === 'string' && p.length > 0),
+      ),
+    ].sort();
     if (packages.length < minPackages) continue;
     const anchor = lowestByQualifiedName(occs);
     // Lighter, body-size-only floor (NO line floor) — see DEFAULT_MIN_CROSS_PACKAGE_BODY_SIZE.

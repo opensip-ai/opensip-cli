@@ -227,36 +227,90 @@ function buildComponentCluster(
   // re-cap by keeping highest-degree nodes from the original component.
   let workingEdges = cappedEdges;
   if (nearIndicesInComponent(cappedEdges).size < 2 && component.length > MAX_CLUSTER_SIZE) {
-    const degreeCap = capComponentIndicesByDegree(component, componentEdges, MAX_CLUSTER_SIZE);
+    const degreeCap = capComponentIndicesByDegree(
+      eligible,
+      component,
+      componentEdges,
+      MAX_CLUSTER_SIZE,
+    );
     const degreeSet = new Set(degreeCap);
     workingEdges = componentEdges.filter((e) => degreeSet.has(e.a) && degreeSet.has(e.b));
   }
 
-  const nearIndices = nearIndicesInComponent(workingEdges);
-  if (nearIndices.size < 2) return undefined;
+  // Re-CC residual edges so a location/degree cap that severs a bridge cannot
+  // merge disconnected cliques into one finding.
+  const residualComponents = residualConnectedComponents(workingEdges);
+  let best: NearDuplicateCluster | undefined;
+  for (const residual of residualComponents) {
+    if (residual.indices.size < 2) continue;
+    const residualEdges = residual.edges;
+    const members = [...residual.indices]
+      .map((i) => eligible[i])
+      .filter((o): o is CloneCandidate => !!o);
+    const cluster: NearDuplicateCluster = {
+      anchor: lowestByLocation(members),
+      nearMembers: members.map((m) => m.qualifiedName).sort(),
+      exactMembers: exactMembersInComponent(members),
+      estimatedSimilarity: maxSimilarityAmong(residualEdges),
+      clusterSize: members.length,
+    };
+    if (
+      best === undefined ||
+      cluster.clusterSize > best.clusterSize ||
+      (cluster.clusterSize === best.clusterSize &&
+        cluster.estimatedSimilarity > best.estimatedSimilarity)
+    ) {
+      best = cluster;
+    }
+  }
+  return best;
+}
 
-  // Members and anchor only from edge-incident nodes (true residual CC).
-  const members = [...nearIndices]
-    .map((i) => eligible[i])
-    .filter((o): o is CloneCandidate => !!o);
-  const anchor = lowestByLocation(members);
-  const nearMembers = members
-    .map((m) => m.qualifiedName)
-    .sort();
-  const exactMembers = exactMembersInComponent(members);
-  const maxSim = maxSimilarityAmong(workingEdges);
-
-  return {
-    anchor,
-    nearMembers,
-    exactMembers,
-    estimatedSimilarity: maxSim,
-    clusterSize: members.length,
+/** Connected components of residual near-edges after a size cap. */
+function residualConnectedComponents(
+  edges: readonly NearEdge[],
+): readonly { indices: Set<number>; edges: NearEdge[] }[] {
+  if (edges.length === 0) return [];
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    let r = x;
+    while ((parent.get(r) ?? r) !== r) r = parent.get(r) ?? r;
+    let cur = x;
+    while (cur !== r) {
+      const next = parent.get(cur) ?? cur;
+      parent.set(cur, r);
+      cur = next;
+    }
+    return r;
   };
+  const union = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  for (const e of edges) {
+    if (!parent.has(e.a)) parent.set(e.a, e.a);
+    if (!parent.has(e.b)) parent.set(e.b, e.b);
+    union(e.a, e.b);
+  }
+  const byRoot = new Map<number, { indices: Set<number>; edges: NearEdge[] }>();
+  for (const e of edges) {
+    const root = find(e.a);
+    let bucket = byRoot.get(root);
+    if (!bucket) {
+      bucket = { indices: new Set(), edges: [] };
+      byRoot.set(root, bucket);
+    }
+    bucket.indices.add(e.a);
+    bucket.indices.add(e.b);
+    bucket.edges.push(e);
+  }
+  return [...byRoot.values()];
 }
 
 /** Cap by degree (desc) then location so hubs survive the size bound. */
 function capComponentIndicesByDegree(
+  eligible: readonly CloneCandidate[],
   component: readonly number[],
   edges: readonly NearEdge[],
   maxSize: number,
@@ -272,7 +326,13 @@ function capComponentIndicesByDegree(
     .sort((ai, bi) => {
       const d = (degree.get(bi) ?? 0) - (degree.get(ai) ?? 0);
       if (d !== 0) return d;
-      return ai - bi;
+      const a = eligible[ai];
+      const b = eligible[bi];
+      if (!a || !b) return ai - bi;
+      if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
+      if (a.line !== b.line) return a.line - b.line;
+      if (a.column !== b.column) return a.column - b.column;
+      return a.qualifiedName < b.qualifiedName ? -1 : a.qualifiedName > b.qualifiedName ? 1 : 0;
     })
     .slice(0, maxSize);
 }

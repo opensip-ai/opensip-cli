@@ -135,6 +135,13 @@ export function extractLambdaParams(
 function findIdentifierChild(node: Node): Node | null {
   for (const c of namedChildrenOf(node)) {
     if (c.type === 'identifier') return c;
+    // Varargs `String... xs` are `spread_parameter` → nested `variable_declarator`.
+    if (c.type === 'variable_declarator') {
+      const nested = findIdentifierChild(c);
+      if (nested) return nested;
+      const nameField = c.childForFieldName('name');
+      if (nameField?.type === 'identifier') return nameField;
+    }
   }
   /* v8 ignore next */
   return null;

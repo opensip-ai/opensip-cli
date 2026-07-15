@@ -18,10 +18,12 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
+import { mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
   isEmbeddedRender,
+  ToolError,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -192,7 +194,9 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
         const raw = error instanceof Error ? error.message : String(error);
         const message = scrubErrorMessage(raw);
         logger.error({ evt: 'cli.liveview.run.error', tool: spec.tool, message });
-        glue.setExitCode?.(1);
+        // Preserve ADR-0020 taxonomy (e.g. ConfigurationError → exit 2), not hard-coded 1.
+        const exitCode = error instanceof ToolError ? mapToolErrorToExitCode(error) : 1;
+        glue.setExitCode?.(exitCode);
         setState({ phase: 'error', message });
         setTimeout(() => exit(), 50);
       }

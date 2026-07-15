@@ -4,6 +4,7 @@
 
 import { currentScope, err, ok, type Result } from '@opensip-cli/core';
 
+import { realpathOrSelf } from '../cli/graph-sharded-engine.js';
 import { resolveDefaultEngineShards } from '../cli/orchestrate/engine-shard-policy.js';
 import { loadGraphConfig, runGraph, runShardedGraph } from '../cli/orchestrate.js';
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
@@ -57,23 +58,27 @@ interface CanonicalRebuildResult {
 }
 
 async function runCanonicalRebuild(input: RebuildCatalogInput): Promise<CanonicalRebuildResult> {
+  // F3 parity with the main graph CLI: realpath so multi-shard workers force
+  // occurrence paths against the same canonical root as discovery (symlink cwd).
+  const root = realpathOrSelf(input.cwd, input.cwd);
+  const rebuiltInput = { ...input, cwd: root };
   const scope = currentScope();
-  if (scope === undefined) return runGraph({ ...input, noCache: true });
+  if (scope === undefined) return runGraph({ ...rebuiltInput, noCache: true });
   const adapter = new GraphAdapterSelector(currentAdapterRegistry()).pick({
-    cwd: input.cwd,
+    cwd: root,
   });
-  const graphConfig = loadGraphConfig(input.cwd);
+  const graphConfig = loadGraphConfig(root);
   const policy = await resolveDefaultEngineShards({
-    projectRoot: input.cwd,
+    projectRoot: root,
     languageAdapters: scope.languages.list(),
     graphAdapter: adapter,
     graphConfig,
     forcedLanguage: false,
   });
-  if (policy.shards.length <= 1) return runGraph({ ...input, noCache: true });
+  if (policy.shards.length <= 1) return runGraph({ ...rebuiltInput, noCache: true });
   return runShardedGraph({
     shards: policy.shards,
-    projectRoot: input.cwd,
+    projectRoot: root,
     cliScript: process.argv[1] ?? '',
     adapter,
     resolutionMode: 'exact',

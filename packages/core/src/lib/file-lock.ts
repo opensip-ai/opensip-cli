@@ -335,7 +335,18 @@ function startLockHeartbeat(
  * @throws {TimeoutError} when live contention exceeds `policy.waitMs`.
  * @throws {SystemError} when lock metadata is malformed and cannot be recovered.
  */
+function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
+  // staleMs must outlive several heartbeats or a live owner is reclaimed mid-critical-section.
+  const heartbeatMs = Math.max(1, Math.floor(policy.heartbeatMs));
+  const minStale = heartbeatMs * 3;
+  const staleMs = Math.max(minStale, Math.floor(policy.staleMs));
+  const waitMs = Math.max(0, Math.floor(policy.waitMs));
+  return { waitMs, staleMs, heartbeatMs };
+}
+
 export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, fn: () => T): T {
+  const policy = normalizeLockPolicy(options.policy);
+  const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
   const cwdBasename = options.cwdBasename ?? basename(process.cwd());
   const metadata: FileLockMetadata = {
@@ -356,11 +367,11 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     operation: options.operation,
   });
 
-  const deadline = Date.now() + options.policy.waitMs;
+  const deadline = Date.now() + policy.waitMs;
   let acquired = false;
 
   while (!acquired) {
-    const outcome = evaluateLockContention(lockPath, metadata, options, deadline);
+    const outcome = evaluateLockContention(lockPath, metadata, normalizedOptions, deadline);
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -374,9 +385,14 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     sleepSync(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
   }
 
-  if (!acquired) throwLockTimeout(lockPath, options);
+  if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
 
-  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, options.policy.heartbeatMs);
+  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs);
+  try {
+    heartbeatTimer.unref?.();
+  } catch {
+    // @swallow-ok unref is optional (not all timers support it)
+  }
 
   try {
     const result = fn();
@@ -402,6 +418,8 @@ export async function withFileLockAsync<T>(
   options: WithFileLockOptions,
   fn: () => Promise<T>,
 ): Promise<T> {
+  const policy = normalizeLockPolicy(options.policy);
+  const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
   const cwdBasename = options.cwdBasename ?? basename(process.cwd());
   const metadata: FileLockMetadata = {
@@ -422,13 +440,13 @@ export async function withFileLockAsync<T>(
     operation: options.operation,
   });
 
-  const deadline = Date.now() + options.policy.waitMs;
+  const deadline = Date.now() + policy.waitMs;
   let acquired = false;
 
   const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
   while (!acquired) {
-    const outcome = evaluateLockContention(lockPath, metadata, options, deadline);
+    const outcome = evaluateLockContention(lockPath, metadata, normalizedOptions, deadline);
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -442,9 +460,14 @@ export async function withFileLockAsync<T>(
     await sleep(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
   }
 
-  if (!acquired) throwLockTimeout(lockPath, options);
+  if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
 
-  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, options.policy.heartbeatMs);
+  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs);
+  try {
+    heartbeatTimer.unref?.();
+  } catch {
+    // @swallow-ok unref is optional
+  }
 
   try {
     const result = await fn();

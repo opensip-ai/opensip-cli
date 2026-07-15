@@ -13,15 +13,18 @@ const SOURCE_DIRS = ['src/', 'lib/'];
 const ARTIFACT_EXTENSIONS = ['.js', '.d.ts', '.js.map'];
 
 function isArtifactInSource(filePath: string): { ext: string } | null {
+  const normalized = filePath.replaceAll('\\', '/');
   // Must be in a source directory
-  const inSource = SOURCE_DIRS.some((d) => filePath.includes(`/${d}`) || filePath.startsWith(d));
+  const inSource = SOURCE_DIRS.some(
+    (d) => normalized.includes(`/${d}`) || normalized.startsWith(d),
+  );
   if (!inSource) return null;
 
   // Must not be in dist/, node_modules/, or .cache/
   if (
-    filePath.includes('/dist/') ||
-    filePath.includes('/node_modules/') ||
-    filePath.includes('/.cache/')
+    normalized.includes('/dist/') ||
+    normalized.includes('/node_modules/') ||
+    normalized.includes('/.cache/')
   )
     return null;
 

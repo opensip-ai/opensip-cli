@@ -245,10 +245,13 @@ function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- TS scanner driver: token-by-token loop with per-kind handling; flatter shape would scatter token classification
 function filterContentImpl(content: string): FilteredContent {
+  // JSX variant so `</div>` closing tags are not re-scanned as regex openers
+  // (Standard + reScanSlashToken treats `LessThan` + `/` as regex start and can
+  // desync on same-line `http://` / string quotes). Matches TSX ScriptKind.
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
     false,
-    ts.LanguageVariant.Standard,
+    ts.LanguageVariant.JSX,
     content,
   );
 

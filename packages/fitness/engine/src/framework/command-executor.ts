@@ -26,6 +26,8 @@ export interface CommandExecutionResult {
   readonly aborted: boolean;
   readonly exitCode: number | null;
   readonly error?: string;
+  /** True only for ENOENT / exit 127 — optional tool missing, not a command fault. */
+  readonly notInstalled?: boolean;
 }
 
 // =============================================================================
@@ -60,6 +62,7 @@ export async function executeCommand(
         violations: [],
         aborted: false,
         exitCode: null,
+        notInstalled: true,
         error: `${config.bin} is not installed. Install it to enable this check.`,
       };
     }
@@ -76,6 +79,7 @@ export async function executeCommand(
       violations: [],
       aborted: false,
       exitCode: 127,
+      notInstalled: true,
       error: `${config.bin} is not installed. Install it to enable this check.`,
     };
   }

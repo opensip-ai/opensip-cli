@@ -263,9 +263,9 @@ async function executeCommandMode(
 
   if (result.error) {
     // Optional external tools that are not installed are a skip, not a
-    // framework fault — hard-failing would invert the old greenwash and break
-    // default fit runs on machines without every optional scanner.
-    if (result.error.includes('is not installed')) {
+    // framework fault. Key on the structured notInstalled flag only — never
+    // substring-match the free-text error (stderr can mention "is not installed").
+    if (result.notInstalled === true) {
       const clean = builder.build();
       return {
         ...clean,
