@@ -134,7 +134,7 @@ export function analyzeFileForPerformancePatterns(
 ): CheckViolation[] {
   if (isTestFile(filePath)) return [];
   if (isCheckAuthoringSource(filePath)) return [];
-  if (filePath.includes('/diagnostics')) return [];
+  if (filePath.replaceAll('\\', '/').includes('/diagnostics')) return [];
   if (!content.includes('await') && !content.includes('for') && !content.includes('while')) {
     return [];
   }

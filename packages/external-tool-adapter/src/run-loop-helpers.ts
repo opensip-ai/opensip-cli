@@ -93,13 +93,9 @@ export function isEmptyReclaimedStdoutFindings(
   verdict: 'ok' | 'findings' | 'fault',
   signalCount: number,
 ): boolean {
-  // Process claimed findings (nonzero + findings verdict) but parse produced
-  // nothing — treat as fault (bad stream / redirected output), not a clean pass.
-  // Covers findingsFromNonzero tools and explicit findings exit codes (e.g. golangci 1).
-  return (
-    command.output.kind === 'stdout' &&
-    code !== 0 &&
-    verdict === 'findings' &&
-    signalCount === 0
-  );
+  // Process claimed findings (findings verdict, typically nonzero exit) but parse
+  // produced nothing — treat as fault (bad stream / schema drift / empty report),
+  // not a clean pass. Applies to stdout and file-backed SARIF/JSON alike.
+  void command;
+  return code !== 0 && verdict === 'findings' && signalCount === 0;
 }

@@ -190,8 +190,8 @@ function readPackageJson(pkgPath: string): PackageJson | null {
  */
 function allowsDevDependencies(filePath: string): boolean {
   return (
-    TEST_FILE_PATTERNS.some((pattern) => pattern.test(filePath)) ||
-    TOOLING_FILE_PATTERN.test(filePath)
+    TEST_FILE_PATTERNS.some((pattern) => pattern.test(filePath.replaceAll('\\', '/'))) ||
+    TOOLING_FILE_PATTERN.test(filePath.replaceAll('\\', '/'))
   );
 }
 

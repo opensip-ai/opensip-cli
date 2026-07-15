@@ -131,7 +131,7 @@ export function buildEffectiveSafePaths(): readonly RegExp[] {
 
 /** Check if a file path is in a safe TOCTOU context. */
 export function isSafeToctouPath(filePath: string, safePaths: readonly RegExp[]): boolean {
-  return safePaths.some((pattern) => pattern.test(filePath));
+  return safePaths.some((pattern) => pattern.test(filePath.replaceAll('\\', '/')));
 }
 
 /** Check if content has atomic patterns */

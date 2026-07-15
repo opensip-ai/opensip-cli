@@ -97,13 +97,37 @@ export async function executeCommand(
     };
   }
 
-  const violations = config.parseOutput(
-    result.stdout,
-    result.stderr,
-    result.exitCode ?? 0,
-    files,
-    cwd,
-  );
+  let violations: CheckViolation[];
+  try {
+    violations = config.parseOutput(
+      result.stdout,
+      result.stderr,
+      result.exitCode ?? 0,
+      files,
+      cwd,
+    );
+  } catch (parseError) {
+    const message = parseError instanceof Error ? parseError.message : String(parseError);
+    return {
+      violations: [],
+      aborted: false,
+      exitCode: result.exitCode,
+      error: `Failed to parse command output: ${message}`,
+    };
+  }
+
+  // Nonzero exit that is "allowed" as findings, but parse produced nothing —
+  // do not green-wash (truncated JSON / wrong schema / silent scanner failure).
+  if ((result.exitCode ?? 0) !== 0 && violations.length === 0) {
+    return {
+      violations: [],
+      aborted: false,
+      exitCode: result.exitCode,
+      error:
+        `Command exited ${String(result.exitCode)} with no parseable findings. ` +
+        `stderr: ${result.stderr.slice(0, 500)}${result.stderr.length > 500 ? ' [truncated]' : ''}`,
+    };
+  }
 
   return { violations, aborted: false, exitCode: result.exitCode };
 }
