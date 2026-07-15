@@ -105,30 +105,48 @@ function forkAndAwait(args: {
       { runId },
     );
     handle.child.on('exit', (code: number | null) => {
-      if (handle.isSettled()) return;
-      // Defer the premature-exit rejection so a result/error message already
-      // queued on the IPC channel is processed first. Without this, Linux
-      // runners under load intermittently reject clean workers that drained
-      // their final `process.send` just before exiting (exit races message).
-      // Two macrotasks (setImmediate + short timer) covers both "already in
-      // the parent's queue" and "still crossing the kernel pipe" cases.
-      setImmediate(() => {
-        if (handle.isSettled()) return;
-        setTimeout(() => {
-          if (handle.isSettled()) return;
-          handle.done(() => {
-            recordDuration(args.spec, 'exit', started);
-            reject(
-              workerError(
-                args.spec,
-                `capability worker exited (code ${code ?? 'null'}) before producing a result`,
-                handle.getStderrTail(),
-              ),
-            );
-          });
-        }, 50);
+      rejectPrematureCapabilityWorkerExit({
+        handle,
+        spec: args.spec,
+        started,
+        code,
+        reject,
       });
     });
+  });
+}
+
+/**
+ * Defer premature-exit rejection so a result/error already queued on the IPC
+ * channel is processed first. Linux under load can otherwise reject clean
+ * workers that drained their final `process.send` just before exiting.
+ */
+function rejectPrematureCapabilityWorkerExit(args: {
+  readonly handle: ReturnType<typeof forkAndSettle>;
+  readonly spec: CapabilityWorkerSpec;
+  readonly started: number;
+  readonly code: number | null;
+  readonly reject: (error: Error) => void;
+}): void {
+  const { handle, spec, started, code, reject } = args;
+  if (handle.isSettled()) return;
+  // Two macrotasks (setImmediate + short timer) cover both "already in the
+  // parent's queue" and "still crossing the kernel pipe" cases.
+  setImmediate(() => {
+    if (handle.isSettled()) return;
+    setTimeout(() => {
+      if (handle.isSettled()) return;
+      handle.done(() => {
+        recordDuration(spec, 'exit', started);
+        reject(
+          workerError(
+            spec,
+            `capability worker exited (code ${code ?? 'null'}) before producing a result`,
+            handle.getStderrTail(),
+          ),
+        );
+      });
+    }, 50);
   });
 }
 

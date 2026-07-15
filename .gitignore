@@ -80,11 +80,9 @@ docs/ai-helpers/
 docs/examples/
 docs/plans/
 
-# docs/internal is repo-only contributor documentation, but existing local
-# content remains deny-by-default. Explicit durable notes are committed one by
-# one so unrelated local material cannot be exposed accidentally.
-docs/internal/*
-!docs/internal/agent-eval-promotion-instrument.md
+# Private local strategy and working context. Never commit or publish content
+# from this directory.
+docs/internal/
 
 # Ephemeral remediation artifacts from the Correctness Remediation Process.
 # These contain per-round findings, coverage reports, and the final summary.

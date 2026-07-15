@@ -649,8 +649,8 @@ silently report 0 checks.
 
 ## Documentation
 
-The `docs/` tree has five committed siblings plus one local-only
-scratch area, each with a distinct contract:
+The `docs/` tree has committed and local-only areas, each with a distinct
+contract:
 
 - **`docs/public/`** — hand-edited source. These are the docs we publish
   on the website at opensip.ai/docs/opensip-cli/. Numbered
@@ -658,11 +658,10 @@ scratch area, each with a distinct contract:
   `40-graph`, `50-extend`, `60-guides`, `70-reference`,
   `80-implementation`. Anything here is reader-facing and externally
   consumable.
-- **`docs/internal/`** — hand-edited, repo-only but committed.
-  Contributor-facing awareness that doesn't belong on the website:
-  cross-repo consumer relationships, operational notes. See
-  `docs/internal/README.md` for the charter. (Formal decisions live in
-  `docs/decisions/`, not here.)
+- **`docs/internal/`** — hand-edited, local-only and gitignored by default.
+  Private working context that must not be published or force-added. See the
+  local `docs/internal/README.md` for the charter. (Public formal decisions live
+  in `docs/decisions/`, not here.)
 - **`docs/decisions/`** — hand-edited, committed. The architecture
   decision log (ADRs): the durable _why_ behind a choice, with
   alternatives and consequences. One file per `ADR-NNNN-*.md`,
@@ -685,17 +684,17 @@ scratch area, each with a distinct contract:
 - **`docs/plans/`** — local-only scratch space, **gitignored**.
   In-progress implementation plans and design notes that don't belong
   in a public OSS repo. Not committed; not visible to external
-  contributors. Anything that matures into a durable record (decision →
-  `docs/decisions/`, consumer contract →
-  `docs/internal/`, reader-facing fact → `docs/public/`) graduates out
-  of `docs/plans/`.
+  contributors. Anything that matures into a public durable record (decision →
+  `docs/decisions/`, reader-facing fact → `docs/public/`) graduates out of
+  `docs/plans/`; private durable context may move to local-only
+  `docs/internal/`.
 
 Boundary rule of thumb: a durable _decision_ (what we chose + why, with
 alternatives) is an ADR in `docs/decisions/`; the _how to build it_ is a
 spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
 opensip-cli without naming a specific consumer, it goes in
 `docs/public/`; if naming a specific consumer (or other private context)
-is load-bearing, it goes in `docs/internal/`; if it's pending work or
+is load-bearing, it goes in local-only `docs/internal/`; if it's pending work or
 design exploration not yet ready for external readers, it stays in
 `docs/plans/` (local-only).
 
