@@ -51,12 +51,12 @@ export function sendWorkerIpcMessage(msg: unknown, maxBytes?: number): void {
  */
 export async function sendWorkerIpcMessageAndDrain(msg: unknown, maxBytes?: number): Promise<void> {
   assertUnderCap(msg, maxBytes);
-  const send = process.send;
-  if (send === undefined) return;
+  if (typeof process.send !== 'function') return;
   await new Promise<void>((resolve, reject) => {
     // process.send callback: err is set when the channel is closed/broken.
-    // Bind `this` — process.send reads `this.connected` in Node's implementation.
-    const ok = send.call(process, msg, (error: Error | null) => {
+    // Call as `process.send(...)` (not a detached method) so `this` stays the
+    // process object — Node reads `this.connected` inside the implementation.
+    const ok = process.send!(msg, (error: Error | null) => {
       if (error) reject(error);
       else resolve();
     });
