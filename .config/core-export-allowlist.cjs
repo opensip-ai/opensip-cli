@@ -111,6 +111,7 @@ const EXPORT_ALLOWLIST = {
   measureIpcPayloadBytes: 'runtime-transport',
   runJsonSpecWorker: 'runtime-transport',
   sendWorkerIpcMessage: 'runtime-transport',
+  sendWorkerIpcMessageAndDrain: 'runtime-transport',
   startWorkerHeartbeat: 'runtime-transport',
   workerExecArgv: 'runtime-transport',
   workerLimitsEnv: 'runtime-transport',
