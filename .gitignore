@@ -85,6 +85,7 @@ docs/plans/
 # one so unrelated local material cannot be exposed accidentally.
 docs/internal/*
 !docs/internal/agent-eval-promotion-instrument.md
+!docs/internal/installed-artifact-platform-acceptance.md
 
 # Ephemeral remediation artifacts from the Correctness Remediation Process.
 # These contain per-round findings, coverage reports, and the final summary.

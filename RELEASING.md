@@ -256,6 +256,43 @@ gh release download "$TAG" \
 Full hash and provenance verification commands are documented in
 [Verifiable releases](docs/public/70-reference/13-verifiable-releases.md).
 
+## Release verification tiers
+
+There are four distinct install-proof tiers. Do not conflate them — each answers
+a different question:
+
+1. **Fast packed smoke** (`smoke-pack.mjs`, run inside `pnpm release:preflight`
+   and CI). Installs the packed workspace into a throwaway consumer and runs the
+   command-only `release-smoke` subset projected from the shared journey catalog.
+   Cross-platform, fast, and the pre-publish gate. It catches packaging
+   regressions; it is **not** a platform support proof.
+
+2. **Reusable native acceptance** (`pnpm platform:acceptance` +
+   `pnpm platform:acceptance:verify`). Installs a real candidate into a hermetic
+   run root, runs the full closed journey catalog on the native host, and writes
+   one sealed `platform-acceptance.v1` evidence artifact that a **separate**
+   verifier re-validates. It is heavier and host-specific, so it is deliberately
+   **not** wired into `release:preflight` or any developer build. See the
+   "Platform acceptance" section of [`scripts/README.md`](scripts/README.md) and
+   the maintainer guide
+   [`docs/internal/installed-artifact-platform-acceptance.md`](docs/internal/installed-artifact-platform-acceptance.md).
+
+3. **OS support qualification.** Turning acceptance evidence into a *published
+   supported platform* is a separate, deliberate OS-specific plan that selects a
+   profile, cadence, burn-in, and publication policy. A green acceptance run is
+   evidence for the measured candidate/host/profile tuple only — **never** a
+   support declaration
+   ([ADR-0164](docs/decisions/ADR-0164-installed-artifact-platform-acceptance-evidence.md)).
+   Do not add a supported-platform claim to release notes or public docs from a
+   passing run alone.
+
+4. **Staged published-version gating.** After publish, native acceptance can
+   re-run against the **exact published version**
+   (`--published-version <semver> [--previous-version <semver>]`) to prove the
+   registry bytes — and the upgrade path from the prior release — behave on the
+   target host. This is post-publish qualification, distinct from the pre-publish
+   packed smoke in tier 1.
+
 ## Partial publish recovery
 
 The release workflow publishes every package to a version-scoped staging dist-tag

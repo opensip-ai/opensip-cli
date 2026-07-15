@@ -8,21 +8,23 @@
  * the only thing that spawns and asserts — so the release lane exercises exactly
  * the same scenario semantics as the in-repo Vitest harness.
  *
+ * SINGLE SOURCE OF TRUTH (ADR: installed-artifact platform acceptance): these
+ * scenarios are no longer hand-authored here. They are PROJECTED from the
+ * canonical journey catalog's `release-smoke` selection
+ * (`scripts/platform-acceptance/journey-catalog.mjs`), so the packed smoke and
+ * the native platform-acceptance runner exercise byte-identical assertions for
+ * every version/help/init/fit/graph/report/sessions/Tool/pack scenario. This
+ * module only PROJECTS that subset and layers the packed-fixture paths + the
+ * deny-by-default installed-tool allowlist; a parity assertion guarantees each
+ * emitted scenario maps to a registered journey id and cannot diverge from the
+ * catalog source.
+ *
  * THIS LIST RUNS IN BOTH CI LANES. The PR lane
  * (`packages/cli/src/__tests__/packed-smoke-scenarios-e2e.test.ts`) imports this
- * exact module and drives the BUILT dist CLI through it on every PR, so a
- * `--json`/output-shape change that breaks a scenario fails the PR rather than
- * surfacing only in the publish lane. The
- * release lane re-runs it against the PACKED, npm-installed bytes, which is the
- * half only it can do (inter-package export/ABI mismatches). If you change a
- * scenario here, the PR-lane suite is your fast local check:
- * `pnpm --filter=opensip-cli test packed-smoke-scenarios-e2e`.
- *
- * This replaces the old inline `--version`/`--help` pair with a broad
- * command-level walk: init → fit (built-in + fit-pack plugin) → list → graph →
- * report → sessions → tool install. Every scenario runs in ONE
- * consumer cwd (passed in), in order; later scenarios depend on the side effects
- * (config, plugins, seeded files) of earlier ones.
+ * exact module and drives the BUILT dist CLI through it on every PR; the release
+ * lane re-runs it against the PACKED, npm-installed bytes (the half only it can
+ * do — inter-package export/ABI mismatches). If you change a scenario, change it
+ * in the catalog: `pnpm --filter=opensip-cli test packed-smoke-scenarios-e2e`.
  *
  * Command-surface taxonomy (packs-under-the-tool):
  *   - WHOLE Tool plugins (a `kind:"tool"` package contributing a subcommand)
@@ -32,36 +34,21 @@
  *   - Extension PACKS (a `kind:"fit-pack"` package contributing checks) install
  *     via the domain-bound `opensip fit plugin add <spec>` — the domain is bound
  *     from the tool (no `--domain`/`--type` flag), and fit/sim packs always land
- *     project-local in `.runtime/plugins/<domain>/` (no user-global pack path),
- *     so no `--project` flag either.
+ *     project-local in `.runtime/plugins/<domain>/`.
  *
- * Hermeticity notes:
- *   - The consumer starts empty, so the first real scenario is `init`.
- *   - The tool install uses `--project` so it lands in the consumer's
- *     `opensip-cli/.runtime/plugins/tool/` rather than polluting the real
- *     user-global `~/.opensip-cli/`. Fit-pack installs are project-local by
- *     construction.
- *
- * Dependency-free (only imports the acceptance core, which itself only uses
- * node:child_process) so smoke-pack.mjs can import it with no build step.
+ * Dependency-free (only imports the acceptance core + the catalog, both of which
+ * only use node built-ins) so smoke-pack.mjs can import it with no build step.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import { expectEnvelope } from './cli-acceptance-core.mjs';
-
-/**
- * `--json` is a `CommandOutcome` wrapper. Non-run command results
- * (init / list / report / plugin / sessions) ride under `.data`; run-command
- * envelopes ride under `.envelope`. These unwrap the inner payload, tolerating a
- * bare shape too (forward/backward robustness — matches `expectEnvelope`).
- */
-const cmdData = (parsed) => parsed?.data ?? parsed;
-const cmdEnvelope = (parsed) => parsed?.envelope ?? parsed;
+import {
+  assertReleaseSmokeParity,
+  projectReleaseSmokeScenarios,
+} from './platform-acceptance/journey-catalog.mjs';
 
 /**
- * Build the ordered packed-smoke scenario list.
+ * Build the ordered packed-smoke scenario list by projecting the catalog's
+ * `release-smoke` selection and layering the packed-fixture paths + the
+ * deny-by-default installed-tool allowlist.
  *
  * @param {object} opts
  * @param {string} opts.expectedVersion   the consensus release version (no leading 'v')
@@ -80,327 +67,16 @@ export function buildPackedSmokeScenarios({
   // allowlisted for post-install scenarios that mount/run it in the host process.
   const allowInstalledEnv = { OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'audit-demo-tool' };
 
-  /** @type {import('./cli-acceptance-core.mjs').Scenario[]} */
-  const scenarios = [
-    {
-      name: '--version reports the consensus release version',
-      args: ['--version'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        // Substring guard here; smoke-pack.mjs additionally enforces strict
-        // `stdout.trim() === expectedVersion` (the packed bytes must report
-        // exactly the version we are about to publish).
-        stdoutIncludes: expectedVersion,
-      },
-    },
-    {
-      name: '--help mounts the full command tree',
-      args: ['--help'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        stdoutIncludes: 'Commands:',
-      },
-    },
-    {
-      name: '--help lists the fit subcommand',
-      args: ['--help'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        stdoutIncludes: 'fit',
-      },
-    },
-    {
-      name: 'init --language typescript --json scaffolds a pristine project',
-      args: ['init', '--language', 'typescript', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const failures = [];
-          const data = cmdData(parsed);
-          if (data?.type !== 'init')
-            failures.push(`init.type: expected "init", got ${JSON.stringify(data?.type)}`);
-          if (data?.created !== true)
-            failures.push(`init.created: expected true, got ${JSON.stringify(data?.created)}`);
-          if (typeof data?.path !== 'string' || !data.path.endsWith('opensip-cli.config.yml')) {
-            failures.push(
-              `init.path: expected a path ending in opensip-cli.config.yml, got ${JSON.stringify(data?.path)}`,
-            );
-          }
-          return failures;
-        },
-      },
-    },
-    {
-      // Seed the source tree AFTER init (so init sees a pristine project) but
-      // BEFORE the built-in fit run. `bad.ts` trips no-console-log; `clean.ts`
-      // does not. A tsconfig.json is required by the TS graph adapter and is
-      // also seeded here so the later `graph --json` scenario has one.
-      name: 'fit --json --check no-console-log flags exactly one finding',
-      args: ['fit', '--json', '--check', 'no-console-log'],
-      cwd: consumerCwd,
-      setup: ({ cwd }) => {
-        const root = cwd ?? consumerCwd;
-        mkdirSync(join(root, 'src'), { recursive: true });
-        writeFileSync(join(root, 'src', 'clean.ts'), 'export const x = 1;\n');
-        writeFileSync(join(root, 'src', 'bad.ts'), "console.log('debug');\n");
-        writeFileSync(
-          join(root, 'tsconfig.json'),
-          `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
-        );
-      },
-      // fit exits 1 when it records error-severity findings (failOnErrors: 1).
-      expect: {
-        exitCode: 1,
-        json: (parsed) => {
-          const failures = expectEnvelope({ tool: 'fit' })(parsed);
-          const env = cmdEnvelope(parsed);
-          const total = env?.verdict?.summary?.total;
-          if (total !== 1)
-            failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`);
-          const signals = Array.isArray(env?.signals) ? env.signals : [];
-          if (!signals.some((s) => s?.source === 'no-console-log')) {
-            failures.push('fit signals: expected a no-console-log signal');
-          }
-          return failures;
-        },
-      },
-    },
-    {
-      name: 'fit --list --json enumerates the bundled checks',
-      args: ['fit', '--list', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const failures = [];
-          const data = cmdData(parsed);
-          if (data?.type !== 'list-checks') {
-            failures.push(
-              `list-checks.type: expected "list-checks", got ${JSON.stringify(data?.type)}`,
-            );
-          }
-          if (typeof data?.totalCount !== 'number' || data.totalCount <= 0) {
-            failures.push(
-              `list-checks.totalCount: expected > 0, got ${JSON.stringify(data?.totalCount)}`,
-            );
-          }
-          // Guardrail (P1-1): a packed `opensip-cli` install must bundle every
-          // language check pack it advertises (README/FAQ/CLAUDE/checks-index all
-          // claim TS, Python, Go, Java, C/C++, Rust). The monorepo masks gaps
-          // because all packs are root devDeps; only this packed-consumer lane
-          // resolves the CLI's *declared* deps alone. Assert one stable slug per
-          // pack so a pack dropped from cli/package.json fails the release gate
-          // instead of silently shipping a TS-only CLI.
-          const slugs = new Set(Array.isArray(data?.checks) ? data.checks.map((c) => c?.slug) : []);
-          const requiredByPack = {
-            'checks-python': 'python-no-bare-except',
-            'checks-go': 'go-no-fmt-print',
-            'checks-java': 'java-no-print-stack-trace',
-            'checks-cpp': 'cpp-clang-tidy',
-            'checks-rust': 'rust-no-dbg-macro',
-          };
-          for (const [pack, slug] of Object.entries(requiredByPack)) {
-            if (!slugs.has(slug)) {
-              failures.push(
-                `list-checks: expected a "${slug}" check from ${pack} — the packed CLI does not bundle that language pack`,
-              );
-            }
-          }
-          return failures;
-        },
-      },
-    },
-    {
-      name: 'graph --json emits a well-formed graph envelope',
-      args: ['graph', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: expectEnvelope({ tool: 'graph' }),
-      },
-    },
-    {
-      name: 'report --no-open --json writes the report without launching a browser',
-      args: ['report', '--no-open', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const failures = [];
-          const data = cmdData(parsed);
-          if (data?.type !== 'report') {
-            failures.push(`report.type: expected "report", got ${JSON.stringify(data?.type)}`);
-          }
-          if (data?.opened !== false)
-            failures.push(`report.opened: expected false, got ${JSON.stringify(data?.opened)}`);
-          return failures;
-        },
-      },
-    },
-    {
-      name: 'sessions list reads the run history',
-      args: ['sessions', 'list'],
-      cwd: consumerCwd,
-      expect: { exitCode: 0 },
-    },
-    {
-      // Whole Tool-plugin install path: a `kind:"tool"` package contributes a
-      // whole subcommand. Installed via `tools install` (NOT the retired
-      // top-level `plugin add`); `--project` keeps it inside the consumer's
-      // .runtime (hermetic).
-      name: 'tools install <tool-plugin> --project --json',
-      args: ['tools', 'install', toolPluginTarball, '--project', '--json'],
-      cwd: consumerCwd,
-      timeout: 120_000,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const data = cmdData(parsed);
-          return data?.success === true
-            ? []
-            : [
-                `tools-install.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
-              ];
-        },
-      },
-    },
-    {
-      name: 'audit-demo subcommand contributed by the tool plugin runs',
-      args: ['audit-demo'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        stdoutIncludes: 'audit-demo ran',
-      },
-    },
-    {
-      // Fit-pack install path: a `kind:"fit-pack"` package contributes checks.
-      // Installed via the domain-bound `fit plugin add` (the `fit` primary binds
-      // the domain — no `--domain` flag). Fit packs are project-local by
-      // construction (`.runtime/plugins/fit/`), so no `--project` flag either.
-      name: 'fit plugin add <fit-pack> --json',
-      args: ['fit', 'plugin', 'add', fitPackTarball, '--json'],
-      cwd: consumerCwd,
-      timeout: 120_000,
-      setup: ({ cwd }) => {
-        // Seed a file that trips the fixture check's FIT_PACK_FIXTURE marker.
-        const root = cwd ?? consumerCwd;
-        writeFileSync(join(root, 'src', 'marker.ts'), 'export const m = "FIT_PACK_FIXTURE";\n');
-      },
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const data = cmdData(parsed);
-          return data?.success === true
-            ? []
-            : [
-                `fit-plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
-              ];
-        },
-      },
-    },
-    {
-      name: 'fit --json --check <fit-pack-slug> narrows to the contributed check',
-      args: ['fit', '--json', '--check', 'fit-pack-fixture-marker'],
-      cwd: consumerCwd,
-      // fit exits 1 on the error-severity finding the fixture check emits.
-      expect: {
-        exitCode: 1,
-        json: (parsed) => {
-          const failures = expectEnvelope({ tool: 'fit' })(parsed);
-          const env = cmdEnvelope(parsed);
-          const total = env?.verdict?.summary?.total;
-          if (total !== 1)
-            failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`);
-          const signals = Array.isArray(env?.signals) ? env.signals : [];
-          if (!signals.some((s) => s?.source === 'fit-pack-fixture-marker')) {
-            failures.push('fit signals: expected a fit-pack-fixture-marker signal');
-          }
-          return failures;
-        },
-      },
-    },
-    // ── tools-surface walk (ADR-0041) — depends on the plugin-add scenarios
-    //    above (the tool-plugin fixture is installed project-local). ─────────
-    {
-      name: 'tools list --json shows bundled ids + the installed fixture row',
-      args: ['tools', 'list', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const failures = [];
-          const data = cmdData(parsed);
-          const rows = Array.isArray(data?.tools) ? data.tools : [];
-          const ids = new Set(rows.map((t) => t?.id));
-          // tool-identity-single-source (ADR-0059): bundled tool ids are the
-          // canonical identity.name values (fitness/simulation/graph/yagni).
-          for (const bundled of ['fitness', 'simulation', 'graph']) {
-            if (!ids.has(bundled)) failures.push(`tools list: missing bundled id '${bundled}'`);
-          }
-          const fixture = rows.find((t) => t?.id === 'audit-demo-tool');
-          if (fixture === undefined) {
-            failures.push('tools list: missing the installed audit-demo-tool row');
-          } else if (fixture.source !== 'project') {
-            failures.push(
-              `tools list: audit-demo-tool source: expected 'project', got ${JSON.stringify(fixture.source)}`,
-            );
-          }
-          return failures;
-        },
-      },
-    },
-    {
-      name: 'tools validate <tool fixture tarball> passes every section',
-      args: ['tools', 'validate', toolPluginTarball, '--json'],
-      cwd: consumerCwd,
-      timeout: 120_000,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const data = cmdData(parsed);
-          return data?.verdict === 'passed'
-            ? []
-            : [`tools-validate.verdict: expected 'passed', got ${JSON.stringify(data?.verdict)}`];
-        },
-      },
-    },
-    {
-      name: 'tools uninstall removes the project-local fixture',
-      args: ['tools', 'uninstall', 'audit-demo-tool', '--project', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const data = cmdData(parsed);
-          return data?.success === true
-            ? []
-            : [
-                `tools-uninstall.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
-              ];
-        },
-      },
-    },
-    {
-      name: 'tools list --json no longer shows the fixture row',
-      args: ['tools', 'list', '--json'],
-      cwd: consumerCwd,
-      expect: {
-        exitCode: 0,
-        json: (parsed) => {
-          const data = cmdData(parsed);
-          const rows = Array.isArray(data?.tools) ? data.tools : [];
-          return rows.some((t) => t?.id === 'audit-demo-tool')
-            ? ['tools list: audit-demo-tool row still present after uninstall']
-            : [];
-        },
-      },
-    },
-  ];
+  const params = {
+    cwd: consumerCwd,
+    expectedVersion,
+    toolPluginTarball,
+    fitPackTarball,
+  };
+  const scenarios = projectReleaseSmokeScenarios(params);
+  // Guarantee the projected set is exactly the catalog source (id/name/argv):
+  // no scenario can be hand-authored here or diverge from a registered journey.
+  assertReleaseSmokeParity(scenarios, params);
 
   return scenarios.map((scenario) => ({
     ...scenario,

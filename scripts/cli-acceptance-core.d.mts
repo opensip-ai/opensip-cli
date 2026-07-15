@@ -40,6 +40,8 @@ export interface ScenarioSetupContext {
 
 export interface Scenario {
   readonly name: string
+  /** Optional stable id (e.g. `<journeyId>#<slug>`) used for catalog parity. */
+  readonly id?: string
   readonly args: readonly string[]
   readonly cwd?: string
   readonly env?: Record<string, string>
@@ -51,6 +53,8 @@ export interface Scenario {
 
 export interface ScenarioResult {
   readonly name: string
+  /** Present when the source scenario declared a stable `id`. */
+  readonly id?: string
   readonly ok: boolean
   readonly failures: string[]
   readonly result: SpawnResult
@@ -71,6 +75,9 @@ export function spawnCli(
 export function checkScenario(result: SpawnResult, expect?: ScenarioExpectation): string[]
 
 export function expectEnvelope(opts?: { tool?: string }): (parsed: unknown) => string[]
+
+/** Bounded, control-character-free diagnostic tail (shared redaction/bounding rule). */
+export function boundedDiagnostic(text: unknown, maxBytes?: number): string
 
 export function runScenarios(
   descriptor: BinaryDescriptor,

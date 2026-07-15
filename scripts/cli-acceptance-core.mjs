@@ -126,19 +126,39 @@ export function expectEnvelope(opts = {}) {
 }
 
 /**
+ * Format one bounded, control-character-free diagnostic tail. Extracted so the
+ * platform-acceptance journey runner shares ONE redaction/bounding rule with the
+ * packed-smoke lane. Pure; never touches the process or filesystem.
+ */
+export function boundedDiagnostic(text, maxBytes = 4096) {
+  // Strip C0/C1 control characters — they corrupt evidence and terminals.
+  const stripped = String(text ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ')
+    .trim();
+  const buffer = Buffer.from(stripped, 'utf8');
+  if (buffer.byteLength <= maxBytes) return stripped;
+  return `…${buffer.subarray(buffer.byteLength - maxBytes).toString('utf8')}`;
+}
+
+/**
  * Run a scenario list against one binary descriptor, in order. Each scenario's
  * optional `setup` hook runs before its spawn; a throwing hook fails just that
- * scenario. Returns pass/fail counts plus the per-scenario results.
+ * scenario. A scenario's optional stable `id` (e.g. `<journeyId>#<slug>`) is
+ * carried onto its result for catalog parity; behavior is otherwise unchanged.
+ * Returns pass/fail counts plus the per-scenario results.
  */
 export function runScenarios(descriptor, scenarios) {
   const results = [];
   for (const scenario of scenarios) {
+    const idField = scenario.id === undefined ? {} : { id: scenario.id };
     if (typeof scenario.setup === 'function') {
       try {
         scenario.setup({ cwd: scenario.cwd, descriptor, scenario });
       } catch (error) {
         results.push({
           name: scenario.name,
+          ...idField,
           ok: false,
           failures: [`setup threw: ${error instanceof Error ? error.message : String(error)}`],
           result: { stdout: '', stderr: '', exitCode: -1 },
@@ -152,7 +172,7 @@ export function runScenarios(descriptor, scenarios) {
       timeout: scenario.timeout,
     });
     const failures = checkScenario(result, scenario.expect);
-    results.push({ name: scenario.name, ok: failures.length === 0, failures, result });
+    results.push({ name: scenario.name, ...idField, ok: failures.length === 0, failures, result });
   }
   const passed = results.filter((r) => r.ok).length;
   return { passed, failed: results.length - passed, results };

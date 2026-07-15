@@ -109,10 +109,13 @@
     "release:preflight": "node scripts/release-preflight.mjs",
     "supply-chain:verify": "node scripts/verify-supply-chain.mjs",
     "smoke-pack": "node scripts/smoke-pack.mjs",
+    "platform:acceptance": "node scripts/run-platform-acceptance.mjs",
+    "platform:acceptance:verify": "node scripts/verify-platform-acceptance.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@opensip-cli/checks-cpp": "workspace:*",
     "@opensip-cli/checks-dogfood": "workspace:*",
     "@opensip-cli/checks-go": "workspace:*",

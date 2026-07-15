@@ -1,3 +1,5 @@
+import { hasControlCharacter } from './control-text.js';
+
 import type { Arm, GoldTask } from './model/task.js';
 
 const SMOKE_TASK_ID = 'entrypoint-trace.customer-ts';
@@ -10,6 +12,7 @@ Options:
   --task <id>                 Run one task (repeatable; default: all)
   --arm <control|opensip|both>  Select an arm (default: both)
   --json <path>               Set the JSON report path
+  --opensip-entrypoint <js>   Measure an installed CLI JS bin (absolute path)
   --smoke                     Run the entrypoint-trace smoke task with both arms
   --list                      List registered task ids
   --help                      Show this help
@@ -22,6 +25,8 @@ export interface ParsedCliOptions {
   readonly help: boolean;
   readonly jsonPath?: string;
   readonly list: boolean;
+  /** Absolute path to an installed CLI JS bin to measure instead of workspace `dist`. */
+  readonly opensipEntrypoint?: string;
   readonly smoke: boolean;
   readonly taskIds: readonly string[];
 }
@@ -49,13 +54,6 @@ function validateArgvBounds(argv: readonly string[]): void {
   }
 }
 
-function hasControlCharacter(value: string): boolean {
-  return [...value].some((character) => {
-    const codePoint = character.codePointAt(0);
-    return codePoint !== undefined && (codePoint < 32 || codePoint === 127);
-  });
-}
-
 /**
  * Read and validate the value following one CLI flag.
  *
@@ -78,6 +76,7 @@ interface MutableParseState {
   help: boolean;
   jsonPath?: string;
   list: boolean;
+  opensipEntrypoint?: string;
   smoke: boolean;
   taskIds: string[];
 }
@@ -114,6 +113,13 @@ function parseValueFlag(
     state.jsonPath = readValue(argv, index, flag);
     return index + 2;
   }
+  if (flag === '--opensip-entrypoint') {
+    if (state.opensipEntrypoint !== undefined) {
+      throw new InvocationError('--opensip-entrypoint may be specified only once.');
+    }
+    state.opensipEntrypoint = readValue(argv, index, flag);
+    return index + 2;
+  }
   return undefined;
 }
 
@@ -147,7 +153,11 @@ function validateModeCombinations(state: MutableParseState): void {
     throw new InvocationError('--smoke cannot be combined with task, arm, list, or help options.');
   }
   const evaluationOptionPresent =
-    state.taskIds.length > 0 || state.armProvided || state.jsonPath !== undefined || state.smoke;
+    state.taskIds.length > 0 ||
+    state.armProvided ||
+    state.jsonPath !== undefined ||
+    state.opensipEntrypoint !== undefined ||
+    state.smoke;
   if (state.list && (state.help || evaluationOptionPresent)) {
     throw new InvocationError('--list cannot be combined with evaluation or help options.');
   }
@@ -188,6 +198,9 @@ export function parseArgs(argv: readonly string[]): ParsedCliOptions {
     help: state.help,
     ...(state.jsonPath === undefined ? {} : { jsonPath: state.jsonPath }),
     list: state.list,
+    ...(state.opensipEntrypoint === undefined
+      ? {}
+      : { opensipEntrypoint: state.opensipEntrypoint }),
     smoke: state.smoke,
     taskIds: [...state.taskIds],
   };

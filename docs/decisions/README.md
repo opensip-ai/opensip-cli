@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0164](ADR-0164-installed-artifact-platform-acceptance-evidence.md) — Operating-system support qualification targets the exact installed bytes through a closed data profile and an independently verifiable `platform-acceptance.v1` evidence artifact; a pass proves only the measured candidate/host/profile tuple, not a support declaration, and the harness adds no command, datastore, or fitness check.
 - [ADR-0163](ADR-0163-local-cpu-profiling-independent-of-otel-export.md) — Explicit local Node inspector profiling independent of OTel export, bounded owner-only artifacts, clean-wall-only performance claims, and Pyroscope deferred (supersedes ADR-0049).
 - [ADR-0162](ADR-0162-typescript-7-1-readiness.md) — Keep the 6.0.3 line and defer separate TypeScript 7 build-compiler/runtime-API migrations until a stable top-level `createProgram(rootFiles, compilerOptions)` (or equivalent) and the full capability/equivalence gates exist.
 - [ADR-0161](ADR-0161-codebase-inventory-and-context-snapshot-ownership.md) — Persistence-free layer-3 codebase facts, graph-owned immutable derived snapshots, explicit-file input, and exact captured-port replay with labelled fallbacks.

@@ -28,9 +28,22 @@ export interface EvalTaskResult {
   readonly taskId: string;
 }
 
+/**
+ * Non-sensitive identity of the CLI build the harness measured. Additive to
+ * schema v1: absent in reports produced before this field existed, and present
+ * for every report the current harness writes. Carries no absolute path.
+ */
+export interface EvalReportCliTarget {
+  readonly source: 'installed' | 'workspace';
+  /** Entrypoint basename only (e.g. `index.js`); never an absolute or home path. */
+  readonly entrypointName: string;
+}
+
 /** Immutable file-plane result. Raw tool responses never cross into this shape. */
 export interface EvalReport {
   readonly cliVersion: string;
+  /** Additive (schema-v1 tolerant): which CLI build the harness measured. */
+  readonly cliTarget?: EvalReportCliTarget;
   readonly completedAt: string;
   readonly contractFingerprint: string;
   readonly gitSha: string;
@@ -55,6 +68,19 @@ function isArm(value: unknown): value is Arm {
 
 function isSourceState(value: unknown): value is SourceState {
   return value === 'changed-during-run' || value === 'clean' || value === 'dirty';
+}
+
+/**
+ * Validate the optional additive `cliTarget` block. `undefined` is tolerated (old
+ * fixtures); a present block must carry a known source and a populated identity.
+ */
+function isValidCliTarget(value: unknown): boolean {
+  if (value === undefined) return true;
+  return (
+    isRecord(value) &&
+    (value.source === 'installed' || value.source === 'workspace') &&
+    isPopulatedString(value.entrypointName)
+  );
 }
 
 function hasRequiredStepRecord(value: unknown): boolean {
@@ -157,6 +183,7 @@ export function validateEvalReport(value: unknown): value is EvalReport {
     value.promotionEligible !== (value.sourceState === 'clean') ||
     !isPopulatedString(value.startedAt) ||
     !isPopulatedString(value.completedAt) ||
+    !isValidCliTarget(value.cliTarget) ||
     !Array.isArray(value.selectedArms) ||
     !Array.isArray(value.tasks) ||
     value.tasks.length === 0

@@ -85,6 +85,14 @@ const INVALID_REPORT_CASES: readonly (readonly [string, ReportMutation])[] = [
     (value) => ({ ...value, promotionEligible: false, sourceState: 'clean' }),
   ],
   ['empty task set', (value) => ({ ...value, tasks: [] })],
+  [
+    'invalid cli target source',
+    (value) => ({ ...value, cliTarget: { entrypointName: 'index.js', source: 'bogus' } }),
+  ],
+  [
+    'cli target missing entrypoint name',
+    (value) => ({ ...value, cliTarget: { source: 'installed' } }),
+  ],
   ['missing task arm', (value) => ({ ...value, tasks: [{ ...value.tasks[0], arms: {} }] })],
   [
     'raw response leak',
@@ -133,6 +141,22 @@ describe('EvalReport model', () => {
 
   it('tolerates additive unknown fields', () => {
     expect(validateEvalReport({ ...report(), futureField: { enabled: true } })).toBe(true);
+  });
+
+  it('tolerates an absent cli target but validates a present one', () => {
+    expect(validateEvalReport(report())).toBe(true);
+    expect(
+      validateEvalReport({
+        ...report(),
+        cliTarget: { entrypointName: 'index.js', source: 'installed' },
+      }),
+    ).toBe(true);
+    expect(
+      validateEvalReport({
+        ...report(),
+        cliTarget: { entrypointName: 'index.js', source: 'workspace' },
+      }),
+    ).toBe(true);
   });
 
   it.each(INVALID_REPORT_CASES)('rejects %s', (_label, mutate) => {

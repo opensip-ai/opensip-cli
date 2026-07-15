@@ -37,7 +37,9 @@ export type {
 
 /** Connection, environment, and resource bounds for one MCP arm session. */
 export interface McpArmSessionOptions {
-  /** Unit-test seam; production always uses the package's canonical resolver. */
+  /** The Node executable that runs the MCP entrypoint; defaults to this process's Node. */
+  readonly cliCommand?: string;
+  /** Resolves the CLI JS entrypoint; production injects the run's CLI target, tests a stub. */
   readonly cliDistResolver?: () => string;
   readonly connectionFactory?: McpConnectionFactory;
   readonly env?: Readonly<Record<string, string | undefined>>;
@@ -110,6 +112,7 @@ export class McpArmSession {
       'maxResponseBytes',
     );
     const connectionFactory = options.connectionFactory ?? defaultConnectionFactory;
+    const cliCommand = options.cliCommand ?? process.execPath;
     const cliDist = (options.cliDistResolver ?? resolveCliDist)();
     const ownedHome =
       options.env?.HOME === undefined
@@ -124,7 +127,7 @@ export class McpArmSession {
     try {
       connection = connectionFactory({
         args: [cliDist, 'mcp', '--cwd', options.workspaceRoot],
-        command: process.execPath,
+        command: cliCommand,
         cwd: options.workspaceRoot,
         env: buildDeterministicEnv({
           ...options.env,
