@@ -9,11 +9,8 @@ import {
   type PlatformQualification,
   type PlatformSupportRow,
 } from '../../index.js';
-import {
-  MACOS_INTEL_ROW,
-  MACOS_PREVIEW_ROW,
-  assertPlatformSupportRowsValid,
-} from '../platform-support-rows.js';
+import { MACOS_INTEL_ROW, MACOS_PREVIEW_ROW } from '../platform-support-rows.js';
+import { assertPlatformSupportRowsValid } from '../platform-support-validate.js';
 
 /** The exact supported tuple (spec §4), fully observed. */
 const EXACT_MACOS: ObservedHost = Object.freeze({
