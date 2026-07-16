@@ -5,19 +5,33 @@
 // `gh attestation verify` step when a downloaded bundle and trusted root are
 // supplied.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 import {
+  MAX_RELEASE_CHECKSUMS_BYTES,
+  MAX_RELEASE_MANIFEST_BYTES,
   RELEASE_CHECKSUMS_NAME,
   RELEASE_MANIFEST_NAME,
   isSafeArtifactPath,
   normalizeReleaseManifest,
   normalizeVersion,
   parseSha256Sums,
-  sha256File,
   verifyManifestArtifacts,
 } from './lib/release-artifacts.mjs';
+import { readBoundedFileBytes } from './platform-acceptance/bounded-owned-file.mjs';
+
+function readReleaseControlFile(path, maxBytes, reasonPrefix) {
+  const result = readBoundedFileBytes({
+    path,
+    maxBytes,
+    reasonPrefix,
+    requireNonEmpty: true,
+  });
+  if (!result.ok) throw new Error(result.reasonCode);
+  return result.buffer;
+}
 
 function usage() {
   return [
@@ -65,13 +79,19 @@ function failList(failures) {
   for (const failure of failures) console.error(`[release-artifacts] ${failure}`);
 }
 
-async function verifySha256Sums({ artifactDir, manifest, manifestPath }) {
+async function verifySha256Sums({ artifactDir, manifest, manifestPath, manifestBytes }) {
   const checksumsPath = join(artifactDir, RELEASE_CHECKSUMS_NAME);
   if (!existsSync(checksumsPath)) {
     return [`${RELEASE_CHECKSUMS_NAME}: file is missing`];
   }
   const failures = [];
-  const entries = parseSha256Sums(readFileSync(checksumsPath, 'utf8'));
+  const entries = parseSha256Sums(
+    readReleaseControlFile(
+      checksumsPath,
+      MAX_RELEASE_CHECKSUMS_BYTES,
+      'release-checksums',
+    ).toString('utf8'),
+  );
   const byPath = new Map();
   for (const entry of entries) {
     if (byPath.has(entry.path)) {
@@ -85,7 +105,7 @@ async function verifySha256Sums({ artifactDir, manifest, manifestPath }) {
     failures.push(`manifest filename should be ${RELEASE_MANIFEST_NAME}, got ${manifestBase}`);
   }
   if (isSafeArtifactPath(manifestBase)) {
-    expected.set(manifestBase, await sha256File(manifestPath));
+    expected.set(manifestBase, createHash('sha256').update(manifestBytes).digest('hex'));
   } else {
     failures.push(`${manifestBase}: unsafe manifest path`);
   }
@@ -125,7 +145,12 @@ function attestationCommand({ manifestPath, bundlePath, trustedRootPath }) {
 }
 
 export async function verifyReleaseArtifacts(options) {
-  const manifestRaw = JSON.parse(readFileSync(options.manifestPath, 'utf8'));
+  const manifestBytes = readReleaseControlFile(
+    options.manifestPath,
+    MAX_RELEASE_MANIFEST_BYTES,
+    'release-manifest',
+  );
+  const manifestRaw = JSON.parse(manifestBytes.toString('utf8'));
   const manifest = normalizeReleaseManifest(manifestRaw, options.manifestPath);
   const failures = [];
   if (
@@ -146,6 +171,7 @@ export async function verifyReleaseArtifacts(options) {
       artifactDir: options.artifactDir,
       manifest,
       manifestPath: options.manifestPath,
+      manifestBytes,
     })),
   );
   return {

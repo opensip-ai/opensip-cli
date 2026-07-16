@@ -85,7 +85,7 @@ Row id: `macos-26-intel-unsupported`
 | Filesystem | apfs (case-insensitive) |
 | Install channels | `npm-exact-version`, `install-sh` |
 
-Intel/x64 macOS is intentionally excluded: no Intel GA evidence. Native dependency, process, TTY, and lifecycle behavior must be qualified separately.
+This exact Intel/x64 macOS 26 / Node 24 tuple is intentionally excluded: no Intel GA evidence. Other Intel tuples remain unqualified until measured.
 
 No qualification evidence is collected for this tuple; it is intentionally excluded.
 
@@ -97,8 +97,9 @@ case-sensitive volumes. Unqualified hosts may work perfectly well — the CLI
 does not block them and never claims they "cannot run" — but they carry no
 evidence-backed promise. Individual dimensions are also unqualified when they
 cannot be observed at classification time (see the agent projection below):
-npm version, filesystem type, case behavior, install channel, and the OS/kernel
-product versions are frequently unobserved during an ordinary command.
+npm version, filesystem type, case behavior, install channel, the OS product
+version, and kernel name/version are frequently unobserved during an ordinary
+command.
 
 ## Install channels
 
@@ -115,7 +116,8 @@ agent-catalog --json` (and the MCP `get_agent_catalog` tool) carry a
 `hostSupport` projection built only from process-observable facts
 (`process.platform`, `process.arch`, `process.version`,
 `process.versions.modules`). Because npm, filesystem, case behavior, install
-channel, and OS/kernel product versions are unobserved at runtime, the local
+channel, OS product version, and kernel name/version are unobserved at runtime,
+the local
 `match` is never `exact` — it is `partial` on a clean match and `none` on a
 contradiction. Agents must distinguish the registry row's published `status`
 (e.g. `preview`) from the local `match`:
@@ -131,16 +133,19 @@ contradiction. Agents must distinguish the registry row's published `status`
     "matrixUrl": "https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms",
     "reasonCodes": [],
     "observed": ["os-platform", "arch", "node-major", "node-abi"],
-    "unobserved": ["os-version", "kernel-version", "npm-major", "filesystem-type", "case-sensitivity", "install-channel"]
+    "unobserved": ["os-version", "kernel-name", "kernel-version", "npm-major", "filesystem-type", "case-sensitivity", "install-channel"]
   }
 }
 ```
 
 A non-macOS host projects `status: "unqualified"`, `match: "none"`, and
-`reasonCodes: ["non-macos-host"]`; Intel/x64 macOS projects `status:
-"unsupported"` with `reasonCodes: ["macos-intel-unsupported"]`. The CLI and MCP
-surfaces map the same core projection through one shared helper, so they emit a
-byte-identical `hostSupport` for identical process facts.
+`reasonCodes: ["non-macos-host"]`. Process-only facts cannot establish every
+dimension of the exact Intel exclusion row, so Intel/x64 projects
+`status: "unqualified"` with `reasonCodes: ["insufficient-host-facts"]` unless
+a fuller assessment observes the complete published tuple. Only that exact tuple
+is `unsupported`, with `reasonCodes: ["macos-intel-unsupported"]`. The CLI and
+MCP surfaces map the same core projection through one shared helper, so they emit
+a byte-identical `hostSupport` for identical process facts.
 
 ## `engines` is not a support claim
 

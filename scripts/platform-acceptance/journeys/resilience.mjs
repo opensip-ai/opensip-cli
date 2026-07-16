@@ -7,7 +7,8 @@
  * missing one becomes an explicit `unavailable` result (the runner gates on
  * them), never an omitted row. Cancellation and timeout assert the port's
  * `cancelled` / `timedOut` flags and, critically, `cleanup.residualDescendants
- * === 0` — no orphaned child survives.
+ * === 0` — no residual descendant was observed under the POSIX process-group
+ * plus sampled process-table model.
  */
 
 import { chmodSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -55,7 +56,10 @@ function seedProject(dir) {
   );
 }
 
-const FIT_ENVELOPE_EXPECT = { exitCode: 1, json: expectEnvelope({ tool: 'fit' }) };
+const FIT_ENVELOPE_EXPECT = {
+  exitCode: 1,
+  json: expectEnvelope({ tool: 'fit' }),
+};
 
 const spacesUnicodeExecutor = async (context) => {
   const dir = join(context.paths.workRoot, 'wörk späce ✓');
@@ -130,6 +134,10 @@ const isolatedHomeExecutor = async (context) => {
   const home = join(context.paths.workRoot, 'owned-home');
   try {
     mkdirSync(home, { recursive: true });
+    // `graph` needs a recognizable source project before it can exercise the
+    // zero-init cache path. Keep OpenSIP itself uninitialized: this journey is
+    // specifically proving that first-run state honors the supplied HOME.
+    seedProject(context.paths.workRoot);
   } catch (error) {
     return fail('home-setup-failed', [
       context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
@@ -152,6 +160,13 @@ const isolatedHomeExecutor = async (context) => {
     },
   });
   if (result.timedOut) return fail('timed-out', [context.assert.diagnostic(result.stderrTail)]);
+  const commandOutcome = assertCommand(
+    context,
+    result,
+    { exitCode: 0, json: expectEnvelope({ tool: 'graph' }) },
+    'isolated-home-command-failed',
+  );
+  if (commandOutcome.status !== 'pass') return commandOutcome;
   if (!hasAnyFile(home)) {
     return fail('home-not-honored', [
       context.assert.diagnostic('no state landed under the supplied HOME (isolation not honored)'),
@@ -188,7 +203,8 @@ const signalsExecutor = async (context) => {
 };
 
 const timeoutCleanupExecutor = async (context) => {
-  // A hard, short timeout must terminate the process tree with no residue.
+  // A hard, short timeout must leave no residual descendant observed by the
+  // POSIX process-group plus sampled process-table model.
   const result = await runCli(context, {
     args: ['graph', '--json'],
     cwd: context.paths.workRoot,
@@ -272,12 +288,12 @@ export const resilienceJourneys = assertUniqueJourneyIds([
     category: 'resilience',
     value: {
       human: 'Cancels cleanly',
-      agent: 'an aborted run is reported cancelled and leaves no descendants',
+      agent: 'an aborted run is cancelled with no observed residual descendants',
     },
     isolated: true,
     steps: [
       { label: 'abort a run mid-startup' },
-      { label: 'assert cancelled + no residual descendants' },
+      { label: 'assert cancelled + no observed residual descendants' },
     ],
     executor: signalsExecutor,
   }),
@@ -286,12 +302,12 @@ export const resilienceJourneys = assertUniqueJourneyIds([
     category: 'resilience',
     value: {
       human: 'Times out cleanly',
-      agent: 'a timed-out run is reported timedOut and leaves no descendants',
+      agent: 'a timed-out run is timedOut with no observed residual descendants',
     },
     isolated: true,
     steps: [
       { label: 'run with a 25ms timeout' },
-      { label: 'assert timedOut + no residual descendants' },
+      { label: 'assert timedOut + no observed residual descendants' },
     ],
     executor: timeoutCleanupExecutor,
   }),

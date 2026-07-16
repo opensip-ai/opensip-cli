@@ -379,7 +379,12 @@ test('cleanupOwnedCorpus refuses unmarked directories', async () => {
 });
 
 test('process-table helpers sum root and descendant RSS', () => {
-  const rows = parseProcessTable('10 1 100\n11 10 25\n12 11 5\n13 2 200\n');
+  const rows = parseProcessTable(
+    '10 1 10 10 Wed Jul 15 10:00:00 2026 100 /usr/bin/node\n' +
+      '11 10 10 10 Wed Jul 15 10:00:01 2026 25 /usr/bin/node\n' +
+      '12 11 10 10 Wed Jul 15 10:00:02 2026 5 /usr/bin/node\n' +
+      '13 2 13 13 Wed Jul 15 10:00:03 2026 200 /usr/bin/node\n',
+  );
   assert.equal(sumProcessTreeRss(rows, 10), 130 * 1024);
 });
 
@@ -390,13 +395,23 @@ test('readProcessTable bounds and force-kills the ps subprocess', async () => {
     timeoutMs: 37,
     execFileAsync: async (command, args, options) => {
       invocation = { command, args, options };
-      return { stdout: '10 1 100\n' };
+      return { stdout: '10 1 10 10 Wed Jul 15 10:00:00 2026 100 /usr/bin/node\n' };
     },
   });
 
-  assert.deepEqual(rows, [{ pid: 10, ppid: 1, rssBytes: 100 * 1024 }]);
-  assert.equal(invocation.command, 'ps');
-  assert.deepEqual(invocation.args, ['-eo', 'pid=,ppid=,rss=']);
+  assert.deepEqual(rows, [
+    {
+      pid: 10,
+      ppid: 1,
+      processGroupId: 10,
+      sessionToken: '10',
+      startedAt: 'Wed Jul 15 10:00:00 2026',
+      command: '/usr/bin/node',
+      rssBytes: 100 * 1024,
+    },
+  ]);
+  assert.equal(invocation.command, '/usr/bin/ps');
+  assert.deepEqual(invocation.args, ['-eo', 'pid=,ppid=,pgid=,sess=,lstart=,rss=,ucomm=']);
   assert.equal(invocation.options.timeout, 37);
   assert.equal(invocation.options.killSignal, 'SIGKILL');
 });

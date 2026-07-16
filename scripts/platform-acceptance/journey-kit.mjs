@@ -29,8 +29,11 @@
  * @typedef {import('./journey-catalog.d.mts').CommandStepParams} CommandStepParams
  */
 
+import { resolveInstalledCliInvocation } from './node-cli-invocation.mjs';
+import { PLATFORM_ACCEPTANCE_CAPABILITIES } from './contract.mjs';
+
 /** The closed native-capability vocabulary. A journey may declare only these. */
-export const KNOWN_CAPABILITIES = Object.freeze(new Set(['pty', 'symlink', 'permissions']));
+export const KNOWN_CAPABILITIES = Object.freeze(new Set(PLATFORM_ACCEPTANCE_CAPABILITIES));
 
 const KEBAB_REASON = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
@@ -212,22 +215,26 @@ export function unavailable(reasonCode, diagnostics = []) {
 
 /**
  * Run the installed customer CLI once via the injected measured-process port.
- * argv is built from the resolved `installedBin` descriptor the context carries;
- * this never discovers or resolves a binary.
+ * argv is built from the resolved installed descriptors the context carries;
+ * this never discovers a candidate binary. A Windows `.cmd` shim is represented
+ * as `process.execPath` plus the validated package JS entrypoint, keeping the
+ * measured-process port shell-free.
  *
  * @param {JourneyExecutorContext} context
- * @param {{ args: readonly string[], cwd?: string, env?: Record<string,string>, timeoutMs?: number, stdin?: string, signal?: AbortSignal, pty?: boolean }} options
+ * @param {{ args: readonly string[], cwd?: string, env?: Record<string,string>, timeoutMs?: number, stdin?: string, signal?: AbortSignal, nativeSignal?: {signal:'SIGINT'|'SIGTERM',afterMs:number}, pty?: boolean }} options
  * @returns {Promise<MeasuredProcessResult>}
  */
 export function runCli(context, options) {
+  const invocation = resolveInstalledCliInvocation(context.installed);
   const spec = {
-    argv: [context.installed.installedBin.bin, ...options.args],
+    argv: [invocation.command, ...invocation.prefixArgs, ...options.args],
     cwd: options.cwd ?? context.paths.workRoot,
   };
   if (options.env !== undefined) spec.env = options.env;
   if (options.timeoutMs !== undefined) spec.timeoutMs = options.timeoutMs;
   if (options.stdin !== undefined) spec.stdin = options.stdin;
   if (options.signal !== undefined) spec.signal = options.signal;
+  if (options.nativeSignal !== undefined) spec.nativeSignal = options.nativeSignal;
   if (options.pty !== undefined) spec.pty = options.pty;
   return context.process.run(spec);
 }

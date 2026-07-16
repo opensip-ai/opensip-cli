@@ -13,6 +13,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   cpSync,
   mkdirSync,
@@ -29,6 +30,7 @@ import { after, before, test } from 'node:test';
 
 import { buildReleaseArtifacts } from '../build-release-artifacts.mjs';
 import {
+  MAX_RELEASE_MANIFEST_BYTES,
   RELEASE_CHECKSUMS_NAME,
   RELEASE_MANIFEST_NAME,
   expectedTarballName,
@@ -42,6 +44,7 @@ import { RELEASE_PACKAGE_ORDER } from '../release-package-order.mjs';
 
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VERSION = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version;
+const REGISTRY_INTEGRITY_DIGEST = 'c'.repeat(64);
 
 const roots = [];
 function tmpRoot(prefix = 'pa-candidate-') {
@@ -65,11 +68,16 @@ async function reasonCodeOf(input) {
 
 test('published-version accepts an exact semver (incl. prerelease/build metadata)', async () => {
   for (const version of ['0.7.0', '1.2.3', '2.0.0-rc.1', '3.4.5+build.7']) {
-    const result = await resolveCandidateSource({ kind: 'published-version', version });
+    const result = await resolveCandidateSource({
+      kind: 'published-version',
+      version,
+      registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+    });
     assert.equal(result.ok, true, `${version}: ${result.message}`);
     assert.equal(result.identity.version, version);
-    assert.equal(result.identity.registry, 'registry.npmjs.org');
+    assert.equal(result.identity.registry, 'https://registry.npmjs.org/');
     assert.equal(result.install.spec, `opensip-cli@${version}`);
+    assert.equal(result.install.registry, 'https://registry.npmjs.org/');
   }
 });
 
@@ -84,6 +92,13 @@ test('published-version rejects tags, ranges, git/file specs, and control charac
     'git+https://x/y.git',
     'file:../x',
     '1.0.0\n',
+    '01.2.3',
+    '1.02.3',
+    '1.2.03',
+    '1.2.3-01',
+    '1.2.3-a..b',
+    '1.2.3-',
+    '1.2.3+build..7',
   ]) {
     const result = await resolveCandidateSource({ kind: 'published-version', version });
     assert.equal(result.ok, false, `${JSON.stringify(version)} should be rejected`);
@@ -91,7 +106,7 @@ test('published-version rejects tags, ranges, git/file specs, and control charac
   }
 });
 
-test('published-version rejects credentialed and non-HTTPS registries but accepts a plain HTTPS mirror', async () => {
+test('published-version rejects credential-bearing and non-HTTPS registries', async () => {
   const credentialed = await resolveCandidateSource({
     kind: 'published-version',
     version: '0.7.0',
@@ -108,13 +123,103 @@ test('published-version rejects credentialed and non-HTTPS registries but accept
   assert.equal(http.ok, false);
   assert.equal(http.reasonCode, CANDIDATE_REASON_CODES.INVALID_REGISTRY);
 
-  const ok = await resolveCandidateSource({
+  for (const registry of [
+    'https://mirror.example/npm?token=secret',
+    'https://mirror.example/npm#token',
+  ]) {
+    const result = await resolveCandidateSource({
+      kind: 'published-version',
+      version: '0.7.0',
+      registry,
+    });
+    assert.equal(result.ok, false, `${registry} should be rejected`);
+    assert.equal(result.reasonCode, CANDIDATE_REASON_CODES.INVALID_REGISTRY);
+  }
+});
+
+test('published-version normalizes and binds the credential-free registry origin and pathname', async () => {
+  const withoutSlash = await resolveCandidateSource({
     kind: 'published-version',
     version: '0.7.0',
-    registry: 'https://mirror.example/',
+    registry: 'https://MIRROR.example/npm',
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
   });
-  assert.equal(ok.ok, true, ok.message);
-  assert.equal(ok.identity.registry, 'mirror.example');
+  const withSlash = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    registry: 'https://mirror.example/npm///',
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+  });
+  const otherPath = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    registry: 'https://mirror.example/other',
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+  });
+
+  assert.equal(withoutSlash.ok, true, withoutSlash.message);
+  assert.equal(withSlash.ok, true, withSlash.message);
+  assert.equal(otherPath.ok, true, otherPath.message);
+  assert.equal(withoutSlash.identity.registry, 'https://mirror.example/npm/');
+  assert.equal(withoutSlash.install.registry, 'https://mirror.example/npm/');
+  assert.equal(withSlash.identity.registry, withoutSlash.identity.registry);
+  assert.equal(withSlash.identity.digest, withoutSlash.identity.digest);
+  assert.notEqual(otherPath.identity.registry, withoutSlash.identity.registry);
+  assert.notEqual(otherPath.identity.digest, withoutSlash.identity.digest);
+});
+
+test('published-version binds an optional exact release-manifest digest into identity', async () => {
+  const manifestDigest = 'b'.repeat(64);
+  const bound = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    manifestDigest,
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+  });
+  const unbound = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+  });
+  assert.equal(bound.ok, true, bound.message);
+  assert.equal(bound.identity.manifestDigest, manifestDigest);
+  assert.notEqual(bound.identity.digest, unbound.identity.digest);
+
+  const invalid = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    manifestDigest: 'not-a-digest',
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+  });
+  assert.equal(invalid.reasonCode, CANDIDATE_REASON_CODES.INVALID_MANIFEST);
+});
+
+test('published-version requires target integrity and permits an explicit previous-source exception', async () => {
+  const missing = await resolveCandidateSource({ kind: 'published-version', version: '0.7.0' });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.reasonCode, CANDIDATE_REASON_CODES.INVALID_INTEGRITY_DIGEST);
+
+  const previous = await resolveCandidateSource(
+    { kind: 'published-version', version: '0.7.0' },
+    { allowUnboundRegistryIntegrity: true },
+  );
+  assert.equal(previous.ok, true);
+  assert.equal(previous.identity.registryIntegrityDigest, undefined);
+
+  const invalid = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    registryIntegrityDigest: 'A'.repeat(64),
+  });
+  assert.equal(invalid.reasonCode, CANDIDATE_REASON_CODES.INVALID_INTEGRITY_DIGEST);
+
+  const valid = await resolveCandidateSource({
+    kind: 'published-version',
+    version: '0.7.0',
+    registryIntegrityDigest: REGISTRY_INTEGRITY_DIGEST,
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.identity.registryIntegrityDigest, REGISTRY_INTEGRITY_DIGEST);
 });
 
 test('resolveCandidateSource rejects a non-object, an unknown kind, and unknown keys', async () => {
@@ -182,10 +287,25 @@ test('packed-release accepts a complete signed set and binds a redacted identity
   assert.equal(result.identity.kind, 'packed-release');
   assert.equal(result.identity.version, VERSION);
   assert.match(result.identity.digest, /^[a-f0-9]{64}$/);
+  const expectedManifestDigest = createHash('sha256')
+    .update(readFileSync(join(dir, RELEASE_MANIFEST_NAME)))
+    .digest('hex');
+  assert.equal(result.identity.manifestDigest, expectedManifestDigest);
   // The redacted source string must never carry the absolute directory path.
   assert.ok(!result.identity.source.includes(dir), result.identity.source);
   assert.equal(result.install.kind, 'packed-release');
   assert.ok(result.install.cliTarball.endsWith(`opensip-cli-${VERSION}.tgz`));
+});
+
+test('packed-release rejects an expected release-manifest digest mismatch', async () => {
+  const dir = mutatedRelease();
+  const result = await resolveCandidateSource({
+    kind: 'packed-release',
+    directory: dir,
+    expectedVersion: VERSION,
+    manifestDigest: 'f'.repeat(64),
+  });
+  assert.equal(result.reasonCode, CANDIDATE_REASON_CODES.CHECKSUM_MISMATCH);
 });
 
 test('packed-release rejects a missing directory', async () => {
@@ -266,6 +386,23 @@ test('packed-release rejects a missing / unsafe manifest', async () => {
   );
 });
 
+test('packed-release rejects an oversized manifest without parsing it', async () => {
+  const oversized = mutatedRelease((dir) => {
+    writeFileSync(
+      join(dir, RELEASE_MANIFEST_NAME),
+      Buffer.alloc(MAX_RELEASE_MANIFEST_BYTES + 1, 0x20),
+    );
+  });
+  assert.equal(
+    await reasonCodeOf({
+      kind: 'packed-release',
+      directory: oversized,
+      expectedVersion: VERSION,
+    }),
+    CANDIDATE_REASON_CODES.INVALID_MANIFEST,
+  );
+});
+
 test('packed-release rejects a non-exact expected version before touching the directory', async () => {
   const dir = mutatedRelease();
   assert.equal(
@@ -302,7 +439,11 @@ function installedLayout(overrides = {}) {
   }
   const binName = overrides.platform === 'win32' ? 'opensip.cmd' : 'opensip';
   if (overrides.writeShim !== false) {
-    writeFileSync(join(binDir, binName), 'shim\n');
+    if (overrides.platform === 'win32') {
+      writeFileSync(join(binDir, binName), '@echo off\n');
+    } else {
+      symlinkSync(join(packageDir, entrypointRel), join(binDir, binName));
+    }
   }
   return { runRoot, packageDir, binDir, platform: overrides.platform };
 }
@@ -409,6 +550,18 @@ test('resolveInstalledDescriptors rejects a package name that is not opensip-cli
   assert.equal(result.reasonCode, CANDIDATE_REASON_CODES.INVALID_PACKAGE_JSON);
 });
 
+test('resolveInstalledDescriptors rejects an oversized installed package manifest', () => {
+  const layout = installedLayout();
+  writeFileSync(join(layout.packageDir, 'package.json'), Buffer.alloc(1024 * 1024 + 1, 0x20));
+  const result = resolveInstalledDescriptors({
+    runRoot: layout.runRoot,
+    packageDir: layout.packageDir,
+    binDir: layout.binDir,
+    platform: 'linux',
+  });
+  assert.equal(result.reasonCode, CANDIDATE_REASON_CODES.INVALID_PACKAGE_JSON);
+});
+
 test('resolveInstalledDescriptors rejects a JS entrypoint whose realpath escapes the run root', () => {
   const outside = tmpRoot('pa-outside-');
   const outsideEntry = join(outside, 'evil.js');
@@ -416,6 +569,35 @@ test('resolveInstalledDescriptors rejects a JS entrypoint whose realpath escapes
   const layout = installedLayout({ writeEntrypoint: false });
   // The declared package-relative entrypoint is a symlink to a file OUTSIDE the run root.
   symlinkSync(outsideEntry, join(layout.packageDir, 'dist', 'index.js'));
+  const result = resolveInstalledDescriptors({
+    runRoot: layout.runRoot,
+    packageDir: layout.packageDir,
+    binDir: layout.binDir,
+    platform: 'linux',
+  });
+  assert.equal(result.reasonCode, CANDIDATE_REASON_CODES.CANDIDATE_BINARY_ESCAPE);
+});
+
+test('resolveInstalledDescriptors rejects a JS entrypoint that escapes its package within the run root', () => {
+  const layout = installedLayout({ writeEntrypoint: false, writeShim: false });
+  const siblingEntry = join(layout.runRoot, 'sibling-entry.js');
+  writeFileSync(siblingEntry, 'export default 1;\n');
+  symlinkSync(siblingEntry, join(layout.packageDir, 'dist', 'index.js'));
+  symlinkSync(join(layout.packageDir, 'dist', 'index.js'), join(layout.binDir, 'opensip'));
+  const result = resolveInstalledDescriptors({
+    runRoot: layout.runRoot,
+    packageDir: layout.packageDir,
+    binDir: layout.binDir,
+    platform: 'linux',
+  });
+  assert.equal(result.reasonCode, CANDIDATE_REASON_CODES.CANDIDATE_BINARY_ESCAPE);
+});
+
+test('resolveInstalledDescriptors rejects a POSIX customer shim targeting a run-owned sibling', () => {
+  const layout = installedLayout({ writeShim: false });
+  const siblingEntry = join(layout.runRoot, 'sibling-bin.js');
+  writeFileSync(siblingEntry, 'export default 1;\n');
+  symlinkSync(siblingEntry, join(layout.binDir, 'opensip'));
   const result = resolveInstalledDescriptors({
     runRoot: layout.runRoot,
     packageDir: layout.packageDir,

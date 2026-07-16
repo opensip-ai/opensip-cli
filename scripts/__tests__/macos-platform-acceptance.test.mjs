@@ -31,6 +31,7 @@ import { assessHostSupport } from '../../packages/core/dist/index-lib.js';
 /** The exact, fully-observed macOS 26 arm64 tuple sources. */
 const OK_TUPLE = Object.freeze({
   swVers: '26.0.1',
+  kernelName: 'Darwin',
   kernelRelease: '25.5.0',
   unameMachine: 'arm64',
   npmVersion: '11.0.0',
@@ -43,7 +44,7 @@ const OK_TUPLE = Object.freeze({
 // buildTupleObservedHost — every source maps to its ObservedHost dimension
 // ---------------------------------------------------------------------------
 
-test('buildTupleObservedHost maps every present source and always pins darwin/Darwin', () => {
+test('buildTupleObservedHost maps every present source and pins only process.platform', () => {
   const observed = buildTupleObservedHost(OK_TUPLE);
   assert.deepEqual(observed, {
     osPlatform: 'darwin',
@@ -60,14 +61,15 @@ test('buildTupleObservedHost maps every present source and always pins darwin/Da
 test('buildTupleObservedHost omits every unavailable source (never a guessed value)', () => {
   const observed = buildTupleObservedHost({
     swVers: null,
+    kernelName: null,
     kernelRelease: null,
     npmVersion: null,
     nodeArch: null,
     nodeVersion: null,
     nodeAbi: null,
   });
-  // Only the constant identity remains; nothing is fabricated.
-  assert.deepEqual(observed, { osPlatform: 'darwin', kernelName: 'Darwin' });
+  // Only the process-platform identity remains; nothing is fabricated.
+  assert.deepEqual(observed, { osPlatform: 'darwin' });
 });
 
 // ---------------------------------------------------------------------------
@@ -101,6 +103,7 @@ test('a fully consistent macOS 26 tuple passes and reports the selected preview 
 
 test('each independent tuple contradiction fails as tuple-not-supported-row', () => {
   for (const patch of [
+    { kernelName: 'Linux' }, // wrong kernel identity
     { kernelRelease: '24.0.0' }, // wrong Darwin kernel major
     { nodeAbi: '127' }, // wrong Node module ABI
     { npmVersion: '10.9.0' }, // wrong npm major
@@ -116,6 +119,7 @@ test('each independent tuple contradiction fails as tuple-not-supported-row', ()
 test('each missing required source fails as tuple-source-unavailable and names the gap', () => {
   for (const [patch, missing] of [
     [{ swVers: null }, 'sw_vers'],
+    [{ kernelName: null }, 'uname-s'],
     [{ kernelRelease: null }, 'uname-r'],
     [{ unameMachine: null }, 'uname-m'],
     [{ npmVersion: null }, 'npm'],

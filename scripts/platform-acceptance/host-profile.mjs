@@ -24,7 +24,9 @@
 
 import { execFileSync } from 'node:child_process';
 import {
+  accessSync,
   chmodSync,
+  constants,
   mkdtempSync,
   openSync,
   closeSync,
@@ -37,8 +39,22 @@ import {
 import { cpus, totalmem, release, version as osVersionString } from 'node:os';
 import { basename, join } from 'node:path';
 
+import { PLATFORM_ACCEPTANCE_CAPABILITIES } from './contract.mjs';
+import { resolveNpmInvocation } from './node-cli-invocation.mjs';
+
 const CHILD_TIMEOUT_MS = 5000;
-const KNOWN_CAPABILITIES = ['pty', 'symlink', 'permissions', 'process-tree-rss'];
+const NATIVE_COMMANDS = Object.freeze({
+  darwin: Object.freeze({
+    mount: '/sbin/mount',
+    ps: '/bin/ps',
+    stat: '/usr/bin/stat',
+  }),
+  linux: Object.freeze({
+    mount: '/usr/bin/mount',
+    ps: '/usr/bin/ps',
+    stat: '/usr/bin/stat',
+  }),
+});
 
 /** Run a bounded, shell-free child and return trimmed stdout, or null on any failure. */
 function runProbe(command, args) {
@@ -69,13 +85,14 @@ function collectOsVersion() {
 }
 
 function collectNpmVersion(platform) {
-  // npm ships as `npm.cmd` on Windows, which execFile cannot run directly; try
-  // the platform-appropriate name and treat any failure as unavailable.
-  const candidates = platform === 'win32' ? ['npm.cmd', 'npm'] : ['npm'];
-  for (const candidate of candidates) {
-    const out = runProbe(candidate, ['--version']);
-    if (out && /^\d+\.\d+\.\d+/.test(out)) return out;
+  let invocation;
+  try {
+    invocation = resolveNpmInvocation({ platform });
+  } catch {
+    return unavailable('npm-unavailable');
   }
+  const out = runProbe(invocation.command, [...invocation.prefixArgs, '--version']);
+  if (out && /^\d+\.\d+\.\d+/.test(out)) return out;
   return unavailable('npm-unavailable');
 }
 
@@ -102,6 +119,14 @@ function collectCpuModel() {
 }
 
 function collectShell(platform) {
+  // The qualified macOS tuple names Apple's /bin/zsh, not the ambient shell
+  // variable inherited by a GitHub Actions step (which may be bash even though
+  // zsh is the platform shell under qualification). Prove the fixed executable
+  // directly; the native journey separately runs the installed CLI through it.
+  if (platform === 'darwin') {
+    const version = runProbe('/bin/zsh', ['--version']);
+    return version?.startsWith('zsh ') ? 'zsh' : unavailable('shell-undetermined');
+  }
   // Report only the basename (e.g. "zsh"), never the absolute shell path.
   const raw = platform === 'win32' ? process.env.ComSpec : process.env.SHELL;
   if (typeof raw === 'string' && raw.length > 0) {
@@ -152,7 +177,8 @@ function collectFilesystemType(platform, root) {
   if (platform !== 'darwin' && platform !== 'linux') {
     return unavailable('fs-type-unsupported-probe');
   }
-  const mountOut = runProbe('mount', []);
+  const commands = NATIVE_COMMANDS[platform];
+  const mountOut = commands === undefined ? null : runProbe(commands.mount, []);
   if (mountOut) {
     let best = null;
     for (const line of mountOut.split('\n')) {
@@ -166,7 +192,7 @@ function collectFilesystemType(platform, root) {
     if (best) return best.type;
   }
   if (platform === 'linux') {
-    const out = runProbe('stat', ['-f', '-c', '%T', root]);
+    const out = runProbe(commands.stat, ['-f', '-c', '%T', root]);
     if (out && /^[A-Za-z0-9._-]+$/.test(out)) return out;
   }
   return unavailable('fs-type-undetermined');
@@ -208,11 +234,18 @@ function safeRemove(target) {
 
 function probePty(platform) {
   if (platform === 'win32') return false;
-  return (
-    existsSync('/usr/bin/script') ||
-    existsSync('/bin/script') ||
-    runProbe('sh', ['-c', 'command -v script']) !== null
-  );
+  // Qualification permits only the fixed native utility paths that journeys
+  // invoke. Do not discover a caller-controlled executable through PATH or a
+  // shell command body.
+  for (const executable of ['/usr/bin/script', '/bin/script']) {
+    try {
+      accessSync(executable, constants.X_OK);
+      return true;
+    } catch {
+      /* try the other fixed native location */
+    }
+  }
+  return false;
 }
 
 function probeSymlink(root) {
@@ -260,8 +293,17 @@ function probePermissions(platform, root) {
 }
 
 function probeProcessTreeRss(platform) {
-  if (platform === 'win32') return false;
-  return runProbe('ps', ['-o', 'pid=', '-p', String(process.pid)]) !== null;
+  const ps = NATIVE_COMMANDS[platform]?.ps;
+  return ps !== undefined && runProbe(ps, ['-o', 'pid=', '-p', String(process.pid)]) !== null;
+}
+
+function probeProcessTreeCleanup(platform) {
+  // This capability means zero *observed* residual descendants under POSIX
+  // process groups plus sampled fixed-native process-table observation. It is
+  // not OS containment and cannot prove against an instant/deliberate setsid
+  // escape between samples. Observation faults fail individual runs closed.
+  // Node does not expose Windows Job Objects, so Windows remains unavailable.
+  return platform !== 'win32' && probeProcessTreeRss(platform);
 }
 
 function probeCapability(id, platform, root) {
@@ -277,6 +319,9 @@ function probeCapability(id, platform, root) {
     }
     case 'process-tree-rss': {
       return probeProcessTreeRss(platform);
+    }
+    case 'process-tree-cleanup': {
+      return probeProcessTreeCleanup(platform);
     }
     default: {
       return false;
@@ -296,7 +341,9 @@ export function collectHostProfile(root, requiredCapabilities = []) {
   }
   const platform = process.platform;
 
-  const capabilityIds = [...new Set([...KNOWN_CAPABILITIES, ...requiredCapabilities])];
+  const capabilityIds = [
+    ...new Set([...PLATFORM_ACCEPTANCE_CAPABILITIES, ...requiredCapabilities]),
+  ];
   const capabilities = {};
   for (const id of capabilityIds) {
     capabilities[id] = probeCapability(id, platform, root);

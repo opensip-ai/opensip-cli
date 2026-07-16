@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -33,6 +34,18 @@ function temporaryDirectory(): string {
   const directory = mkdtempSync(join(tmpdir(), 'agent-eval-smoke-test-'));
   temporaryDirectories.push(directory);
   return directory;
+}
+
+function installedCliEntrypoint(root: string): string {
+  const packageRoot = join(root, 'node_modules', 'opensip-cli');
+  const entrypoint = join(packageRoot, 'dist', 'installed-cli.js');
+  mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+  writeFileSync(
+    join(packageRoot, 'package.json'),
+    `${JSON.stringify({ bin: { opensip: './dist/installed-cli.js' }, name: 'opensip-cli' })}\n`,
+  );
+  writeFileSync(entrypoint, 'export default 1;\n', 'utf8');
+  return entrypoint;
 }
 
 function smokeTask(): GoldTask {
@@ -123,8 +136,7 @@ describe('--smoke', () => {
 
   it('threads a fake installed JS bin target through smoke — never the workspace dist', async () => {
     const root = temporaryDirectory();
-    const entrypoint = join(root, 'installed-cli.js');
-    writeFileSync(entrypoint, 'export default 1;\n', 'utf8');
+    const entrypoint = installedCliEntrypoint(root);
     const jsonPath = join(root, 'installed-smoke.json');
     const targets: CliTarget[] = [];
 
@@ -163,7 +175,12 @@ describe('--smoke', () => {
     }
     const report: unknown = JSON.parse(readFileSync(jsonPath, 'utf8'));
     expect(report).toMatchObject({
-      cliTarget: { entrypointName: 'installed-cli.js', source: 'installed' },
+      cliTarget: {
+        entrypointName: 'installed-cli.js',
+        entrypointSha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
+        packageJsonSha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
+        source: 'installed',
+      },
     });
   });
 

@@ -87,11 +87,37 @@ const INVALID_REPORT_CASES: readonly (readonly [string, ReportMutation])[] = [
   ['empty task set', (value) => ({ ...value, tasks: [] })],
   [
     'invalid cli target source',
-    (value) => ({ ...value, cliTarget: { entrypointName: 'index.js', source: 'bogus' } }),
+    (value) => ({
+      ...value,
+      cliTarget: { entrypointName: 'index.js', source: 'bogus' },
+    }),
   ],
   [
     'cli target missing entrypoint name',
     (value) => ({ ...value, cliTarget: { source: 'installed' } }),
+  ],
+  [
+    'installed cli target has only one identity digest',
+    (value) => ({
+      ...value,
+      cliTarget: {
+        entrypointName: 'index.js',
+        entrypointSha256: `sha256:${'a'.repeat(64)}`,
+        source: 'installed',
+      },
+    }),
+  ],
+  [
+    'installed cli target has malformed entrypoint digest',
+    (value) => ({
+      ...value,
+      cliTarget: {
+        entrypointName: 'index.js',
+        entrypointSha256: 'sha256:nope',
+        packageJsonSha256: `sha256:${'b'.repeat(64)}`,
+        source: 'installed',
+      },
+    }),
   ],
   ['missing task arm', (value) => ({ ...value, tasks: [{ ...value.tasks[0], arms: {} }] })],
   [
@@ -149,6 +175,17 @@ describe('EvalReport model', () => {
       validateEvalReport({
         ...report(),
         cliTarget: { entrypointName: 'index.js', source: 'installed' },
+      }),
+    ).toBe(true);
+    expect(
+      validateEvalReport({
+        ...report(),
+        cliTarget: {
+          entrypointName: 'index.js',
+          entrypointSha256: `sha256:${'a'.repeat(64)}`,
+          packageJsonSha256: `sha256:${'b'.repeat(64)}`,
+          source: 'installed',
+        },
       }),
     ).toBe(true);
     expect(

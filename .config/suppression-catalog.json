@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-15T08:07:54.761Z",
+  "generatedAt": "2026-07-16T06:30:29.608Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,9 +25,9 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 240,
+        "total": 241,
         "bySlug": {
-          "missing-type-exports": 3,
+          "missing-type-exports": 4,
           "async-waterfall-detection": 14,
           "file-length-limit": 9,
           "no-markdown-references": 5,
@@ -101,7 +101,7 @@
           "phantom-dependency-detection": 1
         },
         "byPackage": {
-          "agent-eval": 8,
+          "agent-eval": 9,
           "cli": 8,
           "contracts": 4,
           "core": 6,
@@ -127,9 +127,9 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 68,
+        "total": 69,
         "bySlug": {
-          "missing-type-exports": 3,
+          "missing-type-exports": 4,
           "async-waterfall-detection": 14,
           "file-length-limit": 9,
           "no-markdown-references": 3,
@@ -158,7 +158,7 @@
           "array-validation": 1
         },
         "byPackage": {
-          "agent-eval": 8,
+          "agent-eval": 9,
           "cli": 8,
           "contracts": 4,
           "core": 6,
@@ -460,13 +460,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 240,
+    "budgetGateFitness": 241,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 68,
+    "productRuntimeFitness": 69,
     "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 100,
+    "productRuntimeCombined": 101,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 62,
@@ -486,10 +486,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -237,
+      "productRuntimeFitness": -236,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -212,
-      "budgetGateFitness": -302,
+      "productRuntimeCombined": -211,
+      "budgetGateFitness": -301,
       "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

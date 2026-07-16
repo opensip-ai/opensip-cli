@@ -87,14 +87,12 @@ export interface SessionResultsReadPortDeps {
 export class SessionResultsReadPort implements ResultsReadPort {
   private readonly store: DataStore;
   private readonly projectRoot?: string;
-  private readonly tools?: ToolRegistry;
   private readonly replayFor: (tool: ToolShortId) => SessionReplayFn | undefined;
   private readonly capturedAgentCatalog: AgentCatalog;
 
   constructor(deps: SessionResultsReadPortDeps) {
     this.store = deps.store;
     this.projectRoot = deps.projectRoot;
-    this.tools = deps.tools;
     this.replayFor = deps.replayFor ?? (deps.tools ? bundledReplayResolver(deps.tools) : noReplay);
     this.capturedAgentCatalog = deps.agentCatalog;
   }
@@ -112,8 +110,10 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
       // Default to the lean projection — agents want pointers, not heavy payloads.
       summaryOnly: opts.summaryOnly ?? true,
-      ...(this.tools ? { registry: this.tools } : {}),
     });
+    // Preserve the stored layout key here: list_runs pointers must feed directly
+    // into show_run and match the replay envelope's tool identity. The human CLI
+    // may canonicalize display names, but the MCP machine contract must not.
     return ok(history.sessions.map(toRunSummary));
   }
 

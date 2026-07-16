@@ -15,24 +15,133 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { assertUniqueJourneyIds, defineJourney, fail, pass, unavailable } from '../journey-kit.mjs';
+import { expectEnvelope } from '../../cli-acceptance-core.mjs';
+import {
+  assertCommand,
+  assertUniqueJourneyIds,
+  defineJourney,
+  fail,
+  pass,
+  runCli,
+  unavailable,
+} from '../journey-kit.mjs';
+import { MAX_INSTALLED_AGENT_REPORT_BYTES } from '../agent-report-writer.mjs';
+import { readBoundedOwnedTextFile } from '../bounded-owned-file.mjs';
 
-/** Reason/fallback tokens a graceful stale-or-missing-evidence response surfaces. */
-const STALE_EVIDENCE_TOKENS = [
-  'unavailable',
-  'stale',
-  'partial',
-  'not_ready',
-  'notready',
-  'missing',
-  'reason',
-  'fallback',
-  'readiness',
-];
+const CONTEXT_STATUSES = new Set(['available', 'missing', 'unavailable']);
+const FILE_SCOPE_STATUSES = new Set(['matched', 'mismatched', 'not-requested']);
+const FILE_CONTEXT_STATUSES = new Set(['found', 'excluded', 'unknown', 'unavailable']);
+const COVERAGE_STATUSES = new Set(['complete', 'partial', 'unavailable']);
+const FRESHNESS_VERIFICATIONS = new Set(['complete', 'partial', 'missing']);
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function isStringArray(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+/** Validate the public ContextStatusDto shape, including reasoned non-ready states. */
+function contextStatusFailures(payload) {
+  if (!isRecord(payload)) return ['context status payload is not an object'];
+  const failures = [];
+  if (!CONTEXT_STATUSES.has(payload.status)) {
+    failures.push(`context status is invalid: ${JSON.stringify(payload.status)}`);
+  }
+  if (!isRecord(payload.fileScope) || !FILE_SCOPE_STATUSES.has(payload.fileScope.status)) {
+    failures.push('context fileScope.status is missing or invalid');
+  }
+  if (!Array.isArray(payload.steps)) failures.push('context steps is not an array');
+  if (!Array.isArray(payload.pointers)) failures.push('context pointers is not an array');
+  if (!isStringArray(payload.reasonCodes))
+    failures.push('context reasonCodes is not a string array');
+  if (!isStringArray(payload.nextActions))
+    failures.push('context nextActions is not a string array');
+  if (payload.status === 'available') {
+    if (!isRecord(payload.run)) failures.push('available context is missing run provenance');
+    if (!isRecord(payload.manifest)) failures.push('available context is missing its manifest');
+    if (!['ready', 'degraded', 'unavailable'].includes(payload.manifest?.readiness)) {
+      failures.push('available context manifest has no valid readiness');
+    }
+  } else if (payload.status === 'missing' || payload.status === 'unavailable') {
+    if (!Array.isArray(payload.reasonCodes) || payload.reasonCodes.length === 0) {
+      failures.push('non-ready context did not provide a reason code');
+    }
+    if (!Array.isArray(payload.nextActions) || payload.nextActions.length === 0) {
+      failures.push('non-ready context did not provide a next action');
+    }
+  }
+  return failures;
+}
+
+/** Validate the bounded FileContextDto returned for the seeded acceptance file. */
+function fileContextFailures(payload, expectedPath) {
+  if (!isRecord(payload)) return ['file context payload is not an object'];
+  const failures = [];
+  if (!FILE_CONTEXT_STATUSES.has(payload.status)) {
+    failures.push(`file context status is invalid: ${JSON.stringify(payload.status)}`);
+  }
+  if (payload.status !== 'found') {
+    failures.push(`seeded file context was not found (status=${JSON.stringify(payload.status)})`);
+  }
+  if (!isRecord(payload.file) || payload.file.path !== expectedPath) {
+    failures.push(`file context did not identify ${JSON.stringify(expectedPath)}`);
+  }
+  if (!isRecord(payload.project)) failures.push('file context is missing project facts');
+  if (!isNonEmptyString(payload.inventoryIdentity)) {
+    failures.push('file context is missing its inventory identity');
+  }
+  if (!isRecord(payload.coverage) || !COVERAGE_STATUSES.has(payload.coverage.status)) {
+    failures.push('file context coverage is missing or invalid');
+  }
+  if (
+    !isRecord(payload.freshness) ||
+    typeof payload.freshness.fresh !== 'boolean' ||
+    !isNonEmptyString(payload.freshness.capturedAt) ||
+    !FRESHNESS_VERIFICATIONS.has(payload.freshness.verification) ||
+    !isStringArray(payload.freshness.reasonCodes)
+  ) {
+    failures.push('file context freshness is missing or invalid');
+  }
+  if (!isStringArray(payload.reasonCodes)) failures.push('file context reasonCodes is invalid');
+  if (!isStringArray(payload.nextActions)) failures.push('file context nextActions is invalid');
+  return failures;
+}
+
+/** Validate one show_run response against the exact list_runs pointer selected. */
+function replayFailures(payload, selectedRun) {
+  if (!isRecord(payload)) return ['show_run payload is not an object'];
+  const failures = [];
+  if (!isRecord(payload.session) || payload.session.id !== selectedRun.id) {
+    failures.push(`show_run session id does not match ${JSON.stringify(selectedRun.id)}`);
+  }
+  if (!isRecord(payload.session) || payload.session.tool !== selectedRun.tool) {
+    failures.push(`show_run session tool does not match ${JSON.stringify(selectedRun.tool)}`);
+  }
+  if (!isRecord(payload.data) || payload.data.fidelity !== 'projection') {
+    failures.push('show_run fidelity is not "projection"');
+  }
+  const envelope = isRecord(payload.data) ? payload.data.envelope : undefined;
+  failures.push(...expectEnvelope({ tool: selectedRun.tool })(envelope));
+  if (!isRecord(envelope) || envelope.runId !== selectedRun.id) {
+    failures.push(`replayed envelope runId does not match ${JSON.stringify(selectedRun.id)}`);
+  }
+  if (!isRecord(envelope?.verdict)) failures.push('replayed envelope verdict is missing');
+  if (!Array.isArray(envelope?.units)) failures.push('replayed envelope units is not an array');
+  if (!isRecord(envelope?.baselineIdentity)) {
+    failures.push('replayed envelope baselineIdentity is missing');
+  }
+  return failures;
+}
 
 /**
  * Decode one MCP tool result into `{ isError, text, payload }`. The single text
@@ -70,19 +179,74 @@ async function withMcp(context, cwd, fn) {
       context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
     ]);
   }
+  let outcome;
   try {
-    return await fn(client);
+    outcome = await fn(client);
   } catch (error) {
-    return fail('mcp-call-failed', [
+    outcome = fail('mcp-call-failed', [
       context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
     ]);
-  } finally {
-    try {
-      await client.close();
-    } catch {
-      /* a close error is not a journey failure */
-    }
   }
+  try {
+    await client.close();
+  } catch (error) {
+    return fail('mcp-close-failed', [
+      context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
+    ]);
+  }
+  const stderr = client.stderrSummary();
+  if (stderr.truncated) {
+    return fail('mcp-output-overflow', [
+      context.assert.diagnostic(
+        `MCP stderr exceeded its bounded capture after ${stderr.bytes} byte(s)`,
+      ),
+    ]);
+  }
+  return outcome;
+}
+
+const CONTEXT_GIT_STEPS = Object.freeze([
+  Object.freeze({ label: 'git init', argv: Object.freeze(['git', 'init', '--quiet']) }),
+  Object.freeze({ label: 'git add', argv: Object.freeze(['git', 'add', '--all']) }),
+  Object.freeze({
+    label: 'git commit',
+    argv: Object.freeze([
+      'git',
+      '-c',
+      'user.name=OpenSIP Acceptance',
+      '-c',
+      'user.email=acceptance@invalid',
+      'commit',
+      '--quiet',
+      '--no-gpg-sign',
+      '-m',
+      'seed acceptance project',
+    ]),
+    env: Object.freeze({
+      GIT_AUTHOR_DATE: '2000-01-01T00:00:00Z',
+      GIT_COMMITTER_DATE: '2000-01-01T00:00:00Z',
+    }),
+  }),
+]);
+
+/** Commit the shared fixture so task-context source identity is real and stable. */
+async function commitContextFixture(context) {
+  for (const step of CONTEXT_GIT_STEPS) {
+    const result = await context.process.run({
+      argv: step.argv,
+      cwd: context.paths.workRoot,
+      ...(step.env === undefined ? {} : { env: step.env }),
+    });
+    const outcome = assertCommand(
+      context,
+      result,
+      { exitCode: 0 },
+      'context-git-seed-failed',
+      step.label,
+    );
+    if (outcome.status !== 'pass') return outcome;
+  }
+  return pass();
 }
 
 const initializeExecutor = (context) =>
@@ -143,20 +307,88 @@ const catalogParityExecutor = (context) =>
         );
   });
 
-const contextExecutor = (context) =>
-  withMcp(context, context.paths.workRoot, async (client) => {
+const contextExecutor = async (context) => {
+  const committed = await commitContextFixture(context);
+  if (committed.status !== 'pass') return committed;
+
+  const captured = await runCli(context, {
+    args: ['suite', 'run', 'agent-context', '--files', 'src/bad.ts', '--json'],
+  });
+  const captureOutcome = assertCommand(
+    context,
+    captured,
+    {
+      exitCode: 0,
+      json: (parsed) => {
+        const data = parsed?.data ?? parsed;
+        const failures = [];
+        if (data?.type !== 'suite-run') failures.push('agent-context did not return a suite-run');
+        if (data?.suite !== 'agent-context') failures.push('agent-context suite identity is wrong');
+        if (data?.contextManifest?.readiness !== 'ready') {
+          failures.push(
+            `agent-context readiness is ${JSON.stringify(data?.contextManifest?.readiness)}, expected "ready"`,
+          );
+        }
+        return failures;
+      },
+    },
+    'context-capture-failed',
+  );
+  if (captureOutcome.status !== 'pass') return captureOutcome;
+
+  return withMcp(context, context.paths.workRoot, async (client) => {
     const status = decodeMcp(
-      await client.callTool({ name: 'get_context_status', arguments: { files: ['src/bad.ts'] } }),
+      await client.callTool({
+        name: 'get_context_status',
+        arguments: { files: ['src/bad.ts'] },
+      }),
     );
-    if (status.isError)
-      return fail('context-status-error', [context.assert.diagnostic(status.text)]);
+    if (status.isError || status.payload === undefined) {
+      return fail('context-status-error', [
+        context.assert.diagnostic(status.text || 'get_context_status returned no payload'),
+      ]);
+    }
+    const statusFailures = contextStatusFailures(status.payload);
+    if (statusFailures.length > 0) {
+      return fail(
+        'context-status-invalid',
+        statusFailures.map((failure) => context.assert.diagnostic(failure)),
+      );
+    }
+    if (
+      status.payload.status !== 'available' ||
+      status.payload.fileScope?.status !== 'matched' ||
+      status.payload.manifest?.readiness !== 'ready' ||
+      status.payload.pointers.length === 0 ||
+      !status.payload.pointers.every((pointer) => pointer?.status === 'available')
+    ) {
+      return fail('context-status-not-ready', [
+        context.assert.diagnostic(
+          'captured task context was not available, scope-matched, ready, and pointer-backed',
+        ),
+      ]);
+    }
     const fileContext = decodeMcp(
-      await client.callTool({ name: 'get_file_context', arguments: { file: 'src/bad.ts' } }),
+      await client.callTool({
+        name: 'get_file_context',
+        arguments: { file: 'src/bad.ts' },
+      }),
     );
-    if (fileContext.isError)
-      return fail('file-context-error', [context.assert.diagnostic(fileContext.text)]);
+    if (fileContext.isError || fileContext.payload === undefined) {
+      return fail('file-context-error', [
+        context.assert.diagnostic(fileContext.text || 'get_file_context returned no payload'),
+      ]);
+    }
+    const fileFailures = fileContextFailures(fileContext.payload, 'src/bad.ts');
+    if (fileFailures.length > 0) {
+      return fail(
+        'file-context-invalid',
+        fileFailures.map((failure) => context.assert.diagnostic(failure)),
+      );
+    }
     return pass();
   });
+};
 
 const graphReadsExecutor = (context) =>
   withMcp(context, context.paths.workRoot, async (client) => {
@@ -172,17 +404,47 @@ const graphReadsExecutor = (context) =>
 const resultReplayExecutor = (context) =>
   withMcp(context, context.paths.workRoot, async (client) => {
     const runs = decodeMcp(await client.callTool({ name: 'list_runs', arguments: {} }));
-    if (runs.isError) return fail('list-runs-error', [context.assert.diagnostic(runs.text)]);
-    const id = (runs.payload?.runs ?? []).find((run) => typeof run?.id === 'string')?.id;
-    if (id === undefined)
+    if (runs.isError || runs.payload === undefined) {
+      return fail('list-runs-error', [
+        context.assert.diagnostic(runs.text || 'list_runs returned no payload'),
+      ]);
+    }
+    if (!isRecord(runs.payload) || !Array.isArray(runs.payload.runs)) {
+      return fail('list-runs-invalid', [
+        context.assert.diagnostic('list_runs payload did not contain a runs array'),
+      ]);
+    }
+    if (runs.payload.runs.length === 0) {
       return fail('no-stored-run', [
         context.assert.diagnostic('list_runs returned no run id to replay'),
       ]);
-    const shown = decodeMcp(await client.callTool({ name: 'show_run', arguments: { ref: id } }));
+    }
+    const malformedIndex = runs.payload.runs.findIndex(
+      (run) => !isRecord(run) || !isNonEmptyString(run.id) || !isNonEmptyString(run.tool),
+    );
+    if (malformedIndex >= 0) {
+      return fail('list-runs-invalid', [
+        context.assert.diagnostic(`list_runs row ${malformedIndex} is missing id/tool identity`),
+      ]);
+    }
+    const selectedRun = runs.payload.runs[0];
+    const shown = decodeMcp(
+      await client.callTool({
+        name: 'show_run',
+        arguments: { ref: selectedRun.id },
+      }),
+    );
     if (shown.isError || shown.payload === undefined) {
       return fail('show-run-failed', [
         context.assert.diagnostic(shown.text || 'show_run returned no payload'),
       ]);
+    }
+    const failures = replayFailures(shown.payload, selectedRun);
+    if (failures.length > 0) {
+      return fail(
+        'show-run-invalid',
+        failures.map((failure) => context.assert.diagnostic(failure)),
+      );
     }
     return pass();
   });
@@ -198,30 +460,69 @@ const staleEvidenceExecutor = async (context) => {
       context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
     ]);
   }
+
+  // MCP is a project-scoped command. Initialize only the config surface so the
+  // server can start, while deliberately leaving context and graph evidence absent.
+  const initialized = await runCli(context, {
+    args: ['init', '--language', 'typescript', '--json'],
+  });
+  const initOutcome = assertCommand(
+    context,
+    initialized,
+    {
+      exitCode: 0,
+      json: (parsed) =>
+        (parsed?.data ?? parsed)?.type === 'init'
+          ? []
+          : ['isolated project init did not return type "init"'],
+    },
+    'stale-evidence-init-failed',
+  );
+  if (initOutcome.status !== 'pass') return initOutcome;
+
   return withMcp(context, context.paths.workRoot, async (client) => {
     const status = decodeMcp(
-      await client.callTool({ name: 'get_context_status', arguments: { files: ['probe.ts'] } }),
+      await client.callTool({
+        name: 'get_context_status',
+        arguments: { files: ['probe.ts'] },
+      }),
     );
-    if (status.payload === undefined && !status.isError) {
-      return fail('stale-evidence-undecodable', [
-        context.assert.diagnostic('stale-evidence read returned neither an error nor a payload'),
-      ]);
-    }
-    if (typeof status.payload?.status === 'string' && status.payload.status === 'available') {
-      return fail('stale-evidence-greenwash', [
+    if (status.isError || status.payload === undefined) {
+      return fail('stale-evidence-read-error', [
         context.assert.diagnostic(
-          'context status claimed "available" for an evidence-less project',
+          status.text || 'stale-evidence read returned no decodable status payload',
         ),
       ]);
     }
-    const reasoned =
-      status.isError ||
-      STALE_EVIDENCE_TOKENS.some((token) => status.text.toLowerCase().includes(token));
-    return reasoned
+    const failures = contextStatusFailures(status.payload);
+    if (status.payload.status !== 'missing' && status.payload.status !== 'unavailable') {
+      failures.push(
+        `evidence-less context status is ${JSON.stringify(status.payload.status)}, expected missing/unavailable`,
+      );
+    }
+    if (status.payload.fileScope?.status !== 'mismatched') {
+      failures.push('evidence-less requested file scope was not reported as mismatched');
+    }
+    if (!Array.isArray(status.payload.steps) || status.payload.steps.length > 0) {
+      failures.push('evidence-less context unexpectedly returned stored steps');
+    }
+    if (!Array.isArray(status.payload.pointers) || status.payload.pointers.length > 0) {
+      failures.push('evidence-less context unexpectedly returned stored pointers');
+    }
+    if (
+      !Array.isArray(status.payload.reasonCodes) ||
+      !status.payload.reasonCodes.some(
+        (reason) => reason === 'context-run-missing' || reason === 'context-run-pre-feature',
+      )
+    ) {
+      failures.push('evidence-less context omitted its context-run reason code');
+    }
+    return failures.length === 0
       ? pass()
-      : fail('stale-evidence-not-reasoned', [
-          context.assert.diagnostic('stale/missing evidence did not surface a reason or fallback'),
-        ]);
+      : fail(
+          'stale-evidence-invalid',
+          failures.map((failure) => context.assert.diagnostic(failure)),
+        );
   });
 };
 
@@ -251,9 +552,14 @@ export const mcpJourneys = assertUniqueJourneyIds([
     category: 'mcp',
     value: {
       human: 'Agents get task context',
-      agent: 'get_context_status + get_file_context return without error',
+      agent: 'captured task context replays as ready/matched and the seeded file is found',
     },
-    steps: [{ label: 'call get_context_status' }, { label: 'call get_file_context' }],
+    steps: [
+      { label: 'commit the seeded source and test fixture' },
+      { label: 'capture agent-context for src/bad.ts' },
+      { label: 'require ready, scope-matched pointer replay' },
+      { label: 'require bounded file context for src/bad.ts' },
+    ],
     executor: contextExecutor,
   }),
   defineJourney({
@@ -286,6 +592,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
     isolated: true,
     steps: [
       { label: 'write a probe file (no recorded context)' },
+      { label: 'initialize the isolated project without producing evidence' },
       { label: 'call get_context_status' },
       { label: 'assert a reasoned fallback, no green-wash' },
     ],
@@ -308,6 +615,7 @@ const AGENT_EVAL_CLI = join(REPO_ROOT, 'packages', 'agent-eval', 'dist', 'cli.js
 const AGENT_EVAL_MODEL = join(REPO_ROOT, 'packages', 'agent-eval', 'dist', 'report', 'model.js');
 /** Bound the private harness run (fixture init + graph + two MCP arms). */
 const INSTALLED_SMOKE_TIMEOUT_MS = 300_000;
+const INSTALLED_SMOKE_TASK_ID = 'entrypoint-trace.customer-ts';
 
 /** Load the agent-eval schema validator from its built dist (ESM caches the module). */
 async function loadReportValidator() {
@@ -330,14 +638,29 @@ function summarizeInstalledSmoke(report) {
 function collectInstalledSmokeFailures(report, installed) {
   const failures = [];
   const selected = new Set(Array.isArray(report.selectedArms) ? report.selectedArms : []);
-  if (!selected.has('control') || !selected.has('opensip')) {
+  if (selected.size !== 2 || !selected.has('control') || !selected.has('opensip')) {
     failures.push(
-      `report did not run both arms (selectedArms=${[...selected].join(',') || 'none'})`,
+      `report did not run exactly both arms (selectedArms=${[...selected].join(',') || 'none'})`,
     );
   }
-  const taskArms = report.tasks?.[0]?.arms ?? {};
+  const tasks = Array.isArray(report.tasks) ? report.tasks : [];
+  if (tasks.length !== 1) {
+    failures.push(`the smoke report contains ${tasks.length} task(s), expected exactly one`);
+  }
+  const smokeTask = tasks[0];
+  if (smokeTask?.taskId !== INSTALLED_SMOKE_TASK_ID) {
+    failures.push(
+      `the smoke task is ${JSON.stringify(smokeTask?.taskId)}, expected ${JSON.stringify(INSTALLED_SMOKE_TASK_ID)}`,
+    );
+  }
+  const taskArms = smokeTask?.arms ?? {};
   if (taskArms.control === undefined || taskArms.opensip === undefined) {
     failures.push('the smoke task is missing a control or opensip arm result');
+  }
+  for (const arm of ['control', 'opensip']) {
+    if (taskArms[arm]?.record?.taskId !== INSTALLED_SMOKE_TASK_ID) {
+      failures.push(`${arm} arm did not execute the fixed smoke task`);
+    }
   }
   if (taskArms.opensip?.assertions?.passed !== true) {
     failures.push('the OpenSIP arm assertions did not pass on the installed candidate');
@@ -347,6 +670,21 @@ function collectInstalledSmokeFailures(report, installed) {
       `report target source is ${JSON.stringify(report.cliTarget?.source)}, expected "installed"`,
     );
   }
+  const expectedEntrypointSha256 = installed?.jsEntrypoint?.entrypointSha256;
+  const expectedPackageJsonSha256 = installed?.jsEntrypoint?.packageJsonSha256;
+  if (
+    typeof expectedEntrypointSha256 !== 'string' ||
+    typeof expectedPackageJsonSha256 !== 'string'
+  ) {
+    failures.push('the installed candidate identity omitted its pinned package digests');
+  } else {
+    if (report.cliTarget?.entrypointSha256 !== expectedEntrypointSha256) {
+      failures.push('report entrypoint digest does not match the installed candidate identity');
+    }
+    if (report.cliTarget?.packageJsonSha256 !== expectedPackageJsonSha256) {
+      failures.push('report package.json digest does not match the installed candidate identity');
+    }
+  }
   const expectedVersion = installed?.resolvedVersion;
   if (typeof expectedVersion !== 'string' || expectedVersion.length === 0) {
     failures.push('the installed candidate identity has no resolved version to match');
@@ -355,8 +693,13 @@ function collectInstalledSmokeFailures(report, installed) {
       `report cliVersion ${JSON.stringify(report.cliVersion)} does not match installed ${JSON.stringify(expectedVersion)}`,
     );
   }
-  if (report.sourceState === 'changed-during-run') {
-    failures.push('the report was produced while the workspace source changed during the run');
+  if (report.sourceState !== 'clean') {
+    failures.push(
+      `the report sourceState is ${JSON.stringify(report.sourceState)}, expected "clean"`,
+    );
+  }
+  if (report.promotionEligible !== true) {
+    failures.push('the report is not promotion-eligible');
   }
   return failures;
 }
@@ -413,14 +756,37 @@ const installedAgentSmokeExecutor = async (context) => {
     ]);
   }
 
-  let raw;
-  try {
-    raw = readFileSync(reportPath, 'utf8');
-  } catch (error) {
+  const reportFile = readBoundedOwnedTextFile({
+    path: reportPath,
+    root: context.paths.workRoot,
+    maxBytes: MAX_INSTALLED_AGENT_REPORT_BYTES,
+    reasonPrefix: 'installed-smoke-report',
+    requireNonEmpty: true,
+  });
+  if (!reportFile.ok) {
+    if (
+      reportFile.reasonCode === 'installed-smoke-report-too-large' ||
+      reportFile.reasonCode === 'installed-smoke-report-empty'
+    ) {
+      return fail('installed-smoke-report-too-large', [
+        context.assert.diagnostic('the smoke report is empty or exceeds its byte bound'),
+      ]);
+    }
+    if (
+      reportFile.reasonCode === 'installed-smoke-report-not-regular' ||
+      reportFile.reasonCode === 'installed-smoke-report-path-escaped' ||
+      reportFile.reasonCode === 'installed-smoke-report-changed-before-open' ||
+      reportFile.reasonCode === 'installed-smoke-report-changed-during-read'
+    ) {
+      return fail('installed-smoke-report-invalid', [
+        context.assert.diagnostic('the smoke report was not a stable run-owned regular file'),
+      ]);
+    }
     return fail('installed-smoke-report-missing', [
-      context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
+      context.assert.diagnostic('the smoke report could not be opened safely'),
     ]);
   }
+  const raw = reportFile.text;
   let parsed;
   try {
     parsed = JSON.parse(raw);
@@ -435,12 +801,35 @@ const installedAgentSmokeExecutor = async (context) => {
     ]);
   }
 
+  let preservedDigest;
+  if (context.artifacts !== undefined) {
+    try {
+      const preserved = context.artifacts.writeInstalledAgentReport(parsed);
+      if (!/^[a-f0-9]{64}$/u.test(preserved.digest)) {
+        throw new TypeError('agent report writer returned an invalid digest');
+      }
+      preservedDigest = preserved.digest;
+    } catch (error) {
+      const reason =
+        error !== null && typeof error === 'object' && 'reasonCode' in error
+          ? String(error.reasonCode)
+          : 'write-failed';
+      return fail('installed-smoke-report-write-failed', [
+        context.assert.diagnostic(`agent report preservation failed (${reason})`),
+      ]);
+    }
+  }
+
   // Store ONLY a bounded summary + report digest in evidence; the full private
-  // report stays at reportPath as a run-owned auxiliary artifact.
+  // report is optional sanitized auxiliary output; sealed evidence is authoritative.
   const digest = createHash('sha256').update(raw).digest('hex');
   const evidence = [
     context.assert.diagnostic(summarizeInstalledSmoke(parsed)),
-    context.assert.diagnostic(`report sha256:${digest}`),
+    context.assert.diagnostic(
+      preservedDigest === undefined
+        ? `ephemeral raw report sha256:${digest}`
+        : `sanitized report sha256:${preservedDigest}`,
+    ),
   ];
   const failures = collectInstalledSmokeFailures(parsed, context.installed);
   if (failures.length > 0) {
@@ -463,7 +852,9 @@ export const agentJourneys = assertUniqueJourneyIds([
     },
     isolated: true,
     steps: [
-      { label: 'launch the private agent-eval smoke against the installed entrypoint' },
+      {
+        label: 'launch the private agent-eval smoke against the installed entrypoint',
+      },
       { label: 'validate the report through the agent-eval schema contract' },
       {
         label: 'assert both arms, an OpenSIP pass, the installed identity, and an unchanged source',

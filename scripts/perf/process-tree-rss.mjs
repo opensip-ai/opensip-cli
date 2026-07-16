@@ -9,7 +9,6 @@
  */
 
 export {
-  captureProcessDescendants,
   killProcessTree,
   parseProcessTable,
   processDescendantsFromTable,

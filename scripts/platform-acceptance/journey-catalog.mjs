@@ -179,6 +179,7 @@ const ALL_JOURNEYS = [
  */
 export const COMMON_V1_JOURNEY_IDS = Object.freeze([
   'lifecycle.install',
+  'lifecycle.upgrade',
   'lifecycle.version',
   'lifecycle.help',
   'analysis.audit-preinit',
@@ -221,7 +222,6 @@ export const COMMON_V1_JOURNEY_IDS = Object.freeze([
   'resilience.isolated-home',
   'resilience.signals',
   'resilience.timeout-cleanup',
-  'lifecycle.upgrade',
   'lifecycle.cli-state-uninstall',
   'lifecycle.package-uninstall',
 ]);

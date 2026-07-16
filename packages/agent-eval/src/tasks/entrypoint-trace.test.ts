@@ -138,6 +138,63 @@ describe('entrypoint-trace gold task', () => {
     );
   });
 
+  it('selects the named entry when get_symbol returns nested enclosing candidates', () => {
+    const resolveEntry = step(entrypointTraceCustomerTsTask, 'opensip', 'opensip-resolve-entry');
+    const facts = resolveEntry.extract({
+      ambiguous: true,
+      candidates: [
+        {
+          bodyHash: 'body:module',
+          column: 0,
+          filePath: 'src/index.ts',
+          inTestFile: false,
+          line: 1,
+          package: '@fixture/customer-ts',
+          qualifiedName: 'src/index.<module-init>',
+          simpleName: '<module-init:src/index.ts>',
+          symbolId: 'src/index.ts:1:0',
+        },
+        {
+          bodyHash: 'body:main',
+          column: 0,
+          filePath: 'src/index.ts',
+          inTestFile: false,
+          line: 3,
+          package: '@fixture/customer-ts',
+          qualifiedName: 'src/index.main',
+          simpleName: 'main',
+          symbolId: 'src/index.ts:3:0',
+        },
+      ],
+    });
+    const observations: readonly FactObservation[] = facts.map((fact, ordinal) => ({
+      fact,
+      leg: 'main',
+      ordinal,
+      stepId: 'opensip-resolve-entry',
+    }));
+    const followEntry = step(entrypointTraceCustomerTsTask, 'opensip', 'opensip-follow-hop-1');
+
+    expect(facts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'symbol-handle',
+          name: '<module-init:src/index.ts>',
+          symbolId: 'src/index.ts:1:0',
+        }),
+        expect.objectContaining({
+          kind: 'symbol-handle',
+          name: 'main',
+          symbolId: 'src/index.ts:3:0',
+        }),
+      ]),
+    );
+    expect(resolveStepArguments(followEntry, observations)).toMatchObject({
+      ok: true,
+      step: { arguments: { symbolId: 'src/index.ts:3:0' } },
+    });
+  });
+
   it('derives manual import targets from passed source bytes rather than fixture truth', () => {
     const extract = step(entrypointTraceCustomerTsTask, 'control', 'control-read-entry').extract;
     const facts = extract({
@@ -208,9 +265,17 @@ describe('entrypoint-trace gold task', () => {
       id.startsWith('opensip-follow-hop-'),
     );
     expect(hops).toHaveLength(4);
-    for (const hop of hops) {
+    for (const [index, hop] of hops.entries()) {
       const binding = hop.arguments.symbolId as FactBinding;
-      expect(binding.$fact.match).toEqual({ kind: 'symbol-handle' });
+      expect(binding.$fact.match).toEqual(
+        index === 0
+          ? {
+              filePath: customerTsGroundTruth.entrypoint.entryFile,
+              kind: 'symbol-handle',
+              name: customerTsGroundTruth.entrypoint.entrySymbol,
+            }
+          : { kind: 'symbol-handle' },
+      );
       expect(binding.$fact.select).toBe('only');
     }
   });
@@ -220,7 +285,9 @@ describe('entrypoint-trace gold task', () => {
     expect(Object.isFrozen(entrypointTraceCustomerTsTask)).toBe(true);
     expect(Object.isFrozen(entrypointTraceCustomerTsTask.strategies)).toBe(true);
     expect(Object.isFrozen(entrypointTraceCustomerTsTask.strategies.opensip.steps)).toBe(true);
-    expect(entrypointTraceCustomerTsTask.strategies.opensip.version).toContain('epoch-4');
+    expect(entrypointTraceCustomerTsTask.strategies.opensip.version).toBe(
+      'opensip-mcp-epoch-4-v2-entry-disambiguation',
+    );
     expect(
       Object.values(entrypointTraceCustomerTsTask.strategies).flatMap(({ steps }) =>
         steps.map(({ tool }) => tool),

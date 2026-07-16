@@ -9,6 +9,7 @@ import { HarnessPrerequisiteError } from '../runner/spawn.js';
 import { extractImpactFiles } from '../tasks/context-surface-extractors.js';
 import { taskRegistry } from '../tasks/index.js';
 
+import { cumulativeMcpStdoutByteLimit, mcpRawFrameByteLimit } from './opensip-mcp-connection.js';
 import {
   EXPECTED_MCP_SURFACE_EPOCH,
   McpArmSession,
@@ -176,6 +177,8 @@ async function connectFake(
     readonly env?: Readonly<Record<string, string | undefined>>;
     readonly maxResponseBytes?: number;
     readonly maxStderrBytes?: number;
+    readonly maxToolCalls?: number;
+    readonly targetStabilityCheck?: () => void;
   } = {},
 ): Promise<{
   readonly captured: McpConnectionOptions;
@@ -229,6 +232,46 @@ afterEach(() => {
 });
 
 describe('McpArmSession handshake', () => {
+  it('resolves the CLI entrypoint immediately before constructing the MCP transport', async () => {
+    const root = temporaryRoot();
+    const harness = fakeConnection(root);
+    const events: string[] = [];
+    const session = await McpArmSession.connect({
+      cliDistResolver: () => {
+        events.push('resolve');
+        return '/built/opensip.js';
+      },
+      connectionFactory: (options) => {
+        events.push(`factory:${options.args[0]}`);
+        return harness.connection;
+      },
+      workspaceRoot: root,
+    });
+
+    expect(events).toEqual(['resolve', 'factory:/built/opensip.js']);
+    await session.close();
+  });
+
+  it('rejects installed-target mutation observed after the MCP process closes', async () => {
+    const root = temporaryRoot();
+    const harness = fakeConnection(root);
+    let checks = 0;
+    const { session } = await connectFake(root, harness, {
+      targetStabilityCheck: () => {
+        checks += 1;
+        if (checks > 1) {
+          throw new HarnessPrerequisiteError(
+            'The installed CLI private snapshot changed during the run.',
+          );
+        }
+      },
+    });
+
+    expect(checks).toBe(1);
+    await expect(session.close()).rejects.toThrow(/private snapshot changed/u);
+    expect(checks).toBe(2);
+  });
+
   it('verifies initialize, catalog, listTools, root, posture, and actively drains stderr', async () => {
     const root = temporaryRoot();
     const harness = fakeConnection(root, { stderrOnConnect: '123456789' });
@@ -244,6 +287,8 @@ describe('McpArmSession handshake', () => {
       args: ['/built/opensip.js', 'mcp', '--cwd', root],
       command: process.execPath,
       cwd: root,
+      maxFrameBytes: mcpRawFrameByteLimit(16 * 1024 * 1024),
+      maxStdoutBytes: cumulativeMcpStdoutByteLimit(16 * 1024 * 1024, 16),
     });
     expect(captured.env.OPENSIP_API_KEY).toBeUndefined();
     expect(captured.env.HOME).toBe(join(root, 'isolated home'));
@@ -263,6 +308,23 @@ describe('McpArmSession handshake', () => {
 
     await session.close();
     expect(harness.close).toHaveBeenCalledOnce();
+  });
+
+  it('enforces the closed tool-call budget used to derive cumulative transport bytes', async () => {
+    const root = temporaryRoot();
+    const payload = textResult(graphPayload(root, {}));
+    const harness = fakeConnection(root, { toolResults: [payload, payload] });
+    const { captured, session } = await connectFake(root, harness, {
+      maxResponseBytes: 4096,
+      maxToolCalls: 2,
+    });
+
+    expect(captured.maxStdoutBytes).toBe(cumulativeMcpStdoutByteLimit(4096, 2));
+    expect(captured.maxFrameBytes).toBe(mcpRawFrameByteLimit(4096));
+    await session.callTool(resolvedStep());
+    await session.callTool(resolvedStep());
+    await expect(session.callTool(resolvedStep())).rejects.toThrow(/tool-call budget/u);
+    await session.close();
   });
 
   it.each([

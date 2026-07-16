@@ -13,8 +13,8 @@
  *
  * Because the projection is built only from process-observable facts
  * (platform / arch / Node version / Node ABI), the match level is NEVER
- * `exact`: npm, filesystem, case behavior, OS/kernel version, and install
- * channel are unobserved at runtime. The `match` field is therefore typed
+ * `exact`: npm, filesystem, case behavior, OS product version, kernel
+ * name/version, and install channel are unobserved at runtime. The `match` field is therefore typed
  * `'partial' | 'none'`, making `exact` structurally unrepresentable here.
  */
 
@@ -35,7 +35,7 @@ interface AgentHostSupportProfile {
  * The honest, process-only host-support projection attached to an
  * {@link AgentCatalog}. Advertises the matched registry row's published status
  * (e.g. `preview`) while keeping `match: 'partial'` whenever normative
- * dimensions (npm / filesystem / install channel / OS-kernel version) were not
+ * dimensions (npm / filesystem / install channel / OS and kernel identity) were not
  * observed. A contradicted dimension yields `match: 'none'` with reason codes.
  */
 export interface AgentHostSupport {

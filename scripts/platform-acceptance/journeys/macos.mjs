@@ -39,7 +39,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { expectEnvelope } from '../../cli-acceptance-core.mjs';
@@ -53,6 +53,11 @@ import {
   runCli,
   unavailable,
 } from '../journey-kit.mjs';
+import {
+  initProject,
+  runInterruptedSqliteProbe,
+  runSqliteContentionProbe,
+} from './persistence.mjs';
 
 // ---------------------------------------------------------------------------
 // Constants + tiny pure helpers
@@ -64,21 +69,57 @@ export const MACOS_PREVIEW_ROW_ID = 'macos-26-arm64-node24-npm11-v1';
 const HERE = fileURLToPath(import.meta.url);
 // journeys → platform-acceptance → scripts → repo root.
 const REPO_ROOT = dirname(dirname(dirname(dirname(HERE))));
-const INSTALL_SH = join(REPO_ROOT, 'scripts', 'install.sh');
 /** The built core lib is loaded lazily so module load stays build-free. */
 const CORE_LIB_URL = new URL('../../../packages/core/dist/index-lib.js', import.meta.url);
 
 const SW_VERS = '/usr/bin/sw_vers';
 const UNAME = '/usr/bin/uname';
 const DISKUTIL = '/usr/sbin/diskutil';
+const DF = '/bin/df';
 const OPEN_BIN = '/usr/bin/open';
-const SH = '/bin/sh';
 const ZSH = '/bin/zsh';
 
 const ANSI_ESCAPE = '\u001B';
 /** The finding the analysis `fit` journey seeds; exit 1 under either mode. */
 const FIT_FINDING_ARGS = Object.freeze(['fit', '--check', 'no-console-log']);
-const FIT_ENVELOPE_EXPECT = { exitCode: 1, json: expectEnvelope({ tool: 'fit' }) };
+const FIT_ENVELOPE_EXPECT = {
+  exitCode: 1,
+  json: expectEnvelope({ tool: 'fit' }),
+};
+const NATIVE_SIGNAL_TIMEOUT_MS = 10_000;
+const NATIVE_SIGNAL_AFTER_MS = 100;
+
+/** Run in a separate Node process so the installed native addon is really loaded. */
+const NATIVE_SQLITE_PROBE_SOURCE = String.raw`
+const { createRequire } = require('node:module');
+try {
+  const fromCli = createRequire(process.argv[1]);
+  const datastoreEntrypoint = fromCli.resolve('@opensip-cli/datastore');
+  const fromDatastore = createRequire(datastoreEntrypoint);
+  const sqliteEntrypoint = fromDatastore.resolve('better-sqlite3');
+  const Database = fromDatastore('better-sqlite3');
+  const database = new Database(':memory:');
+  let queryOk = false;
+  try {
+    queryOk = database.prepare('SELECT 1 AS ok').get()?.ok === 1;
+  } finally {
+    database.close();
+  }
+  const nativeAddon = Object.keys(require.cache).find(
+    (path) => path.endsWith('.node') && /better[_-]sqlite3/i.test(path),
+  );
+  if (!nativeAddon) throw new Error('native addon was not loaded');
+  process.stdout.write(JSON.stringify({
+    ok: queryOk,
+    datastoreEntrypoint,
+    sqliteEntrypoint,
+    nativeAddon,
+  }));
+} catch {
+  process.stdout.write(JSON.stringify({ ok: false }));
+  process.exitCode = 1;
+}
+`;
 
 /** A short, safe error string (never a stack, never absolute paths guaranteed). */
 function errText(error) {
@@ -97,6 +138,169 @@ function isUnder(root, target) {
   return rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel);
 }
 
+/** Parse the containing device from POSIX `df -P <path>` output. */
+export function parseDfDevice(output) {
+  if (typeof output !== 'string') return null;
+  const lines = output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2) return null;
+  const [device] = lines.at(-1).split(/\s+/u);
+  return /^\/dev\/[A-Za-z0-9._-]+$/u.test(device ?? '') ? device : null;
+}
+
+/** Classify the two commands whose success is required by `macos.browser-open`. */
+export function evaluateBrowserCommandResult(result, phase) {
+  if (result?.timedOut === true) return { ok: false, reasonCode: 'timed-out' };
+  if ((result?.status ?? 1) !== 0) {
+    return {
+      ok: false,
+      reasonCode: phase === 'seed' ? 'browser-open-seed-failed' : 'report-open-failed',
+    };
+  }
+  return { ok: true, reasonCode: null };
+}
+
+function containingNodeModules(path) {
+  let current = dirname(path);
+  while (true) {
+    if (basename(current) === 'node_modules') return current;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+/** Verify a successful native probe stayed inside the installed dependency tree. */
+export function evaluateNativeSqliteProvenance(probe) {
+  if (probe?.queryOk !== true) return { ok: false, reasonCode: 'native-sqlite-query-failed' };
+  const paths = [
+    probe.installedEntrypoint,
+    probe.datastoreEntrypoint,
+    probe.sqliteEntrypoint,
+    probe.nativeAddon,
+  ];
+  if (paths.some((path) => typeof path !== 'string' || !isAbsolute(path))) {
+    return { ok: false, reasonCode: 'native-sqlite-provenance-invalid' };
+  }
+  if (!probe.nativeAddon.endsWith('.node')) {
+    return { ok: false, reasonCode: 'native-sqlite-provenance-invalid' };
+  }
+  const installNodeModules = containingNodeModules(probe.installedEntrypoint);
+  if (installNodeModules === null) {
+    return { ok: false, reasonCode: 'installed-dependency-tree-unknown' };
+  }
+  if (paths.slice(1).some((path) => !isUnder(installNodeModules, path))) {
+    return { ok: false, reasonCode: 'native-sqlite-outside-install' };
+  }
+  return { ok: true, reasonCode: null };
+}
+
+/** Validate one PTY fitness probe before accepting its terminal/output semantics. */
+export function evaluatePtyFindingResult(result, mode) {
+  const failures = [];
+  if (result?.timedOut === true) failures.push('run timed out');
+  if ((result?.status ?? 0) !== 1) failures.push(`expected exit 1, got ${String(result?.status)}`);
+  if ((result?.cleanup?.residualDescendants ?? 1) !== 0) {
+    failures.push('run left residual descendants');
+  }
+  if (result?.outputTruncated === true) failures.push('stdout was truncated');
+  const stdout = typeof result?.stdoutCapture === 'string' ? result.stdoutCapture : '';
+  if (stdout.trim().length === 0) failures.push('stdout was empty');
+  if (mode === 'no-color' && stdout.includes(ANSI_ESCAPE)) {
+    failures.push('stdout contained ANSI under NO_COLOR');
+  }
+  if (mode === 'json') {
+    try {
+      const payload = JSON.parse(stdout);
+      if (
+        payload?.kind !== 'fit.run' ||
+        payload?.status !== 'ok' ||
+        payload?.exitCode !== 1 ||
+        payload?.envelope?.schemaVersion !== 2 ||
+        payload?.envelope?.tool !== 'fit' ||
+        payload?.envelope?.verdict?.passed !== false
+      ) {
+        failures.push('stdout did not contain the expected fit envelope shape');
+      }
+    } catch {
+      failures.push('stdout was not pure JSON');
+    }
+  }
+  return failures;
+}
+
+/** Validate explicit signal identity, bounded exit, and descendant cleanup. */
+export function evaluateNativeSignalResult(result, expectedSignal, timeoutMs) {
+  const failures = [];
+  if (result?.deliveredSignal !== expectedSignal) {
+    failures.push(`${expectedSignal} was not delivered`);
+  }
+  if (result?.timedOut === true) failures.push(`${expectedSignal} fell through to timeout`);
+  if (result?.cancelled === true)
+    failures.push(`${expectedSignal} was reported as generic cancellation`);
+  if (
+    !Number.isFinite(result?.durationMs) ||
+    result.durationMs < 0 ||
+    result.durationMs >= timeoutMs
+  ) {
+    failures.push(`${expectedSignal} did not terminate within the bound`);
+  }
+  if ((result?.cleanup?.residualDescendants ?? 1) !== 0) {
+    failures.push(`${expectedSignal} left residual descendants`);
+  }
+  if (result?.signal === 'SIGKILL') failures.push(`${expectedSignal} required SIGKILL escalation`);
+  if (result?.signal === null && (result?.status ?? 0) === 0) {
+    failures.push(`${expectedSignal} produced a clean exit instead of interruption`);
+  }
+  return failures;
+}
+
+/** Require an interrupted live child with zero observed residual descendants. */
+export function evaluateInterruptedRecoveryResult(result) {
+  if (result?.cancelled !== true) return 'interruption-not-observed';
+  if (result?.timedOut === true) return 'interruption-fell-through-to-timeout';
+  if ((result?.cleanup?.residualDescendants ?? 1) !== 0) {
+    return 'interruption-left-descendants';
+  }
+  return null;
+}
+
+/** Require a structured, actionable permission error for one exact state target. */
+export function evaluatePermissionFailure(result, targetMarker) {
+  if (result?.timedOut === true) return { ok: false, reasonCode: 'permission-check-timed-out' };
+  if (!Number.isInteger(result?.status) || result.status <= 0) {
+    return { ok: false, reasonCode: 'permission-denied-silently-succeeded' };
+  }
+  let payload;
+  try {
+    payload = JSON.parse(result.stdoutCapture);
+  } catch {
+    return { ok: false, reasonCode: 'permission-error-not-json' };
+  }
+  const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+  const text = errors
+    .flatMap((error) => [error?.message, error?.suggestion])
+    .filter((entry) => typeof entry === 'string')
+    .join(' ');
+  if (
+    payload?.kind !== 'command.error' ||
+    payload?.status !== 'error' ||
+    payload?.exitCode !== result.status ||
+    errors.length === 0
+  ) {
+    return { ok: false, reasonCode: 'permission-error-shape-invalid' };
+  }
+  if (!text.includes(targetMarker)) {
+    return { ok: false, reasonCode: 'permission-error-target-missing' };
+  }
+  if (!/(?:EACCES|permission|non-writable|writable directory)/iu.test(text)) {
+    return { ok: false, reasonCode: 'permission-error-not-actionable' };
+  }
+  return { ok: true, reasonCode: null };
+}
+
 /** Normalize a `uname -m` machine string to a Node `process.arch` token. */
 export function normalizeUnameArch(machine) {
   const value = String(machine ?? '')
@@ -110,8 +314,9 @@ export function normalizeUnameArch(machine) {
 
 /** Map cross-checked macOS tuple facts to a core `ObservedHost` (absent = unobserved). */
 export function buildTupleObservedHost(facts) {
-  const observed = { osPlatform: 'darwin', kernelName: 'Darwin' };
+  const observed = { osPlatform: 'darwin' };
   if (facts.swVers != null) observed.osVersion = facts.swVers;
+  if (facts.kernelName != null) observed.kernelName = facts.kernelName;
   if (facts.kernelRelease != null) observed.kernelRelease = facts.kernelRelease;
   if (facts.nodeArch != null) observed.arch = facts.nodeArch;
   if (facts.nodeVersion != null) observed.nodeVersion = facts.nodeVersion;
@@ -134,6 +339,7 @@ export function evaluateTupleCrosscheck(facts, assessHostSupport) {
   const record = (source, value) =>
     lines.push(`${source}=${value == null ? 'unavailable' : String(value)}`);
   record('sw_vers.productVersion', facts.swVers);
+  record('uname.kernelName', facts.kernelName);
   record('uname.kernelRelease', facts.kernelRelease);
   record('uname.machine', facts.unameMachine);
   record('process.arch', facts.nodeArch);
@@ -143,6 +349,7 @@ export function evaluateTupleCrosscheck(facts, assessHostSupport) {
 
   const missing = [];
   if (facts.swVers == null) missing.push('sw_vers');
+  if (facts.kernelName == null) missing.push('uname-s');
   if (facts.kernelRelease == null) missing.push('uname-r');
   if (facts.unameMachine == null) missing.push('uname-m');
   if (facts.npmVersion == null) missing.push('npm');
@@ -248,6 +455,24 @@ function seedProject(dir) {
   );
 }
 
+function seedIdentifiedProject(dir) {
+  seedProject(dir);
+  writeFileSync(
+    join(dir, 'package.json'),
+    `${JSON.stringify({ name: 'opensip-macos-acceptance', private: true, type: 'module' }, null, 2)}\n`,
+  );
+}
+
+function seedSignalProject(dir) {
+  seedIdentifiedProject(dir);
+  for (let index = 0; index < 192; index += 1) {
+    writeFileSync(
+      join(dir, 'src', `signal-${String(index).padStart(3, '0')}.ts`),
+      `export const signalValue${String(index)} = ${String(index)};\n`,
+    );
+  }
+}
+
 /** True when the run root reports case-INsensitive behavior (mutates only run-owned paths). */
 function probeCaseInsensitive(root) {
   const dir = mkdtempSync(join(root, 'macos-fs-'));
@@ -273,6 +498,12 @@ function probeCaseInsensitive(root) {
 const tupleCrosscheckExecutor = async (context) => {
   const gate = requireDarwin(context);
   if (gate) return gate;
+  const npmArgv = context.toolchain?.npm?.argv;
+  if (!Array.isArray(npmArgv) || npmArgv.length === 0) {
+    return unavailable('npm-toolchain-unavailable', [
+      context.assert.diagnostic('the runner did not provide a resolved npm executable descriptor'),
+    ]);
+  }
   const assessHostSupport = await loadAssessHostSupport();
   if (assessHostSupport == null) {
     return unavailable('core-support-policy-unavailable', [
@@ -281,9 +512,10 @@ const tupleCrosscheckExecutor = async (context) => {
   }
   const facts = {
     swVers: await probeValue(context, [SW_VERS, '-productVersion']),
+    kernelName: await probeValue(context, [UNAME, '-s']),
     kernelRelease: await probeValue(context, [UNAME, '-r']),
     unameMachine: await probeValue(context, [UNAME, '-m']),
-    npmVersion: await probeValue(context, ['npm', '--version']),
+    npmVersion: await probeValue(context, [...npmArgv, '--version']),
     nodeArch: process.arch,
     nodeVersion: process.version,
     nodeAbi: String(process.versions.modules),
@@ -312,8 +544,18 @@ const filesystemExecutor = async (context) => {
     ]);
   }
 
-  // APFS on the ACTUAL run root — never inferred from the system volume or a label.
-  const info = await probeValue(context, [DISKUTIL, 'info', context.paths.workRoot]);
+  // Resolve the ACTUAL containing device first. `diskutil info <directory>` is
+  // not a supported macOS invocation; POSIX df gives us the device without shell
+  // parsing, then diskutil proves that device is APFS.
+  const dfOutput = await probeValue(context, [DF, '-P', context.paths.workRoot]);
+  const device = parseDfDevice(dfOutput);
+  if (device === null) {
+    return unavailable('filesystem-device-unavailable', [
+      ...lines,
+      context.assert.diagnostic('df could not identify the run-root device'),
+    ]);
+  }
+  const info = await probeValue(context, [DISKUTIL, 'info', device]);
   if (info == null) {
     return unavailable('diskutil-unavailable', [
       ...lines,
@@ -338,74 +580,39 @@ const filesystemExecutor = async (context) => {
 const installerShExecutor = async (context) => {
   const gate = requireDarwin(context);
   if (gate) return gate;
+  if (context.installed?.mode !== 'published-version') {
+    return fail('installer-published-candidate-required', [
+      context.assert.diagnostic('the canonical installer assertion requires a published candidate'),
+    ]);
+  }
+  if (context.installed?.installChannel !== 'canonical-installer') {
+    return fail('installer-channel-unproven', [
+      context.assert.diagnostic(
+        'the lifecycle target was not installed through scripts/install.sh',
+      ),
+    ]);
+  }
   const version = context.installed?.resolvedVersion;
   if (typeof version !== 'string' || version.length === 0) {
     return fail('installer-version-unknown', [
       context.assert.diagnostic('the installed candidate did not report a resolved version'),
     ]);
   }
-  const home = join(context.paths.workRoot, 'installer-home');
-  const prefix = join(context.paths.workRoot, 'installer-prefix');
-  const cache = join(context.paths.workRoot, 'installer-cache');
-  const tmp = join(context.paths.workRoot, 'installer-tmp');
-  try {
-    for (const dir of [home, prefix, cache, tmp]) mkdirSync(dir, { recursive: true });
-  } catch (error) {
-    return fail('installer-setup-failed', [context.assert.diagnostic(errText(error))]);
-  }
-  const nodeBinDir = dirname(process.execPath);
-  const env = {
-    OPENSIP_CLI_PACKAGE: 'opensip-cli',
-    OPENSIP_CLI_VERSION: version,
-    NPM_CONFIG_PREFIX: prefix,
-    NPM_CONFIG_CACHE: cache,
-    HOME: home,
-    TMPDIR: tmp,
-    // A minimal PATH that excludes any ambient/candidate `opensip`, so the
-    // installer can only resolve the run-owned prefix bin — never ambient.
-    PATH: `${join(prefix, 'bin')}:${nodeBinDir}:/usr/bin:/bin`,
-  };
-
-  const install = await runProcess(context, [SH, INSTALL_SH], { env });
-  if (install.timedOut)
-    return fail('timed-out', [context.assert.diagnostic('install.sh timed out')]);
-  if ((install.status ?? 1) !== 0) {
-    return fail('installer-failed', [
-      context.assert.diagnostic(`install.sh exited ${install.status}`),
-      context.assert.diagnostic(install.stderrTail),
-    ]);
-  }
-
-  const ownedBin = join(prefix, 'bin', 'opensip');
-  if (!existsSync(ownedBin)) {
-    return fail('installer-bin-missing', [
-      context.assert.diagnostic('opensip was not linked under the run-owned prefix'),
-    ]);
-  }
-  let realBin;
-  try {
-    realBin = realpathSync(ownedBin);
-  } catch (error) {
-    return fail('installer-bin-unreadable', [context.assert.diagnostic(errText(error))]);
-  }
-  let realPrefix;
-  try {
-    realPrefix = realpathSync(prefix);
-  } catch {
-    realPrefix = prefix;
-  }
-  if (!isUnder(realPrefix, realBin)) {
-    return fail('installer-escaped-prefix', [
-      context.assert.diagnostic('installed opensip resolved outside the run-owned prefix'),
-    ]);
-  }
-  const versionRun = await runProcess(context, [ownedBin, '--version'], { env });
-  if ((versionRun.status ?? 1) !== 0 || !versionRun.stdoutCapture.includes(version)) {
+  const versionRun = await runCli(context, { args: ['--version'] });
+  if (
+    versionRun.timedOut ||
+    (versionRun.status ?? 1) !== 0 ||
+    !versionRun.stdoutCapture.includes(version)
+  ) {
     return fail('installed-cli-unusable', [
-      context.assert.diagnostic(`run-owned opensip --version exited ${versionRun.status}`),
+      context.assert.diagnostic(
+        'the lifecycle-owned canonical target did not report its exact version',
+      ),
     ]);
   }
-  return pass([context.assert.diagnostic(`installed ${version} under a run-owned prefix`)]);
+  return pass([
+    context.assert.diagnostic(`canonical lifecycle target ${version} passed its measured smoke`),
+  ]);
 };
 
 const zshInvocationExecutor = async (context) => {
@@ -485,6 +692,23 @@ const npmShimContainmentExecutor = async (context) => {
       context.assert.diagnostic('the npm shim resolved outside the isolated install prefix'),
     ]);
   }
+  // This journey otherwise performs only filesystem inspection, which would
+  // make the macOS profile's required process-tree RSS claim impossible. Run
+  // the validated customer shim once and bind its output to the candidate
+  // version after proving both realpaths are contained.
+  const version = context.installed?.resolvedVersion ?? '';
+  const invoked = await runCli(context, { args: ['--version'] });
+  if (
+    invoked.timedOut ||
+    (invoked.status ?? 1) !== 0 ||
+    invoked.cleanup.residualDescendants !== 0 ||
+    version.length === 0 ||
+    !invoked.stdoutCapture.includes(version)
+  ) {
+    return fail('npm-shim-invocation-failed', [
+      context.assert.diagnostic('the contained npm shim did not report the candidate version'),
+    ]);
+  }
   return pass(lines);
 };
 
@@ -539,38 +763,86 @@ const pathSemanticsExecutor = async (context) => {
 const permissionsExecutor = async (context) => {
   const gate = requireDarwin(context);
   if (gate) return gate;
-  const readOnly = join(context.paths.workRoot, 'read-only');
+  const configDenied = join(context.paths.workRoot, 'config-denied');
+  const runtimeDenied = join(context.paths.workRoot, 'runtime-denied');
+  let runtimeStateRoot;
   try {
-    mkdirSync(readOnly, { recursive: true });
-    chmodSync(readOnly, 0o500);
+    seedIdentifiedProject(configDenied);
+    chmodSync(configDenied, 0o500);
   } catch (error) {
     return fail('permissions-setup-failed', [context.assert.diagnostic(errText(error))]);
   }
   try {
-    const result = await runCli(context, {
-      args: ['init', '--language', 'typescript', '--json'],
-      cwd: readOnly,
+    const configResult = await runCli(context, {
+      args: ['init', '--cwd', configDenied, '--language', 'typescript', '--json'],
+      cwd: configDenied,
     });
-    if (result.timedOut) {
-      return fail('timed-out', [context.assert.diagnostic('init in a read-only dir timed out')]);
-    }
-    if ((result.status ?? 0) === 0) {
-      return fail('permission-denied-silently-succeeded', [
-        context.assert.diagnostic('init reported success writing into a read-only directory'),
+    const configFailure = evaluatePermissionFailure(configResult, 'opensip-cli.config.yml');
+    if (!configFailure.ok) {
+      return fail(configFailure.reasonCode, [
+        context.assert.diagnostic('read-only config target lacked an actionable structured error'),
       ]);
     }
-    // No out-of-root fallback: the denied target must not have gained project state.
-    if (existsSync(join(readOnly, 'opensip-cli'))) {
-      return fail('permission-out-of-root-fallback', [
-        context.assert.diagnostic('init left partial project state in the read-only target'),
+    if (
+      existsSync(join(configDenied, 'opensip-cli.config.yml')) ||
+      existsSync(join(configDenied, 'opensip-cli', '.runtime'))
+    ) {
+      return fail('permission-config-partial-state', [
+        context.assert.diagnostic('config denial left partial config/runtime state'),
+      ]);
+    }
+
+    chmodSync(configDenied, 0o700);
+    seedIdentifiedProject(runtimeDenied);
+    const init = await runCli(context, {
+      args: ['init', '--cwd', runtimeDenied, '--language', 'typescript', '--json'],
+      cwd: runtimeDenied,
+    });
+    const initPayload = readJson(init);
+    if (
+      init.timedOut ||
+      (init.status ?? 1) !== 0 ||
+      !initPayload.ok ||
+      initPayload.value?.kind !== 'init' ||
+      initPayload.value?.status !== 'ok'
+    ) {
+      return fail('permission-runtime-setup-failed', [
+        context.assert.diagnostic('could not initialize the runtime-permission fixture'),
+      ]);
+    }
+    runtimeStateRoot = join(runtimeDenied, 'opensip-cli');
+    const runtimeDir = join(runtimeStateRoot, '.runtime');
+    rmSync(runtimeDir, { recursive: true, force: true });
+    chmodSync(runtimeStateRoot, 0o500);
+
+    const runtimeResult = await runCli(context, {
+      args: ['graph', '--json'],
+      cwd: runtimeDenied,
+    });
+    const runtimeFailure = evaluatePermissionFailure(runtimeResult, '.runtime/datastore.sqlite');
+    if (!runtimeFailure.ok) {
+      return fail(runtimeFailure.reasonCode, [
+        context.assert.diagnostic('read-only runtime target lacked an actionable structured error'),
+      ]);
+    }
+    if (!existsSync(join(runtimeDenied, 'opensip-cli.config.yml')) || existsSync(runtimeDir)) {
+      return fail('permission-runtime-partial-state', [
+        context.assert.diagnostic('runtime denial changed config or left partial runtime state'),
       ]);
     }
     return pass();
   } finally {
     try {
-      chmodSync(readOnly, 0o700);
+      chmodSync(configDenied, 0o700);
     } catch {
       /* best-effort restore so the run-owned cleanup can remove the tree */
+    }
+    if (runtimeStateRoot !== undefined) {
+      try {
+        chmodSync(runtimeStateRoot, 0o700);
+      } catch {
+        /* best-effort restore so the run-owned cleanup can remove the tree */
+      }
     }
   }
 };
@@ -584,16 +856,12 @@ const ptyHumanViewExecutor = async (context) => {
   if (gate) return gate;
   // 1. Human render under a real PTY (/usr/bin/script) completes with the finding.
   const human = await runCli(context, { args: FIT_FINDING_ARGS, pty: true });
-  if (human.timedOut) return fail('timed-out', [context.assert.diagnostic('PTY run timed out')]);
-  if ((human.status ?? 1) !== 1) {
-    return fail('pty-unexpected-exit', [
-      context.assert.diagnostic(`expected exit 1 under a PTY, got ${human.status}`),
-    ]);
-  }
-  if (human.stdoutCapture.trim().length === 0) {
-    return fail('pty-empty-output', [
-      context.assert.diagnostic('the PTY run produced empty stdout'),
-    ]);
+  const humanFailures = evaluatePtyFindingResult(human, 'human');
+  if (humanFailures.length > 0) {
+    return fail(
+      'pty-human-view-invalid',
+      humanFailures.map((failure) => context.assert.diagnostic(failure)),
+    );
   }
   // 2. NO_COLOR suppresses escape sequences even under a TTY.
   const noColor = await runCli(context, {
@@ -601,51 +869,102 @@ const ptyHumanViewExecutor = async (context) => {
     pty: true,
     env: { NO_COLOR: '1' },
   });
-  if (noColor.stdoutCapture.includes(ANSI_ESCAPE)) {
-    return fail('pty-ansi-under-no-color', [
-      context.assert.diagnostic('stdout carried an ANSI escape under a PTY while NO_COLOR was set'),
-    ]);
+  const noColorFailures = evaluatePtyFindingResult(noColor, 'no-color');
+  if (noColorFailures.length > 0) {
+    return fail(
+      'pty-no-color-invalid',
+      noColorFailures.map((failure) => context.assert.diagnostic(failure)),
+    );
   }
   // 3. --json stays pure + non-interactive under a TTY.
   const json = await runCli(context, {
     args: ['fit', '--json', '--check', 'no-console-log'],
     pty: true,
   });
-  const parsed = readJson(json);
-  if (!parsed.ok) {
-    return fail('pty-json-not-pure', [context.assert.diagnostic(parsed.message)]);
+  const jsonFailures = evaluatePtyFindingResult(json, 'json');
+  if (jsonFailures.length > 0) {
+    return fail(
+      'pty-json-invalid',
+      jsonFailures.map((failure) => context.assert.diagnostic(failure)),
+    );
   }
+  const canonical = assertCommand(context, json, FIT_ENVELOPE_EXPECT, 'pty-json-invalid');
+  if (canonical.status !== 'pass') return canonical;
   return pass();
 };
 
 const signalsExecutor = async (context) => {
   const gate = requireDarwin(context);
   if (gate) return gate;
-  // Abort mid-run — the port drives a bounded SIGTERM→SIGKILL tree termination.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25);
-  let aborted;
   try {
-    aborted = await runCli(context, { args: ['graph', '--json'], signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+    seedSignalProject(context.paths.workRoot);
+  } catch (error) {
+    return fail('signal-setup-failed', [context.assert.diagnostic(errText(error))]);
   }
-  const failures = [];
-  if (aborted.cancelled !== true) failures.push('run was not reported cancelled after abort');
-  if (aborted.cleanup.residualDescendants > 0) {
-    failures.push(`cancellation left ${aborted.cleanup.residualDescendants} descendant(s)`);
+  const init = await runCli(context, {
+    args: ['init', '--language', 'typescript', '--json'],
+  });
+  const initPayload = readJson(init);
+  if (
+    init.timedOut ||
+    (init.status ?? 1) !== 0 ||
+    !initPayload.ok ||
+    initPayload.value?.kind !== 'init' ||
+    initPayload.value?.status !== 'ok'
+  ) {
+    return fail('signal-setup-failed', [
+      context.assert.diagnostic('could not initialize the signal fixture'),
+    ]);
   }
-  if (failures.length > 0) {
-    return fail(
-      'signal-shutdown-failed',
-      failures.map((message) => context.assert.diagnostic(message)),
-    );
+
+  for (const probe of [
+    { signal: 'SIGINT', pty: true },
+    { signal: 'SIGTERM', pty: false },
+  ]) {
+    const result = await runCli(context, {
+      args: ['graph', '--json'],
+      timeoutMs: NATIVE_SIGNAL_TIMEOUT_MS,
+      nativeSignal: { signal: probe.signal, afterMs: NATIVE_SIGNAL_AFTER_MS },
+      pty: probe.pty,
+    });
+    const failures = evaluateNativeSignalResult(result, probe.signal, NATIVE_SIGNAL_TIMEOUT_MS);
+    if (failures.length > 0) {
+      return fail(
+        'native-signal-shutdown-failed',
+        failures.map((message) => context.assert.diagnostic(message)),
+      );
+    }
   }
-  // Reusable state: a fresh datastore read after cancellation still succeeds.
+
+  // Reusable state: a fresh datastore read after both signals still succeeds.
   const rerun = await runCli(context, { args: ['sessions', 'list', '--json'] });
-  if (rerun.timedOut || (rerun.status ?? 1) !== 0 || !readJson(rerun).ok) {
+  const replay = readJson(rerun);
+  if (
+    rerun.timedOut ||
+    (rerun.status ?? 1) !== 0 ||
+    rerun.cleanup.residualDescendants !== 0 ||
+    !replay.ok ||
+    replay.value?.kind !== 'history' ||
+    replay.value?.status !== 'ok' ||
+    !Array.isArray(replay.value?.data?.sessions)
+  ) {
     return fail('state-not-reusable', [
-      context.assert.diagnostic(`post-cancel sessions list exited ${rerun.status}`),
+      context.assert.diagnostic(`post-signal sessions list exited ${rerun.status}`),
+    ]);
+  }
+
+  // Reusable terminal: a fresh PTY can still launch, render, and close cleanly.
+  const terminal = await runCli(context, { args: ['--version'], pty: true });
+  const version = context.installed?.resolvedVersion ?? '';
+  if (
+    terminal.timedOut ||
+    (terminal.status ?? 1) !== 0 ||
+    terminal.cleanup.residualDescendants !== 0 ||
+    terminal.stdoutCapture.trim().length === 0 ||
+    (version.length > 0 && !terminal.stdoutCapture.includes(version))
+  ) {
+    return fail('terminal-not-reusable', [
+      context.assert.diagnostic(`post-signal PTY version exited ${terminal.status}`),
     ]);
   }
   return pass();
@@ -665,9 +984,22 @@ const browserOpenExecutor = async (context) => {
   } catch (error) {
     return fail('browser-open-setup-failed', [context.assert.diagnostic(errText(error))]);
   }
+  const initialized = await runCli(context, {
+    args: ['init', '--language', 'typescript', '--json'],
+  });
+  if (initialized.timedOut || (initialized.status ?? 1) !== 0) {
+    return fail('browser-open-init-failed', [
+      context.assert.diagnostic('could not initialize the browser-open fixture'),
+      context.assert.diagnostic(initialized.stderrTail),
+    ]);
+  }
   const seedRun = await runCli(context, { args: ['graph', '--json'] });
-  if (seedRun.timedOut) {
-    return fail('timed-out', [context.assert.diagnostic('seed graph run timed out')]);
+  const seedResult = evaluateBrowserCommandResult(seedRun, 'seed');
+  if (!seedResult.ok) {
+    const message = seedRun.timedOut
+      ? 'seed graph run timed out'
+      : `seed graph run exited ${seedRun.status}`;
+    return fail(seedResult.reasonCode, [context.assert.diagnostic(message)]);
   }
 
   // Availability probe of a REGISTERED browser without launching a GUI. A missing
@@ -697,8 +1029,12 @@ const browserOpenExecutor = async (context) => {
     // launcher actually attempts to open under the PTY.
     env: { PATH: `${shimBin}:${nodeBinDir}:/usr/bin:/bin`, CI: '' },
   });
-  if (result.timedOut) {
-    return fail('timed-out', [context.assert.diagnostic('report --open timed out')]);
+  const reportResult = evaluateBrowserCommandResult(result, 'report');
+  if (!reportResult.ok) {
+    const message = result.timedOut
+      ? 'report --open timed out'
+      : `report --open exited ${result.status}`;
+    return fail(reportResult.reasonCode, [context.assert.diagnostic(message)]);
   }
 
   let captured;
@@ -776,7 +1112,58 @@ const nativeSqliteExecutor = async (context) => {
       context.assert.diagnostic('the installed entrypoint resolved inside the workspace checkout'),
     ]);
   }
-  return pass([context.assert.diagnostic('native SQLite loaded from the isolated install prefix')]);
+
+  const probeRun = await runProcess(context, [
+    process.execPath,
+    '-e',
+    NATIVE_SQLITE_PROBE_SOURCE,
+    realScript,
+  ]);
+  if (probeRun.timedOut) {
+    return fail('timed-out', [context.assert.diagnostic('native SQLite probe timed out')]);
+  }
+  if ((probeRun.status ?? 1) !== 0) {
+    return fail('native-sqlite-probe-failed', [
+      context.assert.diagnostic(`native SQLite probe exited ${probeRun.status}`),
+    ]);
+  }
+  const parsed = readJson(probeRun);
+  if (!parsed.ok || parsed.value === null || typeof parsed.value !== 'object') {
+    return fail('native-sqlite-probe-invalid', [
+      context.assert.diagnostic('native SQLite probe did not return valid JSON'),
+    ]);
+  }
+
+  const probe = parsed.value;
+  const resolved = {
+    installedEntrypoint: realScript,
+    queryOk: probe.ok === true,
+  };
+  for (const field of ['datastoreEntrypoint', 'sqliteEntrypoint', 'nativeAddon']) {
+    if (typeof probe[field] !== 'string') {
+      return fail('native-sqlite-probe-invalid', [
+        context.assert.diagnostic(`native SQLite probe omitted ${field}`),
+      ]);
+    }
+    try {
+      resolved[field] = realpathSync(probe[field]);
+    } catch {
+      return fail('native-sqlite-provenance-invalid', [
+        context.assert.diagnostic(`native SQLite probe returned an unreadable ${field}`),
+      ]);
+    }
+  }
+  const provenance = evaluateNativeSqliteProvenance(resolved);
+  if (!provenance.ok) {
+    return fail(provenance.reasonCode, [
+      context.assert.diagnostic('native SQLite resolved outside the isolated install tree'),
+    ]);
+  }
+  return pass([
+    context.assert.diagnostic(
+      'better-sqlite3 loaded its native addon from the isolated install dependency tree',
+    ),
+  ]);
 };
 
 const contentionRecoveryExecutor = async (context) => {
@@ -787,36 +1174,13 @@ const contentionRecoveryExecutor = async (context) => {
   } catch (error) {
     return fail('contention-setup-failed', [context.assert.diagnostic(errText(error))]);
   }
-  // Bounded contention: concurrent datastore readers/writers all succeed on APFS.
-  const concurrent = await Promise.all([
-    runCli(context, { args: ['sessions', 'list', '--json'] }),
-    runCli(context, { args: ['sessions', 'list', '--json'] }),
-    runCli(context, { args: ['graph', '--json'] }),
-  ]);
-  for (const run of concurrent) {
-    if (run.timedOut || (run.status ?? 1) !== 0) {
-      return fail('contention-failed', [
-        context.assert.diagnostic(`a concurrent datastore command exited ${run.status}`),
-        context.assert.diagnostic(run.stderrTail),
-      ]);
-    }
-  }
-  // Interrupted-child recovery: abort mid-write, then prove a clean replay.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25);
-  try {
-    await runCli(context, { args: ['graph', '--json'], signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-  const replay = await runCli(context, { args: ['sessions', 'list', '--json'] });
-  if (replay.timedOut || (replay.status ?? 1) !== 0 || !readJson(replay).ok) {
-    return fail('interrupted-recovery-failed', [
-      context.assert.diagnostic(`post-interrupt sessions list exited ${replay.status}`),
-      context.assert.diagnostic(replay.stderrTail),
-    ]);
-  }
-  return pass();
+  const initialized = await initProject(context, context.paths.workRoot);
+  if (!initialized.ok) return initialized.outcome;
+  const contention = await runSqliteContentionProbe(context, context.paths.workRoot);
+  if (contention.status !== 'pass') return contention;
+  const interrupted = await runInterruptedSqliteProbe(context, context.paths.workRoot);
+  if (interrupted.status !== 'pass') return interrupted;
+  return pass([...contention.diagnostics, ...interrupted.diagnostics]);
 };
 
 // ---------------------------------------------------------------------------
@@ -862,9 +1226,15 @@ export const macosJourneys = assertUniqueJourneyIds([
     },
     isolated: true,
     steps: [
-      { label: 'run install.sh with an exact version + run-owned prefix/HOME/cache/temp' },
-      { label: 'assert the bin is linked under the prefix (no ambient escape)' },
-      { label: 'assert the run-owned bin reports the exact version' },
+      {
+        label: 'assert the lifecycle target was installed through scripts/install.sh',
+      },
+      {
+        label: 'invoke the lifecycle-owned installed descriptor',
+      },
+      {
+        label: 'assert the exact candidate version under measured execution',
+      },
     ],
     executor: installerShExecutor,
   }),
@@ -893,6 +1263,7 @@ export const macosJourneys = assertUniqueJourneyIds([
     steps: [
       { label: 'realpath the installed bin and entrypoint' },
       { label: 'assert both stay under the isolated install prefix' },
+      { label: 'run the contained shim and assert the candidate version' },
     ],
     executor: npmShimContainmentExecutor,
   }),
@@ -906,8 +1277,12 @@ export const macosJourneys = assertUniqueJourneyIds([
     capabilities: ['symlink'],
     isolated: true,
     steps: [
-      { label: 'seed spaces + precomposed + decomposed + symlinked project roots' },
-      { label: 'run fit --json from each and prove containment under the physical run root' },
+      {
+        label: 'seed spaces + precomposed + decomposed + symlinked project roots',
+      },
+      {
+        label: 'run fit --json from each and prove containment under the physical run root',
+      },
     ],
     executor: pathSemanticsExecutor,
   }),
@@ -916,14 +1291,19 @@ export const macosJourneys = assertUniqueJourneyIds([
     category: 'macos',
     value: {
       human: 'Fails cleanly on permission denied',
-      agent: 'init into a read-only dir fails with no out-of-root fallback',
+      agent:
+        'denied config and runtime targets return structured actionable errors without partial state',
     },
     capabilities: ['permissions'],
     isolated: true,
     steps: [
-      { label: 'create a read-only directory' },
-      { label: 'attempt init and assert a graceful non-zero exit' },
-      { label: 'assert no partial state escaped the denied target' },
+      {
+        label: 'deny the project config target and require an actionable JSON error',
+      },
+      {
+        label: 'deny the initialized runtime target and require an actionable JSON error',
+      },
+      { label: 'assert neither denial leaves partial config/runtime state' },
     ],
     executor: permissionsExecutor,
   }),
@@ -937,8 +1317,11 @@ export const macosJourneys = assertUniqueJourneyIds([
     capabilities: ['pty'],
     isolated: true,
     steps: [
-      { label: 'run fit under a PTY and assert a non-empty exit-1 render' },
-      { label: 'assert NO_COLOR removes escapes and --json stays pure JSON' },
+      {
+        label: 'run fit under a PTY and require exit 1, output, and zero descendants',
+      },
+      { label: 'require NO_COLOR exit 1 with no escapes' },
+      { label: 'require --json exit 1 with the canonical pure fit envelope' },
     ],
     executor: ptyHumanViewExecutor,
   }),
@@ -946,14 +1329,17 @@ export const macosJourneys = assertUniqueJourneyIds([
     id: 'macos.signals',
     category: 'macos',
     value: {
-      human: 'Cancels cleanly and stays reusable',
-      agent: 'an aborted run is cancelled, leaves no descendants, and state replays next run',
+      human: 'Handles terminal interrupts cleanly and stays reusable',
+      agent:
+        'exact SIGINT (PTY) and SIGTERM forwarding exit boundedly with no descendants; state and terminal reuse succeed',
     },
     isolated: true,
     steps: [
-      { label: 'abort a run mid-flight' },
-      { label: 'assert cancelled + zero residual descendants' },
-      { label: 'assert a fresh datastore read still succeeds' },
+      { label: 'forward SIGINT through a PTY and SIGTERM without a PTY' },
+      {
+        label: 'require exact signal identity, bounded exit, and zero descendants',
+      },
+      { label: 'require fresh datastore and PTY version commands to succeed' },
     ],
     executor: signalsExecutor,
   }),
@@ -968,7 +1354,9 @@ export const macosJourneys = assertUniqueJourneyIds([
     isolated: true,
     steps: [
       { label: 'probe /usr/bin/open availability without launching a GUI' },
-      { label: 'intercept report --open with a run-owned open shim under a PTY' },
+      {
+        label: 'intercept report --open with a run-owned open shim under a PTY',
+      },
       { label: 'assert exactly one safe generated file target' },
     ],
     executor: browserOpenExecutor,
@@ -983,7 +1371,9 @@ export const macosJourneys = assertUniqueJourneyIds([
     isolated: true,
     steps: [
       { label: 'open the store via sessions list --json' },
-      { label: 'assert the entrypoint resolves outside the workspace checkout' },
+      {
+        label: 'assert the entrypoint resolves outside the workspace checkout',
+      },
     ],
     executor: nativeSqliteExecutor,
   }),

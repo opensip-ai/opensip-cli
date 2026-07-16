@@ -20,31 +20,35 @@
  *     `JourneyResult`. `rss` is a tagged measurement (see `contract.d.mts`).
  */
 
-import type { Scenario } from '../cli-acceptance-core.mjs';
+import type { Scenario } from "../cli-acceptance-core.mjs";
 
 /** Every journey lands in exactly one status (mirrors the contract). */
-export type JourneyStatus = 'pass' | 'fail' | 'skipped' | 'unavailable';
+export type JourneyStatus = "pass" | "fail" | "skipped" | "unavailable";
 
 /**
  * The closed native-capability vocabulary a journey may declare. A journey that
  * declares a capability the host lacks becomes an explicit `unavailable` result
  * (produced by the runner), never an omitted row.
  */
-export type JourneyCapability = 'pty' | 'symlink' | 'permissions';
+export type JourneyCapability = "pty" | "symlink" | "permissions";
 
 /** Tagged resident-set-size measurement (identical to the contract's shape). */
 export type RssMeasurement =
-  | { readonly status: 'available'; readonly peakBytes: number }
-  | { readonly status: 'unavailable'; readonly reasonCode: string };
+  | { readonly status: "available"; readonly peakBytes: number }
+  | { readonly status: "unavailable"; readonly reasonCode: string };
 
 /** The two verified installed descriptors carried unchanged from lifecycle.installed. */
 export interface InstalledBinDescriptor {
-  readonly kind: 'installed-bin';
+  readonly kind: "installed-bin";
   readonly bin: string;
 }
 export interface JsEntrypointDescriptor {
-  readonly kind: 'node-script';
+  readonly kind: "node-script";
   readonly script: string;
+  /** Digest of the exact package-declared JS bytes pinned by the lifecycle. */
+  readonly entrypointSha256: `sha256:${string}`;
+  /** Digest of the package manifest that bound `bin.opensip` to the entrypoint. */
+  readonly packageJsonSha256: `sha256:${string}`;
 }
 
 /**
@@ -53,7 +57,9 @@ export interface JsEntrypointDescriptor {
  * resolved identity facts a journey legitimately asserts against.
  */
 export interface InstalledCandidateView {
-  readonly mode: 'packed-release' | 'published-version';
+  readonly mode: "packed-release" | "published-version";
+  readonly installChannel:
+    "canonical-installer" | "npm-direct" | "packed-consumer";
   readonly installedBin: InstalledBinDescriptor;
   readonly jsEntrypoint: JsEntrypointDescriptor;
   /** The version the installed package.json reports, or null when uncaptured. */
@@ -97,6 +103,15 @@ export interface MeasuredProcessRunSpec {
   readonly stdin?: string;
   readonly signal?: AbortSignal;
   /**
+   * Deliver one exact native signal to the measured POSIX process group after a
+   * bounded delay. Unlike `signal` (AbortSignal), this preserves whether SIGINT
+   * or SIGTERM was requested and is intended for native signal-forwarding probes.
+   */
+  readonly nativeSignal?: {
+    readonly signal: "SIGINT" | "SIGTERM";
+    readonly afterMs: number;
+  };
+  /**
    * Opt-in TTY seam. Honoured ONLY on a host the runner reports as `pty`-capable
    * (a `pty`-declaring journey is otherwise marked `unavailable` before it runs).
    * Omitted/false => piped, non-TTY stdio.
@@ -110,6 +125,8 @@ export interface MeasuredProcessResult {
   readonly signal: string | null;
   readonly timedOut: boolean;
   readonly cancelled: boolean;
+  /** Exact scheduled native signal successfully delivered by the process port. */
+  readonly deliveredSignal: "SIGINT" | "SIGTERM" | null;
   readonly outputTruncated: boolean;
   readonly durationMs: number;
   readonly rss: RssMeasurement;
@@ -136,8 +153,11 @@ export interface MeasuredProcessPort {
 
 /** One live MCP stdio session, already through the `initialize` handshake. */
 export interface McpClientHandle {
-  serverVersion(): { readonly name: string; readonly version: string } | undefined;
-  listTools(): Promise<{ readonly tools: ReadonlyArray<{ readonly name: string }> }>;
+  serverVersion():
+    { readonly name: string; readonly version: string } | undefined;
+  listTools(): Promise<{
+    readonly tools: ReadonlyArray<{ readonly name: string }>;
+  }>;
   callTool(input: {
     readonly name: string;
     readonly arguments: Record<string, unknown>;
@@ -159,6 +179,26 @@ export interface McpClientPort {
     readonly env?: Readonly<Record<string, string>>;
     readonly timeoutMs?: number;
   }): Promise<McpClientHandle>;
+  /** Peak RSS observed across MCP server children launched by this connector. */
+  rssMeasurement(): RssMeasurement;
+  /**
+   * Drain the bounded terminal observations completed since the previous call.
+   * The runner owns this seam; journeys never inspect process evidence directly.
+   */
+  takeStepEvidence(): ReadonlyArray<{
+    readonly label: string;
+    readonly stage: "mcp";
+    readonly exitCode: number | null;
+    readonly signal: string | null;
+    readonly timedOut: boolean;
+    readonly cancelled: boolean;
+    readonly outputTruncated: boolean;
+    readonly durationMs: number;
+    readonly rss: RssMeasurement;
+    readonly residualDescendants: number;
+    readonly reasonCode: string | null;
+    readonly diagnostics: readonly string[];
+  }>;
 }
 
 /** A `SpawnResult`-shaped view a `MeasuredProcessResult` adapts to for `checkScenario`. */
@@ -173,11 +213,50 @@ export interface JourneyAssertHelpers {
   /** Adapt a measured result to the `{stdout,stderr,exitCode}` shape `checkScenario` reads. */
   toAssertable(result: MeasuredProcessResult): AssertableResult;
   /** Run a `checkScenario`-style expectation block; returns failure messages ([] = pass). */
-  check(result: MeasuredProcessResult, expect: Scenario['expect']): string[];
+  check(result: MeasuredProcessResult, expect: Scenario["expect"]): string[];
   /** Shape-assert a `--json` Signal envelope (schemaVersion 2, tool, signals[]). */
   envelope(options?: { readonly tool?: string }): (parsed: unknown) => string[];
   /** Bounded, redacted diagnostic line (caps length; strips control characters). */
   diagnostic(text: string): string;
+}
+
+/**
+ * Agent-only auxiliary-artifact capability. The runner injects this surface
+ * only when the closed CLI grammar supplies `--agent-report-out`; the method
+ * sanitizes, bounds, and writes outside the disposable run root.
+ */
+export interface JourneyAgentArtifacts {
+  writeInstalledAgentReport(report: unknown): Readonly<{
+    bytes: number;
+    digest: string;
+    path: string;
+  }>;
+}
+
+/** Runner-resolved, shell-free host toolchain descriptors; never profile-authored. */
+export interface JourneyToolchain {
+  readonly node: Readonly<{
+    readonly argv: readonly [string, ...string[]];
+  }>;
+  readonly npm: Readonly<{
+    readonly argv: readonly [string, ...string[]];
+  }>;
+}
+
+/** Canonical registry bytes bound to a published release candidate. */
+export interface JourneyRegistryInventory {
+  readonly schemaVersion: 1;
+  readonly registry: string;
+  readonly releaseVersion: string;
+  readonly manifestDigest: string;
+  readonly packages: ReadonlyArray<{
+    readonly name: string;
+    readonly version: string;
+    readonly tarball: string;
+    readonly tarballUrl: string;
+    readonly integrity: string;
+    readonly sha256: string;
+  }>;
 }
 
 /**
@@ -190,8 +269,14 @@ export interface JourneyExecutorContext {
   /** `null` when fixture packing failed; fixture-using journeys are gated off first. */
   readonly fixtures: JourneyFixtures | null;
   readonly process: MeasuredProcessPort;
+  /** Present when the runner can prove the exact Node/npm executable descriptors it uses. */
+  readonly toolchain?: JourneyToolchain;
+  /** Present only for a published candidate whose canonical inventory passed preflight. */
+  readonly registryInventory?: JourneyRegistryInventory;
   /** Present only for journeys in the `mcp` category. */
   readonly mcp?: McpClientPort;
+  /** Present only for `agent.installed-smoke` when an auxiliary output was requested. */
+  readonly artifacts?: JourneyAgentArtifacts;
   readonly assert: JourneyAssertHelpers;
 }
 
@@ -238,7 +323,7 @@ export interface CommandStepSpec {
   readonly env?: Readonly<Record<string, string>>;
   readonly timeout?: number;
   readonly setup?: (context: { readonly cwd: string }) => void;
-  readonly expect: Scenario['expect'];
+  readonly expect: Scenario["expect"];
 }
 
 /** A frozen catalog row. Registration rejects duplicate ids and unknown capabilities. */
@@ -258,8 +343,12 @@ export interface AcceptanceJourney {
    */
   readonly lifecycleDriven: boolean;
   /** Command-only journeys expose their shared step source; the projection reads it. */
-  readonly commandSteps?: (params: CommandStepParams) => readonly CommandStepSpec[];
-  readonly executor: (context: JourneyExecutorContext) => Promise<JourneyOutcome>;
+  readonly commandSteps?: (
+    params: CommandStepParams,
+  ) => readonly CommandStepSpec[];
+  readonly executor: (
+    context: JourneyExecutorContext,
+  ) => Promise<JourneyOutcome>;
 }
 
 /** The closed registry: id -> frozen journey row. */
@@ -276,7 +365,10 @@ export const MACOS_JOURNEY_IDS: readonly string[];
 export const RELEASE_SMOKE_JOURNEY_IDS: readonly string[];
 
 /** Look up a registered journey by id (throws on an unregistered id). */
-export function getJourney(id: string, registry?: JourneyRegistry): AcceptanceJourney;
+export function getJourney(
+  id: string,
+  registry?: JourneyRegistry,
+): AcceptanceJourney;
 
 /**
  * Resolve a profile's selected ids to their frozen registry rows, in profile
@@ -293,7 +385,9 @@ export function resolveProfileJourneys(
  * smoke runs. The scenarios ARE the catalog source — each carries a stable
  * `id` (`<journeyId>#<stepSlug>`) so parity can be proven structurally.
  */
-export function projectReleaseSmokeScenarios(params: CommandStepParams): Scenario[];
+export function projectReleaseSmokeScenarios(
+  params: CommandStepParams,
+): Scenario[];
 
 /**
  * Assert that every scenario maps to a registered release-smoke journey and that

@@ -27,8 +27,12 @@ import {
   contractError,
   digestOf,
   evidenceDigest,
+  isJourneyApplicable,
+  isJourneyRequired,
   parseAcceptanceEvidence,
   parseAcceptanceProfile,
+  PLATFORM_ACCEPTANCE_BOUND_LIMITS,
+  PLATFORM_ACCEPTANCE_CAPABILITIES,
   PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
   profileDigest,
 } from '../platform-acceptance/contract.mjs';
@@ -81,7 +85,13 @@ const VALID_HOST = Object.freeze({
   swVers: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
   kernelRelease: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
   unameArch: { status: 'unavailable', reasonCode: 'darwin-only-probe' },
-  capabilities: { pty: true, symlink: true, permissions: true, 'process-tree-rss': true },
+  capabilities: {
+    pty: true,
+    symlink: true,
+    permissions: true,
+    'process-tree-rss': true,
+    'process-tree-cleanup': true,
+  },
 });
 
 /** A schema-valid evidence body (WITHOUT the terminal completion record). */
@@ -96,15 +106,44 @@ function makeEvidenceBody(profile, overrides = {}) {
     rss: { status: 'unavailable', reasonCode: 'rss-not-sampled' },
     diagnostics: [],
   }));
-  const cleanup = { status: 'clean', reasonCode: null, removedRoots: 3, residualDescendants: 0 };
+  const cleanup = {
+    status: 'clean',
+    reasonCode: null,
+    removedRoots: 3,
+    residualDescendants: 0,
+  };
   const body = {
     schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
-    profile: { id: profile.id, version: profile.version, digest: profileDigest(profile) },
+    profile: {
+      id: profile.id,
+      version: profile.version,
+      digest: profileDigest(profile),
+    },
     candidate: {
       kind: 'packed-release',
       version: '0.7.0',
       source: 'packed-release@0.7.0 (58 npm tarballs)',
       digest: 'a'.repeat(64),
+      manifestDigest: 'b'.repeat(64),
+    },
+    previousCandidate: null,
+    execution: {
+      runId: 'local-test',
+      runAttempt: 1,
+      runnerLabel: 'test-runner',
+    },
+    lifecycle: {
+      installedVersion: '0.7.0',
+      upgradedVersion: '0.7.0',
+      versionMigrated: false,
+      stateMigrated: true,
+      cliStateRemoved: true,
+      packageRemoved: true,
+      targetInstallChannel: 'packed-consumer',
+      integrityChecks: {
+        count: 45,
+        durationMs: 1234,
+      },
     },
     harnessGitSha: 'abc1234',
     startedAt: '2026-07-15T00:00:00.000Z',
@@ -119,9 +158,65 @@ function makeEvidenceBody(profile, overrides = {}) {
   return body;
 }
 
+function registryProof(inventoryDigest = 'b'.repeat(64)) {
+  return {
+    inventoryDigest,
+    packageNames: ['opensip-cli'],
+    packageCount: 1,
+    packageSetDigest: 'c'.repeat(64),
+    offlineReplayComplete: true,
+  };
+}
+
+test('lifecycle install channels are closed while legacy v1 evidence may omit the field', () => {
+  for (const channel of ['packed-consumer', 'npm-direct', 'canonical-installer', null]) {
+    const body = makeEvidenceBody(BASE_PROFILE);
+    body.lifecycle.targetInstallChannel = channel;
+    assert.equal(parseAcceptanceEvidence(seal(body)).lifecycle.targetInstallChannel, channel);
+  }
+
+  const legacy = makeEvidenceBody(BASE_PROFILE);
+  delete legacy.lifecycle.targetInstallChannel;
+  const parsedLegacy = parseAcceptanceEvidence(seal(legacy));
+  assert.equal(Object.hasOwn(parsedLegacy.lifecycle, 'targetInstallChannel'), false);
+
+  const malformed = makeEvidenceBody(BASE_PROFILE);
+  malformed.lifecycle.targetInstallChannel = 'curl-script';
+  assert.throws(() => parseAcceptanceEvidence(seal(malformed)), /lifecycle\.targetInstallChannel/);
+});
+
+test('candidate-integrity timing is bounded observability and remains additive for v1 evidence', () => {
+  const body = makeEvidenceBody(BASE_PROFILE);
+  assert.deepEqual(parseAcceptanceEvidence(seal(body)).lifecycle.integrityChecks, {
+    count: 45,
+    durationMs: 1234,
+  });
+
+  const legacy = makeEvidenceBody(BASE_PROFILE);
+  delete legacy.lifecycle.integrityChecks;
+  const parsedLegacy = parseAcceptanceEvidence(seal(legacy));
+  assert.equal(Object.hasOwn(parsedLegacy.lifecycle, 'integrityChecks'), false);
+
+  for (const field of ['count', 'durationMs']) {
+    const malformed = makeEvidenceBody(BASE_PROFILE);
+    malformed.lifecycle.integrityChecks[field] = -1;
+    assert.throws(
+      () => parseAcceptanceEvidence(seal(malformed)),
+      new RegExp(`lifecycle\\.integrityChecks\\.${field}`),
+    );
+  }
+
+  const unknown = makeEvidenceBody(BASE_PROFILE);
+  unknown.lifecycle.integrityChecks.extra = 1;
+  assert.throws(() => parseAcceptanceEvidence(seal(unknown)), /unknown key/);
+});
+
 /** Seal a body by appending the completion record over its digest. */
 function seal(body, state = 'completed') {
-  return { ...body, completion: { state, evidenceDigest: evidenceDigest(body) } };
+  return {
+    ...body,
+    completion: { state, evidenceDigest: evidenceDigest(body) },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +269,46 @@ test('rejects an empty journey selection', () => {
   assert.throws(() => parseAcceptanceProfile(raw), /non-empty|empty-journeys/);
 });
 
+test('profile and journey capability prerequisites use the closed native vocabulary', () => {
+  assert.deepEqual(PLATFORM_ACCEPTANCE_CAPABILITIES, [
+    'pty',
+    'symlink',
+    'permissions',
+    'process-tree-rss',
+    'process-tree-cleanup',
+  ]);
+  for (const mutate of [
+    (raw) => {
+      raw.requiredCapabilities = ['typo-capability'];
+    },
+    (raw) => {
+      raw.journeys[0].capabilities = ['typo-capability'];
+    },
+  ]) {
+    const raw = clone(COMMON_V1_RAW);
+    mutate(raw);
+    assert.throws(() => parseAcceptanceProfile(raw), /unknown-capability/);
+  }
+});
+
+test('journey candidate applicability is closed, frozen, and fail-closed', () => {
+  const raw = clone(COMMON_V1_RAW);
+  raw.journeys[0].candidateKinds = ['published-version'];
+  const profile = parseAcceptanceProfile(raw);
+  const selection = profile.journeys[0];
+  assert.deepEqual(selection.candidateKinds, ['published-version']);
+  assert.ok(Object.isFrozen(selection.candidateKinds));
+  assert.equal(isJourneyApplicable(selection, 'published-version'), true);
+  assert.equal(isJourneyApplicable(selection, 'packed-release'), false);
+  assert.equal(isJourneyApplicable(profile.journeys[1], 'packed-release'), true);
+
+  for (const candidateKinds of [[], ['source-tree'], ['published-version', 'published-version']]) {
+    const malformed = clone(COMMON_V1_RAW);
+    malformed.journeys[0].candidateKinds = candidateKinds;
+    assert.throws(() => parseAcceptanceProfile(malformed), /candidate|invalid-enum|duplicate/);
+  }
+});
+
 test('rejects invalid numeric bounds (non-positive, non-integer, too large)', () => {
   for (const value of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
     const raw = clone(COMMON_V1_RAW);
@@ -182,9 +317,49 @@ test('rejects invalid numeric bounds (non-positive, non-integer, too large)', ()
   }
 });
 
+test('rejects every profile bound above its field-specific hard ceiling', () => {
+  for (const [key, limit] of Object.entries(PLATFORM_ACCEPTANCE_BOUND_LIMITS)) {
+    const raw = clone(COMMON_V1_RAW);
+    raw.bounds[key] = limit.max + 1;
+    assert.throws(
+      () => parseAcceptanceProfile(raw),
+      (error) => error?.reasonCode === 'bound-too-large',
+      key,
+    );
+  }
+});
+
+test('rss sampling interval enforces both anti-spin and coverage bounds', () => {
+  const limit = PLATFORM_ACCEPTANCE_BOUND_LIMITS.rssSampleIntervalMs;
+  for (const value of [limit.min - 1, limit.max + 1]) {
+    const raw = clone(COMMON_V1_RAW);
+    raw.bounds.rssSampleIntervalMs = value;
+    assert.throws(
+      () => parseAcceptanceProfile(raw),
+      (error) => error?.reasonCode === (value < limit.min ? 'bound-too-small' : 'bound-too-large'),
+    );
+  }
+});
+
+test('rejects a profile whose journey count exceeds bounds.maxJourneyResults', () => {
+  const exact = clone(COMMON_V1_RAW);
+  exact.bounds.maxJourneyResults = exact.journeys.length;
+  assert.doesNotThrow(() => parseAcceptanceProfile(exact));
+
+  const over = clone(exact);
+  over.bounds.maxJourneyResults -= 1;
+  assert.throws(
+    () => parseAcceptanceProfile(over),
+    (error) => error?.reasonCode === 'max-journey-results-exceeded',
+  );
+});
+
 test('rejects an oversized journey selection and an oversized capability list', () => {
   const many = clone(COMMON_V1_RAW);
-  many.journeys = Array.from({ length: 257 }, (_v, i) => ({ id: `x.j${i}`, required: false }));
+  many.journeys = Array.from({ length: 257 }, (_v, i) => ({
+    id: `x.j${i}`,
+    required: false,
+  }));
   assert.throws(() => parseAcceptanceProfile(many), /exceeds|too-many/);
 
   const caps = clone(COMMON_V1_RAW);
@@ -264,16 +439,29 @@ function matrixResults(statuses) {
   }));
 }
 
-const CLEAN = { status: 'clean', reasonCode: null, removedRoots: 1, residualDescendants: 0 };
+const CLEAN = {
+  status: 'clean',
+  reasonCode: null,
+  removedRoots: 1,
+  residualDescendants: 0,
+};
 
 test('verdict matrix: optional skip preserves a passing required set; any required non-pass fails', () => {
   const rows = [
     { statuses: ['pass', 'pass', 'skipped'], cleanup: CLEAN, verdict: 'pass' },
-    { statuses: ['pass', 'pass', 'unavailable'], cleanup: CLEAN, verdict: 'pass' },
+    {
+      statuses: ['pass', 'pass', 'unavailable'],
+      cleanup: CLEAN,
+      verdict: 'pass',
+    },
     { statuses: ['pass', 'pass', 'fail'], cleanup: CLEAN, verdict: 'pass' },
     { statuses: ['fail', 'pass', 'pass'], cleanup: CLEAN, verdict: 'fail' },
     { statuses: ['pass', 'skipped', 'pass'], cleanup: CLEAN, verdict: 'fail' },
-    { statuses: ['pass', 'unavailable', 'pass'], cleanup: CLEAN, verdict: 'fail' },
+    {
+      statuses: ['pass', 'unavailable', 'pass'],
+      cleanup: CLEAN,
+      verdict: 'fail',
+    },
     {
       statuses: ['pass', 'pass', 'pass'],
       cleanup: {
@@ -286,7 +474,12 @@ test('verdict matrix: optional skip preserves a passing required set; any requir
     },
     {
       statuses: ['pass', 'pass', 'pass'],
-      cleanup: { status: 'clean', reasonCode: null, removedRoots: 1, residualDescendants: 2 },
+      cleanup: {
+        status: 'clean',
+        reasonCode: null,
+        removedRoots: 1,
+        residualDescendants: 2,
+      },
       verdict: 'fail',
     },
   ];
@@ -300,7 +493,7 @@ test('verdict matrix: optional skip preserves a passing required set; any requir
   }
 });
 
-test('computeVerdict enforces rssRequired: a run must exhibit real peak-RSS proof', () => {
+test('computeVerdict enforces rssRequired for every required journey', () => {
   const rssProfile = parseAcceptanceProfile({
     schemaVersion: 1,
     id: 'rss-matrix',
@@ -322,26 +515,83 @@ test('computeVerdict enforces rssRequired: a run must exhibit real peak-RSS proo
       { id: 'a.optional-one', required: false },
     ],
   });
-  const allPass = (rssByIndex) =>
-    rssProfile.journeys.map((journey, index) => ({
-      id: journey.id,
-      category: 'a',
-      required: journey.required,
-      status: 'pass',
-      reasonCode: null,
-      durationMs: 1,
-      rss: rssByIndex[index] ?? { status: 'unavailable', reasonCode: 'rss-not-sampled' },
-      diagnostics: [],
-    }));
+  const allPass = (rssByIndex, stepRssByIndex = rssByIndex) =>
+    rssProfile.journeys.map((journey, index) => {
+      const rss = rssByIndex[index] ?? {
+        status: 'unavailable',
+        reasonCode: 'rss-not-sampled',
+      };
+      return {
+        id: journey.id,
+        category: 'a',
+        required: journey.required,
+        status: 'pass',
+        reasonCode: null,
+        durationMs: 1,
+        rss,
+        diagnostics: [],
+        steps: [
+          {
+            label: 'process-1',
+            stage: 'process',
+            exitCode: 0,
+            signal: null,
+            timedOut: false,
+            cancelled: false,
+            outputTruncated: false,
+            durationMs: 1,
+            rss: stepRssByIndex[index] ?? rss,
+            residualDescendants: 0,
+            reasonCode: null,
+            diagnostics: [],
+          },
+        ],
+      };
+    });
 
   // Every required journey passes, but NONE produced a real RSS sample: an
   // RSS-required profile cannot be satisfied, so the verdict fails.
   assert.equal(computeVerdict(rssProfile, allPass([]), CLEAN), 'fail');
-  // At least one required, passing journey exhibits available RSS: satisfied.
+  // One sampled required journey cannot green-wash another unavailable one.
   assert.equal(
     computeVerdict(rssProfile, allPass([{ status: 'available', peakBytes: 4096 }]), CLEAN),
+    'fail',
+  );
+  // Every required journey carries a real sample: satisfied.
+  assert.equal(
+    computeVerdict(
+      rssProfile,
+      allPass([
+        { status: 'available', peakBytes: 4096 },
+        { status: 'available', peakBytes: 2048 },
+      ]),
+      CLEAN,
+    ),
     'pass',
   );
+  // A second child that exits before the first sample is expected and cannot
+  // invalidate the real sample from another step in the same journey.
+  const shortChild = allPass([
+    { status: 'available', peakBytes: 4096 },
+    { status: 'available', peakBytes: 2048 },
+  ]);
+  shortChild[0].steps.push({
+    ...shortChild[0].steps[0],
+    label: 'process-2',
+    rss: { status: 'unavailable', reasonCode: 'rss-child-too-short' },
+  });
+  assert.equal(computeVerdict(rssProfile, shortChild, CLEAN), 'pass');
+  const samplerFault = allPass(
+    [
+      { status: 'available', peakBytes: 4096 },
+      { status: 'available', peakBytes: 2048 },
+    ],
+    [
+      { status: 'unavailable', reasonCode: 'rss-sampler-fault' },
+      { status: 'available', peakBytes: 2048 },
+    ],
+  );
+  assert.equal(computeVerdict(rssProfile, samplerFault, CLEAN), 'fail');
   // Available RSS on an OPTIONAL journey alone does not prove capability.
   assert.equal(
     computeVerdict(
@@ -366,6 +616,31 @@ test('computeSummary counts each status and the required-passed subset', () => {
     requiredTotal: 2,
     requiredPassed: 1,
   });
+});
+
+test('an exact previous candidate dynamically gates the otherwise-optional upgrade journey', () => {
+  const upgrade = BASE_PROFILE.journeys.find((journey) => journey.id === 'lifecycle.upgrade');
+  assert.equal(upgrade.required, false);
+  assert.equal(isJourneyRequired(upgrade, null), false);
+  assert.equal(
+    isJourneyRequired(upgrade, {
+      kind: 'published-version',
+      version: '0.6.9',
+      source: 'npm:opensip-cli@0.6.9',
+      digest: 'b'.repeat(64),
+    }),
+    true,
+  );
+
+  const results = matrixResults(['pass', 'pass', 'pass']);
+  results[2] = {
+    ...results[2],
+    required: true,
+    status: 'fail',
+    reasonCode: 'forced',
+  };
+  assert.equal(computeSummary(MATRIX_PROFILE, results).requiredTotal, 3);
+  assert.equal(computeVerdict(MATRIX_PROFILE, results, CLEAN), 'fail');
 });
 
 test('computeVerdict fails when a required journey result is entirely absent', () => {
@@ -395,15 +670,25 @@ test('composeProfile succeeds when derived adds a journey, strengthens optionalâ
   const composed = composeProfile(
     BASE_PROFILE,
     derivedRaw((raw) => {
-      raw.journeys.push({ id: 'darwin.only', required: true });
+      const cleanupIndex = raw.journeys.findIndex(
+        (journey) => journey.id === 'lifecycle.cli-state-uninstall',
+      );
+      raw.journeys.splice(cleanupIndex, 0, {
+        id: 'darwin.only',
+        required: true,
+      });
       const upgrade = raw.journeys.find((j) => j.id === 'lifecycle.upgrade');
       upgrade.required = true;
       raw.bounds.journeyTimeoutMs = BASE_PROFILE.bounds.journeyTimeoutMs - 1;
     }),
   );
   assert.equal(composed.id, 'derived-v1');
-  // Base journeys keep base order; new derived journeys append at the end.
-  assert.equal(composed.journeys.at(-1).id, 'darwin.only');
+  // Base journeys keep relative order while a platform journey may be inserted
+  // before the terminal lifecycle removals.
+  assert.ok(
+    composed.journeys.findIndex((journey) => journey.id === 'darwin.only') <
+      composed.journeys.findIndex((journey) => journey.id === 'lifecycle.cli-state-uninstall'),
+  );
   assert.equal(composed.journeys.find((j) => j.id === 'lifecycle.upgrade').required, true);
   assert.ok(Object.isFrozen(composed));
 });
@@ -457,6 +742,21 @@ test('composeProfile rejects a removed base journey', () => {
   );
 });
 
+test('composeProfile rejects reordering base journeys around derived insertions', () => {
+  assert.throws(
+    () =>
+      composeProfile(
+        BASE_PROFILE,
+        derivedRaw((raw) => {
+          const first = raw.journeys[0];
+          raw.journeys[0] = raw.journeys[1];
+          raw.journeys[1] = first;
+        }),
+      ),
+    /reordered-base-journey/,
+  );
+});
+
 test('composeProfile rejects downgrading a required base journey to optional', () => {
   assert.throws(
     () =>
@@ -467,6 +767,19 @@ test('composeProfile rejects downgrading a required base journey to optional', (
         }),
       ),
     /downgraded-journey/,
+  );
+});
+
+test('composeProfile rejects narrowing a base journey to fewer candidate kinds', () => {
+  assert.throws(
+    () =>
+      composeProfile(
+        BASE_PROFILE,
+        derivedRaw((raw) => {
+          raw.journeys[0].candidateKinds = ['published-version'];
+        }),
+      ),
+    /narrowed-journey-applicability/,
   );
 });
 
@@ -496,7 +809,10 @@ test('composeProfile rejects a derived profile that omits its base declaration',
 
 test('parseAcceptanceProfile parses, freezes, and digests a supportRow binding', () => {
   const raw = clone(COMMON_V1_RAW);
-  raw.supportRow = { contractVersion: 1, rowId: 'macos-26-arm64-node24-npm11-v1' };
+  raw.supportRow = {
+    contractVersion: 1,
+    rowId: 'macos-26-arm64-node24-npm11-v1',
+  };
   const profile = parseAcceptanceProfile(raw);
   assert.deepEqual(profile.supportRow, {
     contractVersion: 1,
@@ -524,7 +840,10 @@ test('parseAcceptanceProfile rejects a malformed supportRow', () => {
     [(row) => ({ ...row, rowId: 'Not A Row Id' }), /rowId/],
   ]) {
     const raw = clone(COMMON_V1_RAW);
-    raw.supportRow = mutate({ contractVersion: 1, rowId: 'macos-26-arm64-node24-npm11-v1' });
+    raw.supportRow = mutate({
+      contractVersion: 1,
+      rowId: 'macos-26-arm64-node24-npm11-v1',
+    });
     assert.throws(() => parseAcceptanceProfile(raw), pattern);
   }
 });
@@ -535,9 +854,21 @@ test('the committed macOS profile is a legitimate additive extension of common-v
   assert.equal(MACOS_V1_RAW.base.digest, profileDigest(BASE_PROFILE));
 
   const composed = composeProfile(BASE_PROFILE, MACOS_V1_RAW);
-  // The composed profile contains EVERY common-v1 journey exactly once, in base
-  // order, with no downgrade â€” then appends the macOS-specific journeys.
+  assert.deepEqual(composed.requiredCapabilities, [
+    'process-tree-cleanup',
+    'pty',
+    'symlink',
+    'permissions',
+    'process-tree-rss',
+  ]);
+  // The composed profile preserves the committed executable order and contains
+  // EVERY common-v1 journey exactly once, in relative base order, with no downgrade.
   const composedIds = composed.journeys.map((journey) => journey.id);
+  assert.deepEqual(
+    composedIds,
+    MACOS_V1_RAW.journeys.map((journey) => journey.id),
+    'composition must preserve the derived profile executable order',
+  );
   const composedIdSet = new Set(composedIds);
   assert.equal(composedIdSet.size, composedIds.length, 'composed journeys must be unique');
   for (const base of BASE_PROFILE.journeys) {
@@ -551,23 +882,40 @@ test('the committed macOS profile is a legitimate additive extension of common-v
     // A required base journey stays required (never silently downgraded).
     if (base.required) assert.equal(carried.required, true, `${base.id} must stay required`);
   }
-  // The first common-v1 journeys keep their base order at the head of the list.
+  // Base rows remain an ordered subsequence even when macOS rows are interleaved.
+  const baseIdSet = new Set(BASE_PROFILE.journeys.map((journey) => journey.id));
   assert.deepEqual(
-    composedIds.slice(0, BASE_PROFILE.journeys.length),
+    composedIds.filter((id) => baseIdSet.has(id)),
     BASE_PROFILE.journeys.map((journey) => journey.id),
   );
-  // Every trailing (macOS-only) journey is namespaced and required.
-  const macosOnly = composed.journeys.slice(BASE_PROFILE.journeys.length);
+  // Every macOS-only journey is required and executes before destructive lifecycle cleanup.
+  const macosOnly = composed.journeys.filter((journey) => journey.id.startsWith('macos.'));
   assert.ok(macosOnly.length > 0, 'the macOS profile must add at least one native journey');
   for (const journey of macosOnly) {
     assert.match(journey.id, /^macos\./, `${journey.id} must be a macos.* journey`);
     assert.equal(journey.required, true, `${journey.id} must be required`);
+    assert.ok(
+      composedIds.indexOf(journey.id) < composedIds.indexOf('lifecycle.cli-state-uninstall'),
+      `${journey.id} must execute before lifecycle.cli-state-uninstall`,
+    );
   }
+  assert.ok(
+    composedIds.indexOf('lifecycle.cli-state-uninstall') <
+      composedIds.indexOf('lifecycle.package-uninstall'),
+    'CLI-state cleanup must remain before final package removal',
+  );
   // The support-row binding is carried onto the composed profile + stays frozen.
   assert.deepEqual(composed.supportRow, {
     contractVersion: 1,
     rowId: 'macos-26-arm64-node24-npm11-v1',
   });
+  const upgrade = composed.journeys.find((journey) => journey.id === 'lifecycle.upgrade');
+  const installer = composed.journeys.find((journey) => journey.id === 'macos.installer-sh');
+  assert.equal(upgrade.required, false);
+  assert.equal(isJourneyRequired(upgrade, null), false);
+  assert.deepEqual(installer.candidateKinds, ['published-version']);
+  assert.equal(isJourneyApplicable(installer, 'packed-release'), false);
+  assert.equal(isJourneyApplicable(installer, 'published-version'), true);
   assert.ok(Object.isFrozen(composed));
 });
 
@@ -590,7 +938,9 @@ test('parseAcceptanceEvidence rejects a completion digest that does not match th
 });
 
 test('parseAcceptanceEvidence rejects completedAt before startedAt', () => {
-  const body = makeEvidenceBody(BASE_PROFILE, { completedAt: '2025-01-01T00:00:00.000Z' });
+  const body = makeEvidenceBody(BASE_PROFILE, {
+    completedAt: '2025-01-01T00:00:00.000Z',
+  });
   assert.throws(() => parseAcceptanceEvidence(seal(body)), /timestamp-order/);
 });
 
@@ -613,6 +963,12 @@ test('parseAcceptanceEvidence rejects unknown top-level keys and non-array resul
   assert.throws(() => parseAcceptanceEvidence(seal(badResults)), /invalid-results/);
 });
 
+test('parseAcceptanceEvidence rejects unknown host capability ids', () => {
+  const body = makeEvidenceBody(BASE_PROFILE);
+  body.host.capabilities['typo-capability'] = true;
+  assert.throws(() => parseAcceptanceEvidence(seal(body)), /unknown-capability/);
+});
+
 test('RSS is a tagged measurement: bare zero/undefined sentinels are rejected', () => {
   // An available measurement must carry peakBytes and no reasonCode.
   for (const rss of [
@@ -633,17 +989,95 @@ test('RSS is a tagged measurement: bare zero/undefined sentinels are rejected', 
   }
   // A genuine zero-byte available sample is a valid tagged measurement.
   const zero = makeEvidenceBody(BASE_PROFILE);
-  zero.results[0] = { ...zero.results[0], rss: { status: 'available', peakBytes: 0 } };
+  zero.results[0] = {
+    ...zero.results[0],
+    rss: { status: 'available', peakBytes: 0 },
+  };
   assert.doesNotThrow(() => parseAcceptanceEvidence(seal(zero)));
 });
 
 test('candidate registry must never embed credentials', () => {
   const body = makeEvidenceBody(BASE_PROFILE);
-  body.candidate = { ...body.candidate, registry: 'user:pass@registry.example' };
+  body.candidate = {
+    kind: 'published-version',
+    version: '0.7.0',
+    source: 'npm:opensip-cli@0.7.0',
+    digest: 'a'.repeat(64),
+    registry: 'https://user:pass@registry.example/',
+    registryIntegrityDigest: 'b'.repeat(64),
+  };
   assert.throws(() => parseAcceptanceEvidence(seal(body)), /invalid-registry/);
   const httpsOk = makeEvidenceBody(BASE_PROFILE);
-  httpsOk.candidate = { ...httpsOk.candidate, registry: 'registry.npmjs.org' };
+  httpsOk.candidate = {
+    kind: 'published-version',
+    version: '0.7.0',
+    source: 'npm:opensip-cli@0.7.0',
+    digest: 'a'.repeat(64),
+    registry: 'https://registry.npmjs.org/',
+    registryIntegrityDigest: 'b'.repeat(64),
+  };
+  httpsOk.registryBindings = {
+    candidateLifecycle: registryProof(),
+    canonicalInstaller: null,
+  };
   assert.doesNotThrow(() => parseAcceptanceEvidence(seal(httpsOk)));
+});
+
+test('published registry binding evidence is closed, bounded, and fail-closed', () => {
+  const missing = makeEvidenceBody(BASE_PROFILE);
+  missing.candidate = {
+    kind: 'published-version',
+    version: '0.7.0',
+    source: 'npm:opensip-cli@0.7.0',
+    digest: 'a'.repeat(64),
+    registry: 'https://registry.npmjs.org/',
+    registryIntegrityDigest: 'b'.repeat(64),
+  };
+  assert.throws(() => parseAcceptanceEvidence(seal(missing)), /registry-binding-evidence-missing/);
+
+  const valid = structuredClone(missing);
+  valid.registryBindings = {
+    candidateLifecycle: registryProof(),
+    canonicalInstaller: null,
+  };
+  assert.doesNotThrow(() => parseAcceptanceEvidence(seal(valid)));
+
+  for (const mutate of [
+    (proof) => {
+      proof.packageCount = 2;
+    },
+    (proof) => {
+      proof.packageNames = ['opensip-cli', 'opensip-cli'];
+      proof.packageCount = 2;
+    },
+    (proof) => {
+      proof.offlineReplayComplete = false;
+    },
+    (proof) => {
+      proof.inventoryDigest = 'd'.repeat(64);
+    },
+  ]) {
+    const body = structuredClone(valid);
+    mutate(body.registryBindings.candidateLifecycle);
+    assert.throws(() => parseAcceptanceEvidence(seal(body)));
+  }
+});
+
+test('evidence requires standalone previous-candidate and execution provenance', () => {
+  const missingPrevious = makeEvidenceBody(BASE_PROFILE);
+  delete missingPrevious.previousCandidate;
+  assert.throws(() => parseAcceptanceEvidence(seal(missingPrevious)), /previousCandidate/);
+
+  const missingExecution = makeEvidenceBody(BASE_PROFILE);
+  delete missingExecution.execution;
+  assert.throws(() => parseAcceptanceEvidence(seal(missingExecution)), /execution/);
+
+  const malformedManifest = makeEvidenceBody(BASE_PROFILE);
+  malformedManifest.candidate = {
+    ...malformedManifest.candidate,
+    manifestDigest: 'bad',
+  };
+  assert.throws(() => parseAcceptanceEvidence(seal(malformedManifest)), /manifestDigest/);
 });
 
 // ---------------------------------------------------------------------------
@@ -664,6 +1098,20 @@ test('writeAcceptanceEvidence writes a verifiable sealed artifact', () => {
     assert.doesNotThrow(() => parseAcceptanceEvidence(written));
     assert.equal(written.completion.state, 'completed');
   });
+});
+
+test('acceptance documentation distinguishes integrity from provenance-backed authenticity', () => {
+  const decision = readFileSync(
+    join(REPO_ROOT, 'docs/decisions/ADR-0164-installed-artifact-platform-acceptance-evidence.md'),
+    'utf8',
+  );
+  const maintainerGuide = readFileSync(join(REPO_ROOT, 'scripts/README.md'), 'utf8');
+  for (const document of [decision, maintainerGuide]) {
+    assert.match(document, /unkeyed (?:digest|integrity check)/);
+    assert.match(document, /not an authenticity signature/);
+    assert.match(document, /trusted workflow(?:-run|\/release)/);
+    assert.doesNotMatch(document, /self-verifying|unforgeable/);
+  }
 });
 
 test('writeAcceptanceEvidence refuses a symlink destination and a path inside the run root', () => {

@@ -14,12 +14,13 @@
 //   7. The release workflow emits checksums/SBOM and pinned artifact attestations.
 //   8. The scheduled macOS qualification lane is pinned + least-privilege.
 
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { discoverPublishablePackages } from './release-package-order.mjs';
+import { RELEASE_PACKAGE_ORDER, discoverPublishablePackages } from './release-package-order.mjs';
 import {
   extractPublishBlocks,
   publishBlockHasProvenance,
@@ -293,11 +294,11 @@ function collectOrderProblems(segment, jobName, orderedSteps) {
 }
 
 /**
- * Assert the three-job release topology (Plan 02 Phase 3): `stage-release` owns
- * pack/attest/smoke/staging-publish and the attestation permissions; the pinned
- * `qualify-macos` gate holds only `contents: read` with NO publish/promotion
- * credential; `promote-release` is the ONLY job with the promotion secret +
- * release write, needs both prior jobs, and holds no publish OIDC/attestation.
+ * Assert the four-job release topology (Plan 02 Phase 3): unprivileged
+ * `build-release` owns repository code, gates, pack, and smoke; minimal
+ * `stage-release` consumes one immutable bundle and alone owns publish OIDC +
+ * attestation permissions; the pinned `qualify-macos` gate holds only
+ * `contents: read`; `promote-release` alone owns release write + promotion.
  */
 function checkReleaseArtifactAttestations(workflows) {
   const workflow = workflows.find((entry) => entry.relPath === '.github/workflows/release.yml');
@@ -309,12 +310,14 @@ function checkReleaseArtifactAttestations(workflows) {
   const problems = [];
   const content = stripComments(workflow.content);
   const jobs = sliceJobs(workflow.content);
+  const build = jobs.has('build-release') ? stripComments(jobs.get('build-release')) : undefined;
   const stage = jobs.has('stage-release') ? stripComments(jobs.get('stage-release')) : undefined;
   const macos = jobs.has('qualify-macos') ? stripComments(jobs.get('qualify-macos')) : undefined;
   const promote = jobs.has('promote-release')
     ? stripComments(jobs.get('promote-release'))
     : undefined;
 
+  if (build === undefined) problems.push('build-release job is missing');
   if (stage === undefined) problems.push('stage-release job is missing');
   if (macos === undefined) problems.push('qualify-macos job is missing');
   if (promote === undefined) problems.push('promote-release job is missing');
@@ -330,16 +333,46 @@ function checkReleaseArtifactAttestations(workflows) {
     }
   }
 
-  // stage-release: ordered pack/artifact/attest/smoke/staging-publish + perms.
-  if (stage !== undefined) {
+  // build-release: every checkout-controlled action happens without publish or
+  // attestation authority, then one attempt-bound immutable bundle is uploaded.
+  if (build !== undefined) {
     problems.push(
-      ...collectOrderProblems(stage, 'stage-release', [
+      ...collectOrderProblems(build, 'build-release', [
         'scripts/build-release-artifacts.mjs',
         'scripts/verify-release-artifacts.mjs',
         'scripts/smoke-pack.mjs',
+        'Upload immutable staging bundle',
+      ]),
+    );
+    for (const permission of [
+      'id-token: write',
+      'attestations: write',
+      'artifact-metadata: write',
+    ]) {
+      if (build.includes(permission)) problems.push(`build-release must NOT hold ${permission}`);
+    }
+    if (/\bnpm\s+publish\b/u.test(build)) problems.push('build-release must NOT publish to npm');
+    if (!/release-staging-bundle-v\$\{VERSION\}-run\$\{RUN_ATTEMPT\}/u.test(build)) {
+      problems.push('build-release staging bundle identity must include version + run attempt');
+    }
+    if (!/uses:\s*actions\/upload-artifact@[a-f0-9]{40}\b/u.test(build)) {
+      problems.push('build-release must upload the staging bundle through a pinned action SHA');
+    }
+  }
+
+  // stage-release: no checkout/repository execution/dependency install. It
+  // strictly validates the bundle, attests it, and publishes with scripts off.
+  if (stage !== undefined) {
+    problems.push(
+      ...collectOrderProblems(stage, 'stage-release', [
+        'Download immutable attempt-bound staging bundle',
+        'Strictly validate bundle identity, checksums, and package metadata',
+        'Attest release artifact provenance',
         'Publish via npm',
       ]),
     );
+    if (!/needs:\s*build-release\b/u.test(stage))
+      problems.push('stage-release must depend on build-release');
     if (!/attestations:\s*write/u.test(stage))
       problems.push('stage-release permissions.attestations: write is missing');
     if (!/artifact-metadata:\s*write/u.test(stage))
@@ -348,12 +381,80 @@ function checkReleaseArtifactAttestations(workflows) {
       problems.push('stage-release permissions.id-token: write is missing (OIDC publish)');
     if (!/uses:\s*actions\/attest@[a-f0-9]{40}\b/u.test(stage))
       problems.push('actions/attest must be pinned to a full commit SHA in stage-release');
-    if (!/subject-checksums:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(stage))
+    if (!/subject-checksums:\s*\$\{\{ runner\.temp \}\}\/release-bundle\/SHA256SUMS/u.test(stage))
       problems.push('artifact attestation must use the generated SHA256SUMS subject list');
-    if (!/subject-path:\s*\/tmp\/tarballs\/SHA256SUMS/u.test(stage))
+    if (!/subject-path:\s*\$\{\{ runner\.temp \}\}\/release-bundle\/SHA256SUMS/u.test(stage))
       problems.push('SHA256SUMS must have its own artifact attestation');
-    if (!/sbom-path:\s*\/tmp\/tarballs\/opensip-cli-sbom\.cyclonedx\.json/u.test(stage))
+    if (
+      !/sbom-path:\s*\$\{\{ runner\.temp \}\}\/release-bundle\/opensip-cli-sbom\.cyclonedx\.json/u.test(
+        stage,
+      )
+    )
       problems.push('SBOM attestation must use opensip-cli-sbom.cyclonedx.json');
+    if (/actions\/checkout@|\bpnpm\b|\bnpm\s+(?:install|ci)\b|node\s+scripts\//u.test(stage)) {
+      problems.push(
+        'stage-release must not checkout, install dependencies, run pnpm, or execute repo scripts',
+      );
+    }
+    if (!/node-version:\s*'24\.16\.0'/u.test(stage))
+      problems.push('stage-release must provision the reviewed exact Node runtime');
+    if (!/process\.argv\[1\]!=="11\.13\.0"/u.test(stage))
+      problems.push('stage-release must verify the exact bundled npm runtime');
+    if (
+      !/needs\.build-release\.outputs\.manifest-digest/u.test(stage) ||
+      !/manifest digest mismatch/u.test(stage)
+    ) {
+      problems.push('stage-release must fail closed against the independent manifest digest');
+    }
+    const releaseOrderDigest = createHash('sha256')
+      .update(`${RELEASE_PACKAGE_ORDER.map((entry) => entry.name).join('\n')}\n`)
+      .digest('hex');
+    if (!stage.includes(`expectedPackageOrderDigest = '${releaseOrderDigest}'`)) {
+      problems.push('stage-release must bind the exact canonical full package-name order');
+    }
+    if (!/tag !== ambientTag \|\| gitSha !== ambientGitSha/u.test(stage)) {
+      problems.push('stage-release must bind builder identity to GITHUB_REF_NAME/GITHUB_SHA');
+    }
+    if (
+      !/stagingTag !== `release-candidate-\$\{version\}` \|\| stagingTag === 'latest'/u.test(
+        stage,
+      ) ||
+      !/STAGING_TAG:\s*\$\{\{\s*steps\.identity\.outputs\.staging-tag\s*\}\}/u.test(stage)
+    ) {
+      problems.push(
+        'stage-release must validate and publish only to the version-scoped staging tag',
+      );
+    }
+    if (
+      !/forbiddenLifecycleScripts = \['preinstall', 'install', 'postinstall'\]/u.test(stage) ||
+      !/hasOwnProperty\.call\(packageJson\.scripts, scriptName\)/u.test(stage)
+    ) {
+      problems.push('stage-release must reject install lifecycle keys inside every tarball');
+    }
+    const releaseComponentSetDigest = createHash('sha256')
+      .update(
+        `${RELEASE_PACKAGE_ORDER.map((entry) => entry.name)
+          .sort()
+          .join('\n')}\n`,
+      )
+      .digest('hex');
+    if (
+      !stage.includes(`expectedReleaseComponentSetDigest = '${releaseComponentSetDigest}'`) ||
+      !/SBOM schema\/spec version mismatch/u.test(stage) ||
+      !/SBOM release metadata identity mismatch/u.test(stage) ||
+      !/SBOM OpenSIP component set does not match the reviewed canonical release set/u.test(stage)
+    ) {
+      problems.push(
+        'stage-release must bind SBOM schema, release identity, and canonical components',
+      );
+    }
+    if (
+      !/npm publish[\s\S]*--ignore-scripts[\s\S]*--registry https:\/\/registry\.npmjs\.org\//u.test(
+        stage,
+      )
+    ) {
+      problems.push('stage-release npm publish must disable scripts and pin the public registry');
+    }
     if (/secrets\.MACBOOKM5/u.test(stage))
       problems.push('stage-release must NOT reference the promotion secret MACBOOKM5');
     if (/npm\s+dist-tag\s+add/u.test(stage))
@@ -399,12 +500,67 @@ function checkReleaseArtifactAttestations(workflows) {
       problems.push(
         'promote-release must create the GitHub Release via a pinned action-gh-release SHA',
       );
+    if (!/ref:\s*\$\{\{\s*needs\.stage-release\.outputs\.git-sha\s*\}\}/u.test(promote))
+      problems.push('promote-release must checkout the exact staged SHA');
+    if (!/persist-credentials:\s*false/u.test(promote))
+      problems.push('promote-release checkout must not persist the contents-write credential');
+    if (!/origin URL contains embedded credentials/u.test(promote))
+      problems.push('promote-release must reject a credential-bearing origin URL');
+    if (
+      !/git rev-list -n 1 "\$TAG"/u.test(promote) ||
+      !/git status --porcelain=v1/u.test(promote)
+    ) {
+      problems.push('promote-release must validate tag→SHA and a clean tree before repo code');
+    }
+    if (/pnpm\/action-setup@|\bpnpm\b|\bnpm\s+(?:install|ci)\b/u.test(promote)) {
+      problems.push('promote-release must not install package managers or dependencies');
+    }
+    const identityIndex = promote.indexOf('Validate exact tag, SHA, clean tree');
+    const runtimeIndex = promote.indexOf("node-version: '24.16.0'");
+    const repoScriptIndex = promote.indexOf('node scripts/');
+    if (identityIndex < 0 || runtimeIndex <= identityIndex || repoScriptIndex <= runtimeIndex) {
+      problems.push(
+        'promote-release must validate identity, then pin Node, before repository scripts',
+      );
+    }
+    if (!/PROMOTION_ORDER:\s*\$\{\{ runner\.temp \}\}\/promotion-order\.txt/u.test(promote)) {
+      problems.push('promote-release must use one bounded inert promotion-order handoff');
+    }
+    const promotionOrderDigest = createHash('sha256')
+      .update(`${RELEASE_PACKAGE_ORDER.map((entry) => entry.name).join('\n')}\n`)
+      .digest('hex');
+    if (!promote.includes(`PROMOTION_ORDER_SHA256: ${promotionOrderDigest}`)) {
+      problems.push('promotion-order digest must match canonical RELEASE_PACKAGE_ORDER');
+    }
+    const tokenStart = promote.indexOf('- name: Promote staged release to latest');
+    const tokenEnd = promote.indexOf('\n      - name:', tokenStart + 1);
+    const tokenStep = promote.slice(tokenStart, tokenEnd);
+    if (
+      tokenStart < 0 ||
+      !/NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.MACBOOKM5\s*\}\}/u.test(tokenStep) ||
+      !/mapfile -t package_names < "\$PROMOTION_ORDER"/u.test(tokenStep) ||
+      !/:_authToken=\$\{NODE_AUTH_TOKEN\}/u.test(tokenStep) ||
+      !/export NPM_CONFIG_USERCONFIG="\$promotion_npmrc"/u.test(tokenStep) ||
+      !/trap cleanup_npmrc EXIT/u.test(tokenStep)
+    ) {
+      problems.push('token-bearing promotion must consume the bounded inert order file');
+    }
+    if (/node\s+scripts\/|release-package-order\.mjs/u.test(tokenStep)) {
+      problems.push('token-bearing promotion must NOT execute repository code');
+    }
+    for (const line of promote
+      .split('\n')
+      .filter((entry) => /\bnpm\s+(?:view|dist-tag)\b/u.test(entry))) {
+      if (!/--registry https:\/\/registry\.npmjs\.org\//u.test(line)) {
+        problems.push(`promote-release npm registry is not fixed: ${line.trim()}`);
+      }
+    }
   }
 
   if (problems.length === 0) {
     pass(
       7,
-      'release workflow enforces the staged→macOS-gate→promote topology with pinned attestations.',
+      'release workflow isolates build→minimal-stage→macOS-gate→promote with pinned attestations.',
     );
   } else {
     fail(7, `release artifact attestation problems:\n    ${problems.join('\n    ')}`);
@@ -451,6 +607,19 @@ function checkMacosQualificationLane(workflows) {
     problems.push('the qualification lane must NOT promote to latest');
   if (/secrets\.MACBOOKM5/u.test(content))
     problems.push('the qualification lane must NOT hold the promotion secret MACBOOKM5');
+  for (const path of [
+    "'packages/**'",
+    "'scripts/**'",
+    "'package.json'",
+    "'pnpm-lock.yaml'",
+    "'pnpm-workspace.yaml'",
+    "'tsconfig*.json'",
+    "'turbo.json'",
+  ]) {
+    if (content.split(path).length - 1 !== 2) {
+      problems.push(`${path} must trigger both push and pull_request qualification`);
+    }
+  }
 
   if (problems.length === 0) {
     pass(

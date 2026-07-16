@@ -56,7 +56,7 @@ export type InstallOutcome =
 export function npmInstallIntoHost(dir: string, packageName: string): InstallOutcome {
   const depsBefore = readHostDependencies(dir);
   try {
-    execFileSync('npm', ['install', '--ignore-scripts', packageName], {
+    execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', packageName], {
       cwd: dir,
       stdio: ['ignore', process.stderr, process.stderr],
     });
@@ -107,7 +107,7 @@ export function addToolPlugin(packageName: string, cwd: string, project: boolean
 /** npm-uninstall a package from a host dir. Pure of config concerns. */
 export function npmUninstallFromHost(dir: string, packageName: string): boolean {
   try {
-    execFileSync('npm', ['uninstall', packageName], {
+    execFileSync('npm', ['uninstall', '--ignore-scripts', '--no-audit', '--no-fund', packageName], {
       cwd: dir,
       stdio: ['ignore', process.stderr, process.stderr],
     });

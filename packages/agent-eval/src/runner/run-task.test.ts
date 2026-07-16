@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,17 +14,37 @@ import {
   runTaskArm,
   type RunTaskDependencies,
 } from './run-task.js';
+import { buildCliTarget, cleanupCliTarget } from './spawn.js';
 
 import type { FixtureCopySource } from './fixture-workspace.js';
 import type { McpSetupProvenance, SetupRecord, StepRecord, ToolInvoker } from '../model/record.js';
 import type { AnswerFact, GoldTask, ResolvedStrategyStep, StrategyStep } from '../model/task.js';
 
 const temporaryRoots: string[] = [];
+const temporaryTargets: ReturnType<typeof buildCliTarget>[] = [];
+
+function installedTarget(entrypoint: string): ReturnType<typeof buildCliTarget> {
+  const target = buildCliTarget(entrypoint);
+  temporaryTargets.push(target);
+  return target;
+}
 
 function temporaryDirectory(prefix = 'agent-eval-run-task-'): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   temporaryRoots.push(root);
   return root;
+}
+
+function installedCliEntrypoint(root: string): string {
+  const packageRoot = join(root, 'node_modules', 'opensip-cli');
+  const entrypoint = join(packageRoot, 'dist', 'cli.js');
+  mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+  writeFileSync(
+    join(packageRoot, 'package.json'),
+    `${JSON.stringify({ bin: { opensip: './dist/cli.js' }, name: 'opensip-cli' })}\n`,
+  );
+  writeFileSync(entrypoint, 'export default 1;\n');
+  return entrypoint;
 }
 
 function step(id: string, tool = 'readFile'): StrategyStep {
@@ -192,6 +212,7 @@ function visibleDogfoodFiles(root: string) {
 }
 
 afterEach(() => {
+  for (const target of temporaryTargets.splice(0)) cleanupCliTarget(target);
   for (const root of temporaryRoots.splice(0)) {
     rmSync(root, { force: true, recursive: true });
   }
@@ -247,33 +268,45 @@ describe('ordinary task orchestration', () => {
 
   it('threads a CLI target into MCP command and entrypoint resolution', () => {
     const root = temporaryDirectory();
-    const target = {
-      command: '/node-bin',
-      entrypoint: '/installed/cli.js',
-      source: 'installed' as const,
-    };
+    const entrypoint = installedCliEntrypoint(root);
+    const target = installedTarget(entrypoint);
     const options = buildMcpSessionOptions(root, 'fixture', target);
     expect(options.workspaceRoot).toBe(root);
     expect(options.env).toEqual({ HOME: join(root, '.agent-eval-home') });
-    expect(options.cliCommand).toBe('/node-bin');
-    expect(options.cliDistResolver?.()).toBe('/installed/cli.js');
+    expect(options.cliCommand).toBe(process.execPath);
+    expect(options.cliPreludeArgs).toEqual(target.executionPrelude);
+    expect(options.cliDistResolver?.()).toBe(
+      target.source === 'installed' ? target.executionEntrypoint : '',
+    );
+  });
+
+  it('keeps MCP entrypoint resolution pure and verifies once at the process boundary', () => {
+    const root = temporaryDirectory();
+    const entrypoint = installedCliEntrypoint(root);
+    const target = installedTarget(entrypoint);
+    const options = buildMcpSessionOptions(root, 'fixture', target);
+    writeFileSync(entrypoint, 'export default 2;\n');
+
+    expect(options.cliDistResolver?.()).toBe(
+      target.source === 'installed' ? target.executionEntrypoint : '',
+    );
+    expect(() => options.targetStabilityCheck?.()).toThrow(/changed/u);
   });
 
   it('threads the run CLI target into fixture setup and the MCP session', async () => {
     const events: string[] = [];
     const root = temporaryDirectory('target-threading-');
-    const target = {
-      command: process.execPath,
-      entrypoint: '/installed/cli.js',
-      source: 'installed' as const,
-    };
+    const entrypoint = installedCliEntrypoint(root);
+    const target = installedTarget(entrypoint);
     let setupTarget: unknown;
     let connectTarget: unknown;
+    let maxToolCalls: number | undefined;
     await runTaskArm(ordinaryTask(), 'opensip', {
       cliTarget: target,
       dependencies: {
-        connectMcp: (workspaceRoot, _mode, injected) => {
+        connectMcp: (workspaceRoot, _mode, injected, requestedToolCalls) => {
           connectTarget = injected;
+          maxToolCalls = requestedToolCalls;
           return Promise.resolve(fakeSession(workspaceRoot, events));
         },
         setupFixture: (workspaceRoot, _language, injected) => {
@@ -285,6 +318,7 @@ describe('ordinary task orchestration', () => {
     });
     expect(setupTarget).toBe(target);
     expect(connectTarget).toBe(target);
+    expect(maxToolCalls).toBe(2);
   });
 
   it.each(['control', 'opensip'] as const)(

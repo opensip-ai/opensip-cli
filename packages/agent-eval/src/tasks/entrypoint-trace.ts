@@ -15,7 +15,7 @@ import type {
 } from '../model/task.js';
 
 const CONTROL_STRATEGY_VERSION = 'control-native-v1';
-const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-4';
+const OPENSIP_STRATEGY_VERSION = 'opensip-mcp-epoch-4-v2-entry-disambiguation';
 const MAX_SOURCE_BYTES = 65_536;
 const ENTRY_FILE = 'src/index.ts';
 const ENTRY_SYMBOL = 'main';
@@ -285,7 +285,11 @@ function controlSteps(): readonly StrategyStep[] {
   ];
 }
 
-function directCalleeStep(id: string, priorStepId: string): StrategyStep {
+function directCalleeStep(
+  id: string,
+  priorStepId: string,
+  symbolId: FactBinding = soleHandleBinding('symbolId', priorStepId),
+): StrategyStep {
   return {
     arguments: {
       depth: 1,
@@ -294,12 +298,12 @@ function directCalleeStep(id: string, priorStepId: string): StrategyStep {
       identity: 'occurrence',
       limit: 20,
       sourceScope: 'production',
-      symbolId: soleHandleBinding('symbolId', priorStepId),
+      symbolId,
     },
     expectedNonEmpty: true,
     extract: extractDirectCalleeSymbols,
     id,
-    rationale: 'Follow the sole direct callee identity returned by the preceding graph response.',
+    rationale: 'Traverse from the uniquely selected symbol handle in the preceding graph response.',
     tool: 'callees_of',
   };
 }
@@ -333,7 +337,11 @@ function opensipSteps(): readonly StrategyStep[] {
       rationale: 'Confirm the discovered file/line identity before traversing its calls.',
       tool: 'get_symbol',
     },
-    directCalleeStep('opensip-follow-hop-1', 'opensip-resolve-entry'),
+    directCalleeStep(
+      'opensip-follow-hop-1',
+      'opensip-resolve-entry',
+      handleBinding('symbolId', 'opensip-resolve-entry'),
+    ),
     directCalleeStep('opensip-follow-hop-2', 'opensip-follow-hop-1'),
     directCalleeStep('opensip-follow-hop-3', 'opensip-follow-hop-2'),
     directCalleeStep('opensip-follow-hop-4', 'opensip-follow-hop-3'),

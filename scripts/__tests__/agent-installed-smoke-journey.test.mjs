@@ -24,6 +24,9 @@ const AGENT_EVAL_MODEL = join(REPO_ROOT, 'packages', 'agent-eval', 'dist', 'repo
 const SKIP = !existsSync(AGENT_EVAL_MODEL);
 
 const INSTALLED_VERSION = '9.9.9';
+const ENTRYPOINT_SHA256 = `sha256:${'c'.repeat(64)}`;
+const PACKAGE_JSON_SHA256 = `sha256:${'d'.repeat(64)}`;
+const SMOKE_TASK_ID = 'entrypoint-trace.customer-ts';
 const executor = getJourney('agent.installed-smoke').executor;
 
 const roots = [];
@@ -60,7 +63,7 @@ function armResult(arm, passed) {
       ],
       setup: { mode: 'fixture', stages: [] },
       strategyVersion: `${arm}-v1`,
-      taskId: 'entrypoint-trace.customer-ts',
+      taskId: SMOKE_TASK_ID,
     },
   };
 }
@@ -70,7 +73,15 @@ function makeReport(overrides = {}) {
   const source = overrides.source ?? 'installed';
   const sourceState = overrides.sourceState ?? 'clean';
   return {
-    cliTarget: { entrypointName: 'index.js', source },
+    cliTarget:
+      source === 'installed'
+        ? {
+            entrypointName: 'index.js',
+            entrypointSha256: overrides.entrypointSha256 ?? ENTRYPOINT_SHA256,
+            packageJsonSha256: overrides.packageJsonSha256 ?? PACKAGE_JSON_SHA256,
+            source,
+          }
+        : { entrypointName: 'index.js', source },
     cliVersion: overrides.cliVersion ?? INSTALLED_VERSION,
     completedAt: '2026-07-14T20:01:00.000Z',
     contractFingerprint: `sha256:${'a'.repeat(64)}`,
@@ -90,10 +101,18 @@ function makeReport(overrides = {}) {
           opensip: armResult('opensip', overrides.opensipPassed ?? true),
         },
         completedAt: '2026-07-14T20:00:30.000Z',
-        taskId: 'entrypoint-trace.customer-ts',
+        taskId: SMOKE_TASK_ID,
       },
     ],
   };
+}
+
+function taskWithId(task, taskId) {
+  const copy = structuredClone(task);
+  copy.taskId = taskId;
+  copy.arms.control.record.taskId = taskId;
+  copy.arms.opensip.record.taskId = taskId;
+  return copy;
 }
 
 /** Build a journey context whose measured-process port runs `handleRun(spec)`. */
@@ -102,7 +121,12 @@ function makeContext(handleRun, installedOverrides = {}) {
   return {
     installed: {
       installedBin: { bin: '/candidate/bin/opensip', kind: 'installed-bin' },
-      jsEntrypoint: { kind: 'node-script', script: '/candidate/dist/index.js' },
+      jsEntrypoint: {
+        entrypointSha256: ENTRYPOINT_SHA256,
+        kind: 'node-script',
+        packageJsonSha256: PACKAGE_JSON_SHA256,
+        script: '/candidate/dist/index.js',
+      },
       mode: 'packed-release',
       resolvedVersion: INSTALLED_VERSION,
       ...installedOverrides,
@@ -154,7 +178,7 @@ test(
     const outcome = await executor(context);
     assert.equal(outcome.status, 'pass');
     assert.ok(outcome.diagnostics.some((d) => d.includes('targetSource=installed')));
-    assert.ok(outcome.diagnostics.some((d) => d.includes('report sha256:')));
+    assert.ok(outcome.diagnostics.some((d) => d.includes('ephemeral raw report sha256:')));
   },
 );
 
@@ -201,6 +225,22 @@ test(
   },
 );
 
+test('fails when either reported installed-package digest differs', { skip: SKIP }, async () => {
+  for (const overrides of [
+    { entrypointSha256: `sha256:${'e'.repeat(64)}` },
+    { packageJsonSha256: `sha256:${'f'.repeat(64)}` },
+  ]) {
+    const context = makeContext((spec) => {
+      writeFileSync(reportPathOf(spec), JSON.stringify(makeReport(overrides)));
+      return measuredResult();
+    });
+    const outcome = await executor(context);
+    assert.equal(outcome.status, 'fail');
+    assert.equal(outcome.reasonCode, 'installed-smoke-unmet');
+    assert.ok(outcome.diagnostics.some((entry) => entry.includes('digest does not match')));
+  }
+});
+
 test('fails when the OpenSIP arm assertions did not pass', { skip: SKIP }, async () => {
   const context = makeContext((spec) => {
     writeFileSync(reportPathOf(spec), JSON.stringify(makeReport({ opensipPassed: false })));
@@ -210,6 +250,34 @@ test('fails when the OpenSIP arm assertions did not pass', { skip: SKIP }, async
   assert.equal(outcome.status, 'fail');
   assert.equal(outcome.reasonCode, 'installed-smoke-unmet');
 });
+
+test(
+  'fails unless the schema-valid report contains exactly the fixed smoke task',
+  { skip: SKIP },
+  async () => {
+    const wrongTask = makeContext((spec) => {
+      const report = makeReport();
+      report.tasks[0] = taskWithId(report.tasks[0], 'different.customer-task');
+      writeFileSync(reportPathOf(spec), JSON.stringify(report));
+      return measuredResult();
+    });
+    const wrongOutcome = await executor(wrongTask);
+    assert.equal(wrongOutcome.status, 'fail');
+    assert.equal(wrongOutcome.reasonCode, 'installed-smoke-unmet');
+    assert.ok(wrongOutcome.diagnostics.some((entry) => entry.includes(SMOKE_TASK_ID)));
+
+    const extraTask = makeContext((spec) => {
+      const report = makeReport();
+      report.tasks.push(taskWithId(report.tasks[0], 'additional.customer-task'));
+      writeFileSync(reportPathOf(spec), JSON.stringify(report));
+      return measuredResult();
+    });
+    const extraOutcome = await executor(extraTask);
+    assert.equal(extraOutcome.status, 'fail');
+    assert.equal(extraOutcome.reasonCode, 'installed-smoke-unmet');
+    assert.ok(extraOutcome.diagnostics.some((entry) => entry.includes('expected exactly one')));
+  },
+);
 
 test('fails when the workspace source changed during the run', { skip: SKIP }, async () => {
   const context = makeContext((spec) => {
@@ -225,11 +293,29 @@ test('fails when the workspace source changed during the run', { skip: SKIP }, a
 });
 
 test(
+  'fails when a schema-valid report is dirty and not promotion-eligible',
+  { skip: SKIP },
+  async () => {
+    const context = makeContext((spec) => {
+      writeFileSync(reportPathOf(spec), JSON.stringify(makeReport({ sourceState: 'dirty' })));
+      return measuredResult();
+    });
+    const outcome = await executor(context);
+    assert.equal(outcome.status, 'fail');
+    assert.equal(outcome.reasonCode, 'installed-smoke-unmet');
+    assert.ok(outcome.diagnostics.some((entry) => entry.includes('promotion-eligible')));
+  },
+);
+
+test(
   'classifies a non-zero harness run as a journey fail (installed-candidate failure)',
   { skip: SKIP },
   async () => {
     const context = makeContext(() =>
-      measuredResult({ status: 2, stderrTail: 'prerequisite: MCP unavailable' }),
+      measuredResult({
+        status: 2,
+        stderrTail: 'prerequisite: MCP unavailable',
+      }),
     );
     const outcome = await executor(context);
     assert.equal(outcome.status, 'fail');

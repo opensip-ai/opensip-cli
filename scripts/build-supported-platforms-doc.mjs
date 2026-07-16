@@ -23,6 +23,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import {
+  composeProfile,
+  parseAcceptanceProfile,
+  profileDigest,
+} from './platform-acceptance/contract.mjs';
+
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT_PATH = join(REPO_ROOT, 'docs/public/70-reference/17-supported-platforms.md');
 const CORE_LIB = join(REPO_ROOT, 'packages/core/dist/index-lib.js');
@@ -33,6 +39,12 @@ const ACCEPTANCE_PROFILE_DIR = '.config/platform-acceptance';
 const LAST_VERIFIED = '2026-07-14';
 
 const KNOWN_STATUSES = new Set(['supported', 'preview', 'unqualified', 'unsupported']);
+const POSITIVE_DECIMAL = /^[1-9]\d*$/u;
+const DECIMAL = /^\d+$/u;
+const SEMVER_IDENTIFIER = /^[0-9A-Za-z-]+$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
+const EVIDENCE_RELEASE_ORIGIN = 'https://github.com';
+const EVIDENCE_RELEASE_PREFIX = '/opensip-ai/opensip-cli/releases/download/';
 
 const log = (msg) => console.error(`[build-supported-platforms-doc] ${msg}`);
 
@@ -75,21 +87,112 @@ export function validateSupportRows(rows) {
     ) {
       throw new Error(`row ${row.id}: ${row.status} row missing a qualification profile link`);
     }
+    if (
+      row.status === 'preview' &&
+      (row.evidence === undefined || !row.evidence.artifact || row.evidence.url === undefined)
+    ) {
+      throw new Error(`row ${row.id}: preview row missing an evidence artifact policy`);
+    }
     if (row.status === 'supported') {
       if (row.evidence === undefined || !row.evidence.url) {
         throw new Error(`row ${row.id}: supported row missing a published evidence link`);
       }
-      if (
-        row.qualification === undefined ||
-        typeof row.qualification.consecutiveDailyPasses !== 'number' ||
-        !row.qualification.qualifiedVersion ||
-        !row.qualification.qualifiedAt
-      ) {
+      const qualification = row.qualification;
+      if (qualification === undefined) {
         throw new Error(`row ${row.id}: supported row missing exact qualification metadata`);
+      }
+      if (
+        !Number.isSafeInteger(qualification.consecutiveDailyPasses) ||
+        qualification.consecutiveDailyPasses < 14
+      ) {
+        throw new Error(`row ${row.id}: supported row requires at least 14 daily passes`);
+      }
+      if (!isExactSemver(qualification.qualifiedVersion)) {
+        throw new Error(`row ${row.id}: supported row has an invalid exact qualified version`);
+      }
+      if (!isCanonicalIsoTimestamp(qualification.qualifiedAt)) {
+        throw new Error(`row ${row.id}: supported row has an invalid qualification timestamp`);
+      }
+      if (!SHA256.test(qualification.profileDigest)) {
+        throw new Error(`row ${row.id}: supported row has an invalid profile digest`);
+      }
+      if (
+        !isImmutableEvidenceUrl(
+          row.evidence.url,
+          row.evidence.artifact,
+          qualification.qualifiedVersion,
+        )
+      ) {
+        throw new Error(`row ${row.id}: supported row lacks an immutable HTTPS evidence URL`);
       }
     }
   }
   return rows;
+}
+
+function isExactSemver(value) {
+  if (typeof value !== 'string') return false;
+  const buildParts = value.split('+');
+  if (buildParts.length > 2) return false;
+  const [versionAndPrerelease = '', build] = buildParts;
+  if (build !== undefined && !areValidSemverIdentifiers(build, false)) return false;
+
+  const prereleaseAt = versionAndPrerelease.indexOf('-');
+  const core =
+    prereleaseAt === -1 ? versionAndPrerelease : versionAndPrerelease.slice(0, prereleaseAt);
+  const prerelease = prereleaseAt === -1 ? undefined : versionAndPrerelease.slice(prereleaseAt + 1);
+  const coreParts = core.split('.');
+  if (
+    coreParts.length !== 3 ||
+    coreParts.some((part) => part !== '0' && !POSITIVE_DECIMAL.test(part))
+  ) {
+    return false;
+  }
+  return prerelease === undefined || areValidSemverIdentifiers(prerelease, true);
+}
+
+function areValidSemverIdentifiers(value, rejectNumericLeadingZero) {
+  const identifiers = value.split('.');
+  return identifiers.every(
+    (identifier) =>
+      SEMVER_IDENTIFIER.test(identifier) &&
+      (!rejectNumericLeadingZero ||
+        !DECIMAL.test(identifier) ||
+        identifier === '0' ||
+        !identifier.startsWith('0')),
+  );
+}
+
+function isCanonicalIsoTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
+function isImmutableEvidenceUrl(value, artifact, qualifiedVersion) {
+  if (typeof value !== 'string' || typeof artifact !== 'string' || artifact.length === 0) {
+    return false;
+  }
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username.length > 0 ||
+    parsed.password.length > 0 ||
+    parsed.search.length > 0 ||
+    parsed.hash.length > 0
+  ) {
+    return false;
+  }
+  return (
+    parsed.origin === EVIDENCE_RELEASE_ORIGIN &&
+    parsed.pathname === `${EVIDENCE_RELEASE_PREFIX}v${qualifiedVersion}/${artifact}`
+  );
 }
 
 /** Distinct acceptance-profile config paths for rows that declare a profile. */
@@ -141,7 +244,7 @@ function renderEvidence(row) {
     ? `Release evidence artifact: \`${row.evidence.artifact}\`.`
     : 'No release evidence artifact is declared.';
   const qualification = row.qualification
-    ? `Burn-in: ${String(row.qualification.consecutiveDailyPasses)} consecutive daily passes; qualified at version ${row.qualification.qualifiedVersion} on ${row.qualification.qualifiedAt}.`
+    ? `Burn-in: ${String(row.qualification.consecutiveDailyPasses)} consecutive daily passes; qualified at version ${row.qualification.qualifiedVersion} on ${row.qualification.qualifiedAt}. Profile digest: \`${row.qualification.profileDigest}\`.`
     : '';
   return [profile, artifact, evidenceLinkLine(row), qualification]
     .filter((s) => s.length > 0)
@@ -249,8 +352,9 @@ export function renderSupportedPlatformsDoc(rawRows, contractVersion, releaseVer
     'does not block them and never claims they "cannot run" — but they carry no',
     'evidence-backed promise. Individual dimensions are also unqualified when they',
     'cannot be observed at classification time (see the agent projection below):',
-    'npm version, filesystem type, case behavior, install channel, and the OS/kernel',
-    'product versions are frequently unobserved during an ordinary command.',
+    'npm version, filesystem type, case behavior, install channel, the OS product',
+    'version, and kernel name/version are frequently unobserved during an ordinary',
+    'command.',
     '',
     '## Install channels',
     '',
@@ -267,7 +371,8 @@ export function renderSupportedPlatformsDoc(rawRows, contractVersion, releaseVer
     '`hostSupport` projection built only from process-observable facts',
     '(`process.platform`, `process.arch`, `process.version`,',
     '`process.versions.modules`). Because npm, filesystem, case behavior, install',
-    'channel, and OS/kernel product versions are unobserved at runtime, the local',
+    'channel, OS product version, and kernel name/version are unobserved at runtime,',
+    'the local',
     '`match` is never `exact` — it is `partial` on a clean match and `none` on a',
     "contradiction. Agents must distinguish the registry row's published `status`",
     '(e.g. `preview`) from the local `match`:',
@@ -283,16 +388,19 @@ export function renderSupportedPlatformsDoc(rawRows, contractVersion, releaseVer
     '    "matrixUrl": "https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms",',
     '    "reasonCodes": [],',
     '    "observed": ["os-platform", "arch", "node-major", "node-abi"],',
-    '    "unobserved": ["os-version", "kernel-version", "npm-major", "filesystem-type", "case-sensitivity", "install-channel"]',
+    '    "unobserved": ["os-version", "kernel-name", "kernel-version", "npm-major", "filesystem-type", "case-sensitivity", "install-channel"]',
     '  }',
     '}',
     '```',
     '',
     'A non-macOS host projects `status: "unqualified"`, `match: "none"`, and',
-    '`reasonCodes: ["non-macos-host"]`; Intel/x64 macOS projects `status:',
-    '"unsupported"` with `reasonCodes: ["macos-intel-unsupported"]`. The CLI and MCP',
-    'surfaces map the same core projection through one shared helper, so they emit a',
-    'byte-identical `hostSupport` for identical process facts.',
+    '`reasonCodes: ["non-macos-host"]`. Process-only facts cannot establish every',
+    'dimension of the exact Intel exclusion row, so Intel/x64 projects',
+    '`status: "unqualified"` with `reasonCodes: ["insufficient-host-facts"]` unless',
+    'a fuller assessment observes the complete published tuple. Only that exact tuple',
+    'is `unsupported`, with `reasonCodes: ["macos-intel-unsupported"]`. The CLI and',
+    'MCP surfaces map the same core projection through one shared helper, so they emit',
+    'a byte-identical `hostSupport` for identical process facts.',
     '',
     '## `engines` is not a support claim',
     '',
@@ -358,10 +466,58 @@ function assertProfileArtifactsExist(rows) {
   }
 }
 
+function readProfileDocument(profileId, repoRoot) {
+  const path = join(repoRoot, ACCEPTANCE_PROFILE_DIR, `${profileId}.json`);
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    throw new Error(`acceptance profile ${profileId} is unreadable or invalid JSON`);
+  }
+  return raw;
+}
+
+/**
+ * Parse/compose every referenced profile and bind supported-row qualification
+ * metadata to the exact executable profile digest. This filesystem-aware check
+ * belongs in the generator/release gate; the core registry remains pure data.
+ */
+export function assertQualificationProfilesMatch(rows, contractVersion, repoRoot = REPO_ROOT) {
+  for (const row of rows) {
+    if (row.profile === undefined) continue;
+    const raw = readProfileDocument(row.profile.id, repoRoot);
+    let effective;
+    if (raw?.base === undefined) {
+      effective = parseAcceptanceProfile(raw);
+    } else {
+      const base = parseAcceptanceProfile(readProfileDocument(raw.base.id, repoRoot));
+      effective = composeProfile(base, raw, { knownBaseIds: [base.id] });
+    }
+    if (effective.id !== row.profile.id || effective.version !== row.profile.version) {
+      throw new Error(
+        `row ${row.id}: qualification profile identity does not match its registry link`,
+      );
+    }
+    if (
+      effective.supportRow?.rowId !== row.id ||
+      effective.supportRow?.contractVersion !== contractVersion
+    ) {
+      throw new Error(`row ${row.id}: acceptance profile has a stale support-row binding`);
+    }
+    if (
+      row.status === 'supported' &&
+      profileDigest(effective) !== row.qualification?.profileDigest
+    ) {
+      throw new Error(`row ${row.id}: qualification profile digest does not match the profile`);
+    }
+  }
+}
+
 export async function buildSupportedPlatformsDoc(argv = process.argv.slice(2)) {
   const check = argv.includes('--check');
   const { rows, contractVersion } = await loadRegistry();
   assertProfileArtifactsExist(rows);
+  assertQualificationProfilesMatch(rows, contractVersion);
   const next = renderSupportedPlatformsDoc(rows, contractVersion, readReleaseVersion());
   const current = existsSync(OUT_PATH) ? readFileSync(OUT_PATH, 'utf8') : null;
 

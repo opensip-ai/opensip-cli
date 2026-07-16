@@ -95,6 +95,20 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
     expect(cli.emitEnvelope).toHaveBeenCalledTimes(1);
   });
 
+  it('retains an already-delivered JSON envelope for a composition-root side artifact', async () => {
+    const opts = {
+      json: true,
+      returnJsonEnvelope: true,
+      cwd: '/x',
+    } as unknown as Parameters<typeof dispatchGraphResult>[0];
+    const cli = mockCli();
+    const outcome = await dispatchGraphResult(opts, result, cli, STARTED, '/x');
+    expect(outcome?.envelope?.tool).toBe('graph');
+    expect(outcome?.session).toBeUndefined();
+    expect(cli.deliverSignals).toHaveBeenCalledTimes(1);
+    expect(cli.emitEnvelope).toHaveBeenCalledTimes(1);
+  });
+
   it('suppresses inline delivery for a --workspace child (still emits, no egress/verdict exit)', async () => {
     const prior = process.env.OPENSIP_GRAPH_WORKSPACE_CHILD;
     process.env.OPENSIP_GRAPH_WORKSPACE_CHILD = '1';

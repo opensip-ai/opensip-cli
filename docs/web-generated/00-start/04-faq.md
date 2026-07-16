@@ -188,8 +188,8 @@ support claim. Qualified *host* support names an exact tuple across those
 dimensions with measured evidence, and every host resolves to one of four
 statuses: `supported` (measured, past burn-in, every release evidence-gated),
 `preview` (published with evidence but documented gaps), `unqualified` (not
-measured — may work, no promise), or `unsupported` (intentionally excluded, like
-Intel/x64 macOS). The exact qualified tuple, the current status of each host,
+measured — may work, no promise), or `unsupported` (an exact, intentionally
+excluded tuple). The exact qualified tuple, the current status of each host,
 and the reporting instructions live in the generated, authoritative
 [supported-platforms matrix](/docs/opensip-cli/70-reference/17-supported-platforms/) — this
 page deliberately does not restate the mutable status so the two can't drift.

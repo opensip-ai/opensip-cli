@@ -26,10 +26,11 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import {
+  MAX_RELEASE_MANIFEST_BYTES,
   RELEASE_MANIFEST_NAME,
   discoverTarballFiles,
   expectedTarballEntries,
@@ -38,6 +39,7 @@ import {
   renderSha256Sums,
 } from '../lib/release-artifacts.mjs';
 import { verifyReleaseArtifacts } from '../verify-release-artifacts.mjs';
+import { readBoundedFileBytes } from './bounded-owned-file.mjs';
 
 /**
  * The closed, stable reason-code vocabulary for candidate resolution and
@@ -51,11 +53,15 @@ export const CANDIDATE_REASON_CODES = Object.freeze({
   INVALID_REGISTRY: 'invalid-registry',
   MISSING_DIRECTORY: 'missing-directory',
   INVALID_MANIFEST: 'invalid-manifest',
+  INVALID_INTEGRITY_DIGEST: 'invalid-integrity-digest',
   CHECKSUM_MISMATCH: 'checksum-mismatch',
+  PACKED_PROVENANCE_MISMATCH: 'packed-provenance-mismatch',
+  PUBLISHED_PROVENANCE_MISMATCH: 'published-provenance-mismatch',
   INCOMPLETE_PACKAGE_SET: 'incomplete-package-set',
   REGISTRY_UNAVAILABLE: 'registry-unavailable',
   INSTALL_FAILED: 'install-failed',
   INVALID_PACKAGE_JSON: 'invalid-package-json',
+  CANDIDATE_VERSION_MISMATCH: 'candidate-version-mismatch',
   INVALID_ENTRYPOINT: 'invalid-entrypoint',
   CANDIDATE_BINARY_ESCAPE: 'candidate-binary-escape',
 });
@@ -64,18 +70,25 @@ export const CANDIDATE_REASON_CODES = Object.freeze({
 export const NPMJS_REGISTRY = 'https://registry.npmjs.org/';
 
 const R = CANDIDATE_REASON_CODES;
+const MAX_INSTALLED_PACKAGE_JSON_BYTES = 1024 * 1024;
 
 // An EXACT semver — no ranges (`^`, `~`, `>=`, `*`, `x`), no dist-tags
 // (`latest`), no URLs, no local paths, no credentials. Prerelease/build
 // metadata are allowed; everything else is rejected structurally.
-const EXACT_SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const SEMVER_NUMBER = '(?:0|[1-9]\\d*)';
+const SEMVER_PRERELEASE_ID = '(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)';
+const EXACT_SEMVER = new RegExp(
+  `^${SEMVER_NUMBER}\\.${SEMVER_NUMBER}\\.${SEMVER_NUMBER}` +
+    `(?:-${SEMVER_PRERELEASE_ID}(?:\\.${SEMVER_PRERELEASE_ID})*)?` +
+    '(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$',
+);
 
 // C0/C1 control characters never belong in a path, version, or registry.
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/;
 
-const PACKED_KEYS = ['kind', 'directory', 'manifest', 'expectedVersion'];
-const PUBLISHED_KEYS = ['kind', 'version', 'registry'];
+const PACKED_KEYS = ['kind', 'directory', 'manifest', 'expectedVersion', 'manifestDigest'];
+const PUBLISHED_KEYS = ['kind', 'version', 'registry', 'manifestDigest', 'registryIntegrityDigest'];
 
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -115,6 +128,17 @@ function summarizeFailures(failures) {
   return text.length > 300 ? `${text.slice(0, 297)}...` : text;
 }
 
+function readPackedManifestBytes(path) {
+  const result = readBoundedFileBytes({
+    path,
+    maxBytes: MAX_RELEASE_MANIFEST_BYTES,
+    reasonPrefix: 'release-manifest',
+    requireNonEmpty: true,
+  });
+  if (!result.ok) throw new Error(result.reasonCode);
+  return result.buffer;
+}
+
 /**
  * Resolve and validate a candidate SOURCE. Returns a frozen result:
  *   - `{ ok: true, identity, install }` on success, where `identity` is a
@@ -125,8 +149,11 @@ function summarizeFailures(failures) {
  * @param {unknown} input a closed union: `{ kind: 'packed-release', directory,
  *   manifest?, expectedVersion }` or `{ kind: 'published-version', version,
  *   registry? }`.
+ * @param {{ allowUnboundRegistryIntegrity?: boolean }} [options] internal
+ *   lifecycle-only exception for an exact previous published version. A target
+ *   published candidate is integrity-bound by default.
  */
-export async function resolveCandidateSource(input) {
+export async function resolveCandidateSource(input, options = {}) {
   if (!isPlainObject(input)) {
     return fail(R.INVALID_INPUT, 'candidate source input must be an object');
   }
@@ -135,7 +162,7 @@ export async function resolveCandidateSource(input) {
       return resolvePackedRelease(input);
     }
     case 'published-version': {
-      return resolvePublishedVersion(input);
+      return resolvePublishedVersion(input, options);
     }
     default: {
       return fail(R.UNKNOWN_KIND, `unknown candidate kind ${JSON.stringify(input.kind)}`);
@@ -189,12 +216,24 @@ async function resolvePackedRelease(input) {
   if (!existsSync(manifestPath)) {
     return fail(R.INVALID_MANIFEST, 'release manifest file was not found');
   }
-  let manifest;
+  let manifestRealPath;
   try {
-    manifest = normalizeReleaseManifest(
-      JSON.parse(readFileSync(manifestPath, 'utf8')),
-      manifestPath,
-    );
+    const stat = lstatSync(manifestPath);
+    manifestRealPath = realpathSync(manifestPath);
+    if (!stat.isFile() || stat.isSymbolicLink() || !isUnderRoot(directory, manifestRealPath)) {
+      return fail(
+        R.INVALID_MANIFEST,
+        'release manifest must be a regular file under the candidate directory',
+      );
+    }
+  } catch {
+    return fail(R.INVALID_MANIFEST, 'release manifest could not be safely resolved');
+  }
+  let manifest;
+  let manifestBytes;
+  try {
+    manifestBytes = readPackedManifestBytes(manifestRealPath);
+    manifest = normalizeReleaseManifest(JSON.parse(manifestBytes.toString('utf8')), manifestPath);
   } catch {
     return fail(R.INVALID_MANIFEST, 'release manifest is missing, malformed, or unreadable');
   }
@@ -203,6 +242,18 @@ async function resolvePackedRelease(input) {
       R.INVALID_MANIFEST,
       `manifest releaseVersion ${manifest.releaseVersion} does not match expected ${version}`,
     );
+  }
+  const manifestDigest = createHash('sha256').update(manifestBytes).digest('hex');
+  const expectedManifestDigest = normalizeOptionalDigest(
+    input.manifestDigest,
+    'packed-release.manifestDigest',
+  );
+  if (!expectedManifestDigest.ok) return expectedManifestDigest;
+  if (
+    expectedManifestDigest.digest !== undefined &&
+    expectedManifestDigest.digest !== manifestDigest
+  ) {
+    return fail(R.CHECKSUM_MISMATCH, 'release manifest digest does not match the expected digest');
   }
 
   // Require the COMPLETE expected package set: every release tarball must be
@@ -230,7 +281,7 @@ async function resolvePackedRelease(input) {
   try {
     verified = await verifyReleaseArtifacts({
       artifactDir: directory,
-      manifestPath,
+      manifestPath: manifestRealPath,
       expectedVersion: `v${version}`,
     });
   } catch {
@@ -242,13 +293,36 @@ async function resolvePackedRelease(input) {
       `release artifact verification failed: ${summarizeFailures(verified.failures)}`,
     );
   }
+  try {
+    const postVerificationDigest = createHash('sha256')
+      .update(readPackedManifestBytes(manifestRealPath))
+      .digest('hex');
+    if (postVerificationDigest !== manifestDigest) {
+      return fail(
+        R.CHECKSUM_MISMATCH,
+        'release manifest changed while the candidate was being verified',
+      );
+    }
+  } catch {
+    return fail(R.INVALID_MANIFEST, 'release manifest could not be revalidated');
+  }
 
   // Bind the checksum content into the identity digest and build the install
   // payload from the authoritative release order.
   const overrides = {};
+  const verifiedTarballs = [];
   let cliTarball;
   for (const entry of expected) {
     const abs = join(directory, entry.fileName);
+    const artifact = manifestByPath.get(entry.fileName);
+    verifiedTarballs.push(
+      Object.freeze({
+        packageName: entry.releaseEntry.name,
+        sourcePath: abs,
+        sha256: artifact.sha256,
+        sizeBytes: artifact.sizeBytes,
+      }),
+    );
     if (entry.releaseEntry.name === 'opensip-cli') cliTarball = abs;
     else overrides[entry.releaseEntry.name] = `file:${abs}`;
   }
@@ -278,6 +352,7 @@ async function resolvePackedRelease(input) {
     version,
     source: `packed-release@${version} (${expected.length} npm tarballs)`,
     digest,
+    manifestDigest,
   });
 
   return Object.freeze({
@@ -289,12 +364,13 @@ async function resolvePackedRelease(input) {
       directory,
       cliTarball,
       overrides: Object.freeze(overrides),
+      verifiedTarballs: Object.freeze(verifiedTarballs),
       version,
     }),
   });
 }
 
-function resolvePublishedVersion(input) {
+function resolvePublishedVersion(input, options) {
   const unknown = firstUnknownKey(input, PUBLISHED_KEYS);
   if (unknown !== undefined) {
     return fail(R.INVALID_INPUT, `published-version has unknown key ${JSON.stringify(unknown)}`);
@@ -303,19 +379,37 @@ function resolvePublishedVersion(input) {
   if (!versionResult.ok) return versionResult;
   const version = versionResult.version;
 
-  let registryUrl = NPMJS_REGISTRY;
-  if (input.registry !== undefined) {
-    const registryResult = validateRegistry(input.registry);
-    if (!registryResult.ok) return registryResult;
-    registryUrl = registryResult.url;
+  const registryResult = validateRegistry(input.registry ?? NPMJS_REGISTRY);
+  if (!registryResult.ok) return registryResult;
+  const registryUrl = registryResult.url;
+  const registryIdentity = registryResult.identity;
+  const integrityResult = normalizeOptionalDigest(
+    input.registryIntegrityDigest,
+    'published-version.registryIntegrityDigest',
+    R.INVALID_INTEGRITY_DIGEST,
+  );
+  if (!integrityResult.ok) return integrityResult;
+  if (integrityResult.digest === undefined && options.allowUnboundRegistryIntegrity !== true) {
+    return fail(
+      R.INVALID_INTEGRITY_DIGEST,
+      'published-version.registryIntegrityDigest is required for a target candidate',
+    );
   }
-  const registryHost = new URL(registryUrl).host;
+  const manifestResult = normalizeOptionalDigest(
+    input.manifestDigest,
+    'published-version.manifestDigest',
+  );
+  if (!manifestResult.ok) return manifestResult;
 
   const digest = createHash('sha256')
     .update('published\nopensip-cli@')
     .update(version)
     .update('\n')
-    .update(registryHost)
+    .update(registryIdentity)
+    .update('\n')
+    .update(integrityResult.digest ?? 'unbound-registry-integrity')
+    .update('\n')
+    .update(manifestResult.digest ?? 'unbound-manifest')
     .digest('hex');
 
   /** @type {CandidateIdentity} */
@@ -324,7 +418,11 @@ function resolvePublishedVersion(input) {
     version,
     source: `npm:opensip-cli@${version}`,
     digest,
-    registry: registryHost,
+    registry: registryIdentity,
+    ...(integrityResult.digest === undefined
+      ? {}
+      : { registryIntegrityDigest: integrityResult.digest }),
+    ...(manifestResult.digest === undefined ? {} : { manifestDigest: manifestResult.digest }),
   });
 
   return Object.freeze({
@@ -338,6 +436,14 @@ function resolvePublishedVersion(input) {
       registry: registryUrl,
     }),
   });
+}
+
+function normalizeOptionalDigest(raw, label, reasonCode = R.INVALID_MANIFEST) {
+  if (raw === undefined) return { ok: true, digest: undefined };
+  if (typeof raw !== 'string' || !/^[a-f0-9]{64}$/.test(raw)) {
+    return fail(reasonCode, `${label} must be a 64-character lowercase SHA-256 digest`);
+  }
+  return { ok: true, digest: raw };
 }
 
 function normalizeExactVersion(raw, label) {
@@ -381,7 +487,16 @@ function validateRegistry(value) {
   if (url.username !== '' || url.password !== '') {
     return fail(R.INVALID_REGISTRY, 'registry must not embed credentials');
   }
-  return { ok: true, url: url.href };
+  if (url.search !== '' || url.hash !== '') {
+    return fail(R.INVALID_REGISTRY, 'registry must not contain a query string or fragment');
+  }
+
+  // npm treats a registry as a directory-like endpoint. Canonicalize trailing
+  // slashes so equivalent spellings bind to one candidate identity while
+  // preserving the path that distinguishes registries hosted on one origin.
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}/`;
+  const identity = `${url.origin}${url.pathname}`;
+  return { ok: true, url: identity, identity };
 }
 
 /**
@@ -416,10 +531,20 @@ export function resolveInstalledDescriptors(options) {
     }
   }
   let rootReal;
+  let packageReal;
+  let binDirReal;
   try {
     rootReal = realpathSync(runRoot);
+    packageReal = realpathSync(packageDir);
+    binDirReal = realpathSync(binDir);
   } catch {
-    return fail(R.INVALID_INPUT, 'runRoot does not exist');
+    return fail(R.INVALID_INPUT, 'installed descriptor roots do not exist');
+  }
+  if (!isUnderRoot(rootReal, packageReal) || !isUnderRoot(rootReal, binDirReal)) {
+    return fail(
+      R.CANDIDATE_BINARY_ESCAPE,
+      'installed package or bin directory resolves outside the run root',
+    );
   }
 
   // (a) the customer invocation shim — invoked exactly as a customer would, but
@@ -440,8 +565,24 @@ export function resolveInstalledDescriptors(options) {
   }
 
   // (b) the JS entrypoint from the validated package.json#bin.
-  const entrypoint = resolvePackageEntrypoint(packageDir, rootReal);
+  const entrypoint = resolvePackageEntrypoint(packageDir, packageReal);
   if (!entrypoint.ok) return entrypoint;
+
+  // npm's POSIX customer bin is a symlink to package.json#bin. Requiring both
+  // descriptors to resolve to the same regular file prevents a candidate
+  // postinstall from replacing the shim with an unrelated run-owned program.
+  // Windows uses a generated `.cmd` wrapper, so equality is not meaningful;
+  // its wrapper is still required to remain physically inside the bin dir.
+  if (platform === 'win32') {
+    if (!isUnderRoot(binDirReal, binReal)) {
+      return fail(R.CANDIDATE_BINARY_ESCAPE, 'installed customer bin escapes its bin directory');
+    }
+  } else if (binReal !== entrypoint.script) {
+    return fail(
+      R.CANDIDATE_BINARY_ESCAPE,
+      'installed customer bin does not resolve to the package JS entrypoint',
+    );
+  }
 
   return Object.freeze({
     ok: true,
@@ -454,14 +595,21 @@ export function resolveInstalledDescriptors(options) {
   });
 }
 
-function resolvePackageEntrypoint(packageDir, rootReal) {
+function resolvePackageEntrypoint(packageDir, packageReal) {
   const pkgJsonPath = join(packageDir, 'package.json');
   if (!existsSync(pkgJsonPath)) {
     return fail(R.INVALID_PACKAGE_JSON, 'installed opensip-cli package.json was not found');
   }
   let pkg;
   try {
-    pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+    const packageJson = readBoundedFileBytes({
+      path: pkgJsonPath,
+      maxBytes: MAX_INSTALLED_PACKAGE_JSON_BYTES,
+      reasonPrefix: 'installed-package-json',
+      requireNonEmpty: true,
+    });
+    if (!packageJson.ok) throw new Error(packageJson.reasonCode);
+    pkg = JSON.parse(packageJson.buffer.toString('utf8'));
   } catch {
     return fail(R.INVALID_PACKAGE_JSON, 'installed opensip-cli package.json is not valid JSON');
   }
@@ -503,8 +651,11 @@ function resolvePackageEntrypoint(packageDir, rootReal) {
   } catch {
     return fail(R.INVALID_ENTRYPOINT, 'package JS entrypoint could not be resolved');
   }
-  if (!isUnderRoot(rootReal, real)) {
-    return fail(R.CANDIDATE_BINARY_ESCAPE, 'package JS entrypoint resolves outside the run root');
+  if (!isUnderRoot(packageReal, real)) {
+    return fail(
+      R.CANDIDATE_BINARY_ESCAPE,
+      'package JS entrypoint resolves outside the installed package',
+    );
   }
   return { ok: true, script: real };
 }

@@ -5,10 +5,16 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
+  assertQualificationProfilesMatch,
   profileConfigPaths,
   renderSupportedPlatformsDoc,
   validateSupportRows,
 } from '../build-supported-platforms-doc.mjs';
+import {
+  composeProfile,
+  parseAcceptanceProfile,
+  profileDigest,
+} from '../platform-acceptance/contract.mjs';
 import {
   PLATFORM_SUPPORT_CONTRACT_VERSION,
   PLATFORM_SUPPORT_ROWS,
@@ -53,7 +59,7 @@ const INTEL_ROW = {
   tuple: { ...BASE_TUPLE, arch: 'x64' },
   docsPath: 'docs/public/70-reference/17-supported-platforms.md',
   docsUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
-  notes: 'Intel/x64 macOS is intentionally excluded: no Intel GA evidence.',
+  notes: 'This exact Intel/x64 macOS 26 / Node 24 tuple is intentionally excluded.',
 };
 
 const ROWS = [PREVIEW_ROW, INTEL_ROW];
@@ -136,6 +142,15 @@ test('validateSupportRows rejects a preview row without a profile', () => {
   );
 });
 
+test('validateSupportRows rejects a preview row without an evidence artifact policy', () => {
+  const noEvidence = { ...PREVIEW_ROW };
+  delete noEvidence.evidence;
+  assert.throws(
+    () => validateSupportRows([noEvidence]),
+    /preview row missing an evidence artifact policy/u,
+  );
+});
+
 test('validateSupportRows rejects a supported row missing evidence/qualification', () => {
   const supportedNoEvidence = {
     ...PREVIEW_ROW,
@@ -166,12 +181,13 @@ const SUPPORTED_ROW = {
   status: 'supported',
   evidence: {
     artifact: 'opensip-cli-macos-qualification.v1.json',
-    url: 'https://example.test/evidence/v0.7.0',
+    url: 'https://github.com/opensip-ai/opensip-cli/releases/download/v0.7.0/opensip-cli-macos-qualification.v1.json',
   },
   qualification: {
     consecutiveDailyPasses: 14,
     qualifiedVersion: '0.7.0',
     qualifiedAt: '2026-08-01T00:00:00.000Z',
+    profileDigest: 'a'.repeat(64),
   },
 };
 
@@ -187,8 +203,117 @@ const UNQUALIFIED_ROW = {
 test('renders a supported row (post burn-in) with its evidence link and burn-in count', () => {
   const doc = renderSupportedPlatformsDoc([SUPPORTED_ROW], 1, 'v0.7.0');
   assert.match(doc, /`macos-26-arm64-node24-npm11-v1` \| `supported`/u);
-  assert.match(doc, /Published evidence: https:\/\/example\.test\/evidence\/v0\.7\.0/u);
+  assert.match(
+    doc,
+    /Published evidence: https:\/\/github\.com\/opensip-ai\/opensip-cli\/releases\/download\/v0\.7\.0\/opensip-cli-macos-qualification\.v1\.json/u,
+  );
   assert.match(doc, /14 consecutive daily passes/u);
+  assert.match(doc, /Profile digest: `a{64}`/u);
+});
+
+test('validateSupportRows enforces complete GA qualification metadata', () => {
+  assert.doesNotThrow(() => validateSupportRows([SUPPORTED_ROW]));
+
+  for (const consecutiveDailyPasses of [13, 14.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN]) {
+    assert.throws(
+      () =>
+        validateSupportRows([
+          {
+            ...SUPPORTED_ROW,
+            qualification: { ...SUPPORTED_ROW.qualification, consecutiveDailyPasses },
+          },
+        ]),
+      /at least 14 daily passes/u,
+    );
+  }
+
+  for (const qualifiedVersion of ['latest', 'v1.2.3', '1.2', '01.2.3', '1.2.3-01']) {
+    assert.throws(
+      () =>
+        validateSupportRows([
+          { ...SUPPORTED_ROW, qualification: { ...SUPPORTED_ROW.qualification, qualifiedVersion } },
+        ]),
+      /invalid exact qualified version/u,
+    );
+  }
+
+  for (const qualifiedAt of ['not-a-date', '2026-02-30T00:00:00.000Z', '2026-08-01T00:00:00Z']) {
+    assert.throws(
+      () =>
+        validateSupportRows([
+          { ...SUPPORTED_ROW, qualification: { ...SUPPORTED_ROW.qualification, qualifiedAt } },
+        ]),
+      /invalid qualification timestamp/u,
+    );
+  }
+
+  for (const profileDigest of ['a'.repeat(63), 'A'.repeat(64), 'z'.repeat(64)]) {
+    assert.throws(
+      () =>
+        validateSupportRows([
+          { ...SUPPORTED_ROW, qualification: { ...SUPPORTED_ROW.qualification, profileDigest } },
+        ]),
+      /invalid profile digest/u,
+    );
+  }
+});
+
+test('validateSupportRows requires a version-addressed immutable HTTPS evidence URL', () => {
+  const artifact = SUPPORTED_ROW.evidence.artifact;
+  for (const url of [
+    `http://example.test/releases/v0.7.0/${artifact}`,
+    `https://user:secret@example.test/releases/v0.7.0/${artifact}`,
+    `https://example.test/releases/latest/${artifact}`,
+    'https://example.test/releases/v0.7.0/other.json',
+    `https://example.test/releases/v0.7.0/${artifact}?download=1`,
+    `https://example.test/releases/v0.7.0/${artifact}#fragment`,
+    `https://github.com/other/project/releases/download/v0.7.0/${artifact}`,
+    `https://github.com/opensip-ai/opensip-cli/releases/download/0.7.0/${artifact}`,
+  ]) {
+    assert.throws(
+      () =>
+        validateSupportRows([{ ...SUPPORTED_ROW, evidence: { ...SUPPORTED_ROW.evidence, url } }]),
+      /immutable HTTPS evidence URL/u,
+    );
+  }
+});
+
+test('qualification metadata is bound to the exact composed profile digest', () => {
+  const base = parseAcceptanceProfile(
+    JSON.parse(readFileSync(join(REPO_ROOT, '.config/platform-acceptance/common-v1.json'), 'utf8')),
+  );
+  const derivedRaw = JSON.parse(
+    readFileSync(
+      join(REPO_ROOT, '.config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json'),
+      'utf8',
+    ),
+  );
+  const effective = composeProfile(base, derivedRaw);
+  const supported = {
+    ...SUPPORTED_ROW,
+    qualification: {
+      ...SUPPORTED_ROW.qualification,
+      profileDigest: profileDigest(effective),
+    },
+  };
+
+  assert.doesNotThrow(() =>
+    assertQualificationProfilesMatch([supported], PLATFORM_SUPPORT_CONTRACT_VERSION, REPO_ROOT),
+  );
+  assert.throws(
+    () =>
+      assertQualificationProfilesMatch(
+        [
+          {
+            ...supported,
+            qualification: { ...supported.qualification, profileDigest: 'f'.repeat(64) },
+          },
+        ],
+        PLATFORM_SUPPORT_CONTRACT_VERSION,
+        REPO_ROOT,
+      ),
+    /qualification profile digest does not match/u,
+  );
 });
 
 test('renders an unqualified row without a false promise and never as supported', () => {
@@ -241,9 +366,15 @@ test('a registry change necessarily changes the rendered bytes (drift is observa
   assert.notEqual(base, drifted, 'a status change must change the generated bytes');
 });
 
-test('the web-generated mirror exists and the public matrix links compatibility/quick-start/FAQ', () => {
+test('the web-generated mirror carries the same support facts and the public matrix links related docs', () => {
   assert.ok(existsSync(WEB_DOC), 'docs/web-generated must carry the generated matrix mirror');
   const committed = readFileSync(PUBLIC_DOC, 'utf8');
+  const web = readFileSync(WEB_DOC, 'utf8');
+  assert.match(web, /Platform-support contract version: \*\*1\*\*/u);
+  assert.match(web, /`macos-26-arm64-node24-npm11-v1` \| `preview`/u);
+  assert.match(web, /`macos-26-intel-unsupported` \| `unsupported`/u);
+  assert.doesNotMatch(web, /`macos-26-arm64-node24-npm11-v1` \| `supported`/u);
+  assert.match(web, /opensip-cli-macos-qualification\.v1\.json/u);
   assert.match(committed, /\.\/15-compatibility-policy\.md/u, 'links the compatibility policy');
   assert.match(committed, /\.\.\/00-start\/00-quick-start\.md/u, 'links Quick start');
   assert.match(committed, /\.\.\/00-start\/04-faq\.md/u, 'links the FAQ');

@@ -6,22 +6,36 @@
  *   - seals an evidence body by appending the terminal `completion` record
  *     ({ state, evidenceDigest }) — only after the runner's cleanup finished;
  *   - re-validates the full artifact through the contract parser (which
- *     recomputes the sealed-body digest, so a partially written or tampered file
- *     can never verify);
+ *     recomputes the sealed-body digest, so a partial write, accidental
+ *     corruption, or internally inconsistent file cannot verify);
  *   - enforces the profile's total evidence byte bound;
  *   - refuses a symlink destination and any path inside the run root; and
- *   - writes via a same-directory temp file → fsync → close → atomic rename.
+ *   - writes via a same-directory temp file → fsync → close → atomic rename
+ *     → parent-directory fsync on POSIX.
  *
  * It also renders the two bounded human/JSON summaries. Child process output
  * NEVER leaves the artifact: the summaries carry only counts + required-failure
  * ids/reasons, never stdout/stderr tails.
+ *
+ * The digest is an unkeyed internal-integrity check, not an authenticity
+ * signature. Qualification consumers must also trust the workflow/artifact or
+ * release provenance through which the file was retained.
  *
  * Dependency-free apart from Node built-ins + the sibling contract module.
  *
  * @typedef {import('./contract.d.mts').AcceptanceEvidence} AcceptanceEvidence
  */
 
-import { closeSync, fsyncSync, lstatSync, openSync, renameSync, rmSync, writeSync } from 'node:fs';
+import {
+  closeSync,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -76,6 +90,7 @@ export function writeAcceptanceEvidence(input, deps = {}) {
     renameSync: deps.renameSync ?? renameSync,
     rmSync: deps.rmSync ?? rmSync,
     lstatSync: deps.lstatSync ?? lstatSync,
+    realpathSync: deps.realpathSync ?? realpathSync,
   };
   if (
     input === null ||
@@ -85,12 +100,37 @@ export function writeAcceptanceEvidence(input, deps = {}) {
   ) {
     throw new EvidenceWriteError(W.EVIDENCE_INVALID, 'no evidence body was supplied');
   }
-  const outPath = requireOutPath(input.outPath);
+  if (!Number.isSafeInteger(input.maxEvidenceBytes) || input.maxEvidenceBytes <= 0) {
+    throw new EvidenceWriteError(
+      W.EVIDENCE_INVALID,
+      'maxEvidenceBytes must be a positive safe integer',
+    );
+  }
+  const requestedPath = requireOutPath(input.outPath);
+  const hasRunRoot = typeof input.runRoot === 'string' && input.runRoot.length > 0;
+  const runRootResolved = hasRunRoot ? resolve(input.runRoot) : undefined;
+  if (runRootResolved !== undefined && isUnderOrEqual(runRootResolved, requestedPath)) {
+    throw new EvidenceWriteError(W.OUT_INSIDE_RUN_ROOT, 'output path is inside the run root');
+  }
+  let parentReal;
+  try {
+    parentReal = fs.realpathSync(dirname(requestedPath));
+  } catch {
+    throw new EvidenceWriteError(W.OUT_INVALID, 'output parent must already exist');
+  }
+  const outPath = join(parentReal, basename(requestedPath));
 
-  // The output must live OUTSIDE the run root (which contains candidate + project roots).
-  if (typeof input.runRoot === 'string' && input.runRoot.length > 0) {
-    const runRootResolved = resolve(input.runRoot);
-    if (isUnderOrEqual(runRootResolved, outPath)) {
+  // Compare the REAL output parent with the run root. This rejects a lexical
+  // outside path whose existing parent is a symlink into the disposable root.
+  if (runRootResolved !== undefined) {
+    let runRootReal = runRootResolved;
+    try {
+      runRootReal = fs.realpathSync(runRootResolved);
+    } catch {
+      // The runner normally removes its root before evidence is sealed. Its
+      // already-realpathed absolute identity remains safe for lexical fallback.
+    }
+    if (isUnderOrEqual(runRootReal, outPath)) {
       throw new EvidenceWriteError(W.OUT_INSIDE_RUN_ROOT, 'output path is inside the run root');
     }
   }
@@ -109,12 +149,18 @@ export function writeAcceptanceEvidence(input, deps = {}) {
   // Seal: append the terminal completion record over the sealed body digest.
   const body = stripCompletion(input.evidence);
   const digest = evidenceDigest(body);
-  const sealed = { ...body, completion: { state: input.completionState, evidenceDigest: digest } };
+  const sealed = {
+    ...body,
+    completion: { state: input.completionState, evidenceDigest: digest },
+  };
 
   // Re-validate the FULL artifact — this recomputes the sealed-body digest and
-  // the summary, so a hand-edited or partial file cannot verify.
+  // the summary, so an inconsistent, accidentally corrupted, or partial file
+  // cannot verify. An actor can rewrite and reseal an unkeyed digest; trusted
+  // workflow/artifact provenance supplies authenticity outside this module.
+  let validated;
   try {
-    parseAcceptanceEvidence(sealed);
+    validated = parseAcceptanceEvidence(sealed);
   } catch (error) {
     throw new EvidenceWriteError(
       W.EVIDENCE_INVALID,
@@ -122,7 +168,12 @@ export function writeAcceptanceEvidence(input, deps = {}) {
     );
   }
 
-  const serialized = `${JSON.stringify(sealed, null, 2)}\n`;
+  // Serialize the normalized contract value, not the caller-owned object. A
+  // nested object may carry a non-enumerable `toJSON` hook (or a getter) that
+  // changes what JSON.stringify emits after validation; using the parser's
+  // plain frozen projection ensures the durable bytes are exactly the value
+  // whose schema and digest were checked above.
+  const serialized = `${JSON.stringify(validated, null, 2)}\n`;
   const bytes = Buffer.byteLength(serialized, 'utf8');
   if (bytes > input.maxEvidenceBytes) {
     throw new EvidenceWriteError(
@@ -131,8 +182,8 @@ export function writeAcceptanceEvidence(input, deps = {}) {
     );
   }
 
-  atomicWrite(fs, outPath, serialized);
-  return { ok: true, path: outPath, bytes, digest };
+  atomicWrite(fs, outPath, serialized, deps.platform ?? process.platform);
+  return { ok: true, path: requestedPath, bytes, digest };
 }
 
 function requireOutPath(outPath) {
@@ -152,15 +203,27 @@ function stripCompletion(evidence) {
   return body;
 }
 
-/** Same-directory temp file → write → fsync → close → atomic rename. */
-function atomicWrite(fs, outPath, serialized) {
+/** Persist the rename's directory entry on POSIX; Node cannot portably do this on Windows. */
+function syncParentDirectory(fs, outPath, platform) {
+  if (platform === 'win32') return;
+  let descriptor;
+  try {
+    descriptor = fs.openSync(dirname(outPath), 'r');
+    fs.fsyncSync(descriptor);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+}
+
+/** Same-directory temp → write/fsync/close → rename → parent fsync. */
+function atomicWrite(fs, outPath, serialized, platform) {
   const dir = dirname(outPath);
   const tmp = join(dir, `.${basename(outPath)}.${randomBytes(6).toString('hex')}.tmp`);
   let fd;
   try {
     // `wx` fails if the temp path already exists — never clobber an unexpected file.
     fd = fs.openSync(tmp, 'wx', 0o600);
-    fs.writeSync(fd, serialized);
+    writeAllSync(fs, fd, serialized);
     fs.fsyncSync(fd);
   } catch (error) {
     if (fd !== undefined) {
@@ -194,6 +257,36 @@ function atomicWrite(fs, outPath, serialized) {
       `could not atomically rename evidence into place: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+  try {
+    syncParentDirectory(fs, outPath, platform);
+  } catch (error) {
+    // The caller must never receive success for a namespace update whose
+    // durability could not be confirmed. Remove the renamed artifact and make
+    // a best-effort directory sync of that rollback before reporting failure.
+    tryRemove(fs, outPath);
+    try {
+      syncParentDirectory(fs, outPath, platform);
+    } catch {
+      /* already reporting the original durability failure */
+    }
+    throw new EvidenceWriteError(
+      W.WRITE_FAILED,
+      `could not persist the evidence rename: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function writeAllSync(fs, descriptor, serialized) {
+  const buffer = Buffer.from(serialized, 'utf8');
+  let offset = 0;
+  while (offset < buffer.length) {
+    const remaining = buffer.length - offset;
+    const written = fs.writeSync(descriptor, buffer, offset, remaining);
+    if (!Number.isSafeInteger(written) || written <= 0 || written > remaining) {
+      throw new Error('writeSync returned an invalid byte count');
+    }
+    offset += written;
+  }
 }
 
 function tryRemove(fs, target) {
@@ -213,7 +306,11 @@ function requiredFailures(evidence) {
   const out = [];
   for (const result of evidence.results) {
     if (result.required && result.status !== 'pass') {
-      out.push({ id: result.id, status: result.status, reasonCode: result.reasonCode });
+      out.push({
+        id: result.id,
+        status: result.status,
+        reasonCode: result.reasonCode,
+      });
     }
   }
   return out;
@@ -232,7 +329,13 @@ export function renderJsonSummary(result, outPath) {
     evidencePath: outPath ?? null,
   };
   if (evidence === null || evidence === undefined) {
-    return { ...base, profile: null, candidate: null, summary: null, requiredFailures: [] };
+    return {
+      ...base,
+      profile: null,
+      candidate: null,
+      summary: null,
+      requiredFailures: [],
+    };
   }
   return {
     ...base,

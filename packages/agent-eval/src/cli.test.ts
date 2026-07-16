@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
@@ -49,6 +51,18 @@ function temporaryDirectory(prefix = 'agent-eval-cli-test-'): string {
   const directory = mkdtempSync(join(tmpdir(), prefix));
   temporaryDirectories.push(directory);
   return directory;
+}
+
+function installedCliEntrypoint(root: string, bytes = 'export default 1;\n'): string {
+  const packageRoot = join(root, 'node_modules', 'opensip-cli');
+  const entrypoint = join(packageRoot, 'dist', 'cli.js');
+  mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+  writeFileSync(
+    join(packageRoot, 'package.json'),
+    `${JSON.stringify({ bin: { opensip: './dist/cli.js' }, name: 'opensip-cli' })}\n`,
+  );
+  writeFileSync(entrypoint, bytes, 'utf8');
+  return entrypoint;
 }
 
 function makeTask(id: string): GoldTask {
@@ -216,9 +230,18 @@ describe('parseArgs', () => {
       argv: ['--opensip-entrypoint', '/a.js', '--opensip-entrypoint', '/b.js'],
       label: 'duplicate installed entrypoints',
     },
-    { argv: ['--opensip-entrypoint'], label: 'missing installed entrypoint value' },
-    { argv: Array.from({ length: 513 }, () => '--list'), label: 'an argv count over the bound' },
-    { argv: ['--json', 'x'.repeat(8193)], label: 'a single argument over the byte bound' },
+    {
+      argv: ['--opensip-entrypoint'],
+      label: 'missing installed entrypoint value',
+    },
+    {
+      argv: Array.from({ length: 513 }, () => '--list'),
+      label: 'an argv count over the bound',
+    },
+    {
+      argv: ['--json', 'x'.repeat(8193)],
+      label: 'a single argument over the byte bound',
+    },
   ])('rejects $label', ({ argv }) => {
     expect(() => parseArgs(argv)).toThrow(InvocationError);
   });
@@ -301,12 +324,18 @@ describe('parseGitProvenance', () => {
     );
     writeFileSync(join(root, '.env'), 'IGNORED_SECRET=needle\n', 'utf8');
 
-    await expect(resolveGitProvenance(root)).resolves.toMatchObject({ worktreeDirty: false });
+    await expect(resolveGitProvenance(root)).resolves.toMatchObject({
+      worktreeDirty: false,
+    });
     writeFileSync(join(root, 'go.sum'), 'example.invalid/module v1.0.0 hash\n', 'utf8');
-    await expect(resolveGitProvenance(root)).resolves.toMatchObject({ worktreeDirty: true });
+    await expect(resolveGitProvenance(root)).resolves.toMatchObject({
+      worktreeDirty: true,
+    });
     rmSync(join(root, 'go.sum'));
     writeFileSync(join(root, 'ignored.ts'), 'export const ignored = true;\n', 'utf8');
-    await expect(resolveGitProvenance(root)).resolves.toMatchObject({ worktreeDirty: true });
+    await expect(resolveGitProvenance(root)).resolves.toMatchObject({
+      worktreeDirty: true,
+    });
   });
 
   it('fails closed when the snapshot has no commit identity', () => {
@@ -387,18 +416,25 @@ describe('main', () => {
 
   it('records the installed CLI target and threads one target to version + arm runs', async () => {
     const root = temporaryDirectory();
-    const entrypoint = join(root, 'cli.js');
-    writeFileSync(entrypoint, 'export default 1;\n', 'utf8');
+    const entrypoint = installedCliEntrypoint(root);
     const realEntrypoint = realpathSync(entrypoint);
     const jsonPath = join(root, 'installed.json');
     const targets: { entrypoint: string; phase: string; source: string }[] = [];
     const harness = dependencyHarness(root, {
       resolveCliVersion: (target) => {
-        targets.push({ entrypoint: target.entrypoint, phase: 'version', source: target.source });
+        targets.push({
+          entrypoint: target.entrypoint,
+          phase: 'version',
+          source: target.source,
+        });
         return Promise.resolve(CLI_VERSION);
       },
       runArm: (task, arm, target) => {
-        targets.push({ entrypoint: target.entrypoint, phase: 'arm', source: target.source });
+        targets.push({
+          entrypoint: target.entrypoint,
+          phase: 'arm',
+          source: target.source,
+        });
         return Promise.resolve(armResult(task, arm));
       },
     });
@@ -420,7 +456,16 @@ describe('main', () => {
     ).resolves.toBe(0);
 
     const report = JSON.parse(readFileSync(jsonPath, 'utf8')) as EvalReport;
-    expect(report.cliTarget).toEqual({ entrypointName: 'cli.js', source: 'installed' });
+    expect(report.cliTarget).toMatchObject({
+      entrypointName: 'cli.js',
+      source: 'installed',
+    });
+    expect(report.cliTarget?.source === 'installed' && report.cliTarget.entrypointSha256).toMatch(
+      /^sha256:[a-f0-9]{64}$/u,
+    );
+    expect(report.cliTarget?.source === 'installed' && report.cliTarget.packageJsonSha256).toMatch(
+      /^sha256:[a-f0-9]{64}$/u,
+    );
     expect(targets).toEqual([
       { entrypoint: realEntrypoint, phase: 'version', source: 'installed' },
       { entrypoint: realEntrypoint, phase: 'arm', source: 'installed' },
@@ -437,6 +482,68 @@ describe('main', () => {
       ),
     ).resolves.toBe(2);
     expect(harness.calls).toEqual([]);
+    expect(harness.stderr()).toContain('prerequisite');
+  });
+
+  it('rejects installed entrypoint bytes changed by an arm before writing evidence', async () => {
+    const root = temporaryDirectory();
+    const entrypoint = installedCliEntrypoint(root);
+    const jsonPath = join(root, 'mutated.json');
+    const harness = dependencyHarness(root, {
+      runArm: (task, arm) => {
+        writeFileSync(entrypoint, 'export default 2;\n', 'utf8');
+        return Promise.resolve(armResult(task, arm));
+      },
+    });
+
+    await expect(
+      main(
+        [
+          '--task',
+          TASK_ONE.id,
+          '--arm',
+          'opensip',
+          '--opensip-entrypoint',
+          entrypoint,
+          '--json',
+          jsonPath,
+        ],
+        harness.dependencies,
+      ),
+    ).resolves.toBe(2);
+    expect(existsSync(jsonPath)).toBe(false);
+    expect(harness.stderr()).toContain('prerequisite');
+  });
+
+  it('rejects a private snapshot mutation at the final run boundary before writing evidence', async () => {
+    const root = temporaryDirectory();
+    const entrypoint = installedCliEntrypoint(root);
+    const jsonPath = join(root, 'snapshot-mutated.json');
+    const harness = dependencyHarness(root, {
+      runArm: (task, arm, target) => {
+        if (target.source !== 'installed') throw new TypeError('expected an installed target');
+        chmodSync(target.executionEntrypoint, 0o600);
+        writeFileSync(target.executionEntrypoint, 'export default 2;\n', 'utf8');
+        return Promise.resolve(armResult(task, arm));
+      },
+    });
+
+    await expect(
+      main(
+        [
+          '--task',
+          TASK_ONE.id,
+          '--arm',
+          'opensip',
+          '--opensip-entrypoint',
+          entrypoint,
+          '--json',
+          jsonPath,
+        ],
+        harness.dependencies,
+      ),
+    ).resolves.toBe(2);
+    expect(existsSync(jsonPath)).toBe(false);
     expect(harness.stderr()).toContain('prerequisite');
   });
 

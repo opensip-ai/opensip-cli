@@ -49,12 +49,15 @@ installed through the exact npm version or the canonical `scripts/install.sh`
 `macos-26` ARM64 image. `runs-on: macos-26` alone is never evidence — a fail-closed
 runtime tuple preflight plus the independent verifier establish the facts.
 
-**Everything else is explicitly out of the claim.** Intel/x64 macOS is
-`unsupported` (an intentional exclusion row — no Intel GA evidence). macOS 14/15,
-a Node major other than 24, an npm major other than 11, case-sensitive/HFS+/network
-filesystems, and non-canonical install channels (Homebrew, pnpm/Yarn/Bun global,
-from-source) are `unqualified` — they may work, but carry no evidence-backed
-promise, and the CLI never claims they "cannot run". Linux and Windows belong to
+**Everything else is explicitly out of the claim.** The exact macOS 26.x ·
+Intel/x64 · Node 24.x (ABI 137) · npm 11.x · case-insensitive APFS tuple is
+`unsupported` (an intentional exclusion row — no evidence for that complete
+tuple). Other Intel tuples, macOS 14/15, a Node major other than 24, an npm major
+other than 11, case-sensitive/HFS+/network filesystems, and non-canonical install
+channels (Homebrew, pnpm/Yarn/Bun global, from-source) are `unqualified` — they
+may work, but carry no evidence-backed promise, and the CLI never claims they
+"cannot run". A process-only host projection cannot establish the full Intel
+exclusion tuple and therefore remains `unqualified`. Linux and Windows belong to
 later OS profiles and are not classified by this matrix. **`engines.node: ">=24"`
 is an install/runtime floor, not a support qualification** — passing it is
 necessary, not sufficient, for a supported host.
@@ -95,15 +98,42 @@ utility is `unavailable` and fails qualification; the plan may replace a probe w
 more stable native mechanism but may not silently skip it. "Pass" means every required
 journey is present with `status: "pass"`, candidate/host constraints match, cleanup
 succeeded, and the independent verifier accepts the sealed evidence artifact.
+Two explicit applicability cases are not missing proof: `macos.installer-sh` is
+required only for a `published-version` candidate and is recorded as a non-required
+`candidate-kind-not-applicable` skip for the scheduled packed lane;
+`lifecycle.upgrade` becomes required only when the release lane supplies an exact
+previous version and otherwise records `previous-candidate-not-supplied`. Both are
+zero-effect rows whose status, reason, requirement flag, timing, RSS, and empty step
+list are recomputed by the verifier. The packed lane therefore proves packed-consumer
+installation; the published release lane still must prove the canonical installer,
+and a release with a previous version still must prove the real previous-to-target
+migration.
+The profile also requires the harness's closed native capability set (`pty`,
+`symlink`, `permissions`, `process-tree-rss`, and `process-tree-cleanup`) as a
+host-level prerequisite. Here `process-tree-cleanup` means zero observed residual
+descendants under the POSIX process-group plus sampled fixed-native process-table
+model. It qualifies trusted release behavior, not hostile-code containment, and
+does not prove the absence of a deliberate descendant that creates a new session
+and reparents between samples. Process-table observation faults fail cleanup
+closed. Retained matches additionally bind PID, process group, native session
+token, and the one-second native start token. The observed command/ucomm is
+diagnostic metadata only because it may change across exec; it is not part of
+identity. An unrelated same-second replacement matching that stable tuple remains
+a sampled-inventory collision limit.
+The runner gates every journey before lifecycle effects when one is unavailable,
+and the independent verifier rechecks those capability facts from sealed evidence.
 
 **Evidence authority + retention.** The authoritative artifact is
 `opensip-cli-macos-qualification.v1.json`, conforming to ADR-0164's evidence schema
 and additionally binding the support-profile id/digest and the pinned support-row
 id + contract version, so acceptance evidence can never satisfy a different public
-support claim. It is a **standalone, self-verifying file** — release evidence is
-uploaded as a workflow artifact and attached to the GitHub Release; scheduled
-evidence is a retained workflow artifact. Console logs and OpenSIP runtime logs are
-diagnostic only and cannot establish a pass. **No acceptance evidence is persisted in
+support claim. It is a **standalone, internally self-checking file**: its unkeyed
+digest detects incomplete, corrupted, or inconsistent contents but is not an
+authenticity signature. Authenticity comes from the trusted workflow-run, artifact,
+and release provenance that retains it. Release evidence is uploaded as a workflow
+artifact and attached to the GitHub Release; scheduled evidence is a retained
+workflow artifact. Console logs and OpenSIP runtime logs are diagnostic only and
+cannot establish a pass. **No acceptance evidence is persisted in
 `datastore.sqlite`, a Tool session, or cloud state.**
 
 **Burn-in + support suspension.** Promotion from `preview` to `supported` requires 14
@@ -144,9 +174,13 @@ CLI/MCP equality (including `hostSupport`), not merely equal hostSupport payload
 
 **Security posture.** The candidate version/package is fixed (no arbitrary npm spec,
 shell fragment, or credentialed registry URL); workflows use pinned action SHAs and
-least-privilege job permissions; macOS qualification requires no npm publish token and
-reads the staged public version; promotion credentials exist only in the
-post-qualification promotion job; evidence excludes usernames, hostnames, home paths,
+least-privilege job permissions. Repository-controlled gates/build/pack/smoke run in an
+unprivileged job, while the minimal OIDC/attestation stage job has no checkout,
+dependency install, or repository-script execution and publishes only a strictly
+validated, attempt-bound bundle with lifecycle scripts disabled. macOS qualification
+requires no npm publish token and reads the staged public version; promotion credentials
+exist only in the post-qualification promotion job, whose exact-SHA checkout does not
+persist them; evidence excludes usernames, hostnames, home paths,
 IPs, npm config/tokens, full environments, and unbounded child output; all cleanup is
 ancestry-checked under the run-owned root; and registry-propagation retry is bounded and
 cannot turn a version mismatch into a pass.
@@ -157,8 +191,8 @@ cannot turn a version mismatch into a pass.
   off the qualified tuple, so its evidence is not reproducible. The lane pins `macos-26`
   and re-checks runtime facts.
 - **Infer Intel/x64 from an Apple-silicon pass.** Rejected: native dependency, process,
-  TTY, and lifecycle behavior differ; Intel is an explicit `unsupported` exclusion until
-  it is qualified separately.
+  TTY, and lifecycle behavior differ; the exact listed Intel tuple is an explicit
+  `unsupported` exclusion, while other Intel tuples remain `unqualified` until measured.
 - **Treat the packed smoke or workspace E2E as support proof.** Rejected: the packed
   `smoke-pack` is a fast command-only subset with no host profile, lifecycle, RSS, or
   durable evidence, and workspace tests never exercise the installed bytes' native
@@ -180,8 +214,9 @@ cannot turn a version mismatch into a pass.
   qualification is a release harness under `scripts/`, not a customer runtime surface;
   the host-support READ projection rides the existing agent-catalog/MCP surface only.
 - **Persist acceptance evidence in the datastore or a Tool session.** Rejected: evidence
-  is an uploaded, self-verifying file; the datastore/session planes are for tool results,
-  not release qualification.
+  is an uploaded, internally self-checking file retained with trusted workflow/release
+  provenance; the datastore/session planes are for tool results, not release
+  qualification.
 
 **Observability contract:** identical to ADR-0164 — the sealed evidence (ordered
 per-journey statuses, durations, tagged RSS, closed reason codes, the runner's stage
@@ -193,7 +228,8 @@ grepping `.runtime/logs` or reading raw SQLite.
 **Consequences:**
 
 - The public/machine matrix flips to `supported` only after burn-in and clearly scopes
-  the claim; Intel and every unmeasured tuple stay explicitly `unsupported`/`unqualified`.
+  the claim; the exact Intel exclusion stays `unsupported` and every other unmeasured
+  tuple stays `unqualified`.
 - `latest` promotion + the GitHub Release cannot run until exact staged-version macOS
   evidence verifies; a failed gate may burn a staged version but never advances `latest`.
 - The host-support READ path is additive and behavior-neutral: no datastore migration,

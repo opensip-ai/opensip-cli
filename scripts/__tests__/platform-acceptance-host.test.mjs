@@ -30,7 +30,13 @@ import {
 } from '../platform-acceptance/contract.mjs';
 import { collectHostProfile } from '../platform-acceptance/host-profile.mjs';
 
-const KNOWN_CAPABILITIES = ['pty', 'symlink', 'permissions', 'process-tree-rss'];
+const KNOWN_CAPABILITIES = [
+  'pty',
+  'symlink',
+  'permissions',
+  'process-tree-rss',
+  'process-tree-cleanup',
+];
 
 function withRoot(fn) {
   const root = mkdtempSync(join(tmpdir(), 'pa-host-'));
@@ -88,6 +94,11 @@ test('collects the allowlisted host shape with a closed capability vocabulary', 
     for (const [id, value] of Object.entries(host.capabilities)) {
       assert.equal(typeof value, 'boolean', `capability ${id} must be a boolean`);
     }
+    assert.equal(
+      host.capabilities['process-tree-cleanup'],
+      process.platform !== 'win32' && host.capabilities['process-tree-rss'],
+      'cleanup qualification requires POSIX process groups plus the fixed native process table',
+    );
   });
 });
 
@@ -136,15 +147,39 @@ test('the collected profile round-trips as contract-conformant host evidence', (
         diagnostics: [],
       },
     ];
-    const cleanup = { status: 'clean', reasonCode: null, removedRoots: 1, residualDescendants: 0 };
+    const cleanup = {
+      status: 'clean',
+      reasonCode: null,
+      removedRoots: 1,
+      residualDescendants: 0,
+    };
     const body = {
       schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
-      profile: { id: profile.id, version: profile.version, digest: profileDigest(profile) },
+      profile: {
+        id: profile.id,
+        version: profile.version,
+        digest: profileDigest(profile),
+      },
       candidate: {
         kind: 'packed-release',
         version: '0.7.0',
         source: 'packed-release@0.7.0',
         digest: 'a'.repeat(64),
+        manifestDigest: 'b'.repeat(64),
+      },
+      previousCandidate: null,
+      execution: {
+        runId: 'host-test',
+        runAttempt: 1,
+        runnerLabel: 'test-runner',
+      },
+      lifecycle: {
+        installedVersion: '0.7.0',
+        upgradedVersion: '0.7.0',
+        versionMigrated: false,
+        stateMigrated: true,
+        cliStateRemoved: true,
+        packageRemoved: true,
       },
       harnessGitSha: 'abc1234',
       startedAt: '2026-07-15T00:00:00.000Z',

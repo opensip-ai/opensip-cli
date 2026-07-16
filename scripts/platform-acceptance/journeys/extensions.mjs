@@ -29,162 +29,184 @@ import {
 
 const cmdData = (parsed) => parsed?.data ?? parsed;
 
+// Extension qualification must consume only the packed fixture plus the exact
+// installed candidate. A registry-backed peer substitution would make a green
+// release gate evidence some other published SDK.
+const offlineNpmEnv = (cwd, journey) =>
+  Object.freeze({
+    npm_config_cache: join(cwd, '.acceptance-npm-cache', journey),
+    npm_config_legacy_peer_deps: 'true',
+    npm_config_offline: 'true',
+  });
+
 // Installed npm tools are deny-by-default; the fixture id must be allowlisted for
 // the post-install scenarios that mount/run it in the host process.
-const ALLOW_INSTALLED_ENV = Object.freeze({ OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'audit-demo-tool' });
+const allowInstalledEnv = (cwd) =>
+  Object.freeze({
+    ...offlineNpmEnv(cwd, 'whole-tool'),
+    OPENSIP_CLI_ALLOW_INSTALLED_TOOLS: 'audit-demo-tool',
+  });
 
 /** The whole-Tool lifecycle steps (install → run → list → validate → uninstall → gone). */
-const wholeToolSteps = (params) => [
-  {
-    slug: 'tools-install',
-    name: 'tools install <tool-plugin> --project --json',
-    args: ['tools', 'install', params.toolPluginTarball, '--project', '--json'],
-    env: ALLOW_INSTALLED_ENV,
-    timeout: 120_000,
-    expect: {
-      exitCode: 0,
-      json: (parsed) => {
-        const data = cmdData(parsed);
-        return data?.success === true
-          ? []
-          : [
-              `tools-install.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
-            ];
+const wholeToolSteps = (params) => {
+  const env = allowInstalledEnv(params.cwd);
+  return [
+    {
+      slug: 'tools-install',
+      name: 'tools install <tool-plugin> --project --json',
+      args: ['tools', 'install', params.toolPluginTarball, '--project', '--json'],
+      env,
+      timeout: 120_000,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.success === true
+            ? []
+            : [
+                `tools-install.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+              ];
+        },
       },
     },
-  },
-  {
-    slug: 'audit-demo-run',
-    name: 'audit-demo subcommand contributed by the tool plugin runs',
-    args: ['audit-demo'],
-    env: ALLOW_INSTALLED_ENV,
-    expect: { exitCode: 0, stdoutIncludes: 'audit-demo ran' },
-  },
-  {
-    slug: 'tools-list',
-    name: 'tools list --json shows bundled ids + the installed fixture row',
-    args: ['tools', 'list', '--json'],
-    env: ALLOW_INSTALLED_ENV,
-    expect: {
-      exitCode: 0,
-      json: (parsed) => {
-        const failures = [];
-        const data = cmdData(parsed);
-        const rows = Array.isArray(data?.tools) ? data.tools : [];
-        const ids = new Set(rows.map((t) => t?.id));
-        for (const bundled of ['fitness', 'simulation', 'graph']) {
-          if (!ids.has(bundled)) failures.push(`tools list: missing bundled id '${bundled}'`);
-        }
-        const fixture = rows.find((t) => t?.id === 'audit-demo-tool');
-        if (fixture === undefined) {
-          failures.push('tools list: missing the installed audit-demo-tool row');
-        } else if (fixture.source !== 'project') {
-          failures.push(
-            `tools list: audit-demo-tool source: expected 'project', got ${JSON.stringify(fixture.source)}`,
-          );
-        }
-        return failures;
+    {
+      slug: 'audit-demo-run',
+      name: 'audit-demo subcommand contributed by the tool plugin runs',
+      args: ['audit-demo'],
+      env,
+      expect: { exitCode: 0, stdoutIncludes: 'audit-demo ran' },
+    },
+    {
+      slug: 'tools-list',
+      name: 'tools list --json shows bundled ids + the installed fixture row',
+      args: ['tools', 'list', '--json'],
+      env,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const failures = [];
+          const data = cmdData(parsed);
+          const rows = Array.isArray(data?.tools) ? data.tools : [];
+          const ids = new Set(rows.map((t) => t?.id));
+          for (const bundled of ['fitness', 'simulation', 'graph']) {
+            if (!ids.has(bundled)) failures.push(`tools list: missing bundled id '${bundled}'`);
+          }
+          const fixture = rows.find((t) => t?.id === 'audit-demo-tool');
+          if (fixture === undefined) {
+            failures.push('tools list: missing the installed audit-demo-tool row');
+          } else if (fixture.source !== 'project') {
+            failures.push(
+              `tools list: audit-demo-tool source: expected 'project', got ${JSON.stringify(fixture.source)}`,
+            );
+          }
+          return failures;
+        },
       },
     },
-  },
-  {
-    slug: 'tools-validate',
-    name: 'tools validate <tool fixture tarball> passes every section',
-    args: ['tools', 'validate', params.toolPluginTarball, '--json'],
-    env: ALLOW_INSTALLED_ENV,
-    timeout: 120_000,
-    expect: {
-      exitCode: 0,
-      json: (parsed) => {
-        const data = cmdData(parsed);
-        return data?.verdict === 'passed'
-          ? []
-          : [`tools-validate.verdict: expected 'passed', got ${JSON.stringify(data?.verdict)}`];
+    {
+      slug: 'tools-validate',
+      name: 'tools validate <tool fixture tarball> passes every section',
+      args: ['tools', 'validate', params.toolPluginTarball, '--json'],
+      env,
+      timeout: 120_000,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.verdict === 'passed'
+            ? []
+            : [`tools-validate.verdict: expected 'passed', got ${JSON.stringify(data?.verdict)}`];
+        },
       },
     },
-  },
-  {
-    slug: 'tools-uninstall',
-    name: 'tools uninstall removes the project-local fixture',
-    args: ['tools', 'uninstall', 'audit-demo-tool', '--project', '--json'],
-    env: ALLOW_INSTALLED_ENV,
-    expect: {
-      exitCode: 0,
-      json: (parsed) => {
-        const data = cmdData(parsed);
-        return data?.success === true
-          ? []
-          : [
-              `tools-uninstall.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
-            ];
+    {
+      slug: 'tools-uninstall',
+      name: 'tools uninstall removes the project-local fixture',
+      args: ['tools', 'uninstall', 'audit-demo-tool', '--project', '--json'],
+      env,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.success === true
+            ? []
+            : [
+                `tools-uninstall.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+              ];
+        },
       },
     },
-  },
-  {
-    slug: 'tools-list-gone',
-    name: 'tools list --json no longer shows the fixture row',
-    args: ['tools', 'list', '--json'],
-    env: ALLOW_INSTALLED_ENV,
-    expect: {
-      exitCode: 0,
-      json: (parsed) => {
-        const data = cmdData(parsed);
-        const rows = Array.isArray(data?.tools) ? data.tools : [];
-        return rows.some((t) => t?.id === 'audit-demo-tool')
-          ? ['tools list: audit-demo-tool row still present after uninstall']
-          : [];
+    {
+      slug: 'tools-list-gone',
+      name: 'tools list --json no longer shows the fixture row',
+      args: ['tools', 'list', '--json'],
+      env,
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          const rows = Array.isArray(data?.tools) ? data.tools : [];
+          return rows.some((t) => t?.id === 'audit-demo-tool')
+            ? ['tools list: audit-demo-tool row still present after uninstall']
+            : [];
+        },
       },
     },
-  },
-];
+  ];
+};
 
 /** The fit-pack lifecycle steps (install → narrow fit --check to the contributed slug). */
-const fitPackSteps = (params) => [
-  {
-    slug: 'fit-plugin-add',
-    name: 'fit plugin add <fit-pack> --json',
-    args: ['fit', 'plugin', 'add', params.fitPackTarball, '--json'],
-    timeout: 120_000,
-    setup: ({ cwd }) => {
-      mkdirSync(join(cwd, 'src'), { recursive: true });
-      writeFileSync(join(cwd, 'src', 'marker.ts'), 'export const m = "FIT_PACK_FIXTURE";\n');
-    },
-    expect: {
-      exitCode: 0,
-      json: (parsed) => {
-        const data = cmdData(parsed);
-        return data?.success === true
-          ? []
-          : [
-              `fit-plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
-            ];
+const fitPackSteps = (params) => {
+  const env = offlineNpmEnv(params.cwd, 'fit-pack');
+  return [
+    {
+      slug: 'fit-plugin-add',
+      name: 'fit plugin add <fit-pack> --json',
+      args: ['fit', 'plugin', 'add', params.fitPackTarball, '--json'],
+      env,
+      timeout: 120_000,
+      setup: ({ cwd }) => {
+        mkdirSync(join(cwd, 'src'), { recursive: true });
+        writeFileSync(join(cwd, 'src', 'marker.ts'), 'export const m = "FIT_PACK_FIXTURE";\n');
+      },
+      expect: {
+        exitCode: 0,
+        json: (parsed) => {
+          const data = cmdData(parsed);
+          return data?.success === true
+            ? []
+            : [
+                `fit-plugin-add.success: expected true, got ${JSON.stringify(data?.success)} (${JSON.stringify(data?.error)})`,
+              ];
+        },
       },
     },
-  },
-  {
-    slug: 'fit-pack-check',
-    name: 'fit --json --check <fit-pack-slug> narrows to the contributed check',
-    args: ['fit', '--json', '--check', 'fit-pack-fixture-marker'],
-    expect: {
-      exitCode: 1,
-      json: (parsed) => {
-        const failures = expectEnvelope({ tool: 'fit' })(parsed);
-        const env = parsed?.envelope ?? parsed;
-        const total = env?.verdict?.summary?.total;
-        if (total !== 1)
-          failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`);
-        const signals = Array.isArray(env?.signals) ? env.signals : [];
-        if (!signals.some((s) => s?.source === 'fit-pack-fixture-marker')) {
-          failures.push('fit signals: expected a fit-pack-fixture-marker signal');
-        }
-        return failures;
+    {
+      slug: 'fit-pack-check',
+      name: 'fit --json --check <fit-pack-slug> narrows to the contributed check',
+      args: ['fit', '--json', '--check', 'fit-pack-fixture-marker'],
+      expect: {
+        exitCode: 1,
+        json: (parsed) => {
+          const failures = expectEnvelope({ tool: 'fit' })(parsed);
+          const env = parsed?.envelope ?? parsed;
+          const total = env?.verdict?.summary?.total;
+          if (total !== 1)
+            failures.push(`fit verdict.summary.total: expected 1, got ${JSON.stringify(total)}`);
+          const signals = Array.isArray(env?.signals) ? env.signals : [];
+          if (!signals.some((s) => s?.source === 'fit-pack-fixture-marker')) {
+            failures.push('fit signals: expected a fit-pack-fixture-marker signal');
+          }
+          return failures;
+        },
       },
     },
-  },
-];
+  ];
+};
 
 const simPackExecutor = async (context) => {
   const cwd = context.paths.workRoot;
+  const npmEnv = offlineNpmEnv(cwd, 'sim-pack');
   const init = await runCli(context, { args: ['init', '--language', 'typescript', '--json'], cwd });
   if (init.timedOut || (init.status ?? 1) !== 0)
     return fail('init-failed', [context.assert.diagnostic(init.stderrTail)]);
@@ -192,6 +214,7 @@ const simPackExecutor = async (context) => {
   const added = await runCli(context, {
     args: ['sim', 'plugin', 'add', context.fixtures.simPackTarball, '--json'],
     cwd,
+    env: npmEnv,
     timeoutMs: 120_000,
   });
   const addOutcome = assertCommand(
@@ -225,6 +248,7 @@ const simPackExecutor = async (context) => {
   const removed = await runCli(context, {
     args: ['sim', 'plugin', 'remove', '@opensip-cli-fixture/sim-pack-demo', '--json'],
     cwd,
+    env: npmEnv,
   });
   const removeOutcome = assertCommand(context, removed, { exitCode: 0 }, 'sim-pack-remove-failed');
   if (removeOutcome.status !== 'pass') return removeOutcome;

@@ -9,10 +9,14 @@ import { HarnessPrerequisiteError, resolveCliDist } from '../runner/spawn.js';
 
 import {
   BoundedByteRing,
+  DEFAULT_MAX_MCP_TOOL_CALLS,
   DEFAULT_MAX_RESPONSE_BYTES,
   DEFAULT_MAX_STDERR_BYTES,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  MAX_MCP_TOOL_CALLS,
+  cumulativeMcpStdoutByteLimit,
   defaultConnectionFactory,
+  mcpRawFrameByteLimit,
   positiveBoundedInteger,
   type McpConnection,
   type McpConnectionFactory,
@@ -41,11 +45,17 @@ export interface McpArmSessionOptions {
   readonly cliCommand?: string;
   /** Resolves the CLI JS entrypoint; production injects the run's CLI target, tests a stub. */
   readonly cliDistResolver?: () => string;
+  /** Node arguments that load the installed target's verified-byte snapshot. */
+  readonly cliPreludeArgs?: readonly string[];
   readonly connectionFactory?: McpConnectionFactory;
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly maxResponseBytes?: number;
   readonly maxStderrBytes?: number;
+  /** Maximum post-handshake MCP tool calls in this session. */
+  readonly maxToolCalls?: number;
   readonly requestTimeoutMs?: number;
+  /** Verifies the selected installed target before launch and after process close. */
+  readonly targetStabilityCheck?: () => void;
   readonly workspaceRoot: string;
 }
 
@@ -57,11 +67,13 @@ interface McpArmSessionState {
   readonly connection: McpConnection;
   readonly handshakeDurationMs: number;
   readonly maxResponseBytes: number;
+  readonly maxToolCalls: number;
   readonly ownedHome: string | undefined;
   readonly requestTimeoutMs: number;
   readonly sensitivePaths: readonly string[];
   readonly stderr: BoundedByteRing;
   readonly surface: VerifiedSurface;
+  readonly targetStabilityCheck: (() => void) | undefined;
 }
 
 /** One real, read-only MCP process bound to one project workspace. */
@@ -69,21 +81,25 @@ export class McpArmSession {
   private readonly connection: McpConnection;
   private readonly handshakeDurationMs: number;
   private readonly maxResponseBytes: number;
+  private remainingToolCalls: number;
   private readonly ownedHome: string | undefined;
   private readonly requestTimeoutMs: number;
   private readonly sensitivePaths: readonly string[];
   private readonly stderr: BoundedByteRing;
   private readonly surface: VerifiedSurface;
+  private readonly targetStabilityCheck: (() => void) | undefined;
 
   private constructor(state: McpArmSessionState) {
     this.connection = state.connection;
     this.handshakeDurationMs = state.handshakeDurationMs;
     this.maxResponseBytes = state.maxResponseBytes;
+    this.remainingToolCalls = state.maxToolCalls;
     this.ownedHome = state.ownedHome;
     this.requestTimeoutMs = state.requestTimeoutMs;
     this.sensitivePaths = state.sensitivePaths;
     this.stderr = state.stderr;
     this.surface = state.surface;
+    this.targetStabilityCheck = state.targetStabilityCheck;
   }
 
   /**
@@ -111,9 +127,17 @@ export class McpArmSession {
       64 * 1024 * 1024,
       'maxResponseBytes',
     );
+    const maxToolCalls = positiveBoundedInteger(
+      options.maxToolCalls,
+      DEFAULT_MAX_MCP_TOOL_CALLS,
+      MAX_MCP_TOOL_CALLS,
+      'maxToolCalls',
+    );
+    const maxStdoutBytes = cumulativeMcpStdoutByteLimit(maxResponseBytes, maxToolCalls);
+    const maxFrameBytes = mcpRawFrameByteLimit(maxResponseBytes);
     const connectionFactory = options.connectionFactory ?? defaultConnectionFactory;
     const cliCommand = options.cliCommand ?? process.execPath;
-    const cliDist = (options.cliDistResolver ?? resolveCliDist)();
+    const cliDistResolver = options.cliDistResolver ?? resolveCliDist;
     const ownedHome =
       options.env?.HOME === undefined
         ? mkdtempSync(join(tmpdir(), 'opensip-agent-eval-home-'))
@@ -125,14 +149,20 @@ export class McpArmSession {
     );
     let connection: McpConnection | undefined;
     try {
+      options.targetStabilityCheck?.();
+      // Resolve immediately after the single boundary check and before
+      // constructing the process transport. Do not cache this across setup.
+      const cliDist = cliDistResolver();
       connection = connectionFactory({
-        args: [cliDist, 'mcp', '--cwd', options.workspaceRoot],
+        args: [...(options.cliPreludeArgs ?? []), cliDist, 'mcp', '--cwd', options.workspaceRoot],
         command: cliCommand,
         cwd: options.workspaceRoot,
         env: buildDeterministicEnv({
           ...options.env,
           ...(ownedHome === undefined ? {} : { HOME: ownedHome }),
         }),
+        maxFrameBytes,
+        maxStdoutBytes,
       });
       connection.stderr?.on('data', (chunk: unknown) => stderr.append(chunk));
       // @fitness-ignore-next-line async-waterfall-detection -- Surface discovery cannot begin until the stdio MCP transport has connected.
@@ -153,11 +183,13 @@ export class McpArmSession {
         connection,
         handshakeDurationMs: Math.max(0, performance.now() - startedAt),
         maxResponseBytes,
+        maxToolCalls,
         ownedHome,
         requestTimeoutMs,
         sensitivePaths,
         stderr,
         surface,
+        targetStabilityCheck: options.targetStabilityCheck,
       });
     } catch (error) {
       await connection?.close().catch((closeError: unknown) => {
@@ -171,9 +203,15 @@ export class McpArmSession {
           retryDelay: 50,
         });
       }
-      if (error instanceof HarnessPrerequisiteError) throw error;
+      let authoritativeError = error;
+      try {
+        options.targetStabilityCheck?.();
+      } catch (stabilityError) {
+        authoritativeError = stabilityError;
+      }
+      if (authoritativeError instanceof HarnessPrerequisiteError) throw authoritativeError;
       throw new HarnessPrerequisiteError(
-        `Unable to connect to the OpenSIP MCP server: ${safeErrorDetail(error, sensitivePaths)}`,
+        `Unable to connect to the OpenSIP MCP server: ${safeErrorDetail(authoritativeError, sensitivePaths)}`,
       );
     }
   }
@@ -199,6 +237,12 @@ export class McpArmSession {
    * @throws {HarnessPrerequisiteError} When the MCP transport becomes unavailable.
    */
   public async callTool(step: ResolvedStrategyStep): Promise<StepRecord> {
+    if (this.remainingToolCalls <= 0) {
+      throw new HarnessPrerequisiteError(
+        'OpenSIP MCP session exceeded its bounded tool-call budget.',
+      );
+    }
+    this.remainingToolCalls -= 1;
     const startedAt = performance.now();
     let result: unknown;
     try {
@@ -280,13 +324,17 @@ export class McpArmSession {
     try {
       await this.connection.close();
     } finally {
-      if (this.ownedHome !== undefined) {
-        rmSync(this.ownedHome, {
-          force: true,
-          maxRetries: 3,
-          recursive: true,
-          retryDelay: 50,
-        });
+      try {
+        this.targetStabilityCheck?.();
+      } finally {
+        if (this.ownedHome !== undefined) {
+          rmSync(this.ownedHome, {
+            force: true,
+            maxRetries: 3,
+            recursive: true,
+            retryDelay: 50,
+          });
+        }
       }
     }
   }

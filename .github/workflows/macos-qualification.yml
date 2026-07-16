@@ -43,30 +43,26 @@ on:
       # of these can move the measured tuple and must re-qualify.
       - '.github/workflows/macos-qualification.yml'
       - '.config/platform-acceptance/**'
-      - 'scripts/run-platform-acceptance.mjs'
-      - 'scripts/verify-platform-acceptance.mjs'
-      - 'scripts/platform-acceptance/**'
-      - 'scripts/build-release-artifacts.mjs'
-      - 'scripts/verify-release-artifacts.mjs'
-      - 'scripts/release-package-order.mjs'
-      - 'scripts/lib/release-artifacts.mjs'
-      - 'scripts/install.sh'
-      - 'packages/agent-eval/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'turbo.json'
       - '.nvmrc'
   pull_request:
     branches: [main]
     paths:
       - '.github/workflows/macos-qualification.yml'
       - '.config/platform-acceptance/**'
-      - 'scripts/run-platform-acceptance.mjs'
-      - 'scripts/verify-platform-acceptance.mjs'
-      - 'scripts/platform-acceptance/**'
-      - 'scripts/build-release-artifacts.mjs'
-      - 'scripts/verify-release-artifacts.mjs'
-      - 'scripts/release-package-order.mjs'
-      - 'scripts/lib/release-artifacts.mjs'
-      - 'scripts/install.sh'
-      - 'packages/agent-eval/**'
+      - 'packages/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'turbo.json'
       - '.nvmrc'
 
 concurrency:
@@ -115,8 +111,9 @@ jobs:
           set -eu
           major="$(npm -v | cut -d. -f1)"
           if [ "$major" != "11" ]; then
-            npm install --prefix "$HOME/.npm-cli" npm@11
+            npm install --prefix "$HOME/.npm-cli" npm@11 --registry https://registry.npmjs.org/
             echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+            echo "OPENSIP_ACCEPTANCE_NPM_CLI=$HOME/.npm-cli/node_modules/npm/bin/npm-cli.js" >> "$GITHUB_ENV"
           fi
 
       # Non-authoritative diagnostics — the preflight + verifier are the only
@@ -243,13 +240,33 @@ jobs:
         run: |
           set -u
           VERSION="$(node -p "require('./packages/core/package.json').version")"
+          manifest="$TARBALL_DIR/opensip-cli-release-manifest.v1.json"
+          MANIFEST_DIGEST="$(shasum -a 256 "$manifest" | awk '{print $1}')"
+          CANDIDATE_DIGEST="$(node --input-type=module -e '
+            import { resolveCandidateSource } from "./scripts/platform-acceptance/candidate-source.mjs";
+            const resolved = await resolveCandidateSource({
+              kind: "packed-release",
+              directory: process.argv[1],
+              expectedVersion: process.argv[2],
+              manifestDigest: process.argv[3],
+            });
+            if (!resolved.ok) throw new Error(resolved.reasonCode);
+            process.stdout.write(resolved.identity.digest);
+          ' "$TARBALL_DIR" "$VERSION" "$MANIFEST_DIGEST")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "manifest_digest=$MANIFEST_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "candidate_digest=$CANDIDATE_DIGEST" >> "$GITHUB_OUTPUT"
           set +e
           pnpm platform:acceptance -- \
             --profile "$MACOS_PROFILE" \
             --packed-release "$TARBALL_DIR" \
             --expected-version "$VERSION" \
-            --out "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json"
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --runner-label macos-26 \
+            --out "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
+            --agent-report-out "$EVIDENCE_DIR/agent-eval-installed-smoke.json"
           rc=$?
           set -e
           echo "run_rc=$rc" >> "$GITHUB_OUTPUT"
@@ -263,6 +280,8 @@ jobs:
         if: always() && steps.preflight.outputs.host_ok == 'true'
         env:
           VERSION: ${{ steps.acceptance.outputs.version }}
+          MANIFEST_DIGEST: ${{ steps.acceptance.outputs.manifest_digest }}
+          CANDIDATE_DIGEST: ${{ steps.acceptance.outputs.candidate_digest }}
         run: |
           set -u
           set +e
@@ -270,12 +289,26 @@ jobs:
             --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
             --profile "$MACOS_PROFILE" \
             --expected-version "$VERSION" \
+            --expected-candidate-kind packed-release \
+            --candidate-manifest "$TARBALL_DIR/opensip-cli-release-manifest.v1.json" \
+            --expected-candidate-digest "$CANDIDATE_DIGEST" \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --expect-no-previous-candidate \
+            --expected-git-sha "$GITHUB_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-runner-label macos-26 \
             --expect-platform darwin \
             --expect-arch arm64 \
             --expect-node-abi 137 \
             --expect-fs-type apfs \
             --expected-node-major 24 \
             --expected-npm-major 11 \
+            --expected-sw-vers-major 26 \
+            --expected-kernel-major 25 \
+            --expect-uname-arch arm64 \
+            --expect-case-sensitive false \
+            --expect-shell zsh \
             --expected-support-row "$SUPPORT_ROW" \
             --expected-support-contract-version "$SUPPORT_CONTRACT_VERSION" \
             --json > "$EVIDENCE_DIR/verifier-result.json"
@@ -346,7 +379,7 @@ jobs:
       # `latest`). If no sealed evidence exists (e.g. host-mismatch), only the
       # bounded preflight/verifier diagnostics upload. NEVER uploads temp homes,
       # npm config/cache, raw SQLite, or unbounded logs — only the sealed
-      # evidence + preflight + verifier-result JSON from the run-owned dir.
+      # evidence, bounded sanitized agent report, preflight, and verifier JSON.
       - name: Upload qualification evidence
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
@@ -354,6 +387,7 @@ jobs:
           name: ${{ steps.classify.outputs.artifact-name || format('macos-qualification-run{0}', github.run_attempt) }}
           path: |
             ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v1.json
+            ${{ env.EVIDENCE_DIR }}/agent-eval-installed-smoke.json
             ${{ env.EVIDENCE_DIR }}/host-preflight.json
             ${{ env.EVIDENCE_DIR }}/verifier-result.json
           if-no-files-found: warn

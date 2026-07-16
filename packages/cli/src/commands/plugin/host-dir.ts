@@ -12,10 +12,19 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
+import { satisfies as satisfiesSemver } from 'semver';
 
 /** Filename of the host package.json that pins plugin installs. */
 export const HOST_PACKAGE_JSON = 'package.json';
@@ -31,7 +40,10 @@ export function isSafeNpmSpec(spec: string): boolean {
   return true;
 }
 
-/** Create the host package.json (if absent) for a plugin host dir + return the dir. */
+function isSafePeerPackageName(name: string): boolean {
+  return /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/i.test(name);
+}
+
 /** Create (if absent) a plugin host dir + its host package.json; returns `dir`. */
 export function ensureHostDir(dir: string, domain: string): string {
   mkdirSync(dir, { recursive: true });
@@ -70,10 +82,12 @@ export function ensureUserPluginHostDir(domain: string): string {
 }
 
 /**
- * After installing a plugin, look at its peerDependencies and install
- * any missing ones into the same plugin directory. Best-effort: missing
- * peers produce no error here, the loader will surface a clear error if
- * the plugin can't resolve its imports.
+ * After installing a plugin, look at its peerDependencies and install any that
+ * Node cannot already resolve from the plugin host. This follows ordinary peer
+ * dependency semantics: a project dependency in an ancestor `node_modules`
+ * satisfies the plugin without downloading a second copy into the private host.
+ * Best-effort: missing peers produce no error here; the loader surfaces a clear
+ * error if the plugin still cannot resolve its imports.
  */
 export function installMissingPeers(
   dir: string,
@@ -85,21 +99,71 @@ export function installMissingPeers(
 
   const peerDeps = installed.peerDependencies ?? {};
   const installedAtRoot = new Set(safeReaddirScopedAndFlat(join(dir, 'node_modules')));
-
-  const missing = Object.entries(peerDeps).filter(([name]) => !installedAtRoot.has(name));
+  const requireFromHost = createRequire(join(dir, '__opensip_peer_resolution__.cjs'));
+  const missing = Object.entries(peerDeps).filter(([name, range]) => {
+    if (!isSafePeerPackageName(name)) return true;
+    const rootPackage = join(dir, 'node_modules', name);
+    const compatibleAtRoot =
+      installedAtRoot.has(name) && isCompatiblePeerPackage(rootPackage, name, range);
+    return !compatibleAtRoot && !canResolveAncestorPeer(dir, requireFromHost, name, range);
+  });
   if (missing.length === 0) return;
 
   for (const [name, range] of missing) {
-    if (!isSafeNpmSpec(name)) continue;
+    if (!isSafePeerPackageName(name) || !isSafeNpmSpec(name)) continue;
     if (typeof range !== 'string' || !isSafeNpmSpec(range)) continue;
     try {
-      execFileSync('npm', ['install', '--ignore-scripts', '--no-save', `${name}@${range}`], {
-        cwd: dir,
-        stdio: ['ignore', process.stderr, process.stderr],
-      });
+      execFileSync(
+        'npm',
+        ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', `${name}@${range}`],
+        {
+          cwd: dir,
+          stdio: ['ignore', process.stderr, process.stderr],
+        },
+      );
     } catch {
       // Loader will surface unresolved imports; swallow here.
     }
+  }
+}
+
+function canResolveAncestorPeer(
+  hostDir: string,
+  requireFromHost: { resolve(id: string): string },
+  name: string,
+  range: string,
+): boolean {
+  let current = hostDir;
+  let physicalPackagePath: string | undefined;
+  while (true) {
+    const candidate = join(current, 'node_modules', name);
+    if (existsSync(candidate)) {
+      physicalPackagePath = candidate;
+      break;
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  if (physicalPackagePath === undefined) return false;
+  try {
+    if (!isCompatiblePeerPackage(physicalPackagePath, name, range)) return false;
+    const packageReal = realpathSync(physicalPackagePath);
+    const resolvedReal = realpathSync(requireFromHost.resolve(name));
+    const rel = relative(packageReal, resolvedReal);
+    return rel === '' || (rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel));
+  } catch {
+    return false;
+  }
+}
+
+function isCompatiblePeerPackage(packagePath: string, name: string, range: string): boolean {
+  const manifest = readPackageJson(join(packagePath, HOST_PACKAGE_JSON));
+  if (manifest?.name !== name || typeof manifest.version !== 'string') return false;
+  try {
+    return satisfiesSemver(manifest.version, range);
+  } catch {
+    return false;
   }
 }
 
@@ -115,7 +179,7 @@ function findInstalledPackage(
   dir: string,
   requestedSpec: string,
   depsBefore: Set<string>,
-): { name: string; peerDependencies?: Record<string, string> } | undefined {
+): PackageManifest | undefined {
   const nodeModulesDir = join(dir, 'node_modules');
   if (!existsSync(nodeModulesDir)) return undefined;
 
@@ -156,20 +220,17 @@ function extractNameFromSpec(spec: string): string | undefined {
   return atIdx === -1 ? spec : spec.slice(0, atIdx);
 }
 
-function readPackageJson(path: string):
-  | {
-      name: string;
-      dependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-    }
-  | undefined {
+interface PackageManifest {
+  name: string;
+  version?: string;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+function readPackageJson(path: string): PackageManifest | undefined {
   if (!existsSync(path)) return undefined;
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as {
-      name: string;
-      dependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-    };
+    return JSON.parse(readFileSync(path, 'utf8')) as PackageManifest;
   } catch {
     return undefined;
   }

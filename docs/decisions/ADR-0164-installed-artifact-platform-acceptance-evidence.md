@@ -46,9 +46,13 @@ verdict is `pass | fail | infrastructure-fault`. Candidate and host identity are
 resolved once and carried unchanged through every journey into the verifier. The
 evidence is a single, atomically written, sealed file whose terminal `completion`
 record is appended only after cleanup, over a recomputed sealed-body digest, so a
-partial or tampered artifact can never verify. The harness owns candidate and run
-cleanup. Persistence is a **standalone file only** — no datastore schema, session
-row, or `ToolState` record.
+partial write, accidental corruption, or internally inconsistent artifact cannot
+verify. The digest is an unkeyed integrity check, not an authenticity signature:
+an actor able to rewrite the JSON can recompute the digest. Qualification authority
+therefore requires both independent content verification and trusted workflow-run,
+artifact, or release provenance. The harness owns candidate and run cleanup.
+Persistence is a **standalone file only** — no datastore schema, session row, or
+`ToolState` record.
 
 **Alternatives:**
 
@@ -85,10 +89,34 @@ confidence in the bytes they actually run; agents need a stable machine artifact
 that distinguishes *failure* from *skip* from *unavailable* so absent evidence
 can never read as success. The closed profile + closed journey registry keep
 profile data from injecting argv, environment keys, or code, and make the
-required-coverage floor unforgeable. Sealing the artifact over a recomputed
+required-coverage floor impossible to weaken without changing the digest-bound
+profile. A journey may declare the closed
+`candidateKinds` set for which it is meaningful; the runner preserves a
+non-applicable row as a non-required `skipped` result with
+`candidate-kind-not-applicable`, and the independent verifier recomputes that
+applicability and exact no-effect skip shape. Likewise, `lifecycle.upgrade` is
+required only when an exact previous candidate exists; without one it records
+`previous-candidate-not-supplied` and performs no synthetic self-reinstall.
+The base profile requires `process-tree-cleanup`: today that capability means
+zero **observed** residual descendants under POSIX process-group retention plus
+sampled, fixed-native-process-table observation. This is a trusted-release
+behavior qualification, not an OS containment boundary: it cannot prove the
+absence of a descendant that deliberately creates a new session and reparents
+between samples. Any sampling, capture, or final-verification fault makes cleanup
+non-clean. Retained identity matches bind PID, process group, the native session
+token, and the one-second native start token. The observed command/ucomm is
+diagnostic metadata only because it may change across exec; it is not part of
+identity. An unrelated same-second replacement matching that stable tuple remains
+a sampled-inventory collision limit. Windows reports the capability unavailable
+until the harness has Job Object containment, so the common qualification profile
+fails closed there
+instead of reporting unverifiable cleanup.
+Sealing the artifact over a recomputed
 digest with a terminal completion record makes the verifier — not the runner's
-own exit code — the source of truth, which is what lets an OS plan or a release
-workflow gate on evidence produced by a process it does not control. RSS is a
+own exit code — the source of truth for internal consistency. Artifact authenticity
+comes from the trusted workflow/release provenance that retained it; the digest
+alone does not prove who produced the file. Together those checks let an OS plan
+or release workflow gate on the retained evidence. RSS is a
 tagged measurement (`available { peakBytes }` or `unavailable { reasonCode }`) so
 a `0`/`undefined` never masquerades as proof. See
 `scripts/platform-acceptance/contract.d.mts` (schema + verdict functions),
@@ -114,8 +142,9 @@ grepping `.runtime/logs` or reading raw SQLite.
 
 - OS support ADRs/plans consume this contract: they bind `common-v1` by digest,
   add or strengthen journeys additively, and may not remove a base journey,
-  weaken a bound, or downgrade required coverage without an ADR-reviewed change to
-  the base itself.
+  weaken a bound, narrow a base journey's candidate applicability, or downgrade
+  required coverage without an ADR-reviewed change to the base itself. A newly
+  added OS-specific journey may declare a closed candidate-kind applicability set.
 - No new fitness check is added for native behavior; the contract validators,
   parity tests, and the workflow verifier are the enforceable guardrails, and a
   release/OS workflow must run the verifier — a green runner console is not
@@ -124,7 +153,8 @@ grepping `.runtime/logs` or reading raw SQLite.
   package API; it stays under `scripts/` and the private agent-eval
   installed-entrypoint seam.
 - Acceptance evidence never enters the OpenSIP runtime datastore; it is an
-  uploaded, self-verifying file.
+  uploaded, internally self-checking file whose authenticity comes from the
+  retained workflow/release provenance.
 
 **Related specs / ADRs:**
 [ADR-0017](ADR-0017-release-gate-policy.md) owns the release-gate strictness and

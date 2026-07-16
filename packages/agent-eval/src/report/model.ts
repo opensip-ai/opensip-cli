@@ -33,11 +33,24 @@ export interface EvalTaskResult {
  * schema v1: absent in reports produced before this field existed, and present
  * for every report the current harness writes. Carries no absolute path.
  */
-export interface EvalReportCliTarget {
-  readonly source: 'installed' | 'workspace';
+interface EvalReportCliTargetBase {
   /** Entrypoint basename only (e.g. `index.js`); never an absolute or home path. */
   readonly entrypointName: string;
 }
+
+export interface EvalReportInstalledCliTarget extends EvalReportCliTargetBase {
+  /** Digest of the exact package-declared JS bytes measured by every child. */
+  readonly entrypointSha256?: `sha256:${string}`;
+  /** Digest of the package manifest that bound `bin.opensip` to the entrypoint. */
+  readonly packageJsonSha256?: `sha256:${string}`;
+  readonly source: 'installed';
+}
+
+export interface EvalReportWorkspaceCliTarget extends EvalReportCliTargetBase {
+  readonly source: 'workspace';
+}
+
+export type EvalReportCliTarget = EvalReportInstalledCliTarget | EvalReportWorkspaceCliTarget;
 
 /** Immutable file-plane result. Raw tool responses never cross into this shape. */
 export interface EvalReport {
@@ -76,10 +89,21 @@ function isSourceState(value: unknown): value is SourceState {
  */
 function isValidCliTarget(value: unknown): boolean {
   if (value === undefined) return true;
+  if (!isRecord(value) || !isPopulatedString(value.entrypointName)) return false;
+  if (value.source === 'workspace') return true;
+  if (
+    value.source === 'installed' &&
+    value.entrypointSha256 === undefined &&
+    value.packageJsonSha256 === undefined
+  ) {
+    return true;
+  }
   return (
-    isRecord(value) &&
-    (value.source === 'installed' || value.source === 'workspace') &&
-    isPopulatedString(value.entrypointName)
+    value.source === 'installed' &&
+    typeof value.entrypointSha256 === 'string' &&
+    /^sha256:[0-9a-f]{64}$/u.test(value.entrypointSha256) &&
+    typeof value.packageJsonSha256 === 'string' &&
+    /^sha256:[0-9a-f]{64}$/u.test(value.packageJsonSha256)
   );
 }
 

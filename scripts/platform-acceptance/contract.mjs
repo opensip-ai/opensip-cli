@@ -23,6 +23,14 @@
 import { createHash } from 'node:crypto';
 
 export const PLATFORM_ACCEPTANCE_SCHEMA_VERSION = 1;
+export const PLATFORM_ACCEPTANCE_CAPABILITIES = Object.freeze([
+  'pty',
+  'symlink',
+  'permissions',
+  'process-tree-rss',
+  'process-tree-cleanup',
+]);
+const PLATFORM_ACCEPTANCE_CAPABILITY_SET = new Set(PLATFORM_ACCEPTANCE_CAPABILITIES);
 
 // Bounds on the contract's own strings/arrays (independent of a profile's
 // runtime output bounds). Keep them generous but finite so a hand-edited or
@@ -36,20 +44,50 @@ const MAX_JOURNEYS = 256;
 const MAX_CAPABILITIES = 64;
 const MAX_DIAGNOSTICS_PER_JOURNEY = 64;
 const MAX_DIAGNOSTIC_LENGTH = 4096;
+const MAX_STEPS_PER_JOURNEY = 64;
+const MAX_DIAGNOSTICS_PER_STEP = 8;
 const MAX_RESULTS = 512;
+const MAX_REGISTRY_BINDING_PACKAGES = 256;
 const MAX_BOUND_VALUE = Number.MAX_SAFE_INTEGER;
+
+// A profile is data, not trusted executable configuration. These ceilings keep
+// a hostile or accidentally malformed profile from turning the acceptance
+// harness into an unbounded allocator, sampler, or long-running process. The
+// committed common/macOS profiles remain comfortably below every limit.
+export const PLATFORM_ACCEPTANCE_BOUND_LIMITS = Object.freeze({
+  journeyTimeoutMs: Object.freeze({ min: 1, max: 10 * 60 * 1000 }),
+  maxStdoutBytes: Object.freeze({ min: 1, max: 16 * 1024 * 1024 }),
+  maxStderrBytes: Object.freeze({ min: 1, max: 16 * 1024 * 1024 }),
+  maxDiagnosticTailBytes: Object.freeze({ min: 1, max: 64 * 1024 }),
+  // Sub-10ms sampling can consume a core; multi-second sampling can make an
+  // rssRequired profile claim coverage while barely observing the process.
+  rssSampleIntervalMs: Object.freeze({ min: 10, max: 1000 }),
+  maxEvidenceBytes: Object.freeze({ min: 1, max: 64 * 1024 * 1024 }),
+  maxJourneyResults: Object.freeze({ min: 1, max: MAX_JOURNEYS }),
+});
 
 const JOURNEY_STATUSES = new Set(['pass', 'fail', 'skipped', 'unavailable']);
 const VERDICTS = new Set(['pass', 'fail', 'infrastructure-fault']);
 const CANDIDATE_KINDS = new Set(['packed-release', 'published-version']);
+const INSTALL_CHANNELS = new Set(['canonical-installer', 'npm-direct', 'packed-consumer']);
 const CLEANUP_STATUSES = new Set(['clean', 'incomplete']);
 const COMPLETION_STATES = new Set(['completed', 'infrastructure-fault']);
+const STEP_STAGES = new Set(['process', 'lifecycle', 'mcp']);
 const KNOWN_BASE_IDS_DEFAULT = ['common-v1'];
 
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const REASON_CODE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const HEX_DIGEST_PATTERN = /^[a-f0-9]{64}$/;
+const SEMVER_NUMBER = '(?:0|[1-9]\\d*)';
+const SEMVER_PRERELEASE_ID = '(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)';
+const EXACT_SEMVER_PATTERN = new RegExp(
+  `^${SEMVER_NUMBER}\\.${SEMVER_NUMBER}\\.${SEMVER_NUMBER}` +
+    `(?:-${SEMVER_PRERELEASE_ID}(?:\\.${SEMVER_PRERELEASE_ID})*)?` +
+    '(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$',
+);
+const SIGNAL_PATTERN = /^SIG[A-Z0-9]+$/;
 const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+const FIRST_PARTY_PACKAGE_PATTERN = /^(?:opensip-cli|@opensip-cli\/[a-z0-9][a-z0-9._-]*)$/;
 
 /** Construct a closed, machine-readable contract failure. */
 export function contractError(reasonCode, message) {
@@ -100,11 +138,17 @@ function requireString(value, label, { max = MAX_STRING_LENGTH, pattern } = {}) 
 }
 
 function requireId(value, label) {
-  return requireString(value, label, { max: MAX_ID_LENGTH, pattern: ID_PATTERN });
+  return requireString(value, label, {
+    max: MAX_ID_LENGTH,
+    pattern: ID_PATTERN,
+  });
 }
 
 function requireReasonCode(value, label) {
-  return requireString(value, label, { max: MAX_REASON_CODE_LENGTH, pattern: REASON_CODE_PATTERN });
+  return requireString(value, label, {
+    max: MAX_REASON_CODE_LENGTH,
+    pattern: REASON_CODE_PATTERN,
+  });
 }
 
 function requirePositiveInt(value, label, { max = MAX_BOUND_VALUE } = {}) {
@@ -223,7 +267,7 @@ const PROFILE_KEY_SET = new Set([
   'journeys',
   'supportRow',
 ]);
-const JOURNEY_SELECTION_KEY_SET = new Set(['id', 'required', 'capabilities']);
+const JOURNEY_SELECTION_KEY_SET = new Set(['id', 'required', 'capabilities', 'candidateKinds']);
 const BASE_REF_KEY_SET = new Set(['id', 'digest']);
 const SUPPORT_ROW_KEY_SET = new Set(['contractVersion', 'rowId']);
 
@@ -232,7 +276,14 @@ function parseBounds(raw) {
   rejectUnknownKeys(record, BOUNDS_KEY_SET, 'profile.bounds');
   const bounds = {};
   for (const key of BOUND_KEYS) {
-    bounds[key] = requirePositiveInt(record[key], `profile.bounds.${key}`);
+    const limit = PLATFORM_ACCEPTANCE_BOUND_LIMITS[key];
+    const value = requirePositiveInt(record[key], `profile.bounds.${key}`, {
+      max: limit.max,
+    });
+    if (value < limit.min) {
+      throw contractError('bound-too-small', `profile.bounds.${key} must be at least ${limit.min}`);
+    }
+    bounds[key] = value;
   }
   return Object.freeze(bounds);
 }
@@ -249,11 +300,44 @@ function parseCapabilities(raw, label) {
   const out = [];
   for (const entry of raw) {
     const id = requireId(entry, `${label} entry`);
+    if (!PLATFORM_ACCEPTANCE_CAPABILITY_SET.has(id)) {
+      throw contractError(
+        'unknown-capability',
+        `${label} has unknown capability ${JSON.stringify(id)}`,
+      );
+    }
     if (seen.has(id)) {
       throw contractError('duplicate-capability', `${label} has duplicate ${JSON.stringify(id)}`);
     }
     seen.add(id);
     out.push(id);
+  }
+  return Object.freeze(out);
+}
+
+function parseCandidateKinds(raw, label) {
+  if (raw === undefined) return;
+  if (!Array.isArray(raw)) {
+    throw contractError('invalid-array', `${label} must be an array`);
+  }
+  if (raw.length === 0) {
+    throw contractError('empty-candidate-kinds', `${label} must not be empty`);
+  }
+  if (raw.length > CANDIDATE_KINDS.size) {
+    throw contractError('array-too-long', `${label} exceeds ${CANDIDATE_KINDS.size} entries`);
+  }
+  const seen = new Set();
+  const out = [];
+  for (const entry of raw) {
+    const kind = requireEnum(entry, CANDIDATE_KINDS, `${label} entry`);
+    if (seen.has(kind)) {
+      throw contractError(
+        'duplicate-candidate-kind',
+        `${label} has duplicate ${JSON.stringify(kind)}`,
+      );
+    }
+    seen.add(kind);
+    out.push(kind);
   }
   return Object.freeze(out);
 }
@@ -270,6 +354,11 @@ function parseJourneySelection(raw, index) {
     `profile.journeys[${index}].capabilities`,
   );
   if (capabilities) selection.capabilities = capabilities;
+  const candidateKinds = parseCandidateKinds(
+    record.candidateKinds,
+    `profile.journeys[${index}].candidateKinds`,
+  );
+  if (candidateKinds) selection.candidateKinds = candidateKinds;
   return Object.freeze(selection);
 }
 
@@ -321,6 +410,13 @@ export function parseAcceptanceProfile(input) {
   if (journeysRaw.length > MAX_JOURNEYS) {
     throw contractError('too-many-journeys', `profile.journeys exceeds ${MAX_JOURNEYS}`);
   }
+  const bounds = parseBounds(record.bounds);
+  if (journeysRaw.length > bounds.maxJourneyResults) {
+    throw contractError(
+      'max-journey-results-exceeded',
+      `profile.journeys has ${journeysRaw.length} entries, exceeding profile.bounds.maxJourneyResults (${bounds.maxJourneyResults})`,
+    );
+  }
   const seen = new Set();
   const journeys = journeysRaw.map((entry, index) => {
     const selection = parseJourneySelection(entry, index);
@@ -342,7 +438,7 @@ export function parseAcceptanceProfile(input) {
       parseCapabilities(record.requiredCapabilities, 'profile.requiredCapabilities') ??
       Object.freeze([]),
     rssRequired: requireBoolean(record.rssRequired, 'profile.rssRequired'),
-    bounds: parseBounds(record.bounds),
+    bounds,
     journeys: Object.freeze(journeys),
   };
   const base = parseBaseRef(record.base);
@@ -355,8 +451,8 @@ export function parseAcceptanceProfile(input) {
 /**
  * Compose an OS-specific derived profile over a validated base. Additive only:
  * derived may add journeys/capabilities, strengthen optional→required, and
- * tighten (never weaken) bounds. Base journeys cannot be removed, overridden, or
- * downgraded to optional.
+ * tighten (never weaken) bounds. Base journeys cannot be removed, reordered, or
+ * downgraded to optional; new journeys may be inserted between base journeys.
  */
 export function composeProfile(base, derived, options = {}) {
   const knownBaseIds = new Set(options.knownBaseIds ?? KNOWN_BASE_IDS_DEFAULT);
@@ -395,6 +491,15 @@ export function composeProfile(base, derived, options = {}) {
   if (base.rssRequired && !parsedDerived.rssRequired) {
     throw contractError('weaker-rss', 'derived profile cannot drop a required RSS measurement');
   }
+  const derivedRequiredCapabilities = new Set(parsedDerived.requiredCapabilities);
+  for (const capability of base.requiredCapabilities) {
+    if (!derivedRequiredCapabilities.has(capability)) {
+      throw contractError(
+        'removed-required-capability',
+        `derived profile removes required capability ${JSON.stringify(capability)}`,
+      );
+    }
+  }
 
   const baseById = new Map(base.journeys.map((journey) => [journey.id, journey]));
   const derivedById = new Map(parsedDerived.journeys.map((journey) => [journey.id, journey]));
@@ -412,16 +517,37 @@ export function composeProfile(base, derived, options = {}) {
         `derived profile downgrades required journey ${JSON.stringify(journey.id)}`,
       );
     }
+    const overrideCapabilities =
+      override.capabilities === undefined ? new Set() : new Set(override.capabilities);
+    for (const capability of journey.capabilities ?? []) {
+      if (!overrideCapabilities.has(capability)) {
+        throw contractError(
+          'removed-journey-capability',
+          `derived profile removes capability ${JSON.stringify(capability)} from ${JSON.stringify(journey.id)}`,
+        );
+      }
+    }
+    const baseCandidateKinds = journey.candidateKinds ?? CANDIDATE_KINDS;
+    const overrideCandidateKinds = new Set(override.candidateKinds ?? CANDIDATE_KINDS);
+    for (const candidateKind of baseCandidateKinds) {
+      if (!overrideCandidateKinds.has(candidateKind)) {
+        throw contractError(
+          'narrowed-journey-applicability',
+          `derived profile removes candidate kind ${JSON.stringify(candidateKind)} from ${JSON.stringify(journey.id)}`,
+        );
+      }
+    }
   }
 
-  // Result: base journeys carried in base order (with any strengthening),
-  // then any brand-new derived journeys in derived order.
-  const journeys = [];
-  for (const journey of base.journeys) {
-    journeys.push(derivedById.get(journey.id));
-  }
-  for (const journey of parsedDerived.journeys) {
-    if (!baseById.has(journey.id)) journeys.push(journey);
+  // The derived document owns executable order so OS-specific probes can run
+  // before terminal lifecycle-removal rows. Its base rows must still form the
+  // exact base-order subsequence; only new rows may be interleaved.
+  const derivedBaseIds = parsedDerived.journeys
+    .filter((journey) => baseById.has(journey.id))
+    .map((journey) => journey.id);
+  const baseIds = base.journeys.map((journey) => journey.id);
+  if (derivedBaseIds.some((id, index) => id !== baseIds[index])) {
+    throw contractError('reordered-base-journey', 'derived profile reorders base journeys');
   }
 
   const requiredCapabilities = [
@@ -436,7 +562,7 @@ export function composeProfile(base, derived, options = {}) {
     requiredCapabilities: Object.freeze(requiredCapabilities),
     rssRequired: parsedDerived.rssRequired,
     bounds: parsedDerived.bounds,
-    journeys: Object.freeze(journeys),
+    journeys: parsedDerived.journeys,
   };
   // The support-row binding is OS-specific: carry the derived profile's binding
   // (falling back to a base binding if one exists). It stays part of the digest.
@@ -465,24 +591,95 @@ function parseHostFact(raw, label, validate) {
   return validate(raw, label);
 }
 
-const CANDIDATE_KEY_SET = new Set(['kind', 'version', 'source', 'digest', 'registry']);
+const CANDIDATE_KEY_SET = new Set([
+  'kind',
+  'version',
+  'source',
+  'digest',
+  'registry',
+  'manifestDigest',
+  'registryIntegrityDigest',
+]);
 
-function parseCandidateIdentity(raw) {
-  const record = requireObject(raw, 'candidate');
-  rejectUnknownKeys(record, CANDIDATE_KEY_SET, 'candidate');
+function parseCandidateIdentity(raw, label = 'candidate', options = {}) {
+  const record = requireObject(raw, label);
+  rejectUnknownKeys(record, CANDIDATE_KEY_SET, label);
   const candidate = {
-    kind: requireEnum(record.kind, CANDIDATE_KINDS, 'candidate.kind'),
-    version: requireString(record.version, 'candidate.version', { max: MAX_ID_LENGTH }),
-    source: requireString(record.source, 'candidate.source', { max: MAX_SOURCE_LENGTH }),
-    digest: requireString(record.digest, 'candidate.digest', { max: MAX_DIGEST_LENGTH }),
+    kind: requireEnum(record.kind, CANDIDATE_KINDS, `${label}.kind`),
+    version: requireString(record.version, `${label}.version`, {
+      max: MAX_ID_LENGTH,
+      pattern: EXACT_SEMVER_PATTERN,
+    }),
+    source: requireString(record.source, `${label}.source`, {
+      max: MAX_SOURCE_LENGTH,
+    }),
+    digest: requireString(record.digest, `${label}.digest`, {
+      max: MAX_DIGEST_LENGTH,
+      pattern: HEX_DIGEST_PATTERN,
+    }),
   };
   if (record.registry !== undefined) {
-    candidate.registry = requireString(record.registry, 'candidate.registry', {
+    candidate.registry = requireString(record.registry, `${label}.registry`, {
       max: MAX_SOURCE_LENGTH,
     });
-    if (/[:@]/.test(candidate.registry) && !/^https?:\/\//.test(candidate.registry)) {
-      throw contractError('invalid-registry', 'candidate.registry must not embed credentials');
+    let registryUrl;
+    try {
+      registryUrl = new URL(candidate.registry);
+    } catch {
+      throw contractError('invalid-registry', `${label}.registry must be a canonical HTTPS URL`);
     }
+    if (
+      registryUrl.protocol !== 'https:' ||
+      registryUrl.username !== '' ||
+      registryUrl.password !== '' ||
+      registryUrl.search !== '' ||
+      registryUrl.hash !== ''
+    ) {
+      throw contractError(
+        'invalid-registry',
+        `${label}.registry must be credential-free HTTPS origin + pathname`,
+      );
+    }
+    registryUrl.pathname = `${registryUrl.pathname.replace(/\/+$/, '')}/`;
+    const canonicalRegistry = `${registryUrl.origin}${registryUrl.pathname}`;
+    if (candidate.registry !== canonicalRegistry) {
+      throw contractError('invalid-registry', `${label}.registry must use canonical URL form`);
+    }
+  }
+  if (record.manifestDigest !== undefined) {
+    candidate.manifestDigest = requireString(record.manifestDigest, `${label}.manifestDigest`, {
+      max: MAX_DIGEST_LENGTH,
+      pattern: HEX_DIGEST_PATTERN,
+    });
+  }
+  if (record.registryIntegrityDigest !== undefined) {
+    candidate.registryIntegrityDigest = requireString(
+      record.registryIntegrityDigest,
+      `${label}.registryIntegrityDigest`,
+      { max: MAX_DIGEST_LENGTH, pattern: HEX_DIGEST_PATTERN },
+    );
+  }
+  if (candidate.kind === 'packed-release') {
+    if (candidate.registry !== undefined || candidate.registryIntegrityDigest !== undefined) {
+      throw contractError(
+        'candidate-kind-mismatch',
+        `${label} packed-release cannot carry registry integrity fields`,
+      );
+    }
+    if (candidate.manifestDigest === undefined) {
+      throw contractError(
+        'candidate-integrity-missing',
+        `${label} packed-release requires manifestDigest`,
+      );
+    }
+  } else if (
+    candidate.registry === undefined ||
+    (options.requireRegistryIntegrity === true && candidate.registryIntegrityDigest === undefined)
+  ) {
+    throw contractError(
+      'candidate-integrity-missing',
+      `${label} published-version requires registry${options.requireRegistryIntegrity === true ? ' and registryIntegrityDigest' : ''}`,
+    );
   }
   return Object.freeze(candidate);
 }
@@ -517,6 +714,12 @@ function parseCapabilityMap(raw) {
   const out = {};
   for (const key of keys) {
     requireId(key, 'host.capabilities key');
+    if (!PLATFORM_ACCEPTANCE_CAPABILITY_SET.has(key)) {
+      throw contractError(
+        'unknown-capability',
+        `host.capabilities has unknown capability ${JSON.stringify(key)}`,
+      );
+    }
     out[key] = requireBoolean(record[key], `host.capabilities.${key}`);
   }
   return Object.freeze(out);
@@ -528,11 +731,15 @@ function parseHostProfile(raw) {
   const fs = requireObject(record.filesystem, 'host.filesystem');
   rejectUnknownKeys(fs, FILESYSTEM_KEY_SET, 'host.filesystem');
   return Object.freeze({
-    platform: requireString(record.platform, 'host.platform', { max: MAX_ID_LENGTH }),
+    platform: requireString(record.platform, 'host.platform', {
+      max: MAX_ID_LENGTH,
+    }),
     arch: requireString(record.arch, 'host.arch', { max: MAX_ID_LENGTH }),
     osRelease: parseHostFact(record.osRelease, 'host.osRelease', (v, l) => requireString(v, l)),
     osVersion: parseHostFact(record.osVersion, 'host.osVersion', (v, l) => requireString(v, l)),
-    nodeVersion: requireString(record.nodeVersion, 'host.nodeVersion', { max: MAX_ID_LENGTH }),
+    nodeVersion: requireString(record.nodeVersion, 'host.nodeVersion', {
+      max: MAX_ID_LENGTH,
+    }),
     nodeModuleAbi: requireString(record.nodeModuleAbi, 'host.nodeModuleAbi', {
       max: MAX_ID_LENGTH,
     }),
@@ -612,38 +819,164 @@ const JOURNEY_RESULT_KEY_SET = new Set([
   'durationMs',
   'rss',
   'diagnostics',
+  'steps',
 ]);
+
+const STEP_EVIDENCE_KEY_SET = new Set([
+  'label',
+  'stage',
+  'exitCode',
+  'signal',
+  'deliveredSignal',
+  'timedOut',
+  'cancelled',
+  'outputTruncated',
+  'durationMs',
+  'rss',
+  'residualDescendants',
+  'reasonCode',
+  'diagnostics',
+]);
+
+function parseDiagnostics(raw, label, maxEntries) {
+  if (!Array.isArray(raw)) {
+    throw contractError('invalid-diagnostics', `${label} must be an array`);
+  }
+  if (raw.length > maxEntries) {
+    throw contractError('too-many-diagnostics', `${label} exceeds ${maxEntries}`);
+  }
+  return Object.freeze(
+    raw.map((entry, index) =>
+      requireString(entry, `${label}[${index}]`, {
+        max: MAX_DIAGNOSTIC_LENGTH,
+      }),
+    ),
+  );
+}
+
+function parseNullableReasonCode(value, label) {
+  return value === null || value === undefined ? null : requireReasonCode(value, label);
+}
+
+function parseJourneyStep(raw, resultIndex, stepIndex) {
+  const label = `results[${resultIndex}].steps[${stepIndex}]`;
+  const record = requireObject(raw, label);
+  rejectUnknownKeys(record, STEP_EVIDENCE_KEY_SET, label);
+  const exitCode =
+    record.exitCode === null ? null : requireNonNegativeInt(record.exitCode, `${label}.exitCode`);
+  const signal =
+    record.signal === null
+      ? null
+      : requireString(record.signal, `${label}.signal`, {
+          max: 32,
+          pattern: SIGNAL_PATTERN,
+        });
+  let deliveredSignal;
+  if (record.deliveredSignal !== undefined) {
+    deliveredSignal =
+      record.deliveredSignal === null
+        ? null
+        : requireString(record.deliveredSignal, `${label}.deliveredSignal`, {
+            max: 32,
+            pattern: SIGNAL_PATTERN,
+          });
+  }
+  if (exitCode !== null && signal !== null) {
+    throw contractError('invalid-step-terminal', `${label} cannot carry exitCode and signal`);
+  }
+  const timedOut = requireBoolean(record.timedOut, `${label}.timedOut`);
+  const cancelled = requireBoolean(record.cancelled, `${label}.cancelled`);
+  if (timedOut && cancelled) {
+    throw contractError('invalid-step-terminal', `${label} cannot be timed out and cancelled`);
+  }
+  const outputTruncated = requireBoolean(record.outputTruncated, `${label}.outputTruncated`);
+  const residualDescendants = requireNonNegativeInt(
+    record.residualDescendants,
+    `${label}.residualDescendants`,
+  );
+  const reasonCode = parseNullableReasonCode(record.reasonCode, `${label}.reasonCode`);
+  const abnormal =
+    exitCode === null ||
+    exitCode !== 0 ||
+    signal !== null ||
+    timedOut ||
+    cancelled ||
+    outputTruncated ||
+    residualDescendants > 0;
+  if (abnormal && reasonCode === null) {
+    throw contractError('missing-step-reason', `${label} abnormal terminal outcome needs a reason`);
+  }
+  if (!abnormal && reasonCode !== null) {
+    throw contractError('unexpected-step-reason', `${label} clean terminal outcome has a reason`);
+  }
+  return Object.freeze({
+    label: requireId(record.label, `${label}.label`),
+    stage: requireEnum(record.stage, STEP_STAGES, `${label}.stage`),
+    exitCode,
+    signal,
+    ...(deliveredSignal === undefined ? {} : { deliveredSignal }),
+    timedOut,
+    cancelled,
+    outputTruncated,
+    durationMs: requireNonNegativeInt(record.durationMs, `${label}.durationMs`),
+    rss: parseRss(record.rss, `${label}.rss`),
+    residualDescendants,
+    reasonCode,
+    diagnostics: parseDiagnostics(
+      record.diagnostics,
+      `${label}.diagnostics`,
+      MAX_DIAGNOSTICS_PER_STEP,
+    ),
+  });
+}
+
+function parseJourneySteps(raw, resultIndex) {
+  if (!Array.isArray(raw)) {
+    throw contractError('invalid-steps', `results[${resultIndex}].steps must be an array`);
+  }
+  if (raw.length > MAX_STEPS_PER_JOURNEY) {
+    throw contractError(
+      'too-many-steps',
+      `results[${resultIndex}].steps exceeds ${MAX_STEPS_PER_JOURNEY}`,
+    );
+  }
+  const seen = new Set();
+  const steps = raw.map((entry, stepIndex) => {
+    const step = parseJourneyStep(entry, resultIndex, stepIndex);
+    if (seen.has(step.label)) {
+      throw contractError(
+        'duplicate-step-label',
+        `results[${resultIndex}].steps has duplicate ${JSON.stringify(step.label)}`,
+      );
+    }
+    seen.add(step.label);
+    return step;
+  });
+  return Object.freeze(steps);
+}
 
 function parseJourneyResult(raw, index) {
   const record = requireObject(raw, `results[${index}]`);
   rejectUnknownKeys(record, JOURNEY_RESULT_KEY_SET, `results[${index}]`);
-  const diagnosticsRaw = record.diagnostics;
-  if (!Array.isArray(diagnosticsRaw)) {
-    throw contractError('invalid-diagnostics', `results[${index}].diagnostics must be an array`);
-  }
-  if (diagnosticsRaw.length > MAX_DIAGNOSTICS_PER_JOURNEY) {
-    throw contractError(
-      'too-many-diagnostics',
-      `results[${index}].diagnostics exceeds ${MAX_DIAGNOSTICS_PER_JOURNEY}`,
-    );
-  }
-  const diagnostics = diagnosticsRaw.map((entry, i) =>
-    requireString(entry, `results[${index}].diagnostics[${i}]`, { max: MAX_DIAGNOSTIC_LENGTH }),
-  );
-  let reasonCode = null;
-  if (record.reasonCode !== null && record.reasonCode !== undefined) {
-    reasonCode = requireReasonCode(record.reasonCode, `results[${index}].reasonCode`);
-  }
-  return Object.freeze({
+  const result = {
     id: requireId(record.id, `results[${index}].id`),
     category: requireId(record.category, `results[${index}].category`),
     required: requireBoolean(record.required, `results[${index}].required`),
     status: requireEnum(record.status, JOURNEY_STATUSES, `results[${index}].status`),
-    reasonCode,
+    reasonCode: parseNullableReasonCode(record.reasonCode, `results[${index}].reasonCode`),
     durationMs: requireNonNegativeInt(record.durationMs, `results[${index}].durationMs`),
     rss: parseRss(record.rss, `results[${index}].rss`),
-    diagnostics: Object.freeze(diagnostics),
-  });
+    diagnostics: parseDiagnostics(
+      record.diagnostics,
+      `results[${index}].diagnostics`,
+      MAX_DIAGNOSTICS_PER_JOURNEY,
+    ),
+  };
+  // Early v1 artifacts omitted `steps`. Preserve that absence during parsing so
+  // their sealed digest remains reproducible; the independent verifier still
+  // rejects any required passing result without new step evidence.
+  if (record.steps !== undefined) result.steps = parseJourneySteps(record.steps, index);
+  return Object.freeze(result);
 }
 
 const CLEANUP_KEY_SET = new Set(['status', 'reasonCode', 'removedRoots', 'residualDescendants']);
@@ -668,7 +1001,9 @@ function parseCleanup(raw) {
 
 /** Deterministic count summary derived from the ordered results. */
 export function computeSummary(profile, results) {
-  const requiredIds = new Set(profile.journeys.filter((j) => j.required).map((j) => j.id));
+  const requiredIds = new Set(
+    results.filter((result) => result.required).map((result) => result.id),
+  );
   let passed = 0;
   let failed = 0;
   let skipped = 0;
@@ -705,26 +1040,54 @@ export function computeSummary(profile, results) {
   });
 }
 
+/** A supplied exact previous candidate turns the common upgrade row into a gate. */
+export function isJourneyRequired(journey, previousCandidate) {
+  return (
+    journey.required === true || (journey.id === 'lifecycle.upgrade' && previousCandidate !== null)
+  );
+}
+
+/** A profile may retain a row while declaring it inapplicable to one candidate form. */
+export function isJourneyApplicable(journey, candidateKind) {
+  return journey.candidateKinds === undefined || journey.candidateKinds.includes(candidateKind);
+}
+
 /**
  * The overall verdict. Every required journey must be present and `pass`;
- * cleanup must be `clean`. When the profile sets `rssRequired`, the run must also
- * exhibit at least one real peak-RSS measurement from a required journey — a host
- * that cannot sample RSS anywhere cannot satisfy an RSS-required profile, and a
- * bare `unavailable` never green-washes into proof. Otherwise the run fails.
+ * cleanup must be `clean`. When the profile sets `rssRequired`, every required
+ * journey must carry a real aggregate peak and at least one real step peak.
+ * A genuinely short-lived child may report `rss-child-too-short`; sampler or
+ * process-table faults may not be hidden by a different sampled child.
  * (`infrastructure-fault` is a separate terminal state set by the writer, not
  * derivable from results here.)
  */
 export function computeVerdict(profile, results, cleanup) {
   if (cleanup.status !== 'clean' || cleanup.residualDescendants > 0) return 'fail';
   const byId = new Map(results.map((result) => [result.id, result]));
-  let rssProven = false;
   for (const journey of profile.journeys) {
-    if (!journey.required) continue;
     const result = byId.get(journey.id);
-    if (!result || result.status !== 'pass') return 'fail';
-    if (result.rss.status === 'available') rssProven = true;
+    if (!result) return 'fail';
+    // `required` is the runner's effective, candidate-aware requirement. The
+    // independent verifier recomputes and validates this flag before trusting
+    // the verdict, including dynamic upgrade and applicability semantics.
+    if (result.required !== true) continue;
+    if (result.status !== 'pass') return 'fail';
+    if (profile.rssRequired) {
+      if (result.rss.status !== 'available' || result.rss.peakBytes <= 0) return 'fail';
+      if (!Array.isArray(result.steps) || result.steps.length === 0) return 'fail';
+      let sampledStep = false;
+      let maxStepPeak = 0;
+      for (const step of result.steps) {
+        if (step.rss.status === 'available') {
+          sampledStep = true;
+          maxStepPeak = Math.max(maxStepPeak, step.rss.peakBytes);
+        } else if (step.rss.reasonCode !== 'rss-child-too-short') {
+          return 'fail';
+        }
+      }
+      if (!sampledStep || result.rss.peakBytes < maxStepPeak) return 'fail';
+    }
   }
-  if (profile.rssRequired && !rssProven) return 'fail';
   return 'pass';
 }
 
@@ -736,6 +1099,10 @@ const EVIDENCE_KEY_SET = new Set([
   'schemaVersion',
   'profile',
   'candidate',
+  'previousCandidate',
+  'execution',
+  'lifecycle',
+  'registryBindings',
   'harnessGitSha',
   'startedAt',
   'completedAt',
@@ -757,6 +1124,189 @@ const SUMMARY_KEY_SET = new Set([
   'requiredPassed',
 ]);
 const COMPLETION_KEY_SET = new Set(['state', 'evidenceDigest']);
+const EXECUTION_KEY_SET = new Set(['runId', 'runAttempt', 'runnerLabel']);
+const LIFECYCLE_EVIDENCE_KEY_SET = new Set([
+  'installedVersion',
+  'upgradedVersion',
+  'versionMigrated',
+  'stateMigrated',
+  'cliStateRemoved',
+  'packageRemoved',
+  'targetInstallChannel',
+  'integrityChecks',
+]);
+const INTEGRITY_CHECKS_KEY_SET = new Set(['count', 'durationMs']);
+const REGISTRY_BINDINGS_KEY_SET = new Set(['candidateLifecycle', 'canonicalInstaller']);
+const REGISTRY_BINDING_PROOF_KEY_SET = new Set([
+  'inventoryDigest',
+  'packageNames',
+  'packageCount',
+  'packageSetDigest',
+  'offlineReplayComplete',
+]);
+
+function parseExecutionIdentity(raw) {
+  const record = requireObject(raw, 'execution');
+  rejectUnknownKeys(record, EXECUTION_KEY_SET, 'execution');
+  return Object.freeze({
+    runId: requireString(record.runId, 'execution.runId', {
+      max: MAX_ID_LENGTH,
+    }),
+    runAttempt: requirePositiveInt(record.runAttempt, 'execution.runAttempt'),
+    runnerLabel: requireString(record.runnerLabel, 'execution.runnerLabel', {
+      max: MAX_ID_LENGTH,
+    }),
+  });
+}
+
+function parseNullableString(value, label) {
+  return value === null ? null : requireString(value, label, { max: MAX_ID_LENGTH });
+}
+
+function parseNullableBoolean(value, label) {
+  return value === null ? null : requireBoolean(value, label);
+}
+
+function parseLifecycleEvidence(raw) {
+  const record = requireObject(raw, 'lifecycle');
+  rejectUnknownKeys(record, LIFECYCLE_EVIDENCE_KEY_SET, 'lifecycle');
+  const parsed = {
+    installedVersion: parseNullableString(record.installedVersion, 'lifecycle.installedVersion'),
+    upgradedVersion: parseNullableString(record.upgradedVersion, 'lifecycle.upgradedVersion'),
+    versionMigrated: parseNullableBoolean(record.versionMigrated, 'lifecycle.versionMigrated'),
+    stateMigrated: parseNullableBoolean(record.stateMigrated, 'lifecycle.stateMigrated'),
+    cliStateRemoved: parseNullableBoolean(record.cliStateRemoved, 'lifecycle.cliStateRemoved'),
+    packageRemoved: parseNullableBoolean(record.packageRemoved, 'lifecycle.packageRemoved'),
+  };
+  if (Object.hasOwn(record, 'targetInstallChannel')) {
+    parsed.targetInstallChannel =
+      record.targetInstallChannel === null
+        ? null
+        : requireEnum(
+            record.targetInstallChannel,
+            INSTALL_CHANNELS,
+            'lifecycle.targetInstallChannel',
+          );
+  }
+  if (Object.hasOwn(record, 'integrityChecks')) {
+    const integrityChecks = requireObject(record.integrityChecks, 'lifecycle.integrityChecks');
+    rejectUnknownKeys(integrityChecks, INTEGRITY_CHECKS_KEY_SET, 'lifecycle.integrityChecks');
+    parsed.integrityChecks = Object.freeze({
+      count: requireNonNegativeInt(integrityChecks.count, 'lifecycle.integrityChecks.count'),
+      durationMs: requireNonNegativeInt(
+        integrityChecks.durationMs,
+        'lifecycle.integrityChecks.durationMs',
+      ),
+    });
+  }
+  return Object.freeze(parsed);
+}
+
+function parseRegistryBindingProof(raw, label, candidate) {
+  if (raw === null) return null;
+  const record = requireObject(raw, label);
+  rejectUnknownKeys(record, REGISTRY_BINDING_PROOF_KEY_SET, label);
+  if (!Array.isArray(record.packageNames)) {
+    throw contractError('invalid-array', `${label}.packageNames must be an array`);
+  }
+  if (
+    record.packageNames.length === 0 ||
+    record.packageNames.length > MAX_REGISTRY_BINDING_PACKAGES
+  ) {
+    throw contractError(
+      'invalid-registry-binding-package-count',
+      `${label}.packageNames must contain 1-${MAX_REGISTRY_BINDING_PACKAGES} entries`,
+    );
+  }
+  const seen = new Set();
+  const packageNames = record.packageNames.map((name, index) => {
+    const normalized = requireString(name, `${label}.packageNames[${index}]`, {
+      max: MAX_ID_LENGTH,
+      pattern: FIRST_PARTY_PACKAGE_PATTERN,
+    });
+    if (seen.has(normalized)) {
+      throw contractError('duplicate-registry-binding-package', `${label} repeats ${normalized}`);
+    }
+    seen.add(normalized);
+    return normalized;
+  });
+  const packageCount = requirePositiveInt(record.packageCount, `${label}.packageCount`, {
+    max: MAX_REGISTRY_BINDING_PACKAGES,
+  });
+  if (packageCount !== packageNames.length) {
+    throw contractError(
+      'registry-binding-package-count-mismatch',
+      `${label}.packageCount must equal packageNames.length`,
+    );
+  }
+  const inventoryDigest = requireString(record.inventoryDigest, `${label}.inventoryDigest`, {
+    max: MAX_DIGEST_LENGTH,
+    pattern: HEX_DIGEST_PATTERN,
+  });
+  if (
+    candidate.registryIntegrityDigest !== undefined &&
+    inventoryDigest !== candidate.registryIntegrityDigest
+  ) {
+    throw contractError(
+      'registry-binding-inventory-mismatch',
+      `${label}.inventoryDigest does not match candidate.registryIntegrityDigest`,
+    );
+  }
+  if (record.offlineReplayComplete !== true) {
+    throw contractError(
+      'registry-binding-replay-incomplete',
+      `${label}.offlineReplayComplete must be true`,
+    );
+  }
+  return Object.freeze({
+    inventoryDigest,
+    packageNames: Object.freeze(packageNames),
+    packageCount,
+    packageSetDigest: requireString(record.packageSetDigest, `${label}.packageSetDigest`, {
+      max: MAX_DIGEST_LENGTH,
+      pattern: HEX_DIGEST_PATTERN,
+    }),
+    offlineReplayComplete: true,
+  });
+}
+
+function parseRegistryBindings(raw, candidate) {
+  if (raw === undefined) {
+    // Early common-v1 packed artifacts predate this proof. Published artifacts
+    // never receive the compatibility path: their registry binding fails closed.
+    if (candidate.kind === 'published-version') {
+      throw contractError(
+        'registry-binding-evidence-missing',
+        'published evidence must carry registryBindings',
+      );
+    }
+    return;
+  }
+  const record = requireObject(raw, 'registryBindings');
+  rejectUnknownKeys(record, REGISTRY_BINDINGS_KEY_SET, 'registryBindings');
+  const parsed = Object.freeze({
+    candidateLifecycle: parseRegistryBindingProof(
+      record.candidateLifecycle,
+      'registryBindings.candidateLifecycle',
+      candidate,
+    ),
+    canonicalInstaller: parseRegistryBindingProof(
+      record.canonicalInstaller,
+      'registryBindings.canonicalInstaller',
+      candidate,
+    ),
+  });
+  if (
+    candidate.kind === 'packed-release' &&
+    (parsed.candidateLifecycle !== null || parsed.canonicalInstaller !== null)
+  ) {
+    throw contractError(
+      'candidate-kind-mismatch',
+      'packed-release evidence cannot carry registry binding proofs',
+    );
+  }
+  return parsed;
+}
 
 function parseEvidenceProfileRef(raw) {
   const record = requireObject(raw, 'profile');
@@ -828,10 +1378,21 @@ export function parseAcceptanceEvidence(input) {
   const completionRecord = requireObject(record.completion, 'evidence.completion');
   rejectUnknownKeys(completionRecord, COMPLETION_KEY_SET, 'evidence.completion');
 
+  const candidate = parseCandidateIdentity(record.candidate, 'candidate', {
+    requireRegistryIntegrity: true,
+  });
+  const registryBindings = parseRegistryBindings(record.registryBindings, candidate);
   const evidence = {
     schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
     profile: parseEvidenceProfileRef(record.profile),
-    candidate: parseCandidateIdentity(record.candidate),
+    candidate,
+    previousCandidate:
+      record.previousCandidate === null
+        ? null
+        : parseCandidateIdentity(record.previousCandidate, 'previousCandidate'),
+    execution: parseExecutionIdentity(record.execution),
+    lifecycle: parseLifecycleEvidence(record.lifecycle),
+    ...(registryBindings === undefined ? {} : { registryBindings }),
     harnessGitSha: requireString(record.harnessGitSha, 'evidence.harnessGitSha', {
       max: MAX_ID_LENGTH,
     }),
@@ -857,6 +1418,37 @@ export function parseAcceptanceEvidence(input) {
 
   if (Date.parse(evidence.completedAt) < Date.parse(evidence.startedAt)) {
     throw contractError('timestamp-order', 'evidence.completedAt precedes startedAt');
+  }
+
+  const recomputedSummary = computeSummary(null, evidence.results);
+  for (const key of SUMMARY_KEY_SET) {
+    if (evidence.summary[key] !== recomputedSummary[key]) {
+      throw contractError(
+        'summary-mismatch',
+        `evidence.summary.${key} is not derived from results`,
+      );
+    }
+  }
+
+  const internallyPassing =
+    evidence.cleanup.status === 'clean' &&
+    evidence.cleanup.residualDescendants === 0 &&
+    evidence.results.every((result) => !result.required || result.status === 'pass');
+  if (evidence.completion.state === 'infrastructure-fault') {
+    if (evidence.verdict !== 'infrastructure-fault') {
+      throw contractError(
+        'completion-verdict-mismatch',
+        'infrastructure-fault completion requires infrastructure-fault verdict',
+      );
+    }
+  } else {
+    const derivedVerdict = internallyPassing ? 'pass' : 'fail';
+    if (evidence.verdict !== derivedVerdict) {
+      throw contractError(
+        'completion-verdict-mismatch',
+        `completed evidence must carry derived verdict ${derivedVerdict}`,
+      );
+    }
   }
 
   // Re-verify the sealed-body digest.

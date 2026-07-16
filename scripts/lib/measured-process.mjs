@@ -27,7 +27,11 @@
  *     a valid sample, else `{ status:'unavailable', reasonCode }`. An absent
  *     sample is NEVER coerced to zero.
  *   - RSS sampling is platform-dependent (POSIX `ps`; unsupported on Windows).
- *     Tree termination preserves the POSIX + Windows behavior it always had.
+ *   - POSIX cleanup reports zero only when no retained descendant identity is
+ *     present in the final sampled process table and every observation succeeded.
+ *     This is cleanup assistance for trusted release behavior, not OS containment:
+ *     a process can deliberately create a new session and reparent between samples.
+ *     Windows cannot claim this capability until Job Object containment exists.
  *
  * @typedef {import('../platform-acceptance/journey-catalog.d.mts').MeasuredProcessRunSpec} MeasuredProcessRunSpec
  * @typedef {import('../platform-acceptance/journey-catalog.d.mts').MeasuredProcessResult} MeasuredProcessResult
@@ -47,39 +51,114 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const PROCESS_TABLE_TIMEOUT_MS = 1000;
 const PROCESS_TREE_KILL_TIMEOUT_MS = 1000;
+const DECIMAL_INTEGER = /^\d+$/;
 
 export async function readProcessTable(options = {}) {
-  if ((options.platform ?? process.platform) === 'win32') return [];
+  const platform = options.platform ?? process.platform;
+  if (platform === 'win32') return [];
   const execute = options.execFileAsync ?? execFileAsync;
   const timeoutMs = options.timeoutMs ?? PROCESS_TABLE_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError('process table timeout must be a positive safe integer');
   }
-  const { stdout } = await execute('ps', ['-eo', 'pid=,ppid=,rss='], {
-    killSignal: 'SIGKILL',
-    maxBuffer: 1024 * 1024,
-    timeout: timeoutMs,
-  });
+  // Qualification must not trust a repository- or package-manager-prepended
+  // PATH for process evidence. Use the fixed native location on the two hosts
+  // this harness currently measures.
+  const psCommand = platform === 'darwin' ? '/bin/ps' : '/usr/bin/ps';
+  const { stdout } = await execute(
+    psCommand,
+    ['-eo', 'pid=,ppid=,pgid=,sess=,lstart=,rss=,ucomm='],
+    {
+      killSignal: 'SIGKILL',
+      maxBuffer: 1024 * 1024,
+      timeout: timeoutMs,
+    },
+  );
   return parseProcessTable(stdout);
 }
 
 export function parseProcessTable(stdout) {
-  return stdout
+  if (typeof stdout !== 'string') throw new TypeError('process table output must be a string');
+  const lines = stdout
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [pidRaw, ppidRaw, rssRaw] = line.split(/\s+/);
-      return {
-        pid: Number.parseInt(pidRaw ?? '', 10),
-        ppid: Number.parseInt(ppidRaw ?? '', 10),
-        rssBytes: Number.parseInt(rssRaw ?? '', 10) * 1024,
-      };
-    })
-    .filter(
-      (row) =>
-        Number.isInteger(row.pid) && Number.isInteger(row.ppid) && Number.isFinite(row.rssBytes),
-    );
+    .filter(Boolean);
+  if (lines.length === 0) throw new TypeError('process table output was empty');
+  return lines.map((line, index) => {
+    // Both Darwin and procps `lstart` occupy five whitespace-delimited tokens.
+    // `ucomm` is last; retain the remainder defensively across ps implementations.
+    const fields = line.split(/\s+/);
+    if (fields.length < 11) {
+      throw new TypeError(`process table line ${index + 1} is malformed`);
+    }
+    const [pidRaw, ppidRaw, processGroupIdRaw, sessionTokenRaw, ...tail] = fields;
+    const startedAtRaw = tail.slice(0, 5).join(' ');
+    const rssRaw = tail[5];
+    const commandRaw = tail.slice(6).join(' ');
+    const pid = Number(pidRaw);
+    const ppid = Number(ppidRaw);
+    const processGroupId = Number(processGroupIdRaw);
+    const sessionToken = sessionTokenRaw.trim();
+    const startedAt = startedAtRaw.trim();
+    const rssKiB = Number(rssRaw);
+    const command = commandRaw.trim();
+    if (
+      !Number.isSafeInteger(pid) ||
+      !DECIMAL_INTEGER.test(pidRaw) ||
+      pid <= 0 ||
+      !Number.isSafeInteger(ppid) ||
+      !DECIMAL_INTEGER.test(ppidRaw) ||
+      ppid < 0 ||
+      !Number.isSafeInteger(processGroupId) ||
+      !DECIMAL_INTEGER.test(processGroupIdRaw) ||
+      processGroupId <= 0 ||
+      sessionToken.length === 0 ||
+      startedAt.length === 0 ||
+      !Number.isSafeInteger(rssKiB) ||
+      !DECIMAL_INTEGER.test(rssRaw) ||
+      rssKiB < 0 ||
+      !Number.isSafeInteger(rssKiB * 1024) ||
+      command.length === 0
+    ) {
+      throw new TypeError(`process table line ${index + 1} is out of range`);
+    }
+    return {
+      pid,
+      ppid,
+      processGroupId,
+      sessionToken,
+      startedAt,
+      command,
+      rssBytes: rssKiB * 1024,
+    };
+  });
+}
+
+function validateProcessRows(rows) {
+  if (!Array.isArray(rows)) throw new TypeError('process table sample must be an array');
+  for (const row of rows) {
+    if (
+      row === null ||
+      typeof row !== 'object' ||
+      !Number.isSafeInteger(row.pid) ||
+      row.pid <= 0 ||
+      !Number.isSafeInteger(row.ppid) ||
+      row.ppid < 0 ||
+      !Number.isSafeInteger(row.processGroupId) ||
+      row.processGroupId <= 0 ||
+      typeof row.sessionToken !== 'string' ||
+      row.sessionToken.length === 0 ||
+      typeof row.startedAt !== 'string' ||
+      row.startedAt.length === 0 ||
+      typeof row.command !== 'string' ||
+      row.command.length === 0 ||
+      !Number.isSafeInteger(row.rssBytes) ||
+      row.rssBytes < 0
+    ) {
+      throw new TypeError('process table sample contains a malformed row');
+    }
+  }
+  return rows;
 }
 
 export function sumProcessTreeRss(rows, rootPid) {
@@ -108,44 +187,74 @@ export function sumProcessTreeRss(rows, rootPid) {
   return total;
 }
 
-/** Capture the current descendants while the root still owns their parent links. */
-export async function captureProcessDescendants(rootPid, options = {}) {
-  requirePositivePid(rootPid);
-  const platform = options.platform ?? process.platform;
-  if (platform === 'win32') return [];
-  const rows = await readProcessTable({
-    execFileAsync: options.execFileAsync,
-    platform,
-    timeoutMs: options.timeoutMs,
-  });
-  return processDescendantsFromTable(rows, rootPid);
-}
-
 /** Project a captured process table into the descendants of one live root. */
 export function processDescendantsFromTable(rows, rootPid) {
   requirePositivePid(rootPid);
   return collectDescendants(rows, rootPid);
 }
 
-/** Best-effort signal of a previously captured PID set, deepest descendants first. */
-export function signalCapturedProcesses(processIds, signal = 'SIGTERM', options = {}) {
+function sameProcessIdentity(left, right) {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    left.pid === right.pid &&
+    left.processGroupId === right.processGroupId &&
+    left.sessionToken === right.sessionToken &&
+    left.startedAt === right.startedAt
+  );
+}
+
+function processIdentityKey(identity) {
+  return JSON.stringify([
+    identity.pid,
+    identity.processGroupId,
+    identity.sessionToken,
+    identity.startedAt,
+  ]);
+}
+
+/**
+ * Signal retained identities only while a fresh process-table row still matches
+ * their PID, process-group id, native `sess` token, and start token. `ucomm` is
+ * retained as bounded metadata but is not identity: a legitimate exec or process
+ * title update can change it while the kernel process remains the same.
+ * Group signals are issued only for groups with a currently matching retained
+ * member. The native start token has one-second resolution, so even the complete
+ * tuple reduces rather than eliminates theoretical PID-reuse collisions.
+ */
+export function signalCapturedProcesses(processIdentities, signal = 'SIGTERM', options = {}) {
   const killProcess = options.killProcess ?? process.kill;
-  for (const pid of [...processIds].toReversed()) {
-    if (!Number.isSafeInteger(pid) || pid <= 0) continue;
-    try {
-      // A captured descendant may itself lead a detached process group. Signal
-      // that group first so children created just after the snapshot cannot escape.
-      killProcess(-pid, signal);
-      continue;
-    } catch {
-      // Most descendants are not group leaders; fall through to their exact PID.
-    }
-    try {
-      killProcess(pid, signal);
-    } catch {
-      // A captured process may already have exited; escalation remains best-effort.
+  const rows = validateProcessRows(options.currentRows ?? []);
+  const currentByPid = new Map(rows.map((row) => [row.pid, row]));
+  const alive = [...processIdentities].filter((identity) =>
+    sameProcessIdentity(identity, currentByPid.get(identity?.pid)),
+  );
+  const signalledGroups = new Set();
+  let delivered = false;
+  if (options.useProcessGroups !== false) {
+    for (const identity of alive.toReversed()) {
+      const groupId = identity.processGroupId;
+      if (signalledGroups.has(groupId)) continue;
+      try {
+        killProcess(-groupId, signal);
+        signalledGroups.add(groupId);
+        delivered = true;
+        continue;
+      } catch {
+        // A fresh exact-identity signal below remains the bounded fallback.
+      }
     }
   }
+  for (const identity of alive.toReversed()) {
+    if (signalledGroups.has(identity.processGroupId)) continue;
+    try {
+      killProcess(identity.pid, signal);
+      delivered = true;
+    } catch {
+      // The identity may have exited after the fresh inventory.
+    }
+  }
+  return delivered;
 }
 
 export async function killProcessTree(rootPid, signal = 'SIGTERM', options = {}) {
@@ -170,16 +279,24 @@ export async function killProcessTree(rootPid, signal = 'SIGTERM', options = {})
       return false;
     }
   }
-  const descendants = await captureProcessDescendants(rootPid, {
-    execFileAsync: options.execFileAsync,
-    platform,
-    timeoutMs: options.timeoutMs,
-  }).catch(() => []);
-  signalCapturedProcesses(descendants, signal, { killProcess });
+  let rows;
   try {
-    killProcess(rootPid, signal);
+    rows = await readProcessTable({
+      execFileAsync: options.execFileAsync,
+      platform,
+      timeoutMs: options.timeoutMs,
+    });
   } catch {
-    // The root may already have exited; timeout cleanup is best-effort.
+    return false;
+  }
+  const descendants = processDescendantsFromTable(rows, rootPid);
+  signalCapturedProcesses(descendants, signal, {
+    currentRows: rows,
+    killProcess,
+  });
+  const root = rows.find((row) => row.pid === rootPid);
+  if (root !== undefined) {
+    signalCapturedProcesses([root], signal, { currentRows: rows, killProcess });
   }
   return true;
 }
@@ -194,18 +311,18 @@ function collectDescendants(rows, rootPid) {
   const childrenByParent = new Map();
   for (const row of rows) {
     const children = childrenByParent.get(row.ppid) ?? [];
-    children.push(row.pid);
+    children.push(row);
     childrenByParent.set(row.ppid, children);
   }
   const out = [];
   const seen = new Set([rootPid]);
   const stack = [...(childrenByParent.get(rootPid) ?? [])];
   while (stack.length > 0) {
-    const pid = stack.pop();
-    if (pid === undefined || seen.has(pid)) continue;
-    seen.add(pid);
-    out.push(pid);
-    stack.push(...(childrenByParent.get(pid) ?? []));
+    const row = stack.pop();
+    if (row === undefined || seen.has(row.pid)) continue;
+    seen.add(row.pid);
+    out.push(row);
+    stack.push(...(childrenByParent.get(row.pid) ?? []));
   }
   return out;
 }
@@ -216,7 +333,9 @@ function collectDescendants(rows, rootPid) {
 // ===========================================================================
 
 const PARENT_SIGNALS = Object.freeze(['SIGINT', 'SIGTERM']);
-const DEFAULT_PARENT_SIGNAL_CLEANUP_TIMEOUT_MS = 3000;
+// The MCP shutdown path performs bounded TERM -> KILL -> stdio -> final process
+// inventory settlement. Keep the coordinator deadline above that composed bound.
+const DEFAULT_PARENT_SIGNAL_CLEANUP_TIMEOUT_MS = 4000;
 
 /**
  * Coordinate process-level interruption across every currently running child.
@@ -375,41 +494,98 @@ export function reserveParentSignalCleanup(coordinator) {
   });
 }
 
-/** Build a retained-descendant terminator for one spawned child process. */
+/**
+ * Build a retained-descendant terminator for one spawned child process.
+ *
+ * POSIX identities are learned from bounded process-table samples. A clean result
+ * means zero retained `(pid, pgid, session, lstart)` tuples matched the final
+ * sample and every observation succeeded; it does not prove OS containment
+ * against an escape between samples. Because `lstart` has one-second resolution,
+ * a same-second PID reuse with every other tuple fact identical remains a
+ * documented collision limit.
+ */
 export function createChildProcessTerminator(input) {
-  const captureProcessDescendantsImpl =
-    input.captureProcessDescendants ?? captureProcessDescendants;
   const killProcessTreeImpl = input.killProcessTree ?? killProcessTree;
   const killProcess = input.killProcess ?? process.kill;
   const platform = input.platform ?? process.platform;
-  const retainedDescendants = new Set();
+  const readProcessTableImpl = input.readProcessTable ?? readProcessTable;
+  const retainedDescendants = new Map();
+  const directChildren = new Map();
   let captureInFlight;
   let disposed = false;
+  let observationFailed = platform === 'win32';
+  let observedTable = false;
+  let rootIdentity;
   let rootClosed = false;
 
-  const retain = (processIds, rootPid, preservePrevious = rootClosed) => {
-    const observed = new Set();
-    for (const pid of processIds) {
-      if (Number.isSafeInteger(pid) && pid > 0 && pid !== rootPid) {
-        observed.add(pid);
+  const markObservationFailure = () => {
+    observationFailed = true;
+  };
+
+  const retain = (identities, rootPid) => {
+    for (const identity of identities) {
+      if (identity.pid !== rootPid) {
+        retainedDescendants.set(processIdentityKey(identity), identity);
       }
     }
-    if (!preservePrevious) retainedDescendants.clear();
-    for (const pid of observed) retainedDescendants.add(pid);
+  };
+
+  const observeProcessTable = (rawRows) => {
+    if (disposed || platform === 'win32') return [];
+    const rows = validateProcessRows(rawRows);
+    observedTable = true;
+    const rootPid = input.child.pid;
+    if (rootPid === undefined) return rows;
+    const root = rows.find((row) => row.pid === rootPid);
+    if (root !== undefined) {
+      if (rootIdentity === undefined) rootIdentity = root;
+      else if (!sameProcessIdentity(rootIdentity, root)) {
+        // After the child has closed, a mismatching row at the same PID is a
+        // reused identity, not evidence that process-table observation failed.
+        // Never traverse or signal through that unrelated replacement. While
+        // the root is still expected to be live, however, an identity change is
+        // ambiguous (for example a too-early pre-exec sample), so fail closed.
+        if (!rootClosed) observationFailed = true;
+        return rows;
+      }
+      if (!rootClosed) {
+        directChildren.clear();
+        for (const row of rows) {
+          if (row.ppid === rootPid && row.pid !== rootPid) {
+            directChildren.set(processIdentityKey(row), row);
+          }
+        }
+      }
+      retain(processDescendantsFromTable(rows, rootPid), rootPid);
+    }
+    return rows;
   };
 
   const capture = () => {
     if (disposed) return Promise.resolve();
     const rootPid = input.child.pid;
-    if (rootPid === undefined || platform === 'win32') return Promise.resolve();
+    if (rootPid === undefined || platform === 'win32') {
+      markObservationFailure();
+      return Promise.resolve();
+    }
     if (captureInFlight !== undefined) return captureInFlight;
-    captureInFlight = Promise.resolve()
-      .then(() => captureProcessDescendantsImpl(rootPid, { platform }))
-      .then((processIds) => {
+    captureInFlight = sampleRssWithinDeadline(
+      () => readProcessTableImpl({ platform }),
+      input.rssSampleTimeoutMs ?? RSS_SAMPLE_TIMEOUT_MS,
+    )
+      .then((rows) => {
         if (disposed) return;
-        retain(processIds, rootPid);
+        if (rows === undefined) {
+          markObservationFailure();
+          return;
+        }
+        try {
+          return observeProcessTable(rows);
+        } catch {
+          markObservationFailure();
+          return;
+        }
       })
-      .catch(() => false)
       .finally(() => {
         captureInFlight = undefined;
       });
@@ -423,63 +599,93 @@ export function createChildProcessTerminator(input) {
     } catch {
       treeTerminated = false;
     }
-    if (treeTerminated) return;
+    if (treeTerminated) return true;
     try {
-      input.child.kill?.(signal);
+      return input.child.kill?.(signal) !== false;
     } catch {
       // taskkill and root-handle termination are both best-effort.
-    }
-  };
-
-  const signalRetainedAndGroup = (rootPid, signal) => {
-    signalCapturedProcesses(retainedDescendants, signal, { killProcess });
-    if (!input.useProcessGroup) return false;
-    try {
-      killProcess(-rootPid, signal);
-      return true;
-    } catch {
       return false;
     }
   };
 
+  const signalRetainedAndRoot = (rows, signal, includeRoot) => {
+    const identities = [...retainedDescendants.values()];
+    if (includeRoot && rootIdentity !== undefined && input.useProcessGroup !== false) {
+      identities.push(rootIdentity);
+    }
+    let delivered = signalCapturedProcesses(identities, signal, {
+      currentRows: rows,
+      killProcess,
+      useProcessGroups: input.useProcessGroup !== false,
+    });
+    if (
+      includeRoot &&
+      input.useProcessGroup === false &&
+      rootIdentity !== undefined &&
+      sameProcessIdentity(
+        rootIdentity,
+        rows.find((row) => row.pid === rootIdentity.pid),
+      )
+    ) {
+      try {
+        delivered = input.child.kill?.(signal) !== false || delivered;
+      } catch {
+        // The freshly matched root may still exit before the handle signal.
+      }
+    }
+    return delivered;
+  };
+
   return Object.freeze({
     capture,
-    /** Snapshot the currently retained descendant PIDs (for residual accounting). */
-    retainedPids() {
-      return [...retainedDescendants];
+    markObservationFailure,
+    reliable() {
+      return observedTable && !observationFailed;
+    },
+    /** Snapshot retained immutable identities for diagnostics/tests. */
+    retainedIdentities() {
+      return [...retainedDescendants.values()];
     },
     markRootClosed() {
       rootClosed = true;
     },
     observeProcessTable(rows) {
-      if (disposed || platform === 'win32') return;
-      const rootPid = input.child.pid;
-      if (rootPid === undefined) return;
-      const rootPresent = rows.some((row) => row.pid === rootPid);
-      retain(processDescendantsFromTable(rows, rootPid), rootPid, rootClosed || !rootPresent);
+      try {
+        return observeProcessTable(rows);
+      } catch (error) {
+        markObservationFailure();
+        throw error;
+      }
     },
     async signal(signal) {
-      if (disposed) return;
+      if (disposed) return false;
       const rootPid = input.child.pid;
-      if (rootPid === undefined) return;
+      if (rootPid === undefined) return false;
       if (platform === 'win32') {
-        await signalWindows(rootPid, signal);
-        return;
+        return signalWindows(rootPid, signal);
       }
 
-      // Escalate every PID retained during the pre-termination snapshot even if
-      // the root has since exited and the descendant has been reparented.
-      if (signal === 'SIGKILL') {
-        signalCapturedProcesses(retainedDescendants, signal, { killProcess });
+      const rows = await capture();
+      if (disposed || rows === undefined) return false;
+      return signalRetainedAndRoot(rows, signal, !rootClosed);
+    },
+    async signalHostedChild(signal) {
+      if (disposed || platform === 'win32') return false;
+      const rows = await capture();
+      if (disposed || rows === undefined) return false;
+      // BSD `script` is the measured root; its direct child is the hosted CLI
+      // and may itself own workers. Signal the CLI process group exactly once,
+      // excluding the wrapper while including those workers.
+      for (const identity of directChildren.values()) {
+        const delivered = signalCapturedProcesses([identity], signal, {
+          currentRows: rows,
+          killProcess,
+          useProcessGroups:
+            rootIdentity === undefined || identity.processGroupId !== rootIdentity.processGroupId,
+        });
+        if (delivered) return true;
       }
-      await capture();
-      if (disposed) return;
-      if (signalRetainedAndGroup(rootPid, signal)) return;
-      try {
-        input.child.kill?.(signal);
-      } catch {
-        // The root may already have exited; retained descendants were still signalled.
-      }
+      return false;
     },
     async signalAfterRootClose(signal = 'SIGKILL') {
       if (disposed) return;
@@ -492,13 +698,40 @@ export function createChildProcessTerminator(input) {
         // Reliable successful-exit containment on Windows requires a Job Object.
         return;
       }
-      if (captureInFlight !== undefined) await captureInFlight;
-      if (disposed) return;
-      signalRetainedAndGroup(rootPid, signal);
+      const rows = await capture();
+      if (disposed || rows === undefined) return false;
+      return signalRetainedAndRoot(rows, signal, false);
+    },
+    async verifyResiduals(options = {}) {
+      const includeRoot = options.includeRoot === true;
+      const rootPid = input.child.pid;
+      const rows = await capture();
+      if (rows === undefined) {
+        return Math.max(1, retainedDescendants.size + (includeRoot ? 1 : 0));
+      }
+      const currentByPid = new Map(rows.map((row) => [row.pid, row]));
+      const alivePids = new Set();
+      for (const identity of retainedDescendants.values()) {
+        if (sameProcessIdentity(identity, currentByPid.get(identity.pid))) {
+          alivePids.add(identity.pid);
+        }
+      }
+      if (includeRoot && Number.isSafeInteger(rootPid) && rootPid > 0) {
+        const currentRoot = currentByPid.get(rootPid);
+        if (
+          currentRoot !== undefined &&
+          (rootIdentity === undefined || sameProcessIdentity(rootIdentity, currentRoot))
+        ) {
+          alivePids.add(rootPid);
+        }
+      }
+      const count = alivePids.size;
+      return observationFailed ? Math.max(1, count) : count;
     },
     dispose() {
       disposed = true;
       retainedDescendants.clear();
+      directChildren.clear();
     },
   });
 }
@@ -512,7 +745,25 @@ export const parentSignalCoordinator = createParentSignalCoordinator();
 
 const TERMINATION_GRACE_MS = 1000;
 const FORCE_KILL_SETTLEMENT_MS = 1000;
+const RESIDUAL_SETTLEMENT_MS = 1000;
+const RESIDUAL_SETTLEMENT_POLL_MS = 25;
 const RSS_SAMPLE_TIMEOUT_MS = 1000;
+
+async function verifyResidualsWithinDeadline(terminator, options, timeoutMs) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0) {
+    throw new RangeError('residual settlement timeout must be a non-negative safe integer');
+  }
+  let residuals = await terminator.verifyResiduals(options);
+  const deadline = performance.now() + timeoutMs;
+  while (residuals > 0 && performance.now() < deadline) {
+    const remainingMs = Math.max(1, Math.ceil(deadline - performance.now()));
+    await new Promise((resolve) => {
+      setTimeout(resolve, Math.min(RESIDUAL_SETTLEMENT_POLL_MS, remainingMs));
+    });
+    residuals = await terminator.verifyResiduals(options);
+  }
+  return residuals;
+}
 
 /**
  * Run one command (an argv array; NEVER a shell string), bounding output, timing
@@ -527,7 +778,10 @@ export async function runMeasuredCommand(input) {
   if (command === undefined) throw new Error('runMeasuredCommand requires a command.');
 
   const stdout = new TailBuffer(input.stdoutTailBytes);
-  const stderr = new TailBuffer(input.stderrTailBytes);
+  const stderr = new TailBuffer(
+    input.stderrTailBytes,
+    input.stderrLimitBytes ?? input.stderrTailBytes,
+  );
   const stdoutCapture =
     input.stdoutCaptureBytes === undefined
       ? undefined
@@ -543,6 +797,7 @@ export async function runMeasuredCommand(input) {
   let timedOut = false;
   let cancelled = false;
   let timeoutHandle;
+  let nativeSignalHandle;
   let terminationHandle;
   let forceKillSettlementHandle;
   let sampleHandle;
@@ -551,10 +806,10 @@ export async function runMeasuredCommand(input) {
   let commandCompletedAt;
   let commandDurationMs;
   // RSS-availability tracking (never coerce an absent sample to zero).
-  let anyTableRead = false;
   let rssTableUnavailable = false;
   let rssSamplerFault = false;
-  let retainedSnapshot = [];
+  let deliveredSignal;
+  let rootCloseObserved = false;
 
   const spawnChild = input.spawnChild ?? spawn;
   const useProcessGroup = input.useProcessGroup ?? process.platform !== 'win32';
@@ -593,6 +848,8 @@ export async function runMeasuredCommand(input) {
     killProcess: input.killProcess,
     killProcessTree: input.killProcessTree,
     platform: input.platform,
+    readProcessTable: sampleProcessTable,
+    rssSampleTimeoutMs: sampleTimeoutMs,
     useProcessGroup,
   });
 
@@ -612,16 +869,18 @@ export async function runMeasuredCommand(input) {
         if (rows === undefined) {
           samplingDisabled = true;
           rssTableUnavailable = true;
+          terminator.markObservationFailure();
           return;
         }
-        anyTableRead = true;
-        terminator.observeProcessTable(rows);
-        const rss = sumProcessTreeRss(rows, child.pid);
+        const validatedRows = validateProcessRows(rows);
+        terminator.observeProcessTable(validatedRows);
+        const rss = sumProcessTreeRss(validatedRows, child.pid);
         if (rss > 0) maxRssBytes = Math.max(maxRssBytes ?? 0, rss);
       })
       .catch(() => {
         samplingDisabled = true;
         rssSamplerFault = true;
+        terminator.markObservationFailure();
       })
       .finally(() => {
         sampleInFlight = undefined;
@@ -651,6 +910,7 @@ export async function runMeasuredCommand(input) {
     });
     const cleanup = () => {
       clearTimeout(timeoutHandle);
+      clearTimeout(nativeSignalHandle);
       clearTimeout(terminationHandle);
       clearTimeout(forceKillSettlementHandle);
       child.stdout?.off('data', onStdout);
@@ -659,8 +919,6 @@ export async function runMeasuredCommand(input) {
       child.off('close', onClose);
       input.abortSignal?.removeEventListener('abort', onAbort);
       parentReservation.complete();
-      if (input.trackResidualDescendants) retainedSnapshot = terminator.retainedPids();
-      terminator.dispose();
     };
     const settle = (result) => {
       if (settled) return;
@@ -670,6 +928,7 @@ export async function runMeasuredCommand(input) {
       resolveTerminationComplete();
       resolve(result);
     };
+    const settleCloseResult = () => settle(closeResult);
     const forceKill = (rootClosed = false) => {
       if (forceSignalPromise !== undefined) return forceSignalPromise;
       clearTimeout(terminationHandle);
@@ -696,7 +955,7 @@ export async function runMeasuredCommand(input) {
         .catch(() => false);
       return forceSignalPromise;
     };
-    const beginTermination = (reason) => {
+    const beginTermination = (reason, initialSignal = 'SIGTERM') => {
       if (terminationReason !== undefined) return terminationComplete;
       terminationReason = reason;
       clearTimeout(timeoutHandle);
@@ -704,7 +963,15 @@ export async function runMeasuredCommand(input) {
       cancelled = reason === 'abort';
       terminationHandle = setTimeout(forceKill, input.terminationGraceMs ?? TERMINATION_GRACE_MS);
       Promise.resolve()
-        .then(() => terminator.signal('SIGTERM'))
+        .then(() => {
+          if (reason === 'native-signal' && input.nativeSignal?.descendantOnly === true) {
+            return terminator.signalHostedChild(initialSignal);
+          }
+          return terminator.signal(initialSignal);
+        })
+        .then((delivered) => {
+          if (reason === 'native-signal' && delivered) deliveredSignal = initialSignal;
+        })
         .catch(() => false);
       return terminationComplete;
     };
@@ -714,15 +981,30 @@ export async function runMeasuredCommand(input) {
       terminator.markRootClosed();
       noteCommandCompletion();
       closeResult = { code: undefined, signal: undefined, error };
-      forceKill().finally(() => settle(closeResult));
+      forceKill().finally(settleCloseResult);
     }
     function onClose(code, signal) {
+      rootCloseObserved = true;
       clearTimeout(timeoutHandle);
       if (sampleHandle !== undefined) clearInterval(sampleHandle);
       terminator.markRootClosed();
       noteCommandCompletion();
       closeResult = { code, signal, error: undefined };
-      forceKill(true).finally(() => settle(closeResult));
+      // A PTY wrapper can close as soon as it receives the forwarded native
+      // signal while its child is still running the same signal handler. Honour
+      // the normal termination grace before escalating that retained process
+      // group; otherwise SIGINT can be converted into an immediate SIGKILL of
+      // the actual CLI before it flushes/cleans up. Normal (unsignalled) exits
+      // still signal retained, observed grandchildren immediately.
+      if (terminationReason === 'native-signal') {
+        clearTimeout(terminationHandle);
+        terminationHandle = setTimeout(
+          () => forceKill(true).finally(settleCloseResult),
+          input.terminationGraceMs ?? TERMINATION_GRACE_MS,
+        );
+        return;
+      }
+      forceKill(true).finally(settleCloseResult);
     }
     function onAbort() {
       beginTermination('abort');
@@ -739,6 +1021,12 @@ export async function runMeasuredCommand(input) {
     if (input.timeoutMs !== undefined) {
       timeoutHandle = setTimeout(() => beginTermination('timeout'), input.timeoutMs);
     }
+    if (input.nativeSignal !== undefined) {
+      nativeSignalHandle = setTimeout(
+        () => beginTermination('native-signal', input.nativeSignal.signal),
+        input.nativeSignal.afterMs,
+      );
+    }
   });
 
   // Command duration ends with the child/stdio settlement. The final best-effort
@@ -748,20 +1036,18 @@ export async function runMeasuredCommand(input) {
 
   let residualDescendants = 0;
   if (input.trackResidualDescendants) {
-    residualDescendants = await countResidualDescendants(
-      retainedSnapshot,
-      sampleProcessTable,
-      sampleTimeoutMs,
+    residualDescendants = await verifyResidualsWithinDeadline(
+      terminator,
+      { includeRoot: !rootCloseObserved },
+      input.residualSettlementMs ?? RESIDUAL_SETTLEMENT_MS,
     );
   }
+  terminator.dispose();
 
   let rssUnavailableReason;
-  if (maxRssBytes === undefined) {
-    if (rssSamplerFault) rssUnavailableReason = RSS_REASON_CODES.SAMPLER_FAULT;
-    else if (rssTableUnavailable && !anyTableRead)
-      rssUnavailableReason = RSS_REASON_CODES.PROCESS_TABLE_UNAVAILABLE;
-    else rssUnavailableReason = RSS_REASON_CODES.CHILD_TOO_SHORT;
-  }
+  if (rssSamplerFault) rssUnavailableReason = RSS_REASON_CODES.SAMPLER_FAULT;
+  else if (rssTableUnavailable) rssUnavailableReason = RSS_REASON_CODES.PROCESS_TABLE_UNAVAILABLE;
+  else if (maxRssBytes === undefined) rssUnavailableReason = RSS_REASON_CODES.CHILD_TOO_SHORT;
 
   return {
     command: input.command,
@@ -773,6 +1059,7 @@ export async function runMeasuredCommand(input) {
     error: exit.error === undefined ? undefined : String(exit.error.message ?? exit.error),
     timedOut,
     cancelled,
+    deliveredSignal,
     durationMs: commandDurationMs,
     maxRssBytes,
     rssUnavailableReason,
@@ -781,21 +1068,8 @@ export async function runMeasuredCommand(input) {
     stderrTail: stderr.toString(),
     stdoutCapture: stdoutCapture?.toString(),
     stdoutTruncated: stdoutCapture?.truncated(),
+    stderrTruncated: stderr.truncated(),
   };
-}
-
-/** Count how many previously-retained descendant PIDs are still alive. */
-async function countResidualDescendants(pids, readTable, timeoutMs) {
-  if (pids.length === 0) return 0;
-  const rows = await sampleRssWithinDeadline(readTable, timeoutMs);
-  // An unverifiable final read is reported as residual — fail-closed, never a
-  // silent "clean".
-  if (rows === undefined) return pids.length;
-  const alive = new Set();
-  for (const row of rows) alive.add(row.pid);
-  let count = 0;
-  for (const pid of pids) if (alive.has(pid)) count += 1;
-  return count;
 }
 
 function sampleRssWithinDeadline(readTable, timeoutMs) {
@@ -819,16 +1093,28 @@ function sampleRssWithinDeadline(readTable, timeoutMs) {
 
 class TailBuffer {
   #limit;
+  #overflowLimit;
   #chunks = [];
   #bytes = 0;
+  #seenBytes = 0;
+  #truncated = false;
 
-  constructor(limit) {
+  constructor(limit, overflowLimit = limit) {
+    if (!Number.isSafeInteger(limit) || limit < 0) {
+      throw new RangeError('tail buffer limit must be a non-negative safe integer');
+    }
+    if (!Number.isSafeInteger(overflowLimit) || overflowLimit < limit) {
+      throw new RangeError('tail buffer overflow limit must be a safe integer at least the tail');
+    }
     this.#limit = limit;
+    this.#overflowLimit = overflowLimit;
   }
 
   push(chunk) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
     const combined = Buffer.concat([...this.#chunks, buffer]);
+    this.#seenBytes = Math.min(Number.MAX_SAFE_INTEGER, this.#seenBytes + buffer.byteLength);
+    if (this.#seenBytes > this.#overflowLimit) this.#truncated = true;
     const tail =
       combined.byteLength > this.#limit
         ? combined.subarray(combined.byteLength - this.#limit)
@@ -840,6 +1126,10 @@ class TailBuffer {
   toString() {
     if (this.#bytes === 0) return '';
     return Buffer.concat(this.#chunks, this.#bytes).toString('utf8');
+  }
+
+  truncated() {
+    return this.#truncated;
   }
 }
 
@@ -938,21 +1228,39 @@ function toRssMeasurement(measured, platform) {
       reasonCode: RSS_REASON_CODES.UNSUPPORTED_PLATFORM,
     });
   }
+  if (measured.rssUnavailableReason !== undefined) {
+    return Object.freeze({
+      status: 'unavailable',
+      reasonCode: measured.rssUnavailableReason,
+    });
+  }
   if (
     typeof measured.maxRssBytes === 'number' &&
     Number.isFinite(measured.maxRssBytes) &&
     measured.maxRssBytes > 0
   ) {
-    return Object.freeze({ status: 'available', peakBytes: measured.maxRssBytes });
+    return Object.freeze({
+      status: 'available',
+      peakBytes: measured.maxRssBytes,
+    });
   }
   return Object.freeze({
     status: 'unavailable',
-    reasonCode: measured.rssUnavailableReason ?? RSS_REASON_CODES.CHILD_TOO_SHORT,
+    reasonCode: RSS_REASON_CODES.CHILD_TOO_SHORT,
   });
 }
 
+function normalizePtyOutput(value, platform, pty) {
+  const output = value ?? '';
+  // BSD `script` echoes the non-interactive stdin EOF as "^D\b\b" before the
+  // child output. A real interactive terminal does not display this wrapper
+  // artifact, so remove only that exact prefix from acceptance captures.
+  if (pty && platform === 'darwin' && output.startsWith('^D\b\b')) return output.slice(4);
+  return output;
+}
+
 /** Adapt a raw `runMeasuredCommand` result into the closed `MeasuredProcessResult`. */
-function toMeasuredProcessResult(measured, platform) {
+function toMeasuredProcessResult(measured, platform, pty) {
   const signal = measured.signal ?? null;
   const spawnFailed = signal === null && measured.error !== undefined;
   let status = null;
@@ -964,13 +1272,19 @@ function toMeasuredProcessResult(measured, platform) {
     signal,
     timedOut: measured.timedOut === true,
     cancelled: measured.cancelled === true,
-    outputTruncated: measured.stdoutTruncated === true,
+    deliveredSignal: measured.deliveredSignal ?? null,
+    outputTruncated: measured.stdoutTruncated === true || measured.stderrTruncated === true,
     durationMs: typeof measured.durationMs === 'number' ? measured.durationMs : 0,
     rss: toRssMeasurement(measured, platform),
-    stdoutTail: measured.stdoutTail ?? '',
+    stdoutTail: normalizePtyOutput(measured.stdoutTail, platform, pty),
     stderrTail: measured.stderrTail ?? '',
-    stdoutCapture: measured.stdoutCapture ?? '',
-    cleanup: Object.freeze({ residualDescendants: measured.residualDescendants ?? 0 }),
+    stdoutCapture: normalizePtyOutput(measured.stdoutCapture, platform, pty),
+    cleanup: Object.freeze({
+      residualDescendants:
+        Number.isSafeInteger(measured.residualDescendants) && measured.residualDescendants >= 0
+          ? measured.residualDescendants
+          : 1,
+    }),
   });
 }
 
@@ -987,9 +1301,9 @@ function singleQuote(token) {
  * descriptors), never attacker input, and spawn stays `shell: false` either way.
  */
 function buildPtyArgv(argv, platform) {
-  if (platform === 'darwin') return ['script', '-q', '/dev/null', ...argv];
+  if (platform === 'darwin') return ['/usr/bin/script', '-q', '/dev/null', ...argv];
   return [
-    'script',
+    '/usr/bin/script',
     '-q',
     '-e',
     '-c',
@@ -1035,6 +1349,32 @@ export async function runMeasuredProcess(spec, ctx = {}) {
   const sampleIntervalMs =
     spec.rssSampleIntervalMs ?? bounds.rssSampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS;
   const env = { ...ctx.baseEnv, ...spec.env };
+  let nativeSignal;
+  if (spec.nativeSignal !== undefined) {
+    if (platform === 'win32') {
+      throw new TypeError('runMeasuredProcess nativeSignal is POSIX-only');
+    }
+    if (
+      spec.nativeSignal === null ||
+      typeof spec.nativeSignal !== 'object' ||
+      (spec.nativeSignal.signal !== 'SIGINT' && spec.nativeSignal.signal !== 'SIGTERM') ||
+      !Number.isSafeInteger(spec.nativeSignal.afterMs) ||
+      spec.nativeSignal.afterMs <= 0 ||
+      spec.nativeSignal.afterMs >= timeoutMs
+    ) {
+      throw new TypeError(
+        'runMeasuredProcess nativeSignal requires SIGINT/SIGTERM and 0 < afterMs < timeoutMs',
+      );
+    }
+    nativeSignal = {
+      signal: spec.nativeSignal.signal,
+      afterMs: spec.nativeSignal.afterMs,
+      // The PTY wrapper is not the CLI. Forward the exact native signal to the
+      // hosted CLI descendant once, then retain the whole group for bounded
+      // escalation/cleanup if the child does not terminate.
+      descendantOnly: spec.pty === true,
+    };
+  }
 
   const commandArgv = spec.pty === true ? buildPtyArgv([...argv], platform) : [...argv];
   const abortSignal = combineSignals(spec.signal, ctx.runSignal);
@@ -1047,9 +1387,11 @@ export async function runMeasuredProcess(spec, ctx = {}) {
     sampleIntervalMs,
     stdoutTailBytes: Math.min(stdoutBytes, diagnosticTailBytes),
     stderrTailBytes: Math.min(stderrBytes, diagnosticTailBytes),
+    stderrLimitBytes: stderrBytes,
     stdoutCaptureBytes: stdoutBytes,
     stdin: spec.stdin,
     abortSignal,
+    nativeSignal,
     trackResidualDescendants: true,
     platform: ctx.platform,
     spawnChild: ctx.spawnChild,
@@ -1059,9 +1401,10 @@ export async function runMeasuredProcess(spec, ctx = {}) {
     killProcessTree: ctx.killProcessTree,
     parentSignalCoordinator: ctx.parentSignalCoordinator,
     rssSampleTimeoutMs: ctx.rssSampleTimeoutMs,
+    residualSettlementMs: ctx.residualSettlementMs,
   });
 
-  return toMeasuredProcessResult(measured, platform);
+  return toMeasuredProcessResult(measured, platform, spec.pty === true);
 }
 
 /** Combine an optional per-run signal with an optional runner-level signal. */
@@ -1110,7 +1453,10 @@ export function createMeasuredProcessPort(options = {}) {
     },
     rssMeasurement() {
       if (sawAvailable) return Object.freeze({ status: 'available', peakBytes });
-      return Object.freeze({ status: 'unavailable', reasonCode: lastUnavailableReason });
+      return Object.freeze({
+        status: 'unavailable',
+        reasonCode: lastUnavailableReason,
+      });
     },
   });
 }

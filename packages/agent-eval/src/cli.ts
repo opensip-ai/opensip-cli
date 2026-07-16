@@ -23,8 +23,9 @@ import { resolveGitProvenance } from './runner/git-provenance.js';
 import { runTaskArm } from './runner/run-task.js';
 import {
   HarnessPrerequisiteError,
-  assertTargetRealpathStable,
+  assertTargetFinalStable,
   buildCliTarget,
+  cleanupCliTarget,
   resolveCliDist,
   spawnCli,
   tailForDiagnostics,
@@ -203,8 +204,9 @@ async function runEvaluation(
   // @fitness-ignore-next-line async-waterfall-detection -- The closing Git snapshot must observe the source state after every measured task has finished.
   const taskResults = await executeTasks(tasks, arms, target, dependencies);
   const finalSource = await dependencies.resolveGitProvenance();
-  // Reject a target whose realpath changed mid-run before trusting its evidence.
-  assertTargetRealpathStable(target);
+  // Re-hash the complete installed target once, after all target process
+  // boundaries have performed metadata checks and before evidence is trusted.
+  assertTargetFinalStable(target);
   const sourceState = classifySourceState(initialSource, finalSource);
   if (sourceState === 'changed-during-run') {
     void dependencies.stderr(
@@ -219,7 +221,15 @@ async function runEvaluation(
     sourceState,
   );
   const report: EvalReport = {
-    cliTarget: { entrypointName: basename(target.entrypoint), source: target.source },
+    cliTarget:
+      target.source === 'installed'
+        ? {
+            entrypointName: basename(target.entrypoint),
+            entrypointSha256: `sha256:${target.entrypointIdentity.sha256}`,
+            packageJsonSha256: `sha256:${target.packageJsonIdentity.sha256}`,
+            source: 'installed',
+          }
+        : { entrypointName: basename(target.entrypoint), source: 'workspace' },
     cliVersion,
     completedAt: dependencies.now().toISOString(),
     contractFingerprint: fingerprint,
@@ -286,11 +296,15 @@ async function mainImpl(argv: readonly string[], dependencies: CliDependencies):
   // Construct the one immutable CLI target once, after help/list have returned, so
   // every version/init/graph/MCP spawn in this run measures the same build.
   const target = buildCliTarget(options.opensipEntrypoint);
-  const requestedPaths = buildRequestedPaths(options, dependencies);
-  if (requestedPaths !== undefined) {
-    await requireExplicitPairAvailable(requestedPaths, dependencies.artifactFileSystem);
+  try {
+    const requestedPaths = buildRequestedPaths(options, dependencies);
+    if (requestedPaths !== undefined) {
+      await requireExplicitPairAvailable(requestedPaths, dependencies.artifactFileSystem);
+    }
+    return await runEvaluation(tasks, arms, requestedPaths, target, dependencies);
+  } finally {
+    cleanupCliTarget(target);
   }
-  return runEvaluation(tasks, arms, requestedPaths, target, dependencies);
 }
 
 /** Run the evaluation command without allowing task assertion failures to become process failures. */

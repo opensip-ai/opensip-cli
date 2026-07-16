@@ -21,7 +21,9 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+import { basename as pathBasename, isAbsolute, join, relative } from 'node:path';
+
+import { resolveNpmInvocation } from './node-cli-invocation.mjs';
 
 /** The closed reason-code vocabulary for fixture packing. */
 export const FIXTURE_REASON_CODES = Object.freeze({
@@ -106,16 +108,20 @@ function resolveFixtureDir(fixturesRoot, basename) {
  * tarball path. Parses the JSON filename npm reports and verifies it landed.
  */
 function packOne(npm, fixtureDir, destReal, timeoutMs, env) {
-  const result = spawnSync(npm, ['pack', '--json', '--pack-destination', destReal, fixtureDir], {
-    cwd: destReal,
-    env,
-    shell: false,
-    encoding: 'utf8',
-    timeout: timeoutMs,
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    maxBuffer: MAX_PACK_BUFFER,
-  });
+  const result = spawnSync(
+    npm.command,
+    [...npm.prefixArgs, 'pack', '--json', '--pack-destination', destReal, fixtureDir],
+    {
+      cwd: destReal,
+      env,
+      shell: false,
+      encoding: 'utf8',
+      timeout: timeoutMs,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: MAX_PACK_BUFFER,
+    },
+  );
   if (result.status !== 0) {
     throw new FixturePackError(R.PACK_FAILED, `npm pack failed for ${fixtureDir}`);
   }
@@ -137,6 +143,14 @@ function packOne(npm, fixtureDir, destReal, timeoutMs, env) {
       `npm pack did not report a tarball filename for ${fixtureDir}`,
     );
   }
+  if (
+    filename !== pathBasename(filename) ||
+    filename.includes('..') ||
+    filename.includes('/') ||
+    filename.includes('\\')
+  ) {
+    throw new FixturePackError(R.PACK_FAILED, 'npm pack reported an unsafe tarball filename');
+  }
   const tarball = join(destReal, filename);
   if (!existsSync(tarball)) {
     throw new FixturePackError(
@@ -144,7 +158,11 @@ function packOne(npm, fixtureDir, destReal, timeoutMs, env) {
       `packed tarball ${JSON.stringify(filename)} did not land in the destination`,
     );
   }
-  return tarball;
+  const tarballReal = realpathSync(tarball);
+  if (!isUnderRoot(destReal, tarballReal)) {
+    throw new FixturePackError(R.FIXTURE_ESCAPE, 'packed tarball resolved outside the destination');
+  }
+  return tarballReal;
 }
 
 /**
@@ -153,7 +171,8 @@ function packOne(npm, fixtureDir, destReal, timeoutMs, env) {
  * @param {object} options
  * @param {string} options.repoRoot   absolute path to the repository root.
  * @param {string} options.destDir    absolute, existing, run-owned destination directory.
- * @param {string} [options.platform] defaults to `process.platform` (selects `npm` vs `npm.cmd`).
+ * @param {string} [options.platform] defaults to `process.platform`.
+ * @param {string} [options.npmCliPath] explicit npm JS entrypoint seam for Windows tests/embedding.
  * @param {Record<string,string>} [options.env] deterministic child env (defaults to `process.env`).
  * @param {number} [options.timeoutMs] per-pack timeout (default 120s).
  * @returns {{ toolPluginTarball: string, fitPackTarball: string, simPackTarball: string }}
@@ -175,7 +194,16 @@ export function packFixtures(options) {
   const destReal = realpathSync(destDir);
 
   const platform = options.platform ?? process.platform;
-  const npm = platform === 'win32' ? 'npm.cmd' : 'npm';
+  let npm;
+  try {
+    npm = resolveNpmInvocation({
+      platform,
+      npmCliPath: options.npmCliPath,
+      env: options.env ?? process.env,
+    });
+  } catch {
+    throw new FixturePackError(R.PACK_FAILED, 'npm JavaScript entrypoint is unavailable');
+  }
   const timeoutMs =
     typeof options.timeoutMs === 'number' ? options.timeoutMs : DEFAULT_PACK_TIMEOUT_MS;
   const env = options.env ?? process.env;

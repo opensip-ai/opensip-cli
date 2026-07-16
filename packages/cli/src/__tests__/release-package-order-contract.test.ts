@@ -12,8 +12,9 @@
  *   2. `.github/workflows/release.yml` Pack loop  — DERIVED from the source
  *      (`--print pack`); asserts no literal per-package `pnpm --filter … pack`
  *      lines remain (robust to ordering — duplication is the failure, not order).
- *   3. `.github/workflows/release.yml` Publish loop — DERIVED (`--print names`);
- *      asserts no literal `publish_if_new <pkg>` lines remain.
+ *   3. `.github/workflows/release.yml` Publish loop — consumes the validated
+ *      release-manifest order produced from the source (and executes no source
+ *      printer under OIDC); asserts no literal package list remains.
  *   4. `.github/workflows/release.yml` Preflight loop — DERIVED (`--print names`);
  *      asserts no literal hand-listed `for pkg in …` package list remains.
  *   5. `scripts/bootstrap-publish.sh` — DERIVED (`--print names`); asserts the
@@ -27,11 +28,13 @@
  * same way.
  */
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
+import { parseDocument } from 'yaml';
 
 function findRepoRoot(start: string): string {
   let dir = start;
@@ -135,6 +138,19 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
 
   const releaseYml = read('.github/workflows/release.yml');
 
+  it('release workflows parse as YAML with unique mapping keys', () => {
+    for (const workflowPath of [
+      '.github/workflows/release.yml',
+      '.github/workflows/macos-qualification.yml',
+    ]) {
+      const document = parseDocument(read(workflowPath), { uniqueKeys: true });
+      expect(
+        document.errors.map((error) => error.message),
+        `${workflowPath} must be valid YAML without duplicate keys`,
+      ).toEqual([]);
+    }
+  });
+
   it('release.yml Pack loop is derived from the source (no literal --filter pack lines)', () => {
     // The derived loop invokes the printer.
     expect(
@@ -153,11 +169,30 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
     ).toEqual([]);
   });
 
-  it('release.yml Publish loop is derived from the source (no literal publish_if_new <pkg> lines)', () => {
-    expect(
-      releaseYml.includes('release-package-order.mjs --print names'),
-      'release.yml Publish step must derive its order via `release-package-order.mjs --print names`',
-    ).toBe(true);
+  it('release.yml Publish loop consumes the validated generated-manifest order', () => {
+    const stageStart = releaseYml.indexOf('\n  stage-release:');
+    const stageEnd = releaseYml.indexOf('\n  qualify-macos:', stageStart);
+    const stage = releaseYml.slice(stageStart, stageEnd);
+    expect(stage).toContain('npmArtifacts.map');
+    expect(stage).toContain('publish-order.tsv');
+    expect(stage).not.toContain('release-package-order.mjs');
+    expect(stage).not.toContain('actions/checkout@');
+    const promotionOrderDigest = createHash('sha256')
+      .update(`${RELEASE_PACKAGE_ORDER.map((entry) => entry.name).join('\n')}\n`)
+      .digest('hex');
+    expect(stage).toContain(`expectedPackageOrderDigest = '${promotionOrderDigest}'`);
+    expect(stage).toContain("forbiddenLifecycleScripts = ['preinstall', 'install', 'postinstall']");
+    const releaseComponentSetDigest = createHash('sha256')
+      .update(
+        `${RELEASE_PACKAGE_ORDER.map((entry) => entry.name)
+          .sort()
+          .join('\n')}\n`,
+      )
+      .digest('hex');
+    expect(stage).toContain(`expectedReleaseComponentSetDigest = '${releaseComponentSetDigest}'`);
+    expect(stage).toContain('stagingTag !== `release-candidate-${version}`');
+    expect(stage).toContain('steps.identity.outputs.staging-tag');
+    expect(releaseYml).toContain(`PROMOTION_ORDER_SHA256: ${promotionOrderDigest}`);
     // A literal call is `publish_if_new core` (a bareword arg). The function
     // DEFINITION (`publish_if_new() {`) and the derived call inside the loop
     // (`publish_if_new "$pkg"`) are allowed; a bareword package arg is not.
@@ -168,7 +203,7 @@ describe('release package-order contract (ADR-0017 — workspace invariant)', ()
     expect(
       literalPublishLines,
       'release.yml still contains hand-listed `publish_if_new <pkg>` calls — ' +
-        'these must be driven from the source of truth:\n' +
+        'these must be driven from the validated generated manifest:\n' +
         literalPublishLines.join('\n'),
     ).toEqual([]);
   });

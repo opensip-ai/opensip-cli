@@ -23,7 +23,16 @@ import { KNOWN_CAPABILITIES } from '../platform-acceptance/journey-kit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const COMMON_V1_PATH = join(HERE, '..', '..', '.config', 'platform-acceptance', 'common-v1.json');
+const MACOS_V1_PATH = join(
+  HERE,
+  '..',
+  '..',
+  '.config',
+  'platform-acceptance',
+  'macos-26-arm64-node24-npm11-v1.json',
+);
 const commonV1 = JSON.parse(readFileSync(COMMON_V1_PATH, 'utf8'));
+const macosV1 = JSON.parse(readFileSync(MACOS_V1_PATH, 'utf8'));
 
 // Placeholder absolute paths only — this test projects scenarios (no filesystem
 // writes), so the exact location is irrelevant and never touched.
@@ -66,6 +75,38 @@ test('the committed common-v1.json selects exactly the catalog ids in order', ()
     [...COMMON_V1_JOURNEY_IDS],
     'common-v1.json drifted from the catalog selection',
   );
+});
+
+test('lifecycle order qualifies the installed target before uninstalling state or package', () => {
+  for (const profile of [commonV1, macosV1]) {
+    const ids = profile.journeys.map((entry) => entry.id);
+    const install = ids.indexOf('lifecycle.install');
+    const upgrade = ids.indexOf('lifecycle.upgrade');
+    const stateRemove = ids.indexOf('lifecycle.cli-state-uninstall');
+    const packageRemove = ids.indexOf('lifecycle.package-uninstall');
+
+    assert.equal(install, 0, `${profile.id}: install must be first`);
+    assert.equal(upgrade, 1, `${profile.id}: upgrade must immediately follow install`);
+    assert.ok(stateRemove > upgrade, `${profile.id}: state removal ran before upgrade`);
+    assert.ok(
+      packageRemove > stateRemove,
+      `${profile.id}: package removal ran before state removal`,
+    );
+    assert.equal(
+      packageRemove,
+      ids.length - 1,
+      `${profile.id}: package removal must be the terminal selected journey`,
+    );
+  }
+
+  const macIds = macosV1.journeys.map((entry) => entry.id);
+  const firstRemoval = macIds.indexOf('lifecycle.cli-state-uninstall');
+  for (const id of MACOS_JOURNEY_IDS) {
+    assert.ok(
+      macIds.indexOf(id) > macIds.indexOf('lifecycle.upgrade') && macIds.indexOf(id) < firstRemoval,
+      `${id} must run against the target candidate before lifecycle removal`,
+    );
+  }
 });
 
 test('every profile-declared capability is in the known vocabulary and matches the row', () => {

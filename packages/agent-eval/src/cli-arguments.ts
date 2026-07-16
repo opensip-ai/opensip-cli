@@ -12,7 +12,7 @@ Options:
   --task <id>                 Run one task (repeatable; default: all)
   --arm <control|opensip|both>  Select an arm (default: both)
   --json <path>               Set the JSON report path
-  --opensip-entrypoint <js>   Measure an installed CLI JS bin (absolute path)
+  --opensip-entrypoint <js>   Measure an installed opensip-cli package JS bin
   --smoke                     Run the entrypoint-trace smoke task with both arms
   --list                      List registered task ids
   --help                      Show this help
@@ -25,7 +25,7 @@ export interface ParsedCliOptions {
   readonly help: boolean;
   readonly jsonPath?: string;
   readonly list: boolean;
-  /** Absolute path to an installed CLI JS bin to measure instead of workspace `dist`. */
+  /** Absolute path to an installed opensip-cli package JS bin instead of workspace `dist`. */
   readonly opensipEntrypoint?: string;
   readonly smoke: boolean;
   readonly taskIds: readonly string[];

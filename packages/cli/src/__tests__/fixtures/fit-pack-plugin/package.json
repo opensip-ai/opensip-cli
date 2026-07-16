@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "main": "./index.js",
+  "peerDependencies": {
+    "@opensip-cli/core": ">=0.1.11 <1",
+    "@opensip-cli/fitness": ">=0.1.11 <1"
+  },
   "opensipTools": {
     "kind": "fit-pack"
   }

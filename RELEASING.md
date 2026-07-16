@@ -6,26 +6,32 @@ workspace packages to npm with OIDC trusted publishing.
 
 The user-facing npm package is `opensip-cli`. It installs the `opensip` command.
 
-## Three-job release topology (macOS-gated)
+## Four-job release topology (macOS-gated)
 
-`.github/workflows/release.yml` runs **three jobs** so that verified
-exact-version macOS evidence is a hard dependency between npm staging publish and
-`latest` promotion (Plan 02 / ADR-0164; the normative sequence is Plan 02 §6):
+`.github/workflows/release.yml` runs **four jobs** so repository-controlled build
+code never shares the npm OIDC/attestation boundary, while verified exact-version
+macOS evidence remains a hard dependency between npm staging publish and `latest`
+promotion (Plan 02 / ADR-0164; the normative sequence is Plan 02 §6):
 
-1. **`stage-release`** (ubuntu) — every pre-publication gate (consistency,
-   supply-chain, clean two-pass build, artifact boundary, typecheck, lint,
-   coverage tests, fit/graph/yagni dogfood, package preflight), then pack →
-   release-artifact generation/verification → provenance/checksum/SBOM
-   attestation → packed smoke → **STAGING publish** of the exact immutable
-   version to `release-candidate-<version>`. It resolves the currently promoted
-   `opensip-cli@latest` to an exact version (the upgrade source) **before**
-   publishing, exposes typed outputs (candidate version, tag, git SHA, staging
-   tag, manifest digest, previous exact version), and uploads the manifest +
-   `SHA256SUMS` + SBOM as one immutable `release-metadata-<tag>` artifact. It
-   holds `id-token` / `attestations` / `artifact-metadata` write and **does not**
-   promote to `latest`, verify `latest`, or create the GitHub Release. It holds
-   **no** promotion credential.
-2. **`qualify-macos`** (pinned `macos-26`, `contents: read`, **no** publish or
+1. **`build-release`** (ubuntu, `contents: read` only) — every pre-publication
+   gate (consistency, supply-chain, clean two-pass build, artifact boundary,
+   typecheck, lint, coverage tests, fit/graph/yagni dogfood, package preflight),
+   then pack → release-artifact generation/verification → packed smoke. It
+   resolves the currently promoted `opensip-cli@latest` to an exact version (the
+   upgrade source) before publishing, exposes typed identity outputs, and uploads
+   the tarballs, manifest, `SHA256SUMS`, and SBOM as one immutable,
+   version-and-attempt-bound staging bundle. It holds no OIDC, attestation,
+   release-write, or promotion credential.
+2. **`stage-release`** (ubuntu, minimal credentialed boundary) — downloads only
+   that exact bundle through pinned artifact actions; independently validates
+   the manifest digest, closed file set, checksums, sizes, package identities,
+   and publish order; attests the tarballs/checksums/SBOM; then **STAGING
+   publishes** the exact immutable version to `release-candidate-<version>` with
+   npm provenance, the fixed public registry, and lifecycle scripts disabled.
+   This is the only job with `id-token` / `attestations` /
+   `artifact-metadata` write. It has no checkout, dependency install, repository
+   script execution, promotion credential, `latest` mutation, or GitHub Release.
+3. **`qualify-macos`** (pinned `macos-26`, `contents: read`, **no** publish or
    promotion secret) — checks out the exact staged SHA, downloads the staged
    manifest metadata, polls npm for the exact staged version + complete package
    set with bounded backoff, fetches each exact registry tarball and compares its
@@ -36,7 +42,7 @@ exact-version macOS evidence is a hard dependency between npm staging publish an
    sealed `opensip-cli-macos-qualification.v1.json` evidence. It uploads evidence
    on every outcome (90-day retention) and exposes only a verified evidence
    digest/artifact name.
-3. **`promote-release`** (ubuntu, `needs: [stage-release, qualify-macos]`,
+4. **`promote-release`** (ubuntu, `needs: [stage-release, qualify-macos]`,
    `contents: write` + the `MACBOOKM5` promotion secret **only**) — GitHub's
    default success dependency means any Mac failure/cancellation prevents this
    job from starting. It downloads the release metadata + verified macOS
@@ -46,9 +52,13 @@ exact-version macOS evidence is a hard dependency between npm staging publish an
    `verify-release-publish-surface.mjs --tag latest`, and creates the GitHub
    Release with the manifest, checksums, SBOM, and the macOS evidence artifact.
 
-**Least privilege:** the promotion token lives in `promote-release` only; the Mac
-job holds no publish/promotion credential and no OIDC/attestation permission. All
-action SHAs are pinned, all installs are frozen, and all versions are exact.
+**Least privilege:** repository code runs in unprivileged `build-release`; only
+the no-checkout `stage-release` boundary receives OIDC/attestation permissions;
+the promotion token lives in `promote-release` only; and the Mac job holds no
+publish/promotion credential. All action SHAs are pinned and all versions are
+exact. `promote-release` checks out the exact staged SHA without persisting the
+contents-write credential, validates tag→SHA and a clean tree before executing
+repository-local built-in-only verifiers, and installs no dependencies.
 
 **Never manually promote after a failed Mac gate.** A failed `qualify-macos` job
 may consume (burn) the immutable staged version, but `latest` must remain on the

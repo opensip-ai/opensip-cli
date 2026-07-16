@@ -13,7 +13,7 @@ import { executeArm } from './execute-arm.js';
 import { listGitVisibleFixtureFiles } from './fixture-inventory.js';
 import { REUSE_EXISTING_MODE, resolveFixtureReference } from './fixture-resolution.js';
 import { withFixtureCopy } from './fixture-workspace.js';
-import { HarnessPrerequisiteError, spawnCli } from './spawn.js';
+import { HarnessPrerequisiteError, assertTargetRealpathStable, spawnCli } from './spawn.js';
 import { assertionsForLeg, validateTask } from './task-validation.js';
 
 import type { FixtureResolution, FixtureResolutionOptions } from './fixture-resolution.js';
@@ -44,6 +44,7 @@ export interface RunTaskDependencies {
     workspaceRoot: string,
     mode: SetupRecord['mode'],
     target?: CliTarget,
+    maxToolCalls?: number,
   ) => Promise<TaskMcpSession>;
   readonly createControlInvoker: typeof createNativeInvoker;
   readonly execute: typeof executeArm;
@@ -83,8 +84,12 @@ export interface EvaluatedArmRun {
 
 const DEFAULT_RUN_TASK_DEPENDENCIES: RunTaskDependencies = Object.freeze({
   applyEdit: applyEditScript,
-  connectMcp: (workspaceRoot: string, mode: SetupRecord['mode'], target?: CliTarget) =>
-    McpArmSession.connect(buildMcpSessionOptions(workspaceRoot, mode, target)),
+  connectMcp: (
+    workspaceRoot: string,
+    mode: SetupRecord['mode'],
+    target?: CliTarget,
+    maxToolCalls?: number,
+  ) => McpArmSession.connect(buildMcpSessionOptions(workspaceRoot, mode, target, maxToolCalls)),
   createControlInvoker: createNativeInvoker,
   execute: executeArm,
   listFixtureFiles: listGitVisibleFixtureFiles,
@@ -110,14 +115,33 @@ export function buildMcpSessionOptions(
   workspaceRoot: string,
   mode: SetupRecord['mode'],
   target?: CliTarget,
+  maxToolCalls?: number,
 ): McpArmSessionOptions {
   return {
     ...(mode === 'fixture' ? { env: { HOME: fixtureHomePath(workspaceRoot) } } : {}),
     ...(target === undefined
       ? {}
-      : { cliCommand: target.command, cliDistResolver: () => target.entrypoint }),
+      : {
+          cliCommand: target.command,
+          cliPreludeArgs: target.executionPrelude,
+          cliDistResolver: () =>
+            target.source === 'installed' ? target.executionEntrypoint : target.entrypoint,
+          targetStabilityCheck: () => assertTargetRealpathStable(target),
+        }),
+    ...(maxToolCalls === undefined ? {} : { maxToolCalls }),
     workspaceRoot,
   };
+}
+
+/** Exact post-handshake MCP call budget for one OpenSIP arm, including its catalog probe. */
+export function opensipToolCallBudget(task: GoldTask): number {
+  if (task.staleness === undefined) return 1 + task.strategies.opensip.steps.length;
+  return (
+    1 +
+    task.strategies.opensip.steps.length +
+    task.staleness.postEditSteps.opensip.length +
+    (task.staleness.recoverySteps?.opensip.length ?? 0)
+  );
 }
 
 const CATALOG_PREREQUISITE_PROBE: ResolvedStrategyStep = Object.freeze({
@@ -254,7 +278,12 @@ async function runOpenSipWithSession(
   dependencies: RunTaskDependencies,
   target: CliTarget | undefined,
 ) {
-  const session = await dependencies.connectMcp(workspaceRoot, setup.mode, target);
+  const session = await dependencies.connectMcp(
+    workspaceRoot,
+    setup.mode,
+    target,
+    opensipToolCallBudget(task),
+  );
   let legs: Awaited<ReturnType<typeof executeTaskLegs>>;
   let catalogProbe: CatalogProbeRecord;
   try {

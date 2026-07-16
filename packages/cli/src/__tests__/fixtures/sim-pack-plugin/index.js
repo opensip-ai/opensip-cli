@@ -35,7 +35,10 @@ export const scenarios = [
     description: 'Fixture sim-pack scenario: drives a trivial in-process target',
     tags: ['fixture'],
     target: inProcessTarget,
-    workload: { rps: 1 },
+    // Keep the release gate above the scheduler's lowest-rate boundary: this
+    // fixture proves pack loading/removal, while the load-window unit suite
+    // owns the exact 1 RPS / 1 second pacing regression.
+    workload: { rps: 10 },
     duration: 1,
     assertions: [ASSERTIONS.lowErrorRate()],
   }),

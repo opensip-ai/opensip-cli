@@ -10,7 +10,7 @@
  * deterministic (the whole stdout must parse); no full-output snapshots.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { expectEnvelope } from '../../cli-acceptance-core.mjs';
@@ -23,15 +23,61 @@ import {
   readJson,
   runCli,
 } from '../journey-kit.mjs';
+import { readBoundedOwnedTextFile } from '../bounded-owned-file.mjs';
 
 const cmdData = (parsed) => parsed?.data ?? parsed;
 const ANSI_ESCAPE = '\u001B';
+const MAX_SIDE_FILE_BYTES = 16 * 1024 * 1024;
+
+/** Read a bounded regular file through a no-follow, ownership-checked descriptor. */
+export function readBoundedOwnedText(path, root) {
+  return readBoundedOwnedTextFile({
+    path,
+    root,
+    maxBytes: MAX_SIDE_FILE_BYTES,
+    reasonPrefix: 'side-file',
+  });
+}
 
 /** The finding the analysis `fit` journey seeded; exit 1 under either mode. */
 const FIT_FINDING_ARGS = ['fit', '--check', 'no-console-log'];
 
+/** Validate the stable agent-filter wrapper without snapshotting its envelope. */
+function agentFilteredFailures(result, expectedFilters) {
+  const failures = [];
+  if (result?.type !== 'agent-filtered') {
+    failures.push(
+      `agent-filtered.type: expected "agent-filtered", got ${JSON.stringify(result?.type)}`,
+    );
+  }
+  if (
+    !Array.isArray(result?.filtersApplied) ||
+    result.filtersApplied.join('\u0000') !== expectedFilters.join('\u0000')
+  ) {
+    failures.push(
+      `agent-filtered.filtersApplied: expected ${JSON.stringify(expectedFilters)}, got ${JSON.stringify(result?.filtersApplied)}`,
+    );
+  }
+  if (!Number.isInteger(result?.originalSignalCount) || result.originalSignalCount < 0) {
+    failures.push('agent-filtered.originalSignalCount: expected a non-negative integer');
+  }
+  if (
+    !Number.isInteger(result?.returnedSignalCount) ||
+    result.returnedSignalCount < 0 ||
+    result.returnedSignalCount > result.originalSignalCount
+  ) {
+    failures.push(
+      'agent-filtered.returnedSignalCount: expected an integer within the original count',
+    );
+  }
+  return failures;
+}
+
 const humanNonTtyExecutor = async (context) => {
-  const result = await runCli(context, { args: FIT_FINDING_ARGS, env: { NO_COLOR: '1' } });
+  const result = await runCli(context, {
+    args: FIT_FINDING_ARGS,
+    env: { NO_COLOR: '1' },
+  });
   if (result.timedOut) return fail('timed-out', [context.assert.diagnostic(result.stderrTail)]);
   if ((result.status ?? 1) !== 1) {
     return fail('unexpected-exit', [
@@ -71,7 +117,10 @@ const ptyExecutor = async (context) => {
 };
 
 const noColorExecutor = async (context) => {
-  const result = await runCli(context, { args: FIT_FINDING_ARGS, env: { NO_COLOR: '1' } });
+  const result = await runCli(context, {
+    args: FIT_FINDING_ARGS,
+    env: { NO_COLOR: '1' },
+  });
   if (result.timedOut) return fail('timed-out', [context.assert.diagnostic(result.stderrTail)]);
   if (result.stdoutCapture.includes(ANSI_ESCAPE)) {
     return fail('ansi-under-no-color', [
@@ -82,8 +131,15 @@ const noColorExecutor = async (context) => {
 };
 
 const jsonExecutor = async (context) => {
-  const result = await runCli(context, { args: ['fit', '--json', '--check', 'no-console-log'] });
+  const result = await runCli(context, {
+    args: ['fit', '--json', '--check', 'no-console-log'],
+  });
   if (result.timedOut) return fail('timed-out', [context.assert.diagnostic(result.stderrTail)]);
+  if ((result.status ?? 1) !== 1) {
+    return fail('unexpected-exit', [
+      context.assert.diagnostic(`expected exit 1 (seeded finding), got ${result.status}`),
+    ]);
+  }
   const parsed = readJson(result);
   if (!parsed.ok) return fail('stdout-not-pure-json', [context.assert.diagnostic(parsed.message)]);
   const failures = expectEnvelope({ tool: 'fit' })(parsed.value);
@@ -103,6 +159,24 @@ const filtersRawExecutor = async (context) => {
   const filteredParsed = readJson(filtered);
   if (!filteredParsed.ok)
     return fail('filtered-not-json', [context.assert.diagnostic(filteredParsed.message)]);
+  if ((filtered.status ?? 1) !== 1) {
+    return fail('filtered-unexpected-exit', [
+      context.assert.diagnostic(`expected filtered fit exit 1, got ${filtered.status}`),
+    ]);
+  }
+  // Filtered output is a non-run CommandOutcome whose `.data` is the
+  // AgentFilteredResult; that result carries the envelope one level below.
+  const filteredData = cmdData(filteredParsed.value);
+  const filteredFailures = [
+    ...expectEnvelope({ tool: 'fit' })(filteredData),
+    ...agentFilteredFailures(filteredData, ['errors-only', 'top:5']),
+  ];
+  if (filteredFailures.length > 0) {
+    return fail(
+      'filtered-envelope-invalid',
+      filteredFailures.map((failure) => context.assert.diagnostic(failure)),
+    );
+  }
 
   const raw = await runCli(context, {
     args: ['fit', '--json', '--check', 'no-console-log', '--raw'],
@@ -110,12 +184,20 @@ const filtersRawExecutor = async (context) => {
   if (raw.timedOut) return fail('timed-out', [context.assert.diagnostic(raw.stderrTail)]);
   const rawParsed = readJson(raw);
   if (!rawParsed.ok) return fail('raw-not-json', [context.assert.diagnostic(rawParsed.message)]);
-  // `--raw` unwraps the CommandOutcome: the envelope is the top-level object.
-  if (rawParsed.value?.schemaVersion !== 2) {
+  if ((raw.status ?? 1) !== 1) {
+    return fail('raw-unexpected-exit', [
+      context.assert.diagnostic(`expected raw fit exit 1, got ${raw.status}`),
+    ]);
+  }
+  // `--raw` unwraps the CommandOutcome: AgentFilteredResult is the top-level
+  // object and retains its nested envelope plus filter/count metadata.
+  const rawFailures = [
+    ...expectEnvelope({ tool: 'fit' })(rawParsed.value),
+    ...agentFilteredFailures(rawParsed.value, []),
+  ];
+  if (rawFailures.length > 0) {
     return fail('raw-not-unwrapped', [
-      context.assert.diagnostic(
-        `--raw payload top-level schemaVersion: expected 2, got ${JSON.stringify(rawParsed.value?.schemaVersion)}`,
-      ),
+      ...rawFailures.map((failure) => context.assert.diagnostic(failure)),
     ]);
   }
   return pass();
@@ -123,22 +205,44 @@ const filtersRawExecutor = async (context) => {
 
 const sarifExecutor = async (context) => {
   const sarifPath = join(context.paths.workRoot, 'acceptance-graph.sarif');
-  const result = await runCli(context, { args: ['graph', '--json', '--sarif', sarifPath] });
+  const result = await runCli(context, {
+    args: ['graph', '--json', '--sarif', sarifPath],
+  });
   if (result.timedOut) return fail('timed-out', [context.assert.diagnostic(result.stderrTail)]);
+  if ((result.status ?? 1) !== 0 || result.signal !== null || result.cancelled === true) {
+    return fail('sarif-command-failed', [
+      context.assert.diagnostic(
+        `graph --json --sarif exited ${result.status} (${result.signal ?? 'none'})`,
+      ),
+    ]);
+  }
+  const stdout = readJson(result);
+  if (!stdout.ok) {
+    return fail('sarif-stdout-not-json', [context.assert.diagnostic(stdout.message)]);
+  }
+  const envelopeFailures = expectEnvelope({ tool: 'graph' })(stdout.value);
+  if (envelopeFailures.length > 0) {
+    return fail(
+      'sarif-envelope-invalid',
+      envelopeFailures.map((failure) => context.assert.diagnostic(failure)),
+    );
+  }
   if (!existsSync(sarifPath)) {
     return fail('sarif-not-written', [
-      context.assert.diagnostic('graph --sarif did not write the SARIF side file'),
+      context.assert.diagnostic('graph --json --sarif did not write the SARIF side file'),
+    ]);
+  }
+  const sarifFile = readBoundedOwnedText(sarifPath, context.paths.workRoot);
+  if (!sarifFile.ok) {
+    return fail(sarifFile.reasonCode, [
+      context.assert.diagnostic('SARIF side file was not a bounded, run-owned regular file'),
     ]);
   }
   let sarif;
   try {
-    sarif = JSON.parse(readFileSync(sarifPath, 'utf8'));
-  } catch (error) {
-    return fail('sarif-not-json', [
-      context.assert.diagnostic(
-        `SARIF file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-    ]);
+    sarif = JSON.parse(sarifFile.text);
+  } catch {
+    return fail('sarif-not-json', [context.assert.diagnostic('SARIF file is not valid JSON')]);
   }
   const failures = [];
   if (sarif?.version !== '2.1.0')
@@ -153,8 +257,17 @@ const sarifExecutor = async (context) => {
 };
 
 const reportHtmlExecutor = async (context) => {
-  const result = await runCli(context, { args: ['report', '--no-open', '--json'] });
+  const result = await runCli(context, {
+    args: ['report', '--no-open', '--json'],
+  });
   if (result.timedOut) return fail('timed-out', [context.assert.diagnostic(result.stderrTail)]);
+  if ((result.status ?? 1) !== 0 || result.signal !== null || result.cancelled === true) {
+    return fail('report-command-failed', [
+      context.assert.diagnostic(
+        `report --no-open exited ${result.status} (${result.signal ?? 'none'})`,
+      ),
+    ]);
+  }
   const parsed = readJson(result);
   if (!parsed.ok) return fail('report-not-json', [context.assert.diagnostic(parsed.message)]);
   const data = cmdData(parsed.value);
@@ -165,12 +278,13 @@ const reportHtmlExecutor = async (context) => {
       ),
     ]);
   }
-  if (!existsSync(data.path)) {
-    return fail('report-html-missing', [
-      context.assert.diagnostic('report result path does not exist on disk'),
+  const reportFile = readBoundedOwnedText(data.path, context.paths.workRoot);
+  if (!reportFile.ok) {
+    return fail(reportFile.reasonCode, [
+      context.assert.diagnostic('report path was not a bounded, run-owned regular file'),
     ]);
   }
-  const html = readFileSync(data.path, 'utf8');
+  const html = reportFile.text;
   if (!/<!doctype html|<html/i.test(html)) {
     return fail('report-not-html', [
       context.assert.diagnostic('report file is not recognizable HTML'),
@@ -193,7 +307,10 @@ export const outputJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'output.no-color',
     category: 'output',
-    value: { human: 'Respect NO_COLOR', agent: 'NO_COLOR yields zero ANSI escapes on stdout' },
+    value: {
+      human: 'Respect NO_COLOR',
+      agent: 'NO_COLOR yields zero ANSI escapes on stdout',
+    },
     steps: [{ label: 'run fit with NO_COLOR=1' }, { label: 'assert no ANSI escape bytes' }],
     executor: noColorExecutor,
   }),
@@ -217,7 +334,7 @@ export const outputJourneys = assertUniqueJourneyIds([
     steps: [
       { label: 'run fit --json --filter errors-only --top 5' },
       { label: 'run fit --json --raw' },
-      { label: 'assert raw is the unwrapped envelope' },
+      { label: 'assert raw is an unwrapped AgentFilteredResult containing the envelope' },
     ],
     executor: filtersRawExecutor,
   }),
@@ -226,10 +343,11 @@ export const outputJourneys = assertUniqueJourneyIds([
     category: 'output',
     value: {
       human: 'SARIF side output',
-      agent: 'graph --sarif writes SARIF 2.1.0 with a runs array',
+      agent: 'graph --json --sarif emits a graph envelope and writes SARIF 2.1.0',
     },
     steps: [
-      { label: 'run graph --sarif <path>' },
+      { label: 'run graph --json --sarif <path>' },
+      { label: 'assert stdout parses to a graph envelope' },
       { label: 'parse the SARIF file, assert version 2.1.0' },
     ],
     executor: sarifExecutor,

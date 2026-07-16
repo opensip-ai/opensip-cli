@@ -15,7 +15,7 @@
  * accepts command text or resolves an executable.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { expectEnvelope } from '../../cli-acceptance-core.mjs';
@@ -33,6 +33,61 @@ import {
 const cmdData = (parsed) => parsed?.data ?? parsed;
 /** Unwrap the CommandOutcome `.envelope` (run-command results) or fall back to a bare shape. */
 const cmdEnvelope = (parsed) => parsed?.envelope ?? parsed;
+
+const TYPESCRIPT_TEST_TARGET = `  typescript-tests:
+    description: TypeScript tests
+    languages: [typescript]
+    concerns: [test]
+    include:
+      - "src/**/*.test.ts"
+    exclude:
+      - "**/node_modules/**"
+      - "**/dist/**"
+
+`;
+
+/**
+ * Seed one small source→test relationship for the later agent-context journey.
+ * The initialized TypeScript source target intentionally excludes tests, so the
+ * fixture contributes a separate test target instead of weakening that default.
+ */
+function writeAnalysisFixture(cwd) {
+  mkdirSync(join(cwd, 'src'), { recursive: true });
+  writeFileSync(join(cwd, 'src', 'clean.ts'), 'export const x = 1;\n');
+  writeFileSync(
+    join(cwd, 'src', 'bad.ts'),
+    "export function bad(): void {\n  console.log('debug');\n}\n",
+  );
+  writeFileSync(join(cwd, 'src', 'bad.test.ts'), "import { bad } from './bad.js';\n\nbad();\n");
+  writeFileSync(
+    join(cwd, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: 'opensip-platform-acceptance-fixture',
+        version: '1.0.0',
+        private: true,
+        type: 'module',
+        scripts: { test: 'vitest run' },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  writeFileSync(
+    join(cwd, 'tsconfig.json'),
+    `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
+  );
+
+  const configPath = join(cwd, 'opensip-cli.config.yml');
+  const config = readFileSync(configPath, 'utf8');
+  if (!config.includes('  typescript-tests:')) {
+    const fitnessMarker = '\nfitness:';
+    if (!config.includes(fitnessMarker)) {
+      throw new Error('initialized fixture config is missing the fitness block');
+    }
+    writeFileSync(configPath, config.replace(fitnessMarker, `\n${TYPESCRIPT_TEST_TARGET}fitness:`));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Command-only journeys — commandSteps feed BOTH the executor and the smoke
@@ -69,15 +124,7 @@ const fitSteps = () => [
     slug: 'fit-check',
     name: 'fit --json --check no-console-log flags exactly one finding',
     args: ['fit', '--json', '--check', 'no-console-log'],
-    setup: ({ cwd }) => {
-      mkdirSync(join(cwd, 'src'), { recursive: true });
-      writeFileSync(join(cwd, 'src', 'clean.ts'), 'export const x = 1;\n');
-      writeFileSync(join(cwd, 'src', 'bad.ts'), "console.log('debug');\n");
-      writeFileSync(
-        join(cwd, 'tsconfig.json'),
-        `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
-      );
-    },
+    setup: ({ cwd }) => writeAnalysisFixture(cwd),
     expect: {
       exitCode: 1,
       json: (parsed) => {
@@ -190,7 +237,40 @@ async function firstSessionId(context) {
     : { ok: true, id };
 }
 
+function sessionReplayFailures(data, expectedId) {
+  const failures = [];
+  if (data?.session?.id !== expectedId) {
+    failures.push(
+      `session.id: expected ${JSON.stringify(expectedId)}, got ${JSON.stringify(data?.session?.id)}`,
+    );
+  }
+  if (typeof data?.session?.tool !== 'string' || data.session.tool.length === 0) {
+    failures.push('session.tool: expected a non-empty tool id');
+  }
+  if (data?.fidelity !== 'projection') {
+    failures.push(`fidelity: expected "projection", got ${JSON.stringify(data?.fidelity)}`);
+  }
+  if (
+    data?.envelope?.schemaVersion !== 2 ||
+    data?.envelope?.tool !== data?.session?.tool ||
+    !Array.isArray(data?.envelope?.signals)
+  ) {
+    failures.push('envelope: expected a schemaVersion 2 envelope matching the session tool');
+  }
+  return failures;
+}
+
 const auditPreinitExecutor = async (context) => {
+  // Zero-init means OpenSIP can operate before `opensip init`; it does not mean
+  // an entirely empty directory is a recognizable source project. Seed the
+  // smallest TypeScript project so this journey exercises cache-backed audit
+  // persistence without accidentally testing project-language discovery.
+  mkdirSync(join(context.paths.workRoot, 'src'), { recursive: true });
+  writeFileSync(join(context.paths.workRoot, 'src', 'index.ts'), 'export const ready = true;\n');
+  writeFileSync(
+    join(context.paths.workRoot, 'tsconfig.json'),
+    `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
+  );
   const result = await runCli(context, { args: ['audit', '--json'] });
   return assertCommand(
     context,
@@ -266,16 +346,7 @@ const sessionsShowExecutor = async (context) => {
       exitCode: 0,
       json: (parsed) => {
         const data = cmdData(parsed);
-        const failures = [];
-        if (data?.type !== 'session-replay')
-          failures.push(
-            `session-replay.type: expected "session-replay", got ${JSON.stringify(data?.type)}`,
-          );
-        if (data?.session?.id !== found.id)
-          failures.push(
-            `session-replay.session.id: expected ${JSON.stringify(found.id)}, got ${JSON.stringify(data?.session?.id)}`,
-          );
-        return failures;
+        return sessionReplayFailures(data, found.id);
       },
     },
     'sessions-show-failed',
@@ -295,15 +366,18 @@ const replayExecutor = async (context) => {
   const second = await runCli(context, { args: ['sessions', 'show', found.id, '--json'] });
   if (first.timedOut || second.timedOut)
     return fail('timed-out', [context.assert.diagnostic('replay read timed out')]);
+  if ((first.status ?? 1) !== 0 || (second.status ?? 1) !== 0) {
+    return fail('replay-failed', [
+      context.assert.diagnostic('one of the public replay reads exited non-zero'),
+    ]);
+  }
   const a = readJson(first);
   const b = readJson(second);
   if (!a.ok || !b.ok)
     return fail('replay-not-json', [context.assert.diagnostic((a.ok ? b : a).message)]);
   const da = cmdData(a.value);
   const db = cmdData(b.value);
-  const failures = [];
-  if (da?.type !== 'session-replay')
-    failures.push(`replay.type: expected "session-replay", got ${JSON.stringify(da?.type)}`);
+  const failures = [...sessionReplayFailures(da, found.id), ...sessionReplayFailures(db, found.id)];
   if (da?.envelope?.tool !== db?.envelope?.tool)
     failures.push('replay: tool differs between two reads (non-deterministic replay)');
   if (JSON.stringify(da?.envelope?.verdict) !== JSON.stringify(db?.envelope?.verdict)) {

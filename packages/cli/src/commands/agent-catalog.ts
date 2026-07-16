@@ -32,8 +32,8 @@ export type { AgentCatalog, CommandTier } from '@opensip-cli/contracts';
  * process-observable facts only (platform / arch / Node version / Node ABI).
  * Mapped through the shared contracts helper so the CLI and MCP catalogs emit a
  * byte-identical `hostSupport` for identical facts (Plan 02 / Plan 03 handoff).
- * npm, filesystem, case behavior, and OS/kernel version stay unobserved, so the
- * result is never an exact match.
+ * npm, filesystem, case behavior, OS product version, and kernel name/version
+ * stay unobserved, so the result is never an exact match.
  */
 function liveHostSupport(): AgentHostSupport {
   return hostSupportFromRuntimeProjection(

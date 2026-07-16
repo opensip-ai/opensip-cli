@@ -4,8 +4,9 @@
 // dependency/publish ORDER. (ADR-0017.)
 //
 // Every release surface derives from or is verified against this file:
-//   - .github/workflows/release.yml — the Preflight, Pack, and Publish loops
-//     consume `--print names` / `--print pack` (no hand-maintained second copy).
+//   - .github/workflows/release.yml — Preflight + Pack consume `--print names` /
+//     `--print pack`; the minimal publish job consumes the release manifest
+//     generated from this exact ordered list (no hand-maintained second copy).
 //   - scripts/bootstrap-publish.sh — its PACKAGES array is read from
 //     `--print names`.
 //   - scripts/verify-release.mjs — check #10 cross-checks the discovered

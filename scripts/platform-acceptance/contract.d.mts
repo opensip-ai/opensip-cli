@@ -13,6 +13,9 @@
  */
 
 export const PLATFORM_ACCEPTANCE_SCHEMA_VERSION: 1;
+export type PlatformAcceptanceCapability =
+  'pty' | 'symlink' | 'permissions' | 'process-tree-rss' | 'process-tree-cleanup';
+export const PLATFORM_ACCEPTANCE_CAPABILITIES: readonly PlatformAcceptanceCapability[];
 
 /**
  * Every journey lands in exactly one of these states. `required` journeys pass
@@ -24,6 +27,9 @@ export type JourneyStatus = 'pass' | 'fail' | 'skipped' | 'unavailable';
 
 /** Overall run verdict. `infrastructure-fault` means evidence is untrustworthy. */
 export type AcceptanceVerdict = 'pass' | 'fail' | 'infrastructure-fault';
+
+/** Closed origin of one terminal child-process observation. */
+export type JourneyStepStage = 'process' | 'lifecycle' | 'mcp';
 
 /** The two trusted candidate forms. No arbitrary npm spec, URL, or branch. */
 export type CandidateKind = 'packed-release' | 'published-version';
@@ -44,7 +50,13 @@ export type HostFact<T> = T | { readonly status: 'unavailable'; readonly reasonC
 export interface ProfileJourneySelection {
   readonly id: string;
   readonly required: boolean;
-  readonly capabilities?: readonly string[];
+  readonly capabilities?: readonly PlatformAcceptanceCapability[];
+  /**
+   * Candidate forms for which this row is executable. Omission means both
+   * closed candidate kinds. A non-applicable row is preserved as an explicit,
+   * non-required `skipped` result rather than being removed from the profile.
+   */
+  readonly candidateKinds?: readonly CandidateKind[];
 }
 
 /** All numeric bounds a run enforces. Every value must be a positive integer. */
@@ -57,6 +69,11 @@ export interface AcceptanceBounds {
   readonly maxEvidenceBytes: number;
   readonly maxJourneyResults: number;
 }
+
+/** Closed hard limits applied before a data-only profile can drive the runner. */
+export const PLATFORM_ACCEPTANCE_BOUND_LIMITS: Readonly<{
+  [Key in keyof AcceptanceBounds]: Readonly<{ min: number; max: number }>;
+}>;
 
 /** Digest-bound reference to a known base profile for OS-specific composition. */
 export interface ProfileBaseRef {
@@ -80,7 +97,7 @@ export interface AcceptanceProfile {
   readonly id: string;
   readonly version: number;
   readonly base?: ProfileBaseRef;
-  readonly requiredCapabilities: readonly string[];
+  readonly requiredCapabilities: readonly PlatformAcceptanceCapability[];
   readonly rssRequired: boolean;
   readonly bounds: AcceptanceBounds;
   readonly journeys: readonly ProfileJourneySelection[];
@@ -95,8 +112,56 @@ export interface CandidateIdentity {
   readonly source: string;
   /** Manifest/checksum digest (packed) or version identity (published). */
   readonly digest: string;
-  /** Registry host only; never contains credentials. */
+  /** Canonical HTTPS registry origin + pathname; never contains credentials. */
   readonly registry?: string;
+  /** Exact release-manifest SHA-256 when the candidate is release-bound. */
+  readonly manifestDigest?: string;
+  /** Exact registry-integrity inventory SHA-256 for a published candidate. */
+  readonly registryIntegrityDigest?: string;
+}
+
+/** Workflow/runner identity bound into the standalone evidence artifact. */
+export interface AcceptanceExecutionIdentity {
+  readonly runId: string;
+  readonly runAttempt: number;
+  readonly runnerLabel: string;
+}
+
+/** Lifecycle facts independently cross-checked against candidate identities. */
+export interface AcceptanceLifecycleEvidence {
+  readonly installedVersion: string | null;
+  readonly upgradedVersion: string | null;
+  readonly versionMigrated: boolean | null;
+  readonly stateMigrated: boolean | null;
+  readonly cliStateRemoved: boolean | null;
+  readonly packageRemoved: boolean | null;
+  /** Install path used for the primary target; absent only on legacy v1 evidence. */
+  readonly targetInstallChannel?: 'canonical-installer' | 'npm-direct' | 'packed-consumer' | null;
+  /** Bounded wall time spent on candidate-integrity boundary observations. */
+  readonly integrityChecks?: {
+    readonly count: number;
+    readonly durationMs: number;
+  };
+}
+
+/**
+ * Independently re-verifiable proof that one isolated npm install consumed a
+ * projection of the retained canonical registry inventory. Package names stay
+ * in inventory order; the verifier resolves those rows and recomputes the set
+ * digest instead of trusting the runner's success claim.
+ */
+export interface RegistryInstallBindingEvidence {
+  readonly inventoryDigest: string;
+  readonly packageNames: readonly string[];
+  readonly packageCount: number;
+  readonly packageSetDigest: string;
+  readonly offlineReplayComplete: true;
+}
+
+/** Published qualification binds lifecycle and canonical facets to one target. */
+export interface AcceptanceRegistryBindingsEvidence {
+  readonly candidateLifecycle: RegistryInstallBindingEvidence | null;
+  readonly canonicalInstaller: RegistryInstallBindingEvidence | null;
 }
 
 export interface FilesystemFacts {
@@ -106,7 +171,11 @@ export interface FilesystemFacts {
 
 /** Availability of each declared native probe, keyed by capability id. */
 export interface HostCapabilities {
-  readonly [capability: string]: boolean;
+  readonly pty?: boolean;
+  readonly symlink?: boolean;
+  readonly permissions?: boolean;
+  readonly 'process-tree-rss'?: boolean;
+  readonly 'process-tree-cleanup'?: boolean;
 }
 
 /** Bounded, secret-free native host facts. */
@@ -133,6 +202,28 @@ export interface HostProfile {
   readonly capabilities: HostCapabilities;
 }
 
+/**
+ * One bounded terminal child-process observation. It deliberately contains no
+ * argv, environment, command, cwd, package path, or executable path.
+ */
+export interface JourneyStepEvidence {
+  /** Stable, non-secret kebab-case label (for example `process-1`). */
+  readonly label: string;
+  readonly stage: JourneyStepStage;
+  readonly exitCode: number | null;
+  readonly signal: string | null;
+  /** Signal the harness intentionally delivered, when a journey probes native signal identity. */
+  readonly deliveredSignal?: string | null;
+  readonly timedOut: boolean;
+  readonly cancelled: boolean;
+  readonly outputTruncated: boolean;
+  readonly durationMs: number;
+  readonly rss: RssMeasurement;
+  readonly residualDescendants: number;
+  readonly reasonCode: string | null;
+  readonly diagnostics: readonly string[];
+}
+
 /** One journey outcome inside the ordered results array. */
 export interface JourneyResult {
   readonly id: string;
@@ -144,6 +235,12 @@ export interface JourneyResult {
   readonly rss: RssMeasurement;
   /** Bounded diagnostic tails; never full output, never credentials/paths. */
   readonly diagnostics: readonly string[];
+  /**
+   * Present on evidence produced by the completed v1 runner. Optional only so
+   * an early v1 artifact can still be parsed/digested; the independent verifier
+   * rejects a required passing result that omits or empties this array.
+   */
+  readonly steps?: readonly JourneyStepEvidence[];
 }
 
 /** Result of the run-owned cleanup step. */
@@ -182,6 +279,12 @@ export interface AcceptanceEvidence {
   readonly schemaVersion: 1;
   readonly profile: EvidenceProfileRef;
   readonly candidate: CandidateIdentity;
+  /** Exact upgrade source, or null for a bootstrap/self-reinstall run. */
+  readonly previousCandidate: CandidateIdentity | null;
+  readonly execution: AcceptanceExecutionIdentity;
+  readonly lifecycle: AcceptanceLifecycleEvidence;
+  /** Null proofs for packed candidates; published proofs are verifier-gated. */
+  readonly registryBindings?: AcceptanceRegistryBindingsEvidence;
   readonly harnessGitSha: string;
   readonly startedAt: string;
   readonly completedAt: string;
@@ -204,8 +307,9 @@ export function parseAcceptanceEvidence(input: unknown): AcceptanceEvidence;
 /**
  * Compose an OS-specific derived profile over a validated base. Additive only:
  * may add journeys/capabilities, strengthen optional→required, and tighten
- * bounds. Rejects removal/override, weaker bounds, required→optional downgrade,
- * base-digest mismatch, unknown/cyclic base ids.
+ * bounds. New journeys may be interleaved, but base journeys must remain an
+ * ordered subsequence. Rejects removal/reorder, weaker bounds,
+ * required→optional downgrade, base-digest mismatch, unknown/cyclic base ids.
  */
 export function composeProfile(
   base: AcceptanceProfile,
@@ -227,6 +331,18 @@ export function computeSummary(
   profile: AcceptanceProfile,
   results: readonly JourneyResult[],
 ): EvidenceSummary;
+
+/** Upgrade is dynamically required whenever an exact previous candidate exists. */
+export function isJourneyRequired(
+  journey: ProfileJourneySelection,
+  previousCandidate: CandidateIdentity | null,
+): boolean;
+
+/** Whether a profile row applies to the exact primary candidate form. */
+export function isJourneyApplicable(
+  journey: ProfileJourneySelection,
+  candidateKind: CandidateKind,
+): boolean;
 
 /** Derive the overall verdict from a profile + results (before completion). */
 export function computeVerdict(

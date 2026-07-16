@@ -350,7 +350,14 @@ describe('hostSupportFromRuntimeProjection', () => {
     docsUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
     reasonCodes: [],
     observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
-    unobserved: ['os-version', 'kernel-version', 'npm-major', 'filesystem-type', 'install-channel'],
+    unobserved: [
+      'os-version',
+      'kernel-name',
+      'kernel-version',
+      'npm-major',
+      'filesystem-type',
+      'install-channel',
+    ],
   } as const;
 
   it('mirrors the core projection into the serializable shape (matrixUrl from docsUrl)', () => {
@@ -367,6 +374,7 @@ describe('hostSupportFromRuntimeProjection', () => {
       observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
       unobserved: [
         'os-version',
+        'kernel-name',
         'kernel-version',
         'npm-major',
         'filesystem-type',

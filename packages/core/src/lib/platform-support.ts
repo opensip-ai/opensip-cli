@@ -20,7 +20,8 @@
  *     is absent until an external gate promotes it. macOS launches as `preview`.
  *   - Classification never claims an unlisted host "cannot run": non-macOS,
  *     other Macs, and toolchain/filesystem drift all resolve to `unqualified`
- *     (may work, no promise). Only Intel/x64 macOS is `unsupported`.
+ *     (may work, no promise). Only the complete published Intel/x64 tuple is
+ *     `unsupported`.
  *   - `match: 'exact'` requires EVERY normative dimension observed and matching.
  *     A single missing dimension downgrades to `partial` (the row's status may
  *     still be advertised, but never as an exact match).

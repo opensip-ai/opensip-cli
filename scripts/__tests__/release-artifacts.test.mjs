@@ -7,6 +7,8 @@ import test from 'node:test';
 
 import { buildReleaseArtifacts } from '../build-release-artifacts.mjs';
 import {
+  MAX_RELEASE_CHECKSUMS_BYTES,
+  MAX_RELEASE_MANIFEST_BYTES,
   RELEASE_CHECKSUMS_NAME,
   RELEASE_MANIFEST_NAME,
   RELEASE_SBOM_NAME,
@@ -145,14 +147,64 @@ test('release artifact verifier rejects incomplete checksum subject lists', asyn
   }
 });
 
+test('release artifact verifier bounds operator-controlled manifest and checksum files', async () => {
+  const manifestDir = makeReleaseDir(WORKSPACE_VERSION);
+  try {
+    writeFileSync(
+      join(manifestDir, RELEASE_MANIFEST_NAME),
+      Buffer.alloc(MAX_RELEASE_MANIFEST_BYTES + 1, 0x20),
+    );
+    await assert.rejects(
+      verifyReleaseArtifacts({
+        artifactDir: manifestDir,
+        manifestPath: join(manifestDir, RELEASE_MANIFEST_NAME),
+      }),
+      /release-manifest-too-large/u,
+    );
+  } finally {
+    rmSync(manifestDir, { recursive: true, force: true });
+  }
+
+  const checksumsDir = makeReleaseDir(WORKSPACE_VERSION);
+  try {
+    await buildReleaseArtifacts({
+      artifactDir: checksumsDir,
+      expectedVersion: WORKSPACE_VERSION,
+      gitTag: `v${WORKSPACE_VERSION}`,
+      gitSha: 'abc123',
+      sbomFile: writeSbomFixture(checksumsDir),
+      now: new Date('2026-07-02T00:00:00.000Z'),
+    });
+    writeFileSync(
+      join(checksumsDir, RELEASE_CHECKSUMS_NAME),
+      Buffer.alloc(MAX_RELEASE_CHECKSUMS_BYTES + 1, 0x20),
+    );
+    await assert.rejects(
+      verifyReleaseArtifacts({
+        artifactDir: checksumsDir,
+        manifestPath: join(checksumsDir, RELEASE_MANIFEST_NAME),
+      }),
+      /release-checksums-too-large/u,
+    );
+  } finally {
+    rmSync(checksumsDir, { recursive: true, force: true });
+  }
+});
+
 test('release workflow pins artifact attestations and uploads verification files', () => {
   const workflow = read('.github/workflows/release.yml');
   assert.match(workflow, /attestations:\s*write/u);
   assert.match(workflow, /artifact-metadata:\s*write/u);
   assert.match(workflow, new RegExp(`uses:\\s*actions/attest@${ACTIONS_ATTEST_SHA}`, 'u'));
-  assert.match(workflow, /subject-checksums:\s*\/tmp\/tarballs\/SHA256SUMS/u);
-  assert.match(workflow, /subject-path:\s*\/tmp\/tarballs\/SHA256SUMS/u);
-  assert.match(workflow, /sbom-path:\s*\/tmp\/tarballs\/opensip-cli-sbom\.cyclonedx\.json/u);
+  assert.match(
+    workflow,
+    /subject-checksums:\s*\$\{\{ runner\.temp \}\}\/release-bundle\/SHA256SUMS/u,
+  );
+  assert.match(workflow, /subject-path:\s*\$\{\{ runner\.temp \}\}\/release-bundle\/SHA256SUMS/u);
+  assert.match(
+    workflow,
+    /sbom-path:\s*\$\{\{ runner\.temp \}\}\/release-bundle\/opensip-cli-sbom\.cyclonedx\.json/u,
+  );
 
   const generateIndex = workflow.indexOf('scripts/build-release-artifacts.mjs');
   const verifyIndex = workflow.indexOf('scripts/verify-release-artifacts.mjs');
@@ -164,7 +216,13 @@ test('release workflow pins artifact attestations and uploads verification files
   assert.ok(publishIndex > smokeIndex, 'publish must happen after artifact verification and smoke');
 
   for (const artifact of [RELEASE_MANIFEST_NAME, RELEASE_CHECKSUMS_NAME, RELEASE_SBOM_NAME]) {
-    assert.match(workflow, new RegExp(`/tmp/tarballs/${escapeRegExp(artifact)}`, 'u'));
+    assert.match(
+      workflow,
+      new RegExp(
+        `(?:/tmp/tarballs|\\$\\{\\{ runner\\.temp \\}\\}/release-bundle)/${escapeRegExp(artifact)}`,
+        'u',
+      ),
+    );
   }
 });
 

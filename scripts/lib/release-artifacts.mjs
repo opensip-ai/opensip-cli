@@ -9,6 +9,8 @@ export const RELEASE_MANIFEST_NAME = 'opensip-cli-release-manifest.v1.json';
 export const RELEASE_CHECKSUMS_NAME = 'SHA256SUMS';
 export const RELEASE_SBOM_NAME = 'opensip-cli-sbom.cyclonedx.json';
 export const RELEASE_ARTIFACT_GENERATOR = 'opensip-cli-release-artifacts@1';
+export const MAX_RELEASE_MANIFEST_BYTES = 1024 * 1024;
+export const MAX_RELEASE_CHECKSUMS_BYTES = 256 * 1024;
 
 const ARTIFACT_KINDS = new Set(['npm-tarball', 'sbom']);
 

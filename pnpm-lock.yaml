@@ -286,6 +286,9 @@ importers:
       react:
         specifier: ^19.2.7
         version: 19.2.7
+      semver:
+        specifier: ^7.7.4
+        version: 7.8.5
       update-notifier:
         specifier: ^7.3.1
         version: 7.3.1
@@ -305,6 +308,9 @@ importers:
       '@types/react':
         specifier: ^19.2.17
         version: 19.2.17
+      '@types/semver':
+        specifier: ^7.7.1
+        version: 7.7.1
       '@types/update-notifier':
         specifier: ^6.0.8
         version: 6.0.8
@@ -2845,6 +2851,9 @@ packages:
   '@types/react@19.2.17':
     resolution: {integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==}
 
+  '@types/semver@7.7.1':
+    resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
+
   '@types/update-notifier@6.0.8':
     resolution: {integrity: sha512-IlDFnfSVfYQD+cKIg63DEXn3RFmd7W1iYtKQsJodcHK9R1yr8aKbKaPKfBxzPpcHCq2DU8zUq4PIPmy19Thjfg==}
 
@@ -4563,11 +4572,6 @@ packages:
   scslre@0.3.0:
     resolution: {integrity: sha512-3A6sD0WYP7+QrjbfNA2FN3FsOaGGFoekCVgTyypy53gPxhbkCIjtO6YWgdrfM+n/8sI8JeXZOIxsHjMTNxQ4nQ==}
     engines: {node: ^14.0.0 || >=16.0.0}
-
-  semver@7.7.4:
-    resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
-    engines: {node: '>=10'}
-    hasBin: true
 
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
@@ -6734,6 +6738,8 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@types/semver@7.7.1': {}
+
   '@types/update-notifier@6.0.8':
     dependencies:
       '@types/configstore': 6.0.2
@@ -8440,8 +8446,6 @@ snapshots:
       refa: 0.12.1
       regexp-ast-analysis: 0.7.1
 
-  semver@7.7.4: {}
-
   semver@7.8.5: {}
 
   send@1.2.1:
@@ -8793,7 +8797,7 @@ snapshots:
       is-npm: 6.1.0
       latest-version: 9.0.0
       pupa: 3.3.0
-      semver: 7.7.4
+      semver: 7.8.5
       xdg-basedir: 5.1.0
 
   uri-js@4.4.1:

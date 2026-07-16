@@ -21,9 +21,16 @@ import { getJourney, MACOS_JOURNEY_IDS } from '../platform-acceptance/journey-ca
 import { KNOWN_CAPABILITIES } from '../platform-acceptance/journey-kit.mjs';
 import {
   buildTupleObservedHost,
+  evaluateBrowserCommandResult,
+  evaluateInterruptedRecoveryResult,
+  evaluateNativeSignalResult,
+  evaluateNativeSqliteProvenance,
+  evaluatePermissionFailure,
+  evaluatePtyFindingResult,
   evaluateTupleCrosscheck,
   MACOS_PREVIEW_ROW_ID,
   normalizeUnameArch,
+  parseDfDevice,
 } from '../platform-acceptance/journeys/macos.mjs';
 import { assessHostSupport } from '../../packages/core/dist/index-lib.js';
 
@@ -70,6 +77,7 @@ function permissiveContext() {
           signal: null,
           timedOut: false,
           cancelled: false,
+          deliveredSignal: null,
           outputTruncated: false,
           durationMs: 1,
           rss: { status: 'unavailable', reasonCode: 'rss-not-sampled' },
@@ -79,6 +87,10 @@ function permissiveContext() {
           cleanup: { residualDescendants: 0 },
         }),
     },
+    toolchain: {
+      node: { argv: [process.execPath] },
+      npm: { argv: [process.execPath, '/toolchain/npm/bin/npm-cli.js'] },
+    },
     assert: makeAssert(),
   };
   return context;
@@ -86,6 +98,7 @@ function permissiveContext() {
 
 const OK_TUPLE = Object.freeze({
   swVers: '26.0.1',
+  kernelName: 'Darwin',
   kernelRelease: '25.5.0',
   unameMachine: 'arm64',
   npmVersion: '11.0.0',
@@ -115,6 +128,41 @@ test('every macOS journey is registered under the macos category with known capa
   }
 });
 
+test('installer journey smoke-tests the lifecycle-owned canonical target without reinstalling', async () => {
+  if (process.platform !== 'darwin') return;
+  const context = permissiveContext();
+  context.installed = {
+    ...context.installed,
+    mode: 'published-version',
+    installChannel: 'canonical-installer',
+  };
+  const invocations = [];
+  context.process.run = async (spec) => {
+    invocations.push(spec);
+    return {
+      status: 0,
+      timedOut: false,
+      stdoutCapture: '9.9.9\n',
+      stderrTail: '',
+    };
+  };
+
+  const outcome = await getJourney('macos.installer-sh').executor(context);
+
+  assert.equal(outcome.status, 'pass', JSON.stringify(outcome));
+  assert.deepEqual(
+    invocations.map((spec) => spec.argv),
+    [[context.installed.installedBin.bin, '--version']],
+  );
+
+  context.installed = { ...context.installed, installChannel: 'npm-direct' };
+  invocations.length = 0;
+  const rejected = await getJourney('macos.installer-sh').executor(context);
+  assert.equal(rejected.status, 'fail');
+  assert.equal(rejected.reasonCode, 'installer-channel-unproven');
+  assert.equal(invocations.length, 0);
+});
+
 // ---------------------------------------------------------------------------
 // Pure tuple helpers (host-independent — driven by the REAL core policy)
 // ---------------------------------------------------------------------------
@@ -126,6 +174,225 @@ test('normalizeUnameArch folds machine strings to Node arch tokens', () => {
   assert.equal(normalizeUnameArch('amd64'), 'x64');
   assert.equal(normalizeUnameArch('i386'), 'ia32');
   assert.equal(normalizeUnameArch('  ARM64 '), 'arm64');
+});
+
+test('parseDfDevice extracts only a safe device from POSIX df output', () => {
+  assert.equal(
+    parseDfDevice(
+      'Filesystem 512-blocks Used Available Capacity Mounted on\n/dev/disk3s1 100 20 80 20% /private/var/folders\n',
+    ),
+    '/dev/disk3s1',
+  );
+  assert.equal(parseDfDevice('Filesystem 512-blocks Used Available Capacity Mounted on\n'), null);
+  assert.equal(
+    parseDfDevice(
+      'Filesystem 512-blocks Used Available Capacity Mounted on\n/dev/disk3s1;touch 100 20 80 20% /\n',
+    ),
+    null,
+  );
+  assert.equal(parseDfDevice('map auto_home 0 0 100% /System/Volumes/Data/home\n'), null);
+});
+
+test('browser command classification rejects nonzero seed and report exits', () => {
+  assert.deepEqual(evaluateBrowserCommandResult({ status: 0, timedOut: false }, 'seed'), {
+    ok: true,
+    reasonCode: null,
+  });
+  assert.deepEqual(evaluateBrowserCommandResult({ status: 1, timedOut: false }, 'seed'), {
+    ok: false,
+    reasonCode: 'browser-open-seed-failed',
+  });
+  assert.deepEqual(evaluateBrowserCommandResult({ status: 2, timedOut: false }, 'report'), {
+    ok: false,
+    reasonCode: 'report-open-failed',
+  });
+});
+
+test('native SQLite provenance requires the loaded addon to remain in the install tree', () => {
+  const installed = '/isolated/node_modules/opensip-cli/dist/index.js';
+  const valid = {
+    queryOk: true,
+    installedEntrypoint: installed,
+    datastoreEntrypoint: '/isolated/node_modules/@opensip-cli/datastore/dist/index.js',
+    sqliteEntrypoint: '/isolated/node_modules/better-sqlite3/lib/index.js',
+    nativeAddon: '/isolated/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+  };
+  assert.deepEqual(evaluateNativeSqliteProvenance(valid), {
+    ok: true,
+    reasonCode: null,
+  });
+  assert.deepEqual(evaluateNativeSqliteProvenance({ ...valid, queryOk: false }), {
+    ok: false,
+    reasonCode: 'native-sqlite-query-failed',
+  });
+  assert.deepEqual(
+    evaluateNativeSqliteProvenance({
+      ...valid,
+      nativeAddon: '/workspace/node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+    }),
+    { ok: false, reasonCode: 'native-sqlite-outside-install' },
+  );
+  assert.deepEqual(
+    evaluateNativeSqliteProvenance({
+      ...valid,
+      nativeAddon: valid.sqliteEntrypoint,
+    }),
+    { ok: false, reasonCode: 'native-sqlite-provenance-invalid' },
+  );
+});
+
+test('PTY result classification enforces exit, cleanup, NO_COLOR, and JSON shape', () => {
+  const envelope = {
+    kind: 'fit.run',
+    status: 'ok',
+    exitCode: 1,
+    envelope: {
+      schemaVersion: 2,
+      tool: 'fit',
+      verdict: { passed: false },
+    },
+  };
+  const valid = {
+    status: 1,
+    timedOut: false,
+    outputTruncated: false,
+    stdoutCapture: JSON.stringify(envelope),
+    cleanup: { residualDescendants: 0 },
+  };
+
+  assert.deepEqual(evaluatePtyFindingResult(valid, 'json'), []);
+  assert.deepEqual(
+    evaluatePtyFindingResult({ ...valid, stdoutCapture: 'human output' }, 'no-color'),
+    [],
+  );
+  assert.ok(
+    evaluatePtyFindingResult(
+      {
+        ...valid,
+        stdoutCapture: `human ${String.fromCodePoint(27)}[31moutput`,
+      },
+      'no-color',
+    ).some((failure) => failure.includes('ANSI')),
+  );
+  assert.ok(
+    evaluatePtyFindingResult({ ...valid, status: 0 }, 'json').some((failure) =>
+      failure.includes('expected exit 1'),
+    ),
+  );
+  assert.ok(
+    evaluatePtyFindingResult({ ...valid, stdoutCapture: '{"kind":"fit.run"}' }, 'json').some(
+      (failure) => failure.includes('envelope shape'),
+    ),
+  );
+  assert.ok(
+    evaluatePtyFindingResult({ ...valid, cleanup: { residualDescendants: 1 } }, 'json').some(
+      (failure) => failure.includes('residual descendants'),
+    ),
+  );
+});
+
+test('native signal classification requires exact identity, bounded exit, and zero descendants', () => {
+  const valid = {
+    deliveredSignal: 'SIGINT',
+    signal: 'SIGINT',
+    status: null,
+    timedOut: false,
+    cancelled: false,
+    durationMs: 125,
+    cleanup: { residualDescendants: 0 },
+  };
+  assert.deepEqual(evaluateNativeSignalResult(valid, 'SIGINT', 1000), []);
+  assert.ok(
+    evaluateNativeSignalResult({ ...valid, deliveredSignal: 'SIGTERM' }, 'SIGINT', 1000).some(
+      (failure) => failure.includes('was not delivered'),
+    ),
+  );
+  assert.ok(
+    evaluateNativeSignalResult({ ...valid, signal: 'SIGKILL' }, 'SIGINT', 1000).some((failure) =>
+      failure.includes('SIGKILL'),
+    ),
+  );
+  assert.ok(
+    evaluateNativeSignalResult(
+      { ...valid, cleanup: { residualDescendants: 1 } },
+      'SIGINT',
+      1000,
+    ).some((failure) => failure.includes('residual descendants')),
+  );
+  assert.ok(
+    evaluateNativeSignalResult({ ...valid, durationMs: 1000 }, 'SIGINT', 1000).some((failure) =>
+      failure.includes('within the bound'),
+    ),
+  );
+});
+
+test('interrupted recovery requires cancellation with zero observed residual descendants', () => {
+  const valid = {
+    cancelled: true,
+    timedOut: false,
+    cleanup: { residualDescendants: 0 },
+  };
+  assert.equal(evaluateInterruptedRecoveryResult(valid), null);
+  assert.equal(
+    evaluateInterruptedRecoveryResult({ ...valid, cancelled: false }),
+    'interruption-not-observed',
+  );
+  assert.equal(
+    evaluateInterruptedRecoveryResult({ ...valid, timedOut: true }),
+    'interruption-fell-through-to-timeout',
+  );
+  assert.equal(
+    evaluateInterruptedRecoveryResult({
+      ...valid,
+      cleanup: { residualDescendants: 1 },
+    }),
+    'interruption-left-descendants',
+  );
+});
+
+test('permission classification requires structured actionable errors for the exact target', () => {
+  const result = {
+    status: 1,
+    timedOut: false,
+    stdoutCapture: JSON.stringify({
+      kind: 'command.error',
+      status: 'error',
+      exitCode: 1,
+      errors: [
+        {
+          message: 'EACCES writing opensip-cli.config.yml',
+          suggestion: 'Choose a writable directory.',
+        },
+      ],
+    }),
+  };
+  assert.deepEqual(evaluatePermissionFailure(result, 'opensip-cli.config.yml'), {
+    ok: true,
+    reasonCode: null,
+  });
+  assert.deepEqual(evaluatePermissionFailure({ ...result, status: 0 }, 'opensip-cli.config.yml'), {
+    ok: false,
+    reasonCode: 'permission-denied-silently-succeeded',
+  });
+  assert.deepEqual(evaluatePermissionFailure(result, '.runtime/datastore.sqlite'), {
+    ok: false,
+    reasonCode: 'permission-error-target-missing',
+  });
+  assert.deepEqual(
+    evaluatePermissionFailure(
+      {
+        ...result,
+        stdoutCapture: JSON.stringify({
+          kind: 'command.error',
+          status: 'error',
+          exitCode: 1,
+          errors: [{ message: 'opensip-cli.config.yml could not be written' }],
+        }),
+      },
+      'opensip-cli.config.yml',
+    ),
+    { ok: false, reasonCode: 'permission-error-not-actionable' },
+  );
 });
 
 test('buildTupleObservedHost omits unavailable sources (never a guessed value)', () => {
@@ -154,9 +421,11 @@ test('contradictory architecture sources fail even when one matches the tuple', 
 });
 
 test('a missing required source fails as tuple-source-unavailable', () => {
-  const verdict = evaluateTupleCrosscheck({ ...OK_TUPLE, swVers: null }, assessHostSupport);
-  assert.equal(verdict.ok, false);
-  assert.equal(verdict.reasonCode, 'tuple-source-unavailable');
+  for (const patch of [{ swVers: null }, { kernelName: null }]) {
+    const verdict = evaluateTupleCrosscheck({ ...OK_TUPLE, ...patch }, assessHostSupport);
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.reasonCode, 'tuple-source-unavailable');
+  }
 });
 
 test('a contradicted OS version fails as tuple-not-supported-row', () => {

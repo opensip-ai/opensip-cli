@@ -3,5 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./index.js"
+  "main": "./index.js",
+  "peerDependencies": {
+    "@opensip-cli/core": ">=0.1.11 <1",
+    "@opensip-cli/simulation": ">=0.1.11 <1"
+  }
 }

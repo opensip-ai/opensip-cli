@@ -13,7 +13,17 @@ real users choose a feature.
 ## Running it
 
 Build artifacts are a hard prerequisite because the harness treats OpenSIP as
-a black box:
+a black box. Runs currently require macOS or Linux. The harness combines a root
+process group with bounded `/bin/ps` sampling so it can clean up detached
+descendants it observes before they are reparented. This is not OS-enforced
+containment: a child can create a new session and leave the root lineage between
+samples. If inherited stdio does not close, the harness force-settles the run as
+failed instead of hanging, but it cannot prove cleanup of an unobserved escape.
+Observed PID identities combine the second-resolution process start time with
+process group, session, and a fingerprint of the full command/executable. Those
+facets reduce accidental PID-reuse collisions but cannot eliminate the remaining
+same-second collision window without a native kernel identity.
+Windows fails closed until the harness has Job Object containment:
 
 ```sh
 pnpm agent-eval --list

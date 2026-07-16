@@ -77,6 +77,8 @@ export interface PlatformQualification {
   readonly qualifiedVersion: string;
   /** ISO timestamp of promotion. */
   readonly qualifiedAt: string;
+  /** SHA-256 of the exact acceptance profile used for qualification. */
+  readonly profileDigest: string;
 }
 
 /** One immutable entry in the platform-support registry. */
@@ -137,6 +139,7 @@ export interface ObservedHost {
 export type PlatformDimension =
   | 'os-platform'
   | 'os-version'
+  | 'kernel-name'
   | 'kernel-version'
   | 'arch'
   | 'node-major'
@@ -149,9 +152,11 @@ export type PlatformDimension =
 /** Stable, kebab-case reason codes emitted when a host is not the exact tuple. */
 export type PlatformMismatchReason =
   | 'non-macos-host'
+  | 'insufficient-host-facts'
   | 'macos-intel-unsupported'
   | 'os-platform-mismatch'
   | 'os-version-mismatch'
+  | 'kernel-name-mismatch'
   | 'kernel-version-mismatch'
   | 'arch-mismatch'
   | 'node-major-mismatch'
@@ -192,8 +197,9 @@ export interface RuntimeHostFacts {
 
 /**
  * A support projection built only from process-observable facts. It can NEVER be
- * an exact match because npm, filesystem, case behavior, OS/kernel version, and
- * install channel are unobserved at runtime. Both the CLI and MCP surfaces call
+ * an exact match because npm, filesystem, case behavior, OS product version,
+ * kernel name/release, and install channel are unobserved at runtime. This
+ * projection performs no shell probe. Both the CLI and MCP surfaces call
  * `projectRuntimeHostSupport` with explicit facts.
  */
 export interface RuntimeHostSupportProjection {

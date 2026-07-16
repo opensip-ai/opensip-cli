@@ -24,6 +24,7 @@ import {
   BASELINE_FORMAT_VERSION,
   createSignal,
   HOST_VERDICT_POLICY_FALLBACK,
+  ToolRegistry,
   type BaselineIdentityMetadata,
   type Signal,
   type ToolShortId,
@@ -243,6 +244,21 @@ function port(): SessionResultsReadPort {
   });
 }
 
+function registryWithCanonicalFitnessName(): ToolRegistry {
+  const tools = new ToolRegistry();
+  tools.register({
+    identity: { name: 'fitness', aliases: ['fit'], layoutKey: 'fit' },
+    metadata: {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'fitness',
+      version: '1.0.0',
+      description: 'fitness fixture',
+    },
+    commandSpecs: [],
+  });
+  return tools;
+}
+
 describe('SessionResultsReadPort — listRuns', () => {
   it('lists stored runs as lean RunSummary pointers (newest first)', () => {
     new SessionRepo(store).save(
@@ -298,6 +314,29 @@ describe('SessionResultsReadPort — listRuns', () => {
       ordinal: 0,
       attempt: 1,
     });
+  });
+
+  it('preserves stored layout identity across list_runs → show_run', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-layout', tool: 'fit' }));
+    const results = new SessionResultsReadPort({
+      store,
+      tools: registryWithCanonicalFitnessName(),
+      replayFor: recordingResolver,
+      agentCatalog: AGENT_CATALOG,
+    });
+
+    const listed = results.listRuns();
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    const pointer = listed.value.find((run) => run.id === 'fit-layout');
+    expect(pointer?.tool).toBe('fit');
+
+    const shown = await results.showRun({ ref: pointer?.id ?? '' });
+    expect(shown.ok).toBe(true);
+    if (shown.ok) {
+      expect(shown.value.session?.tool).toBe(pointer?.tool);
+      expect(shown.value.data.envelope.tool).toBe(pointer?.tool);
+    }
   });
 });
 

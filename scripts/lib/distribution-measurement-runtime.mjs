@@ -527,6 +527,8 @@ export async function runBoundedJsonCommand(input) {
     killProcess: input.killProcess,
     killProcessTree: input.terminateProcessTree,
     platform: input.platform,
+    readProcessTable: input.readProcessTable,
+    rssSampleTimeoutMs: input.processTableTimeoutMs,
     useProcessGroup,
   });
   const chunks = [];

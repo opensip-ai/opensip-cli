@@ -641,7 +641,8 @@ test('bounded JSON commands reject within a hard bound when a hostile child neve
             forceKillSettlementMs: 20,
             maxBytes: 100,
             spawnChild: () => child,
-            captureProcessDescendants: () => {
+            processTableTimeoutMs: 100,
+            readProcessTable: () => {
               captureCalls += 1;
               return new Promise(() => {
                 // Deliberately model a descendant snapshot that never settles.
@@ -664,7 +665,7 @@ test('bounded JSON commands reject within a hard bound when a hostile child neve
 });
 
 test(
-  'successful POSIX commands reap detached grandchildren without changing successful results',
+  'successful POSIX commands reap an observed detached grandchild without changing results',
   { skip: process.platform === 'win32' },
   async () => {
     const captures = [{ output: '' }, { output: '' }];
@@ -793,7 +794,11 @@ test('real children that ignore SIGTERM are force-killed within measured command
       runMeasuredCommand({
         command: [process.execPath, '--eval', HOSTILE_CHILD_SOURCE],
         timeoutMs: 200,
-        terminationGraceMs: 50,
+        // Leave enough event-loop time for the deliberately trapped SIGTERM to
+        // flush its marker even when the complete script suite is running in
+        // parallel. Production uses a 1s grace; 50ms made this assertion depend
+        // on host load rather than the TERM -> KILL behavior under test.
+        terminationGraceMs: 250,
         forceKillSettlementMs: 100,
         stdoutTailBytes: 1024,
         stderrTailBytes: 1024,
@@ -984,7 +989,17 @@ test('a parent signal emitted synchronously during spawn reaches both reserved c
     forceKillSettlementMs: 100,
     maxBytes: 128,
     useProcessGroup: false,
-    captureProcessDescendants: async () => [],
+    readProcessTable: async () => [
+      {
+        pid: 51_001,
+        ppid: 1,
+        processGroupId: 51_001,
+        sessionToken: '51_001',
+        startedAt: 'json-root',
+        command: '/usr/bin/node',
+        rssBytes: 1,
+      },
+    ],
     parentSignalCoordinator: jsonParent.coordinator,
     spawnChild: () => {
       jsonParent.signalSource.emit('SIGTERM');
@@ -1013,8 +1028,17 @@ test('a parent signal emitted synchronously during spawn reaches both reserved c
     stderrTailBytes: 128,
     sampleIntervalMs: 20,
     useProcessGroup: false,
-    captureProcessDescendants: async () => [],
-    readProcessTable: async () => [],
+    readProcessTable: async () => [
+      {
+        pid: 51_002,
+        ppid: 1,
+        processGroupId: 51_002,
+        sessionToken: '51_002',
+        startedAt: 'measured-root',
+        command: '/usr/bin/node',
+        rssBytes: 1,
+      },
+    ],
     parentSignalCoordinator: measuredParent.coordinator,
     spawnChild: () => {
       measuredParent.signalSource.emit('SIGINT');
@@ -1045,7 +1069,17 @@ test('the first parent-signal termination reason survives a later command timeou
     forceKillSettlementMs: 100,
     maxBytes: 128,
     useProcessGroup: false,
-    captureProcessDescendants: async () => [],
+    readProcessTable: async () => [
+      {
+        pid: 52_001,
+        ppid: 1,
+        processGroupId: 52_001,
+        sessionToken: '52_001',
+        startedAt: 'json-root',
+        command: '/usr/bin/node',
+        rssBytes: 1,
+      },
+    ],
     parentSignalCoordinator: jsonParent.coordinator,
     spawnChild: () => json.child,
   });
@@ -1075,8 +1109,17 @@ test('the first parent-signal termination reason survives a later command timeou
     stderrTailBytes: 128,
     sampleIntervalMs: 20,
     useProcessGroup: false,
-    captureProcessDescendants: async () => [],
-    readProcessTable: async () => [],
+    readProcessTable: async () => [
+      {
+        pid: 52_002,
+        ppid: 1,
+        processGroupId: 52_002,
+        sessionToken: '52_002',
+        startedAt: 'measured-root',
+        command: '/usr/bin/node',
+        rssBytes: 1,
+      },
+    ],
     parentSignalCoordinator: measuredParent.coordinator,
     spawnChild: () => measured.child,
   });

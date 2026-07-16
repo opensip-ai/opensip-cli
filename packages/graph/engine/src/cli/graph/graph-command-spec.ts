@@ -194,6 +194,10 @@ async function dispatchGraphLiveView(
   });
 }
 
+function shouldRetainJsonEnvelope(opts: GraphCommandOptions): boolean {
+  return opts.json === true && typeof opts.sarif === 'string' && opts.sarif.length > 0;
+}
+
 /**
  * The `graph` command handler — the former `registerGraphCommand()` action body,
  * lifted to a spec handler. The host (`raw-stream`) renders nothing, so the
@@ -332,6 +336,7 @@ async function runGraphCommand(
       filter: opts.filter,
       top: opts.top,
       raw: opts.raw,
+      returnJsonEnvelope: shouldRetainJsonEnvelope(opts),
     },
     cli,
   );
@@ -373,9 +378,10 @@ function graphRunCompletion(
 /**
  * Effectful egress at the composition root (ADR-0011 / ADR-0008): cloud sync +
  * `--report-to` (which owns exit 4). `executeGraph` returns the envelope for every
- * mode that should deliver (catalog / default render / `--report-to`) and
- * `undefined` for the modes that must not (plain `--json` workspace-child carrier,
- * `--workspace` parent, error paths).
+ * mode that should deliver (catalog / default render / `--report-to`). Plain
+ * `--json`, `--workspace`, and error paths normally return `undefined`; JSON +
+ * SARIF is the narrow exception that retains an already-delivered envelope for
+ * the side-file sink below, and this egress function explicitly skips it.
  *
  * ADR-0036: gate modes (`--gate-save`/`--gate-compare`) own their OWN
  * deliverSignals call inside `runGateMode` — they feed the gate verdict to the
@@ -389,7 +395,10 @@ async function deliverNonGateEgress(
   cli: ToolCliContext,
 ): Promise<void> {
   const isGateMode = opts.gateSave === true || opts.gateCompare === true;
-  if (envelope === undefined || isGateMode) return;
+  // JSON runs already deliver inline so the emitted CommandOutcome carries the
+  // final host-derived exit. A retained envelope exists only for a sibling
+  // side-file sink such as --sarif and must never trigger duplicate egress.
+  if (envelope === undefined || isGateMode || opts.json === true) return;
   await cli.deliverSignals(envelope, {
     cwd: opts.cwd,
     reportTo: opts.reportTo,
