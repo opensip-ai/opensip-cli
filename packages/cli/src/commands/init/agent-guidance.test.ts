@@ -99,7 +99,7 @@ describe('upsertManagedBlock', () => {
 });
 
 describe('buildManagedAgentGuidance', () => {
-  it('documents the auto-swap, bounded evidence, package, and live-wiring workflow', () => {
+  it('documents the auto-swap, package, and live-wiring workflow', () => {
     const guidance = buildManagedAgentGuidance();
     expect(guidance).toContain('context.project.root');
     expect(guidance).toContain('context.catalog.identity');
@@ -120,18 +120,15 @@ describe('buildManagedAgentGuidance', () => {
     expect(guidance).toContain('why_depends');
     expect(guidance).toContain('package_cycles');
     expect(guidance).toContain('get_runtime_wiring');
-    expect(guidance).toContain('get_context_status');
-    expect(guidance).toContain('same explicit project-relative `files` array');
-    expect(guidance).toContain('`fileScope.status` is `matched`');
-    expect(guidance).toContain('`manifest.readiness` is `ready`');
-    expect(guidance).toContain('current, complete, uncapped');
-    expect(guidance).toContain('replay status is `available`');
-    expect(guidance).toContain('get_file_context');
-    expect(guidance).toContain('impact_files');
-    expect(guidance).toContain('select_tests');
-    expect(guidance).toContain('suite run agent-context');
-    expect(guidance).toContain('same `--files` set');
-    expect(guidance).toContain('Ordinary MCP reads never build a graph');
+    // The deferred agent-context guidance (get_context_status / get_file_context /
+    // impact_files / select_tests / suite run agent-context / audit edit-loop) was
+    // intentionally removed from the managed block; assert it stays out so it can't
+    // silently return. The graph-audit + tool-precedence guidance remains authoritative.
+    expect(guidance).not.toContain('get_context_status');
+    expect(guidance).not.toContain('get_file_context');
+    expect(guidance).not.toContain('impact_files');
+    expect(guidance).not.toContain('select_tests');
+    expect(guidance).not.toContain('suite run agent-context');
     expect(guidance).toContain('default to 20 nodes');
     expect(guidance).toContain('exclusive compact detail modes');
     expect(guidance).toContain('runtime edges, not call edges');
