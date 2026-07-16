@@ -72,6 +72,30 @@ describe('install.sh ⇄ CLI surface contract', () => {
     });
   });
 
+  // ---- Node floor messaging: fail closed with recovery guidance -----------------
+  describe('Node requirement guidance', () => {
+    it('states the Node floor without judgmental "too old" wording', () => {
+      expect(INSTALL_SH).toContain('OpenSIP CLI requires Node.js ${MIN_NODE_MAJOR}+.');
+      expect(INSTALL_SH).not.toMatch(/too old/i);
+    });
+
+    it('prints found path, re-run command, and common install options', () => {
+      expect(INSTALL_SH).toContain('Found:');
+      expect(INSTALL_SH).toContain('Need:');
+      expect(INSTALL_SH).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
+      expect(INSTALL_SH).toContain('nvm install');
+      expect(INSTALL_SH).toContain('fnm install');
+      expect(INSTALL_SH).toContain('brew install node@');
+      expect(INSTALL_SH).toContain('https://nodejs.org/en/download');
+      expect(INSTALL_SH).toContain('https://opensip.ai/docs/opensip-cli');
+    });
+
+    it('handles missing Node on PATH with a distinct message', () => {
+      expect(INSTALL_SH).toContain('Node.js was not found on PATH.');
+      expect(INSTALL_SH).toContain('OpenSIP CLI needs Node.js ${MIN_NODE_MAJOR}+ (with npm).');
+    });
+  });
+
   // ---- direction 2: those commands still work against the built CLI ---------
   describe('installer smoke commands succeed against the built CLI', () => {
     let dir = '';

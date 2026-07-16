@@ -98,11 +98,19 @@ run_with_spinner() {
   return "$status"
 }
 
-require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    error "$2"
-    exit 1
-  fi
+# Public re-run line + install options shown when Node/npm is missing or below the floor.
+INSTALL_RERUN='curl -fsSL https://opensip.ai/cli/install.sh | bash'
+DOCS_URL='https://opensip.ai/docs/opensip-cli'
+
+print_node_install_help() {
+  printf '\n%s\n' "Install or switch to Node.js ${MIN_NODE_MAJOR}+, then re-run:" >&2
+  printf '  %s\n' "$INSTALL_RERUN" >&2
+  printf '\n%s\n' "Common options:" >&2
+  printf '  %s\n' "nvm:   nvm install ${MIN_NODE_MAJOR} && nvm use ${MIN_NODE_MAJOR}" >&2
+  printf '  %s\n' "fnm:   fnm install ${MIN_NODE_MAJOR} && fnm use ${MIN_NODE_MAJOR}" >&2
+  printf '  %s\n' "brew:  brew install node@${MIN_NODE_MAJOR}" >&2
+  printf '  %s\n' "Other: https://nodejs.org/en/download" >&2
+  printf '\n%s\n' "Docs: ${DOCS_URL}" >&2
 }
 
 # Strip a leading v/V and surrounding whitespace so "v0.6.0" and "0.6.0" compare equal.
@@ -133,22 +141,46 @@ read_opensip_version() {
   "$cmd" --version 2>/dev/null || true
 }
 
-require_command node "Node.js is required. Install Node.js ${MIN_NODE_MAJOR}+ and run this installer again."
-require_command npm "npm is required. Install Node.js ${MIN_NODE_MAJOR}+ with npm and run this installer again."
+if ! command -v node >/dev/null 2>&1; then
+  error "Node.js was not found on PATH."
+  printf '\n%s\n' "OpenSIP CLI needs Node.js ${MIN_NODE_MAJOR}+ (with npm)." >&2
+  print_node_install_help
+  exit 1
+fi
 
+if ! command -v npm >/dev/null 2>&1; then
+  error "npm was not found on PATH."
+  printf '\n%s\n' "OpenSIP CLI needs Node.js ${MIN_NODE_MAJOR}+ with npm." >&2
+  NODE_PATH="$(command -v node 2>/dev/null || true)"
+  if [ -n "$NODE_PATH" ]; then
+    printf '\n%s\n' "  Found node at: ${NODE_PATH}" >&2
+  fi
+  print_node_install_help
+  exit 1
+fi
+
+NODE_PATH="$(command -v node)"
 NODE_VERSION="$(node --version 2>/dev/null | sed 's/^v//')"
 NODE_MAJOR="$(printf '%s' "$NODE_VERSION" | sed 's/\..*$//')"
 
 case "$NODE_MAJOR" in
   ''|*[!0-9]*)
-    error "Could not read your Node.js version. Install Node.js ${MIN_NODE_MAJOR}+ and try again."
+    error "Could not read your Node.js version."
+    printf '\n%s\n' "OpenSIP CLI requires Node.js ${MIN_NODE_MAJOR}+." >&2
+    printf '\n%s\n' "  Found:   ${NODE_PATH}" >&2
+    print_node_install_help
     exit 1
     ;;
 esac
 
 if [ "$NODE_MAJOR" -lt "$MIN_NODE_MAJOR" ]; then
-  error "OpenSIP CLI requires Node.js ${MIN_NODE_MAJOR}+; found Node.js ${NODE_VERSION}."
-  printf '%s\n' "Update Node.js, then run this installer again." >&2
+  error "OpenSIP CLI requires Node.js ${MIN_NODE_MAJOR}+."
+  printf '\n%s\n' "  Found:   v${NODE_VERSION}  at ${NODE_PATH}" >&2
+  printf '%s\n' "  Need:    Node.js ${MIN_NODE_MAJOR}+" >&2
+  printf '\n%s\n' "If you already installed a newer Node, check which one is first on PATH:" >&2
+  printf '  %s\n' "which -a node" >&2
+  printf '  %s\n' "node --version" >&2
+  print_node_install_help
   exit 1
 fi
 
