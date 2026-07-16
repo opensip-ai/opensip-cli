@@ -139,11 +139,16 @@ function buildEffectiveThrowAllowedPaths(): readonly RegExp[] {
 }
 
 function isRecipeOrchestratorPath(filePath: string): boolean {
-  return filePath.includes('/recipes/') && /service\.ts$/i.test(filePath);
+  const normalized = filePath.replaceAll('\\', '/');
+  return normalized.includes('/recipes/') && /service\.ts$/i.test(normalized);
 }
 
 function isThrowAllowedPath(filePath: string): boolean {
-  if (buildEffectiveThrowAllowedPaths().some((pattern) => pattern.test(filePath))) {
+  if (
+    buildEffectiveThrowAllowedPaths().some((pattern) =>
+      pattern.test(filePath.replaceAll('\\', '/')),
+    )
+  ) {
     return true;
   }
 

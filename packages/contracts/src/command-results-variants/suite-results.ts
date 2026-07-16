@@ -1,21 +1,10 @@
 import type { ImpactTrust } from '../impact-trust.js';
 import type { ReviewBrief } from '../review-brief.js';
+import type { SuiteRunScope } from '../run-context.js';
 import type { RunOutcome } from '../run-outcome.js';
+import type { TaskContextManifest, TaskContextReadiness } from '../task-context.js';
 
-export type SuiteRunScopeMode = 'changed' | 'full';
-export type SuiteRunScopeSource = 'default' | 'explicit' | 'fallback';
-
-export interface SuiteRunScope {
-  readonly mode: SuiteRunScopeMode;
-  /** Why this mode applies: built-in default, user flag, or no-git fallback. */
-  readonly source: SuiteRunScopeSource;
-  /** Git ref base when running with --since. */
-  readonly ref?: string;
-  /** Changed-file count from the host-side resolution (display/brief only). */
-  readonly changedFiles?: number;
-  /** Human-readable notice, e.g. the no-git fallback explanation. */
-  readonly notice?: string;
-}
+export type { SuiteRunScope, SuiteRunScopeMode, SuiteRunScopeSource } from '../run-context.js';
 
 export interface SuiteStepSummary {
   readonly tool: string;
@@ -44,11 +33,18 @@ export interface SuiteStepSummary {
     readonly findings: number;
   };
   readonly verification?: ImpactTrust;
+  /** Additive evidence-step discriminator; absent means a verdict step. */
+  readonly kind?: 'verdict' | 'evidence';
+  /** Evidence readiness for evidence-only steps. */
+  readonly readiness?: TaskContextReadiness;
 }
 
 export interface SuiteRunResult {
   type: 'suite-run';
   readonly suite: string;
+  /** Authoritative persisted parent Run identity; absent when persistence was unavailable. */
+  readonly runId?: string;
+  /** Legacy suite correlation identity retained for replay and existing joins. */
   readonly suiteRunId: string;
   readonly exitCode: number;
   readonly durationMs: number;
@@ -73,6 +69,8 @@ export interface SuiteRunResult {
   };
   readonly steps: readonly SuiteStepSummary[];
   readonly reviewBrief?: ReviewBrief;
+  /** Present only for a task-context evidence suite. */
+  readonly contextManifest?: TaskContextManifest;
 }
 
 export interface SuiteListStep {

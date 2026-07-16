@@ -2,6 +2,7 @@ import { logger, ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildCommandRegistrationInput } from '../build-command-registration-input.js';
+import * as dispatchHookMod from '../dispatch-external-tool-hook.js';
 
 import type { CommandSpec, Tool, ToolCliContext } from '@opensip-cli/core';
 
@@ -28,6 +29,7 @@ function tool(overrides: {
   readonly extensionPoints?: Tool['extensionPoints'];
 }): Tool {
   return {
+    identity: { name: overrides.name },
     metadata: {
       id: overrides.id ?? '00000000-0000-4000-8000-000000000000',
       name: overrides.name,
@@ -131,6 +133,46 @@ describe('buildCommandRegistrationInput', () => {
         evt: 'cli.tool.expected_bundled_absent',
         tool: 'sim',
       }),
+    );
+  });
+
+  it('binds an external session-replay hook RPC context to its owning Tool', async () => {
+    const registry = new ToolRegistry();
+    registry.register(
+      tool({
+        name: 'ext',
+        id: '00000000-0000-4000-8000-0000000000e1',
+        extensionPoints: {
+          sessionReplay: { tool: 'ext', replaySession: vi.fn() },
+        },
+      }),
+    );
+    const dispatch = vi
+      .spyOn(dispatchHookMod, 'dispatchExternalToolHook')
+      .mockImplementation(async (args) => {
+        await args.ctx.toolState.put('victim-tool', 'stolen', true);
+        return { fidelity: 'projection', envelope: {} };
+      });
+    const input = buildCommandRegistrationInput(registry, {
+      cwd: '/repo',
+      provenance: [
+        {
+          source: 'installed',
+          id: 'ext',
+          stableId: '00000000-0000-4000-8000-0000000000e1',
+          version: '0.0.0',
+          manifestHash: 'h',
+        },
+      ],
+    });
+
+    await expect(
+      input.sessionReplayRegistry.get('ext')?.replaySession({} as never),
+    ).rejects.toThrow(/namespace 'victim-tool'/);
+    expect(dispatch).toHaveBeenCalledOnce();
+    const dispatchedCtx = dispatch.mock.calls[0]?.[0].ctx;
+    expect(() => dispatchedCtx?.toolState.put('victim-tool', 'stolen', true)).toThrow(
+      /namespace 'victim-tool'/,
     );
   });
 });

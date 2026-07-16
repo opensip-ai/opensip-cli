@@ -7,6 +7,7 @@
  * show_run, list_runs) before re-running anything.
  */
 
+import { strictInput } from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -24,11 +25,29 @@ export function registerGetAgentCatalog(server: McpStdioServer, deps: McpToolDep
         'replay persisted sessions and never re-run fit/graph/yagni/sim. Do not grep ' +
         '.runtime/logs, read datastore.sqlite directly, or re-run a CLI tool to answer ' +
         'stored-result questions.',
+      inputSchema: strictInput({}),
     },
     () => {
       const outcome = deps.results.agentCatalog();
       if (!outcome.ok) return errorResult(outcome.error);
-      return jsonResult(outcome.value);
+      const catalog = outcome.value;
+      const surface = deps.mcpSurface?.();
+      if (surface === undefined) return jsonResult(catalog);
+      // Additive MCP-only overlay — never forced into contracts AgentCatalog.
+      return jsonResult({
+        ...(catalog as unknown as Record<string, unknown>),
+        mcp: {
+          version: surface.version,
+          surfaceEpoch: surface.surfaceEpoch,
+          toolNames: surface.toolNames,
+          toolCount: surface.toolCount,
+          mutationPosture: surface.mutationPosture,
+          project: {
+            root: surface.projectRoot,
+            scope: surface.projectScope,
+          },
+        },
+      });
     },
   );
 }

@@ -2,6 +2,281 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.7.0] - 2026-07-15
+
+An agent-context, first-run, and proof-of-change release. `opensip audit` works
+before `init`, deterministic task-context evidence lands on MCP for agent edit
+loops, the HTML report adds a visual proof-of-change surface, and a measured
+performance program cuts large-repo cost without changing product contracts.
+Install UX, reserved host names, and a black-box agent-eval harness round out
+the control plane.
+
+While opensip-cli is pre-1.0, this **minor is potentially breaking** for
+consumers that assumed first-run always wrote project-local runtime state,
+relied on unbounded report catalog embedding, or treated host command / suite
+names as free for third-party tools.
+
+### Added
+
+- **Canonical audit visual proof** workflow: changed-code review with an HTML
+  proof surface so humans and agents can see what the run decided (ADR-0155).
+- **Deterministic agent task context** plane: bounded file-scoped context,
+  impact, and test-selection evidence over MCP for edit loops without ad-hoc
+  graph rebuilds (ADR-0160, ADR-0161).
+- **Agent-eval harness** (`@opensip-cli/agent-eval`, private): black-box gold
+  tasks that measure context-tool honesty and promotion readiness
+  (ADR-0157, ADR-0158).
+- **Visual proof-of-change** dashboard report and related suite presentation.
+- **Measured performance program**: contributor benchmark/SLO lane, evidence
+  docs, and optimizations for large inventories and sharded graph context
+  (ADR-0163 local CPU profiling posture).
+- **Init / capability UX**: optional tools and distribution footprint
+  measurement guidance so adopters can see install cost before enabling packs.
+- Host reservation of **command and built-in suite names** so plugins cannot
+  shadow audit and other host surfaces (ADR-0159).
+- Report control: `--max-catalog-mb` and a named escape hatch in truncation
+  notices when the inlined graph catalog would blow report size.
+- Installer: clearer download+install progress and upgrade messaging
+  (`Updated opensip from vA to vB` when a prior version is present).
+- DX: `pnpm opensip` / `pnpm opensip:audit` passthrough scripts and audit-first
+  docs flow.
+- ADRs 0155–0163 (audit command, impact proof, agent-eval, reserved names,
+  task context, inventory ownership, TypeScript readiness, local profiling).
+
+### Changed
+
+- **First run without init**: `opensip audit` and related surfaces work in a
+  supported project before scaffolding; rebuildable runtime state stays in the
+  user cache so a first run does not write into the customer repo.
+- No-init runtime cache is pruned instead of growing without bound.
+- Dashboard bounds the inlined graph catalog (multi-hundred-MB reports reduced
+  to single-digit MB class by default) and hardens oversized live-report paths
+  against OOM in tests and real runs.
+- Public docs cover plans 1–6 surfaces (audit, context, capability, perf,
+  report, install).
+- Tooling baseline: Prettier 3.9.4 format gate; TypeScript 6.0.3 test-typecheck
+  reconciliation.
+
+### Fixed
+
+- Multi-pass bug and correctness sweeps (green-wash holes for security/path
+  gates, silent host-command failures, faulting parity, coverage gaps).
+- Context plane: evidence production/freshness bounds, unambiguous impact
+  symbol identity, integrated graph policy gates, abandoned shared impact
+  index cancellation.
+- Graph: sharded context parity; wide-function and near-duplicate noise.
+- CLI: single scope-aware runtime-state seam; typed host-command failure
+  presentation instead of silent exit.
+- Distribution offline measurement hardening; post-landing review and lint
+  follow-ups across plans 1–6.
+
+## [0.6.0] - 2026-07-12
+
+An MCP audit-evidence correctness and efficiency release. Graph catalogs and
+MCP tools now carry complete import evidence, optional declaration/reference
+facts, four independent coverage facets, and exclusive compact projections so
+agents can diagnose connectors, packages, and runtime wiring without flooding
+context. Publishable packages fail closed on incomplete boundary maps and ship
+runtime artifacts only; test typecheck runs as an isolated monorepo lane.
+
+While opensip-cli is pre-1.0, this **minor is potentially breaking** for MCP
+clients and tool authors that assumed mixed verbose payloads, identity-stable
+`defineCommand` returns, or incomplete public package export maps.
+
+### Breaking
+
+- MCP graph tools default to **exclusive** compact `detail` modes
+  (`summary` | `groups` | `nodes`) instead of combining nodes with groups or
+  verbose mixed payloads. Identity searches (`search_symbols`,
+  `search_declarations`) default to `detail=nodes` with **limit 20** (caller
+  range still 1–500); other paged tools keep default 100 / max 500.
+- Package samples, cycle proofs, and architecture row families are **opt-in**;
+  default responses return counts/coverage without large evidence samples.
+- `defineCommand()` **copies and freezes** the validated spec (including optional
+  `staticHandler`); it is no longer an identity pass-through. Mutating a
+  returned spec or relying on `===` with the input fails.
+- Publishable package boundaries and production packlists are enforced: incomplete
+  export allowlists, test files in published `dist`, and masked workspace deps
+  fail CI. Consumers must use documented public barrels only.
+
+### Added
+
+- Optional catalog **semantic facts** (exact TypeScript): bounded declarations
+  and cross-file references with present-empty vs absent semantics; public
+  graph/read views and MCP tools `search_declarations` / `references_to`
+  (default MCP inventory **21** tools; **22** with mutation).
+- Complete module **import evidence** on exact catalogs (form/role/target/basis),
+  workspace declaration-entry attribution, and independent dependency/semantic
+  producer cache ABI segments (catalog version remains `3.0`, no SQL migration).
+- Four **coverage facets** (inventory / evidence / grouping / projection) on
+  graph MCP responses, independent of each other.
+- Config `graph.auditTestSourceGlobs` and an explicit source-role matcher for
+  audit-oriented test/production classification on reads.
+- Core `CommandSpec.staticHandler` descriptors and plain per-run
+  `RuntimeCommandInventory` on `RunScope`; CLI projects the full host+Tool
+  surface; MCP `get_runtime_wiring` bridges handlers to declarations without
+  inventing call edges (`w1:` runtime identity + `g1:` catalog join).
+- `get_agent_catalog` additive `mcp` block: live server version, surface epoch,
+  registered tool names/count, mutation posture, and canonical project root for
+  connector diagnosis (reconnect for a new surface; `refresh_graph` is not a
+  connector repair).
+- Architecture gates for complete package export allowlists, production packlists,
+  and derived Tool/package facts (ADR-0150, ADR-0151).
+- Isolated per-package **test typecheck** lane wired into monorepo typecheck/lint.
+- ADRs 0150–0154 (production artifacts only; package/export boundaries; dependency
+  and declaration evidence; faceted compact MCP protocol; declarative runtime
+  handler bridge). ADR-0153 supersedes ADR-0149.
+
+### Changed
+
+- Discovery diagnostics are caller-owned (`diagnosticIntent: normal | quiet`);
+  freshness/probe paths use quiet discovery so agent logs stay aggregate-level.
+- Managed agent guidance (`opensip init` blocks in AGENTS/CLAUDE) prioritizes
+  MCP evidence tools, four facets, declaration/reference separation, and
+  reconnect-vs-refresh diagnosis.
+- Public graph, MCP, configuration, and CLI dispatch docs document compact
+  defaults, audit source roles, and runtime inventory ownership.
+
+### Fixed
+
+- Package SCCs no longer include same-package self edges; architecture counters
+  and workspace declaration imports are hardened against hostile keys and
+  ambiguous attribution.
+- Review follow-ups after the MCP audit rollout (red gates and correctness bugs
+  across phases 2–9).
+- Root `yagni.sarif` dogfood artifact is no longer tracked; packaging excludes
+  tests from production builds.
+
+## [0.5.3] - 2026-07-10
+
+An MCP graph-audit readiness release. Agents can inspect occurrence-precise
+call evidence, package boundaries, architecture views, and runtime wiring from
+stored catalogs over MCP without re-running analysis; ordinary reads auto-swap
+to a newly persisted catalog generation and report complete or partial
+freshness. The HTML report overview suite expander keeps step columns aligned
+with the table header.
+
+### Added
+
+- Graph public read surface for occurrence call views, package evidence
+  (dependencies, why-depends, SCCs), architecture view, filter-first symbol
+  search, dead-code paging, and source filters with project-bound cursors.
+- MCP tools and projections for bounded, labelled audit evidence: occurrence-
+  default walks (`who_calls`, `callees_of`, `trace_path`, blast radius),
+  package tools, `get_architecture`, `find_dead_code`, `get_runtime_wiring`,
+  and shared paging / identity / freshness envelopes.
+- Catalog identity and generation lifecycle: opaque `g1:` generation keys,
+  auto-swap on newly persisted external graph catalogs, complete/partial
+  freshness without building a graph on ordinary reads; `refresh_graph`
+  remains the sole explicit rebuild path (ADR-0148).
+- ADRs 0148–0149 (catalog identity / auto-swap / freshness; bounded labelled
+  MCP audit evidence).
+
+### Changed
+
+- MCP graph traversal defaults to occurrence-precise identity; body-twin
+  reachability is explicit and label-preserving.
+- Agent guidance and public MCP docs document the expanded tool inventory,
+  freshness fields, and evidence-kind / confidence contracts.
+- Dashboard suite steps render as sibling table rows (same columns as the
+  overview header) with a darker child-row background.
+
+### Fixed
+
+- Overview Recent Activity: expanded suite child rows no longer indent out of
+  alignment with the TIMESTAMP / RUN / … header columns.
+
+## [0.5.2] - 2026-07-09
+
+A modular-monolith boundary hardening release. Public packages fail closed on
+raw datastore and host-plane access, external workers lose ambient DB capability,
+MCP reads the graph only through `@opensip-cli/graph/read`, and architecture
+gates enforce export maps and tool inventory so those boundaries stay true in CI.
+
+### Breaking
+
+- Public `DataStore` no longer exposes `transaction`; raw Drizzle handles, table
+  objects, and `DEFAULT_TEST_BASELINE_IDENTITY` are not public barrel exports
+  (use repositories; owners use `@opensip-cli/datastore/internal`).
+- Fitness no longer exports the test-only `fileCache` value from the public
+  barrel (tests use `fitnessTestFileCache` via `@opensip-cli/test-support`).
+- Core no longer exports dead `fitnessEmptyCheckRegistryDiagnostic` /
+  `fitnessPluginLoadFailedDiagnostic` builders.
+- `HostGovernance.listForProject` and `HostAudit.exportForCloud` are removed from
+  the tool-facing host-plane surface.
+- External tool trust env vars (`OPENSIP_CLI_ALLOW_*_TOOLS`) no longer admit `*`;
+  only exact ids are trusted (`cli.trust.tool_wildcard_ignored`).
+
+### Added
+
+- External workers install a denied ambient datastore thunk (`host-rpc-only`);
+  privileged effects remain host-RPC only (ADR-0145).
+- Host-plane storage identity `@opensip-cli/host-plane:<toolId>` with copy-only
+  migration 0009 and dual-identity purge (ADR-0146).
+- Public `@opensip-cli/graph/read` facade; MCP production consumes it (ADR-0147).
+- Architecture gates: complete depcruise export-path map, manifest-derived Tool
+  inventory, fail-closed internal-import owner allowlists, and workspace import-
+  surface verification in lint.
+- ADRs 0145–0147 (worker datastore capability, host-plane reserved namespace,
+  public graph/read + package boundaries).
+
+### Changed
+
+- `applyToolContributeScope` is the single validated installer for every tool
+  scope contribution (tests and CLI bootstrap share it).
+- ToolCliContext seam inventory is extracted via the TypeScript compiler API;
+  Vitest path aliases rebuild from declared package exports only.
+- Worker mode resolution for external-tool and capability-pack workers is
+  tightened; host-RPC baseline messages are allowlisted.
+
+### Fixed
+
+- HTML report overview ledger: suite and step Run cells show only the tool/suite
+  badge (no duplicate suite name or command text beside the badge).
+- `@opensip-cli/test-support` covers `parseCliJsonOutcomes` and
+  `runTwoScopesConcurrently` so the package meets coverage floors after those
+  helpers moved onto the private barrel.
+
+## [0.5.1] - 2026-07-09
+
+A presentation-identity and run-evidence patch. Human duration and score labels
+now share one pure package across CLI, report, and host history; MCP run
+summaries expose raw `durationMs`; and the host run ledger only suppresses a
+delegated supervisor row after proving the child wrote correlated evidence.
+
+### Added
+
+- `@opensip-cli/format` — pure, zero-dependency `formatDuration` / `formatScore`
+  and narrow display projectors (`projectDurationDisplay`,
+  `projectSessionDisplay`) so CLI, HTML report, and host history cannot drift
+  (ADR-0144).
+- Host-owned run/run-step ledger for suite and standalone tool runs, with
+  delegated-execution markers and child-evidence proof before supervisor-row
+  suppression.
+- Local fitness check `presentation-labels-via-format` and depcruise
+  `format-imports-nothing` leaf rule (with gate-live probe).
+- ADR enforcement frontmatter gate (`scripts/verify-adr-enforcement.mjs`) and
+  private dogfood pack for opensip-internal architecture checks.
+
+### Changed
+
+- CLI live UI, host session history, suite step tables, and the HTML dashboard
+  use `@opensip-cli/format` for duration and score labels (including recipe
+  timeouts and check pass-rate text).
+- MCP `RunSummary` includes host-stamped `durationMs` for agent semantic
+  identity (raw evidence; no human labels on MCP).
+- Graph heap re-exec preserves run correlation in the elevated child
+  environment.
+- Dependency toolchain refresh (Node types pinned to major 24).
+
+### Fixed
+
+- Report overview/ledger recipe columns stay bounded; overview is ledger-first.
+- Session history indexes hardened.
+- Dogfood fitness findings cleared (yagni ephemeral worker-spec allowlist,
+  composition-root fan-out exemptions, public-api JSDoc).
+- Cold dogfood gate and external-adapter fixture versioning for CI.
+
 ## [0.5.0] - 2026-07-07
 
 A polyglot external-tool and suite-verdict release. This adds the first wave of

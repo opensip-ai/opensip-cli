@@ -141,6 +141,7 @@ function validatePolicyConstants(runtime) {
     ['cloud-wire', runtime.core.CLOUD_WIRE_CONTRACT_VERSION],
     ['release-artifact', runtime.core.RELEASE_ARTIFACT_CONTRACT_VERSION],
     ['datastore-payload', runtime.core.DATASTORE_PAYLOAD_CONTRACT_VERSION],
+    ['platform-support', runtime.core.PLATFORM_SUPPORT_CONTRACT_VERSION],
   ];
   for (const [className, version] of checks) {
     const policy = runtime.core.findCompatibilityPolicy(className);

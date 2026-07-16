@@ -66,6 +66,20 @@ type DispatchWorkerMessage = WorkerMessage<DispatchProgressEvent, ToolCommandRes
 /** Narrowing helper: a worker `error` IPC message carries an optional failureClass/stack. */
 type DispatchWorkerError = Extract<DispatchWorkerMessage, { kind: 'error' }>;
 
+const MAX_WORKER_DETAIL_CODE_LENGTH = 128;
+const ALLOWED_WORKER_DETAIL_CODES = new Set(['PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS']);
+
+function allowlistedWorkerDetailCode(detailCode: string | undefined): string | undefined {
+  if (
+    detailCode === undefined ||
+    detailCode.length > MAX_WORKER_DETAIL_CODE_LENGTH ||
+    !ALLOWED_WORKER_DETAIL_CODES.has(detailCode)
+  ) {
+    return undefined;
+  }
+  return detailCode;
+}
+
 /** Resolve the package dir for an external tool, or fail with a structured error. */
 export function requirePackageDir(provenance: ToolProvenance): string {
   const dir = provenance.resolvedPath;
@@ -177,14 +191,15 @@ function forkAndAwait({
         },
         onLimitFailure: (failureClass, detail) => {
           reject(
-            dispatchError(
+            dispatchError({
               spec,
-              detail === undefined
-                ? `worker failed: ${failureClass}`
-                : `worker failed: ${failureClass} (${detail})`,
+              message:
+                detail === undefined
+                  ? `worker failed: ${failureClass}`
+                  : `worker failed: ${failureClass} (${detail})`,
               failureClass,
-              handle.getStderrTail(),
-            ),
+              stderrTail: handle.getStderrTail(),
+            }),
           );
         },
       },
@@ -197,7 +212,13 @@ function forkAndAwait({
       if (totalRpc > workerLimits.maxTotalRpc) {
         handle.killTree('SIGKILL');
         handle.done(() => {
-          reject(dispatchError(spec, 'host-RPC upcall flood (total cap exceeded)', 'rpc_flood'));
+          reject(
+            dispatchError({
+              spec,
+              message: 'host-RPC upcall flood (total cap exceeded)',
+              failureClass: 'rpc_flood',
+            }),
+          );
         });
         return;
       }
@@ -205,7 +226,11 @@ function forkAndAwait({
         handle.killTree('SIGKILL');
         handle.done(() => {
           reject(
-            dispatchError(spec, 'host-RPC upcall flood (concurrency cap exceeded)', 'rpc_flood'),
+            dispatchError({
+              spec,
+              message: 'host-RPC upcall flood (concurrency cap exceeded)',
+              failureClass: 'rpc_flood',
+            }),
           );
         });
         return;
@@ -225,12 +250,13 @@ function forkAndAwait({
     handle.child.on('error', (err: Error) => {
       handle.done(() => {
         reject(
-          dispatchError(
+          dispatchError({
             spec,
-            `cannot isolate external tool '${spec.toolId}' (worker fork failed: ${err.message}); ` +
+            message:
+              `cannot isolate external tool '${spec.toolId}' (worker fork failed: ${err.message}); ` +
               'refusing to run it in-process',
-            'spawn',
-          ),
+            failureClass: 'spawn',
+          }),
         );
       });
     });
@@ -238,12 +264,12 @@ function forkAndAwait({
       if (handle.isSettled()) return;
       handle.done(() => {
         reject(
-          dispatchError(
+          dispatchError({
             spec,
-            `worker exited (code ${code ?? 'null'}) before producing a result`,
-            'exit_nonzero',
-            handle.getStderrTail(),
-          ),
+            message: `worker exited (code ${code ?? 'null'}) before producing a result`,
+            failureClass: 'exit_nonzero',
+            stderrTail: handle.getStderrTail(),
+          }),
         );
       });
     });
@@ -294,13 +320,23 @@ function specLabel(spec: ToolCommandWorkerSpec): string {
  *   3. otherwise → `SystemError` (exit 1) — genuine worker/transport faults
  *      (`spawn` / `exit_nonzero` / `rpc_flood` / `timeout` / `ipc_error`).
  */
-export function dispatchError(
-  spec: ToolCommandWorkerSpec,
-  message: string,
-  failureClass: string,
-  stderrTail?: string,
-  code?: string,
-): ToolError {
+interface DispatchErrorInput {
+  readonly spec: ToolCommandWorkerSpec;
+  readonly message: string;
+  readonly failureClass: string;
+  readonly stderrTail?: string;
+  readonly code?: string;
+  readonly detailCode?: string;
+}
+
+export function dispatchError({
+  spec,
+  message,
+  failureClass,
+  stderrTail,
+  code,
+  detailCode,
+}: DispatchErrorInput): ToolError {
   const label = specLabel(spec);
   currentScope()?.logger.error({
     evt: 'cli.tool.dispatch_failed',
@@ -317,7 +353,12 @@ export function dispatchError(
     });
   }
   if (code !== undefined) {
-    const rebuilt = toolErrorFromCanonicalCode(code, message, { code, failureClass, stderrTail });
+    const safeDetailCode = allowlistedWorkerDetailCode(detailCode);
+    const rebuilt = toolErrorFromCanonicalCode(code, message, {
+      code: safeDetailCode ?? code,
+      failureClass,
+      stderrTail,
+    });
     if (rebuilt !== undefined) return rebuilt;
   }
   return new SystemError(`external tool '${spec.toolId}' ${label} failed: ${message}`, {
@@ -333,5 +374,12 @@ function workerErrorToToolError(
   msg: DispatchWorkerError,
   stderrTail?: string,
 ): ToolError {
-  return dispatchError(spec, msg.message, msg.failureClass ?? 'ipc_error', stderrTail, msg.code);
+  return dispatchError({
+    spec,
+    message: msg.message,
+    failureClass: msg.failureClass ?? 'ipc_error',
+    stderrTail,
+    code: msg.code,
+    detailCode: msg.detailCode,
+  });
 }

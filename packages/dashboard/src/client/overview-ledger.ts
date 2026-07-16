@@ -134,7 +134,10 @@ function appendLedgerStepCells(
       style: MUTED_STYLE,
     }),
   );
-  row.append(el('td', { text: step.outcome, style: DIM_STYLE }));
+  // Pass Rate column: unlinked steps have no session score — never put outcome
+  // text here (outcome belongs in Status). Show a dash for score parity with
+  // linked rows that use formatScore(session.score).
+  row.append(el('td', { text: '—', style: DIM_STYLE }));
   const statusCell = el('td');
   statusCell.append(statusBadge(stepStatus(step)));
   row.append(statusCell);
@@ -239,18 +242,26 @@ function appendLedgerRunRow(
 ): void {
   const counts = runCounts(run);
   const score = counts.total > 0 ? Math.round((counts.passed / counts.total) * 100) : 0;
-  const expanderId = 'overview-run-' + Math.random().toString(36).slice(2, 8);
+  // Sibling child rows share the parent table columns (no nested table indent).
+  // Marked `.expander-row` so pagination/sort keep them glued to this summary.
+  const childRows: HTMLElement[] = [];
   const arrow = el('span', { class: 'overview-suite-arrow', text: '▶' });
   const row = el('tr', {
     class: 'clickable overview-suite-summary-row',
     'data-suite-run-id': run.legacySuiteRunId ?? run.id,
     onclick: () => {
-      const exp = document.querySelector<HTMLElement>('#' + expanderId);
-      if (!exp) return;
-      const isOpen = exp.classList.toggle('open');
-      exp.style.display = isOpen ? 'table-row' : 'none';
-      arrow.textContent = isOpen ? '▼' : '▶';
+      const isOpen = !row.classList.contains('expanded');
       row.classList.toggle('expanded', isOpen);
+      arrow.textContent = isOpen ? '▼' : '▶';
+      for (const child of childRows) {
+        child.classList.toggle('open', isOpen);
+        // Respect pagination: off-page children stay hidden even when expanded.
+        if (child.dataset.paged === 'no') {
+          child.style.display = 'none';
+        } else {
+          child.style.display = isOpen ? 'table-row' : 'none';
+        }
+      }
     },
   });
   const arrowCell = el('td', { class: 'overview-row-control' });
@@ -286,34 +297,27 @@ function appendLedgerRunRow(
   );
   tbody.append(row);
 
-  const expander = el('tr', {
-    id: expanderId,
-    class: 'expander-row overview-suite-expander-row',
-  });
-  const expanderCell = el('td', { colspan: '9', style: 'padding:0' });
-  const expanderContent = el('div', {
-    class: 'expander-content overview-suite-expander-content',
-  });
-  const childTable = el('table', {
-    class: 'data-table overview-suite-child-table',
-  });
-  const childBody = el('tbody');
-  sortedSteps(run).forEach((step) => {
+  for (const step of sortedSteps(run)) {
     const linked = step.sessionId === undefined ? undefined : sessionsById.get(step.sessionId);
     const childRow = el('tr', {
       class:
-        linked === undefined ? 'overview-suite-child-row' : 'clickable overview-suite-child-row',
-      ...(linked === undefined ? {} : { onclick: () => deps.activateSession(linked) }),
+        linked === undefined
+          ? 'expander-row overview-suite-child-row'
+          : 'expander-row clickable overview-suite-child-row',
+      ...(linked === undefined
+        ? {}
+        : {
+            onclick: (event: Event) => {
+              event.stopPropagation();
+              deps.activateSession(linked);
+            },
+          }),
     });
     if (linked) appendLinkedLedgerStepCells(childRow, step, linked, deps);
     else appendLedgerStepCells(childRow, step, deps);
-    childBody.append(childRow);
-  });
-  childTable.append(childBody);
-  expanderContent.append(childTable);
-  expanderCell.append(expanderContent);
-  expander.append(expanderCell);
-  tbody.append(expander);
+    childRows.push(childRow);
+    tbody.append(childRow);
+  }
 }
 
 export function appendLedgerRows(

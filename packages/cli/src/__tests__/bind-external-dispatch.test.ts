@@ -73,7 +73,7 @@ function provenance(source: ToolProvenance['source']): ToolProvenance {
 
 describe('buildMaybeDispatchExternal', () => {
   it('returns false for a bundled tool (in-process path, byte-identical to before)', async () => {
-    const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+    const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
     const dispatched = await runWithScope(scopeWith([provenance('bundled')]), () =>
       hook('ext-run', {}, []),
     );
@@ -81,13 +81,13 @@ describe('buildMaybeDispatchExternal', () => {
   });
 
   it('returns false when no provenance is recorded for the tool (unknown → in-process)', async () => {
-    const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+    const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
     const dispatched = await runWithScope(scopeWith([]), () => hook('ext-run', {}, []));
     expect(dispatched).toBe(false);
   });
 
   it('matches provenance by human name when no stableId was declared', async () => {
-    const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+    const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
     const byName: ToolProvenance = {
       source: 'bundled',
       id: 'external-dispatch-tool',
@@ -100,7 +100,7 @@ describe('buildMaybeDispatchExternal', () => {
   });
 
   it('forks the worker BY DEFAULT for installed provenance (no opt-in gate; M4-E flip)', async () => {
-    const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+    const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
     // External provenance routes into dispatchExternalToolCommand with NO env gate
     // set. With no resolved package path it fails fast with a structured error —
     // proving the external branch ran (vs. the false in-process return).
@@ -110,7 +110,7 @@ describe('buildMaybeDispatchExternal', () => {
   });
 
   it('forks by default for project-local and user-global provenance too', async () => {
-    const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+    const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
     for (const source of ['project-local', 'user-global'] as const) {
       await expect(
         runWithScope(scopeWith([provenance(source)]), () => hook('ext-run', {}, [])),
@@ -125,7 +125,7 @@ describe('buildMaybeDispatchExternal', () => {
     const prev = process.env.OPENSIP_CLI_NO_WORKER;
     process.env.OPENSIP_CLI_NO_WORKER = '1';
     try {
-      const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+      const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
       await expect(
         runWithScope(scopeWith([provenance('installed')]), () => hook('ext-run', {}, [])),
       ).rejects.toThrow(/no resolved package path|cannot isolate|failed/);
@@ -160,7 +160,7 @@ describe('buildMaybeDispatchExternal', () => {
         schema: { type: 'object', properties: {} },
       },
     };
-    const hook = buildMaybeDispatchExternal(TOOL, stubCtx);
+    const hook = buildMaybeDispatchExternal(TOOL, stubCtx, {});
     await expect(
       runWithScope(
         scopeWith([provenance('installed')], {

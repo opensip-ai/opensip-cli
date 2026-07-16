@@ -68,6 +68,7 @@ import type { CommandResult } from '@opensip-cli/contracts';
 export {
   buildDatastoreThunk,
   getCurrentProjectRoot,
+  getCurrentRuntimePaths,
   getOrOpenDatastore,
 } from './bootstrap/scope-access.js';
 export { createLiveViewRegistry, type LiveViewRegistry } from './bootstrap/io-plane.js';

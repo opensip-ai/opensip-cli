@@ -1,4 +1,5 @@
 import type { SignalEnvelope } from '@opensip-cli/contracts';
+import type { EvidenceSnapshotContribution } from '@opensip-cli/core';
 
 const OMIT_ARG_KEYS = new Set([
   'apiKey',
@@ -39,6 +40,7 @@ export function projectEnvelopeEvidence(envelope: SignalEnvelope | undefined): u
     .filter((fingerprint): fingerprint is string => typeof fingerprint === 'string')
     .slice(0, 20);
   return {
+    kind: 'signal-envelope',
     schemaVersion: envelope.schemaVersion,
     tool: envelope.tool,
     runId: envelope.runId,
@@ -55,6 +57,33 @@ export function projectEnvelopeEvidence(envelope: SignalEnvelope | undefined): u
     unitCount: envelope.units.length,
     ...(fingerprints.length === 0 ? {} : { fingerprints }),
     ...(envelope.resolutionMode === undefined ? {} : { resolutionMode: envelope.resolutionMode }),
+  };
+}
+
+/** Bounded metadata-only projection; snapshot payloads never enter the host ledger. */
+export function projectEvidenceSnapshotEvidence(
+  snapshots: readonly EvidenceSnapshotContribution[] | undefined,
+): unknown {
+  if (snapshots === undefined || snapshots.length === 0) return undefined;
+  return {
+    kind: 'evidence-snapshots',
+    schemaVersion: 1,
+    snapshots: snapshots.slice(0, 16).map((snapshot) => ({
+      kind: snapshot.kind,
+      status: snapshot.status,
+      ...(snapshot.snapshotId === undefined ? {} : { snapshotId: snapshot.snapshotId }),
+      ...(snapshot.snapshotSchemaVersion === undefined
+        ? {}
+        : { snapshotSchemaVersion: snapshot.snapshotSchemaVersion }),
+      producer: snapshot.producer,
+      freshness: snapshot.freshness,
+      coverage: snapshot.coverage,
+      ...(snapshot.inputs === undefined ? {} : { inputs: snapshot.inputs }),
+      ...(snapshot.reasons === undefined
+        ? {}
+        : { reasonCodes: snapshot.reasons.map((reason) => reason.code) }),
+      ...(snapshot.followUpReads === undefined ? {} : { followUpReads: snapshot.followUpReads }),
+    })),
   };
 }
 

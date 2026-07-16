@@ -268,12 +268,15 @@ const versions = {
   'dependency-check': 'Dependency-Check Core version 9.0.0',
   cppcheck: 'Cppcheck 2.16.0'
 };
+// Exit models must match each adapter exitCodes contract: govulncheck
+// -json always exits 0 (findings from parse); dependency-check findings live
+// in SARIF while process exit stays 0 on clean tool execution.
 const exitCodes = {
   semgrep: 1,
   'ast-grep': 1,
   ruff: 1,
   'golangci-lint': 1,
-  govulncheck: 3,
+  govulncheck: 0,
   'cargo-deny': 2,
   bandit: 1,
   'pip-audit': 1,
@@ -294,7 +297,8 @@ function outputPath() {
   if (tool === 'pip-audit') return valueAfter('--output');
   if (tool === 'spotbugs') return valueAfter('-output');
   if (tool === 'pmd') return valueAfter('-r');
-  if (tool === 'dependency-check') return path.join(valueAfter('--out') || '', 'dependency-check-report.sarif');
+  // Adapter passes --out as the full SARIF file path (not a directory).
+  if (tool === 'dependency-check') return valueAfter('--out');
   if (tool === 'cppcheck') {
     const arg = args.find((entry) => entry.startsWith('--output-file='));
     return arg === undefined ? undefined : arg.slice('--output-file='.length);

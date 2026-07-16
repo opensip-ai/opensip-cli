@@ -1,7 +1,25 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { deriveStepOutcome } from '../suite-step-runner.js';
+import { deriveStepOutcome, evidenceStepReadiness } from '../suite-step-runner.js';
+
+import type { EvidenceSnapshotContribution } from '@opensip-cli/core';
+
+function snapshot(
+  overrides: Partial<EvidenceSnapshotContribution> = {},
+): EvidenceSnapshotContribution {
+  return {
+    schemaVersion: 1,
+    kind: 'inventory',
+    snapshotId: 'inventory-1',
+    snapshotSchemaVersion: 1,
+    producer: { toolId: 'graph', command: 'context', version: '1.0.0' },
+    status: 'rebuilt',
+    freshness: { status: 'current' },
+    coverage: { status: 'complete', items: 1, total: 1 },
+    ...overrides,
+  };
+}
 
 describe('deriveStepOutcome', () => {
   it("derives 'passed' from a passing envelope with no host error", () => {
@@ -97,5 +115,24 @@ describe('deriveStepOutcome', () => {
         exitCode: EXIT_CODES.RUNTIME_ERROR,
       }),
     ).toBe('failed');
+  });
+});
+
+describe('evidenceStepReadiness', () => {
+  it('requires complete, current evidence before reporting ready', () => {
+    expect(evidenceStepReadiness([snapshot()])).toBe('ready');
+    expect(evidenceStepReadiness([snapshot({ freshness: { status: 'stale' } })])).toBe('degraded');
+    expect(evidenceStepReadiness([snapshot({ freshness: { status: 'unknown' } })])).toBe(
+      'degraded',
+    );
+    expect(
+      evidenceStepReadiness([snapshot({ coverage: { status: 'partial', items: 1, total: 2 } })]),
+    ).toBe('degraded');
+  });
+
+  it('reports absent, failed, and cancelled contributions as unavailable', () => {
+    expect(evidenceStepReadiness([])).toBe('unavailable');
+    expect(evidenceStepReadiness([snapshot({ status: 'failed' })])).toBe('unavailable');
+    expect(evidenceStepReadiness([snapshot({ status: 'cancelled' })])).toBe('unavailable');
   });
 });

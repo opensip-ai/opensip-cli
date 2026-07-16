@@ -139,6 +139,11 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
     spec.config === undefined ? defaultAdapterConfigManifest(spec.identity.name) : undefined;
 
   const scanPrimary = definePrimaryCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: '@opensip-cli/external-tool-adapter',
+      path: 'packages/external-tool-adapter/src/define-external-tool-adapter.ts',
+      declaration: 'dispatchScan',
+    },
     description: primary.description ?? spec.metadata.description,
     commonFlags: [...SCAN_COMMON_FLAGS],
     options: [...SCAN_GATE_OPTIONS],
@@ -152,6 +157,11 @@ export function defineExternalToolAdapter(spec: ExternalToolAdapterSpec): Tool {
 
   const nestedScans: ToolCommandSpecInput<unknown, ToolCliContext>[] = rest.map((command) =>
     defineNestedCommand<unknown, ToolCliContext>({
+      staticHandler: {
+        package: '@opensip-cli/external-tool-adapter',
+        path: 'packages/external-tool-adapter/src/define-external-tool-adapter.ts',
+        declaration: 'dispatchScan',
+      },
       name: command.name,
       description: command.description ?? `Run the ${spec.identity.name} ${command.name} scan`,
       commonFlags: [...SCAN_COMMON_FLAGS],

@@ -22,6 +22,7 @@ import { el } from './el.js';
 import { appendLedgerRows } from './overview-ledger.js';
 import { paginateGroupedRows } from './pagination.js';
 import { activateTabForSession } from './tab-activators.js';
+import { activateReportTab } from './tab-bar.js';
 
 const DEFAULT_TOOL_BADGE_STYLE = 'background:var(--bg-hover);color:var(--text-muted)';
 
@@ -38,13 +39,7 @@ function activateSession(s: DashboardSession): void {
   // current view intact) rather than deactivating every panel — including
   // #panel-overview — and activating nothing, which would blank the report.
   const tabName = s.tool in tabMap ? tabMap[s.tool] : externalTabId;
-  const tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
-  const activePanel = document.querySelector('#panel-' + tabName);
-  if (!tab && !activePanel) return;
-  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-  if (tab) tab.classList.add('active');
-  if (activePanel) activePanel.classList.add('active');
+  activateReportTab(tabName);
 }
 
 function appendToolBadge(cell: HTMLElement, tool: string): void {

@@ -67,7 +67,9 @@ const NON_CONFIG_CONSUMER_PATTERNS = [
  * Check if a path should be excluded from analysis
  */
 function shouldExcludePath(filePath: string): boolean {
-  return NON_CONFIG_CONSUMER_PATTERNS.some((pattern) => pattern.test(filePath));
+  return NON_CONFIG_CONSUMER_PATTERNS.some((pattern) =>
+    pattern.test(filePath.replaceAll('\\', '/')),
+  );
 }
 
 /**

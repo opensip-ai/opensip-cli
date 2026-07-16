@@ -12,12 +12,28 @@ import type { HostSubcommandGroup, ToolPluginGroup } from './host-subcommand-gro
 import type { CommandScopeRequirement } from '@opensip-cli/core';
 import type { Command } from 'commander';
 
-export type CommandScopeIndex = ReadonlyMap<string, CommandScopeRequirement>;
+/**
+ * The host-facing requirements of one mounted command, keyed by `commandPath`.
+ *
+ * Both facts are DECLARED on the CommandSpec and derived here — never
+ * hand-listed in bootstrap. `noInit` used to live in a hardcoded allowlist in
+ * `no-init-eligibility.ts`, which silently omitted `audit` (the canonical
+ * first-run command) and so failed the exact workflow it was built for.
+ */
+export interface CommandScopeEntry {
+  readonly scope: CommandScopeRequirement;
+  /** True when this command may run outside an initialized project (ephemeral). */
+  readonly noInit: boolean;
+}
+
+export type CommandScopeIndex = ReadonlyMap<string, CommandScopeEntry>;
 
 export interface CommandScopeSpec {
   readonly name: string;
   readonly aliases?: readonly string[];
   readonly scope: CommandScopeRequirement;
+  /** See {@link CommandSpec.noInit} — may run with no opensip-cli project. */
+  readonly noInit?: boolean;
   /**
    * When set, this tool command is nested under the named primary verb (the
    * `<tool> <verb>` grammar — see `CommandSpec.parent`). The index then keys it
@@ -41,18 +57,19 @@ export interface CommandScopeIndexInput {
 }
 
 function addSpec(
-  index: Map<string, CommandScopeRequirement>,
+  index: Map<string, CommandScopeEntry>,
   pathPrefix: string | undefined,
   spec: CommandScopeSpec,
 ): void {
   const names = [spec.name, ...(spec.aliases ?? [])];
+  const entry: CommandScopeEntry = { scope: spec.scope, noInit: spec.noInit === true };
   names.forEach((name) => {
-    index.set(pathPrefix === undefined ? name : `${pathPrefix} ${name}`, spec.scope);
+    index.set(pathPrefix === undefined ? name : `${pathPrefix} ${name}`, entry);
   });
 }
 
 export function buildCommandScopeIndex(input: CommandScopeIndexInput): CommandScopeIndex {
-  const index = new Map<string, CommandScopeRequirement>();
+  const index = new Map<string, CommandScopeEntry>();
 
   // Tool specs key flat by `name`, EXCEPT `parent`-nested specs (the
   // `<tool> <verb>` grammar, taxonomy Task 0.4), which key under

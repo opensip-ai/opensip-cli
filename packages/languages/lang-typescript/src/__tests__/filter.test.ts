@@ -201,4 +201,34 @@ describe('filterContent', () => {
       expect(code).toContain('${b}');
     });
   });
+
+  describe('regular expressions (reScanSlashToken)', () => {
+    it('does not treat quote chars inside a regex as string openers', () => {
+      const src = 'const re = /"/; const after = 1;';
+      const { code } = filterContent(src);
+      // Regex body is code (not masked); code after the regex must survive.
+      expect(code).toContain('const after = 1');
+      expect(code).not.toMatch(/const after\s+=\s+\s+$/);
+    });
+
+    it('does not treat division as a regex', () => {
+      const src = 'const q = a / b;';
+      const { code } = filterContent(src);
+      expect(code).toBe(src);
+    });
+
+    it('does not treat TSX closing tags as regex openers before http URLs', () => {
+      const src = 'const el = <div></div>; const url = "http://example.com"; const after = 1;';
+      const { code } = filterContent(src);
+      // Closing `</div>` must not start a regex that swallows `http://` and blanks the rest.
+      expect(code).toContain('const after = 1');
+    });
+
+    it('does not treat division after type keywords as a regex before http URLs', () => {
+      const src =
+        'const number = 10; const x = number / 2; const url = "http://example.com"; const after = 1;';
+      const { code } = filterContent(src);
+      expect(code).toContain('const after = 1');
+    });
+  });
 });

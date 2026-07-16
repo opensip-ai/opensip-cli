@@ -38,17 +38,16 @@
 // Exits 0 on success, 1 on any failure (so it gates the publish step).
 
 import { execFileSync } from 'node:child_process';
-import { promises as fs, existsSync, readdirSync } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runScenarios } from './cli-acceptance-core.mjs';
+import { resolveCandidateSource } from './platform-acceptance/candidate-source.mjs';
 import { buildPackedSmokeScenarios } from './smoke-pack-scenarios.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const SCOPE = '@opensip-cli/';
-const TARBALL_PREFIX = 'opensip-cli-';
 
 // ---------------------------------------------------------------------
 // Arg parsing
@@ -87,44 +86,36 @@ if (expectedVersion === null) {
 info(`expected version: ${expectedVersion}`);
 
 // ---------------------------------------------------------------------
-// Discover the packed tarballs
+// Resolve + verify the packed candidate (shared release-artifact authority)
 // ---------------------------------------------------------------------
-
-if (!existsSync(tarballDir)) {
-  fail(`tarball directory not found: ${tarballDir} (run the pack step first)`);
-}
-
-const tarballSuffix = `-${expectedVersion}.tgz`;
-const tarballs = readdirSync(tarballDir).filter(
-  (f) => f.startsWith(TARBALL_PREFIX) && f.endsWith(tarballSuffix),
-);
-if (tarballs.length === 0) {
-  fail(`no ${TARBALL_PREFIX}*${tarballSuffix} tarballs found in ${tarballDir}`);
-}
-
-// pnpm pack names scoped packages `opensip-cli-<unscoped-name>-<version>.tgz`
-// and the unscoped CLI package (`opensip-cli`) just `opensip-cli-<version>.tgz`.
-// All packages share one version (verify-release.mjs enforces this), so the
-// suffix is deterministic. The CLI tarball is the install entry point; every
-// other tarball is a scoped transitive dep we force via `overrides`.
-const cliFileName = `opensip-cli-${expectedVersion}.tgz`;
-const overrides = {};
-let cliTarball;
-for (const file of tarballs) {
-  if (file === cliFileName) {
-    cliTarball = `file:${join(tarballDir, file)}`;
-    continue;
-  }
-  const unscoped = file.slice(TARBALL_PREFIX.length, -tarballSuffix.length);
-  overrides[`${SCOPE}${unscoped}`] = `file:${join(tarballDir, file)}`;
-}
-info(`discovered ${Object.keys(overrides).length} @opensip-cli/* tarball(s) + the opensip-cli CLI`);
-
-if (!cliTarball) {
+//
+// Discovery, the complete-package-set requirement, and SHA-256 verification are
+// delegated to the shared candidate-source resolver, which reuses the release
+// authority (scripts/lib/release-artifacts.mjs + verify-release-artifacts.mjs)
+// and refuses to hand back a tarball path until the whole set is proven. The
+// manifest + SHA256SUMS this needs are written by build-release-artifacts.mjs,
+// which runs BEFORE this step in both the release workflow and release-preflight.
+const resolved = await resolveCandidateSource({
+  kind: 'packed-release',
+  directory: tarballDir,
+  expectedVersion,
+});
+if (!resolved.ok) {
   fail(
-    `opensip-cli tarball (${cliFileName}) missing from ${tarballDir} — cannot smoke-test the entry point`,
+    `packed candidate could not be resolved (${resolved.reasonCode}): ${resolved.message}. ` +
+      'Run scripts/build-release-artifacts.mjs against the tarball dir first — it writes the ' +
+      'release manifest + SHA256SUMS this step verifies.',
   );
 }
+
+// `overrides` forces every transitive @opensip-cli/* dep to its matching local
+// tarball; `cliTarball` is the install entry point (the unscoped opensip-cli).
+const overrides = resolved.install.overrides;
+const cliTarball = `file:${resolved.install.cliTarball}`;
+info(
+  `verified ${Object.keys(overrides).length} @opensip-cli/* tarball(s) + the opensip-cli CLI ` +
+    `against the release manifest (digest ${resolved.identity.digest.slice(0, 12)}…)`,
+);
 
 // ---------------------------------------------------------------------
 // Build a throwaway consumer project and install the packed set

@@ -87,6 +87,11 @@
  *    pack operation in a resource-bounded worker. It is mounted-but-hidden under
  *    the same public-surface invariant as `__tool-command-worker`.
  *
+ * 10. The host-owned canonical `audit` command appears once at the root. It
+ *     shares suite scope/output flags with `suite run`, adds the human-only
+ *     `--open` presentation flag, and deliberately omits unsupported aggregate
+ *     delivery flags (`--report-to` / `--api-key`).
+ *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -159,8 +164,12 @@ function buildFullProgram(): Command {
     registerCliCommands(program, {
       setExitCode: vi.fn(),
       render: vi.fn(() => Promise.resolve()),
+      emitJson: vi.fn(),
+      emitRaw: vi.fn(),
+      emitError: vi.fn(),
       datastore: () => undefined,
       pluginLayouts,
+      toolScaffolds: [],
       tools: registry,
     });
 
@@ -312,6 +321,9 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'graph-run-worker',
       'graph-shard-worker',
       'graph-equivalence-check',
+      'graph-context-inventory',
+      'graph-context-ensure',
+      'graph-context-select-tests',
       'sim-run-worker',
       'yagni-run-worker',
       '__tool-command-worker',
@@ -354,6 +366,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'graph',
       'simulation',
       'init',
+      'audit',
       'report',
       'configure',
       'agent-catalog',
@@ -364,6 +377,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
     ]) {
       expect(publicNames, `public verb '${verb}' must be listed in --help`).toContain(verb);
     }
+    expect(publicNames.filter((verb) => verb === 'audit')).toEqual(['audit']);
 
     // The retired top-level `plugin` group is GONE from the root surface.
     expect(publicNames, '`plugin` must NOT be a top-level command').not.toContain('plugin');

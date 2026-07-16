@@ -220,7 +220,8 @@ export function analyzeFileForDetachedPromises(
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
 
-  if (FILE_SKIP_PATTERNS.some((pattern) => filePath.includes(pattern))) {
+  const normalizedPath = filePath.replaceAll('\\', '/');
+  if (FILE_SKIP_PATTERNS.some((pattern) => normalizedPath.includes(pattern))) {
     return violations;
   }
 

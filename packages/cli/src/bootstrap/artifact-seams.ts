@@ -9,7 +9,7 @@ import {
   ConfigurationError,
   currentScope,
   isPathInside,
-  resolveProjectPaths,
+  resolveRuntimePathsForScope,
   SystemError,
   ToolError,
   logger as defaultLogger,
@@ -50,9 +50,10 @@ function maybePruneArtifactStore(
   log: Logger,
 ): void {
   try {
-    const projectRoot = scope?.projectContext?.projectRoot;
-    if (projectRoot === undefined) return; // project-less run: no store to prune
-    const { artifactsDir } = resolveProjectPaths(projectRoot);
+    const project = scope?.projectContext;
+    if (project === undefined) return; // project-less run: no store to prune
+    // Scope-aware: an ephemeral run's artifact store lives in the user cache.
+    const { artifactsDir } = resolveRuntimePathsForScope(project);
     if (!isPathInside(target, artifactsDir)) return; // not an artifact-store write
     // The dir immediately under the store is the `<tool>` segment; the substrate
     // composes `<tool>/<runId>/<name>` underneath it.

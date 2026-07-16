@@ -11,6 +11,7 @@
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate.js';
 
+import { catalogBuildCoverage } from './catalog-build-coverage.js';
 import {
   buildAndResolveCatalog,
   buildAndResolveCatalogIncremental,
@@ -22,12 +23,19 @@ import { recoverExactBoundaryEdges } from './exact-boundary-recovery.js';
 import type { GraphProgressCallback } from './types.js';
 import type { DiscoverOutput, GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
-import type { Catalog, ResolutionMode, ResolutionStats } from '../../types.js';
+import type {
+  AdapterSelectionEvidence,
+  Catalog,
+  ResolutionMode,
+  ResolutionStats,
+} from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
 
 export interface ObtainCatalogInput {
   readonly runStage: RunStage;
   readonly adapter: GraphLanguageAdapter;
+  /** Provenance from the same GraphAdapterSelector pick that chose `adapter`. */
+  readonly adapterSelection: AdapterSelectionEvidence;
   readonly discovery: DiscoverOutput;
   readonly catalogRepo: CatalogRepo | null;
   readonly useCache: boolean;
@@ -119,6 +127,16 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
     {
       ...recovered,
       filesFingerprint: computeFilesFingerprint(input.discovery.files),
+      // Provenance for freshness verification — only stamped on actual rebuilds;
+      // legacy cache hits above return byte-unchanged.
+      adapterSelection: input.adapterSelection,
+      engineMode: 'exact',
+      buildCoverage: catalogBuildCoverage({
+        projectRoot: input.projectRoot,
+        files: input.discovery.files,
+        parseErrors: built.parseErrors,
+        status: verdict.kind === 'incremental' ? 'partial' : 'complete',
+      }),
     },
     input.projectRoot,
   );

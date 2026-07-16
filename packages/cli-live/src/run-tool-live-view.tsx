@@ -18,10 +18,12 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
+import { mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
   isEmbeddedRender,
+  ToolError,
   type LiveViewContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
@@ -56,6 +58,88 @@ export interface LiveRunProduceHelpers {
   readonly setHeaderMetadata: (metadata: readonly LiveRunHeaderMeta[]) => void;
   readonly setShowRunHeader: (show: boolean) => void;
   readonly setRunning: (subscribe: (cb: ProgressCallback) => void) => void;
+}
+
+type LiveRunDoneOutcome = Extract<LiveRunOutcome, { kind: 'done' }>;
+type LiveRunErrorOutcome = Extract<LiveRunOutcome, { kind: 'error' }>;
+
+function durationFromSnapshot(
+  summaryDurationMs: number | undefined,
+  completionSnapshot: { readonly durationMs: number } | undefined,
+): { readonly durationMs: number } | Record<string, never> {
+  if (summaryDurationMs !== undefined || completionSnapshot === undefined) return {};
+  return { durationMs: completionSnapshot.durationMs };
+}
+
+function buildDoneData(
+  outcome: LiveRunDoneOutcome,
+  completionSnapshot: { readonly durationMs: number } | undefined,
+): LiveRunDoneData {
+  return {
+    ...outcome.done,
+    summary: {
+      ...outcome.done.summary,
+      ...durationFromSnapshot(outcome.done.summary.durationMs, completionSnapshot),
+    },
+  };
+}
+
+function buildCompletion(outcome: LiveRunDoneOutcome): ToolRunCompletion {
+  return {
+    ...(outcome.envelope === undefined ? {} : { envelope: outcome.envelope }),
+    ...(outcome.session === undefined ? {} : { session: outcome.session }),
+  };
+}
+
+function doneSubscribePatch(
+  progressOnDone: boolean | undefined,
+  doneSubscribe: ((cb: ProgressCallback) => void) | undefined,
+): { readonly subscribe: (cb: ProgressCallback) => void } | Record<string, never> {
+  if (progressOnDone === true && doneSubscribe !== undefined) {
+    return { subscribe: doneSubscribe };
+  }
+  return {};
+}
+
+function applyLiveError(
+  outcome: LiveRunErrorOutcome,
+  deps: {
+    readonly logger: ReturnType<typeof currentLogger>;
+    readonly tool: string;
+    readonly glue: { readonly setExitCode?: (code: number) => void };
+    readonly setState: (state: LiveRunState) => void;
+    readonly exit: () => void;
+  },
+): void {
+  const message = scrubErrorMessage(outcome.message);
+  deps.logger.error({ evt: 'cli.liveview.run.error', tool: deps.tool, message });
+  deps.glue.setExitCode?.(outcome.exitCode);
+  deps.setState({
+    phase: 'error',
+    message,
+    ...(outcome.suggestion === undefined ? {} : { suggestion: outcome.suggestion }),
+  });
+  setTimeout(() => deps.exit(), 50);
+}
+
+function applyThrownLiveError(
+  error: unknown,
+  deps: {
+    readonly logger: ReturnType<typeof currentLogger>;
+    readonly tool: string;
+    readonly glue: { readonly setExitCode?: (code: number) => void };
+    readonly setState: (state: LiveRunState) => void;
+    readonly exit: () => void;
+  },
+): void {
+  const raw = error instanceof Error ? error.message : String(error);
+  const message = scrubErrorMessage(raw);
+  deps.logger.error({ evt: 'cli.liveview.run.error', tool: deps.tool, message });
+  // Preserve ADR-0020 taxonomy (e.g. ConfigurationError → exit 2), not hard-coded 1.
+  const exitCode = error instanceof ToolError ? mapToolErrorToExitCode(error) : 1;
+  deps.glue.setExitCode?.(exitCode);
+  deps.setState({ phase: 'error', message });
+  setTimeout(() => deps.exit(), 50);
 }
 
 export interface LiveRunSpec {
@@ -147,54 +231,23 @@ function LiveRunner({ spec, glue, onDone }: LiveRunnerProps): React.ReactElement
         if (cancelled) return;
 
         if (outcome.kind === 'error') {
-          const message = scrubErrorMessage(outcome.message);
-          logger.error({ evt: 'cli.liveview.run.error', tool: spec.tool, message });
-          glue.setExitCode?.(outcome.exitCode);
-          setState({
-            phase: 'error',
-            message,
-            ...(outcome.suggestion === undefined ? {} : { suggestion: outcome.suggestion }),
-          });
-          setTimeout(() => exit(), 50);
+          applyLiveError(outcome, { logger, tool: spec.tool, glue, setState, exit });
           return;
         }
 
         logger.info({ evt: 'cli.liveview.run.complete', tool: spec.tool });
-
         const completionSnapshot = glue.liveContext?.runSession.timing.complete();
-        const doneData: LiveRunDoneData = {
-          ...outcome.done,
-          summary: {
-            ...outcome.done.summary,
-            ...(outcome.done.summary.durationMs === undefined && completionSnapshot !== undefined
-              ? { durationMs: completionSnapshot.durationMs }
-              : {}),
-          },
-        };
-
-        const completion: ToolRunCompletion = {
-          ...(outcome.envelope === undefined ? {} : { envelope: outcome.envelope }),
-          ...(outcome.session === undefined ? {} : { session: outcome.session }),
-        };
-        onDone(completion);
-
-        const doneSubscribe = doneSubscribeRef.current;
+        const doneData = buildDoneData(outcome, completionSnapshot);
+        onDone(buildCompletion(outcome));
         setState({
           phase: 'done',
-          ...(spec.progressOnDone === true && doneSubscribe !== undefined
-            ? { subscribe: doneSubscribe }
-            : {}),
+          ...doneSubscribePatch(spec.progressOnDone, doneSubscribeRef.current),
           data: enrichDoneWithEnvelope(doneData, outcome.envelope),
         });
         setTimeout(() => exit(), 50);
       } catch (error) {
         if (cancelled) return;
-        const raw = error instanceof Error ? error.message : String(error);
-        const message = scrubErrorMessage(raw);
-        logger.error({ evt: 'cli.liveview.run.error', tool: spec.tool, message });
-        glue.setExitCode?.(1);
-        setState({ phase: 'error', message });
-        setTimeout(() => exit(), 50);
+        applyThrownLiveError(error, { logger, tool: spec.tool, glue, setState, exit });
       }
     })();
 

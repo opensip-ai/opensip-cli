@@ -1,0 +1,14 @@
+export { registerBlastRadius } from '../blast-radius.js';
+export { registerCalleesOf } from '../callees-of.js';
+export { registerFindDeadCode } from '../find-dead-code.js';
+export { registerGetArchitecture } from '../get-architecture.js';
+export { registerGetRuntimeWiring } from '../get-runtime-wiring.js';
+export { registerGetSymbol } from '../get-symbol.js';
+export { registerPackageCycles } from '../package-cycles.js';
+export { registerPackageDependencies } from '../package-dependencies.js';
+export { registerReferencesTo } from '../references-to.js';
+export { registerSearchDeclarations } from '../search-declarations.js';
+export { registerSearchSymbols } from '../search-symbols.js';
+export { registerTracePath } from '../trace-path.js';
+export { registerWhoCalls } from '../who-calls.js';
+export { registerWhyDepends } from '../why-depends.js';

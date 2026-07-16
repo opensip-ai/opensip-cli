@@ -9,10 +9,20 @@ When answering questions about existing OpenSIP results, prior `fit` / `graph` /
 
 Source precedence:
 
-1. OpenSIP MCP tools: `list_runs`, `show_run`, `get_latest_findings`, `search_symbols`, `who_calls`, `callees_of`, `blast_radius`.
+1. OpenSIP MCP tools: `get_agent_catalog`, `list_runs`, `show_run`, `get_latest_findings`, `get_architecture`, `search_symbols`, `search_declarations`, `references_to`, `who_calls`, `callees_of`, `blast_radius`, `package_dependencies`, `why_depends`, `package_cycles`, `get_runtime_wiring`.
 2. `opensip sessions ...` replay commands when MCP is unavailable.
 3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.
 4. Raw logs or direct datastore inspection only as a last-resort debugging path.
+
+Graph audit notes:
+
+- Call `get_agent_catalog` first for live surface diagnosis (version, surface epoch, registered names/count, mutation posture, project root). Compare with initialize/listTools. A mismatched surface epoch or tool names means reconnect the MCP client/process — `refresh_graph` cannot repair a stale connector inventory.
+- Verify the canonical configured project context first, including `context.project.root`, then the opaque `g1:` catalog generation identity in `context.catalog.identity`. The project key is a separate cursor binding only; never treat it as response context or infer it from an opaque cursor.
+- Inspect freshness `complete` versus `partial`, reason codes, effective filters, evidence kind/confidence, and the four coverage facets (inventory / evidence / grouping / projection) — noting per-facet hard-cap reasons and cursor continuation — before claiming complete coverage. Sample or page caps must not invalidate a complete inventory.
+- Ordinary MCP graph reads auto-load a newer catalog already persisted by `opensip graph`; they never build one. Use `refresh_graph` only when missing/stale graph evidence explicitly requires a fresh build, not merely because an external graph run just finished, and never to fix a stale connector.
+- Prefer exclusive compact detail modes (`summary` / `groups` / `nodes`). Identity searches (`search_symbols`, `search_declarations`) default to 20 nodes. Request package samples, cycle proofs, and reference sites only when needed.
+- Traversal defaults to occurrence identity; body-twin union is explicit. Use `package_dependencies`, `why_depends`, and `package_cycles` for labelled call/import package evidence. Use `search_declarations` then `references_to` for cross-file type/interface references (exact TypeScript only; declaration IDs are not callable symbolIds). Use `get_runtime_wiring` for live command inventory (`w1:`) and author-declared static-handler bridges against `g1:` — runtime edges, not call edges.
+- Continue bounded pages with the returned cursor and keep filters stable. Do not loop `refresh_graph` per query.
 
 Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result/history questions; logs are event streams and may not match stored session semantics.
 <!-- opensip:agent-guidance end -->
@@ -20,11 +30,14 @@ Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result
 ## What is OpenSIP CLI?
 
 OpenSIP CLI is an **open-source codebase intelligence CLI** — a CLI that
-hosts pluggable tools for static analysis and evidence serving. Today it ships
-with five bundled tools: `fit` (fitness checks across TypeScript, Rust, Python,
-Java, Go, C/C++), `graph` (static call-graph analysis), `sim` (simulation
-scenarios, experimental), `yagni` (advisory YAGNI reduction audit), and `mcp`
-(stored results + graph evidence over stdio for MCP clients).
+hosts pluggable tools for static analysis and evidence serving. It ships with the
+five bundled tools declared in
+`packages/cli/src/bootstrap/bundled-tools.manifest.json` (the source of truth):
+`fit` (fitness checks across TypeScript, Rust, Python, Java, Go, C/C++), `graph`
+(static call-graph analysis), `sim` (simulation scenarios, experimental), `yagni`
+(advisory YAGNI reduction audit), and `mcp` (stored results + graph evidence over
+stdio for MCP clients). Of these, the four analysis tools (`fit`, `graph`, `sim`,
+`yagni`) render live views; `mcp` is a raw stdio server.
 Adding a new tool is a plugin operation; the CLI is a generic dispatcher.
 
 ## Product Origin And Intent
@@ -64,9 +77,17 @@ Turborepo + pnpm monorepo. Workspace scope: `@opensip-cli/*`. Layered —
 higher-level packages depend on lower-level substrates, never the other
 direction. Architecture rules are enforced by dependency-cruiser in CI.
 
+The generated inventory in `docs/public/80-implementation/architecture-map.md`
+is authoritative: 60 workspace packages, 57 publishable and three private
+(`@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
+`@opensip-cli/checks-dogfood`). The tree below is a hand-maintained orientation
+map, not the source of truth for the exact package set.
+
 ```
 opensip-cli/
 ├── packages/
+│   ├── agent-eval/              # @opensip-cli/agent-eval — PRIVATE black-box
+│   │                            #   agent-usability gold-task evaluation harness
 │   ├── core/                    # @opensip-cli/core — kernel: errors, logger,
 │   │                            #   IDs, language adapters, plugin loader,
 │   │                            #   Tool contract
@@ -83,6 +104,8 @@ opensip-cli/
 │   ├── clone-detection/         # @opensip-cli/clone-detection — shared
 │   │                            #   function-body clone-detection substrate
 │   │                            #   used by graph and yagni (ADR-0064)
+│   ├── format/                  # @opensip-cli/format — pure human-facing
+│   │                            #   formatters (no @opensip-cli deps; layer 2)
 │   ├── dashboard/               # @opensip-cli/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by the CLI-owned `report` command
@@ -115,6 +138,9 @@ opensip-cli/
 │   │                            #   runtime substrate (ADR-0037): TargetRegistry +
 │   │                            #   glob expansion w/ globalExcludes; built once
 │   │                            #   per run by the CLI bootstrap → scope.targets
+│   ├── codebase/                # @opensip-cli/codebase — bounded deterministic
+│   │                            #   project inventory + package-manifest facts
+│   │                            #   (deps: contracts + core; layer 3)
 │   ├── test-support/            # @opensip-cli/test-support — PRIVATE, never
 │   │                            #   published (ADR-0040): cross-package test
 │   │                            #   scaffolding (RunScope test sugar + the
@@ -128,7 +154,9 @@ opensip-cli/
 │   ├── external-tool-adapter/   # @opensip-cli/external-tool-adapter —
 │   │                            #   substrate for wrapping external scanners
 │   ├── mcp/                     # @opensip-cli/mcp — bundled MCP stdio server
-│   │                            #   over graph catalogs and stored sessions
+│   │                            #   over graph catalogs and stored sessions;
+│   │                            #   graph reads go through @opensip-cli/graph/read,
+│   │                            #   never @opensip-cli/graph/internal
 │   ├── tool-gitleaks/           # @opensip-cli/tool-gitleaks — external
 │   │                            #   scanner adapter for committed secrets
 │   ├── tool-osv-scanner/        # @opensip-cli/tool-osv-scanner — external
@@ -140,13 +168,15 @@ opensip-cli/
 │   │   ├── engine/              # @opensip-cli/fitness — fitness engine,
 │   │   │                        #   fit/report-data/fit-list/fit-recipes,
 │   │   │                        #   gate, SARIF
-│   │   ├── checks-typescript/   # @opensip-cli/checks-typescript (51 checks)
-│   │   ├── checks-universal/    # @opensip-cli/checks-universal (94 checks)
+│   │   ├── checks-typescript/   # @opensip-cli/checks-typescript (50 checks)
+│   │   ├── checks-universal/    # @opensip-cli/checks-universal (96 checks)
 │   │   ├── checks-python/       # @opensip-cli/checks-python
 │   │   ├── checks-go/           # @opensip-cli/checks-go
 │   │   ├── checks-java/         # @opensip-cli/checks-java
 │   │   ├── checks-cpp/          # @opensip-cli/checks-cpp
-│   │   └── checks-rust/         # @opensip-cli/checks-rust
+│   │   ├── checks-rust/         # @opensip-cli/checks-rust
+│   │   └── checks-dogfood/      # @opensip-cli/checks-dogfood — PRIVATE
+│   │                            #   repository-only architecture checks
 │   │
 │   ├── simulation/              # simulation namespace
 │   │   └── engine/              # @opensip-cli/simulation
@@ -210,6 +240,11 @@ pnpm install && pnpm build
 # Run fitness checks against this repo (must build first)
 pnpm fit            # shortcut for: node packages/cli/dist/index.js fit
 
+# Run the canonical changed-code review against this repo
+pnpm opensip:audit  # NOT `pnpm audit` — that is pnpm's built-in dependency
+                    # vulnerability scanner and cannot be shadowed by a script.
+pnpm opensip <any>  # generic passthrough, e.g. pnpm opensip suite list
+
 # Run all tests
 pnpm test
 
@@ -255,6 +290,7 @@ tools load by package name through the same plugin path as installed tools.
 
 Subcommands available out of the box:
 
+- `opensip audit` — Run the canonical changed-code review (`--json`, `--open`, `--full`, `--since`, `--files`)
 - `opensip fit` — Run fitness checks (with --gate-save, --gate-compare,
   --recipe, --check, --tags, --json, --report-to)
 - `opensip fit list` — List available checks
@@ -288,14 +324,14 @@ Subcommands available out of the box:
 
 ## Fitness Check System
 
-151 checks across seven check packs (TypeScript, Universal, Python,
+152 checks across seven check packs (TypeScript, Universal, Python,
 Go, Java, C/C++, Rust). The authoritative per-pack list lives in
 `docs/public/70-reference/05-checks-index.md` (generated) — counts below
 are approximate and drift as checks are added:
 
-- `@opensip-cli/checks-typescript` (51 checks) — TS-AST-driven checks
+- `@opensip-cli/checks-typescript` (50 checks) — TS-AST-driven checks
   (drizzle-orm, typed-inject, react, package.json exports, tsconfig).
-- `@opensip-cli/checks-universal` (94 checks) — text/regex/glob checks
+- `@opensip-cli/checks-universal` (96 checks) — text/regex/glob checks
   (Docker, .env, Sentry, generic structure, dead-code via knip).
 - `@opensip-cli/checks-python|go|java|cpp|rust` — language-specific checks.
 
@@ -404,12 +440,12 @@ fn)`, every async descendant of `fn` sees the same scope. The
   `Symbol.for(globalThis)` slot that held run state (`recipeCheckConfig`)
   stays deleted. There IS one `Symbol.for('@opensip-cli/core/scopeStorage')`
   slot on `globalThis`, but it holds only the `AsyncLocalStorage`
-  *container* (infrastructure), not run state: pinning the ALS instance
+  _container_ (infrastructure), not run state: pinning the ALS instance
   process-globally lets duplicate physical copies of `@opensip-cli/core`
   (pnpm `injectWorkspacePackages` hard-links a nested core into the
   virtual store) share one scope store instead of splitting it — which
   otherwise leaves `currentScope()` undefined in check execution and
-  silently degrades content filters to raw. The scope *value* still flows
+  silently degrades content filters to raw. The scope _value_ still flows
   per-async-context through `runWithScope`/`enterScope`, so this does NOT
   reintroduce module-level mutable run state. See `run-scope.ts` (ALS seam)
   and the fitness-transitive probe in `single-core-guard.ts`.
@@ -493,9 +529,9 @@ This is the mechanical realization of "only use documented seams".
 ```
 core (kernel)
   ↑
-contracts / cli-ui / datastore / tree-sitter / clone-detection / tool-test-kit (layer 2)
+contracts / cli-ui / datastore / tree-sitter / clone-detection / format / tool-test-kit (layer 2)
   ↑
-cli-live / output / config / targeting / lang-* / dashboard / external-tool-adapter (layer 3)
+cli-live / session-store / output / config / targeting / codebase / lang-* / dashboard / external-tool-adapter (layer 3)
   ↑
 fitness / graph / simulation / yagni / mcp / tool-* scanner adapters (layer 4 — tool engines)
   ↑
@@ -512,6 +548,13 @@ cli (layer 6 — composition root; depends on every tool)
   it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
 - fitness / graph / simulation / yagni / mcp / tool-* adapters must NOT import
   from cli (would create a cycle).
+- MCP production reads graph catalogs through `@opensip-cli/graph/read`; it must
+  NOT import `@opensip-cli/graph/internal`.
+- External Tool workers enter `host-rpc-only` mode only when the exact internal
+  command and host marker both match. Their ambient datastore thunk is denied;
+  privileged OpenSIP effects use the enumerated host RPC surface. This is not an
+  OS sandbox: admitted code retains the current user's filesystem and network
+  authority. External trust lists accept exact ids only; `*` is ignored.
 - check packs must NOT import from cli or contracts.
 - lang-\* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`
@@ -615,8 +658,8 @@ silently report 0 checks.
 
 ## Documentation
 
-The `docs/` tree has five committed siblings plus one local-only
-scratch area, each with a distinct contract:
+The `docs/` tree has committed and local-only areas, each with a distinct
+contract:
 
 - **`docs/public/`** — hand-edited source. These are the docs we publish
   on the website at opensip.ai/docs/opensip-cli/. Numbered
@@ -624,11 +667,10 @@ scratch area, each with a distinct contract:
   `40-graph`, `50-extend`, `60-guides`, `70-reference`,
   `80-implementation`. Anything here is reader-facing and externally
   consumable.
-- **`docs/internal/`** — hand-edited, repo-only but committed.
-  Contributor-facing awareness that doesn't belong on the website:
-  cross-repo consumer relationships, operational notes. See
-  `docs/internal/README.md` for the charter. (Formal decisions live in
-  `docs/decisions/`, not here.)
+- **`docs/internal/`** — hand-edited, local-only and gitignored by default.
+  Private working context that must not be published or force-added. See the
+  local `docs/internal/README.md` for the charter. (Public formal decisions live
+  in `docs/decisions/`, not here.)
 - **`docs/decisions/`** — hand-edited, committed. The architecture
   decision log (ADRs): the durable _why_ behind a choice, with
   alternatives and consequences. One file per `ADR-NNNN-*.md`,
@@ -651,17 +693,17 @@ scratch area, each with a distinct contract:
 - **`docs/plans/`** — local-only scratch space, **gitignored**.
   In-progress implementation plans and design notes that don't belong
   in a public OSS repo. Not committed; not visible to external
-  contributors. Anything that matures into a durable record (decision →
-  `docs/decisions/`, consumer contract →
-  `docs/internal/`, reader-facing fact → `docs/public/`) graduates out
-  of `docs/plans/`.
+  contributors. Anything that matures into a public durable record (decision →
+  `docs/decisions/`, reader-facing fact → `docs/public/`) graduates out of
+  `docs/plans/`; private durable context may move to local-only
+  `docs/internal/`.
 
 Boundary rule of thumb: a durable _decision_ (what we chose + why, with
 alternatives) is an ADR in `docs/decisions/`; the _how to build it_ is a
 spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
 opensip-cli without naming a specific consumer, it goes in
 `docs/public/`; if naming a specific consumer (or other private context)
-is load-bearing, it goes in `docs/internal/`; if it's pending work or
+is load-bearing, it goes in local-only `docs/internal/`; if it's pending work or
 design exploration not yet ready for external readers, it stays in
 `docs/plans/` (local-only).
 
@@ -700,7 +742,7 @@ npm's self-replacement and pnpm's lack of OIDC support.
 
 ## Project Status
 
-**v0.5.0 (initial production launch)** — OpenSIP CLI is a tool-plugin
+**v0.7.0 (initial production launch)** — OpenSIP CLI is a tool-plugin
 platform: `core` is a strict kernel, and `fitness`, `graph`,
 `simulation`, `yagni`, and `mcp` are bundled peer tools implementing a
 shared Tool contract, with `cli` as a generic dispatcher. Installed and
@@ -712,15 +754,23 @@ CLI package dependency, refresh the bundled-tool test utilities, and
 regenerate the command-surface parity snapshot. The npm package is
 `opensip-cli`; the installed command is `opensip`.
 
-The new-customer flow is three commands: `init` (language detection
-
-- scaffolded layout) → `fit --recipe example` → `sim --recipe
+The new-customer flow leads with first value: `opensip audit` (and
+`fit`, `graph`, `graph impact`) work in a supported project **before**
+`init` — the CLI composes a validated in-memory default config and
+keeps rebuildable runtime state in the user cache, so nothing lands in
+the customer's repo. Initialization is customization after first
+value, not a prerequisite (`audit` is the canonical changed-code
+review, ADR-0155; posture documented in
+`docs/public/00-start/00-quick-start.md`). When the user wants
+explicit setup, `init` (language detection + scaffolded layout) writes
+the config, examples, `.gitignore`, and agent guidance; the
+post-init smoke path is `fit --recipe example` → `sim --recipe
 example`. Project layout is local: user-authored content under
-  `<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
-  (tracked) and tool-generated state under
-  `<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
-  auto-discovers `.mjs` files by directory presence; npm packages
-  must be explicitly listed in `plugins.<domain>` to load.
+`<project>/opensip-cli/{fit,sim}/{checks,recipes,scenarios}/`
+(tracked) and tool-generated state under
+`<project>/opensip-cli/.runtime/` (gitignored). Plugin loader
+auto-discovers `.mjs` files by directory presence; npm packages
+must be explicitly listed in `plugins.<domain>` to load.
 
 Re-running `init` on a non-pristine project refuses with exit 2 by
 default. Two explicit flags express user intent:

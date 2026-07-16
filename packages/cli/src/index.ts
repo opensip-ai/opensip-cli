@@ -31,6 +31,7 @@ import {
 } from '@opensip-cli/core';
 import { Command } from 'commander';
 
+import { buildRuntimeCommandInventory } from './bootstrap/build-runtime-command-inventory.js';
 import {
   bootstrapCli,
   installPreActionHook,
@@ -39,7 +40,9 @@ import {
   mountAllToolCommands,
   renderResult,
   buildCommandRegistrationInput,
+  resolveStartupExecutionMode,
 } from './bootstrap/index.js';
+import { rejectHostCommandCollisions } from './bootstrap/reject-host-command-collisions.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import { buildTopLevelHostSpecs } from './commands/host-command-specs.js';
@@ -90,6 +93,12 @@ const program = new Command('opensip')
   .exitOverride();
 
 async function main(): Promise<void> {
+  const userArgv = process.argv.slice(2);
+  // Resolve the exact internal-command + host-marker pair before startup tool
+  // discovery. A forged one-sided marker must fail before an external package's
+  // module can be evaluated in this process.
+  const runtimeMode = resolveStartupExecutionMode(userArgv, process.env);
+
   // Bare `opensip --version` / `-V` → the CLI version (host-owned), printed
   // before any bootstrap. A `--version` AFTER a subcommand is that tool's own
   // (handled by decorateToolPrimary's subcommand-local version option).
@@ -106,7 +115,6 @@ async function main(): Promise<void> {
   // Persistence: datastore is opened LAZILY in cli-context.ts on
   // first access via getOrOpenDatastore. bootstrapCli just registers
   // tools and adapters; no SQLite file is created here.
-  const userArgv = process.argv.slice(2);
   const { provenance, manifests, bootstrapDiagnostics, startupTimings, trustPolicy, policyAudit } =
     await bootstrapCli({
       langRegistry,
@@ -115,7 +123,9 @@ async function main(): Promise<void> {
       cwd: process.cwd(),
       cliEntryUrl: import.meta.url,
       argv: userArgv,
+      runtimeMode,
     });
+  rejectHostCommandCollisions(toolRegistry);
 
   const { ctx, runActionHooks, getExitCode } = buildToolCliContext({
     render: renderResult,
@@ -137,6 +147,7 @@ async function main(): Promise<void> {
     setExitCode: ctx.setExitCode,
     getExitCode,
     render: renderResult,
+    reportFailure: ctx.reportFailure,
     emitJson: ctx.emitJson,
     emitRaw: ctx.emitRaw,
     emitError: ctx.emitError,
@@ -148,11 +159,26 @@ async function main(): Promise<void> {
     ...registrationInput,
   };
 
+  // Build host/tool command surfaces ONCE — same values feed scope indexing,
+  // plain runtime inventory projection, and Commander mounting so inventory
+  // cannot drift through repeated builders.
+  const hostSpecs = buildTopLevelHostSpecs(commandCtx);
+  const hostGroups = buildHostSubcommandGroups(commandCtx);
+  const toolPluginGroups = buildToolPluginGroups(commandCtx, toolRegistry);
   const commandScopes = buildCommandScopeIndex({
     toolSpecs: registrationInput.toolCommandSpecs,
-    hostSpecs: buildTopLevelHostSpecs(commandCtx),
-    hostGroups: buildHostSubcommandGroups(commandCtx),
-    toolPluginGroups: buildToolPluginGroups(commandCtx, toolRegistry),
+    hostSpecs,
+    hostGroups,
+    toolPluginGroups,
+  });
+  const runtimeCommands = buildRuntimeCommandInventory({
+    toolRegistry,
+    toolCommandSpecs: registrationInput.toolCommandSpecs,
+    hostSpecs,
+    hostGroups,
+    toolPluginGroups,
+    manifests,
+    provenance,
   });
 
   // Install the pre-action hook AFTER bootstrap + command-scope indexing so the
@@ -170,6 +196,7 @@ async function main(): Promise<void> {
       startupTimings,
       trustPolicy,
       policyAudit,
+      runtimeCommands,
     },
     commandScopes,
   );

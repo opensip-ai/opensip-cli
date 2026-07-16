@@ -180,6 +180,7 @@ describe('DataStoreFactory.open — downgrade guard', () => {
     writeUserVersion(path, 9999);
 
     expect(() => DataStoreFactory.open({ backend: 'sqlite', path })).toThrow(DataStoreVersionError);
+    expect(readUserVersion(path)).toBe(9999);
   });
 
   it('the error message points at the install script and the delete fallback', () => {

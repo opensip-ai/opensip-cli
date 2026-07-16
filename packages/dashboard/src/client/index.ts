@@ -22,8 +22,13 @@
 
 import { renderCatalogProvenance } from './catalog-provenance.js';
 import { renderGraphRecipeCatalog, renderGraphRuleCatalog } from './catalog-recipes-tables.js';
+import { renderChangeImpact } from './change-impact.js';
 import { renderChecksCatalog } from './checks.js';
-import { openCodePathsSession, renderCodePathsTab } from './code-paths-panel.js';
+import {
+  openCodePathsFunction,
+  openCodePathsSession,
+  renderCodePathsTab,
+} from './code-paths-panel.js';
 import { el } from './el.js';
 import { filterState, KIND_LIST, packagesInCatalog, passesFilter } from './filters.js';
 import { closeFunctionCard, openFunctionCard } from './function-card.js';
@@ -39,6 +44,7 @@ import { renderSessionTable } from './sessions.js';
 import { makeSortable } from './sortable.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { activateTabForSession, registerTabActivator } from './tab-activators.js';
+import { activateReportTab } from './tab-bar.js';
 import {
   renderExternalTab,
   renderFitnessTab,
@@ -47,12 +53,10 @@ import {
 } from './tool-tabs.js';
 import { defineRankedView } from './view-template.js';
 import { activateView, views } from './views-registry.js';
-// Side-effect-only module: tab-bar wires the #tab-bar click handler at load.
-// (sortable also schedules its setTimeout(0) `.data-table.sortable` activation
+// tab-bar wires the #tab-bar click handler at load. (sortable also schedules its setTimeout(0) `.data-table.sortable` activation
 // pass as a load-time side effect, imported above for `makeSortable`. help-drawer
 // attaches its document-level Escape keydown handler at load, imported above for
 // `openHelpDrawer`.)
-import './tab-bar.js';
 
 // Expose the migrated helpers as page globals so the still-string-emitted client
 // modules (Code Paths) and generator.ts's render block — which run in the same
@@ -71,6 +75,7 @@ interface ClientGlobals {
   renderChecksCatalog: typeof renderChecksCatalog;
   renderRecipesPanel: typeof renderRecipesPanel;
   renderOverview: typeof renderOverview;
+  renderChangeImpact: typeof renderChangeImpact;
   renderFitnessTab: typeof renderFitnessTab;
   renderSimulationTab: typeof renderSimulationTab;
   renderYagniTab: typeof renderYagniTab;
@@ -83,6 +88,8 @@ interface ClientGlobals {
   // through the booted page scope.
   renderCodePathsTab: typeof renderCodePathsTab;
   openCodePathsSession: typeof openCodePathsSession;
+  openCodePathsFunction: typeof openCodePathsFunction;
+  activateReportTab: typeof activateReportTab;
   // Code Paths prelude (L4): the views (view-coupling / view-distribution /
   // view-graph + view-template) and the panel now live in the bundle, so these
   // helpers are imported directly there. They stay exposed because the jsdom
@@ -123,6 +130,7 @@ g.renderSessionTable = renderSessionTable;
 g.renderChecksCatalog = renderChecksCatalog;
 g.renderRecipesPanel = renderRecipesPanel;
 g.renderOverview = renderOverview;
+g.renderChangeImpact = renderChangeImpact;
 g.renderFitnessTab = renderFitnessTab;
 g.renderSimulationTab = renderSimulationTab;
 g.renderYagniTab = renderYagniTab;
@@ -130,6 +138,8 @@ g.renderExternalTab = renderExternalTab;
 // Code Paths panel entry + prelude bridge globals (L4).
 g.renderCodePathsTab = renderCodePathsTab;
 g.openCodePathsSession = openCodePathsSession;
+g.openCodePathsFunction = openCodePathsFunction;
+g.activateReportTab = activateReportTab;
 g.packageOfPath = packageOfPath;
 g.shortPkg = shortPkg;
 g.pkgOf = pkgOf;

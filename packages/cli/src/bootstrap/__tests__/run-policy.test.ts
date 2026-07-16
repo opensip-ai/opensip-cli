@@ -16,9 +16,12 @@ vi.mock('@opensip-cli/config', async (importOriginal) => {
 });
 
 const PROJECT: ProjectContext = {
+  cwd: '/repo',
+  cwdExplicit: false,
   scope: 'project',
   projectRoot: '/repo',
   configPath: '/repo/opensip-cli.config.yml',
+  walkedUp: 0,
 };
 
 function baseArgs(

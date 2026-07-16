@@ -1,24 +1,29 @@
 /**
  * Shared registration for bounded call-graph walk tools.
  *
- * `who_calls` and `callees_of` differ only by metadata and adjacency direction;
- * resolving `symbolId`, enforcing the bounded BFS, freshness propagation, and
- * `truncated` shaping belong in one implementation.
+ * `who_calls` and `callees_of` route through one `GraphReadPort.traverse` call
+ * so a single immutable generation is captured for the whole walk.
  */
 
-import { boundedBfs, MAX_WALK_NODES } from './graph-walk.js';
-import { depth as depthSchema, symbolId as symbolIdSchema } from './schemas.js';
-import { errorResult, failure, jsonResult } from './tool-result.js';
+import {
+  compactDetail,
+  depth as depthSchema,
+  pageFields,
+  sourceFilterFields,
+  strictInput,
+  symbolId as symbolIdSchema,
+  traversalIdentity,
+} from './schemas.js';
+import { errorResult, jsonResult } from './tool-result.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
 import type { McpStdioServer } from '../server.js';
-import type { SymbolRef } from '../symbol-dto.js';
 
 export interface CallWalkToolSpec {
   readonly name: string;
   readonly title: string;
   readonly description: string;
-  readonly graph: (port: GraphReadPort) => ReturnType<GraphReadPort['callerGraph']>;
+  readonly direction: 'callers' | 'callees';
 }
 
 export function registerCallWalkTool(
@@ -31,38 +36,37 @@ export function registerCallWalkTool(
     {
       title: spec.title,
       description: spec.description,
-      inputSchema: {
+      inputSchema: strictInput({
         symbolId: symbolIdSchema(),
         depth: depthSchema(),
-      },
+        identity: traversalIdentity(),
+        detail: compactDetail('nodes'),
+        ...sourceFilterFields(),
+        ...pageFields(),
+      }),
     },
-    ({ symbolId, depth }) => {
-      const resolved = graphPort.resolveSymbolId(symbolId);
-      if (!resolved.ok) return errorResult(resolved.error);
-      const startRef = resolved.value.data;
-      if (startRef === undefined) {
-        return failure(
-          'symbol-not-found',
-          `Unknown symbolId "${symbolId}". Obtain a valid symbolId from search_symbols or get_symbol.`,
-        );
-      }
-      const graph = spec.graph(graphPort);
-      if (!graph.ok) return errorResult(graph.error);
-      const { data: snapshot, freshness } = graph.value;
-      const walk = boundedBfs(snapshot.edges, startRef.bodyHash, {
-        depth,
-        cap: MAX_WALK_NODES,
+    async (args) => {
+      const outcome = await graphPort.traverse({
+        direction: spec.direction,
+        startSymbolId: args.symbolId,
+        depth: args.depth,
+        identity: args.identity,
+        limit: args.limit,
+        cursor: args.cursor,
+        groupBy: args.groupBy,
+        detail: args.detail ?? 'nodes',
+        filter: {
+          packages: args.packages,
+          filePath: args.filePath,
+          filePrefix: args.filePrefix,
+          kinds: args.kinds,
+          visibilities: args.visibilities,
+          sourceScope: args.sourceScope,
+          generated: args.generated,
+        },
       });
-      const data = walk.order.map((hash) => snapshot.resolve(hash)).filter(isSymbolRef);
-      return jsonResult({
-        data,
-        freshness,
-        ...(walk.truncated ? { truncated: true } : {}),
-      });
+      if (!outcome.ok) return errorResult(outcome.error);
+      return jsonResult(outcome.value);
     },
   );
-}
-
-function isSymbolRef(ref: SymbolRef | undefined): ref is SymbolRef {
-  return ref !== undefined;
 }

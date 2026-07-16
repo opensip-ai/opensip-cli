@@ -148,15 +148,13 @@ describe('graph-java walk.ts defensive paths', () => {
 });
 
 describe('graph-java walk-metadata param extraction', () => {
-  it('skips a varargs parameter whose name lives in a variable_declarator', () => {
+  it('extracts a varargs parameter whose name lives in a variable_declarator', () => {
     // tree-sitter-java models `String... xs` as a `spread_parameter`
-    // with `type_identifier` + `variable_declarator` named children and
-    // no `name` field — so findIdentifierChild returns null and the
-    // param is skipped.
+    // with `type_identifier` + `variable_declarator` named children.
     const root = parseRoot('class A { void f(String... xs) {} }');
     const method = findNode(root, 'method_declaration');
     expect(method).not.toBeNull();
-    expect(extractParams(method!)).toEqual([]);
+    expect(extractParams(method!)).toEqual([{ name: 'xs', optional: false, rest: true }]);
   });
 
   it('extracts plain formal parameter names', () => {

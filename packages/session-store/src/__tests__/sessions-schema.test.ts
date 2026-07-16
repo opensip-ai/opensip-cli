@@ -1,7 +1,7 @@
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import { describe, expect, it } from 'vitest';
 
-import { sessions, sessionToolPayload } from '../schema/sessions.js';
+import { sessionHostMetrics, sessions, sessionToolPayload } from '../schema/sessions.js';
 
 describe('sessions schema', () => {
   it('declares timestamp lookup indexes on sessions', () => {
@@ -55,6 +55,22 @@ describe('sessions schema', () => {
       'payload_version',
       'session_id',
       'tool',
+    ]);
+  });
+
+  it('wires the session_host_metrics -> sessions cascade foreign key', () => {
+    const { foreignKeys, columns } = getTableConfig(sessionHostMetrics);
+    expect(foreignKeys).toHaveLength(1);
+    expect(foreignKeys[0]?.onDelete).toBe('cascade');
+    const ref = foreignKeys[0]?.reference();
+    expect(ref?.foreignTable).toBe(sessions);
+    expect(columns.map((c) => c.name).sort()).toEqual([
+      'egress_ms',
+      'persist_ms',
+      'render_ms',
+      'session_id',
+      'total_command_ms',
+      'tty_busy_ms',
     ]);
   });
 });

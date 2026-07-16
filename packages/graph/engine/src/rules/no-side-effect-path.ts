@@ -5,7 +5,12 @@
  *
  * Heuristic, in order:
  *   1. The function's entire transitive callee set is side-effect free
- *      (no I/O, logging, mutation, or unresolved edges).
+ *      (no I/O, logging, or mutation), AND the candidate's own call edges are
+ *      all resolved. Unresolved edges are gated on the DIRECT occurrence only
+ *      (see isPureCandidate): an unresolved edge deep in the transitive set is
+ *      tolerated, because real code reaches library/builtin calls the catalog
+ *      cannot resolve, so disqualifying on any transitive unresolved edge would
+ *      suppress nearly every candidate.
  *   2. At least one inbound caller invokes this function as an
  *      ExpressionStatement (its return value is discarded).
  *

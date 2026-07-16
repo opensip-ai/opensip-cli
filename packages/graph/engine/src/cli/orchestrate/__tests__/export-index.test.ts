@@ -458,6 +458,44 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
     expect(index.get('@opensip-cli/core')?.dir).toBe('packages/core');
   });
 
+  it('keeps the project-root package aligned with graph root attribution', () => {
+    writePackage('.', {
+      name: '@example/root',
+      exports: { './api': './src/api.ts' },
+    });
+    const index = buildPackageManifestIndex([shard('pkg:root', '.')], projectRoot);
+
+    expect(index.get('@example/root')).toEqual({
+      name: '@example/root',
+      dir: '',
+      exportsMap: { './api': true },
+    });
+    expect(resolveSpecifierToPackage('@example/root/api', index)).toEqual({
+      packageGroup: '@example/root',
+      subpath: './api',
+    });
+  });
+
+  it('skips malformed and bounded-oversize manifests through the shared parser', () => {
+    const malformedRoot = join(projectRoot, 'packages/malformed');
+    const oversizedRoot = join(projectRoot, 'packages/oversized');
+    mkdirSync(malformedRoot, { recursive: true });
+    mkdirSync(oversizedRoot, { recursive: true });
+    writeFileSync(join(malformedRoot, 'package.json'), '{invalid', 'utf8');
+    writeFileSync(
+      join(oversizedRoot, 'package.json'),
+      JSON.stringify({ name: 'oversized', pad: 'x'.repeat(1024 * 1024) }),
+      'utf8',
+    );
+
+    const index = buildPackageManifestIndex(
+      [shard('pkg:malformed', 'packages/malformed'), shard('pkg:oversized', 'packages/oversized')],
+      projectRoot,
+    );
+
+    expect(index.size).toBe(0);
+  });
+
   it('resolves a scoped bare root specifier to its package group (the package name)', () => {
     const index = buildPackageManifestIndex(shards, projectRoot);
     const resolved = resolveSpecifierToPackage('@opensip-cli/core', index);
@@ -483,6 +521,43 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
       packageGroup: '@opensip-cli/core',
       subpath: './languages/parse-cache.js',
     });
+  });
+
+  it('retains graph resolution parity beyond the bounded display export projection', () => {
+    writePackage('packages/wide-exports', {
+      name: 'wide-exports',
+      exports: Object.fromEntries(
+        Array.from({ length: 300 }, (_value, index) => [
+          `./entry-${String(index)}`,
+          `./dist/entry-${String(index)}.js`,
+        ]),
+      ),
+    });
+    const index = buildPackageManifestIndex(
+      [shard('pkg:wide-exports', 'packages/wide-exports')],
+      projectRoot,
+    );
+
+    expect(resolveSpecifierToPackage('wide-exports/entry-299', index)).toEqual({
+      packageGroup: 'wide-exports',
+      subpath: './entry-299',
+    });
+  });
+
+  it('treats a conditional exports object as root-only', () => {
+    writePackage('packages/conditional-exports', {
+      name: 'conditional-exports',
+      exports: { import: './index.mjs', require: './index.cjs' },
+    });
+    const index = buildPackageManifestIndex(
+      [shard('pkg:conditional-exports', 'packages/conditional-exports')],
+      projectRoot,
+    );
+
+    expect(resolveSpecifierToPackage('conditional-exports', index)).toEqual({
+      packageGroup: 'conditional-exports',
+    });
+    expect(resolveSpecifierToPackage('conditional-exports/internal', index)).toBeUndefined();
   });
 
   it('declines a subpath NOT declared in exports', () => {
@@ -521,5 +596,63 @@ describe('buildPackageManifestIndex + resolveSpecifierToPackage', () => {
     // The whole point: the specifier's group keys straight into the export index.
     const byName = exportIndex.get(resolved?.packageGroup ?? '<none>');
     expect(byName?.get('parse')?.map((o) => o.bodyHash)).toEqual(['P']);
+  });
+
+  describe('duplicate package.json#name fails closed (P2 Phase 0.4)', () => {
+    let dupRoot: string;
+
+    beforeAll(() => {
+      dupRoot = mkdtempSync(join(tmpdir(), 'export-index-dup-'));
+      const write = (relDir: string, manifest: Record<string, unknown>): void => {
+        const abs = join(dupRoot, relDir);
+        mkdirSync(abs, { recursive: true });
+        writeFileSync(join(abs, 'package.json'), JSON.stringify(manifest), 'utf8');
+      };
+      // Two distinct dirs declaring the SAME name → ambiguous.
+      write('packages/first', {
+        name: '@dup/pkg',
+        exports: { '.': './dist/index.js' },
+      });
+      write('packages/second', {
+        name: '@dup/pkg',
+        exports: { '.': './dist/index.js' },
+      });
+      // A non-colliding neighbour that must keep resolving.
+      write('packages/unique', { name: '@dup/unique' });
+    });
+
+    afterAll(() => {
+      rmSync(dupRoot, { recursive: true, force: true });
+    });
+
+    function dupShard(relDir: string): Shard {
+      return { id: `pkg:${relDir}`, rootDir: join(dupRoot, relDir), files: [] };
+    }
+
+    const first = () => dupShard('packages/first');
+    const second = () => dupShard('packages/second');
+    const unique = () => dupShard('packages/unique');
+
+    it('tombstones the ambiguous name so it is absent regardless of input order', () => {
+      const forward = buildPackageManifestIndex([first(), second(), unique()], dupRoot);
+      const reverse = buildPackageManifestIndex([second(), first(), unique()], dupRoot);
+      // Order-independent: the colliding name is removed either way; the unique
+      // neighbour survives both orders (no first-wins for the duplicate).
+      expect(forward.has('@dup/pkg')).toBe(false);
+      expect(reverse.has('@dup/pkg')).toBe(false);
+      expect(forward.has('@dup/unique')).toBe(true);
+      expect(reverse.has('@dup/unique')).toBe(true);
+    });
+
+    it('declines resolving the ambiguous specifier (no guessed first-wins package)', () => {
+      const index = buildPackageManifestIndex([first(), second()], dupRoot);
+      expect(resolveSpecifierToPackage('@dup/pkg', index)).toBeUndefined();
+      expect(resolveSpecifierToPackage('@dup/pkg/sub', index)).toBeUndefined();
+    });
+
+    it('keeps the tombstone even when the name appears three+ times', () => {
+      const index = buildPackageManifestIndex([first(), second(), first()], dupRoot);
+      expect(index.has('@dup/pkg')).toBe(false);
+    });
   });
 });

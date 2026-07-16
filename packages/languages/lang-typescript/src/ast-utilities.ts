@@ -107,17 +107,30 @@ export function isLiteral(node: ts.Node): boolean {
 }
 
 /**
- * Check if a node is inside a string literal or template literal.
+ * Check if a node is inside a string literal or template *literal* span.
+ * Code inside `${…}` interpolations is not treated as "in a string".
  */
 export function isInStringLiteral(node: ts.Node): boolean {
-  let current = node.parent;
-  while (!ts.isSourceFile(current)) {
-    if (
-      ts.isStringLiteral(current) ||
-      ts.isNoSubstitutionTemplateLiteral(current) ||
-      ts.isTemplateExpression(current)
-    ) {
+  let current: ts.Node | undefined = node.parent;
+  while (current && !ts.isSourceFile(current)) {
+    if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
       return true;
+    }
+    // Template head/middle/tail spans are string content; TemplateSpan.expression is code.
+    if (ts.isTemplateHead(current) || ts.isTemplateMiddle(current) || ts.isTemplateTail(current)) {
+      return true;
+    }
+    if (ts.isTemplateSpan(current) && current.expression === node) {
+      return false;
+    }
+    // Inside a TemplateSpan's expression subtree — keep walking past the span.
+    if (ts.isTemplateSpan(current)) {
+      current = current.parent;
+      continue;
+    }
+    if (ts.isTemplateExpression(current)) {
+      // Only pure no-sub templates are fully string; with spans we only matched heads/tails above.
+      return false;
     }
     current = current.parent;
   }
@@ -193,22 +206,29 @@ function isPositionInRanges(position: number, ranges: ts.CommentRange[] | undefi
 
 /**
  * Check if a position in the source falls inside a comment.
+ *
+ * Walks every AST node's leading/trailing comment ranges (not only line
+ * starts). Line-start probing misses mid-line trailing comments
+ * (`code; // here`) and can miss interior positions of multi-line blocks
+ * when the line start is not a token boundary TypeScript associates with
+ * the comment.
  */
 export function isInComment(position: number, sourceFile: ts.SourceFile): boolean {
   const text = sourceFile.getFullText();
-  const lineStarts = sourceFile.getLineStarts();
 
-  for (let i = 0; i < lineStarts.length; i++) {
-    const lineStart = lineStarts[i] ?? 0;
-    const lineEnd = i + 1 < lineStarts.length ? (lineStarts[i + 1] ?? text.length) : text.length;
+  const visit = (node: ts.Node): boolean | undefined => {
+    // Leading comments of this node (full multi-line range when present).
+    if (isPositionInRanges(position, ts.getLeadingCommentRanges(text, node.pos))) {
+      return true;
+    }
+    // Trailing comments after this node (covers mid-line `//` / `/* */`).
+    if (isPositionInRanges(position, ts.getTrailingCommentRanges(text, node.end))) {
+      return true;
+    }
+    return ts.forEachChild(node, visit);
+  };
 
-    if (position < lineStart || position >= lineEnd) continue;
-
-    if (isPositionInRanges(position, ts.getLeadingCommentRanges(text, lineStart))) return true;
-    if (isPositionInRanges(position, ts.getTrailingCommentRanges(text, lineStart))) return true;
-  }
-
-  return false;
+  return visit(sourceFile) === true;
 }
 
 // =============================================================================
@@ -217,11 +237,16 @@ export function isInComment(position: number, sourceFile: ts.SourceFile): boolea
 
 /**
  * Count unescaped backtick characters in a line.
+ * A backtick is escaped only when preceded by an odd number of backslashes
+ * (`\\`` is unescaped; `\`` is escaped).
  */
 export function countUnescapedBackticks(line: string): number {
   let count = 0;
   for (let ci = 0; ci < line.length; ci++) {
-    if (line[ci] === '`' && (ci === 0 || line[ci - 1] !== '\\')) count++;
+    if (line[ci] !== '`') continue;
+    let backslashes = 0;
+    for (let j = ci - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
+    if (backslashes % 2 === 0) count++;
   }
   return count;
 }

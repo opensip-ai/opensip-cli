@@ -4,7 +4,7 @@ import {
   currentScope,
   defineCommand,
   IpcPayloadTooLargeError,
-  sendWorkerIpcMessage,
+  sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   type CommandSpec,
   type WorkerMessage,
@@ -18,12 +18,16 @@ import type { CapabilityWorkerErrorPayload, CapabilityWorkerSpec } from './types
 
 type CapabilityWorkerMessage = WorkerMessage<never, unknown>;
 
-function send(msg: CapabilityWorkerMessage): void {
+/**
+ * Terminal IPC send — drains before the worker process exits so the parent
+ * does not race `exit` ahead of `message` (Linux under load).
+ */
+async function send(msg: CapabilityWorkerMessage): Promise<void> {
   try {
-    sendWorkerIpcMessage(msg);
+    await sendWorkerIpcMessageAndDrain(msg);
   } catch (error) {
     if (error instanceof IpcPayloadTooLargeError) {
-      process.send?.({
+      await sendWorkerIpcMessageAndDrain({
         kind: 'error',
         message: error.message,
         failureClass: 'payload_too_large',
@@ -77,18 +81,24 @@ async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown>
 export async function executeCapabilityWorker(specPath: string): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
   try {
-    send({
+    await send({
       kind: 'result',
       value: await runCapabilityWorker(readSpec(specPath)),
     });
   } catch (error) {
-    send({
+    await send({
       kind: 'error',
       message: error instanceof Error ? error.message : String(error),
       ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
     });
   } finally {
     stopHeartbeat();
+    // Give the parent event loop a beat to receive the drained IPC message
+    // before this process exits. Without this, Linux under load can still
+    // surface exit before message despite sendWorkerIpcMessageAndDrain.
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
   }
 }
 
@@ -96,6 +106,11 @@ export const capabilityWorkerCommandSpec: CommandSpec<unknown, CliCommandsContex
   unknown,
   CliCommandsContext
 >({
+  staticHandler: {
+    package: 'opensip-cli',
+    path: 'packages/cli/src/bootstrap/capability-worker/entry.ts',
+    declaration: 'capabilityWorkerCommandSpec',
+  },
   name: '__capability-pack-worker',
   visibility: 'internal',
   description:

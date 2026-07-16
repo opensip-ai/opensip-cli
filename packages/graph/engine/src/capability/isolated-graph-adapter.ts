@@ -4,6 +4,11 @@ import {
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
 
+import {
+  isSafeGraphAdapterDescriptor,
+  isSafeGraphAdapterMetadata,
+} from '../lang-adapter/descriptor-validation.js';
+
 import type {
   CacheKeyInput,
   DiscoverInput,
@@ -48,17 +53,7 @@ interface GraphProjectHandle {
 }
 
 function isGraphAdapter(value: unknown): value is GraphLanguageAdapter {
-  if (typeof value !== 'object' || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.id === 'string' &&
-    Array.isArray(record.fileExtensions) &&
-    typeof record.discoverFiles === 'function' &&
-    typeof record.parseProject === 'function' &&
-    typeof record.walkProject === 'function' &&
-    typeof record.resolveCallSites === 'function' &&
-    typeof record.cacheKey === 'function'
-  );
+  return isSafeGraphAdapterDescriptor(value);
 }
 
 /**
@@ -129,7 +124,10 @@ function createProxyAdapter(
         input,
       } satisfies GraphInvokeRequest)) as ResolveOutput,
     cacheKey: async (input: CacheKeyInput): Promise<string> =>
-      (await invoke({ kind: 'graph.cacheKey', input } satisfies GraphInvokeRequest)) as string,
+      (await invoke({
+        kind: 'graph.cacheKey',
+        input,
+      } satisfies GraphInvokeRequest)) as string,
   };
 }
 
@@ -227,12 +225,20 @@ async function runGraphWorkerRequest(
   throw new Error('unknown graph capability worker request');
 }
 
+/**
+ * Create the host-side proxy contribution from worker-reported adapter metadata.
+ *
+ * @throws {Error} when the worker returns an unsafe graph adapter descriptor.
+ */
 async function createHostContributions(
   context: Parameters<CapabilityIsolationBridge['createHostContributions']>[0],
 ): Promise<readonly CapabilityBridgeContribution[]> {
   const result = (await context.invoke({
     kind: 'graph.discover',
   } satisfies GraphDiscoverRequest)) as GraphDiscoverResult;
+  if (!isSafeGraphAdapterMetadata(result.adapter)) {
+    throw new Error('capability pack returned an unsafe graph adapter descriptor');
+  }
   return [{ contribution: createProxyAdapter(result.adapter, context.invoke) }];
 }
 

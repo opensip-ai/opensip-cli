@@ -188,9 +188,14 @@ async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
   }
 
   // Find the repo root by looking for packages directory
+  // Stop at the filesystem root on every platform (Windows `C:\` has
+  // dirname === itself and would loop forever with a POSIX-only `/` check).
   let cwd = path.dirname(firstPath);
-  while (cwd !== '/' && !fs.existsSync(path.join(cwd, 'packages'))) {
-    cwd = path.dirname(cwd);
+  const root = path.parse(cwd).root;
+  while (cwd !== root && !fs.existsSync(path.join(cwd, 'packages'))) {
+    const parent = path.dirname(cwd);
+    if (parent === cwd) break;
+    cwd = parent;
   }
 
   const violations: CheckViolation[] = [];

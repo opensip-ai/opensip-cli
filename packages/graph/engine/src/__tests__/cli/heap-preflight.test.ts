@@ -11,10 +11,16 @@
 import os from 'node:os';
 import v8 from 'node:v8';
 
-import { ConfigurationError, runWithScope, runWithScopeSync } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  runWithScope,
+  runWithScopeSync,
+  type RunCorrelation,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildHeapChildEnv,
   decideHeapTargetMb,
   HEAP_TARGETS,
   runHeapPreflight,
@@ -31,7 +37,6 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../../lang-adapter/types.js';
-
 function adapterWithFileCount(fileCount: number): GraphLanguageAdapter {
   const files = Array.from({ length: fileCount }, (_, i) => `/tmp/file-${String(i)}.ts`);
   return {
@@ -100,6 +105,53 @@ describe('totalSystemMemoryMb / systemHasMemoryFor', () => {
 
   it('fails for a wildly oversized target', () => {
     expect(systemHasMemoryFor(Number.MAX_SAFE_INTEGER)).toBe(false);
+  });
+});
+
+describe('buildHeapChildEnv', () => {
+  it('preserves the parent environment and forwards the active run correlation', () => {
+    const correlation: RunCorrelation = {
+      runId: 'RUN_parent',
+      tool: 'graph',
+      parentCommand: 'graph',
+      traceId: 'trace_parent',
+      repo: '/repo',
+    };
+
+    const env = buildHeapChildEnv(
+      8192,
+      {
+        PATH: '/usr/bin',
+        NODE_OPTIONS: '--trace-warnings',
+        OPENSIP_RUN_ID: 'RUN_stale',
+        OPENSIP_WORKER_KIND: 'shard',
+        OPENSIP_SHARD_ID: 'stale-shard',
+        OPENSIP_CHILD_INVOCATION_ID: 'stale-child',
+      },
+      correlation,
+    );
+
+    expect(env).toMatchObject({
+      PATH: '/usr/bin',
+      NODE_OPTIONS: '--trace-warnings --max-old-space-size=8192',
+      OPENSIP_HEAP_ELEVATED: '1',
+      OPENSIP_RUN_ID: 'RUN_parent',
+      OPENSIP_TOOL: 'graph',
+      OPENSIP_PARENT_COMMAND: 'graph',
+      OPENSIP_TRACE_ID: 'trace_parent',
+      OPENSIP_REPO: '/repo',
+    });
+    expect(env.OPENSIP_WORKER_KIND).toBeUndefined();
+    expect(env.OPENSIP_SHARD_ID).toBeUndefined();
+    expect(env.OPENSIP_CHILD_INVOCATION_ID).toBeUndefined();
+  });
+
+  it('sets the elevation options without inventing correlation when no scope exists', () => {
+    expect(buildHeapChildEnv(12_288, { PATH: '/usr/bin' }, undefined)).toEqual({
+      PATH: '/usr/bin',
+      NODE_OPTIONS: '--max-old-space-size=12288',
+      OPENSIP_HEAP_ELEVATED: '1',
+    });
   });
 });
 

@@ -25,6 +25,11 @@
 import { z } from 'zod';
 
 import { NEAR_DUP_SIGNATURE_K } from '../lang-adapter/near-duplicate-signature.js';
+import {
+  MAX_AUDIT_TEST_SOURCE_GLOBS,
+  MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH,
+  MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS,
+} from '../types.js';
 
 import type { GraphConfig } from '../types.js';
 import type { ToolConfigDeclaration } from '@opensip-cli/config';
@@ -34,6 +39,72 @@ const cycleSize2Severity = z.enum(['off', 'low']);
 
 /** Per-rule severity-override value — `error` or `warning` (GraphConfig). */
 const severityOverrideValue = z.enum(['error', 'warning']);
+
+const EXTGLOB_PREFIXES = ['?(', '*(', '+(', '@(', '!('] as const;
+
+/** Count wildcard/character-class tokens (`* ? [ ]`) in one glob pattern. */
+function countGlobTokens(pattern: string): number {
+  let count = 0;
+  for (const ch of pattern) {
+    if (ch === '*' || ch === '?' || ch === '[' || ch === ']') count += 1;
+  }
+  return count;
+}
+
+/**
+ * Validate ONE audit-test source-role glob, returning a human error or
+ * `undefined` when acceptable (P2 Phase 1.3). The pattern must be a bounded,
+ * project-relative POSIX glob with no absolute/drive root, backslash, parent
+ * traversal, brace expansion, extglob, leading negation, or comment form.
+ */
+function auditGlobError(pattern: string): string | undefined {
+  if (pattern.length === 0) return 'must be non-empty';
+  if (pattern.length > MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH) {
+    return `must be at most ${String(MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH)} characters`;
+  }
+  if (/\p{Cc}/u.test(pattern)) return 'must not contain NUL or control characters';
+  if (pattern.includes('\\')) return 'must not contain a backslash (POSIX-relative only)';
+  if (pattern.startsWith('/')) return 'must be project-relative (no leading "/")';
+  if (/^[A-Za-z]:/.test(pattern)) return 'must not have a drive prefix';
+  if (pattern.startsWith('!')) return 'must not start with a negation "!"';
+  if (pattern.startsWith('#')) return 'must not be a comment form ("#")';
+  if (pattern.includes('{') || pattern.includes('}')) return 'must not use brace expansion';
+  if (EXTGLOB_PREFIXES.some((prefix) => pattern.includes(prefix))) {
+    return 'must not use extglob operators';
+  }
+  if (pattern.split('/').includes('..')) return 'must not contain a ".." traversal segment';
+  if ((pattern.match(/\[/g)?.length ?? 0) !== (pattern.match(/\]/g)?.length ?? 0)) {
+    return 'has an unbalanced character class';
+  }
+  if (countGlobTokens(pattern) > MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS) {
+    return `must have at most ${String(MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS)} wildcard/class tokens`;
+  }
+  return undefined;
+}
+
+/**
+ * Bounded, unique, strictly-validated audit-test source-role glob list. Mirrors
+ * `GraphConfig.auditTestSourceGlobs`; the composer folds it into the strict
+ * whole-document schema.
+ */
+const auditTestSourceGlobsSchema = z
+  .array(z.string())
+  .max(MAX_AUDIT_TEST_SOURCE_GLOBS)
+  .readonly()
+  .superRefine((patterns, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, pattern] of patterns.entries()) {
+      const error = auditGlobError(pattern);
+      if (error !== undefined) {
+        ctx.addIssue({ code: 'custom', message: `glob ${error}`, path: [index] });
+        continue;
+      }
+      if (seen.has(pattern)) {
+        ctx.addIssue({ code: 'custom', message: 'duplicate glob pattern', path: [index] });
+      }
+      seen.add(pattern);
+    }
+  });
 
 /**
  * Zod object mirroring {@link GraphConfig}. Field order follows the type
@@ -70,6 +141,7 @@ export const GraphConfigSchema = z.object({
   cycleMinSize: z.number().int().min(0).optional(),
   cycleSize2Severity: cycleSize2Severity.optional(),
   severityOverrides: z.record(z.string(), severityOverrideValue).readonly().optional(),
+  auditTestSourceGlobs: auditTestSourceGlobsSchema.optional(),
 });
 
 /**

@@ -26,6 +26,7 @@
 
 import { projectJsonScalarMetadata } from '@opensip-cli/core';
 
+import type { GraphImpactReportProjection } from './impact-report-projection.js';
 import type { JsonScalar, Signal, SignalRepair } from '@opensip-cli/core';
 
 /** Two-level severity the dashboard buckets on (`critical|high → error`). */
@@ -78,6 +79,10 @@ export interface GraphSessionPayload {
     readonly warnings: number;
   };
   readonly checks: readonly GraphSessionCheck[];
+  /** Bounded durable evidence for current `graph impact` sessions. */
+  readonly impact?: GraphImpactReportProjection;
+  /** Absent for legacy and ordinary graph sessions. */
+  readonly impactStatus?: 'available' | 'omitted-overflow';
 }
 
 /**

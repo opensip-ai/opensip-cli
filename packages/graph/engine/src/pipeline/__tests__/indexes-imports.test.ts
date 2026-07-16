@@ -139,4 +139,55 @@ describe('buildIndexes — occurrencesByHash + importedPackagesByFile', () => {
       [...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])].sort(),
     ).toEqual(['pkg-b', 'pkg-c']);
   });
+
+  it('attributes external imports via classification.resolvedPackage when to[] is empty', () => {
+    const callerMi: FunctionOccurrence = {
+      ...occ({
+        bodyHash: 'MI_A',
+        filePath: 'packages/pkg-a/src/index.ts',
+        simpleName: '<module-init>',
+      }),
+      kind: 'module-init',
+      dependencies: [
+        {
+          to: [],
+          specifier: '@scope/external/sub',
+          line: 1,
+          column: 0,
+          classification: {
+            form: 'import-declaration',
+            role: 'runtime',
+            targetKind: 'external',
+            basis: 'external-specifier',
+            resolvedPackage: '@scope/external',
+            reason: 'external',
+          },
+        },
+      ],
+    };
+    const idx = buildIndexes(catalogOf({ '<module-init>': [callerMi] }));
+    expect([...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])]).toEqual([
+      '@scope/external',
+    ]);
+  });
+
+  it('falls back to packageNameOf(specifier) when to[] is empty and no resolvedPackage', () => {
+    const callerMi: FunctionOccurrence = {
+      ...occ({
+        bodyHash: 'MI_A',
+        filePath: 'packages/pkg-a/src/index.ts',
+        simpleName: '<module-init>',
+      }),
+      kind: 'module-init',
+      dependencies: [
+        { to: [], specifier: 'lodash/map', line: 1, column: 0 },
+        { to: [], specifier: '@scope/pkg/utils', line: 2, column: 0 },
+        { to: [], specifier: './local', line: 3, column: 0 },
+      ],
+    };
+    const idx = buildIndexes(catalogOf({ '<module-init>': [callerMi] }));
+    expect(
+      [...(idx.importedPackagesByFile.get('packages/pkg-a/src/index.ts') ?? [])].sort(),
+    ).toEqual(['@scope/pkg', 'lodash']);
+  });
 });

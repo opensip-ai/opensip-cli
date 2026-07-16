@@ -273,7 +273,10 @@ export const nodeVersionConsistency = defineCheck({
 
         checkWorkspaceEngines(content, filePath, expectedMajor, rootConstraint, violations);
         checkTypesNode(content, filePath, expectedMajor, violations);
-      } else if (filePath.includes('.github/workflows/') && basename.endsWith('.yml')) {
+      } else if (
+        filePath.replaceAll('\\', '/').includes('.github/workflows/') &&
+        basename.endsWith('.yml')
+      ) {
         checkCiWorkflow(content, filePath, expectedMajor, violations);
       }
     }

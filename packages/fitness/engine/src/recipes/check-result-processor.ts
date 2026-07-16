@@ -7,6 +7,7 @@
 
 import { logger, SystemError } from '@opensip-cli/core';
 
+import { isFrameworkErrorResult } from '../framework/ignore-processing.js';
 import { type CheckMemoryProfile } from '../framework/memory-profiler.js';
 import { resolveMemoryProfiler } from '../framework/scope-registry.js';
 import { countErrors, countWarnings } from '../types/severity.js';
@@ -156,6 +157,51 @@ function updateSessionForError(
   session.totalErrors++;
 }
 
+function resolveFrameworkError(result: CheckResult): string | undefined {
+  if (!isFrameworkErrorResult(result)) return undefined;
+  const fromLabel = result.info?.label?.replace(/^Error:\s*/u, '');
+  if (fromLabel !== undefined) return fromLabel;
+  const original = result.metadata.extra?.originalError;
+  if (typeof original === 'string') return original;
+  return 'check failed';
+}
+
+function resolveSkipReason(result: CheckResult): string | undefined {
+  if (result.metadata.extra?.skipped !== true) return undefined;
+  const reason = result.metadata.extra.skipReason;
+  return typeof reason === 'string' ? reason : undefined;
+}
+
+function applyFileFilter(
+  result: CheckResult,
+  fileFilter: string | undefined,
+): {
+  readonly effectiveSignals: CheckResult['signals'];
+  readonly signalCount: number;
+  readonly errorCount: number;
+  readonly warningCount: number;
+  readonly passed: boolean;
+} {
+  if (!fileFilter) {
+    return {
+      effectiveSignals: result.signals,
+      signalCount: result.signals.length,
+      errorCount: result.errors,
+      warningCount: result.warnings,
+      passed: result.passed,
+    };
+  }
+  const effectiveSignals = result.signals.filter((s) => s.code?.file === fileFilter);
+  const errorCount = countErrors(effectiveSignals);
+  return {
+    effectiveSignals,
+    signalCount: effectiveSignals.length,
+    errorCount,
+    warningCount: countWarnings(effectiveSignals),
+    passed: errorCount === 0,
+  };
+}
+
 // =============================================================================
 // MAIN PROCESSORS
 // =============================================================================
@@ -169,16 +215,11 @@ export function processSuccessResult(
     input;
   const { session, callbacks, recipe } = ctx;
 
-  // Apply file filter if set
-  let effectiveSignals = result.signals;
-  if (recipe.fileFilter) {
-    effectiveSignals = result.signals.filter((s) => s.code?.file === recipe.fileFilter);
-  }
-  const signalCount = effectiveSignals.length;
-  const errorCount = recipe.fileFilter ? countErrors(effectiveSignals) : result.errors;
-  const warningCount = recipe.fileFilter ? countWarnings(effectiveSignals) : result.warnings;
+  const { effectiveSignals, signalCount, errorCount, warningCount, passed } = applyFileFilter(
+    result,
+    recipe.fileFilter,
+  );
   const ignoredCount = result.ignoredCount ?? 0;
-  const passed = recipe.fileFilter ? errorCount === 0 : result.passed;
 
   const memoryProfiler = resolveMemoryProfiler();
   const memoryProfile = memoryProfiler.recordCheckComplete(
@@ -201,19 +242,27 @@ export function processSuccessResult(
   }
   /* v8 ignore stop */
 
+  // Framework/command faults arrive as CheckResult with empty signals and errors>0.
+  // Promote them to RecipeCheckResult.error so the envelope unit faults and CI fails.
+  const frameworkError = resolveFrameworkError(result);
+  const skipReason = resolveSkipReason(result);
+  const skipped = skipReason !== undefined;
+
   const checkResult: RecipeCheckResult = {
     checkId,
     checkSlug,
-    passed,
+    passed: frameworkError === undefined ? passed : false,
     violationCount: signalCount,
-    errorCount,
+    errorCount: frameworkError === undefined ? errorCount : Math.max(errorCount, 1),
     warningCount,
     ignoredCount,
     durationMs,
     totalItems: result.metadata.totalItems,
     itemType: result.metadata.itemType,
-    skipped: false,
+    skipped,
     effectiveSignals,
+    ...(skipped ? { skipReason } : {}),
+    ...(frameworkError === undefined ? {} : { error: frameworkError }),
     ...(result.appliedDirectives && result.appliedDirectives.length > 0
       ? { appliedDirectives: result.appliedDirectives }
       : {}),
@@ -221,17 +270,27 @@ export function processSuccessResult(
 
   updateSessionForSuccess(session, checkResult, tags);
 
-  const summary = createCheckSummary({
-    checkId,
-    checkSlug,
-    passed,
-    errorCount,
-    warningCount,
-    durationMs,
-    memoryProfile,
-    ignoredCount,
-    filesScanned: result.metadata.filesScanned ?? 0,
-  });
+  const summary =
+    frameworkError === undefined
+      ? createCheckSummary({
+          checkId,
+          checkSlug,
+          passed,
+          errorCount,
+          warningCount,
+          durationMs,
+          memoryProfile,
+          ignoredCount,
+          filesScanned: result.metadata.filesScanned ?? 0,
+        })
+      : createErrorSummary({
+          checkId,
+          checkSlug,
+          durationMs,
+          memoryProfile,
+          timedOut: false,
+          errorMessage: frameworkError,
+        });
   try {
     callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
   } catch (cbError) {
@@ -246,7 +305,8 @@ export function processSuccessResult(
     });
   }
 
-  const shouldStop = recipe.execution.stopOnFirstFailure && !passed;
+  const shouldStop =
+    recipe.execution.stopOnFirstFailure && (frameworkError !== undefined || !passed);
 
   return { checkResult, memoryProfile, shouldStop };
 }
@@ -309,13 +369,24 @@ export function processErrorResult(
     timedOut,
     errorMessage: errMsg,
   });
-  callbacks.onError?.(
-    checkSlug,
-    error instanceof Error
-      ? error
-      : new SystemError(errMsg, { code: 'SYSTEM.FITNESS.CHECK_ERROR' }),
-  );
-  callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
+  try {
+    callbacks.onError?.(
+      checkSlug,
+      error instanceof Error
+        ? error
+        : new SystemError(errMsg, { code: 'SYSTEM.FITNESS.CHECK_ERROR' }),
+    );
+    callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
+  } catch (cbError) {
+    // Mirror success path: callback faults must not re-enter processErrorResult
+    // via runOneCheck's outer catch (double session counts).
+    logger.warn({
+      evt: 'fitness.check.callback_error',
+      module: 'fitness:check-result-processor',
+      checkSlug,
+      error: cbError instanceof Error ? cbError.message : String(cbError),
+    });
+  }
 
   const shouldStop = recipe.execution.stopOnFirstFailure;
 

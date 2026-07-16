@@ -30,18 +30,20 @@
 
 import { posix } from 'node:path';
 
-import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
-import { buildExportIndex } from '../../cross-package/export-index.js';
+import { buildShardedCatalogCacheKey } from '../../cache/sharded-cache-key.js';
+import { buildExportIndex, resolveSpecifierToPackage } from '../../cross-package/export-index.js';
 import { resolveCrossPackageCall } from '../../cross-package/resolve.js';
 import { createMutableStats, truncateForCallEdge } from '../../lang-adapter/edge-helpers.js';
 import { assignPackages } from '../../pipeline/assign-packages.js';
 import { constrainCrossPackageEdges } from '../../pipeline/constrain-edges.js';
 import { computeSccs } from '../../pipeline/features.js';
 import { buildIndexes } from '../../pipeline/indexes.js';
+import { mergeSemanticFactBundles } from '../../semantic-facts.js';
 
 import { bucketEdgesByOwner, stitchEdgesByOwner } from './edge-identity.js';
 import { traceResolveOne } from './resolution-trace.js';
+import { reconcileSemanticFacts } from './semantic-fact-reconcile.js';
 
 import type { ShardBuildResult } from './shard-model.js';
 import type { ExportIndex, PackageManifestIndex } from '../../cross-package/export-index.js';
@@ -73,8 +75,12 @@ export function mergeAndResolveShards(
     fragments.map((f) => f.fragment),
     allFiles,
   );
+  // Global semantic reconciliation runs AFTER fragment union so cross-package
+  // references can join against the complete declaration inventory. Results
+  // are never written back into shard-fragment rows (Task 3.4).
+  const reconciled = reconcileCatalogSemanticFacts(merged, manifestIndex);
   const boundaryCalls = fragments.flatMap((f) => f.boundaryCalls);
-  return resolveCrossBoundaryCalls(merged, boundaryCalls, manifestIndex);
+  return resolveCrossBoundaryCalls(reconciled, boundaryCalls, manifestIndex);
 }
 
 /**
@@ -110,6 +116,71 @@ export function stampAndConstrainPackages(catalog: Catalog, projectRoot: string)
  * uses as its node id) makes the merged function set byte-identical to exact
  * (Phase 3 closed the residual 2-occurrence delta this way).
  */
+/**
+ * Fill a declaration-target dependency edge's `resolvedPackage` using the
+ * COMPLETE merged manifest index (P2 Phase 0 Task 0.2). A single shard worker
+ * sees only its own packages, so a cross-shard workspace `.d.ts` import it could
+ * not attribute — `workspace-declaration-unmapped`, or `external-declaration`
+ * when the workspace package resolved through a `node_modules` symlink — is
+ * re-attributed here to a unique workspace package, matching the single-program
+ * exact catalog byte-for-byte. Ambiguous names (tombstoned duplicates) stay
+ * unresolved. Pure: returns the SAME catalog reference when nothing changes.
+ *
+ * Scope: this parity holds when workspace imports resolve to DECLARATION files —
+ * the norm for built `dist/*.d.ts` packages, where a worker emits
+ * `workspace-declaration-unmapped` / `external-declaration` and this patch upgrades
+ * both to `workspace-declaration-entry`. A workspace that exports raw source `.ts`
+ * would resolve to `catalog-source` (a real `to:[hash]`) in the exact build; this
+ * classification-only patch cannot reconstruct that target hash, so such a repo is
+ * a fidelity boundary rather than byte-identical. (Not reachable in this repo.)
+ */
+export function reattributeDeclarationDependencies(
+  catalog: Catalog,
+  manifestIndex: PackageManifestIndex,
+): Catalog {
+  const functions: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
+    string,
+    FunctionOccurrence[]
+  >;
+  let changed = false;
+  for (const [name, occs] of Object.entries(catalog.functions)) {
+    functions[name] = occs.map((o) => {
+      const deps = o.dependencies;
+      if (deps === undefined || deps.length === 0) return o;
+      let occChanged = false;
+      const next = deps.map((edge) => {
+        const c = edge.classification;
+        // Only re-attempt a declaration target the worker resolved to a `.d.ts`
+        // but could not attribute to a unique workspace package.
+        if (
+          c === undefined ||
+          c.resolvedPackage !== undefined ||
+          (c.reason !== 'workspace-declaration-unmapped' && c.reason !== 'external-declaration')
+        ) {
+          return edge;
+        }
+        const pkg = resolveSpecifierToPackage(edge.specifier, manifestIndex);
+        if (pkg === undefined) return edge;
+        occChanged = true;
+        return {
+          ...edge,
+          classification: {
+            ...c,
+            targetKind: 'declaration-file' as const,
+            basis: 'workspace-manifest' as const,
+            reason: 'workspace-declaration-entry',
+            resolvedPackage: pkg.packageGroup,
+          },
+        };
+      });
+      if (!occChanged) return o;
+      changed = true;
+      return { ...o, dependencies: next };
+    });
+  }
+  return changed ? { ...catalog, functions } : catalog;
+}
+
 export function mergeShardFragments(
   fragments: readonly Catalog[],
   allFiles: readonly string[],
@@ -129,6 +200,7 @@ export function mergeShardFragments(
   // catalog (Phase 3).
   const canonicalFunctions = canonicalizeFunctions(functions);
   const reExports = mergeFragmentReExports(fragments);
+  const semanticFacts = mergeFragmentSemanticFacts(fragments);
 
   const first = fragments[0];
   return {
@@ -147,15 +219,49 @@ export function mergeShardFragments(
     // row but build structurally incompatible catalogs — can never read each
     // other's row: a mode switch is a clean `cacheKey` mismatch (a rebuild),
     // never a silent cross-engine read of a clobbered row.
-    cacheKey: stampEngineVersion(
-      `sharded-${String(fragments.length)}-${hashKeys(fragments)}`,
-      'sharded',
+    cacheKey: buildShardedCatalogCacheKey(
+      fragments.map((fragment) => ({
+        shardId: fragment.cacheKey,
+        rootDir: '.',
+        cacheKey: fragment.cacheKey,
+      })),
     ),
     filesFingerprint: computeFilesFingerprint(allFiles),
     resolutionMode: first?.resolutionMode,
     ...(reExports.length > 0 ? { reExports } : {}),
+    // Present-empty vs absent: only attach when at least one fragment supported
+    // the plane (mergeSemanticFactBundles returns undefined when all omit it).
+    ...(semanticFacts === undefined ? {} : { semanticFacts }),
     functions: canonicalFunctions,
   };
+}
+
+/**
+ * Union per-shard semantic fact bundles by stable identity. Absent on every
+ * fragment stays absent; a present-empty fragment keeps the plane present.
+ */
+function mergeFragmentSemanticFacts(
+  fragments: readonly Catalog[],
+): ReturnType<typeof mergeSemanticFactBundles> {
+  return mergeSemanticFactBundles(fragments.map((f) => f.semanticFacts));
+}
+
+/**
+ * Run the pure global reconciler over a merged catalog's semantic plane.
+ * No-op when the plane is absent.
+ */
+function reconcileCatalogSemanticFacts(
+  catalog: Catalog,
+  manifestIndex: PackageManifestIndex,
+): Catalog {
+  if (catalog.semanticFacts === undefined) return catalog;
+  const semanticFacts = reconcileSemanticFacts(catalog.semanticFacts, manifestIndex);
+  if (semanticFacts === undefined) {
+    const rest = { ...catalog };
+    delete rest.semanticFacts;
+    return rest;
+  }
+  return { ...catalog, semanticFacts };
 }
 
 /**
@@ -244,12 +350,6 @@ function addFragmentOccurrences(
       else functions[name] = [occ];
     }
   }
-}
-
-function hashKeys(fragments: readonly Catalog[]): string {
-  // Order-independent join of shard cacheKeys (shards may complete in any
-  // order); kept short and deterministic.
-  return [...fragments.map((f) => f.cacheKey)].sort().join('+').slice(0, 64);
 }
 
 // ── Task 2.2: resolve cross-boundary calls ────────────────────────

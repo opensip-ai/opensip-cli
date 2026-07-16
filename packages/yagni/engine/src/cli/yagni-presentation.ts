@@ -2,7 +2,7 @@
  * Human presentation for YAGNI audit runs (spec §11).
  */
 
-import { relative } from 'node:path';
+import { isAbsolute, relative } from 'node:path';
 
 import { buildYagniRunSummary, readYagniMetadata } from '../scoring/confidence.js';
 
@@ -15,8 +15,13 @@ const CONFIDENCE_SECTION_ORDER: readonly YagniConfidence[] = ['high', 'medium', 
 
 function formatYagniSignalLocation(signal: Signal, cwd: string): string {
   if (signal.filePath === '') return '<unknown>';
-  const rel = relative(cwd, signal.filePath).split('\\').join('/');
-  return signal.line === undefined ? rel : `${rel}:${String(signal.line)}`;
+  // Detectors already stamp project-relative paths. relative(cwd, relPath)
+  // resolves the second arg against process.cwd(), not `cwd` — wrong when
+  // tool cwd ≠ process cwd. Only relativize absolute paths.
+  const normalized = isAbsolute(signal.filePath)
+    ? relative(cwd, signal.filePath).split('\\').join('/')
+    : signal.filePath.split('\\').join('/');
+  return signal.line === undefined ? normalized : `${normalized}:${String(signal.line)}`;
 }
 
 function formatLocSuffix(signal: Signal): string {

@@ -3,7 +3,7 @@
  *
  * `makeSortable(table)` wires click handlers to each `<th>` so columns
  * can be sorted asc/desc with a numeric/date/string fallback. Keeps
- * any trailing `.expander-row` glued to its parent during sort.
+ * any trailing `.expander-row` siblings glued to their parent during sort.
  *
  * After all rendering, a `setTimeout(0)` pass scans the DOM for
  * `.data-table.sortable` elements and activates each — this catches
@@ -14,31 +14,12 @@
  * TypeScript (DOM lib) bundled into the inlined client `<script>`.
  */
 
-import { paginateGroupedRows, paginateTable } from './pagination.js';
+import { collectGroupedTableRows, paginateGroupedRows, paginateTable } from './pagination.js';
 
 /** Mutable per-table sort state, threaded through the column click handler. */
 interface SortState {
   col: number;
   asc: boolean;
-}
-
-/**
- * Group each data row with its trailing `.expander-row` (if any) so a sort
- * keeps the pair together and pages them as one unit.
- */
-function collectRowGroups(tbody: Element): HTMLElement[][] {
-  const allRows = [...tbody.children] as HTMLElement[];
-  const groups: HTMLElement[][] = [];
-  for (let i = 0; i < allRows.length; i++) {
-    const row = allRows[i];
-    if (row.classList.contains('expander-row')) continue;
-    const group = [row];
-    if (i + 1 < allRows.length && allRows[i + 1].classList.contains('expander-row')) {
-      group.push(allRows[i + 1]);
-    }
-    groups.push(group);
-  }
-  return groups;
 }
 
 /** Compare two row groups by the text of column `colIdx` (numeric → date → string). */
@@ -115,7 +96,7 @@ function sortByColumn(options: SortByColumnOptions): void {
   // every other tab's tables, and it never touches `.expander-row` grouping.
   for (const banner of tbody.querySelectorAll('.suite-group-header')) banner.remove();
 
-  const groups = collectRowGroups(tbody);
+  const groups = collectGroupedTableRows(tbody);
   groups.sort((a, b) => compareGroups(a, b, colIdx, state.asc));
   reorderRows(tbody, groups);
   repaginate(table, tbody, groups);

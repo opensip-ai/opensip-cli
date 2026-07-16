@@ -19,6 +19,9 @@
  * gitleaks id.
  */
 
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
 import { readPackageVersion } from '@opensip-cli/core';
 import { defineExternalToolAdapter } from '@opensip-cli/external-tool-adapter';
 
@@ -35,6 +38,8 @@ export const GITLEAKS_IDENTITY: ToolIdentity = {
 
 /** Stable UUID identity (ADR-0048); mirrors `opensipTools.stableId` in package.json. */
 export const GITLEAKS_STABLE_ID = 'cd08f737-ce8e-4813-9259-b4ffeb954268';
+
+const PROJECT_GITLEAKS_CONFIGS = ['.gitleaks.toml', 'gitleaks.toml'] as const;
 
 /**
  * Normalize the `gitleaks version` stdout to a bare semver. Gitleaks prints
@@ -73,18 +78,49 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 }
 
 /**
+ * Project-root candidates that may carry a gitleaks config. The substrate's
+ * `excludePath` is always `<project>/opensip-cli/.runtime` (see
+ * `resolveProjectPaths`), so the project root is two directories up.
+ */
+function projectRootFromRuntimeExclude(excludePath: string): string {
+  const trimmed = excludePath.replace(/[/\\]+$/, '');
+  const parts = trimmed.split(/[/\\]/);
+  if (parts.at(-1) === '.runtime' && parts.at(-2) === 'opensip-cli') {
+    return dirname(dirname(trimmed));
+  }
+  return dirname(trimmed);
+}
+
+/**
+ * Prefer extending the project's own gitleaks config when present, so project
+ * rules/allowlists are not replaced by a bare `useDefault = true` overlay.
+ * Falls back to the built-in ruleset when the project has no config file.
+ */
+function resolveExtendSource(
+  projectRoot: string,
+): { kind: 'default' } | { kind: 'path'; path: string } {
+  for (const name of PROJECT_GITLEAKS_CONFIGS) {
+    const fullPath = join(projectRoot, name);
+    if (existsSync(fullPath)) return { kind: 'path', path: fullPath };
+  }
+  return { kind: 'default' };
+}
+
+/**
  * A3: build gitleaks's exclusion of opensip's own `.runtime` artifact store.
  *
  * gitleaks has NO CLI path-exclude, so we generate a `--config` allowlist that
- * EXTENDS the default ruleset (secret detection still runs) and allowlists any
- * file under `opensip-cli/.runtime`. Without this, a raw `Secret`/`Match` in a
- * prior run's JSON report is re-detected with a new runId in its path → a net-new
+ * EXTENDS either the project config (when `.gitleaks.toml` / `gitleaks.toml` is
+ * present) or the default ruleset, and allowlists any file under
+ * `opensip-cli/.runtime`. Without this, a raw `Secret`/`Match` in a prior run's
+ * JSON report is re-detected with a new runId in its path → a net-new
  * message-hash fingerprint every run → permanently degraded `--gate-compare`.
  *
  * The leading `# opensip-cli A3 exclude:` marker is load-bearing for the
  * deterministic worker-E2E fake (it honors the SAME injected exclusion the real
  * binary reads from the allowlist). VERIFY-against-installed-binary: gitleaks
  * allowlist `paths` regex semantics (matched against the reported file path).
+ * `useDefault` and `path` cannot be set together — choose one extend source.
  */
 export function buildGitleaksExclude(input: {
   readonly excludePath: string;
@@ -94,16 +130,70 @@ export function buildGitleaksExclude(input: {
   readonly configFile: { path: string; contents: string };
 } {
   const path = input.configPath('gitleaks-exclude.toml');
-  const contents = [
-    '# opensip-cli A3 exclude: opensip-cli/.runtime',
-    '[extend]',
-    'useDefault = true',
+  const projectRoot = projectRootFromRuntimeExclude(input.excludePath);
+  const extend = resolveExtendSource(projectRoot);
+  // Flatten: never wrap project config in `[extend] path = ...` — that burns one
+  // of gitleaks's maxExtendDepth=2 hops and can drop base/org rules. Inline the
+  // project file (preserving its own extends) and append our runtime allowlist.
+  // Prefer modern [[allowlists]]; if the project still uses deprecated singular
+  // [allowlist], use the same form so gitleaks does not hard-fail on mix.
+  const modernAllowlist = [
+    '[[allowlists]]',
+    'description = "opensip-cli: skip the .runtime artifact store"',
+    "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
     '',
+  ].join('\n');
+  const legacyAllowlist = [
     '[allowlist]',
     'description = "opensip-cli: skip the .runtime artifact store"',
     "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
     '',
   ].join('\n');
+  let contents: string;
+  if (extend.kind === 'path') {
+    let projectConfig = '';
+    try {
+      // Config files are small TOML; reject oversized inputs before reading.
+      const MAX_GITLEAKS_CONFIG_BYTES = 1_048_576;
+      const size = statSync(extend.path).size;
+      if (size <= MAX_GITLEAKS_CONFIG_BYTES) {
+        projectConfig = readFileSync(extend.path, 'utf8').trimEnd();
+      }
+    } catch {
+      projectConfig = '';
+    }
+    if (projectConfig.length > 0) {
+      // Match project allowlist form (singular vs plural) to avoid gitleaks
+      // "cannot be used alongside" config rejection.
+      const usesLegacyAllowlist =
+        /(?:^|\n)\s*\[allowlist\]\s*(?:\n|$)/.test(projectConfig) &&
+        !/(?:^|\n)\s*\[\[allowlists\]\]\s*(?:\n|$)/.test(projectConfig);
+      const allowlistBlock = usesLegacyAllowlist ? legacyAllowlist : modernAllowlist;
+      contents = [
+        // Marker text after the colon must stay a bare path for the walking fake.
+        '# opensip-cli A3 exclude: opensip-cli/.runtime',
+        projectConfig,
+        '',
+        allowlistBlock,
+      ].join('\n');
+    } else {
+      contents = [
+        '# opensip-cli A3 exclude: opensip-cli/.runtime',
+        '[extend]',
+        'useDefault = true',
+        '',
+        modernAllowlist,
+      ].join('\n');
+    }
+  } else {
+    contents = [
+      '# opensip-cli A3 exclude: opensip-cli/.runtime',
+      '[extend]',
+      'useDefault = true',
+      '',
+      modernAllowlist,
+    ].join('\n');
+  }
   return { args: ['--config', path], configFile: { path, contents } };
 }
 

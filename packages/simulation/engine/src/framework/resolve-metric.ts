@@ -19,6 +19,12 @@
  *   - `recovery_rate`      — `1 - failedRequests / errorsGenerated`,
  *                            `1` when `errorsGenerated === 0` (no errors to
  *                            recover from ⇒ trivially fully recovered).
+ *                            Intended semantics treat `errorsGenerated` as the
+ *                            fault-injection count; the load-window driver
+ *                            currently increments it on every throw (see
+ *                            `run-load-window.ts`), so with driver-stamped
+ *                            metrics alone recovery_rate collapses to 0 whenever
+ *                            any request fails.
  *   - `requests_per_second` — `totalRequests / durationSeconds`,
  *                             `0` when `durationSeconds` is missing or `<= 0`.
  *
@@ -77,7 +83,9 @@ export function resolveMetric(
 ): number {
   switch (metric) {
     case 'error_rate': {
-      return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 0;
+      // Align with success_rate: zero requests is not a clean proof — treat as
+      // fully erroneous so lowErrorRate / zeroErrors assertions fail closed.
+      return metrics.totalRequests > 0 ? metrics.failedRequests / metrics.totalRequests : 1;
     }
     case 'success_rate': {
       // See module-level docs: `0` when totalRequests === 0 (tightening choice).

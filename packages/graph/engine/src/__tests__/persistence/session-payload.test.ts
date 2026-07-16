@@ -83,6 +83,8 @@ describe('buildGraphSessionPayload', () => {
     const payload = buildGraphSessionPayload([]);
     expect(payload.checks).toEqual([]);
     expect(payload.summary.total).toBe(0);
+    expect(payload.impact).toBeUndefined();
+    expect(payload.impactStatus).toBeUndefined();
   });
 
   it('records a PASS row for every evaluated rule on a clean run (data, not an empty table)', () => {

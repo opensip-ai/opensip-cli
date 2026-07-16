@@ -174,9 +174,16 @@ function PhaseLine({
   if (status.kind === 'done') {
     const dur = formatDuration(status.durationMs);
     const detail = status.detail ? `${status.detail} (${dur})` : dur;
+    const detailLower = (status.detail ?? '').toLowerCase();
+    const failed =
+      detailLower.includes('fail') ||
+      detailLower.includes('fault') ||
+      detailLower.includes('error');
+    const glyph = failed ? '✗' : '✓';
+    const tone = failed ? theme.error : theme.success;
     return (
       <Text>
-        <Text color={theme.success}>✓</Text> <Text>{stage.label}</Text>
+        <Text color={tone}>{glyph}</Text> <Text>{stage.label}</Text>
         {'   '}
         <Text dimColor>{detail}</Text>
       </Text>

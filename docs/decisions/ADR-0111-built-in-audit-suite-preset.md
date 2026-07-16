@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-07-02
+last_verified: 2026-07-12
 owner: opensip-cli
 ---
 
@@ -22,10 +22,13 @@ enforcement-reason: >
 ```
 
 **Decision:** Ship `audit` as a CLI-owned built-in suite preset. `opensip suite
-run audit` resolves to data shaped like `SuiteDefinition` when the user has not
-defined `suites.audit`; a user-defined `suites.audit` wins. The preset composes
-existing first-party tools through the host-owned suite plane and returns the
-same `SuiteRunResult` / `ReviewBrief` contract as any other suite.
+run audit` resolves to data shaped like `SuiteDefinition`. ~~When the user has
+not defined `suites.audit`; a user-defined `suites.audit` wins.~~ **Amended by
+[ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md):** the name is
+reserved, so a configured override is unrepresentable and both spellings always
+use the built-in definition. The preset composes existing first-party tools
+through the host-owned suite plane and returns the same `SuiteRunResult` /
+`ReviewBrief` contract as any other suite.
 
 **Alternatives:**
 
@@ -64,3 +67,23 @@ baseline behavior.
 [ADR-0093](ADR-0093-host-owned-suite-plane.md),
 [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md),
 [ADR-0110](ADR-0110-host-owned-review-brief-contract.md).
+
+## Amendment: Canonical Root Entry (2026-07-12)
+
+[ADR-0155](ADR-0155-canonical-audit-command.md) partially amends this decision.
+`opensip audit` now exists as a reserved host-owned entry for the curated
+built-in definition because both command forms share the same option descriptors,
+executor, suite orchestrator, output seams, Run ledger, sessions, and exit
+policy. It is not a second composition path and does not establish general root
+aliases.
+
+The original rejection of a top-level command and the consequence “There is
+still no top-level `opensip audit` command” are retired under that condition.
+
+~~The configured-override decision remains active for the generic form:
+`opensip suite run audit` selects configured `suites.audit` when present, while
+top-level `opensip audit` always selects the curated built-in suite.~~
+**Superseded by [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md):**
+the suite name `audit` is reserved at config validation, so both spellings
+always select the curated built-in suite. Custom multi-tool workflows must use
+a different suite name.

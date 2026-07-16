@@ -33,6 +33,7 @@ const CHILD_ENV_SPECS = [
   'FORCE_COLOR',
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'OPENSIP_PROFILING',
+  'OPENSIP_PROFILE_DIR',
 ].map((canonical): EnvVarSpec => ({
   canonical,
   docs: 'Forwarded from the parent process into a nested repair verification CLI run.',
@@ -68,7 +69,7 @@ function currentCliEntrypoint(): string | undefined {
   return process.argv[1];
 }
 
-function childEnv(): NodeJS.ProcessEnv {
+export function repairVerificationChildEnv(): NodeJS.ProcessEnv {
   return snapshotEnv(CHILD_ENV_SPECS, { OPENSIP_REPAIR_VERIFY_CHILD: '1' });
 }
 
@@ -77,7 +78,7 @@ export const defaultProcessRunner: ProcessRunner = (request) =>
     const startedAt = Date.now();
     const child = spawn(request.command, [...request.args], {
       cwd: request.cwd,
-      env: childEnv(),
+      env: repairVerificationChildEnv(),
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

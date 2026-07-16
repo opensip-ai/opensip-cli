@@ -19,6 +19,92 @@ const ctx = (signal: AbortSignal): ScenarioExecutionContext => ({
 });
 
 describe('runLoadWindow', () => {
+  it('dispatches exactly one request at the 1 RPS / 1 second boundary', async () => {
+    vi.useFakeTimers();
+    try {
+      const ct = countingTarget();
+      const run = runLoadWindow({ workload: { rps: 1 } }, ctx(new AbortController().signal), {
+        windowMs: 1000,
+        target: ct.target,
+      });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      const result = await run;
+
+      expect(result.metrics.totalRequests).toBe(1);
+      expect(result.metrics.successfulRequests).toBe(1);
+      expect(ct.calls()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not round a genuinely fractional request budget upward', async () => {
+    vi.useFakeTimers();
+    try {
+      const ct = countingTarget();
+      const run = runLoadWindow({ workload: { rps: 2.5 } }, ctx(new AbortController().signal), {
+        windowMs: 1000,
+        target: ct.target,
+      });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      const result = await run;
+
+      expect(result.metrics.totalRequests).toBe(2);
+      expect(ct.calls()).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { expected: 3, rps: 0.3 },
+    { expected: 33, rps: 3.3 },
+  ])('preserves the $rps RPS budget across a long fractional window', async ({ expected, rps }) => {
+    vi.useFakeTimers();
+    try {
+      const ct = countingTarget();
+      const run = runLoadWindow({ workload: { rps } }, ctx(new AbortController().signal), {
+        windowMs: 10_000,
+        target: ct.target,
+      });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      const result = await run;
+
+      expect(result.metrics.totalRequests).toBe(expected);
+      expect(ct.calls()).toBe(expected);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { expected: 0, rps: 1 - Number.EPSILON / 2, windowMs: 1000 },
+    { expected: 32, rps: 3.3 - Number.EPSILON * 4, windowMs: 10_000 },
+  ])(
+    'does not round the $rps RPS budget across $windowMs ms upward',
+    async ({ expected, rps, windowMs }) => {
+      vi.useFakeTimers();
+      try {
+        const ct = countingTarget();
+        const run = runLoadWindow({ workload: { rps } }, ctx(new AbortController().signal), {
+          windowMs,
+          target: ct.target,
+        });
+
+        await vi.advanceTimersByTimeAsync(windowMs);
+        const result = await run;
+
+        expect(result.metrics.totalRequests).toBe(expected);
+        expect(ct.calls()).toBe(expected);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it('drives the target and counts every resolve as a success', async () => {
     const ct = countingTarget();
     const r = await runLoadWindow({ workload: { rps: 50 } }, ctx(new AbortController().signal), {
@@ -54,6 +140,20 @@ describe('runLoadWindow', () => {
     );
     expect(ct.maxConcurrent()).toBeLessThanOrEqual(3);
     expect(ct.calls()).toBeGreaterThan(0);
+  });
+
+  it('does not hang when concurrency is 0 (clamped to ≥ 1)', async () => {
+    const ct = countingTarget();
+    const r = await runLoadWindow(
+      { workload: { rps: 50, concurrency: 0 } },
+      ctx(new AbortController().signal),
+      {
+        windowMs: 250,
+        target: ct.target,
+      },
+    );
+    expect(r.metrics.totalRequests).toBeGreaterThan(0);
+    expect(ct.maxConcurrent()).toBeLessThanOrEqual(1);
   });
 
   it('records real measured latency in the snapshot', async () => {

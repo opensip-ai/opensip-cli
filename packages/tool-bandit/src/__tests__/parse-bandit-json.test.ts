@@ -44,7 +44,36 @@ describe('parseBanditJson', () => {
       message: 'subprocess call with shell=True identified, security issue.',
       filePath: 'app.py',
       line: 10,
-      column: 4,
+      // Bandit col_offset is 0-based; OpenSIP columns are 1-based.
+      column: 5,
+    });
+  });
+
+  it('maps col_offset 0 → column 1 and omits negative offsets', () => {
+    const raw = JSON.stringify({
+      results: [
+        { test_id: 'B0', filename: 'a.py', col_offset: 0, issue_text: 'zero' },
+        { test_id: 'Bneg', filename: 'a.py', col_offset: -1, issue_text: 'neg' },
+      ],
+    });
+    const signals = parseBanditJson(output(raw), CTX);
+    expect(signals[0]?.column).toBe(1);
+    expect(signals[1]?.column).toBeUndefined();
+  });
+
+  it('surfaces errors[] (skipped/unreadable files) as quality findings', () => {
+    const raw = JSON.stringify({
+      results: [],
+      errors: [{ filename: 'broken.py', reason: 'syntax error while parsing AST from file' }],
+    });
+    const signals = parseBanditJson(output(raw), CTX);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]).toMatchObject({
+      ruleId: 'bandit-error',
+      severity: 'medium',
+      category: 'quality',
+      message: 'syntax error while parsing AST from file',
+      filePath: 'broken.py',
     });
   });
 

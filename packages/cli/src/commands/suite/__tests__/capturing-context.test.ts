@@ -14,7 +14,7 @@ import { createCapturingContext } from '../capturing-context.js';
  * deliverEnvelope exit writes so unit tests avoid real network I/O.
  */
 function captureWith(deliveryResult?: Partial<SignalDeliveryResult>) {
-  const result = deliveryResult ?? { cloudAccepted: 0 };
+  const result: SignalDeliveryResult = { cloudAccepted: 0, ...deliveryResult };
   const deliverSignals = vi.fn(
     (
       envelopeArg: Parameters<ToolCliContext['deliverSignals']>[0],
@@ -113,7 +113,7 @@ describe('createCapturingContext', () => {
       }),
     });
     capture.context.setExitCode(2);
-    await capture.context.deliverSignals({}, { runFailed: true });
+    await capture.context.deliverSignals({}, { cwd: '/x', runFailed: true });
 
     // runFailed override DOMINATES and OVERWRITES the earlier setExitCode(2).
     expect(capture.getExitCode()).toBe(EXIT_CODES.RUNTIME_ERROR);
@@ -290,14 +290,20 @@ describe('createCapturingContext', () => {
     expect(capture.getReportedFailure()?.message.endsWith('...')).toBe(true);
   });
 
-  it('captures the last emitted envelope verdict and signal count', async () => {
+  it('captures embedded evidence while suppressing every parent output seam', async () => {
     const first = envelope({ passed: true, warnings: 1, findings: 1 });
     const second = envelope({ passed: false, errors: 2, findings: 2 });
     const deliverSignals = vi.fn(() => Promise.resolve({ cloudAccepted: 0 }));
+    const render = vi.fn(() => Promise.resolve());
     const emitEnvelope = vi.fn();
+    const emitJson = vi.fn();
+    const emitRaw = vi.fn();
     const base = {
       deliverSignals,
+      render,
       emitEnvelope,
+      emitJson,
+      emitRaw,
       setExitCode: vi.fn(),
     } as unknown as ToolCliContext;
     const capture = createCapturingContext(base);
@@ -311,12 +317,19 @@ describe('createCapturingContext', () => {
     });
 
     capture.context.emitEnvelope(second);
-    expect(emitEnvelope).toHaveBeenCalledWith(second);
+    await capture.context.render({ type: 'help' });
+    capture.context.emitJson({ nested: 'json' });
+    capture.context.emitRaw('nested raw output');
+
     expect(capture.getEnvelope()).toBe(second);
     expect(capture.getEnvelopeStats()).toEqual({
       verdict: second.verdict,
       findings: second.signals.length,
     });
+    expect(emitEnvelope).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    expect(emitJson).not.toHaveBeenCalled();
+    expect(emitRaw).not.toHaveBeenCalled();
   });
 
   it('distinguishes an empty emitted envelope from no envelope output', async () => {

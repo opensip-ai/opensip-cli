@@ -3,19 +3,48 @@
  *
  * Asserts the bundled tool descriptor (`mcp` identity, the single `mcp` command,
  * the `mcp-graph-adapter` capability registrar) and that `registerMcpTools`
- * mounts all 15 tools (9 graph + 6 result/review) through the server's register seam.
+ * mounts the exact default surface through the server's register seam.
  */
 
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { mcpTool, MCP_IDENTITY, MCP_STABLE_ID } from '../index.js';
-import { registerMcpTools } from '../tools/register.js';
+import { MCP_SURFACE_EPOCH, registerMcpTools } from '../tools/register.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
 import type { RepairWritePort } from '../repair-write-port.js';
 import type { ResultsReadPort } from '../results-read-port.js';
 import type { McpStdioServer } from '../server.js';
 import type { McpToolDeps } from '../tools/types.js';
+
+const DEFAULT_TOOL_NAMES = [
+  'search_symbols',
+  'search_declarations',
+  'references_to',
+  'get_symbol',
+  'impact_files',
+  'select_tests',
+  'who_calls',
+  'callees_of',
+  'trace_path',
+  'blast_radius',
+  'find_dead_code',
+  'get_architecture',
+  'package_dependencies',
+  'why_depends',
+  'package_cycles',
+  'refresh_graph',
+  'get_file_context',
+  'get_runtime_wiring',
+  'get_context_status',
+  'get_agent_catalog',
+  'list_runs',
+  'show_run',
+  'get_latest_findings',
+  'review_change',
+  'compare_to_baseline',
+] as const;
 
 describe('mcpTool descriptor', () => {
   it('declares the mcp identity, one command, and the graph-adapter registrar', () => {
@@ -30,7 +59,7 @@ describe('mcpTool descriptor', () => {
 });
 
 describe('registerMcpTools', () => {
-  it('mounts all 15 MCP tools (9 graph + 6 result/review) on the server', () => {
+  it('mounts the exact default MCP surface on the server', () => {
     const names: string[] = [];
     const server = {
       register: (name: string) => {
@@ -40,32 +69,18 @@ describe('registerMcpTools', () => {
     } as unknown as McpStdioServer;
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
+      codebase: {} as McpToolDeps['codebase'],
+      context: {} as McpToolDeps['context'],
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(),
     };
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(15);
-    expect(new Set(names)).toEqual(
-      new Set([
-        'search_symbols',
-        'get_symbol',
-        'who_calls',
-        'callees_of',
-        'trace_path',
-        'blast_radius',
-        'find_dead_code',
-        'get_architecture',
-        'refresh_graph',
-        'get_agent_catalog',
-        'list_runs',
-        'show_run',
-        'get_latest_findings',
-        'review_change',
-        'compare_to_baseline',
-      ]),
-    );
+    expect(names).toHaveLength(25);
+    expect(new Set(names)).toEqual(new Set(DEFAULT_TOOL_NAMES));
+    expect(MCP_SURFACE_EPOCH).toBe(7);
   });
 
   it('adds repair_apply_verify only when mutation is explicitly enabled', () => {
@@ -78,7 +93,10 @@ describe('registerMcpTools', () => {
     } as unknown as McpStdioServer;
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
+      codebase: {} as McpToolDeps['codebase'],
+      context: {} as McpToolDeps['context'],
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(['fit']),
       mutationsEnabled: true,
       repairWrite: {} as RepairWritePort,
@@ -86,8 +104,42 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(16);
-    expect(names).toContain('repair_apply_verify');
+    expect(names).toHaveLength(26);
+    expect(new Set(names)).toEqual(new Set([...DEFAULT_TOOL_NAMES, 'repair_apply_verify']));
+  });
+
+  it('registers every default and opt-in tool with a strict object schema', () => {
+    const configs = new Map<string, { readonly inputSchema?: unknown }>();
+    const server = {
+      register: (name: string, config: { readonly inputSchema?: unknown }) => {
+        configs.set(name, config);
+        return undefined;
+      },
+    } as unknown as McpStdioServer;
+    const deps: McpToolDeps = {
+      graph: {} as GraphReadPort,
+      codebase: {} as McpToolDeps['codebase'],
+      context: {} as McpToolDeps['context'],
+      results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
+      validToolIds: new Set(['fit']),
+      mutationsEnabled: true,
+      repairWrite: {} as RepairWritePort,
+    };
+
+    registerMcpTools(server, deps);
+
+    expect(configs.size).toBe(26);
+    for (const [name, config] of configs) {
+      expect(config.inputSchema, `${name} must declare an input schema`).toBeInstanceOf(
+        z.ZodObject,
+      );
+      const schema = config.inputSchema as z.ZodObject;
+      expect(schema.toJSONSchema(), `${name} must reject unknown keys`).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+      });
+    }
   });
 
   it('describes result tools as persisted replay and warns against log/sqlite/rerun fallbacks', () => {
@@ -100,7 +152,10 @@ describe('registerMcpTools', () => {
     } as unknown as McpStdioServer;
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
+      codebase: {} as McpToolDeps['codebase'],
+      context: {} as McpToolDeps['context'],
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(),
     };
 
@@ -126,12 +181,17 @@ describe('registerMcpTools', () => {
     } as unknown as McpStdioServer;
     const deps: McpToolDeps = {
       graph: {} as GraphReadPort,
+      codebase: {} as McpToolDeps['codebase'],
+      context: {} as McpToolDeps['context'],
       results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
       validToolIds: new Set(),
     };
 
     registerMcpTools(server, deps);
 
-    expect(configs.get('get_architecture')?.description ?? '').toMatch(/convention counts/i);
+    expect(configs.get('get_architecture')?.description ?? '').toMatch(
+      /sections=\["metrics"\]|topN|packageEdges|hotspots/i,
+    );
   });
 });

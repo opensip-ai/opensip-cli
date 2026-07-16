@@ -25,7 +25,7 @@ describe('lang-rust discover.ts — branches', () => {
   });
 
   it('returns undefined configPathAbs when no Cargo.toml or Cargo.lock exists', () => {
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeUndefined();
     expect(out.files).toEqual([]);
   });
@@ -33,14 +33,14 @@ describe('lang-rust discover.ts — branches', () => {
   it('uses Cargo.lock when present (preferred over Cargo.toml)', () => {
     writeFileSync(join(dir, 'Cargo.lock'), '# lock\n', 'utf8');
     writeFileSync(join(dir, 'Cargo.toml'), '[package]\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('Cargo.lock');
   });
 
   it('falls back to Cargo.toml when Cargo.lock absent', () => {
     writeFileSync(join(dir, 'Cargo.toml'), '[package]\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('Cargo.toml');
   });
@@ -48,13 +48,21 @@ describe('lang-rust discover.ts — branches', () => {
   it('honors a configPathOverride that exists', () => {
     const override = join(dir, 'custom.toml');
     writeFileSync(override, '[package]\n', 'utf8');
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'custom.toml' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'custom.toml',
+    });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('custom.toml');
   });
 
   it('returns the override path verbatim when the override does not exist', () => {
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'nonexistent.toml' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'nonexistent.toml',
+    });
     // Existing behavior: when override is supplied but file is missing,
     // the absolute path is still returned (cacheKey emits "missing:..").
     expect(out.configPathAbs).toBeDefined();
@@ -67,7 +75,7 @@ describe('lang-rust discover.ts — branches', () => {
     writeFileSync(join(dir, 'src/main.rs'), 'fn main() {}\n', 'utf8');
     mkdirSync(join(dir, 'target'), { recursive: true });
     writeFileSync(join(dir, 'target/cached.rs'), 'fn excluded() {}\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.files.length).toBe(2);
     expect(out.files.every((f) => !f.includes('/target/'))).toBe(true);
     // Sorted

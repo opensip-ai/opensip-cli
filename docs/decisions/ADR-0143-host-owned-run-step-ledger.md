@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-07-09
+last_verified: 2026-07-12
 owner: opensip-cli
 ---
 
@@ -104,3 +104,19 @@ observed RunSteps.
 Plan: `docs/plans/host-owned-run-ledger/`. Partially amends ADR-0093 and extends
 ADR-0051, ADR-0100.
 Complements ADR-0084 (MCP replay). Does not supersede ADR-0111.
+
+## Amendment: Reserved Audit Entry And Returned Run Identity (2026-07-12)
+
+[ADR-0155](ADR-0155-canonical-audit-command.md) resolves this ADR's root-alias
+deferral narrowly. The host reserves top-level `opensip audit` for the curated
+built-in definition and routes it through the same suite executor and ledger as
+`suite run`; configured suites are not mounted at root. The broader rejection of
+configured root aliases remains active.
+
+`SuiteRunResult.runId` is now the optional projection of the authoritative
+persisted `StoredRun.id`. It is present when Run-ledger persistence succeeds and
+absent when persistence is unavailable; consumers must not substitute
+`suiteRunId`, a timestamp, or a latest-row lookup. The legacy `suiteRunId`
+remains correlation identity. [ADR-0156](ADR-0156-bounded-stored-impact-proof.md)
+uses the selected `StoredRun.id` and the matching `RunStep.sessionId` as the only
+route to stored graph impact detail.

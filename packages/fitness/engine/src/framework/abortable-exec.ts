@@ -120,15 +120,24 @@ export function execAbortable(
     child.stdout?.setEncoding('utf8');
     child.stderr?.setEncoding('utf8');
 
+    let truncated = false;
     child.stdout?.on('data', (chunk: string) => {
       if (stdout.length + chunk.length <= maxBuffer) {
         stdout += chunk;
+      } else if (!truncated) {
+        truncated = true;
+        stdout += chunk.slice(0, Math.max(0, maxBuffer - stdout.length));
+        killProcess(child);
       }
     });
 
     child.stderr?.on('data', (chunk: string) => {
       if (stderr.length + chunk.length <= maxBuffer) {
         stderr += chunk;
+      } else if (!truncated) {
+        truncated = true;
+        stderr += chunk.slice(0, Math.max(0, maxBuffer - stderr.length));
+        killProcess(child);
       }
     });
 
@@ -153,6 +162,16 @@ export function execAbortable(
     child.on('close', (code: number | null) => {
       signal?.removeEventListener('abort', abortHandler);
       if (timeoutId) clearTimeout(timeoutId);
+      if (truncated) {
+        // Fail closed: truncated capture must not parse as a clean empty report.
+        resolve({
+          stdout,
+          stderr: `${stderr}\n[opensip] maxBuffer exceeded; output truncated`,
+          exitCode: code === 0 || code === null ? 1 : code,
+          aborted: false,
+        });
+        return;
+      }
       resolve({ stdout, stderr, exitCode: code, aborted });
     });
 

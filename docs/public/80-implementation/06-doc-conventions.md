@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.5.0
+release: v0.7.0
 title: "Doc conventions"
 audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
@@ -154,9 +154,9 @@ Most docs end with a "What's next" section. A few — especially the reference d
 ```markdown
 ## Verification trail
 
-Last verified at v0.5.0 against:
+Last verified at v0.7.0 against:
 
-- `packages/` directory listing (55 publishable packages plus workspace-private support packages ...).
+- `packages/` directory listing — `scripts/release-package-order.mjs` is the source of truth (57 publishable packages plus the three workspace-private support packages `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and `@opensip-cli/checks-dogfood`).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```

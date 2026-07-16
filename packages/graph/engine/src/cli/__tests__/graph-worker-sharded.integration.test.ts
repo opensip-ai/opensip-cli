@@ -93,8 +93,10 @@ describe('executeGraphWorker sharded integration', () => {
     originalArgv1 = process.argv[1];
     process.argv[1] = cliScript;
     messages = [];
-    (process as { send?: unknown }).send = vi.fn((m: Msg) => {
+    // Callback-aware mock: terminal IPC drains await the process.send callback.
+    (process as { send?: unknown }).send = vi.fn((m: Msg, cb?: (error: Error | null) => void) => {
       messages.push(m);
+      cb?.(null);
       return true;
     });
   });

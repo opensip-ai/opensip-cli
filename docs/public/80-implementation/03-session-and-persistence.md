@@ -1,42 +1,56 @@
 ---
 status: current
-last_verified: 2026-06-27
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Session and persistence"
 audience: [contributors]
 purpose: "What gets written to disk during and after a run. The runtime dir layout, the SQLite store, logs, reports."
 source-files:
   - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
   - packages/core/src/lib/logger.ts
   - packages/datastore/src/data-store.ts
   - packages/datastore/src/backends/shared.ts
   - packages/datastore/src/factory.ts
   - packages/contracts/src/session-types.ts
   - packages/contracts/src/graph-catalog.ts
+  - packages/contracts/src/task-context.ts
   - packages/session-store/src/session-repo.ts
   - packages/session-store/src/store.ts
   - packages/session-store/src/schema/sessions.ts
+  - packages/session-store/src/schema/runs.ts
+  - packages/session-store/src/context-manifest-read.ts
   - packages/cli/src/report-compose.ts
   - packages/graph/engine/src/persistence/catalog-repo.ts
   - packages/graph/engine/src/persistence/schema.ts
+  - packages/graph/engine/src/persistence/context-snapshot-repo.ts
   - packages/datastore/src/baseline-repo.ts
   - packages/datastore/src/schema/baseline.ts
   - packages/datastore/src/policy-audit-repo.ts
   - packages/datastore/src/schema/policy-audit.ts
   - packages/cli/src/bootstrap/session-retention.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
   - packages/cli/src/bootstrap/declared-inputs.ts
+  - packages/cli/src/telemetry/profiling.ts
 related-docs:
   - ../00-start/06-system-context.md
   - ./01-cli-dispatch.md
   - ./02-plugin-loader.md
   - ../80-implementation/05-layer-policy.md
-  - ../decisions/ADR-0051-host-owned-run-lifecycle-timing.md (host-owned run lifecycle, timing, and persistence)
-  - ../decisions/ADR-0096-host-owned-datastore-lifecycle.md (host-owned datastore lifecycle)
-  - ../decisions/ADR-0097-gate-verdict-determinism.md (gate verdict determinism)
+  - ../../decisions/ADR-0051-host-owned-run-lifecycle-timing.md (host-owned run lifecycle, timing, and persistence)
+  - ../../decisions/ADR-0096-host-owned-datastore-lifecycle.md (host-owned datastore lifecycle)
+  - ../../decisions/ADR-0097-gate-verdict-determinism.md (gate verdict determinism)
 ---
 # Session and persistence
 
-A run produces three kinds of on-disk artifacts: the SQLite database, structured log files, and HTML reports. All three live under one directory — `<project>/opensip-cli/.runtime/` — which is gitignored and rebuildable.
+An active runtime can contain a SQLite database, structured logs, HTML reports,
+raw tool artifacts, rebuildable caches, optional CPU profiles, and
+initialized-project plugin hosts. A command's selected mode determines which
+records or files it actually writes. Host-managed implicit state lives under one
+active **runtime root**; explicit export/SARIF paths and profile-directory
+overrides may point elsewhere. Before initialization the active root is in the
+managed user cache; after initialization it is the project's gitignored
+`.runtime/` directory.
 
 > **What you'll understand after this:**
 > - The on-disk layout and what's stored where.
@@ -46,22 +60,60 @@ A run produces three kinds of on-disk artifacts: the SQLite database, structured
 
 ---
 
+## Runtime mode is not a storage tier
+
+`opensip init` is a command that changes the project's state; “Init” is not a
+storage location. Keep these dimensions separate:
+
+| Customer state | Runtime root | Whole-root lifecycle |
+|---|---|---|
+| **Zero-config project** | `~/.opensip-cli/cache/ephemeral/<project-key>/` | Managed cache entry; automatically evictable |
+| **Initialized project** | `<project>/opensip-cli/.runtime/` | Project-local; no whole-cache eviction policy |
+
+Despite the internal `ephemeral` directory name, the user-cache runtime is real
+file-backed persistence. It survives normal process exits and reboots. What
+makes it cache storage is its lifecycle: the CLI may remove the whole project
+entry when its project path disappears, after 30 days without use, or under the
+project-count policy. The entry active during pruning is protected while up to
+50 other survivors are retained. Pruning is best-effort, so these are eviction
+rules—not an archival promise or an exact deletion schedule.
+
+The initialized project runtime uses the same SQLite schema and runtime-file
+layout. It is attached to the working copy and exempt from the extra whole-cache
+eviction pass, but it is still local, gitignored, and governed by ordinary
+record/artifact retention. Its caches and catalogs are rebuildable; retained
+sessions, baselines, tool state, and other evidence are not. Initialization
+makes project intent explicit and project-bound; it does not make evidence
+permanent or share it through Git.
+
+OpenSIP Cloud is optional and additive. Connecting Cloud does not replace the
+local runtime or imply that every local file is uploaded.
+
 ## The runtime dir layout
 
 ```
-<project>/opensip-cli/.runtime/
+<runtime-root>/
+├── project.json                                ← managed-cache entry only: project path + last-used time
 ├── datastore.sqlite                            ← single SQLite store for tool-produced data
 ├── datastore.sqlite-wal                        ← WAL journal (created when writes are in flight)
 ├── datastore.sqlite-shm                        ← shared-memory page (companion to WAL)
+├── cache/                                      ← AST, graph, and other rebuildable caches
+├── artifacts/<tool>/                           ← retained raw external-tool artifacts
 ├── reports/latest.html                         ← rewritten by every dashboard generation
 ├── logs/<YYYY-MM-DD>.jsonl                     ← one log file per local day, shared across runs
-└── plugins/                                    ← npm-installed project plugins
+├── profiles/                                   ← optional CPU profiles
+└── plugins/                                    ← initialized-project npm plugin hosts
     ├── fit/node_modules/
     ├── sim/node_modules/
     └── tool/node_modules/
 ```
 
-Source of truth: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts). Every consumer reads paths through `resolveProjectPaths(cwd)`. The directory is created lazily by whichever consumer needs a subpath first; `mkdirSync(..., { recursive: true })` is the standard idiom.
+Source of truth: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts).
+Cross-mode host-owned persistence consumers route through
+`resolveRuntimePathsForScope(...)`, which selects the managed user cache or
+project-local root without changing the shared subdirectory contract.
+Project-only plugin/adapter paths and profiling have bounded, specialized path
+selection. Directories are created lazily by their first consumer.
 
 The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mode, enabled at open time so concurrent reads — e.g. from `graph --workspace` child processes — don't block writes). They may be empty or absent after a clean shutdown depending on SQLite's WAL checkpoint timing; both states are normal.
 
@@ -69,7 +121,14 @@ The WAL/SHM sidecar files are SQLite implementation details (Write-Ahead Log mod
 
 ## The DataStore
 
-[`packages/datastore`](../../../packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap opens one `DataStore` per invocation in the `preAction` hook ([`packages/cli/src/index.ts`](../../../packages/cli/src/index.ts)) and closes it on `process.exit`. Tool commands do not receive a raw datastore handle on `ToolCliContext`; they use the entered `RunScope` for read-owned internals and the host-owned seams (`toolState`, baseline/export seams, `writeArtifact`) for durable writes.
+[`packages/datastore`](../../../packages/datastore) hosts the persistence kernel: a `DataStore` interface, a SQLite-backed implementation, an in-memory implementation for tests, and the workspace-wide migration store under `migrations/`. The CLI bootstrap installs a lazy per-scope datastore accessor; the first consumer opens at most one `DataStore`, and RunScope teardown disposes it. Help, discovery, and other datastore-free paths need not open SQLite. Tool commands do not receive a raw datastore handle on `ToolCliContext`; they use the entered `RunScope` for read-owned internals and the host-owned seams (`toolState`, baseline/export seams, `writeArtifact`) for durable writes.
+
+The public `DataStore` is deliberately opaque: lifecycle, maintenance, and
+serialized write-lock coordination only. Raw Drizzle handles, table values, and
+transaction callbacks remain behind `@opensip-cli/datastore/internal` for the
+datastore owner, session-store, and graph persistence. General Tool/CLI business
+logic goes through repositories or documented host seams
+([ADR-0147](../../decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)).
 
 Schemas are owned by the package that produces the data — datastore is paradigm-agnostic infrastructure — **with one deliberate exception**: baseline persistence is a host-owned plane (ADR-0036). A tool that wants tool-specific tables (like graph's catalog cache) adds a schema module under its `src/persistence/schema.ts` and registers it in [`packages/datastore/drizzle.config.ts`](../../../packages/datastore/drizzle.config.ts); a tool that wants the **gate** (`--gate-save`/`--gate-compare`/export) adds *no schema at all* — it inherits the generic `tool_baseline_entries` / `tool_baseline_meta` pair (scoped by a `tool` column, [`packages/datastore/src/schema/baseline.ts`](../../../packages/datastore/src/schema/baseline.ts)) by stamping fingerprints on its signals. The schema registrations today:
 
@@ -118,6 +177,29 @@ host-only maintenance seam for `incrementalVacuum`, bounded full `VACUUM`, and
 file-size measurement. The in-memory test store does not expose maintenance.
 Existing file stores are converted on open with a one-time `VACUUM`; conversion
 failure is logged and non-fatal.
+
+---
+
+## Reserved host-plane state
+
+Ordinary Tool state and host compatibility state share the `tool_state` table
+but not an identity. Tool-owned rows use validated canonical/layout/stable keys;
+host compatibility rows use `@opensip-cli/host-plane:<toolId>`. One shared
+reserved-prefix predicate rejects that namespace during runtime Tool admission,
+owned-key derivation, binding, and explicit purge input before handler or state
+access. A bound Tool therefore cannot overwrite or enumerate its host rows.
+
+Migration `0009_host_plane_namespace` copies recognized legacy compatibility
+rows into the reserved identity. It preserves payload bytes and timestamps,
+does not delete the legacy row, never overwrites an existing reserved row, and
+is idempotent, including stored JSON `null`. This copy-only posture avoids
+guessing whether an ambiguous legacy key was host- or Tool-owned
+([ADR-0146](../../decisions/ADR-0146-host-plane-reserved-state-namespace.md)).
+
+`opensip tools data-purge <tool-id>` resolves the Tool's admitted owned keys and
+clears sessions, baselines, ordinary state, and the corresponding reserved host
+compatibility rows. The reserved identity itself is never accepted as a command
+argument.
 
 ---
 
@@ -196,6 +278,15 @@ logged under `session.retention.*`, but it never changes the primary tool
 verdict, session write result, or process exit code. Tools do not call this
 maintenance path directly; the host owns it per ADR-0096.
 
+This record-level policy applies independently of the active runtime location.
+The managed user cache has an additional whole-entry policy that initialized
+project runtimes do not: at most once per day, cache hygiene may remove entries
+whose project path no longer exists, entries unused for more than 30 days, then
+the oldest survivors under a count policy that retains up to 50 entries in
+addition to the protected active entry. It never removes the entry backing the
+run in progress. The outer cache policy is host-owned rather than controlled by
+one project's config because it governs a cross-project user directory.
+
 ## Policy audit events
 
 The trust-policy plane records bounded local evidence in
@@ -242,13 +333,43 @@ The `--workspace` runner spawns one child process per workspace unit (per adapte
 
 The `--no-cache` flag forces a cache miss; the existing fingerprint-based invalidation path runs even when `datastore.sqlite` is present and current.
 
+### Task-context derived snapshots and parent manifests
+
+Task context spans two deliberately separate owners. Graph persists immutable
+inventory and test-selection payloads in `graph_context_snapshot`; each row has
+an exact id/kind/payload version, source/config identity, byte count, and JSON
+payload. Writes reject payloads above 8 MiB, retain at most three rows per kind,
+and prune deterministically until total retained bytes are at most 24 MiB.
+Snapshot payloads contain facts and labelled static evidence, never source,
+raw manifests, environment values, or unsafe script text.
+
+The CLI aggregates only bounded contribution metadata. It preallocates the
+parent Run and RunStep identities, builds `TaskContextManifest`, then writes the
+same ids to `runs.context_manifest` and ordered `run_steps.evidence`. The parent
+manifest is capped at 16 planes/64 KiB. Snapshot write precedes parent write, so
+a failed parent transaction can leave an orphan; bounded age/size retention can
+eventually remove old rows, including orphans and referenced snapshots. A
+failed snapshot write cannot yield a successful contribution. There is no
+cross-owner transaction and no context Tool session.
+
+`get_context_status` reads the exact project-root/name parent Run through
+session-store, validates its stored step references, and asks graph only whether
+each recorded pointer is still available. For a retained inventory pointer it
+also compares a freshly computed, content-free inventory identity; a mismatch
+is stale and the newer identity is not disclosed. It never substitutes latest.
+Old Runs have no manifest; an evicted snapshot leaves the parent Run available
+but marks that exact pointer missing with a conservative rerun action. Callers
+must require response `status: available`, `fileScope.status: matched`,
+`manifest.readiness: ready`, and current, complete, uncapped required planes
+whose exact pointers all replay as `available` before trusting the context.
+
 ---
 
 ## Host-owned run timing (ADR-0051 / host-owned-run-timing plan)
 
 `StoredSession.startedAt`, `completedAt`, and `durationMs` are produced exclusively by the host from a single `RunTimer` (a.k.a. `RunLifecycle`). The host run plane (`packages/cli/src/bootstrap/run-plane.ts`) creates the lifecycle inside the command action — after `RunScope` entry, before any tool handler or `renderLive` — and freezes it (`complete()`, idempotent) once the tool returns. Tools read the timer only for a **display clock** via `ToolCliContext.runSession.timing` (also passed as the optional second `LiveViewContext` arg to live renderers registered with `cli.registerLiveView`). There is **no** generic-session writer on the context.
 
-**The contribution model.** A tool RECORDS a run by RETURNING a `ToolRunCompletion` from its command handler or live renderer — `{ result?, envelope?, session?, dashboard? }`. Its `session` is a `ToolSessionContribution` `{ tool, cwd, recipe?, score, passed, payload? }` (no timing). The host run plane then stamps the frozen `startedAt`/`completedAt`/`durationMs`, generates the id via `generatePrefixedId(tool)`, writes via `SessionRepo`, records `persistMs` on the sibling host-metrics record, and (for a live run) records `ttyBusyMs`. Persistence is best-effort: no datastore ⇒ no row, never throws, never affects the result or exit code.
+**The contribution model.** A tool RECORDS a run by RETURNING a `ToolRunCompletion` from its command handler or live renderer — `{ result?, envelope?, session?, execution? }`. Its `session` is a `ToolSessionContribution` `{ tool, cwd, recipe?, score, passed, payload? }` (no timing). The host run plane then stamps the frozen `startedAt`/`completedAt`/`durationMs`, generates the id via `generatePrefixedId(tool)`, writes via `SessionRepo`, records `persistMs` on the sibling host-metrics record, and (for a live run) records `ttyBusyMs`. Persistence is best-effort: no datastore ⇒ no row, never throws, never affects the result or exit code. A subprocess supervisor may return `execution: { kind: 'delegated', startedAt }`, but the host suppresses its standalone ledger row only after proving that a child row with the same run correlation, tool, and command began no earlier than that delegation; an unproven delegation remains a missing-evidence fault.
 
 For primary verdict-producing analysis commands, prefer
 `defineAnalysisRunCommand` from `@opensip-cli/contracts`. The tool's `session`
@@ -301,7 +422,7 @@ The capture (`--gate-save`), ratchet (`--gate-compare`), and export (SARIF + JSO
 
 ### Baselines live in SQLite
 
-Each tool has exactly one baseline per project in the SQLite database.
+Each tool has at most one saved baseline per active local runtime in the SQLite database.
 `--gate-save` replaces that tool's baseline rows; `--gate-compare` compares the
 current run against the saved rows. SARIF remains an export format, not the
 baseline store.
@@ -313,7 +434,7 @@ baseline store.
 Structured JSON Lines, one event per line. Written to two destinations simultaneously:
 
 1. **stderr** — for live observation (`opensip fit 2>&1 | jq`).
-2. **`<project>/opensip-cli/.runtime/logs/<YYYY-MM-DD>.jsonl`** — one file per local day; every run on the same day appends to the same file. Filter with `jq` on the `runId` field to isolate a specific run.
+2. **`<runtime-root>/logs/<YYYY-MM-DD>.jsonl`** — one file per local day; every run on the same day appends to the same file. The runtime root is the managed user cache before initialization and the project-local `.runtime/` afterward. Filter with `jq` on the `runId` field to isolate a specific run.
 
 The logger is in [`packages/core/src/lib/logger.ts`](../../../packages/core/src/lib/logger.ts). Every log entry carries:
 
@@ -324,25 +445,41 @@ The logger is in [`packages/core/src/lib/logger.ts`](../../../packages/core/src/
 
 Persistence call sites emit structured events with stable `evt:` names: `session.save.complete` / `.list.complete` / `.purge.complete`, `graph.baseline.save.complete` / `.load.complete` / `.load.miss`, `graph.catalog.read.hit` / `.read.miss` / `.write.complete`, `fit.baseline.save.complete` / `.load.complete` / `.load.miss`. Observability did not regress with the storage swap.
 
-The log file persists until manually deleted. There's no rotation; that's the user's job. `sessions purge` deletes session rows but leaves logs alone, by design.
+There is no per-file log rotation. In an initialized project, logs remain until
+the user removes them or the runtime. For a zero-config project, logs can also
+disappear when the whole managed cache entry is evicted. `sessions purge`
+deletes session rows but leaves logs alone, by design.
 
 ---
 
 ## Reports
 
-The HTML report writes a single self-contained file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file — the report is "always show the most recent state", not a per-run archive.
+The HTML report writes a single self-contained file at
+`<runtime-root>/reports/latest.html`. `opensip report` and `--open` resolve the
+same active runtime as the analysis command, so managed-cache reports work before
+initialization without writing project files. Each generation overwrites the
+previous file—the report is “always show the most recent state,” not a per-run
+archive.
 
 Composition is owned by the **CLI** ([`packages/cli/src/report-compose.ts`](../../../packages/cli/src/report-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectReportData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-cli/dashboard`](../../../packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
 
-The report auto-open hook fires after a run if (a) `--open` was requested or auto-open is configured, (b) output isn't `--json`, and (c) stdout is a TTY.
+The report hook fires after an eligible analysis run only when `--open` was
+requested and browser policy accepts it. The explicit `opensip report` command
+always composes a snapshot and opens it by default unless `--no-open` or `--json`
+is selected.
 
 ---
 
 ## Upgrade behavior
 
-`DataStoreFactory.open()` applies any pending Drizzle migrations on every CLI invocation. Migrations are content-hashed and idempotent. Users see no extra step; first run of a new opensip-cli version brings the schema up to date in milliseconds. After a successful migrate it stamps the SQLite header (`PRAGMA user_version`) with the number of migrations this build ships.
+Whenever an invocation opens the active datastore, `DataStoreFactory.open()`
+applies any pending Drizzle migrations. Migrations are content-hashed and
+idempotent. Users see no extra step; the first datastore-using command on a new
+opensip-cli version brings that store up to date. After a successful migrate it
+stamps the SQLite header (`PRAGMA user_version`) with the number of migrations
+this build ships.
 
-**Downgrades across schema changes are unsupported** — Drizzle has no down-migration concept, and an older CLI cannot detect a newer schema on its own (its migrations are a prefix of what was applied, so `migrate()` no-ops and later queries hit missing columns). The version stamp closes that gap: on open, a CLI whose supported version is behind the on-disk stamp fails fast with `DataStoreVersionError`, whose message offers two recoveries — upgrade the CLI (`curl -fsSL https://opensip.ai/cli/install.sh | bash`), or delete `<project>/opensip-cli/.runtime/datastore.sqlite` to continue on the older CLI (cache rebuilds on next run; session history is lost). The forward direction (newer CLI, older or pre-guard `user_version 0` DB) auto-migrates and re-stamps with no user action.
+**Downgrades across schema changes are unsupported** — Drizzle has no down-migration concept, and an older CLI cannot detect a newer schema on its own (its migrations are a prefix of what was applied, so `migrate()` no-ops and later queries hit missing columns). The version stamp closes that gap: on open, a CLI whose supported version is behind the on-disk stamp fails fast with `DataStoreVersionError`, whose message offers two recoveries — upgrade the CLI (`curl -fsSL https://opensip.ai/cli/install.sh | bash`), or delete the active `<runtime-root>/datastore.sqlite` to continue on the older CLI. Cacheable data can rebuild, but session history, saved baselines, tool state, and other retained database evidence are lost. The forward direction (newer CLI, older or pre-guard `user_version 0` DB) auto-migrates and re-stamps with no user action.
 
 If opening or migrating fails for other reasons (corrupted DB header, unwritable directory), the CLI surfaces a `DataStoreMigrationError` with the same delete-to-recover hint.
 
@@ -355,13 +492,16 @@ A reference for "I want to free disk / I'm debugging."
 | Command | Touches |
 |---|---|
 | `opensip sessions list` | `SELECT FROM sessions` |
-| `opensip sessions purge --older-than N` | `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to the tool-payload row) |
+| `opensip sessions purge --older-than N` | In an initialized project, `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to the tool-payload row) |
 | `opensip fit --no-cache` / `graph --no-cache` | Forces cache miss; rebuilds full catalog/results, ignores any cached row |
-| `opensip uninstall --project [path]` | Removes `<path>/opensip-cli/` recursively. **`datastore.sqlite` and its `-wal` / `-shm` sidecars are caught transitively.** On Windows, ensure no opensip-cli CLI process is active when running this — open file handles can block WAL/SHM removal. |
-| `opensip uninstall` (no flag) | Removes `~/.opensip-cli/`. No DB there; user-global state is a single config file. |
-| Manual `rm <path>/opensip-cli/.runtime/datastore.sqlite*` | Wipes the project DB. Caches rebuild; session history is lost. |
+| `opensip uninstall --project [path]` | Removes generated project runtime state and the matching zero-config user-cache runtime while preserving project config/authored content unless `--purge` is passed. Session/log history, baselines, tool state, and other retained evidence in those runtimes are lost. On Windows, ensure no opensip-cli process is active; open handles can block WAL/SHM removal. |
+| `opensip uninstall` (no flag) | Removes `~/.opensip-cli/`, including user config, user-global tools/plugins, and every managed user-cache runtime/database. |
+| Manual `rm <runtime-root>/datastore.sqlite*` | Wipes the active local DB. Cacheable records can rebuild; session history, saved baselines, tool state, and other retained database evidence are lost. |
 
-The whole `<project>/opensip-cli/` directory is also safe to delete; `opensip init` will scaffold it fresh. You lose your custom checks and recipes if you didn't commit them.
+`opensip init` can recreate the standard scaffold under
+`<project>/opensip-cli/`, but deleting the whole directory also removes authored
+checks, recipes, scenarios, and tools that the scaffold cannot recover. Preserve
+or commit authored content first.
 
 ---
 

@@ -124,6 +124,11 @@ function commandError(ctx: CliCommandsContext, error: RepairError): CommandResul
 
 function buildRepairPreviewSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/repair/command-specs.ts',
+      declaration: 'buildRepairPreviewSpec',
+    },
     name: 'preview',
     description: 'Preview a deterministic repair action from a stored session signal',
     commonFlags: ['json'],
@@ -166,6 +171,11 @@ function buildRepairPreviewSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildRepairApplySpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/repair/command-specs.ts',
+      declaration: 'buildRepairApplySpec',
+    },
     name: 'apply',
     description: 'Apply a deterministic repair action from a stored session signal',
     commonFlags: ['json'],

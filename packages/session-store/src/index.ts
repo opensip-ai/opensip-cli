@@ -21,6 +21,13 @@
 
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
 export { RunRepo, type RunListOptions } from './run-repo.js';
+export {
+  TASK_CONTEXT_RUN_NAME,
+  readTaskContextRun,
+  type StoredTaskContextRun,
+  type TaskContextRunReadError,
+  type TaskContextRunReadReason,
+} from './context-manifest-read.js';
 export { isSessionCwdWithin } from './session-cwd-scope.js';
 export {
   resolveSession,

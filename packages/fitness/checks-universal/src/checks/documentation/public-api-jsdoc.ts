@@ -80,6 +80,7 @@ function analyzeJsdoc(content: string, filePath: string): CheckViolation[] {
         }
         if (prevLine.startsWith('//')) continue; // skip single-line comments
         if (prevLine.startsWith('*')) continue; // inside JSDoc block
+        if (prevLine.startsWith('@')) continue; // skip TS decorators between the JSDoc and the export
         break; // non-comment, non-blank line means no JSDoc
       }
 

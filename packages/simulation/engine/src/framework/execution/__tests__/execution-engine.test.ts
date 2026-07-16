@@ -82,7 +82,8 @@ describe('validateAssertions', () => {
 describe('resolveMetric (via validateAssertions)', () => {
   it.each([
     ['error_rate', baseMetrics({ totalRequests: 100, failedRequests: 25 }), 0.25],
-    ['error_rate', baseMetrics({ totalRequests: 0 }), 0],
+    // Fail-closed: zero requests is not a clean proof.
+    ['error_rate', baseMetrics({ totalRequests: 0 }), 1],
     ['success_rate', baseMetrics({ totalRequests: 100, successfulRequests: 90 }), 0.9],
     // Per resolve-metric.ts: success_rate is 0 when totalRequests === 0 (tightening choice).
     ['success_rate', baseMetrics({ totalRequests: 0 }), 0],

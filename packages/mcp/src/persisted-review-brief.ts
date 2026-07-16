@@ -3,6 +3,7 @@ import {
   buildReviewBriefCorrelations,
   buildReviewBriefRecommendedActions,
   type CommandResult,
+  compareCodePoint,
   compareReviewBriefRisks,
   deriveReviewBriefVerdict,
   pushReviewBriefDegradation,
@@ -225,10 +226,4 @@ function collectRisks(input: {
   });
 
   return { risks, reviewDegraded, evidenceDegraded, baselineStates, degradedSteps };
-}
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
 }

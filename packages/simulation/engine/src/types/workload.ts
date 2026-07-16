@@ -24,10 +24,12 @@ export interface Workload {
 /**
  * Resolve the in-flight concurrency cap for a workload.
  *
- * When `concurrency` is set, it wins. Otherwise derive a bound from `rps`:
- * roughly one in-flight slot per 5 rps (min 1). This keeps a default scenario
- * from issuing an unbounded burst while still letting real latency overlap.
+ * When `concurrency` is set, it wins (clamped to ≥ 1 — a zero cap would hang
+ * the load-window backpressure loop forever). Otherwise derive a bound from
+ * `rps`: roughly one in-flight slot per 5 rps (min 1). This keeps a default
+ * scenario from issuing an unbounded burst while still letting real latency
+ * overlap.
  */
 export function resolveConcurrency(workload: Workload): number {
-  return workload.concurrency ?? Math.max(1, Math.ceil(workload.rps / 5));
+  return Math.max(1, workload.concurrency ?? Math.ceil(workload.rps / 5));
 }

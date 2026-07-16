@@ -129,6 +129,14 @@ export function scanLineComment(
   const bodyStart = start + 2; // skip the opening //
   let i = bodyStart;
   while (i < len) {
+    // CRLF: treat `\r\n` as one terminator; splice check looks before `\r`.
+    if (src[i] === '\r' && src[i + 1] === '\n') {
+      if (allowLineContinuation && hasUnescapedTrailingBackslash(src, bodyStart, i)) {
+        i += 2;
+        continue;
+      }
+      break;
+    }
     if (src[i] === '\n') {
       if (allowLineContinuation && hasUnescapedTrailingBackslash(src, bodyStart, i)) {
         // Line splice — continue onto the next physical line.

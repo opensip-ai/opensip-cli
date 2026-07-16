@@ -11,7 +11,11 @@
 
 import { runToolLiveView } from '@opensip-cli/cli-live';
 
-import { suiteReviewLine, suiteVerboseDetail } from '../../ui/views/suite-views.js';
+import {
+  suiteContextLine,
+  suiteReviewLine,
+  suiteVerboseDetail,
+} from '../../ui/views/suite-views.js';
 
 import { runSuite, type RunSuiteInput } from './orchestrator.js';
 
@@ -97,7 +101,8 @@ export async function renderSuiteLive(
       // §4 the canonical RunSummary headline, a one-line review verdict under it
       // (`summaryNote`), and the per-step + risk tables only under `--verbose`
       // (`verboseExtra`). The per-step outcome list is §3 (the checklist above).
-      const reviewLine = suiteReviewLine(result.reviewBrief);
+      const reviewLine =
+        suiteContextLine(result.contextManifest) ?? suiteReviewLine(result.reviewBrief);
       return {
         kind: 'done',
         done: {
@@ -115,10 +120,41 @@ export async function renderSuiteLive(
     },
   };
 
-  const completion = await runToolLiveView(spec, args.glue ?? {});
-  // `produce` always runs to completion before `runToolLiveView` resolves.
+  // Capture the live-view exit so a synthetic empty result keeps ADR-0020 taxonomy
+  // (e.g. ConfigurationError → 2) instead of hard-coding 1 after glue.setExitCode.
+  let liveExitCode = 1;
+  const outerSetExit = args.glue?.setExitCode;
+  const glue = {
+    ...args.glue,
+    setExitCode: (code: number) => {
+      liveExitCode = code;
+      outerSetExit?.(code);
+    },
+  };
+
+  let completion: ToolRunCompletion;
+  try {
+    completion = await runToolLiveView(spec, glue);
+  } catch (error) {
+    // Live view may rethrow after painting; if produce never assigned, rethrow
+    // the original error rather than inventing a secondary message.
+    if (result === undefined) throw error;
+    throw error;
+  }
+  // Live view catches produce throws, paints error, and sets exit — if produce
+  // still left result unset, surface a structured empty failure instead of a
+  // secondary generic Error that obscures diagnostics.
   if (result === undefined) {
-    throw new Error('renderSuiteLive: suite produced no result');
+    const empty: SuiteRunResult = {
+      type: 'suite-run',
+      suite: args.suiteInput.name,
+      suiteRunId: '',
+      durationMs: 0,
+      exitCode: liveExitCode,
+      steps: [],
+      scope: { mode: 'full', source: 'fallback', notice: 'suite live produce did not complete' },
+    };
+    return { completion, result: empty };
   }
   return { completion, result };
 }

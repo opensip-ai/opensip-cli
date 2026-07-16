@@ -29,6 +29,7 @@ const SRC = [
   '        String x = "h";',
   '        if (true) { return; }',
   '        for (int i = 0; i < 3; i++) {}',
+  '        do { } while (false);',
   '        try { } catch (RuntimeException e) { }',
   '    }',
   '}',
@@ -58,7 +59,8 @@ describe('java substrate', () => {
     expect(count(isString)).toBe(1);
     expect(count(isCatch)).toBe(1);
     expect(count(isConditional)).toBe(1);
-    expect(count(isLoop)).toBe(1);
+    // for + do-while
+    expect(count(isLoop)).toBe(2);
   });
 
   it('getSharedTree caches within an active parse cache', () => {

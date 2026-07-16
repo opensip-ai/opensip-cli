@@ -114,26 +114,26 @@ describe('resolveSuiteScope', () => {
     expect(scope.notice).toMatch(/running the full scope/);
   });
 
-  it('keeps explicit selectors changed-scoped when git resolution degrades', () => {
-    expect(
-      resolveSuiteScope({
-        cwd: tmp,
-        suiteOpts: { changed: true },
-        defaultChanged: true,
-      }),
-    ).toEqual({ mode: 'changed', source: 'explicit' });
+  it('falls back to full scope when explicit --changed cannot resolve files', () => {
+    const scope = resolveSuiteScope({
+      cwd: tmp,
+      suiteOpts: { changed: true },
+      defaultChanged: true,
+    });
+    expect(scope).toMatchObject({ mode: 'full', source: 'fallback' });
+    expect(scope.notice).toMatch(/running the full scope/);
   });
 
-  it('treats hostile refs as structured enrichment failures without throwing', () => {
+  it('falls back to full scope for hostile --since without throwing', () => {
     makeGitFixture();
 
-    expect(
-      resolveSuiteScope({
-        cwd: tmp,
-        suiteOpts: { since: '-upload-pack=x' },
-        defaultChanged: false,
-      }),
-    ).toEqual({ mode: 'changed', source: 'explicit', ref: '-upload-pack=x' });
+    const scope = resolveSuiteScope({
+      cwd: tmp,
+      suiteOpts: { since: '-upload-pack=x' },
+      defaultChanged: false,
+    });
+    expect(scope).toMatchObject({ mode: 'full', source: 'fallback' });
+    expect(scope.notice).toMatch(/running the full scope/);
   });
 });
 

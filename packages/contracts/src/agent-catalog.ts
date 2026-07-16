@@ -33,6 +33,7 @@ import {
   publicPrimaryCommand,
 } from './agent-catalog-entries.js';
 
+import type { AgentHostSupport } from './host-support.js';
 import type { AgentProjectContext } from './target-conventions.js';
 import type { Tool, ToolRegistry } from '@opensip-cli/core';
 
@@ -83,11 +84,34 @@ export interface AgentCatalog {
   readonly outputShapes: {
     readonly signalEnvelope: string; // high-level note + reference
     readonly reviewBrief: string;
+    readonly taskContext: string;
     readonly repairApplyVerify: string;
     readonly sessionReplay: string;
     readonly history: string;
   };
   readonly projectContext?: AgentProjectContext;
+  /**
+   * Names no Tool or configured suite may claim (ADR-0159). Additive
+   * (optional): the composition root injects the live lists (it owns them —
+   * this contracts layer cannot import the cli or config packages), so
+   * catalogs built without them (e.g. over MCP) simply omit the field.
+   * `rootCommands` = host-owned root commands a Tool cannot mount;
+   * `suiteNames` = built-in suite names a configured suite cannot use.
+   */
+  readonly reservedNames?: {
+    readonly rootCommands: readonly string[];
+    readonly suiteNames: readonly string[];
+  };
+  /**
+   * Honest, process-only host-support projection (Plan 02, macOS GA). Additive
+   * (optional): the composition root observes the live process, asks core to
+   * classify it, and injects the serializable projection here. Catalogs built
+   * without it (e.g. a bare contracts builder) simply omit the field. The
+   * value is NEVER an exact match — npm/filesystem/install-channel are
+   * unobserved at runtime — so agents must distinguish the row's published
+   * status from the local `match`.
+   */
+  readonly hostSupport?: AgentHostSupport;
   readonly notes: readonly string[];
 }
 
@@ -159,19 +183,30 @@ function deriveToolEntryPoints(
 }
 
 /**
+ * Named input for the sole catalog content builder {@link buildAgentCatalog}.
+ * Readonly and self-contained: it carries the admitted `tools`, the internal
+ * command denylist, an already-bounded project context, the caller-controlled
+ * `validateOverlays` flag, the injected reserved-name lists (ADR-0159), and
+ * Plan 02's process-only host-support projection. Extracted (was anonymous) so
+ * both transports name the same input and a new common field cannot silently
+ * reach only one adapter.
+ */
+export interface AgentCatalogBuildInput {
+  readonly tools?: ToolRegistry;
+  readonly internalCommands?: ReadonlySet<string>;
+  readonly projectContext?: AgentProjectContext;
+  readonly validateOverlays?: boolean;
+  readonly reservedNames?: AgentCatalog['reservedNames'];
+  readonly hostSupport?: AgentHostSupport;
+}
+
+/**
  * Build the {@link AgentCatalog} for this invocation: derive a Tier-2 entry
  * point per registered tool, append the static Tier-1 platform commands, assert
  * no Tier-3 (`internal`) command leaks into the surface, and return the assembled
  * catalog. With no `tools` registry the result carries only the platform entries.
  */
-export function buildAgentCatalog(
-  input: {
-    readonly tools?: ToolRegistry;
-    readonly internalCommands?: ReadonlySet<string>;
-    readonly projectContext?: AgentProjectContext;
-    readonly validateOverlays?: boolean;
-  } = {},
-): AgentCatalog {
+export function buildAgentCatalog(input: AgentCatalogBuildInput = {}): AgentCatalog {
   if (input.validateOverlays === true && input.tools !== undefined) {
     assertAgentCatalogOverlayKeys(input.tools, input.internalCommands ?? new Set());
   }
@@ -196,6 +231,12 @@ export function buildAgentCatalog(
           'opensip sessions show latest --tool fit --json --filter errors-only --filter top:20',
       },
       {
+        name: 'Prepare before-edit task context',
+        description:
+          'Call MCP get_context_status with files: ["src/server.ts"] first. Trust it only when status is available, fileScope.status is matched, manifest.readiness is ready, and every required plane is current, complete, uncapped, and backed by an available durable pointer; otherwise recapture bounded inventory, graph, and static test-selection evidence.',
+        example: 'opensip suite run agent-context --files src/server.ts --json',
+      },
+      {
         name: 'Agent edit loop',
         description:
           'Fast check → impact analysis → changed/impacted fit with trust metadata → final gate.',
@@ -205,8 +246,8 @@ export function buildAgentCatalog(
       {
         name: 'Read audit review brief',
         description:
-          'For PR review workflows, use MCP review_change when available; fall back to the host-owned suite review brief over CLI JSON.',
-        example: 'opensip suite run audit --changed --json',
+          'For PR review workflows, use MCP review_change when available; use the canonical host-owned audit review brief when fresh execution is needed.',
+        example: 'opensip audit --json',
       },
       {
         name: 'Apply and verify a structured repair',
@@ -250,7 +291,9 @@ export function buildAgentCatalog(
         'The canonical cross-tool currency (schemaVersion, tool, runId, verdict, units, signals). ' +
         'Every fit/graph/sim result (live or replayed) carries one. See contracts for full type.',
       reviewBrief:
-        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For suite run: { type: "suite-run", suite, suiteRunId, scope?: { mode, source, ref?, changedFiles?, notice? }, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
+        'For MCP review_change: { data: { reviewBrief: { version: 1, verdict, changedFiles, topRisks, correlatedRisks?, newFindings, baselineDelta, degraded, recommendedActions }, source, freshness } }. For audit or suite run: { type: "suite-run", suite, suiteRunId, runId?, scope?: { mode, source, ref?, changedFiles?, notice? }, aggregate, steps: [{ verification?: { coverage, fallback, fullyVerified, uncertainties } }], reviewBrief: { version: 1, correlatedRisks?, ... } }',
+      taskContext:
+        'For suite run agent-context: { type: "suite-run", runId, contextManifest: { schemaVersion, createdAt, projectIdentity, readiness, sourceStart, sourceEnd, fileScope: {mode,fileCount,filesIdentity}, graphIdentity?, inventoryIdentity?, planes: [{kind,status,required,producer:{toolId,command,version},pointer?,step,freshness,coverage,caps,reasonCodes,followUpReads}], reasonCodes, nextActions } }. get_context_status accepts the same explicit files and returns status, fileScope.status, the manifest, and exact pointer replay statuses. Trust requires available + matched + ready and every required plane current, complete, uncapped, and pointer-available. Context evidence is not a finding or ReviewBrief; raw paths are never stored in fileScope, and project roots are never stored in projectIdentity.',
       repairApplyVerify:
         'For repair apply --verify: { type: "repair-apply-verify", status, session, signal, action, changes, force, verification: { status: "verified" | "partial" | "unverified" | "skipped", coverage, scope: { tool, ruleId, files, checkRan, fallback }, commands, remainingFindings, trust? } }',
       sessionReplay:
@@ -261,10 +304,16 @@ export function buildAgentCatalog(
     ...(input.projectContext && input.projectContext.targetConventions.length > 0
       ? { projectContext: input.projectContext }
       : {}),
+    ...(input.reservedNames === undefined ? {} : { reservedNames: input.reservedNames }),
+    ...(input.hostSupport === undefined ? {} : { hostSupport: input.hostSupport }),
     notes: [
       'Agent recipes (when present): fit agent-fast / agent-risk / agent-final; graph agent-risk / agent-final.',
       'Live runs support --filter/--top/--raw on fit/graph/sim --json (same engine as sessions show).',
       'graph impact answers changed→impacted without a separate git diff dance.',
+      'Before editing, call MCP get_context_status with the same explicit project-relative files. Trust it only when status is available, fileScope.status is matched, manifest.readiness is ready, and every required plane is current, complete, uncapped, and has an available durable pointer; run opensip suite run agent-context with the same --files set and --json when any condition fails.',
+      'impact_files and select_tests accept explicit project-relative files; ordinary MCP reads never build a graph, invoke Git, or execute tests.',
+      'Use opensip audit --json for a fresh canonical review. --open is human-only and is suppressed by JSON/non-TTY/CI execution.',
+      'Configured multi-tool workflows remain under opensip suite run <name>; they do not replace the canonical top-level audit.',
       'graph impact JSON includes trust.coverage/trust.fullyVerified/trust.uncertainties; do not claim targeted verification when fullyVerified is false.',
       'fit --changed --include-impacted falls back to the full target set when graph/git impact trust is partial or unknown.',
       'repair apply --verify and MCP repair_apply_verify are mutating. MCP repair_apply_verify is absent unless the server starts with --allow-mutations or OPENSIP_MCP_ALLOW_MUTATIONS=1.',

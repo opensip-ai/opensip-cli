@@ -1,16 +1,18 @@
 /**
  * `review_change` — one-call persisted review brief for agents.
  *
- * Reads `resultsPort.reviewChange()` plus graph freshness from the injected
- * graph port. It replays stored suite step sessions only; it never re-runs a
- * tool and never reads raw logs or SQLite directly.
+ * Graph status errors degrade to a bounded partial/unavailable freshness so
+ * stored ReviewBrief replay still succeeds.
  */
 
 import { z } from 'zod';
 
+import { unavailableGraphStatus } from '../freshness.js';
+
 import {
   filePath as filePathSchema,
   limit as limitSchema,
+  strictInput,
   suiteName as suiteNameSchema,
   suiteRunId as suiteRunIdSchema,
 } from './schemas.js';
@@ -30,20 +32,29 @@ export function registerReviewChange(server: McpStdioServer, deps: McpToolDeps):
         'from persisted suite step sessions, includes graph freshness, and never re-runs ' +
         'fit/graph/yagni/sim. Do not grep .runtime/logs, read datastore.sqlite directly, ' +
         'or re-run a CLI tool to answer stored review questions.',
-      inputSchema: {
+      inputSchema: strictInput({
         suiteRunId: suiteRunIdSchema().optional(),
         suite: suiteNameSchema().optional(),
         files: z.array(filePathSchema()).max(100).optional(),
         limit: limitSchema(),
-      },
+      }),
     },
     async ({ suiteRunId, suite, files, limit }) => {
+      let graphFreshness = unavailableGraphStatus();
+      try {
+        const status = await deps.graph.catalogStatus();
+        if (status.ok) {
+          graphFreshness = status.value.freshness;
+        }
+      } catch {
+        graphFreshness = unavailableGraphStatus();
+      }
       const outcome = await deps.results.reviewChange({
         ...(suiteRunId === undefined ? {} : { suiteRunId }),
         ...(suite === undefined ? {} : { suite }),
         ...(files === undefined ? {} : { files }),
         ...(limit === undefined ? {} : { limit }),
-        graphFreshness: deps.graph.freshness(),
+        graphFreshness,
       });
       if (!outcome.ok) return errorResult(outcome.error);
       return jsonResult(outcome.value);

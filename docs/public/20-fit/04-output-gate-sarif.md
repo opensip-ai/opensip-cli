@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-12
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Output, gate, SARIF"
 audience: [contributors, ci-integrators]
 purpose: "What happens to the signals a check produces — formatter/sink routing, JSON output, SARIF, the gate, cloud reporting."
@@ -156,7 +156,7 @@ opensip fit --gate-save                     # capture today's reality
 opensip fit --gate-compare                  # CI gate from now on
 ```
 
-The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps the current run's signals and stores them through the host-owned baseline plane (`cli.saveBaseline('fitness', envelope)` → the generic `tool_baseline_entries` table, scoped by `tool`, at `<project>/opensip-cli/.runtime/datastore.sqlite`), then exits according to the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save itself happens first, so the baseline survives a failing exit). `--gate-compare` runs the same checks, reads the saved rows back, computes the diff, and exits 1 if any *new* signal appears (the reserved `failOnDegraded` key, default on, toggles hard-fail vs. report-only). There is exactly one baseline per tool per project.
+The gate is the regression-detection workflow. `--gate-save` fingerprint-stamps the current run's signals and stores them through the host-owned baseline plane (`cli.saveBaseline('fitness', envelope)` → the generic `tool_baseline_entries` table, scoped by `tool`, in the active local SQLite store), then exits according to the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save itself happens first, so the baseline survives a failing exit). `--gate-compare` runs the same checks, reads the saved rows back, computes the diff, and exits 1 if any *new* signal appears (the reserved `failOnDegraded` key, default on, toggles hard-fail vs. report-only). For a zero-config project that store is the automatically evictable managed user cache; initialize the project before treating a local baseline as an adopted CI asset. There is at most one saved baseline per tool per active local runtime.
 
 > **Baseline shape.** Per ADR-0011/ADR-0036 the baseline stores the run's *signals* (fingerprint + payload rows) directly — **not** a SARIF document — through host seams shared by every tool; fitness contributes only its `fingerprintStrategy`. This keeps fitness off any `@opensip-cli/output` production dependency: the root owns all SARIF egress. `fit export --format baseline` re-renders the stored signals as SARIF via the root `cli.writeSarif` seam, so the on-disk CI artifact stays a SARIF document.
 

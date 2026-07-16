@@ -2,12 +2,20 @@
 /**
  * build-arch-map — generate docs/public/80-implementation/architecture-map.md
  * from dependency-cruiser layer policy + ToolCliContext documented seams.
+ *
+ * Seam extraction uses the TypeScript compiler API so nested readonly fields
+ * (e.g. toolState.get) are never counted as top-level ToolCliContext members.
+ * Package inventory uses the shared workspace manifest walker (no silent
+ * subprocess fallback).
  */
 
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import ts from 'typescript';
+
+import { readGovernanceFacts } from './lib/release-governance-surface.mjs';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT_PATH = join(REPO_ROOT, 'docs/public/80-implementation/architecture-map.md');
@@ -31,34 +39,75 @@ function readLayerTable() {
   return lines;
 }
 
+/**
+ * Extract direct property/method names from the exported ToolCliContext interface.
+ * Nested type members are not included. Fails on missing or duplicate interfaces.
+ *
+ * @param {string} sourceText
+ * @param {string} [fileName]
+ * @returns {readonly string[]}
+ */
+export function extractToolCliContextSeams(sourceText, fileName = 'cli-context.ts') {
+  const sf = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true);
+  /** @type {ts.InterfaceDeclaration[]} */
+  const matches = [];
+  const visit = (node) => {
+    if (
+      ts.isInterfaceDeclaration(node) &&
+      node.name.text === 'ToolCliContext' &&
+      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      matches.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  if (matches.length === 0) {
+    throw new Error('ToolCliContext interface not found in cli-context.ts');
+  }
+  if (matches.length > 1) {
+    throw new Error(`duplicate exported ToolCliContext interfaces: ${matches.length}`);
+  }
+  const iface = matches[0];
+  /** @type {string[]} */
+  const seams = [];
+  for (const member of iface.members) {
+    if (
+      (ts.isPropertySignature(member) || ts.isMethodSignature(member)) &&
+      member.name &&
+      ts.isIdentifier(member.name)
+    ) {
+      seams.push(member.name.text);
+    }
+  }
+  return Object.freeze(seams);
+}
+
 function readToolCliSeams() {
   const text = readFileSync(CLI_CONTEXT, 'utf8');
-  const ifaceStart = text.indexOf('export interface ToolCliContext');
-  if (ifaceStart === -1) return [];
-  const slice = text.slice(ifaceStart);
-  const seams = [];
-  for (const match of slice.matchAll(/^\s+readonly\s+(\w+):/gm)) {
-    seams.push(match[1]);
-  }
-  return seams;
+  return extractToolCliContextSeams(text, CLI_CONTEXT);
 }
 
-function readWorkspacePackages() {
-  const json = execSync(`pnpm -r exec node -e "console.log(require('./package.json').name)"`, {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  return json
-    .split('\n')
-    .map((s) => s.trim())
-    .filter((s) => s.startsWith('@opensip-cli/') || s === 'opensip-cli')
-    .sort();
+function packageInventorySummary(repoRoot = REPO_ROOT) {
+  // Derived from the single governance projection so counts/names never drift
+  // from the release-order + workspace-manifest sources (ADR-0151).
+  const facts = readGovernanceFacts(repoRoot);
+  return {
+    total: facts.workspacePackageCount,
+    publishable: facts.publishableCount,
+    private: facts.privateWorkspaceCount,
+    names: [...facts.workspacePackageNames].sort((a, b) => a.localeCompare(b)),
+  };
 }
 
-function render(layers, packages, seams) {
+/**
+ * @param {readonly {layer:number,pkg:string,note:string}[]} layers
+ * @param {readonly string[]} packages
+ * @param {readonly string[]} seams
+ * @param {{ total: number, publishable: number, private: number }} counts
+ */
+export function renderArchitectureMap(layers, packages, seams, counts) {
   const layerRows = layers.map((l) => `| ${l.layer} | \`${l.pkg}\` | ${l.note} |`).join('\n');
-
   const pkgList = packages.map((p) => `- \`${p}\``).join('\n');
   const seamList = seams.map((s) => `- \`${s}\``).join('\n');
 
@@ -71,9 +120,9 @@ function render(layers, packages, seams) {
     `| Layer | Package | Role |\n` +
     `|-------|---------|------|\n` +
     `${layerRows}\n\n` +
-    `## Workspace packages (${packages.length})\n\n` +
+    `## Workspace packages (${counts.total}: ${counts.publishable} publishable, ${counts.private} private)\n\n` +
     `${pkgList}\n\n` +
-    `## ToolCliContext seams\n\n` +
+    `## ToolCliContext seams (${seams.length})\n\n` +
     `Tools and host command handlers must use only these documented methods on the\n` +
     `per-run \`ToolCliContext\` (ADR-0051). See\n` +
     `\`packages/core/src/tools/cli-context.ts\`.\n\n` +
@@ -88,14 +137,14 @@ function render(layers, packages, seams) {
 function main() {
   const layers = readLayerTable();
   const seams = readToolCliSeams();
-  let packages = [];
-  try {
-    packages = readWorkspacePackages();
-  } catch {
-    log('WARNING: could not enumerate workspace packages via pnpm; layer table only.');
-  }
+  const inventory = packageInventorySummary();
+  const packages = inventory.names;
 
-  const next = render(layers, packages, seams);
+  const next = renderArchitectureMap(layers, packages, seams, {
+    total: inventory.total,
+    publishable: inventory.publishable,
+    private: inventory.private,
+  });
   const current = existsSync(OUT_PATH) ? readFileSync(OUT_PATH, 'utf8') : null;
 
   if (CHECK_ONLY) {
@@ -108,11 +157,16 @@ function main() {
   }
 
   writeFileSync(OUT_PATH, next, 'utf8');
-  log(`wrote ${relativePath(OUT_PATH)} (${layers.length} layers, ${seams.length} seams).`);
+  log(
+    `wrote ${relativePath(OUT_PATH)} (${layers.length} layers, ${seams.length} seams, ${packages.length} packages).`,
+  );
 }
 
 function relativePath(abs) {
   return abs.startsWith(REPO_ROOT) ? abs.slice(REPO_ROOT.length + 1) : abs;
 }
 
-main();
+// Only run when executed as a script (not when imported by tests).
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main();
+}

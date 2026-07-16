@@ -72,21 +72,22 @@ export const exitCodeCorrectness = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = [];
+    const normalized = filePath.replaceAll('\\', '/');
 
-    // Target CLI and command handler files
+    // Target CLI and command handler files (POSIX segment match on OS paths)
     if (
-      !filePath.includes('/cli/') &&
-      !filePath.includes('/commands/') &&
-      !filePath.includes('/bin/')
+      !normalized.includes('/cli/') &&
+      !normalized.includes('/commands/') &&
+      !normalized.includes('/bin/')
     ) {
       return violations;
     }
 
     // Skip test files
     if (
-      filePath.includes('.test.') ||
-      filePath.includes('.spec.') ||
-      filePath.includes('__tests__')
+      normalized.includes('.test.') ||
+      normalized.includes('.spec.') ||
+      normalized.includes('__tests__')
     ) {
       return violations;
     }

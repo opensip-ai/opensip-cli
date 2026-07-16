@@ -1,3 +1,4 @@
+import { compareCodePoint } from './code-point-order.js';
 import {
   REVIEW_BRIEF_CORRELATION_KEY_PRIORITY as keyPriority,
   REVIEW_BRIEF_SEVERITY_RANK as severityRank,
@@ -8,11 +9,7 @@ import type {
   ReviewBriefCorrelationRisk,
 } from './review-brief-correlation-types.js';
 
-export function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
+export { compareCodePoint } from './code-point-order.js';
 
 export function compareReviewBriefCorrelationRisks(
   left: ReviewBriefCorrelationRisk,

@@ -1,10 +1,35 @@
 name: Release
 
+# Four-job release topology (Plan 02 Phase 3): verified exact-version macOS
+# evidence is a HARD dependency between npm staging publish and `latest`
+# promotion / GitHub Release.
+#
+#   build-release  (ubuntu)  — all pre-publication gates → pack → smoke →
+#                              immutable attempt-bound release bundle. Unprivileged:
+#                              no OIDC, attestation, or promotion credential.
+#   stage-release  (ubuntu)  — downloads and strictly revalidates that bundle,
+#                              attests it, then STAGING-publishes exact tarballs.
+#                              Minimal OIDC job: no checkout, repo-code execution,
+#                              dependency install, promotion, or GitHub Release.
+#   qualify-macos  (macos-26)— installs the EXACT staged version on the pinned
+#                              tuple, runs the macOS profile, independently
+#                              verifies the sealed evidence. `contents: read`,
+#                              NO publish/promotion secret.
+#   promote-release(ubuntu)  — the ONLY job with the promotion secret + release
+#                              write. Rechecks identity + verified evidence, then
+#                              promotes to `latest` and creates the GitHub Release.
+#
+# A failed macOS gate may burn an immutable staged version but NEVER advances
+# `latest`; the fix ships under a NEW version (npm artifacts are never
+# overwritten). See RELEASING.md "macOS qualification gate".
+#
 # Pinned action SHAs (bump via dependabot or deliberate review):
-#   actions/checkout@v7        → 9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-#   pnpm/action-setup@v6       → 0ebf47130e4866e96fce0953f49152a61190b271
-#   actions/setup-node@v6      → 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
-#   actions/attest@v4          → a1948c3f048ba23858d222213b7c278aabede763
+#   actions/checkout@v7            → 9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+#   pnpm/action-setup@v6           → 0ebf47130e4866e96fce0953f49152a61190b271
+#   actions/setup-node@v6          → 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+#   actions/attest@v4              → a1948c3f048ba23858d222213b7c278aabede763
+#   actions/upload-artifact@v4     → b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 (v4.4.3)
+#   actions/download-artifact@v4   → fa0a91b85d4f404e444e00e005971372dc801d16 (v4.1.8)
 #   softprops/action-gh-release@v3 → 718ea10b132b3b2eba29c1007bb80653f286566b
 
 on:
@@ -17,13 +42,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # ===========================================================================
+  # build-release — all repository-controlled gates, build, pack, and smoke work.
+  # This job is intentionally unprivileged; immutable bytes cross into the
+  # minimal stage-release job only through an attempt-bound artifact.
+  # ===========================================================================
+  build-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # softprops/action-gh-release creates the GitHub Release
-      id-token: write # OIDC token for npm trusted publishing
-      attestations: write # GitHub Artifact Attestations for release artifacts
-      artifact-metadata: write # storage records for attested release artifacts
+      contents: read
+    outputs:
+      candidate-version: ${{ steps.identity.outputs.candidate-version }}
+      tag: ${{ steps.identity.outputs.tag }}
+      git-sha: ${{ steps.identity.outputs.git-sha }}
+      staging-tag: ${{ steps.identity.outputs.staging-tag }}
+      manifest-digest: ${{ steps.manifest-digest.outputs.manifest-digest }}
+      previous-version: ${{ steps.previous.outputs.previous-version }}
+      release-metadata-artifact: ${{ steps.identity.outputs.release-metadata-artifact }}
+      release-bundle-artifact: ${{ steps.identity.outputs.release-bundle-artifact }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -43,8 +79,9 @@ jobs:
       # module 'promise-retry'").
       - name: Install npm 11 to separate prefix (avoids self-replace bug)
         run: |
-          npm install --prefix "$HOME/.npm-cli" npm@11
+          npm install --prefix "$HOME/.npm-cli" npm@11 --registry https://registry.npmjs.org/
           echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+          echo "OPENSIP_ACCEPTANCE_NPM_CLI=$HOME/.npm-cli/node_modules/npm/bin/npm-cli.js" >> "$GITHUB_ENV"
 
       - run: npm --version
       - run: pnpm install --frozen-lockfile
@@ -77,6 +114,12 @@ jobs:
       # scripts/build-ci.mjs.
       - run: node scripts/build-ci.mjs
       - run: pnpm typecheck
+
+      # Emitted + packed bytes must contain runtime artifacts only, verified
+      # against real dist trees and pnpm packlists BEFORE the correctness gates
+      # and pack/publish (ADR-0150). Lane invariant: clean -> build -> inspect
+      # build/packlist -> correctness/dogfood -> actual pack/smoke -> publish.
+      - run: pnpm verify:published-artifacts
 
       # ADR-0017 — the release gate must be at least as strict as the PR gate.
       # npm versions are immutable; the release lane is the last gate before an
@@ -155,7 +198,7 @@ jobs:
             else
               name="@opensip-cli/$pkg"
             fi
-            if npm view "$name" version >/dev/null 2>&1 ; then
+            if npm view "$name" version --registry https://registry.npmjs.org/ >/dev/null 2>&1 ; then
               echo "  ok  $name"
             else
               echo "::warning title=New package detected::$name is not yet on npm. Publish will fail unless trusted publisher is registered on npmjs.com (org opensip-ai → package settings → Publishing access)."
@@ -164,6 +207,166 @@ jobs:
           done < <(node scripts/release-package-order.mjs --print names)
           if [ "$new_count" -gt 0 ] ; then
             echo "::notice::$new_count new package(s) detected. Continuing — publish step will fail loudly for any unregistered trusted publisher."
+          fi
+
+      # Typed release-identity outputs consumed by the Mac + promotion jobs.
+      # verify-release.mjs above already enforced tag ↔ version lockstep; this
+      # re-asserts it before exposing the values so a downstream job can never
+      # act on a mismatched tuple.
+      - name: Expose staging identity outputs
+        id: identity
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -eu
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
+          if [ "$RELEASE_TAG" != "v${VERSION}" ]; then
+            echo "::error::tag $RELEASE_TAG does not match package version v${VERSION}"
+            exit 1
+          fi
+          case "$RUN_ATTEMPT" in
+            ''|*[!0-9]*) echo "::error::workflow run attempt is not a positive integer"; exit 1 ;;
+            0) echo "::error::workflow run attempt must be positive"; exit 1 ;;
+          esac
+          echo "candidate-version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "git-sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "staging-tag=release-candidate-${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release-metadata-artifact=release-metadata-v${VERSION}-run${RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "release-bundle-artifact=release-staging-bundle-v${VERSION}-run${RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      # Resolve the currently promoted latest exact version BEFORE staging
+      # publish — it is the upgrade SOURCE for macOS qualification, and
+      # `latest` must never be used as candidate identity (Plan 02 §6). A
+      # previously-established release that cannot be resolved is a hard failure
+      # (investigate, do not silently qualify without an upgrade source); the
+      # ONLY allowed empty case is a genuine first-publish bootstrap.
+      - name: Resolve currently promoted latest (upgrade source)
+        id: previous
+        env:
+          CANDIDATE_VERSION: ${{ steps.identity.outputs.candidate-version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+
+          normalize_stable_semver() {
+            node scripts/release-version-policy.mjs normalize-stable "$@"
+          }
+
+          require_forward_upgrade() {
+            node scripts/release-version-policy.mjs assert-upgrade "$1" "$2" >/dev/null
+          }
+
+          list_stable_github_release_tags() {
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name'
+          }
+
+          if ! candidate="$(normalize_stable_semver "$CANDIDATE_VERSION")"; then
+            echo "::error::candidate version is not a stable exact semver"
+            exit 1
+          fi
+
+          if prev="$(npm view opensip-cli@latest version --registry https://registry.npmjs.org/ 2>/dev/null)" && [ -n "$prev" ]; then
+            if ! prev="$(normalize_stable_semver "$prev")"; then
+              echo "::error::npm latest did not resolve to a stable exact semver"
+              exit 1
+            fi
+            if [ "$prev" != "$candidate" ]; then
+              if ! require_forward_upgrade "$candidate" "$prev"; then
+                echo "::error::candidate must have greater SemVer precedence than npm latest"
+                exit 1
+              fi
+              echo "previous-version=$prev" >> "$GITHUB_OUTPUT"
+              echo "resolved previous latest from npm: $prev"
+              exit 0
+            fi
+
+            # A prior attempt may already have promoted npm latest and created
+            # the candidate GitHub Release before failing in a later step. Page
+            # every non-draft/non-prerelease Release, exclude the candidate, and
+            # choose the greatest validated SemVer rather than trusting the
+            # candidate-valued `/releases/latest` endpoint or API list order.
+            if ! stable_tags="$(list_stable_github_release_tags 2>/dev/null)"; then
+              echo "::error::could not enumerate established GitHub Releases"
+              exit 1
+            fi
+            if ! recovered="$(printf '%s\n' "$stable_tags" | node scripts/release-version-policy.mjs select-prior-stable "$candidate")"; then
+              echo "::error::stable GitHub Release history is not a valid SemVer recovery source"
+              exit 1
+            fi
+            if [ -n "$recovered" ]; then
+              if ! registry_version="$(npm view "opensip-cli@${recovered}" version --registry https://registry.npmjs.org/ 2>/dev/null)"; then
+                echo "::error::recovered GitHub Release version is unavailable on npm"
+                exit 1
+              fi
+              if ! registry_version="$(normalize_stable_semver "$registry_version")" || [ "$registry_version" != "$recovered" ]; then
+                echo "::error::recovered GitHub Release version is not available exactly on npm"
+                exit 1
+              fi
+              if ! require_forward_upgrade "$candidate" "$recovered"; then
+                echo "::error::candidate must have greater SemVer precedence than recovered previous release"
+                exit 1
+              fi
+              echo "previous-version=$recovered" >> "$GITHUB_OUTPUT"
+              echo "recovered newest prior stable GitHub Release: $recovered"
+              exit 0
+            fi
+
+            # An empty GitHub result is bootstrap only when npm also has no
+            # distinct stable version. Otherwise an established version exists
+            # but lacks a validated Release cross-check, so recovery fails.
+            if ! published_versions="$(npm view opensip-cli versions --json --registry https://registry.npmjs.org/ 2>/dev/null)"; then
+              echo "::error::could not inspect npm version history for bootstrap recovery"
+              exit 1
+            fi
+            if ! published_prior="$(printf '%s' "$published_versions" | node scripts/release-version-policy.mjs select-prior-stable-json "$candidate")"; then
+              echo "::error::npm version history is not valid exact SemVer"
+              exit 1
+            fi
+            if [ -n "$published_prior" ]; then
+              echo "::error::npm has a prior stable version but no matching GitHub Release recovery source"
+              exit 1
+            fi
+            echo "previous-version=" >> "$GITHUB_OUTPUT"
+            echo "::notice::candidate is the only stable npm/GitHub release — bootstrap rerun"
+          else
+            # A failed `npm view` is NOT evidence that the package is absent:
+            # outages, auth errors, throttling, and registry 5xx responses must
+            # all fail closed. Probe the fixed public registry endpoint with
+            # bounded curl and accept only an authoritative HTTP 404.
+            registry_body="$(mktemp)"
+            trap 'rm -f "$registry_body"' EXIT
+            if ! registry_status="$(curl --silent --show-error --location \
+              --proto '=https' --tlsv1.2 \
+              --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 1 \
+              --output "$registry_body" --write-out '%{http_code}' \
+              'https://registry.npmjs.org/opensip-cli')"; then
+              echo "::error::could not establish opensip-cli package state from the public npm registry"
+              exit 1
+            fi
+            if ! registry_state="$(node scripts/release-version-policy.mjs classify-npm-status "$registry_status")"; then
+              echo "::error::npm registry response cannot prove a first-publish bootstrap"
+              exit 1
+            fi
+            if [ "$registry_state" != "absent" ]; then
+              echo "::error::opensip-cli exists on npm but latest could not be resolved — refusing to stage"
+              exit 1
+            fi
+
+            # npm absence alone is insufficient: a stable GitHub Release means
+            # release history exists and must not be silently discarded.
+            if ! stable_tags="$(list_stable_github_release_tags 2>/dev/null)"; then
+              echo "::error::could not enumerate GitHub Releases for bootstrap proof"
+              exit 1
+            fi
+            if [ -n "$stable_tags" ]; then
+              echo "::error::stable GitHub Release history exists while npm reports package absence"
+              exit 1
+            fi
+            echo "previous-version=" >> "$GITHUB_OUTPUT"
+            echo "::notice::npm returned 404 and GitHub has zero stable Releases — bootstrap release"
           fi
 
       # Pack every workspace package into a tarball. `pnpm pack` resolves
@@ -202,21 +405,16 @@ jobs:
             --manifest /tmp/tarballs/opensip-cli-release-manifest.v1.json \
             --expected-version "$RELEASE_TAG"
 
-      - name: Attest release artifact provenance
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-checksums: /tmp/tarballs/SHA256SUMS
-
-      - name: Attest release checksum file
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-path: /tmp/tarballs/SHA256SUMS
-
-      - name: Attest release SBOM
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-checksums: /tmp/tarballs/SHA256SUMS
-          sbom-path: /tmp/tarballs/opensip-cli-sbom.cyclonedx.json
+      # Bind the manifest digest into a typed output so the Mac job can compare
+      # the registry tarballs to the exact staged manifest and the promotion job
+      # can independently recheck it before mutating dist-tags.
+      - name: Compute release manifest digest
+        id: manifest-digest
+        run: |
+          set -eu
+          digest="$(sha256sum /tmp/tarballs/opensip-cli-release-manifest.v1.json | awk '{print $1}')"
+          echo "manifest-digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "manifest digest: $digest"
 
       # Post-pack / pre-publish smoke test. Installs the freshly-packed
       # tarballs *together* into a throwaway consumer project (forcing
@@ -243,112 +441,979 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/smoke-pack.mjs --expected-version "$RELEASE_TAG"
 
-      # Publish in strict dependency order to a STAGING dist-tag first; only
-      # after every package succeeds do we promote the full set to `latest`.
-      # Sequential (not parallel) by design — racing a downstream publish
-      # ahead of its upstream produces a broken release because the upstream
-      # version isn't in the registry yet when downstream's `dependencies`
-      # field is resolved by consumers.
-      #
-      # `npm publish <tarball>` performs the OIDC handshake (unlike
-      # `pnpm publish`, which uses its own HTTP client and skips OIDC).
-      #
-      # Idempotent — already-published versions are skipped on publish, and
-      # promotion re-runs safely; re-running the workflow on the same tag is
-      # safe after a network blip halfway through the loop.
-      - name: Publish via npm (OIDC trusted publishing — staging tag)
+      # Transfer only the packed release bundle into the privileged staging
+      # boundary. upload-artifact@v4 names are immutable within an attempt; the
+      # tag/version/run-attempt identity prevents a rerun from consuming a prior
+      # attempt's bytes. stage-release independently revalidates every byte.
+      - name: Upload immutable staging bundle
+        id: release-bundle
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: ${{ steps.identity.outputs.release-bundle-artifact }}
+          path: /tmp/tarballs/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  # ===========================================================================
+  # stage-release — the minimal credentialed boundary. It never checks out or
+  # executes repository code and never installs dependencies. It consumes the
+  # immutable build artifact, validates its closed manifest/checksums/package
+  # identities inline, attests the bytes, and publishes with scripts disabled.
+  # ===========================================================================
+  stage-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    outputs:
+      candidate-version: ${{ steps.identity.outputs.candidate-version }}
+      tag: ${{ steps.identity.outputs.tag }}
+      git-sha: ${{ steps.identity.outputs.git-sha }}
+      staging-tag: ${{ steps.identity.outputs.staging-tag }}
+      manifest-digest: ${{ steps.identity.outputs.manifest-digest }}
+      previous-version: ${{ steps.identity.outputs.previous-version }}
+      release-metadata-artifact: ${{ steps.identity.outputs.release-metadata-artifact }}
+    env:
+      BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+      NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+      NPM_CONFIG_PROVENANCE: 'true'
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+    steps:
+      # Provision a reviewed, exact Node distribution through the pinned
+      # first-party action. This supplies npm 11 without npm-installing code in
+      # the credentialed boundary and does not read a checkout (there is none).
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24.16.0'
+          check-latest: false
+          registry-url: https://registry.npmjs.org/
+
+      - name: Verify provisioned Node and npm trusted-publishing client
         run: |
-          set -e
-          VERSION=$(node -p "require('./packages/core/package.json').version")
-          STAGING_TAG="release-candidate-${VERSION}"
-          echo "Publishing version: $VERSION (staging tag: $STAGING_TAG)"
+          set -eu
+          node -e 'if(process.versions.node!=="24.16.0")throw new Error("provisioned Node version mismatch")'
+          npm_version="$(npm --version)"
+          node -e 'if(process.argv[1]!=="11.13.0")throw new Error("provisioned npm version mismatch")' "$npm_version"
+          echo "provisioned Node $(node --version); npm $npm_version"
 
-          publish_if_new() {
-            local pkg="$1"
-            local name="@opensip-cli/$pkg"
-            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
+      # download-artifact automatically validates the upload-artifact transport
+      # digest. The next step additionally fails closed against the independently
+      # forwarded manifest digest, hashes every extracted file, and rejects any
+      # missing/extra/non-regular entry; transport validation is never the sole
+      # trust decision.
+      - name: Download immutable attempt-bound staging bundle
+        id: download-bundle
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ${{ needs.build-release.outputs.release-bundle-artifact }}
+          path: ${{ runner.temp }}/release-bundle
+
+      - name: Strictly validate bundle identity, checksums, and package metadata
+        id: validate-bundle
+        env:
+          VERSION: ${{ needs.build-release.outputs.candidate-version }}
+          TAG: ${{ needs.build-release.outputs.tag }}
+          GIT_SHA: ${{ needs.build-release.outputs.git-sha }}
+          STAGING_TAG: ${{ needs.build-release.outputs.staging-tag }}
+          MANIFEST_DIGEST: ${{ needs.build-release.outputs.manifest-digest }}
+        run: |
+          set -eu
+          node <<'NODE'
+          const { createHash } = require('node:crypto');
+          const { execFileSync } = require('node:child_process');
+          const { createReadStream, lstatSync, readFileSync, readdirSync, statSync, writeFileSync } = require('node:fs');
+          const { basename, join } = require('node:path');
+
+          const dir = process.env.BUNDLE_DIR;
+          const version = process.env.VERSION;
+          const tag = process.env.TAG;
+          const gitSha = process.env.GIT_SHA;
+          const stagingTag = process.env.STAGING_TAG;
+          const ambientTag = process.env.GITHUB_REF_NAME;
+          const ambientGitSha = process.env.GITHUB_SHA;
+          const expectedManifestDigest = process.env.MANIFEST_DIGEST;
+          const manifestName = 'opensip-cli-release-manifest.v1.json';
+          const checksumsName = 'SHA256SUMS';
+          const sbomName = 'opensip-cli-sbom.cyclonedx.json';
+          const expectedPackageOrderDigest = '11c99ddf52f6f001054179e71a600e9a5d3dfb8bc05014a93b91295f63e7327d';
+          const expectedReleaseComponentSetDigest = 'cce4452f184948d694953401c48b704f699547cc7a68c201a9e00d6902c78c3b';
+          const forbiddenLifecycleScripts = ['preinstall', 'install', 'postinstall'];
+          const exactVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+          const hex64 = /^[a-f0-9]{64}$/;
+          const safeName = (value) => typeof value === 'string' && value === basename(value) && value.length > 0 && value.length <= 240 && !value.includes('..') && !value.includes('/') && !value.includes('\\');
+          const exactKeys = (value, keys, label) => {
+            if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+            const actual = Object.keys(value).sort();
+            const expected = [...keys].sort();
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`${label} has an invalid field set`);
+          };
+          const sha256 = async (path) => {
+            const hash = createHash('sha256');
+            for await (const chunk of createReadStream(path)) hash.update(chunk);
+            return hash.digest('hex');
+          };
+
+          (async () => {
+            if (!exactVersion.test(version) || tag !== `v${version}`) throw new Error('invalid staged version/tag identity');
+            if (!/^[a-f0-9]{40}$/.test(gitSha)) throw new Error('invalid staged git SHA');
+            if (tag !== ambientTag || gitSha !== ambientGitSha) throw new Error('staged tag/SHA does not match the authoritative workflow event identity');
+            if (stagingTag !== `release-candidate-${version}` || stagingTag === 'latest') throw new Error('staging tag is not the exact version-scoped release-candidate tag');
+            if (!hex64.test(expectedManifestDigest)) throw new Error('invalid manifest digest identity');
+
+            const entries = readdirSync(dir, { withFileTypes: true });
+            if (entries.length < 20 || entries.length > 260) throw new Error('bundle entry count is outside bounds');
+            for (const entry of entries) {
+              if (!entry.isFile() || !safeName(entry.name) || lstatSync(join(dir, entry.name)).isSymbolicLink()) throw new Error('bundle contains a non-regular or unsafe entry');
+            }
+
+            const manifestPath = join(dir, manifestName);
+            if (statSync(manifestPath).size > 1024 * 1024) throw new Error('manifest exceeds size bound');
+            const manifestBytes = readFileSync(manifestPath);
+            if (createHash('sha256').update(manifestBytes).digest('hex') !== expectedManifestDigest) throw new Error('manifest digest mismatch');
+            const manifest = JSON.parse(manifestBytes.toString('utf8'));
+            exactKeys(manifest, ['schemaVersion', 'releaseVersion', 'gitTag', 'gitSha', 'generatedAt', 'generator', 'artifacts'], 'manifest');
+            if (manifest.schemaVersion !== 1 || manifest.generator !== 'opensip-cli-release-artifacts@1') throw new Error('manifest schema/generator mismatch');
+            if (manifest.releaseVersion !== version || manifest.gitTag !== tag || manifest.gitSha !== gitSha) throw new Error('manifest release identity mismatch');
+            if (typeof manifest.generatedAt !== 'string' || !Number.isFinite(Date.parse(manifest.generatedAt))) throw new Error('manifest timestamp is invalid');
+            if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length < 20 || manifest.artifacts.length > 258) throw new Error('manifest artifact count is outside bounds');
+
+            const paths = new Set();
+            const packages = new Set();
+            let sbomCount = 0;
+            let totalBytes = 0;
+            const npmArtifacts = [];
+            for (const [index, artifact] of manifest.artifacts.entries()) {
+              const common = ['name', 'kind', 'path', 'sha256', 'sizeBytes'];
+              exactKeys(artifact, artifact.kind === 'npm-tarball' ? [...common, 'packageName', 'packageVersion'] : [...common, 'format'], `artifact ${index}`);
+              if (!safeName(artifact.path) || artifact.name !== artifact.path || paths.has(artifact.path)) throw new Error('artifact path/name is unsafe or duplicated');
+              if (!hex64.test(artifact.sha256) || !Number.isSafeInteger(artifact.sizeBytes) || artifact.sizeBytes <= 0 || artifact.sizeBytes > 128 * 1024 * 1024) throw new Error('artifact digest/size is invalid');
+              const path = join(dir, artifact.path);
+              const stat = statSync(path);
+              if (!stat.isFile() || stat.size !== artifact.sizeBytes) throw new Error('artifact size/type mismatch');
+              if (await sha256(path) !== artifact.sha256) throw new Error('artifact checksum mismatch');
+              paths.add(artifact.path);
+              totalBytes += stat.size;
+
+              if (artifact.kind === 'npm-tarball') {
+                if (artifact.packageVersion !== version || packages.has(artifact.packageName)) throw new Error('package version/name is invalid or duplicated');
+                const scoped = /^@opensip-cli\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(artifact.packageName);
+                if (artifact.packageName !== 'opensip-cli' && scoped === null) throw new Error('package name is outside the OpenSIP release namespace');
+                const expectedPath = artifact.packageName === 'opensip-cli' ? `opensip-cli-${version}.tgz` : `opensip-cli-${scoped[1]}-${version}.tgz`;
+                if (artifact.path !== expectedPath) throw new Error('tarball filename does not match package identity');
+                const packageBytes = execFileSync('/usr/bin/tar', ['-xOf', path, 'package/package.json'], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+                const packageJson = JSON.parse(packageBytes);
+                if (packageJson.name !== artifact.packageName || packageJson.version !== version) throw new Error('tarball package.json identity mismatch');
+                if (packageJson.scripts !== undefined) {
+                  if (packageJson.scripts === null || typeof packageJson.scripts !== 'object' || Array.isArray(packageJson.scripts)) throw new Error('tarball package.json scripts must be an object');
+                  for (const scriptName of forbiddenLifecycleScripts) {
+                    if (Object.prototype.hasOwnProperty.call(packageJson.scripts, scriptName)) throw new Error(`tarball declares forbidden install-time lifecycle script: ${scriptName}`);
+                  }
+                }
+                packages.add(artifact.packageName);
+                npmArtifacts.push(artifact);
+              } else if (artifact.kind === 'sbom') {
+                if (artifact.path !== sbomName || artifact.format !== 'cyclonedx-json') throw new Error('SBOM identity mismatch');
+                const sbom = JSON.parse(readFileSync(path, 'utf8'));
+                if (sbom.bomFormat !== 'CycloneDX' || sbom.specVersion !== '1.6' || sbom.version !== 1) throw new Error('SBOM schema/spec version mismatch');
+                const releaseComponent = sbom.metadata?.component;
+                if (sbom.metadata?.timestamp !== manifest.generatedAt || releaseComponent?.type !== 'application' || releaseComponent?.name !== 'opensip-cli release' || releaseComponent?.version !== version || releaseComponent?.['bom-ref'] !== `opensip-cli-release@${version}`) throw new Error('SBOM release metadata identity mismatch');
+                if (!Array.isArray(releaseComponent.properties)) throw new Error('SBOM release metadata properties are missing');
+                const releaseProperties = new Map();
+                for (const property of releaseComponent.properties) {
+                  if (property === null || typeof property !== 'object' || typeof property.name !== 'string' || typeof property.value !== 'string' || releaseProperties.has(property.name)) throw new Error('SBOM release metadata properties are invalid');
+                  releaseProperties.set(property.name, property.value);
+                }
+                if (releaseProperties.get('opensip:release:gitTag') !== tag || releaseProperties.get('opensip:release:gitSha') !== gitSha) throw new Error('SBOM release git identity mismatch');
+                if (!Array.isArray(sbom.components)) throw new Error('SBOM components are missing');
+                const releaseComponentNames = [];
+                const seenReleaseComponents = new Set();
+                for (const component of sbom.components) {
+                  const name = component?.name;
+                  if (name !== 'opensip-cli' && !(typeof name === 'string' && name.startsWith('@opensip-cli/'))) continue;
+                  if (component.version !== version || seenReleaseComponents.has(name)) throw new Error('SBOM OpenSIP component identity is invalid or duplicated');
+                  seenReleaseComponents.add(name);
+                  releaseComponentNames.push(name);
+                }
+                const releaseComponentSetBytes = releaseComponentNames.sort().join('\n') + '\n';
+                if (createHash('sha256').update(releaseComponentSetBytes).digest('hex') !== expectedReleaseComponentSetDigest) throw new Error('SBOM OpenSIP component set does not match the reviewed canonical release set');
+                sbomCount += 1;
+              } else {
+                throw new Error('unknown artifact kind');
+              }
+            }
+            if (totalBytes > 1024 * 1024 * 1024) throw new Error('bundle exceeds aggregate size bound');
+            if (sbomCount !== 1 || npmArtifacts.length + 1 !== manifest.artifacts.length) throw new Error('bundle kind cardinality mismatch');
+            if (npmArtifacts.at(-1)?.packageName !== 'opensip-cli') throw new Error('unscoped CLI must be last in publish order');
+            const packageOrderBytes = npmArtifacts.map((artifact) => artifact.packageName).join('\n') + '\n';
+            if (createHash('sha256').update(packageOrderBytes).digest('hex') !== expectedPackageOrderDigest) throw new Error('npm package set/order does not match the reviewed canonical release order');
+
+            const expectedFiles = new Set([...paths, manifestName, checksumsName]);
+            if (entries.length !== expectedFiles.size || entries.some((entry) => !expectedFiles.has(entry.name))) throw new Error('bundle contains missing or unexpected files');
+            const expectedChecksums = [...manifest.artifacts.map((artifact) => ({ path: artifact.path, sha256: artifact.sha256 })), { path: manifestName, sha256: expectedManifestDigest }]
+              .sort((a, b) => a.path.localeCompare(b.path))
+              .map((entry) => `${entry.sha256}  ${entry.path}`)
+              .join('\n') + '\n';
+            const checksumsPath = join(dir, checksumsName);
+            if (statSync(checksumsPath).size > 256 * 1024 || readFileSync(checksumsPath, 'utf8') !== expectedChecksums) throw new Error('SHA256SUMS is not exact canonical content');
+            writeFileSync(join(dir, 'publish-order.tsv'), npmArtifacts.map((artifact) => `${artifact.packageName}\t${artifact.path}`).join('\n') + '\n', { encoding: 'utf8', mode: 0o600 });
+            console.log(`validated ${npmArtifacts.length} exact npm tarballs`);
+          })().catch((error) => { console.error(`::error::bundle validation failed: ${error.message}`); process.exit(1); });
+          NODE
+          echo "staging-tag=$STAGING_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Expose validated staging identity outputs
+        id: identity
+        env:
+          VERSION: ${{ needs.build-release.outputs.candidate-version }}
+          TAG: ${{ needs.build-release.outputs.tag }}
+          GIT_SHA: ${{ needs.build-release.outputs.git-sha }}
+          STAGING_TAG: ${{ steps.validate-bundle.outputs.staging-tag }}
+          MANIFEST_DIGEST: ${{ needs.build-release.outputs.manifest-digest }}
+          PREVIOUS: ${{ needs.build-release.outputs.previous-version }}
+          METADATA_ARTIFACT: ${{ needs.build-release.outputs.release-metadata-artifact }}
+        run: |
+          set -eu
+          echo "candidate-version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "git-sha=$GIT_SHA" >> "$GITHUB_OUTPUT"
+          echo "staging-tag=$STAGING_TAG" >> "$GITHUB_OUTPUT"
+          echo "manifest-digest=$MANIFEST_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "previous-version=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "release-metadata-artifact=$METADATA_ARTIFACT" >> "$GITHUB_OUTPUT"
+
+      - name: Attest release artifact provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-checksums: ${{ runner.temp }}/release-bundle/SHA256SUMS
+
+      - name: Attest release checksum file
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-path: ${{ runner.temp }}/release-bundle/SHA256SUMS
+
+      - name: Attest release SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-checksums: ${{ runner.temp }}/release-bundle/SHA256SUMS
+          sbom-path: ${{ runner.temp }}/release-bundle/opensip-cli-sbom.cyclonedx.json
+
+      # Publish in the validated manifest order to a version-scoped staging tag.
+      # npm is invoked with the fixed public registry and lifecycle scripts are
+      # disabled even though no tarball code is otherwise loaded in this job.
+      - name: Publish via npm (OIDC trusted publishing — staging tag)
+        env:
+          VERSION: ${{ needs.build-release.outputs.candidate-version }}
+          STAGING_TAG: ${{ steps.identity.outputs.staging-tag }}
+          MANIFEST_DIGEST: ${{ needs.build-release.outputs.manifest-digest }}
+        run: |
+          set -eu
+          got="$(sha256sum "$BUNDLE_DIR/opensip-cli-release-manifest.v1.json" | awk '{print $1}')"
+          [ "$got" = "$MANIFEST_DIGEST" ] || { echo "::error::manifest changed after validation"; exit 1; }
+          (cd "$BUNDLE_DIR" && sha256sum --check --strict SHA256SUMS)
+          while IFS=$'\t' read -r name tarball; do
+            [ -n "$name" ] && [ -n "$tarball" ] || { echo "::error::invalid publish order row"; exit 1; }
+            if npm view "${name}@${VERSION}" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
               echo "::notice::skip ${name}@${VERSION} (already on npm)"
-              return 0
+              continue
             fi
-            # Pin the tarball filename to the exact version rather than a
-            # `-*.tgz` glob. The glob form bites when one package's name is
-            # a prefix of another's — e.g. `graph` matches `graph-typescript`,
-            # `graph-python`, `graph-rust`, `graph-go`, `graph-java` — and
-            # `npm publish` receives multiple paths and errors EUSAGE.
-            npm publish /tmp/tarballs/opensip-cli-${pkg}-${VERSION}.tgz --access public --provenance --tag "$STAGING_TAG"
-          }
+            npm publish "$BUNDLE_DIR/$tarball" \
+              --access public \
+              --provenance \
+              --ignore-scripts \
+              --tag "$STAGING_TAG" \
+              --registry https://registry.npmjs.org/
+          done < "$BUNDLE_DIR/publish-order.tsv"
 
-          # The CLI publishes under the UNSCOPED name `opensip-cli`, so its
-          # tarball is `opensip-cli-<version>.tgz` (no `<unscoped>` segment)
-          # and the registry lookup uses the bare name.
-          publish_unscoped() {
-            local name="$1"
-            if npm view "${name}@${VERSION}" version >/dev/null 2>&1; then
-              echo "::notice::skip ${name}@${VERSION} (already on npm)"
-              return 0
-            fi
-            npm publish /tmp/tarballs/${name}-${VERSION}.tgz --access public --provenance --tag "$STAGING_TAG"
-          }
+      # Downstream jobs need only bounded release metadata, never the full
+      # staging bundle or a credential-bearing workspace.
+      - name: Upload release metadata (manifest, checksums, SBOM)
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: ${{ steps.identity.outputs.release-metadata-artifact }}
+          path: |
+            ${{ runner.temp }}/release-bundle/opensip-cli-release-manifest.v1.json
+            ${{ runner.temp }}/release-bundle/SHA256SUMS
+            ${{ runner.temp }}/release-bundle/opensip-cli-sbom.cyclonedx.json
+          if-no-files-found: error
+          retention-days: 90
 
-          # The publish ORDER is DERIVED from scripts/release-package-order.mjs
-          # (the single source of truth — ADR-0017): `--print names` emits the
-          # unscoped tarball-segment tokens in strict dependency order, CLI
-          # last. The bare `opensip-cli` token routes to publish_unscoped
-          # (unscoped tarball name); every other token to publish_if_new
-          # (scoped `@opensip-cli/<pkg>`). Do NOT re-hand-list the packages
-          # here; edit that script and every release surface follows.
-          while IFS= read -r pkg ; do
-            if [ "$pkg" = "opensip-cli" ] ; then
-              publish_unscoped opensip-cli
+  # ===========================================================================
+  # qualify-macos — install the EXACT staged version on the pinned macOS 26
+  # ARM64 tuple, run the full macOS profile, and independently verify evidence.
+  # No publish/promotion credential; GitHub's default success dependency makes
+  # any failure/cancellation here prevent promotion.
+  # ===========================================================================
+  qualify-macos:
+    needs: stage-release
+    runs-on: macos-26
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      evidence-digest: ${{ steps.evidence.outputs.evidence-digest }}
+      evidence-artifact: ${{ steps.evidence.outputs.evidence-artifact }}
+      evidence-run-attempt: ${{ steps.evidence.outputs.evidence-run-attempt }}
+      registry-integrity-digest: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
+      candidate-digest: ${{ steps.registry-integrity.outputs.candidate-digest }}
+    env:
+      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+      SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
+      SUPPORT_CONTRACT_VERSION: '1'
+    steps:
+      # Exact SHA the staging job packed/published — never a branch or `latest`.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.stage-release.outputs.git-sha }}
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      # No registry-url here: this job reads PUBLIC package metadata/tarballs and
+      # must hold no npm auth expectation. npmjs.org is npm's default registry.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install npm 11 to a separate prefix if the image differs
+        run: |
+          set -eu
+          major="$(npm -v | cut -d. -f1)"
+          if [ "$major" != "11" ]; then
+            npm install --prefix "$HOME/.npm-cli" npm@11 --registry https://registry.npmjs.org/
+            echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+            echo "OPENSIP_ACCEPTANCE_NPM_CLI=$HOME/.npm-cli/node_modules/npm/bin/npm-cli.js" >> "$GITHUB_ENV"
+          fi
+
+      - name: Print runtime versions (diagnostic only)
+        run: |
+          node --version
+          npm --version
+          /usr/bin/sw_vers -productVersion || true
+
+      # Fail-closed tuple preflight + run-owned evidence dir (Plan 02 §4).
+      - name: Host tuple preflight (fail-closed)
+        id: preflight
+        run: |
+          set -uo pipefail
+          evidence_dir="$RUNNER_TEMP/qualification-evidence"
+          mkdir -p "$evidence_dir"
+          echo "EVIDENCE_DIR=$evidence_dir" >> "$GITHUB_ENV"
+          preflight_json="$evidence_dir/host-preflight.json"
+
+          os_ver="$(/usr/bin/sw_vers -productVersion 2>/dev/null || echo unknown)"
+          kernel="$(/usr/bin/uname -r 2>/dev/null || echo unknown)"
+          uname_arch="$(/usr/bin/uname -m 2>/dev/null || echo unknown)"
+          node_platform="$(node -p 'process.platform')"
+          node_arch="$(node -p 'process.arch')"
+          node_ver="$(node -p 'process.versions.node')"
+          node_abi="$(node -p 'process.versions.modules')"
+          npm_ver="$(npm -v 2>/dev/null || echo unknown)"
+          run_dev="$(df "$RUNNER_TEMP" | tail -1 | awk '{print $1}')"
+          fs_type="$(mount | awk -v d="$run_dev" '$1==d{print}' | grep -oE 'apfs|hfs|msdos|exfat|smbfs|nfs' | head -1)"
+          [ -n "$fs_type" ] || fs_type=unknown
+
+          fail=0
+          note() { echo "::error title=host-preflight::$1"; fail=1; }
+          case "$os_ver" in 26.*|26) ;; *) note "macOS productVersion $os_ver != 26.x" ;; esac
+          case "$kernel" in 25.*|25) ;; *) note "Darwin kernel $kernel != 25.x" ;; esac
+          [ "$uname_arch" = arm64 ] || note "uname -m $uname_arch != arm64"
+          [ "$node_platform" = darwin ] || note "process.platform $node_platform != darwin"
+          [ "$node_arch" = arm64 ] || note "process.arch $node_arch != arm64"
+          case "$node_ver" in 24.*) ;; *) note "Node $node_ver != 24.x" ;; esac
+          [ "$node_abi" = 137 ] || note "Node module ABI $node_abi != 137"
+          case "$npm_ver" in 11.*) ;; *) note "npm $npm_ver != 11.x" ;; esac
+          [ "$fs_type" = apfs ] || note "run-root filesystem $fs_type != apfs"
+
+          HOST_OS="$os_ver" HOST_KERNEL="$kernel" HOST_ARCH="$uname_arch" \
+          HOST_PLATFORM="$node_platform" HOST_NODE_ARCH="$node_arch" \
+          HOST_NODE="$node_ver" HOST_ABI="$node_abi" HOST_NPM="$npm_ver" HOST_FS="$fs_type" \
+          node -e 'const e=process.env;require("fs").writeFileSync(process.argv[1],JSON.stringify({schema:"macos-tuple-preflight.v1",runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,event:process.env.GITHUB_EVENT_NAME,runnerLabel:"macos-26",productVersion:e.HOST_OS,kernel:e.HOST_KERNEL,unameArch:e.HOST_ARCH,platform:e.HOST_PLATFORM,nodeArch:e.HOST_NODE_ARCH,nodeVersion:e.HOST_NODE,nodeModuleAbi:e.HOST_ABI,npmVersion:e.HOST_NPM,fsType:e.HOST_FS},null,2)+"\n")' "$preflight_json"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "host_ok=false" >> "$GITHUB_OUTPUT"
+            echo "::error::host tuple preflight failed — this runner does not match the supported tuple"
+            exit 1
+          fi
+          echo "host_ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build every checkout-owned runtime the qualification harness imports.
+      # The tuple journey loads core's support policy from dist/index-lib.js;
+      # installed-smoke loads the private agent-eval CLI + report validator.
+      # Neither dist tree is tracked, so both are required after a clean checkout.
+      - name: Build macOS qualification harness prerequisites
+        run: |
+          pnpm --filter @opensip-cli/core build
+          pnpm --filter @opensip-cli/agent-eval build
+
+      - name: Download staged release metadata
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ${{ needs.stage-release.outputs.release-metadata-artifact }}
+          path: ${{ runner.temp }}/release-metadata
+
+      # Poll for the EXACT staged version + the COMPLETE package set with bounded
+      # exponential backoff. Never falls back to `latest`, a range, or a
+      # different registry — a version mismatch can never become a pass.
+      - name: Poll npm for the exact staged version + complete package set
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+        run: |
+          set -eu
+          attempts=8
+          delay=5
+          check_all() {
+            while IFS= read -r pkg; do
+              if [ "$pkg" = "opensip-cli" ]; then name="opensip-cli"; else name="@opensip-cli/$pkg"; fi
+              npm view "${name}@${VERSION}" version --registry https://registry.npmjs.org/ >/dev/null 2>&1 || return 1
+            done < <(node scripts/release-package-order.mjs --print names)
+            return 0
+          }
+          i=1
+          while [ "$i" -le "$attempts" ]; do
+            if check_all; then echo "all packages visible at exact version $VERSION"; exit 0; fi
+            echo "attempt $i/$attempts: staged package set not fully visible yet; sleeping ${delay}s"
+            sleep "$delay"
+            delay=$((delay * 2))
+            [ "$delay" -le 60 ] || delay=60
+            i=$((i + 1))
+          done
+          echo "::error::exact staged version $VERSION not fully visible on npm after $attempts attempts"
+          exit 1
+
+      # Fetch each EXACT registry tarball into a run-owned dir and compare its
+      # SHA-256 + name/version against the downloaded release manifest. The
+      # manifest itself is first re-checked against the staging job's digest.
+      - name: Fetch registry tarballs and verify against the staged manifest
+        id: registry-integrity
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+        run: |
+          set -eu
+          stage="$RUNNER_TEMP/registry-tarballs"
+          rm -rf "$stage"; mkdir -p "$stage"
+          manifest="$RUNNER_TEMP/release-metadata/opensip-cli-release-manifest.v1.json"
+
+          got="$(shasum -a 256 "$manifest" | awk '{print $1}')"
+          if [ "$got" != "$MANIFEST_DIGEST" ]; then
+            echo "::error::downloaded manifest digest $got != staged $MANIFEST_DIGEST"; exit 1
+          fi
+
+          while IFS= read -r pkg; do
+            if [ "$pkg" = "opensip-cli" ]; then
+              name="opensip-cli"; file="opensip-cli-${VERSION}.tgz"
             else
-              publish_if_new "$pkg"
+              name="@opensip-cli/$pkg"; file="opensip-cli-${pkg}-${VERSION}.tgz"
             fi
+            ( cd "$stage" && npm pack "${name}@${VERSION}" --registry https://registry.npmjs.org/ >/dev/null )
+            if [ ! -f "$stage/$file" ]; then
+              echo "::error::npm pack did not produce expected tarball $file for $name@$VERSION"; exit 1
+            fi
+            got="$(shasum -a 256 "$stage/$file" | awk '{print $1}')"
+            want="$(node -e 'const m=require(process.argv[1]);const f=process.argv[2];const a=(m.artifacts||[]).find(x=>x.path===f);process.stdout.write(a&&a.sha256?String(a.sha256):"")' "$manifest" "$file")"
+            if [ -z "$want" ]; then echo "::error::$file absent from staged manifest"; exit 1; fi
+            if [ "$got" != "$want" ]; then echo "::error::$file registry sha256 $got != manifest $want"; exit 1; fi
+            echo "  ok $name@$VERSION ($file)"
           done < <(node scripts/release-package-order.mjs --print names)
+          echo "all registry tarballs match the staged manifest by sha256/name/version"
 
+          # Query exact npm metadata for every package, verify each tarball's
+          # sha512 SRI, and retain one canonical complete inventory. Its digest
+          # is candidate identity; promotion independently reparses the closed
+          # schema and checks the inventory back against this manifest.
+          inventory="$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json"
+          integrity_digest="$(node scripts/registry-integrity-inventory.mjs build \
+            --directory "$stage" \
+            --manifest "$manifest" \
+            --version "$VERSION" \
+            --registry https://registry.npmjs.org/ \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --out "$inventory")"
+          candidate_digest="$(node --input-type=module -e '
+            import { resolveCandidateSource } from "./scripts/platform-acceptance/candidate-source.mjs";
+            const resolved = await resolveCandidateSource({
+              kind: "published-version",
+              version: process.argv[1],
+              registry: "https://registry.npmjs.org/",
+              manifestDigest: process.argv[2],
+              registryIntegrityDigest: process.argv[3],
+            });
+            if (!resolved.ok) throw new Error(resolved.reasonCode);
+            process.stdout.write(resolved.identity.digest);
+          ' "$VERSION" "$MANIFEST_DIGEST" "$integrity_digest")"
+          echo "registry-integrity-digest=$integrity_digest" >> "$GITHUB_OUTPUT"
+          echo "candidate-digest=$candidate_digest" >> "$GITHUB_OUTPUT"
+          echo "retained complete npm integrity inventory ($integrity_digest)"
+
+      # Install the exact published version via the canonical installer and run
+      # the full macOS profile in PUBLISHED-VERSION mode, upgrading FROM the
+      # prior exact `latest` (empty only on a bootstrap release). The runner exit
+      # is captured but not trusted; the independent verifier is the authority.
+      - name: Run macOS platform acceptance (published version)
+        id: acceptance
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          PREVIOUS: ${{ needs.stage-release.outputs.previous-version }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+          REGISTRY_INTEGRITY_DIGEST: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
+        run: |
+          set -u
+          out="$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json"
+          set +e
+          if [ -n "${PREVIOUS:-}" ]; then
+            pnpm platform:acceptance -- \
+              --profile "$MACOS_PROFILE" \
+              --published-version "$VERSION" \
+              --previous-version "$PREVIOUS" \
+              --registry https://registry.npmjs.org/ \
+              --expected-manifest-digest "$MANIFEST_DIGEST" \
+              --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+              --registry-integrity-inventory "$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json" \
+              --run-id "$GITHUB_RUN_ID" \
+              --run-attempt "$GITHUB_RUN_ATTEMPT" \
+              --runner-label macos-26 \
+              --out "$out" \
+              --agent-report-out "$EVIDENCE_DIR/agent-eval-installed-smoke.json"
+          else
+            pnpm platform:acceptance -- \
+              --profile "$MACOS_PROFILE" \
+              --published-version "$VERSION" \
+              --registry https://registry.npmjs.org/ \
+              --expected-manifest-digest "$MANIFEST_DIGEST" \
+              --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+              --registry-integrity-inventory "$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json" \
+              --run-id "$GITHUB_RUN_ID" \
+              --run-attempt "$GITHUB_RUN_ATTEMPT" \
+              --runner-label macos-26 \
+              --out "$out" \
+              --agent-report-out "$EVIDENCE_DIR/agent-eval-installed-smoke.json"
+          fi
+          rc=$?
+          set -e
+          echo "run_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "acceptance runner exit: $rc"
+
+      - name: Verify acceptance evidence (independent)
+        id: verify
+        if: always() && steps.preflight.outputs.host_ok == 'true'
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          PREVIOUS: ${{ needs.stage-release.outputs.previous-version }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+          REGISTRY_INTEGRITY_DIGEST: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
+          CANDIDATE_DIGEST: ${{ steps.registry-integrity.outputs.candidate-digest }}
+          GIT_SHA: ${{ needs.stage-release.outputs.git-sha }}
+        run: |
+          set -u
+          previous_args=(--expect-no-previous-candidate)
+          if [ -n "${PREVIOUS:-}" ]; then
+            previous_args=(--expected-previous-version "$PREVIOUS")
+          fi
+          set +e
+          node scripts/verify-platform-acceptance.mjs \
+            --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
+            --profile "$MACOS_PROFILE" \
+            --expected-version "$VERSION" \
+            --expected-candidate-kind published-version \
+            --expected-registry https://registry.npmjs.org/ \
+            --expected-candidate-digest "$CANDIDATE_DIGEST" \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+            --registry-integrity-inventory "$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json" \
+            "${previous_args[@]}" \
+            --expected-git-sha "$GIT_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-runner-label macos-26 \
+            --expect-platform darwin \
+            --expect-arch arm64 \
+            --expect-node-abi 137 \
+            --expect-fs-type apfs \
+            --expected-node-major 24 \
+            --expected-npm-major 11 \
+            --expected-sw-vers-major 26 \
+            --expected-kernel-major 25 \
+            --expect-uname-arch arm64 \
+            --expect-case-sensitive false \
+            --expect-shell zsh \
+            --expected-support-row "$SUPPORT_ROW" \
+            --expected-support-contract-version "$SUPPORT_CONTRACT_VERSION" \
+            --json > "$EVIDENCE_DIR/verifier-result.json"
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/verifier-result.json" || true
+          echo "verify_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "verifier exit: $rc"
+
+      # Expose ONLY a verified evidence digest + artifact name (no runner-set
+      # boolean). promote-release re-derives the digest independently.
+      - name: Expose verified evidence identity
+        id: evidence
+        if: always() && steps.verify.outputs.verify_rc == '0'
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+        run: |
+          set -eu
+          short_sha="${GITHUB_SHA:0:7}"
+          digest="$(node -e 'const e=require(process.argv[1]);const d=e.completion?.evidenceDigest;if(typeof d!=="string"||!/^[a-f0-9]{64}$/.test(d))throw new Error("invalid evidence digest");process.stdout.write(d)' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json")"
+          evidence_attempt="$(node -e 'const e=require(process.argv[1]);const a=e.execution?.runAttempt;if(!Number.isSafeInteger(a)||a<=0)throw new Error("invalid evidence attempt");process.stdout.write(String(a))' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json")"
+          echo "evidence-digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "evidence-run-attempt=$evidence_attempt" >> "$GITHUB_OUTPUT"
+          echo "evidence-artifact=macos-release-qualification-c${SUPPORT_CONTRACT_VERSION}-v${VERSION}-${short_sha}-run${evidence_attempt}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload macOS qualification evidence
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: ${{ steps.evidence.outputs.evidence-artifact || format('macos-release-qualification-run{0}', github.run_attempt) }}
+          path: |
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v1.json
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-registry-integrity.v1.json
+            ${{ env.EVIDENCE_DIR }}/agent-eval-installed-smoke.json
+            ${{ env.EVIDENCE_DIR }}/host-preflight.json
+            ${{ env.EVIDENCE_DIR }}/verifier-result.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      # Fail the gate LAST so evidence always uploads first. Host mismatch,
+      # required skip/unavailable (run_rc=1), or a verifier rejection all fail
+      # here — blocking promotion.
+      - name: Enforce macOS release qualification
+        if: always()
+        env:
+          HOST_OK: ${{ steps.preflight.outputs.host_ok }}
+          RUN_RC: ${{ steps.acceptance.outputs.run_rc }}
+          VERIFY_RC: ${{ steps.verify.outputs.verify_rc }}
+          EVIDENCE_DIGEST: ${{ steps.evidence.outputs.evidence-digest }}
+          EVIDENCE_RUN_ATTEMPT: ${{ steps.evidence.outputs.evidence-run-attempt }}
+        run: |
+          set -eu
+          if [ "${HOST_OK:-false}" != "true" ] || [ "${RUN_RC:-1}" != "0" ] || [ "${VERIFY_RC:-1}" != "0" ]; then
+            echo "::error::macOS release qualification failed (host_ok=${HOST_OK:-} run_rc=${RUN_RC:-} verify_rc=${VERIFY_RC:-})"
+            exit 1
+          fi
+          case "${EVIDENCE_DIGEST:-}" in
+            *[!a-f0-9]*) echo "::error::verified evidence digest is not lowercase SHA-256"; exit 1 ;;
+          esac
+          if [ "${#EVIDENCE_DIGEST}" -ne 64 ]; then
+            echo "::error::verified evidence digest is not lowercase SHA-256"
+            exit 1
+          fi
+          case "${EVIDENCE_RUN_ATTEMPT:-}" in
+            ''|*[!0-9]*|0) echo "::error::verified evidence attempt is not positive"; exit 1 ;;
+          esac
+          echo "macOS release qualification passed"
+
+  # ===========================================================================
+  # promote-release — the ONLY job with the promotion secret + release write. It
+  # runs only after stage-release AND qualify-macos succeed (GitHub's default
+  # success dependency). It independently rechecks identity + verified evidence
+  # before promoting to `latest` and creating the GitHub Release.
+  # ===========================================================================
+  promote-release:
+    needs: [stage-release, qualify-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # softprops/action-gh-release creates the GitHub Release
+      # No id-token / attestations / artifact-metadata here — this job neither
+      # publishes nor attests. The promotion secret below is scoped to this job
+      # only and is never exposed to stage-release or qualify-macos.
+    env:
+      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+      SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
+      SUPPORT_CONTRACT_VERSION: '1'
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+      PROMOTION_ORDER: ${{ runner.temp }}/promotion-order.txt
+      PROMOTION_ORDER_SHA256: 11c99ddf52f6f001054179e71a600e9a5d3dfb8bc05014a93b91295f63e7327d
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.stage-release.outputs.git-sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Establish the exact immutable source identity before any repository-local
+      # verifier runs. checkout must not persist the contents-write token into
+      # git config; all later scripts use Node built-ins and need no dependency
+      # install or package-manager bootstrap.
+      - name: Validate exact tag, SHA, clean tree, and credential-free checkout
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          TAG: ${{ needs.stage-release.outputs.tag }}
+          GIT_SHA: ${{ needs.stage-release.outputs.git-sha }}
+        run: |
+          set -eu
+          [ "$TAG" = "v${VERSION}" ] || { echo "::error::tag $TAG != v$VERSION"; exit 1; }
+          head_sha="$(git rev-parse HEAD)"
+          [ "$head_sha" = "$GIT_SHA" ] || { echo "::error::HEAD $head_sha != staged git-sha $GIT_SHA"; exit 1; }
+          tag_sha="$(git rev-list -n 1 "$TAG")"
+          [ "$tag_sha" = "$GIT_SHA" ] || { echo "::error::tag $TAG resolves to $tag_sha, not $GIT_SHA"; exit 1; }
+          [ -z "$(git status --porcelain=v1 --untracked-files=all)" ] || { echo "::error::promotion checkout is not clean"; exit 1; }
+          if git config --local --get-regexp '^(http\..*\.extraheader|credential\.)' >/dev/null 2>&1; then
+            echo "::error::checkout persisted a reusable credential"
+            exit 1
+          fi
+          case "$(git remote get-url origin)" in
+            *://*@*) echo "::error::origin URL contains embedded credentials"; exit 1 ;;
+          esac
+
+      # Only after the git-only identity boundary succeeds, provision the exact
+      # reviewed runtime. No registry-url/cache means setup-node writes no npm
+      # credential configuration, and no dependency install occurs.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24.16.0'
+          check-latest: false
+
+      - name: Verify exact promotion runtime and package version
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+        run: |
+          set -eu
+          node -e 'if(process.versions.node!=="24.16.0")throw new Error("promotion Node version mismatch")'
+          npm_version="$(npm --version)"
+          node -e 'if(process.argv[1]!=="11.13.0")throw new Error("promotion npm version mismatch")' "$npm_version"
+          pkg_version="$(node -p "require('./packages/core/package.json').version")"
+          [ "$pkg_version" = "$VERSION" ] || { echo "::error::checked-out version $pkg_version != staged $VERSION"; exit 1; }
+
+      - name: Download staged release metadata
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ${{ needs.stage-release.outputs.release-metadata-artifact }}
+          path: ${{ runner.temp }}/release-metadata
+
+      - name: Download verified macOS evidence
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ${{ needs.qualify-macos.outputs.evidence-artifact }}
+          path: ${{ runner.temp }}/macos-evidence
+
+      # Independently recheck version/SHA/manifest-digest AND re-verify the
+      # sealed macOS evidence (the verifier recomputes the evidence digest from
+      # the artifact's own contents) BEFORE mutating any dist-tag. No runner-set
+      # boolean is trusted.
+      - name: Recheck release identity + verified evidence
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          TAG: ${{ needs.stage-release.outputs.tag }}
+          GIT_SHA: ${{ needs.stage-release.outputs.git-sha }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+          EVIDENCE_DIGEST: ${{ needs.qualify-macos.outputs.evidence-digest }}
+          EVIDENCE_RUN_ATTEMPT: ${{ needs.qualify-macos.outputs.evidence-run-attempt }}
+          REGISTRY_INTEGRITY_DIGEST: ${{ needs.qualify-macos.outputs.registry-integrity-digest }}
+          CANDIDATE_DIGEST: ${{ needs.qualify-macos.outputs.candidate-digest }}
+          PREVIOUS: ${{ needs.stage-release.outputs.previous-version }}
+        run: |
+          set -eu
+          # (a) Reassert version/tag/sha coherence after artifact download.
+          pkg_version="$(node -p "require('./packages/core/package.json').version")"
+          [ "$pkg_version" = "$VERSION" ] || { echo "::error::checked-out version $pkg_version != staged $VERSION"; exit 1; }
+          [ "$TAG" = "v${VERSION}" ] || { echo "::error::tag $TAG != v$VERSION"; exit 1; }
+          head_sha="$(git rev-parse HEAD)"
+          [ "$head_sha" = "$GIT_SHA" ] || { echo "::error::HEAD $head_sha != staged git-sha $GIT_SHA"; exit 1; }
+
+          # (b) manifest digest matches the staged output.
+          manifest="$RUNNER_TEMP/release-metadata/opensip-cli-release-manifest.v1.json"
+          got="$(sha256sum "$manifest" | awk '{print $1}')"
+          [ "$got" = "$MANIFEST_DIGEST" ] || { echo "::error::manifest digest $got != staged $MANIFEST_DIGEST"; exit 1; }
+          # manifest gitSha/releaseVersion must match the tag being released.
+          node -e '
+            const m=require(process.argv[1]);
+            if(m.releaseVersion!==process.argv[2]){console.error("manifest releaseVersion "+m.releaseVersion+" != "+process.argv[2]);process.exit(1)}
+            if(m.gitSha!==process.argv[3]){console.error("manifest gitSha "+m.gitSha+" != "+process.argv[3]);process.exit(1)}
+          ' "$manifest" "$VERSION" "$GIT_SHA"
+
+          # (c) independently validate the retained exact-registry inventory:
+          # canonical bytes/closed schema, complete RELEASE_PACKAGE_ORDER,
+          # registry/version, npm SRI metadata, digest, and manifest SHA mapping.
+          inventory="$RUNNER_TEMP/macos-evidence/opensip-cli-registry-integrity.v1.json"
+          node scripts/registry-integrity-inventory.mjs verify \
+            --inventory "$inventory" \
+            --manifest "$manifest" \
+            --expected-version "$VERSION" \
+            --expected-registry https://registry.npmjs.org/ \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --expected-digest "$REGISTRY_INTEGRITY_DIGEST"
+
+          # (d) independently RE-VERIFY the sealed evidence (recomputes the
+          #     evidence digest from the artifact) with the same host/version/
+          #     support-row constraints the Mac job used.
+          ev="$RUNNER_TEMP/macos-evidence/opensip-cli-macos-qualification.v1.json"
+          case "$EVIDENCE_RUN_ATTEMPT" in
+            ''|*[!0-9]*) echo "::error::qualified evidence run attempt is not a positive integer"; exit 1 ;;
+            0) echo "::error::qualified evidence run attempt must be positive"; exit 1 ;;
+          esac
+          case "$EVIDENCE_DIGEST" in
+            *[!a-f0-9]*) echo "::error::qualified evidence digest is not lowercase SHA-256"; exit 1 ;;
+          esac
+          if [ "${#EVIDENCE_DIGEST}" -ne 64 ]; then
+            echo "::error::qualified evidence digest is not lowercase SHA-256"
+            exit 1
+          fi
+          case "$CANDIDATE_DIGEST" in
+            *[!a-f0-9]*) echo "::error::qualified candidate digest is not lowercase SHA-256"; exit 1 ;;
+          esac
+          if [ "${#CANDIDATE_DIGEST}" -ne 64 ]; then
+            echo "::error::qualified candidate digest is not lowercase SHA-256"
+            exit 1
+          fi
+          previous_args=(--expect-no-previous-candidate)
+          if [ -n "${PREVIOUS:-}" ]; then
+            previous_args=(--expected-previous-version "$PREVIOUS")
+          fi
+          node scripts/verify-platform-acceptance.mjs \
+            --evidence "$ev" \
+            --profile "$MACOS_PROFILE" \
+            --expected-version "$VERSION" \
+            --expected-candidate-kind published-version \
+            --expected-registry https://registry.npmjs.org/ \
+            --expected-candidate-digest "$CANDIDATE_DIGEST" \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+            --registry-integrity-inventory "$inventory" \
+            "${previous_args[@]}" \
+            --expected-git-sha "$GIT_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$EVIDENCE_RUN_ATTEMPT" \
+            --expected-runner-label macos-26 \
+            --expect-platform darwin \
+            --expect-arch arm64 \
+            --expect-node-abi 137 \
+            --expect-fs-type apfs \
+            --expected-node-major 24 \
+            --expected-npm-major 11 \
+            --expected-sw-vers-major 26 \
+            --expected-kernel-major 25 \
+            --expect-uname-arch arm64 \
+            --expect-case-sensitive false \
+            --expect-shell zsh \
+            --expected-support-row "$SUPPORT_ROW" \
+            --expected-support-contract-version "$SUPPORT_CONTRACT_VERSION"
+
+          # (e) the evidence's own sealed digest must equal the digest the Mac
+          #     job exposed, and its candidate version + git SHA must match.
+          node -e '
+            const e=require(process.argv[1]);
+            const [ , , wantDigest, wantVersion, wantSha, wantAttempt ] = process.argv;
+            const d=e.completion&&e.completion.evidenceDigest;
+            if(!d){console.error("evidence has no sealed digest");process.exit(1)}
+            if(d!==wantDigest){console.error("evidence digest "+d+" != exposed "+wantDigest);process.exit(1)}
+            if(e.candidate&&e.candidate.version!==wantVersion){console.error("evidence candidate "+e.candidate.version+" != "+wantVersion);process.exit(1)}
+            if(e.harnessGitSha&&e.harnessGitSha!==wantSha){console.error("evidence harnessGitSha "+e.harnessGitSha+" != "+wantSha);process.exit(1)}
+            if(String(e.execution?.runAttempt)!==wantAttempt){console.error("evidence run attempt does not match qualified output");process.exit(1)}
+            if(e.verdict!=="pass"){console.error("evidence verdict "+e.verdict+" != pass");process.exit(1)}
+          ' "$ev" "$EVIDENCE_DIGEST" "$VERSION" "$GIT_SHA" "$EVIDENCE_RUN_ATTEMPT"
+
+          # Produce inert, bounded promotion input while no npm credential is in
+          # scope. The inventory verifier above already proved this exact array
+          # is canonical RELEASE_PACKAGE_ORDER; this closes the handoff so the
+          # token-bearing step never executes repository code.
+          node -e '
+            const fs=require("node:fs");
+            const inventory=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+            const out=process.argv[2];
+            const version=process.argv[3];
+            const packages=inventory.packages;
+            if(!Array.isArray(packages)||packages.length<20||packages.length>256)throw new Error("promotion package count is outside bounds");
+            const names=[];
+            const seen=new Set();
+            for(const entry of packages){
+              const name=entry&&entry.name;
+              if(entry.version!==version||typeof name!=="string"||name.length>128||seen.has(name))throw new Error("promotion package identity is invalid");
+              if(name!=="opensip-cli"&&!/^@opensip-cli\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name))throw new Error("promotion package name is outside namespace");
+              seen.add(name);names.push(name);
+            }
+            if(names.at(-1)!=="opensip-cli")throw new Error("promotion order must end with opensip-cli");
+            fs.writeFileSync(out,names.join("\n")+"\n",{encoding:"utf8",flag:"wx",mode:0o600});
+          ' "$inventory" "$PROMOTION_ORDER" "$VERSION"
+          echo "identity + evidence rechecks passed"
+
+      # Promote every exact staged package to `latest`. `npm dist-tag add` is NOT
+      # covered by OIDC (which authorizes `npm publish` only), so it needs the
+      # classic MACBOOKM5 automation token — scoped to THIS job alone. Idempotent
+      # and sequential in RELEASE_PACKAGE_ORDER; a missing exact package aborts.
       - name: Promote staged release to latest
-        # `npm dist-tag add` (the staged→latest promotion) is NOT covered by OIDC
-        # trusted publishing — OIDC authorizes `npm publish` only. So unlike the
-        # publish step above, the promotion needs a classic npm auth token. Without
-        # it the step fails E401 and `latest` is never advanced (the symptom in the
-        # v0.1.8 run). MACBOOKM5 holds an npm automation token with publish +
-        # dist-tag rights for the @opensip-cli scope and the unscoped opensip-cli.
         env:
           NODE_AUTH_TOKEN: ${{ secrets.MACBOOKM5 }}
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          STAGING_TAG: ${{ needs.stage-release.outputs.staging-tag }}
         run: |
-          set -e
-          VERSION=$(node -p "require('./packages/core/package.json').version")
-          STAGING_TAG="release-candidate-${VERSION}"
+          set -eu
           echo "Promoting ${VERSION} from ${STAGING_TAG} to latest"
+
+          [ -f "$PROMOTION_ORDER" ] && [ ! -L "$PROMOTION_ORDER" ] || { echo "::error::promotion order is not a regular file"; exit 1; }
+          [ "$(wc -c < "$PROMOTION_ORDER")" -le 32768 ] || { echo "::error::promotion order exceeds size bound"; exit 1; }
+          order_digest="$(sha256sum "$PROMOTION_ORDER" | awk '{print $1}')"
+          [ "$order_digest" = "$PROMOTION_ORDER_SHA256" ] || { echo "::error::promotion order does not match the reviewed canonical digest"; exit 1; }
+          mapfile -t package_names < "$PROMOTION_ORDER"
+          [ "${#package_names[@]}" -ge 20 ] && [ "${#package_names[@]}" -le 256 ] || { echo "::error::promotion package count is outside bounds"; exit 1; }
+          declare -A seen=()
+          for name in "${package_names[@]}"; do
+            if [ "$name" != "opensip-cli" ] && [[ ! "$name" =~ ^@opensip-cli/[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+              echo "::error::promotion package name is outside namespace"
+              exit 1
+            fi
+            [ -z "${seen[$name]:-}" ] || { echo "::error::duplicate promotion package"; exit 1; }
+            seen[$name]=1
+          done
+          [ "${package_names[-1]}" = "opensip-cli" ] || { echo "::error::promotion order must end with opensip-cli"; exit 1; }
+
+          # The long-lived npm token exists only in this step. Create a private,
+          # run-owned userconfig that binds it to the fixed registry, and delete
+          # it on every exit before any later action runs.
+          promotion_npmrc="$RUNNER_TEMP/promotion.npmrc"
+          umask 077
+          printf '%s\n' \
+            'registry=https://registry.npmjs.org/' \
+            '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' \
+            'always-auth=true' > "$promotion_npmrc"
+          export NPM_CONFIG_USERCONFIG="$promotion_npmrc"
+          cleanup_npmrc() { rm -f "$promotion_npmrc"; }
+          trap cleanup_npmrc EXIT
 
           promote() {
             local name="$1"
-            if ! npm view "${name}@${VERSION}" version >/dev/null 2>&1 ; then
+            if ! npm view "${name}@${VERSION}" version --registry https://registry.npmjs.org/ >/dev/null 2>&1 ; then
               echo "::error::${name}@${VERSION} is missing on npm — cannot promote"
               exit 1
             fi
-            npm dist-tag add "${name}@${VERSION}" latest
+            npm dist-tag add "${name}@${VERSION}" latest --registry https://registry.npmjs.org/
             echo "  promoted ${name}@${VERSION} → latest"
           }
 
-          while IFS= read -r pkg ; do
-            if [ "$pkg" = "opensip-cli" ] ; then
-              promote opensip-cli
-            else
-              promote "@opensip-cli/$pkg"
-            fi
-          done < <(node scripts/release-package-order.mjs --print names)
+          for name in "${package_names[@]}"; do
+            promote "$name"
+          done
 
       - name: Verify publish surface on latest
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
         run: |
-          VERSION=$(node -p "require('./packages/core/package.json').version")
           node scripts/verify-release-publish-surface.mjs --expected-version "v${VERSION}" --tag latest
 
+      # Create the GitHub Release with the manifest/checksums/SBOM AND the
+      # verified macOS evidence. The evidence version/git SHA/profile digest were
+      # rechecked above and must match this exact tag.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
+          tag_name: ${{ needs.stage-release.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            /tmp/tarballs/opensip-cli-release-manifest.v1.json
-            /tmp/tarballs/SHA256SUMS
-            /tmp/tarballs/opensip-cli-sbom.cyclonedx.json
+            ${{ runner.temp }}/release-metadata/opensip-cli-release-manifest.v1.json
+            ${{ runner.temp }}/release-metadata/SHA256SUMS
+            ${{ runner.temp }}/release-metadata/opensip-cli-sbom.cyclonedx.json
+            ${{ runner.temp }}/macos-evidence/opensip-cli-macos-qualification.v1.json
+            ${{ runner.temp }}/macos-evidence/opensip-cli-registry-integrity.v1.json
+            ${{ runner.temp }}/macos-evidence/agent-eval-installed-smoke.json
+            ${{ runner.temp }}/macos-evidence/host-preflight.json
+            ${{ runner.temp }}/macos-evidence/verifier-result.json

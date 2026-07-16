@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-07
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Stages and catalog (graph)"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "How `graph` builds its picture of the codebase — the seven-stage pipeline, the catalog format, and the content-keyed cache."
@@ -32,6 +32,12 @@ source-files:
   - packages/graph/engine/src/cli/positional-paths.ts
   - packages/graph/engine/src/cli/workspace-runner.ts
   - packages/graph/engine/src/types.ts
+  - packages/graph/graph-typescript/src/semantic-reference-facts.ts
+  - packages/graph/engine/src/read/declaration-reference-view.ts
+  - packages/graph/engine/src/read/entity-detail-view.ts
+  - packages/graph/engine/src/read/impact-view.ts
+  - packages/graph/engine/src/read/test-selection-view.ts
+  - packages/graph/engine/src/persistence/context-snapshot-repo.ts
 related-docs:
   - ./02-rules-and-gating.md
   - ./03-adding-a-language.md
@@ -42,7 +48,7 @@ related-docs:
 
 The `graph` command is the static call-graph tool. Where `fit` answers "is the codebase clean?" and `sim` answers "does it behave correctly under stress?", `graph` asks: **"what is reachable from where?"** Orphans, side-effect chains, duplicated bodies, and test-only reachable code are all questions about the call graph, not any single file.
 
-> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the project-local SQLite store at `<project>/opensip-cli/.runtime/datastore.sqlite` — see [Catalog in SQLite](#the-catalog-in-sqlite) below.
+> **Naming.** CLI-facing docs and code use `graph`; the dashboard labels the same data **Code Paths**. The catalog lives in the active local SQLite store: managed user cache for a zero-config project, project `.runtime` after initialization. See [Catalog in SQLite](#the-catalog-in-sqlite) below.
 
 > **What you'll understand after this:**
 > - The seven-stage pipeline graph uses to build its picture of the codebase.
@@ -185,6 +191,31 @@ For the TypeScript adapter, a single `ts.Program` is created in `parseProject` a
 
 Indexes are in-memory only — never persisted. They rebuild on every run from the catalog, and the cost (~50ms) is negligible compared to stages 1+2.
 
+#### Bounded context read views
+
+The public `@opensip-cli/graph/read` facade projects impact, entity detail, and
+test selection from the frozen catalog/indexes. Entity detail reuses existing
+occurrence fields (end span, at most 64 parameters, return type, enclosing
+class, at most 32 decorator/annotation/attribute **names**) plus derived test
+reachability. Decorator arguments and literal bodies are stripped; the view does
+not expose source-shaped parameter patterns or literal/compound return-type text,
+and it does not read source or expose compiler/parser handles. Oversized or malformed identity rows
+are omitted with partial projection coverage rather than truncated into another
+identity.
+
+Current catalogs retain a privacy-safe build-coverage summary: exact input-file
+set identity, discovered-file count, and parse-error file count. The
+`agent-context` graph plane compares this evidence with the complete inventory
+and degrades on parse errors, approximate resolution, unproven adapter selection,
+unsupported/omitted languages, or a mismatched source-file set. Legacy catalogs
+without this summary are rebuilt before they can support a ready context claim.
+
+All answers bind to one exact `g1:` generation and report the four coverage
+facets independently. Inventory facts come from the persistence-free
+`@opensip-cli/codebase` substrate. Derived inventory/test-selection snapshots
+are graph-owned, numeric-versioned, immutable by id, and replayed only through
+the public read facade; MCP never imports graph repositories or internal paths.
+
 #### Package identity
 
 Each occurrence carries a `package` — the `name` of its **nearest enclosing `package.json`** (e.g. `@opensip-cli/fitness`), or the top-level path segment when there's no manifest. It is stamped at build time by [`assignPackages`](../../../packages/graph/engine/src/pipeline/assign-packages.ts) (a post-walk catalog pass, before persistence) because the dashboard has no filesystem access. This is what the coupling grid buckets by, so it shows real packages on any repo layout (`packages/`, `apps/`+`libs/`, single-package, non-JS) rather than a `packages/<segment>` heuristic. Consumers read `occurrence.package` via the `pkgOf` helper, which falls back to the path heuristic when a catalog predates package stamps.
@@ -233,7 +264,14 @@ The two rules that consume entry-points only see the resulting `EntryPoint[]` �
 
 ## The catalog in SQLite
 
-The output of stages 1+2 is persisted to the project-local SQLite store at `<project>/opensip-cli/.runtime/datastore.sqlite` via [`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts). The catalog rides a single row in the `graph_catalog` table: cache-validity fields (language, cacheKey, filesFingerprint) live in typed columns; the function/occurrence/edge data is stored as a JSON payload preserving the launch wire shape exactly.
+The output of stages 1+2 is persisted to the active local
+`<runtime-root>/datastore.sqlite` via
+[`CatalogRepo.replaceAll(catalog)`](../../../packages/graph/engine/src/persistence/catalog-repo.ts).
+The runtime root is the managed user cache before initialization and the
+project-local `.runtime/` afterward. The catalog rides a single row in the
+`graph_catalog` table: cache-validity fields (language, cacheKey,
+filesFingerprint) live in typed columns; the function/occurrence/edge data is
+stored as a JSON payload preserving the launch wire shape exactly.
 
 The reconstructed `Catalog` value returned by `CatalogRepo.loadFullCatalog()`
 is the same shape consumed by dashboard view derivations, rules, and indexes.
@@ -248,7 +286,7 @@ below).
   "tool": "graph",
   "language": "typescript",       // adapter id; Python catalog → "python", Rust → "rust", …
   "builtAt": "2026-05-18T12:00:00.000Z",
-  "cacheKey": "eng=0.5.0|ts-5.7.3-9bb6ef4d07c08140", // engine version + adapter-supplied invalidation key
+  "cacheKey": "eng=0.7.0|ts-5.7.3-9bb6ef4d07c08140", // engine version + adapter-supplied invalidation key
   "filesFingerprint": "694\n/abs/path/foo.ts|1715000000000|1234\n...",
   "functions": {
     "saveBaseline": [
@@ -290,6 +328,92 @@ Notable shape choices:
 - **`calls[i].to` is always an array.** Static (one element), polymorphic (many), unresolved (zero). Consumers don't switch on shape.
 - **Anonymous functions get angle-bracketed names** (`<arrow:...>`, `<module-init:...>`) so they can't collide with real identifiers.
 - **Optional `features` surface.** The catalog payload carries an optional `features` block (per-function `bodyLines` / `blast` / reachability, plus package-level `scc` and `packageCoupling` rows) computed by the engine's feature-derivation stage ([`pipeline/features.ts`](../../../packages/graph/engine/src/pipeline/features.ts)). Per [ADR-0006](../../decisions/ADR-0006-derived-data-persistence-policy.md), features are a recomputed in-engine view for the rules and are **materialized into the catalog only when the producing run requests them** (for the decoupled dashboard); a default run persists no features.
+
+### Public catalog read boundary
+
+Cross-package consumers use `@opensip-cli/graph/read`
+([ADR-0147](../../decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)).
+The subpath provides free functions for payload-free catalog identity reads,
+full generation loads, canonical index/feature/orphan/classification/fingerprint
+derivation, and bounded catalog rebuild. Storage and rebuild failures return a
+fixed `GraphReadError` `Result`; missing catalog remains `ok(null)`.
+
+`CatalogRepo`, rule instances, raw datastore handles, and `runGraph`
+orchestration stay private. MCP production consumes this public facade and maps
+its bounded errors; it does not import `@opensip-cli/graph/internal`. The
+identity probe selects only `language`, `cacheKey`, `filesFingerprint`, and
+`builtAt`, so frequent freshness checks do not parse payload or emit per-probe
+events.
+
+### Long-lived MCP catalog generations
+
+Catalog payloads may also record canonical adapter-selection provenance
+(`forced` or `auto`) and engine mode (`exact` or `sharded`). These optional
+fields evolve the existing JSON payload; they add no SQLite column, migration,
+or catalog-version bump. A pre-feature payload remains readable, but freshness
+verification reports partial coverage instead of inventing missing provenance.
+
+A long-lived MCP reader probes the persisted identity before each graph query.
+When another `opensip graph` process atomically replaces the catalog row, the
+next read loads and swaps to that immutable generation without building again.
+Responses and cursors expose only an opaque `g1:` SHA-256 generation key, never
+the raw language/cache/fingerprint/built-at tuple. The core project key remains
+a separate cursor binding. Ordinary reads never build; `refresh_graph` owns an
+explicit rebuild only after missing/stale evidence or a forced request. See
+[ADR-0148](../../decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md).
+
+Occurrence, package, and runtime-wiring audit evidence stays labelled and
+bounded. Runtime manifest/registry/CommandSpec wiring is projected by MCP's
+injected live port and is not written into this static catalog. Cross-package
+readers remain restricted to the public graph-read boundary
+([ADR-0147](../../decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md));
+query semantics and ceilings are recorded in
+[ADR-0153](../../decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)
+(supersedes ADR-0149).
+
+
+### Dependency and declaration audit evidence
+
+Exact catalogs preserve two additional audit planes beyond callable occurrences.
+Neither requires a SQLite schema migration: optional JSON payload fields use
+**absent-field** defaults so pre-feature catalogs stay readable
+([ADR-0152](../../decisions/ADR-0152-dependency-and-declaration-audit-evidence.md)).
+
+**Module dependencies (three-state contract).** On each module-init occurrence:
+
+| State | Meaning |
+| --- | --- |
+| Field **absent** | Adapter or resolution tier did not produce dependency evidence (fast mode, non-emitting adapters, pre-feature catalogs). |
+| Field **present empty** (`dependencies: []`) | Exact inspection found zero import/require/re-export sites. |
+| Field **populated** | Each edge carries orthogonal **form** + **role** + **target-kind** + **basis** classification with a closed valid form→role map. |
+
+Unique workspace bare-specifier targets that resolve only through declaration-file
+entries are attributed via the workspace manifest (`workspace-declaration-entry`)
+with labelled basis/confidence. Ambiguous package candidates fail closed
+(unresolved) rather than inventing a target. External/unresolved edges omit only
+`resolvedPackage` while retaining a complete atomic classification.
+
+**Optional semantic facts (`semanticFacts`).** Exact TypeScript may attach a
+bounded declaration/reference bundle with `referenceScope: 'cross-file'`.
+Declaration IDs (`d1|…`) are separate from callable `symbolId`s. Same-file and
+declaration-file reference sites are deliberately omitted — this is audit
+evidence, not IDE find-all-references. Fast mode, polyglot adapters, and
+pre-feature catalogs leave the plane absent and report
+`semantic-facts-unsupported` rather than complete-empty inventory.
+
+**Bounds and cache ABI.** Production caps include 100,000 declarations and
+500,000 cross-file references per generation (plus per-declaration soft bounds
+and text/span limits). Producers allocate producer-first under injected limits
+in tests. Dependency classification and semantic facts use **independent**
+engine-version cache ABI segments so advancing one plane does not overload the
+other. Exact, incremental, and sharded assembly must preserve optional presence,
+classification labels, workspace attribution, and deterministic order
+(no absent-to-empty coercion).
+
+Public graph/read exposes these planes through package evidence views and
+declaration/reference views; MCP wraps them as compact tools
+([ADR-0153](../../decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)).
+Generation/freshness behaviour remains [ADR-0148](../../decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md).
 
 ## Cache invalidation
 

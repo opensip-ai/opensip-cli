@@ -23,10 +23,11 @@
  */
 
 import { enterScope } from '@opensip-cli/core';
-import { fileCache } from '@opensip-cli/fitness';
 import { beforeEach } from 'vitest';
 
 import { makeFitnessTestScope } from './with-scope.js';
+
+import { fitnessTestFileCache } from './index.js';
 
 beforeEach(() => {
   // Start from a full fitness subscope (checks/recipes/load + a fresh cache),
@@ -36,6 +37,6 @@ beforeEach(() => {
   // ambient scope for the test.
   const scope = makeFitnessTestScope();
   // The `fitness` slot is installed by makeFitnessTestScope; override its cache.
-  Object.assign(scope.fitness ?? {}, { fileCache });
+  Object.assign(scope.fitness ?? {}, { fileCache: fitnessTestFileCache });
   enterScope(scope);
 });

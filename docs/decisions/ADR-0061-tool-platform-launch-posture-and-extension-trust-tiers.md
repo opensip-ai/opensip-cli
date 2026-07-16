@@ -216,3 +216,6 @@ superseded ADR-0028's guard), ADR-0036 (host-owned baseline plane), ADR-0051
 **Extended by:** [ADR-0081](ADR-0081-capability-pack-trust-and-resource-declarations.md)
 adds exact-name admission for non-bundled in-process capability packs and records
 `opensipTools.requires` as declaration-only trust metadata.
+
+### Boundary hardening amendments (2026-07-09)
+Wildcard external trust is no longer admitted; exact-id admission is defined by [ADR-0145](ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md).

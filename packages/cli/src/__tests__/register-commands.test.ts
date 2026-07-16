@@ -26,7 +26,11 @@ function makeCtx() {
         exitCode = n;
       },
       render: () => Promise.resolve(),
+      emitJson: () => undefined,
+      emitRaw: () => undefined,
+      emitError: () => undefined,
       pluginLayouts: [],
+      toolScaffolds: [],
       datastore: () => {
         throw new Error('not opened in this test');
       },
@@ -56,6 +60,34 @@ describe('init wiring', () => {
       expect.arrayContaining(['--cwd', '--language', '--keep', '--remove', '--json', '--debug']),
     );
     expect(cmd!.description()).toMatch(/Scaffold/i);
+  });
+});
+
+describe('audit wiring', () => {
+  it('registers exactly one canonical audit command with bounded workflow flags', () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    const matches = program.commands.filter((command) => command.name() === 'audit');
+
+    expect(matches).toHaveLength(1);
+    const flags = matches[0].options.map((option) => option.long);
+    expect(flags).toEqual(
+      expect.arrayContaining([
+        '--cwd',
+        '--json',
+        '--quiet',
+        '--verbose',
+        '--debug',
+        '--open',
+        '--config',
+        '--changed',
+        '--since',
+        '--files',
+        '--full',
+      ]),
+    );
+    expect(flags).not.toContain('--report-to');
+    expect(flags).not.toContain('--api-key');
   });
 });
 

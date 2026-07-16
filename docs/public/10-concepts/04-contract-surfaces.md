@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-26
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Contract surfaces"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The system's public edges. Every contract opensip-cli makes with the outside world, and what changing each one would cost."
@@ -325,7 +325,7 @@ It's worth being explicit about what isn't promised:
 - **Internal framework types.** `CheckConfig`, `FitnessRecipe`, `RecipeCheckResult`, `ExecutionContext`, `PathMatcher` — all internal. They live in `@opensip-cli/fitness`, but they're not re-exported as part of the marketplace shape. Check packs use `defineCheck`/`defineRecipe` (which *are* stable) and never touch these.
 - **Logger output format.** Logs are JSON Lines, but the field set is internal. Don't grep production logs for specific keys; treat them as opaque.
 - **Cache file format.** The AST cache, the glob cache, the prewarm cache — all rebuildable. They have on-disk shapes, but those shapes change without notice. Wiping `<project>/opensip-cli/.runtime/cache/` is always safe.
-- **Session record format.** Sessions are persisted as rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, with per-session detail in a companion `session_tool_payload` row, but the schema is internal. The `sessions list` command (with `--summary-only` for agents) is the supported reader. See also `agent-catalog` for programmatic discovery of the sessions/history surface.
+- **Session record format.** Sessions are persisted via `SessionRepo` in the active local SQLite datastore—the managed user cache before initialization or project `.runtime` afterward—with per-session detail in a companion `session_tool_payload` row, but the schema is internal. The `sessions list` command (with `--summary-only` for agents) is the supported reader. See also `agent-catalog` for programmatic discovery of the sessions/history surface.
 - **OpenSIP Cloud API.** The cloud is a separate product. Its API is its own contract, not opensip-cli'. The CLI POSTs signals (the `SignalBatch` wire shape derived from the envelope; SARIF on the `--report-to` path), and the cloud is responsible for ingesting it.
 
 ---
@@ -336,7 +336,7 @@ If you write a tool, a check pack, or a CI integration:
 
 - **Lean on the six surfaces above.** Anything in this doc is safe to depend on. Read the linked source files for the precise shape.
 - **Don't import internal types.** If you find yourself wanting `import { CheckConfig } from '@opensip-cli/fitness'`, take a step back — that import will move under your feet. Use `defineCheck()` instead, or open an issue to expose what you need as a stable surface.
-- **Pin to the current 0.x line.** `peerDependencies: { "@opensip-cli/core": "^0.5.0" }` is the right shape today. While opensip-cli is pre-1.0, a caret range on a `0.x` version locks to the *minor* (`^0.1.0` resolves to `>=0.1.0 <0.2.0`), so each **minor** (`0.y`) bump may carry breaking changes — treat `0.1 → 0.2` as a deliberate migration, not a safe upgrade. Once opensip-cli reaches `1.0.0`, this becomes the usual "pin to majors; patch and minor are safe."
+- **Pin to the current 0.x line.** `peerDependencies: { "@opensip-cli/core": "^0.7.0" }` is the right shape today. While opensip-cli is pre-1.0, a caret range on a `0.x` version locks to the *minor* (`^0.1.0` resolves to `>=0.1.0 <0.2.0`), so each **minor** (`0.y`) bump may carry breaking changes — treat `0.1 → 0.2` as a deliberate migration, not a safe upgrade. Once opensip-cli reaches `1.0.0`, this becomes the usual "pin to majors; patch and minor are safe."
 - **Test against `--json`, not against the table renderer.** The table renderer is for humans; the JSON output is the contract. Your CI integration parses JSON.
 
 ---

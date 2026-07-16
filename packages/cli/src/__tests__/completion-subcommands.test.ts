@@ -70,16 +70,18 @@ function makeStubToolContext(): ToolCliContext {
           durationMs: 0,
         }),
       },
-      record: () => undefined,
     },
     emitJson: vi.fn(),
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
-    deliverSignals: vi.fn(() => Promise.resolve()),
+    deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
     datastore: undefined,
-  };
+    // Mount-only stub: command handlers are never invoked in these tests, so
+    // the remaining ToolCliContext seams (scope, baseline/artifact/toolState)
+    // are intentionally omitted. Cast is compile-time only — no runtime change.
+  } as unknown as ToolCliContext;
 }
 
 /** A minimal host context for building the host specs we introspect (handlers
@@ -91,11 +93,13 @@ function makeStubHostContext(registry: ToolRegistry): CliCommandsContext {
     setExitCode: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     emitJson: vi.fn(),
+    emitRaw: vi.fn(),
     emitError: vi.fn(),
     pluginLayouts: [
       { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
       { domain: 'sim', userSubdirs: ['scenarios', 'recipes'] },
     ],
+    toolScaffolds: [],
     datastore: () => undefined,
     tools: registry,
   };
@@ -141,6 +145,30 @@ describe('completion subcommand parity', () => {
         `expected completion to surface live subcommand '${sub}'`,
       ).toContain(sub);
     }
+  });
+
+  it('surfaces one canonical audit entry while retaining generic suite run', async () => {
+    const { inventory, program } = await buildLiveInventory();
+    const mountedAudit = program.commands.filter((command) => command.name() === 'audit');
+
+    expect(mountedAudit).toHaveLength(1);
+    expect(inventory.subcommands.filter((name) => name === 'audit')).toEqual(['audit']);
+    expect(inventory.groupSubcommands.suite).toContain('run');
+    expect(inventory.commandFlags.audit).toEqual(
+      expect.arrayContaining([
+        '--cwd',
+        '--json',
+        '--quiet',
+        '--verbose',
+        '--debug',
+        '--open',
+        '--config',
+        '--changed',
+        '--since',
+        '--files',
+        '--full',
+      ]),
+    );
   });
 });
 

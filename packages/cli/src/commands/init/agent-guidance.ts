@@ -22,9 +22,17 @@ interface GuidanceTargetSpec {
 const GUIDANCE_TARGETS: readonly GuidanceTargetSpec[] = [
   { relativePath: 'AGENTS.md', create: 'always', kind: 'playbook' },
   { relativePath: 'CLAUDE.md', create: 'never', kind: 'block' },
-  { relativePath: '.github/copilot-instructions.md', create: 'never', kind: 'block' },
+  {
+    relativePath: '.github/copilot-instructions.md',
+    create: 'never',
+    kind: 'block',
+  },
   { relativePath: '.cursorrules', create: 'never', kind: 'block' },
-  { relativePath: '.cursor/rules/opensip.mdc', create: 'if-parent-exists', kind: 'block' },
+  {
+    relativePath: '.cursor/rules/opensip.mdc',
+    create: 'if-parent-exists',
+    kind: 'block',
+  },
   { relativePath: '.windsurfrules', create: 'never', kind: 'block' },
 ];
 
@@ -61,10 +69,20 @@ export function buildManagedAgentGuidance(): string {
     '',
     'Source precedence:',
     '',
-    '1. OpenSIP MCP tools: `list_runs`, `show_run`, `get_latest_findings`, `search_symbols`, `who_calls`, `callees_of`, `blast_radius`.',
+    '1. OpenSIP MCP tools: `get_agent_catalog`, `list_runs`, `show_run`, `get_latest_findings`, `get_architecture`, `search_symbols`, `search_declarations`, `references_to`, `who_calls`, `callees_of`, `blast_radius`, `package_dependencies`, `why_depends`, `package_cycles`, `get_runtime_wiring`.',
     '2. `opensip sessions ...` replay commands when MCP is unavailable.',
     '3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.',
     '4. Raw logs or direct datastore inspection only as a last-resort debugging path.',
+    '',
+    'Graph audit notes:',
+    '',
+    '- Call `get_agent_catalog` first for live surface diagnosis (version, surface epoch, registered names/count, mutation posture, project root). Compare with initialize/listTools. A mismatched surface epoch or tool names means reconnect the MCP client/process — `refresh_graph` cannot repair a stale connector inventory.',
+    '- Verify the canonical configured project context first, including `context.project.root`, then the opaque `g1:` catalog generation identity in `context.catalog.identity`. The project key is a separate cursor binding only; never treat it as response context or infer it from an opaque cursor.',
+    '- Inspect freshness `complete` versus `partial`, reason codes, effective filters, evidence kind/confidence, and the four coverage facets (inventory / evidence / grouping / projection) — noting per-facet hard-cap reasons and cursor continuation — before claiming complete coverage. Sample or page caps must not invalidate a complete inventory.',
+    '- Ordinary MCP graph reads auto-load a newer catalog already persisted by `opensip graph`; they never build one. Use `refresh_graph` only when missing/stale graph evidence explicitly requires a fresh build, not merely because an external graph run just finished, and never to fix a stale connector.',
+    '- Prefer exclusive compact detail modes (`summary` / `groups` / `nodes`). Identity searches (`search_symbols`, `search_declarations`) default to 20 nodes. Request package samples, cycle proofs, and reference sites only when needed.',
+    '- Traversal defaults to occurrence identity; body-twin union is explicit. Use `package_dependencies`, `why_depends`, and `package_cycles` for labelled call/import package evidence. Use `search_declarations` then `references_to` for cross-file type/interface references (exact TypeScript only; declaration IDs are not callable symbolIds). Use `get_runtime_wiring` for live command inventory (`w1:`) and author-declared static-handler bridges against `g1:` — runtime edges, not call edges.',
+    '- Continue bounded pages with the returned cursor and keep filters stable. Do not loop `refresh_graph` per query.',
     '',
     'Do not grep `.runtime/logs` or read `datastore.sqlite` directly to answer result/history questions; logs are event streams and may not match stored session semantics.',
     AGENT_GUIDANCE_END,
@@ -105,10 +123,11 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
 
   if (hasFitDomain(toolScaffolds)) {
     lines.push(
-      'Start PR review with the composed audit suite. It runs changed-code risk, graph impact, and high-confidence reduction candidates in one command.',
+      'Prepare bounded before-edit evidence for the explicit task files, then use the composed audit suite after editing.',
       '',
       '```bash',
-      'opensip suite run audit --json',
+      'opensip suite run agent-context --files src/example.ts --json',
+      'opensip audit --json',
       'opensip fit --recipe agent-fast --json --filter errors-only',
       'opensip graph impact --changed --json --top 20',
       'opensip fit --changed --include-impacted --json',
@@ -118,10 +137,11 @@ function buildPlaybook(toolScaffolds: readonly ToolScaffold[]): string {
     );
   } else {
     lines.push(
-      'Start PR review with the composed audit suite. It runs changed-code risk, graph impact, and high-confidence reduction candidates in one command.',
+      'Prepare bounded before-edit evidence for the explicit task files, then use the composed audit suite after editing.',
       '',
       '```bash',
-      'opensip suite run audit --json',
+      'opensip suite run agent-context --files src/example.ts --json',
+      'opensip audit --json',
       'opensip graph impact --changed --json --top 20',
       '```',
       '',
@@ -213,7 +233,10 @@ function readExistingContent(
 function writeTarget(
   cwd: string,
   spec: GuidanceTargetSpec,
-  opts: { readonly toolScaffolds: readonly ToolScaffold[]; readonly block: string },
+  opts: {
+    readonly toolScaffolds: readonly ToolScaffold[];
+    readonly block: string;
+  },
 ): AgentGuidanceTargetResult {
   const path = join(cwd, spec.relativePath);
   const exists = existsSync(path);

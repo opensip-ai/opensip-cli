@@ -48,6 +48,16 @@ export interface CliCommandsContext {
   readonly getExitCode?: () => number | undefined;
   readonly render: (result: CommandResult) => Promise<void>;
   /**
+   * Typed-failure presentation seam — the host-command mirror of
+   * {@link ToolCliContext.reportFailure}, sourced from the same context closure
+   * in the composition root. A host command handler that throws a `ToolError`
+   * is presented through here by the shared mount action (human render or
+   * structured `--json` outcome), identically to a tool command. Optional only
+   * for lean test contexts; the mount action falls back to `emitError`/`render`
+   * so a typed failure is never silent.
+   */
+  readonly reportFailure?: ToolCliContext['reportFailure'];
+  /**
    * Success machine-output seam — wraps the value in a `CommandOutcome` via the
    * single `renderOutcome` seam (launch, §5.5). Always supplied by the host
    * (sourced from {@link ToolCliContext.emitJson}); required so raw-stream host

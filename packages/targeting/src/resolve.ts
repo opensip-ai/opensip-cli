@@ -15,11 +15,10 @@ import { isPathInside } from '@opensip-cli/core';
 import { globSync } from 'glob';
 import { minimatch, Minimatch } from 'minimatch';
 
+import { COMMON_TARGET_IGNORE } from './resolve-common.js';
+
 import type { TargetRegistry } from './target-registry.js';
 import type { Target } from '@opensip-cli/config';
-
-// Common infrastructure dirs are always ignored to prevent expensive traversals.
-const COMMON_IGNORE = ['**/node_modules/**', '**/dist/**', '**/.git/**'];
 
 // =============================================================================
 // Global excludes
@@ -40,7 +39,8 @@ export function applyGlobalExcludes(
     // symlink / ../include / absolute-outside escape vectors.
     if (!isPathInside(filePath, rootDir)) return false;
     if (globalExcludes.length === 0) return true;
-    const relativePath = relative(rootDir, filePath);
+    // minimatch expects POSIX-style relative paths; Windows `relative()` yields `\`.
+    const relativePath = relative(rootDir, filePath).split('\\').join('/');
     return !globalExcludes.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
   });
 }
@@ -82,7 +82,7 @@ export function resolveTargets(
         cwd: rootDir,
         absolute: true,
         nodir: true,
-        ignore: [...COMMON_IGNORE, ...exclude],
+        ignore: [...COMMON_TARGET_IGNORE, ...exclude],
       });
       // Use the *exact same* post-glob filter as the pre-resolve assemble path
       // (inside-root + target exclude + globalExcludes, dedup+sort) to guarantee
@@ -200,7 +200,7 @@ export function preResolveAllTargets(
       cwd: rootDir,
       absolute: true,
       nodir: true,
-      ignore: COMMON_IGNORE,
+      ignore: [...COMMON_TARGET_IGNORE],
     });
     patternResults.set(
       pattern,

@@ -1,4 +1,4 @@
-import { defineCommand, definePrimaryCommand, ToolRegistry } from '@opensip-cli/core';
+import { defineCommand, ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { bundledReplayResolver } from '../bundled-replay.js';
@@ -46,7 +46,8 @@ describe('bundledReplayResolver', () => {
       },
       commands: [{ name: 'plain', description: 'plain' }],
       commandSpecs: [
-        definePrimaryCommand({
+        defineCommand({
+          name: 'plain',
           description: 'plain',
           commonFlags: [],
           scope: 'project',

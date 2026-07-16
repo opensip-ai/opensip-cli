@@ -56,6 +56,9 @@ export { loadCliDefaults, readProjectTrustPolicy, cliConfigSchema } from './docu
 export type { CliDefaults, ReadProjectTrustPolicyResult } from './document/cli-config.js';
 export { dashboardConfigSchema } from './document/dashboard.js';
 export {
+  isReservedSuiteName,
+  RESERVED_SUITE_NAMES,
+  reservedSuiteNameMessage,
   suiteDefinitionSchema,
   suiteExecutionSchema,
   suitesConfigSchema,

@@ -26,7 +26,10 @@
  * no `scope.graph`, and reads return `undefined`.
  */
 
+import type { ContextRunState } from './context-run-state.js';
 import type { GraphAdapterRegistry } from './lang-adapter/registry.js';
+import type { ContextCatalogAccessor } from './read/catalog.js';
+import type { ContextSnapshotAccessor } from './read/context-snapshot.js';
 import type { GraphRecipeRegistry } from './recipes/registry.js';
 import type { GraphRulesRegistry } from './rules/registry.js';
 
@@ -43,6 +46,12 @@ export interface GraphSubscope {
   readonly rules: GraphRulesRegistry;
   /** Recipe registry — pre-seeded with the built-in graph recipes. */
   readonly recipes: GraphRecipeRegistry;
+  /** Lazy immutable snapshot persistence/read seam for context producers. */
+  readonly contextSnapshots: ContextSnapshotAccessor;
+  /** Lazy canonical catalog persistence seam for context producers. */
+  readonly contextCatalog: ContextCatalogAccessor;
+  /** Exact prior-step identities for this invocation's context chain. */
+  readonly contextRun: ContextRunState;
 }
 
 declare module '@opensip-cli/core' {

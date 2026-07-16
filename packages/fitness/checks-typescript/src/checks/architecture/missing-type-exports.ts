@@ -14,12 +14,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { currentScope } from '@opensip-cli/core';
 import {
   defineCheck,
   isTestFile,
   type CheckViolation,
   type FileAccessor,
 } from '@opensip-cli/fitness';
+
+function normalizePath(p: string): string {
+  return p.replaceAll('\\', '/');
+}
 
 const IMPORT_PATTERN = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g;
 const NAMED_EXPORT_BLOCK = /export\s+(?:type\s+)?\{([^}]+)\}/g;
@@ -162,8 +167,9 @@ export const missingTypeExports = defineCheck({
     // Step 1: Discover workspace packages and their declared exports maps.
     // This is a workspace-wide concern — the target's glob can't express
     // it — so we reach outside the FileAccessor using node:fs.
+    // Prefer the host-resolved project root when a RunScope is active.
     // ---------------------------------------------------------------------
-    const projectRoot = process.cwd();
+    const projectRoot = currentScope()?.projectContext?.projectRoot ?? process.cwd();
     const exportsByPackage = new Map<string, PackageExportsInfo>();
 
     for (const pkgJsonPath of findPackageJsonFiles(projectRoot)) {
@@ -192,12 +198,13 @@ export const missingTypeExports = defineCheck({
     // Fallback precision signal for packages without an exports map:
     // if the imported name appears in SOME barrel, treat as public.
     // ---------------------------------------------------------------------
-    const barrelFiles = files.paths.filter(
-      (p) =>
-        (/^packages\/[^/]+\/src\/index\.ts$/.test(p) ||
-          /^services\/[^/]+\/src\/index\.ts$/.test(p)) &&
-        !p.includes('node_modules'),
-    );
+    const barrelFiles = files.paths.filter((p) => {
+      const normalized = normalizePath(p);
+      return (
+        /(?:^|\/)(?:packages|services)\/[^/]+\/src\/index\.ts$/.test(normalized) &&
+        !normalized.includes('node_modules')
+      );
+    });
 
     const allExportedNames = new Set<string>();
     for (const barrelPath of barrelFiles) {
@@ -218,8 +225,9 @@ export const missingTypeExports = defineCheck({
     // the target package's exports map (and not surfaced via any barrel).
     // ---------------------------------------------------------------------
     for (const filePath of files.paths) {
-      if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) continue;
-      if (filePath.includes('node_modules') || filePath.includes('/dist/')) continue;
+      const normalizedPath = normalizePath(filePath);
+      if (!normalizedPath.endsWith('.ts') && !normalizedPath.endsWith('.tsx')) continue;
+      if (normalizedPath.includes('node_modules') || normalizedPath.includes('/dist/')) continue;
       if (isTestFile(filePath)) continue;
 
       const content = await files.read(filePath);

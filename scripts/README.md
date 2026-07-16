@@ -64,6 +64,104 @@ step for brand-new `@opensip-cli/*` packages (OIDC cannot bootstrap a
 package name that does not yet exist on npm); a CI contract test pins it to the
 source list, so it must stay in sync.
 
+## Platform acceptance (installed-artifact qualification)
+
+`run-platform-acceptance.mjs` drives the installed-artifact acceptance harness —
+it installs a real candidate build into a hermetic run root, runs the closed
+common journey catalog against it, and writes ONE sealed, versioned evidence
+artifact. `verify-platform-acceptance.mjs` is a **separate** process that
+independently re-validates that artifact. A workflow must run both: a passing
+runner console exit is never trusted on its own.
+
+The full architecture, evidence schema, cleanup model, and reason-code-keyed
+troubleshooting live in a local-only maintainer note under `docs/internal/`
+(private working context, not committed to the repo); the evidence-authority and
+non-product decision is
+[ADR-0164](../docs/decisions/ADR-0164-installed-artifact-platform-acceptance-evidence.md).
+
+- **Stable entry points (the only supported way to invoke the harness):**
+  - `pnpm platform:acceptance -- <args>` → `run-platform-acceptance.mjs`
+  - `pnpm platform:acceptance:verify -- <args>` → `verify-platform-acceptance.mjs`
+  - Both print a closed-grammar `--help`; pass `-- --help` to see it.
+- **Prerequisites:** the harness needs an already-built, packed (or published)
+  candidate — it does **not** build for you. For the packed form, first run the
+  release pack + artifact steps so the tarball directory contains the npm
+  tarballs plus `opensip-cli-release-manifest.v1.json` + `SHA256SUMS` (the same
+  directory `release-preflight.mjs` builds; see `build-release-artifacts.mjs`).
+  The acceptance candidate-source re-verifies those checksums independently
+  before any tarball is trusted.
+- **Two candidate forms (exactly one per run):**
+  - `--packed-release <dir> --expected-version <semver>` — qualify freshly
+    packed release tarballs verified against the manifest + `SHA256SUMS`.
+  - `--published-version <semver> [--previous-version <semver>] [--registry <https-url>]`
+    — qualify an exact published version already on a registry (npmjs by
+    default; an explicit HTTPS mirror only).
+- **Candidate-aware journeys:** a profile row may use the closed
+  `candidateKinds` selector. A non-applicable row remains visible as a
+  non-required `skipped` result (`candidate-kind-not-applicable`) and performs no
+  effects. `lifecycle.upgrade` is similarly a no-effect
+  `previous-candidate-not-supplied` skip unless `--previous-version` supplies an
+  exact older candidate, at which point the row becomes required. The macOS
+  profile uses this for its canonical-installer proof: scheduled packed runs skip
+  that published-only row, while published release runs must pass it.
+- **Exit semantics — run (`run-platform-acceptance.mjs`):**
+  `0` pass · `1` a completed profile with an unsatisfied required journey ·
+  `2` invalid invocation / profile / candidate · `3` infrastructure fault before
+  trustworthy evidence. `--out <path>` (absolute, outside the run root) receives
+  the sealed evidence; `--json-summary` prints exactly one JSON summary object to
+  stdout (counts + required-failure ids only — never child stdout/stderr).
+- **Native capability gates:** profile `requiredCapabilities` use the closed
+  vocabulary `pty`, `symlink`, `permissions`, `process-tree-rss`, and
+  `process-tree-cleanup`. The cleanup capability currently means zero **observed**
+  residual descendants under POSIX process groups plus sampled, fixed-native
+  process-table observation. It qualifies trusted release behavior; it is not OS
+  containment and cannot prove the absence of a descendant that deliberately
+  creates a new session and reparents between samples. Any sampling, capture, or
+  final-verification fault makes cleanup non-clean. Retained matches bind PID,
+  process group, native session token, and the one-second native start token.
+  The observed command/ucomm is diagnostic metadata only because it may change
+  across exec; it is not part of identity. An unrelated same-second replacement
+  matching that stable tuple remains a sampled-inventory collision limit. Windows
+  remains unavailable until Job Object containment exists. A missing
+  profile-level capability gates every journey before lifecycle effects, and the
+  independent verifier rechecks it from the sealed host evidence.
+- **Installed-agent auxiliary report:** `--agent-report-out <absolute-json-path>`
+  preserves the full `agent.installed-smoke` report outside the disposable run
+  root. This is a bounded, credential/path-sanitized debugging artifact, not
+  qualification authority; the sealed `--out` evidence and independent verifier
+  remain authoritative. When requested, omission, invalid report data, or a
+  preservation failure makes the required agent journey fail. The scheduled and
+  release macOS lanes upload this JSON alongside their evidence bundle.
+- **Exit semantics — verify (`verify-platform-acceptance.mjs`):** `0` verified ·
+  non-zero not verified/invalid (`1` = evidence loaded but did not verify;
+  `2` = invalid invocation or an unreadable profile/evidence file). It loads the
+  profile independently, revalidates the evidence schema, and recomputes the
+  profile digest, summary, verdict, and sealed-body digest — cross-checking each
+  against the artifact and requiring the terminal completion record. `--json`
+  prints exactly one machine result. It never echoes diagnostic tails, candidate
+  registry URLs, or absolute paths.
+- **Output/evidence handling:** the sealed evidence file is the durable content
+  record a workflow uploads; console summaries and auxiliary output are bounded
+  and secret-free. Its unkeyed digest detects partial writes, accidental corruption,
+  and internal inconsistency, but it is not an authenticity signature: an actor able
+  to rewrite the JSON can recompute it. Qualification authority therefore combines
+  independent content verification with the trusted workflow-run, artifact, or
+  release provenance that retained the file. Optional
+  `--expected-version` / `--expected-candidate-digest` and host constraints
+  (`--expect-platform` / `--expect-arch` / `--expect-node-abi` / `--expect-fs-type`)
+  let a workflow pin the identity + host the evidence must attest to. The macOS
+  plan (and future OS profiles) extend this closed set; the base seam does not
+  change.
+- **Relationship to `smoke-pack`:** `smoke-pack.mjs` stays the fast
+  cross-platform release check (a command-only subset projected from the same
+  catalog). Full OS qualification is an **additional** consumer that runs
+  after/reuses packed artifacts (or an exact staged published version); it is
+  deliberately NOT wired into `release-preflight.mjs` or any developer build,
+  because it is heavier and host-specific.
+- **Rule — not a support declaration:** a passing common profile qualifies the
+  tested bytes on the tested host only. It is evidence, **not** a declaration of
+  official platform support; a support matrix is a separate, deliberate decision.
+
 ## Public installer
 
 `install.sh` is the canonical source for

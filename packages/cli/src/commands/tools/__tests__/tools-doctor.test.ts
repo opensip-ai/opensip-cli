@@ -2,7 +2,7 @@ import {
   BootstrapDiagnosticsCollector,
   CLI_DIAGNOSTIC_CODES,
   RunScope,
-  runWithScope,
+  runWithScopeSync,
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
@@ -21,7 +21,7 @@ describe('toolsDoctor', () => {
     });
 
     const scope = new RunScope({ bootstrapDiagnostics: collector.list() });
-    const result = runWithScope(scope, () => toolsDoctor(scope.bootstrapDiagnostics.list()));
+    const result = runWithScopeSync(scope, () => toolsDoctor(scope.bootstrapDiagnostics.list()));
 
     expect(result).toEqual({
       type: 'tools-doctor',

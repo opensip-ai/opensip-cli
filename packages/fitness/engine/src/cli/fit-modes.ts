@@ -83,6 +83,41 @@ function fitRunCompletion(
   };
 }
 
+/**
+ * Human gate-save summary lines. Includes verdict + unit faults + a sample of
+ * findings so CI dogfood logs diagnose silent exit-1-with-zero-signals cases.
+ */
+function formatFitGateSaveLines(envelope: SignalEnvelope, runFailed: boolean): readonly string[] {
+  const unitErrors = envelope.units
+    .filter((unit) => unit.error !== undefined && unit.error !== '')
+    .map((unit) => `  unit-error ${unit.slug}: ${unit.error}`);
+  const faultedSuffix = envelope.verdict.faulted ? ', faulted' : '';
+  const verdictState = envelope.verdict.passed ? 'passed' : 'failed';
+  const lines = [
+    'Baseline saved (project SQLite store)',
+    `  ${String(envelope.units.length)} check(s), ${String(envelope.signals.length)} finding(s)`,
+    `  verdict: ${verdictState} (score ${String(envelope.verdict.score)}${faultedSuffix})`,
+  ];
+  if (runFailed) {
+    lines.push('Fit gate FAILED: findings policy not satisfied (or unit faulted).');
+  }
+  lines.push(...unitErrors.slice(0, 20));
+  if (unitErrors.length > 20) {
+    lines.push(`  … ${String(unitErrors.length - 20)} more unit error(s)`);
+  }
+  if (envelope.signals.length > 0 && runFailed) {
+    const sample = envelope.signals.slice(0, 10).map((signal) => {
+      const fileSuffix = signal.filePath === '' ? '' : ` (${signal.filePath})`;
+      return `  finding ${signal.ruleId}: ${signal.message}${fileSuffix}`;
+    });
+    lines.push(...sample);
+    if (envelope.signals.length > 10) {
+      lines.push(`  … ${String(envelope.signals.length - 10)} more finding(s)`);
+    }
+  }
+  return lines;
+}
+
 // persistFitRun removed (Phase 3). The three mode bodies (json/live-fallback/gate)
 // now RETURN a FitRunCompletion (the `session` contribution above) from the
 // handler/live renderer; the host run plane persists it and stamps
@@ -316,10 +351,7 @@ export async function runGateMode(
         reportTo: args.reportTo,
         apiKey: args.apiKey,
       },
-      renderSaveLines: ({ envelope }) => [
-        'Baseline saved (project SQLite store)',
-        `  ${envelope.units.length} check(s), ${envelope.signals.length} finding(s)`,
-      ],
+      renderSaveLines: ({ envelope, runFailed }) => formatFitGateSaveLines(envelope, runFailed),
       renderCompareLines: ({ result }) => renderGateCompareOutput(result).split('\n'),
     });
     return completion;

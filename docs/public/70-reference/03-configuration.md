@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-02
-release: v0.5.0
+last_verified: 2026-07-12
+release: v0.7.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
@@ -346,21 +346,31 @@ readability only. `command` is the `CommandSpec` name, not necessarily the
 shortest CLI alias: for example, the fitness primary command is `fitness` here
 even though users normally type `opensip fit`.
 
-`audit` is built in: `opensip suite run audit` works even when config omits a
-`suites.audit` block. Define `suites.audit` only when you want to replace the
-built-in PR-review workflow. The built-in preset runs changed-scope by default
-when git scope resolves; pass `--full` for a whole-repo run.
+`audit` is built in: `opensip suite run audit` works even when config defines
+no suites at all, and it always runs the same curated definition as top-level
+`opensip audit`. The suite name `audit` is **reserved** for that built-in
+workflow: a configured `suites.audit` fails config validation with a rename
+hint, so the two spellings can never diverge. Use another suite name (for
+example `audit-custom`) for a distinct workflow. The built-in preset runs
+changed-scope by default when Git scope resolves; pass `--full` for a
+whole-repo run.
+
+`agent-context` is also built in. It runs the bundled graph Tool's internal
+inventory, graph-ensure, and test-selection evidence producers serially and
+persists a bounded non-finding `TaskContextManifest` on the parent Run. Pass
+repeatable `--files` on `suite run`; the host propagates them only to the
+declaring selector step. Like `audit`, the `agent-context` name is reserved; use
+a different name for a configured workflow. The built-in preset accepts only
+the exact bundled graph Tool provenance.
+
+These reservations are architectural, not naming advice: see
+[ADR-0111](../../decisions/ADR-0111-built-in-audit-suite-preset.md),
+[ADR-0129](../../decisions/ADR-0129-audit-suite-scope-defaults.md),
+[ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md), and
+[ADR-0159](../../decisions/ADR-0159-reserved-host-command-and-suite-names.md).
 
 ```yaml
 suites:
-  audit:
-    description: Custom audit override
-    steps:
-      - tool: afd68bd3-ff3c-4935-a5b6-76d8fc7a5224
-        name: fitness
-        command: fitness
-        args:
-          recipe: agent-risk
   security:
     description: Run security checks and graph rules
     steps:
@@ -407,6 +417,34 @@ dashboard:
 Validated by the project-config schema and read by the dashboard data path. Unknown dashboard fields are rejected by the strict loader.
 
 ## `graph`
+
+### `graph.auditTestSourceGlobs`
+
+Bounded, project-relative POSIX globs that reclassify matching catalog paths as
+**audit-test sources** at MCP/graph read time ([ADR-0153](../../decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)
+source-role policy). They do **not** rewrite the catalog or infer package privacy.
+
+```yaml
+graph:
+  auditTestSourceGlobs:
+    - packages/test-support/**
+    - '**/__fixtures__/**'
+```
+
+Semantics:
+
+- Effective test role is `inTestFile || matches(auditTestSourceGlobs, filePath)`.
+- Simple minimatch only: no brace expansion, extglob, leading negation, comments,
+  absolute roots, backslashes, or parent traversal.
+- Bounds: at most **64** patterns, **256** characters and **32** wildcard/class
+  tokens per pattern; unique patterns required.
+- Config is loaded once when the MCP command constructs its query context.
+  Editing globs takes effect on the next MCP process/reconnect (or other newly
+  constructed context). There is no live config watcher. Changing globs changes
+  effective source policy and cursor digests without a catalog rebuild.
+- Classification of more than the production distinct-file limit fails closed
+  with a typed resource error.
+
 
 Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](../../../packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
 

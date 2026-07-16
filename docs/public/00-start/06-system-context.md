@@ -1,13 +1,15 @@
 ---
 status: current
-last_verified: 2026-06-15
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-cli sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."
 source-files:
   - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
   - packages/cli/src/index.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
   - packages/cli/src/commands/init.ts
   - packages/cli/src/commands/configure.ts
   - packages/contracts/src/exit-codes.ts
@@ -73,16 +75,34 @@ OpenSIP CLI is a CLI that runs against your project. This doc draws the box arou
                                                   └─────────────────┘
 ```
 
+The diagram shows an initialized project. For a zero-config project, the same
+SQLite/report/log writes go to the managed user-cache runtime instead; by
+default, the CLI writes no implicit OpenSIP state into the project. A path the
+user explicitly supplies for an export, SARIF file, or profile is the exception.
+`opensip init` is the command that initializes the project and changes the local
+runtime location—it is not itself a storage location.
+
 There are exactly four actors:
 
 1. **You.** The engineer running `opensip fit` from a terminal. You read the rendered table, you see the exit code, you click the dashboard link.
 2. **CI.** GitHub Actions, GitLab CI, Buildkite, or whatever — runs `opensip fit` non-interactively and consumes the exit code and (optionally) the SARIF or JSON output.
-3. **The dashboard browser.** When `--open` is passed (or auto-open conditions are met), the CLI launches the user's default browser onto the local HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` (a single rolling file overwritten on each generation). No server, just a static file.
-4. **OpenSIP Cloud (optional).** If `~/.opensip-cli/config.yml` carries an API key, the CLI POSTs the run summary to [opensip.ai](https://opensip.ai) for centralized reporting. Without the key, this side is dead — the cloud is fully optional.
+3. **The dashboard browser.** When an analysis path accepts `--open`, or when
+   the explicit `opensip report` command opens its generated snapshot, the CLI
+   launches the local HTML report from the active runtime root: managed user
+   cache before initialization, project `.runtime` afterward. It is a single
+   rolling file overwritten on each generation. No server, just a static file.
+4. **OpenSIP Cloud (optional).** Native signal sync sends bounded signals only
+   when an API key, compatible HTTPS endpoint, and entitlement are present.
+   Separately, an explicit `--report-to` path sends SARIF to the selected
+   receiver through its own transport and optional authentication; it is not
+   Cloud-entitlement-gated. Neither path uploads the runtime database, logs,
+   catalogs, HTML reports, or raw artifacts.
 
 For normal one-shot analysis commands, there is no fifth actor. Specifically:
-no daemon, no project-external database, no message queue, and no scheduled job;
-opensip-cli runs to completion and exits. The explicit exception is
+no daemon, remote service database, message queue, or scheduled job;
+opensip-cli runs to completion and exits. A zero-config run may use a
+project-specific SQLite database under the local user cache, but that is still
+on the same machine and managed by the CLI. The explicit exception is
 [`opensip mcp`](../70-reference/01-cli-commands.md#mcp--serve-the-call-graph--results-to-agents-over-stdio):
 an external coding agent may spawn the CLI as a stdio MCP server to read the
 project's persisted graph and sessions. See
@@ -94,6 +114,29 @@ Code, and Codex setup.
 ## The on-disk layout
 
 The layout is set by [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts) and is the single source of truth for every consumer (logger, gate, plugin loader, dashboard, sessions store).
+
+### Local runtime selection
+
+OpenSIP has two local customer states and two local runtime roots:
+
+| Customer state | Evidence location | Meaning |
+|---|---|---|
+| **Zero-config project** | `~/.opensip-cli/cache/ephemeral/<project-key>/` | Managed user-cache runtime; persistent on disk but automatically evictable |
+| **Initialized project** | `<project>/opensip-cli/.runtime/` | Project-local, gitignored runtime with no whole-cache eviction policy |
+
+Both locations use the same runtime layout and SQLite schema. The internal
+`ephemeral` name means the cache entry is not attached to an initialized project and may be pruned;
+it does not mean the data disappears when the command exits. The cache defaults
+to removing orphaned entries, entries unused for more than 30 days, then the
+oldest entries under a project-count policy. The active entry is protected while
+up to 50 other survivors are retained.
+
+`opensip init` transitions the customer state from zero-config to initialized
+and writes commit-worthy project intent. On a successful scaffold path, it also
+moves existing cache evidence into the project-local runtime when the cache
+runtime exists and the destination runtime does not. Neither
+local runtime is an archive, and the project-local runtime is not shared through
+Git.
 
 ### Project-level (`<project>/`)
 
@@ -120,34 +163,58 @@ Gitignored (`opensip init` adds the entry to `.gitignore` for you):
 │       │                                             graph_catalog, graph_shard_fragment,
 │       │                                             tool_baseline_entries, tool_baseline_meta)
 │       └── datastore.sqlite-wal / .sqlite-shm    ← WAL sidecar files (auto-managed by SQLite)
-├── reports/latest.html                           ← single rolling HTML report, overwritten each run
+├── reports/latest.html                           ← single rolling HTML report, overwritten each generation
 ├── logs/<YYYY-MM-DD>.jsonl                       ← one log file per local day, all runs append
+├── cache/                                        ← AST, graph, and other rebuildable caches
+├── artifacts/<tool>/                             ← host-owned raw scanner artifacts
+├── profiles/                                     ← optional explicitly requested CPU profiles
 └── plugins/
     ├── fit/node_modules/                         ← project-pinned fit plugins (fit plugin add/sync)
     └── sim/node_modules/                         ← project-pinned sim plugins
 ```
 
-The split rule is simple: anything you author lives in `opensip-cli/`; anything
-the tool generates lives in `opensip-cli/.runtime/`. The runtime dir is
-rebuildable from the source side, so wiping `.runtime/` is always safe — caches
-rebuild and session history is lost. Gate baselines, graph catalogs, sessions,
-and tool state live in the project-local SQLite store under `.runtime/`; run
+The split rule is simple: authored Tools, checks, recipes, and scenarios for an
+initialized project live under `opensip-cli/`; the root config and managed agent
+guidance capture other project intent. Generated local state lives under the
+active runtime root.
+That root is `opensip-cli/.runtime/` for an initialized project and the managed
+user cache for a zero-config project. Caches and catalogs can be rebuilt after a
+runtime is removed, but session history, saved baselines, and other retained
+evidence are lost. Gate baselines, graph catalogs, sessions, and tool state that
+a command mode persists use the selected runtime's SQLite store; run
 `--gate-save` to capture a baseline and `--gate-compare` to ratchet against it.
 See [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md)
 for the schema layout.
 
 ### User-level (`~/.opensip-cli/`)
 
-Cross-project, single file:
+Cross-project user state and managed per-project cache entries:
 
 ```
 ~/.opensip-cli/
-└── config.yml                    ← cloud API key + per-user defaults
+├── config.yml                    ← cloud API key + per-user defaults
+├── update-state.json             ← cached update-notifier state
+├── cache/
+│   ├── entitlement-*.json        ← optional Cloud entitlement decisions
+│   ├── signal-sync-notice        ← optional Cloud privacy-notice marker
+│   └── ephemeral/
+│       └── <project-key>/        ← zero-config runtime (SQLite, reports, logs, artifacts)
+├── plugins/                      ← user-global installed Tool plugins
+└── tools/                        ← user-global authored Tool sidecars
 ```
 
-The user-level dir is intentionally small. Anything project-specific (checks, recipes, plugins) lives in the project, not here. The `~/.opensip-cli/` dir exists so every project on your machine can share one cloud API key.
+The config, update state, Cloud cache markers, global plugins, and authored Tool
+sidecars are user-level or cross-project state. The `cache/ephemeral/` runtime
+entries are project-specific but live outside every repository, so a first run
+can preserve local evidence without writing implicit state into the project.
+Project checks, recipes, scenarios, and project-pinned plugins still belong in
+the initialized project—not in the user cache.
 
-`opensip configure` is the command that creates and edits this file. `opensip uninstall` deletes the whole `~/.opensip-cli/` directory.
+`opensip configure` creates and edits the user config file. `opensip uninstall`
+deletes the whole `~/.opensip-cli/` directory, including all zero-config cache
+entries; `opensip uninstall --project <path>` can remove only one project's
+generated local runtime state. Removing a runtime also removes its retained
+history, baselines, tool state, and other evidence.
 
 ---
 
@@ -174,7 +241,7 @@ The `--gate-compare` flow uses the same exit codes: `0` if no new violations vs.
 
 `stdout` carries the human-readable output (tables) or the machine-readable output (JSON / SARIF), gated by `--json` and `--sarif`. **Mixing the two is forbidden:** if `--json` is set, every renderer emits JSON or nothing. This rule exists so CI tooling can `opensip fit --json | jq …` without hitting interleaved table fragments.
 
-`stderr` carries logs — structured JSON lines tagged with `evt`, `module`, and a correlation id (`runId`, format `RUN_<ulid>`). The same lines are mirrored to `<project>/opensip-cli/.runtime/logs/<YYYY-MM-DD>.jsonl` (one log file per local day, shared across runs); filter by `.runId` with `jq` to isolate one run.
+`stderr` carries logs — structured JSON lines tagged with `evt`, `module`, and a correlation id (`runId`, format `RUN_<ulid>`). The same lines are mirrored to `<runtime-root>/logs/<YYYY-MM-DD>.jsonl` (one log file per local day, shared across runs); filter by `.runId` with `jq` to isolate one run. The active runtime root follows the zero-config/initialized selection above.
 
 The exit code is your gate. The stdout shape is your data. The stderr stream is your debugger.
 

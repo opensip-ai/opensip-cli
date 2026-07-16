@@ -33,7 +33,7 @@ import {
   type CloneCandidate,
   type FunctionKind,
 } from '@opensip-cli/clone-detection';
-import { getMeter, logger, withSpan } from '@opensip-cli/core';
+import { getMeter, isPathInside, logger, withSpan } from '@opensip-cli/core';
 import { getSharedSourceFile, stripComments } from '@opensip-cli/lang-typescript';
 import ts from 'typescript';
 
@@ -275,7 +275,8 @@ function resolveParentPackage(
   cache: Map<string, string | undefined>,
 ): string | undefined {
   const parent = dirname(dir);
-  return dir !== cwd && parent !== dir && dir.startsWith(cwd)
+  // Containment must not use naive `startsWith` (e.g. `/foo` vs `/foobar`).
+  return dir !== cwd && parent !== dir && isPathInside(dir, cwd)
     ? resolvePackage(parent, cwd, cache)
     : undefined;
 }

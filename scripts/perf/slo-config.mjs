@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -23,7 +24,7 @@ export function normalizeSloConfig(raw, sourcePath = '<memory>') {
   const profiles = normalizeRecord(raw.profiles, 'profiles');
   const budgets = normalizeBudgetList(raw.budgets, tiers, scenarios);
 
-  return {
+  const normalized = {
     version: 1,
     sourcePath,
     sampleIntervalMs,
@@ -36,6 +37,35 @@ export function normalizeSloConfig(raw, sourcePath = '<memory>') {
       budgets.map((budget) => [budgetKey(budget.tier, budget.scenario), budget]),
     ),
   };
+  return {
+    ...normalized,
+    fingerprint: performanceSloConfigFingerprint(normalized),
+  };
+}
+
+/** Stable identity for the semantic benchmark configuration (paths and Maps excluded). */
+export function performanceSloConfigFingerprint(config) {
+  const semanticConfig = {
+    version: config.version,
+    sampleIntervalMs: config.sampleIntervalMs,
+    tailBytes: config.tailBytes,
+    profiles: config.profiles,
+    tiers: config.tiers,
+    scenarios: config.scenarios,
+    budgets: config.budgets,
+  };
+  return createHash('sha256').update(stableJson(semanticConfig)).digest('hex');
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map((entry) => stableJson(entry)).join(',')}]`;
+  if (isRecord(value)) {
+    return `{${Object.keys(value)
+      .sort((left, right) => left.localeCompare(right))
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function normalizeRecord(value, name) {

@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { logger } from '../../lib/logger.js';
-import { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from '../../tools/manifest.js';
+import {
+  MIN_SUPPORTED_PLUGIN_API_VERSION,
+  PLUGIN_API_VERSION,
+  type RawToolPluginManifest,
+} from '../../tools/manifest.js';
+import { hashManifest } from '../manifest-loader-helpers.js';
 import { admitTool, loadToolManifest, PROJECT_LOCAL_MANIFEST_FILE } from '../manifest-loader.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -481,6 +486,70 @@ function manifest(overrides: Partial<{ apiVersion: number | undefined; id: strin
     commands: [{ name: 'audit', description: 'Run an audit' }],
   };
 }
+
+const LEGACY_HASH_MANIFEST = {
+  kind: 'tool',
+  id: 'audit',
+  identity: { name: 'audit' },
+  name: 'Audit',
+  version: '1.2.3',
+  apiVersion: 1,
+  commands: [{ name: 'audit', description: 'Run an audit' }],
+} as const satisfies RawToolPluginManifest;
+
+describe('hashManifest compatibility', () => {
+  it('preserves the fixed historical hash when evidence production is not declared', () => {
+    expect(hashManifest(LEGACY_HASH_MANIFEST)).toBe(
+      'e56822d24cbbd358224fd18e26fe43f8a2f1d5d6e1106aef430bba1393a209dc',
+    );
+  });
+
+  it('fingerprints explicit evidence production without null-padding absent manifests', () => {
+    const absentHash = hashManifest(LEGACY_HASH_MANIFEST);
+    const falseHash = hashManifest({
+      ...LEGACY_HASH_MANIFEST,
+      commands: [
+        {
+          ...LEGACY_HASH_MANIFEST.commands[0],
+          producesEvidenceSnapshot: false,
+        },
+      ],
+    });
+    const trueHash = hashManifest({
+      ...LEGACY_HASH_MANIFEST,
+      commands: [
+        {
+          producesEvidenceSnapshot: true,
+          description: 'Run an audit',
+          name: 'audit',
+        },
+      ],
+    });
+
+    expect(falseHash).toBe('3c499c1b8a8548d54a9bd59019187cdd9902d7ead4d242c96a4d20d39d6c966e');
+    expect(trueHash).toBe('c5b9cd56f02c55d024951d540479998659fa0b696061a491e5ce1abafeadf570');
+    expect(new Set([absentHash, falseHash, trueHash])).toHaveLength(3);
+  });
+
+  it('continues to omit the optional command-shell fields excluded by the legacy hash', () => {
+    const extendedCommandShell: RawToolPluginManifest = {
+      ...LEGACY_HASH_MANIFEST,
+      commands: [
+        {
+          ...LEGACY_HASH_MANIFEST.commands[0],
+          visibility: 'internal',
+          parent: 'parent',
+          commonFlags: ['json'],
+          scope: 'none',
+          output: 'command-result',
+          producesVerdict: true,
+        },
+      ],
+    };
+
+    expect(hashManifest(extendedCommandShell)).toBe(hashManifest(LEGACY_HASH_MANIFEST));
+  });
+});
 
 /** Write a single-capability `disc` tool manifest carrying the given `discovery` field. */
 function withCapability(discovery: unknown): void {

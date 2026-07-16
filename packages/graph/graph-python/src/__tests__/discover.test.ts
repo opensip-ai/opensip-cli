@@ -26,7 +26,7 @@ describe('lang-python discover.ts — branches', () => {
   });
 
   it('returns undefined configPathAbs when no pyproject.toml or setup.py exists', () => {
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeUndefined();
     expect(out.files).toEqual([]);
   });
@@ -34,14 +34,14 @@ describe('lang-python discover.ts — branches', () => {
   it('uses pyproject.toml when present (preferred over setup.py)', () => {
     writeFileSync(join(dir, 'pyproject.toml'), '[project]\nname = "p"\n', 'utf8');
     writeFileSync(join(dir, 'setup.py'), 'from setuptools import setup\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('pyproject.toml');
   });
 
   it('falls back to setup.py when pyproject.toml absent', () => {
     writeFileSync(join(dir, 'setup.py'), 'from setuptools import setup\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('setup.py');
   });
@@ -49,13 +49,21 @@ describe('lang-python discover.ts — branches', () => {
   it('honors a configPathOverride that exists', () => {
     const override = join(dir, 'custom.toml');
     writeFileSync(override, '[project]\n', 'utf8');
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'custom.toml' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'custom.toml',
+    });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('custom.toml');
   });
 
   it('returns the override path verbatim when the override does not exist', () => {
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'nonexistent.toml' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'nonexistent.toml',
+    });
     expect(out.configPathAbs).toBeDefined();
     expect(out.configPathAbs).toContain('nonexistent.toml');
   });
@@ -67,7 +75,7 @@ describe('lang-python discover.ts — branches', () => {
     writeFileSync(join(dir, '.venv/excluded.py'), 'pass\n', 'utf8');
     mkdirSync(join(dir, '__pycache__'), { recursive: true });
     writeFileSync(join(dir, '__pycache__/cached.py'), 'pass\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.files.length).toBe(2);
     expect(out.files.every((f) => !f.includes('/.venv/') && !f.includes('/__pycache__/'))).toBe(
       true,

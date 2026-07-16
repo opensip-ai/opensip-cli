@@ -15,7 +15,7 @@ import {
   type TargetConventionsView,
   type TargetResolver,
 } from '@opensip-cli/core';
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { parseKnipOutput } from '../checks/quality/code-structure/dead-code.js';
@@ -61,7 +61,7 @@ function targetResolver(conventions: TargetConventionsView): TargetResolver {
 }
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
 });
 
 // =============================================================================

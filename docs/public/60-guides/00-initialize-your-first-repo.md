@@ -1,13 +1,16 @@
 ---
 status: current
-last_verified: 2026-07-07
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Initialize your first repo"
 audience: [getting-started, ci-integrators]
 purpose: "Task-led guide for running opensip init, understanding the scaffold, and getting to the first useful run."
 source-files:
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/commands/init/scaffold-writer.ts
   - packages/cli/src/commands/host-command-specs.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
   - packages/fitness/engine/src/tool.ts
   - packages/simulation/engine/src/tool.ts
 related-docs:
@@ -46,7 +49,8 @@ Language detection is marker-based:
 | Java | `pom.xml`, `build.gradle` |
 | C / C++ | `CMakeLists.txt`, `Makefile` |
 
-If your repo has multiple markers, either let `init` scaffold for all detected languages or pass the list explicitly:
+If your repo has multiple detected languages, Init reports the set and requires
+you to pass the intended list explicitly:
 
 ```bash
 opensip init --language typescript,python
@@ -55,13 +59,20 @@ opensip init --language typescript,python
 Before you scaffold, the built-in analysis commands can still run:
 
 ```bash
-opensip suite run audit
+opensip audit
 ```
 
 In a git repo, the built-in audit suite runs changed-scope by default and prints
 the resolved scope, for example `Scope: changed (working tree, 14 files)`. Use
-`opensip suite run audit --full` when you want the whole repo. Outside git, the
+`opensip audit --full` when you want the whole repo. Outside git, the
 same command falls back to full scope with one suite-level notice.
+
+Use `opensip audit --open` for a human Change Impact report or `opensip audit
+--json` for machine output. Browser launch is suppressed for JSON, CI, non-TTY,
+and remote-shell execution. Configured multi-tool workflows continue to use
+`opensip suite run <name>`; the suite name `audit` is reserved for the built-in
+review (config validation rejects `suites.audit`), so name custom suites
+something else.
 
 For lower-level inspection:
 
@@ -70,9 +81,13 @@ opensip fit
 opensip graph --list-files
 ```
 
-In that no-init mode, the CLI synthesizes a validated in-memory config from the
-same language markers and writes no project files. Runtime state goes to your
-user cache until you adopt the project with `opensip init`.
+For a **zero-config project**, the CLI synthesizes a validated in-memory config from
+the same language markers and writes no implicit OpenSIP state into the project.
+An explicitly requested export, SARIF, or profile path is the exception. Runtime state goes to a
+managed user-cache entry. It is real file-backed storage that survives commands
+and reboots, but it is eligible for automatic eviction when the project is
+gone, the entry is stale, or the cache exceeds its project limit. Do not treat
+it as permanent history.
 
 ## 3. Scaffold
 
@@ -95,8 +110,28 @@ opensip-cli/
 
 It also adds `opensip-cli/.runtime/` to `.gitignore`. Commit the config and the authored content under `opensip-cli/`. Do not commit `.runtime/`; it holds local sessions, reports, logs, caches, baselines, and the SQLite datastore.
 
-If you ran a no-init command first, `init` moves that rebuildable runtime state
-into `opensip-cli/.runtime/` when the project runtime does not already exist.
+If you ran a zero-config command first, a successful Init scaffold moves that
+existing runtime state into `opensip-cli/.runtime/` when the cache runtime
+exists and the project runtime does not.
+
+### What initialization changes
+
+`init` is the command that changes project state; it is not the name of a
+storage tier.
+
+| Before `opensip init` | After `opensip init` |
+|---|---|
+| **Zero-config mode** | **Initialized project mode** |
+| Evidence is under the user cache | Evidence is under the project-local, gitignored `.runtime/` |
+| Config is synthesized in memory | Config and authored guardrails are explicit and can be committed |
+| Only commands declared first-run capable are available | The complete project/config/plugin surface is available |
+| The whole cache entry is automatically evictable | There is no whole-project cache eviction policy |
+
+Both modes use the same local SQLite and runtime-file formats. Initialization
+persists project intent and attaches local evidence to the project; it does not
+turn that evidence into permanent or team-shared storage. Normal session and
+artifact retention still applies, and teammates receive the committed config
+and authored guardrails—not your gitignored `.runtime/` history.
 
 `graph` does not scaffold a directory because graph rules and adapters are package-level extensions, not project-local files created by `init`.
 
@@ -107,6 +142,24 @@ opensip fit --recipe example
 ```
 
 That run proves the project wiring end to end: config loading, target detection, plugin discovery, recipe selection, check execution, rendering, and exit-code policy.
+
+### Optional tools after a pristine init
+
+A successful **pristine** `opensip init` (first scaffold for a project with at
+least one selected language) may also print an **Optional tools for this project
+(not installed)** footer after the **Try it** block. Rows are language-relevant
+first-party adapter recommendations from the same catalog as
+`opensip tools list --available`: multi-language union plus polyglot adapters,
+already-installed adapters omitted, exact install commands only.
+
+- Advice only — `init` never prompts, installs, or executes adapter code.
+- Repeat init, `--keep`, `--remove`, recovery, and error paths do **not** emit
+  recommendations.
+- With `--json`, the same rows appear under `data.optionalTools` (field absent
+  when ineligible or nothing remains to recommend).
+
+See the [init optional-tools reference](../70-reference/01-cli-commands.md#optional-tools-after-pristine-init)
+for the full field list and eligibility rules.
 
 If you also want to smoke-test the scaffolded simulation files:
 

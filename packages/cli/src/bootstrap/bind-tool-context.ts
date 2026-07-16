@@ -8,32 +8,13 @@
  * cross-tool keys before they reach persistence.
  */
 
-import {
-  PluginIncompatibleError,
-  resolveToolCommands,
-  resolveToolHooks,
-  type Tool,
-  type ToolCliContext,
-} from '@opensip-cli/core';
+import { PluginIncompatibleError, type Tool, type ToolCliContext } from '@opensip-cli/core';
+
+import { toolOwnedKeys } from './tool-owned-keys.js';
+
+export { toolOwnedKeys } from './tool-owned-keys.js';
 
 type BoundToolCliContext = ToolCliContext;
-
-function primaryCommandName(tool: Tool): string | undefined {
-  const commands = resolveToolCommands(tool);
-  return tool.commandSpecs?.[0]?.name ?? commands[0]?.name;
-}
-
-export function toolOwnedKeys(tool: Tool): ReadonlySet<string> {
-  return new Set(
-    [
-      tool.metadata.id,
-      tool.metadata.name,
-      primaryCommandName(tool),
-      resolveToolHooks(tool).sessionReplay?.tool,
-      resolveToolHooks(tool).config?.namespace,
-    ].filter((value): value is string => typeof value === 'string' && value.length > 0),
-  );
-}
 
 function describeTool(tool: Tool): string {
   return tool.metadata.name || tool.metadata.id;
@@ -74,7 +55,6 @@ function wrapHostPlanes(
         assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.getGovernanceState');
         return governance.getGovernanceState(toolId);
       },
-      listForProject: governance.listForProject.bind(governance),
       queryAudit: (toolId, filter) => {
         assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.governance.queryAudit');
         return governance.queryAudit(toolId, filter);
@@ -109,7 +89,6 @@ function wrapHostPlanes(
         assertOwnToolKey(tool, allowed, toolId, 'hostPlanes.audit.query');
         return audit.query(toolId, filter);
       },
-      ...(audit.exportForCloud ? { exportForCloud: audit.exportForCloud.bind(audit) } : {}),
     };
   }
 

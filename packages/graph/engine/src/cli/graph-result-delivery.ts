@@ -82,7 +82,8 @@ function envelopeFor(
 
 /**
  * Dispatch a completed graph run to its output mode and return the run outcome
- * for signal delivery and session persistence (undefined for plain `--json`).
+ * for signal delivery and session persistence (undefined for plain `--json`,
+ * unless the composition root requested the envelope for a sibling artifact).
  */
 export async function dispatchGraphResult(
   opts: GraphCommandOptions,
@@ -192,13 +193,17 @@ export async function deliverGraphResult(
     suppressed: suppressedCount,
   });
   // Plain `--json` delivers INLINE in `renderGraphResult` (H2 exit parity) and
-  // returns `undefined` here so the composition root does not deliver a second
-  // time. A `--workspace` child (`graph <unit> --json`) is additionally marked
-  // by the OPENSIP_GRAPH_WORKSPACE_CHILD sentinel, which suppresses that inline
-  // delivery so only the parent aggregates (no per-unit egress/verdict — audit
-  // P1-2). Every other mode (default render, `--report-to`) returns the outcome
-  // for root delivery; only the non-export render path carries a `session`.
-  return opts.json === true ? undefined : { envelope, ...(session ? { session } : {}) };
+  // normally returns `undefined` so the composition root does not deliver a
+  // second time. When the root also owns a side-file artifact (`--sarif`), it
+  // explicitly asks to retain the already-delivered envelope; its egress path
+  // still skips JSON, while the side-file sink consumes this return value. A
+  // `--workspace` child has no such request and retains the historical
+  // undefined outcome. Every other mode returns the outcome for root delivery;
+  // only the non-export render path carries a `session`.
+  if (opts.json !== true) {
+    return { envelope, ...(session ? { session } : {}) };
+  }
+  return opts.returnJsonEnvelope === true ? { envelope } : undefined;
 }
 
 /**

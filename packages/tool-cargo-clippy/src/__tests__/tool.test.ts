@@ -63,7 +63,8 @@ describe('cargo-clippy tool — identity + metadata', () => {
   it('carries the stable UUID, name, and description', () => {
     expect(tool.metadata.id).toBe(CARGO_CLIPPY_STABLE_ID);
     expect(tool.metadata.name).toBe('cargo-clippy');
-    expect(tool.metadata.description).toBe('Rust lint diagnostics via cargo clippy');
+    expect(tool.metadata.description).toMatch(/cargo clippy/i);
+    expect(tool.metadata.description).toMatch(/CARGO_TARGET_DIR|warm target/i);
   });
 
   it('defaults to the message-hash fingerprint strategy', () => {
@@ -99,13 +100,19 @@ describe('cargo-clippy tool — commandSpecs', () => {
 });
 
 describe('cargo-clippy tool — scan helper', () => {
-  it('builds the clippy JSON-message argv across all targets/features', () => {
-    const ctx = { projectRoot: '/proj' } as unknown as AdapterRunContext;
+  it('builds the clippy JSON-message argv with a cold per-run target dir', () => {
+    const ctx = {
+      projectRoot: '/proj',
+      artifactPath: (name: string) => `/proj/.runtime/artifacts/cargo-clippy/run1/${name}`,
+    } as unknown as AdapterRunContext;
     expect(buildScanArgs(ctx)).toEqual([
       'clippy',
+      '--offline',
       '--message-format=json',
       '--all-targets',
       '--all-features',
+      '--target-dir',
+      '/proj/.runtime/artifacts/cargo-clippy/run1/cargo-target',
     ]);
   });
 });

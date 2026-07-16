@@ -38,8 +38,9 @@ if (!mode || !baseDir) {
 const profilingUrl = new URL('../../../../dist/telemetry/profiling.js', import.meta.url);
 const { startProfiling, stopProfiling } = await import(profilingUrl.href);
 
-// Open the profiling gate for this child.
-process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318/v1/traces';
+// Open only the local profiling gate. The e2e path deliberately has no OTLP
+// endpoint, proving collector-free profile generation.
+delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 process.env.OPENSIP_PROFILING = '1';
 
 // Profiles land under <baseDir>/opensip-cli/.runtime/profiles when project-scoped
@@ -80,7 +81,7 @@ async function waitFor(pred, ms = 8000) {
   return true;
 }
 
-startProfiling(scope, command);
+await startProfiling(scope, command);
 
 // The labels sidecar is written from the async Profiler.start callback.
 if (!(await waitFor(() => existsSync(profilesDir) && hasArtifact('.labels.json')))) {
@@ -96,7 +97,7 @@ if (!(accumulator > 0)) {
   process.exit(4);
 }
 
-stopProfiling(scope);
+await stopProfiling(scope);
 
 // The .cpuprofile is written from the async Profiler.stop callback.
 if (!(await waitFor(() => hasArtifact('.cpuprofile')))) {

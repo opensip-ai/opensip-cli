@@ -9,6 +9,7 @@ describe('run ledger schema', () => {
     const { indexes } = getTableConfig(runs);
     expect(indexes.map((idx) => idx.config.name).sort()).toEqual([
       'runs_completed_at_idx',
+      'runs_cwd_name_completed_at_idx',
       'runs_legacy_suite_run_id_idx',
       'runs_source_completed_at_idx',
     ]);

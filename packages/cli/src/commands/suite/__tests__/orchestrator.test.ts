@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import {
   DEFAULT_BASELINE_IDENTITY,
   EXIT_CODES,
+  buildTaskContextFileScope,
   mapToolErrorToExitCode,
   type SignalEnvelope,
   type SuiteStepSummary,
@@ -20,16 +21,26 @@ import {
   TimeoutError,
   ValidationError,
   defineCommand,
+  ok,
   runWithScope,
+  type EvidenceSnapshotContribution,
   type Tool,
   type ToolCliContext,
   type ToolError,
   type ToolProvenance,
+  type ToolRunCompletion,
 } from '@opensip-cli/core';
+import { DataStoreFactory } from '@opensip-cli/datastore';
+import { RunRepo } from '@opensip-cli/session-store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeDispatchHostCtx } from '../../../__tests__/harness/dispatch-host-ctx.js';
-import { BUILT_IN_GRAPH_TOOL_ID } from '../built-in-suites.js';
+import {
+  BUILT_IN_AGENT_CONTEXT_PLANES,
+  BUILT_IN_AGENT_CONTEXT_SUITE,
+  BUILT_IN_GRAPH_PACKAGE_NAME,
+  BUILT_IN_GRAPH_TOOL_ID,
+} from '../built-in-suites.js';
 import { deriveSuiteAggregate, runSuite } from '../orchestrator.js';
 
 const dispatchSpy = vi.hoisted(() => vi.fn());
@@ -44,10 +55,59 @@ vi.mock('../../../bootstrap/load-tool-capabilities.js', () => ({
 const TOOL_ID = '00000000-0000-4000-8000-000000000111';
 const OTHER_TOOL_ID = '00000000-0000-4000-8000-000000000222';
 const EXTERNAL_TOOL_ID = '00000000-0000-4000-8000-000000000333';
+const CONTEXT_INVENTORY_ID = `i1:${'1'.repeat(64)}`;
+const CONTEXT_GRAPH_ID = `g1:${'2'.repeat(64)}`;
+const CONTEXT_SELECTION_ID = `ts1:${'3'.repeat(64)}`;
 const tempDirs: string[] = [];
+
+function contextSnapshotId(kind: (typeof BUILT_IN_AGENT_CONTEXT_PLANES)[number]['kind']): string {
+  if (kind === 'inventory') return CONTEXT_INVENTORY_ID;
+  if (kind === 'graph') return CONTEXT_GRAPH_ID;
+  return CONTEXT_SELECTION_ID;
+}
+
+function contextSnapshotKind(id: string): 'inventory' | 'test-selection' | undefined {
+  if (id === CONTEXT_INVENTORY_ID) return 'inventory';
+  if (id === CONTEXT_SELECTION_ID) return 'test-selection';
+  return undefined;
+}
+
+function contextPointerGraphScope(options: { readonly evictAfterValidation?: boolean } = {}) {
+  let inventoryReads = 0;
+  return {
+    contextCatalog: {
+      generationIdentity: () => ok(CONTEXT_GRAPH_ID),
+    },
+    contextSnapshots: {
+      get: (id: string) => {
+        const kind = contextSnapshotKind(id);
+        let evicted = false;
+        if (kind === 'inventory') {
+          inventoryReads += 1;
+          evicted = options.evictAfterValidation === true && inventoryReads > 1;
+        }
+        if (kind !== undefined && !evicted) {
+          return {
+            id,
+            kind,
+            schemaVersion: 1,
+            producerVersion: '0.6.0',
+            createdAt: '2026-07-13T00:00:00.000Z',
+            sourceIdentity: 'fixture-source',
+            configIdentity: 'fixture-config',
+            byteCount: 2,
+            payload: {},
+          };
+        }
+        return null;
+      },
+    },
+  };
+}
 
 function tool(id: string, name: string, specs: Tool['commandSpecs']): Tool {
   return {
+    identity: { name },
     metadata: {
       id,
       name,
@@ -75,6 +135,97 @@ function helpCommand(
     producesVerdict: true,
     handler,
   });
+}
+
+function evidenceCommand(
+  name: string,
+  handler: (opts: unknown, cli: ToolCliContext) => unknown,
+): NonNullable<Tool['commandSpecs']>[number] {
+  return defineCommand<unknown, ToolCliContext>({
+    name,
+    description: 'fixture evidence producer',
+    commonFlags: [],
+    scope: 'project',
+    output: 'raw-stream',
+    rawStreamReason: 'host-orchestrated-evidence',
+    producesEvidenceSnapshot: true,
+    handler,
+  });
+}
+
+function contextContribution(
+  kind: (typeof BUILT_IN_AGENT_CONTEXT_PLANES)[number]['kind'],
+  command: string,
+): ToolRunCompletion {
+  const snapshotId = contextSnapshotId(kind);
+  const contribution: EvidenceSnapshotContribution = {
+    schemaVersion: 1,
+    kind,
+    snapshotId,
+    snapshotSchemaVersion: kind === 'graph' ? 3 : 1,
+    producer: { toolId: BUILT_IN_GRAPH_TOOL_ID, command, version: '0.6.0' },
+    status: 'rebuilt',
+    freshness: { status: 'current' },
+    coverage: { status: 'complete', items: 1, total: 1 },
+    ...(kind === 'test-selection'
+      ? {
+          inputs: [
+            { kind: 'inventory', snapshotId: CONTEXT_INVENTORY_ID },
+            { kind: 'graph', snapshotId: CONTEXT_GRAPH_ID },
+          ],
+        }
+      : {}),
+  };
+  return { evidenceSnapshots: [contribution] };
+}
+
+function contextGraphTool(observeOpts?: (opts: Readonly<Record<string, unknown>>) => void): Tool {
+  const commandSpecs = BUILT_IN_AGENT_CONTEXT_PLANES.map((plane) =>
+    defineCommand<unknown, ToolCliContext>({
+      name: plane.command,
+      visibility: 'internal',
+      description: 'fixture context producer',
+      commonFlags: ['cwd'],
+      ...(plane.kind === 'test-selection'
+        ? {
+            options: [
+              {
+                flag: '--files',
+                value: '<path>',
+                description: 'files',
+                arrayDefault: [],
+                parse: (raw: string, prior: unknown) => [
+                  ...(Array.isArray(prior) ? prior : []),
+                  raw,
+                ],
+              },
+            ],
+          }
+        : {}),
+      staticHandler: {
+        package: BUILT_IN_GRAPH_PACKAGE_NAME,
+        path: 'packages/graph/engine/src/cli/context/context-command-specs.ts',
+        declaration: plane.declaration,
+      },
+      scope: 'project',
+      output: 'raw-stream',
+      rawStreamReason: 'host-orchestrated-evidence',
+      producesEvidenceSnapshot: true,
+      handler: (opts) => {
+        observeOpts?.(opts as Readonly<Record<string, unknown>>);
+        return contextContribution(plane.kind, plane.command);
+      },
+    }),
+  );
+  return {
+    ...tool(BUILT_IN_GRAPH_TOOL_ID, 'graph', commandSpecs),
+    metadata: {
+      id: BUILT_IN_GRAPH_TOOL_ID,
+      name: 'graph',
+      version: '0.6.0',
+      description: 'fixture',
+    },
+  };
 }
 
 function signalEnvelope(input: {
@@ -179,6 +330,389 @@ function makeChangedGitFixture(): string {
 }
 
 describe('runSuite', () => {
+  it('does not grant a forged configured agent-context source built-in aggregation authority', async () => {
+    const spec = helpCommand('fit', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
+
+    const result = await runWithScope(new RunScope({ toolProvenance: [] }), () =>
+      runSuite({
+        name: 'agent-context',
+        suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
+        source: 'configured',
+        tools: [tool(TOOL_ID, 'fitness', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: { files: ['src/configured-suite-input.ts'] },
+      }),
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODES.SUCCESS);
+    expect(result.contextManifest).toBeUndefined();
+    expect(result.reviewBrief).toBeDefined();
+  });
+
+  it.each([
+    { suiteOpts: { changed: true }, defaultChanged: false },
+    { suiteOpts: { since: 'origin/main' }, defaultChanged: false },
+    { suiteOpts: {}, defaultChanged: true },
+  ])(
+    'rejects deferred Git selectors for the built-in agent-context suite',
+    async ({ suiteOpts, defaultChanged }) => {
+      await expect(
+        runWithScope(new RunScope({}), () =>
+          runSuite({
+            name: 'agent-context',
+            suite: BUILT_IN_AGENT_CONTEXT_SUITE,
+            source: 'built-in',
+            tools: [contextGraphTool()],
+            ctx: makeDispatchHostCtx().ctx,
+            runActionHooks: {},
+            suiteOpts,
+            defaultChanged,
+          }),
+        ),
+      ).rejects.toMatchObject({
+        name: 'ConfigurationError',
+        code: 'CONFIG.SUITE.CONTEXT_SELECTOR_UNSUPPORTED',
+      });
+    },
+  );
+
+  it('fails with a typed configuration error when the built-in context root cannot be canonicalized', async () => {
+    const graph = contextGraphTool();
+    const scope = new RunScope({
+      toolProvenance: [
+        {
+          source: 'bundled',
+          id: 'graph',
+          stableId: BUILT_IN_GRAPH_TOOL_ID,
+          version: '0.6.0',
+          packageName: BUILT_IN_GRAPH_PACKAGE_NAME,
+          manifestHash: 'fixture-manifest-hash',
+        },
+      ],
+    });
+    Object.assign(scope, {
+      projectContext: {
+        projectRoot: join(makeTempDir('suite-orchestrator-missing-'), 'missing'),
+        scope: 'project',
+      },
+    });
+
+    await expect(
+      runWithScope(scope, () =>
+        runSuite({
+          name: 'agent-context',
+          suite: BUILT_IN_AGENT_CONTEXT_SUITE,
+          source: 'built-in',
+          tools: [graph],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {},
+          suiteOpts: {},
+        }),
+      ),
+    ).rejects.toMatchObject({
+      name: 'ConfigurationError',
+      code: 'CONFIG.SUITE.CONTEXT_PROJECT_ROOT_INVALID',
+    });
+  });
+
+  it('builds trusted context only from exact bundled contributions without persisting or logging file args', async () => {
+    const physicalCwd = makeChangedGitFixture();
+    const linkParent = makeTempDir('suite-orchestrator-link-');
+    const cwd = join(linkParent, 'project-link');
+    symlinkSync(physicalCwd, cwd, process.platform === 'win32' ? 'junction' : 'dir');
+    const privatePath = 'src/private-customer-task.ts';
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const observedCwds: unknown[] = [];
+    const info = vi.fn();
+    const warn = vi.fn();
+    const error = vi.fn();
+    const graph = contextGraphTool((opts) => observedCwds.push(opts.cwd));
+    const scope = new RunScope({
+      datastore: () => datastore,
+      logger: { info, warn, error, debug: vi.fn() },
+      toolProvenance: [
+        {
+          source: 'bundled',
+          id: 'graph',
+          stableId: BUILT_IN_GRAPH_TOOL_ID,
+          version: '0.6.0',
+          packageName: BUILT_IN_GRAPH_PACKAGE_NAME,
+          manifestHash: 'fixture-manifest-hash',
+        },
+      ],
+    });
+    Object.assign(scope, {
+      projectContext: { projectRoot: cwd, scope: 'project' },
+      graph: contextPointerGraphScope(),
+    });
+    let snapshots: readonly EvidenceSnapshotContribution[] = [];
+    const runActionHooks = {
+      resetRun: () => {
+        snapshots = [];
+      },
+      completeRun: (value: unknown) => {
+        snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
+      },
+      currentEvidenceSnapshots: () => snapshots,
+    };
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'agent-context',
+          suite: BUILT_IN_AGENT_CONTEXT_SUITE,
+          source: 'built-in',
+          tools: [graph],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks,
+          suiteOpts: { cwd, files: [privatePath] },
+        }),
+      );
+
+      expect(result.contextManifest).toMatchObject({
+        readiness: 'ready',
+        inventoryIdentity: CONTEXT_INVENTORY_ID,
+        graphIdentity: CONTEXT_GRAPH_ID,
+        fileScope: buildTaskContextFileScope([privatePath]),
+      });
+      expect(result.contextManifest?.planes).toHaveLength(3);
+      expect(JSON.stringify(result)).not.toContain(privatePath);
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '');
+      expect(persisted).toHaveLength(3);
+      expect(persisted.every((step) => step.effectiveArgs?.files === undefined)).toBe(true);
+      expect(observedCwds).toEqual(Array.from({ length: 3 }, () => realpathSync(cwd)));
+      expect(new RunRepo(datastore).getRun(result.runId ?? '')?.cwd).toBe(realpathSync(cwd));
+      const serializedLogs = JSON.stringify([info.mock.calls, warn.mock.calls, error.mock.calls]);
+      expect(serializedLogs).not.toContain(privatePath);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('withholds a ready ledger when a pointer disappears before the locked commit check', async () => {
+    const cwd = makeChangedGitFixture();
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const graph = contextGraphTool();
+    const scope = new RunScope({
+      datastore: () => datastore,
+      toolProvenance: [
+        {
+          source: 'bundled',
+          id: 'graph',
+          stableId: BUILT_IN_GRAPH_TOOL_ID,
+          version: '0.6.0',
+          packageName: BUILT_IN_GRAPH_PACKAGE_NAME,
+          manifestHash: 'fixture-manifest-hash',
+        },
+      ],
+    });
+    Object.assign(scope, {
+      projectContext: { projectRoot: cwd, scope: 'project' },
+      graph: contextPointerGraphScope({ evictAfterValidation: true }),
+    });
+    let snapshots: readonly EvidenceSnapshotContribution[] = [];
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'agent-context',
+          suite: BUILT_IN_AGENT_CONTEXT_SUITE,
+          source: 'built-in',
+          tools: [graph],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {
+            resetRun: () => {
+              snapshots = [];
+            },
+            completeRun: (value: unknown) => {
+              snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
+            },
+            currentEvidenceSnapshots: () => snapshots,
+          },
+          suiteOpts: { cwd, files: ['src/a.ts'] },
+        }),
+      );
+
+      expect(result).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        contextManifest: {
+          readiness: 'unavailable',
+          reasonCodes: expect.arrayContaining(['ledger-persist-failed']),
+        },
+      });
+      expect(result.runId).toBeUndefined();
+      expect(new RunRepo(datastore).listRuns()).toEqual([]);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('returns the authoritative persisted run ID from the single ledger transaction', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const spec = helpCommand('fit', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'audit',
+          suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
+          source: 'built-in',
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {},
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      const runs = new RunRepo(datastore).listRuns();
+      expect(runs).toHaveLength(1);
+      expect(result.runId).toBe(runs[0]?.id);
+      expect(runs[0]?.legacySuiteRunId).toBe(result.suiteRunId);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('faults a verdict step that returns undeclared snapshots and withholds both output legs', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const completion = contextContribution('inventory', 'verdict-with-snapshot');
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'verdict-with-snapshot',
+      description: 'misdeclared fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'raw-stream',
+      rawStreamReason: 'host-orchestrated-evidence',
+      producesVerdict: true,
+      handler: (_opts, cli) => {
+        emitPassingEvidence(cli);
+        return completion;
+      },
+    });
+    let snapshots: readonly EvidenceSnapshotContribution[] = [];
+    const completeRun = vi.fn((value: unknown) => {
+      snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
+    });
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'capability-mismatch',
+          suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {
+            resetRun: () => {
+              snapshots = [];
+            },
+            completeRun,
+            currentEvidenceSnapshots: () => snapshots,
+          },
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        outcome: 'faulted',
+        errorCode: 'RUN.CAPABILITY.MISMATCH',
+      });
+      expect(result.steps[0]?.verdict).toBeUndefined();
+      expect(completeRun).toHaveBeenCalledWith({});
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toBeUndefined();
+      expect(persisted?.sessionId).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('faults an evidence step that emits a verdict/session and withholds every contribution', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const evidence = contextContribution('inventory', 'evidence-with-verdict');
+    const spec = evidenceCommand('evidence-with-verdict', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return {
+        ...evidence,
+        session: { tool: 'graph', cwd: '/repo', score: 100, passed: true },
+      } satisfies ToolRunCompletion;
+    });
+    let snapshots: readonly EvidenceSnapshotContribution[] = [];
+    const completeRun = vi.fn((value: unknown) => {
+      snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
+    });
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'capability-mismatch',
+          suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: {
+            resetRun: () => {
+              snapshots = [];
+            },
+            completeRun,
+            currentEvidenceSnapshots: () => snapshots,
+          },
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        outcome: 'faulted',
+        readiness: 'unavailable',
+        errorCode: 'RUN.CAPABILITY.MISMATCH',
+      });
+      expect(result.steps[0]?.verdict).toBeUndefined();
+      expect(completeRun).toHaveBeenCalledWith(evidence);
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toBeUndefined();
+      expect(persisted?.sessionId).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('omits runId without failing the completed suite when persistence is unavailable', async () => {
+    const spec = helpCommand('fit', (_opts, cli) => {
+      emitPassingEvidence(cli);
+      return { type: 'help' };
+    });
+    const scope = new RunScope({
+      datastore: () => {
+        throw new Error('datastore offline');
+      },
+    });
+
+    const result = await runWithScope(scope, () =>
+      runSuite({
+        name: 'audit',
+        suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
+        source: 'built-in',
+        tools: [tool(TOOL_ID, 'fitness', [spec])],
+        ctx: makeDispatchHostCtx().ctx,
+        runActionHooks: {},
+        suiteOpts: { cwd: '/repo' },
+      }),
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODES.SUCCESS);
+    expect(result.runId).toBeUndefined();
+  });
+
   it('assembles step opts from CommandSpec options plus shared suite flags', async () => {
     const seen: Record<string, unknown>[] = [];
     const spec = defineCommand<unknown, ToolCliContext>({
@@ -204,7 +738,7 @@ describe('runSuite', () => {
       output: 'command-result',
       producesVerdict: true,
       handler: (opts, cli) => {
-        seen.push(opts);
+        seen.push(opts as Record<string, unknown>);
         emitPassingEvidence(cli);
         return { type: 'help' };
       },
@@ -507,7 +1041,9 @@ describe('runSuite', () => {
 
     expect(seen).toEqual([
       { changed: true, files: [], _args: [] },
-      { changed: false, since: 'origin/main', files: [], _args: [] },
+      // `since: origin/main` fails in this fixture (no remote) → full fallback.
+      // Full scope clears failed selectors so steps do not re-receive `since`.
+      { changed: false, files: [], _args: [] },
     ]);
   });
 
@@ -539,7 +1075,9 @@ describe('runSuite', () => {
         return { type: 'help' };
       },
     });
-    const scope = new RunScope({ logger: { info: vi.fn(), debug, warn, error: vi.fn() } });
+    const scope = new RunScope({
+      logger: { info: vi.fn(), debug, warn, error: vi.fn() },
+    });
 
     const result = await runWithScope(scope, () =>
       runSuite({
@@ -554,7 +1092,11 @@ describe('runSuite', () => {
     );
 
     expect(seen).toEqual([{ changed: true, files: [], _args: [] }]);
-    expect(result.scope).toEqual({ mode: 'changed', source: 'default', changedFiles: 2 });
+    expect(result.scope).toEqual({
+      mode: 'changed',
+      source: 'default',
+      changedFiles: 2,
+    });
     expect(result.reviewBrief?.changedFiles).toBe(2);
     expect(debug).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -588,7 +1130,9 @@ describe('runSuite', () => {
         return { type: 'help' };
       },
     });
-    const scope = new RunScope({ logger: { info: vi.fn(), debug, warn, error: vi.fn() } });
+    const scope = new RunScope({
+      logger: { info: vi.fn(), debug, warn, error: vi.fn() },
+    });
 
     const result = await runWithScope(scope, () =>
       runSuite({
@@ -768,7 +1312,9 @@ describe('runSuite', () => {
     const info = vi.fn();
     const warn = vi.fn();
     const error = vi.fn();
-    const scope = new RunScope({ logger: { info, warn, error, debug: vi.fn() } });
+    const scope = new RunScope({
+      logger: { info, warn, error, debug: vi.fn() },
+    });
 
     const result = await runWithScope(scope, () =>
       runSuite({
@@ -1123,7 +1669,10 @@ describe('runSuite', () => {
     ]);
     expect(result.reviewBrief?.degraded).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: 'failing-verdict-without-signals', stepIndex: 3 }),
+        expect.objectContaining({
+          code: 'failing-verdict-without-signals',
+          stepIndex: 3,
+        }),
         expect.objectContaining({ code: 'step-fault', stepIndex: 4 }),
         expect.objectContaining({ code: 'missing-envelope', stepIndex: 4 }),
         expect.objectContaining({ code: 'step-fault', stepIndex: 5 }),
@@ -1192,7 +1741,12 @@ describe('runSuite', () => {
     // faults with ZERO signals. Both must now surface the runtime fault.
     const faultWithFindings = helpCommand('fault-with-findings', async (_opts, cli) => {
       await cli.deliverSignals(
-        signalEnvelope({ passed: false, faulted: true, errors: 1, findings: 1 }),
+        signalEnvelope({
+          passed: false,
+          faulted: true,
+          errors: 1,
+          findings: 1,
+        }),
         { cwd: '/repo' },
       );
       return { type: 'help' };
@@ -1209,7 +1763,12 @@ describe('runSuite', () => {
       }),
     );
 
-    expect(result.aggregate).toMatchObject({ steps: 1, passed: 0, failed: 0, faulted: 1 });
+    expect(result.aggregate).toMatchObject({
+      steps: 1,
+      passed: 0,
+      failed: 0,
+      faulted: 1,
+    });
     expect(result.steps[0]?.outcome).toBe('faulted');
     // The fault was NOT a run-level throw — it rode in on the envelope's verdict.
     expect(result.steps[0]?.error).toBeUndefined();
@@ -1227,7 +1786,12 @@ describe('runSuite', () => {
     // faulted (result unknown) — distinct from the whole step crashing.
     const faultyCheck = helpCommand('faulty', async (_opts, cli) => {
       await cli.deliverSignals(
-        signalEnvelope({ passed: false, faulted: true, errors: 1, findings: 1 }),
+        signalEnvelope({
+          passed: false,
+          faulted: true,
+          errors: 1,
+          findings: 1,
+        }),
         { cwd: '/repo' },
       );
       return { type: 'help' };
@@ -1253,7 +1817,11 @@ describe('runSuite', () => {
     // Default: the fault is RAISED in the aggregate but is NON-blocking — the
     // envelope-backed faulted step's exit is excluded from the suite worst-of.
     const nonBlocking = await run();
-    expect(nonBlocking.aggregate).toMatchObject({ steps: 2, passed: 1, faulted: 1 });
+    expect(nonBlocking.aggregate).toMatchObject({
+      steps: 2,
+      passed: 1,
+      faulted: 1,
+    });
     expect(nonBlocking.steps[1]?.outcome).toBe('faulted');
     expect(nonBlocking.exitCode).toBe(0);
 
@@ -1297,7 +1865,9 @@ describe('runSuite', () => {
       return { type: 'help' };
     });
     const info = vi.fn();
-    const scope = new RunScope({ logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() } });
+    const scope = new RunScope({
+      logger: { info, warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    });
 
     const result = await runWithScope(scope, () =>
       runSuite({
@@ -1320,12 +1890,19 @@ describe('runSuite', () => {
       expect.objectContaining({
         reasons: expect.arrayContaining([
           expect.objectContaining({
-            key: expect.objectContaining({ kind: 'symbol', value: 'src/review.ts#reviewChange' }),
+            key: expect.objectContaining({
+              kind: 'symbol',
+              value: 'src/review.ts#reviewChange',
+            }),
           }),
         ]),
         members: expect.arrayContaining([
-          expect.objectContaining({ signalRef: expect.objectContaining({ tool: 'fit' }) }),
-          expect.objectContaining({ signalRef: expect.objectContaining({ tool: 'graph' }) }),
+          expect.objectContaining({
+            signalRef: expect.objectContaining({ tool: 'fit' }),
+          }),
+          expect.objectContaining({
+            signalRef: expect.objectContaining({ tool: 'graph' }),
+          }),
         ]),
       }),
     );

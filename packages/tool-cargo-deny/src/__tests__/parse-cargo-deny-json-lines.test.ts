@@ -125,6 +125,54 @@ describe('parseCargoDenyJsonLines', () => {
     expect(signal?.ruleId).toBe('cargo-deny');
   });
 
+  it('prefers fields.advisory.id as ruleId over the bare code', () => {
+    const [signal] = parseCargoDenyJsonLines(
+      output(
+        diagnostic({
+          severity: 'error',
+          message: 'Uncontrolled recursion',
+          code: 'vulnerability',
+          advisory: { id: 'RUSTSEC-2019-0001', package: 'ammonia' },
+          labels: [{ span: 'ammonia 0.7.0', line: 4, column: 1 }],
+        }),
+      ),
+      CTX,
+    );
+    expect(signal?.ruleId).toBe('RUSTSEC-2019-0001');
+    expect(signal?.category).toBe('security');
+    expect(signal?.metadata).toMatchObject({
+      code: 'vulnerability',
+      advisoryId: 'RUSTSEC-2019-0001',
+    });
+  });
+
+  it('maps real cargo-deny codes: banned → quality, vulnerability → security', () => {
+    const [banned] = parseCargoDenyJsonLines(
+      output(
+        diagnostic({
+          severity: 'error',
+          message: 'crate is banned',
+          code: 'banned',
+          labels: [],
+        }),
+      ),
+      CTX,
+    );
+    const [vuln] = parseCargoDenyJsonLines(
+      output(
+        diagnostic({
+          severity: 'error',
+          message: 'vuln',
+          code: 'vulnerability',
+          labels: [],
+        }),
+      ),
+      CTX,
+    );
+    expect(banned?.category).toBe('quality');
+    expect(vuln?.category).toBe('security');
+  });
+
   it('skips a diagnostic with no message', () => {
     expect(
       parseCargoDenyJsonLines(output(diagnostic({ severity: 'error', code: 'L001' })), CTX),

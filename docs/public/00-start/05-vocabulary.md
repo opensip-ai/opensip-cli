@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-07
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Vocabulary"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "The terms used everywhere in opensip-cli. Read this once before going deeper."
@@ -17,16 +17,67 @@ source-files:
   - packages/fitness/engine/src/targets/types.ts
   - packages/graph/engine/src/rules/define-rule.ts
   - packages/graph/engine/src/rules/registry.ts
+  - packages/contracts/src/review-brief.ts
+  - packages/contracts/src/task-context.ts
+  - packages/cli/src/commands/audit-command-spec.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./06-system-context.md
   - ../10-concepts/01-fitness-loop.md
+  - ../60-guides/use-opensip-with-ai-agents.md
+  - ../70-reference/06-dashboard.md
 ---
 # Vocabulary
 
-The codebase has thirteen load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
+The codebase has a small set of load-bearing terms. If you know what each of these is, you can read any source file in the repo without guessing. They're listed in a deliberate order — earlier terms support later ones.
 
 If you're skimming for one definition, [Ctrl-F]. If you're reading top-to-bottom, expect each entry to be ~3-6 sentences with a source pointer.
+
+---
+
+## Runtime mode and initialization
+
+OpenSIP CLI has two local project states and two corresponding local evidence
+locations. These are separate concepts: `opensip init` is the transition command,
+not a storage location.
+
+| Customer state | Local evidence location | Configuration authority |
+|---|---|---|
+| **Zero-config project** (cache-backed; not initialized) | **Managed user cache** under `~/.opensip-cli/cache/ephemeral/<project-key>/` | Validated config synthesized in memory |
+| **Initialized project** | **Project-local runtime** under `<project>/opensip-cli/.runtime/` | Explicit project config and authored guardrails |
+
+```text
+Customer state   Zero-config project ── opensip init ──▶ Initialized project
+Evidence home    Managed user cache ───────────▶ Project-local runtime
+Optional Cloud   Disconnected ───── opt in ────▶ Cloud-connected (local runtime remains)
+```
+
+The Cloud row is orthogonal to local initialization; it is not a third local
+runtime mode.
+
+**Zero-config project** is the preferred customer-facing term. Implementation details may
+say `no-init`, `cache-backed`, or `ephemeral`; those describe the same customer
+state or its managed-cache storage, not additional modes.
+
+Both locations are file-backed and use the same SQLite/runtime formats. The
+managed user cache survives commands and reboots, but its whole project entry is
+automatically evictable; the internal `ephemeral` path/scope name means
+“not attached to an initialized project and retention-managed,” not “deleted
+when the process exits.” The project-local runtime has no whole-cache eviction
+policy, but it is still gitignored and local to one working copy. It contains
+rebuildable caches and catalogs alongside retained evidence—such as sessions,
+baselines, and tool state—that is lost when the runtime is removed.
+
+`opensip init` **initializes** the project: it persists commit-worthy
+configuration and authored guardrails and switches subsequent runs to the
+project-local runtime. On a successful scaffold path, it also migrates existing
+cache evidence when the cache runtime exists and the project runtime does not.
+Initialization persists project intent; it does not promise permanent evidence
+storage. OpenSIP Cloud is an optional additive connection, not a replacement for
+either local runtime.
 
 ---
 
@@ -130,17 +181,73 @@ The per-tool `opensip <tool> plugin` command surface (`add`/`remove`/`list`/`syn
 
 ## Session
 
-A **session** is one persisted run of a Tool such as `opensip fit`, `sim`, `graph`, `yagni`, or an installed scanner adapter like `gitleaks`. Each session is persisted as a row in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`, alongside a structured log under `.runtime/logs/` and a rendered HTML report under `.runtime/reports/`.
+A **session** is one persisted run of a Tool such as `opensip fit`, `sim`, `graph`, `yagni`, or an installed scanner adapter like `gitleaks`. Each session is persisted through `SessionRepo` in the active local runtime: the managed user-cache datastore before initialization, or the project-local datastore afterward. Structured logs and rendered reports use that same active runtime root.
 
 Each session record is keyed by a UUID (`session.id`, generated via `randomUUID()`) and ordered by its `timestamp` column (newest first). The persisted row carries only the columns every tool shares; per-session detail rides in a companion `session_tool_payload` row as a tool-owned opaque JSON blob. The logger uses a separate per-process correlation id of the form `RUN_<ulid>` (`generatePrefixedId('run')`); it appears in every log entry as `runId`. The `sessions list` command (with `--summary-only` for agents) browses past sessions; `sessions purge` deletes the rows. See `agent-catalog` (in the CLI commands reference) for the recommended way for agents to discover these surfaces and the new ergonomics around historical inspection.
 
-The runtime dir is gitignored — sessions are local artifacts, not source. The path resolver lives in [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts).
+Runtime evidence is local state, not source. The project-local runtime is
+gitignored; the zero-config runtime stays outside the project in the managed
+user cache. The path resolver lives in
+[`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.ts).
 
 ## Gate
 
-A **gate** is the host-owned baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the project SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). `graph` and installed external scanner adapters use the same `--gate-save` / `--gate-compare` ratchet for their signal envelopes. Use `opensip fit export --format baseline` or graph's SARIF/export commands when CI needs files.
+A **gate** is the host-owned baseline workflow. `opensip fit --gate-save` stores the current run's `SignalEnvelope` in the active local runtime's SQLite baseline. `opensip fit --gate-compare` runs again, compares to the baseline, and exits non-zero if any *new* violation appeared (existing ones are tolerated; resolved ones are celebrated). `graph` and installed external scanner adapters use the same `--gate-save` / `--gate-compare` ratchet for their signal envelopes. Use `opensip fit export --format baseline` or graph's SARIF/export commands when CI needs files.
 
 The gate matches by `(filePath, ruleId, message)` — line numbers are deliberately excluded from the identity hash so unrelated line shifts don't register as added/resolved violations. See [`packages/fitness/engine/src/baseline-strategy.ts`](../../../packages/fitness/engine/src/baseline-strategy.ts) and [`../10-concepts/05-architecture-gate.md`](../10-concepts/05-architecture-gate.md).
+
+## Audit
+
+**Audit** is the host-owned canonical changed-code review: `opensip audit` (and
+the equivalent `opensip suite run audit`). It is not a Tool. It runs the curated
+built-in suite (fit risk recipe, graph impact, high-confidence YAGNI) through
+one suite executor, returns a `SuiteRunResult` with host-owned `reviewBrief` and
+optional parent `runId`, and may open the human **Change Impact** report with
+`--open`. The suite name `audit` is reserved (ADR-0159). See
+[CLI commands — audit](../70-reference/01-cli-commands.md#audit--canonical-changed-code-review)
+and [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md).
+
+## Review brief
+
+A **review brief** is the host-owned aggregate over a multi-tool suite run:
+verdict, bounded `topRisks[]` and `newFindings[]`, optional correlated groups,
+baseline delta, degradations, and recommended actions. It is finding-oriented —
+it summarizes `SignalEnvelope` evidence. It never appears on the built-in
+`agent-context` suite (that suite uses a **context manifest** instead). Shape
+and JSON fields: [JSON output schema](../70-reference/04-json-output-schema.md).
+
+## Change Impact
+
+**Change Impact** is the self-contained HTML report tab that renders *stored*
+audit evidence only: the parent Run, graph-impact session projection, review
+brief, and verification trust. The browser never re-runs Git, graph, or the
+suite. `opensip audit --open` selects the completed run on this tab. See
+[Report — Change Impact](../70-reference/06-dashboard.md#change-impact) and
+[ADR-0156](../../decisions/ADR-0156-bounded-stored-impact-proof.md).
+
+## Task context / agent-context
+
+**Task context** is the before-edit evidence plane for agents and humans:
+
+- CLI: `opensip suite run agent-context --files <path> --json` writes a
+  versioned **TaskContextManifest** on the parent Run (inventory, graph
+  generation, labelled static test selection).
+- MCP: `get_context_status`, `get_file_context`, `impact_files`, `select_tests`,
+  and entity-detail `get_symbol` read that evidence without building a graph,
+  invoking Git, running tests, or starting the suite.
+
+Task context is **evidence, not findings**: contributions are typed snapshots,
+not `SignalEnvelope` findings and not a ReviewBrief. See
+[Use OpenSIP with AI agents](../60-guides/use-opensip-with-ai-agents.md) and
+[ADR-0160](../../decisions/ADR-0160-deterministic-task-context-evidence-plane.md).
+
+## Impact trust
+
+**Impact trust** is the machine-readable coverage verdict on `graph impact` /
+`impact_files` and suite step `verification`: `coverage`, `fullyVerified`,
+`fallback`, and `uncertainties[]`. Targeted verification is only trustworthy
+when `fullyVerified` is true. See
+[Impact analysis and trust](../40-graph/05-impact-analysis.md).
 
 ---
 
@@ -152,6 +259,7 @@ A few terms that appear in the codebase or docs but aren't kernel concepts:
 - **Finding** — user-facing synonym for `Signal`. Prefer `Signal` in platform code.
 - **Violation** — what a check returns to the framework (`CheckViolation[]`). The framework converts each violation into a Signal. Use `violation` inside a check, `Signal` everywhere else.
 - **Selector** — the discriminated-union type a recipe uses to pick checks (`all | tags | pattern | explicit`). Lives in [`packages/fitness/engine/src/recipes/types.ts`](../../../packages/fitness/engine/src/recipes/types.ts).
+- **agent-eval** — private black-box gold-task harness (`@opensip-cli/agent-eval`) that measures whether the CLI/MCP surface beats native search/read/glob on fixed tasks. Contributor promotion instrument, not a customer command.
 
 ---
 

@@ -1,97 +1,79 @@
-/**
- * Catalog freshness mapping (Task 6.1 — Persistence/freshness).
- *
- * Maps the graph engine's `CatalogVerdict` to the agent-facing `Freshness` DTO,
- * and recovers the working-tree `ValidationContext` from a catalog's recorded
- * `filesFingerprint`. Pure verdict→DTO logic — no engine re-entry.
- */
-
 import { describe, expect, it } from 'vitest';
 
 import {
-  freshnessFromVerdict,
+  freshnessFromVerification,
   missingFreshness,
-  unverifiedFreshness,
-  workingTreeContextFromCatalog,
+  unavailableGraphStatus,
 } from '../freshness.js';
 
-import type { Catalog } from '@opensip-cli/graph';
-import type { CatalogVerdict } from '@opensip-cli/graph/internal';
-
-const BUILT_AT = '2026-05-22T00:00:00.000Z';
-
-function makeCatalog(over: Partial<Catalog> = {}): Catalog {
-  return {
-    version: '3.0',
-    tool: 'graph',
-    language: 'typescript',
-    builtAt: BUILT_AT,
-    cacheKey: 'ts-5.7.3-test',
-    filesFingerprint: '0\n',
-    functions: {},
-    ...over,
-  };
-}
-
-describe('missingFreshness', () => {
-  it('is fresh:false with reason "missing" and no builtAt', () => {
-    expect(missingFreshness()).toEqual({ fresh: false, reason: 'missing' });
-  });
-});
-
-describe('unverifiedFreshness', () => {
-  it('reports fresh:true with the builtAt (matches graph lookup serving the persisted catalog)', () => {
-    expect(unverifiedFreshness(BUILT_AT)).toEqual({ fresh: true, builtAt: BUILT_AT });
-  });
-});
-
-describe('freshnessFromVerdict', () => {
-  it('maps a valid verdict to fresh:true', () => {
-    const verdict: CatalogVerdict = { kind: 'valid' };
-    expect(freshnessFromVerdict(verdict, BUILT_AT)).toEqual({ fresh: true, builtAt: BUILT_AT });
+describe('freshness mapping', () => {
+  it('missingFreshness is not complete', () => {
+    const f = missingFreshness();
+    expect(f.fresh).toBe(false);
+    expect(f.verification).toBe('missing');
+    expect(f.reasonCode).toBe('missing');
+    expect(f.verifiedAt).toBeTruthy();
   });
 
-  it('maps an incremental verdict to fresh:false with a changed-file reason', () => {
-    const verdict: CatalogVerdict = {
-      kind: 'incremental',
-      changedFiles: ['a.ts', 'b.ts'],
-    };
-    const fresh = freshnessFromVerdict(verdict, BUILT_AT);
-    expect(fresh.fresh).toBe(false);
-    expect(fresh.builtAt).toBe(BUILT_AT);
-    expect(fresh.reason).toContain('2 file(s) changed');
+  it('partial verification never claims fresh', () => {
+    const f = freshnessFromVerification(
+      {
+        fresh: true,
+        verifiedAt: '2026-01-01T00:00:00.000Z',
+        verification: 'partial',
+        reasonCode: 'verification-unavailable',
+        reason: 'no provenance',
+      },
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(f.fresh).toBe(false);
+    expect(f.verification).toBe('partial');
   });
 
-  it('maps an invalid verdict to fresh:false with its reason', () => {
-    const verdict: CatalogVerdict = {
-      kind: 'invalid',
-      reason: 'version-mismatch',
-    };
-    const fresh = freshnessFromVerdict(verdict, BUILT_AT);
-    expect(fresh.fresh).toBe(false);
-    expect(fresh.reason).toContain('version-mismatch');
+  it('complete fresh verification passes through', () => {
+    const f = freshnessFromVerification(
+      {
+        fresh: true,
+        verifiedAt: '2026-01-01T00:00:00.000Z',
+        verification: 'complete',
+      },
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(f.fresh).toBe(true);
+    expect(f.builtAt).toBe('2026-01-01T00:00:00.000Z');
   });
-});
 
-describe('workingTreeContextFromCatalog', () => {
-  it('recovers the tracked file set (in order) from the persisted fingerprint', () => {
-    const catalog = makeCatalog({
-      filesFingerprint: '2\nsrc/a.ts|111|10\nsrc/b.ts|222|20\n',
+  it('omits optional fields when verification has no builtAt/reason/changes', () => {
+    const f = freshnessFromVerification({
+      fresh: false,
+      verifiedAt: '2026-01-01T00:00:00.000Z',
+      verification: 'complete',
     });
-    const ctx = workingTreeContextFromCatalog(catalog);
-    expect(ctx).toBeDefined();
-    expect(ctx?.currentFiles).toEqual(['src/a.ts', 'src/b.ts']);
-    expect(ctx?.currentLanguage).toBe('typescript');
-    expect(ctx?.currentCacheKey).toBe('ts-5.7.3-test');
+    expect(f.fresh).toBe(false);
+    expect(f.builtAt).toBeUndefined();
+    expect(f.reasonCode).toBeUndefined();
+    expect(f.reason).toBeUndefined();
+    expect(f.changes).toBeUndefined();
+
+    const withChanges = freshnessFromVerification({
+      fresh: false,
+      verifiedAt: '2026-01-01T00:00:00.000Z',
+      verification: 'partial',
+      reasonCode: 'files-changed',
+      reason: 'file churn',
+      changes: { added: 1, modified: 0, deleted: 0, sample: [] },
+    });
+    expect(withChanges.changes).toEqual({ added: 1, modified: 0, deleted: 0, sample: [] });
+    expect(withChanges.reasonCode).toBe('files-changed');
   });
 
-  it('returns undefined for a pre-fingerprint catalog (older build)', () => {
-    const { filesFingerprint, ...withoutFp } = makeCatalog();
-    void filesFingerprint;
-    expect(workingTreeContextFromCatalog(withoutFp as Catalog)).toBeUndefined();
-  });
-
-  it('returns undefined when the fingerprint records zero files', () => {
-    expect(workingTreeContextFromCatalog(makeCatalog({ filesFingerprint: '0\n' }))).toBeUndefined();
+  it('unavailableGraphStatus is the review_change degradation shape', () => {
+    const f = unavailableGraphStatus();
+    expect(f).toMatchObject({
+      fresh: false,
+      verification: 'partial',
+      reasonCode: 'verification-unavailable',
+      reason: 'Graph status unavailable',
+    });
   });
 });

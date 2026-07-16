@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
@@ -646,11 +646,11 @@ beforeAll(async () => {
 
   // Prewarm so the file cache contains every fixture for any check
   // whose scope falls back to the cache.
-  await fileCache.prewarm(cwd, ['**/*']);
+  await fitnessTestFileCache.prewarm(cwd, ['**/*']);
 });
 
 afterAll(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   rmSync(cwd, { recursive: true, force: true });
 });
 

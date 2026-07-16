@@ -316,7 +316,7 @@ describe('viewToolsDoctor', () => {
         diagnostics: [
           {
             code: 'BOOT.LOAD.FAIL',
-            category: 'bootstrap',
+            category: 'discovery',
             severity: 'error',
             message: 'tool package failed to load',
             impact: 'tool omitted from registry',
@@ -324,7 +324,7 @@ describe('viewToolsDoctor', () => {
           },
           {
             code: 'BOOT.MANIFEST.WARN',
-            category: 'bootstrap',
+            category: 'integrity',
             severity: 'warning',
             message: 'manifest hash drifted',
             impact: 'continuing with warning',

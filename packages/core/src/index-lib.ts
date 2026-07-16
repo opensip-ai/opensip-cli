@@ -115,11 +115,7 @@ export {
   scrubModuleNotFoundPath,
 } from './lib/diagnostic-classifier.js';
 export type { IntegrityFailureInput } from './lib/diagnostic-classifier.js';
-export {
-  capabilityDiscoveryToCliDiagnostic,
-  fitnessEmptyCheckRegistryDiagnostic,
-  fitnessPluginLoadFailedDiagnostic,
-} from './lib/capability-diagnostic.js';
+export { capabilityDiscoveryToCliDiagnostic } from './lib/capability-diagnostic.js';
 
 // Lib — permissive YAML reader (returns undefined on missing/malformed
 // files). Used by plugin-discovery sites that need to peek at a single
@@ -211,10 +207,24 @@ export {
   ephemeralProjectCacheKey,
   resolveProjectPaths,
   resolveEphemeralProjectPaths,
+  resolveRuntimePathsForScope,
   resolveUserPaths,
   isPathInside,
   toPosixRelative,
 } from './lib/paths.js';
+export {
+  DEFAULT_EPHEMERAL_KEEP,
+  DEFAULT_EPHEMERAL_MAX_AGE_DAYS,
+  EPHEMERAL_MARKER_FILE,
+  pruneEphemeralRuntimes,
+  shouldPruneEphemeralRuntimes,
+  touchEphemeralRuntime,
+} from './lib/ephemeral-runtime.js';
+export type {
+  EphemeralMarker,
+  PruneEphemeralInput,
+  PruneEphemeralResult,
+} from './lib/ephemeral-runtime.js';
 export type {
   EphemeralProjectPaths,
   ProjectPaths,
@@ -273,6 +283,32 @@ export type {
   CompatibilityContractPolicy,
   CompatibilityStability,
 } from './lib/compatibility-policy.js';
+
+// Lib — platform-support policy registry (Plan 02, macOS GA). Pure host-support
+// classification (no process/fs reads); consumed by CLI/MCP catalog projections,
+// the acceptance harness, docs, and the compatibility matrix. `supported` is
+// never implied by engine compatibility; macOS launches as `preview`.
+export {
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  PLATFORM_SUPPORT_ROWS,
+  assessHostSupport,
+  projectRuntimeHostSupport,
+} from './lib/platform-support.js';
+export type {
+  PlatformSupportStatus,
+  PlatformSupportTuple,
+  PlatformSupportProfileRef,
+  PlatformSupportEvidence,
+  PlatformQualification,
+  PlatformSupportRow,
+  PlatformDimension,
+  PlatformMismatchReason,
+  PlatformMatchLevel,
+  ObservedHost,
+  HostSupportAssessment,
+  RuntimeHostFacts,
+  RuntimeHostSupportProjection,
+} from './lib/platform-support.js';
 
 // Lib — phantom-dir detector. Warns about orphaned opensip-cli/
 // subtrees left over from pre-discovery runs. Returns paths; callers

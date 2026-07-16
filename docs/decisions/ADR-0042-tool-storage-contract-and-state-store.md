@@ -81,3 +81,6 @@ before it is demanded.
 ADR-0009 (public `db` handle + confined table symbols); ADR-0028 (engine
 persistence-free, caller persists); ADR-0036 (host-owned baseline plane —
 the generic-table pattern `tool_state` copies).
+
+### Boundary hardening amendments (2026-07-09)
+Host compatibility blobs use the reserved namespace in [ADR-0146](ADR-0146-host-plane-reserved-state-namespace.md); every admitted/derived Tool-owned key rejects that namespace.

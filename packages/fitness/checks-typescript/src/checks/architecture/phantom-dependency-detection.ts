@@ -10,60 +10,36 @@
  */
 
 import * as fs from 'node:fs';
+import { builtinModules } from 'node:module';
 import * as path from 'node:path';
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 import { getSharedSourceFile, walkNodes } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
-/**
- * Packages that are always available (Node.js built-ins)
- */
-const NODE_BUILTINS = new Set([
-  'assert',
-  'async_hooks',
-  'buffer',
-  'child_process',
-  'cluster',
-  'console',
-  'constants',
-  'crypto',
-  'dgram',
-  'dns',
-  'domain',
-  'events',
-  'fs',
-  'fs/promises',
-  'http',
-  'http2',
-  'https',
-  'inspector',
-  'module',
-  'net',
-  'os',
-  'path',
-  'perf_hooks',
-  'process',
-  'punycode',
-  'querystring',
-  'readline',
-  'repl',
-  'stream',
-  'stream/promises',
-  'string_decoder',
-  'sys',
-  'timers',
-  'timers/promises',
-  'tls',
-  'trace_events',
-  'tty',
-  'url',
-  'util',
-  'v8',
-  'vm',
-  'worker_threads',
-  'zlib',
-]);
+/** Built-ins that support their historical unprefixed specifier. */
+const PREFIX_OPTIONAL_NODE_BUILTINS = new Set(
+  builtinModules.filter((specifier) => !specifier.startsWith('node:')),
+);
+
+/** Newer built-ins that Node exposes only through the explicit `node:` prefix. */
+const PREFIX_REQUIRED_NODE_BUILTINS = new Set(
+  builtinModules
+    .filter((specifier) => specifier.startsWith('node:'))
+    .map((specifier) => specifier.slice(5)),
+);
+
+function isNodeBuiltinSpecifier(importSpecifier: string): boolean {
+  const hasNodePrefix = importSpecifier.startsWith('node:');
+  const bare = hasNodePrefix ? importSpecifier.slice(5) : importSpecifier;
+  const root = bare.split('/')[0] ?? '';
+  return (
+    PREFIX_OPTIONAL_NODE_BUILTINS.has(bare) ||
+    PREFIX_OPTIONAL_NODE_BUILTINS.has(root) ||
+    (hasNodePrefix &&
+      (PREFIX_REQUIRED_NODE_BUILTINS.has(bare) || PREFIX_REQUIRED_NODE_BUILTINS.has(root)))
+  );
+}
 
 /**
  * Patterns that indicate test-only imports (should check devDependencies)
@@ -107,11 +83,8 @@ function extractPackageName(importSpecifier: string): string | null {
     return null;
   }
 
-  // Strip the node: prefix before built-in / package detection
-  const bare = importSpecifier.startsWith('node:') ? importSpecifier.slice(5) : importSpecifier;
-
-  // Skip Node.js built-ins (with or without the node: prefix, and subpaths like fs/promises)
-  if (NODE_BUILTINS.has(bare) || NODE_BUILTINS.has(bare.split('/')[0] ?? '')) {
+  // Skip Node.js built-ins, including prefix-required modules added after this check shipped.
+  if (isNodeBuiltinSpecifier(importSpecifier)) {
     return null;
   }
 
@@ -217,8 +190,8 @@ function readPackageJson(pkgPath: string): PackageJson | null {
  */
 function allowsDevDependencies(filePath: string): boolean {
   return (
-    TEST_FILE_PATTERNS.some((pattern) => pattern.test(filePath)) ||
-    TOOLING_FILE_PATTERN.test(filePath)
+    TEST_FILE_PATTERNS.some((pattern) => pattern.test(filePath.replaceAll('\\', '/'))) ||
+    TOOLING_FILE_PATTERN.test(filePath.replaceAll('\\', '/'))
   );
 }
 

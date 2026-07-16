@@ -1,42 +1,49 @@
 /**
- * The `opensip mcp` command (ADR-0084).
+ * The `opensip mcp` command (ADR-0084 + MCP Graph Audit).
  *
- * A long-lived, BLOCKING stdio JSON-RPC server. `output: 'raw-stream'` +
- * `rawStreamReason: 'mcp-stdio'` because the protocol genuinely owns stdout: an
- * MCP client speaks JSON-RPC frames over this command's stdin/stdout for the
- * whole serve lifetime, so the host must render NOTHING and the handler owns its
- * entire output surface. This is the documented raw-stream escape hatch — NOT a
- * bypass of the `SignalEnvelope`/`CommandResult` currency: there is no run
- * verdict to render, only a transport. Every diagnostic goes to stderr (the
- * server routes the structured logger sink there for the serve lifetime); stdout
- * carries only JSON-RPC. See ADR-0084 and `server.ts`.
- *
- * The handler captures the entered `RunScope` (never `currentScope()`), opens the
- * per-run datastore through the documented `cli.scope.datastore()` seam, builds
- * the two read ports from it, and hands the captured scope + ports to the server
- * — which re-enters the scope around every tool dispatch (the EventEmitter ALS
- * fix). It resolves to a clean exit (0) when the transport closes on stdin EOF.
+ * Captures the entered `RunScope` once, constructs graph/results ports from
+ * public graph/read functions + captured adapters, and never calls
+ * `currentScope()` from handlers or ports.
  */
-import { EXIT_CODES, summarizeTargetConventions } from '@opensip-cli/contracts';
+import { realpathSync } from 'node:fs';
+
+import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
+import {
+  assembleAgentCatalog,
+  EXIT_CODES,
+  hostSupportFromRuntimeProjection,
+  projectAgentCatalogRuntimeFacts,
+  summarizeTargetConventions,
+  type FileEvidenceSupport,
+} from '@opensip-cli/contracts';
 import {
   definePrimaryCommand,
   EnvRegistry,
+  err,
+  logger,
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  projectRuntimeHostSupport,
   readPackageVersion,
   type EnvVarSpec,
+  type Result,
   type RunScope,
   type ToolCliContext,
 } from '@opensip-cli/core';
-import { runGraph } from '@opensip-cli/graph/internal';
+import { loadGraphReadConfig, rebuildCatalog, type Catalog } from '@opensip-cli/graph/read';
 
-import { workingTreeContextFromCatalog } from './freshness.js';
+import { capturedConfigIdentity } from './captured-config-identity.js';
+import { LiveRuntimeWiringReadPort } from './live-runtime-wiring-read-port.js';
+import { LocalCodebaseReadPort } from './local-codebase-read-port.js';
+import { fromGraphReadError } from './mcp-error.js';
 import { CliRepairWritePort } from './repair-write-port.js';
 import { McpStdioServer } from './server.js';
 import { SessionResultsReadPort } from './session-results-read-port.js';
+import { SqliteContextReadPort } from './sqlite-context-read-port.js';
 import { SqliteGraphReadPort } from './sqlite-graph-read-port.js';
-import { registerMcpTools } from './tools/register.js';
+import { MCP_SURFACE_EPOCH, registerMcpTools } from './tools/register.js';
 
+import type { McpReadError } from './mcp-error.js';
 import type { DataStore } from '@opensip-cli/datastore';
-import type { Catalog } from '@opensip-cli/graph';
 
 interface McpCommandOptions {
   readonly allowMutations?: boolean;
@@ -56,7 +63,215 @@ function mutationsEnabled(opts: McpCommandOptions): boolean {
   return opts.allowMutations === true || env.get<boolean>('OPENSIP_MCP_ALLOW_MUTATIONS') === true;
 }
 
+/** Named serve entry for static-handler audit bridging. */
+async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<void> {
+  const scope = cli.scope as RunScope;
+
+  const store = cli.scope.datastore() as DataStore | undefined;
+  if (store === undefined) {
+    await cli.reportFailure({
+      message: 'opensip mcp requires a project datastore, but none is available.',
+      suggestion:
+        'Run `opensip mcp` from inside an opensip-cli project (where `opensip init` has been run).',
+      code: 'MCP.DATASTORE_UNAVAILABLE',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      log: { evt: 'mcp.server.datastore_unavailable', level: 'error' },
+    });
+    return;
+  }
+
+  // Keep persistence reads bound to the exact root captured by the host:
+  // existing stored rows may predate canonical-root advertisement. Filesystem
+  // and response-context seams use the physical root so every live MCP context
+  // agrees without rebinding historical session rows.
+  const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
+  const canonicalProjectRoot = realpathSync(projectRoot);
+  const configPath = scope.projectContext?.configPath ?? 'opensip-cli.config.yml';
+  const canonicalConfigPath =
+    scope.projectContext?.configPath === undefined
+      ? configPath
+      : realpathSync(scope.projectContext.configPath);
+  const graphConfig = loadGraphReadConfig(projectRoot, configPath);
+  // Capture graph adapters once from the entered scope — never currentScope().
+  const graphScope = scope.graph;
+  if (graphScope === undefined) {
+    await cli.reportFailure({
+      message: 'opensip mcp requires the graph tool scope (adapters registry).',
+      suggestion: 'Ensure the graph tool is registered in the CLI bootstrap.',
+      code: 'MCP.GRAPH_SCOPE_UNAVAILABLE',
+      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      log: { evt: 'mcp.server.graph_scope_unavailable', level: 'error' },
+    });
+    return;
+  }
+  const adapters = graphScope.adapters;
+  const languageEvidenceSupport = new Map<string, FileEvidenceSupport>(
+    adapters.getAll().map((entry) => {
+      const semantic = entry.id === 'typescript' ? 'supported' : 'unsupported';
+      return [
+        entry.id,
+        {
+          callable: 'supported',
+          declaration: semantic,
+          reference: semantic,
+        },
+      ];
+    }),
+  );
+
+  async function rebuild(): Promise<Result<Catalog, McpReadError>> {
+    const outcome = await rebuildCatalog({
+      cwd: projectRoot,
+      datastore: store,
+    });
+    if (!outcome.ok) {
+      return err(fromGraphReadError(outcome.error));
+    }
+    return outcome;
+  }
+
+  const graph = new SqliteGraphReadPort({
+    store,
+    projectRoot,
+    contextProjectRoot: canonicalProjectRoot,
+    configPath: canonicalConfigPath,
+    adapters,
+    languageAdapters: scope.languages.list(),
+    config: graphConfig,
+    rebuild,
+    log: (evt, fields) => {
+      logger.info({ evt, module: 'mcp:graph', ...fields });
+    },
+  });
+  // Compute the honest, process-only host-support projection ONCE at
+  // construction from the same process facts and shared contracts mapper the
+  // CLI uses, so get_agent_catalog is byte-identical to `agent-catalog --json`
+  // (Plan 02 / Plan 03 parity). A long-lived server never re-observes this per
+  // method. npm/filesystem/install-channel stay unobserved → never exact.
+  const hostSupport = hostSupportFromRuntimeProjection(
+    projectRuntimeHostSupport({
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
+      nodeAbi: process.versions.modules,
+    }),
+    PLATFORM_SUPPORT_CONTRACT_VERSION,
+  );
+  // Assemble the ONE common agent catalog here at the composition boundary
+  // (Plan 03 transport parity). `serveMcpStdio` is the only scope-reading site:
+  // it projects the reserved host roots + internal Tool commands from the
+  // complete, immutable runtime inventory (adding Commander's implicit `help`),
+  // reuses the SAME target-convention array computed once for registerMcpTools,
+  // imports the config-owned reserved suite names, and folds in the Plan 02
+  // hostSupport — then hands the finished catalog to the read port, which is a
+  // pure conduit. This makes the MCP common body byte-identical to
+  // `opensip agent-catalog --json` for the same admitted registry + project.
+  const targetConventions = summarizeTargetConventions(scope.targets);
+  const runtimeFacts = projectAgentCatalogRuntimeFacts(scope.runtimeCommands, ['help']);
+  const agentCatalog = assembleAgentCatalog({
+    tools: scope.tools,
+    internalCommands: new Set(runtimeFacts.internalCommands),
+    rootCommands: runtimeFacts.rootCommands,
+    suiteNames: RESERVED_SUITE_NAMES,
+    hostSupport,
+    ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
+  });
+  const results = new SessionResultsReadPort({
+    store,
+    projectRoot,
+    tools: scope.tools,
+    agentCatalog,
+  });
+  const codebase = new LocalCodebaseReadPort({
+    projectRoot,
+    configIdentity: capturedConfigIdentity(scope.configDocument),
+    languageEvidenceSupport,
+    ...(scope.targets === undefined ? {} : { targets: scope.targets }),
+    log: (event, fields) => {
+      logger.info({ evt: event, module: 'mcp:codebase', ...fields });
+    },
+  });
+  const context = new SqliteContextReadPort({
+    store,
+    projectRoot,
+    graph,
+    codebase,
+    log: (event, fields) => {
+      logger.info({ evt: event, module: 'mcp:context', ...fields });
+    },
+  });
+  const runtimeWiring = new LiveRuntimeWiringReadPort({
+    projectRoot: canonicalProjectRoot,
+    configPath: canonicalConfigPath,
+    tools: scope.tools,
+    manifests: scope.toolManifests,
+    provenance: scope.toolProvenance,
+    runtimeCommands: scope.runtimeCommands,
+    resolveStaticHandlers: async (runtimeSnapshotKey, refs) => {
+      const outcome = await graph.resolveStaticHandlerDeclarations(runtimeSnapshotKey, refs);
+      if (!outcome.ok) {
+        return {
+          catalogStatus: 'missing' as const,
+          outcomes: refs.map((ref) => ({
+            ref,
+            status: 'catalog-missing' as const,
+            claimProvenance: 'author-declared' as const,
+            matchBasis: 'author-declared-exact-declaration' as const,
+            confidence: 'low' as const,
+          })),
+        };
+      }
+      return outcome.value;
+    },
+  });
+  const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
+  const repairWrite = mutationEnabled
+    ? new CliRepairWritePort({
+        projectRoot,
+      })
+    : undefined;
+
+  const server = new McpStdioServer({
+    scope,
+    graph,
+    results,
+    version: readPackageVersion(import.meta.url),
+    projectRoot: canonicalProjectRoot,
+    surfaceEpoch: MCP_SURFACE_EPOCH,
+    mutationsEnabled: mutationEnabled,
+  });
+
+  const validToolIds = new Set(
+    scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
+  );
+  // `targetConventions` is computed once above (shared with the agent-catalog
+  // assembly) — no second resolver read or alternate summarizer here.
+  // Registration is synchronous; the Promise-shaped registerMcpTools return is
+  // not a detached async job — fire-and-forget without awaiting is intentional.
+  void registerMcpTools(server, {
+    graph,
+    codebase,
+    context,
+    results,
+    runtimeWiring,
+    validToolIds,
+    targetConventions,
+    ...(repairWrite === undefined ? {} : { repairWrite }),
+    mutationsEnabled: mutationEnabled,
+    // Surface snapshot is final after registration completes.
+    mcpSurface: () => server.describeSurface(),
+  });
+
+  await server.serve();
+  cli.setExitCode(EXIT_CODES.SUCCESS);
+}
+
 export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
+  staticHandler: {
+    package: '@opensip-cli/mcp',
+    path: 'packages/mcp/src/command.ts',
+    declaration: 'serveMcpStdio',
+  },
   description: 'Serve the OpenSIP call graph + stored results to MCP agents over stdio',
   commonFlags: ['cwd'],
   options: [
@@ -69,103 +284,5 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
   scope: 'project',
   output: 'raw-stream',
   rawStreamReason: 'mcp-stdio',
-  handler: async (rawOpts, cli) => {
-    // The host enters a concrete `RunScope` for the project-scoped command and
-    // hands it to tools as the narrowed `ToolScope` view; the MCP server needs
-    // the full `RunScope` — for `runWithScope` re-entry AND the `tools` registry
-    // the results port replays through — so we narrow back to the runtime type.
-    // We capture it here (NOT `currentScope()`) because the SDK's EventEmitter
-    // dispatch would lose the ambient scope inside tool handlers.
-    const scope = cli.scope as RunScope;
-
-    // Documented per-run datastore seam (no raw `DataStore.db`, no `SessionRepo`).
-    const store = cli.scope.datastore() as DataStore | undefined;
-    if (store === undefined) {
-      await cli.reportFailure({
-        message: 'opensip mcp requires a project datastore, but none is available.',
-        suggestion:
-          'Run `opensip mcp` from inside an opensip-cli project (where `opensip init` has been run).',
-        code: 'MCP.DATASTORE_UNAVAILABLE',
-        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-        log: { evt: 'mcp.server.datastore_unavailable', level: 'error' },
-      });
-      return;
-    }
-
-    // Pre-build both read ports from the captured datastore (Phase 2 impls).
-    //
-    // Freshness (Task 4.4): the provider derives the working-tree
-    // `ValidationContext` from the served catalog's OWN recorded inputs
-    // (`workingTreeContextFromCatalog`) — the file set (recovered from the
-    // persisted `filesFingerprint`, in order) plus the catalog's language +
-    // cacheKey. `classifyCatalog` then re-stats those files, so a mutated/deleted
-    // tracked file flips `fresh` to false. (Newly-added files / a tsconfig change
-    // are catalog-additive and resolved by the explicit `refresh_graph` op — see
-    // the helper's doc for the precise approximation.)
-    //
-    // Rebuild (Task 4.4): `refresh_graph` runs the graph engine's programmatic
-    // build (`runGraph`) over the project root, threading the same datastore so
-    // the rebuilt catalog persists where the port reads it. v1 is the exact
-    // single-program build (no cloud egress, no live render).
-    const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
-    /**
-     * The `refresh_graph` rebuild thunk: runs the graph engine's programmatic
-     * build over the project root and returns the fresh catalog.
-     *
-     * @throws {Error} when the build discovers no source files (no catalog
-     *   produced) — surfaced to the refresh tool as an infra-boundary failure.
-     */
-    async function rebuild(): Promise<Catalog> {
-      const outcome = await runGraph({ cwd: projectRoot, datastore: store });
-      if (outcome.catalog === null) {
-        throw new Error('graph rebuild produced no catalog (no source files discovered).');
-      }
-      return outcome.catalog;
-    }
-    const graph = new SqliteGraphReadPort({
-      store,
-      freshnessContext: workingTreeContextFromCatalog,
-      rebuild,
-    });
-    const results = new SessionResultsReadPort({ store, projectRoot, tools: scope.tools });
-    const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
-    const repairWrite = mutationEnabled
-      ? new CliRepairWritePort({
-          projectRoot,
-        })
-      : undefined;
-
-    const server = new McpStdioServer({
-      scope,
-      graph,
-      results,
-      version: readPackageVersion(import.meta.url),
-    });
-
-    // Mount the tool catalog through the server's scope-wrapping register seam.
-    // `validToolIds` lets the result tools reject an unknown `tool` argument. It
-    // must be the per-tool LAYOUT KEY (`fit`/`sim`/`graph`/`yagni`) — the key
-    // sessions are stored under and the value `sessions show --tool <k>` accepts —
-    // NOT `identity.name` (`fitness`/`simulation`), or `get_latest_findings({ tool:
-    // 'fit' })`, the headline result-first path, would be rejected as unknown.
-    const validToolIds = new Set(
-      scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
-    );
-    const targetConventions = summarizeTargetConventions(scope.targets);
-    // `void`: registerMcpTools is synchronous (returns void); the leading `void`
-    // marks the discard explicitly so the detached-promises heuristic (which can't
-    // see cross-file sync callables) doesn't read this floating call as a promise.
-    void registerMcpTools(server, {
-      graph,
-      results,
-      validToolIds,
-      targetConventions,
-      ...(repairWrite === undefined ? {} : { repairWrite }),
-      mutationsEnabled: mutationEnabled,
-    });
-
-    // Block for the serve lifetime; resolves on stdin EOF (or graceful SIGINT).
-    await server.serve();
-    cli.setExitCode(EXIT_CODES.SUCCESS);
-  },
+  handler: serveMcpStdio,
 });

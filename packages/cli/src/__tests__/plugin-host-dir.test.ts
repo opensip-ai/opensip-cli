@@ -16,7 +16,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { resolveProjectPaths } from '@opensip-cli/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { execFileSync } = vi.hoisted(() => ({ execFileSync: vi.fn() }));
+
+vi.mock('node:child_process', () => ({ execFileSync }));
 
 import {
   HOST_PACKAGE_JSON,
@@ -30,6 +34,7 @@ import {
 let projectRoot: string;
 
 beforeEach(() => {
+  execFileSync.mockReset();
   projectRoot = mkdtempSync(join(tmpdir(), 'opensip-host-dir-'));
 });
 
@@ -200,6 +205,100 @@ describe('installMissingPeers', () => {
     writeInstalledPackage(nm, '@org/peer', { version: '1.0.0' });
     writeInstalledPackage(nm, 'flatpeer', { version: '2.0.0' });
     expect(() => installMissingPeers(dir, '@org/has-peers', new Set())).not.toThrow();
+    expect(execFileSync).not.toHaveBeenCalled();
+  });
+
+  it('uses a peer that Node can resolve from an ancestor of the plugin host', () => {
+    const dir = ensurePluginHostDir('fit', join(projectRoot, 'project'));
+    const hostModules = join(dir, 'node_modules');
+    writeInstalledPackage(hostModules, '@org/has-ancestor-peer', {
+      version: '1.0.0',
+      peerDependencies: { '@org/candidate-sdk': '^1.0.0' },
+    });
+    const candidateModules = join(projectRoot, 'node_modules');
+    writeInstalledPackage(candidateModules, '@org/candidate-sdk', {
+      version: '1.2.3',
+      main: './index.js',
+    });
+    writeFileSync(join(candidateModules, '@org/candidate-sdk', 'index.js'), 'export {}\n');
+
+    installMissingPeers(dir, '@org/has-ancestor-peer', new Set());
+
+    expect(execFileSync).not.toHaveBeenCalled();
+  });
+
+  it('installs a peer when the nearest ancestor version does not satisfy the declared range', () => {
+    const dir = ensurePluginHostDir('fit', join(projectRoot, 'project'));
+    const hostModules = join(dir, 'node_modules');
+    writeInstalledPackage(hostModules, '@org/has-incompatible-ancestor-peer', {
+      version: '1.0.0',
+      peerDependencies: { '@org/candidate-sdk': '^1.0.0' },
+    });
+    const candidateModules = join(projectRoot, 'node_modules');
+    writeInstalledPackage(candidateModules, '@org/candidate-sdk', {
+      version: '2.0.0',
+      main: './index.js',
+    });
+    writeFileSync(join(candidateModules, '@org/candidate-sdk', 'index.js'), 'export {}\n');
+
+    installMissingPeers(dir, '@org/has-incompatible-ancestor-peer', new Set());
+
+    expect(execFileSync).toHaveBeenCalledWith(
+      'npm',
+      [
+        'install',
+        '--ignore-scripts',
+        '--no-audit',
+        '--no-fund',
+        '--no-save',
+        '@org/candidate-sdk@^1.0.0',
+      ],
+      expect.objectContaining({ cwd: dir }),
+    );
+  });
+
+  it('installs an unresolved peer without scripts or implicit peer fetching', () => {
+    const dir = ensurePluginHostDir('fit', projectRoot);
+    const nm = join(dir, 'node_modules');
+    writeInstalledPackage(nm, '@org/has-missing-peer', {
+      version: '1.0.0',
+      peerDependencies: { '@org/missing-peer': '^2.0.0' },
+    });
+
+    installMissingPeers(dir, '@org/has-missing-peer', new Set());
+
+    expect(execFileSync).toHaveBeenCalledWith(
+      'npm',
+      [
+        'install',
+        '--ignore-scripts',
+        '--no-audit',
+        '--no-fund',
+        '--no-save',
+        '@org/missing-peer@^2.0.0',
+      ],
+      expect.objectContaining({ cwd: dir }),
+    );
+  });
+
+  it('does not accept an ancestor placeholder whose resolved entry escapes its package', () => {
+    const dir = ensurePluginHostDir('fit', join(projectRoot, 'project'));
+    const hostModules = join(dir, 'node_modules');
+    writeInstalledPackage(hostModules, '@org/has-escaping-peer', {
+      version: '1.0.0',
+      peerDependencies: { '@org/escaping-peer': '^1.0.0' },
+    });
+    const candidateModules = join(projectRoot, 'node_modules');
+    writeInstalledPackage(candidateModules, '@org/escaping-peer', {
+      version: '1.0.0',
+      main: '../../../outside-peer.js',
+    });
+    const outside = join(projectRoot, 'outside-peer.js');
+    writeFileSync(outside, 'export {}\n');
+
+    installMissingPeers(dir, '@org/has-escaping-peer', new Set());
+
+    expect(execFileSync).toHaveBeenCalledOnce();
   });
 
   it('skips peers whose name or version range is unsafe (no npm install)', () => {
@@ -218,5 +317,6 @@ describe('installMissingPeers', () => {
     // No matching entry installed ⇒ both are "missing", but both are rejected
     // by the safety guards, so installMissingPeers performs no npm install.
     expect(() => installMissingPeers(dir, '@org/sketchy-peers', new Set())).not.toThrow();
+    expect(execFileSync).not.toHaveBeenCalled();
   });
 });

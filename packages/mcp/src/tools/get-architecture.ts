@@ -1,12 +1,18 @@
 /**
- * `get_architecture` — compact codebase overview (ADR-0084, Task 4.3).
- *
- * Delegates to `graphPort.architectureSummary()`: function/edge counts,
- * languages, the top-coupled packages, and the highest-blast hotspots (graph's
- * canonical scoring). Capped via `limit`; carries `{ freshness }`.
+ * `get_architecture` — labelled, bounded codebase orientation overview.
  */
 
-import { limit as limitSchema } from './schemas.js';
+import {
+  architectureSections,
+  architectureTopN,
+  exactFilePath,
+  filePrefix,
+  packageArray,
+  pageFields,
+  productionGeneratedPolicy,
+  productionSourceScope,
+  strictInput,
+} from './schemas.js';
 import { errorResult, jsonResult } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -18,19 +24,47 @@ export function registerGetArchitecture(server: McpStdioServer, deps: McpToolDep
     {
       title: 'Architecture overview',
       description:
-        'High-level shape of the codebase: function/edge counts, languages, the most-coupled ' +
-        'packages, the highest blast-radius hotspots, and bounded target convention counts when ' +
-        'configured. A cheap first call to orient before drilling in with who_calls/blast_radius. ' +
-        'Use `limit` to cap rows.',
-      inputSchema: {
-        limit: limitSchema(),
-      },
+        'Labelled orientation view. Default sections=["metrics"] returns occurrence/body counts, ' +
+        'call evidence, package counts, and bounded target convention counts when configured. ' +
+        'Add "packageEdges" and/or "hotspots" to request ranked families; topN (default 20, max 100) ' +
+        'selects the deterministic global window and limit pages inside it. Unselected families are ' +
+        'omitted (not empty arrays). Defaults to production/non-generated. Use ' +
+        'package_dependencies / package_cycles for exhaustive package evidence.',
+      inputSchema: strictInput({
+        packages: packageArray(),
+        filePath: exactFilePath().optional(),
+        filePrefix: filePrefix().optional(),
+        sourceScope: productionSourceScope(),
+        generated: productionGeneratedPolicy(),
+        sections: architectureSections(),
+        topN: architectureTopN(),
+        ...pageFields(),
+      }),
     },
-    ({ limit }) => {
-      const outcome = deps.graph.architectureSummary(limit);
+    async (args) => {
+      const outcome = await deps.graph.architectureSummary({
+        limit: args.limit,
+        cursor: args.cursor,
+        groupBy: args.groupBy,
+        sections: args.sections,
+        topN: args.topN,
+        filter: {
+          packages: args.packages,
+          filePath: args.filePath,
+          filePrefix: args.filePrefix,
+          sourceScope: args.sourceScope,
+          generated: args.generated,
+        },
+      });
       if (!outcome.ok) return errorResult(outcome.error);
       const targetConventions = deps.targetConventions ?? [];
-      if (targetConventions.length === 0) return jsonResult(outcome.value);
+      // targetConventions only when metrics section is included (summary section).
+      if (
+        targetConventions.length === 0 ||
+        !outcome.value.data.includedSections.includes('metrics')
+      ) {
+        return jsonResult(outcome.value);
+      }
       return jsonResult({
         ...outcome.value,
         data: {

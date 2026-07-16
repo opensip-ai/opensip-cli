@@ -6,13 +6,21 @@
  * coverage-invisible.
  */
 
+import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
 import {
   agentCatalogOverlayKeys,
   agentCatalogPlatformEntryPoints,
+  assembleAgentCatalog,
   assertAgentCatalogOverlayKeys,
+  buildAgentCatalog as buildAgentCatalogFromContracts,
   commonFlags,
+  hostSupportFromRuntimeProjection,
+  summarizeTargetConventions,
+  type AgentHostSupport,
 } from '@opensip-cli/contracts';
 import {
+  PLATFORM_SUPPORT_CONTRACT_VERSION,
+  projectRuntimeHostSupport,
   RunScope,
   ToolRegistry,
   runWithScopeSync,
@@ -23,6 +31,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
+import { HOST_RESERVED_ROOT_COMMANDS } from '../bootstrap/reserved-names.js';
 import { buildAgentCatalog, executeAgentCatalog } from '../commands/agent-catalog.js';
 import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
 import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
@@ -135,12 +144,16 @@ async function makeRegistry(): Promise<ToolRegistry> {
       {
         name: 'third-party-tool',
         description: 'run the third-party tool',
+        commonFlags: [],
+        scope: 'project',
         output: 'command-result',
         handler: () => ({ type: 'text-lines', lines: ['ok'] }),
       },
       {
         name: 'third-party-tool-worker',
         description: '[internal] worker',
+        commonFlags: [],
+        scope: 'project',
         output: 'raw-stream',
         rawStreamReason: 'worker-ipc',
         visibility: 'internal',
@@ -363,6 +376,8 @@ describe('buildAgentCatalog', () => {
         {
           name: 'internal-only-run-worker',
           description: '[internal] worker',
+          commonFlags: [],
+          scope: 'project',
           output: 'raw-stream',
           rawStreamReason: 'worker-ipc',
           visibility: 'internal',
@@ -389,6 +404,8 @@ describe('buildAgentCatalog', () => {
         {
           name: 'hidden-tool',
           description: 'hidden by host policy',
+          commonFlags: [],
+          scope: 'project',
           output: 'command-result',
           handler: () => ({ type: 'text-lines', lines: ['hidden'] }),
         },
@@ -474,14 +491,21 @@ describe('buildAgentCatalog', () => {
       expect(p.name).toBeTruthy();
       expect(p.example).toMatch(/^opensip /);
     }
-    expect(
-      c.commonPatterns.some((p) => p.example === 'opensip suite run audit --changed --json'),
-    ).toBe(true);
-    expect(JSON.stringify(c)).not.toContain('opensip audit');
+    expect(c.commonPatterns.some((p) => p.example === 'opensip audit --json')).toBe(true);
+    expect(c.entryPoints.filter((entry) => entry.command === 'audit')).toHaveLength(1);
     expect(c.outputShapes.signalEnvelope).toMatch(/SignalEnvelope|schemaVersion/);
     expect(c.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(c.outputShapes.reviewBrief).toMatch(/correlatedRisks/);
     expect(c.outputShapes.reviewBrief).toMatch(/verification/);
+    expect(c.outputShapes.taskContext).toMatch(/contextManifest/);
+    expect(c.outputShapes.taskContext).toMatch(/fileScope\.status/);
+    expect(c.outputShapes.taskContext).toMatch(/createdAt/);
+    expect(c.outputShapes.taskContext).toMatch(/projectIdentity/);
+    expect(c.outputShapes.taskContext).toMatch(/freshness,coverage,caps/);
+    expect(c.outputShapes.taskContext).toMatch(/available \+ matched \+ ready/);
+    expect(c.notes.some((note) => note.includes('same explicit project-relative files'))).toBe(
+      true,
+    );
     expect(c.outputShapes.sessionReplay).toMatch(/fidelity/);
     expect(c.outputShapes.history).toMatch(/history/);
     expect(c.notes.length).toBeGreaterThan(0);
@@ -491,7 +515,7 @@ describe('buildAgentCatalog', () => {
     const c = buildAgentCatalog({ tools: await makeRegistry() });
     expect(c.commonPatterns.some((p) => p.name.toLowerCase().includes('read-latest'))).toBe(true);
     expect(c.commonPatterns.some((p) => p.example.includes('agent-fast'))).toBe(true);
-    expect(c.commonPatterns.some((p) => p.example.includes('suite run audit'))).toBe(true);
+    expect(c.commonPatterns.some((p) => p.example.includes('opensip audit'))).toBe(true);
     expect(c.notes.some((n) => n.includes('agent-fast'))).toBe(true);
     expect(c.notes.some((n) => n.includes('graph impact'))).toBe(true);
     expect(c.notes.some((n) => n.includes('fullyVerified'))).toBe(true);
@@ -536,7 +560,24 @@ describe('executeAgentCatalog', () => {
     const { catalog } = out as {
       catalog: ReturnType<typeof buildAgentCatalog>;
     };
-    expect(catalog).toEqual(buildAgentCatalog({ tools }));
+    // The host wrapper injects the reserved-name lists (ADR-0159) and the
+    // process-only host-support projection (Plan 02) the bare contracts builder
+    // cannot know about; the rest must match the pure builder exactly.
+    const { reservedNames, hostSupport, ...rest } = catalog;
+    expect(rest).toEqual(buildAgentCatalog({ tools }));
+    expect(reservedNames?.rootCommands).toContain('audit');
+    expect(reservedNames?.rootCommands).toContain('init');
+    expect(reservedNames?.suiteNames).toEqual(['audit', 'agent-context']);
+    // hostSupport is always injected from live process facts. It is honest:
+    // never an exact match (npm/filesystem/install-channel are unobserved at
+    // runtime), it carries the support-contract version, and its status stays
+    // within the closed vocabulary. It never claims `supported` unless the
+    // registry row itself does (macOS is preview at launch).
+    expect(hostSupport).toBeDefined();
+    expect(hostSupport?.supportContractVersion).toBe(PLATFORM_SUPPORT_CONTRACT_VERSION);
+    expect(['partial', 'none']).toContain(hostSupport?.match);
+    expect(hostSupport?.match).not.toBe('exact');
+    expect(['supported', 'preview', 'unqualified', 'unsupported']).toContain(hostSupport?.status);
   });
 
   it('returns a concise text summary in human mode (no --json)', async () => {
@@ -571,5 +612,102 @@ describe('executeAgentCatalog', () => {
         usedExportCount: 2,
       },
     ]);
+  });
+});
+
+// The Plan 03 catalog-parity handoff: the CLI and MCP composition roots both
+// build their catalog from `buildAgentCatalog` and both derive `hostSupport` from
+// the SAME core projection via the SAME contracts mapper. Feeding identical
+// process facts must produce EQUAL full AgentCatalog objects (including
+// hostSupport) — not merely equal hostSupport payloads — so a future common
+// parity assembler can accept `hostSupport?: AgentHostSupport` with no adapter or
+// rename. (The MCP read port's forwarding half is proven in
+// packages/mcp/src/__tests__/session-results-read-port.test.ts.)
+describe('CLI↔MCP catalog parity (Plan 03 handoff)', () => {
+  /** The exact live-process projection both composition roots compute. */
+  function liveHostSupport(): AgentHostSupport {
+    return hostSupportFromRuntimeProjection(
+      projectRuntimeHostSupport({
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
+        nodeAbi: process.versions.modules,
+      }),
+      PLATFORM_SUPPORT_CONTRACT_VERSION,
+    );
+  }
+
+  /** Exactly what `SessionResultsReadPort.agentCatalog()` builds for these deps. */
+  function mcpCatalog(tools: ToolRegistry, hostSupport: AgentHostSupport) {
+    return buildAgentCatalogFromContracts({ tools, hostSupport, validateOverlays: true });
+  }
+
+  it('CLI executeAgentCatalog equals the MCP-composed catalog for identical facts (incl. hostSupport)', async () => {
+    const tools = await makeRegistry();
+    const out = executeAgentCatalog({ json: true, tools });
+    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
+
+    // The ONE documented CLI-only overlay is reservedNames (ADR-0159); MCP omits
+    // it. Everything else — including the honest process-only hostSupport — must
+    // be byte-for-byte identical to the MCP composition.
+    const { reservedNames, ...cliRest } = catalog;
+    expect(reservedNames).toBeDefined();
+
+    const mcp = mcpCatalog(tools, liveHostSupport());
+    expect(cliRest).toEqual(mcp);
+    // Prove the equality is not vacuous: hostSupport is present, additive, and
+    // identical on both sides (the load-bearing Plan 03 field).
+    expect(cliRest.hostSupport).toBeDefined();
+    expect(cliRest.hostSupport).toEqual(mcp.hostSupport);
+    expect(cliRest.hostSupport).toEqual(liveHostSupport());
+    expect(JSON.stringify(cliRest.hostSupport)).toBe(JSON.stringify(mcp.hostSupport));
+  });
+
+  it('the shared hostSupport is honest: contract-versioned, never exact, closed vocabulary', async () => {
+    const tools = await makeRegistry();
+    const hostSupport = mcpCatalog(tools, liveHostSupport()).hostSupport;
+    expect(hostSupport?.supportContractVersion).toBe(PLATFORM_SUPPORT_CONTRACT_VERSION);
+    expect(hostSupport?.match).not.toBe('exact');
+    expect(['partial', 'none']).toContain(hostSupport?.match);
+    expect(['supported', 'preview', 'unqualified', 'unsupported']).toContain(hostSupport?.status);
+  });
+
+  // Plan 03 Task 1.1/2.1: the CLI adapter must route through the SAME contracts
+  // `assembleAgentCatalog` seam MCP uses. These prove the CLI's rendered catalog
+  // is byte-for-byte what the shared assembler produces for the CLI's
+  // authoritative inputs — a full-object comparison, not a hand-picked subset.
+  it('executeAgentCatalog(--json) deep-equals the shared assembler result (no scope)', async () => {
+    const tools = await makeRegistry();
+    const out = executeAgentCatalog({ json: true, tools });
+    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
+    // The CLI's authority inputs: its sorted static reserved roots (ADR-0159),
+    // config's reserved suite names, and the live process-only hostSupport.
+    const assembled = assembleAgentCatalog({
+      tools,
+      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+      suiteNames: RESERVED_SUITE_NAMES,
+      hostSupport: liveHostSupport(),
+    });
+    expect(catalog).toEqual(assembled);
+    // No entered scope → no project context on either side.
+    expect(catalog.projectContext).toBeUndefined();
+  });
+
+  it('routes reserved names + bounded target conventions through the assembler (entered scope)', () => {
+    const scope = new RunScope();
+    Object.assign(scope, { targets: targetResolver() });
+    const out = runWithScopeSync(scope, () => executeAgentCatalog({ json: true }));
+    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
+    const assembled = assembleAgentCatalog({
+      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+      suiteNames: RESERVED_SUITE_NAMES,
+      hostSupport: liveHostSupport(),
+      projectContext: { targetConventions: summarizeTargetConventions(targetResolver()) },
+    });
+    expect(catalog).toEqual(assembled);
+    // The deterministic reserved-name shape flows through the shared path.
+    expect(catalog.reservedNames?.suiteNames).toEqual(['audit', 'agent-context']);
+    expect(catalog.reservedNames?.rootCommands).toEqual([...HOST_RESERVED_ROOT_COMMANDS].sort());
+    expect(catalog.projectContext?.targetConventions.length).toBeGreaterThan(0);
   });
 });

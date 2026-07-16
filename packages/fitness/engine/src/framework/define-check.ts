@@ -117,6 +117,60 @@ function repairFromViolation(
 // ANALYSIS MODE EXECUTORS
 // =============================================================================
 
+/**
+ * @throws {CheckAbortedError} When the original error is an abort.
+ * @throws {Error} Always rethrows `error` (wrapped via `wrap` when not already an Error).
+ */
+function rethrowUnlessAbort(error: unknown, wrap: (message: string) => Error): never {
+  if (error instanceof CheckAbortedError) throw error;
+  throw error instanceof Error ? error : wrap(String(error));
+}
+
+async function analyzeSingleFile(
+  config: AnalyzeCheckConfig,
+  filePath: string,
+  ctx: ExecutionContext,
+): Promise<readonly CheckViolation[] | 'skip'> {
+  let rawContent: string;
+  try {
+    rawContent = await ctx.readFile(filePath);
+  } catch (error) {
+    if (error instanceof CheckAbortedError) throw error;
+    // Only filesystem/read failures are skippable. Analyze bugs must not
+    // silently green-pass the rest of the run.
+    logger.debug('Skipping unreadable file', {
+      evt: 'fitness.check.file.skip',
+      module: 'fitness:framework',
+      filePath,
+      checkSlug: config.slug,
+    });
+    return 'skip';
+  }
+
+  let content: string;
+  try {
+    // Dispatch the content filter through the LanguageAdapter for the
+    // file's extension. Falls back to raw content when no adapter is
+    // registered. See languages/content-filter-dispatch.ts.
+    content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
+  } catch (error) {
+    rethrowUnlessAbort(
+      error,
+      (message) => new Error(`Content filter failed for ${filePath}: ${message}`),
+    );
+  }
+
+  try {
+    return config.analyze(content, filePath);
+  } catch (error) {
+    // Surface analyze-mode throws as check failure (parity with analyzeAll).
+    rethrowUnlessAbort(
+      error,
+      (message) => new Error(`Check analyze failed for ${filePath}: ${message}`),
+    );
+  }
+}
+
 /** @throws {CheckAbortedError} When the check is aborted via AbortSignal */
 async function executeAnalyzeMode(
   config: AnalyzeCheckConfig,
@@ -138,27 +192,13 @@ async function executeAnalyzeMode(
       throw new CheckAbortedError(config.slug);
     }
 
-    try {
-      const rawContent = await ctx.readFile(filePath);
-      // Dispatch the content filter through the LanguageAdapter for the
-      // file's extension. Falls back to raw content when no adapter is
-      // registered. See languages/content-filter-dispatch.ts.
-      const content = applyContentFilter(filePath, rawContent, config.contentFilter ?? 'none');
-      const violations = config.analyze(content, filePath);
+    const violations = await analyzeSingleFile(config, filePath, ctx);
+    if (violations === 'skip') continue;
 
-      for (const violation of violations) {
-        void builder.addSignal(
-          toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider),
-        );
-      }
-    } catch (error) {
-      if (error instanceof CheckAbortedError) throw error;
-      logger.debug('Skipping unreadable file', {
-        evt: 'fitness.check.file.skip',
-        module: 'fitness:framework',
-        filePath,
-        checkSlug: config.slug,
-      });
+    for (const violation of violations) {
+      void builder.addSignal(
+        toSignal(violation, config.slug, config.tags ?? [], filePath, config.provider),
+      );
     }
   }
 
@@ -219,6 +259,39 @@ async function executeCommandMode(
   files: readonly string[],
   ctx: ExecutionContext,
 ): Promise<CheckResult> {
+  const builder = ResultBuilder.create({
+    checkId: config.id,
+    itemType: config.itemType ?? 'files',
+  })
+    .totalItems(files.length)
+    .filesScanned(0);
+
+  // File-list-driven scanners (`args: (files) => ...`) with zero matched files
+  // must not invoke the binary: tools like clang-tidy exit 1 with
+  // "no input files specified", and the green-wash fail-closed path promotes
+  // that to a unit fault. Project-wide command checks use `args: () => ...` or
+  // a static args array and still run with an empty file list.
+  if (
+    files.length === 0 &&
+    typeof config.command.args === 'function' &&
+    config.command.args.length > 0
+  ) {
+    const clean = builder.build();
+    return {
+      ...clean,
+      info: { label: 'Skipped: no matched files' },
+      metadata: {
+        ...clean.metadata,
+        extra: {
+          ...clean.metadata.extra,
+          skipped: true,
+          skipReason: 'no-matched-files',
+          skipMessage: 'no matched files for file-list command check',
+        },
+      },
+    };
+  }
+
   const result = await executeCommand(config.command, files, {
     cwd: ctx.cwd,
     signal: ctx.signal,
@@ -231,14 +304,26 @@ async function executeCommandMode(
   }
   /* v8 ignore stop */
 
-  const builder = ResultBuilder.create({
-    checkId: config.id,
-    itemType: config.itemType ?? 'files',
-  })
-    .totalItems(files.length)
-    .filesScanned(0);
-
   if (result.error) {
+    // Optional external tools that are not installed are a skip, not a
+    // framework fault. Key on the structured notInstalled flag only — never
+    // substring-match the free-text error (stderr can mention "is not installed").
+    if (result.notInstalled === true) {
+      const clean = builder.build();
+      return {
+        ...clean,
+        info: { label: `Skipped: ${result.error}` },
+        metadata: {
+          ...clean.metadata,
+          extra: {
+            ...clean.metadata.extra,
+            skipped: true,
+            skipReason: 'tool-not-installed',
+            skipMessage: result.error,
+          },
+        },
+      };
+    }
     return builder.buildError(result.error);
   }
 

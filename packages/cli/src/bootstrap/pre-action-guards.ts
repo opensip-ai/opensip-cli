@@ -91,7 +91,7 @@ export function checkNoProjectAndBailout(
   runId: string,
   commandScopes: CommandScopeIndex,
 ): void {
-  if (project.scope !== 'none' || commandScopes.get(commandPath) === 'none') return;
+  if (project.scope !== 'none' || commandScopes.get(commandPath)?.scope === 'none') return;
   logger.warn({
     evt: 'cli.project.not-found',
     module: MODULE_TAG,

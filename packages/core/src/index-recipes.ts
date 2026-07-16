@@ -81,6 +81,13 @@ export type {
   ResolvedToolConfig,
   TargetConventionUsedExportView,
   TargetConventionsView,
+  BoundedTargetResolution,
+  BoundedTargetResolutionOptions,
+  BoundedTargetResolver,
+  BoundedTargetMembership,
+  BoundedTargetMembershipResolution,
+  BoundedTargetMembershipResolutionOptions,
+  BoundedTargetMembershipResolver,
   TargetResolver,
   TargetView,
 } from './lib/scope-types.js';

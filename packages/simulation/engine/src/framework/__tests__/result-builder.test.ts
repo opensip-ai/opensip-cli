@@ -96,12 +96,12 @@ describe('ScenarioResultBuilder', () => {
       expect(out.passed).toBe(true);
     });
 
-    it('resolves error_rate to 0 when totalRequests is 0', () => {
+    it('resolves error_rate to 1 when totalRequests is 0 (fail closed)', () => {
       const out = ScenarioResultBuilder.create('s1')
         .withMetrics(baseMetrics({ totalRequests: 0, failedRequests: 0 }))
         .evaluateAssertions([ASSERTIONS.lowErrorRate()])
         .build();
-      expect(out.passed).toBe(true);
+      expect(out.passed).toBe(false);
     });
 
     it('resolves success_rate from successful / total', () => {

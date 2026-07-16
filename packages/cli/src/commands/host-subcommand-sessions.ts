@@ -51,8 +51,17 @@ function parseOlderThanDays(raw: string): number {
 
 function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-sessions.ts',
+      declaration: 'buildSessionsListSpec',
+    },
     name: 'list',
     description: 'List stored sessions',
+    // First-run capable: a pre-init run records real evidence in the ephemeral
+    // user-cache datastore, so the user must be able to read it back without
+    // being forced to initialize the project first.
+    noInit: true,
     commonFlags: ['json'],
     options: [
       {
@@ -104,8 +113,16 @@ function buildSessionsListSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-sessions.ts',
+      declaration: 'buildSessionsShowSpec',
+    },
     name: 'show',
     description: 'Display a stored session result',
+    // First-run capable — see `sessions list`. Replay reads the same ephemeral
+    // datastore the pre-init run wrote.
+    noInit: true,
     commonFlags: ['json'],
     args: [{ name: 'ref', description: 'Session id, or latest with --tool' }],
     options: [
@@ -183,6 +200,11 @@ function buildSessionsShowSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: 'opensip-cli',
+      path: 'packages/cli/src/commands/host-subcommand-sessions.ts',
+      declaration: 'buildSessionsPurgeSpec',
+    },
     name: 'purge',
     description:
       'Delete session rows from the project-local SQLite store (opensip-cli/.runtime/datastore.sqlite)',

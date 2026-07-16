@@ -1,22 +1,18 @@
 import { z } from 'zod';
 
-import { sessionRef, toolId } from './schemas.js';
+import { boundedText, sessionRef, strictInput, toolId } from './schemas.js';
 import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
 import type { McpStdioServer } from '../server.js';
 
 const selector = () =>
-  z
-    .string()
-    .min(1)
-    .max(512)
-    .regex(
-      /^(id|fingerprint|index):.+$/,
-      'signal must be id:<value>, fingerprint:<value>, or index:<zero-based>',
-    );
+  boundedText(512, 'signal').regex(
+    /^(id|fingerprint|index):.+$/,
+    'signal must be id:<value>, fingerprint:<value>, or index:<zero-based>',
+  );
 
-const actionId = () => z.string().min(1).max(128);
+const actionId = () => boundedText(128, 'action');
 
 export function registerRepairApplyVerify(server: McpStdioServer, deps: McpToolDeps): void {
   server.register(
@@ -27,13 +23,13 @@ export function registerRepairApplyVerify(server: McpStdioServer, deps: McpToolD
         'Mutating OpenSIP MCP tool. It applies one structured signal.repair action from a stored session ' +
         'and reruns deterministic verification through the same host repair apply --verify path. This tool ' +
         'is registered only when the MCP server is started with mutation explicitly enabled.',
-      inputSchema: {
+      inputSchema: strictInput({
         ref: sessionRef(),
         tool: toolId(),
         signal: selector(),
         action: actionId(),
         force: z.boolean().optional(),
-      },
+      }),
     },
     async ({ ref, tool, signal, action, force }) => {
       if (!deps.validToolIds.has(tool)) return unknownToolError(tool, deps.validToolIds);

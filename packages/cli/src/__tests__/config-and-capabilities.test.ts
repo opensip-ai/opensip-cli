@@ -73,6 +73,7 @@ const fitnessTool = makeTool({
 
 const capabilityPreferenceManifest: ToolPluginManifest = {
   kind: 'tool',
+  identity: { name: 'capability-owner' },
   id: 'capability-owner',
   name: 'capability-owner',
   version: '0.0.0',
@@ -117,6 +118,7 @@ const capabilityPreferenceManifest: ToolPluginManifest = {
     {
       id: 'graph-adapter',
       apiVersion: 1,
+      minSupportedApiVersion: 1,
       contributionSchema: { requiredKeys: ['id'] },
       contributionKind: 'module-export',
       discovery: {
@@ -452,9 +454,11 @@ describe('composeAndValidateToolConfig', () => {
 function manifest(id: string, domainId: string): ToolPluginManifest {
   return {
     kind: 'tool',
+    identity: { name: id },
     id,
     name: id,
     version: '0.0.0',
+    apiVersion: 1,
     commands: [],
     capabilities: [
       {
@@ -617,6 +621,7 @@ describe('A4: external adapters claim a config namespace (no brick)', () => {
     // (exit 2 on EVERY command reading project config — the brick).
     const noConfigManifest: ToolPluginManifest = {
       kind: 'tool',
+      identity: { name: 'gitleaks' },
       id: 'gitleaks',
       name: 'gitleaks',
       version: '0.1.14',

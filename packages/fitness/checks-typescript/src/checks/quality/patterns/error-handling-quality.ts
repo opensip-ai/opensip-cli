@@ -145,7 +145,9 @@ const COMPOSITION_ROOT_PATH_PATTERNS = [
 // =============================================================================
 
 function isCompositionRootPath(filePath: string): boolean {
-  return COMPOSITION_ROOT_PATH_PATTERNS.some((pattern) => pattern.test(filePath));
+  return COMPOSITION_ROOT_PATH_PATTERNS.some((pattern) =>
+    pattern.test(filePath.replaceAll('\\', '/')),
+  );
 }
 
 function isModuleInitResolutionProbe(node: ts.CatchClause, sourceFile: ts.SourceFile): boolean {

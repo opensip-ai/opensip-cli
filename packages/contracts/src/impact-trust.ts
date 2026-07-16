@@ -23,6 +23,7 @@ export type ImpactUncertaintyCode =
   | 'graph-catalog-approximate'
   | 'impact-uncertainty-truncated'
   | 'impact-truncated'
+  | 'impact-malformed-row-omitted'
   | 'suite-step-unverified';
 
 export interface ImpactUncertainty {

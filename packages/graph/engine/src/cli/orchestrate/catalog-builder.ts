@@ -11,9 +11,10 @@
  */
 
 import { stampEngineVersion, type EngineMode } from '../../cache/engine-version.js';
+import { declarationFileIndex, mergeSemanticFactsIncremental } from '../../semantic-facts.js';
 
 import { countCatalogCallSites } from './catalog-stats.js';
-import { ownerEdgeKey } from './edge-identity.js';
+import { lookupByOwnerThenBodyHash, lookupEdgesByOwnerThenBodyHash } from './edge-identity.js';
 import {
   expandClosureToFixpoint,
   mergeOccurrences,
@@ -32,6 +33,7 @@ import type {
   ReExportRecord,
   ResolutionMode,
   ResolutionStats,
+  SemanticFactBundle,
 } from '../../types.js';
 import type { PressureMonitor } from '../pressure-monitor.js';
 import type { Attributes } from '@opensip-cli/core';
@@ -163,7 +165,10 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
         resolutionMode,
         emitBoundaryCalls,
       });
-      const catalog = stitchEdges(initialCatalog, result.edgesByOwner, result.dependenciesByOwner);
+      const catalog = attachSemanticFacts(
+        stitchEdges(initialCatalog, result.edgesByOwner, result.dependenciesByOwner),
+        result.semanticFacts,
+      );
       return { ...result, catalog };
     },
     detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
@@ -219,6 +224,7 @@ export async function buildAndResolveCatalogIncremental(
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
+  readonly parseErrors: readonly ParseError[];
 }> {
   const {
     runStage,
@@ -311,11 +317,22 @@ export async function buildAndResolveCatalogIncremental(
       const stitchedFunctions = attachDependenciesIncremental(
         finalFunctions,
         result.dependenciesByOwner,
+        closureRel,
       );
-      const catalog: Catalog = {
-        ...initialCatalog,
-        functions: stitchedFunctions,
-      };
+      const declIndex = declarationFileIndex(cachedCatalog.semanticFacts?.declarations ?? []);
+      const semanticFacts = mergeSemanticFactsIncremental(
+        cachedCatalog.semanticFacts,
+        result.semanticFacts,
+        closureRel,
+        declIndex,
+      );
+      const catalog = attachSemanticFacts(
+        {
+          ...initialCatalog,
+          functions: stitchedFunctions,
+        },
+        semanticFacts,
+      );
       return { ...result, catalog };
     },
     detailFn: (r) => `${String(countCatalogCallSites(r.catalog))} call site(s)`,
@@ -325,24 +342,30 @@ export async function buildAndResolveCatalogIncremental(
     catalog: resolved.catalog,
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
+    parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
   };
 }
 
 /**
- * Phase 4 (DEC-498) post-pass for the incremental path. Attaches
- * `dependencies` to occurrences whose hash appears in the resolver's
- * dependency map. Unchanged-file occurrences keep their cached
- * dependency arrays (if any) untouched — they came from the cached
- * catalog and are still valid since the file hasn't changed.
+ * Incremental post-pass. A freshly walked CLOSURE module-init REPLACES its
+ * cached dependency facts with the newly resolved array — including replacing
+ * prior populated data with an explicit `[]` when the file now has zero imports
+ * (P2 Phase 0 Task 0.2).
  *
- * No-op when `dependenciesByOwner` is undefined (adapter doesn't emit
- * dependency edges) or empty.
+ * Only CLOSURE files are touched. The adapter's `resolveDependencies` is handed
+ * the FULL merged catalog, so it also keys UNCHANGED files' module-inits with
+ * `[]`; applying that here would clobber their cached dependencies. Gating on
+ * `closureRel` (the set the engine re-walked this pass) keeps unchanged files'
+ * cached `dependencies` untouched — the adapter's `[]` for them is ignored.
+ *
+ * No-op only when the map is ABSENT (adapter/tier emits no dependency evidence).
  */
 function attachDependenciesIncremental(
   functions: Record<string, readonly FunctionOccurrence[]>,
   dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined,
+  closureRel: ReadonlySet<string>,
 ): Record<string, readonly FunctionOccurrence[]> {
-  if (dependenciesByOwner === undefined || dependenciesByOwner.size === 0) {
+  if (dependenciesByOwner === undefined) {
     return functions;
   }
   const out: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
@@ -351,7 +374,8 @@ function attachDependenciesIncremental(
   >;
   for (const [name, occs] of Object.entries(functions)) {
     out[name] = occs.map((o) => {
-      const deps = dependenciesByOwner.get(ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column));
+      if (!closureRel.has(o.filePath)) return o; // unchanged file — keep cached
+      const deps = lookupByOwnerThenBodyHash(dependenciesByOwner, o);
       return deps === undefined ? o : { ...o, dependencies: deps };
     });
   }
@@ -439,17 +463,18 @@ function sortReExports(reExports: readonly ReExportRecord[]): readonly ReExportR
 
 /**
  * Stitch resolved edges into the catalog. The adapter returns a
- * `bodyHash → CallEdge[]` map for call edges and (Phase 4) optionally
- * a `bodyHash → DependencyEdge[]` map for module-level dependency
- * edges. We walk the catalog and replace each occurrence's `calls`
- * array; if the dependency map is provided, attach `dependencies` to
- * occurrences whose hash appears as a key (typically only module-init
- * occurrences).
+ * `bodyHash → CallEdge[]` map for call edges and optionally a
+ * `ownerKey → DependencyEdge[]` map for module-level dependency edges.
  *
- * Adapters that don't emit dependency edges pass `undefined` for the
- * second map; resulting occurrences have no `dependencies` field
- * (matches the pre-Phase-4 catalog shape — the field is optional on
- * `FunctionOccurrence`).
+ * Three dependency states (P2 Phase 0), enforced by the `?.get` below:
+ *   - map ABSENT (`dependenciesByOwner === undefined`) → the adapter/tier
+ *     does not emit dependency evidence → every occurrence's `dependencies`
+ *     field stays absent (unsupported).
+ *   - map PRESENT + owner entry `[]` → the file was inspected and has no
+ *     imports → `dependencies: []` (supported, empty).
+ *   - map PRESENT + owner entry populated → `dependencies: [...]` (evidence).
+ * Non-module-init occurrences (never keyed in the map) keep no `dependencies`
+ * field regardless — the map only carries module-init owners.
  */
 function stitchEdges(
   initial: Catalog,
@@ -463,17 +488,38 @@ function stitchEdges(
   for (const [name, occs] of Object.entries(initial.functions)) {
     if (!occs) continue;
     next[name] = occs.map((o) => {
-      // Owner identity comes from the ONE shared module (ADR-0003/0136 canonical
-      // key) — the exact and cross-shard paths bucket/stitch through the same
-      // `ownerEdgeKey` (full occurrence identity), never a bare `bodyHash`.
-      const ownerKey = ownerEdgeKey(o.bodyHash, o.filePath, o.line, o.column);
-      const calls = edgesByOwner.get(ownerKey) ?? [];
-      const dependencies = dependenciesByOwner?.get(ownerKey);
-      // Omit `dependencies` entirely when no edges resolved — the
-      // optional field stays absent, matching the pre-Phase-4 wire
-      // shape for adapters that don't emit dependency sites.
+      // Prefer full occurrence identity (ADR-0003/0136). Fall back to bare
+      // bodyHash for polyglot adapters that still bucket by owner hash alone
+      // (pre-migration Go/Java/Python/Rust). Bare-hash twins may union edges —
+      // empty catalogs are worse than twin over-approx until adapters migrate.
+      // Dual-lookup lives in edge-identity (the only allowed bare-hash home).
+      const calls = lookupEdgesByOwnerThenBodyHash(edgesByOwner, o);
+      const dependencies =
+        dependenciesByOwner === undefined
+          ? undefined
+          : lookupByOwnerThenBodyHash(dependenciesByOwner, o);
+      // Absent key → omit the field (unsupported / non-module-init). A present
+      // `[]` is retained verbatim as "supported, no imports".
       return dependencies === undefined ? { ...o, calls } : { ...o, calls, dependencies };
     });
   }
   return { ...initial, functions: next };
+}
+
+/**
+ * Attach optional semantic facts onto a catalog. Absent stays absent
+ * (unsupported); a present bundle (including empty arrays) is retained.
+ */
+function attachSemanticFacts(
+  catalog: Catalog,
+  semanticFacts: SemanticFactBundle | undefined,
+): Catalog {
+  if (semanticFacts === undefined) {
+    // Drop any stale plane when the adapter omitted facts this pass.
+    if (catalog.semanticFacts === undefined) return catalog;
+    const rest = { ...catalog };
+    delete rest.semanticFacts;
+    return rest;
+  }
+  return { ...catalog, semanticFacts };
 }

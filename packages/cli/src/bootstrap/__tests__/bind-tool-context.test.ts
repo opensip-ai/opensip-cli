@@ -9,6 +9,7 @@ import { bindToolCliContext, toolOwnedKeys } from '../bind-tool-context.js';
 
 function makeTool(): Tool {
   return {
+    identity: { name: 'simulation' },
     metadata: {
       id: '00000000-0000-4000-8000-00000000abcd',
       name: 'simulation',
@@ -75,7 +76,6 @@ function makeContext(): {
           calls.push(`governance-get:${tool}`);
           return Promise.resolve(undefined);
         }),
-        listForProject: vi.fn(() => Promise.resolve([])),
         queryAudit: vi.fn((tool: string) => {
           calls.push(`governance-audit:${tool}`);
           return Promise.resolve([]);
@@ -136,6 +136,32 @@ describe('bindToolCliContext', () => {
     ]);
   });
 
+  it('selects the actual primary command when a nested child is listed first', () => {
+    const tool = makeTool();
+    (tool as { identity: { name: string } }).identity = { name: 'simulation' };
+    (tool as { commandSpecs: Tool['commandSpecs'] }).commandSpecs = [
+      {
+        name: 'victim-stable-id',
+        parent: 'simulation',
+        description: 'nested child',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => ({ type: 'noop' }),
+      },
+      {
+        name: 'simulation',
+        description: 'primary',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler: () => ({ type: 'noop' }),
+      },
+    ];
+    expect(toolOwnedKeys(tool)).not.toContain('victim-stable-id');
+    expect(toolOwnedKeys(tool)).toContain('simulation');
+  });
+
   it('preserves the lazy scope getter without reading it at bind time', () => {
     const { ctx, scopeReads } = makeContext();
     const bound = bindToolCliContext(makeTool(), ctx);
@@ -180,11 +206,21 @@ describe('bindToolCliContext', () => {
     expect(() => bound.hostPlanes?.entitlements?.check('fitness')).toThrow(/namespace 'fitness'/);
   });
 
-  it('keeps project-level host-plane methods that are not tool-keyed available', async () => {
+  it('does not expose unbound listForProject / exportForCloud on bound context', () => {
     const { ctx } = makeContext();
     const bound = bindToolCliContext(makeTool(), ctx);
+    expect(bound.hostPlanes?.governance).not.toHaveProperty('listForProject');
+    expect(bound.hostPlanes?.audit).not.toHaveProperty('exportForCloud');
+  });
 
-    await expect(bound.hostPlanes?.governance?.listForProject('/repo')).resolves.toEqual([]);
+  it('rejects a reserved host-plane identity on owned-key candidates before binding seams', () => {
+    const tool = makeTool();
+    // Corrupt metadata id to the reserved prefix — toolOwnedKeys must throw
+    // before any seam is callable.
+    (tool.metadata as { id: string }).id = '@opensip-cli/host-plane:victim';
+    const { ctx, calls } = makeContext();
+    expect(() => bindToolCliContext(tool, ctx)).toThrow(/reserved host-plane identity/);
+    expect(calls).toEqual([]);
   });
 
   // Guards the hand-enumerated `wrapHostPlanes` shape: a method added to any host
@@ -201,7 +237,7 @@ describe('bindToolCliContext', () => {
       expect(wrapped, `bound.hostPlanes.${plane} missing`).toBeDefined();
       for (const method of Object.keys(source as object)) {
         expect(
-          typeof (wrapped as Record<string, unknown>)[method],
+          typeof (wrapped as unknown as Record<string, unknown>)[method],
           `host plane '${plane}' method '${method}' not forwarded by wrapHostPlanes`,
         ).toBe('function');
       }

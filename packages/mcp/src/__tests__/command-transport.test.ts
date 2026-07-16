@@ -14,11 +14,43 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { currentScope, logger, RunScope } from '@opensip-cli/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mcpCommandSpec } from '../command.js';
+import { McpStdioServer } from '../server.js';
+
+import type { CallToolResult } from '../server.js';
 
 const SRC_DIR = fileURLToPath(new URL('..', import.meta.url));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function serverWithScope(scope: RunScope): McpStdioServer {
+  return new McpStdioServer({
+    scope,
+    graph: {} as ConstructorParameters<typeof McpStdioServer>[0]['graph'],
+    results: {} as ConstructorParameters<typeof McpStdioServer>[0]['results'],
+    version: '0.0.0-test',
+  });
+}
+
+type Dispatch = (
+  name: string,
+  run: () => CallToolResult | Promise<CallToolResult>,
+) => Promise<CallToolResult>;
+
+function dispatchOf(server: McpStdioServer): Dispatch {
+  return (
+    server as unknown as {
+      dispatch: Dispatch;
+    }
+  ).dispatch.bind(server);
+}
+
+const OK_RESULT: CallToolResult = { content: [{ type: 'text', text: '{}' }] };
 
 /** Every production `.ts` under `src/` (excludes `__tests__/` and `*.test.ts`). */
 function productionSources(dir: string): string[] {
@@ -40,6 +72,22 @@ describe('mcp command — raw-stream transport contract', () => {
     expect(mcpCommandSpec.output).toBe('raw-stream');
     expect(mcpCommandSpec.rawStreamReason).toBe('mcp-stdio');
     expect(mcpCommandSpec.scope).toBe('project');
+  });
+
+  it('uses the current context-read surface epoch when constructed directly', () => {
+    expect(serverWithScope(new RunScope()).describeSurface().surfaceEpoch).toBe(7);
+  });
+
+  it('advertises an explicitly captured canonical project root', () => {
+    const server = new McpStdioServer({
+      scope: new RunScope(),
+      graph: {} as ConstructorParameters<typeof McpStdioServer>[0]['graph'],
+      results: {} as ConstructorParameters<typeof McpStdioServer>[0]['results'],
+      version: '0.0.0-test',
+      projectRoot: '/canonical/project',
+    });
+
+    expect(server.describeSurface().projectRoot).toBe('/canonical/project');
   });
 });
 
@@ -74,5 +122,85 @@ describe('mcp source — no session-record writer (transport, not a run)', () =>
         `${needle} must not appear in MCP source:\n${offenders.join('\n')}`,
       ).toEqual([]);
     }
+  });
+
+  it('never imports currentScope in production MCP code', () => {
+    const offenders = [...contents]
+      .filter(([, content]) => /import[^;]*\bcurrentScope\b[^;]*from/.test(content))
+      .map(([file]) => file);
+    expect(
+      offenders,
+      `MCP production must use captured ports, not currentScope:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+});
+
+describe('MCP dispatch observability', () => {
+  it('re-enters the captured scope and logs a bounded ok outcome with duration', async () => {
+    const scope = new RunScope();
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const result = await dispatchOf(serverWithScope(scope))('search_symbols', () => {
+      expect(currentScope()).toBe(scope);
+      return OK_RESULT;
+    });
+    expect(result).toBe(OK_RESULT);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'mcp.tool.dispatch.ok',
+        tool: 'search_symbols',
+        outcome: 'ok',
+        durationMs: expect.any(Number),
+      }),
+    );
+    const exit = info.mock.calls.find(
+      (call) => (call[0] as { evt?: string }).evt === 'mcp.tool.dispatch.ok',
+    )?.[0] as Record<string, unknown>;
+    expect(exit.durationMs).toEqual(expect.any(Number));
+    expect(exit).not.toHaveProperty('projectRoot');
+    expect(exit).not.toHaveProperty('query');
+    expect(Object.keys(exit).sort()).toEqual(
+      ['durationMs', 'evt', 'module', 'outcome', 'tool'].sort(),
+    );
+  });
+
+  it('logs a returned MCP tool error without throwing', async () => {
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const toolError: CallToolResult = { ...OK_RESULT, isError: true };
+    await expect(
+      dispatchOf(serverWithScope(new RunScope()))('get_runtime_wiring', () => toolError),
+    ).resolves.toBe(toolError);
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'mcp.tool.dispatch.ok',
+        tool: 'get_runtime_wiring',
+        outcome: 'tool-error',
+        durationMs: expect.any(Number),
+      }),
+    );
+  });
+
+  it('logs thrown infrastructure failures without raw path/query/error payloads', async () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    const errorLog = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const secret = '/private/project?query=raw-symbol';
+    await expect(
+      dispatchOf(serverWithScope(new RunScope()))('who_calls', () => {
+        throw new Error(secret);
+      }),
+    ).rejects.toThrow('<path>');
+    expect(errorLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'mcp.tool.dispatch.error',
+        tool: 'who_calls',
+        outcome: 'thrown',
+        durationMs: expect.any(Number),
+      }),
+    );
+    const event = errorLog.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(JSON.stringify(event)).not.toContain('/private/project');
+    expect(event).not.toHaveProperty('error');
+    expect(Object.keys(event).sort()).toEqual(
+      ['durationMs', 'evt', 'module', 'outcome', 'tool'].sort(),
+    );
   });
 });

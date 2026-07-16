@@ -21,8 +21,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { assembleAgentCatalog } from '@opensip-cli/contracts';
 import {
   applyToolContributeScope,
+  err,
+  ok,
   RunScope,
   runWithScope,
   runWithScopeSync,
@@ -34,13 +37,14 @@ import { typescriptGraphAdapter } from '@opensip-cli/graph-typescript';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { workingTreeContextFromCatalog } from '../freshness.js';
 import { registerMcpGraphAdapter } from '../register-mcp-graph-adapters.js';
 import { SessionResultsReadPort } from '../session-results-read-port.js';
 import { SqliteGraphReadPort } from '../sqlite-graph-read-port.js';
 
 import type { GraphReadPort } from '../graph-read-port.js';
+import type { McpReadError } from '../mcp-error.js';
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
+import type { Result } from '@opensip-cli/core';
 import type { Catalog } from '@opensip-cli/graph';
 import type { SessionReplayFn } from '@opensip-cli/session-store';
 
@@ -83,14 +87,18 @@ afterEach(() => {
 
 /** Build the graph read port whose rebuild runs the real engine under the scope. */
 function buildGraphPort(): GraphReadPort {
-  const rebuild = async (): Promise<Catalog> => {
+  const rebuild = async (): Promise<Result<Catalog, McpReadError>> => {
     const outcome = await runWithScope(scope, () => runGraph({ cwd: dir, datastore: store }));
-    if (outcome.catalog === null) throw new Error('graph build produced no catalog');
-    return outcome.catalog;
+    if (outcome.catalog === null) {
+      return err({ code: 'refresh-empty', message: 'Graph build produced no catalog.' });
+    }
+    return ok(outcome.catalog);
   };
   return new SqliteGraphReadPort({
     store,
-    freshnessContext: workingTreeContextFromCatalog,
+    projectRoot: dir,
+    adapters: runWithScopeSync(scope, () => currentAdapterRegistry()),
+    languageAdapters: scope.languages.list(),
     rebuild,
   });
 }
@@ -110,40 +118,48 @@ describe('MCP integration — adapter load + real catalog', () => {
     const graph = buildGraphPort();
 
     // refresh_graph: a project without a loaded catalog → build it.
-    const refreshed = await graph.refresh();
+    const refreshed = await graph.refresh({ forceRebuild: true });
     expect(refreshed.ok).toBe(true);
+    if (refreshed.ok) {
+      expect(refreshed.value.context.catalog.status).toBe('loaded');
+      expect(refreshed.value.data.action).toBe('rebuilt');
+    }
 
     // search → get_symbol
-    const search = graph.searchSymbols('helper');
+    const search = await graph.searchSymbols('helper');
     expect(search.ok).toBe(true);
     const helperRef = search.ok
-      ? search.value.data.find((r) => r.qualifiedName.includes('helper'))
+      ? search.value.data.symbols.find((r) => r.qualifiedName.includes('helper'))
       : undefined;
     expect(helperRef).toBeDefined();
 
-    const span = graph.findBySpan(helperRef!.filePath, helperRef!.line);
+    const span = await graph.findBySpan(helperRef!.filePath, helperRef!.line);
     expect(span.ok && span.value.data.some((r) => r.bodyHash === helperRef!.bodyHash)).toBe(true);
 
     // who_calls (reverse adjacency): main calls helper.
-    const callers = graph.callerGraph();
+    const callers = await graph.traverse({
+      direction: 'callers',
+      startSymbolId: helperRef!.symbolId,
+      depth: 2,
+    });
     expect(callers.ok).toBe(true);
     if (callers.ok) {
-      const callerHashes = callers.value.data.edges.get(helperRef!.bodyHash) ?? [];
-      const callerNames = callerHashes
-        .map((h) => callers.value.data.resolve(h)?.qualifiedName ?? '')
-        .join(',');
+      const callerNames = callers.value.data.nodes.map((n) => n.symbol.qualifiedName).join(',');
       expect(callerNames).toContain('main');
+      expect(callers.value.context.catalog.identity).toBe(
+        refreshed.ok ? refreshed.value.context.catalog.identity : undefined,
+      );
     }
 
     // blast: helper has at least one direct caller.
-    const blast = graph.blast(helperRef!.symbolId);
+    const blast = await graph.blast(helperRef!.symbolId);
     expect(blast.ok).toBe(true);
     expect(blast.ok && (blast.value.data?.direct ?? 0)).toBeGreaterThanOrEqual(1);
 
     // dead_code: `unused` is unreachable.
-    const dead = graph.deadCode();
+    const dead = await graph.deadCode({ detail: 'nodes' });
     expect(dead.ok).toBe(true);
-    const deadNames = dead.ok ? dead.value.data.map((d) => d.symbol.qualifiedName) : [];
+    const deadNames = dead.ok ? dead.value.data.rows.map((d) => d.symbol.qualifiedName) : [];
     expect(deadNames.some((n) => n.includes('unused'))).toBe(true);
   });
 });
@@ -187,6 +203,8 @@ const buildStubReplay: SessionReplayFn = (stored): ToolSessionReplay<CommandResu
 
 const stubResolver: (tool: string) => SessionReplayFn | undefined = () => buildStubReplay;
 
+const AGENT_CATALOG = assembleAgentCatalog({ rootCommands: [], suiteNames: [] });
+
 describe('MCP integration — session replay over a real DataStore', () => {
   it('lists, replays latest, and shows a seeded run (replay only, never re-run)', async () => {
     new SessionRepo(store).save(makeSession({ id: 'fit-int-1' }));
@@ -197,7 +215,11 @@ describe('MCP integration — session replay over a real DataStore', () => {
         completedAt: '2026-05-22T00:00:30.000Z',
       }),
     );
-    const results = new SessionResultsReadPort({ store, replayFor: stubResolver });
+    const results = new SessionResultsReadPort({
+      store,
+      replayFor: stubResolver,
+      agentCatalog: AGENT_CATALOG,
+    });
 
     const list = results.listRuns();
     expect(list.ok && list.value.map((r) => r.id)).toEqual(['fit-int-2', 'fit-int-1']);

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-12
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Use graph"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "Task-led guide for running static call-graph analysis, inspecting discovered files, scoping runs, opening the dashboard, and adopting graph gates."
@@ -64,7 +64,9 @@ The default output is compact. Use verbose mode when you want details in the ter
 opensip graph --verbose
 ```
 
-The run creates a session and writes report data to the project runtime store. Open the report with:
+The run creates a session and writes report data to the active local runtime:
+managed user cache for a zero-config project, project `.runtime` after initialization.
+Open the report with:
 
 ```bash
 opensip report

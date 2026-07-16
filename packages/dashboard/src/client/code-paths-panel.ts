@@ -39,11 +39,12 @@ import {
 } from './catalog-recipes-tables.js';
 import { el } from './el.js';
 import { filterState } from './filters.js';
-import { closeFunctionCard, openFunctionCard } from './function-card.js';
+import { closeFunctionCard, openFunctionCard, openFunctionOccurrence } from './function-card.js';
 import { buildIndexes } from './indexes.js';
 import { renderSessionTable } from './sessions.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { registerTabActivator } from './tab-activators.js';
+import { activateReportTab } from './tab-bar.js';
 import { activateView, views } from './views-registry.js';
 // view-coupling / view-distribution / view-graph register themselves into the
 // `views` array as a load-time side effect. Importing them here (the panel is
@@ -154,6 +155,9 @@ export function renderCodePathsTab(): void {
       },
     },
   ]);
+  if (readViewIdFromHash() !== null && activateReportTab('code-paths')) {
+    activateExploreSubtab(panel);
+  }
 }
 
 // =======================================================
@@ -182,9 +186,15 @@ function renderCodePathsExplore(host: HTMLElement): void {
   host.append(tabBar);
 
   // One container per view; only one is .active at a time.
-  const stack = el('div', { class: 'code-paths-view-container', id: 'code-paths-view-container' });
+  const stack = el('div', {
+    class: 'code-paths-view-container',
+    id: 'code-paths-view-container',
+  });
   for (const view of views) {
-    const c = el('div', { class: 'code-paths-view', id: 'code-paths-view-' + view.id });
+    const c = el('div', {
+      class: 'code-paths-view',
+      id: 'code-paths-view-' + view.id,
+    });
     stack.append(c);
   }
   host.append(stack);
@@ -233,13 +243,8 @@ function readViewIdFromHash(): string | null {
  * key 'graph'.
  */
 export function openCodePathsSession(sessionId: string): void {
-  const tab = document.querySelector('.tab[data-tab="code-paths"]');
   const panel = document.querySelector('#panel-code-paths');
-  if (!tab || !panel) return;
-  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-  tab.classList.add('active');
-  panel.classList.add('active');
+  if (!panel || !activateReportTab('code-paths')) return;
   // Force the Sessions subtab.
   const sessionsSub = panel.querySelector('.subtab[data-subtab="sessions"]');
   const exploreSub = panel.querySelector('.subtab[data-subtab="explore"]');
@@ -252,6 +257,51 @@ export function openCodePathsSession(sessionId: string): void {
   // Click the matching row to trigger the standard renderDetail flow.
   const row = sessionsPanel?.querySelector<HTMLElement>('tr[data-session-id="' + sessionId + '"]');
   if (row) row.click();
+}
+
+export interface CodePathFunctionIdentity {
+  readonly bodyHash: string;
+  readonly qualifiedName: string;
+  readonly filePath: string;
+  readonly line: number;
+}
+
+function activateExploreSubtab(panel: Element): void {
+  panel.querySelectorAll('.subtab').forEach((tab) => {
+    tab.classList.toggle('active', (tab as HTMLElement).dataset.subtab === 'explore');
+  });
+  panel.querySelectorAll('.subtab-panel').forEach((subpanel) => {
+    subpanel.classList.toggle('active', subpanel.id === 'panel-code-paths-explore');
+  });
+}
+
+/** Open one exact current-catalog occurrence in Code Paths Explore. */
+export function openCodePathsFunction(identity: CodePathFunctionIdentity): void {
+  const matches = (cg.graphIndexes.occurrencesByHash.get(identity.bodyHash) ?? []).filter(
+    (occurrence) =>
+      occurrence.qualifiedName === identity.qualifiedName &&
+      occurrence.filePath === identity.filePath &&
+      occurrence.line === identity.line,
+  );
+  const occurrence = matches.length === 1 ? matches[0] : undefined;
+  if (!occurrence || !activateReportTab('code-paths')) return;
+  const panel = document.querySelector('#panel-code-paths');
+  if (!panel) return;
+  activateExploreSubtab(panel);
+  const activeView =
+    document.querySelector<HTMLElement>('.code-paths-tab.active')?.dataset.view ?? views[0]?.id;
+  try {
+    globalThis.history.replaceState(
+      null,
+      '',
+      activeView === undefined
+        ? globalThis.location.href.split('#', 1)[0]
+        : `#code-paths/${activeView}`,
+    );
+  } catch {
+    // @swallow-ok file/sandbox history restrictions must not break navigation.
+  }
+  openFunctionOccurrence(occurrence);
 }
 
 // =======================================================

@@ -48,7 +48,7 @@ export const asyncStatePattern = defineCheck({
   analyze(content, filePath) {
     // Only check screen files
     if (
-      !filePath.includes('/screens/') ||
+      !filePath.replaceAll('\\', '/').includes('/screens/') ||
       (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx'))
     ) {
       return [];

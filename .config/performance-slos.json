@@ -29,6 +29,20 @@
         "graph-impact-files",
         "audit-changed"
       ]
+    },
+    "optimization": {
+      "description": "Local hotspot-ranking lane with non-gating startup, graph-mode, and report scenarios.",
+      "tiers": ["small"],
+      "scenarios": [
+        "fit-changed",
+        "graph-cold",
+        "graph-exact",
+        "graph-fast",
+        "graph-impact-files",
+        "audit-changed",
+        "cli-help",
+        "report-generate"
+      ]
     }
   },
   "tiers": {
@@ -75,6 +89,22 @@
     "audit-changed": {
       "label": "Audit changed suite",
       "description": "Run the built-in audit suite in changed-file mode."
+    },
+    "graph-exact": {
+      "label": "Graph exact resolution",
+      "description": "Build a cold graph with semantic TypeScript resolution."
+    },
+    "graph-fast": {
+      "label": "Graph fast resolution",
+      "description": "Build a cold graph with syntactic TypeScript resolution."
+    },
+    "cli-help": {
+      "label": "CLI help startup",
+      "description": "Measure root command startup and help rendering without project side effects."
+    },
+    "report-generate": {
+      "label": "HTML report generation",
+      "description": "Generate the self-contained report from a deterministic primed session without opening a browser."
     }
   },
   "budgets": [

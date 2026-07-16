@@ -156,11 +156,19 @@ async function hasTestPendingMarker(filePath: string, files: FileAccessor): Prom
     msg: 'Checking if file has a test-pending marker',
   });
   try {
+    // Prefer FileAccessor when the path is in the matched set.
     const content = await files.read(filePath);
     return content.slice(0, 500).includes('@test-pending');
   } catch {
-    // @swallow-ok graceful degradation - return sentinel on failure
-    return false;
+    // Scan may walk files outside the accessor set; fall back to disk so
+    // @test-pending is not silently ignored (false missing-test positives).
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      return content.slice(0, 500).includes('@test-pending');
+    } catch {
+      // @swallow-ok graceful degradation - return sentinel on failure
+      return false;
+    }
   }
 }
 
@@ -236,10 +244,14 @@ async function analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     return [];
   }
 
-  // Find the repo root by looking for packages directory
+  // Find the repo root by looking for packages directory. Stop at the
+  // filesystem root on every platform (Windows `C:\` has dirname === itself).
   let cwd = path.dirname(firstPath);
-  while (cwd !== '/' && !fs.existsSync(path.join(cwd, 'packages'))) {
-    cwd = path.dirname(cwd);
+  const root = path.parse(cwd).root;
+  while (cwd !== root && !fs.existsSync(path.join(cwd, 'packages'))) {
+    const parent = path.dirname(cwd);
+    if (parent === cwd) break;
+    cwd = parent;
   }
 
   const scanDirs = [path.join(cwd, 'packages'), path.join(cwd, 'apps'), path.join(cwd, 'services')];

@@ -35,7 +35,10 @@ interface RawStreamEntry {
   readonly reason: RawStreamReason;
 }
 
-function collectRawStreamSpecs(toolName: string, specs: readonly CommandSpec[]): RawStreamEntry[] {
+function collectRawStreamSpecs(
+  toolName: string,
+  specs: readonly CommandSpec<unknown, ToolCliContext>[],
+): RawStreamEntry[] {
   const entries: RawStreamEntry[] = [];
   for (const spec of specs) {
     if (spec.output !== 'raw-stream') continue;
@@ -64,7 +67,7 @@ interface ToolPackageJson {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..', '..');
-const RAW_STREAM_MANIFEST_BUDGET = 63;
+const RAW_STREAM_MANIFEST_BUDGET = 66;
 
 function workspacePackageDirs(): readonly string[] {
   const packagesDir = join(REPO_ROOT, 'packages');
@@ -195,7 +198,7 @@ describe('raw-stream inventory (packaged tools)', () => {
   });
 
   it('has no lookup raw-stream entries', () => {
-    expect(manifestInventory.some((e) => e.reason === 'lookup')).toBe(false);
+    expect(manifestInventory.some((e) => (e.reason as string) === 'lookup')).toBe(false);
     expect(manifestInventory.some((e) => e.command === 'lookup' && e.tool === 'graph')).toBe(false);
   });
 
@@ -290,7 +293,7 @@ describe('raw-stream host parity', () => {
     const program = new Command();
     mountCommandSpec(
       program,
-      defineCommand({
+      defineCommand<unknown, ToolCliContext>({
         name: 'probe',
         description: 'raw-stream probe',
         commonFlags: [],

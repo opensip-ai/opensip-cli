@@ -1,17 +1,18 @@
 /**
  * @fileoverview `@opensip-cli/fitness/internal` — engine internals exposed
- * ONLY for cross-package test suites.
+ * ONLY for cross-package test suites (and private test-support).
  *
  * This is NOT public API. Production code in other packages must not import
- * from `@opensip-cli/fitness/internal` (enforced by dependency-cruiser per
- * ADR-0009), and the subpath is excluded from the published exports map.
- * `executeFit` lives here because the CLI drives fitness through the Tool
- * contract (`fitnessTool`), not by calling `executeFit` directly; the only
- * external consumer is the SaaS-mode concurrency smoke test.
+ * from `@opensip-cli/fitness/internal` (enforced by dependency-cruiser). The
+ * subpath is declared in package exports for workspace tests but is
+ * unsupported for sibling production source.
  *
- * The per-check fixture-coverage harness that used to live here moved to the
- * unpublished `@opensip-cli/test-support` package (ADR-0040) — test
- * scaffolding no longer ships inside production package source.
+ * `executeFit` lives here because the CLI drives fitness through the Tool
+ * contract (`fitnessTool`), not by calling `executeFit` directly.
+ * `fitnessTestFileCache` is the test-only module singleton for check-pack
+ * fixture prewarm (formerly public `fileCache`).
  */
 
 export { executeFit } from './cli/fit.js';
+/** Test-only FileCache singleton — not a production runtime value. */
+export { fileCache as fitnessTestFileCache } from './framework/file-cache.js';

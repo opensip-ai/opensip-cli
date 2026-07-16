@@ -1,4 +1,5 @@
 import {
+  assembleAgentCatalog,
   buildSignalEnvelope,
   type CommandResult,
   type StoredSession,
@@ -46,7 +47,9 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     score: 100,
     passed: true,
     durationMs: 30_000,
-    payload: { summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 } },
+    payload: {
+      summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+    },
     ...overrides,
   };
 }
@@ -74,8 +77,15 @@ function replay(stored: StoredSession): ToolSessionReplay<CommandResult> {
 
 const replayFor: (_tool: ToolShortId) => SessionReplayFn | undefined = () => replay;
 
+const AGENT_CATALOG = assembleAgentCatalog({ rootCommands: [], suiteNames: [] });
+
 function port(): SessionResultsReadPort {
-  return new SessionResultsReadPort({ store, projectRoot: '/repo', replayFor });
+  return new SessionResultsReadPort({
+    store,
+    projectRoot: '/repo',
+    replayFor,
+    agentCatalog: AGENT_CATALOG,
+  });
 }
 
 describe('SessionResultsReadPort repo scoping', () => {
@@ -115,28 +125,33 @@ describe('SessionResultsReadPort repo scoping', () => {
   it('returns not-found for showRun on a foreign session id without replaying it', async () => {
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     new SessionRepo(store).save(makeSession({ id: 'FIT_FOREIGN', cwd: '/other' }));
+    info.mockClear();
 
     const out = await port().showRun({ ref: 'FIT_FOREIGN' });
 
     expect(out.ok).toBe(false);
     if (!out.ok) expect(out.error.code).toBe('not-found');
     expect(replayed).toEqual([]);
-    expect(info).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'mcp.results.scope.rejected',
-        module: 'mcp:results-read-port',
-        ref: 'FIT_FOREIGN',
-        sessionCwd: '/other',
-        projectRoot: '/repo',
-      }),
-    );
+    expect(info).toHaveBeenCalledWith({
+      evt: 'mcp.results.scope.rejected',
+      module: 'mcp:results-read-port',
+      reason: 'outside-project',
+    });
+    const logged = JSON.stringify(info.mock.calls);
+    expect(logged).not.toContain('FIT_FOREIGN');
+    expect(logged).not.toContain('/other');
+    expect(logged).not.toContain('/repo');
   });
 
   it('latestFindings selects the newest in-root session over a newer foreign one', async () => {
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const repo = new SessionRepo(store);
     repo.save(
-      makeSession({ id: 'FIT_LOCAL_OLD', cwd: '/repo', startedAt: '2026-05-01T00:00:00.000Z' }),
+      makeSession({
+        id: 'FIT_LOCAL_OLD',
+        cwd: '/repo',
+        startedAt: '2026-05-01T00:00:00.000Z',
+      }),
     );
     repo.save(
       makeSession({
@@ -190,7 +205,11 @@ describe('SessionResultsReadPort repo scoping', () => {
   it('showRun({ ref: latest }) scope-selects the newest in-root session', async () => {
     const repo = new SessionRepo(store);
     repo.save(
-      makeSession({ id: 'FIT_LOCAL_OLD', cwd: '/repo', startedAt: '2026-05-01T00:00:00.000Z' }),
+      makeSession({
+        id: 'FIT_LOCAL_OLD',
+        cwd: '/repo',
+        startedAt: '2026-05-01T00:00:00.000Z',
+      }),
     );
     repo.save(
       makeSession({
@@ -231,7 +250,7 @@ describe('SessionResultsReadPort repo scoping', () => {
 });
 
 describe('McpStdioServer repo scoping observability', () => {
-  it('logs the captured projectRoot when the stdio server starts', async () => {
+  it('logs bounded project scope without the captured project root', async () => {
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
     const fakeMcp = {
       server: {} as { onclose?: () => void },
@@ -274,8 +293,13 @@ describe('McpStdioServer repo scoping observability', () => {
         module: 'mcp:server',
         server: 'opensip-cli-mcp',
         version: '0.0.0-test',
-        projectRoot: '/repo',
+        projectScope: 'project',
       }),
     );
+    // Absolute project paths must not appear on the shared stderr start event.
+    const startPayload = info.mock.calls.find(
+      (call) => (call[0] as { evt?: string } | undefined)?.evt === 'mcp.server.start',
+    )?.[0] as Record<string, unknown> | undefined;
+    expect(startPayload).not.toHaveProperty('projectRoot');
   });
 });

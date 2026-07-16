@@ -1,5 +1,30 @@
 import { z } from 'zod';
 
+/**
+ * Suite names reserved for host-owned built-in suites (ADR-0159). A configured
+ * suite may not claim one, so a built-in workflow cannot diverge from generic
+ * `suite run <name>` resolution. Rejecting the key at document validation makes
+ * shadowing unrepresentable. Bundling a new built-in suite requires adding its
+ * name here in the same change.
+ */
+export const RESERVED_SUITE_NAMES = ['audit', 'agent-context'] as const;
+
+const reservedSuiteNames: ReadonlySet<string> = new Set(RESERVED_SUITE_NAMES);
+
+/** True when `name` is reserved for a built-in suite (ADR-0159). */
+export function isReservedSuiteName(name: string): boolean {
+  return reservedSuiteNames.has(name);
+}
+
+/** Actionable rejection message for a reserved suite name, with a rename hint. */
+export function reservedSuiteNameMessage(name: string): string {
+  return (
+    `Suite name '${name}' is reserved for the built-in ${name} suite (ADR-0159). ` +
+    `Rename the configured suite (for example '${name}-custom') and run it with: ` +
+    `opensip suite run ${name}-custom`
+  );
+}
+
 export const suiteStepArgsSchema = z.record(z.string(), z.unknown()).default({});
 
 export const suiteStepSchema = z
@@ -46,6 +71,16 @@ export const suiteDefinitionSchema = z
 
 export const suitesConfigSchema = z
   .record(z.string().trim().min(1), suiteDefinitionSchema)
+  .superRefine((suites, ctx) => {
+    for (const name of Object.keys(suites)) {
+      if (!reservedSuiteNames.has(name)) continue;
+      ctx.addIssue({
+        code: 'custom',
+        path: [name],
+        message: reservedSuiteNameMessage(name),
+      });
+    }
+  })
   .default({});
 
 /** One UUID-addressed tool command invocation inside a configured suite. */

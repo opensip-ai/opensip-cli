@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -98,6 +98,18 @@ describe('config migration', () => {
     const configPath = join(dir, 'opensip-cli.config.yml');
     writeFileSync(configPath, 'schemaVersion: 1\n', 'utf8');
     expect(() => migrateConfigFile({ configPath, maxBytes: 1 })).toThrow(ConfigurationError);
+  });
+
+  it('rejects directories and other non-files after existsSync', () => {
+    const dir = makeTmpDir();
+    const asDir = join(dir, 'opensip-cli.config.yml');
+    mkdirSync(asDir);
+    expect(() => migrateConfigFile({ configPath: asDir })).toThrow(
+      expect.objectContaining({
+        name: 'ConfigurationError',
+        code: 'CONFIG.MIGRATION.NOT_A_FILE',
+      }),
+    );
   });
 
   it('rejects invalid migration text targets and non-map YAML documents', () => {

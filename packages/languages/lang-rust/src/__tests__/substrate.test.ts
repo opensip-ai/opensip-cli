@@ -25,6 +25,7 @@ const SRC = [
   'impl S {',
   '    fn m(&self) -> i32 {',
   '        let s = "h";',
+  '        let r = r#"raw"#;',
   '        if true { return 1; }',
   '        for _i in 0..3 {}',
   '        2',
@@ -53,7 +54,8 @@ describe('rust substrate', () => {
     expect(count(isStruct)).toBe(1);
     expect(count(isImpl)).toBe(1);
     expect(count(isComment)).toBe(1);
-    expect(count(isString)).toBeGreaterThanOrEqual(1);
+    // plain string_literal + raw_string_literal
+    expect(count(isString)).toBeGreaterThanOrEqual(2);
     expect(count(isConditional)).toBe(1);
     expect(count(isLoop)).toBe(1);
   });

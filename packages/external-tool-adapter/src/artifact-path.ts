@@ -10,7 +10,7 @@
  * 3-arg `ProjectPaths` method.
  */
 
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 /** The minimal path scope the resolver needs (a `ProjectPaths` satisfies it). */
 export interface ArtifactPathScope {
@@ -25,11 +25,21 @@ export interface ArtifactPathScope {
  * `<artifactDir(tool)>/<runId>/<name>`. Pure — no IO. The bytes are persisted
  * through `cli.writeArtifact(path, bytes)` (the host seam, ADR-0080), never a
  * raw `fs` write.
+ *
+ * `name` must be a basename (no path separators / `..`) so adapters cannot
+ * escape the per-run artifact directory.
+ *
+ * @throws {Error} When `name` is empty or not a plain basename.
  */
 export function resolveScannerArtifactPath(
   scope: ArtifactPathScope,
   tool: string,
   name: string,
 ): string {
+  if (name.length === 0 || basename(name) !== name || name === '.' || name === '..') {
+    throw new Error(
+      `resolveScannerArtifactPath: name must be a plain basename, got ${JSON.stringify(name)}`,
+    );
+  }
   return join(scope.artifactDir(tool), scope.runId, name);
 }

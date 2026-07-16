@@ -13,7 +13,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertManifestMatchesTool } from '@opensip-cli/core';
@@ -122,7 +122,7 @@ describe('dependency-check tool — commandSpecs', () => {
 });
 
 describe('dependency-check tool — scan-arg + exclude builders', () => {
-  it('builds the SARIF argv (--out is the artifact DIRECTORY, --noupdate for offline)', () => {
+  it('builds the SARIF argv (--out is the full artifact file, local-only analyzer flags)', () => {
     const ctx = {
       projectRoot: '/proj/my-app',
       artifactPath: (name: string) => `/proj/.runtime/artifacts/dependency-check/run1/${name}`,
@@ -136,14 +136,19 @@ describe('dependency-check tool — scan-arg + exclude builders', () => {
       '--format',
       'SARIF',
       '--out',
-      dirname(artifact),
+      artifact,
       '--noupdate',
+      '--disableOssIndex',
+      '--disableNodeAudit',
+      '--disableYarnAudit',
+      '--disablePnpmAudit',
+      '--disableCentral',
     ]);
   });
 
-  it('excludes the .runtime store via --exclude (A3)', () => {
+  it('excludes the .runtime store via an Ant recursive --exclude pattern (A3)', () => {
     expect(buildDependencyCheckExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual(
-      ['--exclude', '/proj/opensip-cli/.runtime'],
+      ['--exclude', '**/opensip-cli/.runtime/**'],
     );
   });
 });

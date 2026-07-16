@@ -140,9 +140,19 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
         const propertyName = node.name.text;
         accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
       }
-      if (ts.isBindingElement(node) && ts.isIdentifier(node.name)) {
-        const propertyName = node.name.text;
-        accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+      // Object destructuring (`const { foo } = opts`) is a property read.
+      // Renames (`const { realKey: localName } = opts`) read `realKey`, not the local.
+      // Array patterns (`const [foo] = items`) are not config property access.
+      if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
+        const nameNode = node.propertyName ?? node.name;
+        if (
+          ts.isIdentifier(nameNode) ||
+          ts.isStringLiteral(nameNode) ||
+          ts.isNoSubstitutionTemplateLiteral(nameNode)
+        ) {
+          const propertyName = nameNode.text;
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+        }
       }
       ts.forEachChild(node, visit);
     };
@@ -176,7 +186,7 @@ function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetecto
             category: 'quality',
             message: `Unused public config key '${prop.name}' in ${prop.interfaceName} (${confidence} confidence)`,
             suggestion: `Remove '${prop.name}' from ${prop.interfaceName} or wire it into runtime behavior`,
-            code: { file: prop.filePath, line: prop.line, column: 0 },
+            code: { file: relPath, line: prop.line, column: 0 },
             repair: {
               repairKind: 'manual',
               autofixable: false,
@@ -184,7 +194,7 @@ function runUnusedConfigSurface(ctx: YagniDetectorContext): Promise<YagniDetecto
               patchHint: {
                 kind: 'text',
                 summary: `Remove unused key \`${prop.name}\` from ${prop.interfaceName}.`,
-                target: prop.filePath,
+                target: relPath,
               },
             },
             yagni: {

@@ -68,30 +68,3 @@ export function capabilityDiscoveryToCliDiagnostic(
     logRef: diagnostic.evt,
   };
 }
-
-/** Typed diagnostic when the fitness check registry ends up empty after load. */
-export function fitnessEmptyCheckRegistryDiagnostic(): CliDiagnostic {
-  return {
-    severity: 'error',
-    code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_EMPTY_CHECK_REGISTRY,
-    category: 'configuration',
-    message: 'No check packages were loaded.',
-    impact: 'A fitness run cannot scan anything until at least one check pack is available.',
-    action:
-      'Install at least one package declaring the fit-pack marker plus target-domain epoch, ' +
-      'or declare plugins.checkPackages in opensip-cli.config.yml.',
-    provenance: { toolId: 'fitness', capabilityDomain: 'fit-pack' },
-  };
-}
-
-/** Typed diagnostic for a fitness plugin import failure. */
-export function fitnessPluginLoadFailedDiagnostic(message: string): CliDiagnostic {
-  return {
-    severity: 'warning',
-    code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
-    category: 'runtime',
-    message: `Plugin failed to load — ${message}`,
-    impact: 'Checks from the failed plugin will not run.',
-    provenance: { toolId: 'fitness' },
-  };
-}

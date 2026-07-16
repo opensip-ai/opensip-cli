@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { decideReportOpen, launchReport } from '../open-report.js';
+import { buildReportLaunchTarget, decideReportOpen, launchReport } from '../open-report.js';
 
 function base() {
   return {
@@ -87,5 +87,34 @@ describe('launchReport', () => {
     // either result so the test is portable.
     const ok = await launchReport('://invalid::not-a-url');
     expect(typeof ok).toBe('boolean');
+  });
+});
+
+describe('buildReportLaunchTarget', () => {
+  it('appends only the closed Change Impact fragment grammar', () => {
+    expect(buildReportLaunchTarget('/repo/reports/latest.html', '#change-impact')).toBe(
+      'file:///repo/reports/latest.html#change-impact',
+    );
+    expect(buildReportLaunchTarget('/repo/reports/latest.html', '#change-impact/run_A-1')).toBe(
+      'file:///repo/reports/latest.html#change-impact/run_A-1',
+    );
+  });
+
+  it('encodes filesystem metacharacters before adding the selection fragment', () => {
+    expect(buildReportLaunchTarget('/repo/report #1.html', '#change-impact')).toBe(
+      'file:///repo/report%20%231.html#change-impact',
+    );
+  });
+
+  it.each([
+    '#overview',
+    '#change-impact/',
+    '#change-impact/a/b',
+    '#change-impact/%2Fetc',
+    `#change-impact/${'a'.repeat(129)}`,
+  ])('ignores an arbitrary or malformed fragment %s', (fragment) => {
+    expect(buildReportLaunchTarget('/repo/reports/latest.html', fragment)).toBe(
+      '/repo/reports/latest.html',
+    );
   });
 });

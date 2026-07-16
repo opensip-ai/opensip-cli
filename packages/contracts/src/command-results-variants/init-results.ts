@@ -17,6 +17,16 @@ export interface AgentGuidanceResult {
   readonly targets: readonly AgentGuidanceTargetResult[];
 }
 
+/** One uninstalled first-party adapter recommended after a pristine init. */
+export interface InitOptionalToolRecommendation {
+  readonly id: string;
+  readonly pkg: string;
+  readonly network: 'local-only' | 'networked';
+  readonly languages: readonly string[];
+  readonly installCommand: string;
+  readonly projectInstallCommand: string;
+}
+
 export interface InitResult {
   type: 'init';
   created: boolean;
@@ -43,6 +53,8 @@ export interface InitResult {
   state?: 'pristine' | 'fully-initialized' | 'partial-config-only' | 'partial-dir-only';
   /** Languages selected for this scaffold (post-detection or from --language). */
   languages?: readonly ('typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp')[];
+  /** Relevant uninstalled adapters after an eligible pristine init; absent otherwise. */
+  optionalTools?: readonly InitOptionalToolRecommendation[];
   /**
    * Every file init created, in display order. Includes the config
    * file plus example check / recipe / scenario scaffolds. Empty

@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { parseFitnessDirectives } from '../checks/documentation/_directives/fitness.js';
@@ -35,7 +35,7 @@ function writeFixture(cwd: string, rel: string, content: string): string {
 }
 
 afterEach(() => {
-  fileCache.clear();
+  fitnessTestFileCache.clear();
   _resetPublicApiGraphCache();
 });
 

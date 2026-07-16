@@ -1,121 +1,165 @@
 /**
- * Optional CPU profiling (ADR-0049) — gate logic + idempotency.
+ * Optional local CPU profiling — explicit gate, scoped lifecycle, and shutdown.
  *
- * This file covers the pure env-gate (`isProfilingEnabled`) and the
- * start/stop scope-state reuse / stop-when-idle / OTEL-only-warning / reset
- * paths. The inner inspector-callback arms (label/profile write, stop-error, the
- * WIRE-throw catch, cleanup) are exercised in the sibling
- * `profiling-callback-arms.test.ts`; the genuine real-`node:inspector` wiring is
- * proven out-of-process in `profiling-real-inspector.e2e.test.ts`. All three
- * build on `fixtures/profiling-test-harness.ts`.
- *
- * Why the real-inspector suite is a SEPARATE FILE (and why every gate-open test
- * here uses the SYNCHRONOUS fake session): Node's CPU profiler is inspector-based
- * and process-global. Run in-process — even when driven via blocking `spawnSync`
- * in an uninstrumented child — it corrupts `@vitest/coverage-v8`'s precise-
- * coverage counters for profiling.ts, intermittently dropping the fake-session
- * callback arms and flickering the cli package below its 84% branch floor.
- * vitest's `forks` pool isolates each test FILE in its own worker, so keeping the
- * real profiler out of these files makes profiling.ts branch coverage
- * deterministic in isolation AND in the full run.
+ * Every gate-open test injects the synchronous fake inspector. The genuine
+ * process-global profiler remains isolated in profiling-real-inspector.e2e.test.ts
+ * so it cannot corrupt Vitest's inspector-based coverage collection.
  */
 
-import { logger } from '@opensip-cli/core';
-import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { isProfilingEnabled, startProfiling, stopProfiling } from '../profiling.js';
+import { shutdownTelemetry } from '../sdk-init.js';
 
 import {
-  isProfilingEnabled,
-  resetProfilingForTests,
-  startProfiling,
-  stopProfiling,
-} from '../profiling.js';
-
-import { createProfilingHarness, ENDPOINT, GATE } from './fixtures/profiling-test-harness.js';
-
-import type { RunScope } from '@opensip-cli/core';
+  createProfilingHarness,
+  ENDPOINT,
+  GATE,
+  PROFILE_DIR,
+} from './fixtures/profiling-test-harness.js';
 
 const h = createProfilingHarness();
 
 describe('isProfilingEnabled', () => {
-  it('is false without an OTLP endpoint', () => {
+  it('is false when profiling is unset, including when an OTLP endpoint is present', () => {
+    expect(isProfilingEnabled()).toBe(false);
+    process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
     expect(isProfilingEnabled()).toBe(false);
   });
 
-  it('is true when the gate is explicitly 1/true and an endpoint is set', () => {
-    process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
+  it('is true for explicit 1/true without requiring an OTLP endpoint', () => {
     process.env[GATE] = '1';
     expect(isProfilingEnabled()).toBe(true);
-    process.env[GATE] = 'true';
+    process.env[GATE] = ' TRUE ';
     expect(isProfilingEnabled()).toBe(true);
   });
 
-  it('falls back to ON when only the OTLP endpoint is set (OTEL-only mode)', () => {
+  it('keeps explicit 0/false and unknown values off with or without an endpoint', () => {
     process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
-    expect(isProfilingEnabled()).toBe(true);
-  });
-
-  it('honors explicit 0/false as force-off even when the OTLP endpoint is set', () => {
-    process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
-    process.env[GATE] = '0';
-    expect(isProfilingEnabled()).toBe(false);
-    process.env[GATE] = 'false';
-    expect(isProfilingEnabled()).toBe(false);
+    for (const value of ['0', 'false', 'yes', '']) {
+      process.env[GATE] = value;
+      expect(isProfilingEnabled()).toBe(false);
+    }
   });
 });
 
-describe('startProfiling / stopProfiling — gate + idempotency', () => {
-  it('is a no-op when the gate is closed (no session, no files)', () => {
-    startProfiling(h.scopeFor(), 'fit');
-    expect(h.profilesDirExists()).toBe(false);
-  });
-
-  it('reuses an existing scope-owned profiling state when present', () => {
-    const existing = {
-      session: null,
-      isProfiling: false,
-      profilePath: null,
-      labelsPath: null,
-    };
-    const scope = {
-      runId: 'RUN_EXISTING',
-      projectContext: { scope: 'project', projectRoot: h.tmp() },
-      telemetry: { profiling: existing },
-    } as unknown as RunScope;
-
-    startProfiling(scope, 'fit');
-
-    expect((scope.telemetry as { profiling?: unknown }).profiling).toBe(existing);
-    expect(h.profilesDirExists()).toBe(false);
-  });
-
-  it('stopProfiling when not profiling is a safe no-op', () => {
-    expect(() => stopProfiling()).not.toThrow();
-  });
-
-  it('emits one cost warning in OTEL-only mode', () => {
+describe('startProfiling / stopProfiling', () => {
+  it('is a no-op when the explicit gate is closed', async () => {
     process.env[ENDPOINT] = 'http://localhost:4318/v1/traces';
-    // A SYNCHRONOUS fake session — never the real inspector (see the harness note
-    // on coverage poisoning). The label/profile artifacts land inline, so no
-    // async waitFor is needed.
-    h.installSyncFakeSession({ profile: { nodes: [] } });
-    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-
-    startProfiling(h.scopeFor(), 'fit');
-    expect(h.profilesDirExists() && h.readdirHasLabels()).toBe(true);
-    startProfiling(h.scopeFor(), 'fit'); // idempotent re-entry: must not re-warn
-    stopProfiling();
-    expect(h.readdirHasCpuprofile()).toBe(true);
-
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.profiling.otel_only_enabled' }),
-    );
+    await expect(startProfiling(h.scopeFor(), 'fit')).resolves.toBeUndefined();
+    expect(h.profilesDirExists()).toBe(false);
   });
 
-  it('resetProfilingForTests is safe to call repeatedly', () => {
-    expect(() => {
-      resetProfilingForTests();
-      resetProfilingForTests();
-    }).not.toThrow();
+  it('profiles locally without OTLP and returns metadata rather than profile content', async () => {
+    process.env[GATE] = '1';
+    h.installSyncFakeSession({ profile: { nodes: [{ id: 1 }] } });
+    const scope = h.scopeFor();
+
+    const started = await startProfiling(scope, 'fit:run');
+    expect(started).toEqual(
+      expect.objectContaining({
+        profilePath: expect.stringMatching(/\.cpuprofile$/),
+        labelsPath: expect.stringMatching(/\.labels\.json$/),
+        labels: { service: 'opensip-cli', runId: 'RUN_PROF_1', command: 'fit:run' },
+        status: 'reserved',
+      }),
+    );
+    expect(started).not.toHaveProperty('profile');
+    expect((scope.telemetry.profiling as { artifacts?: unknown } | undefined)?.artifacts).toBe(
+      started,
+    );
+
+    const stopped = await stopProfiling(scope);
+    expect(stopped).not.toBe(started);
+    expect(stopped).toMatchObject({
+      profilePath: started?.profilePath,
+      labelsPath: started?.labelsPath,
+      status: 'complete',
+      completedAt: expect.any(String),
+    });
+    expect((scope.telemetry.profiling as { artifacts?: unknown } | undefined)?.artifacts).toBe(
+      stopped,
+    );
+    expect(h.readdirHasLabels()).toBe(true);
+    expect(h.readdirHasCpuprofile()).toBe(true);
+  });
+
+  it('reuses one in-flight state and makes an immediate stop wait for start', async () => {
+    process.env[GATE] = '1';
+    const flags = h.installSyncFakeSession({
+      deferMethod: 'Profiler.start',
+      profile: { nodes: [] },
+    });
+    const scope = h.scopeFor();
+    const concurrentScope = h.scopeFor();
+
+    const firstStart = startProfiling(scope, 'fit');
+    const secondStart = startProfiling(concurrentScope, 'graph');
+    const stop = stopProfiling(concurrentScope);
+    const secondStop = stopProfiling(scope);
+
+    expect(secondStart).toBe(firstStart);
+    expect(secondStop).toBe(stop);
+    await Promise.resolve();
+    expect(h.readdirHasLabels()).toBe(true);
+    expect(h.readdirHasCpuprofile()).toBe(false);
+    flags.releaseDeferred();
+
+    const [first, second, stopped] = await Promise.all([firstStart, secondStart, stop]);
+    expect(second).toBe(first);
+    expect(first?.status).toBe('reserved');
+    expect(stopped).not.toBe(first);
+    expect(stopped).toMatchObject({
+      profilePath: first?.profilePath,
+      labelsPath: first?.labelsPath,
+      status: 'complete',
+    });
+    expect(flags.disconnectCount).toBe(1);
+    expect(h.readdir().filter((file) => file.endsWith('.labels.json'))).toHaveLength(1);
+    expect(h.readdir().filter((file) => file.endsWith('.cpuprofile'))).toHaveLength(1);
+  });
+
+  it('honors a caller-selected OPENSIP_PROFILE_DIR', async () => {
+    process.env[GATE] = '1';
+    process.env[PROFILE_DIR] = join(h.tmp(), 'caller', 'profiles');
+    h.installSyncFakeSession({ profile: { nodes: [] } });
+
+    const artifacts = await startProfiling(h.scopeFor(), 'graph');
+    await stopProfiling();
+
+    expect(artifacts?.profilePath.startsWith(process.env[PROFILE_DIR])).toBe(true);
+    expect(h.readdirHasLabels()).toBe(true);
+    expect(h.readdirHasCpuprofile()).toBe(true);
+  });
+
+  it('shutdownTelemetry flushes a profile even when no OTel provider was started', async () => {
+    process.env[GATE] = '1';
+    h.installSyncFakeSession({ profile: { nodes: [] } });
+
+    await startProfiling(h.scopeFor(), 'fit');
+    await shutdownTelemetry();
+
+    expect(h.readdirHasCpuprofile()).toBe(true);
+  });
+
+  it('stopProfiling when idle is safe and preserves the last metadata', async () => {
+    await expect(stopProfiling()).resolves.toBeUndefined();
+
+    process.env[GATE] = '1';
+    h.installSyncFakeSession({ profile: { nodes: [] } });
+    const scope = h.scopeFor();
+    const artifacts = await startProfiling(scope, 'fit');
+    const completed = await stopProfiling(scope);
+
+    expect(completed?.status).toBe('complete');
+    await expect(stopProfiling(scope)).resolves.toBe(completed);
+    const labels = JSON.parse(readFileSync(artifacts?.labelsPath ?? '', 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    expect(labels).toEqual({ service: 'opensip-cli', runId: 'RUN_PROF_1', command: 'fit' });
   });
 });

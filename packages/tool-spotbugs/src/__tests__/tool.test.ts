@@ -128,6 +128,25 @@ describe('spotbugs tool — scan-arg builder (requires compiled classes)', () =>
     } as unknown as AdapterRunContext;
     expect(() => buildScanArgs(ctx)).toThrow(/compiled Java classes/i);
   });
+
+  it('discovers nested module class dirs via a bounded walk', () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'spotbugs-nested-'));
+    const nested = join(projectRoot, 'modules', 'api', 'target', 'classes');
+    mkdirSync(nested, { recursive: true });
+    const ctx = {
+      projectRoot,
+      artifactPath: (name: string) => `${projectRoot}/.runtime/artifacts/spotbugs/run1/${name}`,
+    } as unknown as AdapterRunContext;
+    expect(buildScanArgs(ctx)).toEqual([
+      '-textui',
+      '-effort:max',
+      '-low',
+      '-sarif',
+      '-output',
+      `${projectRoot}/.runtime/artifacts/spotbugs/run1/spotbugs.sarif`,
+      nested,
+    ]);
+  });
 });
 
 describe('spotbugs tool — exit model (SpotBugs bitmask, Phase-0 decision 4)', () => {

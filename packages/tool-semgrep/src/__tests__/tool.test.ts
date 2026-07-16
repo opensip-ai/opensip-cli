@@ -90,7 +90,7 @@ describe('semgrep tool — scan helper', () => {
       '--output',
       `${dir}/.runtime/artifacts/semgrep/run1/semgrep.sarif`,
       '--error',
-      dir,
+      '.',
     ]);
     // The exit contract (findings ⇒ nonzero) + the SARIF report both required.
     expect(args).toContain('--error');
@@ -104,10 +104,10 @@ describe('semgrep tool — scan helper', () => {
     expect(buildScanArgs(ctxFor(dir))[2]).toBe(cfg);
   });
 
-  it('excludes the .runtime store via --exclude', () => {
+  it('excludes the .runtime store via a relative --exclude segment', () => {
     expect(buildSemgrepExclude({ excludePath: '/proj/opensip-cli/.runtime' }).args).toEqual([
       '--exclude',
-      '/proj/opensip-cli/.runtime',
+      'opensip-cli/.runtime',
     ]);
   });
 });

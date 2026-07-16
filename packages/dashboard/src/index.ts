@@ -19,3 +19,9 @@
 
 export { generateDashboardHtml } from './generator.js';
 export type { DashboardInput } from './generator.js';
+export {
+  decodeReportViewSelection,
+  encodeReportViewSelection,
+  normalizeReportViewSelection,
+} from './report-selection.js';
+export type { ReportViewSelection } from './report-selection.js';

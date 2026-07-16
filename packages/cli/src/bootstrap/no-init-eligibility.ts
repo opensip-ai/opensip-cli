@@ -1,13 +1,24 @@
 /**
- * no-init-eligibility — narrow command allowlist for ephemeral first-run mode.
+ * no-init-eligibility — may this command run outside an initialized project?
+ *
+ * The answer is DERIVED from the mounted CommandSpecs (`CommandSpec.noInit`,
+ * indexed by `buildCommandScopeIndex`), never from a list maintained here. The
+ * previous implementation was a hardcoded `Set` of command paths that omitted
+ * `audit` — the canonical first-run command — so `opensip audit` hard-failed
+ * with "No OpenSIP CLI project found" on exactly the zero-config first run the
+ * docs, the installer, and the quick start all promise. A parallel allowlist
+ * cannot be kept in sync with the command surface by discipline; deriving it
+ * from the specs makes that class of drift unrepresentable.
  */
 
+import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 import type { ProjectContext } from '@opensip-cli/core';
 
-const NO_INIT_COMMAND_PATHS = new Set(['fitness', 'fit', 'graph', 'graph impact', 'suite run']);
-
-export function isNoInitEligibleCommand(commandPath: string): boolean {
-  return NO_INIT_COMMAND_PATHS.has(commandPath);
+export function isNoInitEligibleCommand(
+  commandPath: string,
+  commandScopes: CommandScopeIndex,
+): boolean {
+  return commandScopes.get(commandPath)?.noInit === true;
 }
 
 export function shouldRenderNoInitAdoptionHint(args: {

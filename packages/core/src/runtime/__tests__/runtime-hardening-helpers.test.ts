@@ -7,7 +7,11 @@ import {
 } from '../result-accumulator-cap.js';
 import { readChildRssBytes, startRssWatchdog } from '../rss-watchdog.js';
 import { CapturedStderr } from '../stderr-capture.js';
-import { IpcPayloadTooLargeError, sendWorkerIpcMessage } from '../worker-ipc-send.js';
+import {
+  IpcPayloadTooLargeError,
+  sendWorkerIpcMessage,
+  sendWorkerIpcMessageAndDrain,
+} from '../worker-ipc-send.js';
 
 import type { ChildProcess } from 'node:child_process';
 
@@ -57,12 +61,13 @@ describe('runtime hardening helpers', () => {
     );
   });
 
-  it('guards worker IPC sends with the configured payload cap', () => {
+  it('guards worker IPC sends with the configured payload cap', async () => {
     const sent: unknown[] = [];
     Object.defineProperty(process, 'send', {
       configurable: true,
-      value: (msg: unknown) => {
+      value: (msg: unknown, cb?: (error: Error | null) => void) => {
         sent.push(msg);
+        cb?.(null);
         return true;
       },
     });
@@ -72,6 +77,12 @@ describe('runtime hardening helpers', () => {
     expect(() => sendWorkerIpcMessage({ value: 'x'.repeat(256) }, 8)).toThrow(
       IpcPayloadTooLargeError,
     );
+
+    await sendWorkerIpcMessageAndDrain({ kind: 'result' }, 1024);
+    expect(sent).toEqual([{ kind: 'ok' }, { kind: 'result' }]);
+    await expect(
+      sendWorkerIpcMessageAndDrain({ value: 'x'.repeat(256) }, 8),
+    ).rejects.toBeInstanceOf(IpcPayloadTooLargeError);
   });
 
   it('falls back to child.kill when pid is unavailable or taskkill is unavailable', () => {

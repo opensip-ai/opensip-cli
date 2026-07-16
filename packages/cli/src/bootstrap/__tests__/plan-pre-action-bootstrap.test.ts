@@ -6,32 +6,39 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import {
   defineCommand,
   LanguageRegistry,
   ToolRegistry,
   type CommandScopeRequirement,
   type CommandSpec,
+  type ScopeContribution,
   type Tool,
+  type ToolCliContext,
   type ToolPluginManifest,
   type ToolProvenance,
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
+import { type HostSpec } from '../../commands/host-subcommand-shared.js';
+import { type CliCommandsContext } from '../../commands/shared.js';
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
+import { PolicyAuditCollector } from '../policy-audit.js';
 import { POST_BAILOUT_PHASE_ORDER, PRE_ACTION_PHASES } from '../pre-action-bootstrap-phases.js';
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
 
-function scopeSpec(name: string, scope: CommandScopeRequirement): CommandSpec {
-  return defineCommand({
+function scopeSpec(name: string, scope: CommandScopeRequirement, noInit = false): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
     name,
     description: `${name} command`,
     commonFlags: [],
     scope,
+    ...(noInit ? { noInit: true } : {}),
     output: 'command-result',
     handler: () => undefined,
   });
@@ -41,8 +48,8 @@ function toolCommandSpec(
   name: string,
   scope: CommandScopeRequirement,
   parent?: string,
-): CommandSpec {
-  return defineCommand({
+): CommandSpec<unknown, ToolCliContext> {
+  return defineCommand<unknown, ToolCliContext>({
     name,
     description: `${name} command`,
     commonFlags: [],
@@ -59,7 +66,8 @@ const COMMAND_SCOPES = buildCommandScopeIndex({
     scopeSpec('configure', 'none'),
     scopeSpec('completion', 'none'),
     scopeSpec('agent-catalog', 'none'),
-    scopeSpec('fit', 'project'),
+    // `fit` is first-run capable (declares noInit); `fit-list` is not.
+    scopeSpec('fit', 'project', true),
     scopeSpec('fit-list', 'project'),
   ],
   hostGroups: [
@@ -73,6 +81,7 @@ const COMMAND_SCOPES = buildCommandScopeIndex({
 });
 
 const noopTool = (name: string): Tool => ({
+  identity: { name },
   metadata: { id: name, name, version: '0', description: name },
   commands: [{ name, description: name }],
   commandSpecs: [],
@@ -82,6 +91,7 @@ const nestedTool = (id: string, primary: string): Tool => {
   const primarySpec = toolCommandSpec(primary, 'project');
   const listSpec = toolCommandSpec('list', 'project', primary);
   return {
+    identity: { name: primary },
     metadata: { id, name: primary, version: '0', description: primary },
     commands: [
       { name: primary, description: primary, scope: 'project' },
@@ -100,6 +110,8 @@ function runtimeWith(tools: Tool[]): PreActionRuntime {
     manifests: [] as ToolPluginManifest[],
     provenance: [] as ToolProvenance[],
     bootstrapDiagnostics: [],
+    trustPolicy: BUILTIN_TRUST_POLICY,
+    policyAudit: new PolicyAuditCollector(),
   };
 }
 
@@ -271,7 +283,7 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         enterScope: () => undefined,
         isScopeEntered: () => true,
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
         maybeInitializeOwningTool: () => Promise.resolve(),
         loadOwningToolCapabilities: () => Promise.resolve(0),
       },
@@ -280,13 +292,58 @@ describe('executePostBailoutBootstrap phase ordering', () => {
     expect(phases).toEqual([...POST_BAILOUT_PHASE_ORDER]);
   });
 
+  it('awaits profiler startup before running tool preflight', async () => {
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: process.cwd(),
+      cwdExplicit: false,
+      runId: 'RUN_profile_order',
+      commandName: 'init',
+      commandPath: 'init',
+      commandScopes: COMMAND_SCOPES,
+    });
+    let releaseProfile: (() => void) | undefined;
+    const startProfiling = vi.fn(
+      () =>
+        new Promise<undefined>((resolve) => {
+          releaseProfile = () => resolve(undefined);
+        }),
+    );
+    const maybeInitializeOwningTool = vi.fn(() => Promise.resolve());
+
+    const execution = executePostBailoutBootstrap(
+      {
+        plan,
+        runtime: runtimeWith([]),
+        version: '0.0.0-test',
+        noCloud: true,
+      },
+      {
+        enterScope: () => undefined,
+        isScopeEntered: () => true,
+        checkForUpdate: () => undefined,
+        startProfiling,
+        maybeInitializeOwningTool,
+        loadOwningToolCapabilities: () => Promise.resolve(0),
+      },
+    );
+
+    expect(startProfiling).toHaveBeenCalledOnce();
+    expect(maybeInitializeOwningTool).not.toHaveBeenCalled();
+    releaseProfile?.();
+    await execution;
+    expect(maybeInitializeOwningTool).toHaveBeenCalledOnce();
+  });
+
   it('builds a real project RunScope before tool preflight', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'opensip-post-'));
     writeFileSync(join(tmp, 'opensip-cli.config.yml'), 'schemaVersion: 1\ntargets: {}\n', 'utf8');
     const tool = {
       ...noopTool('scoped-tool'),
       extensionPoints: {
-        contributeScope: () => ({ scopedTool: { ready: true } }),
+        // `scopedTool` is a tool-contributed subscope slot (module-augmented in
+        // real tools); cast to the augmentable contribution bag the host installs.
+        contributeScope: () => ({ scopedTool: { ready: true } }) as ScopeContribution,
       },
     } satisfies Tool;
     const runtime = {
@@ -320,7 +377,7 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         enterScope: () => undefined,
         isScopeEntered: () => true,
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
         maybeInitializeOwningTool: () => Promise.resolve(),
         loadOwningToolCapabilities: () => Promise.resolve(0),
       },
@@ -395,7 +452,7 @@ describe('executePostBailoutBootstrap phase ordering', () => {
         enterScope: () => undefined,
         isScopeEntered: () => true,
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
         maybeInitializeOwningTool,
         loadOwningToolCapabilities,
       },

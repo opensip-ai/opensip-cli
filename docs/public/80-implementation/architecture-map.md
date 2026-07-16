@@ -23,6 +23,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 3 | `@opensip-cli/output` | signal-envelope formatters + sinks |
 | 3 | `@opensip-cli/config` | capability-configuration composer + schema registry (depends on core) |
 | 3 | `@opensip-cli/targeting` | host file-targeting runtime substrate (scope.targets; depends on core + config) |
+| 3 | `@opensip-cli/codebase` | bounded project inventory substrate (core + contracts) |
 | 3 | `@opensip-cli/lang-*` | language adapters |
 | 3 | `@opensip-cli/dashboard` | HTML report generator (core + contracts) |
 | 3 | `@opensip-cli/external-tool-adapter` | External Tool Adapter substrate (core + contracts; output devDep) |
@@ -34,10 +35,11 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 4 | `@opensip-cli/tool-*` | external scanner Tool adapters |
 | 5 | `@opensip-cli/checks-*` | fitness check packs (depend on fitness) |
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
-| 6 | `opensip-cli` | CLI composition root (depends on tools) |
+| 6 | `opensip-cli` | CLI composition root (loads Tools dynamically, no static Tool imports) |
 
-## Workspace packages (58)
+## Workspace packages (60: 57 publishable, 3 private)
 
+- `@opensip-cli/agent-eval`
 - `@opensip-cli/checks-cpp`
 - `@opensip-cli/checks-dogfood`
 - `@opensip-cli/checks-go`
@@ -49,6 +51,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/cli-live`
 - `@opensip-cli/cli-ui`
 - `@opensip-cli/clone-detection`
+- `@opensip-cli/codebase`
 - `@opensip-cli/config`
 - `@opensip-cli/contracts`
 - `@opensip-cli/core`
@@ -97,7 +100,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/yagni`
 - `opensip-cli`
 
-## ToolCliContext seams
+## ToolCliContext seams (24)
 
 Tools and host command handlers must use only these documented methods on the
 per-run `ToolCliContext` (ADR-0051). See
@@ -112,14 +115,12 @@ per-run `ToolCliContext` (ADR-0051). See
 - `logger`
 - `reportFailure`
 - `setExitCode`
+- `getExitCode`
 - `emitJson`
 - `emitEnvelope`
 - `emitError`
-- `message`
-- `exitCode`
 - `emitRaw`
 - `deliverSignals`
-- `cwd`
 - `writeSarif`
 - `writeArtifact`
 - `ensureArtifactDir`
@@ -128,10 +129,7 @@ per-run `ToolCliContext` (ADR-0051). See
 - `exportBaselineSarif`
 - `exportBaselineFingerprints`
 - `toolState`
-- `get`
-- `put`
-- `delete`
-- `list`
+- `hostPlanes`
 
 ## Related docs
 

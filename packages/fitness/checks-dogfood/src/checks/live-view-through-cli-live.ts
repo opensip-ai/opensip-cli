@@ -31,7 +31,10 @@ export function analyzeLiveViewThroughCliLive(content: string, filePath: string)
 export const liveViewThroughCliLive = defineCheck({
   id: 'f8c2a1d0-4e5b-4a9c-8d7e-6f3b2a1c0d94',
   slug: 'live-view-through-cli-live',
-  contentFilter: 'strip-strings',
+  // Must keep string interiors: the import regex matches the module specifier
+  // literal `'ink'`. strip-strings blanks that to `'   '` and would silence every
+  // real violation while unit tests that call analyze with raw content still pass.
+  contentFilter: 'raw',
   description: 'Tool engine live views route through cli-live (no direct ink render imports)',
   longDescription: `**Purpose:** Prevent tool engines from hand-rolling Ink live views.
 

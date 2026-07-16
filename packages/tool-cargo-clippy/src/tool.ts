@@ -14,16 +14,25 @@ export const CARGO_CLIPPY_STABLE_ID = '66cb4afb-783c-42e7-b893-bb922ff8a72c';
 
 /**
  * Build the CLI args for `cargo clippy` with JSON diagnostics across all targets
- * and features. See the build-cache caveat below on why a warm target cache can
- * silently produce zero diagnostics.
+ * and features.
+ *
+ * Uses a per-run `--target-dir` under the host artifact store so warm project
+ * `target/` caches cannot hide diagnostics (clippy only re-emits messages for
+ * crates it recompiles). Slightly slower; gate-honest.
  */
-export function buildScanArgs(_ctx: AdapterRunContext): readonly string[] {
-  // NOTE (build cache): `cargo clippy` only emits `compiler-message` records for
-  // crates it actually (re)compiles. With a warm target cache a repeat run emits
-  // zero diagnostics even though the lints still hold — so a stable `--gate-compare`
-  // requires a cold cache (fresh checkout / CI without target caching). See the
-  // package README's determinism caveat.
-  return ['clippy', '--message-format=json', '--all-targets', '--all-features'];
+export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
+  // --offline matches network: local-only — fail closed when registry deps missing.
+  // --target-dir forces recompile under a cold per-run dir (deterministic findings).
+  const targetDir = ctx.artifactPath('cargo-target');
+  return [
+    'clippy',
+    '--offline',
+    '--message-format=json',
+    '--all-targets',
+    '--all-features',
+    '--target-dir',
+    targetDir,
+  ];
 }
 
 export const tool: Tool = defineExternalToolAdapter({
@@ -31,7 +40,8 @@ export const tool: Tool = defineExternalToolAdapter({
   metadata: {
     id: CARGO_CLIPPY_STABLE_ID,
     version: readPackageVersion(import.meta.url),
-    description: 'Rust lint diagnostics via cargo clippy',
+    description:
+      'Rust lint diagnostics via cargo clippy (note: warm target/ cache can hide diagnostics — use a cold cache or CARGO_TARGET_DIR for deterministic gate-compare)',
     adapterPackage: '@opensip-cli/tool-cargo-clippy',
   },
   binary: {

@@ -11,13 +11,19 @@
 // `renderFitnessTab`) resolve for them and for the render block below. The
 // subtab-bar / overview / sessions / checks / recipes / tool-tabs renderers now
 // live in that bundle (src/client/*.ts).
+import { boundChangeImpactRuns, projectChangeImpactRuns } from './change-impact/project.js';
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
+import { boundGraphCatalog } from './code-paths/bound-catalog.js';
 import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
 import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
+import { renderDeclaredInputs } from './declared-inputs-html.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
+import { normalizeReportViewSelection } from './report-selection.js';
+import { serializeJsonForScriptContext } from './script-context-json.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
+import type { ReportViewSelection } from './report-selection.js';
 import type {
   StoredRun,
   StoredRunStep,
@@ -29,6 +35,55 @@ import type {
 /** A persisted host-owned run plus its ordered steps for dashboard rendering. */
 export interface DashboardRun extends StoredRun {
   readonly steps: readonly StoredRunStep[];
+}
+
+type OverviewDashboardRun = Pick<
+  DashboardRun,
+  | 'aggregate'
+  | 'completedAt'
+  | 'durationMs'
+  | 'exitCode'
+  | 'id'
+  | 'legacySuiteRunId'
+  | 'name'
+  | 'source'
+  | 'startedAt'
+  | 'steps'
+>;
+
+/** Keep the Overview ledger lean; Change Impact owns the bounded ReviewBrief copy. */
+function projectOverviewRuns(runs: readonly DashboardRun[]): readonly OverviewDashboardRun[] {
+  return runs.map((run) => ({
+    id: run.id,
+    name: run.name,
+    source: run.source,
+    startedAt: run.startedAt,
+    completedAt: run.completedAt,
+    durationMs: run.durationMs,
+    exitCode: run.exitCode,
+    aggregate: run.aggregate,
+    steps: run.steps,
+    ...(run.legacySuiteRunId === undefined ? {} : { legacySuiteRunId: run.legacySuiteRunId }),
+  }));
+}
+
+/** Remove impact's duplicate opaque copy after the bounded Change Impact model is projected. */
+function projectBrowserSessions(sessions: readonly StoredSession[]): readonly StoredSession[] {
+  return sessions.map((session) => {
+    const payload = session.payload;
+    if (
+      session.tool !== 'graph' ||
+      typeof payload !== 'object' ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
+      return session;
+    }
+    const browserPayload = Object.fromEntries(
+      Object.entries(payload).filter(([key]) => key !== 'impact' && key !== 'impactStatus'),
+    );
+    return { ...session, payload: browserPayload };
+  });
 }
 
 /**
@@ -47,6 +102,8 @@ export interface DashboardRun extends StoredRun {
 export interface DashboardInput {
   sessions: StoredSession[];
   runs?: readonly DashboardRun[];
+  /** Initial report navigation. Absence retains the current Overview default. */
+  selection?: ReportViewSelection;
   declaredInputs?: DeclaredInputs;
   // Tool-owned catalog data, consumed structurally by the dashboard's
   // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry
@@ -72,6 +129,16 @@ export interface DashboardInput {
   yagniSummary?: unknown;
   yagniCatalog?: readonly unknown[];
   editorProtocol?: string | null;
+  /**
+   * Byte budget for the inlined graph catalog (see `code-paths/bound-catalog.ts`).
+   *
+   * Omitted ⇒ {@link MAX_GRAPH_CATALOG_BYTES}, which keeps the report a size you
+   * can attach to a PR or email. A caller that is producing a report to explore
+   * LOCALLY rather than to send someone (`opensip report --max-catalog-mb 64`)
+   * raises it — that intent is per-invocation, which is why it is an argument
+   * here and a flag there, not a project-wide setting.
+   */
+  maxGraphCatalogBytes?: number;
 }
 
 // Host-owned catch-all tab for sessions whose `tool` is NOT claimed by any
@@ -86,13 +153,7 @@ const EXTERNAL_TAB_ID = 'external';
 const EXTERNAL_TAB_LABEL = 'External Tools';
 // Shield icon (lucide) — external adapters are typically secret/vuln scanners.
 const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
-const OPENSIP_CLI_REPOSITORY_URL = 'https://github.com/opensip-ai/opensip-cli';
-const RELEASE_VERSION_RE = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
-
-// Escape all < and > to prevent script injection in HTML <script> context
-function escapeForScriptContext(json: string): string {
-  return json.replaceAll('<', String.raw`\u003c`).replaceAll('>', String.raw`\u003e`);
-}
+const CHANGE_IMPACT_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>`;
 
 // Coerce a session.score into a finite number safe for HTML interpolation
 // in the <title> tag. Returns 0 for non-finite values so the rendered
@@ -101,57 +162,6 @@ function escapeForScriptContext(json: string): string {
 function coerceScoreForTitle(score: unknown): number {
   const n = Number(score);
   return Number.isFinite(n) ? n : 0;
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
-
-function githubReleaseUrlForCliVersion(cliVersion: string): string | undefined {
-  const version = cliVersion.trim();
-  if (!RELEASE_VERSION_RE.test(version)) return undefined;
-  const tagName = `v${version}`;
-  return `${OPENSIP_CLI_REPOSITORY_URL}/releases/tag/${encodeURIComponent(tagName)}`;
-}
-
-function renderCliVersionValue(cliVersion: string): string {
-  const escapedVersion = escapeHtml(cliVersion);
-  const releaseUrl = githubReleaseUrlForCliVersion(cliVersion);
-  if (releaseUrl === undefined) return escapedVersion;
-  return `<a class="report-details-link" href="${escapeHtml(releaseUrl)}" target="_blank" rel="noopener noreferrer" title="View OpenSIP CLI v${escapedVersion} on GitHub">${escapedVersion}</a>`;
-}
-
-function renderDeclaredInputs(input: DeclaredInputs | undefined): string {
-  if (input === undefined) return '';
-  // Only Engine (a tool's manifest version) and Baseline (a gate's fingerprint
-  // identity) are meaningful for a TOOL run. The report itself is a host command
-  // with neither, so those rows are omitted rather than rendered as "unknown".
-  // Package manager is likewise omitted when it can't be resolved.
-  const pairs: (readonly [string, string])[] = [
-    ['CLI', renderCliVersionValue(input.cliVersion)],
-    ['Node', escapeHtml(input.nodeVersion)],
-  ];
-  if (input.packageManager !== undefined) {
-    pairs.push(['Package manager', escapeHtml(input.packageManager)]);
-  }
-  pairs.push(['Platform', escapeHtml(input.platform)], ['Tool', escapeHtml(input.tool)]);
-  if (input.engineVersion !== undefined) pairs.push(['Engine', escapeHtml(input.engineVersion)]);
-  if (input.baselineIdentity !== undefined) {
-    pairs.push([
-      'Baseline',
-      escapeHtml(
-        `${input.baselineIdentity.fingerprintStrategyId}@${input.baselineIdentity.fingerprintStrategyVersion}`,
-      ),
-    ]);
-  }
-  const rows = pairs
-    .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${value}</dd>`)
-    .join('');
-  return `<details class="report-details"><summary><span class="report-details-version">CLI ${escapeHtml(input.cliVersion)}</span><span class="report-details-label">Report details</span></summary><div class="report-details-panel"><div class="report-details-title">Run environment</div><dl class="report-details-list">${rows}</dl></div></details>`;
 }
 
 /**
@@ -171,7 +181,7 @@ function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'liter
   switch (kind) {
     case 'json': {
       if (value === null || value === undefined) return '';
-      const escaped = escapeForScriptContext(JSON.stringify(value));
+      const escaped = serializeJsonForScriptContext(value);
       return `<script type="application/json" id="${id}">${escaped}</script>`;
     }
     case 'literal': {
@@ -179,9 +189,7 @@ function serializeOptionalBlob(id: string, value: unknown, kind: 'json' | 'liter
       // a value containing the literal sequence `</script>` would close the
       // surrounding inline <script> block (JSON.stringify does not escape `<`).
       const rendered =
-        value === null || value === undefined
-          ? 'null'
-          : escapeForScriptContext(JSON.stringify(value));
+        value === null || value === undefined ? 'null' : serializeJsonForScriptContext(value);
       return `const ${id} = ${rendered};`;
     }
   }
@@ -199,9 +207,11 @@ export function generateDashboardHtml(input: DashboardInput): string {
     graphRecipeCatalog = [],
     simScenarioCatalog = [],
     simRecipeCatalog = [],
+    maxGraphCatalogBytes,
     yagniSummary = null,
     yagniCatalog = [],
     editorProtocol = null,
+    selection,
     declaredInputs,
   } = input;
 
@@ -212,17 +222,22 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // Number(NaN-ish) on a string still yields NaN; we substitute 0 to keep
   // the page title well-formed in the pathological case.
   const latestScoreSafe = latest ? coerceScoreForTitle(latest.score) : 0;
-  const safeDataJson = escapeForScriptContext(JSON.stringify(sessions));
-  const safeRunsJson = escapeForScriptContext(JSON.stringify(runs));
-  const safeCatalogJson = escapeForScriptContext(JSON.stringify(checkCatalog));
-  const safeRecipeJson = escapeForScriptContext(JSON.stringify(recipeCatalog));
-  const safeGraphRuleCatalogJson = escapeForScriptContext(JSON.stringify(graphRuleCatalog));
-  const safeGraphRecipeCatalogJson = escapeForScriptContext(JSON.stringify(graphRecipeCatalog));
-  const safeSimScenarioCatalogJson = escapeForScriptContext(JSON.stringify(simScenarioCatalog));
-  const safeSimRecipeCatalogJson = escapeForScriptContext(JSON.stringify(simRecipeCatalog));
-  const safeYagniSummaryJson = escapeForScriptContext(JSON.stringify(yagniSummary));
-  const safeYagniCatalogJson = escapeForScriptContext(JSON.stringify(yagniCatalog));
-  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', graphCatalog, 'json');
+  const safeDataJson = serializeJsonForScriptContext(projectBrowserSessions(sessions));
+  const safeRunsJson = serializeJsonForScriptContext(projectOverviewRuns(runs));
+  const safeCatalogJson = serializeJsonForScriptContext(checkCatalog);
+  const safeRecipeJson = serializeJsonForScriptContext(recipeCatalog);
+  const safeGraphRuleCatalogJson = serializeJsonForScriptContext(graphRuleCatalog);
+  const safeGraphRecipeCatalogJson = serializeJsonForScriptContext(graphRecipeCatalog);
+  const safeSimScenarioCatalogJson = serializeJsonForScriptContext(simScenarioCatalog);
+  const safeSimRecipeCatalogJson = serializeJsonForScriptContext(simRecipeCatalog);
+  const safeYagniSummaryJson = serializeJsonForScriptContext(yagniSummary);
+  const safeYagniCatalogJson = serializeJsonForScriptContext(yagniCatalog);
+  // The catalog contract is a STORAGE shape; the browser reads a much smaller
+  // one. Inlining it whole produced a 293 MB report on this repo. Project it to
+  // the client's contract and bound what remains — truncation is surfaced to
+  // the page (see `graphCatalogOmittedFunctions`), never silent.
+  const boundedCatalog = boundGraphCatalog(graphCatalog, maxGraphCatalogBytes);
+  const graphCatalogBlock = serializeOptionalBlob('graph-catalog', boundedCatalog.catalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
   // function call graph up to PACKAGE nodes + package→package edges (with
@@ -232,6 +247,15 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
   const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
+  const reportSelectionJs = serializeOptionalBlob(
+    'REPORT_SELECTION',
+    normalizeReportViewSelection(selection),
+    'literal',
+  );
+  const normalizedSelection = normalizeReportViewSelection(selection);
+  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graphCatalog);
+  const boundedImpact = boundChangeImpactRuns(projectedImpactRuns, normalizedSelection?.runId);
+  const safeChangeImpactJson = serializeJsonForScriptContext(boundedImpact.runs);
 
   // Overview is a cross-tool aggregate kept fixed at position 0. The HTML tab
   // buttons, panel containers, renderXxxTab() invocation list, and overview maps
@@ -243,16 +267,26 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const claimedTools = new Set<string>(toolTabs.map((t) => t.tool));
   const hasExternalSessions = sessions.some((s) => !claimedTools.has(s.tool));
   const toolTabButtons = [
-    ...toolTabs.map((t) => `  <div class="tab" data-tab="${t.id}">${t.icon} ${t.label}</div>`),
+    ...toolTabs.map(
+      (t) =>
+        `  <button type="button" id="tab-${t.id}" class="tab" role="tab" aria-selected="false" aria-controls="panel-${t.id}" tabindex="-1" data-tab="${t.id}">${t.icon} ${t.label}</button>`,
+    ),
     ...(hasExternalSessions
       ? [
-          `  <div class="tab" data-tab="${EXTERNAL_TAB_ID}">${EXTERNAL_TAB_ICON} ${EXTERNAL_TAB_LABEL}</div>`,
+          `  <button type="button" id="tab-${EXTERNAL_TAB_ID}" class="tab" role="tab" aria-selected="false" aria-controls="panel-${EXTERNAL_TAB_ID}" tabindex="-1" data-tab="${EXTERNAL_TAB_ID}">${EXTERNAL_TAB_ICON} ${EXTERNAL_TAB_LABEL}</button>`,
         ]
       : []),
   ].join('\n');
   const toolTabPanels = [
-    ...toolTabs.map((t) => `<div id="panel-${t.id}" class="tab-panel"></div>`),
-    ...(hasExternalSessions ? [`<div id="panel-${EXTERNAL_TAB_ID}" class="tab-panel"></div>`] : []),
+    ...toolTabs.map(
+      (t) =>
+        `<div id="panel-${t.id}" class="tab-panel" role="tabpanel" aria-labelledby="tab-${t.id}" hidden></div>`,
+    ),
+    ...(hasExternalSessions
+      ? [
+          `<div id="panel-${EXTERNAL_TAB_ID}" class="tab-panel" role="tabpanel" aria-labelledby="tab-${EXTERNAL_TAB_ID}" hidden></div>`,
+        ]
+      : []),
   ].join('\n');
   const toolTabRenderCalls = [
     ...toolTabs.map((t) => `${t.renderFunctionName}();`),
@@ -275,12 +309,18 @@ export function generateDashboardHtml(input: DashboardInput): string {
 <title>OpenSIP CLI${latest ? ` — Pass Rate: ${latestScoreSafe}%` : ''}</title>
 <link rel="icon" type="image/svg+xml" href="${REPORT_CUP_FAVICON_DATA_URI}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
 <style>
 ${dashboardCss()}
 </style>
 </head>
 <body>
+
+<div class="report-ambient" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
 
 <div class="header">
   <span class="header-icon">${REPORT_CUP_HEADER_HTML}</span>
@@ -288,12 +328,14 @@ ${dashboardCss()}
   ${renderDeclaredInputs(declaredInputs)}
 </div>
 
-<div class="tab-bar" id="tab-bar">
-  <div class="tab active" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</div>
+<div class="tab-bar" id="tab-bar" role="tablist" aria-label="Report views">
+  <button type="button" id="tab-overview" class="tab active" role="tab" aria-selected="true" aria-controls="panel-overview" tabindex="0" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</button>
+  <button type="button" id="tab-change-impact" class="tab" role="tab" aria-selected="false" aria-controls="panel-change-impact" tabindex="-1" data-tab="change-impact">${CHANGE_IMPACT_ICON} Change Impact</button>
 ${toolTabButtons}
 </div>
 
-<div id="panel-overview" class="tab-panel active"></div>
+<div id="panel-overview" class="tab-panel active" role="tabpanel" aria-labelledby="tab-overview"></div>
+<div id="panel-change-impact" class="tab-panel" role="tabpanel" aria-labelledby="tab-change-impact" hidden></div>
 ${toolTabPanels}
 
 <div class="footer">Generated by <strong>OpenSIP CLI</strong> &mdash; <a href="https://opensip.ai">opensip.ai</a></div>
@@ -303,6 +345,10 @@ ${graphViewModelBlock}
 <script>
 const sessions = ${safeDataJson};
 const runs = ${safeRunsJson};
+const changeImpactRuns = ${safeChangeImpactJson};
+const changeImpactOmittedRuns = ${String(boundedImpact.omittedRuns)};
+const graphCatalogTotalFunctions = ${String(boundedCatalog.totalFunctions)};
+const graphCatalogOmittedFunctions = ${String(boundedCatalog.omittedFunctions)};
 const checkCatalog = ${safeCatalogJson};
 const recipeCatalog = ${safeRecipeJson};
 const graphRuleCatalog = ${safeGraphRuleCatalogJson};
@@ -312,6 +358,7 @@ const simRecipeCatalog = ${safeSimRecipeCatalogJson};
 const yagniSummary = ${safeYagniSummaryJson};
 const yagniCatalog = ${safeYagniCatalogJson};
 ${editorProtocolJs}
+${reportSelectionJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');
 const yagniSessions = sessions.filter(s => s.tool === 'yagni');
@@ -336,6 +383,7 @@ ${DASHBOARD_CLIENT_BUNDLE}
 // =======================================================
 renderOverview();
 ${toolTabRenderCalls}
+renderChangeImpact();
 </script>
 </body>
 </html>`;

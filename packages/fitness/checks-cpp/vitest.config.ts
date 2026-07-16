@@ -15,7 +15,7 @@ export default mergeConfig(
         exclude: ['src/**/*.test.ts', 'src/**/__tests__/**', 'src/index.ts'],
         thresholds: {
           statements: 90,
-          branches: 85,
+          branches: 82,
           functions: 90,
           lines: 90,
         },

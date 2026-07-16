@@ -6,7 +6,20 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 
 import { compareBudgets } from './perf/compare-budgets.mjs';
+import {
+  BENCHMARK_NODE_OPTIONS,
+  collectBenchmarkEnvironment,
+  createCleanWallChildEnv,
+} from './perf/benchmark-environment.mjs';
+import {
+  scenarioArgs,
+  scenarioNeedsGraphCatalog,
+  scenarioNeedsReportSession,
+  scenarioRequiresGit,
+  scenarioResetsRuntime,
+} from './perf/benchmark-scenarios.mjs';
 import { cleanupOwnedCorpus, materializeCorpus } from './perf/corpus.mjs';
+import { isDirectInvocation } from './perf/direct-invocation.mjs';
 import {
   createEmptyReport,
   createScenarioResult,
@@ -14,7 +27,7 @@ import {
   summarizeGraphProfile,
 } from './perf/report-schema.mjs';
 import { runMeasuredCommand } from './perf/run-command.mjs';
-import { loadSloConfig, budgetKey } from './perf/slo-config.mjs';
+import { loadSloConfig } from './perf/slo-config.mjs';
 import { signalsFromComparisons } from './perf/performance-signals.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -42,11 +55,16 @@ export async function runBenchSlo(argv = process.argv.slice(2), deps = {}) {
     throw new Error('Built CLI not found. Run `pnpm build` before `pnpm bench:slo:ci`.');
   }
 
+  const environment = await (deps.collectBenchmarkEnvironment ?? collectBenchmarkEnvironment)({
+    repoRoot,
+  });
   const report = createEmptyReport({
     profile: options.profile,
     quick: options.quick,
     config,
     repoRoot,
+    measurementMode: 'clean-wall',
+    environment,
   });
   const workRoot = resolve(repoRoot, options.workRoot ?? DEFAULT_WORK_ROOT, runId(options.profile));
   await (deps.mkdir ?? mkdir)(workRoot, { recursive: true });
@@ -66,6 +84,7 @@ export async function runBenchSlo(argv = process.argv.slice(2), deps = {}) {
         fileCount: corpus.fileCount,
         changedFiles: corpus.changedFiles,
         gitReady: corpus.gitReady,
+        contentSha256: corpus.contentSha256,
       });
       await runTierScenarios({
         repoRoot,
@@ -93,7 +112,12 @@ export async function runBenchSlo(argv = process.argv.slice(2), deps = {}) {
     await (deps.mkdir ?? mkdir)(dirname(outPath), { recursive: true });
     await (deps.writeFile ?? writeFile)(outPath, `${JSON.stringify(report, null, 2)}\n`);
     printSummary(report, comparisons, relative(repoRoot, outPath), deps);
-    return { exitCode: report.verdict === 'fail' ? 1 : 0, report, comparisons, outPath };
+    return {
+      exitCode: report.verdict === 'fail' ? 1 : 0,
+      report,
+      comparisons,
+      outPath,
+    };
   } finally {
     if (!options.keepCorpus) {
       await (deps.rm ?? rm)(workRoot, { recursive: true, force: true }).catch(async () => {
@@ -110,21 +134,7 @@ export async function runBenchSlo(argv = process.argv.slice(2), deps = {}) {
 async function runTierScenarios(input) {
   const context = { graphPrimed: false };
   for (const scenario of input.profile.scenarios) {
-    if (input.config.budgetByKey.has(budgetKey(input.tierId, scenario)) !== true) {
-      input.report.scenarios.push(
-        createScenarioResult({
-          tier: input.tierId,
-          scenario,
-          label: input.config.scenarios[scenario]?.label ?? scenario,
-          command: [],
-          cwd: input.corpus.root,
-          skipped: true,
-          skipReason: 'no budget defined for tier/scenario',
-        }),
-      );
-      continue;
-    }
-    if (requiresGit(scenario) && input.corpus.gitReady !== true) {
+    if (scenarioRequiresGit(scenario) && input.corpus.gitReady !== true) {
       input.report.scenarios.push(
         createScenarioResult({
           tier: input.tierId,
@@ -144,20 +154,28 @@ async function runTierScenarios(input) {
 
 async function runOneScenario(input) {
   const graphProfilePath = join(input.corpus.root, `graph-profile-${input.scenario}.json`);
-  if (input.scenario === 'graph-cold') {
+  if (scenarioResetsRuntime(input.scenario)) {
     await (input.deps.rm ?? rm)(join(input.corpus.root, 'opensip-cli', '.runtime'), {
       recursive: true,
       force: true,
     });
     input.context.graphPrimed = false;
   }
-  if (needsGraphCatalog(input.scenario) && input.context.graphPrimed !== true) {
-    const prime = await runCommand(
-      input,
-      ['graph', '--json', '--profile', graphProfilePath],
-      'graph-prime',
-    );
-    input.context.graphPrimed = prime.status === 0;
+  if (scenarioNeedsGraphCatalog(input.scenario) && input.context.graphPrimed !== true) {
+    const prime = await runCommand(input, ['graph', '--json', '--profile', graphProfilePath]);
+    input.context.graphPrimed = prime.status === 0 && prime.timedOut !== true;
+    if (input.context.graphPrimed !== true) {
+      recordSetupFailure(input, prime, ['graph', '--json', '--profile', graphProfilePath]);
+      return;
+    }
+  }
+
+  if (scenarioNeedsReportSession(input.scenario)) {
+    const prime = await runCommand(input, ['fit', '--json']);
+    if (prime.status !== 0 || prime.timedOut === true) {
+      recordSetupFailure(input, prime, ['fit', '--json']);
+      return;
+    }
   }
 
   const commandArgs = scenarioArgs(
@@ -171,14 +189,38 @@ async function runOneScenario(input) {
   }
 }
 
+function recordSetupFailure(input, setup, args) {
+  input.report.scenarios.push(
+    createScenarioResult({
+      tier: input.tierId,
+      scenario: input.scenario,
+      label: input.config.scenarios[input.scenario]?.label ?? input.scenario,
+      command: [process.execPath, input.cliPath, '--no-cloud', ...args],
+      cwd: input.corpus.root,
+      startedAt: setup.startedAt,
+      completedAt: setup.completedAt,
+      status: setup.status,
+      signal: setup.signal,
+      timedOut: setup.timedOut,
+      durationMs: setup.durationMs,
+      maxRssBytes: setup.maxRssBytes,
+      stdoutTail: setup.stdoutTail,
+      stderrTail: setup.stderrTail,
+      setupFailure: true,
+    }),
+  );
+}
+
 async function runCommand(input, commandArgs, scenario) {
   const command = [process.execPath, input.cliPath, '--no-cloud', ...commandArgs];
+  const cleanEnvironment = createCleanWallChildEnv(process.env);
   const measured = await (input.deps.runMeasuredCommand ?? runMeasuredCommand)({
     command,
     cwd: input.corpus.root,
     env: {
-      ...process.env,
-      NODE_OPTIONS: process.env.NODE_OPTIONS ?? '--max-old-space-size=8192',
+      ...cleanEnvironment,
+      NODE_OPTIONS: BENCHMARK_NODE_OPTIONS,
+      OPENSIP_CLI_SKIP_INSTALLED: '1',
       OPENSIP_DISABLE_UPDATE_CHECK: '1',
     },
     timeoutMs: input.options.timeoutMs,
@@ -187,7 +229,7 @@ async function runCommand(input, commandArgs, scenario) {
     stderrTailBytes: input.config.tailBytes.stderr,
   });
 
-  if (scenario !== 'graph-prime') {
+  if (scenario !== undefined) {
     input.report.scenarios.push(
       createScenarioResult({
         tier: input.tierId,
@@ -211,30 +253,6 @@ async function runCommand(input, commandArgs, scenario) {
   return measured;
 }
 
-function scenarioArgs(scenario, graphProfilePath, changedFile) {
-  switch (scenario) {
-    case 'fit-full': {
-      return ['fit', '--json'];
-    }
-    case 'fit-changed': {
-      return ['fit', '--changed', '--json'];
-    }
-    case 'graph-cold':
-    case 'graph-warm': {
-      return ['graph', '--json', '--profile', graphProfilePath];
-    }
-    case 'graph-impact-files': {
-      return ['graph', 'impact', '--files', changedFile, '--top', '20', '--json'];
-    }
-    case 'audit-changed': {
-      return ['suite', 'run', 'audit', '--changed', '--json'];
-    }
-    default: {
-      throw new Error(`Unsupported SLO scenario '${scenario}'.`);
-    }
-  }
-}
-
 async function readGraphProfile(deps, cwd, commandArgs) {
   const profileIndex = commandArgs.indexOf('--profile');
   if (profileIndex === -1) return;
@@ -246,16 +264,6 @@ async function readGraphProfile(deps, cwd, commandArgs) {
   } catch {
     return;
   }
-}
-
-function needsGraphCatalog(scenario) {
-  return (
-    scenario === 'graph-warm' || scenario === 'graph-impact-files' || scenario === 'audit-changed'
-  );
-}
-
-function requiresGit(scenario) {
-  return scenario === 'fit-changed' || scenario === 'audit-changed';
 }
 
 function parseArgs(argv) {
@@ -357,7 +365,7 @@ Options:
 `);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   runBenchSlo().then(
     ({ exitCode }) => {
       process.exitCode = exitCode;

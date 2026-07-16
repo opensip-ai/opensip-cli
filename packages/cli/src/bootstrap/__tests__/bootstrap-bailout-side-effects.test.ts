@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import { defineCommand, LanguageRegistry, ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +15,7 @@ import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
 import { BootstrapError } from '../bootstrap-error.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
+import { PolicyAuditCollector } from '../policy-audit.js';
 
 import type { PreActionRuntime } from '../pre-action-runtime.js';
 
@@ -55,6 +57,8 @@ function runtime(): PreActionRuntime {
     manifests: [],
     provenance: [],
     bootstrapDiagnostics: [],
+    trustPolicy: BUILTIN_TRUST_POLICY,
+    policyAudit: new PolicyAuditCollector(),
   };
 }
 
@@ -104,6 +108,7 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
     const buildPerRunScope = vi.fn();
     const enterScope = vi.fn();
     const createRunLogger = vi.fn(() => ({
+      debug: vi.fn(),
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
@@ -174,7 +179,7 @@ describe('bootstrap bailout side effects (ADR-0052)', () => {
         maybeInitializeOwningTool: vi.fn(),
         loadOwningToolCapabilities: vi.fn(() => Promise.resolve(0)),
         checkForUpdate: () => undefined,
-        startProfiling: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
       },
     );
 

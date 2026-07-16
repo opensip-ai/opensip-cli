@@ -6,6 +6,7 @@
  * the live registry (unknown → structured error), and surfaces the err arm.
  */
 
+import { assembleAgentCatalog } from '@opensip-cli/contracts';
 import { err, ok } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
@@ -31,7 +32,7 @@ import type {
   ShowRunData,
 } from '../../result-dto.js';
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from '../../results-read-port.js';
-import type { CallToolResult, McpStdioServer } from '../../server.js';
+import type { CallToolResult, McpStdioServer, McpSurfaceSnapshot } from '../../server.js';
 import type { McpToolDeps } from '../types.js';
 import type { AgentCatalog, RepairApplyVerifyResult, ReviewBrief } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
@@ -67,12 +68,49 @@ function fakeResults(over: Partial<ResultsReadPort>): ResultsReadPort {
   return { ...base, ...over };
 }
 
+const GRAPH_FRESH = {
+  fresh: true as const,
+  builtAt: '2026-07-02T00:00:00.000Z',
+  verifiedAt: '2026-07-02T00:00:01.000Z',
+  verification: 'complete' as const,
+};
+
 function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])): McpToolDeps {
   return {
     graph: {
-      freshness: () => ({ fresh: true, builtAt: '2026-07-02T00:00:00.000Z' }),
-    } as McpToolDeps['graph'],
+      catalogStatus: () =>
+        Promise.resolve(
+          ok({
+            context: {
+              project: {
+                root: '/proj',
+                scope: 'project' as const,
+                configPath: 'opensip-cli.config.yml',
+              },
+              catalog: { status: 'loaded' as const, builtAt: GRAPH_FRESH.builtAt },
+            },
+            freshness: GRAPH_FRESH,
+          }),
+        ),
+    } as unknown as McpToolDeps['graph'],
+    codebase: {
+      inventoryStatus: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+        ),
+      fileContext: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+        ),
+    },
+    context: {
+      contextStatus: () =>
+        Promise.resolve(
+          err({ code: 'test-dependency-unused', message: 'Context reads are not under test.' }),
+        ),
+    },
     results,
+    runtimeWiring: {} as McpToolDeps['runtimeWiring'],
     validToolIds,
   };
 }
@@ -259,6 +297,48 @@ describe('repair_apply_verify handler', () => {
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('unknown-tool');
   });
+
+  it('errors when mutations are disabled and when the write port fails', async () => {
+    {
+      const { server, handlers } = captureServer();
+      registerRepairApplyVerify(server, {
+        ...deps(fakeResults({})),
+        // no repairWrite
+      });
+      const out = parseResult(
+        await handlers.get('repair_apply_verify')!({
+          ref: 'latest',
+          tool: 'fit',
+          signal: 'index:0',
+          action: 'replace-ts-ignore',
+        }),
+      );
+      expect(out.isError).toBe(true);
+      expect((out.body.error as McpReadError).code).toBe('mcp-mutation-disabled');
+    }
+    {
+      const repairWrite: RepairWritePort = {
+        applyVerify: () => Promise.resolve(err({ code: 'repair-failed', message: 'nope' })),
+      };
+      const { server, handlers } = captureServer();
+      registerRepairApplyVerify(server, {
+        ...deps(fakeResults({})),
+        repairWrite,
+        mutationsEnabled: true,
+      });
+      const out = parseResult(
+        await handlers.get('repair_apply_verify')!({
+          ref: 'latest',
+          tool: 'fit',
+          signal: 'index:0',
+          action: 'replace-ts-ignore',
+          // force omitted branch
+        }),
+      );
+      expect(out.isError).toBe(true);
+      expect((out.body.error as McpReadError).code).toBe('repair-failed');
+    }
+  });
 });
 
 // ── review_change ───────────────────────────────────────────────────
@@ -271,7 +351,7 @@ describe('review_change handler', () => {
         reviewBrief: reviewBrief(),
         source: { suiteRunId: 'suite-1', suiteName: 'audit', sessionIds: ['fit-1'] },
         freshness: {
-          graph: { fresh: true, builtAt: '2026-07-02T00:00:00.000Z' },
+          graph: GRAPH_FRESH,
           sessions: {
             replayedAt: '2026-07-02T00:00:01.000Z',
             replayedSessions: 1,
@@ -305,7 +385,7 @@ describe('review_change handler', () => {
       suite: 'audit',
       files: ['src/a.ts'],
       limit: 5,
-      graphFreshness: { fresh: true, builtAt: '2026-07-02T00:00:00.000Z' },
+      graphFreshness: GRAPH_FRESH,
     });
     expect((out.body.data as McpReviewChangeData).reviewBrief.version).toBe(1);
   });
@@ -323,6 +403,55 @@ describe('review_change handler', () => {
     const out = parseResult(await handlers.get('review_change')!({ suiteRunId: 'missing' }));
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('not-found');
+  });
+
+  it('degrades graph status errors and still replays stored review data', async () => {
+    let seen: ReviewChangeOptions | undefined;
+    const base = deps(
+      fakeResults({
+        reviewChange: (opts) => {
+          seen = opts;
+          return Promise.resolve(
+            ok({
+              data: {
+                reviewBrief: reviewBrief(),
+                source: { suiteRunId: 'suite-1', suiteName: 'audit', sessionIds: ['fit-1'] },
+                freshness: {
+                  graph: opts.graphFreshness,
+                  sessions: {
+                    replayedAt: '2026-07-02T00:00:01.000Z',
+                    replayedSessions: 1,
+                    degradedSteps: 0,
+                  },
+                },
+              },
+            }),
+          );
+        },
+      }),
+    );
+    const { server, handlers } = captureServer();
+    registerReviewChange(server, {
+      ...base,
+      graph: {
+        catalogStatus: () =>
+          Promise.resolve(
+            err({
+              code: 'GRAPH.READ.CATALOG_GENERATION',
+              message: 'Failed to load graph catalog generation',
+            }),
+          ),
+      } as unknown as McpToolDeps['graph'],
+    });
+
+    const out = parseResult(await handlers.get('review_change')!({}));
+    expect(out.isError).toBe(false);
+    expect(seen?.graphFreshness).toMatchObject({
+      fresh: false,
+      verification: 'partial',
+      reasonCode: 'verification-unavailable',
+      reason: 'Graph status unavailable',
+    });
   });
 });
 
@@ -529,17 +658,45 @@ describe('show_run handler', () => {
 // ── get_agent_catalog ────────────────────────────────────────────────
 
 describe('get_agent_catalog handler', () => {
-  it('returns the agent catalog', () => {
+  /** A representative common catalog with reserved names + project + hostSupport. */
+  function commonCatalog(): AgentCatalog {
+    return assembleAgentCatalog({
+      rootCommands: ['audit', 'init', 'sessions', 'suite'],
+      suiteNames: ['audit', 'agent-context'],
+      hostSupport: {
+        supportContractVersion: 1,
+        status: 'preview',
+        match: 'partial',
+        rowId: 'macos-26-arm64-node24-npm11-v1',
+        rowStatus: 'preview',
+        profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+        matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+        reasonCodes: [],
+        observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+        unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+      },
+    });
+  }
+
+  const SURFACE: McpSurfaceSnapshot = Object.freeze({
+    version: '9.9.9-test',
+    surfaceEpoch: 7,
+    toolNames: Object.freeze(['get_agent_catalog', 'search_symbols']),
+    toolCount: 2,
+    mutationPosture: 'read-only',
+    projectRoot: '/canonical/project/root',
+    projectScope: 'project',
+  });
+
+  it('returns the bare common catalog when mcpSurface is absent (no overlay)', () => {
+    const catalog = commonCatalog();
     const { server, handlers } = captureServer();
-    registerGetAgentCatalog(
-      server,
-      deps(
-        fakeResults({ agentCatalog: () => ok({ commands: ['fit'] } as unknown as AgentCatalog) }),
-      ),
-    );
+    // deps() does not set mcpSurface → the handler must return the bare catalog.
+    registerGetAgentCatalog(server, deps(fakeResults({ agentCatalog: () => ok(catalog) })));
     const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
     expect(out.isError).toBe(false);
-    expect(out.body.commands).toEqual(['fit']);
+    expect(out.body).toEqual(catalog);
+    expect(out.body).not.toHaveProperty('mcp');
   });
 
   it('surfaces an err arm', () => {
@@ -550,5 +707,47 @@ describe('get_agent_catalog handler', () => {
     );
     const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
     expect(out.isError).toBe(true);
+  });
+
+  it('adds ONLY the additive mcp overlay from McpSurfaceSnapshot, leaving the common body unchanged', () => {
+    const catalog = commonCatalog();
+    const { server, handlers } = captureServer();
+    registerGetAgentCatalog(server, {
+      ...deps(fakeResults({ agentCatalog: () => ok(catalog) })),
+      mcpSurface: () => SURFACE,
+    });
+    const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
+    expect(out.isError).toBe(false);
+
+    // The `mcp` overlay carries EXACTLY the McpSurfaceSnapshot fields, mapped
+    // verbatim (projectRoot → project.root, projectScope → project.scope).
+    expect(out.body.mcp).toEqual({
+      version: '9.9.9-test',
+      surfaceEpoch: 7,
+      toolNames: ['get_agent_catalog', 'search_symbols'],
+      toolCount: 2,
+      mutationPosture: 'read-only',
+      project: { root: '/canonical/project/root', scope: 'project' },
+    });
+
+    // Removing ONLY the named `mcp` overlay yields the untouched common catalog —
+    // no other field was added, renamed, or dropped (no wildcard omission list).
+    const common: Record<string, unknown> = { ...out.body };
+    delete common.mcp;
+    expect(common).toEqual(catalog);
+  });
+
+  it('never mutates the input catalog when composing the overlay', () => {
+    const catalog = commonCatalog();
+    const before = JSON.stringify(catalog);
+    const { server, handlers } = captureServer();
+    registerGetAgentCatalog(server, {
+      ...deps(fakeResults({ agentCatalog: () => ok(catalog) })),
+      mcpSurface: () => SURFACE,
+    });
+    void handlers.get('get_agent_catalog')!({});
+    // The catalog the read port returned is untouched — the overlay is additive.
+    expect(JSON.stringify(catalog)).toBe(before);
+    expect(catalog).not.toHaveProperty('mcp');
   });
 });

@@ -65,6 +65,31 @@ describe('runCheckOnFixture', () => {
     });
     expect(run.findings).toHaveLength(0);
   });
+
+  it('rejects fixture paths with .. segments', async () => {
+    await expect(
+      runCheckOnFixture(bannedCheck, {
+        files: [{ path: '../escape.ts', content: 'export const x = 1\n' }],
+      }),
+    ).rejects.toThrow(/\.\./);
+  });
+
+  it('rejects absolute fixture paths', async () => {
+    await expect(
+      runCheckOnFixture(bannedCheck, {
+        files: [{ path: '/absolute/escape.ts', content: 'export const x = 1\n' }],
+      }),
+    ).rejects.toThrow(/relative/);
+  });
+
+  it('rejects targetPaths that escape the temp root', async () => {
+    await expect(
+      runCheckOnFixture(bannedCheck, {
+        files: [{ path: 'ok.ts', content: 'export const x = 1\n' }],
+        targetPaths: ['../outside.ts'],
+      }),
+    ).rejects.toThrow(/\.\./);
+  });
 });
 
 /** A check that reads only `.config` for the planner; never run here. */

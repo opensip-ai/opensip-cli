@@ -1,9 +1,4 @@
-import {
-  BASELINE_FORMAT_VERSION,
-  logger,
-  type BaselineIdentityMetadata,
-  type Signal,
-} from '@opensip-cli/core';
+import { logger, type BaselineIdentityMetadata, type Signal } from '@opensip-cli/core';
 import { eq, sql } from 'drizzle-orm';
 
 import { requireDrizzleHandle, type DataStore, type DrizzleDataStore } from './data-store.js';
@@ -236,12 +231,5 @@ export class BaselineRepo {
     });
   }
 }
-
-/** Test/helper default identity matching the host default strategy. */
-export const DEFAULT_TEST_BASELINE_IDENTITY: BaselineIdentityMetadata = {
-  baselineFormatVersion: BASELINE_FORMAT_VERSION,
-  fingerprintStrategyId: 'opensip.default.rule-file-line-col',
-  fingerprintStrategyVersion: 1,
-};
 
 export type { BaselineIdentityMetadata } from '@opensip-cli/core';

@@ -3,15 +3,16 @@
  *
  * Implements the result/history reads over the `@opensip-cli/session-store`
  * read API (`listSessionSummaries` / `resolveAndReplaySession` / the bundled
- * replay resolver) and the `@opensip-cli/contracts` `buildAgentCatalog`. It is
- * constructed from an injected `DataStore` (+ the live `ToolRegistry`) captured
- * once — it NEVER calls `currentScope()` inside a method (the long-lived server
- * captures scope at construction; Phase 3). It NEVER names `SessionRepo`, never
- * raw-queries the datastore, and never re-runs the underlying tool — replay only
- * (the `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
+ * replay resolver), and returns the already-assembled common `AgentCatalog`
+ * captured at construction (Plan 03 transport parity — `serveMcpStdio` composes
+ * it once through the contracts `assembleAgentCatalog`; the port never builds
+ * it). It is constructed from an injected `DataStore` (+ the live `ToolRegistry`)
+ * captured once — it NEVER calls `currentScope()` inside a method (the long-lived
+ * server captures scope at construction; Phase 3). It NEVER names `SessionRepo`,
+ * never raw-queries the datastore, and never re-runs the underlying tool — replay
+ * only (the `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
  */
 
-import { buildAgentCatalog } from '@opensip-cli/contracts';
 import { err, logger, mapWithConcurrency, ok } from '@opensip-cli/core';
 import { BaselineRepo } from '@opensip-cli/datastore';
 import {
@@ -24,7 +25,7 @@ import {
   type SessionReplayFn,
 } from '@opensip-cli/session-store';
 
-import { readError } from './mcp-error.js';
+import { readError, sanitizeMcpErrorMessage } from './mcp-error.js';
 import { buildPersistedReviewBrief, type PersistedReviewStep } from './persisted-review-brief.js';
 import {
   baselineComparisonReplay,
@@ -67,37 +68,39 @@ export interface SessionResultsReadPortDeps {
   readonly store: DataStore;
   /** Project root that scopes session result reads. Omitted keeps reads unscoped. */
   readonly projectRoot?: string;
-  /** Live tool registry — for the agent catalog + the bundled replay resolver. */
+  /** Live tool registry — for the bundled replay resolver default. */
   readonly tools?: ToolRegistry;
   /** Override the per-tool replay resolver (defaults to the bundled in-host one). */
   readonly replayFor?: (tool: ToolShortId) => SessionReplayFn | undefined;
-  /** Tier-3 internal command names excluded from the agent catalog. */
-  readonly internalCommands?: ReadonlySet<string>;
+  /**
+   * The already-assembled common agent catalog (Plan 03, agent-catalog transport
+   * parity). The long-lived server composes it ONCE from the captured scope
+   * (`serveMcpStdio`) via the shared contracts `assembleAgentCatalog`, so the
+   * common body reaches byte-identical parity with `opensip agent-catalog --json`
+   * (reserved roots, reserved suites, bounded target conventions, and Plan 02's
+   * process-only `hostSupport`). The read port is a pure conduit: `agentCatalog()`
+   * forwards this captured object verbatim and consults NO other dependency.
+   */
+  readonly agentCatalog: AgentCatalog;
 }
 
 export class SessionResultsReadPort implements ResultsReadPort {
   private readonly store: DataStore;
   private readonly projectRoot?: string;
-  private readonly tools?: ToolRegistry;
   private readonly replayFor: (tool: ToolShortId) => SessionReplayFn | undefined;
-  private readonly internalCommands?: ReadonlySet<string>;
+  private readonly capturedAgentCatalog: AgentCatalog;
 
   constructor(deps: SessionResultsReadPortDeps) {
     this.store = deps.store;
     this.projectRoot = deps.projectRoot;
-    this.tools = deps.tools;
     this.replayFor = deps.replayFor ?? (deps.tools ? bundledReplayResolver(deps.tools) : noReplay);
-    this.internalCommands = deps.internalCommands;
+    this.capturedAgentCatalog = deps.agentCatalog;
   }
 
   agentCatalog(): Result<AgentCatalog, McpReadError> {
-    return ok(
-      buildAgentCatalog({
-        ...(this.tools ? { tools: this.tools } : {}),
-        ...(this.internalCommands ? { internalCommands: this.internalCommands } : {}),
-        validateOverlays: true,
-      }),
-    );
+    // Pure conduit: return the catalog assembled once at the composition root.
+    // No scope, filesystem, graph, Git, test, session, or datastore read here.
+    return ok(this.capturedAgentCatalog);
   }
 
   listRuns(opts: ListRunsOptions = {}): Result<readonly RunSummary[], McpReadError> {
@@ -107,8 +110,10 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
       // Default to the lean projection — agents want pointers, not heavy payloads.
       summaryOnly: opts.summaryOnly ?? true,
-      ...(this.tools ? { registry: this.tools } : {}),
     });
+    // Preserve the stored layout key here: list_runs pointers must feed directly
+    // into show_run and match the replay envelope's tool identity. The human CLI
+    // may canonicalize display names, but the MCP machine contract must not.
     return ok(history.sessions.map(toRunSummary));
   }
 
@@ -124,7 +129,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
-    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref, session);
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref);
     return ok({
       data: { fidelity: replay.fidelity, envelope: replay.envelope },
       session: this.withLedger(runSummaryFromReplay(session, replay.envelope), session.id),
@@ -148,7 +153,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
-    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound('latest', session);
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound('latest');
     const findings = replay.envelope.signals.map(toMcpFinding);
     return ok({
       data: findings,
@@ -186,7 +191,9 @@ export class SessionResultsReadPort implements ResultsReadPort {
       } catch (error) {
         return {
           session,
-          error: error instanceof Error ? error.message : String(error),
+          error: sanitizeMcpErrorMessage(error, {
+            projectRoot: this.projectRoot,
+          }),
           errorCode: 'decode-error',
         };
       }
@@ -240,8 +247,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
     const { session, replay } = outcome;
-    if (!this.isSessionInScope(session))
-      return this.foreignSessionNotFound(opts.ref ?? 'latest', session);
+    if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref ?? 'latest');
 
     try {
       const repo = new BaselineRepo(this.store);
@@ -258,7 +264,10 @@ export class SessionResultsReadPort implements ResultsReadPort {
       );
     } catch (error) {
       return err(
-        readError('baseline-error', error instanceof Error ? error.message : String(error)),
+        readError(
+          'baseline-error',
+          sanitizeMcpErrorMessage(error, { projectRoot: this.projectRoot }),
+        ),
       );
     }
   }
@@ -278,7 +287,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     if (!resolved.ok) return err(readError(resolved.reason, resolved.detail));
     if (!this.isSessionInScope(resolved.session)) {
-      return this.foreignSessionNotFound(ref, resolved.session);
+      return this.foreignSessionNotFound(ref);
     }
     return ok(resolved.session);
   }
@@ -294,13 +303,11 @@ export class SessionResultsReadPort implements ResultsReadPort {
     return ledger === undefined ? summary : { ...summary, ledger };
   }
 
-  private foreignSessionNotFound<T>(ref: string, session: StoredSession): Result<T, McpReadError> {
+  private foreignSessionNotFound<T>(ref: string): Result<T, McpReadError> {
     logger.info({
       evt: 'mcp.results.scope.rejected',
       module: 'mcp:results-read-port',
-      ref,
-      sessionCwd: session.cwd,
-      projectRoot: this.projectRoot,
+      reason: 'outside-project',
     });
     return err(readError('not-found', `session ${ref} was not found`));
   }

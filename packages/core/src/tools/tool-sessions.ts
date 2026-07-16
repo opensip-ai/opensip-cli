@@ -84,6 +84,82 @@ export interface ToolSessionContribution {
   readonly payload?: unknown;
 }
 
+/** Version of the generic Tool-to-host evidence snapshot contribution. */
+export const EVIDENCE_SNAPSHOT_CONTRIBUTION_VERSION = 1 as const;
+
+/**
+ * Closed lifecycle state for an evidence snapshot produced by a command.
+ *
+ * `rebuilt` and `reused` name durable evidence. The remaining states are
+ * deliberately negative/qualified answers: consumers must follow the supplied
+ * reasons and follow-up reads instead of interpreting them as an empty result.
+ */
+export type EvidenceSnapshotStatus =
+  'rebuilt' | 'reused' | 'partial' | 'unsupported' | 'failed' | 'cancelled';
+
+/** Completeness state for the bounded evidence inventory represented by a snapshot. */
+export type EvidenceCoverageStatus = 'complete' | 'partial' | 'unavailable';
+
+/** Freshness state comparing persisted evidence with its current source inputs. */
+export type EvidenceFreshnessStatus = 'current' | 'stale' | 'unknown';
+
+/** Bounded, machine-actionable explanation attached to evidence status. */
+export interface EvidenceSnapshotReason {
+  readonly code: string;
+  readonly message?: string;
+}
+
+/** Generic coverage summary; domain payloads remain in their owning package. */
+export interface EvidenceCoverageSummary {
+  readonly status: EvidenceCoverageStatus;
+  readonly items?: number;
+  readonly total?: number;
+  readonly reasonCodes?: readonly string[];
+}
+
+/** Generic freshness summary without task-context-specific vocabulary. */
+export interface EvidenceFreshnessSummary {
+  readonly status: EvidenceFreshnessStatus;
+  readonly reasonCodes?: readonly string[];
+}
+
+/** Plain producer identity captured by the host for provenance. */
+export interface EvidenceSnapshotProducer {
+  readonly toolId: string;
+  readonly command: string;
+  readonly version?: string;
+}
+
+/** Exact immutable evidence input consumed while producing a snapshot. */
+export interface EvidenceSnapshotInput {
+  readonly kind: string;
+  readonly snapshotId: string;
+}
+
+/**
+ * Generic, bounded evidence produced by a Tool command and returned to the host.
+ *
+ * Core intentionally knows nothing about task contexts, graph generations, or
+ * persistence. The owning Tool persists domain payloads first, then returns this
+ * small pointer/status projection. Negative states may omit `snapshotId`; durable
+ * success states are rejected by the host unless it is present.
+ */
+export interface EvidenceSnapshotContribution {
+  readonly schemaVersion: typeof EVIDENCE_SNAPSHOT_CONTRIBUTION_VERSION;
+  readonly kind: string;
+  readonly snapshotId?: string;
+  /** Version of the pointed domain snapshot payload (not this contribution envelope). */
+  readonly snapshotSchemaVersion?: number;
+  readonly producer: EvidenceSnapshotProducer;
+  readonly status: EvidenceSnapshotStatus;
+  readonly freshness: EvidenceFreshnessSummary;
+  readonly coverage: EvidenceCoverageSummary;
+  /** Bounded immutable inputs that the host can cross-check without reading domain payloads. */
+  readonly inputs?: readonly EvidenceSnapshotInput[];
+  readonly reasons?: readonly EvidenceSnapshotReason[];
+  readonly followUpReads?: readonly string[];
+}
+
 /**
  * What a tool command handler or live renderer returns to the host so the
  * host can complete the run lifecycle and persist the generic session row
@@ -93,6 +169,11 @@ export interface ToolSessionContribution {
  *   handler already produced) — optional so a live renderer that only persists
  *   can return just `session`.
  * - `session` is the generic-session contribution the host persists.
+ * - `execution: { kind: 'delegated', startedAt }` marks a supervisor process
+ *   whose subprocess owns the authoritative run evidence. The host only
+ *   suppresses the supervisor's standalone ledger row after proving that a
+ *   correlated child row for the same tool and command was persisted no earlier
+ *   than that child launch; otherwise the normal missing-evidence fault remains.
  *
  * The host receives this and owns the rest; the tool supplies no lifecycle
  * timing and performs no generic-session write.
@@ -101,6 +182,11 @@ export interface ToolRunCompletion {
   readonly result?: unknown;
   readonly envelope?: unknown;
   readonly session?: ToolSessionContribution;
+  readonly evidenceSnapshots?: readonly EvidenceSnapshotContribution[];
+  readonly execution?: {
+    readonly kind: 'delegated';
+    readonly startedAt: string;
+  };
 }
 
 /**

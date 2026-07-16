@@ -294,7 +294,10 @@ describe('executeInit (ambiguous language)', () => {
 
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError).toBeDefined();
-    expect(result.ambiguousLanguageError?.detected.sort()).toEqual(['rust', 'typescript']);
+    expect([...(result.ambiguousLanguageError?.detected ?? [])].sort()).toEqual([
+      'rust',
+      'typescript',
+    ]);
     expect(result.ambiguousLanguageError?.message).toContain('--language');
 
     // Nothing was written
@@ -573,6 +576,9 @@ describe('executeInit (AGENTS.md)', () => {
     expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('Agent Playbook');
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('OpenSIP MCP First');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('auto-load a newer catalog');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('get_runtime_wiring');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('hard-cap reasons');
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('agent-fast');
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('trust.fullyVerified');
   });

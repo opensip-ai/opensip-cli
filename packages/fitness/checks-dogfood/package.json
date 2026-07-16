@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/checks-dogfood",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "private": true,
   "license": "Apache-2.0",
   "description": "opensip-cli-INTERNAL architecture dogfood checks — NEVER published; keyed on @opensip-cli package internals (ToolCliContext, cli-live, bootstrap). Loaded only for opensip-cli's own fit:ci gate.",

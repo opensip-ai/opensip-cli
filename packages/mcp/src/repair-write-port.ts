@@ -9,7 +9,7 @@ import {
   type Result,
 } from '@opensip-cli/core';
 
-import { readError, type McpReadError } from './mcp-error.js';
+import { readError, sanitizeMcpErrorMessage, type McpReadError } from './mcp-error.js';
 
 import type { RepairApplyVerifyResult } from '@opensip-cli/contracts';
 
@@ -30,6 +30,7 @@ const CHILD_ENV_SPECS = [
   'FORCE_COLOR',
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'OPENSIP_PROFILING',
+  'OPENSIP_PROFILE_DIR',
 ].map((canonical): EnvVarSpec => ({
   canonical,
   docs: 'Forwarded from the parent process into a nested MCP repair mutation CLI run.',
@@ -59,7 +60,7 @@ function cliEntrypoint(): string | undefined {
   return process.argv[1];
 }
 
-function mutationChildEnv(): NodeJS.ProcessEnv {
+export function repairMutationChildEnv(): NodeJS.ProcessEnv {
   return snapshotEnv(CHILD_ENV_SPECS, { OPENSIP_MCP_MUTATION_CHILD: '1' });
 }
 
@@ -136,7 +137,7 @@ export class CliRepairWritePort implements RepairWritePort {
     return new Promise((resolve) => {
       const child = spawn(process.execPath, [...args], {
         cwd: this.projectRoot,
-        env: mutationChildEnv(),
+        env: repairMutationChildEnv(),
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -163,7 +164,14 @@ export class CliRepairWritePort implements RepairWritePort {
       });
       child.on('error', (error) => {
         clearTimeout(timer);
-        resolve(err(readError('repair-spawn-failed', error.message)));
+        resolve(
+          err(
+            readError(
+              'repair-spawn-failed',
+              sanitizeMcpErrorMessage(error, { projectRoot: this.projectRoot }),
+            ),
+          ),
+        );
       });
       child.on('close', () => {
         clearTimeout(timer);
@@ -183,7 +191,9 @@ export class CliRepairWritePort implements RepairWritePort {
             err(
               readError(
                 parsed.error.code,
-                `${parsed.error.message}; stderr: ${stderr.trim().slice(0, 500)}`,
+                sanitizeMcpErrorMessage(`${parsed.error.message}; stderr: ${stderr}`, {
+                  projectRoot: this.projectRoot,
+                }),
               ),
             ),
           );

@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /**
  * host-command-specs — CLI-owned commands as declarative {@link CommandSpec}s,
  * mounted via the same `mountCommandSpec` plane as tools (Phase 6/7 parity).
@@ -8,13 +9,19 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand, type ProjectContext } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  currentScope,
+  defineCommand,
+  type ProjectContext,
+} from '@opensip-cli/core';
 
 import { capabilityWorkerCommandSpec } from '../bootstrap/capability-worker/entry.js';
 import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-entry.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
 import { executeAgentCatalog } from './agent-catalog.js';
+import { buildAuditCommandSpec } from './audit-command-spec.js';
 import {
   assembleCompletionInventory,
   printCompletionScript,
@@ -31,9 +38,14 @@ import {
   mountToolPluginGroups,
   type HostSpec,
 } from './host-subcommand-groups.js';
+import {
+  attachOptionalToolRecommendations,
+  isOptionalToolRecommendationEligible,
+} from './init/optional-tools.js';
 import { executeInit } from './init.js';
 import { showInternalCommands } from './internal-command-visibility.js';
 import { mountCommandSpec } from './mount-command-spec.js';
+import { toolsList } from './tools/list.js';
 import { executeUninstall } from './uninstall.js';
 
 import type { CliCommandsContext } from './shared.js';
@@ -41,6 +53,10 @@ import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
 
 /** Shared `output` mode for the host commands that return a renderable result. */
 const COMMAND_RESULT = 'command-result' as const;
+
+/** Static-handler provenance shared by every host command spec in this module. */
+const HOST_COMMAND_PACKAGE = 'opensip-cli';
+const HOST_COMMAND_SPECS_PATH = 'packages/cli/src/commands/host-command-specs.ts';
 
 // ---------------------------------------------------------------------------
 // init
@@ -54,6 +70,11 @@ interface InitOpts extends InitOptions {
 
 function buildInitSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildInitSpec',
+    },
     name: 'init',
     description: 'Scaffold opensip-cli.config.yml + example checks/scenarios for your project',
     // `--cwd` here matches the registry text ("Target directory"); `--json` /
@@ -88,11 +109,32 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       // source for "was --cwd typed on the CLI?"); the former register-init
       // recomputed `cmd.getOptionValueSource('cwd') === 'cli'` on its own
       // Commander command — identical, since the hook's actionCommand IS init.
-      const result = executeInit({
+      let result = executeInit({
         ...opts,
         cwdExplicit: opts.cwdExplicit === true,
         toolScaffolds: ctx.toolScaffolds,
       });
+      if (
+        opts.keep !== true &&
+        opts.remove !== true &&
+        isOptionalToolRecommendationEligible(result)
+      ) {
+        const scope = currentScope();
+        const inventory = toolsList({
+          cwd: result.cwd,
+          provenance: scope?.toolProvenance ?? [],
+          manifests: scope?.toolManifests ?? [],
+        });
+        const installedIds = new Set(inventory.tools.map((row) => row.id));
+        result = attachOptionalToolRecommendations(result, { installedIds });
+        scope?.logger.debug({
+          evt: 'cli.init.optional_tools_projected',
+          module: 'cli:init',
+          languageCount: result.languages?.length ?? 0,
+          installedCount: installedIds.size,
+          recommendedCount: result.optionalTools?.length ?? 0,
+        });
+      }
       // Exit 2 for any non-success path the user can act on: ambiguous-language
       // detection, partial-state refusal, mutex flag error, inside-existing-
       // project refusal.
@@ -114,6 +156,11 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
 
 function buildConfigureSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildConfigureSpec',
+    },
     name: 'configure',
     description: 'Set up OpenSIP Cloud API key',
     commonFlags: ['json', 'debug'],
@@ -127,10 +174,40 @@ function buildConfigureSpec(): HostSpec {
 // report (CLI-owned composition root)
 // ---------------------------------------------------------------------------
 
+/**
+ * `--max-catalog-mb <mb>` → a byte budget for the inlined graph catalog.
+ *
+ * The default keeps the report a size you can attach to a PR or email. Raising
+ * it is a per-invocation decision — "this report is for me to explore, not to
+ * send you" — which is why it is a flag rather than a project-wide config key:
+ * the same repo wants both shapes on different days.
+ *
+ * @throws {ConfigurationError} When the value is not a positive number.
+ */
+function parseMaxCatalogMb(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const mb = Number(raw);
+  if (!Number.isFinite(mb) || mb <= 0) {
+    throw new ConfigurationError(
+      `report: --max-catalog-mb must be a positive number of megabytes (got '${raw}').`,
+      { code: 'CONFIG.REPORT.INVALID_CATALOG_BUDGET' },
+    );
+  }
+  return Math.floor(mb * 1024 * 1024);
+}
+
 function buildReportSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildReportSpec',
+    },
     name: 'report',
     description: 'Generate the cross-tool HTML report and open it in your browser',
+    // First-run capable: `audit --open` and `report` must work on a pre-init
+    // run. The HTML lands in the ephemeral runtime's reports dir, not the repo.
+    noInit: true,
     commonFlags: ['json'],
     options: [
       {
@@ -138,16 +215,26 @@ function buildReportSpec(): HostSpec {
         description: 'Write the report but do not launch a browser',
         negatable: true,
       },
+      {
+        flag: '--max-catalog-mb',
+        value: '<mb>',
+        description:
+          'Raise the inlined graph-catalog budget (default 8 MB). Use when exploring a large repo locally; a bigger report is slower to open and may be too large to share.',
+      },
     ],
     scope: 'project',
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as { open: boolean; json: boolean };
+      const opts = rawOpts as { open: boolean; json: boolean; maxCatalogMb?: string };
       // Commander stores `--no-open` as `opts.open === false`; default true.
       // In `--json` mode we never launch a browser (machine-output contract).
       // ADR-0054 M4-F: composeAndWriteReport runs an EXTERNAL tool's
       // collectReportData in a forked hook worker (its runtime never runs in-host).
-      return composeAndWriteReport({ open: opts.open === true && opts.json !== true });
+      const maxGraphCatalogBytes = parseMaxCatalogMb(opts.maxCatalogMb);
+      return composeAndWriteReport({
+        open: opts.open === true && opts.json !== true,
+        ...(maxGraphCatalogBytes === undefined ? {} : { maxGraphCatalogBytes }),
+      });
     },
   });
 }
@@ -158,6 +245,11 @@ function buildReportSpec(): HostSpec {
 
 function buildCompletionSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildCompletionSpec',
+    },
     name: 'completion',
     description: 'Print a shell-completion script (bash | zsh | fish)',
     commonFlags: [],
@@ -228,6 +320,11 @@ interface UninstallOpts {
 
 function buildUninstallSpec(): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildUninstallSpec',
+    },
     name: 'uninstall',
     description:
       'Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.',
@@ -291,6 +388,11 @@ function buildUninstallSpec(): HostSpec {
 
 function buildAgentCatalogSpec(ctx: CliCommandsContext): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildAgentCatalogSpec',
+    },
     name: 'agent-catalog',
     description:
       'Structured catalog of agent-friendly commands, patterns, and output shapes (JSON preferred). ' +
@@ -335,6 +437,7 @@ const COMPLETION_SELF_SPEC: SpecLike = { name: 'completion', commonFlags: [] };
 function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildInitSpec(ctx),
+    buildAuditCommandSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),
@@ -377,6 +480,7 @@ function buildHostCompletionSurface(ctx: CliCommandsContext): {
 export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSpec[] {
   return [
     buildInitSpec(ctx),
+    buildAuditCommandSpec(ctx),
     buildReportSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),

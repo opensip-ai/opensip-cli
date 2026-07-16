@@ -12,6 +12,21 @@
  * import from this leaf, and nothing in this file imports back.
  */
 
+import type { Shard, ShardRunStats } from './shard-model.js';
+import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
+import type { CatalogRepo } from '../../persistence/catalog-repo.js';
+import type {
+  Catalog,
+  FeatureColumn,
+  FeatureTable,
+  GraphConfig,
+  Indexes,
+  ResolutionMode,
+  ResolutionStats,
+  Rule,
+} from '../../types.js';
+import type { Signal } from '@opensip-cli/core';
+
 /** Canonical pipeline stages, in execution order. */
 export type GraphStage = 'discover' | 'parse' | 'walk' | 'resolve' | 'index' | 'features' | 'rules';
 
@@ -40,3 +55,44 @@ export interface GraphProgressEvent {
 
 /** Callback invoked with each {@link GraphProgressEvent} during graph orchestration. */
 export type GraphProgressCallback = (event: GraphProgressEvent) => void;
+
+/**
+ * Input to the sharded graph pipeline: planned shards plus shared build,
+ * persistence, rule, feature, and progress context.
+ */
+export interface RunShardedInput {
+  readonly shards: readonly Shard[];
+  /** Common project root; every fragment path resolves against it. */
+  readonly projectRoot: string;
+  /** CLI entry script (`process.argv[1]`) used to spawn shard workers. */
+  readonly cliScript: string;
+  readonly adapter: GraphLanguageAdapter;
+  /** Optional adapter id requested by `graph --language <id>`. */
+  readonly language?: string;
+  readonly resolutionMode: ResolutionMode;
+  readonly concurrency?: number;
+  readonly useCache: boolean;
+  readonly catalogRepo: CatalogRepo | null;
+  readonly config?: GraphConfig;
+  readonly rules?: readonly Rule[];
+  /** Dashboard feature columns to materialize into the persisted catalog. */
+  readonly emitFeatures?: readonly FeatureColumn[];
+  /** Optional structured progress callback over the canonical graph stages. */
+  readonly onProgress?: GraphProgressCallback;
+}
+
+/** Unified sharded graph result with cache, failure, feature, and profile evidence. */
+export interface RunShardedResult {
+  readonly catalog: Catalog;
+  readonly indexes: Indexes;
+  readonly signals: readonly Signal[];
+  readonly resolutionStats: ResolutionStats;
+  /** True when every shard was reused from cache. */
+  readonly cacheHit: boolean;
+  /** Shard ids whose worker failed while the remaining build continued. */
+  readonly failedShardIds: readonly string[];
+  /** Feature table derived over the merged global catalog. */
+  readonly features: FeatureTable;
+  /** Per-run sharded build statistics mirrored into profile output. */
+  readonly shardStats: ShardRunStats;
+}

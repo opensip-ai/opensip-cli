@@ -15,9 +15,10 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ConfigurationError, ToolError, type ToolProvenance } from '@opensip-cli/core';
+import { ConfigurationError, ToolError, type Tool, type ToolProvenance } from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
+import { bindToolCliContext } from '../bootstrap/bind-tool-context.js';
 import { dispatchExternalToolCommand } from '../bootstrap/dispatch-external-tool-command.js';
 import { dispatchExternalToolHook } from '../bootstrap/dispatch-external-tool-hook.js';
 
@@ -25,6 +26,7 @@ import { makeDispatchHostCtx, type CapturedHostCtx } from './harness/dispatch-ho
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RESULT_WORKER = join(HERE, 'fixtures', 'dispatch-result-worker.mjs');
+const RAW_HOOK_RPC_WORKER = join(HERE, 'fixtures', 'dispatch-raw-hook-rpc-worker.mjs');
 const FIXTURE_DIR = join(HERE, 'fixtures', 'external-dispatch-tool');
 
 const PROVENANCE: ToolProvenance = {
@@ -34,6 +36,26 @@ const PROVENANCE: ToolProvenance = {
   version: '0.0.0',
   resolvedPath: FIXTURE_DIR,
   manifestHash: 'h',
+};
+
+const OWNING_TOOL: Tool = {
+  identity: { name: 'external-dispatch-tool' },
+  metadata: {
+    id: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567',
+    name: 'external-dispatch-tool',
+    version: '0.0.0',
+    description: 'external hook owner',
+  },
+  commandSpecs: [
+    {
+      name: 'external-dispatch-tool',
+      description: 'external hook owner',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler: () => undefined,
+    },
+  ],
 };
 
 function dispatch(cap: CapturedHostCtx, mode: string, cliScript = RESULT_WORKER): Promise<void> {
@@ -108,6 +130,33 @@ describe('dispatchExternalToolHook — M4-F lifecycle hook supervisor', () => {
       timeoutMs: 5000,
     });
     expect(result).toEqual({ ok: true, n: 42 });
+  });
+
+  it('denies a raw host-RPC frame targeting another tool through the bound hook context', async () => {
+    const cap = makeDispatchHostCtx();
+    const result = await dispatchExternalToolHook({
+      provenance: PROVENANCE,
+      hook: 'collectReportData',
+      cwd: HERE,
+      ctx: bindToolCliContext(OWNING_TOOL, cap.ctx),
+      cliScript: RAW_HOOK_RPC_WORKER,
+      timeoutMs: 5000,
+    });
+
+    expect(result).toEqual({
+      reply: {
+        kind: 'rpc-reply',
+        rpcId: 41,
+        ok: false,
+        error: {
+          message: 'host-RPC seam failed',
+          code: 'PLUGIN.IDENTITY_NAMESPACE_MISMATCH',
+          toolErrorCode: 'PLUGIN_INCOMPATIBLE',
+        },
+      },
+    });
+    expect(cap.toolStateStore.has('victim-tool:stolen')).toBe(false);
+    expect(cap.calls).not.toContain('toolState.put:victim-tool:stolen');
   });
 
   it('rejects with a structured ToolError when the hook worker cannot spawn', async () => {

@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { fileCache } from '@opensip-cli/fitness';
+import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { checks } from '../index.js';
@@ -28,7 +28,7 @@ function writeFixture(cwd: string, rel: string, content: string): string {
   return abs;
 }
 
-afterEach(() => fileCache.clear());
+afterEach(() => fitnessTestFileCache.clear());
 
 // =============================================================================
 // docker-best-practices: HEALTHCHECK and NODE_ENV branches

@@ -11,6 +11,7 @@
  */
 
 import { dashboardCssCards } from './css/cards.js';
+import { dashboardCssChangeImpact } from './css/change-impact.js';
 import { dashboardCssCodePaths } from './css/code-paths.js';
 import { dashboardCssDataTable } from './css/data-table.js';
 import { dashboardCssFunctionCard } from './css/function-card.js';
@@ -24,6 +25,7 @@ export function dashboardCss(): string {
     dashboardCssTabs(),
     dashboardCssCards(),
     dashboardCssDataTable(),
+    dashboardCssChangeImpact(),
     dashboardCssCodePaths(),
     dashboardCssFunctionCard(),
     dashboardCssHelpDrawer(),

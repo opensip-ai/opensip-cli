@@ -40,6 +40,23 @@ function command(name: string, options: NonNullable<Tool['commandSpecs']>[number
   });
 }
 
+function evidenceCommand(
+  name: string,
+  options: NonNullable<Tool['commandSpecs']>[number]['options'] = [],
+) {
+  return defineCommand<unknown, ToolCliContext>({
+    name,
+    description: 'fixture evidence producer',
+    commonFlags: [],
+    options,
+    scope: 'project',
+    output: 'raw-stream',
+    rawStreamReason: 'host-orchestrated-evidence',
+    producesEvidenceSnapshot: true,
+    handler: () => ({}),
+  });
+}
+
 function fixtureTool(
   id = TOOL_ID,
   name = 'fitness',
@@ -57,6 +74,7 @@ function fixtureTool(
   ],
 ): Tool {
   return {
+    identity: { name },
     metadata: {
       id,
       name,
@@ -78,6 +96,17 @@ function auditTools(): readonly Tool[] {
       command('impact', [
         { flag: '--changed', description: 'changed', default: false },
         { flag: '--since', value: '<ref>', description: 'since' },
+        {
+          flag: '--files',
+          value: '<path>',
+          description: 'files',
+          arrayDefault: [],
+          parse: (raw, prev) => [...(Array.isArray(prev) ? prev : []), raw],
+        },
+      ]),
+      evidenceCommand('graph-context-inventory'),
+      evidenceCommand('graph-context-ensure'),
+      evidenceCommand('graph-context-select-tests', [
         {
           flag: '--files',
           value: '<path>',
@@ -166,7 +195,7 @@ function withSuiteScope<T>(
       scope: 'project',
     },
   });
-  return runWithScope(scope, fn);
+  return runWithScope(scope, async () => fn());
 }
 
 describe('buildSuiteGroupLeaves', () => {
@@ -191,8 +220,18 @@ describe('buildSuiteGroupLeaves', () => {
     const host = makeDispatchHostCtx();
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
+    const completed = {
+      type: 'suite-run',
+      suite: 'security',
+      suiteRunId: 'suite-1',
+      runId: 'run-1',
+      exitCode: 0,
+      durationMs: 10,
+      steps: [],
+    } as const;
+    runSuiteMock.mockResolvedValueOnce(completed);
 
-    await withSuiteScope(() => runSpec.handler?.({ _args: ['security'] }, ctx));
+    const returned = await withSuiteScope(() => runSpec.handler?.({ _args: ['security'] }, ctx));
 
     expect(runSuiteMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -202,6 +241,9 @@ describe('buildSuiteGroupLeaves', () => {
         defaultChanged: false,
       }),
     );
+    expect(returned).toBe(completed);
+    expect(ctx.render).toHaveBeenCalledTimes(1);
+    expect(ctx.render).toHaveBeenCalledWith(completed);
     expect(ctx.exitCodes).toContain(0);
   });
 
@@ -297,35 +339,32 @@ describe('buildSuiteGroupLeaves', () => {
     expect(ctx.render).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'error',
-        message: "suite run without opensip init only supports the built-in 'audit' suite.",
+        message:
+          "suite run without opensip init only supports the built-in 'audit' or 'agent-context' suite.",
       }),
     );
     expect(ctx.exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
     expect(runSuiteMock).not.toHaveBeenCalled();
   });
 
-  it('lets configured audit override the built-in suite', async () => {
+  it('rejects a configured suite named audit even when injected past document validation', async () => {
+    // ADR-0159: `suites.audit` is reserved and cannot exist in a valid config
+    // document. This scope bypasses document validation deliberately; the
+    // suite plane's own parse still rejects it, so a shadowed audit can never
+    // silently run.
     const host = makeDispatchHostCtx();
     const ctx = hostCtx(host.ctx);
     const [runSpec] = buildSuiteGroupLeaves(ctx);
 
-    await withSuiteScope(() => runSpec.handler?.({ _args: ['audit'] }, ctx), {
-      audit: {
-        description: 'Custom audit',
-        steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
-      },
-    });
-
-    expect(runSuiteMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'audit',
-        defaultChanged: false,
-        suite: {
+    await expect(
+      withSuiteScope(() => runSpec.handler?.({ _args: ['audit'] }, ctx), {
+        audit: {
           description: 'Custom audit',
           steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
         },
       }),
-    );
+    ).rejects.toThrow(/reserved for the built-in audit suite/);
+    expect(runSuiteMock).not.toHaveBeenCalled();
   });
 
   it('lists configured suites with resolved steps', async () => {
@@ -336,7 +375,7 @@ describe('buildSuiteGroupLeaves', () => {
 
     expect(result).toEqual({
       type: 'suite-list',
-      totalCount: 2,
+      totalCount: 3,
       suites: [
         {
           name: 'security',
@@ -375,34 +414,111 @@ describe('buildSuiteGroupLeaves', () => {
             },
           ],
         },
+        {
+          name: 'agent-context',
+          description:
+            'Before-edit project inventory, graph generation, and labelled static test-selection evidence',
+          steps: [
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-inventory',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-ensure',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-select-tests',
+              args: {},
+            },
+          ],
+        },
       ],
     });
   });
 
-  it('lists configured audit instead of the built-in audit suite', async () => {
+  it('always lists the built-in audit suite alongside configured suites', async () => {
+    // ADR-0159: configured suites can never claim the reserved `audit` name,
+    // so the built-in definition always appears in the listing.
     const ctx = hostCtx();
     const [, listSpec] = buildSuiteGroupLeaves(ctx);
 
     const result = await withSuiteScope(() => listSpec.handler?.({}, ctx), {
-      audit: {
-        description: 'Custom audit',
+      'audit-custom': {
+        description: 'Custom review',
         steps: [{ tool: TOOL_ID, command: 'fit', args: { recipe: 'custom' } }],
       },
     });
 
     expect(result).toEqual({
       type: 'suite-list',
-      totalCount: 1,
+      totalCount: 3,
       suites: [
         {
-          name: 'audit',
-          description: 'Custom audit',
+          name: 'audit-custom',
+          description: 'Custom review',
           steps: [
             {
               tool: 'fitness',
               stableId: TOOL_ID,
               command: 'fit',
               args: { recipe: 'custom' },
+            },
+          ],
+        },
+        {
+          name: 'audit',
+          description:
+            'PR-review workflow: changed-code risk, graph impact, and high-confidence reduction candidates',
+          steps: [
+            {
+              tool: 'fitness',
+              stableId: TOOL_ID,
+              command: 'fitness',
+              args: { recipe: 'agent-risk' },
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'impact',
+              args: {},
+            },
+            {
+              tool: 'yagni',
+              stableId: YAGNI_ID,
+              command: 'yagni',
+              args: { minConfidence: 'high' },
+            },
+          ],
+        },
+        {
+          name: 'agent-context',
+          description:
+            'Before-edit project inventory, graph generation, and labelled static test-selection evidence',
+          steps: [
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-inventory',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-ensure',
+              args: {},
+            },
+            {
+              tool: 'graph',
+              stableId: GRAPH_ID,
+              command: 'graph-context-select-tests',
+              args: {},
             },
           ],
         },

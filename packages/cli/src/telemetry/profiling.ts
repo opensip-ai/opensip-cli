@@ -1,10 +1,10 @@
 /**
  * Profiling support — optional and severable (see observability-hardening plan).
  *
- * Gate (per ADR-0049 and plan):
- * - Recommended: OPENSIP_PROFILING=1 AND OTEL_EXPORTER_OTLP_ENDPOINT set.
- * - Supported alternative (kept for flexibility): profiling can be tied to
- *   OTEL_EXPORTER_OTLP_ENDPOINT alone (documented with cost warnings).
+ * Gate: `OPENSIP_PROFILING=1|true` explicitly enables local CPU artifacts.
+ * OpenTelemetry export remains independently gated by its OTLP endpoint, so a
+ * local profile never requires a collector and an endpoint alone never creates
+ * an expensive profile artifact.
  *
  * Implementation uses Node's built-in `inspector` module for real CPU profiles
  * (no extra published dependency for the optional profiling path). This gives
@@ -19,13 +19,21 @@
  * SDK bits stay in the CLI root.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { logger, resolveEphemeralProjectPaths, type RunScope } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
+
+import {
+  createProfileArtifactIndex,
+  discardProfileArtifacts,
+  discardProfileArtifactLabels,
+  writeCpuProfileArtifact,
+  writeProfileArtifactLabels,
+  type ProfileArtifactMetadata,
+} from './profile-artifact-index.js';
 
 /**
  * The slice of `node:inspector`'s {@link Session} this module actually drives:
@@ -63,16 +71,20 @@ let inspectorSessionFactory: InspectorSessionFactory = realInspectorSessionFacto
 interface ProfilingState {
   session: InspectorSession | null;
   isProfiling: boolean;
-  profilePath: string | null;
-  labelsPath: string | null;
+  artifacts: ProfileArtifactMetadata | null;
+  startPromise: Promise<ProfileArtifactMetadata | undefined> | null;
+  stopPromise: Promise<ProfileArtifactMetadata | undefined> | null;
+  revision: number;
 }
 
 function createProfilingState(): ProfilingState {
   return {
     session: null,
     isProfiling: false,
-    profilePath: null,
-    labelsPath: null,
+    artifacts: null,
+    startPromise: null,
+    stopPromise: null,
+    revision: 0,
   };
 }
 
@@ -82,8 +94,10 @@ function isProfilingState(value: unknown): value is ProfilingState {
     value !== null &&
     'session' in value &&
     'isProfiling' in value &&
-    'profilePath' in value &&
-    'labelsPath' in value
+    'artifacts' in value &&
+    'startPromise' in value &&
+    'stopPromise' in value &&
+    'revision' in value
   );
 }
 
@@ -96,15 +110,30 @@ function profilingStateFor(scope: RunScope | undefined): ProfilingState {
   return created;
 }
 
-function profilingBaseDir(scope: RunScope | undefined): string {
+function profilingDirectory(scope: RunScope | undefined): {
+  readonly baseDir: string;
+  readonly containmentRoot: string;
+} {
+  const configured = hostEnv.get<string>('OPENSIP_PROFILE_DIR')?.trim();
+  if (configured) {
+    const baseDir = resolve(configured);
+    return { baseDir, containmentRoot: dirname(baseDir) };
+  }
   const project = scope?.projectContext;
   if (project?.scope === 'project') {
-    return join(project.projectRoot, 'opensip-cli/.runtime/profiles');
+    return {
+      baseDir: join(project.projectRoot, 'opensip-cli/.runtime/profiles'),
+      containmentRoot: resolve(project.projectRoot),
+    };
   }
   if (project?.scope === 'ephemeral') {
-    return join(resolveEphemeralProjectPaths(project.projectRoot).runtimeDir, 'profiles');
+    const runtimeDir = resolveEphemeralProjectPaths(project.projectRoot).runtimeDir;
+    return { baseDir: join(runtimeDir, 'profiles'), containmentRoot: runtimeDir };
   }
-  return join(process.cwd(), 'opensip-cli/.runtime/profiles');
+  return {
+    baseDir: join(process.cwd(), 'opensip-cli/.runtime/profiles'),
+    containmentRoot: process.cwd(),
+  };
 }
 
 const fallbackProfilingState = createProfilingState();
@@ -112,44 +141,82 @@ const fallbackProfilingState = createProfilingState();
 // RunScope telemetry bag; this pointer lets shutdownTelemetry stop the active
 // profile when it is invoked outside the original scope.
 let activeProfilingState: ProfilingState | null = null;
-let warnedOtelOnlyProfiling = false;
 
 /** Module tag for structured logging (also dedupes the sonarjs/no-duplicate-string occurrences). */
 const MODULE = 'cli:telemetry';
+export const PROFILING_INSPECTOR_TIMEOUT_MS = 5000;
 
-export interface ProfilingLabels {
-  readonly runId?: string;
-  readonly command?: string;
-  readonly [key: string]: unknown;
-}
-
-/** Returns true if the recommended or OTEL-only profiling gate is satisfied. */
+/** Returns true only when local CPU profiling was explicitly requested. */
 export function isProfilingEnabled(): boolean {
-  const endpoint = hostEnv.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT');
-  if (!endpoint) return false;
-
-  const explicit = hostEnv.get<string>('OPENSIP_PROFILING')?.toLowerCase();
-  if (explicit === '0' || explicit === 'false') return false;
-  if (explicit === '1' || explicit === 'true') return true;
-
-  // Supported "just the OTEL endpoint" alternative (with warnings in docs/ADR-0049).
-  // Many teams prefer one knob; we honor it but log at warn so cost is visible.
-  // Operators who do not want this can set OPENSIP_PROFILING=0 explicitly.
-  return true; // OTEL endpoint present ⇒ profiling on in this fallback mode
+  const explicit = hostEnv.get<string>('OPENSIP_PROFILING')?.trim().toLowerCase();
+  return explicit === '1' || explicit === 'true';
 }
 
-function warnIfOtelOnlyProfilingMode(): void {
-  const endpoint = hostEnv.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT');
-  const explicit = hostEnv.get<string>('OPENSIP_PROFILING');
-  if (!endpoint || explicit !== undefined || warnedOtelOnlyProfiling) return;
-  warnedOtelOnlyProfiling = true;
-  logger.warn({
-    evt: 'cli.profiling.otel_only_enabled',
-    module: MODULE,
-    msg:
-      'CPU profiling is enabled because OTEL_EXPORTER_OTLP_ENDPOINT is set and ' +
-      'OPENSIP_PROFILING is unset; set OPENSIP_PROFILING=0 to disable profile artifacts.',
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+type InspectorReply<T> = (error: Error | null, result?: T) => void;
+
+function postWithDeadline<T>(
+  method: 'Profiler.enable' | 'Profiler.start' | 'Profiler.stop',
+  dispatch: (reply: InspectorReply<T>) => void,
+): Promise<T> {
+  return new Promise((resolvePost, rejectPost) => {
+    let settled = false;
+    const settle = (error: unknown, result?: T): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error !== null && error !== undefined) {
+        rejectPost(error instanceof Error ? error : new Error(errorMessage(error)));
+      } else resolvePost(result as T);
+    };
+    const timer = setTimeout(
+      () =>
+        settle(
+          new Error(`${method} callback exceeded ${String(PROFILING_INSPECTOR_TIMEOUT_MS)}ms`),
+        ),
+      PROFILING_INSPECTOR_TIMEOUT_MS,
+    );
+    timer.unref();
+    try {
+      dispatch((error, result) => settle(error, result));
+    } catch (error) {
+      settle(error);
+    }
   });
+}
+
+function postWithoutResult(
+  session: InspectorSession,
+  method: 'Profiler.enable' | 'Profiler.start',
+): Promise<void> {
+  return postWithDeadline<void>(method, (reply) => {
+    session.post(method, (error) => reply(error));
+  });
+}
+
+function postStop(session: InspectorSession): Promise<{ readonly profile?: unknown }> {
+  return postWithDeadline('Profiler.stop', (reply) => {
+    session.post('Profiler.stop', (error, result = {}) => reply(error, result));
+  });
+}
+
+function discardLabelsBestEffort(artifacts: ProfileArtifactMetadata): void {
+  try {
+    discardProfileArtifactLabels(artifacts);
+  } catch {
+    // @swallow-ok partial profiling artifacts are best-effort cleanup only
+  }
+}
+
+function discardPairBestEffort(artifacts: ProfileArtifactMetadata): void {
+  try {
+    discardProfileArtifacts(artifacts);
+  } catch {
+    // @swallow-ok completed profiling artifacts are best-effort cleanup only
+  }
 }
 
 /**
@@ -157,116 +224,136 @@ function warnIfOtelOnlyProfilingMode(): void {
  * Must be called after RunScope is entered (so runId is available).
  * Safe to call multiple times (idempotent).
  */
-export function startProfiling(scope?: RunScope, command?: string): void {
-  if (activeProfilingState?.isProfiling === true) return;
-  const state = profilingStateFor(scope);
-  if (state.isProfiling) return;
-
-  try {
-    if (!isProfilingEnabled()) return;
-    warnIfOtelOnlyProfilingMode();
-    state.session = inspectorSessionFactory();
-    state.session.connect();
-    state.isProfiling = true;
-    activeProfilingState = state;
-
-    state.session.post('Profiler.enable', (_err?: Error | null, _res?: unknown) => {
-      /* v8 ignore next -- defensive: `state.session` is non-null when this callback runs (it was just assigned + connected above); the guard only fires if a concurrent `cleanup` nulled it between the async wire `post` and the REAL profiler's callback — unreachable with the synchronous fake-session used for coverage, and exercised only by the real async profiler proven out-of-process. */
-      if (!state.session) return;
-      state.session.post('Profiler.start', (_err2?: Error | null, _res2?: unknown) => {
-        /* v8 ignore next -- defensive: same concurrent-cleanup race as the enable guard above; `state.session` is non-null in the synchronous fake path, only nullable by the real async profiler's interleaving (proven out-of-process). */
-        if (!state.session) return;
-
-        const runId = scope?.runId ?? 'unknown';
-        const safeCommand = (command ?? 'cli').replace(/[^a-z0-9_-]/gi, '_');
-        const ts = new Date().toISOString().replace(/[:.]/g, '-');
-
-        const baseDir = profilingBaseDir(scope);
-
-        mkdirSync(baseDir, { recursive: true });
-
-        state.profilePath = join(baseDir, `${ts}-${safeCommand}-${runId}.cpuprofile`);
-        state.labelsPath = join(baseDir, `${ts}-${safeCommand}-${runId}.labels.json`);
-
-        const labels: ProfilingLabels = {
-          runId,
-          command: command ?? 'unknown',
-          service: 'opensip-cli',
-          // Add any OTEL_RESOURCE_ATTRIBUTES derived labels here if needed in future
-        };
-
-        writeFileSync(state.labelsPath, JSON.stringify(labels, null, 2));
-
-        logger.info({
-          evt: 'cli.profiling.started',
-          module: MODULE,
-          runId,
-          command,
-          profilePath: state.profilePath,
-        });
-      });
-    });
-  } catch (error) {
-    logger.warn({
-      evt: 'cli.profiling.start_failed',
-      module: MODULE,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    // Best effort — profiling failure must never break the run
-    cleanup(state);
+export function startProfiling(
+  scope?: RunScope,
+  command?: string,
+): Promise<ProfileArtifactMetadata | undefined> {
+  if (!isProfilingEnabled()) return Promise.resolve(undefined);
+  if (activeProfilingState?.isProfiling === true) {
+    return (
+      activeProfilingState.startPromise ??
+      Promise.resolve(activeProfilingState.artifacts ?? undefined)
+    );
   }
+  const state = profilingStateFor(scope);
+  if (state.isProfiling) {
+    return state.startPromise ?? Promise.resolve(state.artifacts ?? undefined);
+  }
+
+  state.isProfiling = true;
+  state.revision += 1;
+  const revision = state.revision;
+  activeProfilingState = state;
+  const startPromise = (async (): Promise<ProfileArtifactMetadata | undefined> => {
+    let reservedArtifacts: ProfileArtifactMetadata | undefined;
+    try {
+      const runId = scope?.runId ?? 'unknown';
+      const profileDirectory = profilingDirectory(scope);
+      const artifacts = createProfileArtifactIndex({
+        ...profileDirectory,
+        command: command ?? 'unknown',
+        runId,
+      });
+      state.session = inspectorSessionFactory();
+      // connect() is synchronous; void silences detached-promises in async start.
+      void state.session.connect();
+      await postWithoutResult(state.session, 'Profiler.enable');
+      if (state.revision !== revision || !state.session) return undefined;
+
+      // Reserve the sidecar before starting the expensive profiler. Exclusive
+      // creation makes a collision or pre-existing symlink fail closed.
+      // writeProfileArtifactLabels is synchronous; void silences detached-promises.
+      void writeProfileArtifactLabels(artifacts);
+      reservedArtifacts = artifacts;
+      state.artifacts = artifacts;
+      await postWithoutResult(state.session, 'Profiler.start');
+      if (state.revision !== revision || !state.session) {
+        discardLabelsBestEffort(artifacts);
+        state.artifacts = null;
+        return undefined;
+      }
+
+      logger.info({
+        evt: 'cli.profiling.started',
+        module: MODULE,
+        runId: artifacts.labels.runId,
+        command: artifacts.labels.command,
+        profilePath: artifacts.profilePath,
+        labelsPath: artifacts.labelsPath,
+      });
+      return artifacts;
+    } catch (error) {
+      logger.warn({
+        evt: 'cli.profiling.start_failed',
+        module: MODULE,
+        error: errorMessage(error),
+      });
+      if (reservedArtifacts) {
+        discardLabelsBestEffort(reservedArtifacts);
+      }
+      cleanup(state, false);
+      return undefined;
+    }
+  })();
+  state.startPromise = startPromise;
+  return startPromise;
 }
 
 /**
  * Stop profiling and flush the .cpuprofile + labels sidecar.
  * Safe and idempotent.
  */
-export function stopProfiling(scope?: RunScope): void {
-  const state =
-    scope === undefined
-      ? (activeProfilingState ?? fallbackProfilingState)
-      : profilingStateFor(scope);
-  if (!state.isProfiling || !state.session) {
-    cleanup(state);
-    return;
-  }
+export function stopProfiling(scope?: RunScope): Promise<ProfileArtifactMetadata | undefined> {
+  const scopedState = scope === undefined ? fallbackProfilingState : profilingStateFor(scope);
+  // The inspector profiler is process-global. Prefer the active state even when
+  // a caller supplies a different scope, so a concurrent/idempotent start cannot
+  // strand the process-global profiler behind an idle scoped state.
+  const state = activeProfilingState ?? scopedState;
+  if (state.stopPromise) return state.stopPromise;
+  if (!state.isProfiling) return Promise.resolve(state.artifacts ?? undefined);
 
-  try {
-    // node:inspector post callbacks for Profiler.* use structural types not fully declared
-    // in the ambient types we consume; the result object (incl. profile) arrives as any.
-    // We narrow locally for the write path; the disable is scoped to the wire call.
-    state.session.post(
-      'Profiler.stop',
-      (err: Error | null | undefined, result: { profile?: unknown } = {}) => {
-        if (err) {
-          logger.warn({
-            evt: 'cli.profiling.stop_failed',
-            module: MODULE,
-            error: err.message || String(err),
-          });
-        } else if (result.profile && state.profilePath) {
-          writeFileSync(state.profilePath, JSON.stringify(result.profile));
-          logger.info({
-            evt: 'cli.profiling.stopped',
-            module: MODULE,
-            profilePath: state.profilePath,
-            labelsPath: state.labelsPath,
-          });
-        }
-        cleanup(state);
-      },
-    );
-  } catch (error) {
-    logger.warn({
-      evt: 'cli.profiling.stop_failed',
-      module: MODULE,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    cleanup(state);
-  }
+  const stopPromise = (async (): Promise<ProfileArtifactMetadata | undefined> => {
+    let completedArtifacts: ProfileArtifactMetadata | undefined;
+    let profilePublished = false;
+    try {
+      await state.startPromise;
+      if (!state.isProfiling || !state.session) return undefined;
+
+      const result = await postStop(state.session);
+      if (result.profile === undefined || !state.artifacts) {
+        throw new Error('Profiler.stop returned no CPU profile');
+      }
+      completedArtifacts = writeCpuProfileArtifact(state.artifacts, result.profile);
+      profilePublished = true;
+      state.artifacts = completedArtifacts;
+      logger.info({
+        evt: 'cli.profiling.stopped',
+        module: MODULE,
+        profilePath: completedArtifacts.profilePath,
+        labelsPath: completedArtifacts.labelsPath,
+      });
+    } catch (error) {
+      logger.warn({
+        evt: 'cli.profiling.stop_failed',
+        module: MODULE,
+        error: errorMessage(error),
+      });
+      if (state.artifacts) {
+        if (profilePublished) discardPairBestEffort(state.artifacts);
+        else discardLabelsBestEffort(state.artifacts);
+      }
+      completedArtifacts = undefined;
+      state.artifacts = null;
+    } finally {
+      cleanup(state, completedArtifacts !== undefined);
+    }
+    return completedArtifacts;
+  })();
+  state.stopPromise = stopPromise;
+  return stopPromise;
 }
 
-function cleanup(state: ProfilingState): void {
+function cleanup(state: ProfilingState, retainArtifacts: boolean): void {
   if (state.session) {
     try {
       state.session.disconnect();
@@ -276,16 +363,17 @@ function cleanup(state: ProfilingState): void {
   }
   state.session = null;
   state.isProfiling = false;
-  state.profilePath = null;
-  state.labelsPath = null;
+  state.startPromise = null;
+  state.stopPromise = null;
+  state.revision += 1;
+  if (!retainArtifacts) state.artifacts = null;
   if (activeProfilingState === state) activeProfilingState = null;
 }
 
 /** Exposed for tests / shutdown. */
 export function resetProfilingForTests(): void {
-  if (activeProfilingState !== null) cleanup(activeProfilingState);
-  cleanup(fallbackProfilingState);
-  warnedOtelOnlyProfiling = false;
+  if (activeProfilingState !== null) cleanup(activeProfilingState, false);
+  cleanup(fallbackProfilingState, false);
   inspectorSessionFactory = realInspectorSessionFactory;
 }
 

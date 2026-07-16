@@ -10,18 +10,13 @@ export const RUFF_IDENTITY: ToolIdentity = { name: 'ruff' };
 export const RUFF_STABLE_ID = '16419cb0-553b-4bcb-a544-3099c6092480';
 
 /**
- * Build the CLI args for a Ruff scan: `check` the project root and write JSON
- * diagnostics to the artifact path.
+ * Build the CLI args for a Ruff scan: `check` the project working tree (`.`,
+ * relative to the process cwd which the substrate sets to `projectRoot`) and
+ * write JSON diagnostics to the artifact path. Prefer `.` over an absolute root
+ * so reported paths stay project-relative.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
-  return [
-    'check',
-    '--output-format',
-    'json',
-    '--output-file',
-    ctx.artifactPath('ruff.json'),
-    ctx.projectRoot,
-  ];
+  return ['check', '--output-format', 'json', '--output-file', ctx.artifactPath('ruff.json'), '.'];
 }
 
 /**
@@ -31,7 +26,14 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildRuffExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['--exclude', input.excludePath] };
+  // Ruff exclude patterns are project-relative globs; absolute host paths no-op.
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
+  // --extend-exclude ADDS to defaults/config; --exclude REPLACES them (would
+  // scan .venv / node_modules / .git). Same class of footgun Bandit fixed for -x.
+  return { args: ['--extend-exclude', relativeSegment] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

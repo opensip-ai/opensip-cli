@@ -14,22 +14,19 @@ export type { FitOptions, InitOptions, ToolOptions } from './types.js';
 // Signal envelope — the universal tool-run output currency (ADR-0011). The
 // `CommandResult` payload every tool returns; it replaced the fitness-shaped
 // `CliOutput`/`CheckOutput`/`FindingOutput` husk, which was retired in Phase 7.
-export type {
-  BaselineIdentity,
-  DeclaredInputs,
-  SignalEnvelope,
-  RunVerdict,
-  UnitResult,
-  BuildEnvelopeInput,
-} from './signal-envelope.js';
 export {
   buildSignalEnvelope,
   DEFAULT_BASELINE_IDENTITY,
   isSignalEnvelope,
   SIGNAL_ENVELOPE_SCHEMA_VERSION,
+  type BaselineIdentity,
+  type DeclaredInputs,
+  type SignalEnvelope,
+  type RunVerdict,
+  type UnitResult,
+  type BuildEnvelopeInput,
 } from './signal-envelope.js';
-export type { RunOutcome } from './run-outcome.js';
-export { deriveOutcome } from './run-outcome.js';
+export { deriveOutcome, type RunOutcome } from './run-outcome.js';
 export type { EnvelopeResultSummary, ResultSummaryItem } from './result-summary.js';
 export { envelopeToResultSummary, unitOutcome } from './result-summary.js';
 export * from './evidence.js';
@@ -47,28 +44,13 @@ export {
   RELEASE_ARTIFACT_CONTRACT_VERSION,
   assertCompatibilityPoliciesComplete,
   findCompatibilityPolicy,
-} from '@opensip-cli/core';
-export type {
-  CompatibilityContractClass,
-  CompatibilityContractPolicy,
-  CompatibilityStability,
+  type CompatibilityContractClass,
+  type CompatibilityContractPolicy,
+  type CompatibilityStability,
 } from '@opensip-cli/core';
 
-export type {
-  DeriveReviewBriefVerdictInput,
-  ReviewBrief,
-  ReviewBriefBaselineState,
-  ReviewBriefBaselineDelta,
-  ReviewBriefBlastRadius,
-  ReviewBriefDegradation,
-  ReviewBriefRecommendedAction,
-  ReviewBriefRisk,
-  ReviewBriefSignalRef,
-  ReviewBriefVerdict,
-  ReviewBriefVersion,
-  SignalToReviewBriefRiskInput,
-} from './review-brief.js';
 export type * from './review-brief-correlation.js';
+export { compareCodePoint, compareCodePointStrings } from './code-point-order.js';
 export {
   REVIEW_BRIEF_VERSION,
   buildReviewBriefBaselineDelta,
@@ -87,6 +69,18 @@ export {
   reviewBriefSchema,
   reviewBriefSignalRefSchema,
   signalToReviewBriefRisk,
+  type DeriveReviewBriefVerdictInput,
+  type ReviewBrief,
+  type ReviewBriefBaselineState,
+  type ReviewBriefBaselineDelta,
+  type ReviewBriefBlastRadius,
+  type ReviewBriefDegradation,
+  type ReviewBriefRecommendedAction,
+  type ReviewBriefRisk,
+  type ReviewBriefSignalRef,
+  type ReviewBriefVerdict,
+  type ReviewBriefVersion,
+  type SignalToReviewBriefRiskInput,
 } from './review-brief.js';
 export {
   buildReviewBriefCorrelations,
@@ -110,6 +104,28 @@ export {
 
 // Command result types (the CommandResult union + per-command variants)
 export type * from './command-results.js';
+export type * from './task-context.js';
+export {
+  MAX_TASK_CONTEXT_MANIFEST_BYTES,
+  MAX_TASK_CONTEXT_FILES,
+  MAX_TASK_CONTEXT_PLANES,
+  PROJECT_INVENTORY_SCHEMA_VERSION,
+  TEST_SELECTION_SCHEMA_VERSION,
+  TASK_CONTEXT_MANIFEST_SCHEMA_VERSION,
+  contextCoverageSchema,
+  buildProjectInventorySnapshotIdentities,
+  buildTaskContextFileScope,
+  buildTaskContextProjectIdentity,
+  buildTestSelectionSnapshotIdentity,
+  parseTaskContextManifest,
+  projectInventorySnapshotSchema,
+  projectInventorySnapshotIdentityMatches,
+  taskContextManifestSchema,
+  taskContextFileScopeSchema,
+  taskContextPlaneSchema,
+  testSelectionSnapshotSchema,
+  testSelectionSnapshotIdentityMatches,
+} from './task-context.js';
 
 // Render-only run-presentation adjunct (envelope-first-presentation plan). The
 // single run variant on `CommandResult`: it carries the SignalEnvelope (the
@@ -218,7 +234,10 @@ export {
   gateRunFlagSpecs,
   sarifRunFlagSpec,
 } from './command-presets.js';
-export { defineAnalysisRunCommand } from './analysis-run-command.js';
+export {
+  ANALYSIS_RUN_COMMAND_STATIC_HANDLER,
+  defineAnalysisRunCommand,
+} from './analysis-run-command.js';
 export { readOptionalToolConfig, readToolConfig } from './tool-config-read.js';
 export { runHostGateDispatch } from './gate-dispatch.js';
 export { runBaselineExport } from './baseline-export.js';
@@ -356,12 +375,38 @@ export {
   agentCatalogPlatformEntryPoints,
   assertAgentCatalogOverlayKeys,
   buildAgentCatalog,
+  type AgentCatalog,
+  type AgentCatalogBuildInput,
+  type CommandTier,
 } from './agent-catalog.js';
-export type { AgentCatalog, CommandTier } from './agent-catalog.js';
+export {
+  assembleAgentCatalog,
+  projectAgentCatalogRuntimeFacts,
+  type AgentCatalogAssemblyInput,
+  type AgentCatalogRuntimeFacts,
+} from './agent-catalog-assembly.js';
 export { summarizeTargetConventions } from './target-conventions.js';
 export type { AgentProjectContext, TargetConventionSummary } from './target-conventions.js';
-export { computeImpact } from './graph-impact-compute.js';
-export type { ImpactComputation, ImpactFunction, ImpactPackage } from './graph-impact-compute.js';
+// Host-support projection (Plan 02, macOS GA). The serializable AgentCatalog
+// projection + the single core→contracts mapper both CLI and MCP call, so their
+// hostSupport output is byte-identical for identical process facts.
+export { hostSupportFromRuntimeProjection, type AgentHostSupport } from './host-support.js';
+export {
+  buildComputeImpactIndex,
+  computeImpact,
+  computeImpactAsync,
+  computeImpactCatalogGenerationIdentity,
+  computeImpactIndexMatchesCatalog,
+  ComputeImpactCancelledError,
+  ComputeImpactIndexGenerationMismatchError,
+  type ComputeImpactChangedFileEntry,
+  type ComputeImpactAsyncOptions,
+  type ComputeImpactIndex,
+  type ComputeImpactOptions,
+  type ImpactComputation,
+  type ImpactFunction,
+  type ImpactPackage,
+} from './graph-impact-compute.js';
 
 // SARIF + cloud reporting moved to @opensip-cli/output (audit
 // 2026-05-29, contracts split; package renamed reporting→output in Phase 2,

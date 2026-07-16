@@ -97,7 +97,7 @@ describe('authored-tool end-to-end load', () => {
 
     await discoverAndRegisterAuthoredTools(
       registry,
-      { globalAuthoredDir: globalRoot, env: {} },
+      { globalAuthoredDir: globalRoot, env: {}, runtimeMode: 'host' },
       new Set(),
       provenance,
       manifests,
@@ -124,6 +124,7 @@ describe('authored-tool end-to-end load', () => {
           projectAuthoredDir: projectRoot,
           globalAuthoredDir: globalRoot,
           env: {},
+          runtimeMode: 'host',
         },
         new Set(),
       ),
@@ -144,6 +145,7 @@ describe('authored-tool end-to-end load', () => {
           projectAuthoredDir: projectRoot,
           globalAuthoredDir: globalRoot,
           env: {},
+          runtimeMode: 'host',
         },
         new Set(),
       );
@@ -169,6 +171,7 @@ describe('authored-tool end-to-end load', () => {
         projectAuthoredDir: projectRoot,
         globalAuthoredDir: globalRoot,
         env: { [PROJECT_TOOL_ALLOWLIST_ENV]: 'trusted-audit' },
+        runtimeMode: 'host',
       },
       new Set(),
       provenance,
@@ -192,6 +195,7 @@ describe('authored-tool end-to-end load', () => {
         globalAuthoredDir: globalRoot,
         env: {},
         projectTrustedTools: new Set(['trusted-config-audit']),
+        runtimeMode: 'host',
       },
       new Set(),
       provenance,
@@ -209,7 +213,7 @@ describe('authored-tool end-to-end load', () => {
 
     await discoverAndRegisterAuthoredTools(
       registry,
-      { globalAuthoredDir: globalRoot, env: {} },
+      { globalAuthoredDir: globalRoot, env: {}, runtimeMode: 'host' },
       new Set(['fitness']),
       provenance,
     );
@@ -227,6 +231,7 @@ describe('authored-tool end-to-end load', () => {
         {
           globalAuthoredDir: join(tmpdir(), 'opensip-missing-global-root-xyz'),
           env: {},
+          runtimeMode: 'host',
         },
         new Set(),
       ),

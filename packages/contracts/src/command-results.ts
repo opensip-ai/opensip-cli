@@ -24,6 +24,7 @@ export type {
 } from './command-results-variants/graph-results.js';
 export type {
   GraphImpactBasis,
+  GraphImpactCatalogIdentity,
   GraphImpactResult,
 } from './command-results-variants/graph-impact-result.js';
 export type {
@@ -68,6 +69,7 @@ export type {
   AgentGuidanceResult,
   AgentGuidanceTargetAction,
   AgentGuidanceTargetResult,
+  InitOptionalToolRecommendation,
   PreExistingFile,
   InitResult,
   SimNoticeResult,

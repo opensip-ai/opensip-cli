@@ -2,7 +2,7 @@ import { ToolRegistry } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { listSessionSummaries } from '../list-summaries.js';
+import { listSessionSummaries, resolveSessionLedgerReference } from '../list-summaries.js';
 import { RunRepo } from '../run-repo.js';
 import { SessionRepo } from '../session-repo.js';
 
@@ -224,5 +224,40 @@ describe('listSessionSummaries', () => {
         ],
       },
     ]);
+  });
+
+  it('omits summary when numeric summary fields are incomplete', () => {
+    repo.save(
+      makeSession({
+        id: 'FIT_PARTIAL',
+        payload: { summary: { total: 1, passed: 1, failed: 0, errors: 0 } },
+      }),
+    );
+
+    const result = listSessionSummaries(datastore, { summaryOnly: true });
+    expect(
+      result.sessions.find((session) => session.id === 'FIT_PARTIAL')?.summary,
+    ).toBeUndefined();
+  });
+});
+
+describe('resolveSessionLedgerReference', () => {
+  it('returns undefined when no run step is linked to the session', () => {
+    expect(resolveSessionLedgerReference(datastore, 'missing-session')).toBeUndefined();
+  });
+
+  it('returns the ledger reference for a linked session', () => {
+    repo.save(makeSession({ id: 'FIT_LEDGER_REF' }));
+    new RunRepo(datastore).saveRunWithSteps(makeRun(), [
+      makeStep({ sessionId: 'FIT_LEDGER_REF', logicalStepKey: '0:fit:agent-risk' }),
+    ]);
+
+    expect(resolveSessionLedgerReference(datastore, 'FIT_LEDGER_REF')).toEqual({
+      runId: 'run-ledger-1',
+      stepId: 'step-ledger-1',
+      logicalStepKey: '0:fit:agent-risk',
+      ordinal: 0,
+      attempt: 1,
+    });
   });
 });

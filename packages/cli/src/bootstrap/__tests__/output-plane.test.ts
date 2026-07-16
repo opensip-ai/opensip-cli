@@ -6,6 +6,7 @@
  */
 
 import {
+  DEFAULT_BASELINE_IDENTITY,
   EXIT_CODES,
   type CommandOutcome,
   type CommandResult,
@@ -50,11 +51,12 @@ function envelope(passed: boolean): SignalEnvelope {
       },
     ],
     signals: [],
+    baselineIdentity: DEFAULT_BASELINE_IDENTITY,
   };
 }
 
 describe('createOutputPlane — exit code (single write path)', () => {
-  let saved: number | undefined;
+  let saved: typeof process.exitCode;
   beforeEach(() => {
     saved = process.exitCode;
     process.exitCode = 0;
@@ -73,7 +75,7 @@ describe('createOutputPlane — exit code (single write path)', () => {
 });
 
 describe('createOutputPlane — emit seams', () => {
-  let saved: number | undefined;
+  let saved: typeof process.exitCode;
   beforeEach(() => {
     saved = process.exitCode;
     process.exitCode = 0;

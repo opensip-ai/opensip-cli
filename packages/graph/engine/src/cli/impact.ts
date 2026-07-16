@@ -1,11 +1,14 @@
 /**
  * `opensip graph impact` — read-only changed→impact analysis (ADR-0085, spec §5.3).
  */
+import { createHash } from 'node:crypto';
+
 import {
   buildSignalEnvelope,
   computeImpact,
   EXIT_CODES,
   gitWarningsToImpactUncertainties,
+  type GraphImpactCatalogIdentity,
   type GraphImpactResult,
   type ImpactUncertainty,
   type SignalEnvelope,
@@ -29,10 +32,19 @@ import {
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
+import {
+  fitProjectionToByteBudget,
+  MAX_IMPACT_REPORT_PROJECTION_BYTES,
+  projectImpactForReport,
+} from '../persistence/impact-report-projection.js';
+import { buildGraphSessionPayload } from '../persistence/session-payload.js';
+import { verifyCatalogInputs } from '../read/catalog-freshness.js';
+import { loadGraphReadConfig } from '../read/config.js';
+import { rebuildCatalog } from '../read/rebuild.js';
 
-import { contributionFromSignals } from './graph-session-contribution.js';
-import { runGraph } from './orchestrate.js';
+import { contributionFromGraphPayload } from './graph-session-contribution.js';
 
+import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const log = createToolLogger('graph:cli');
@@ -158,6 +170,7 @@ function buildImpactEnvelope(result: GraphImpactResult, durationMs: number): Sig
     policy: resolveVerdictPolicy('graph'),
     runFaulted: false,
     fingerprintStrategy: graphFingerprintStrategy,
+    verification: result.trust,
   });
 }
 
@@ -166,7 +179,77 @@ export function buildImpactSessionContribution(
   opts: Pick<ImpactCommandOptions, 'cwd'>,
   result: GraphImpactResult,
 ): ToolSessionContribution {
-  return contributionFromSignals({ cwd: opts.cwd }, buildImpactSignals(result), [IMPACT_RULE_ID]);
+  const ordinaryPayload = buildGraphSessionPayload(buildImpactSignals(result), [IMPACT_RULE_ID]);
+  const projected = projectImpactForReport(result);
+  const impact = fitProjectionToByteBudget(projected, MAX_IMPACT_REPORT_PROJECTION_BYTES);
+  const retained = impact ?? projected;
+  log.info({
+    evt: 'graph.cli.impact.session_projection',
+    retainedChangedFiles: impact?.changedFiles.length ?? 0,
+    retainedChangedFunctions: impact?.changedFunctions.length ?? 0,
+    retainedImpactedFunctions: impact?.impactedFunctions.length ?? 0,
+    retainedImpactedFiles: impact?.impactedFiles.length ?? 0,
+    retainedImpactedPackages: impact?.impactedPackages.length ?? 0,
+    retainedRecommendedCommands: impact?.recommendedCommands.length ?? 0,
+    omittedChangedFiles:
+      retained.omitted.changedFiles + (impact === undefined ? retained.changedFiles.length : 0),
+    omittedChangedFunctions:
+      retained.omitted.changedFunctions +
+      (impact === undefined ? retained.changedFunctions.length : 0),
+    omittedImpactedFunctions:
+      retained.omitted.impactedFunctions +
+      (impact === undefined ? retained.impactedFunctions.length : 0),
+    omittedImpactedFiles:
+      retained.omitted.impactedFiles + (impact === undefined ? retained.impactedFiles.length : 0),
+    omittedImpactedPackages:
+      retained.omitted.impactedPackages +
+      (impact === undefined ? retained.impactedPackages.length : 0),
+    omittedRecommendedCommands:
+      retained.omitted.recommendedCommands +
+      (impact === undefined ? retained.recommendedCommands.length : 0),
+    trustCoverage: result.trust.coverage,
+    sourceTruncated: result.truncated,
+    ...(impact === undefined ? { omittedReason: 'projection-overflow' } : {}),
+  });
+  const payload = {
+    ...ordinaryPayload,
+    ...(impact === undefined
+      ? { impactStatus: 'omitted-overflow' as const }
+      : { impactStatus: 'available' as const, impact }),
+  };
+  return contributionFromGraphPayload({ cwd: opts.cwd }, payload);
+}
+
+function digestIdentity(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function boundedCatalogIdentity(catalog: {
+  readonly builtAt: string;
+  readonly language: string;
+  readonly filesFingerprint?: string;
+  readonly resolutionMode?: 'exact' | 'fast';
+  readonly cacheKey?: string;
+}): GraphImpactCatalogIdentity | undefined {
+  if (
+    catalog.filesFingerprint === undefined ||
+    catalog.cacheKey === undefined ||
+    catalog.builtAt.length > 64 ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u.test(catalog.builtAt) ||
+    !Number.isFinite(Date.parse(catalog.builtAt)) ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/u.test(catalog.language)
+  ) {
+    return undefined;
+  }
+  return {
+    builtAt: catalog.builtAt,
+    language: catalog.language,
+    // Raw file fingerprints contain absolute paths. A digest preserves
+    // equality while keeping result/session evidence project-root-free.
+    filesFingerprint: digestIdentity(catalog.filesFingerprint),
+    ...(catalog.resolutionMode === undefined ? {} : { resolutionMode: catalog.resolutionMode }),
+    cacheKeyDigest: digestIdentity(catalog.cacheKey),
+  };
 }
 
 function resolveImpactBasis(opts: ImpactCommandOptions): {
@@ -219,23 +302,76 @@ async function emitImpactOutput(
   });
 }
 
+/**
+ * Decide whether a persisted catalog is safe to reuse for impact analysis.
+ * - When graph adapters are available: require complete build coverage + complete
+ *   fresh input verification (mirror context producers).
+ * - When adapters are unavailable (unit tests / thin scopes): reuse any existing
+ *   catalog rather than forcing a rebuild that cannot run.
+ * - Explicit stale/incomplete verification forces rebuild when adapters exist.
+ */
+async function catalogReuseDecision(
+  cwd: string,
+  catalog: Catalog,
+  cli: ToolCliContext,
+): Promise<'reuse' | 'rebuild'> {
+  const adapters = cli.scope.graph?.adapters;
+  if (adapters === undefined) {
+    // Cannot verify — prefer reusing the persisted row over a doomed rebuild.
+    return 'reuse';
+  }
+  if (catalog.buildCoverage?.status !== 'complete') return 'rebuild';
+  const languages =
+    typeof cli.scope.languages?.list === 'function' ? cli.scope.languages.list() : [];
+  const verified = await verifyCatalogInputs({
+    projectRoot: cli.scope.projectContext?.projectRoot ?? cwd,
+    catalog,
+    adapters,
+    languageAdapters: languages,
+    graphConfig: loadGraphReadConfig(cwd, cli.scope.projectContext?.configPath),
+  });
+  if (verified.ok && verified.value.verification === 'complete' && verified.value.fresh === true) {
+    return 'reuse';
+  }
+  return 'rebuild';
+}
+
 async function loadOrBuildCatalog(
   cwd: string,
   datastore: DataStore,
+  cli: ToolCliContext,
   noCache?: boolean,
 ): Promise<NonNullable<ReturnType<CatalogRepo['loadCatalogContract']>>> {
   const repo = new CatalogRepo(datastore);
-  let catalog = repo.loadCatalogContract();
-  if (catalog !== null && noCache !== true) return catalog;
+  // Use the internal Catalog (with buildCoverage / fingerprint fields) for
+  // freshness verification; return the contract view for impact compute.
+  const full = repo.loadFullCatalog();
+  if (full !== null && noCache !== true) {
+    const decision = await catalogReuseDecision(cwd, full, cli);
+    if (decision === 'reuse') return full;
+    log.info({
+      evt: 'graph.cli.impact.catalog_stale_or_incomplete',
+      module: 'graph:cli',
+      buildCoverage: full.buildCoverage?.status ?? 'missing',
+    });
+  }
 
-  await runGraph({ cwd, noCache: noCache === true, datastore });
-  catalog = repo.loadCatalogContract();
-  if (!catalog) {
+  // Always force a real rebuild + durable persist. A plain runGraph with
+  // useCache:true can reload the same partial catalog that reuse rejected;
+  // noCache:true without replaceAll can leave the prior row in the store.
+  const outcome = await rebuildCatalog({ cwd, datastore });
+  if (!outcome.ok) {
+    throw new ConfigurationError(
+      `impact: Graph rebuild failed (${outcome.error.code}): ${outcome.error.message}`,
+    );
+  }
+  const rebuilt = repo.loadCatalogContract();
+  if (!rebuilt) {
     throw new ConfigurationError(
       'impact: No graph catalog found after rebuild. Run `opensip graph` first.',
     );
   }
-  return catalog;
+  return rebuilt;
 }
 
 /**
@@ -258,16 +394,18 @@ export async function executeImpact(
 
     const { changedFiles, basis, entries, uncertainties } = resolveImpactBasis(opts);
 
-    const catalog = await loadOrBuildCatalog(opts.cwd, datastore, opts.noCache);
+    const catalog = await loadOrBuildCatalog(opts.cwd, datastore, cli, opts.noCache);
     const topCap = parseTopCap(opts.top);
     const computation = computeImpact(catalog, changedFiles, {
       top: topCap,
       changedFileEntries: entries,
       uncertainties,
     });
+    const catalogIdentity = boundedCatalogIdentity(catalog);
 
     const result: GraphImpactResult = {
       type: 'graph-impact',
+      ...(catalogIdentity === undefined ? {} : { catalog: catalogIdentity }),
       basis,
       changedFiles,
       changedFunctions: computation.changedFunctions,

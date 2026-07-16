@@ -10,6 +10,7 @@ import { analyzeMcpResultsNoRerun } from '../checks/mcp-results-no-rerun.js';
 import { checks } from '../index.js';
 
 const TOOL_PATH = 'packages/mcp/src/tools/get-latest-findings.ts';
+const CONTEXT_PORT_PATH = 'packages/mcp/src/sqlite-context-read-port.ts';
 
 function check() {
   const c = checks.find((x) => x.config.slug === 'mcp-results-no-rerun');
@@ -47,6 +48,27 @@ describe('analyzeMcpResultsNoRerun (AST)', () => {
     ).toHaveLength(1);
   });
 
+  it('flags every context producer entry point, including an aliased import', () => {
+    expect(
+      analyzeMcpResultsNoRerun(
+        "import { produceContextInventory } from '@opensip-cli/graph/internal';",
+        CONTEXT_PORT_PATH,
+      ),
+    ).toHaveLength(1);
+    expect(
+      analyzeMcpResultsNoRerun(
+        "import { produceContextGraph as ensure } from '@opensip-cli/graph/internal';",
+        CONTEXT_PORT_PATH,
+      ),
+    ).toHaveLength(1);
+    expect(
+      analyzeMcpResultsNoRerun(
+        "import { produceContextTestSelection } from '@opensip-cli/graph/internal';",
+        TOOL_PATH,
+      ),
+    ).toHaveLength(1);
+  });
+
   it('does NOT flag a replay-only handler (no run-command import)', () => {
     const v = analyzeMcpResultsNoRerun(
       "import { jsonResult } from './tool-result.js';\nexport const x = jsonResult;",
@@ -62,6 +84,15 @@ describe('analyzeMcpResultsNoRerun (AST)', () => {
     );
     expect(v).toEqual([]);
   });
+
+  it('does NOT flag injected context-port calls or producer names in comments', () => {
+    expect(
+      analyzeMcpResultsNoRerun(
+        '// produceContextGraph stays behind the host suite\nexport const read = (port: { contextStatus(): unknown }) => port.contextStatus();',
+        CONTEXT_PORT_PATH,
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe('mcp-results-no-rerun (gate)', () => {
@@ -75,12 +106,39 @@ describe('mcp-results-no-rerun (gate)', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
+  it('flags a context read port importing a producer command', async () => {
+    expect(
+      await findingsFor({
+        path: CONTEXT_PORT_PATH,
+        content:
+          "import { produceContextGraph as rebuild } from '@opensip-cli/graph/internal';\nexport const x = rebuild;",
+      }),
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('accepts a context read port that calls only its injected graph port', async () => {
+    expect(
+      await findingsFor({
+        path: CONTEXT_PORT_PATH,
+        content:
+          'export const read = (port: { contextPointerStatus(): unknown }) => port.contextPointerStatus();',
+      }),
+    ).toBe(0);
+  });
+
   it('does NOT flag the same import OUTSIDE the guarded MCP paths (composition root)', async () => {
     expect(
       await findingsFor({
         path: 'packages/mcp/src/command.ts',
         content:
           "import { runGraph } from '@opensip-cli/graph/internal';\nexport const x = runGraph;",
+      }),
+    ).toBe(0);
+    expect(
+      await findingsFor({
+        path: 'packages/mcp/src/command.ts',
+        content:
+          "import { produceContextGraph } from '@opensip-cli/graph/internal';\nexport const x = produceContextGraph;",
       }),
     ).toBe(0);
   });

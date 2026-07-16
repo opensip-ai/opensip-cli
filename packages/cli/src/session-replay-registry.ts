@@ -36,6 +36,7 @@ export interface CliSessionReplayContribution {
  * dispatch chain never imports) supplies the real implementation.
  */
 export type ExternalReplayDispatcher = (
+  tool: Tool,
   provenance: ToolProvenance,
   stored: ToolSessionRecord,
 ) => Promise<unknown>;
@@ -134,7 +135,7 @@ function externalContribution(
             'cannot be isolated (no provenance/dispatcher to fork the replay worker); refusing to run it in-process',
         );
       }
-      const result = await dispatchExternalReplay(record, stored);
+      const result = await dispatchExternalReplay(tool, record, stored);
       return result as ToolSessionReplay<CommandResult>;
     },
   };

@@ -84,6 +84,78 @@ describe('findDuplicateBodies policy branches', () => {
     ]);
   });
 
+  it('sorts members so members[0] is lowest qualifiedName (primary), independent of input order', () => {
+    const { groups } = findDuplicateBodies([
+      cand({
+        bodyHash: hash,
+        filePath: 'z.ts',
+        line: 10,
+        qualifiedName: 'z.fn',
+        simpleName: 'fn',
+      }),
+      cand({
+        bodyHash: hash,
+        filePath: 'a.ts',
+        line: 1,
+        qualifiedName: 'a.fn',
+        simpleName: 'fn',
+      }),
+      cand({
+        bodyHash: hash,
+        filePath: 'm.ts',
+        line: 5,
+        qualifiedName: 'm.fn',
+        simpleName: 'fn',
+      }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.members.map((m) => m.qualifiedName)).toEqual(['a.fn', 'm.fn', 'z.fn']);
+  });
+
+  it('breaks equal qualifiedName ties by filePath/line/column for members and aggregate anchor', () => {
+    const sharedName = 'pkg.fn';
+    const { groups, aggregates } = findDuplicateBodies(
+      [
+        cand({
+          bodyHash: hash,
+          filePath: 'b.ts',
+          line: 2,
+          column: 0,
+          qualifiedName: sharedName,
+          simpleName: 'fn',
+          package: '@a/one',
+        }),
+        cand({
+          bodyHash: hash,
+          filePath: 'a.ts',
+          line: 9,
+          column: 0,
+          qualifiedName: sharedName,
+          simpleName: 'fn',
+          package: '@a/two',
+        }),
+        cand({
+          bodyHash: hash,
+          filePath: 'a.ts',
+          line: 1,
+          column: 4,
+          qualifiedName: sharedName,
+          simpleName: 'fn',
+          package: '@a/three',
+        }),
+      ],
+      { minCrossPackagePackages: 3 },
+    );
+    expect(groups).toEqual([]);
+    expect(aggregates).toHaveLength(1);
+    expect(aggregates[0]?.anchor).toMatchObject({
+      filePath: 'a.ts',
+      line: 1,
+      column: 4,
+      qualifiedName: sharedName,
+    });
+  });
+
   it('emits cross-package aggregates at minPackages 3 with lighter body-size floor', () => {
     const mediumHash = 'medium-cross-pkg';
     const { aggregates, groups } = findDuplicateBodies([

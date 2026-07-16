@@ -44,7 +44,7 @@ function runAdapter(): {
   walk: ReturnType<typeof rustGraphAdapter.walkProject>;
   dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined;
 } {
-  const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = rustGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   SIGNAL_ENVELOPE_SCHEMA_VERSION,
   buildSignalEnvelope,
+  isSignalEnvelope,
   type UnitResult,
 } from './signal-envelope.js';
 
@@ -229,5 +230,92 @@ describe('buildSignalEnvelope', () => {
 
     expect(env.recipe).toBeUndefined();
     expect(env.resolutionMode).toBeUndefined();
+  });
+
+  it('attaches verification trust metadata when supplied', () => {
+    const verification = {
+      coverage: 'partial' as const,
+      fallback: 'full-run' as const,
+      fullyVerified: false,
+      uncertainties: [
+        {
+          code: 'impact-truncated' as const,
+          source: 'impact' as const,
+          message: 'truncated',
+        },
+      ],
+    };
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', true)],
+      signals: [],
+      verification,
+    });
+    expect(env.verification).toEqual(verification);
+  });
+
+  it('marks a run faulted when runFaulted is true or a unit carries an error', () => {
+    const faultedRun = buildSignalEnvelope({
+      ...BASE,
+      runFaulted: true,
+      units: [unit('a', true)],
+      signals: [],
+    });
+    expect(faultedRun.verdict.faulted).toBe(true);
+    expect(faultedRun.verdict.passed).toBe(false);
+
+    const unitFault = buildSignalEnvelope({
+      ...BASE,
+      units: [{ slug: 'boom', passed: false, durationMs: 1, error: 'threw' }],
+      signals: [],
+    });
+    expect(unitFault.verdict.faulted).toBe(true);
+    expect(unitFault.verdict.passed).toBe(false);
+  });
+});
+
+describe('isSignalEnvelope', () => {
+  it('accepts a structurally valid envelope and rejects non-objects and partial shapes', () => {
+    const env = buildSignalEnvelope({
+      ...BASE,
+      units: [unit('a', true)],
+      signals: [],
+    });
+    expect(isSignalEnvelope(env)).toBe(true);
+    expect(isSignalEnvelope(null)).toBe(false);
+    expect(isSignalEnvelope(undefined)).toBe(false);
+    expect(isSignalEnvelope('envelope')).toBe(false);
+    expect(isSignalEnvelope(42)).toBe(false);
+    expect(isSignalEnvelope({})).toBe(false);
+    expect(
+      isSignalEnvelope({
+        tool: 'fit',
+        runId: 'run-1',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        verdict: null,
+        units: [],
+        signals: [],
+      }),
+    ).toBe(false);
+    expect(
+      isSignalEnvelope({
+        tool: 'fit',
+        runId: 'run-1',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        verdict: { score: 100, passed: true, summary: {} },
+        units: 'nope',
+        signals: [],
+      }),
+    ).toBe(false);
+    expect(
+      isSignalEnvelope({
+        tool: 'fit',
+        runId: 'run-1',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        verdict: { score: 100, passed: true, summary: {} },
+        units: [],
+        signals: 'nope',
+      }),
+    ).toBe(false);
   });
 });

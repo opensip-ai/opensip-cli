@@ -23,7 +23,7 @@
  * public type surface.
  */
 
-import { withSpanAsync, type Signal } from '@opensip-cli/core';
+import { logger, withSpanAsync, type Signal } from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -44,6 +44,7 @@ import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import { createPressureMonitor } from './pressure-monitor.js';
 
 import type {
+  AdapterSelectionEvidence,
   Catalog,
   FeatureColumn,
   FeatureTable,
@@ -207,32 +208,56 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const resolutionMode: ResolutionMode = input.resolution ?? 'exact';
 
   const monitor = createPressureMonitor();
+  const discoveryStarted = Date.now();
   try {
-    const adapter = pickAdapterFor(input);
-    const discovery = await runStage({
-      stage: 'discover',
-      onProgress: input.onProgress,
-      monitor,
-      // Reduce raw discovery to the CANONICAL file set (Phase 1, parity): the
-      // root tsconfig declares no exclude, so `discoverFiles` returns every
-      // `.ts(x)` — fixtures included. The sharded engine partitions the SAME
-      // canonical set, so both engines parse/walk an identical file set. Real
-      // test files are kept (needed for test-only-reachable + test→prod edges);
-      // only `__fixtures__/` (synthetic test input) is dropped.
-      fn: async () => {
-        const raw = await adapter.discoverFiles({
-          cwd: input.cwd,
-          configPathOverride: input.tsConfigPath,
-        });
-        return { ...raw, files: resolveCanonicalFileSet(raw.files) };
-      },
-      detailFn: (d) => `${String(d.files.length)} files`,
-      attrsFn: (d) => ({ 'opensip_cli.graph.file_count': d.files.length }),
-    });
+    const { adapter, adapterSelection } = pickAdapterFor(input);
+    let discovery;
+    try {
+      discovery = await runStage({
+        stage: 'discover',
+        onProgress: input.onProgress,
+        monitor,
+        // Reduce raw discovery to the CANONICAL file set (Phase 1, parity): the
+        // root tsconfig declares no exclude, so `discoverFiles` returns every
+        // `.ts(x)` — fixtures included. The sharded engine partitions the SAME
+        // canonical set, so both engines parse/walk an identical file set. Real
+        // test files are kept (needed for test-only-reachable + test→prod edges);
+        // only `__fixtures__/` (synthetic test input) is dropped.
+        fn: async () => {
+          const raw = await adapter.discoverFiles({
+            cwd: input.cwd,
+            configPathOverride: input.tsConfigPath,
+            diagnosticIntent: 'normal',
+          });
+          return { ...raw, files: resolveCanonicalFileSet(raw.files) };
+        },
+        detailFn: (d) => `${String(d.files.length)} files`,
+        attrsFn: (d) => ({ 'opensip_cli.graph.file_count': d.files.length }),
+      });
+      // Single aggregate discovery terminal event for the producer boundary.
+      logger.info({
+        evt: 'graph.discovery.operation.completed',
+        module: 'graph:orchestrate',
+        adapter: adapter.id,
+        fileCount: discovery.files.length,
+        outcome: 'ok',
+        durationMs: Math.max(0, Date.now() - discoveryStarted),
+      });
+    } catch (error) {
+      logger.info({
+        evt: 'graph.discovery.operation.failed',
+        module: 'graph:orchestrate',
+        adapter: adapter.id,
+        outcome: 'failed',
+        durationMs: Math.max(0, Date.now() - discoveryStarted),
+      });
+      throw error;
+    }
 
     const { catalog, cacheHit, resolutionStats } = await obtainCatalog({
       runStage,
       adapter,
+      adapterSelection,
       discovery,
       catalogRepo,
       useCache: input.noCache !== true,
@@ -327,10 +352,20 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
  * Pick a graph language adapter for the run. When `language` is set, the
  * selector fails immediately if that adapter is not registered; implicit runs
  * still use file-extension dominance plus the deterministic fallback.
+ * Selection provenance is derived from the same pick (never a second select).
  */
-function pickAdapterFor(input: RunGraphInput): GraphLanguageAdapter {
-  return new GraphAdapterSelector(currentAdapterRegistry()).pick({
+function pickAdapterFor(input: RunGraphInput): {
+  readonly adapter: GraphLanguageAdapter;
+  readonly adapterSelection: AdapterSelectionEvidence;
+} {
+  const requested = input.language?.trim();
+  const adapter = new GraphAdapterSelector(currentAdapterRegistry()).pick({
     cwd: input.cwd,
     language: input.language,
   });
+  const adapterSelection: AdapterSelectionEvidence =
+    requested !== undefined && requested.length > 0
+      ? { mode: 'forced', requestedId: requested, selectedId: adapter.id }
+      : { mode: 'auto', selectedId: adapter.id };
+  return { adapter, adapterSelection };
 }

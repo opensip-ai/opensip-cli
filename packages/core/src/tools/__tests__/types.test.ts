@@ -61,6 +61,16 @@ describe('ToolRunSessions launch surface (host-owned-run-timing Phase 6)', () =>
   });
 });
 
+describe('ToolRunCompletion delegated execution', () => {
+  it('accepts the host-verified subprocess delegation marker', () => {
+    const completion: ToolRunCompletion = {
+      execution: { kind: 'delegated', startedAt: '2026-07-09T23:22:19.000Z' },
+    };
+
+    expect(completion.execution?.kind).toBe('delegated');
+  });
+});
+
 describe('run outcome helpers', () => {
   it('derives explicit outcomes before passed/failed inference', () => {
     expect(deriveRunOutcome({ passed: true })).toBe('passed');

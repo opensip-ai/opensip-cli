@@ -344,12 +344,8 @@ function suiteRows(): HTMLElement[] {
   return topLevelRows().filter((r) => r.classList.contains('overview-suite-summary-row'));
 }
 
-function expanderRows(): HTMLElement[] {
-  return topLevelRows().filter((r) => r.classList.contains('overview-suite-expander-row'));
-}
-
 function childRows(): HTMLElement[] {
-  return [...document.querySelectorAll<HTMLElement>('#panel-overview .overview-suite-child-row')];
+  return topLevelRows().filter((r) => r.classList.contains('overview-suite-child-row'));
 }
 
 function directRunRows(): HTMLElement[] {
@@ -387,8 +383,12 @@ describe('Overview suite rows', () => {
     bootReport(sessions, runs);
 
     expect(suiteRows()).toHaveLength(1);
-    expect(expanderRows()).toHaveLength(1);
     expect(childRows()).toHaveLength(3);
+    // Sibling rows in the same table (not a nested expander table).
+    expect(topLevelRows()).toHaveLength(4);
+    expect(suiteRows()[0].nextElementSibling?.classList.contains('overview-suite-child-row')).toBe(
+      true,
+    );
 
     const row = suiteRows()[0];
     const rowCells = cells(row);
@@ -413,16 +413,20 @@ describe('Overview suite rows', () => {
     expect(row.textContent).toContain('54');
     expect(row.textContent).toContain('29.2s');
 
-    const expander = expanderRows()[0];
-    expect(expander.classList.contains('open')).toBe(false);
+    for (const child of childRows()) {
+      expect(child.classList.contains('expander-row')).toBe(true);
+      expect(child.classList.contains('open')).toBe(false);
+      expect(cells(child)).toHaveLength(9);
+    }
     expect(row.querySelector('.overview-suite-arrow')?.textContent).toBe('▶');
 
     row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    expect(expander.classList.contains('open')).toBe(true);
-    expect(expander.style.display).toBe('table-row');
+    expect(row.classList.contains('expanded')).toBe(true);
     expect(row.querySelector('.overview-suite-arrow')?.textContent).toBe('▼');
     const [fitChild, graphChild, yagniChild] = childRows();
+    expect(fitChild.classList.contains('open')).toBe(true);
+    expect(fitChild.style.display).toBe('table-row');
     expect(cells(fitChild)[3].textContent).toBe('agent-risk');
     expect(cells(graphChild)[2].textContent).toBe('GRAPH');
     expect(cells(graphChild)[3].textContent).toBe('—');
@@ -596,13 +600,13 @@ describe('Overview suite rows', () => {
     );
 
     expect(suiteRows()).toHaveLength(1);
-    expect(expanderRows()).toHaveLength(1);
     expect(childRows()).toHaveLength(2);
     expect(directRunRows()).toHaveLength(1);
-    expect(topLevelRows()).toHaveLength(3);
-    expect(
-      suiteRows()[0].nextElementSibling?.classList.contains('overview-suite-expander-row'),
-    ).toBe(true);
+    // suite summary + 2 sibling step rows + 1 standalone run
+    expect(topLevelRows()).toHaveLength(4);
+    expect(suiteRows()[0].nextElementSibling?.classList.contains('overview-suite-child-row')).toBe(
+      true,
+    );
     expect(cells(suiteRows()[0])[2].getAttribute('title')).toBe('built-in-suite');
   });
 
@@ -621,7 +625,7 @@ describe('Overview suite rows', () => {
     expect(visible(suiteRows())).toHaveLength(2);
   });
 
-  it('keeps each suite expander attached to its summary row after sorting', async () => {
+  it('keeps each suite step group attached to its summary row after sorting', async () => {
     const audit = auditSuite();
     const many = manySuites(2);
     bootReport([...audit.sessions, ...many.sessions], [...audit.runs, ...many.runs]);
@@ -634,7 +638,15 @@ describe('Overview suite rows', () => {
 
     expect(document.querySelector('.suite-group-header')).toBeNull();
     for (const row of suiteRows()) {
-      expect(row.nextElementSibling?.classList.contains('overview-suite-expander-row')).toBe(true);
+      let sibling = row.nextElementSibling as HTMLElement | null;
+      expect(sibling?.classList.contains('overview-suite-child-row')).toBe(true);
+      // All consecutive child rows stay glued; next non-child is another top-level run.
+      while (sibling?.classList.contains('overview-suite-child-row') === true) {
+        sibling = sibling.nextElementSibling as HTMLElement | null;
+      }
+      if (sibling !== null) {
+        expect(sibling.classList.contains('overview-suite-child-row')).toBe(false);
+      }
     }
   });
 });

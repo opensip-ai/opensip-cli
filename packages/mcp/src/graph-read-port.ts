@@ -1,126 +1,595 @@
+// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /**
- * `GraphReadPort` — the narrow read interface every MCP graph tool handler
- * depends on (ADR-0084). Handlers NEVER touch `CatalogRepo` / `Indexes`
- * directly; they go through this port. Two named benefits justify the boundary:
- *   1. **Test seam** — handlers are unit-tested against an in-memory fake port,
- *      no SQLite needed (Phase 6).
- *   2. **Compile-time SaaS parity** — a handler cannot reach the storage layer,
- *      so an alternate (cloud) backend can substitute behind the same interface.
+ * `GraphReadPort` — the narrow async read interface every MCP graph tool
+ * handler depends on (ADR-0084 + MCP Graph Audit Phase 1).
  *
- * Every read returns `Result<McpToolResult<T>, McpReadError>` (ADR-0084): the
- * success arm carries `{ data, freshness }`; `throw` is reserved for the
- * SQLite/Drizzle boundary inside the impl. A missing catalog is NOT an error —
- * it surfaces as `freshness.fresh === false` with empty data and no auto-build.
+ * Every operation returns `Promise<Result<GraphToolResult<T>, McpReadError>>`.
+ * A missing catalog is NOT an error — it surfaces as `context.catalog.status
+ * === 'missing'` with empty data and no auto-build. Only `refresh` mutates.
  */
 
 import type { McpReadError } from './mcp-error.js';
-import type { Freshness, McpToolResult, SymbolRef } from './symbol-dto.js';
-import type { TargetConventionSummary } from '@opensip-cli/contracts';
+import type { StaticHandlerBridgeOutcome } from './static-handler-bridge.js';
+import type { Freshness, GraphToolResult, SymbolRef } from './symbol-dto.js';
+import type {
+  ProjectInventorySnapshot,
+  TaskContextSnapshotPointer,
+  TestSelectionSnapshot,
+} from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
+import type {
+  ArchitectureHotspot,
+  ArchitecturePackageEdgeRow,
+  CallEdgeEvidence,
+  CallEvidenceMetrics,
+  LabelledNodeCount,
+  LabelledPackageCount,
+  PackageCallEvidence,
+  PackageCallEvidenceRow,
+  PackageCycleProofEdge,
+  PackageImportEvidence,
+  PackageImportEvidenceRow,
+  GraphSourceFilter,
+  GraphEntityDetail,
+  GraphImpactView,
+  TraversalIdentity,
+} from '@opensip-cli/graph/read';
+
+type GroupByMode = 'none' | 'package' | 'file';
+type PackageEdgeKindParam = 'call' | 'import' | 'combined';
+
+/**
+ * Exclusive compact representation for high-volume graph queries (P2 Phase 2.2+).
+ * Exactly one representation is projected per request — never rows plus groups.
+ */
+export type CompactQueryDetail = 'summary' | 'groups' | 'nodes';
+
+/**
+ * Default page size for identity-producing searches (`search_symbols`).
+ * Intentionally smaller than the shared paged-tool default (100). Caller range 1–500.
+ */
+export const DEFAULT_IDENTITY_SEARCH_LIMIT = 20;
+
+/**
+ * Ephemeral `select_tests` fallback returned only when no graph generation is
+ * loaded. The explicit discriminator prevents this response from being
+ * mistaken for a durable {@link TestSelectionSnapshot}.
+ */
+export interface MissingGraphTestSelectionDto extends Omit<TestSelectionSnapshot, 'graphIdentity'> {
+  readonly graphIdentity: 'graph:missing';
+  readonly durable: false;
+}
+
+/** Durable test-selection evidence or an explicitly non-durable missing-graph fallback. */
+export type TestSelectionReadDto = TestSelectionSnapshot | MissingGraphTestSelectionDto;
 
 /** Identity of the in-memory catalog generation a read was served from. */
 export interface GraphGeneration {
-  /** ISO timestamp the served generation's catalog was built at. */
   readonly builtAt: string;
+  readonly identity: string;
+  readonly source?: string;
 }
 
-/** A blast-radius score for one symbol (graph's canonical scoring — reused, not reinvented). */
+/** A blast-radius score for one symbol (graph's canonical scoring). */
 export interface BlastDto {
   readonly symbol: SymbolRef;
-  /** Direct (depth-1) caller count. */
+  /** Populated only for detail=nodes; empty for summary/groups. */
+  readonly members: readonly SymbolRef[];
+  readonly totalMembership: number;
   readonly direct: number;
-  /** Transitive (depth 2..5) caller count. */
   readonly transitive: number;
-  /** `direct + 0.5 × transitive`. */
   readonly score: number;
+  readonly identityMode: 'body-twin-union';
+  readonly twinCount?: number;
+  readonly filteringLimitations?: readonly string[];
+  readonly detail?: CompactQueryDetail;
 }
 
 /** One dead-code (orphan) finding projected from `graph:orphan-subtree`. */
 export interface DeadCodeDto {
   readonly symbol: SymbolRef;
-  /** The rule's human-readable message. */
   readonly message: string;
+  readonly ruleId: 'graph:orphan-subtree';
+  readonly reason: 'unreachable-from-inferred-entry-point';
+  readonly suggestion?: string;
 }
 
-/** The outcome of the `trace_path` tool: an ordered symbol chain. */
-export interface PathTraceDto {
-  /** `true` when a call path `from → … → to` exists within the depth bound. */
+/** Phase 1 traversal snapshot (body-twin walk; Phase 2 widens evidence). */
+export interface TraversalSnapshot {
   readonly found: boolean;
-  /** The ordered path (empty when not found). */
-  readonly path: readonly SymbolRef[];
+  readonly nodes: readonly TraversalNodeDto[];
+  readonly path?: readonly SymbolRef[];
+  readonly hops?: readonly TraversalHopDto[];
+  readonly weakestConfidence?: CallEdgeEvidence['confidence'];
+  readonly identityMode: TraversalIdentity;
+  readonly totalMembership: number;
+  readonly counts: {
+    readonly includedOccurrences: number;
+    readonly excludedOccurrences: number;
+    readonly includedEdges: number;
+    readonly excludedEdges: number;
+    readonly countScope: 'visited';
+  };
+  readonly unresolved: readonly {
+    readonly ownerSymbolId: string;
+    readonly resolution: string;
+    readonly confidence: string;
+    readonly callSite: {
+      readonly filePath: string;
+      readonly line: number;
+      readonly column: number;
+    };
+    readonly targetHashes: readonly string[];
+    readonly totalTargetHashes: number;
+  }[];
+  readonly unresolvedCounts: readonly {
+    readonly resolution: string;
+    readonly confidence: string;
+    readonly count: number;
+  }[];
+  readonly unresolvedAttribution: 'owner-only';
+}
+
+export interface TraversalNodeDto {
+  readonly symbol: SymbolRef;
+  readonly depth: number;
+  readonly groupId: string;
+  readonly groupTotal: number;
+  readonly incomingEvidence?: CallEdgeEvidence;
+  readonly anyTwinMaySupplyHop?: boolean;
+}
+
+export interface TraversalHopDto {
+  readonly fromGroupId: string;
+  readonly toGroupId: string;
+  readonly evidence: readonly CallEdgeEvidence[];
+  readonly weakestConfidence?: CallEdgeEvidence['confidence'];
+  readonly anyTwinMaySupplyHop: boolean;
+}
+
+/** Options for {@link GraphReadPort.traverse}. */
+export interface TraversalQuery {
+  readonly direction: 'callers' | 'callees' | 'path';
+  readonly startSymbolId: string;
+  readonly goalSymbolId?: string;
+  readonly depth?: number;
+  readonly identity?: TraversalIdentity;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly groupBy?: GroupByMode;
+  /**
+   * Exclusive representation for callers/callees walks (P2 Phase 2.6).
+   * Default `nodes`. `path` walks ignore this and keep ordered path/hop DTOs.
+   * `groups` requires `groupBy: package|file`.
+   */
+  readonly detail?: CompactQueryDetail;
+}
+
+/** Architecture response family selector (P2 Phase 2.5). */
+export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
+
+/** A compact, labelled architecture overview. */
+export interface ArchitectureSummaryDto {
+  readonly languages: readonly string[];
+  readonly occurrenceCount: LabelledNodeCount;
+  readonly uniqueBodyCount: LabelledNodeCount;
+  readonly callEvidence: CallEvidenceMetrics;
+  readonly packageCount: LabelledPackageCount;
+  readonly includedSections: readonly ArchitectureSection[];
+  readonly packageEdges?: readonly ArchitecturePackageEdgeRow[];
+  readonly packageEdgesSummary?: {
+    readonly totalAvailable: number;
+    readonly selectedCount: number;
+    readonly pageReturned: number;
+  };
+  readonly hotspots?: readonly ArchitectureHotspot[];
+  readonly hotspotsSummary?: {
+    readonly totalAvailable: number;
+    readonly selectedCount: number;
+    readonly pageReturned: number;
+  };
+}
+
+export interface SearchSymbolsOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly match?: 'substring' | 'exact' | 'qualified';
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /**
+   * Exclusive representation (P2 Phase 2.2). Default `nodes` so callers receive
+   * symbol IDs for traversal tools. `groups` requires `groupBy: package|file`.
+   */
+  readonly detail?: CompactQueryDetail;
+}
+
+/** Declaration kinds for {@link GraphReadPort.searchDeclarations}. */
+export type McpDeclarationKind =
+  | 'function'
+  | 'class'
+  | 'interface'
+  | 'type-alias'
+  | 'enum'
+  | 'namespace'
+  | 'variable'
+  | 'property'
+  | 'method'
+  | 'import'
+  | 'export';
+
+/** Reference kinds for {@link GraphReadPort.referencesTo}. */
+export type McpReferenceKind = 'type' | 'value' | 'import' | 'export' | 'heritage' | 'annotation';
+
+export interface SearchDeclarationsOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly match?: 'substring' | 'exact' | 'qualified';
+  readonly kinds?: readonly McpDeclarationKind[];
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation. Default `nodes` (declaration IDs for references_to). */
+  readonly detail?: CompactQueryDetail;
+}
+
+export interface DeclarationRefDto {
+  readonly declarationId: string;
+  readonly name: string;
+  readonly qualifiedName: string;
+  readonly kind: McpDeclarationKind;
+  readonly package: string;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly visibility: string;
+  readonly exportRole: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+export interface DeclarationSearchDto {
+  readonly detail: CompactQueryDetail;
+  readonly referenceScope: 'cross-file';
+  readonly declarations: readonly DeclarationRefDto[];
+  readonly totalMatches: number;
+}
+
+export interface ReferencesToOptions {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly kinds?: readonly McpReferenceKind[];
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation. Default `summary` (counts only; no sites). */
+  readonly detail?: CompactQueryDetail;
+}
+
+export interface ReferenceSiteDto {
+  readonly referenceId: string;
+  readonly kind: McpReferenceKind;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly package: string;
+  readonly targetDeclarationId?: string;
+  readonly targetPackage?: string;
+  readonly targetName?: string;
+  readonly targetKind?: McpDeclarationKind;
+  readonly basis: string;
+  readonly confidence: string;
+  readonly importSpecifier?: string;
+  readonly reason?: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+export interface ReferencesToDto {
+  readonly detail: CompactQueryDetail;
+  readonly referenceScope: 'cross-file';
+  readonly declarationId: string;
+  readonly references: readonly ReferenceSiteDto[];
+  readonly totalMatches: number;
+  readonly kindCounts?: readonly {
+    readonly kind: string;
+    readonly count: number;
+  }[];
 }
 
 /**
- * A walkable adjacency snapshot for one call direction. The MCP call-graph tools
- * (`who_calls`/`callees_of`/`trace_path`) run the shared `boundedBfs` over this
- * — the port exposes the engine's `Indexes.callers`/`callees` body-hash
- * adjacency (twin-union per ADR-0003) plus a body-hash → {@link SymbolRef}
- * resolver, so the single walk lives in MCP (rule of three) and the port never
- * re-implements a parallel BFS.
+ * Exclusive `search_symbols` payload. `symbols` is populated only for
+ * `detail: 'nodes'`; group rows live on the envelope `groups` field for
+ * `detail: 'groups'`; summary returns counts only.
  */
-export interface AdjacencySnapshot {
-  /** Body-hash → neighbor body-hashes for this direction. */
-  readonly edges: ReadonlyMap<string, readonly string[]>;
-  /** Resolve a body hash to its representative {@link SymbolRef} (metadata only). */
-  resolve(bodyHash: string): SymbolRef | undefined;
+export interface SymbolSearchDto {
+  readonly detail: CompactQueryDetail;
+  readonly symbols: readonly SymbolRef[];
+  /** Total filtered matches in the candidate inventory (all detail modes). */
+  readonly totalMatches: number;
 }
 
-/** One package-coupling row in the architecture summary. */
-export interface ArchitecturePackageDto {
-  readonly name: string;
-  /** Distinct callee packages this package depends on. */
-  readonly couplingOut: number;
-  /** Distinct caller packages that depend on this one. */
-  readonly couplingIn: number;
-}
-
-/** A compact architecture overview: counts, languages, top-coupled packages, blast hotspots. */
-export interface ArchitectureSummaryDto {
-  readonly functionCount: number;
-  readonly edgeCount: number;
-  /** Languages present in the catalog (single-language per catalog today). */
-  readonly languages: readonly string[];
-  readonly packages: readonly ArchitecturePackageDto[];
-  /** Highest-blast symbols (graph's canonical scoring), capped. */
-  readonly hotspots: readonly BlastDto[];
-  /** Bounded project convention counts from target config, when present. */
-  readonly targetConventions?: readonly TargetConventionSummary[];
-}
-
-/** Options for {@link GraphReadPort.searchSymbols}. */
-export interface SearchSymbolsOptions {
-  /** Max results before truncation (handler-clamped; impl applies a default). */
+export interface DeadCodeQuery {
   readonly limit?: number;
+  readonly cursor?: string;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Exclusive representation (P2 Phase 2.7/2.8). Default `summary`. */
+  readonly detail?: CompactQueryDetail;
+}
+
+/**
+ * Exclusive dead-code payload. `rows` is populated only for `detail: 'nodes'`.
+ */
+export interface DeadCodeResultDto {
+  readonly detail: CompactQueryDetail;
+  readonly rows: readonly DeadCodeDto[];
+  readonly totalOrphans: number;
+  readonly reasonCounts: readonly {
+    readonly reason: string;
+    readonly count: number;
+  }[];
+  readonly ruleCounts: readonly {
+    readonly ruleId: string;
+    readonly count: number;
+  }[];
+}
+
+export interface ArchitectureQuery {
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly groupBy?: GroupByMode;
+  /** Default `['metrics']`. Unselected families are omitted from the response. */
+  readonly sections?: readonly ArchitectureSection[];
+  /** Global top-N for ranked families before page limit. Default 20, max 100. */
+  readonly topN?: number;
+}
+
+export interface RefreshResult {
+  readonly generation: GraphGeneration;
+  readonly action: 'no-op' | 'reloaded' | 'rebuilt';
+  readonly durationMs: number;
+  readonly priorGenerationAvailable: boolean;
+}
+
+export interface CatalogStatus {
+  readonly context: GraphToolResult<null>['context'];
+  readonly freshness: Freshness;
+}
+
+/** Bounded options for an explicit-file impact read. */
+export interface ImpactFilesOptions {
+  readonly maxDepth?: number;
+  readonly top?: number;
+}
+
+/**
+ * Canonical graph impact projection with machine-actionable follow-up guidance.
+ * The impact fields remain flat so agents can consume the graph/read DTO without
+ * an MCP-specific nesting layer.
+ */
+export interface ImpactFilesDto extends GraphImpactView {
+  readonly nextActions: readonly string[];
+}
+
+/** One source-location lookup projected from exactly one immutable graph generation. */
+export interface GraphSymbolLocationDto {
+  readonly candidates: readonly SymbolRef[];
+  readonly entity?: GraphEntityDetail | null;
+}
+
+/** Bounded static-test selection controls. */
+export interface SelectTestsOptions {
+  readonly tier?: 'focused' | 'package' | 'full';
+  readonly maxDepth?: number;
+  readonly limit?: number;
+  readonly commandLimit?: number;
+  readonly proofDetail?: 'none' | 'summary' | 'paths';
+  readonly proofLimit?: number;
+}
+
+/** Exact recorded context-pointer availability; never a latest-pointer lookup. */
+export interface ContextPointerStatus {
+  readonly pointer: TaskContextSnapshotPointer;
+  readonly status: 'available' | 'missing' | 'stale' | 'unsupported';
+  readonly reasonCodes: readonly string[];
+  readonly currentGraphIdentity?: string;
+}
+
+/** Freshness policy for exact context-pointer replay. */
+export interface ContextPointerStatusOptions {
+  /** Bypass a completed graph freshness verdict cached for an ordinary read burst. */
+  readonly forceFresh?: boolean;
 }
 
 export interface GraphReadPort {
-  /** Identity of the current generation (`undefined` when no catalog is loaded). */
-  getGeneration(): Result<McpToolResult<GraphGeneration | undefined>, McpReadError>;
+  /** Project/catalog context + freshness without serving query data. */
+  catalogStatus(): Promise<Result<CatalogStatus, McpReadError>>;
   /** Resolve a `file:line:col` symbolId to its {@link SymbolRef}. */
-  resolveSymbolId(symbolId: string): Result<McpToolResult<SymbolRef | undefined>, McpReadError>;
-  /** Search symbols by simple name (substring, case-insensitive). */
+  resolveSymbolId(
+    symbolId: string,
+  ): Promise<Result<GraphToolResult<SymbolRef | undefined>, McpReadError>>;
+  /** Search symbols (Phase 1: simple-name substring; Phase 4 widens). */
   searchSymbols(
     query: string,
     opts?: SearchSymbolsOptions,
-  ): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
-  /** All symbols declared in `file` enclosing (or starting at) `line`. */
-  findBySpan(file: string, line: number): Result<McpToolResult<readonly SymbolRef[]>, McpReadError>;
-  /** Reverse-call adjacency snapshot (who-calls): walked by MCP's `boundedBfs`. */
-  callerGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError>;
-  /** Forward-call adjacency snapshot (callees): walked by MCP's `boundedBfs`. */
-  calleeGraph(): Result<McpToolResult<AdjacencySnapshot>, McpReadError>;
-  /** Blast radius of `symbolId` — graph's canonical `buildFeatures` scoring. */
-  blast(symbolId: string): Result<McpToolResult<BlastDto | undefined>, McpReadError>;
-  /** Orphan (dead-code) symbols via `graph:orphan-subtree` (no filesystem reads). */
-  deadCode(limit?: number): Result<McpToolResult<readonly DeadCodeDto[]>, McpReadError>;
-  /** Package-coupling architecture overview. */
-  architectureSummary(limit?: number): Result<McpToolResult<ArchitectureSummaryDto>, McpReadError>;
+  ): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>>;
   /**
-   * Rebuild the catalog (the single state-changing op) and swap the generation
-   * atomically. Async — runs the graph programmatic build at a genuine infra
-   * boundary. Wired in Phase 4.
+   * Search non-callable declaration facts (P2 Phase 3). Separate from
+   * {@link searchSymbols} — declaration IDs are not callable symbol IDs.
    */
-  refresh(): Promise<Result<McpToolResult<GraphGeneration>, McpReadError>>;
-  /** The current freshness verdict (read without serving data). */
-  freshness(): Freshness;
+  searchDeclarations(
+    query: string,
+    opts?: SearchDeclarationsOptions,
+  ): Promise<Result<GraphToolResult<DeclarationSearchDto>, McpReadError>>;
+  /**
+   * Cross-file references to a declaration id from {@link searchDeclarations}.
+   */
+  referencesTo(
+    declarationId: string,
+    opts?: ReferencesToOptions,
+  ): Promise<Result<GraphToolResult<ReferencesToDto>, McpReadError>>;
+  /** All symbols declared in `file` enclosing (or starting at) `line`. */
+  findBySpan(
+    file: string,
+    line: number,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<readonly SymbolRef[]>, McpReadError>>;
+  /** Resolve candidates and optional entity detail inside one generation capture. */
+  symbolAtLocation(
+    file: string,
+    line: number,
+    detail: 'summary' | 'entity',
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<GraphSymbolLocationDto>, McpReadError>>;
+  /** Impact of explicit project-relative files in one immutable generation. */
+  impactFiles(
+    files: readonly string[],
+    options?: ImpactFilesOptions,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<ImpactFilesDto>, McpReadError>>;
+  /** Source-free detail for one exact callable occurrence. */
+  entityDetail(
+    symbolId: string,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<GraphEntityDetail | null>, McpReadError>>;
+  /** Static test candidates bound to one graph and one inventory identity. */
+  selectTests(
+    files: readonly string[],
+    inventory: ProjectInventorySnapshot,
+    options?: SelectTestsOptions,
+    signal?: AbortSignal,
+  ): Promise<Result<GraphToolResult<TestSelectionReadDto>, McpReadError>>;
+  /** Verify one recorded snapshot pointer exactly, without rebinding to latest. */
+  contextPointerStatus(
+    pointer: TaskContextSnapshotPointer,
+    signal?: AbortSignal,
+    options?: ContextPointerStatusOptions,
+  ): Promise<Result<ContextPointerStatus, McpReadError>>;
+  /**
+   * One-generation traversal (callers/callees/path). Phase 1 exposes the
+   * currently shipped body-twin walk; Phase 2 adds occurrence identity.
+   */
+  traverse(
+    query: TraversalQuery,
+  ): Promise<Result<GraphToolResult<TraversalSnapshot>, McpReadError>>;
+  /** Blast radius of `symbolId` — graph's canonical `buildFeatures` scoring. */
+  blast(
+    symbolId: string,
+    opts?: {
+      limit?: number;
+      cursor?: string;
+      filter?: Partial<GraphSourceFilter>;
+      groupBy?: GroupByMode;
+      detail?: CompactQueryDetail;
+    },
+  ): Promise<Result<GraphToolResult<BlastDto | undefined>, McpReadError>>;
+  /** Orphan (dead-code) symbols via public orphan evaluation. */
+  deadCode(
+    query?: DeadCodeQuery,
+  ): Promise<Result<GraphToolResult<DeadCodeResultDto>, McpReadError>>;
+  /** Labelled architecture overview (production/non-generated default). */
+  architectureSummary(
+    query?: ArchitectureQuery,
+  ): Promise<Result<GraphToolResult<ArchitectureSummaryDto>, McpReadError>>;
+  /**
+   * Sole graph mutation: sync/verify and optionally rebuild.
+   * `forceRebuild` skips the no-op/reload short-circuit.
+   */
+  refresh(opts?: {
+    forceRebuild?: boolean;
+  }): Promise<Result<GraphToolResult<RefreshResult>, McpReadError>>;
+  /** Package call/import dependency rows. */
+  packageDependencies(
+    query: PackageDependenciesQuery,
+  ): Promise<Result<GraphToolResult<PackageDependenciesDto>, McpReadError>>;
+  /** Evidence for why package A depends on package B. */
+  whyDepends(query: WhyDependsQuery): Promise<Result<GraphToolResult<WhyDependsDto>, McpReadError>>;
+  /** Package SCCs/cycles for a selected edge kind. */
+  packageCycles(
+    query: PackageCyclesQuery,
+  ): Promise<Result<GraphToolResult<PackageCyclesDto>, McpReadError>>;
+  /**
+   * Batch-join author-declared static handler descriptors to declaration
+   * facts for one immutable catalog generation (P2 Phase 4.7).
+   * The runtime snapshot key must be a validated `w1:` identity.
+   */
+  resolveStaticHandlerDeclarations(
+    runtimeSnapshotKey: string,
+    refs: readonly {
+      readonly package: string;
+      readonly path: string;
+      readonly declaration: string;
+      readonly admittedPackageIdentity?: string;
+      readonly owner?: 'host' | 'tool';
+    }[],
+  ): Promise<
+    Result<
+      {
+        readonly catalogIdentity?: string;
+        readonly catalogStatus: 'loaded' | 'missing' | 'unsupported';
+        readonly outcomes: readonly StaticHandlerBridgeOutcome[];
+      },
+      McpReadError
+    >
+  >;
+}
+
+export interface PackageDependenciesQuery {
+  readonly edgeKind?: PackageEdgeKindParam;
+  readonly package?: string;
+  readonly direction?: 'out' | 'in' | 'both';
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly groupBy?: GroupByMode;
+  /** Nested evidence samples per inventory row (0–5). Graph default 5 until Task 2.4. */
+  readonly sampleLimit?: number;
+}
+
+export interface WhyDependsQuery {
+  readonly fromPackage: string;
+  readonly toPackage: string;
+  readonly edgeKind?: PackageEdgeKindParam;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly groupBy?: GroupByMode;
+  /** Max concrete evidence sites retained (0–100). Bound into the cursor digest. */
+  readonly evidenceLimit?: number;
+}
+
+export interface PackageCyclesQuery {
+  readonly edgeKind?: PackageEdgeKindParam;
+  readonly filter?: Partial<GraphSourceFilter>;
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly groupBy?: GroupByMode;
+  /** Max proof edges per component (0–50). Bound into the cursor digest. */
+  readonly proofLimit?: number;
+}
+
+export interface PackageDependenciesDto {
+  readonly edgeKind: PackageEdgeKindParam;
+  readonly calls: readonly PackageCallEvidenceRow[];
+  readonly imports: readonly PackageImportEvidenceRow[];
+}
+
+export interface WhyDependsDto {
+  readonly edgeKind: PackageEdgeKindParam;
+  readonly calls: readonly PackageCallEvidence[];
+  readonly imports: readonly PackageImportEvidence[];
+  readonly totalMatchingEvidence: number;
+}
+
+export interface PackageCyclesDto {
+  readonly edgeKind: PackageEdgeKindParam;
+  readonly components: readonly {
+    readonly packages: readonly string[];
+    readonly proofEdges: readonly PackageCycleProofEdge[];
+    readonly totalProofEdges: number;
+  }[];
 }

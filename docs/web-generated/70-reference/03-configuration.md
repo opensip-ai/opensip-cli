@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-02
-release: v0.5.0
+last_verified: 2026-07-12
+release: v0.7.0
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."
@@ -35,7 +35,7 @@ opensip-cli reads two config files:
 | `<project>/opensip-cli.config.yml` | Project (committed) | Targets, plugins, fitness config, CLI defaults |
 | `~/.opensip-cli/config.yml` | User (gitignored, cross-project) | OpenSIP Cloud API key, machine-wide cloud-sync controls, and user policy |
 
-Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated only when no loaded tool owns that namespace; a block named after a loaded tool that did not declare a config schema is rejected as a tool/config contract bug.
+Each tool contributes a Zod schema for its own top-level namespace (`fitness:`, `simulation:`, `graph:`, `yagni:`); the host **composes** them into one strict whole-document schema ([`packages/config/src/composer.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/config/src/composer.ts), ADR-0023) and validates the entire file **before dispatch** ([`config-and-capabilities.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/bootstrap/config-and-capabilities.ts)). Each known namespace is **strict**: an unknown key inside it (a typo) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped. Unclaimed *top-level* keys are tolerated only when no loaded tool owns that namespace; a block named after a loaded tool that did not declare a config schema is rejected as a tool/config contract bug.
 
 ## Validate, migrate, and export schema
 
@@ -49,7 +49,7 @@ opensip config schema --json
 opensip config schema --out opensip-cli.config.schema.json
 ```
 
-`validate` reads the resolved project config path (or `--config`) and runs strict validation. Success returns `data.type: "config-validate"` with the claimed namespace list; failures exit **2**. `migrate` normalizes the config to the current schema version. Today that means adding or normalizing `schemaVersion: 1` for legacy files; future schema bumps will add deterministic transforms here before the strict loader requires them. `--dry-run` reports pending edits without writing. `--check` is the CI form: it does not write and exits **2** when migration would change the file. `schema` emits the composed JSON Schema from [`toJsonSchema`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/config/src/json-schema.ts) — suitable for editor completion — and optionally writes it with `--out`. See [ADR-0067](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0067-config-validate-schema-commands.md) and [ADR-0121](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0121-platform-compatibility-lts-policy.md).
+`validate` reads the resolved project config path (or `--config`) and runs strict validation. Success returns `data.type: "config-validate"` with the claimed namespace list; failures exit **2**. `migrate` normalizes the config to the current schema version. Today that means adding or normalizing `schemaVersion: 1` for legacy files; future schema bumps will add deterministic transforms here before the strict loader requires them. `--dry-run` reports pending edits without writing. `--check` is the CI form: it does not write and exits **2** when migration would change the file. `schema` emits the composed JSON Schema from [`toJsonSchema`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/config/src/json-schema.ts) — suitable for editor completion — and optionally writes it with `--out`. See [ADR-0067](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0067-config-validate-schema-commands.md) and [ADR-0121](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0121-platform-compatibility-lts-policy.md).
 
 ## Top-level shape
 
@@ -72,7 +72,7 @@ yagni: {}                 # YAGNI reduction audit knobs (tool-contributed namesp
 
 Every section is optional; a missing section becomes `{}`.
 
-The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `tools`, `policy`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
+The composed strict schema covers the host-owned blocks (`schemaVersion`, `globalExcludes`, `targets`, `checkOverrides`, `cli`, `dashboard`, `plugins`, `tools`, `policy`, `suites`) plus each tool's namespace (`fitness:`, `simulation:`, `graph:`, `yagni:` — each contributed by its owning tool). **The whole document validates strict before dispatch**: a typo inside `graph:` (e.g. `minCrossPackageDuplicatePackges`) or inside `fitness:` is rejected with a `CONFIGURATION_ERROR`, not silently dropped. The `graph:` block is no longer read out-of-band — it is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/graph/engine/src/cli/graph-config-schema.ts) like every other.
 
 `schemaVersion` defaults to `1`. The pre-action hook reads it before the strict loader runs; if a project config declares a schema newer than the installed CLI understands, the CLI exits 2 with an "upgrade your CLI" message rather than misreading the file. Use `opensip config migrate --check` in CI to fail before stale committed configs reach that point.
 
@@ -346,21 +346,31 @@ readability only. `command` is the `CommandSpec` name, not necessarily the
 shortest CLI alias: for example, the fitness primary command is `fitness` here
 even though users normally type `opensip fit`.
 
-`audit` is built in: `opensip suite run audit` works even when config omits a
-`suites.audit` block. Define `suites.audit` only when you want to replace the
-built-in PR-review workflow. The built-in preset runs changed-scope by default
-when git scope resolves; pass `--full` for a whole-repo run.
+`audit` is built in: `opensip suite run audit` works even when config defines
+no suites at all, and it always runs the same curated definition as top-level
+`opensip audit`. The suite name `audit` is **reserved** for that built-in
+workflow: a configured `suites.audit` fails config validation with a rename
+hint, so the two spellings can never diverge. Use another suite name (for
+example `audit-custom`) for a distinct workflow. The built-in preset runs
+changed-scope by default when Git scope resolves; pass `--full` for a
+whole-repo run.
+
+`agent-context` is also built in. It runs the bundled graph Tool's internal
+inventory, graph-ensure, and test-selection evidence producers serially and
+persists a bounded non-finding `TaskContextManifest` on the parent Run. Pass
+repeatable `--files` on `suite run`; the host propagates them only to the
+declaring selector step. Like `audit`, the `agent-context` name is reserved; use
+a different name for a configured workflow. The built-in preset accepts only
+the exact bundled graph Tool provenance.
+
+These reservations are architectural, not naming advice: see
+[ADR-0111](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0111-built-in-audit-suite-preset.md),
+[ADR-0129](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0129-audit-suite-scope-defaults.md),
+[ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0155-canonical-audit-command.md), and
+[ADR-0159](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0159-reserved-host-command-and-suite-names.md).
 
 ```yaml
 suites:
-  audit:
-    description: Custom audit override
-    steps:
-      - tool: afd68bd3-ff3c-4935-a5b6-76d8fc7a5224
-        name: fitness
-        command: fitness
-        args:
-          recipe: agent-risk
   security:
     description: Run security checks and graph rules
     steps:
@@ -408,7 +418,35 @@ Validated by the project-config schema and read by the dashboard data path. Unkn
 
 ## `graph`
 
-Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
+### `graph.auditTestSourceGlobs`
+
+Bounded, project-relative POSIX globs that reclassify matching catalog paths as
+**audit-test sources** at MCP/graph read time ([ADR-0153](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0153-faceted-compact-mcp-graph-protocol.md)
+source-role policy). They do **not** rewrite the catalog or infer package privacy.
+
+```yaml
+graph:
+  auditTestSourceGlobs:
+    - packages/test-support/**
+    - '**/__fixtures__/**'
+```
+
+Semantics:
+
+- Effective test role is `inTestFile || matches(auditTestSourceGlobs, filePath)`.
+- Simple minimatch only: no brace expansion, extglob, leading negation, comments,
+  absolute roots, backslashes, or parent traversal.
+- Bounds: at most **64** patterns, **256** characters and **32** wildcard/class
+  tokens per pattern; unique patterns required.
+- Config is loaded once when the MCP command constructs its query context.
+  Editing globs takes effect on the next MCP process/reconnect (or other newly
+  constructed context). There is no live config watcher. Changing globs changes
+  effective source policy and cursor digests without a catalog rebuild.
+- Classification of more than the production distinct-file limit fails closed
+  with a typed resource error.
+
+
+Per-rule knobs for the `graph` tool. The `graph:` block is a tool-contributed namespace validated against [`graph-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/graph/engine/src/cli/graph-config-schema.ts) as part of the composed strict whole-document schema (ADR-0023) — **before dispatch**. Every field is optional; an omitted field uses the rule's in-rule default. A typo'd key (e.g. `minCrossPackageDuplicatePackges`) or a malformed value (e.g. a string where a number is expected, or a `severityOverrides` value outside `'error'`/`'warning'`) is **rejected** with a `CONFIGURATION_ERROR`, not silently dropped.
 
 ### Duplicated-function-body (`graph:duplicated-function-body`)
 
@@ -474,7 +512,7 @@ graph:
 
 ## `yagni`
 
-YAGNI reduction audit settings. Validated against [`yagni-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/yagni/engine/src/cli/yagni-config-schema.ts). Defaults are advisory — findings do not fail the run unless you raise the gate keys.
+YAGNI reduction audit settings. Validated against [`yagni-config-schema.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/yagni/engine/src/cli/yagni-config-schema.ts). Defaults are advisory — findings do not fail the run unless you raise the gate keys.
 
 | Field | Type | Default | Effect |
 |---|---|---|---|

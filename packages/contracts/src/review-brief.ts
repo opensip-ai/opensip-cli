@@ -1,6 +1,7 @@
 import { isErrorSeverity, isPlainRecord } from '@opensip-cli/core';
 import { z } from 'zod';
 
+import { compareCodePoint } from './code-point-order.js';
 import {
   reviewBriefCorrelationGroupSchema,
   reviewBriefCorrelationKeySchema,
@@ -115,12 +116,6 @@ const severityRank: Readonly<Record<SignalSeverity, number>> = {
   medium: 2,
   low: 3,
 };
-
-function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 function compareNumber(left: number | undefined, right: number | undefined): number {
   return (left ?? Number.MAX_SAFE_INTEGER) - (right ?? Number.MAX_SAFE_INTEGER);

@@ -1,12 +1,12 @@
 ---
 status: current
-last_verified: 2026-07-07
-release: v0.5.0
+last_verified: 2026-07-14
+release: v0.7.0
 owner: opensip-cli
 indexable: true
 title: "opensip-cli Docs"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
-purpose: "Public documentation entry point for opensip-cli v0.5.0: product overview, fast paths, and the full reference map."
+purpose: "Public documentation entry point for opensip-cli v0.7.0: product overview, fast paths, and the full reference map."
 ---
 # opensip-cli Docs
 
@@ -20,22 +20,22 @@ It runs in your repo and in CI. It works offline. It is designed for teams that 
 |---|---|
 | Enforce project-specific quality, security, and architecture rules | `opensip fit` with 160 built-in checks across seven packs, plus your own checks |
 | Adopt without fixing every historical issue first | `fit --gate-save` once, then `fit --gate-compare` in CI |
-| Run a multi-tool review in one command | `opensip suite run audit` for changed-scope fit, graph, and review-brief evidence |
+| Run a multi-tool review in one command | `opensip audit` for changed-scope fit, graph impact, and review-brief evidence |
 | Understand reachability, dead ends, duplication, cycles, and blast radius | `opensip graph` with five graph adapters and eleven built-in graph rules |
 | Review evidence-backed code-reduction opportunities (advisory) | `opensip yagni` with bundled detectors and optional graph evidence |
 | Run load or chaos scenarios against a service you control | `opensip sim` |
 | Bring existing scanners into the same report and gate | Opt in to one of 16 adapters, including Gitleaks, Semgrep, Ruff, golangci-lint, cargo-deny, Bandit, PMD, Cppcheck, OSV-Scanner, and Trivy |
 | Share internal rules across repos | Publish or install fit packs and sim scenario packs |
 | Add an entire command to the CLI | Build a Tool plugin and manage it with `opensip tools ...` |
-| Give coding agents deterministic repo evidence | `opensip agent-catalog --json`, `opensip mcp`, filtered JSON, sessions, and graph impact |
-| Show results to humans and CI systems | Open the local HTML report or export SARIF for code scanning |
+| Give coding agents deterministic repo evidence | `opensip agent-catalog --json`, `opensip mcp` (`impact_files`, `select_tests`, `get_file_context`, `get_context_status`), `suite run agent-context`, filtered JSON, sessions, and graph impact |
+| Show results to humans and CI systems | Open the local HTML report (including Change Impact for audit runs) or export SARIF for code scanning |
 
 ## Start Here
 
 ```bash
 curl -fsSL https://opensip.ai/cli/install.sh | bash
 cd your-project
-opensip suite run audit
+opensip audit
 opensip init
 opensip fit --recipe example
 opensip report
@@ -57,7 +57,11 @@ scaffold, one passing fitness run, and the local HTML report. From there:
 | Verify release artifacts | [Verifiable releases](./70-reference/13-verifiable-releases.md) |
 | Inspect detection-quality methodology | [Detection quality](./70-reference/14-detection-quality.md) |
 | Audit contract/version compatibility | [Compatibility policy](./70-reference/15-compatibility-policy.md) |
+| Check whether a host is qualified | [Supported platforms](./70-reference/17-supported-platforms.md) |
+| Profile or compare performance work | [Performance profiling](./70-reference/16-performance-profiling.md) |
 | Connect Cursor, Claude Code, or Codex via MCP | [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
+| Run agent Discover / Edit / Final loops | [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md) |
+| Understand Change Impact and the offline HTML report | [Report](./70-reference/06-dashboard.md) |
 
 ## Command Map
 
@@ -65,7 +69,7 @@ The most common commands:
 
 ```bash
 opensip init
-opensip suite run audit
+opensip audit
 opensip fit
 opensip fit list
 opensip fit recipes
@@ -83,6 +87,14 @@ opensip agent-catalog --json
 opensip mcp --cwd /path/to/repo
 opensip report
 ```
+
+`opensip audit` is the stable, host-owned shortcut for the curated built-in
+review. Add `--open` for the human Change Impact report or `--json` for CI and
+agents. Use `opensip suite run <name>` for configured multi-tool workflows. The
+suite name `audit` is reserved for the built-in review (ADR-0159): a configured
+`suites.audit` fails config validation, so both spellings always run the same
+curated definition — pick another name (for example `audit-custom`) for a
+custom workflow.
 
 Whole Tool plugins are managed through the `tools` group:
 
@@ -216,6 +228,8 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 57. [Verifiable releases](./70-reference/13-verifiable-releases.md)
 58. [Detection quality](./70-reference/14-detection-quality.md)
 59. [Compatibility policy](./70-reference/15-compatibility-policy.md)
+60. [Performance profiling](./70-reference/16-performance-profiling.md)
+61. [Supported platforms](./70-reference/17-supported-platforms.md)
 
 ### 80 - Internals
 
@@ -231,11 +245,17 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ## Factual Baseline
 
-This v0.5.0 doc set was rechecked against the source on 2026-07-07:
+This v0.7.0 doc set was rechecked against the source on 2026-07-11:
 
 - 160 built-in fitness checks across seven packs.
-- 55 publishable workspace packages, plus the private `@opensip-cli/test-support` package.
-- Four bundled first-party tools: `fit`, `graph`, `sim`, and `yagni`.
+- 57 publishable workspace packages, plus the three private workspace packages
+  `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
+  `@opensip-cli/checks-dogfood`; the generated
+  `80-implementation/architecture-map.md` is the authoritative current inventory.
+- Five bundled first-party tools (declared in
+  `packages/cli/src/bootstrap/bundled-tools.manifest.json`): `fit`, `graph`,
+  `sim`, `yagni`, and `mcp`. The four analysis tools render live views; `mcp` is a
+  raw stdio server.
 - Six fitness language adapters: TypeScript/JavaScript, Python, Rust, Go, Java, and C/C++.
 - Five graph language adapters: TypeScript, Python, Rust, Go, and Java.
 - First-party Tool commands are mounted through `CommandSpec`; installed Tool

@@ -16,7 +16,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'check',
     '-d',
-    ctx.projectRoot,
+    '.', // cwd is projectRoot — keep reported paths project-relative
     '-R',
     DEFAULT_RULESET,
     '-f',
@@ -52,7 +52,8 @@ export const tool: Tool = defineExternalToolAdapter({
       description: 'Run PMD Java rules and normalize SARIF',
       args: buildScanArgs,
       output: { kind: 'sarif', path: 'pmd.sarif' },
-      exitCodes: { ok: [0], findings: [4], errorFrom: 1 },
+      // PMD 7: 4 = violations; 5 = recoverable error with possible report findings.
+      exitCodes: { ok: [0], findings: [4, 5], errorFrom: 1 },
     },
   ],
   fingerprintStrategy: 'message-hash',

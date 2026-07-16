@@ -170,7 +170,8 @@ export function migrateConfigText(input: MigrateConfigTextInput): MigrateConfigT
 /**
  * Migrate an `opensip-cli.config.yml` file in place, or report pending changes in dry-run mode.
  *
- * @throws {ConfigurationError} When the file is missing, oversized, malformed, invalid, or newer than this CLI supports.
+ * @throws {ConfigurationError} When the path is missing, not a regular file, oversized,
+ *   unreadable, malformed, invalid, or newer than this CLI supports.
  */
 export function migrateConfigFile(input: MigrateConfigFileInput): MigrateConfigFileResult {
   if (!existsSync(input.configPath)) {
@@ -179,15 +180,40 @@ export function migrateConfigFile(input: MigrateConfigFileInput): MigrateConfigF
     });
   }
   const maxBytes = input.maxBytes ?? MAX_CONFIG_MIGRATION_BYTES;
-  const stat = statSync(input.configPath);
-  if (stat.size > maxBytes) {
+  let size: number;
+  try {
+    const stat = statSync(input.configPath);
+    if (!stat.isFile()) {
+      throw new ConfigurationError(
+        `Cannot migrate ${input.configPath}: path is not a regular file.`,
+        { code: 'CONFIG.MIGRATION.NOT_A_FILE' },
+      );
+    }
+    size = stat.size;
+  } catch (error) {
+    if (error instanceof ConfigurationError) throw error;
+    throw new ConfigurationError(
+      `Cannot migrate ${input.configPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { code: 'CONFIG.MIGRATION.STAT_FAILED', cause: error },
+    );
+  }
+  if (size > maxBytes) {
     throw new ConfigurationError(
       `Cannot migrate ${input.configPath}: file is larger than ${String(maxBytes)} bytes.`,
       { code: 'CONFIG.MIGRATION.CONFIG_TOO_LARGE' },
     );
   }
+  let text: string;
+  try {
+    text = readFileSync(input.configPath, 'utf8');
+  } catch (error) {
+    throw new ConfigurationError(
+      `Cannot migrate ${input.configPath}: ${error instanceof Error ? error.message : String(error)}`,
+      { code: 'CONFIG.MIGRATION.READ_FAILED', cause: error },
+    );
+  }
   const result = migrateConfigText({
-    text: readFileSync(input.configPath, 'utf8'),
+    text,
     configPath: input.configPath,
     targetVersion: input.targetVersion,
   });

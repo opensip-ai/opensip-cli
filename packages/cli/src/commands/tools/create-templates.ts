@@ -112,6 +112,7 @@ const primaryCommand = definePrimaryCommand<unknown, ToolCliContext>({
   commonFlags: ['json'],
   scope: 'none',
   output: 'command-result',
+  // Third-party scaffold: optional staticHandler may be added by the tool author.
   handler: async (opts, cli) => {
     log.info({ evt: '${ctx.toolId}.run.start' });
     try {

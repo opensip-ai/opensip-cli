@@ -96,7 +96,9 @@ describe('saveBaseline / compareBaseline guards', () => {
   it('compareBaseline rejects envelopes missing baseline identity with a typed error', async () => {
     await seams.saveBaseline('graph', envelopeOf([stampedSignal('a|x|1|0')]));
     const current = envelopeOf([stampedSignal('a|x|1|0')]) as Partial<SignalEnvelope>;
-    delete current.baselineIdentity;
+    // Deliberately drop the required baseline identity to exercise compareBaseline's
+    // defensive "missing baseline identity" rejection path.
+    delete (current as { baselineIdentity?: unknown }).baselineIdentity;
 
     expect(() => seams.compareBaseline('graph', current)).toThrow(ConfigurationError);
     expect(() => seams.compareBaseline('graph', current)).toThrow(/compareBaseline\(graph\)/);

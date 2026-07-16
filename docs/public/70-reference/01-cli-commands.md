@@ -1,13 +1,22 @@
 ---
 status: current
-last_verified: 2026-07-07
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "CLI command tree"
 audience: [users, ci-integrators, contributors]
 purpose: "Lookup-shaped reference for user-facing CLI commands, important machine-facing commands, flags, and exit semantics."
 source-files:
   - packages/cli/src/index.ts
+  - packages/cli/src/commands/host-command-specs.ts
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/commands/init/optional-tools.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
+  - packages/cli/src/ui/views/init-view.ts
+  - packages/contracts/src/command-results-variants/init-results.ts
+  - packages/cli/src/commands/audit-command-spec.ts
+  - packages/cli/src/commands/suite/execute-suite-command.ts
+  - packages/cli/src/commands/suite/suite-run-options.ts
   - packages/cli/src/commands/host-subcommand-config.ts
   - packages/cli/src/commands/config-migrate.ts
   - packages/cli/src/commands/configure.ts
@@ -15,6 +24,9 @@ source-files:
   - packages/cli/src/commands/tools/index.ts
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/commands/completion.ts
+  - packages/cli/src/commands/agent-catalog.ts
+  - packages/contracts/src/agent-catalog.ts
+  - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/fitness/engine/src/tool.ts
   - packages/fitness/engine/src/cli/fit/changed-targeting.ts
   - packages/simulation/engine/src/tool.ts
@@ -49,7 +61,7 @@ related-docs:
 
 The user-facing command tree, plus the machine-facing graph export and worker commands that matter to integrators. Use this when you need to look up a flag, not when you're learning what a command is for. For "why", read the relevant subsystem doc.
 
-The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](../50-extend/07-command-taxonomy.md).
+The grouping mirrors the source split: tool-owned commands (`fit`, `sim`, `graph`, `yagni`, `mcp`, and their nested `<tool> <verb>` children — `fit list`, `fit recipes`, `graph lookup`, etc.) come from each Tool's declared `commandSpecs` (mounted by the host). CLI-owned commands (`audit`, `suite`, `init`, `report`, `config`, `sessions`, `policy`, `repair`, `tools`, the per-tool `<tool> plugin` group, `configure`, `agent-catalog`, `completion`, `uninstall`) live under [`packages/cli/src/commands/`](../../../packages/cli/src/commands/). For the Tier-1/2/3 grammar, export `--format` convention, and internal visibility rules, see [Command surface taxonomy](../50-extend/07-command-taxonomy.md).
 
 ---
 
@@ -67,9 +79,10 @@ tool run commands (`fit`/`sim`/`graph`/`yagni`) — `--json`, `--cwd`, `-q/--qui
 `-v/--verbose`, `--debug`, `--report-to`, and `--api-key` — are declared
 **once** in a common-flag registry and applied via `applyCommonFlags`, so their
 names, short aliases, descriptions, and defaults are identical where applied and
-cannot drift (ADR-0021). `fit` and `sim` also expose `--open` for HTML report
-auto-open; `graph` writes report data and uses the separate `report`
-command to open the report. `-v/--verbose` is a uniform "show the detailed
+cannot drift (ADR-0021). The four first-party analysis primaries (`fit`, `sim`,
+`graph`, and `yagni`) plus the host-owned audit/suite workflows expose `--open`
+for HTML report generation and browser launch. The separate `report` command
+regenerates a report from stored evidence. `-v/--verbose` is a uniform "show the detailed
 report body" flag whose output is identical in a TTY and a pipe.
 
 **Host-guaranteed tool-primary surface.** The host mount layer guarantees a
@@ -113,11 +126,13 @@ OpenSIP Cloud sync is optional. This repo ships the CLI client and the
 compatible endpoint are configured. Without a key, the CLI remains fully local.
 
 When configured (an OpenSIP API key via `opensip configure` or
-`OPENSIP_API_KEY`) **and** entitled to the cloud storage tier, each deliverable
+`OPENSIP_API_KEY`) **and** entitled to Cloud signal storage, each deliverable
 `fit`, `sim`, `graph`, and `yagni` run additionally emits its **signals** (the
 findings it already produces) to OpenSIP Cloud for storage. This is **additive
-and best-effort**: results are always written to the local SQLite store first,
-and a cloud failure never blocks, slows, or fails a run. On a successful sync
+and best-effort**: it leaves whatever local artifacts and records the selected
+command mode normally writes unchanged and neither replaces the local runtime
+nor forces a generic session row. A Cloud failure never changes the local result
+or exit code, although an enabled delivery can add network latency. On a successful sync
 you'll see `✓ Sent N signals to OpenSIP Cloud`.
 
 `fit`, `sim`, and `yagni` deliver after normal run modes that produce a
@@ -192,7 +207,7 @@ opensip fit --gate-compare
 | `-v, --verbose` | bool | `false` | Show the detailed report body (per-check findings) inline. Renders identically in a TTY and a pipe (ADR-0021). |
 | `--report-to <url>` | URL | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
 | `--api-key <key>` | string | — | API key for `--report-to`. |
-| `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'fitness'`, at `opensip-cli/.runtime/datastore.sqlite`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
+| `--gate-save` | bool | `false` | Save current findings as architecture baseline rows in the active local SQLite store (managed user cache before initialization, project `.runtime` afterward; host-owned `tool_baseline_entries`, scoped `tool = 'fitness'`; ADR-0036), then exit per the `failOnErrors`/`failOnWarnings` thresholds (ADR-0020 — the save happens before the exit, so the baseline survives a failing gate). |
 | `--gate-compare` | bool | `false` | Compare current findings against baseline; exit 1 on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `-q, --quiet` | bool | `false` | Suppress banner. |
 | `--open` | bool | `false` | Launch the HTML report after run. |
@@ -306,7 +321,7 @@ opensip graph --list-files --workspace  # the per-unit fan-out set
 | `--profile <path>` | path | — | Write a graph performance profile JSON artifact with stage timings, run mode, cache verdict, file/function counts, and resolution stats. Relative paths resolve against `--cwd`. |
 | `--recipe <name>` | string | — | Run a named graph recipe — a subset of the graph rule set. Default (no flag): all rules. An unknown name fails with a configuration error. List recipes with `graph recipes`. |
 | `--show <session>` | string | — | Replay a stored graph session (by id, or `latest`) instead of building — see [`sessions show`](#sessions-list-sessions-show-and-sessions-purge--manage-session-records). |
-| `--gate-save` | bool | `false` | Save the current Signal fingerprint set as baseline rows in the project's SQLite store (the host-owned `tool_baseline_entries` table, scoped `tool = 'graph'`; ADR-0036), then exit per graph's fail thresholds — the save happens before the exit. Mutually exclusive with `--gate-compare`. |
+| `--gate-save` | bool | `false` | Save the current Signal fingerprint set as baseline rows in the active local SQLite store (managed user cache before initialization, project `.runtime` afterward; host-owned `tool_baseline_entries`, scoped `tool = 'graph'`; ADR-0036), then exit per graph's fail thresholds — the save happens before the exit. Mutually exclusive with `--gate-compare`. |
 | `--gate-compare` | bool | `false` | Compare current Signals to the saved baseline; exit non-zero on regression (toggle with the reserved `failOnDegraded` key, default on). |
 | `--sarif <path>` | path | — | Also write this run's findings as a SARIF 2.1.0 file (for GitHub Code Scanning) via the shared `cli.writeSarif` envelope→SARIF seam — the same producer `fit --report-to`/`fit export --format baseline` use. Composes with `--gate-save`: the SARIF is written in the action body after the gate sets its exit code, so the file lands even when the gate fails. Relative paths resolve against `--cwd`. |
 | `--report-to <url>` | string | — | POST findings to OpenSIP Cloud or a compatible endpoint. |
@@ -349,8 +364,9 @@ opensip graph --workspace
 
 **`OPENSIP_HEAP_NO_MONITOR`** (env var): during a build, `graph` runs a V8 heap-pressure monitor that aborts with a readable `MemoryPressureError` when old-gen usage crosses ~90% of the heap limit — catching an impending OOM before V8 SIGABRTs the process. In unusual GC scenarios (REPL embedding, custom allocators) this guard can fire as a false positive before a real OOM is imminent. Set `OPENSIP_HEAP_NO_MONITOR=1` to disable it entirely. This is an escape hatch only: with the monitor off, an actual out-of-memory condition becomes a bare V8 abort instead of a structured error. Prefer raising the heap ceiling (above) or scoping the run (positional paths / `--workspace`) first.
 
-**Catalog storage:** graph stores the catalog in the project's SQLite database
-(`<project>/opensip-cli/.runtime/datastore.sqlite`, `graph_catalog` row). The
+**Catalog storage:** graph stores the catalog in the active local SQLite database
+(`<runtime-root>/datastore.sqlite`, `graph_catalog` row): managed user cache
+before initialization, project `.runtime` afterward. The
 wire format carries `language` (adapter id), `cacheKey` (an opaque per-adapter
 invalidation string — TypeScript: `ts-${ts.version}-${tsconfigContentHash}`;
 Python and Rust use language-id-prefixed keys), and a per-file mtime+size
@@ -410,27 +426,58 @@ Tool-owned: [`packages/mcp/src/command.ts`](../../../packages/mcp/src/command.ts
 ```
 opensip mcp                      # serve over stdio from the current project
 opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
+opensip mcp --allow-mutations    # opt in to repair_apply_verify
 ```
 
-`mcp` takes **only `--cwd`** — there are no tool-specific CLI flags. Every per-query argument (a `symbolId`, a `depth`, a `tool` filter) is an **MCP JSON-RPC tool parameter**, not a command-line flag. The server reads the project's persisted catalog and sessions from `<project>/opensip-cli/.runtime/datastore.sqlite`, so it must be run from inside an initialized project (run `opensip init` and at least one `opensip graph` first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
+`mcp` accepts `--cwd` plus the explicit `--allow-mutations` opt-in. Every
+per-query argument (a `symbolId`, a `depth`, a `tool` filter) is an **MCP
+JSON-RPC tool parameter**, not a command-line flag. The equivalent mutation
+environment opt-in is `OPENSIP_MCP_ALLOW_MUTATIONS=1`; read-only remains the
+default. The server reads the project's persisted catalog and sessions from
+`<project>/opensip-cli/.runtime/datastore.sqlite`, so it must be run from inside
+an initialized project (run `opensip init` and at least one `opensip graph`
+first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
 
 **Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
 
-### Graph tools (9 — read-only, over the persisted call graph)
+The protocol inventory is surface-epoch versioned. Treat initialize/listTools
+and `get_agent_catalog.mcp.names` as authority; reconnect after an executable
+surface change. Starting with `--allow-mutations` adds only
+`repair_apply_verify`.
+
+### Graph tools
 
 | Tool | Purpose |
 |------|---------|
-| `search_symbols` | Find functions/methods by name (case-insensitive substring). Returns a `symbolId` + `bodyHash` per match to feed the other tools. |
-| `get_symbol` | Resolve the function/method declared at a file + line into a stable `symbolId` + `bodyHash`; ambiguity returns a candidate list, never a silent pick. |
-| `who_calls` | Callers of a symbol (reverse call graph), out to `depth` (default 5, max 5). Large fan-in is node-capped with `truncated: true`. |
-| `callees_of` | Symbols a symbol calls (forward call graph), out to `depth`. Large fan-out is node-capped with `truncated: true`. |
+| `search_symbols` | Find functions/methods by name. `match: "substring"` (default) is case-insensitive on `simpleName`; `"exact"` is case-sensitive on `simpleName`; `"qualified"` is case-sensitive on `qualifiedName`. Returns a `symbolId` + `bodyHash` per match to feed the other tools. |
+| `get_symbol` | Resolve the function/method declared at a file + line into a stable `symbolId` + `bodyHash`; `detail: "entity"` adds bounded callable fields after unique resolution. Ambiguity returns candidates, never a silent pick. |
+| `impact_files` | Compute bounded changed-to-impacted functions/files/packages for explicit project-relative files against one immutable generation. |
+| `who_calls` | Callers of a symbol (reverse call graph), out to `depth` (default 5, max 5). Occurrence-precise by default; large fan-in is node-capped with coverage reasons. |
+| `callees_of` | Symbols a symbol calls (forward call graph), out to `depth`. |
 | `trace_path` | A forward call path from one symbol to another within `depth`; returns the ordered path or `{ found: false }`. |
-| `blast_radius` | Change-impact score for a symbol: direct callers, transitive callers, and a composite blast score — the same scoring `opensip graph` uses. |
+| `blast_radius` | Change-impact score for a symbol (body-twin-union identity, labelled): direct callers, transitive callers, and composite score. |
 | `find_dead_code` | Symbols unreachable from any entry point (the graph orphan-subtree rule); each finding carries a `symbolId` + reason. |
-| `get_architecture` | High-level shape: function/edge counts, languages, the most-coupled packages, and the highest blast-radius hotspots. A cheap first call to orient. |
-| `refresh_graph` | Rebuild the catalog from the working tree — the **only** state-changing tool. EXPENSIVE; see freshness below. |
+| `get_architecture` | High-level shape: function/edge counts, languages, top-coupled packages, and blast hotspots. |
+| `package_dependencies` | Labelled package call and/or import edges (production defaults). |
+| `why_depends` | Bounded evidence for why package A depends on package B. |
+| `package_cycles` | Package SCCs/cycles for call, import, or combined edges. |
+| `refresh_graph` | Ensure a fresh catalog: auto-loads a newer persisted generation, rebuilds only when missing/stale or `forceRebuild` — the **only** state-changing graph tool. |
 
-### Result and review tools (6 — replay stored runs, never re-run)
+### Codebase and context reads
+
+| Tool | Purpose |
+|------|---------|
+| `get_file_context` | Read bounded inventory facts and role/target/package provenance for one explicit file without source contents. |
+| `select_tests` | Return labelled static test candidates and conservative allowlisted package/project commands for explicit files; never executes them. |
+| `get_context_status` | Replay the latest or named parent-Run task-context manifest and check its recorded graph/snapshot pointers exactly, without rebuilding or rebinding. |
+
+### Live runtime evidence (read-only, not a call graph)
+
+| Tool | Purpose |
+|------|---------|
+| `get_runtime_wiring`, `search_declarations`, `references_to` | Project admitted manifest, provenance, registry, parent/child CommandSpec, host-mount, handler-dispatch, and external-worker posture. Every edge carries source/confidence and unresolved static bridges remain explicit. |
+
+### Result and review tools (replay stored runs, never re-run)
 
 | Tool | Purpose |
 |------|---------|
@@ -441,7 +488,7 @@ opensip mcp --cwd /path/to/repo  # serve a project at an explicit root
 | `review_change` | Rebuild the v1 `ReviewBrief` from persisted suite step sessions. Inputs: `suiteRunId`, `suite`, `files`, and `limit`. Includes graph freshness and source session ids; does not refresh the graph. |
 | `compare_to_baseline` | Compare a replayed stored run (`tool`, optional `ref`) to that tool's stored baseline fingerprints. Returns added/unchanged/resolved counts, bounded finding details, and missing-baseline degradation. |
 
-The six result/review tools **replay persisted sessions only** — they never re-run
+The result/review tools **replay persisted sessions only** — they never re-run
 `fit`/`graph`/`sim`/`yagni`. They are the preferred first source for existing
 run/finding/history questions. Agents should not grep `.runtime/logs`, read
 `datastore.sqlite` directly, or re-run a tool to answer a stored-result question
@@ -457,11 +504,32 @@ unscoped over the selected datastore.
 
 ### The `symbolId` contract
 
-`search_symbols` and `get_symbol` return a stable `symbolId = "<filePath>:<line>:<column>"` plus a `bodyHash`. Every downstream graph tool (`who_calls`, `callees_of`, `trace_path`, `blast_radius`) accepts that **`symbolId`, not a bare name** — so an agent resolves a name once, then traverses. A query that names an ambiguous symbol returns a **structured candidate list or error**, never a silent pick.
+`search_symbols` and `get_symbol` return a stable `symbolId = "<filePath>:<line>:<column>"` plus a `bodyHash`. Use `search_symbols.match: "exact"` for a case-sensitive simple-name match or `"qualified"` for a case-sensitive qualified-name match; the default `"substring"` searches simple names case-insensitively. Every downstream graph tool (`who_calls`, `callees_of`, `trace_path`, `blast_radius`) accepts that **`symbolId`, not a bare name** — so an agent resolves a name once, then traverses. A query that names an ambiguous symbol returns a **structured candidate list or error**, never a silent pick.
 
-### Freshness and `refresh_graph`
+### Freshness, auto-swap, and `refresh_graph`
 
-Every graph result carries a `freshness` verdict. A **stale or missing catalog is served with a warning** (`freshness.fresh === false`) — it is never silently rebuilt. There is **no auto-build** on a missing catalog or on startup: rebuilding is the agent's explicit, cost-warned decision. `refresh_graph` is the only way to rebuild — it parses the whole project, so it is **expensive**; call it once when a tool reports `freshness.fresh === false`, then read, and **do not loop it per query**. It returns `{ builtAt, durationMs, freshness }`.
+Every graph result carries **project/catalog context**, a **freshness** verdict with verification coverage (`complete` / `partial` / `missing`), and independent **page** vs **coverage** fields ([ADR-0148](../../decisions/ADR-0148-mcp-catalog-identity-auto-swap-and-complete-freshness.md), [ADR-0149](../../decisions/ADR-0149-bounded-labelled-mcp-audit-evidence.md)).
+
+Check the canonical configured root, opaque `g1:` generation identity/source,
+freshness reasons, effective filters, evidence kind/confidence, page cursor,
+coverage counts, `truncated`, and hard-cap reasons before claiming complete
+evidence. The cursor's project key is distinct from its generation key and is
+invalid after project, generation, or query changes. Filters apply before
+paging. Exact paths and segment-prefix paths never use raw string prefixes.
+Unknown keys, hostile paths/enums, and malformed/stale/tampered cursors return
+typed bounded failures. No JSON tool result exceeds 4 MiB.
+Production MCP graph access crosses only the public `@opensip-cli/graph/read`
+boundary ([ADR-0147](../../decisions/ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)).
+
+Occurrence traversal is the default. Explicit body-twin reachability filters
+both occurrence-edge endpoints before grouping twins, so excluded test or
+generated owners/targets cannot fabricate production reachability. Package
+responses keep call and import evidence labelled; runtime-wiring evidence is a
+third, separate kind rather than a synthetic static edge.
+
+A long-lived MCP process **auto-loads** a newer catalog already written by an external `opensip graph` (cheap identity probe + atomic swap). That is a read, not a rebuild. There is still **no auto-build** on a missing catalog or on startup.
+
+`refresh_graph` is the only mutation: it first syncs any externally persisted generation, returns `no-op`/`reloaded` when the generation is completely verified fresh, and rebuilds only when missing/stale or `forceRebuild` is true. Rebuilding parses the whole project — **expensive**; do not loop it per query. Prefer cursors/filters/limits on high-volume tools.
 
 ### Result-first guidance
 
@@ -482,7 +550,7 @@ Setup is **client-specific** (JSON vs TOML, config paths, approval flows). See
 **[Connect MCP clients (Cursor, Claude Code, Codex)](../60-guides/08-connect-mcp-clients.md)**
 for copy-paste configuration for each client.
 
-**Limitations (v1):** no cloud egress / no `SignalEnvelope` delivery; no live render; `refresh_graph` builds the single project program (no `--workspace` fan-out). `impact_of_diff` is not in the v1 tool surface.
+**Limitations (v1):** no cloud egress / no `SignalEnvelope` delivery; no live render; `refresh_graph` rebuilds one configured project through the canonical exact-or-default-sharded engine policy (no `--workspace` fan-out). `impact_of_diff` is not in the v1 tool surface.
 
 ---
 
@@ -528,6 +596,15 @@ opensip graph impact --files packages/core/src/index.ts --json
 `graph impact --json` includes `trust.coverage`, `trust.fullyVerified`,
 `trust.fallback`, and bounded `trust.uncertainties[]`. See
 [Impact analysis and trust](../40-graph/05-impact-analysis.md).
+
+Current results also include optional-for-legacy `catalog` identity: bounded
+`builtAt`, `language`, optional resolution mode, and fixed-length SHA-256
+digests for the opaque cache key and file fingerprint. Raw keys/fingerprints are
+not copied because they can contain absolute local paths. Graph stamps
+`result.trust` onto the delivered envelope's authoritative `verification`
+field and returns a generic session contribution in human, wrapped JSON, and
+raw JSON modes. The linked session contains only the bounded report projection
+described in the [report reference](./06-dashboard.md), not the unbounded result.
 
 **Agent recipes:** `agent-risk`, `agent-final` on `graph --recipe`.
 
@@ -625,14 +702,38 @@ CLI-owned. The cross-tool `report` command lives at the CLI layer (not inside an
 opensip report
 opensip report --no-open
 opensip report --json
+opensip report --max-catalog-mb 64
 ```
 
 | Flag | Type | Default | Effect |
 |---|---|---|---|
 | `--no-open` | bool | `false` | Write the report but do not launch a browser. |
 | `--json` | bool | `false` | Emit a `{ type: 'report', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
+| `--max-catalog-mb` | number | `8` | Byte budget for the inlined graph catalog, in megabytes. |
 
-The report is a single self-contained HTML file at `<project>/opensip-cli/.runtime/reports/latest.html`. Each generation overwrites the previous file. The command launches the browser and exits; the file works without opensip-cli installed, so you can email it directly to a teammate.
+### Report size and the bounded graph catalog
+
+The report is a **single self-contained HTML file** you can attach to a PR or
+email, so the graph catalog it inlines is bounded — by default to 8 MB. On a
+large repository the report therefore ships the highest-blast-radius functions
+and omits the rest, and says so:
+
+```text
+Functions  4,925 of 31,932 (bounded)
+Bounded for sharing — opensip report --max-catalog-mb 64 for the full catalog
+```
+
+Truncation is always a visible state, never a silent one. Raise the budget when
+you are exploring a large repo **locally** rather than producing something to
+send someone — a bigger report is slower to open and may be too large to share.
+The exhaustive evidence always remains available through `opensip graph` and the
+MCP graph tools, which is the better path for an agent or a deep query.
+
+The report is a single self-contained HTML file at
+`<runtime-root>/reports/latest.html`: managed user cache before initialization,
+project `.runtime` afterward. Each generation overwrites the previous file. The
+command launches the browser and exits; the file works without opensip-cli
+installed, so you can email it directly to a teammate.
 
 **See also:** [`70-reference/06-dashboard.md`](./06-dashboard.md), [`80-implementation/03-session-and-persistence.md`](../80-implementation/03-session-and-persistence.md).
 
@@ -717,17 +818,27 @@ opensip init --keep
 opensip init --remove
 ```
 
-### No-init first runs
+### Zero-config first runs
 
-`fit`, `graph`, `graph impact`, and the built-in `suite run audit` can run from
-a supported project before `opensip init`. The CLI synthesizes an in-memory
+`audit`, `fit`, `graph`, `graph impact`, the built-in `suite run audit` and
+`suite run agent-context`, `sessions list`, `sessions show`, and `report` can run from a supported project
+before `opensip init`. The CLI synthesizes an in-memory
 config from language markers, validates it through the normal config schema, and
-stores rebuildable runtime state under `~/.opensip-cli/cache/ephemeral/`.
+stores generated runtime state under `~/.opensip-cli/cache/ephemeral/`. The
+directory name is an implementation detail: this is file-backed,
+retention-managed cache storage, not process-temporary storage. It survives
+normal command exits and reboots, but a whole project entry can be evicted when
+orphaned, stale, or beyond the cache's project limit.
 
-No project files are written in no-init mode. Human output includes an adoption
-hint; JSON, help, and SARIF-oriented output stay quiet. Run `opensip init` when
-you want to persist the config, create example files, refresh agent guidance, and
-move the no-init runtime into `<project>/opensip-cli/.runtime/`.
+No implicit OpenSIP state is written into a zero-config project. An
+explicitly requested export, SARIF, or profile path is the exception. Human
+output includes an initialization hint; JSON, help, and SARIF-oriented output stay quiet. Run `opensip init` when
+you want to initialize the project: persist the config, create example files,
+refresh agent guidance, and make `<project>/opensip-cli/.runtime/` the
+project-local runtime location. `init` transitions a **zero-config project** to
+an **initialized project**; it is not a third storage location. The project
+runtime remains local and gitignored. It contains rebuildable caches and
+catalogs alongside retained evidence that is lost when the runtime is removed.
 
 Detects the project's primary language(s) from filesystem markers and writes one
 directory tree per **registered tool** — each tool owns its own example files and
@@ -765,6 +876,69 @@ The scaffold output is loose `.mjs` files — the lightest-weight starting point
 | `--cwd <path>` | Target directory (default: `process.cwd()`). |
 | `--json` | Emit a structured JSON result instead of the human-readable summary. |
 | `--debug` | Enable debug-level logging. |
+
+### Optional tools after pristine init
+
+After `init` successfully creates a pristine project, the human-readable result
+adds an **Optional tools for this project (not installed)** section after the
+existing **Try it** commands. The section appears only when the result has
+`type: "init"`, `created: true`, `state: "pristine"`, and at least one selected
+language.
+
+OpenSIP projects the generated first-party adapter catalog in its stable order.
+For a multi-language project, it forms one union across all selected languages;
+language-agnostic adapters (`languages: []`) are included once. Adapters already
+present in the effective global or project inventory are omitted. If every
+matching adapter is installed, the section is absent.
+
+Each row shows the exact existing global install command. A `[networked]` marker
+describes the adapter's catalog network posture; it does not perform or authorize
+network access. Use the second form for a repository-local installation:
+
+```bash
+opensip tools install @opensip-cli/tool-ruff
+opensip tools install @opensip-cli/tool-ruff --project
+```
+
+These rows are advice only. `init` does not prompt, install a package, execute an
+adapter, or change tool trust/configuration. Repeat init, `--keep`, `--remove`,
+partial-state recovery, guidance refresh, and refusal/error paths do not include
+the section. Use
+[`opensip tools list --available`](./12-tools-command.md#tools-list---available)
+to inspect the full catalog at any time.
+
+With `--json`, the same recommendations appear under
+`CommandOutcome.data.optionalTools`. The field is absent when the result is
+ineligible or no relevant uninstalled adapter remains; it is not emitted as an
+empty list. Each row has six fields: `id`, `pkg`, `network`, `languages`,
+`installCommand`, and `projectInstallCommand`.
+
+```json
+{
+  "kind": "init",
+  "status": "ok",
+  "exitCode": 0,
+  "data": {
+    "type": "init",
+    "created": true,
+    "path": "/repo/opensip-cli.config.yml",
+    "cwd": "/repo",
+    "configFilename": "opensip-cli.config.yml",
+    "state": "pristine",
+    "languages": ["python"],
+    "optionalTools": [
+      {
+        "id": "ruff",
+        "pkg": "@opensip-cli/tool-ruff",
+        "network": "local-only",
+        "languages": ["python"],
+        "installCommand": "opensip tools install @opensip-cli/tool-ruff",
+        "projectInstallCommand": "opensip tools install @opensip-cli/tool-ruff --project"
+      }
+    ]
+  }
+}
+```
 
 ### Partial-state handling
 
@@ -893,9 +1067,20 @@ The `--json` output is designed to be consumed directly by agents. It contains:
 - Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
 - Common composable agent workflows.
 - Notes on the core output shapes (`SignalEnvelope`, `SessionReplayResult` with `fidelity: "projection"`, etc.).
+- `reservedNames` — the host-owned root commands a Tool cannot mount and the built-in suite names a configured suite cannot claim (ADR-0159).
+- `hostSupport` — the honest, process-only platform-support assessment (Plan 02); the local `match` is never `exact`, so distinguish it from the row's published `status`.
+- Bounded `projectContext.targetConventions` when the project declares any.
 - Explicit call-out that human-readable renderers (tables, banners) are unchanged.
 
+The `--json` output is nested under `data.catalog` in the standard `CommandOutcome` wrapper.
+
 This is the recommended starting point for any agent that needs to discover how to drive OpenSIP programmatically or inspect prior runs.
+
+### Same catalog over the CLI and MCP
+
+`opensip agent-catalog --json` and the MCP `get_agent_catalog` tool return the **same common catalog body** for the same invocation and project — identical entry points, common patterns, output shapes, notes, `reservedNames`, bounded `projectContext.targetConventions`, and `hostSupport`. A single pure assembler in `@opensip-cli/contracts` produces that body for both transports ([ADR-0166](../../decisions/ADR-0166-agent-catalog-transport-parity.md)). Assembling the catalog is **read-only** on either transport: it builds no graph, runs no analysis, invokes no Git or tests, and creates no session.
+
+The MCP response adds exactly one extra top-level object the CLI never emits — `mcp` — carrying live connector diagnosis (`version`, `surfaceEpoch`, `toolNames`, `toolCount`, `mutationPosture`, and `project.root`/`project.scope`). Treat it as connector identity only: when `surfaceEpoch`, `toolNames`, or `version` no longer match the cached inventory, **reconnect** the MCP process — `refresh_graph` rebuilds graph evidence and never repairs a stale connector inventory (ADR-0153). To compare the two surfaces, drop only the top-level `mcp` object; the rest is byte-identical to the CLI's `data.catalog`.
 
 ---
 
@@ -939,7 +1124,12 @@ packs run through the capability worker bridge with undeclared resources denied.
 
 ## `sessions list`, `sessions show`, and `sessions purge` — manage session records
 
-CLI-owned. Reads, replays, and deletes session rows in the project-local SQLite datastore (`<project>/opensip-cli/.runtime/datastore.sqlite`) via `SessionRepo`. `list` and `show` are `SELECT`s; `purge` is a row-level `DELETE` (the FK cascade drops each session's tool-payload row), not file removal.
+CLI-owned. Reads and replays session rows in the active local SQLite datastore
+via `SessionRepo`: the managed user cache before initialization, or
+`<project>/opensip-cli/.runtime/datastore.sqlite` afterward. `list` and `show`
+support zero-config first runs. `purge` requires an initialized project and
+is a row-level `DELETE` (the FK cascade drops each session's tool-payload row),
+not file removal.
 
 Primary surface for inspecting prior runs (especially from agents). See `agent-catalog` above for the recommended discovery entry point.
 
@@ -1034,14 +1224,77 @@ The default MCP server remains read-only and does not register mutating tools.
 
 ---
 
+## `audit` — canonical changed-code review
+
+Host-owned. `opensip audit` always runs the curated built-in audit definition
+through the same concrete executor, suite orchestrator, output seams, Run
+ledger, sessions, and exit policy as generic `suite run`. It is not a Tool, and
+the suite name `audit` is reserved (ADR-0159): config validation rejects a
+configured `suites.audit`, so nothing can shadow the canonical review.
+
+```bash
+opensip audit
+opensip audit --files src/server.ts --json
+opensip audit --since main --json
+opensip audit --full
+opensip audit --open
+```
+
+| Flag | Type | Default | Effect |
+|---|---|---|---|
+| `--cwd <path>` | path | current directory | Shared project root for all audit steps. |
+| `--config <path>` | path | discovered config | Override project-config discovery without changing the curated audit definition. |
+| `--changed` | bool | implicit when no selector | Use Git changed-file selection for compatible steps. |
+| `--since <ref>` | string | — | Use a Git diff base for compatible steps. |
+| `--files <path>` | repeatable | `[]` | Use explicit project-relative changed files; works without Git. |
+| `--full` | bool | `false` | Run the whole repo. Conflicts with `--changed`, `--since`, and `--files`. |
+| `--json` | bool | `false` | Emit the ordinary `SuiteRunResult` in a host `CommandOutcome`. |
+| `--quiet` | bool | `false` | Use compact human output. |
+| `--verbose` | bool | `false` | Include detailed review-brief and per-step human tables. |
+| `--debug` | bool | `false` | Enable debug diagnostics. |
+| `--open` | bool | `false` | After persistence, generate and open the selected Change Impact report for an interactive human. |
+
+With no explicit selector, Git repositories use changed scope. If Git scope
+cannot be resolved, audit falls back once to full scope and records a fallback
+notice/trust degradation; it never silently labels that run changed-only.
+Selectors propagate only to steps whose command declares the corresponding
+option. The command exits with the same numeric worst-step policy as `suite
+run`.
+
+`--json` returns `data.scope`, aggregate counts, step verdicts and
+`steps[].verification`, and the host-owned `reviewBrief`. It also returns
+optional `data.runId`: the authoritative persisted parent Run ID when ledger
+persistence succeeded. Absence means persistence was unavailable;
+`suiteRunId` remains legacy correlation identity and is not a replacement.
+
+`--open` is presentation-only and best effort. JSON, CI, non-TTY, and
+remote-shell execution suppresses browser launch. Report generation or launch
+failure cannot revise the completed audit result or exit code. Agents and CI
+should use `--json`, never depend on `--open`.
+
+For project-defined review workflows, use another configured name such as
+`audit-custom` with `opensip suite run audit-custom`. See
+[ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md).
+
+---
+
 ## `suite run/list/add` — run configured multi-tool suites
 
 CLI-owned. A suite runs several existing tool commands in one project scope.
 The suite invocation owns `--cwd`, `--config`, targeting, JSON/report flags, and
 cloud/report delivery; individual steps may only set tool-behavior options.
 
+The built-in `agent-context` preset is the before-edit evidence workflow. It
+returns `contextManifest` with `ready | degraded | unavailable`, exact parent
+Run/RunStep references, source identities, and graph-owned snapshot pointers.
+It creates no findings or ReviewBrief and does not execute selected tests.
+Inventory and graph are required; selection is required when explicit files are
+present. The `agent-context` name is reserved, so a configured suite cannot
+shadow or acquire the host aggregation workflow.
+
 ```
 opensip suite list
+opensip suite run agent-context --files src/server.ts --json
 opensip suite run audit
 opensip suite run audit --full
 opensip suite run audit --since main --json
@@ -1055,29 +1308,35 @@ opensip suite add security --tool fitness --command fitness --arg recipe=securit
 | `run` | `<name>` | Run every step in `suites.<name>.steps` and exit with the worst step exit code. |
 | `run` | `--cwd <path>` | Shared project root for every step. |
 | `run` | `--config <path>` | Override the discovered `opensip-cli.config.yml` for the shared suite run scope. |
-| `run` | `--json` | Emit the suite summary as JSON, including `scope`, additive aggregate counts, per-step verdict counts when a step emitted an envelope, and a host-owned `reviewBrief` projection. Step output still flows through each step's own output seams. |
+| `run` | `--json` | Emit the suite summary as JSON, including `scope`, additive aggregate counts, per-step verdict/evidence readiness, and either a host-owned `reviewBrief` or built-in `agent-context` manifest. Step output still flows through each step's own output seams. |
 | `run` | `--changed` | Propagate changed-file selection to compatible steps. Built-in `audit` defaults to changed semantics when no selector is supplied and git scope resolves. |
 | `run` | `--since <ref>` | Propagate a git diff base to compatible changed-file steps. |
 | `run` | `--files <path>` | Propagate explicit changed files to compatible steps. Repeat for multiple files. |
 | `run` | `--full` | Run the whole repo. This disables the built-in `audit` changed-scope default and conflicts with `--changed`, `--since`, and `--files`. |
+| `run` | `--open` | After the suite completes, generate and open the HTML report when browser launch is allowed. For built-in `audit`, selects the Change Impact surface for the persisted parent Run (same path as top-level `opensip audit --open`). Other suite names open the ordinary report without inventing a Change Impact selection. JSON, CI, non-TTY, and remote-shell execution suppress browser launch; report failure never changes the suite exit code. |
 | `list` | `--json` | List configured suites with resolved tool UUIDs and commands. |
 | `add` | `<name>` | Append a step to `suites.<name>.steps` in `opensip-cli.config.yml`. |
 | `add` | `--tool <name-or-uuid>` | Resolve a loaded tool by display name or stable UUID; the YAML stores the UUID. |
 | `add` | `--command <name>` | Tool command to run for the step. |
 | `add` | `--arg <key=value>` | Add a tool option to the step. Repeat for multiple options. |
 
-Suite runs stamp `suiteRunId` and `suiteName` on stored sessions, so
-`sessions list --json` and reports can group the step rows from one suite run.
+Suite runs persist a host-owned parent Run and ordered RunSteps. Current JSON
+returns optional `runId`, the authoritative parent identity when persistence
+succeeds; each step's optional `sessionId` is the durable link to tool detail.
+`suiteRunId` and `suiteName` remain legacy correlation fields on stored sessions.
 Suites are intentionally one-scope: use separate CLI invocations when different
 tools must scan different roots or target sets.
 
-`audit` is a built-in suite preset for PR review. It runs fitness `agent-risk`,
+`audit` is also a built-in suite preset for generic suite resolution. It runs fitness `agent-risk`,
 `graph impact`, and high-confidence YAGNI reduction checks through the same suite
 plane as user-authored suites. In a git repo, `opensip suite run audit` runs
 changed-scope by default and prints a line such as `Scope: changed (working
 tree, 14 files)`. Use `--full` for a whole-repo run; outside git, the default
-falls back to full scope with one suite-level notice. Define `suites.audit` in
-config to replace the built-in preset. Suite-level selectors (`--changed`,
+falls back to full scope with one suite-level notice. The suite name `audit`
+is reserved (ADR-0159): config validation rejects a configured `suites.audit`,
+so `suite run audit` always runs the same built-in preset as top-level
+`opensip audit` — use another name (for example `audit-custom`) for a custom
+workflow. Suite-level selectors (`--changed`,
 `--since`, `--files`) reach only steps whose command declares the matching
 option; per-step `args` still override propagated values.
 
@@ -1120,6 +1379,11 @@ and [ADR-0110](../../decisions/ADR-0110-host-owned-review-brief-contract.md).
 See [ADR-0111](../../decisions/ADR-0111-built-in-audit-suite-preset.md) for the
 built-in `audit` preset decision and [ADR-0129](../../decisions/ADR-0129-audit-suite-scope-defaults.md)
 for the changed-scope default, `--full`, and fallback semantics.
+See [ADR-0143](../../decisions/ADR-0143-host-owned-run-step-ledger.md) for Run
+identity, [ADR-0155](../../decisions/ADR-0155-canonical-audit-command.md) for
+the reserved root command, and
+[ADR-0159](../../decisions/ADR-0159-reserved-host-command-and-suite-names.md)
+for built-in suite-name reservation.
 
 **See also:** [`03-configuration.md#suites`](./03-configuration.md#suites),
 [`04-json-output-schema.md#suite-run-results`](./04-json-output-schema.md#suite-run-results).
@@ -1356,9 +1620,9 @@ Two modes:
 
 | Mode | Targets removed | When to use |
 |---|---|---|
-| Default / `--user` | `~/.opensip-cli/` (user-level config dir) | Removing the cloud API key and per-user defaults. |
-| `--project [path]` | `<path>/opensip-cli/.runtime/` by default | Remove rebuildable session/cache/log/baseline state for one repo while preserving authored checks, recipes, scenarios, and config. |
-| `--project [path] --purge` | `<path>/opensip-cli/` (authored content included) and `<path>/opensip-cli.config.yml` | Fully disengage from opensip-cli in one repo. Destructive if custom checks/recipes are not committed. |
+| Default / `--user` | All of `~/.opensip-cli/`: user config, global tools/plugins, and every managed user-cache runtime/database | Remove all per-user OpenSIP CLI state. |
+| `--project [path]` | `<path>/opensip-cli/.runtime/` and the matching zero-config user-cache runtime, when present | Remove generated local runtime state for one repo while preserving authored checks, recipes, scenarios, and config. Session/log history, baselines, tool state, and other retained evidence in those runtimes are lost. |
+| `--project [path] --purge` | The same two runtime targets, plus `<path>/opensip-cli/` (authored content included) and `<path>/opensip-cli.config.yml` | Fully disengage from opensip-cli in one repo. Destructive if custom checks/recipes are not committed. |
 
 | Flag | Effect |
 |---|---|
@@ -1374,12 +1638,14 @@ Both modes:
 - Refuse to run when no targets exist (`--project` against a directory that contains no OpenSIP CLI state is a no-op, not a destructive accident). In project mode without `--purge`, a repo that has only authored content and no `.runtime/` also becomes a no-op and tells you what it kept.
 - Do **not** remove the npm-global binary — the running binary can't safely self-delete. The user-mode success message prints the next step (`npm uninstall -g opensip-cli`); the project-mode success message points back at the user-mode command for the matching cleanup.
 
-State contract enforced by code: `~/.opensip-cli/` holds `config.yml` only.
-Persistence and logging modules throw when asked to write there (see
-[`paths.ts`](../../../packages/core/src/lib/paths.ts),
-[`logger.ts`](../../../packages/core/src/lib/logger.ts)). Anything else in that
-directory is considered extra user-level state and is swept up by the default
-`uninstall`.
+State contract enforced by code: `~/.opensip-cli/` is the user-level root. It
+can contain `config.yml`, `update-state.json`, managed zero-config runtimes under
+`cache/ephemeral/`, npm-installed global Tool plugins under `plugins/`, and
+global authored Tool sidecars under `tools/` (see
+[`paths.ts`](../../../packages/core/src/lib/paths.ts)). Runtime persistence and
+logging stay inside the selected per-project runtime rather than writing loose
+database or log files at the user root. The default `uninstall` removes the
+whole user-level root.
 
 ---
 
@@ -1413,3 +1679,5 @@ If you installed via a version manager (volta, asdf) or Homebrew, use that tool'
 - **[`../50-extend/01-plugin-authoring.md`](../50-extend/01-plugin-authoring.md)** — write a check, recipe, scenario, or full Tool plugin.
 - **[`06-dashboard.md`](./06-dashboard.md)** — the HTML report's structure and lifecycle.
 - **[`../70-reference/03-configuration.md`](../70-reference/03-configuration.md)** — every field of `opensip-cli.config.yml`.
+
+MCP compact audit surface: see [Connect MCP clients](../60-guides/08-connect-mcp-clients.md) and ADR-0152..0154.

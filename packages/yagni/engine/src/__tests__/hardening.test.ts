@@ -8,7 +8,6 @@ import {
   runWithScope,
   runWithScopeSync,
   type TargetResolver,
-  type ToolCliContext,
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,13 +17,6 @@ import { duplicateBodyCandidateDetector } from '../detectors/duplicate-body-cand
 import { buildTsInventory } from '../lib/build-ts-inventory.js';
 
 import type { YagniDetector } from '../detectors/types.js';
-function stubCli(): ToolCliContext {
-  return {
-    scope: { datastore: () => undefined },
-    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
-    reportFailure: vi.fn(() => Promise.resolve()),
-  } as unknown as ToolCliContext;
-}
 
 function targetResolver(entrypoints: readonly string[]): TargetResolver {
   return {
@@ -133,11 +125,9 @@ describe('yagni hardening (H1–H4)', () => {
           }),
       };
 
-      const outcome = await executeYagni(
-        { cwd: dir, config: { defaultMinConfidence: 'low' } },
-        stubCli(),
-        [detector],
-      );
+      const outcome = await executeYagni({ cwd: dir, config: { defaultMinConfidence: 'low' } }, [
+        detector,
+      ]);
 
       expect(outcome.envelope.signals).toHaveLength(0);
       expect(outcome.envelope.units[0]).toMatchObject({
@@ -175,7 +165,7 @@ describe('yagni hardening (H1–H4)', () => {
       Object.assign(scope, { targets: targetResolver(['src/routes/**']) });
 
       const outcome = await runWithScope(scope, () =>
-        executeYagni({ cwd: dir, minConfidence: 'high' }, stubCli(), [detector]),
+        executeYagni({ cwd: dir, minConfidence: 'high' }, [detector]),
       );
 
       expect(outcome.envelope.signals.map((signal) => signal.message)).toEqual([

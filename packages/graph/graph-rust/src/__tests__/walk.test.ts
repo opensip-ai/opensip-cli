@@ -34,7 +34,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
       `// hello\nfn with_line_comment() -> i32 {\n    // inner comment\n    1\n}\n`,
       'utf8',
     );
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -68,7 +68,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
         `}\n`,
       'utf8',
     );
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -97,7 +97,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
         `}\n`,
       'utf8',
     );
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -123,7 +123,7 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
         `}\n`,
       'utf8',
     );
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -157,7 +157,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
   });
 
   function run(): ReturnType<typeof rustGraphAdapter.walkProject> {
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: discovery.files,
@@ -322,7 +322,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
     writeFileSync(f1, `fn n() { }\n`, 'utf8');
     const f2 = join(dir, 'src/foo.generated.rs');
     writeFileSync(f2, `fn g() { }\n`, 'utf8');
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: [f1, f2],
@@ -399,7 +399,7 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     const f = join(dir, 'src/lib.rs');
     writeFileSync(f, `fn x() {}\n`, 'utf8');
-    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir });
+    const discovery = rustGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
     const parsed = rustGraphAdapter.parseProject({
       projectDirAbs: discovery.projectDirAbs,
       files: [], // parse no files

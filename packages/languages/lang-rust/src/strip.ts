@@ -18,6 +18,7 @@
 // (newlines preserved) so line/column positions remain stable.
 
 import {
+  isIdentChar,
   makeStripper,
   scanBlockCommentNesting,
   scanLineComment,
@@ -57,9 +58,11 @@ function scan(src: string): ScanResult {
 
     // Raw string: r"..." or r#"..."# or r##"..."## (any number of #)
     // Byte-raw string: br"..." or br#"..."#
+    // Require identifier boundary so mid-ident `…r#` / `…br"` is not a string.
     if (
-      (c === 'r' && (next === '"' || next === '#')) ||
-      (c === 'b' && src[i + 1] === 'r' && (src[i + 2] === '"' || src[i + 2] === '#'))
+      (i === 0 || !isIdentChar(src[i - 1])) &&
+      ((c === 'r' && (next === '"' || next === '#')) ||
+        (c === 'b' && src[i + 1] === 'r' && (src[i + 2] === '"' || src[i + 2] === '#')))
     ) {
       const prefixLen = c === 'b' ? 2 : 1; // br vs r
       let j = i + prefixLen;
@@ -105,7 +108,7 @@ function scan(src: string): ScanResult {
     }
 
     // Byte string: b"..." — Rust strings may span multiple lines.
-    if (c === 'b' && next === '"') {
+    if (c === 'b' && next === '"' && (i === 0 || !isIdentChar(src[i - 1]))) {
       i++;
       const result = scanRegularString(src, i, { allowMultiline: true });
       stringRegions.push({ start: i + 1, end: result.contentEnd });

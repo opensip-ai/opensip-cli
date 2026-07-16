@@ -9,16 +9,13 @@ import {
 import {
   commandProducesVerdict,
   currentLogger,
-  currentScope,
-  runEmbeddedRender,
   type ToolCliContext,
+  type EvidenceSnapshotContribution,
 } from '@opensip-cli/core';
 
 import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
 import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
-import { truncateDerivedMessage } from '../../bootstrap/report-failure.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
-import { runCommandSpecAction } from '../run-command-spec-action.js';
 import { projectLedgerArgs } from '../run-ledger-projection.js';
 
 import { BUILT_IN_GRAPH_TOOL_ID } from './built-in-suites.js';
@@ -28,7 +25,14 @@ import {
   hasRuntimeSelector,
   propagatedSuiteArgs,
 } from './propagated-options.js';
-import { verificationFromEnvelope, withProcessExitGuard } from './suite-step-helpers.js';
+import {
+  assertStepCompletion,
+  capabilityBoundCompleteRun,
+  executeStep,
+  type RunStepInput,
+  type SuiteCompletionObservation,
+} from './suite-step-execution.js';
+import { verificationFromEnvelope } from './suite-step-helpers.js';
 
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { ValidatedSuite, ValidatedSuiteStep } from './validate-suite.js';
@@ -37,7 +41,11 @@ import type { RunActionHooks } from '../../bootstrap/run-plane.js';
 /** A step's lifecycle transition, emitted so a live view can drive the checklist. */
 export type SuiteStepEvent =
   | { readonly phase: 'start'; readonly index: number }
-  | { readonly phase: 'done'; readonly index: number; readonly summary: SuiteStepSummary };
+  | {
+      readonly phase: 'done';
+      readonly index: number;
+      readonly summary: SuiteStepSummary;
+    };
 
 export async function runStepsSerially(args: {
   readonly suite: ValidatedSuite;
@@ -69,7 +77,11 @@ export async function runStepsSerially(args: {
         fullScopeFiles: args.fullScopeFiles,
       });
       summaries.push(review);
-      args.onStepEvent?.({ phase: 'done', index: step.index, summary: review.summary });
+      args.onStepEvent?.({
+        phase: 'done',
+        index: step.index,
+        summary: review.summary,
+      });
     });
   }
 
@@ -106,16 +118,91 @@ export function deriveStepOutcome(input: {
   return input.exitCode === EXIT_CODES.SUCCESS ? 'passed' : 'failed';
 }
 
-async function runStep(args: {
-  readonly suite: ValidatedSuite;
-  readonly suiteRunId: string;
-  readonly step: ValidatedSuiteStep;
-  readonly ctx: ToolCliContext;
-  readonly runActionHooks: RunActionHooks;
-  readonly suiteOpts: Readonly<Record<string, unknown>>;
-  readonly defaultChanged?: boolean;
-  readonly fullScopeFiles?: readonly string[];
-}): Promise<SuiteStepReviewInput> {
+/** Closed readiness projection for a generic evidence-producing suite step. */
+export function evidenceStepReadiness(
+  snapshots: readonly EvidenceSnapshotContribution[],
+): NonNullable<SuiteStepSummary['readiness']> {
+  if (
+    snapshots.length === 0 ||
+    snapshots.some((snapshot) => snapshot.status === 'failed' || snapshot.status === 'cancelled')
+  ) {
+    return 'unavailable';
+  }
+  return snapshots.some(
+    (snapshot) =>
+      snapshot.status === 'partial' ||
+      snapshot.status === 'unsupported' ||
+      snapshot.freshness.status !== 'current' ||
+      snapshot.coverage.status !== 'complete',
+  )
+    ? 'degraded'
+    : 'ready';
+}
+
+function stepOutcome(input: {
+  readonly kind: ValidatedSuiteStep['kind'];
+  readonly errorMessage: string | undefined;
+  readonly evidenceUnavailable: boolean;
+  readonly envelopeVerdict: { readonly passed: boolean; readonly faulted?: boolean } | undefined;
+  readonly exitCode: number;
+}): RunOutcome {
+  if (input.kind === 'evidence' && input.errorMessage === undefined) {
+    return input.evidenceUnavailable ? 'faulted' : 'passed';
+  }
+  return deriveStepOutcome({
+    errorMessage: input.errorMessage,
+    envelopeVerdict: input.envelopeVerdict,
+    exitCode: input.exitCode,
+  });
+}
+
+function buildStepSummary(input: {
+  readonly args: RunStepInput;
+  readonly exitCode: number;
+  readonly durationMs: number;
+  readonly outcome: RunOutcome;
+  readonly readiness: SuiteStepSummary['readiness'];
+  readonly errorMessage: string | undefined;
+  readonly errorCode: string | undefined;
+  readonly verdict: SuiteStepSummary['verdict'];
+  readonly verification: SuiteStepSummary['verification'];
+}): SuiteStepSummary {
+  return {
+    tool: input.args.step.tool.metadata.name,
+    stableId: input.args.step.tool.metadata.id,
+    command: input.args.step.spec.name,
+    exitCode: input.exitCode,
+    durationMs: input.durationMs,
+    outcome: input.outcome,
+    kind: input.args.step.kind,
+    ...(input.readiness === undefined ? {} : { readiness: input.readiness }),
+    ...(input.errorMessage === undefined ? {} : { error: input.errorMessage }),
+    ...(input.errorCode === undefined ? {} : { errorCode: input.errorCode }),
+    ...(input.verdict === undefined ? {} : { verdict: input.verdict }),
+    ...(input.verification === undefined ? {} : { verification: input.verification }),
+  };
+}
+
+function buildStepReview(input: {
+  readonly args: RunStepInput;
+  readonly summary: SuiteStepSummary;
+  readonly opts: Readonly<Record<string, unknown>>;
+  readonly sessionId: string | undefined;
+  readonly capturedEnvelope: ReturnType<ReturnType<typeof createCapturingContext>['getEnvelope']>;
+  readonly evidenceSnapshots: readonly EvidenceSnapshotContribution[];
+}): SuiteStepReviewInput {
+  const effectiveArgs = projectLedgerArgs(input.opts);
+  return {
+    stepIndex: input.args.step.index,
+    summary: input.summary,
+    ...(effectiveArgs === undefined ? {} : { effectiveArgs }),
+    ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
+    ...(input.capturedEnvelope === undefined ? {} : { capturedEnvelope: input.capturedEnvelope }),
+    ...(input.evidenceSnapshots.length === 0 ? {} : { evidenceSnapshots: input.evidenceSnapshots }),
+  };
+}
+
+async function runStep(args: RunStepInput): Promise<SuiteStepReviewInput> {
   const started = performance.now();
   const bound = bindToolCliContext(args.step.tool, args.ctx);
   const capture = createCapturingContext(bound);
@@ -131,100 +218,54 @@ async function runStep(args: {
   // same isolation the bundled path preserves. (04<->05 regression: external adapter
   // as a suite step.)
   const opts = stepOpts(args.step, args.suiteOpts, args.defaultChanged, args.fullScopeFiles);
+  const completionObservation: SuiteCompletionObservation = {
+    returnedEvidence: false,
+    returnedEnvelope: false,
+    returnedSession: false,
+  };
   const hooks: RunActionHooks = {
     ...args.runActionHooks,
+    completeRun: capabilityBoundCompleteRun(
+      args.step,
+      args.runActionHooks.completeRun,
+      completionObservation,
+    ),
     maybeDispatchExternal: buildMaybeDispatchExternal(
       args.step.tool,
       capture.context,
       args.runActionHooks,
     ),
   };
-  const diagnostics = currentScope()?.diagnostics;
   const log = currentLogger();
-  let errorMessage: string | undefined;
-  let errorCode: string | undefined;
-  let exitCode: number = EXIT_CODES.SUCCESS;
-  try {
-    diagnostics?.event('execute', 'debug', `suite step '${args.step.spec.name}' started`, {
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-    });
-    exitCode = await withProcessExitGuard(
-      async () => {
-        hooks.resetRun?.();
-        // Run the step EMBEDDED: its render/renderLive seams go headless (no
-        // banner, no per-step output), so only the suite's own live view reaches
-        // the terminal. The step's envelope/exit are still captured. Host-owned +
-        // contract-based — any tool routing through the documented seams inherits
-        // this (bundled, tool-*, or third-party), no per-tool code.
-        await runEmbeddedRender(() =>
-          runCommandSpecAction(args.step.spec, opts, args.step.positionals, capture.context, hooks),
-        );
-        return capture.getExitCode() ?? EXIT_CODES.SUCCESS;
-      },
-      (code) => {
-        // A bundled step called `process.exit(code)` directly: route the code into
-        // the capture's last-write-wins slot (the single per-step exit source of
-        // truth) just as `setExitCode` would, then record it.
-        capture.context.setExitCode(code);
-        log.warn?.({
-          evt: 'cli.suite.run.step',
-          suite: args.suite.name,
-          suiteRunId: args.suiteRunId,
-          tool: args.step.tool.metadata.id,
-          command: args.step.spec.name,
-          exitCode: code,
-          msg: 'Bundled step called process.exit directly; captured as step verdict.',
-        });
-      },
-    );
-    diagnostics?.event('execute', 'debug', `suite step '${args.step.spec.name}' completed`, {
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-      exitCode,
-    });
-    diagnostics?.counter('suite.steps.completed', 1);
-    const reportedFailure = capture.getReportedFailure();
-    errorMessage = reportedFailure?.message;
-    errorCode = reportedFailure?.code;
-  } catch (error) {
-    exitCode = EXIT_CODES.RUNTIME_ERROR;
-    errorMessage = truncateDerivedMessage(error instanceof Error ? error.message : String(error));
-    diagnostics?.event('execute', 'error', `suite step '${args.step.spec.name}' failed`, {
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-      exitCode,
-      error: errorMessage,
-    });
-    log.error?.({
-      evt: 'cli.suite.run.step.error',
-      suite: args.suite.name,
-      suiteRunId: args.suiteRunId,
-      tool: args.step.tool.metadata.id,
-      command: args.step.spec.name,
-      error: errorMessage,
-    });
-  }
+  const executed = await executeStep({ args, opts, capture, hooks });
   const durationMs = Math.max(0, performance.now() - started);
-  const envelopeStats = capture.getEnvelopeStats();
-  const capturedEnvelope = capture.getEnvelope();
-  const sessionId = hooks.currentSessionId?.();
-  if (
-    errorMessage === undefined &&
-    commandProducesVerdict(args.step.spec) &&
-    sessionId === undefined &&
-    capturedEnvelope === undefined
-  ) {
-    if (exitCode === EXIT_CODES.SUCCESS) exitCode = EXIT_CODES.RUNTIME_ERROR;
-    errorMessage = 'Verdict-producing suite step completed without session or captured evidence.';
-    errorCode = 'RUN.EVIDENCE.MISSING';
-  }
+  const rawEnvelopeStats = capture.getEnvelopeStats();
+  const rawCapturedEnvelope = capture.getEnvelope();
+  const rawSessionId = hooks.currentSessionId?.();
+  const rawEvidenceSnapshots = hooks.currentEvidenceSnapshots?.() ?? [];
+  const capabilityMismatch =
+    args.step.kind === 'evidence'
+      ? rawCapturedEnvelope !== undefined ||
+        rawSessionId !== undefined ||
+        completionObservation.returnedEnvelope ||
+        completionObservation.returnedSession
+      : rawEvidenceSnapshots.length > 0 || completionObservation.returnedEvidence;
+  const completion = assertStepCompletion({
+    executed,
+    producesVerdict: commandProducesVerdict(args.step.spec),
+    hasSession: rawSessionId !== undefined,
+    hasEnvelope: rawCapturedEnvelope !== undefined,
+    evidenceStep: args.step.kind === 'evidence',
+    evidenceCount: rawEvidenceSnapshots.length,
+    capabilityMismatch,
+  });
+  const { errorMessage, errorCode } = completion;
+  // A capability mismatch invalidates the whole returned proof object. Do not
+  // let either leg enter the review brief, task-context manifest, or run ledger.
+  const capturedEnvelope = capabilityMismatch ? undefined : rawCapturedEnvelope;
+  const sessionId = capabilityMismatch ? undefined : rawSessionId;
+  const evidenceSnapshots = capabilityMismatch ? [] : rawEvidenceSnapshots;
+  const envelopeStats = capabilityMismatch ? undefined : rawEnvelopeStats;
   const verification = verificationFromEnvelope(capturedEnvelope);
   const verdict =
     envelopeStats === undefined
@@ -238,11 +279,21 @@ async function runStep(args: {
 
   // The step's authoritative 3-way outcome — the single source of truth shared
   // with single-tool runs (see {@link deriveStepOutcome}).
-  const outcome = deriveStepOutcome({
+  const evidenceUnavailable = evidenceSnapshots.some(
+    (snapshot) => snapshot.status === 'failed' || snapshot.status === 'cancelled',
+  );
+  const exitCode = evidenceUnavailable
+    ? Math.max(completion.exitCode, EXIT_CODES.RUNTIME_ERROR)
+    : completion.exitCode;
+  const outcome = stepOutcome({
+    kind: args.step.kind,
     errorMessage,
+    evidenceUnavailable,
     envelopeVerdict: envelopeStats?.verdict,
     exitCode,
   });
+  const readiness =
+    args.step.kind === 'evidence' ? evidenceStepReadiness(evidenceSnapshots) : undefined;
 
   log.info?.({
     evt: 'cli.suite.run.step',
@@ -262,28 +313,25 @@ async function runStep(args: {
         }),
   });
 
-  const summary: SuiteStepSummary = {
-    tool: args.step.tool.metadata.name,
-    stableId: args.step.tool.metadata.id,
-    command: args.step.spec.name,
+  const summary = buildStepSummary({
+    args,
     exitCode,
     durationMs,
     outcome,
-    ...(errorMessage === undefined ? {} : { error: errorMessage }),
-    ...(errorCode === undefined ? {} : { errorCode }),
-    ...(verdict === undefined ? {} : { verdict }),
-    ...(verification === undefined ? {} : { verification }),
-  };
-  return {
-    stepIndex: args.step.index,
+    readiness,
+    errorMessage,
+    errorCode,
+    verdict,
+    verification,
+  });
+  return buildStepReview({
+    args,
     summary,
-    ...(() => {
-      const effectiveArgs = projectLedgerArgs(opts);
-      return effectiveArgs === undefined ? {} : { effectiveArgs };
-    })(),
-    ...(sessionId === undefined ? {} : { sessionId }),
-    ...(capturedEnvelope === undefined ? {} : { capturedEnvelope }),
-  };
+    opts,
+    sessionId,
+    capturedEnvelope,
+    evidenceSnapshots,
+  });
 }
 
 function stepOpts(
@@ -306,7 +354,13 @@ function stepOpts(
   if (step.spec.commonFlags.includes('cwd') && common.cwd === undefined) {
     common.cwd = process.cwd();
   }
-  return { ...common, ...assembled, ...propagated, ...fullScopeFilesArg, _args: step.positionals };
+  return {
+    ...common,
+    ...assembled,
+    ...propagated,
+    ...fullScopeFilesArg,
+    _args: step.positionals,
+  };
 }
 
 function builtInGraphImpactFullScopeFiles(

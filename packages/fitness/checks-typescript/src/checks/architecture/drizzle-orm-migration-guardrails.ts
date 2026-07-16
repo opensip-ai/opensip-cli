@@ -70,8 +70,9 @@ export const drizzleOrmMigrationGuardrails = defineCheck({
 
   // eslint-disable-next-line sonarjs/cognitive-complexity -- multi-pattern guardrail: each branch detects a distinct dangerous Drizzle migration pattern
   analyze(content: string, filePath: string): CheckViolation[] {
-    // Only check migration files and schema files
-    if (!filePath.includes('/migrations/') && !filePath.includes('/schema')) return [];
+    // Only check migration files and schema files (POSIX segments on OS paths)
+    const normalized = filePath.replaceAll('\\', '/');
+    if (!normalized.includes('/migrations/') && !normalized.includes('/schema')) return [];
     if (isTestFile(filePath)) return [];
 
     const violations: CheckViolation[] = [];

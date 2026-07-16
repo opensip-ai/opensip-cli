@@ -363,6 +363,37 @@ describe('buildFeatures — packageCoupling', () => {
       f.edge.find((e) => e.callerPackage === 'output' && e.calleePackage === 'core'),
     ).toBeUndefined();
   });
+
+  it('excludes generated callers and callees from production package coupling', () => {
+    const prod = occ({ bodyHash: 'prod', simpleName: 'prod', package: 'core' });
+    const generatedCaller = occ({
+      bodyHash: 'generated-caller',
+      simpleName: 'generatedCaller',
+      package: 'generated',
+      definedInGenerated: true,
+      calls: [call('prod')],
+    });
+    const generatedTarget = occ({
+      bodyHash: 'generated-target',
+      simpleName: 'generatedTarget',
+      package: 'generated',
+      definedInGenerated: true,
+    });
+    const caller = occ({
+      bodyHash: 'caller',
+      simpleName: 'caller',
+      package: 'core',
+      calls: [call('generated-target')],
+    });
+    const catalog = catalogOf({
+      caller: [caller],
+      generatedCaller: [generatedCaller],
+      generatedTarget: [generatedTarget],
+      prod: [prod],
+    });
+    const features = buildFeatures(catalog, buildIndexes(catalog), CONFIG, ['packageCoupling']);
+    expect(features.edge).toEqual([]);
+  });
 });
 
 describe('buildFeatures — reachability', () => {

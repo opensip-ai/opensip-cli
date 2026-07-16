@@ -101,16 +101,17 @@ describe('govulncheck tool — scan helper', () => {
 });
 
 describe('govulncheck tool — exit model', () => {
-  const model: ScannerExitModel = { ok: [0], findings: [3], errorFrom: 1 };
+  // -json always exits 0; findings come from parse. Nonzero is fault.
+  const model: ScannerExitModel = { ok: [0], findings: [], errorFrom: 1 };
 
-  it('exit 0 ⇒ ok, exit 3 ⇒ findings', () => {
+  it('exit 0 ⇒ ok', () => {
     expect(interpretExit(0, model)).toBe('ok');
-    expect(interpretExit(3, model)).toBe('findings');
   });
 
-  it('exit 1/2 (analysis error, below the findings code) ⇒ fault', () => {
+  it('exit 1/2/3 (analysis error) ⇒ fault', () => {
     expect(interpretExit(1, model)).toBe('fault');
     expect(interpretExit(2, model)).toBe('fault');
+    expect(interpretExit(3, model)).toBe('fault');
   });
 });
 

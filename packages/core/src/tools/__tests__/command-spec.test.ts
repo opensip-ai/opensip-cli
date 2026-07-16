@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineCommand, validateCommandSpec } from '../command-spec-validate.js';
 import {
   COMMON_FLAG_KEYS,
+  commandProducesEvidenceSnapshot,
   commandProducesVerdict,
   type ArgSpec,
   type CommandSpec,
@@ -29,9 +30,151 @@ function baseSpec(overrides: Partial<CommandSpec> = {}): CommandSpec {
 }
 
 describe('defineCommand', () => {
-  it('returns the spec unchanged (identity) for a valid spec', () => {
+  it('returns a frozen copy (not identity) for a valid spec', () => {
     const spec = baseSpec();
-    expect(defineCommand(spec)).toBe(spec);
+    const defined = defineCommand(spec);
+    expect(defined).not.toBe(spec);
+    expect(defined).toEqual(spec);
+    expect(Object.isFrozen(defined)).toBe(true);
+    expect(Object.isFrozen(defined.commonFlags)).toBe(true);
+  });
+
+  it('preserves handler identity while freezing the rest', () => {
+    const handler = (): undefined => undefined;
+    const defined = defineCommand(baseSpec({ handler }));
+    expect(defined.handler).toBe(handler);
+  });
+
+  it('carries EVERY declared optional field through the frozen copy', () => {
+    // freezeCommandSpec hand-enumerates the fields it copies, so a field added
+    // to the CommandSpec type but forgotten there is silently DROPPED at
+    // runtime — the declaration type-checks and then does nothing. That is not
+    // hypothetical: `noInit` was dropped exactly this way, which made
+    // `opensip audit` fail on the zero-config first run it was built for.
+    // Populate every optional field; if the frozen copy loses one, fail here.
+    const spec = baseSpec({
+      aliases: ['g'],
+      visibility: 'internal',
+      parent: 'graph',
+      noInit: true,
+      options: [{ flag: '--changed', description: 'Changed files only' }],
+      args: [{ name: 'paths', description: 'Paths' }],
+      output: 'raw-stream',
+      rawStreamReason: 'runtime-render-dispatch',
+      producesVerdict: true,
+      producesEvidenceSnapshot: true,
+      staticHandler: {
+        package: '@opensip-cli/graph',
+        path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+        declaration: 'runGraphCommand',
+      },
+    });
+
+    const defined = defineCommand(spec);
+
+    for (const key of Object.keys(spec) as (keyof CommandSpec)[]) {
+      expect(defined[key], `frozen spec dropped the '${key}' field`).toBeDefined();
+    }
+    expect(defined).toEqual(spec);
+  });
+
+  it('accepts and freezes a valid staticHandler descriptor', () => {
+    const defined = defineCommand(
+      baseSpec({
+        staticHandler: {
+          package: '@opensip-cli/graph',
+          path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+          declaration: 'runGraphCommand',
+        },
+      }),
+    );
+    expect(defined.staticHandler).toEqual({
+      package: '@opensip-cli/graph',
+      path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+      declaration: 'runGraphCommand',
+    });
+    expect(Object.isFrozen(defined.staticHandler)).toBe(true);
+  });
+
+  it('rejects staticHandler with unknown fields', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: '@opensip-cli/graph',
+            path: 'packages/graph/engine/src/x.ts',
+            declaration: 'run',
+            extra: true,
+          } as never,
+        }),
+      ),
+    ).toThrow(/unknown field 'extra'/);
+  });
+
+  it('rejects absolute staticHandler paths', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: '@opensip-cli/graph',
+            path: '/abs/path.ts',
+            declaration: 'run',
+          },
+        }),
+      ),
+    ).toThrow(/project-root-relative/);
+  });
+
+  it('rejects staticHandler paths with parent traversal', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: '@opensip-cli/graph',
+            path: 'packages/../secret.ts',
+            declaration: 'run',
+          },
+        }),
+      ),
+    ).toThrow(/project-root-relative/);
+  });
+
+  it('rejects staticHandler package at N+1 length', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          staticHandler: {
+            package: 'a'.repeat(215),
+            path: 'packages/x.ts',
+            declaration: 'run',
+          },
+        }),
+      ),
+    ).toThrow(/staticHandler\.package/);
+  });
+
+  it('accepts staticHandler package at N length', () => {
+    const defined = defineCommand(
+      baseSpec({
+        staticHandler: {
+          package: 'a'.repeat(214),
+          path: 'packages/x.ts',
+          declaration: 'run',
+        },
+      }),
+    );
+    expect(defined.staticHandler?.package).toHaveLength(214);
+  });
+
+  it('rejects accessor-backed command specs', () => {
+    const base = baseSpec();
+    const hostile = {
+      ...base,
+      get name() {
+        return 'evil';
+      },
+    };
+    expect(() => defineCommand(hostile as CommandSpec)).toThrow(/data property/);
   });
 
   it('accepts every CommonFlagKey', () => {
@@ -301,5 +444,27 @@ describe('commandProducesVerdict', () => {
 
   it('returns false for non-verdict output modes', () => {
     expect(commandProducesVerdict({ output: 'raw-stream' })).toBe(false);
+  });
+});
+
+describe('evidence snapshot command capability', () => {
+  it('survives command admission and is discoverable independently of output', () => {
+    const spec = defineCommand(
+      baseSpec({
+        output: 'command-result',
+        producesVerdict: false,
+        producesEvidenceSnapshot: true,
+      }),
+    );
+    expect(spec.producesEvidenceSnapshot).toBe(true);
+    expect(commandProducesEvidenceSnapshot(spec)).toBe(true);
+    expect(commandProducesVerdict(spec)).toBe(false);
+  });
+
+  it('defaults to false and rejects a non-boolean marker', () => {
+    expect(commandProducesEvidenceSnapshot({})).toBe(false);
+    expect(() => defineCommand(baseSpec({ producesEvidenceSnapshot: 'yes' as never }))).toThrow(
+      /producesEvidenceSnapshot must be a boolean/,
+    );
   });
 });

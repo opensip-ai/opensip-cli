@@ -87,6 +87,45 @@ export type CallConfidence = 'high' | 'medium' | 'low';
  */
 export type ResolutionMode = 'exact' | 'fast';
 
+/**
+ * Whether the catalog was produced by the single-program exact engine or the
+ * multi-shard sharded engine. Distinct from {@link ResolutionMode} (semantic
+ * vs syntactic edges). Optional on legacy catalogs.
+ */
+export type CatalogEngineMode = 'exact' | 'sharded';
+
+/** Bounded producer coverage retained so warm context reads stay honest. */
+export interface CatalogBuildCoverage {
+  /** Complete only when every canonical input went through a fully evidenced build. */
+  readonly status: 'complete' | 'partial';
+  /** Canonical source files handed to the producing graph build. */
+  readonly discoveredFiles: number;
+  /** Unique files that reported a parse or walk error. */
+  readonly parseErrorFiles: number;
+  /** SHA-256 identity of the exact normalized project-relative input set. */
+  readonly filesIdentity: string;
+}
+
+/**
+ * One producing shard's cache-input anchor. Paths are project-relative POSIX;
+ * `.` denotes the configured project root.
+ */
+export interface CatalogShardCacheInput {
+  readonly shardId: string;
+  readonly rootDir: string;
+  readonly configPath?: string;
+}
+
+/**
+ * How the active graph language adapter was selected for the producing run.
+ * Forced = explicit `--language` / `language` input; auto = file-dominance or
+ * registry fallback. Optional on pre-feature catalogs — absence means freshness
+ * verification is partial.
+ */
+export type AdapterSelectionEvidence =
+  | { readonly mode: 'forced'; readonly requestedId: string; readonly selectedId: string }
+  | { readonly mode: 'auto'; readonly selectedId: string };
+
 /** Function visibility tier: exported from module, module-local, or class-private. */
 export type Visibility = 'exported' | 'module-local' | 'private';
 
@@ -145,6 +184,65 @@ export interface CallEdge {
  * (typically an external npm/PyPI/crates.io package). `specifier`
  * preserves the raw import string so unresolved edges remain traceable.
  */
+/**
+ * Bounded closed unions labelling a module-level dependency edge (P2 MCP audit
+ * evidence, Phase 0). The three axes are orthogonal; valid form→role
+ * combinations are constrained by {@link isValidDependencyFormRole}.
+ */
+
+/** How the dependency statement is written. */
+export type DependencyForm =
+  'import-declaration' | 'import-equals' | 're-export' | 'dynamic-import' | 'commonjs-require';
+
+/** The executable role of the dependency. */
+export type DependencyRole = 'runtime' | 'type-only' | 'mixed' | 'side-effect';
+
+/** What kind of compiler target the specifier resolved to. */
+export type DependencyTargetKind =
+  'catalog-source' | 'declaration-file' | 'external' | 'unresolved';
+
+/** How a `resolvedPackage` attribution was determined (or why there is none). */
+export type DependencyResolutionBasis =
+  'catalog-target' | 'workspace-manifest' | 'external-specifier' | 'unresolved';
+
+/** The closed set of valid form→roles. A combination outside this map is an
+ *  impossible/rejected classification a producer must never emit. */
+const DEPENDENCY_FORM_ROLES: Readonly<Record<DependencyForm, readonly DependencyRole[]>> = {
+  'import-declaration': ['runtime', 'type-only', 'mixed', 'side-effect'],
+  'import-equals': ['runtime', 'type-only'],
+  're-export': ['runtime', 'type-only', 'mixed'],
+  'dynamic-import': ['runtime'],
+  'commonjs-require': ['runtime'],
+};
+
+/** Is `role` a valid role for `form`? Producers validate before retaining a
+ *  classification, and `CatalogRepo` re-validates after JSON decode. */
+export function isValidDependencyFormRole(form: DependencyForm, role: DependencyRole): boolean {
+  return DEPENDENCY_FORM_ROLES[form]?.includes(role) ?? false;
+}
+
+/**
+ * Atomic classification of one {@link DependencyEdge}. All-or-nothing: the whole
+ * object is absent on a pre-feature edge — a producer never emits it with one
+ * subfield missing, and no consumer interprets a single missing subfield as
+ * "unsupported". External/unresolved edges omit `resolvedPackage` but retain
+ * form/role/targetKind/basis/reason.
+ */
+export interface DependencyClassification {
+  readonly form: DependencyForm;
+  readonly role: DependencyRole;
+  readonly targetKind: DependencyTargetKind;
+  readonly basis: DependencyResolutionBasis;
+  /** Unique workspace package name when attributable; absent for external/unresolved. */
+  readonly resolvedPackage?: string;
+  /** Stable, bounded reason string for the target/resolution outcome. */
+  readonly reason: string;
+}
+
+/**
+ * One import/require/use edge from a module-init occurrence to resolved targets.
+ * Carries the raw specifier plus optional atomic classification (form/role/basis).
+ */
 export interface DependencyEdge {
   /** bodyHash[] of the target module-init occurrence(s). Empty when the
    *  import resolves to a module outside the catalog (external package). */
@@ -156,6 +254,13 @@ export interface DependencyEdge {
   /** The raw import specifier — `'./foo'`, `'@opensip/core'`, `'os.path'`,
    *  `'std::collections'`, etc. Preserved for unresolved-edge attribution. */
   readonly specifier: string;
+  /**
+   * Atomic form/role/target/basis classification (P2 Phase 0). Absent on a
+   * pre-feature catalog edge; present-and-complete on a current one. Never
+   * interpret one missing subfield as unsupported — the whole object is the
+   * unit of presence.
+   */
+  readonly classification?: DependencyClassification;
 }
 
 /** A single callable function or method, by simple name + per-occurrence record. */
@@ -308,6 +413,172 @@ export interface ReExportRecord {
   readonly specifier: string;
 }
 
+// ── Semantic declaration / cross-file reference facts (P2 MCP audit Phase 3) ──
+//
+// Optional compiler-attested plane for non-callable declarations and cross-file
+// references. Absence on Catalog/ResolveOutput = unsupported (pre-feature, fast
+// mode, non-TS adapters). Present with empty arrays = supported, no facts.
+// Catalog version stays `3.0`; identity/cap changes bump the independent
+// semantic-fact cache ABI segment (`sem=` in stampEngineVersion).
+
+/** Kind of a compiler-attested declaration fact. */
+export type DeclarationKind =
+  | 'function'
+  | 'class'
+  | 'interface'
+  | 'type-alias'
+  | 'enum'
+  | 'namespace'
+  | 'variable'
+  | 'property'
+  | 'method'
+  | 'import'
+  | 'export';
+
+/** Kind of a cross-file reference site. */
+export type ReferenceKind = 'type' | 'value' | 'import' | 'export' | 'heritage' | 'annotation';
+
+/** How a reference's target was resolved (or why it was not). */
+export type SemanticResolutionBasis =
+  | 'compiler-declaration'
+  | 'workspace-export-index'
+  | 'import-specifier'
+  | 'unresolved'
+  | 'ambiguous'
+  | 'external';
+
+/** Confidence in a resolved/unresolved semantic reference. */
+export type SemanticConfidence = 'high' | 'medium' | 'low';
+
+/** Visibility of a declaration relative to its module/package. */
+export type SemanticVisibility = 'exported' | 'module-local' | 'private';
+
+/** Export role of a declaration (orthogonal to visibility for imports). */
+export type SemanticExportRole = 'named-export' | 'default-export' | 're-export' | 'none';
+
+/**
+ * One compiler-attested declaration in project source. Stable identity is
+ * {@link declarationId}; never a callable {@link FunctionOccurrence} id.
+ * Signature-only declarations (interfaces, type aliases, …) remain here.
+ */
+export interface DeclarationFact {
+  /** Stable id: `d1:` + code-point keys of package/path/kind/name/span. */
+  readonly declarationId: string;
+  readonly name: string;
+  readonly qualifiedName: string;
+  readonly kind: DeclarationKind;
+  /** Workspace package group (manifest name or path segment). */
+  readonly package: string;
+  /** Project-relative POSIX path. */
+  readonly filePath: string;
+  /** 1-based start line. */
+  readonly line: number;
+  /** 0-based start column. */
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly visibility: SemanticVisibility;
+  readonly exportRole: SemanticExportRole;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+/**
+ * One cross-file reference site. Same-file and declaration-file sites are
+ * intentionally omitted (`referenceScope: 'cross-file'` only).
+ */
+export interface CrossFileReferenceFact {
+  /** Stable id: `r1:` + code-point keys of path/kind/span/target. */
+  readonly referenceId: string;
+  readonly kind: ReferenceKind;
+  readonly filePath: string;
+  readonly line: number;
+  readonly column: number;
+  readonly endLine: number;
+  readonly endColumn: number;
+  readonly package: string;
+  /**
+   * Resolved project declaration id when uniquely attributed. Absent for
+   * unresolved/external/ambiguous; never a dangling id after cap selection.
+   */
+  readonly targetDeclarationId?: string;
+  readonly targetPackage?: string;
+  readonly targetName?: string;
+  readonly targetKind?: DeclarationKind;
+  readonly basis: SemanticResolutionBasis;
+  readonly confidence: SemanticConfidence;
+  /** Import specifier when the reference is import/export-mediated. */
+  readonly importSpecifier?: string;
+  /** Stable reason for unresolved/ambiguous/cap-downgrade outcomes. */
+  readonly reason?: string;
+  readonly inTestFile: boolean;
+  readonly definedInGenerated: boolean;
+}
+
+/**
+ * Producer coverage for a {@link SemanticFactBundle}. Independent of graph/read
+ * coverage facets — this describes capture completeness at emit time.
+ */
+export interface SemanticFactProducerCoverage {
+  readonly status: 'complete' | 'partial';
+  readonly inspectedDeclarations: number;
+  readonly emittedDeclarations: number;
+  readonly omittedDeclarations: number;
+  readonly inspectedReferences: number;
+  readonly emittedReferences: number;
+  readonly omittedReferences: number;
+  /** Sorted, stable reason codes (e.g. `declaration-cap`, `path-outside-root`). */
+  readonly reasons: readonly string[];
+}
+
+/**
+ * Bounded optional semantic plane on a catalog / resolve result.
+ * `referenceScope` is always `'cross-file'` — the only scope this plane covers.
+ */
+export interface SemanticFactBundle {
+  readonly referenceScope: 'cross-file';
+  readonly declarations: readonly DeclarationFact[];
+  readonly references: readonly CrossFileReferenceFact[];
+  readonly coverage: SemanticFactProducerCoverage;
+}
+
+/** Max retained declaration facts per catalog generation. */
+export const MAX_SEMANTIC_DECLARATIONS = 100_000;
+/** Max retained cross-file reference facts per catalog generation. */
+export const MAX_SEMANTIC_REFERENCES = 500_000;
+/** Max retained references pointing at one declaration (producer soft bound). */
+export const MAX_REFERENCES_PER_DECLARATION = 1000;
+/** Max characters for declaration/reference simple names. */
+export const MAX_SEMANTIC_NAME = 256;
+/** Max characters for qualified names, import specifiers, and paths. */
+export const MAX_SEMANTIC_TEXT = 1024;
+/** Max 1-based line accepted on a semantic fact span. */
+export const MAX_SEMANTIC_LINE = 10_000_000;
+/** Max 0-based column accepted on a semantic fact span. */
+export const MAX_SEMANTIC_COLUMN = 1_000_000;
+
+/** Immutable producer/repository bounds object for collectors and validators. */
+export interface SemanticFactLimits {
+  readonly maxDeclarations: number;
+  readonly maxReferences: number;
+  readonly maxReferencesPerDeclaration: number;
+  readonly maxName: number;
+  readonly maxText: number;
+  readonly maxLine: number;
+  readonly maxColumn: number;
+}
+
+/** Production limits — pure collectors accept an override for unit tests. */
+export const DEFAULT_SEMANTIC_FACT_LIMITS: SemanticFactLimits = {
+  maxDeclarations: MAX_SEMANTIC_DECLARATIONS,
+  maxReferences: MAX_SEMANTIC_REFERENCES,
+  maxReferencesPerDeclaration: MAX_REFERENCES_PER_DECLARATION,
+  maxName: MAX_SEMANTIC_NAME,
+  maxText: MAX_SEMANTIC_TEXT,
+  maxLine: MAX_SEMANTIC_LINE,
+  maxColumn: MAX_SEMANTIC_COLUMN,
+};
+
 /**
  * The catalog: functions keyed by simple name. Multiple occurrences
  * per name.
@@ -348,6 +619,21 @@ export interface Catalog {
    * whether edges are approximate read this field.
    */
   readonly resolutionMode?: ResolutionMode;
+  /**
+   * Adapter selection provenance for the producing run. Optional for
+   * forward-compat with pre-feature catalogs; absence yields partial
+   * freshness verification (never inferred as fresh).
+   */
+  readonly adapterSelection?: AdapterSelectionEvidence;
+  /**
+   * Whether the producing run used the exact or sharded engine. Optional for
+   * pre-feature catalogs; absence yields partial freshness verification.
+   */
+  readonly engineMode?: CatalogEngineMode;
+  /** Producing shard inputs; absent on exact and legacy catalogs. */
+  readonly shardCacheInputs?: readonly CatalogShardCacheInput[];
+  /** Absent on legacy catalogs; context consumers then degrade conservatively. */
+  readonly buildCoverage?: CatalogBuildCoverage;
   readonly functions: Readonly<Record<string, readonly FunctionOccurrence[]>>;
   /**
    * Re-export facts captured at walk time (see {@link ReExportRecord}). Present
@@ -357,6 +643,13 @@ export interface Catalog {
    * typecheck; absence means "no re-export following for this catalog."
    */
   readonly reExports?: readonly ReExportRecord[];
+  /**
+   * Optional compiler-attested declaration + cross-file reference plane
+   * (P2 MCP audit Phase 3). Absent = unsupported (pre-feature / fast /
+   * non-emitting adapter). Present with empty arrays = supported, no facts.
+   * Present with facts = exact TypeScript capture (possibly partial under caps).
+   */
+  readonly semanticFacts?: SemanticFactBundle;
   /**
    * Derived feature columns materialized for the decoupled dashboard
    * (ADR-0006): present ONLY when the producing run requested columns via
@@ -683,7 +976,26 @@ export interface GraphConfig {
   readonly cycleSize2Severity?: 'off' | 'low';
   /** Per-rule severity overrides. */
   readonly severityOverrides?: Readonly<Record<string, 'error' | 'warning'>>;
+  /**
+   * Additive read-time audit source-role globs (P2 Phase 1.3). An occurrence is
+   * classified as a TEST source when the adapter's `inTestFile` bit is set OR its
+   * project-relative POSIX path matches one of these globs. It is a layer OVER
+   * the adapter classification for repositories whose support/test code uses
+   * nonconventional paths the adapter heuristics do not recognize — never a
+   * replacement, and never inferred from `private: true`, package names, or
+   * workspace layout. Package privacy is not a source-role signal. Default empty
+   * (adapter classification only). Bounded by {@link MAX_AUDIT_TEST_SOURCE_GLOBS}
+   * / {@link MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH} / {@link MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS}.
+   */
+  readonly auditTestSourceGlobs?: readonly string[];
 }
+
+/** Max audit-test source-role glob patterns accepted in one `graph:` block. */
+export const MAX_AUDIT_TEST_SOURCE_GLOBS = 64;
+/** Max characters in one audit-test source-role glob pattern. */
+export const MAX_AUDIT_TEST_SOURCE_GLOB_LENGTH = 256;
+/** Max wildcard/character-class tokens (`* ? [ ]`) in one audit-test glob. */
+export const MAX_AUDIT_TEST_SOURCE_GLOB_TOKENS = 32;
 
 /** Resolution-stat counters returned alongside the catalog by stage 2. */
 export interface ResolutionStats {

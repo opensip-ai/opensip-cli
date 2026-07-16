@@ -23,13 +23,17 @@ afterEach(() => {
 const ANSI_PATTERN = new RegExp(String.raw`${String.fromCodePoint(0x1b)}\[`);
 
 describe('buildWelcome', () => {
-  it('includes the version and primary subcommands', () => {
+  it('leads with the canonical audit workflow and retains individual tools', () => {
     const out = buildWelcome({ version: '1.2.3' });
     expect(out).toContain('OpenSIP CLI');
     expect(out).toContain('1.2.3');
+    expect(out).toContain('opensip audit');
     expect(out).toContain('opensip fit');
     expect(out).toContain('opensip sim');
     expect(out).toContain('opensip init');
+    expect(out.indexOf('opensip audit')).toBeLessThan(out.indexOf('opensip fit'));
+    expect(out.indexOf('opensip audit')).toBeLessThan(out.indexOf('opensip init'));
+    expect(out).toContain('evidence quality');
   });
 
   it('emits plain text when NO_COLOR is set', () => {

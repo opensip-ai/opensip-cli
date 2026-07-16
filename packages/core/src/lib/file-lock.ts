@@ -6,7 +6,17 @@
  * imports — callers bridge events at the composition root.
  */
 
-import { closeSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+// @fitness-ignore-file file-length-limit -- single lock state machine; splitting would scatter the lease protocol
+
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { hostname } from 'node:os';
 import { basename } from 'node:path';
 
@@ -106,9 +116,65 @@ function writeLockMetadata(lockPath: string, metadata: FileLockMetadata): void {
   writeFileSync(lockPath, JSON.stringify(metadata), 'utf8');
 }
 
+/**
+ * Heartbeat update that refuses to clobber a stolen lock: write temp, re-check
+ * owner, then atomic rename. Still best-effort under extreme races, but avoids
+ * the classic read-then-blind-overwrite TOCTOU that restored a dead owner's
+ * metadata into a newly acquired lockfile.
+ */
+function writeLockMetadataIfOwner(
+  lockPath: string,
+  metadata: FileLockMetadata,
+  ownerToken: string,
+): void {
+  const tmpPath = `${lockPath}.hb.${ownerToken.slice(0, 8)}`;
+  writeFileSync(tmpPath, JSON.stringify(metadata), 'utf8');
+  try {
+    const current = readLockMetadata(lockPath);
+    if (current?.ownerToken !== ownerToken) {
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // @swallow-ok temp cleanup after lost ownership
+      }
+      return;
+    }
+    try {
+      renameSync(tmpPath, lockPath);
+    } catch {
+      // Windows may refuse rename-over-existing; fall back to checked write.
+      const stillOurs = readLockMetadata(lockPath);
+      if (stillOurs?.ownerToken === ownerToken) {
+        writeLockMetadata(lockPath, metadata);
+      }
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // @swallow-ok temp cleanup after fallback write
+      }
+    }
+  } catch {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // @swallow-ok temp cleanup on unexpected failure
+    }
+  }
+}
+
 function isStale(metadata: FileLockMetadata, staleMs: number): boolean {
-  if (!isProcessAlive(metadata.pid)) return true;
-  return Date.now() - metadata.lastHeartbeatAt > staleMs;
+  // Heartbeat age is the only cross-host-safe signal. Dead local PID alone
+  // must not reclaim a lock owned by another machine (shared FS / NFS / CI
+  // workspace) — that host's process.kill(pid, 0) would always fail.
+  const ageStale = Date.now() - metadata.lastHeartbeatAt > staleMs;
+  if (metadata.hostname !== hostname() && metadata.hostname.length > 0) {
+    // Different host: heartbeat age only.
+    return ageStale;
+  }
+  // Same host: a live process still owns the lock even when the event loop is
+  // blocked in a sync critical section and heartbeats cannot fire. Reclaim only
+  // when the PID is gone (or never was valid).
+  return !isProcessAlive(metadata.pid);
 }
 
 function removeLockIfOwned(lockPath: string, ownerToken: string): void {
@@ -153,6 +219,12 @@ function recoverStaleLock({
 }: StaleLockRecoveryContext): boolean {
   if (!metadata || !isStale(metadata, staleMs)) return false;
   try {
+    // Re-check ownership before unlink so a second waiter cannot delete a
+    // lock another contender already re-acquired after observing the same stale snapshot.
+    const current = readLockMetadata(lockPath);
+    if (current === undefined) return false;
+    if (current.ownerToken !== metadata.ownerToken) return false;
+    if (!isStale(current, staleMs)) return false;
     unlinkSync(lockPath);
     onEvent?.({
       kind: 'stale.recovered',
@@ -184,7 +256,25 @@ function evaluateLockContention(
   if (tryAcquireLock(lockPath, metadata)) return 'acquired';
 
   const existing = readLockMetadata(lockPath);
-  if (!existing) return Date.now() >= deadline ? 'timeout' : 'retry';
+  // Lockfile exists but is unreadable/corrupt (bad JSON, oversize, wrong types).
+  // After the wait deadline, treat as recoverably stale so callers are not
+  // permanently wedged until manual deletion.
+  if (!existing) {
+    if (Date.now() >= deadline) {
+      try {
+        const st = statSync(lockPath);
+        // Only auto-unlink when the file itself looks abandoned by mtime.
+        if (Date.now() - st.mtimeMs > options.policy.staleMs) {
+          unlinkSync(lockPath);
+          return 'retry';
+        }
+      } catch {
+        // @swallow-ok missing between stat and unlink
+      }
+      return 'timeout';
+    }
+    return 'retry';
+  }
 
   if (
     recoverStaleLock({
@@ -237,13 +327,26 @@ function startLockHeartbeat(
   heartbeatMs: number,
 ): ReturnType<typeof setInterval> {
   return setInterval(() => {
-    metadata.lastHeartbeatAt = Date.now();
     try {
-      writeLockMetadata(lockPath, { ...metadata, lastHeartbeatAt: Date.now() });
+      metadata.lastHeartbeatAt = Date.now();
+      writeLockMetadataIfOwner(
+        lockPath,
+        { ...metadata, lastHeartbeatAt: metadata.lastHeartbeatAt },
+        metadata.ownerToken,
+      );
     } catch {
       // @swallow-ok heartbeat update is best-effort; stale recovery handles abandoned locks
     }
   }, heartbeatMs);
+}
+
+function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
+  // staleMs must outlive several heartbeats or a live owner is reclaimed mid-critical-section.
+  const heartbeatMs = Math.max(1, Math.floor(policy.heartbeatMs));
+  const minStale = heartbeatMs * 3;
+  const staleMs = Math.max(minStale, Math.floor(policy.staleMs));
+  const waitMs = Math.max(0, Math.floor(policy.waitMs));
+  return { waitMs, staleMs, heartbeatMs };
 }
 
 /**
@@ -253,6 +356,8 @@ function startLockHeartbeat(
  * @throws {SystemError} when lock metadata is malformed and cannot be recovered.
  */
 export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, fn: () => T): T {
+  const policy = normalizeLockPolicy(options.policy);
+  const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
   const cwdBasename = options.cwdBasename ?? basename(process.cwd());
   const metadata: FileLockMetadata = {
@@ -273,11 +378,11 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     operation: options.operation,
   });
 
-  const deadline = Date.now() + options.policy.waitMs;
+  const deadline = Date.now() + policy.waitMs;
   let acquired = false;
 
   while (!acquired) {
-    const outcome = evaluateLockContention(lockPath, metadata, options, deadline);
+    const outcome = evaluateLockContention(lockPath, metadata, normalizedOptions, deadline);
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -291,9 +396,14 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     sleepSync(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
   }
 
-  if (!acquired) throwLockTimeout(lockPath, options);
+  if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
 
-  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, options.policy.heartbeatMs);
+  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs);
+  try {
+    heartbeatTimer.unref?.();
+  } catch {
+    // @swallow-ok unref is optional (not all timers support it)
+  }
 
   try {
     const result = fn();
@@ -319,6 +429,8 @@ export async function withFileLockAsync<T>(
   options: WithFileLockOptions,
   fn: () => Promise<T>,
 ): Promise<T> {
+  const policy = normalizeLockPolicy(options.policy);
+  const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
   const cwdBasename = options.cwdBasename ?? basename(process.cwd());
   const metadata: FileLockMetadata = {
@@ -339,13 +451,13 @@ export async function withFileLockAsync<T>(
     operation: options.operation,
   });
 
-  const deadline = Date.now() + options.policy.waitMs;
+  const deadline = Date.now() + policy.waitMs;
   let acquired = false;
 
   const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
   while (!acquired) {
-    const outcome = evaluateLockContention(lockPath, metadata, options, deadline);
+    const outcome = evaluateLockContention(lockPath, metadata, normalizedOptions, deadline);
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -359,9 +471,14 @@ export async function withFileLockAsync<T>(
     await sleep(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
   }
 
-  if (!acquired) throwLockTimeout(lockPath, options);
+  if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
 
-  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, options.policy.heartbeatMs);
+  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs);
+  try {
+    heartbeatTimer.unref?.();
+  } catch {
+    // @swallow-ok unref is optional
+  }
 
   try {
     const result = await fn();

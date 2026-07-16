@@ -94,7 +94,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     '--skip-java-db-update',
     '--offline-scan',
     '--skip-check-update',
-    ctx.projectRoot,
+    '.', // cwd is projectRoot — keep reported paths project-relative
   ];
 }
 
@@ -108,7 +108,13 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildTrivyExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['--skip-dirs', input.excludePath] };
+  // Relative segment under cwd=projectRoot (absolute skip + relative scan root
+  // is the mismatch class that no-ops A3 on peer tools).
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
+  return { args: ['--skip-dirs', relativeSegment] };
 }
 
 /**

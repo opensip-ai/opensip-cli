@@ -83,8 +83,24 @@ function makeCtx(): CapturedCtx {
     emitEnvelope: vi.fn((envelope: unknown) => {
       envelopes.push(envelope);
     }),
-    deliverSignals: vi.fn(() => Promise.resolve()),
+    deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
+    // Host seams the mount dispatch never hits, stubbed as no-ops to satisfy the
+    // full ToolCliContext contract.
+    writeArtifact: vi.fn(() => Promise.resolve()),
+    ensureArtifactDir: vi.fn(() => Promise.resolve()),
+    saveBaseline: vi.fn(() => Promise.resolve()),
+    compareBaseline: vi.fn(() =>
+      Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+    ),
+    exportBaselineSarif: vi.fn(() => Promise.resolve()),
+    exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
+    toolState: {
+      get: vi.fn(() => Promise.resolve(undefined)),
+      put: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(() => Promise.resolve()),
+      list: vi.fn(() => Promise.resolve([])),
+    },
     runSession: {
       timing: {
         startedAt: new Date().toISOString(),
@@ -110,9 +126,9 @@ describe('mountCommandSpec — wiring', () => {
   it('wires the name, description, aliases, options, args, and runs the handler', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const handler = vi.fn(() => ({ type: 'help' }) as const);
+    const handler = vi.fn((_opts: unknown) => ({ type: 'help' }) as const);
 
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'demo',
       description: 'A demo command',
       aliases: ['d'],
@@ -183,9 +199,9 @@ describe('mountCommandSpec — wiring', () => {
     // Commander writes choice-validation failures to stderr and throws; suppress
     // the process.exit override so the parse rejects in-band.
     program.exitOverride();
-    const handler = vi.fn(() => ({ type: 'help' }) as const);
+    const handler = vi.fn((_opts: unknown) => ({ type: 'help' }) as const);
 
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'pick',
       description: 'pick a mode',
       commonFlags: [],
@@ -215,9 +231,9 @@ describe('mountCommandSpec — wiring', () => {
   it('seeds a fresh array for an arrayDefault repeatable option via its parse reducer', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const handler = vi.fn(() => ({ type: 'help' }) as const);
+    const handler = vi.fn((_opts: unknown) => ({ type: 'help' }) as const);
 
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'acc',
       description: 'accumulate',
       commonFlags: [],
@@ -246,7 +262,7 @@ describe('mountCommandSpec — wiring', () => {
     const { ctx } = makeCtx();
     const program = new Command();
     program.exitOverride();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'needs',
       description: 'needs out',
       commonFlags: [],
@@ -271,8 +287,8 @@ describe('mountCommandSpec — wiring', () => {
   it('injects the variadic ellipsis into a value placeholder (<slug> → <slug...>)', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const handler = vi.fn(() => ({ type: 'help' }) as const);
-    const spec: HostCommandSpec = defineCommand({
+    const handler = vi.fn((_opts: unknown) => ({ type: 'help' }) as const);
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'many',
       description: 'variadic option',
       commonFlags: [],
@@ -297,7 +313,7 @@ describe('mountCommandSpec — wiring', () => {
   it('throws at mount when a valueless (boolean) option is marked required', () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'badreq',
       description: 'boolean cannot be required',
       commonFlags: [],
@@ -321,12 +337,13 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     const { ctx, rendered } = makeCtx();
     const writes: string[] = [];
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
-      writes.push(typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
+      // Node hands stdout.write a Buffer (not a bare Uint8Array) for the non-string case.
+      writes.push(typeof chunk === 'string' ? chunk : (chunk as Buffer).toString('utf8'));
       return true;
     });
 
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'res',
       description: 'result command',
       commonFlags: ['json'],
@@ -349,7 +366,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     const { ctx, rendered, envelopes } = makeCtx();
     const envelope = { verdict: { passed: true }, signals: [] };
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'run',
       description: 'run command',
       commonFlags: ['json'],
@@ -373,7 +390,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('command-result dispatch (used by emitCommandResult) participates in the one-outcome contract', async () => {
     const { ctx, rendered } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'res',
       description: 'result cmd',
       commonFlags: ['json'],
@@ -394,7 +411,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     const { ctx, rendered, envelopes } = makeCtx();
     const sideEffect = vi.fn();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'export',
       description: 'export command',
       commonFlags: [],
@@ -418,7 +435,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('live-view: dispatches renderLive(name, {…opts, _args}) and ignores the return value', async () => {
     const { ctx, liveViews } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'view',
       description: 'live command',
       commonFlags: ['json'],
@@ -440,7 +457,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('routes a thrown typed ToolError through reportFailure', async () => {
     const { ctx, exitCodes } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'boom',
       description: 'throws',
       commonFlags: [],
@@ -463,7 +480,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('passes jsonRequested when --json is set on a thrown ToolError', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'boom-json',
       description: 'throws json',
       commonFlags: ['json'],
@@ -485,7 +502,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('treats reportFailure plus an undefined return as terminal output', async () => {
     const { ctx, rendered, exitCodes } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'handled-failure',
       description: 'reports and returns',
       commonFlags: ['json'],
@@ -510,7 +527,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('reports command-result handlers that return undefined without an explicit failure', async () => {
     const { ctx, rendered, exitCodes } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'undefined-result',
       description: 'returns undefined',
       commonFlags: [],
@@ -534,7 +551,7 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
   it('re-throws a non-ToolError so the top-level boundary handles it', async () => {
     const { ctx } = makeCtx();
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'bug',
       description: 'plain throw',
       commonFlags: [],
@@ -569,8 +586,10 @@ function makeLeanCtx(): LeanCtx {
   const rendered: CommandResult[] = [];
   const exitCodes: number[] = [];
   const ctx: CommandMountContext = {
-    render: (result: CommandResult) => {
-      rendered.push(result);
+    // The mount plane types `render` as `(result: unknown) => …`; this lean test
+    // ctx captures the rendered CommandResult for assertions.
+    render: (result: unknown) => {
+      rendered.push(result as CommandResult);
       return Promise.resolve();
     },
     setExitCode: (code: number) => {
@@ -592,7 +611,9 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
       output: 'command-result',
       handler: () => ({ type: 'help' }),
     });
-    mountCommandSpec(program, spec, ctx);
+    // Lean CommandMountContext: the mounter's public overloads type `ctx` as the
+    // full ToolCliContext, so cast; the runtime object stays lean (drives the seam checks).
+    mountCommandSpec(program, spec, ctx as ToolCliContext);
 
     await program.parseAsync(['hostlike'], { from: 'user' });
     expect(rendered).toEqual([{ type: 'help' }]);
@@ -613,7 +634,9 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
         ran = true;
       },
     });
-    mountCommandSpec(program, spec, ctx);
+    // Lean CommandMountContext: cast to satisfy the mounter's public overloads;
+    // the runtime object stays lean (handler owns its own IO).
+    mountCommandSpec(program, spec, ctx as ToolCliContext);
 
     await program.parseAsync(['rawhost'], { from: 'user' });
     expect(ran).toBe(true);
@@ -631,7 +654,9 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
       output: 'signal-envelope',
       handler: () => ({ ok: true }),
     });
-    mountCommandSpec(program, spec, ctx);
+    // Lean CommandMountContext: cast to satisfy the mounter's public overloads; the
+    // runtime object lacks emitEnvelope so the --json dispatch throws (the point of this test).
+    mountCommandSpec(program, spec, ctx as ToolCliContext);
 
     await expect(program.parseAsync(['envhost', '--json'], { from: 'user' })).rejects.toThrow(
       /no emitEnvelope/,
@@ -649,7 +674,9 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
       output: 'live-view',
       handler: () => undefined,
     });
-    mountCommandSpec(program, spec, ctx);
+    // Lean CommandMountContext: cast to satisfy the mounter's public overloads; the
+    // runtime object lacks renderLive so the live-view dispatch throws (the point of this test).
+    mountCommandSpec(program, spec, ctx as ToolCliContext);
 
     await expect(program.parseAsync(['livehost'], { from: 'user' })).rejects.toThrow(
       /no renderLive/,
@@ -670,13 +697,14 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
     const { ctx } = makeCtx();
     const program = new Command();
     const received: { opts: Record<string, unknown>; positionals: unknown }[] = [];
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'nopos',
       description: 'no positionals',
       commonFlags: ['json'],
       scope: 'none',
       output: 'command-result',
-      handler: (opts) => {
+      handler: (rawOpts) => {
+        const opts = rawOpts as Record<string, unknown>;
         received.push({ opts, positionals: opts._args });
         return { type: 'help' } as const;
       },
@@ -695,14 +723,15 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
     const { ctx } = makeCtx();
     const program = new Command();
     const received: { opts: Record<string, unknown>; positionals: unknown }[] = [];
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'onepos',
       description: 'one positional',
       commonFlags: ['cwd'],
       args: [{ name: 'target', optional: false, description: 'single target' }],
       scope: 'none',
       output: 'command-result',
-      handler: (opts) => {
+      handler: (rawOpts) => {
+        const opts = rawOpts as Record<string, unknown>;
         received.push({ opts, positionals: opts._args });
         return { type: 'help' } as const;
       },
@@ -725,7 +754,7 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
     const { ctx } = makeCtx();
     const program = new Command();
     const received: { opts: Record<string, unknown>; positionals: unknown }[] = [];
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'multipos',
       description: 'variadic positionals',
       commonFlags: ['json'],
@@ -739,7 +768,8 @@ describe('mountCommandSpec — positional args (_args) fidelity through splitAct
       ],
       scope: 'none',
       output: 'command-result',
-      handler: (opts) => {
+      handler: (rawOpts) => {
+        const opts = rawOpts as Record<string, unknown>;
         received.push({ opts, positionals: opts._args });
         return { type: 'help' } as const;
       },
@@ -787,7 +817,7 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
       return result;
     });
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'lc',
       description: 'lifecycle',
       commonFlags: [],
@@ -814,7 +844,7 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
       throw new ConfigurationError('bad', { code: 'CONFIGURATION_ERROR' });
     });
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'boom',
       description: 'boom',
       commonFlags: [],
@@ -869,7 +899,7 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
       },
     }));
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'persisted',
       description: 'persists a session',
       commonFlags: [],
@@ -903,7 +933,7 @@ describe('mountCommandSpec — dispatch persists a returned contribution through
     const { ctx, hooks } = ctxWithRealRunPlane(datastore);
     const handler = vi.fn(() => ({ type: 'help' as const }));
     const program = new Command();
-    const spec: HostCommandSpec = defineCommand({
+    const spec: HostCommandSpec<unknown> = defineCommand({
       name: 'nopersist',
       description: 'no session',
       commonFlags: [],

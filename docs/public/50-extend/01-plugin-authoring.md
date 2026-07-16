@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.5.0
+release: v0.7.0
 title: "Plugin authoring"
 audience: [plugin-authors]
 purpose: "Overview of the five ways to extend opensip-cli — from a dropped .mjs file to a full Tool plugin. Routes you to the right deep-dive."

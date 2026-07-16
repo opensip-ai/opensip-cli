@@ -11,8 +11,13 @@ import {
   currentScope,
   enterScope,
   getMeter,
+  pruneEphemeralRuntimes,
+  resolveEphemeralProjectPaths,
+  shouldPruneEphemeralRuntimes,
   SystemError,
+  touchEphemeralRuntime,
   type Logger,
+  type ProjectContext,
   type RunScope,
 } from '@opensip-cli/core';
 
@@ -29,12 +34,44 @@ import {
   renderRelevantBootstrapDiagnostics,
 } from './render-bootstrap-diagnostics.js';
 import { createStartupTimer, type StartupTimingEvent } from './startup-timing.js';
+import { resolveDatastoreAccess } from './worker-datastore.js';
 
 import type { PreActionBootstrapPlan } from './plan-pre-action-bootstrap.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';
 
 const MODULE_TAG = 'cli:bootstrap';
 const CLI_PACKAGE_NAME = 'opensip-cli';
+
+/**
+ * Ephemeral (no-init) cache hygiene, on the side-effect phase of an ephemeral
+ * run only. Stamps this project's entry as used, then — at most once a day —
+ * drops orphaned/stale/overflow entries so the user cache cannot grow without
+ * bound (one directory per project path ever audited, kept forever).
+ *
+ * Best-effort by construction: cache hygiene must never fail a user's run.
+ */
+function maintainEphemeralCache(project: ProjectContext, logger: Logger): void {
+  if (project.scope !== 'ephemeral') return;
+  try {
+    const paths = resolveEphemeralProjectPaths(project.projectRoot);
+    touchEphemeralRuntime(paths);
+    if (!shouldPruneEphemeralRuntimes()) return;
+    const pruned = pruneEphemeralRuntimes({ keepCacheKey: paths.cacheKey });
+    const removed = pruned.removedOrphaned + pruned.removedStale + pruned.removedOverflow;
+    if (removed === 0) return;
+    logger.debug?.({
+      evt: 'cli.cache.ephemeral_pruned',
+      module: MODULE_TAG,
+      scanned: pruned.scanned,
+      removedOrphaned: pruned.removedOrphaned,
+      removedStale: pruned.removedStale,
+      removedOverflow: pruned.removedOverflow,
+      msg: `Pruned ${removed} unused no-init cache entr${removed === 1 ? 'y' : 'ies'}.`,
+    });
+  } catch {
+    // Hygiene only — never fail the run.
+  }
+}
 
 function noopPhaseRecord(): void {
   // Default when callers omit recordPhase (production hook path).
@@ -124,6 +161,9 @@ export async function executePostBailoutBootstrap(
     if (checkedUpdate && plan.jsonOutput) {
       process.stderr.write(formatUpdateNag(version, checkedUpdate));
     }
+    preActionTimer.measure('ephemeral-cache-maintenance', () =>
+      maintainEphemeralCache(plan.project, createdRunLogger),
+    );
     return { runLogger: createdRunLogger, update: checkedUpdate };
   });
 
@@ -135,6 +175,10 @@ export async function executePostBailoutBootstrap(
   // owning-tool resolution the preflight uses); fall back to parentCommand when
   // the command belongs to no tool (CLI-only commands have a 1:1 name).
   const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
+  // An exact internal worker command + host-injected marker must agree (ADR-0145).
+  // Resolved before scope construction so a mismatch never reaches a handler
+  // or opens SQLite.
+  const datastoreAccess = resolveDatastoreAccess(plan.commandPath, process.env);
   const { owningTool, scope } = preActionTimer.measure(PRE_ACTION_PHASES.buildScope, () => {
     const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandPath);
     const toolName = resolvedOwningTool?.metadata.id ?? parentCommand;
@@ -157,6 +201,10 @@ export async function executePostBailoutBootstrap(
         noCloud,
         logger: runLogger,
         ui: { version, update },
+        datastoreAccess,
+        ...(runtime.runtimeCommands === undefined
+          ? {}
+          : { runtimeCommands: runtime.runtimeCommands }),
       }),
     };
   });
@@ -197,7 +245,7 @@ export async function executePostBailoutBootstrap(
 
   record(PRE_ACTION_PHASES.hostStartEffects);
 
-  preActionTimer.measure(PRE_ACTION_PHASES.hostStartEffects, () => {
+  await preActionTimer.measureAsync(PRE_ACTION_PHASES.hostStartEffects, async () => {
     scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
     scope.diagnostics.counter('tools.loaded', tools.list().length);
 
@@ -231,7 +279,7 @@ export async function executePostBailoutBootstrap(
       });
     }
 
-    d.startProfiling(scope, plan.commandName);
+    await d.startProfiling(scope, plan.commandName);
   });
   emitNewTimings(scope);
 

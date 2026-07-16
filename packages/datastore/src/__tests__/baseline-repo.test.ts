@@ -1,16 +1,21 @@
-import { createSignal, type Signal } from '@opensip-cli/core';
+import {
+  BASELINE_FORMAT_VERSION,
+  createSignal,
+  type BaselineIdentityMetadata,
+  type Signal,
+} from '@opensip-cli/core';
 import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { requireDrizzleHandle } from '../data-store.js';
-import {
-  BaselineRepo,
-  DataStoreFactory,
-  DEFAULT_TEST_BASELINE_IDENTITY,
-  type DataStore,
-} from '../index.js';
+import { BaselineRepo, DataStoreFactory, type DataStore } from '../index.js';
 
-const ID = DEFAULT_TEST_BASELINE_IDENTITY;
+/** Local test fixture — not a runtime export (ADR-0107 public surface). */
+const ID: BaselineIdentityMetadata = {
+  baselineFormatVersion: BASELINE_FORMAT_VERSION,
+  fingerprintStrategyId: 'opensip.default.rule-file-line-col',
+  fingerprintStrategyVersion: 1,
+};
 
 let ds: DataStore;
 let repo: BaselineRepo;

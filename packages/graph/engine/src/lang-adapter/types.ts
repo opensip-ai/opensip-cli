@@ -20,12 +20,15 @@ import type {
   CallEdge,
   CrossBoundaryCall,
   DependencyEdge,
+  DependencyForm,
+  DependencyRole,
   FunctionOccurrence,
   ParseError,
   ReExportRecord,
   ResolutionMode,
   ResolutionStats,
   RuleHints,
+  SemanticFactBundle,
 } from '../types.js';
 
 /**
@@ -45,11 +48,23 @@ export type ParsedProject = unknown;
 
 // ── method 1 ──────────────────────────────────────────────────────
 
+/**
+ * Who owns discovery lifecycle logging for this invocation.
+ * - `normal` — producer boundary may log aggregate terminal events (adapters stay quiet).
+ * - `quiet`  — no adapter lifecycle logs; used by freshness/probes/sub-operations.
+ */
+export type DiscoveryDiagnosticIntent = 'normal' | 'quiet';
+
 export interface DiscoverInput {
   /** Absolute, realpath-normalized cwd. */
   readonly cwd: string;
   /** User-supplied --tsconfig (or analogue) override; optional. */
   readonly configPathOverride?: string;
+  /**
+   * Required diagnostic intent. Adapters never emit lifecycle logs; callers
+   * that pass `normal` own the single aggregate terminal discovery event.
+   */
+  readonly diagnosticIntent: DiscoveryDiagnosticIntent;
 }
 
 export interface DiscoverOutput {
@@ -165,6 +180,14 @@ export interface DependencySiteRecord {
   readonly line: number;
   /** 0-based column. */
   readonly column: number;
+  /** How the dependency statement is written (P2 Phase 0). Optional: an adapter
+   *  that classifies its sites populates form+role (the TS adapter always does);
+   *  one that emits sites without classification omits BOTH — the resulting
+   *  `DependencyEdge` then carries no atomic classification (absent = unsupported).
+   *  Never populate one without the other. */
+  readonly form?: DependencyForm;
+  /** The executable role of the dependency (P2 Phase 0). Omitted iff `form` is. */
+  readonly role?: DependencyRole;
 }
 
 export interface WalkOutput {
@@ -235,6 +258,12 @@ export interface ResolveOutput {
    * globally. Undefined when not requested or not implemented.
    */
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
+  /**
+   * Optional compiler-attested declaration + cross-file reference plane
+   * (P2 MCP audit Phase 3). Exact TypeScript emits a present bundle
+   * (possibly empty); fast mode and non-emitting adapters omit the field.
+   */
+  readonly semanticFacts?: SemanticFactBundle;
   readonly stats: ResolutionStats;
 }
 

@@ -7,22 +7,18 @@ import { currentRules } from '../rules/registry.js';
 
 import { DASHBOARD_FEATURE_COLUMNS } from './graph-feature-columns.js';
 import { buildLiveGraphOutput, type LiveGraphOutput } from './graph-report.js';
-import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import {
-  detectMonorepoLayout,
-  partitionFlatRepo,
-  selectStrategyForLayout,
-} from './orchestrate/flat-monorepo-strategy.js';
-import { partitionFilesIntoShards } from './orchestrate/partition-files.js';
+  resolveDefaultEngineShards,
+  type EngineShardPolicyResolution,
+} from './orchestrate/engine-shard-policy.js';
 import { loadGraphConfig, runShardedGraph } from './orchestrate.js';
 import { resolveAdaptersForRun } from './resolve-adapters.js';
-import { discoverPolyglotUnits } from './workspace-runner.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { Shard } from './orchestrate/shard-model.js';
 import type { GraphProgressCallback, RunGraphResult } from './orchestrate.js';
 import type { GraphProfileRunRecorder } from './profile.js';
-import type { GraphConfig, PartitionStrategy, ResolutionMode, Rule } from '../types.js';
+import type { GraphConfig, ResolutionMode, Rule } from '../types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -42,10 +38,7 @@ export function realpathOrSelf(input: string, base: string): string {
 }
 
 /** Shard resolution plus optional synthetic-partition timing. */
-export interface ShardResolution {
-  readonly shards: Shard[];
-  readonly partition?: { readonly durationMs: number; readonly detail: string };
-}
+export type ShardResolution = EngineShardPolicyResolution;
 
 /**
  * Engine-selection policy (ADR-0033, superseding ADR-0032/0031). The sharded
@@ -80,37 +73,21 @@ async function resolveShards(
 ): Promise<ShardResolution> {
   const cliScript = opts.cliScript ?? process.argv[1];
   if (typeof cliScript !== 'string' || cliScript.length === 0) return { shards: [] };
-
-  let units: readonly { id: string; rootDir: string; configPath?: string }[];
+  let languageAdapters: ReturnType<typeof resolveAdaptersForRun> = [];
   try {
-    units = await discoverPolyglotUnits(opts.cwd, resolveAdaptersForRun(opts, cli));
+    languageAdapters = resolveAdaptersForRun(opts, cli);
   } catch {
-    /* v8 ignore next */
-    return resolveSyntheticFlatShards(opts);
+    // Preserve the producer policy: a forced graph adapter can still run exact
+    // when the independent core language registry has no matching entry.
+    if (typeof opts.language === 'string' && opts.language.length > 0) return { shards: [] };
   }
-  if (units.length <= 1) return resolveSyntheticFlatShards(opts);
-
-  const adapter = pickAdapter(opts.cwd);
-  let rootDiscovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
-  try {
-    rootDiscovery = await adapter.discoverFiles({ cwd: opts.cwd });
-  } catch {
-    /* v8 ignore next */
-    return resolveSyntheticFlatShards(opts);
-  }
-  const canonicalFiles = resolveCanonicalFileSet(rootDiscovery.files);
-  const shards = partitionFilesIntoShards({
-    canonicalFiles,
-    units: units.map((u) => ({
-      id: u.id,
-      rootDir: u.rootDir,
-      ...(u.configPath === undefined ? {} : { configPathAbs: u.configPath }),
-    })),
-    projectRoot: rootDiscovery.projectDirAbs,
-    rootConfigPathAbs: rootDiscovery.configPathAbs,
+  return resolveDefaultEngineShards({
+    projectRoot: opts.cwd,
+    languageAdapters,
+    graphAdapter: pickAdapter(opts.cwd),
+    graphConfig: loadGraphConfig(opts.cwd),
+    forcedLanguage: typeof opts.language === 'string' && opts.language.length > 0,
   });
-  if (shards.length > 1) return { shards };
-  return resolveSyntheticFlatShards(opts);
 }
 
 /**
@@ -124,54 +101,6 @@ export async function resolveShardsForCwd(
 ): Promise<readonly Shard[]> {
   const resolution = await resolveShards({ cwd, cliScript, noCache: true }, cli);
   return resolution.shards;
-}
-
-async function resolveSyntheticFlatShards(opts: GraphCommandOptions): Promise<ShardResolution> {
-  if (typeof opts.language === 'string' && opts.language.length > 0) return { shards: [] };
-  const adapter = pickAdapter(opts.cwd);
-  if (adapter.id !== 'typescript') return { shards: [] };
-  let discovery: Awaited<ReturnType<typeof adapter.discoverFiles>>;
-  try {
-    discovery = await adapter.discoverFiles({ cwd: opts.cwd });
-  } catch {
-    return { shards: [] };
-  }
-
-  const canonicalFiles = resolveCanonicalFileSet(discovery.files);
-  const partitionStart = Date.now();
-  const layout = detectMonorepoLayout({
-    repoRoot: discovery.projectDirAbs,
-    files: canonicalFiles,
-  });
-  const selection = selectStrategyForLayout(layout);
-  if (layout.kind !== 'flat-large' || selection.mode !== 'synthetic-partition') {
-    return { shards: [] };
-  }
-
-  const graphConfig = loadGraphConfig(opts.cwd);
-  const strategy: PartitionStrategy =
-    graphConfig.partitionStrategy ?? selection.partitionStrategy ?? 'hybrid';
-  const partitions = partitionFlatRepo({
-    files: layout.files,
-    repoRoot: discovery.projectDirAbs,
-    strategy,
-  });
-  const shards = partitions
-    .filter((p) => p.files.length > 0)
-    .map((p): Shard => ({
-      id: `partition:${p.id}`,
-      rootDir: discovery.projectDirAbs,
-      files: p.files,
-      configPathAbs: discovery.configPathAbs,
-    }));
-  if (shards.length <= 1) return { shards: [] };
-  return {
-    shards,
-    partition: {
-      durationMs: Date.now() - partitionStart,
-      detail: `${strategy}: ${String(shards.length)} partition(s)`,
-    },
-  };
 }
 
 /** Inputs the sharded build path threads from `executeGraph`. */

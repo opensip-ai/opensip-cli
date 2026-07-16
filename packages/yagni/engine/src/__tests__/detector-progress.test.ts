@@ -1,21 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { executeYagni } from '../cli/execute-yagni.js';
 import { detectorDoneEvent, detectorLabel, detectorStartEvent } from '../cli/yagni-progress.js';
 import { unusedConfigSurfaceDetector } from '../detectors/unused-config-surface.js';
 
 import type { YagniDetector } from '../detectors/types.js';
-import type { ToolCliContext } from '@opensip-cli/core';
 
 const FIXTURE_ROOT = new URL('fixtures/unused-config-surface/pkg', import.meta.url).pathname;
-
-function stubCli(): ToolCliContext {
-  return {
-    scope: { datastore: () => undefined },
-    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
-    reportFailure: vi.fn(() => Promise.resolve()),
-  } as unknown as ToolCliContext;
-}
 
 const disabledStub: YagniDetector = {
   id: 'disabled-stub',
@@ -70,7 +61,6 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
         onDetectorDone: (slug, durationMs) => done.push({ slug, durationMs }),
         onDetectorsSkipped: (slugs) => skippedBatches.push([...slugs]),
       },
-      stubCli(),
       [unusedConfigSurfaceDetector, disabledStub],
     );
 
@@ -90,7 +80,6 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
         onDetectorStart: (slug) => events.push(`start:${slug}`),
         onDetectorDone: (slug) => events.push(`done:${slug}`),
       },
-      stubCli(),
       [unusedConfigSurfaceDetector],
     );
     expect(events).toEqual([
@@ -109,7 +98,6 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
         onDetectorStart: (slug) => events.push(`start:${slug}`),
         onDetectorDone: (slug) => events.push(`done:${slug}`),
       },
-      stubCli(),
       [throwingStub],
     );
 

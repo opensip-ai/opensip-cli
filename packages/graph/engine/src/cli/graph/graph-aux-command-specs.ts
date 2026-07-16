@@ -64,6 +64,12 @@ const RAW_STREAM = 'raw-stream' as const;
 // duplicated (sonarjs/no-duplicate-string).
 const REASON_FILE_EXPORT = 'file-export' as const;
 
+// Static-handler provenance shared by every graph aux command spec in this
+// module. Declared once so the literals are not duplicated
+// (sonarjs/no-duplicate-string).
+const GRAPH_AUX_PACKAGE = '@opensip-cli/graph';
+const GRAPH_AUX_SPECS_PATH = 'packages/graph/engine/src/cli/graph/graph-aux-command-specs.ts';
+
 /** Read the single trailing positional (`<name>` / `<specPath>`) off the parsed opts. */
 function firstArg(opts: Record<string, unknown>): string {
   const args = (opts._args ?? []) as readonly string[];
@@ -297,6 +303,11 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
+    declaration: 'graphShardWorkerCommandSpec',
+  },
   name: 'graph-shard-worker',
   visibility: 'internal',
   description:
@@ -323,6 +334,11 @@ export const graphEquivalenceCheckCommandSpec: CommandSpec<unknown, ToolCliConte
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
+    declaration: 'graphEquivalenceCheckCommandSpec',
+  },
   name: 'graph-equivalence-check',
   visibility: 'internal',
   description:
@@ -458,6 +474,11 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
+    declaration: 'graphExportCommandSpec',
+  },
   name: 'export',
   description:
     'Export graph analysis artifacts: --format sarif (SARIF v2.1.0 findings), catalog (CatalogExport JSON), or baseline (gate fingerprint JSON)',
@@ -552,6 +573,11 @@ export const graphExportCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
  */
 export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: GRAPH_AUX_PACKAGE,
+      path: GRAPH_AUX_SPECS_PATH,
+      declaration: 'graphRecipesGroupedCommandSpec',
+    },
     name: 'recipes',
     description: 'List available graph recipes',
     commonFlags: ['json'],
@@ -563,6 +589,11 @@ export const graphRecipesGroupedCommandSpec: CommandSpec<unknown, ToolCliContext
 /** `graph lookup <name>` — look up function occurrences by simple name. */
 export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: GRAPH_AUX_PACKAGE,
+      path: GRAPH_AUX_SPECS_PATH,
+      declaration: 'graphLookupGroupedCommandSpec',
+    },
     name: 'lookup',
     description: 'Look up function occurrences by simple name from the persisted catalog',
     commonFlags: ['json', 'cwd'],
@@ -587,6 +618,11 @@ export const graphLookupGroupedCommandSpec: CommandSpec<unknown, ToolCliContext>
  */
 export const graphIndexGroupedCommandSpec: CommandSpec<unknown, ToolCliContext> =
   defineNestedCommand<unknown, ToolCliContext>({
+    staticHandler: {
+      package: GRAPH_AUX_PACKAGE,
+      path: GRAPH_AUX_SPECS_PATH,
+      declaration: 'graphIndexGroupedCommandSpec',
+    },
     name: 'index',
     description:
       'Emit a symbolindex.json artifact (name→file:line and file→names); --build refreshes the catalog first',
@@ -635,6 +671,11 @@ export const graphListCommandSpec: CommandSpec<unknown, ToolCliContext> = define
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
+    declaration: 'graphListCommandSpec',
+  },
   name: 'list',
   description: 'List available graph rules',
   commonFlags: ['cwd', 'json'],
@@ -648,9 +689,17 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: GRAPH_AUX_PACKAGE,
+    path: GRAPH_AUX_SPECS_PATH,
+    declaration: 'graphImpactCommandSpec',
+  },
   name: 'impact',
   description:
     'Analyze what changed and what depends on it (git --changed/--since or explicit --files)',
+  // First-run capable (`graph impact` is a documented pre-init command and an
+  // audit suite step): the ephemeral runtime backs the catalog it reads.
+  noInit: true,
   commonFlags: ['cwd', 'json'],
   options: [
     {
@@ -711,7 +760,6 @@ export const graphImpactCommandSpec: CommandSpec<unknown, ToolCliContext> = defi
       noCache: opts.noCache,
     };
     const result = await executeImpact(commandOpts, cli);
-    if (commandOpts.json === true) return;
     return {
       session: buildImpactSessionContribution(commandOpts, result),
     };

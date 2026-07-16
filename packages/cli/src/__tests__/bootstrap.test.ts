@@ -50,7 +50,7 @@ function makeStubContext(): ToolCliContext {
     emitRaw: vi.fn(),
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
-    deliverSignals: vi.fn(() => Promise.resolve()),
+    deliverSignals: vi.fn(() => Promise.resolve({ cloudAccepted: 0 })),
     writeSarif: vi.fn(() => Promise.resolve()),
     datastore: undefined,
     runSession: {
@@ -70,7 +70,10 @@ function makeStubContext(): ToolCliContext {
         }),
       },
     },
-  };
+    // Mount-only stub: command handlers are never invoked in these tests, so
+    // the remaining ToolCliContext seams (scope, baseline/artifact/toolState)
+    // are intentionally omitted. Cast is compile-time only — no runtime change.
+  } as unknown as ToolCliContext;
 }
 
 describe('registerLanguageAdapters', () => {

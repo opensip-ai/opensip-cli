@@ -8,11 +8,12 @@
   },
   "include": ["src"],
   "exclude": [
-    "node_modules",
-    "dist",
-    "**/__tests__/**",
     "**/__test-support__/**",
+    "**/__tests__/**",
+    "**/__fixtures__/**",
     "**/*.test.ts",
-    "**/*.test.tsx"
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ]
 }

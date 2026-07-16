@@ -8,7 +8,7 @@
 
 import { z } from 'zod';
 
-import { limit as limitSchema, toolId as toolIdSchema } from './schemas.js';
+import { limit as limitSchema, strictInput, toolId as toolIdSchema } from './schemas.js';
 import { errorResult, jsonResult, unknownToolError } from './tool-result.js';
 
 import type { McpToolDeps } from './types.js';
@@ -27,11 +27,11 @@ export function registerListRuns(server: McpStdioServer, deps: McpToolDeps): voi
         'Replays persisted sessions and never re-runs fit/graph/yagni/sim. Do not grep ' +
         '.runtime/logs, read datastore.sqlite directly, or re-run a CLI tool to answer ' +
         'stored-result questions.',
-      inputSchema: {
+      inputSchema: strictInput({
         tool: toolIdSchema().optional(),
         limit: limitSchema(),
         summaryOnly: z.boolean().optional(),
-      },
+      }),
     },
     ({ tool, limit, summaryOnly }) => {
       if (tool !== undefined && !deps.validToolIds.has(tool)) {

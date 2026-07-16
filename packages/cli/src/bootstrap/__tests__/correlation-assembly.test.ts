@@ -37,6 +37,7 @@ import {
   type PostBailoutBootstrapDeps,
 } from '../execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from '../plan-pre-action-bootstrap.js';
+import { PolicyAuditCollector } from '../policy-audit.js';
 
 import type { loadCliDefaults } from '../cli-defaults.js';
 import type { PreActionRuntime } from '../pre-action-runtime.js';
@@ -70,7 +71,7 @@ function captureDeps(onBuild: (input: BuildPerRunScopeInput) => void): PostBailo
     },
     enterScope: () => undefined,
     isScopeEntered: () => true,
-    startProfiling: () => undefined,
+    startProfiling: () => Promise.resolve(undefined),
     maybeInitializeOwningTool: () => Promise.resolve(),
     loadOwningToolCapabilities: () => Promise.resolve(0),
     checkForUpdate: () => undefined,
@@ -116,6 +117,7 @@ function baseInput(
     provenance: [],
     logger,
     ui: { version: '0.0.0', update: undefined },
+    datastoreAccess: 'local',
     ...overrides,
   };
 }
@@ -128,6 +130,8 @@ function emptyRuntime(): PreActionRuntime {
     manifests: [],
     provenance: [],
     bootstrapDiagnostics: [],
+    trustPolicy: configModule.BUILTIN_TRUST_POLICY,
+    policyAudit: new PolicyAuditCollector(),
   };
 }
 

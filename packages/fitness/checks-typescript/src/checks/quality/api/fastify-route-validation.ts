@@ -314,7 +314,8 @@ function analyzeFile(content: string, filePath: string): CheckViolation[] {
  * Check if file is a route file
  */
 function isRouteFile(file: string): boolean {
-  return file.includes('/routes/') && !isTestFile(file) && !file.endsWith('.d.ts');
+  const normalized = file.replaceAll('\\', '/');
+  return normalized.includes('/routes/') && !isTestFile(file) && !file.endsWith('.d.ts');
 }
 
 /**

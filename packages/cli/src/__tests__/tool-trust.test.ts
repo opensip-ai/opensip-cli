@@ -46,21 +46,40 @@ function stageProjectLocalTool(id: string, apiVersion?: number): string {
 }
 
 describe('isInstalledToolTrusted (deny-by-default allowlist)', () => {
-  it('admits all on the wildcard and emits a per-invocation deprecation warning', () => {
+  it('ignores bare * (exact-id only) and emits tool_wildcard_ignored without admitting', () => {
     const warnSpy = vi.spyOn(logger, 'warn');
     expect(
       isInstalledToolTrusted('anything', {
         [INSTALLED_TOOL_ALLOWLIST_ENV]: '*',
       }),
-    ).toBe(true);
-    expect(isInstalledToolTrusted('again', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+    ).toBe(false);
+    expect(isInstalledToolTrusted('again', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
     expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        evt: 'cli.trust.wildcard_allowlist',
+        evt: 'cli.trust.tool_wildcard_ignored',
         envVar: INSTALLED_TOOL_ALLOWLIST_ENV,
-        deprecated: true,
-        detail: expect.stringContaining('DEPRECATED'),
+      }),
+    );
+    // Bounded warning: no tool id, env value, or deprecation detail.
+    for (const call of warnSpy.mock.calls) {
+      const payload = call[0] as Record<string, unknown>;
+      expect(payload).not.toHaveProperty('deprecated');
+      expect(payload).not.toHaveProperty('detail');
+      expect(payload).not.toHaveProperty('toolId');
+    }
+    warnSpy.mockRestore();
+  });
+
+  it('admits only the exact id when * is mixed with a known id', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const env = { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*,known-id' };
+    expect(isInstalledToolTrusted('known-id', env)).toBe(true);
+    expect(isInstalledToolTrusted('other', env)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.trust.tool_wildcard_ignored',
+        envVar: INSTALLED_TOOL_ALLOWLIST_ENV,
       }),
     );
     warnSpy.mockRestore();
@@ -100,19 +119,33 @@ describe('isProjectLocalToolTrusted (deny-by-default allowlist)', () => {
     expect(isProjectLocalToolTrusted('other', env)).toBe(false);
   });
 
-  it('admits all on the wildcard', () => {
+  it('ignores bare * for project-local tools (exact-id only)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
     expect(
       isProjectLocalToolTrusted('anything', {
         [PROJECT_TOOL_ALLOWLIST_ENV]: '*',
       }),
-    ).toBe(true);
+    ).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.trust.tool_wildcard_ignored',
+        envVar: PROJECT_TOOL_ALLOWLIST_ENV,
+      }),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('admits only the exact id when * is mixed with a known project-local id', () => {
+    const env = { [PROJECT_TOOL_ALLOWLIST_ENV]: '*,my-audit' };
+    expect(isProjectLocalToolTrusted('my-audit', env)).toBe(true);
+    expect(isProjectLocalToolTrusted('other', env)).toBe(false);
   });
 });
 
 describe('wildcard allowlist broadening guard', () => {
-  it('admits via * on each surface independently but does not cross-leak surfaces', () => {
-    expect(isProjectLocalToolTrusted('x', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
-    expect(isInstalledToolTrusted('x', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(true);
+  it('ignores * on each surface independently and does not cross-leak surfaces', () => {
+    expect(isProjectLocalToolTrusted('x', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
+    expect(isInstalledToolTrusted('x', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
     expect(isProjectLocalToolTrusted('x', { [INSTALLED_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
     expect(isInstalledToolTrusted('x', { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' })).toBe(false);
   });
@@ -347,10 +380,12 @@ describe('admitProjectLocalTool — trust gate precedes import', () => {
   it('fail-closes a missing/malformed sidecar manifest', () => {
     const dir = mkdtempSync(join(tmpdir(), 'opensip-projlocal-empty-'));
     staged.push(dir);
+    // Exact-id trust cannot apply without a manifest id; empty/missing still
+    // fails closed. Pass an exact placeholder so * is not required.
     expect(() =>
       admitProjectLocalTool({
         dir,
-        env: { [PROJECT_TOOL_ALLOWLIST_ENV]: '*' },
+        env: { [PROJECT_TOOL_ALLOWLIST_ENV]: 'missing-sidecar' },
       }),
     ).toThrow(PluginIncompatibleError);
   });

@@ -10,7 +10,7 @@ import {
   type CommandOutcome,
   type CommandResult,
 } from '@opensip-cli/contracts';
-import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
+import { HOST_VERDICT_POLICY_FALLBACK, runEmbeddedRender } from '@opensip-cli/core';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { renderOutcome } from '../commands/render-outcome.js';
@@ -57,6 +57,22 @@ describe('renderOutcome — --json', () => {
     const parsed = JSON.parse(stdout[0]) as CommandOutcome;
     expect(parsed.kind).toBe('fit.run');
     expect(parsed.envelope).toEqual(ENVELOPE); // the envelope is unchanged, just nested
+  });
+
+  it('writes nothing while embedded so a suite remains the sole output owner', async () => {
+    spyStdout();
+    const render = vi.fn<(r: CommandResult) => Promise<void>>().mockResolvedValue(undefined);
+    const outcome: CommandOutcome = {
+      kind: 'history',
+      status: 'ok',
+      exitCode: 0,
+      data: { type: 'help' },
+    };
+
+    await runEmbeddedRender(() => renderOutcome(outcome, { jsonRequested: true, render }));
+
+    expect(render).not.toHaveBeenCalled();
+    expect(stdout).toHaveLength(0);
   });
 });
 

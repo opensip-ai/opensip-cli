@@ -6,7 +6,7 @@
  * fallback. Driven by input variety and asserted through `renderToText`.
  */
 
-import { renderToText } from '@opensip-cli/cli-ui';
+import { renderToText, type Span, type ViewNode } from '@opensip-cli/cli-ui';
 import { describe, expect, it } from 'vitest';
 
 import { viewInit } from '../views/init-view.js';
@@ -26,6 +26,12 @@ function result(over: Partial<InitResult>): InitResult {
 }
 
 const text = (r: InitResult): string => renderToText(viewInit(r));
+
+function spans(node: ViewNode): readonly Span[] {
+  if (node.kind === 'line') return node.spans;
+  if (node.kind === 'group') return node.children.flatMap(spans);
+  return [];
+}
 
 describe('viewInit — refusals', () => {
   it('renders the inside-existing-project message verbatim (one node per line)', () => {
@@ -52,17 +58,18 @@ describe('viewInit — refusals', () => {
 describe('viewInit — partial-state report', () => {
   it('renders each headline state and summarizes pre-existing files without listing them', () => {
     const files = [
-      { path: '/proj/opensip-cli/custom.ts', classification: 'custom' },
-      { path: '/proj/opensip-cli/old.ts', classification: 'stale-scaffolded' },
-      { path: '/proj/opensip-cli/other.ts', classification: 'scaffolded' },
+      { path: '/proj/opensip-cli/custom.ts', classification: 'custom' as const },
+      { path: '/proj/opensip-cli/old.ts', classification: 'stale-scaffolded' as const },
+      { path: '/proj/opensip-cli/other.ts', classification: 'scaffolded' as const },
     ];
     const dirOnly = text(
       result({
         partialStateError: {
           state: 'partial-dir-only',
           preExistingFiles: files,
+          message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
     expect(dirOnly).toContain('opensip-cli/ present but');
     expect(dirOnly).toContain('Found 3 file(s) preserved under opensip-cli/.');
@@ -77,15 +84,20 @@ describe('viewInit — partial-state report', () => {
         partialStateError: {
           state: 'partial-config-only',
           preExistingFiles: [],
+          message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
     expect(cfgOnly).toContain('present but opensip-cli/ missing');
 
     const full = text(
       result({
-        partialStateError: { state: 'fully-initialized', preExistingFiles: [] },
-      } as Partial<InitResult>),
+        partialStateError: {
+          state: 'fully-initialized',
+          preExistingFiles: [],
+          message: 'partial state',
+        },
+      }),
     );
     expect(full).toContain('Already initialized');
   });
@@ -100,8 +112,9 @@ describe('viewInit — partial-state report', () => {
         partialStateError: {
           state: 'partial-dir-only',
           preExistingFiles: files,
+          message: 'partial state',
         },
-      } as Partial<InitResult>),
+      }),
     );
 
     expect(out).toContain('Found 45 file(s) preserved under opensip-cli/.');
@@ -129,6 +142,71 @@ describe('viewInit — created success', () => {
     expect(out).toContain('Pre-existing files: 1 file(s) preserved under opensip-cli/.');
     expect(out).not.toContain('keep.ts');
     expect(out).toContain('opensip fit --recipe example');
+    expect(out).not.toContain('Optional tools for this project');
+  });
+
+  it('appends optional tools in result order with exact commands and one shared footer', () => {
+    const initResult = result({
+      created: true,
+      state: 'pristine',
+      languages: ['python'],
+      optionalTools: [
+        {
+          id: 'ruff',
+          pkg: '@opensip-cli/tool-ruff',
+          network: 'local-only',
+          languages: ['python'],
+          installCommand: 'opensip tools install @opensip-cli/tool-ruff',
+          projectInstallCommand: 'opensip tools install @opensip-cli/tool-ruff --project',
+        },
+        {
+          id: 'bandit',
+          pkg: '@opensip-cli/tool-bandit',
+          network: 'local-only',
+          languages: ['python'],
+          installCommand: 'opensip tools install @opensip-cli/tool-bandit',
+          projectInstallCommand: 'opensip tools install @opensip-cli/tool-bandit --project',
+        },
+        {
+          id: 'pip-audit',
+          pkg: '@opensip-cli/tool-pip-audit',
+          network: 'networked',
+          languages: ['python'],
+          installCommand: 'opensip tools install @opensip-cli/tool-pip-audit',
+          projectInstallCommand: 'opensip tools install @opensip-cli/tool-pip-audit --project',
+        },
+      ],
+    });
+    const view = viewInit(initResult);
+    const out = renderToText(view);
+
+    expect(out).toContain('Optional tools for this project (not installed):');
+    expect(out.indexOf('ruff')).toBeLessThan(out.indexOf('bandit'));
+    expect(out.indexOf('bandit')).toBeLessThan(out.indexOf('pip-audit'));
+    expect(out).toContain('opensip tools install @opensip-cli/tool-ruff');
+    expect(out).toContain('opensip tools install @opensip-cli/tool-bandit');
+    expect(out).toContain('opensip tools install @opensip-cli/tool-pip-audit  [networked]');
+    expect(
+      out.match(/Use --project on tools install for repo-local installation\./gu),
+    ).toHaveLength(1);
+    expect(out).toContain('Full catalog: opensip tools list --available');
+    expect(spans(view).filter((span) => span.text.includes('[networked]'))).toEqual([
+      expect.objectContaining({ tone: 'warning' }),
+    ]);
+  });
+
+  it('omits the optional-tools footer for an explicitly empty list', () => {
+    const out = text(
+      result({
+        created: true,
+        state: 'pristine',
+        languages: ['python'],
+        optionalTools: [],
+      }),
+    );
+
+    expect(out).not.toContain('Optional tools for this project');
+    expect(out).not.toContain('Full catalog:');
   });
 
   it('renders the re-scaffolded headline and unknown language fallback', () => {

@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-07
-release: v0.5.0
+last_verified: 2026-07-14
+release: v0.7.0
 title: "JSON output schema"
 audience: [ci-integrators, plugin-authors]
 purpose: "The CommandOutcome and SignalEnvelope shapes every tool emits on --json. Every field, every type, and every presence rule."
@@ -13,6 +13,7 @@ source-files:
   - packages/contracts/src/impact-trust.ts
   - packages/contracts/src/command-results-variants/graph-impact-result.ts
   - packages/contracts/src/command-results-variants/suite-results.ts
+  - packages/graph/engine/src/persistence/impact-report-projection.ts
   - packages/contracts/src/review-brief.ts
   - packages/contracts/src/review-brief-correlation.ts
   - packages/contracts/src/review-brief-correlation-order.ts
@@ -28,7 +29,7 @@ related-docs:
 ---
 # JSON output schema
 
-`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip yagni --json`, installed adapter runs such as `opensip gitleaks --json`, `opensip graph lookup --json`, `opensip suite run <name> --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config/suite commands carry their result under `.data`; failures carry structured `errors`. The top-level `exitCode` always equals the process exit code ([ADR-0132](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0132-command-outcome-exit-parity.md)). This is the contract surface for CI integrations.
+`opensip fit --json`, `opensip sim --json`, `opensip graph --json`, `opensip yagni --json`, installed adapter runs such as `opensip gitleaks --json`, `opensip graph lookup --json`, `opensip audit --json`, `opensip suite run <name> --json`, and `opensip config validate|schema|migrate --json` all emit one `CommandOutcome` wrapper on stdout ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0024-command-outcome-and-observability.md), [ADR-0065](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0065-public-json-output-and-raw-stream-policy.md)). Run commands carry a `SignalEnvelope` under `.envelope`; list/report/config/suite commands carry their result under `.data`; failures carry structured `errors`. The top-level `exitCode` always equals the process exit code ([ADR-0132](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0132-command-outcome-exit-parity.md)). This is the contract surface for CI integrations.
 
 ```jsonc
 {
@@ -40,19 +41,21 @@ related-docs:
 }
 ```
 
-`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload. The current outer wrapper contract is `COMMAND_OUTCOME_CONTRACT_VERSION = 1`.
+`CommandOutcome<T>` lives in [`packages/contracts/src/command-outcome.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/contracts/src/command-outcome.ts). The host ASSEMBLES it from each handler's unchanged domain return and serializes it through one renderer; no tool chooses its own error JSON or success carrier. A list/report command sets `.data` (a `CommandResult`) instead of `.envelope`; a failure — including a pre-handler bootstrap failure such as *no project found* — sets `status:"error"` + `.errors[]` (`{ message, suggestion?, code? }`) with neither payload. The current outer wrapper contract is `COMMAND_OUTCOME_CONTRACT_VERSION = 1`.
 
-The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
+The **inner `SignalEnvelope`** is documented below. It lives in [`packages/contracts/src/signal-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/contracts/src/signal-envelope.ts) (the envelope) and [`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/types/signal.ts) (the `Signal`). Per [ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md), **`Signal` is the single output currency of every tool**: a `fit` check, a `graph` rule, and a `sim` scenario are all **units** that *produce signals*, and every run yields one envelope.
 
 > **Stability:** the `schemaVersion: 2` field on the envelope is the output-contract version (`SIGNAL_ENVELOPE_SCHEMA_VERSION = 2`, independent of any package version). Adding optional fields is a minor change; removing or changing types is a major change. The compatibility matrix in `.config/compatibility-matrix.json` checks these constants against public fixtures in CI.
 
 ## Suite Run Results
 
-`opensip suite run <name> --json` emits a `CommandOutcome` whose `.data` is a
-`SuiteRunResult` ([ADR-0093](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0093-host-owned-suite-plane.md),
-[ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md),
-[ADR-0131](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0131-shared-dispatch-pipeline-suite-exit-capture.md),
-[ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0110-host-owned-review-brief-contract.md)).
+`opensip audit --json` and `opensip suite run <name> --json` emit a `CommandOutcome` whose `.data` is a
+`SuiteRunResult` ([ADR-0093](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0093-host-owned-suite-plane.md),
+[ADR-0100](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0100-suite-per-step-verdict-and-aggregate-output.md),
+[ADR-0131](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0131-shared-dispatch-pipeline-suite-exit-capture.md),
+[ADR-0110](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0110-host-owned-review-brief-contract.md),
+[ADR-0143](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0143-host-owned-run-step-ledger.md), and
+[ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0155-canonical-audit-command.md)).
 Suite steps dispatch through the same command-action pipeline as normal mounted
 commands, and the suite exit code remains the numeric worst step exit code. The
 aggregate, per-step verdict, and per-step `errorCode` fields are additive; older
@@ -66,6 +69,7 @@ fields keep their names and types.
   "data": {
     "type": "suite-run",
     "suite": "security",
+    "runId": "RUN_4f8b7c",
     "suiteRunId": "suite_3c4e8a1b9d21",
     "exitCode": 1,
     "durationMs": 1842,
@@ -274,6 +278,7 @@ fields keep their names and types.
 |---|---|---|---|
 | `type` | `"suite-run"` | yes | Discriminant for suite run command results. |
 | `suite` | string | yes | Suite name from `suites.<name>`. |
+| `runId` | string | no | Authoritative persisted parent `StoredRun.id`. Absent when Run-ledger persistence was unavailable; do not substitute `suiteRunId` or a latest-row lookup. |
 | `suiteRunId` | string | yes | Host-generated id shared by the step sessions produced in the run. |
 | `exitCode` | number | yes | Worst step exit code. |
 | `durationMs` | number | yes | Host-measured suite duration. |
@@ -281,6 +286,7 @@ fields keep their names and types.
 | `aggregate` | object | no | Additive roll-up over step summaries. Present on current CLI output; optional for compatibility. |
 | `steps` | `SuiteStepSummary[]` | yes | One summary per configured step, in execution order. |
 | `reviewBrief` | `ReviewBrief` | no | Host-owned v1 review aggregate. Present on current suite runs; optional for compatibility. |
+| `contextManifest` | `TaskContextManifest` | no | Present only for the built-in `agent-context` evidence suite. It is mutually exclusive with finding-oriented `reviewBrief`. |
 
 ### `SuiteRunScope`
 
@@ -315,10 +321,68 @@ fields keep their names and types.
 | `error` | string | no | Error or reported-failure message when the step did not produce a normal verdict. Truncated to 1000 characters. |
 | `errorCode` | string | no | Machine-readable `ToolError` or `reportFailure` code for the step failure, when available. |
 | `verdict` | object | no | Counts-only projection of the step's last emitted `SignalEnvelope`. Absent means the step emitted no envelope. |
+| `verification` | `ImpactTrust` | no | Authoritative scoped-verification projection copied from the step envelope. Inspect before claiming changed/impacted coverage is complete. |
+| `kind` | `"verdict"` \| `"evidence"` | no | Additive step discriminator. Absent on older rows means verdict-style legacy behavior. |
+| `readiness` | `"ready"` \| `"degraded"` \| `"unavailable"` | no | Evidence-step readiness. Never a finding verdict. |
 
 `steps[].verdict` contains only `passed`, `errors`, `warnings`, and `findings`
 (`SignalEnvelope.signals.length`). It intentionally excludes signal messages,
 file paths, symbols, match snippets, and raw scanner output.
+
+### `TaskContextManifest`
+
+`opensip suite run agent-context --files <path> --json` adds a numeric-versioned
+manifest to the parent suite result and persisted Run:
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "suite": "agent-context",
+  "runId": "RUN_...",
+  "createdAt": "2026-07-12T12:00:00.000Z",
+  "projectIdentity": "sha256:...",
+  "readiness": "ready",
+  "sourceStart": { "configIdentity": "sha256:...", "status": "captured", "reasonCodes": [] },
+  "sourceEnd": { "configIdentity": "sha256:...", "status": "captured", "reasonCodes": [] },
+  "fileScope": { "mode": "explicit", "fileCount": 1, "filesIdentity": "sha256:..." },
+  "graphIdentity": "g1:...",
+  "inventoryIdentity": "i1:...",
+  "planes": [
+    {
+      "kind": "inventory",
+      "required": true,
+      "status": "rebuilt",
+      "producer": { "toolId": "...", "command": "graph-context-inventory", "version": "0.6.0" },
+      "pointer": { "owner": "graph", "kind": "inventory", "id": "i1:...", "schemaVersion": 1 },
+      "step": { "runId": "RUN_...", "stepId": "STEP_...", "logicalStepKey": "0:...", "ordinal": 0, "attempt": 1 },
+      "freshness": { "status": "current", "reasonCodes": [] },
+      "coverage": { "status": "complete", "reasonCodes": [], "observed": 42, "total": 42 },
+      "caps": { "status": "not-hit", "reasonCodes": [] },
+      "reasonCodes": [],
+      "followUpReads": ["get_file_context"]
+    }
+  ],
+  "reasonCodes": [],
+  "nextActions": ["get_context_status", "impact_files", "select_tests"]
+}
+```
+
+The manifest is capped at 16 planes and 64 KiB. `fileScope` persists only a
+mode, count, and SHA-256 set identity—never raw task paths. `projectIdentity`
+is a SHA-256 identity of the canonical project root, never the path. Absent means an
+ordinary or pre-feature Run. Plane pointers name exact immutable graph-owned
+evidence; an evicted pointer is reported as missing and a retained-but-replaced
+inventory is reported as stale, without exposing or substituting the newer
+identity. The parent Run can still be replayed in either case. Context evidence
+does not appear in `reviewBrief`, fingerprints, baselines, SARIF, or generic
+Tool sessions. `run_steps.evidence` is explicitly discriminated as
+`signal-envelope` or `evidence-snapshots` and stores only bounded projections,
+never snapshot payloads or source text.
+
+For `get_context_status`, do not trust `fileScope.status: matched` alone. Require
+response `status: available`, `manifest.readiness: ready`, and every required
+plane to be current, complete, uncapped, and backed by an exact pointer whose
+replay status is `available`.
 
 ### `ReviewBrief`
 
@@ -334,7 +398,7 @@ per-tool output.
 | `verdict` | `"pass"` \| `"warn"` \| `"fail"` | yes | `fail` for error-severity risks, `warn` for warning-only risks or degraded evidence, `pass` when clean. |
 | `changedFiles` | number \| `null` | yes | Changed-file count when trustworthy; `null` when unavailable. |
 | `topRisks` | `ReviewBriefRisk[]` | yes | Deterministically ranked current risks, capped by the host. |
-| `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. |
+| `newFindings` | `ReviewBriefRisk[]` | yes | Risks explicitly marked new by baseline evidence. Empty when baseline state is unavailable. Can diverge from `topRisks` when older high-severity risks fill the top cap — the Change Impact report lists both sections so net-new findings are not lost. |
 | `correlatedRisks` | `ReviewBriefCorrelationGroup[]` | no | Bounded, explainable groups of related risks. Additive and absent when no group has at least two risks. |
 | `baselineDelta` | object | yes | `{ available, added, removed, unchanged }`; `available:false` means the suite did not capture compare evidence. |
 | `degraded` | object[] | yes | Evidence-quality notes such as missing envelopes, step faults, missing fingerprints, partial impact verification, or failing verdicts without signals. |
@@ -446,8 +510,8 @@ existing SARIF path when SARIF is required.
 | `verdict` | `RunVerdict` | yes | Run-level pass/fail header. See below. |
 | `units` | `UnitResult[]` | yes | Per-unit ran/errored/timing facts. May be `[]`. |
 | `signals` | `Signal[]` | yes | The flat list of findings the run produced. May be `[]`. |
-| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
-| `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0097-gate-verdict-determinism.md)). |
+| `baselineIdentity` | `{ fingerprintStrategyId: string; fingerprintStrategyVersion: number }` | yes | Fingerprint strategy that stamped signal fingerprints; persisted on `--gate-save` and compared on `--gate-compare` ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)). |
+| `declaredInputs` | `DeclaredInputs` | no | Host-stamped verdict provenance: CLI/Node/package-manager/platform/tool/engine/baseline identity. Optional for additive compatibility; absence means an older/no-manifest producer ([ADR-0097](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0097-gate-verdict-determinism.md)). |
 | `resolutionMode` | `"exact"` \| `"fast"` | no | **graph-only** edge-fidelity marker. Absent for `fit` / `sim`. |
 
 ### `DeclaredInputs`
@@ -539,7 +603,7 @@ A **unit** is the neutral umbrella over a fit check, a graph rule, and a sim sce
 
 ### `Signal`
 
-Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/core/src/types/signal.ts)).
+Each entry in `signals[]` is a `Signal` ([`packages/core/src/types/signal.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/types/signal.ts)).
 It carries 4-level severity, a `category`, a `provider`, a `fingerprint`, and a
 fix hint with confidence.
 
@@ -584,7 +648,7 @@ fix hint with confidence.
 | `strength` | number | no | Optional signal-strength weight. |
 | `fingerprint` | string | no | Stable de-dup fingerprint when the producer computes one. |
 | `createdAt` | string (ISO 8601) | yes | When the signal was created. |
-| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. SARIF exports only a bounded repair projection in `result.properties.repair`. |
+| `repair` | `SignalRepair` | no | Structured repair guidance for agents ([ADR-0086](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0086-signal-repair-metadata.md)). Omitted when no guidance exists. SARIF exports only a bounded repair projection in `result.properties.repair`. |
 
 #### `SignalRepair` (optional)
 
@@ -683,7 +747,7 @@ The line and column are **1-based** to match SARIF and most editor conventions. 
 All envelope-producing tools emit the **same envelope**; the differences are confined to a few fields:
 
 - **`fit`** — `tool: "fit"`; each unit is a check (`slug` = check slug); signal `ruleId` is `fit:<slug>`. Units carry the fitness-only `filesValidated` / `itemType` / `ignoredCount`. Scoped changed runs may include envelope-level `verification` impact-trust metadata (`coverage`, `fallback`, `fullyVerified`, `uncertainties`).
-- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `near-duplicate-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/graph/engine/src/cli/build-envelope.ts).
+- **`graph`** — `tool: "graph"`; each unit is a graph rule; signal `ruleId` / `source` are the OpenSIP-convention id (`graph.<family>.<rule>`). The graph rules: `orphan-subtree`, `duplicated-function-body`, `near-duplicate-function-body`, `no-side-effect-path`, `test-only-reachable`, `always-throws-branch`, `large-function`, `wide-function`, `high-blast-untested`, `cycle`, `unexpected-coupling`. The graph envelope also carries the optional `resolutionMode` marker. Graph builds the envelope in [`packages/graph/engine/src/cli/build-envelope.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/graph/engine/src/cli/build-envelope.ts).
 - **`sim`** — `tool: "sim"`; each unit is a scenario (`slug` = scenario id,
   `error` set when a scenario errored).
 - **`yagni`** — `tool: "yagni"`; each unit is a detector and findings carry `metadata.yagni` evidence such as confidence, preservation argument, and validation steps.
@@ -758,7 +822,7 @@ OpenSIP property bags. See [`10-concepts/05-architecture-gate.md`](/docs/opensip
 ## Native Evidence Authority
 
 OpenSIP Cloud signal sync uses the native `SignalBatch` wire contract from
-[`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/core/src/types/signal-batch.ts).
+[`packages/core/src/types/signal-batch.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/types/signal-batch.ts).
 The batch has `schemaVersion: 1`; spec 20 adds an optional `evidence` header
 without bumping that version.
 
@@ -799,7 +863,7 @@ otherwise the header is present but downgraded to `external-untrusted`.
 
 When `fit`/`graph`/`sim` run with `--json` and any `--filter` token (or
 `sessions show` with filters), the payload includes filter metadata
-([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0085-change-detection-substrate.md)):
+([ADR-0085](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0085-change-detection-substrate.md)):
 
 ```jsonc
 {
@@ -822,6 +886,13 @@ filtered result object is emitted.
   "exitCode": 0,
   "data": {
     "type": "graph-impact",
+    "catalog": {
+      "builtAt": "2026-07-12T18:00:00.000Z",
+      "language": "typescript",
+      "filesFingerprint": "<64 lowercase hex characters>",
+      "resolutionMode": "exact",
+      "cacheKeyDigest": "<64 lowercase hex characters>"
+    },
     "basis": { "type": "changed", "ref": "main" },
     "changedFiles": ["src/foo.ts"],
     "changedFunctions": [ /* ImpactFunction[] */ ],
@@ -843,6 +914,56 @@ filtered result object is emitted.
 `trust.fullyVerified` is the field agents should inspect before claiming a
 targeted verification was complete. Non-empty `uncertainties[]` explain why the
 result is partial or unknown.
+
+`catalog` is optional only for results produced before catalog identity was
+added or when a loaded legacy identity cannot be represented safely. The cache
+key and file fingerprint fields are SHA-256 digests; their raw forms are never
+copied because they can contain absolute paths. The delivered
+`SignalEnvelope.verification` equals the result's full `trust` value.
+
+#### Stored graph-impact report projection
+
+Every current graph-impact command also returns a generic session contribution,
+including wrapped and raw JSON modes. Graph owns an optional bounded `impact`
+field inside its opaque `GraphSessionPayload.__version: 1`:
+
+```jsonc
+{
+  "__version": 1,
+  "impactStatus": "available",
+  "impact": {
+    "catalog": { /* the bounded identity above */ },
+    "basis": { "type": "changed", "source": "git", "warningCodes": [] },
+    "changedFiles": ["src/foo.ts"],
+    "changedFunctions": [ /* bounded ImpactFunction[] */ ],
+    "impactedFunctions": [ /* bounded ImpactFunction[] */ ],
+    "impactedFiles": ["src/caller.ts", "src/foo.ts"],
+    "impactedPackages": [ /* bounded ImpactPackage[] */ ],
+    "trust": { /* bounded display copy; envelope verification is authoritative */ },
+    "recommendedCommands": ["opensip fit --changed --include-impacted --json"],
+    "truncated": false,
+    "omitted": {
+      "changedFiles": 0,
+      "changedFunctions": 0,
+      "impactedFunctions": 0,
+      "impactedFiles": 0,
+      "impactedPackages": 0,
+      "recommendedCommands": 0
+    },
+    "detailTruncated": false,
+    "metadataOmitted": false
+  }
+}
+```
+
+Caps are 200 changed files, 200 changed functions, 500 impacted functions, 500
+impacted files, 100 impacted packages, 20 recommended commands, and 1 MiB for
+the complete UTF-8 projection. Exact omitted counts distinguish persisted
+truncation from zero. `impactStatus: "omitted-overflow"` means analysis
+completed but the scalar projection could not fit; `impact` is absent in that
+case. Both status and projection absent means a legacy or non-impact session.
+These storage states never change the analysis verdict or process exit code.
+See [ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
 
 ### `graph lookup --json`
 

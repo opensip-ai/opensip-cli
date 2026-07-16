@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-09
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "The fitness loop"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "One check, end to end. Definition → loading → recipe selection → scope resolution → execution → signal → render → exit. The spine of the doc set."
@@ -122,7 +122,7 @@ Source: [`packages/core/src/lib/paths.ts`](../../../packages/core/src/lib/paths.
 
 The handler resolves two things:
 
-1. **Project paths.** `resolveProjectPaths(cwd)` returns the canonical layout: where the config file is, where checks live, where the runtime dir is, where the gate baseline default lives. Every other component reads paths through this resolver — there's no `path.join('opensip-cli', '.runtime', ...)` scattered through the codebase.
+1. **Project and runtime paths.** Project discovery resolves config and authored content. `resolveRuntimePathsForScope(...)` then selects the active local runtime: managed user cache for a zero-config project, project `.runtime` after initialization. Cross-mode host-owned persistence consumers use that scope-aware seam; project-only plugin/adapter paths remain separately bounded.
 2. **The project config.** Read from `<project>/opensip-cli.config.yml` (or the path passed via `--config`). The config carries `targets:`, `plugins:`, `globalExcludes:`, recipe overrides, and reporting defaults. See [`70-reference/03-configuration.md`](../70-reference/03-configuration.md) for the full schema.
 
 If the config is missing, first-run eligible commands such as `fit` synthesize a
@@ -244,7 +244,13 @@ The fitness Tool **returns its `SignalEnvelope`** via `CommandResult`; the CLI c
 - **SARIF** (via `--gate-save`/`--gate-compare`/`--report-to`/`fit export --format baseline`) — the shared `formatSignalSarif` formatter, owned by the root (`cli.writeSarif` / `cli.deliverSignals`).
 - **default (Ink)** — `cli.renderLive('fit', args)` mounts a live Ink view that transitions from spinner → results table → summary footer. The fitness Tool doesn't depend on Ink directly; it calls back through `ToolCliContext.renderLive`, which the CLI implements.
 
-After rendering, the report auto-open runs if conditions allow: `--open` was passed (or the user opted into auto-open in their config), output isn't `--json`, and stdout is a TTY. The HTML report at `<project>/opensip-cli/.runtime/reports/latest.html` opens in the user's default browser (a single rolling file overwritten on each generation, not a per-run archive).
+After rendering, the report hook runs only when `--open` was passed and browser
+policy accepts the request (including non-JSON, TTY, non-CI conditions). It
+generates the HTML report under the active local runtime's
+`reports/latest.html` and opens it in the user's default browser. The file is a
+single rolling snapshot overwritten on each generation, not a per-run archive.
+Before initialization that runtime is in the managed user cache; afterward it
+is the project's `.runtime/`.
 
 The exit code is set by the fitness Tool via `cli.setExitCode(code)`:
 
@@ -254,7 +260,7 @@ The exit code is set by the fitness Tool via `cli.setExitCode(code)`:
 
 The CLI process exits when Node's event loop drains, which happens after Ink unmounts and the dashboard launcher returns.
 
-> **Where the example lands:** stdout shows a table with two failed checks (`no-console-log: 2 violations`, plus one other failure from a different check). The exit code is `1`. The dashboard does not auto-open because the example invocation was non-interactive (CI). The session record is persisted as a row in `acme-api/opensip-cli/.runtime/datastore.sqlite` (tool `fit`, recipe `default`) via `SessionRepo`.
+> **Where the example lands:** stdout shows a table with two failed checks (`no-console-log: 2 violations`, plus one other failure from a different check). The exit code is `1`. The dashboard does not auto-open because the example invocation was non-interactive (CI). In this example `acme-api` is initialized, so the session record is persisted as a row in `acme-api/opensip-cli/.runtime/datastore.sqlite` (tool `fit`, recipe `default`) via `SessionRepo`.
 
 ---
 

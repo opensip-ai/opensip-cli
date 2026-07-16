@@ -46,4 +46,28 @@ describe('tool config read helpers', () => {
       }),
     ).toThrow(ConfigurationError);
   });
+
+  it('parses with a function parser and rethrows ConfigurationError without wrapping', () => {
+    expect(
+      readOptionalToolConfig(
+        cliWithToolConfig({ graph: { threshold: 9 } }),
+        'graph',
+        (raw) => raw as { threshold: number },
+      ),
+    ).toEqual({ threshold: 9 });
+
+    expect(() =>
+      readOptionalToolConfig(cliWithToolConfig({ graph: { threshold: 1 } }), 'graph', () => {
+        throw new ConfigurationError('already shaped');
+      }),
+    ).toThrow('already shaped');
+  });
+
+  it('wraps unexpected parser throws as ConfigurationError', () => {
+    expect(() =>
+      readOptionalToolConfig(cliWithToolConfig({ graph: { threshold: 1 } }), 'graph', () => {
+        throw new TypeError('boom');
+      }),
+    ).toThrow(ConfigurationError);
+  });
 });

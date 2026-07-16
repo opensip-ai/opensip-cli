@@ -9,7 +9,7 @@
  * report renderer is covered without depending on the Ink runner.
  */
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -257,7 +257,9 @@ let projectDir: string;
 beforeEach(() => {
   // Item 1: graph adapter + rule registries are per-RunScope.
   enterScope(makeGraphTestScope());
-  projectDir = mkdtempSync(join(tmpdir(), 'graph-test-proj-'));
+  // DiscoverOutput requires realpath-normalized roots/files. On macOS tmpdir()
+  // uses /var while executeGraph canonicalizes the run root to /private/var.
+  projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-test-proj-')));
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
@@ -544,7 +546,7 @@ describe('executeGraph — --workspace aggregation', () => {
   let datastore: DataStore;
 
   beforeEach(() => {
-    workDir = mkdtempSync(join(tmpdir(), 'graph-workspace-'));
+    workDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-workspace-')));
     datastore = DataStoreFactory.open({ backend: 'memory' });
     currentAdapterRegistry().register(fakeAdapter(workDir));
   });

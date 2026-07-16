@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 
 import { ConfigurationError, readPackageVersion } from '@opensip-cli/core';
 import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
@@ -10,16 +10,107 @@ import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
 export const SPOTBUGS_IDENTITY: ToolIdentity = { name: 'spotbugs' };
 export const SPOTBUGS_STABLE_ID = '47a950e0-f631-4d80-aa35-02968ef97747';
 
-function classTargets(projectRoot: string): readonly string[] {
-  const candidates = [
-    'target/classes',
-    'build/classes/java/main',
-    'build/classes',
-    'out/production',
-  ];
-  return candidates
-    .map((candidate) => join(projectRoot, candidate))
-    .filter((path) => existsSync(path));
+/** Well-known class output directory suffixes (Maven / Gradle / IntelliJ). */
+const CLASS_DIR_SUFFIXES = [
+  'target/classes',
+  'build/classes/java/main',
+  'build/classes',
+  'out/production',
+] as const;
+
+/** Bound the walk so monorepos cannot force unbounded FS scans. */
+const MAX_WALK_DEPTH = 6;
+const MAX_DIRS_VISITED = 400;
+const SKIP_DIR_NAMES = new Set([
+  '.git',
+  'node_modules',
+  '.runtime',
+  'opensip-cli',
+  'src',
+  'test',
+  'tests',
+  'docs',
+  'vendor',
+  'dist',
+]);
+
+/**
+ * Discover compiled class directories under the project root: first the well-known
+ * top-level candidates, then a bounded walk for nested modules (e.g.
+ * `modules/api/target/classes`).
+ */
+function matchesClassDirSuffix(relativePath: string): boolean {
+  for (const suffix of CLASS_DIR_SUFFIXES) {
+    if (relativePath === suffix || relativePath.endsWith(`/${suffix}`)) return true;
+  }
+  return false;
+}
+
+function collectWellKnownClassDirs(projectRoot: string, found: Set<string>): void {
+  for (const candidate of CLASS_DIR_SUFFIXES) {
+    const full = join(projectRoot, candidate);
+    if (existsSync(full) && isDirectory(full)) found.add(full);
+  }
+}
+
+function walkNestedClassDirs(projectRoot: string, found: Set<string>): void {
+  // Bounded BFS for nested Maven/Gradle module layouts.
+  const queue: { dir: string; depth: number }[] = [{ dir: projectRoot, depth: 0 }];
+  let visited = 0;
+  while (queue.length > 0 && visited < MAX_DIRS_VISITED) {
+    const next = queue.shift();
+    if (next === undefined) break;
+    const { dir, depth } = next;
+    visited += 1;
+    if (depth >= MAX_WALK_DEPTH) continue;
+    enqueueChildClassDirs(projectRoot, dir, depth, queue, found);
+  }
+}
+
+function enqueueChildClassDirs(
+  projectRoot: string,
+  dir: string,
+  depth: number,
+  queue: { dir: string; depth: number }[],
+  found: Set<string>,
+): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    // intentionally skip unreadable dirs during class discovery
+    return;
+  }
+
+  for (const name of entries) {
+    // Skip VCS / tooling / source trees we never need for class discovery.
+    if (name.startsWith('.') || SKIP_DIR_NAMES.has(name)) continue;
+    const child = join(dir, name);
+    if (!isDirectory(child)) continue;
+
+    const rel = relative(projectRoot, child).split(sep).join('/');
+    if (matchesClassDirSuffix(rel)) found.add(child);
+    queue.push({ dir: child, depth: depth + 1 });
+  }
+}
+
+/**
+ * Discover compiled class-output directories under `projectRoot` (well-known
+ * Maven/Gradle/IntelliJ layouts, then a bounded nested walk).
+ */
+export function classTargets(projectRoot: string): readonly string[] {
+  const found = new Set<string>();
+  collectWellKnownClassDirs(projectRoot, found);
+  walkNestedClassDirs(projectRoot, found);
+  return [...found].sort();
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /**

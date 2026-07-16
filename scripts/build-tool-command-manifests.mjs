@@ -33,12 +33,18 @@
  * Mirrors build-package-keywords.mjs (sibling generator + gate).
  */
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const CHECK_ONLY = process.argv.slice(2).includes('--check');
+const require = createRequire(import.meta.url);
+const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
+const {
+  readProductionToolPackageInventory,
+} = require('./lib/workspace-tool-package-inventory.cjs');
 const BUNDLED_TOOLS_MANIFEST_PATH = join(
   REPO_ROOT,
   'packages',
@@ -75,29 +81,10 @@ async function loadAdapterManifestHelpers() {
   return adapterManifestHelpers;
 }
 
-function workspacePackageDirs() {
-  const packagesDir = join(REPO_ROOT, 'packages');
-  const dirs = [];
-  for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const topLevel = join(packagesDir, entry.name);
-    if (existsSync(join(topLevel, 'package.json'))) dirs.push(topLevel);
-    for (const child of readdirSync(topLevel, { withFileTypes: true })) {
-      if (!child.isDirectory()) continue;
-      const nested = join(topLevel, child.name);
-      if (existsSync(join(nested, 'package.json'))) dirs.push(nested);
-    }
-  }
-  return dirs;
-}
-
 function workspacePackageDirByName() {
-  const byName = new Map();
-  for (const dir of workspacePackageDirs()) {
-    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-    if (typeof pkg.name === 'string') byName.set(pkg.name, relative(REPO_ROOT, dir));
-  }
-  return byName;
+  return new Map(
+    readWorkspacePackageManifests(REPO_ROOT).map((pkg) => [pkg.name, pkg.relativeDir]),
+  );
 }
 
 /**
@@ -141,13 +128,9 @@ const BUNDLED_TOOL_DIRS = bundledToolDirs();
  * below is the generator-local equivalent already used for bundled tools.
  */
 function adapterToolDirs() {
-  return workspacePackageDirs()
-    .map((dir) => relative(REPO_ROOT, dir))
-    .filter((dir) => dir.startsWith('packages/tool-'))
-    .filter((dir) => {
-      const pkg = JSON.parse(readFileSync(join(REPO_ROOT, dir, 'package.json'), 'utf8'));
-      return pkg.opensipTools?.kind === 'tool';
-    })
+  return readProductionToolPackageInventory(REPO_ROOT)
+    .filter((tool) => !tool.bundled)
+    .map((tool) => tool.relativeDir)
     .sort();
 }
 
@@ -206,6 +189,8 @@ function deriveCommandShell(spec) {
   // Carry the verdict-capability so the host (which synthesizes external tools
   // from the manifest, no runtime import) knows a scan command is suite-eligible.
   if (spec.producesVerdict !== undefined) shell.producesVerdict = spec.producesVerdict;
+  if (spec.producesEvidenceSnapshot !== undefined)
+    shell.producesEvidenceSnapshot = spec.producesEvidenceSnapshot;
   return shell;
 }
 

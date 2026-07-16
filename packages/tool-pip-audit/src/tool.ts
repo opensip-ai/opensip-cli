@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readPackageVersion } from '@opensip-cli/core';
+import { ConfigurationError, readPackageVersion } from '@opensip-cli/core';
 import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
 
 import { parsePipAuditJson } from './parse-pip-audit-json.js';
@@ -12,27 +12,52 @@ import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
 export const PIP_AUDIT_IDENTITY: ToolIdentity = { name: 'pip-audit' };
 export const PIP_AUDIT_STABLE_ID = '898272b0-385c-4905-beb9-383de034bfd9';
 
+const REQUIREMENTS_CANDIDATES = [
+  'requirements.txt',
+  'requirements-dev.txt',
+  'requirements.lock',
+] as const;
+
+// Upstream pip-audit project-path resolution only accepts pyproject.toml
+// (and pylock with --locked). setup.py / setup.cfg are NOT valid project roots.
+const PROJECT_MANIFEST_CANDIDATES = ['pyproject.toml'] as const;
+
 function requirementsFile(projectRoot: string): string | undefined {
-  for (const name of ['requirements.txt', 'requirements-dev.txt', 'requirements.lock']) {
+  for (const name of REQUIREMENTS_CANDIDATES) {
     const fullPath = join(projectRoot, name);
     if (existsSync(fullPath)) return fullPath;
   }
   return undefined;
 }
 
+function hasProjectManifest(projectRoot: string): boolean {
+  return PROJECT_MANIFEST_CANDIDATES.some((name) => existsSync(join(projectRoot, name)));
+}
+
 /**
- * Build the CLI args for a pip-audit run. Audits a discovered requirements file
- * when one exists, otherwise the active Python environment; writes JSON to the
- * artifact path with the progress spinner disabled.
+ * Build the CLI args for a pip-audit run.
+ *
+ * Target selection (never silently audits the ambient Python env):
+ * 1. A requirements file (`-r`) when one is present.
+ * 2. Otherwise a project path (positional) when `pyproject.toml` exists —
+ *    pip-audit resolves project dependencies from that tree.
+ * 3. Otherwise {@link ConfigurationError}: there is no project-scoped dependency
+ *    source, and auditing the active environment would be ambient and non-deterministic.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   const requirements = requirementsFile(ctx.projectRoot);
-  // With a requirements file, audit it. Otherwise audit the ACTIVE Python
-  // environment (pip-audit's default with no target). We deliberately do NOT pass
-  // `--path <projectRoot>`: `--path` targets an installed environment's
-  // site-packages directory, not a project source tree, so pointing it at the repo
-  // root either errors or audits the wrong thing.
-  const targetArgs = requirements === undefined ? [] : ['-r', requirements];
+  let targetArgs: readonly string[];
+  if (requirements !== undefined) {
+    targetArgs = ['-r', requirements];
+  } else if (hasProjectManifest(ctx.projectRoot)) {
+    // Positional project_path (not `--path`, which targets a site-packages dir).
+    targetArgs = [ctx.projectRoot];
+  } else {
+    throw new ConfigurationError(
+      'pip-audit requires a requirements file (requirements.txt) or a Python project manifest (pyproject.toml).',
+      { code: 'ADAPTER.CONFIG.MISSING_DEPENDENCY_SOURCE' },
+    );
+  }
   return [
     ...targetArgs,
     '--format',

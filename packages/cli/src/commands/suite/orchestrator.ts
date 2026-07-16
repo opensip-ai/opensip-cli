@@ -1,6 +1,12 @@
 import { performance } from 'node:perf_hooks';
 
 import {
+  EXIT_CODES,
+  type SuiteRunResult,
+  type SuiteRunScope,
+  type SuiteStepSummary,
+} from '@opensip-cli/contracts';
+import {
   currentLogger,
   currentScope,
   generatePrefixedId,
@@ -11,15 +17,21 @@ import {
 import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabilities.js';
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 
+import { type SuiteSource } from './built-in-suites.js';
 import { buildReviewBrief } from './review-brief-builder.js';
-import { persistSuiteRun } from './run-ledger-persist.js';
+import { allocateSuiteLedgerIdentity, persistSuiteRun } from './run-ledger-persist.js';
 import { resolveSuiteScope } from './suite-scope.js';
 import { runStepsSerially, type SuiteStepEvent } from './suite-step-runner.js';
+import {
+  logTaskContextManifest,
+  prepareTaskContext,
+  resultWithPersistence,
+  taskContextManifestFor,
+  taskContextPointersAvailable,
+} from './task-context-orchestration.js';
 import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
-import type { SuiteSource } from './built-in-suites.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
-import type { SuiteRunResult, SuiteStepSummary } from '@opensip-cli/contracts';
 
 export interface RunSuiteInput {
   readonly name: string;
@@ -34,32 +46,29 @@ export interface RunSuiteInput {
   readonly onStepEvent?: (event: SuiteStepEvent) => void;
 }
 
-export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
-  const suite = validateSuite({
-    name: input.name,
-    suite: input.suite,
-    tools: input.tools,
-  });
-  const suiteRunId = generatePrefixedId('suite');
-  const started = performance.now();
-  const startedAt = new Date();
-  const log = currentLogger();
-  const cwd = typeof input.suiteOpts.cwd === 'string' ? input.suiteOpts.cwd : process.cwd();
-  const scope = resolveSuiteScope({
-    cwd,
-    suiteOpts: input.suiteOpts,
-    defaultChanged: input.defaultChanged === true,
-  });
+function contextPersistencePrecondition(manifest: SuiteRunResult['contextManifest']): {
+  readonly persistencePrecondition?: () => boolean;
+} {
+  if (manifest === undefined || manifest.readiness === 'unavailable') return {};
+  return { persistencePrecondition: () => taskContextPointersAvailable(manifest) };
+}
 
+function logSuiteScope(
+  log: ReturnType<typeof currentLogger>,
+  suiteName: string,
+  suiteRunId: string,
+  scope: SuiteRunScope,
+  stepCount: number,
+): void {
   log.info?.({
     evt: 'cli.suite.run.start',
-    suite: suite.name,
+    suite: suiteName,
     suiteRunId,
-    stepCount: suite.steps.length,
+    stepCount,
   });
   log.debug?.({
     evt: 'cli.suite.scope.resolved',
-    suite: suite.name,
+    suite: suiteName,
     suiteRunId,
     mode: scope.mode,
     source: scope.source,
@@ -69,30 +78,18 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   if (scope.source === 'fallback') {
     log.warn?.({
       evt: 'cli.suite.scope.fallback',
-      suite: suite.name,
+      suite: suiteName,
       suiteRunId,
       reason: scope.notice,
     });
   }
+}
 
-  await loadSuiteStepCapabilities(suite);
-
-  const internalSteps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
-    runStepsSerially({
-      suite,
-      suiteRunId,
-      ctx: input.ctx,
-      runActionHooks: input.runActionHooks,
-      suiteOpts: input.suiteOpts,
-      defaultChanged: scope.mode === 'changed' && scope.source === 'default',
-      fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
-        defaultChanged: input.defaultChanged === true,
-        fullScope: scope.mode === 'full',
-      }),
-      ...(input.onStepEvent === undefined ? {} : { onStepEvent: input.onStepEvent }),
-    }),
-  );
-  const steps = internalSteps.map((step) => step.summary);
+function computeSuiteExitCode(
+  steps: readonly SuiteStepSummary[],
+  failOnFault: boolean,
+  contextUnavailable: boolean,
+): number {
   // Worst-of suite exit is deliberately a numeric `Math.max` over the ADR-0020
   // code space (ratified in ADR-0093 / ADR-0100 — see ADR-0131): any failing
   // step fails the suite. After Tasks 1.2/1.3 every step exit source (setExitCode,
@@ -108,29 +105,104 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
   // envelope: a thrown command, ConfigurationError, or ToolError before results,
   // ADR-0060) keeps its ADR-0020 exit taxonomy and still blocks. `failOnFault`
   // (suite execution policy, default false) opts every fault back into blocking.
-  const failOnFault = input.suite.execution?.failOnFault === true;
   const isNonBlockingFault = (step: SuiteStepSummary): boolean =>
     step.outcome === 'faulted' && step.verdict !== undefined;
   const blockingSteps = failOnFault ? steps : steps.filter((step) => !isNonBlockingFault(step));
-  const exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
-  const aggregate = deriveSuiteAggregate(steps);
-  const reviewBrief = buildReviewBrief({
-    suite: suite.name,
-    suiteRunId,
-    steps: internalSteps,
-    changedFiles: scope.mode === 'changed' ? (scope.changedFiles ?? null) : null,
-  });
-  const durationMs = Math.max(0, performance.now() - started);
+  let exitCode = Math.max(0, ...blockingSteps.map((step) => step.exitCode));
+  if (contextUnavailable && failOnFault) {
+    exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
+  }
+  return exitCode;
+}
 
-  log.info?.({
-    evt: 'cli.suite.brief.built',
-    suite: suite.name,
-    suiteRunId,
-    verdict: reviewBrief.verdict,
-    risks: reviewBrief.topRisks.length,
-    correlatedRisks: reviewBrief.correlatedRisks?.length ?? 0,
-    degraded: reviewBrief.degraded.length,
+export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
+  const suite = validateSuite({
+    name: input.name,
+    suite: input.suite,
+    tools: input.tools,
   });
+  const suiteRunId = generatePrefixedId('suite');
+  const started = performance.now();
+  const startedAt = new Date();
+  const log = currentLogger();
+  const requestedCwd =
+    typeof input.suiteOpts.cwd === 'string' ? input.suiteOpts.cwd : process.cwd();
+  const context = await prepareTaskContext(input, suite, requestedCwd);
+  const cwd = context.cwd;
+  const suiteOpts = context.aggregates ? { ...input.suiteOpts, cwd } : input.suiteOpts;
+  const scope = resolveSuiteScope({
+    cwd,
+    suiteOpts,
+    defaultChanged: input.defaultChanged === true,
+  });
+
+  // When scope resolves to full (explicit --full or fallback from failed
+  // changed-file resolution), force full-mode step propagation so failed
+  // selectors (changed/since) are not re-sent and graph-impact full-file
+  // injection is not blocked by hasRuntimeSelector.
+  const stepSuiteOpts: Record<string, unknown> =
+    scope.mode === 'full' ? { ...suiteOpts, full: true } : suiteOpts;
+
+  logSuiteScope(log, suite.name, suiteRunId, scope, suite.steps.length);
+
+  await loadSuiteStepCapabilities(suite, context.aggregates ? cwd : undefined);
+
+  const internalSteps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
+    runStepsSerially({
+      suite,
+      suiteRunId,
+      ctx: input.ctx,
+      runActionHooks: input.runActionHooks,
+      suiteOpts: stepSuiteOpts,
+      defaultChanged: scope.mode === 'changed' && scope.source === 'default',
+      fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
+        defaultChanged: input.defaultChanged === true,
+        fullScope: scope.mode === 'full',
+      }),
+      ...(input.onStepEvent === undefined ? {} : { onStepEvent: input.onStepEvent }),
+    }),
+  );
+  const steps = internalSteps.map((step) => step.summary);
+  const failOnFault = input.suite.execution?.failOnFault === true;
+  const aggregate = deriveSuiteAggregate(steps);
+  const reviewBrief = context.aggregates
+    ? undefined
+    : buildReviewBrief({
+        suite: suite.name,
+        suiteRunId,
+        steps: internalSteps,
+        changedFiles: scope.mode === 'changed' ? (scope.changedFiles ?? null) : null,
+      });
+  if (reviewBrief !== undefined) {
+    log.info?.({
+      evt: 'cli.suite.brief.built',
+      suite: suite.name,
+      suiteRunId,
+      verdict: reviewBrief.verdict,
+      risks: reviewBrief.topRisks.length,
+      correlatedRisks: reviewBrief.correlatedRisks?.length ?? 0,
+      degraded: reviewBrief.degraded.length,
+    });
+  }
+
+  const ledgerIdentity = allocateSuiteLedgerIdentity(internalSteps);
+  const contextManifest = await taskContextManifestFor({
+    preparation: context,
+    ledger: ledgerIdentity,
+    steps: internalSteps,
+  });
+  const exitCode = computeSuiteExitCode(
+    steps,
+    failOnFault,
+    contextManifest?.readiness === 'unavailable',
+  );
+  logTaskContextManifest(suite.name, contextManifest);
+
+  // Source-end capture is part of the context run's evidence work. Freeze both
+  // completion clocks only after it finishes so persisted wall time and the
+  // reported monotonic duration cover the same operation boundary.
+  const completedAt = new Date();
+  const durationMs = Math.max(0, performance.now() - started);
 
   log.info?.({
     evt: 'cli.suite.run.complete',
@@ -141,8 +213,7 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     aggregate,
   });
 
-  const completedAt = new Date();
-  const result: SuiteRunResult = {
+  const baseResult: SuiteRunResult = {
     type: 'suite-run',
     suite: suite.name,
     suiteRunId,
@@ -151,18 +222,21 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     scope,
     aggregate,
     steps,
-    reviewBrief,
+    ...(reviewBrief === undefined ? {} : { reviewBrief }),
+    ...(contextManifest === undefined ? {} : { contextManifest }),
     verbose: input.suiteOpts.verbose === true,
   };
-  persistSuiteRun({
-    result,
+  const runId = persistSuiteRun({
+    result: baseResult,
     internalSteps,
     source: input.source ?? 'configured',
     cwd,
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
+    identity: ledgerIdentity,
+    ...contextPersistencePrecondition(contextManifest),
   });
-  return result;
+  return resultWithPersistence(baseResult, runId);
 }
 
 export function deriveSuiteAggregate(
@@ -209,11 +283,14 @@ export function deriveSuiteAggregate(
   };
 }
 
-async function loadSuiteStepCapabilities(suite: ValidatedSuite): Promise<void> {
+async function loadSuiteStepCapabilities(
+  suite: ValidatedSuite,
+  projectRoot?: string,
+): Promise<void> {
   const loaded = new Set<string>();
   const scope = currentScope();
   if (scope?.capabilities === undefined) return;
-  const projectDir = scope?.projectContext?.projectRoot ?? process.cwd();
+  const projectDir = projectRoot ?? scope?.projectContext?.projectRoot ?? process.cwd();
   const pluginsConfig = scope?.configDocument?.plugins ?? {};
   const log = currentLogger();
 

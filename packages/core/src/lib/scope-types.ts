@@ -20,7 +20,8 @@
  *   never read `scope.tools`. `RunScope` is a `ToolScope` plus `tools`.
  * - `ScopeContribution` — the augmentable slot bag a tool returns from
  *   `Tool.contributeScope()`. Tools augment THIS (not `RunScope`); the
- *   kernel `Object.assign`s it onto the scope. `RunScope`/`ToolScope`
+ *   kernel installs it via `applyToolContributeScope` (validated assign).
+ *   `RunScope`/`ToolScope`
  *   inherit the slots for reading.
  */
 
@@ -92,6 +93,50 @@ export interface TargetView {
   };
 }
 
+/** Bounds and cancellation for cooperative target expansion. */
+export interface BoundedTargetResolutionOptions {
+  /** Maximum number of unique absolute file paths retained in the result. */
+  readonly maxResults: number;
+  /** Cancels filesystem enumeration without discarding already bounded work. */
+  readonly signal?: AbortSignal;
+}
+
+/** Result of deterministic, bounded target expansion. */
+export interface BoundedTargetResolution {
+  /** Sorted, deduplicated absolute paths; never longer than the requested maximum. */
+  readonly files: readonly string[];
+  /** Result or traversal work ceilings prevented proof of complete enumeration. */
+  readonly capped: boolean;
+  /** Enumeration stopped because the caller's signal was aborted. */
+  readonly cancelled: boolean;
+}
+
+/** One bounded file-to-target membership projection from a shared target walk. */
+export interface BoundedTargetMembership {
+  /** Absolute path retained by the bounded target walk. */
+  readonly filePath: string;
+  /** Sorted, deduplicated target names that retain this file. */
+  readonly targetNames: readonly string[];
+}
+
+/** Bounds for a shared target-membership walk. */
+export interface BoundedTargetMembershipResolutionOptions extends BoundedTargetResolutionOptions {
+  /** Maximum target memberships retained for any one file. */
+  readonly maxTargetsPerFile: number;
+}
+
+/** Result of one deterministic walk that preserves per-file target membership. */
+export interface BoundedTargetMembershipResolution {
+  /** Sorted, deduplicated file membership rows; never longer than `maxResults`. */
+  readonly memberships: readonly BoundedTargetMembership[];
+  /** Result or traversal work ceilings prevented complete file coverage. */
+  readonly capped: boolean;
+  /** Per-file target membership ceilings truncated at least one row. */
+  readonly membershipCapped: boolean;
+  /** Enumeration stopped because the caller's signal was aborted. */
+  readonly cancelled: boolean;
+}
+
 /**
  * The structural, host-built targeting accessor exposed on `scope.targets`
  * (ADR-0037). Names only the generic methods the host and any tool call to
@@ -123,6 +168,51 @@ export interface TargetResolver {
   applyGlobalExcludes(files: readonly string[], rootDir: string): readonly string[];
   /** The project-wide exclusion globs this resolver was built with. */
   readonly globalExcludes: readonly string[];
+}
+
+/**
+ * Additive capability for cooperative, hard-bounded target expansion.
+ *
+ * Kept separate from {@link TargetResolver} so existing structural resolver
+ * implementations remain source-compatible. Consumers that require bounded
+ * expansion must feature-detect this subtype and fail closed when it is absent;
+ * they must never fall back to the synchronous unbounded method.
+ */
+export interface BoundedTargetResolver extends TargetResolver {
+  /**
+   * Cooperatively resolve named targets while retaining a deterministic,
+   * hard-bounded file set. Implementations must apply the same target and
+   * global exclusions as {@link resolveTargets}.
+   */
+  resolveTargetsBounded(
+    names: readonly string[],
+    rootDir: string,
+    options: BoundedTargetResolutionOptions,
+  ): Promise<BoundedTargetResolution>;
+
+  /**
+   * Apply project-wide excludes to an already bounded candidate set without
+   * entering the legacy synchronous/unbounded filter path.
+   */
+  applyGlobalExcludesBounded(
+    files: readonly string[],
+    rootDir: string,
+    options: BoundedTargetResolutionOptions,
+  ): Promise<BoundedTargetResolution>;
+}
+
+/**
+ * Additive shared-walk capability for consumers that need exact per-file
+ * target membership without repeating a complete filesystem traversal for
+ * every target.
+ */
+export interface BoundedTargetMembershipResolver extends BoundedTargetResolver {
+  /** Resolve all named targets in one bounded walk and retain exact membership rows. */
+  resolveTargetMembershipsBounded(
+    names: readonly string[],
+    rootDir: string,
+    options: BoundedTargetMembershipResolutionOptions,
+  ): Promise<BoundedTargetMembershipResolution>;
 }
 
 /**
@@ -180,7 +270,7 @@ export interface ScopeContribution {
  * with nothing to dispose (graph, simulation).
  */
 export interface ScopeContributionWithDisposer {
-  /** The tool's subscope slot bag — installed onto the scope via Object.assign. */
+  /** The tool's subscope slot bag — installed via validated applyToolContributeScope. */
   readonly contribution: ScopeContribution;
   /**
    * Optional disposer invoked once when the scope is disposed. Registered by the

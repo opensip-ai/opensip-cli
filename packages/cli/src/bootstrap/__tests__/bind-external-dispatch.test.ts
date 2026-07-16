@@ -19,7 +19,7 @@ import type { Tool, ToolCliContext, ToolPluginManifest, ToolProvenance } from '@
 
 // Stub the fork supervisor so the hook's external arm is observable without a
 // real worker fork (and so `deepConfigBlockFor` is reached + asserted).
-const dispatchSpy = vi.fn(() => Promise.resolve());
+const dispatchSpy = vi.fn((_args: unknown) => Promise.resolve());
 vi.mock('../dispatch-external-tool-command.js', () => ({
   dispatchExternalToolCommand: (args: unknown) => dispatchSpy(args),
 }));
@@ -70,7 +70,7 @@ describe('buildMaybeDispatchExternal — provenance gate', () => {
     const scope = new RunScope({
       toolProvenance: [{ ...externalProvenance(), source: 'bundled' }],
     });
-    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx());
+    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx(), {});
 
     const handled = await runWithScopeSync(scope, () => hook('run', {}, []));
     expect(handled).toBe(false);
@@ -80,7 +80,7 @@ describe('buildMaybeDispatchExternal — provenance gate', () => {
   it('returns false when no provenance is recorded (the `?? []` fallback, L76)', async () => {
     // Run OUTSIDE any entered scope: `currentScope()` is undefined, so
     // `currentScope()?.toolProvenance ?? []` takes the `?? []` arm.
-    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx());
+    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx(), {});
     const handled = await hook('run', {}, []);
     expect(handled).toBe(false);
     expect(dispatchSpy).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('buildMaybeDispatchExternal — external arm forks + forwards config', 
     // construction; the constructor does not read it), so mirror that here.
     Object.assign(scope, { configDocument: { demo: { level: 'strict' } } });
     const ctx = makeCtx();
-    const hook = buildMaybeDispatchExternal(makeTool(), ctx);
+    const hook = buildMaybeDispatchExternal(makeTool(), ctx, {});
 
     const handled = await runWithScope(scope, () => hook('run', { x: 1 }, ['a']));
     expect(handled).toBe(true);
@@ -135,7 +135,7 @@ describe('buildMaybeDispatchExternal — external arm forks + forwards config', 
       ],
     });
     Object.assign(scope, { configDocument: { demo: { matched: 'by-name' } } });
-    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx());
+    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx(), {});
 
     const handled = await runWithScope(scope, () => hook('run', {}, []));
     expect(handled).toBe(true);
@@ -151,7 +151,7 @@ describe('buildMaybeDispatchExternal — external arm forks + forwards config', 
       toolManifests: [manifest({ stableId: TOOL_ID })], // no `config`
     });
     Object.assign(scope, { configDocument: { demo: { ignored: true } } });
-    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx());
+    const hook = buildMaybeDispatchExternal(makeTool(), makeCtx(), {});
 
     await runWithScope(scope, () => hook('run', {}, []));
     expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ config: undefined }));

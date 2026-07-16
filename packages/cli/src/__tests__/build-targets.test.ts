@@ -9,8 +9,8 @@ import { buildTargets } from '../bootstrap/build-targets.js';
 /**
  * Unit coverage for the host's pure `buildTargets` builder (ADR-0037 Phase 1):
  * the `toTarget` normalization matrix (default vs explicit exclude;
- * tags/languages/concerns optionals) and every TargetResolver method
- * (getAll/getByTag/applyGlobalExcludes/resolveTargets unknown-name filter).
+ * tags/languages/concerns optionals) and the synchronous, bounded, and shared
+ * membership TargetResolver surfaces.
  */
 
 let testDir: string;
@@ -132,6 +132,40 @@ describe('buildTargets — TargetResolver surface', () => {
     expect(targets?.applyGlobalExcludes(files, testDir)).toEqual([join(testDir, 'src/a.ts')]);
   });
 
+  it('applyGlobalExcludesBounded forwards exclusions, bounds, and cancellation', async () => {
+    fixture('src/a.ts');
+    fixture('src/b.ts');
+    fixture('dist/drop.ts');
+    const targets = buildTargets({
+      document: {
+        targets: { a: { description: 'a', include: ['src/**'] } },
+        globalExcludes: ['dist/**'],
+      },
+    });
+    const files = [
+      join(testDir, 'src/b.ts'),
+      join(testDir, 'dist/drop.ts'),
+      join(testDir, 'src/a.ts'),
+    ];
+
+    await expect(
+      targets?.applyGlobalExcludesBounded(files, testDir, { maxResults: 1 }),
+    ).resolves.toEqual({
+      files: [join(testDir, 'src/a.ts')],
+      capped: true,
+      cancelled: false,
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      targets?.applyGlobalExcludesBounded(files, testDir, {
+        maxResults: 1,
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({ files: [], capped: false, cancelled: true });
+  });
+
   it('returns undefined for a non-object or targets-less document', () => {
     expect(buildTargets({ document: null })).toBeUndefined();
     expect(buildTargets({ document: [] })).toBeUndefined();
@@ -150,6 +184,129 @@ describe('buildTargets — TargetResolver surface', () => {
     });
     const resolved = targets?.resolveTargets(['src', 'does-not-exist'], testDir) ?? [];
     expect(resolved.map((f) => f.slice(testDir.length + 1))).toEqual(['src/keep.ts']);
+  });
+
+  it('resolveTargetsBounded forwards the hard bound, exclusions, and cancellation', async () => {
+    fixture('src/a.ts');
+    fixture('src/b.ts');
+    fixture('src/generated/drop.ts');
+    const targets = buildTargets({
+      document: {
+        targets: { src: { description: 's', include: ['src/**/*.ts'] } },
+        globalExcludes: ['**/generated/**'],
+      },
+    });
+
+    const bounded = await targets?.resolveTargetsBounded(['src', 'missing'], testDir, {
+      maxResults: 1,
+    });
+    expect(bounded).toEqual({
+      files: [join(testDir, 'src/a.ts')],
+      capped: true,
+      cancelled: false,
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      targets?.resolveTargetsBounded(['src'], testDir, {
+        maxResults: 1,
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({ files: [], capped: false, cancelled: true });
+  });
+
+  it('resolveTargetMembershipsBounded preserves exact deterministic memberships and exclusions', async () => {
+    fixture('src/a.ts');
+    fixture('src/generated/drop.ts');
+    fixture('src/shared/b.ts');
+    fixture('src/shared/source-excluded.ts');
+    const targets = buildTargets({
+      document: {
+        targets: {
+          shared: { description: 'shared', include: ['src/shared/**/*.ts'] },
+          source: {
+            description: 'source',
+            include: ['src/**/*.ts'],
+            exclude: ['src/shared/source-excluded.ts'],
+          },
+        },
+        globalExcludes: ['**/generated/**'],
+      },
+    });
+    expect(targets).toBeDefined();
+    if (!targets) return;
+
+    const forward = await targets.resolveTargetMembershipsBounded(
+      ['source', 'missing', 'shared'],
+      testDir,
+      { maxResults: 10, maxTargetsPerFile: 10 },
+    );
+    const reverse = await targets.resolveTargetMembershipsBounded(['shared', 'source'], testDir, {
+      maxResults: 10,
+      maxTargetsPerFile: 10,
+    });
+
+    const expected = {
+      memberships: [
+        { filePath: join(testDir, 'src/a.ts'), targetNames: ['source'] },
+        {
+          filePath: join(testDir, 'src/shared/b.ts'),
+          targetNames: ['shared', 'source'],
+        },
+        {
+          filePath: join(testDir, 'src/shared/source-excluded.ts'),
+          targetNames: ['shared'],
+        },
+      ],
+      capped: false,
+      membershipCapped: false,
+      cancelled: false,
+    };
+    expect(forward).toEqual(expected);
+    expect(reverse).toEqual(expected);
+  });
+
+  it('resolveTargetMembershipsBounded enforces file and per-file caps and cancellation', async () => {
+    fixture('src/a.ts');
+    fixture('src/b.ts');
+    const targets = buildTargets({
+      document: {
+        targets: {
+          zeta: { description: 'zeta', include: ['src/**/*.ts'] },
+          alpha: { description: 'alpha', include: ['src/**/*.ts'] },
+        },
+      },
+    });
+    expect(targets).toBeDefined();
+    if (!targets) return;
+
+    await expect(
+      targets.resolveTargetMembershipsBounded(['zeta', 'alpha'], testDir, {
+        maxResults: 1,
+        maxTargetsPerFile: 1,
+      }),
+    ).resolves.toEqual({
+      memberships: [{ filePath: join(testDir, 'src/a.ts'), targetNames: ['alpha'] }],
+      capped: true,
+      membershipCapped: true,
+      cancelled: false,
+    });
+
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      targets.resolveTargetMembershipsBounded(['zeta', 'alpha'], testDir, {
+        maxResults: 10,
+        maxTargetsPerFile: 10,
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({
+      memberships: [],
+      capped: false,
+      membershipCapped: false,
+      cancelled: true,
+    });
   });
 });
 

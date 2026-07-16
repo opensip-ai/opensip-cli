@@ -1,13 +1,16 @@
 ---
 status: current
-last_verified: 2026-07-07
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "FAQ"
 audience: [getting-started]
 purpose: "Common questions about adoption, edge cases, and what opensip-cli does or doesn't do."
 source-files:
   - README.md
   - packages/cli/src/index.ts
+  - packages/core/src/lib/paths.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
+  - packages/cli/src/commands/init/scaffold-writer.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./03-vs-other-tools.md
@@ -25,13 +28,13 @@ Common questions. If yours isn't here, the answer probably lives somewhere in th
 **No — English only today.** Programming-language adapters (`lang-typescript`,
 `lang-rust`, …) are for parsing source code, not UI localization. Localization
 extraction is deferred unless an enterprise contract requires it — see
-[ADR-0072](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0072-i18n-posture.md).
+[ADR-0072](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0072-i18n-posture.md).
 
 ---
 
 ### Does opensip-cli "phone home"?
 
-**Not for telemetry.** Summary by surface ([ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)):
+**Not for telemetry.** Summary by surface ([ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)):
 
 - **OpenTelemetry:** off unless you set `OTEL_EXPORTER_OTLP_ENDPOINT`.
 - **OpenSIP Cloud sync:** off without an API key and entitlement; disable with
@@ -65,6 +68,65 @@ See [vs. other tools](/docs/opensip-cli/00-start/03-vs-other-tools/) for the ful
 `graph` when they want static call-graph analysis, run `yagni` when they want an
 advisory reduction audit, and only use `sim` if they have a workload to
 simulate. You can run `opensip fit` and never touch the others.
+
+---
+
+### What is `opensip audit` vs `opensip suite run audit`?
+
+**The same curated built-in review.** Top-level `opensip audit` is the memorable
+host command; `opensip suite run audit` is the generic suite spelling. Both
+share one executor and always use the built-in definition — the suite name
+`audit` is reserved, so a configured `suites.audit` is rejected. Use
+`--json` for agents/CI and `--open` for the human Change Impact report. Custom
+multi-tool workflows use another suite name (`audit-custom`, …). See
+[audit command reference](/docs/opensip-cli/70-reference/01-cli-commands/#audit--canonical-changed-code-review).
+
+---
+
+### How should coding agents prepare before editing?
+
+**Record task context, then read it.** Run
+`opensip suite run agent-context --files <path> --json` (or trust a prior Run
+via MCP `get_context_status` when readiness checks pass). During the edit use
+`get_file_context`, `impact_files`, `select_tests`, and entity-detail
+`get_symbol`. Ordinary MCP reads never rebuild the graph, invoke Git, run tests,
+or start the suite. After edits, prefer `opensip audit --json` for the
+finding-oriented review. Full loop:
+[Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/).
+
+---
+
+### Does `init` install scanner adapters for me?
+
+**No.** A successful pristine init may *recommend* language-relevant optional
+adapters (`optionalTools` in JSON, a footer in human mode) with the exact
+install commands. It never prompts, installs, or runs adapter code. Install
+what you want with `opensip tools install …`.
+
+---
+
+### Is the zero-config cache really ephemeral? Does `init` make evidence permanent?
+
+**No to both.** The zero-config cache is persistent-on-disk, retention-managed local
+storage. It survives commands and reboots, but its whole project entry can be
+automatically removed when the project path disappears, after 30 days without
+use, or under the project-count policy. The active entry is protected while the
+policy retains up to 50 other survivors. Those are eviction defaults, not an
+archival guarantee.
+
+`opensip init` is a transition command, not a storage location. It changes the
+project state from **zero-config project** to **initialized project**, writes the
+project's explicit config and authored guardrails, and makes the gitignored
+project `.runtime/` authoritative for subsequent local evidence. On a
+successful scaffold path, when the cache runtime exists and the project
+runtime does not, initialization also moves the existing cache evidence there;
+otherwise it leaves both locations intact. Both project states use the same
+SQLite and runtime-file formats.
+
+Initialized evidence is not permanent or shared through Git: ordinary session
+and artifact retention still applies. What becomes durable and team-portable is
+the committed project intent—config, checks, recipes, scenarios, and guidance.
+See [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/#runtime-mode-is-not-a-storage-tier).
 
 ---
 
@@ -114,6 +176,31 @@ Use the **baseline gate flow.** Run `opensip fit --gate-save` once to capture ev
 `graph` ships five language adapters: TypeScript, Python, Rust, Go, Java. The TypeScript adapter uses the TypeScript compiler API; the Python, Go, Rust, and Java adapters parse with vendored web-tree-sitter WASM grammars, so there's no native toolchain or compiler to install for them.
 
 `sim` is language-independent — scenarios are JavaScript and drive your service over HTTP.
+
+---
+
+### What operating systems / hosts are qualified?
+
+**Language support and host support are different questions.** The package
+`engines.node: ">=24"` range is an install floor — it does not encode OS,
+architecture, Node ABI, npm major, filesystem, or case behavior, and it is not a
+support claim. Qualified *host* support names an exact tuple across those
+dimensions with measured evidence, and every host resolves to one of four
+statuses: `supported` (measured, past burn-in, every release evidence-gated),
+`preview` (published with evidence but documented gaps), `unqualified` (not
+measured — may work, no promise), or `unsupported` (an exact, intentionally
+excluded tuple). The exact qualified tuple, the current status of each host,
+and the reporting instructions live in the generated, authoritative
+[supported-platforms matrix](/docs/opensip-cli/70-reference/17-supported-platforms/) — this
+page deliberately does not restate the mutable status so the two can't drift.
+
+Agents can read the same registry: `opensip agent-catalog --json` (and the MCP
+`get_agent_catalog` tool) include a `hostSupport` block. It is built only from
+process-observable facts, so its local `match` is never `exact` — `partial` on a
+clean match, `none` on a contradiction — and agents should read the registry
+row's `status` separately from that local `match`. To request a host, open a
+GitHub issue with your `hostSupport` block plus `node`/`npm`/`sw_vers`/`uname`
+output as described in the matrix.
 
 ---
 
@@ -187,7 +274,7 @@ See [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai
 
 ### How do I report a bug or request a feature?
 
-[GitHub issues](https://github.com/opensip-ai/opensip-cli/issues). Bug reports should include `opensip --version`, a minimal reproduction, and the run's `opensip-cli/.runtime/logs/<date>.jsonl` file if relevant.
+[GitHub issues](https://github.com/opensip-ai/opensip-cli/issues). Bug reports should include `opensip --version`, a minimal reproduction, and the run's `<runtime-root>/logs/<date>.jsonl` file if relevant. The runtime root is in the managed user cache before initialization and project `.runtime` afterward.
 
 ---
 

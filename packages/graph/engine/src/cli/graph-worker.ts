@@ -132,6 +132,11 @@ export const graphRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   unknown,
   ToolCliContext
 >({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph-worker.ts',
+    declaration: 'graphRunWorkerCommandSpec',
+  },
   name: 'graph-run-worker',
   visibility: 'internal',
   description:

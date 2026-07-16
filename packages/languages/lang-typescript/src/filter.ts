@@ -212,14 +212,59 @@ export function filterContent(content: string): FilteredContent {
   /* v8 ignore stop */
 }
 
+/**
+ * Heuristic for `/` as regex start vs division (matches the classic scanner
+ * approach: not after values/identifiers that a binary `/` would follow).
+ */
+function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
+  if (prev === undefined) return true;
+  switch (prev) {
+    case ts.SyntaxKind.Identifier:
+    case ts.SyntaxKind.PrivateIdentifier:
+    case ts.SyntaxKind.StringLiteral:
+    case ts.SyntaxKind.NumericLiteral:
+    case ts.SyntaxKind.BigIntLiteral:
+    case ts.SyntaxKind.RegularExpressionLiteral:
+    case ts.SyntaxKind.ThisKeyword:
+    case ts.SyntaxKind.SuperKeyword:
+    case ts.SyntaxKind.TrueKeyword:
+    case ts.SyntaxKind.FalseKeyword:
+    case ts.SyntaxKind.NullKeyword:
+    // Type keywords also appear as value names (`const number = 1; number / 2`)
+    // and after `as` (`x as number / y`) — must not start a regex.
+    // falls through
+    case ts.SyntaxKind.NumberKeyword:
+    case ts.SyntaxKind.StringKeyword:
+    case ts.SyntaxKind.BooleanKeyword:
+    case ts.SyntaxKind.AnyKeyword:
+    case ts.SyntaxKind.ObjectKeyword:
+    case ts.SyntaxKind.SymbolKeyword:
+    case ts.SyntaxKind.BigIntKeyword:
+    case ts.SyntaxKind.UndefinedKeyword:
+    case ts.SyntaxKind.NeverKeyword:
+    case ts.SyntaxKind.UnknownKeyword:
+    case ts.SyntaxKind.ConstKeyword:
+    case ts.SyntaxKind.CloseParenToken:
+    case ts.SyntaxKind.CloseBracketToken:
+    case ts.SyntaxKind.CloseBraceToken:
+    case ts.SyntaxKind.PlusPlusToken:
+    case ts.SyntaxKind.MinusMinusToken:
+    case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+    case ts.SyntaxKind.TemplateTail: {
+      return false;
+    }
+    default: {
+      return true;
+    }
+  }
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity -- TS scanner driver: token-by-token loop with per-kind handling; flatter shape would scatter token classification
 function filterContentImpl(content: string): FilteredContent {
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    ts.LanguageVariant.Standard,
-    content,
-  );
+  // JSX variant so `</div>` closing tags are not re-scanned as regex openers
+  // (Standard + reScanSlashToken treats `LessThan` + `/` as regex start and can
+  // desync on same-line `http://` / string quotes). Matches TSX ScriptKind.
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, content);
 
   const stringRegions: Region[] = [];
   const commentRegions: Region[] = [];
@@ -237,6 +282,11 @@ function filterContentImpl(content: string): FilteredContent {
   // and desync the scanner for the rest of the file (which silently wipes real
   // code to whitespace). Incremented at TemplateHead, decremented at TemplateTail.
   let templateDepth = 0;
+  // Previous non-trivia token — used to decide whether `/` starts a regex
+  // (reScanSlashToken) vs division. Without this, `/.../` is never emitted as
+  // RegularExpressionLiteral and quote/slash chars inside patterns desync the
+  // stripper (can blank the rest of the file).
+  let prevSignificant: ts.SyntaxKind | undefined;
 
   while (true) {
     let token = scanner.scan();
@@ -247,6 +297,12 @@ function filterContentImpl(content: string): FilteredContent {
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.CloseBraceToken && templateDepth > 0) {
       token = scanner.reScanTemplateToken(false);
+    }
+
+    // Bare scanner emits SlashToken for `/`; only reScanSlashToken yields regex.
+    // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
+    if (token === ts.SyntaxKind.SlashToken && canStartRegExpLiteral(prevSignificant)) {
+      token = scanner.reScanSlashToken();
     }
 
     const start = scanner.getTokenStart();
@@ -275,7 +331,7 @@ function filterContentImpl(content: string): FilteredContent {
 
       case ts.SyntaxKind.TemplateTail: {
         // }text` — replace text between } and `
-        templateDepth--;
+        templateDepth = Math.max(0, templateDepth - 1);
         replaceCharsInRange(chars, start + 1, end - 1, stringRegions);
         break;
       }
@@ -291,6 +347,17 @@ function filterContentImpl(content: string): FilteredContent {
       default: {
         break;
       }
+    }
+
+    // Trivia does not affect the regex-vs-division decision.
+    const triviaKinds = new Set([
+      ts.SyntaxKind.SingleLineCommentTrivia,
+      ts.SyntaxKind.MultiLineCommentTrivia,
+      ts.SyntaxKind.NewLineTrivia,
+      ts.SyntaxKind.WhitespaceTrivia,
+    ]);
+    if (!triviaKinds.has(token)) {
+      prevSignificant = token;
     }
   }
 

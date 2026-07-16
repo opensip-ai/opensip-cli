@@ -43,7 +43,7 @@ describe('createDiscover — config resolution branches', () => {
     const override = 'custom.config';
     writeFileSync(join(dir, override), 'k=v\n', 'utf8');
 
-    const out = discover({ cwd: dir, configPathOverride: override });
+    const out = discover({ diagnosticIntent: 'quiet', cwd: dir, configPathOverride: override });
 
     // Resolved against the project dir and realpath-normalized.
     expect(out.configPathAbs).toBe(realpathSync(resolve(dir, override)));
@@ -53,7 +53,7 @@ describe('createDiscover — config resolution branches', () => {
     writeFileSync(join(dir, 'a.go'), 'package x\n', 'utf8');
     const override = 'does-not-exist.config';
 
-    const out = discover({ cwd: dir, configPathOverride: override });
+    const out = discover({ diagnosticIntent: 'quiet', cwd: dir, configPathOverride: override });
 
     // Not realpath-able (missing), so the bare resolved absolute path comes
     // back — resolved against the realpath-normalized project dir.
@@ -64,7 +64,7 @@ describe('createDiscover — config resolution branches', () => {
     writeFileSync(join(dir, 'a.go'), 'package x\n', 'utf8');
     // No go.sum / go.mod written.
 
-    const out = discover({ cwd: dir });
+    const out = discover({ diagnosticIntent: 'quiet', cwd: dir });
 
     expect(out.configPathAbs).toBeUndefined();
     expect('configPathAbs' in out).toBe(false);
@@ -75,7 +75,7 @@ describe('createDiscover — config resolution branches', () => {
     writeFileSync(join(dir, 'a.go'), 'package x\n', 'utf8');
     writeFileSync(join(dir, 'go.mod'), 'module x\n', 'utf8');
 
-    const out = discover({ cwd: dir, configPathOverride: '' });
+    const out = discover({ diagnosticIntent: 'quiet', cwd: dir, configPathOverride: '' });
 
     // Empty override is ignored; candidate precedence picks go.mod.
     expect(out.configPathAbs).toBe(realpathSync(resolve(dir, 'go.mod')));

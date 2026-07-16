@@ -50,6 +50,9 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
       {
         cwd: input.cwd,
         timeout: input.timeoutMs,
+        // SIGKILL (not SIGTERM): scanners that trap SIGTERM would otherwise hang
+        // the promise forever until an outer worker timeout. Node fires once.
+        killSignal: 'SIGKILL',
         maxBuffer: input.maxBuffer,
         encoding: 'utf8',
         windowsHide: true,
@@ -66,7 +69,23 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
           killed?: boolean;
           signal?: NodeJS.Signals;
         };
-        if (failure.killed === true || failure.signal === 'SIGTERM') {
+        // maxBuffer overflow kills with SIGTERM and sets ERR_CHILD_PROCESS_STDIO_MAXBUFFER —
+        // do not misclassify that as a wall-clock timeout (operators tune the wrong knob).
+        if (
+          failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ||
+          (typeof failure.message === 'string' &&
+            failure.message.includes('maxBuffer length exceeded'))
+        ) {
+          reject(
+            error instanceof Error
+              ? error
+              : new Error(`scanner '${input.command}' exceeded maxBuffer`),
+          );
+          return;
+        }
+        // Only Node's own timeout kill sets `killed === true`. External SIGTERM
+        // (operator kill, OOM adj) must not be mislabeled as wall-clock timeout.
+        if (failure.killed === true) {
           resolve({ code: -1, stdout: out, stderr: err, timedOut: true });
           return;
         }
@@ -103,6 +122,7 @@ export function probeBinaryVersion(input: ProbeVersionInput): string | undefined
     const stdout = execFileSync(input.path, [...input.versionArgs], {
       encoding: 'utf8',
       timeout: input.timeoutMs,
+      killSignal: 'SIGKILL',
       windowsHide: true,
     });
     const text = typeof stdout === 'string' ? stdout : String(stdout);

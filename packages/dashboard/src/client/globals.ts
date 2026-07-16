@@ -97,14 +97,167 @@ declare global {
       errors: number;
       warnings: number;
     };
+    scope?: {
+      mode: 'changed' | 'full';
+      source: string;
+      ref?: string;
+      changedFiles?: number;
+      notice?: string;
+    };
+    reviewBrief?: ChangeImpactReviewBrief;
     legacySuiteRunId?: string;
     steps: readonly DashboardRunStep[];
+  }
+
+  interface ChangeImpactRisk {
+    source: string;
+    ruleId: string;
+    message: string;
+    severity: string;
+    file: string;
+    line?: number;
+    column?: number;
+    isNew: boolean;
+    blastRadius?: {
+      dependents: number;
+      confidence: string;
+      impactedFiles?: number;
+    };
+  }
+
+  interface ChangeImpactReviewBrief {
+    verdict: 'pass' | 'warn' | 'fail';
+    changedFiles: number | null;
+    topRisks: readonly ChangeImpactRisk[];
+    newFindings: readonly ChangeImpactRisk[];
+    baselineDelta: {
+      available: boolean;
+      added: number;
+      removed: number;
+      unchanged: number;
+    };
+    degraded: readonly { source: string; reason: string; code?: string }[];
+    recommendedActions: readonly {
+      priority: 'high' | 'medium' | 'low';
+      message: string;
+      source?: string;
+      command?: string;
+    }[];
+    correlatedRisks?: readonly {
+      id: string;
+      title: string;
+      severity: string;
+      isNew: boolean;
+      primary: { source: string; ruleId: string; file: string; line?: number };
+      members: readonly {
+        source: string;
+        ruleId: string;
+        file: string;
+        line?: number;
+      }[];
+      reasons: readonly { confidence: string; message: string }[];
+      blastRadius?: {
+        dependents: number;
+        confidence: string;
+        impactedFiles?: number;
+      };
+    }[];
+  }
+
+  interface ChangeImpactFunctionModel {
+    qualifiedName: string;
+    filePath: string;
+    line: number;
+    package?: string;
+    reason: string;
+    bodyHash?: string;
+    navigation: 'available' | 'catalog-unavailable' | 'not-found' | 'ambiguous';
+  }
+
+  interface ChangeImpactViewModel {
+    runId: string;
+    completedAt: string;
+    durationMs: number;
+    exitCode: number;
+    verdict: 'pass' | 'warn' | 'fail';
+    aggregate: DashboardRun['aggregate'];
+    scope?: DashboardRun['scope'];
+    reviewBrief?: ChangeImpactReviewBrief;
+    reviewBriefState: 'available' | 'missing' | 'malformed';
+    availability:
+      | 'available'
+      | 'projection-degraded'
+      | 'step-faulted'
+      | 'missing-session'
+      | 'legacy'
+      | 'malformed';
+    availabilityReason: string;
+    catalogMatch: 'matching' | 'mismatched' | 'missing-stored' | 'missing-current';
+    zeroImpact: boolean;
+    sourceTruncated: boolean;
+    evidence?: {
+      basisType: 'changed' | 'files';
+      basisRef?: string;
+      changedFiles: readonly string[];
+      changedFunctions: readonly ChangeImpactFunctionModel[];
+      impactedFunctions: readonly ChangeImpactFunctionModel[];
+      impactedFiles: readonly string[];
+      impactedPackages: readonly { name: string; functionCount: number }[];
+      trust: {
+        coverage: 'full' | 'partial' | 'unknown';
+        fallback: string;
+        fullyVerified: boolean;
+        uncertainties: readonly {
+          code: string;
+          source: string;
+          message: string;
+          filePath?: string;
+        }[];
+      };
+      recommendedCommands: readonly string[];
+      truncated: boolean;
+      backendOmitted: {
+        changedFiles: number;
+        changedFunctions: number;
+        impactedFunctions: number;
+        impactedFiles: number;
+        impactedPackages: number;
+        recommendedCommands: number;
+      };
+      detailTruncated: boolean;
+      metadataOmitted: boolean;
+    };
+    reportOmitted: {
+      changedFiles: number;
+      changedFunctions: number;
+      impactedFunctions: number;
+      impactedFiles: number;
+      impactedPackages: number;
+      recommendedCommands: number;
+      uncertainties: number;
+      risks: number;
+      newFindings: number;
+      correlations: number;
+      actions: number;
+      degradations: number;
+    };
   }
 
   // ---- Generator-injected data globals (the report <script> const block) ----
 
   const sessions: readonly DashboardSession[];
   const runs: readonly DashboardRun[];
+  const changeImpactRuns: readonly ChangeImpactViewModel[];
+  const changeImpactOmittedRuns: number;
+  /**
+   * Graph-catalog bounding (see `code-paths/bound-catalog.ts`). The inlined
+   * catalog is byte-bounded, so a very large repository ships a subset of its
+   * functions. Truncation MUST stay visible — a report that silently showed
+   * 5,000 of 28,327 functions would read as complete.
+   */
+  const graphCatalogTotalFunctions: number;
+  const graphCatalogOmittedFunctions: number;
+  const REPORT_SELECTION: { view: 'change-impact'; runId?: string } | null;
   const fitSessions: readonly DashboardSession[];
   const simSessions: readonly DashboardSession[];
   const yagniSessions: readonly DashboardSession[];

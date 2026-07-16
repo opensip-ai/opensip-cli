@@ -1,10 +1,10 @@
 ---
 status: current
-last_verified: 2026-06-27
-release: v0.5.0
+last_verified: 2026-07-11
+release: v0.7.0
 title: "Layered package graph"
 audience: [contributors]
-purpose: "The 56-package monorepo, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
+purpose: "The layered workspace, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
 source-files:
   - .config/dependency-cruiser.cjs
   - pnpm-workspace.yaml
@@ -20,12 +20,13 @@ related-docs:
 ---
 # Layered package graph
 
-Forty-three workspace packages. Six layers. One enforced rule: dependencies flow up only.
+Sixty workspace packages: 57 publishable and three private. Six runtime layers. One
+enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
 
 > **What you'll understand after this:**
-> - Why opensip-cli ships as 56 workspace packages instead of one.
+> - Why opensip-cli ships as 57 publishable packages instead of one.
 > - The six layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
@@ -35,7 +36,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 ## The six layers
 
-The layer model the dependency-cruiser config enforces ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/.config/dependency-cruiser.cjs)):
+The layer model the dependency-cruiser config enforces ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/.config/dependency-cruiser.cjs)):
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -50,16 +51,17 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 4  ┌──────────────────────┴───────────────────────────┐    │
-│           │       fitness     simulation     graph            │   │
+│           │ fitness  simulation  graph  yagni  mcp  tool-*    │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 3  ┌──────────┬───────────┴───────────┬───────────────┐    │
-│           │  session-store  output  config  targeting          │   │
-│           │  dashboard  lang-{ts,rust,py,java,go,cpp}          │   │
+│           │  cli-live  session-store  output  config  targeting │  │
+│           │  dashboard  external-tool-adapter  lang-*          │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 2  ┌──────────────────────┴───────────────────────────┐    │
-│           │   datastore   contracts   tree-sitter   cli-ui     │   │
+│           │ datastore contracts tree-sitter clone-detection    │   │
+│           │ format cli-ui tool-test-kit                         │   │
 │           └──────────────────────────────────────────────────┘    │
 │                                  ▲                                 │
 │  Layer 1  ┌──────────────────────┴───────────────────────────┐    │
@@ -72,35 +74,44 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 
 **Layer 1 — `@opensip-cli/core`.** The kernel. Ships types, errors, IDs, the logger, the path resolver, the language-adapter contract, the plugin discovery mechanics (including the generic marker-discovery walker), and the Tool registry. No knowledge of fitness, simulation, or any other tool. No dependency on Commander, Ink, or any UI library.
 
-**Layer 2 — `@opensip-cli/datastore`, `@opensip-cli/contracts`, `@opensip-cli/tree-sitter`, `@opensip-cli/clone-detection`, `@opensip-cli/format`, and `@opensip-cli/cli-ui`.** Substrate packages above the kernel. Most depend only on `core`; leaf pure packages (`clone-detection`, `format`) depend on nothing. Never on a tool.
+**Layer 2 — `@opensip-cli/datastore`, `@opensip-cli/contracts`, `@opensip-cli/tree-sitter`, `@opensip-cli/clone-detection`, `@opensip-cli/format`, `@opensip-cli/cli-ui`, and `@opensip-cli/tool-test-kit`.** Substrate packages above the kernel. Most depend only on `core`; leaf pure packages (`clone-detection`, `format`) depend on nothing. Never on a tool.
 
 - **`@opensip-cli/datastore`** is the persistence kernel — the `DataStore` interface, the SQLite + Drizzle implementation, the in-memory backend for tests, the workspace migration store under `migrations/`. Paradigm-agnostic infrastructure: tools and session-store own their domain schemas (sessions in session-store; baseline/catalog in graph; baseline in fitness) and register them with the datastore at open time. Depends on `core` only.
-- **`@opensip-cli/contracts`** is the shared contract layer between Tools and the runner: the `SignalEnvelope` shape every tool returns (with its `verdict`/`units[]`/`signals[]`), the `CommandOutcome` wrapper the host stamps on every machine output, the `CommandResult` discriminated union the renderer dispatches on, the exit-code constants, the cross-tool `StoredSession` type, and the `GraphCatalog` type surface that the graph tool produces and the dashboard consumes. It is a contract facade, not a host runtime package: it may re-export small tool-facing helpers such as `defineCommand`, but the `SessionRepo` runtime and sessions schema live in `session-store`, not here. Imports `core` only. Does not import any tool.
+- **`@opensip-cli/contracts`** is the shared Tool/runner contract facade: the `SignalEnvelope` shape every tool returns, the `CommandOutcome` wrapper the host stamps on machine output, the `CommandResult` union, exit codes, `StoredSession`, and `GraphCatalog`. It also owns small shared host-run runtime helpers such as command-result construction; repository runtime and schemas remain in their owning packages (`SessionRepo` in `session-store`). It imports `core` only and no tool.
 - **`@opensip-cli/tree-sitter`** (ADR-0010) is the grammar-agnostic `web-tree-sitter` substrate: the WASM parser lifecycle and grammar-neutral node accessors (`createParser`, `walkNodes`, `findEnclosing`, …). It imports `core` only (plus `web-tree-sitter`) and is consumed from above — by the fitness `lang-*` adapters and the four tree-sitter `graph-*` adapters (through `graph-adapter-common`) — so the WASM lifecycle lives in exactly one place. A dedicated dependency-cruiser rule (`tree-sitter-imports-core-only`) holds it at this substrate position.
 - **`@opensip-cli/cli-ui`** is the Ink/React presentational primitives kit (`Banner`, `Spinner`, `RunHeader`, `theme`) — extracted from `cli/` so tools that ship a live view depend on the UI kit without pulling in the dispatcher.
 
-**Layer 3 — persistence/output/config libraries and language adapters.** Packages above the substrate, depending on `core`/`contracts`/`datastore` (and lower siblings within this layer), never on a tool.
+**Layer 3 — persistence/output/config/codebase libraries and language adapters.** Packages above the substrate, depending on `core`/`contracts`/`datastore` (and lower siblings within this layer), never on a tool.
 
+- **`@opensip-cli/cli-live`** owns the shared live-run state machine and `produce()` seam used by bundled Tools without pulling in the CLI dispatcher.
 - **`@opensip-cli/session-store`** owns session persistence: the `SessionRepo` runtime, the `sessions`/`session_tool_payload` schema, and the `generateSessionId`/`sanitizeForFilename` helpers. Depends on `core`, `datastore`, and `contracts` (for the `StoredSession` shape it round-trips).
 - **`@opensip-cli/output`** (renamed from `@opensip-cli/reporting`, ADR-0011) owns all machine output: pure `(envelope) => string` formatters under `format/` (json, sarif, table) and effectful `sink/` delivery (cloud egress, entitlement). The CLI composition root composes a formatter with a sink per the run's flags; tool engines no longer import it. Depends on `core` and `contracts` only.
 - **`@opensip-cli/config`** is the capability-configuration substrate (ADR-0023): the `composeConfigSchema` composer that folds each tool's namespaced Zod schema into one strict whole-document schema, the resolver, and the `ToolConfigDeclaration` declaration type. The dependency-cruiser rule here is **directional**: `config` must not import a tool. Tools, by contrast, **do** import `@opensip-cli/config` — for the `ToolConfigDeclaration` type they use to declare their config namespace. So the edge runs tool → config, never config → tool. Depends on `core`.
 - **`@opensip-cli/targeting`** is the host file-targeting runtime substrate (ADR-0037): the `TargetRegistry`, the uniform glob expansion (`resolveTargets`, always applying per-target `exclude` **and** `globalExcludes`), and `applyGlobalExcludes`. The CLI bootstrap builds it once per run from the validated config document and exposes it as `scope.targets`; any tool resolves named file sets without importing fitness. Depends on `config` (targeting types) and `core` (the generic `Registry<T>` base) — never a tool engine. The check-domain half (`checkOverrides`, scope matching, the content `fileCache`) stays in `fitness` as a thin consumer.
+- **`@opensip-cli/codebase`** is the persistence-free project inventory substrate: it projects bounded target membership, file metadata, package manifests, and conservative verification commands into deterministic evidence facts. It reads through the captured structural target resolver and retains no source or raw manifest content. Graph and MCP consume it from above.
 - **`@opensip-cli/dashboard`** is the self-contained HTML report renderer; consumed by the CLI-owned `report` command and each tool's auto-open hook. It does not implement the `Tool` contract; it is a library the composition root consumes.
+- **`@opensip-cli/external-tool-adapter`** is the shared normalization and command substrate for external scanner Tools.
 - **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. (The graph engine has its own `GraphLanguageAdapter` contract, implemented by the publishable `graph-*` adapter packs at Layer 5.) See [`50-extend/05-language-adapters.md`](/docs/opensip-cli/50-extend/05-language-adapters/) for the distinction.
 
-**Layer 4 — Tools.** `@opensip-cli/fitness`, `@opensip-cli/simulation`, `@opensip-cli/graph`, `@opensip-cli/yagni`. Each implements the `Tool` contract, declares its config namespace (importing `@opensip-cli/config` for the declaration type), and contributes its own CLI command surface via declarative `commandSpecs`. Peers; none imports another. None imports `cli` (that would create a cycle, enforced by the `*-no-cli` rules).
+**Layer 4 — Tools.** `@opensip-cli/fitness`, `@opensip-cli/simulation`, `@opensip-cli/graph`, `@opensip-cli/yagni`, `@opensip-cli/mcp`, and the external scanner `@opensip-cli/tool-*` adapters. Each implements the Tool contract and contributes declarative `commandSpecs`. Peer imports are denied except the explicit MCP → graph public-surface relationship. YAGNI builds its own TypeScript inventory and has no graph dependency; MCP reads graph state through `@opensip-cli/graph/read`, never `graph/internal`.
 
-**Layer 5 — `@opensip-cli/checks-*` and `@opensip-cli/graph-*`.** Seven fitness check packs (`checks-universal`, `checks-typescript`, `checks-python`, `checks-go`, `checks-java`, `checks-cpp`, `checks-rust`), each depending on `fitness` (for `defineCheck`) and `core`; plus five graph adapter packs (`graph-typescript`, `graph-python`, `graph-rust`, `graph-go`, `graph-java`, the latter four sharing `graph-adapter-common`), each depending on `graph`. These are the marketplace shapes — installable from npm without dragging the CLI in. Check packs do **not** depend on `cli` or `contracts`.
+**Layer 5 — `@opensip-cli/checks-*` and `@opensip-cli/graph-*`.** Seven publishable fitness check packs plus private repository-only `checks-dogfood`; and five graph adapter packs, with the tree-sitter adapters sharing `graph-adapter-common`. These are the marketplace shapes installable without the CLI. Check packs do **not** depend on `cli` or `contracts`.
 
 **Layer 6 — `opensip-cli`.** The composition root. Discovers every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-That's it. Six layers, forty-three packages under `packages/`. Forty-two are publishable; the workspace-private `@opensip-cli/test-support` package carries cross-package test scaffolding (ADR-0040). It is never published and production source may not import it, so it sits deliberately outside the runtime layer diagram.
+The generated architecture map is the inventory source of truth: 60 workspace
+packages, 57 publishable, and three private. `@opensip-cli/agent-eval` is a
+black-box agent-usability harness outside the runtime layers;
+`@opensip-cli/test-support` carries cross-package test scaffolding; and
+`@opensip-cli/checks-dogfood` carries this repository's architecture checks.
+None is published. The eval harness has zero workspace source edges in either
+direction, while the support packages are unavailable to production source.
 
 ---
 
 ## How the layer rule is enforced
 
-The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/.config/dependency-cruiser.cjs) at lint time. The relevant rules:
+The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/.config/dependency-cruiser.cjs) at lint time. The relevant rules:
 
 ```js
 // core imports nothing else from the workspace.
@@ -130,7 +141,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## Two cruiser passes — no standing layer exception
 
-Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/.config/dependency-cruiser.cjs); both have since been **paid down** and deleted:
+Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/.config/dependency-cruiser.cjs); both have since been **paid down** and deleted:
 
 - **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-cli/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
 - **`graph` → `fitness`** (SARIF reuse): SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-cli/output`, applied at the composition root (ADR-0011) — `graph` returns a `SignalEnvelope` and imports neither fitness nor `@opensip-cli/output`. The `graph-may-import-fitness-sarif` info-exception is gone.
@@ -139,15 +150,15 @@ What remains is not an exception but a *second lens*. The layer ruleset runs twi
 
 ### Type-only edges are caught by the type-aware pass
 
-The **runtime pass** ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/.config/dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
+The **runtime pass** ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/.config/dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
 
-That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.config/dependency-cruiser.types.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/.config/dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
+That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.config/dependency-cruiser.types.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/.config/dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
 
 The upshot: there is **no** standing "you may `import type` upward" allowance. A type-only import from a lower layer into a higher one trips the type-aware pass exactly as a runtime import trips the runtime pass. (The historical type-only cycles that predated this pass were paid down before it was promoted from visibility-only to gating.)
 
 ---
 
-## Why 56 workspace packages and not 1
+## Why 57 publishable packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -159,7 +170,7 @@ A check pack like `@opensip-cli/checks-python` has to be installable on its own.
 opensip fit plugin add @opensip-cli/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 56 workspace packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 57 publishable packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -167,15 +178,15 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 56 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 60 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
 ## What this shape costs
 
-Trade-offs are real. The 56-package layout is more expensive in three places:
+Trade-offs are real. The 60-package workspace is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 56 publishable packages (plus the private workspace-root `package.json` for tooling versions and private `@opensip-cli/test-support`). We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and the release scripts verify the package set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 57 publishable packages; `agent-eval`, `test-support`, and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/)) is the antidote.
 
@@ -188,15 +199,15 @@ We've been comfortable with these costs. They're the price of the marketplace sh
 Tracing the dependency arrows for the `no-console-log` check we followed in [`01-fitness-loop.md`](/docs/opensip-cli/10-concepts/01-fitness-loop/):
 
 ```
-opensip-cli           ─── imports ───►  @opensip-cli/fitness
-                                                       │
-                                                       │ imports
-                                                       ▼
-                                              @opensip-cli/core
-                                                       ▲
-                                                       │ imports
-                                                       │
-@opensip-cli/checks-universal ─── imports ──────────┘
+opensip-cli        ─ dynamic-loads ─►  @opensip-cli/fitness
+(resolves manifest,                              │
+ dynamic-imports the                             │ imports
+ `tool` export — no                              ▼
+ static symbol import)                  @opensip-cli/core
+                                                 ▲
+                                                 │ imports
+                                                 │
+@opensip-cli/checks-universal ─── imports ──────┘
        │
        │ exports `noConsoleLog`
        ▼
@@ -206,6 +217,39 @@ opensip-cli           ─── imports ───►  @opensip-cli/fitness
 The `cli` imports the bundled language adapters to register them (Layer 5 → Layer 3). First-party tools are not statically imported by runtime symbol: the CLI lists their package names, resolves their manifests on disk, admits them, and dynamic-imports the same `tool` export shape that installed tool plugins use. It does **not** import `checks-universal` directly — instead, the plugin loader walks `node_modules` at runtime and discovers any package declaring the `fit-pack` marker plus target-domain epoch (or listed exactly in `plugins.checkPackages`). The check pack imports `fitness` (for `defineCheck`) and `core` (for `Signal`), both lower layers. Every arrow points up.
 
 ---
+
+## Complete boundaries, derived and locked
+
+The layer cake above is enforced by more than the dependency-cruiser layer rules.
+Two decisions ([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)
+and [ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md))
+make the boundaries **derived** and **complete** rather than hand-maintained. The
+current package/tool inventory is authoritative in the generated
+[`architecture-map.md`](/docs/opensip-cli/80-implementation/architecture-map/) and the release
+governance projection, not in a frozen count here:
+
+- **Dynamic CLI Tool loading.** The CLI host statically imports **no** Tool
+  runtime (`cli-no-static-tool-package-import`, manifest-derived so it covers a
+  Tool with any package name); a bundled Tool and an installed Tool travel the
+  same dynamic plugin path, so install-source independence is structural.
+- **Fail-closed capability allowlists.** Tool/fit-pack classification comes from
+  `opensipTools.kind`; an unlisted fit pack throws at dependency-cruiser config
+  load rather than getting a permissive default.
+- **Test-only internal subpaths.** Cross-package `/internal` subpaths are matched
+  completely (file *and* directory forms); MCP reads graph evidence only through
+  the public `@opensip-cli/graph/read` surface, with a single sanctioned
+  adapter-registrar root exception.
+- **Exact export locks.** Each governed package's public surface is locked as an
+  exact **value and type** namespace by a TypeScript-AST walker
+  (`verify-core-exports`), so a leaked type is caught even though a runtime
+  `Object.keys` check would miss it.
+- **Production-only packed output.** Package builds emit runtime bytes only;
+  test/spec/fixture trees are excluded from both `tsc` output and the verified
+  `pnpm pack` packlist, while test sources stay semantically checked by a
+  per-package no-emit test project (ADR-0150).
+
+Every one of these gates ships with a firing probe *and* a legal-edge control in
+`scripts/verify-gate-live.mjs`.
 
 ## What's next
 

@@ -47,6 +47,7 @@ import { resolveReportFailure, toReportedFailureWire } from './report-failure.js
 
 import type {
   HostPlaneKind,
+  HostPlaneMethodName,
   HostRpcCall,
   ToolCommandFailureClass,
   ToolCommandResult,
@@ -118,12 +119,12 @@ function buildToolStateRpc(client: WorkerRpcClient): ToolCliContext['toolState']
  * (`plane`/`method`/`args`). The host dispatches to the real plane impl by name;
  * the worker never holds a plane handle.
  */
-function planeMethod<R>(
+function planeMethod<P extends HostPlaneKind, R>(
   client: WorkerRpcClient,
-  plane: HostPlaneKind,
-  method: string,
+  plane: P,
+  method: HostPlaneMethodName<P>,
 ): (...args: readonly unknown[]) => Promise<R> {
-  return (...args) => rpc<R>(client, { seam: 'hostPlane', plane, method, args });
+  return (...args) => rpc<R>(client, { seam: 'hostPlane', plane, method, args } as HostRpcCall);
 }
 
 /**
@@ -135,7 +136,6 @@ function planeMethod<R>(
 function buildHostPlanesRpc(client: WorkerRpcClient): NonNullable<ToolCliContext['hostPlanes']> {
   const governance: HostGovernance = {
     getGovernanceState: planeMethod(client, 'governance', 'getGovernanceState'),
-    listForProject: planeMethod(client, 'governance', 'listForProject'),
     queryAudit: planeMethod(client, 'governance', 'queryAudit'),
     recordInstallation: planeMethod(client, 'governance', 'recordInstallation'),
     recordApprovalDecision: planeMethod(client, 'governance', 'recordApprovalDecision'),
@@ -145,7 +145,6 @@ function buildHostPlanesRpc(client: WorkerRpcClient): NonNullable<ToolCliContext
   const audit: HostAudit = {
     append: planeMethod(client, 'audit', 'append'),
     query: planeMethod(client, 'audit', 'query'),
-    exportForCloud: planeMethod(client, 'audit', 'exportForCloud'),
   };
   const entitlements: HostEntitlements = {
     check: planeMethod(client, 'entitlements', 'check'),
@@ -169,6 +168,10 @@ export interface BuildWorkerContextInput {
 /**
  * Build the worker-side {@link ToolCliContext} shim. FRR seams record into
  * `acc`; RPC seams upcall via `rpcClient`; the live-view seams fail loud.
+ *
+ * The `scope` is the same already-restricted RunScope the worker bootstrap built
+ * (local project/config/parse state; ambient datastore denied). This builder
+ * does not replace, re-enable, or re-wrap the datastore thunk.
  */
 export function buildWorkerContext(input: BuildWorkerContextInput): ToolCliContext {
   const { scope, timing, acc, rpcClient, adapterProgress } = input;

@@ -1,6 +1,10 @@
 import { ValidationError } from '@opensip-cli/core';
 
+import { compareCodePoint } from './code-point-order.js';
+
 import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
+
+export { compareCodePoint } from './code-point-order.js';
 
 type CommandTier = 'platform' | 'tool' | 'internal';
 
@@ -18,13 +22,6 @@ type ToolEntryOverlays = Readonly<Record<string, Partial<EntryPoint>>>;
  * expose.
  */
 export const INTERNAL_COMMAND_NAME_RE = /(?:-run-worker|-shard-worker|-equivalence-check)\b/;
-
-/** Compare command strings by raw code point for locale-independent sorting. */
-export function compareCodePoint(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 const TOOL_ENTRY_OVERLAYS: ToolEntryOverlays = {
   fitness: {
@@ -58,10 +55,20 @@ const TOOL_ENTRY_OVERLAYS: ToolEntryOverlays = {
 
 const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
   {
+    command: 'audit',
+    description:
+      'Run the canonical changed-code review workflow. --json yields a suite result with scope, step verification, and reviewBrief; --open is human-only.',
+    examples: ['opensip audit --json', 'opensip audit --files src/server.ts --json'],
+    tier: 'platform' as const,
+  },
+  {
     command: 'suite run',
     description:
-      'Run a configured or built-in multi-tool suite. --json yields a command result with reviewBrief when the suite steps emit SignalEnvelopes.',
-    examples: ['opensip suite run audit --changed --json'],
+      'Run a configured or built-in suite. agent-context records privacy-safe, file-scope-bound non-finding evidence before editing; verdict suites produce reviewBrief when steps emit SignalEnvelopes.',
+    examples: [
+      'opensip suite run agent-context --files src/server.ts --json',
+      'opensip suite run security --json',
+    ],
     tier: 'platform' as const,
   },
   {

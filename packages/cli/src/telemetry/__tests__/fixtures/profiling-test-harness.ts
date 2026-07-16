@@ -21,7 +21,7 @@
 
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, vi } from 'vitest';
 
@@ -35,12 +35,17 @@ import type { RunScope } from '@opensip-cli/core';
 
 export const ENDPOINT = 'OTEL_EXPORTER_OTLP_ENDPOINT';
 export const GATE = 'OPENSIP_PROFILING';
+export const PROFILE_DIR = 'OPENSIP_PROFILE_DIR';
 
 export interface FakeSessionOptions {
   /** Profile payload delivered to the Profiler.stop callback (undefined ⇒ none). */
   readonly profile?: unknown;
   /** Error delivered to the Profiler.stop callback (exercises the err arm). */
   readonly stopError?: Error;
+  /** Error delivered to the Profiler.enable callback. */
+  readonly enableError?: Error;
+  /** Error delivered to the Profiler.start callback. */
+  readonly startError?: Error;
   /**
    * Throw from connect() to exercise startProfiling's catch + cleanup. `true` (or
    * `'error'`) throws an Error (the `.message` arm); `'non-error'` throws a string
@@ -57,6 +62,15 @@ export interface FakeSessionOptions {
    * `error instanceof Error ? error.message : String(error)` ternary's else.
    */
   readonly throwOnStopPost?: 'error' | 'non-error';
+  /** Hold one inspector callback until releaseDeferred() drives it. */
+  readonly deferMethod?: 'Profiler.enable' | 'Profiler.start' | 'Profiler.stop';
+}
+
+export interface FakeSessionFlags {
+  connected: boolean;
+  disconnected: boolean;
+  disconnectCount: number;
+  releaseDeferred(): void;
 }
 
 export interface ProfilingHarness {
@@ -78,26 +92,28 @@ export interface ProfilingHarness {
    * Install a SYNCHRONOUS fake inspector session whose `post()` invokes callbacks
    * inline (see the module note on why the real session must never run here).
    */
-  readonly installSyncFakeSession: (opts?: FakeSessionOptions) => {
-    connected: boolean;
-    disconnected: boolean;
-  };
+  readonly installSyncFakeSession: (opts?: FakeSessionOptions) => FakeSessionFlags;
 }
 
 /**
  * Build a profiling test harness and register its lifecycle hooks. Call once at
  * the top of a `describe`-less module scope (vitest hooks attach to the current
- * file's suite). Saves/restores the two gate env vars, mints a fresh temp dir per
- * test, and resets profiling state + the injected session factory around each.
+ * file's suite). Saves/restores the profiling env vars, mints a fresh temp dir
+ * per test, and resets profiling state + the injected session factory around each.
  */
 export function createProfilingHarness(): ProfilingHarness {
   let saved: Record<string, string | undefined>;
   let tmp: string;
 
   beforeEach(() => {
-    saved = { [ENDPOINT]: process.env[ENDPOINT], [GATE]: process.env[GATE] };
+    saved = {
+      [ENDPOINT]: process.env[ENDPOINT],
+      [GATE]: process.env[GATE],
+      [PROFILE_DIR]: process.env[PROFILE_DIR],
+    };
     delete process.env[ENDPOINT];
     delete process.env[GATE];
+    delete process.env[PROFILE_DIR];
     tmp = mkdtempSync(join(tmpdir(), 'ost-profiling-'));
     resetProfilingForTests();
   });
@@ -109,14 +125,17 @@ export function createProfilingHarness(): ProfilingHarness {
     // assignment — this is the canonical teardown the public seam advertises.
     __setInspectorSessionFactoryForTests(undefined);
     vi.restoreAllMocks();
-    for (const k of [ENDPOINT, GATE]) {
+    for (const k of [ENDPOINT, GATE, PROFILE_DIR]) {
       if (saved[k] === undefined) delete process.env[k];
       else process.env[k] = saved[k];
     }
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  const profilesDir = (): string => join(tmp, 'opensip-cli/.runtime/profiles');
+  const profilesDir = (): string => {
+    const configured = process.env[PROFILE_DIR]?.trim();
+    return configured ? resolve(configured) : join(tmp, 'opensip-cli/.runtime/profiles');
+  };
   const readdir = (): string[] => {
     try {
       return readdirSync(profilesDir());
@@ -144,8 +163,21 @@ export function createProfilingHarness(): ProfilingHarness {
       return join(profilesDir(), f);
     },
     installSyncFakeSession: (opts: FakeSessionOptions = {}) => {
-      const flags = { connected: false, disconnected: false };
-      const fake: InspectorSession = {
+      let deferredReply: (() => void) | undefined;
+      const flags: FakeSessionFlags = {
+        connected: false,
+        disconnected: false,
+        disconnectCount: 0,
+        releaseDeferred() {
+          const reply = deferredReply;
+          deferredReply = undefined;
+          reply?.();
+        },
+      };
+      // A single general `post` implementation stands in for InspectorSession's two
+      // typed overloads (Profiler.enable/start vs Profiler.stop); no single non-overloaded
+      // signature satisfies both, so cast this test double past the overload variance.
+      const fake = {
         connect() {
           // eslint-disable-next-line @typescript-eslint/only-throw-error -- intentional non-Error throw: drives startProfiling's `error instanceof Error ? … : String(error)` else arm.
           if (opts.throwOnConnect === 'non-error') throw 'connect string boom';
@@ -154,6 +186,7 @@ export function createProfilingHarness(): ProfilingHarness {
         },
         disconnect() {
           flags.disconnected = true;
+          flags.disconnectCount += 1;
           if (opts.throwOnDisconnect) throw new Error('disconnect boom');
         },
         post(method: string, callback?: (err: Error | null, params?: unknown) => void): void {
@@ -168,15 +201,25 @@ export function createProfilingHarness(): ProfilingHarness {
             throw new Error('stop wire fault');
           }
           if (!callback) return;
-          if (method === 'Profiler.stop') {
-            // Mirror node:inspector's (err, params) shape for the stop wire call.
-            callback(opts.stopError ?? null, { profile: opts.profile });
+          const reply = (): void => {
+            if (method === 'Profiler.stop') {
+              // Mirror node:inspector's (err, params) shape for the stop wire call.
+              callback(opts.stopError ?? null, { profile: opts.profile });
+              return;
+            }
+            if (method === 'Profiler.enable') {
+              callback(opts.enableError ?? null);
+              return;
+            }
+            callback(opts.startError ?? null);
+          };
+          if (method === opts.deferMethod) {
+            deferredReply = reply;
             return;
           }
-          // Profiler.enable / Profiler.start succeed synchronously.
-          callback(null);
+          reply();
         },
-      };
+      } as unknown as InspectorSession;
       __setInspectorSessionFactoryForTests(() => fake);
       return flags;
     },

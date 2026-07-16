@@ -48,11 +48,10 @@ export function createDiscover(
   const pattern = `**/*.${extension}`;
 
   return function discoverFiles(input: DiscoverInput): DiscoverOutput {
-    logger.info({
-      evt: 'graph.discover.start',
-      module,
-      projectDir: input.cwd,
-    });
+    // Adapters retain no lifecycle log; callers own aggregate terminal events.
+    void input.diagnosticIntent;
+    void module;
+    void logger;
 
     const projectDirAbs = normalizeProjectDir(input.cwd);
     const configPathAbs = resolveConfigPath(
@@ -61,14 +60,6 @@ export function createDiscover(
       configCandidates,
     );
     const files = collectFiles(projectDirAbs, pattern, excludedDirGlobs);
-
-    logger.info({
-      evt: 'graph.discover.complete',
-      module,
-      projectDir: projectDirAbs,
-      configPath: configPathAbs ?? '(none)',
-      fileCount: files.length,
-    });
 
     const out: DiscoverOutput =
       configPathAbs === undefined

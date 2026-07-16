@@ -1,13 +1,14 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.5.0
+release: v0.7.0
 title: "Compatibility policy"
 audience: [ci-integrators, plugin-authors, contributors]
 purpose: "The public compatibility contract classes, version markers, deprecation posture, and migration/check lanes for opensip-cli."
 source-files:
   - packages/core/src/lib/compatibility-policy.ts
   - packages/core/src/lib/config-version.ts
+  - packages/core/src/lib/platform-support.ts
   - packages/config/src/migration.ts
   - packages/contracts/src/signal-envelope.ts
   - packages/contracts/src/command-outcome.ts
@@ -18,6 +19,7 @@ related-docs:
   - ./03-configuration.md
   - ./04-json-output-schema.md
   - ./13-verifiable-releases.md
+  - ./17-supported-platforms.md
   - ../../decisions/ADR-0121-platform-compatibility-lts-policy.md
 ---
 # Compatibility policy
@@ -35,9 +37,10 @@ so the CLI records them as named compatibility contract classes in
 | `cloud-wire` | 1 | `@opensip-cli/core` | `SignalBatch.schemaVersion` is the OpenSIP Cloud egress wire version. |
 | `release-artifact` | 1 | root release scripts | Release manifest/SBOM/attestation shape changes require verifier updates. |
 | `datastore-payload` | 1 | `@opensip-cli/datastore` | Generic session rows stay host-owned; payload additions must be optional or migrated. |
+| `platform-support` | 1 | root release scripts | Support rows are additive; changing a `supported` tuple restarts burn-in before re-promotion. A `PLATFORM_SUPPORT_CONTRACT_VERSION` bump requires qualification-evidence, acceptance-profile, and supported-platforms docs review. |
 
 The registry lives in
-[`packages/core/src/lib/compatibility-policy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/packages/core/src/lib/compatibility-policy.ts)
+[`packages/core/src/lib/compatibility-policy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/compatibility-policy.ts)
 and is re-exported from `@opensip-cli/contracts` for public consumers.
 
 ## Project config migration
@@ -74,6 +77,26 @@ The matrix checks:
 
 The checked-in matrix is `.config/compatibility-matrix.json`; public fixtures
 live under `scripts/compat/fixtures/`.
+
+## Platform support
+
+The `platform-support` class governs the native-host support claim — the exact
+OS/kernel/arch/Node-ABI/npm/filesystem tuple a release is qualified against,
+plus the status (`supported` / `preview` / `unqualified` / `unsupported`) that
+separates a measured tuple from an unmeasured one. It is a distinct contract
+class because `engines.node` cannot encode any of those dimensions, and because
+`supported` is an *evidence* claim, never an engine-compatibility inference.
+
+The registry lives in
+[`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/platform-support.ts)
+and is rendered into the authoritative
+[supported-platforms matrix](/docs/opensip-cli/70-reference/17-supported-platforms/) by
+`pnpm docs:platform-support` (CI enforces sync via
+`pnpm docs:platform-support:check`). A `supported` row requires a bound
+acceptance profile, a published release-evidence link, and burn-in
+qualification metadata; a `preview` row requires an acceptance profile.
+Bumping `PLATFORM_SUPPORT_CONTRACT_VERSION` is gated on evidence, profile, and
+docs review together — the same lockstep rule as every other contract class.
 
 ## Contributor rule
 

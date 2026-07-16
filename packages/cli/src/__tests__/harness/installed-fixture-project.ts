@@ -22,7 +22,7 @@
  * trust path a third-party tool takes, not a test-only shortcut.
  */
 
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** The fixture source dir (committed under __tests__/fixtures). */
 const FIXTURE_SRC = join(HERE, '..', 'fixtures', 'external-dispatch-tool');
+const CORE_PACKAGE_DIR = join(HERE, '..', '..', '..', '..', 'core');
 
 /** The installed-tool id the fixture declares (must match its manifest). */
 export const FIXTURE_TOOL_ID = 'external-dispatch-tool';
@@ -42,6 +43,10 @@ export interface InstalledFixtureProject {
   readonly projectDir: string;
   /** The fixture's installed package dir under the project's node_modules. */
   readonly packageDir: string;
+  /** File written immediately on handler entry when the sentinel option is enabled. */
+  readonly handlerSentinelPath?: string;
+  /** File written at module evaluation when the import sentinel is enabled. */
+  readonly importSentinelPath?: string;
 }
 
 /**
@@ -49,7 +54,13 @@ export interface InstalledFixtureProject {
  * responsible for cleanup is unnecessary — the OS temp dir is reclaimed; tests
  * create one per run and never collide (mkdtemp is unique).
  */
-export function makeInstalledFixtureProject(): InstalledFixtureProject {
+export function makeInstalledFixtureProject(
+  options: {
+    runtimeMetadataId?: string;
+    handlerSentinel?: boolean;
+    importSentinel?: boolean;
+  } = {},
+): InstalledFixtureProject {
   const projectDir = mkdtempSync(join(tmpdir(), 'opensip-m4e-dispatch-proj-'));
   // Project marker so the worker's `scope: 'project'` bootstrap resolves a
   // project (otherwise it bails "no project found" before the handler runs). A
@@ -64,7 +75,59 @@ export function makeInstalledFixtureProject(): InstalledFixtureProject {
   mkdirSync(packageDir, { recursive: true });
   // Copy (not symlink) so discovery's node_modules scan finds a real package dir.
   cpSync(FIXTURE_SRC, packageDir, { recursive: true });
-  return { projectDir, packageDir };
+  // A real installed Tool that imports currentScope has @opensip-cli/core
+  // resolvable from its project. Link the built workspace package so this fixture
+  // exercises that production shape rather than failing package resolution first.
+  const coreScopeDir = join(projectDir, 'node_modules', '@opensip-cli');
+  mkdirSync(coreScopeDir, { recursive: true });
+  symlinkSync(CORE_PACKAGE_DIR, join(coreScopeDir, 'core'), 'junction');
+  const runtimePath = join(packageDir, 'index.js');
+  let source = readFileSync(runtimePath, 'utf8');
+  let changed = false;
+  const importSentinelPath = join(projectDir, 'runtime-imported.sentinel');
+  if (options.importSentinel === true) {
+    source =
+      "import { writeFileSync as writeImportSentinel } from 'node:fs';\n" +
+      `writeImportSentinel(${JSON.stringify(importSentinelPath)}, 'imported', 'utf8');\n` +
+      source;
+    changed = true;
+  }
+  if (options.runtimeMetadataId !== undefined) {
+    const metadataIdDeclaration = "id: 'f1e2d3c4-b5a6-4789-90ab-cdef01234567'";
+    if (!source.includes(metadataIdDeclaration)) {
+      throw new Error('external dispatch fixture metadata id declaration was not found');
+    }
+    source = source.replace(
+      metadataIdDeclaration,
+      `id: ${JSON.stringify(options.runtimeMetadataId)}`,
+    );
+    changed = true;
+  }
+
+  const handlerSentinelPath = join(projectDir, 'handler-entered.sentinel');
+  if (options.handlerSentinel === true) {
+    const handlerStart =
+      "handler: async (options, cli) => {\n        const mode = options.mode ?? 'ok';";
+    if (!source.includes(handlerStart)) {
+      throw new Error('external dispatch fixture handler declaration was not found');
+    }
+    source = source.replace(
+      handlerStart,
+      'handler: async (options, cli) => {\n' +
+        "        const { writeFileSync: writeHandlerSentinel } = await import('node:fs');\n" +
+        `        writeHandlerSentinel(${JSON.stringify(handlerSentinelPath)}, 'entered', 'utf8');\n` +
+        "        const mode = options.mode ?? 'ok';",
+    );
+    changed = true;
+  }
+  if (changed) writeFileSync(runtimePath, source, 'utf8');
+
+  return {
+    projectDir,
+    packageDir,
+    ...(options.handlerSentinel === true ? { handlerSentinelPath } : {}),
+    ...(options.importSentinel === true ? { importSentinelPath } : {}),
+  };
 }
 
 /**

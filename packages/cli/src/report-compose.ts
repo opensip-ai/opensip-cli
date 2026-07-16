@@ -21,12 +21,10 @@
  * `ToolScope` view as the `collectReportData` parameter.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import {
   currentScope,
-  resolveProjectPaths,
   resolveToolHooks,
   SystemError,
   type Tool,
@@ -34,31 +32,55 @@ import {
   logger as defaultLogger,
 } from '@opensip-cli/core';
 import {
+  encodeReportViewSelection,
   generateDashboardHtml,
+  normalizeReportViewSelection,
   type DashboardInput as HtmlReportInput,
+  type ReportViewSelection,
 } from '@opensip-cli/dashboard';
 import { orderSessionsForSuiteGrouping, RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
+import { writeArtifactAtomically } from './bootstrap/atomic-artifact-write.js';
+import { bindToolCliContext } from './bootstrap/bind-tool-context.js';
 import { collectDeclaredInputsForTool } from './bootstrap/declared-inputs.js';
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
 import { type DispatchHostCtx } from './bootstrap/dispatch-replay-result.js';
+import { resolveStateLockPolicy } from './bootstrap/state-lock-policy.js';
 import {
   isExternalToolProvenance,
   provenanceRecordFor,
   shouldRunHookInHost,
 } from './bootstrap/tool-provenance.js';
-import { buildHostDispatchCtx, getCurrentProjectRoot } from './cli-context.js';
-import { launchReport } from './open-report.js';
+import {
+  buildHostDispatchCtx,
+  getCurrentProjectRoot,
+  getCurrentRuntimePaths,
+} from './cli-context.js';
+import { buildReportLaunchTarget, launchReport } from './open-report.js';
 
 import type { ReportResult, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /**
- * Host-reserved top-level dashboard-input key a tool's `collectReportData` must
- * never set: `sessions` is the durable cross-tool run history the host owns. A
- * tool that returns it is ignored (best-effort) with a warning.
+ * Host-reserved top-level dashboard-input keys a tool's `collectReportData`
+ * must never set. Sessions/runs are durable cross-tool history and selection is
+ * host-owned navigation. A tool that returns one is ignored with a warning.
  */
-const RESERVED_DASHBOARD_KEYS = new Set(['sessions']);
+const RESERVED_DASHBOARD_KEYS = new Set(['runs', 'selection', 'sessions']);
+const UNSAFE_DASHBOARD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const REPORT_MODULE = 'cli:report';
+
+interface ComposeReportOptions {
+  readonly open: boolean;
+  readonly selection?: ReportViewSelection;
+  /**
+   * Byte budget for the inlined graph catalog. Omitted ⇒ the dashboard's
+   * shareable default. Raised by `opensip report --max-catalog-mb` when the
+   * reader wants the full catalog for LOCAL exploration rather than a report
+   * small enough to send someone.
+   */
+  readonly maxGraphCatalogBytes?: number;
+}
 
 /**
  * Build the merged HTML report input from every registered tool's
@@ -74,7 +96,7 @@ const RESERVED_DASHBOARD_KEYS = new Set(['sessions']);
  *   a CLI action body), since session history and tool contributions both
  *   require the scope.
  */
-async function composeReportInput(): Promise<HtmlReportInput> {
+async function composeReportInput(selection?: ReportViewSelection): Promise<HtmlReportInput> {
   const scope = currentScope();
   if (!scope) {
     // Use a typed error with code so the top-level handler + --json paths
@@ -97,9 +119,32 @@ async function composeReportInput(): Promise<HtmlReportInput> {
     ? runRepo.listStepsForRuns(recentRuns.map((run) => run.id))
     : new Map<string, readonly StoredRunStep[]>();
 
+  const normalizedSelection = normalizeReportViewSelection(selection);
+  const requestedRunId = normalizedSelection?.runId;
+  const matchedStoredRun =
+    requestedRunId !== undefined && recentRuns.some((run) => run.id === requestedRunId);
+  const resolvedSelection =
+    normalizedSelection === undefined
+      ? undefined
+      : ({
+          view: normalizedSelection.view,
+          ...(matchedStoredRun ? { runId: requestedRunId } : {}),
+        } satisfies ReportViewSelection);
+  log.info?.({
+    evt: 'cli.report.compose.selection',
+    module: REPORT_MODULE,
+    view: resolvedSelection?.view ?? 'overview',
+    hasRunId: requestedRunId !== undefined,
+    matchedStoredRun,
+  });
+
   const input: HtmlReportInput = {
     sessions,
-    runs: recentRuns.map((run) => ({ ...run, steps: stepsByRun.get(run.id) ?? [] })),
+    runs: recentRuns.map((run) => ({
+      ...run,
+      steps: stepsByRun.get(run.id) ?? [],
+    })),
+    ...(resolvedSelection === undefined ? {} : { selection: resolvedSelection }),
     declaredInputs: collectDeclaredInputsForTool('report'),
   };
   const claimedKeys = new Map<string, string>();
@@ -149,7 +194,7 @@ async function collectExternalReportData(
     if (hostCtx === undefined) {
       void log.warn({
         evt: 'cli.report.compose.external_hook_skipped',
-        module: 'cli:report',
+        module: REPORT_MODULE,
         tool: tool.metadata.id,
         msg: 'No host context to fork the report-data worker for an external tool; skipping its contribution.',
       });
@@ -158,17 +203,18 @@ async function collectExternalReportData(
   }
   try {
     const cwd = getCurrentProjectRoot();
+    const boundHostCtx = bindToolCliContext(tool, hostCtx);
     const result = await dispatchExternalToolHook({
       provenance: record,
       hook: 'collectReportData',
       cwd,
-      ctx: hostCtx,
+      ctx: boundHostCtx,
     });
     return (result ?? undefined) as Record<string, unknown> | undefined;
   } catch (error) {
     void log.warn({
       evt: 'cli.report.compose.external_hook_failed',
-      module: 'cli:report',
+      module: REPORT_MODULE,
       tool: tool.metadata.id,
       error: error instanceof Error ? error.message : String(error),
       msg: 'External tool report-data worker failed; its contribution is omitted (the report still renders).',
@@ -177,7 +223,7 @@ async function collectExternalReportData(
   }
 }
 
-/** Merge one tool's report contribution into the input, guarding reserved host keys. */
+/** Merge one tool's report contribution into the input, guarding host and object keys. */
 function mergeContribution(
   input: HtmlReportInput,
   contribution: Record<string, unknown> | undefined,
@@ -187,36 +233,48 @@ function mergeContribution(
 ): void {
   if (!contribution) return;
   const toolId = tool.metadata.name ?? tool.metadata.id;
-  // Guardrail (spec §8): tools must never clobber the host-owned `sessions` run
-  // history. Ignore with a warning (best-effort) — the host owns the history.
-  const reserved = Object.keys(contribution).filter((k) => RESERVED_DASHBOARD_KEYS.has(k));
-  if (reserved.length > 0) {
+  // Guardrail (spec §8): tools must never clobber host-owned history or
+  // navigation. Prototype-mutating keys are rejected at the same boundary: an
+  // external hook can return arbitrary plain data, and `Object.assign` would
+  // otherwise invoke Object.prototype.__proto__ and make an inherited
+  // `selection` bypass the stored-run match above.
+  const blocked = Object.keys(contribution).filter(
+    (key) => RESERVED_DASHBOARD_KEYS.has(key) || UNSAFE_DASHBOARD_KEYS.has(key),
+  );
+  if (blocked.length > 0) {
     void log.warn({
       evt: 'cli.report.compose.reserved_key_ignored',
-      module: 'cli:report',
+      module: REPORT_MODULE,
       tool: toolId,
-      keys: reserved,
-      msg: 'Tool collectReportData returned a reserved host key; it was ignored.',
+      keys: blocked,
+      msg: 'Tool collectReportData returned a reserved or unsafe host key; it was ignored.',
     });
-    for (const k of reserved) delete contribution[k];
   }
   for (const key of Object.keys(contribution)) {
+    if (RESERVED_DASHBOARD_KEYS.has(key) || UNSAFE_DASHBOARD_KEYS.has(key)) continue;
     const otherTool = claimedKeys.get(key);
     if (otherTool !== undefined && otherTool !== toolId) {
       void log.warn({
         evt: 'cli.report.compose.collision',
-        module: 'cli:report',
+        module: REPORT_MODULE,
         tool: toolId,
         otherTool,
         key,
         msg: 'Tool collectReportData returned a key already contributed by another tool; first writer wins.',
       });
-      delete contribution[key];
       continue;
     }
     claimedKeys.set(key, toolId);
+    // Define an own data property rather than assigning through an inherited
+    // setter. This keeps the merge safe even if the input object's prototype is
+    // extended by the embedding application.
+    Object.defineProperty(input, key, {
+      value: contribution[key],
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
   }
-  Object.assign(input, contribution);
 }
 
 /**
@@ -227,16 +285,37 @@ function mergeContribution(
  * browser was launched. Browser-launch failures never propagate — they
  * fall through to `opened: false` so the user can open the file manually.
  */
-export async function composeAndWriteReport(opts: { open: boolean }): Promise<ReportResult> {
-  const input = await composeReportInput();
-  const html = generateDashboardHtml(input);
+export async function composeAndWriteReport(opts: ComposeReportOptions): Promise<ReportResult> {
+  const input = await composeReportInput(opts.selection);
+  const html = generateDashboardHtml(
+    opts.maxGraphCatalogBytes === undefined
+      ? input
+      : { ...input, maxGraphCatalogBytes: opts.maxGraphCatalogBytes },
+  );
 
-  const paths = resolveProjectPaths(getCurrentProjectRoot());
-  mkdirSync(paths.reportsDir, { recursive: true });
+  // Scope-aware: an ephemeral (no-init) run must write its report into the user
+  // cache, never into the user's repository. Atomic write avoids concurrent
+  // audit --open / report races corrupting latest.html mid-write.
+  const paths = getCurrentRuntimePaths();
   const reportPath = join(paths.reportsDir, 'latest.html');
-  writeFileSync(reportPath, html, 'utf8');
+  const scope = currentScope();
+  const logger = scope?.logger ?? defaultLogger;
+  // Synchronous lock+write (void silences detached-promises on sync helpers in async fns).
+  void writeArtifactAtomically(reportPath, html, {
+    policy: resolveStateLockPolicy(),
+    logger,
+    runId: scope?.runId,
+    command: 'report',
+    cwdBasename:
+      scope?.projectContext?.projectRoot === undefined
+        ? basename(process.cwd())
+        : basename(scope.projectContext.projectRoot),
+  });
 
-  const opened = opts.open ? await launchReport(reportPath) : false;
+  const fragment =
+    input.selection === undefined ? undefined : encodeReportViewSelection(input.selection);
+  const launchTarget = buildReportLaunchTarget(reportPath, fragment);
+  const opened = opts.open ? await launchReport(launchTarget) : false;
 
   return { type: 'report', path: reportPath, opened };
 }

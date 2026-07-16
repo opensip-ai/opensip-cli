@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-08
-release: v0.5.0
+last_verified: 2026-07-13
+release: v0.7.0
 title: "`tools` command"
 audience: [plugin-authors, contributors]
 purpose: "Customer-facing command group for managing whole Tool plugins: list, validate, install, uninstall, and data-purge."
@@ -101,6 +101,13 @@ tool set. `--lang <language>` implies `--available`; language values are
 canonicalized (`c++`, `cxx`, and `cpp` all match C/C++ coverage), and
 language-agnostic adapters match every filter.
 
+A successful pristine [`opensip init`](/docs/opensip-cli/70-reference/01-cli-commands/#optional-tools-after-pristine-init)
+projects the relevant, not-yet-installed subset of this catalog after its
+**Try it** commands. Multi-language projects receive the stable union of all
+language matches plus each language-agnostic adapter once. The footer is advice
+only: `init` does not prompt for or install an adapter. Use
+`opensip tools list --available` whenever you need the complete catalog.
+
 Install the adapter package, then run that adapter's own `doctor` command before
 the first scan:
 
@@ -115,7 +122,7 @@ The adapter package does not install the native scanner binary. Keep managing
 your normal OS/package-manager path, or pin the binary with
 `binaries.<tool>.path` / `OPENSIP_<TOOL>_BIN`. See
 [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/) for the full
-adapter table and prerequisites; [ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0141-external-scanner-binary-ownership.md)
+adapter table and prerequisites; [ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0141-external-scanner-binary-ownership.md)
 records the scanner-binary ownership boundary.
 
 ## `tools doctor`
@@ -183,7 +190,7 @@ Project-local tools remain deny-by-default unless the project config lists their
 tool id under `tools.trusted`. `tools create` adds that entry for the scaffolded
 tool. See
 [Create your first tool](/docs/opensip-cli/60-guides/07-create-your-first-tool/) and
-[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.5.0/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
+[ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md).
 
 ## `tools install <spec>`
 
@@ -230,15 +237,22 @@ committed `tools.trusted`; that field is for tracked project-local authored tool
 ## `tools data-purge <tool-id>`
 
 Deletes one tool's rows from the project datastore — **rows, never tables**
-(the SQLite schema is host-owned and shared):
+(the SQLite schema is host-owned and shared). Input must be non-empty and must
+not use the reserved host-plane prefix. Registered aliases and stable/layout
+identities resolve to one deduplicated owned-key set before any repository call:
 
 - `sessions` rows (per-tool payloads cascade),
 - baseline entries + the baseline existence marker,
-- `tool_state` rows (the keyed tool-state plane, ADR-0042).
+- ordinary `tool_state` rows for every owned identity,
+- the corresponding host compatibility rows stored under the reserved
+  host-plane namespace (ADR-0146).
 
-Reports counts per store. Works for any tool id, including bundled tools
-(purging your fit history is legitimate). First-party ids are accepted in
-either form (`fit`/`fitness`, `sim`/`simulation`).
+The reserved identity is an internal cleanup detail, not a Tool-addressable
+command path; passing it directly is rejected without querying a repository.
+Reports bounded aggregate counts per store. Works for any ordinary tool id,
+including bundled tools (purging fit history is legitimate). First-party ids
+are accepted in either form (`fit`/`fitness`, `sim`/`simulation`). Unknown but
+valid ids still execute one parameterized cleanup set.
 
 Surface note: this is a flat `data-purge` subcommand (the spec drafted a
 nested `tools data purge`; the host's command machinery is deliberately one

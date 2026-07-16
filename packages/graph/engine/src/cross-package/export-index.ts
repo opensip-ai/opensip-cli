@@ -34,13 +34,10 @@
  * linchpin holds on any layout.
  */
 
-import { readFileSync } from 'node:fs';
-import { posix, relative } from 'node:path';
-
+import { readPackageManifestFacts } from '@opensip-cli/codebase';
 import { logger } from '@opensip-cli/core';
 
 import { packageGroupOf } from './package-group.js';
-import { toPosixPath } from './posix-path.js';
 
 import type { PackageManifest, PackageManifestIndex } from './package-group.js';
 import type { Shard } from '../cli/orchestrate/shard-model.js';
@@ -238,69 +235,77 @@ export function buildPackageManifestIndex(
  * single-program (exact) engine uses: it has no `Shard[]` to hand the shard
  * overload, only the package roots it derived from the catalog. Same best-effort
  * semantics — a root with no readable/parseable manifest, or a manifest with no
- * string `name`, is skipped (it won't be specifier-resolvable). First write
- * wins on a duplicate `name`.
+ * string `name`, is skipped (it won't be specifier-resolvable).
+ *
+ * Duplicate `package.json#name` FAILS CLOSED (P2 Phase 0.4): the first time a
+ * name is seen twice it is tombstoned and removed from the index, so
+ * {@link resolveSpecifierToPackage} declines that name regardless of root order.
+ * A guessed first-write-wins attribution across an ambiguous workspace name is
+ * strictly worse than an honest decline. Only a bounded diagnostic COUNT is
+ * logged — never the ambiguous names or paths.
  */
 export function buildPackageManifestIndexFromRoots(
   rootDirs: readonly string[],
   projectRoot: string,
 ): PackageManifestIndex {
   const index = new Map<string, PackageManifest>();
+  const tombstoned = new Set<string>();
+  let duplicates = 0;
   for (const rootDir of rootDirs) {
     const manifest = readManifest(rootDir, projectRoot);
-    if (manifest && !index.has(manifest.name)) index.set(manifest.name, manifest);
+    if (manifest === undefined) continue;
+    const { name } = manifest;
+    if (tombstoned.has(name)) {
+      duplicates += 1;
+      continue;
+    }
+    if (index.has(name)) {
+      // Ambiguous workspace name → remove it entirely and remember the tombstone
+      // so a third+ occurrence never resurrects it. Order-independent by design.
+      index.delete(name);
+      tombstoned.add(name);
+      duplicates += 1;
+      continue;
+    }
+    index.set(name, manifest);
+  }
+  if (duplicates > 0) {
+    logger.debug({
+      evt: 'graph.export_index.duplicate_package_names',
+      module: 'graph:export-index',
+      duplicates,
+    });
   }
   return index;
 }
 
 /** Read + parse one package's `package.json`; `undefined` on any failure. */
 function readManifest(rootDirAbs: string, projectRoot: string): PackageManifest | undefined {
-  const manifestPath = posix.join(toPosixPath(rootDirAbs), 'package.json');
-  let raw: string;
-  try {
-    raw = readFileSync(manifestPath, 'utf8');
-  } catch (error) {
-    // Best-effort: a shard without a readable package.json is simply not
-    // specifier-resolvable. Note the skip so the swallow isn't silent.
+  const result = readPackageManifestFacts({
+    packageRoot: rootDirAbs,
+    projectRoot,
+  });
+  if (!result.ok) {
+    const parseFailure = result.reason === 'parse-failed' || result.reason === 'invalid-shape';
     logger.debug({
-      evt: 'graph.export_index.manifest_read_skipped',
+      evt: parseFailure
+        ? 'graph.export_index.manifest_parse_skipped'
+        : 'graph.export_index.manifest_read_skipped',
       module: 'graph:export-index',
-      manifestPath,
-      err: error instanceof Error ? error.message : String(error),
+      reason: result.reason,
     });
     return undefined;
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    // Best-effort: an unparseable package.json is not specifier-resolvable.
-    // Note the skip so the swallow isn't silent.
-    logger.debug({
-      evt: 'graph.export_index.manifest_parse_skipped',
-      module: 'graph:export-index',
-      manifestPath,
-      err: error instanceof Error ? error.message : String(error),
-    });
-    return undefined;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return undefined;
-  const record = parsed as Record<string, unknown>;
-  const name = record.name;
-  if (typeof name !== 'string' || name.length === 0) return undefined;
-  const exportsField = record.exports;
+  const { facts } = result;
   const exportsMap =
-    typeof exportsField === 'object' && exportsField !== null
-      ? (exportsField as Record<string, unknown>)
-      : undefined;
-  return { name, dir: relativeDir(rootDirAbs, projectRoot), exportsMap };
-}
-
-/** Project-relative POSIX dir for a shard's absolute rootDir — the prefix
- *  {@link packageGroupOf} matches file paths against (`''` when the package IS
- *  the project root, i.e. a single-package repo). */
-function relativeDir(rootDirAbs: string, projectRoot: string): string {
-  return toPosixPath(relative(projectRoot, rootDirAbs));
+    facts.exportMapKeys === undefined
+      ? undefined
+      : Object.fromEntries(facts.exportMapKeys.map((key) => [key, true]));
+  return {
+    name: facts.name,
+    dir: facts.root === '.' ? '' : facts.root,
+    ...(exportsMap === undefined ? {} : { exportsMap }),
+  };
 }
 
 /** The outcome of resolving a bare import specifier to a workspace package. */

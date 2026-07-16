@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreBinaries": ["pgrep", "ps", "taskkill", "wmic"],
+  "ignoreBinaries": ["mkfifo", "pgrep", "ps", "taskkill", "wmic"],
   "ignore": ["**/__fixtures__/**"],
   "rules": {
     "duplicates": "off"
@@ -48,25 +48,23 @@
     "packages/mcp": {
       "entry": ["src/sqlite-graph-read-port.ts", "src/session-results-read-port.ts"]
     },
+    "packages/agent-eval": {
+      "entry": ["src/cli.ts"],
+      "ignoreDependencies": ["opensip-cli"]
+    },
     "packages/tool-gitleaks": {
-      "ignoreDependencies": ["@opensip-cli/contracts", "opensip-cli"]
+      "ignoreDependencies": ["opensip-cli"]
     },
     "packages/tool-osv-scanner": {
-      "ignoreDependencies": ["@opensip-cli/contracts", "opensip-cli"]
+      "ignoreDependencies": ["opensip-cli"]
     },
     "packages/tool-trivy": {
-      "ignoreDependencies": ["@opensip-cli/contracts", "opensip-cli"]
+      "ignoreDependencies": ["opensip-cli"]
     },
     "packages/dashboard": {
       "entry": ["src/client/index.ts", "src/client/globals.ts", "scripts/*.mjs"],
       "ignore": ["src/vendor/cytoscape-bundle.js"],
       "ignoreDependencies": ["cytoscape", "cytoscape-dagre"]
-    },
-    "packages/fitness/checks-cpp": {
-      "ignoreDependencies": ["@opensip-cli/core"]
-    },
-    "packages/fitness/checks-dogfood": {
-      "ignoreDependencies": ["@opensip-cli/core"]
     },
     "packages/fitness/engine": {
       "entry": ["src/tool.ts", "src/cli/{fit,dashboard,fit-list,fit-recipes}.ts"],

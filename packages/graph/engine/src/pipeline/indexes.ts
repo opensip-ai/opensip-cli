@@ -92,19 +92,65 @@ function buildImportedPackagesByFile(
   return out;
 }
 
-/** Package groups one module-init occurrence imports (resolved via byBodyHash). */
+interface DependencyLike {
+  readonly to?: unknown;
+  readonly specifier?: unknown;
+  readonly classification?: { readonly resolvedPackage?: unknown };
+}
+
+/**
+ * Package groups one module-init occurrence imports.
+ *
+ * Prefer catalog-resolved targets (`dep.to[]` → body hash → `pkgOf`). When
+ * `to[]` is empty (external / unresolved / declaration-only), fall back to
+ * `classification.resolvedPackage` then `packageNameOf(specifier)` — the same
+ * attribution surface `constrain-edges` uses for import reachability.
+ */
 function importedPackagesOf(
   occ: FunctionOccurrence,
   byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
 ): Set<string> {
   const set = new Set<string>();
-  for (const dep of occ.dependencies ?? []) {
-    for (const targetHash of dep.to) {
-      const target = byBodyHash.get(targetHash);
-      if (target) set.add(pkgOf(target));
-    }
+  const dependencies: readonly unknown[] = Array.isArray(occ.dependencies) ? occ.dependencies : [];
+  for (const dep of dependencies) {
+    if (typeof dep !== 'object' || dep === null) continue;
+    addDependencyPackages(set, dep, byBodyHash);
   }
   return set;
+}
+
+/** Resolve one dependency edge into package names (catalog target or fallback). */
+function addDependencyPackages(
+  set: Set<string>,
+  edge: DependencyLike,
+  byBodyHash: ReadonlyMap<string, FunctionOccurrence>,
+): void {
+  let resolvedFromCatalog = false;
+  for (const targetHash of stringTargetsOf(edge)) {
+    const target = byBodyHash.get(targetHash);
+    if (target) {
+      set.add(pkgOf(target));
+      resolvedFromCatalog = true;
+    }
+  }
+  if (resolvedFromCatalog) return;
+
+  const classified = edge.classification?.resolvedPackage;
+  if (typeof classified === 'string' && classified.length > 0) {
+    set.add(classified);
+    return;
+  }
+  // Relative imports stay within the caller's own package — only bare/scoped
+  // specifiers name another package (matches constrain-edges).
+  if (typeof edge.specifier === 'string' && !edge.specifier.startsWith('.')) {
+    set.add(packageNameOf(edge.specifier));
+  }
+}
+
+/** `@scope/name/sub` → `@scope/name`; `name/sub` → `name`. */
+function packageNameOf(specifier: string): string {
+  const parts = specifier.split('/');
+  return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : (parts[0] ?? specifier);
 }
 
 function unionInto(map: Map<string, Set<string>>, key: string, values: ReadonlySet<string>): void {
@@ -170,8 +216,9 @@ function collectOutgoing(
 ): Set<string> {
   const out = new Set<string>();
   for (const occ of occs) {
-    for (const edge of occ.calls) {
-      for (const target of edge.to) {
+    const calls: readonly unknown[] = Array.isArray(occ.calls) ? occ.calls : [];
+    for (const edge of calls) {
+      for (const target of stringTargetsOf(edge)) {
         /* v8 ignore next */
         if (!byBodyHash.has(target)) continue;
         out.add(target);
@@ -179,6 +226,15 @@ function collectOutgoing(
     }
   }
   return out;
+}
+
+function* stringTargetsOf(value: unknown): Iterable<string> {
+  if (typeof value !== 'object' || value === null) return;
+  const targets = (value as { to?: unknown }).to;
+  if (!Array.isArray(targets)) return;
+  for (const target of targets) {
+    if (typeof target === 'string') yield target;
+  }
 }
 
 function pushCaller(callers: Map<string, Set<string>>, target: string, caller: string): void {

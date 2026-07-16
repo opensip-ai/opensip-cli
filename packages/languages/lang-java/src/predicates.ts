@@ -24,8 +24,9 @@ export const isClass = (node: Node): boolean => node.type === 'class_declaration
 export const isComment = (node: Node): boolean =>
   node.type === 'line_comment' || node.type === 'block_comment';
 
-/** A string literal. */
-export const isString = (node: Node): boolean => node.type === 'string_literal';
+/** A string literal or text block (`"""…"""`). */
+export const isString = (node: Node): boolean =>
+  node.type === 'string_literal' || node.type === 'text_block';
 
 /** A `catch` clause — Java's error-handling node. */
 export const isCatch = (node: Node): boolean => node.type === 'catch_clause';
@@ -33,8 +34,9 @@ export const isCatch = (node: Node): boolean => node.type === 'catch_clause';
 /** An `if` statement. */
 export const isConditional = (node: Node): boolean => node.type === 'if_statement';
 
-/** A `for`, `while`, or enhanced-`for` (for-each) loop. */
+/** A `for`, `while`, `do`-`while`, or enhanced-`for` (for-each) loop. */
 export const isLoop = (node: Node): boolean =>
   node.type === 'for_statement' ||
   node.type === 'while_statement' ||
+  node.type === 'do_statement' ||
   node.type === 'enhanced_for_statement';

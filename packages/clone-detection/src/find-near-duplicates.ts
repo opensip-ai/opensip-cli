@@ -13,6 +13,7 @@ import {
   estimateJaccard,
   lshBandHashes,
 } from './near-duplicate-signature.js';
+import { UnionFind } from './near-duplicate-union-find.js';
 
 import type { CloneCandidate, NearDupOpts, NearDuplicateCluster } from './types.js';
 
@@ -211,26 +212,156 @@ function buildComponentCluster(
   component: readonly number[],
   componentEdges: readonly NearEdge[],
 ): NearDuplicateCluster | undefined {
-  const nearIndices = nearIndicesInComponent(componentEdges);
-  if (nearIndices.size < 2) return undefined;
-  if (component.length > MAX_CLUSTER_SIZE) return undefined;
+  // Cap oversized components rather than dropping them: keep the first
+  // MAX_CLUSTER_SIZE members sorted by location so the finding still surfaces.
+  // After the location slice, re-derive connectivity from remaining edges so
+  // we never report disconnected remnants as one cluster, and never drop a
+  // component solely because the hub fell outside the location window when
+  // residual edges still connect ≥2 nodes.
+  const cappedIndices = capComponentIndices(eligible, component, MAX_CLUSTER_SIZE);
+  const cappedIndexSet = new Set(cappedIndices);
+  const cappedEdges = componentEdges.filter(
+    (e) => cappedIndexSet.has(e.a) && cappedIndexSet.has(e.b),
+  );
 
-  const members = component.map((i) => eligible[i]).filter((o): o is CloneCandidate => !!o);
-  const anchor = lowestByLocation(members);
-  const nearMembers = [...nearIndices]
-    .map((i) => eligible[i]?.qualifiedName)
-    .filter((n): n is string => n !== undefined)
-    .sort();
-  const exactMembers = exactMembersInComponent(members);
-  const maxSim = maxSimilarityAmong(componentEdges);
+  // Prefer degree-preserving selection: if the location cap severed all edges,
+  // re-cap by keeping highest-degree nodes from the original component.
+  let workingEdges = cappedEdges;
+  if (nearIndicesInComponent(cappedEdges).size < 2 && component.length > MAX_CLUSTER_SIZE) {
+    const degreeCap = capComponentIndicesByDegree(
+      eligible,
+      component,
+      componentEdges,
+      MAX_CLUSTER_SIZE,
+    );
+    const degreeSet = new Set(degreeCap);
+    workingEdges = componentEdges.filter((e) => degreeSet.has(e.a) && degreeSet.has(e.b));
+  }
 
-  return {
-    anchor,
-    nearMembers,
-    exactMembers,
-    estimatedSimilarity: maxSim,
-    clusterSize: component.length,
+  // Re-CC residual edges so a location/degree cap that severs a bridge cannot
+  // merge disconnected cliques into one finding.
+  const residualComponents = residualConnectedComponents(workingEdges);
+  let best: NearDuplicateCluster | undefined;
+  for (const residual of residualComponents) {
+    if (residual.indices.size < 2) continue;
+    const residualEdges = residual.edges;
+    const members = [...residual.indices]
+      .map((i) => eligible[i])
+      .filter((o): o is CloneCandidate => !!o);
+    const cluster: NearDuplicateCluster = {
+      anchor: lowestByLocation(members),
+      nearMembers: members.map((m) => m.qualifiedName).sort(),
+      exactMembers: exactMembersInComponent(members),
+      estimatedSimilarity: maxSimilarityAmong(residualEdges),
+      clusterSize: members.length,
+    };
+    if (
+      best === undefined ||
+      cluster.clusterSize > best.clusterSize ||
+      (cluster.clusterSize === best.clusterSize &&
+        cluster.estimatedSimilarity > best.estimatedSimilarity)
+    ) {
+      best = cluster;
+    }
+  }
+  return best;
+}
+
+/** Connected components of residual near-edges after a size cap. */
+function residualConnectedComponents(
+  edges: readonly NearEdge[],
+): readonly { indices: Set<number>; edges: NearEdge[] }[] {
+  if (edges.length === 0) return [];
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    let r = x;
+    while ((parent.get(r) ?? r) !== r) r = parent.get(r) ?? r;
+    let cur = x;
+    while (cur !== r) {
+      const next = parent.get(cur) ?? cur;
+      parent.set(cur, r);
+      cur = next;
+    }
+    return r;
   };
+  const union = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  for (const e of edges) {
+    if (!parent.has(e.a)) parent.set(e.a, e.a);
+    if (!parent.has(e.b)) parent.set(e.b, e.b);
+    union(e.a, e.b);
+  }
+  const byRoot = new Map<number, { indices: Set<number>; edges: NearEdge[] }>();
+  for (const e of edges) {
+    const root = find(e.a);
+    let bucket = byRoot.get(root);
+    if (!bucket) {
+      bucket = { indices: new Set(), edges: [] };
+      byRoot.set(root, bucket);
+    }
+    bucket.indices.add(e.a);
+    bucket.indices.add(e.b);
+    bucket.edges.push(e);
+  }
+  return [...byRoot.values()];
+}
+
+/** Cap by degree (desc) then location so hubs survive the size bound. */
+function capComponentIndicesByDegree(
+  eligible: readonly CloneCandidate[],
+  component: readonly number[],
+  edges: readonly NearEdge[],
+  maxSize: number,
+): number[] {
+  if (component.length <= maxSize) return [...component];
+  const degree = new Map<number, number>();
+  for (const i of component) degree.set(i, 0);
+  for (const e of edges) {
+    if (degree.has(e.a)) degree.set(e.a, (degree.get(e.a) ?? 0) + 1);
+    if (degree.has(e.b)) degree.set(e.b, (degree.get(e.b) ?? 0) + 1);
+  }
+  return [...component]
+    .sort((ai, bi) => {
+      const d = (degree.get(bi) ?? 0) - (degree.get(ai) ?? 0);
+      if (d !== 0) return d;
+      const a = eligible[ai];
+      const b = eligible[bi];
+      if (!a || !b) return ai - bi;
+      if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
+      if (a.line !== b.line) return a.line - b.line;
+      if (a.column !== b.column) return a.column - b.column;
+      return compareQualifiedNames(a.qualifiedName, b.qualifiedName);
+    })
+    .slice(0, maxSize);
+}
+
+function compareQualifiedNames(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+/** Stable location order, then keep at most `maxSize` member indices. */
+function capComponentIndices(
+  eligible: readonly CloneCandidate[],
+  component: readonly number[],
+  maxSize: number,
+): number[] {
+  if (component.length <= maxSize) return [...component];
+  return [...component]
+    .sort((ai, bi) => {
+      const a = eligible[ai];
+      const b = eligible[bi];
+      if (!a || !b) return 0;
+      if (a.filePath !== b.filePath) return a.filePath < b.filePath ? -1 : 1;
+      if (a.line !== b.line) return a.line - b.line;
+      if (a.column !== b.column) return a.column - b.column;
+      return compareQualifiedNames(a.qualifiedName, b.qualifiedName);
+    })
+    .slice(0, maxSize);
 }
 
 function nearIndicesInComponent(edges: readonly NearEdge[]): Set<number> {
@@ -271,38 +402,4 @@ function lowestByLocation(occs: readonly CloneCandidate[]): CloneCandidate {
 
 function pairKey(a: number, b: number): string {
   return a < b ? `${String(a)}:${String(b)}` : `${String(b)}:${String(a)}`;
-}
-
-class UnionFind {
-  private readonly parent: number[];
-  private readonly rank: number[];
-
-  constructor(size: number) {
-    this.parent = Array.from({ length: size }, (_, i) => i);
-    this.rank = Array.from({ length: size }, () => 0);
-  }
-
-  find(x: number): number {
-    const p = this.parent[x];
-    if (p === undefined || p === x) return x;
-    const root = this.find(p);
-    this.parent[x] = root;
-    return root;
-  }
-
-  union(a: number, b: number): void {
-    const ra = this.find(a);
-    const rb = this.find(b);
-    if (ra === rb) return;
-    const rankA = this.rank[ra] ?? 0;
-    const rankB = this.rank[rb] ?? 0;
-    if (rankA < rankB) {
-      this.parent[ra] = rb;
-    } else if (rankA > rankB) {
-      this.parent[rb] = ra;
-    } else {
-      this.parent[rb] = ra;
-      this.rank[ra] = rankA + 1;
-    }
-  }
 }

@@ -130,8 +130,8 @@ export function diffFingerprints(
   cachedFingerprint: string,
   currentFingerprint: string,
 ): readonly string[] {
-  const cachedMap = parseFingerprint(cachedFingerprint);
-  const currentMap = parseFingerprint(currentFingerprint);
+  const cachedMap = parseFilesFingerprint(cachedFingerprint);
+  const currentMap = parseFilesFingerprint(currentFingerprint);
   const changed = new Set<string>();
   for (const [path, mark] of cachedMap) {
     const cur = currentMap.get(path);
@@ -143,7 +143,8 @@ export function diffFingerprints(
   return [...changed].sort();
 }
 
-function parseFingerprint(fingerprint: string): Map<string, string> {
+/** Parse a files fingerprint into its absolute-path to stat-mark entries. */
+export function parseFilesFingerprint(fingerprint: string): ReadonlyMap<string, string> {
   const out = new Map<string, string>();
   const lines = fingerprint.split('\n');
   // Skip the leading file-count line.
@@ -151,7 +152,7 @@ function parseFingerprint(fingerprint: string): Map<string, string> {
     const line = lines[i];
     if (typeof line !== 'string' || line.length === 0) continue;
     const firstPipe = line.indexOf('|');
-    if (firstPipe === -1) continue;
+    if (firstPipe <= 0) continue;
     const path = line.slice(0, firstPipe);
     const mark = line.slice(firstPipe + 1);
     out.set(path, mark);

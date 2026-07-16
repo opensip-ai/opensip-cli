@@ -37,14 +37,10 @@ function requiredConfig(projectRoot: string): string {
  * built-in ruleset, so a scan without a config would be a no-op.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
-  return [
-    'scan',
-    '--config',
-    requiredConfig(ctx.projectRoot),
-    '--format',
-    'sarif',
-    ctx.projectRoot,
-  ];
+  // Scan `.` under cwd=projectRoot so SARIF paths stay project-relative
+  // (message-hash fingerprints are otherwise machine-path-specific).
+  const config = requiredConfig(ctx.projectRoot);
+  return ['scan', '--config', config, '--format', 'sarif', '.'];
 }
 
 /**
@@ -58,11 +54,23 @@ export function parseAstGrepSarif(
   return parseStdoutSarif(raw.raw, { source: ctx.tool });
 }
 
-/** Build the `--exclude <path>` args that keep ast-grep from scanning a path. */
+/**
+ * Build exclude args that keep ast-grep from scanning a path.
+ * ast-grep uses gitignore-style `--globs` (`!` = exclude); there is no `--exclude`.
+ */
 export function buildAstGrepExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  return { args: ['--exclude', input.excludePath] };
+  // gitignore-style globs are rooted at the scan root — absolute host paths do
+  // not match. Prefer the portable runtime segment (Semgrep-style).
+  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
+  const relativeSegment = normalized.includes('opensip-cli/.runtime')
+    ? 'opensip-cli/.runtime'
+    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
+  const pattern = relativeSegment.endsWith('/**')
+    ? `!${relativeSegment}`
+    : `!${relativeSegment}/**`;
+  return { args: ['--globs', pattern] };
 }
 
 export const tool: Tool = defineExternalToolAdapter({

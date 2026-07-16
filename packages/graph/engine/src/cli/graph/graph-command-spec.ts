@@ -194,6 +194,10 @@ async function dispatchGraphLiveView(
   });
 }
 
+function shouldRetainJsonEnvelope(opts: GraphCommandOptions): boolean {
+  return opts.json === true && typeof opts.sarif === 'string' && opts.sarif.length > 0;
+}
+
 /**
  * The `graph` command handler — the former `registerGraphCommand()` action body,
  * lifted to a spec handler. The host (`raw-stream`) renders nothing, so the
@@ -203,10 +207,11 @@ async function dispatchGraphLiveView(
  * host-owned-run-timing Phase 3: the static render path RETURNS a
  * {@link ToolRunCompletion} carrying the run's `session` contribution; the host
  * run plane persists it after this handler resolves (graph no longer writes the
- * generic session row itself). The early-return branches (show / list-files /
- * heap-preflight re-exec / TTY live view) return `void` — the live view path
+ * generic session row itself). The show / list-files / TTY live view branches
+ * return `void` — the live view path
  * persists its own session via `renderLive`, and the other branches produce no
- * session.
+ * session. A heap-preflight re-exec returns a delegated completion after its
+ * elevated child finishes, so the host does not persist a duplicate parent run.
  */
 async function runGraphCommand(
   rawOpts: unknown,
@@ -250,10 +255,10 @@ async function runGraphCommand(
   }
   // Preflight runs BEFORE any heavy work. If the repo's file count
   // exceeds a threshold AND the current heap cap is too low, this
-  // re-execs the process with elevated `--max-old-space-size`. The
-  // re-execing parent never returns from this call (it `process.exit`s
-  // with the child's code), so `returned === true` only matters for
-  // the type checker. Skipped when the user has expressed an explicit
+  // re-execs the process with elevated `--max-old-space-size`. The parent
+  // waits for that child and propagates its exit code, then returns a delegated
+  // completion so the host does not record a second evidence-free run. Skipped
+  // when the user has expressed an explicit
   // scope (positional paths, --workspace, or --language): those runs
   // either touch a fraction of files (positional/language) or spawn
   // child processes per unit (workspace) and don't need the global
@@ -261,12 +266,12 @@ async function runGraphCommand(
   const hasExplicitScope =
     paths.length > 0 || opts.workspace === true || typeof opts.language === 'string';
   if (!hasExplicitScope) {
-    const reExecing = await runHeapPreflight({
+    const delegation = await runHeapPreflight({
       cwd: opts.cwd,
       verbose: opts.verbose === true,
     });
     /* v8 ignore next */
-    if (reExecing) return;
+    if (delegation) return { execution: { kind: 'delegated', ...delegation } };
   }
 
   // Determinism (ADR-0032, superseding ADR-0031): TTY selects only the RENDERER
@@ -278,7 +283,11 @@ async function runGraphCommand(
   // show the staged "Code Graph" checklist in a terminal; both fall through to
   // the static path when piped. The live view is therefore eligible for any
   // rendering run — there is no `--exact` gate. Every non-rendering mode (json/
-  // gate/report/open/profile/workspace/positional-paths/language) is excluded.
+  // gate/report/open/profile/workspace/positional-paths/language/sarif) is
+  // excluded. `--sarif` MUST exclude live eligibility: the live-view dispatch
+  // returns before the static `executeGraph` path that performs the SARIF write,
+  // so a standalone `graph --sarif <path>` on a TTY would otherwise render the
+  // live view and silently produce no SARIF file.
   const isLiveViewEligible =
     opts.json !== true &&
     opts.gateSave !== true &&
@@ -289,6 +298,7 @@ async function runGraphCommand(
     (typeof opts.profile !== 'string' || opts.profile.length === 0) &&
     opts.workspace !== true &&
     paths.length === 0 &&
+    (typeof opts.sarif !== 'string' || opts.sarif.length === 0) &&
     /* v8 ignore next */
     typeof opts.language !== 'string';
 
@@ -326,6 +336,7 @@ async function runGraphCommand(
       filter: opts.filter,
       top: opts.top,
       raw: opts.raw,
+      returnJsonEnvelope: shouldRetainJsonEnvelope(opts),
     },
     cli,
   );
@@ -367,9 +378,10 @@ function graphRunCompletion(
 /**
  * Effectful egress at the composition root (ADR-0011 / ADR-0008): cloud sync +
  * `--report-to` (which owns exit 4). `executeGraph` returns the envelope for every
- * mode that should deliver (catalog / default render / `--report-to`) and
- * `undefined` for the modes that must not (plain `--json` workspace-child carrier,
- * `--workspace` parent, error paths).
+ * mode that should deliver (catalog / default render / `--report-to`). Plain
+ * `--json`, `--workspace`, and error paths normally return `undefined`; JSON +
+ * SARIF is the narrow exception that retains an already-delivered envelope for
+ * the side-file sink below, and this egress function explicitly skips it.
  *
  * ADR-0036: gate modes (`--gate-save`/`--gate-compare`) own their OWN
  * deliverSignals call inside `runGateMode` — they feed the gate verdict to the
@@ -383,7 +395,10 @@ async function deliverNonGateEgress(
   cli: ToolCliContext,
 ): Promise<void> {
   const isGateMode = opts.gateSave === true || opts.gateCompare === true;
-  if (envelope === undefined || isGateMode) return;
+  // JSON runs already deliver inline so the emitted CommandOutcome carries the
+  // final host-derived exit. A retained envelope exists only for a sibling
+  // side-file sink such as --sarif and must never trigger duplicate egress.
+  if (envelope === undefined || isGateMode || opts.json === true) return;
   await cli.deliverSignals(envelope, {
     cwd: opts.cwd,
     reportTo: opts.reportTo,
@@ -533,8 +548,17 @@ function parseConcurrency(v: string): number {
  * + the `[paths...]` variadic argument, and invokes {@link runGraphCommand}.
  */
 export const graphCommandSpec = definePrimaryRunCommand<unknown>({
+  staticHandler: {
+    package: '@opensip-cli/graph',
+    path: 'packages/graph/engine/src/cli/graph/graph-command-spec.ts',
+    declaration: 'runGraphCommand',
+  },
   description:
     'Run static call-graph analysis (rules, entry points, catalog summary in one report)',
+  // First-run capable: builds the catalog from detected sources with a
+  // synthesized config; the catalog cache lives in the ephemeral user-cache
+  // runtime until `opensip init` moves it into the project.
+  noInit: true,
   options: [
     {
       flag: '--no-cache',

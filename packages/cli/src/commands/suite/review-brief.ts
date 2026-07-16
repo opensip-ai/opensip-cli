@@ -1,4 +1,5 @@
 import type { SignalEnvelope, SuiteStepSummary } from '@opensip-cli/contracts';
+import type { EvidenceSnapshotContribution } from '@opensip-cli/core';
 
 export const DEFAULT_REVIEW_BRIEF_RISK_LIMIT = 20;
 export const DEFAULT_REVIEW_BRIEF_DEGRADATION_LIMIT = 20;
@@ -9,4 +10,5 @@ export interface SuiteStepReviewInput {
   readonly effectiveArgs?: Readonly<Record<string, unknown>>;
   readonly sessionId?: string;
   readonly capturedEnvelope?: SignalEnvelope;
+  readonly evidenceSnapshots?: readonly EvidenceSnapshotContribution[];
 }

@@ -27,6 +27,7 @@ export const runs = sqliteTable(
     aggregate: text('aggregate', { mode: 'json' }).notNull(),
     scope: text('scope', { mode: 'json' }),
     review_brief: text('review_brief', { mode: 'json' }),
+    context_manifest: text('context_manifest', { mode: 'json' }),
     legacy_suite_run_id: text('legacy_suite_run_id'),
     cli_version: text('cli_version'),
     engine_versions: text('engine_versions', { mode: 'json' }),
@@ -35,6 +36,11 @@ export const runs = sqliteTable(
     index('runs_completed_at_idx').on(sql`${table.completed_at} DESC`),
     index('runs_legacy_suite_run_id_idx').on(table.legacy_suite_run_id),
     index('runs_source_completed_at_idx').on(table.source, sql`${table.completed_at} DESC`),
+    index('runs_cwd_name_completed_at_idx').on(
+      table.cwd,
+      table.name,
+      sql`${table.completed_at} DESC`,
+    ),
   ],
 );
 

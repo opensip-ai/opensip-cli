@@ -7,7 +7,7 @@
  * `--language`) does NOT trigger the check.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -143,7 +143,8 @@ let datastore: DataStore;
 
 beforeEach(() => {
   enterScope(makeGraphTestScope());
-  projectDir = mkdtempSync(join(tmpdir(), 'graph-d14-'));
+  // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
+  projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-d14-')));
   datastore = DataStoreFactory.open({ backend: 'memory' });
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);

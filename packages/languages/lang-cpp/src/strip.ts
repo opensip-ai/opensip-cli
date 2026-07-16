@@ -130,8 +130,18 @@ function scan(src: string): ScanResult {
   return { stringRegions, commentRegions };
 }
 
-/** Returns prefix length if src[i..] starts with a raw-string prefix (R, u8R, uR, UR, LR). 0 otherwise. */
+/**
+ * Returns prefix length if src[i..] starts with a raw-string prefix
+ * (R, u8R, uR, UR, LR). 0 otherwise.
+ *
+ * Anchored against identifier boundaries (same rule as matchStringPrefix /
+ * matchCharLiteralPrefix — lang-cpp F12): a candidate only counts if the
+ * character before `i` is not an identifier character. Without this anchor,
+ * source like `abcR"(x)"` would mis-recognize mid-identifier `R"` as a raw
+ * string opener.
+ */
 function matchRawStringPrefix(src: string, i: number): number {
+  if (i > 0 && isIdentChar(src[i - 1])) return 0;
   if (src[i] === 'R') return 1;
   if (src[i] === 'u' && src[i + 1] === '8' && src[i + 2] === 'R') return 3;
   if ((src[i] === 'u' || src[i] === 'U' || src[i] === 'L') && src[i + 1] === 'R') return 2;

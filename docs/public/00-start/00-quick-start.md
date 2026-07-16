@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-07-08
-release: v0.5.0
+last_verified: 2026-07-15
+release: v0.7.0
 title: "Quick start"
 audience: [getting-started, contributors, plugin-authors, ci-integrators]
 purpose: "From zero to a passing fitness run. Hands-on before the conceptual material."
@@ -9,6 +9,8 @@ source-files:
   - README.md
   - packages/cli/src/index.ts
   - packages/cli/src/commands/init.ts
+  - packages/cli/src/bootstrap/no-init-config.ts
+  - packages/core/src/lib/ephemeral-runtime.ts
 related-docs:
   - ./01-what-is-opensip-cli.md
   - ./05-vocabulary.md
@@ -50,9 +52,11 @@ For the full per-language breakdown, see [`../70-reference/02-package-catalog.md
 
 ## Prerequisites
 
-- **Node.js 24+** — `node --version` should print `v24.x` or higher.
+- **Node.js 24+** — `node --version` should print `v24.x` or higher. This engine range is an install floor, not a support claim.
 - A project directory you don't mind a scaffold landing in.
 - *(Optional)* `pnpm` if you're building from source. The curl installer handles global CLI setup.
+
+Qualified support is narrower than the Node engine range: it names an exact host tuple (OS, architecture, Node ABI, npm major, and filesystem) with measured evidence. The generated [supported-platforms matrix](../70-reference/17-supported-platforms.md) is authoritative for each host's current status. Unlisted hosts are unqualified — they may work, with no promise, and the CLI never blocks them.
 
 If you don't have a project handy, `git clone https://github.com/opensip-ai/opensip-cli.git` and run these commands inside the clone — OpenSIP CLI runs checks against its own codebase as the smoke test.
 
@@ -67,8 +71,8 @@ curl -fsSL https://opensip.ai/cli/install.sh | bash
 # 2. Enter your project
 cd your-project
 
-# 3. Try the built-in audit suite before writing project files
-opensip suite run audit
+# 3. Review changed code before writing project files
+opensip audit
 
 # 4. Scaffold config + example check/scenario (language auto-detected)
 opensip init
@@ -80,12 +84,23 @@ opensip fit --recipe example
 opensip sim --recipe example
 ```
 
-`fit`, `graph`, `graph impact`, and `suite run audit` work in supported projects
-before `init`. In a git repo, `suite run audit` is changed-scope by default and
+`fit`, `graph`, `graph impact`, and `audit` work in supported projects before
+`init`. In a git repo, `audit` is changed-scope by default and
 prints the resolved scope; pass `--full` for a whole-repo run. The CLI uses a
-validated in-memory config and stores rebuildable runtime state in your user
-cache. `init` makes the setup explicit by writing the config, examples,
-`.gitignore`, and agent guidance into the project.
+validated in-memory config and stores generated runtime state in a managed
+user cache. That cache is file-backed and survives normal command exits and
+reboots, but it is retention-managed and can be evicted; it is not permanent
+history.
+
+`opensip init` is a transition command, not a storage location. It changes the
+project state from **zero-config project** to **initialized project**: it writes
+the config, examples, `.gitignore`, and agent guidance into the project, and
+subsequent local runtime state belongs under `opensip-cli/.runtime/`.
+
+For a human review with the stored Change Impact report, run `opensip audit
+--open`. For CI or an agent, run `opensip audit --json`; JSON, CI, non-TTY, and
+remote-shell execution never opens a browser. Initialization is customization
+after first value, not a prerequisite for the built-in audit.
 
 If `fit --recipe example` exits 0, the platform is wired correctly end-to-end: language detection picked the right adapter, the plugin loader found the example check, the recipe service matched it, the engine executed it, and the renderer drew the result. Every later doc is depth on one of those steps.
 
@@ -109,9 +124,19 @@ your-project/
         └── recipes/example-recipe.mjs      ← runs the demo scenario
 ```
 
-`opensip-cli.config.yml` is the only file the CLI *requires*. Everything under `opensip-cli/` is plugin source — auto-discovered at runtime, no opt-in needed. `opensip init` also appends `opensip-cli/.runtime/` to your `.gitignore` so the tool's own state files don't pollute commits.
+After initialization, `opensip-cli.config.yml` is the only persisted project
+configuration file the CLI requires. Commands eligible before initialization use
+a synthesized in-memory configuration instead. Recognized authored files under
+`opensip-cli/`—fit checks and recipes, sim scenarios and recipes, and Tool
+sidecars—are discovered at runtime with no extra opt-in. The `.runtime/`
+subdirectory is generated state, not plugin source. `opensip init` appends
+`opensip-cli/.runtime/` to your `.gitignore` so that state does not pollute
+commits.
 
-For a polyglot project (e.g. Rust + TypeScript), `init` writes one example check per detected language. To force a specific configuration: `opensip init --language rust,typescript`.
+For a polyglot project (for example, Rust + TypeScript), automatic detection
+reports the detected set and requires an explicit language list. Run `opensip
+init --language rust,typescript`; Init then writes one example check per selected
+language.
 
 ---
 
@@ -135,8 +160,14 @@ opensip fit recipes
 # See what graph would analyze without building a catalog
 opensip graph --list-files
 
-# Run changed-scope fit + graph evidence in one host-owned suite
-opensip suite run audit --json
+# Run changed-scope fit + graph evidence in one canonical host-owned review
+opensip audit --json
+
+# Open the same run's stored Change Impact evidence for a human
+opensip audit --open
+
+# Prepare before-edit task context for agents (explicit files; no findings)
+opensip suite run agent-context --files src/server.ts --json
 
 # Ask graph which symbols are impacted by your current git diff
 opensip graph impact --changed --json --top 20
@@ -158,6 +189,10 @@ opensip agent-catalog --json
 ```
 
 The full command tree is at [`../70-reference/01-cli-commands.md`](../70-reference/01-cli-commands.md).
+Configured suites remain available through `opensip suite run <name>`. The
+suite name `audit` is reserved for the built-in workflow: a configured
+`suites.audit` fails config validation with a rename hint, so `opensip audit`
+and `opensip suite run audit` always mean the same curated review.
 
 ## Optional: add a local security scanner
 

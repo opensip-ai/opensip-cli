@@ -22,7 +22,7 @@ describe('graph-java discover.ts — branches', () => {
   });
 
   it('returns undefined configPathAbs when no build file exists', () => {
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toBeUndefined();
     expect(out.files).toEqual([]);
   });
@@ -30,37 +30,45 @@ describe('graph-java discover.ts — branches', () => {
   it('uses gradle.lockfile when present (highest precedence)', () => {
     writeFileSync(join(dir, 'gradle.lockfile'), '# locked\n', 'utf8');
     writeFileSync(join(dir, 'pom.xml'), '<project/>\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toContain('gradle.lockfile');
   });
 
   it('falls back to pom.xml when no gradle lockfile', () => {
     writeFileSync(join(dir, 'pom.xml'), '<project/>\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toContain('pom.xml');
   });
 
   it('falls back to build.gradle.kts when no Maven file', () => {
     writeFileSync(join(dir, 'build.gradle.kts'), '// gradle\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toContain('build.gradle.kts');
   });
 
   it('falls back to build.gradle (Groovy DSL) last', () => {
     writeFileSync(join(dir, 'build.gradle'), '// groovy\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.configPathAbs).toContain('build.gradle');
   });
 
   it('honors a configPathOverride that exists', () => {
     const override = join(dir, 'custom.xml');
     writeFileSync(override, '<project/>\n', 'utf8');
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'custom.xml' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'custom.xml',
+    });
     expect(out.configPathAbs).toContain('custom.xml');
   });
 
   it('returns the override path verbatim when the override does not exist', () => {
-    const out = discoverFiles({ cwd: dir, configPathOverride: 'nonexistent.xml' });
+    const out = discoverFiles({
+      diagnosticIntent: 'quiet',
+      cwd: dir,
+      configPathOverride: 'nonexistent.xml',
+    });
     expect(out.configPathAbs).toContain('nonexistent.xml');
   });
 
@@ -72,7 +80,7 @@ describe('graph-java discover.ts — branches', () => {
     writeFileSync(join(dir, 'target/classes/Stale.java'), 'class Stale {}\n', 'utf8');
     mkdirSync(join(dir, 'build/generated'), { recursive: true });
     writeFileSync(join(dir, 'build/generated/Gen.java'), 'class Gen {}\n', 'utf8');
-    const out = discoverFiles({ cwd: dir });
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
     expect(out.files.length).toBe(2);
     expect(out.files.every((f) => !f.includes('/target/'))).toBe(true);
     expect(out.files.every((f) => !f.includes('/build/'))).toBe(true);

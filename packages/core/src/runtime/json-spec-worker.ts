@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { getWorkerErrorFailureClass } from './worker-error-failure-class.js';
 import { startWorkerHeartbeat } from './worker-heartbeat.js';
-import { sendWorkerIpcMessage } from './worker-ipc-send.js';
+import { sendWorkerIpcMessage, sendWorkerIpcMessageAndDrain } from './worker-ipc-send.js';
 
 import type { WorkerMessage } from './progress-transport.js';
 
@@ -39,6 +39,13 @@ function sendJsonSpecWorkerMessage<TEvent, TResult>(msg: WorkerMessage<TEvent, T
   sendWorkerIpcMessage(msg);
 }
 
+async function sendJsonSpecWorkerTerminalMessage<TEvent, TResult>(
+  msg: WorkerMessage<TEvent, TResult>,
+): Promise<void> {
+  // Final result/error must drain so the parent observes the message before exit.
+  await sendWorkerIpcMessageAndDrain(msg);
+}
+
 function stopJsonSpecWorkerHeartbeat(stopHeartbeat: () => void): void {
   stopHeartbeat();
 }
@@ -59,12 +66,12 @@ export async function runJsonSpecWorker<TArgs, TEvent, TResult>(
         event,
       } satisfies WorkerMessage<TEvent, TResult>);
     if (options.startEvent !== undefined) emit(options.startEvent);
-    sendJsonSpecWorkerMessage({
+    await sendJsonSpecWorkerTerminalMessage({
       kind: 'result',
       value: await options.run(args, emit),
     } satisfies WorkerMessage<TEvent, TResult>);
   } catch (error) {
-    sendJsonSpecWorkerMessage(toWorkerErrorMessage<TEvent, TResult>(error));
+    await sendJsonSpecWorkerTerminalMessage(toWorkerErrorMessage<TEvent, TResult>(error));
   } finally {
     stopJsonSpecWorkerHeartbeat(stopHeartbeat);
   }

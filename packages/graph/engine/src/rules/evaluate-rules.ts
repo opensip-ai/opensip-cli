@@ -26,6 +26,8 @@
 
 import { logger, type Signal } from '@opensip-cli/core';
 
+import { currentRules } from './registry.js';
+
 import type { Catalog, FeatureTable, GraphConfig, Indexes, Rule, RuleHints } from '../types.js';
 
 const MODULE_GRAPH_RULES = 'graph:rules';
@@ -45,6 +47,11 @@ export interface RuleEvaluationInput {
   readonly config: GraphConfig;
   readonly hints?: RuleHints;
   readonly features?: FeatureTable;
+}
+
+/** Resolve an explicit rule override or snapshot the current scoped registry. */
+export function resolveRuleSet(explicitRules?: readonly Rule[]): readonly Rule[] {
+  return explicitRules ?? currentRules();
 }
 
 /**

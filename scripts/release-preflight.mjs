@@ -69,6 +69,10 @@ function main() {
   pnpm('install frozen lockfile', ['install', '--frozen-lockfile']);
   pnpm('clean package outputs', ['-r', 'run', 'clean']);
   run('build with injected workspace re-sync', 'node', ['scripts/build-ci.mjs']);
+  // Inspect emitted + packed bytes right after the clean build, before
+  // typecheck/lint/tests (ADR-0150). Clean -> build -> inspect build/packlist ->
+  // correctness -> actual pack/smoke -> publish.
+  pnpm('verify published artifact boundary', ['verify:published-artifacts']);
   pnpm('typecheck', ['typecheck']);
   pnpm('supply-chain policy', ['supply-chain:verify']);
   pnpm('lint', ['lint']);
@@ -77,6 +81,17 @@ function main() {
   pnpm('graph dogfood gate', ['graph:ci']);
   pnpm('release consistency', ['verify-release', '--expected-version', args.expectedVersion]);
 
+  // The tarball directory built below — freshly-packed npm tarballs plus the release
+  // manifest (opensip-cli-release-manifest.v1.json) + SHA256SUMS from
+  // build-release-artifacts.mjs — is byte-for-byte the "packed-release" candidate the
+  // installed-artifact platform-acceptance harness consumes:
+  //   node scripts/run-platform-acceptance.mjs --packed-release <dir> --expected-version <v>
+  // That reuse flows through the shared standalone seam (release-package-order.mjs +
+  // build-release-artifacts.mjs + verify-release-artifacts.mjs), which the acceptance
+  // candidate-source re-verifies independently — NOT through this orchestrator. Platform
+  // acceptance is host-specific and heavier, so it is deliberately NOT run here; an OS
+  // workflow opts in via `pnpm platform:acceptance` after packing (or against a staged
+  // published version). Keep `smoke-pack` (below) as the fast cross-platform release check.
   rmSync(args.tarballDir, { recursive: true, force: true });
   mkdirSync(args.tarballDir, { recursive: true });
   for (const pkg of RELEASE_PACKAGE_ORDER) {

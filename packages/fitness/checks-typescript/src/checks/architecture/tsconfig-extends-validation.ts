@@ -8,9 +8,70 @@
  */
 
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+
+/** True when `extends` is a package-style reference (not a relative/absolute path). */
+function isPackageStyleExtends(value: string): boolean {
+  // Relative (./ ../) or absolute (/ C:\ …) paths are local filesystem targets.
+  if (value.startsWith('./') || value.startsWith('../')) return false;
+  if (isAbsolute(value)) return false;
+  return true;
+}
+
+/** Normalize `extends` to a string list (TS 5+ allows string | string[]). */
+function normalizeExtends(extendsValue: unknown): string[] | null {
+  if (typeof extendsValue === 'string' && extendsValue.length > 0) return [extendsValue];
+  if (Array.isArray(extendsValue)) {
+    const values = extendsValue.filter((v): v is string => typeof v === 'string' && v.length > 0);
+    return values.length > 0 ? values : null;
+  }
+  return null;
+}
+
+/**
+ * True when a package-style extends resolves via Node module resolution, or a
+ * relative/absolute path exists on disk. Unresolvable package refs fail closed
+ * (return false) so typos / missing installs surface as TSCONFIG_MISSING_BASE.
+ */
+function baseExists(filePath: string, extendsValue: string): boolean {
+  if (isPackageStyleExtends(extendsValue)) {
+    // Package-style extends (e.g. "@tsconfig/node20/tsconfig.json") are not
+    // local relative files — resolve via require.resolve from the tsconfig's
+    // directory. Fail closed when resolution fails.
+    try {
+      const from = resolve(process.cwd(), filePath);
+      const req = createRequire(from);
+      req.resolve(extendsValue);
+      return true;
+    } catch {
+      // intentionally probe for package resolution
+      try {
+        const from = resolve(process.cwd(), filePath);
+        const req = createRequire(from);
+        req.resolve(extendsValue.endsWith('.json') ? extendsValue : `${extendsValue}.json`);
+        return true;
+      } catch {
+        // intentionally probe for package resolution
+        return false;
+      }
+    }
+  }
+
+  const dir = dirname(filePath);
+  const resolvedBase = resolve(process.cwd(), dir, extendsValue);
+  const baseWithJson = resolvedBase.endsWith('.json') ? resolvedBase : `${resolvedBase}.json`;
+  return existsSync(resolvedBase) || existsSync(baseWithJson);
+}
+
+/** Project-root tsconfig.json (relative or absolute under cwd) does not need to extend. */
+function isRootTsconfig(filePath: string): boolean {
+  const abs = isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
+  const rel = relative(process.cwd(), abs).replaceAll('\\', '/');
+  return rel === 'tsconfig.json' || rel === './tsconfig.json';
+}
 
 export const tsconfigExtendsValidation = defineCheck({
   id: '4a62d660-9d44-4877-94f8-2c4dc7f3aa40',
@@ -48,16 +109,13 @@ export const tsconfigExtendsValidation = defineCheck({
         continue;
       }
 
-      // Root tsconfig doesn't need to extend
-      if (
-        filePath === 'tsconfig.json' ||
-        (filePath.endsWith('/tsconfig.json') && filePath.split('/').length === 2)
-      ) {
+      // Root tsconfig doesn't need to extend (works for absolute production paths)
+      if (isRootTsconfig(filePath)) {
         continue;
       }
 
-      const extendsValue = parsed.extends;
-      if (!extendsValue || typeof extendsValue !== 'string') {
+      const extendsList = normalizeExtends(parsed.extends);
+      if (!extendsList) {
         violations.push({
           filePath,
           line: 1,
@@ -71,12 +129,11 @@ export const tsconfigExtendsValidation = defineCheck({
         continue;
       }
 
-      // Verify the extended file exists
-      const dir = dirname(filePath);
-      const resolvedBase = resolve(process.cwd(), dir, extendsValue);
-      const baseWithJson = resolvedBase.endsWith('.json') ? resolvedBase : `${resolvedBase}.json`;
+      for (const extendsValue of extendsList) {
+        if (baseExists(filePath, extendsValue)) continue;
 
-      if (!existsSync(resolvedBase) && !existsSync(baseWithJson)) {
+        const dir = dirname(filePath);
+        const resolvedBase = resolve(process.cwd(), dir, extendsValue);
         violations.push({
           filePath,
           line: 1,

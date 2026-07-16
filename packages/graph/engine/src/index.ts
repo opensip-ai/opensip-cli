@@ -42,6 +42,11 @@ export type {
   FunctionOccurrence,
   CallEdge,
   DependencyEdge,
+  DependencyClassification,
+  DependencyForm,
+  DependencyRole,
+  DependencyTargetKind,
+  DependencyResolutionBasis,
   Param,
   Indexes,
   Rule,
@@ -64,6 +69,31 @@ export type {
   FeatureColumn,
   PersistedFeatures,
   PersistedFunctionFeatures,
+  DeclarationKind,
+  ReferenceKind,
+  SemanticResolutionBasis,
+  SemanticConfidence,
+  SemanticVisibility,
+  SemanticExportRole,
+  DeclarationFact,
+  CrossFileReferenceFact,
+  SemanticFactProducerCoverage,
+  SemanticFactBundle,
+  SemanticFactLimits,
+} from './types.js';
+// Dependency-classification validator (P2 Phase 0) — a value: producers and the
+// CatalogRepo re-validator constrain form→role pairs to the closed set.
+export { isValidDependencyFormRole } from './types.js';
+// Semantic-fact producer bounds (P2 MCP audit Phase 3).
+export {
+  MAX_SEMANTIC_DECLARATIONS,
+  MAX_SEMANTIC_REFERENCES,
+  MAX_REFERENCES_PER_DECLARATION,
+  MAX_SEMANTIC_NAME,
+  MAX_SEMANTIC_TEXT,
+  MAX_SEMANTIC_LINE,
+  MAX_SEMANTIC_COLUMN,
+  DEFAULT_SEMANTIC_FACT_LIMITS,
 } from './types.js';
 // `Shard` / `ShardBuildResult` are orchestration internals (sharded build
 // model) consumed only by tests — moved to ./internal (ADR-0009, Finding 3).
@@ -188,6 +218,7 @@ export {
   buildPackageManifestIndex,
   buildPackageManifestIndexFromRoots,
   resolveSpecifierToPackage,
+  packageGroupOf,
 } from './cross-package/export-index.js';
 export type {
   ExportIndex,
@@ -197,6 +228,17 @@ export type {
 } from './cross-package/export-index.js';
 export { resolveCrossPackageCall, linkExported } from './cross-package/resolve.js';
 export type { CrossPackageCallInput } from './cross-package/resolve.js';
+
+// Semantic fact identity/merge helpers (P2 MCP audit Phase 3) — used by the
+// TypeScript exact collector and shared across exact/sharded assembly.
+export {
+  makeDeclarationId,
+  makeReferenceId,
+  applySemanticFactCaps,
+  emptySemanticFactBundle,
+  mergeSemanticFactBundles,
+  sortReasonCodes,
+} from './semantic-facts.js';
 // `buildIndexes` and the individual built-in rule instances are NOT public —
 // they're consumed only by the cross-package rule tests and moved to
 // `@opensip-cli/graph/internal` (rules run via recipes by id). See ADR-0009.

@@ -36,7 +36,11 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
   },
   {
     canonical: 'OPENSIP_PROFILING',
-    docs: 'Explicit gate for the optional CPU profiling path (ADR-0049). "1" or "true" forces on when OTEL_EXPORTER_OTLP_ENDPOINT is set; "0"/"false" forces off. When omitted and the OTLP endpoint is present, falls back to the documented OTEL-only mode (with cost warnings emitted).',
+    docs: 'Explicit gate for local CPU-profile artifacts. "1" or "true" enables profiling without requiring an OTLP endpoint; unset, "0", and "false" are off. An OTLP endpoint alone never creates profile artifacts.',
+  },
+  {
+    canonical: 'OPENSIP_PROFILE_DIR',
+    docs: 'Optional caller-selected directory for local .cpuprofile and .labels.json artifacts. Relative paths resolve from the CLI process working directory; files are created exclusively with owner-only permissions.',
   },
   {
     canonical: 'TRACEPARENT',
@@ -100,11 +104,12 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Override for comma/whitespace-separated installed npm Tool ids. Normal opensip tools ' +
-      "install writes managed trust state; use '*' only to admit all ambient " +
-      'opensipTools.kind === tool packages discovered in ancestor node_modules. Does not ' +
-      'affect bundled or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for incident ' +
-      'response (kill switch wins).',
+      'Override for comma/whitespace-separated installed npm Tool ids (exact match only). ' +
+      'Normal opensip tools install writes managed trust state. The token * is retained as a ' +
+      'literal but is IGNORED for admission (emits cli.trust.tool_wildcard_ignored); only ' +
+      'exact ids admit ambient opensipTools.kind === tool packages. Does not affect bundled ' +
+      'or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for incident response (kill ' +
+      'switch wins).',
   },
   {
     canonical: 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
@@ -138,11 +143,13 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
         .filter((s) => s.length > 0),
     default: [] as readonly string[],
     docs:
-      'Override for comma/whitespace-separated project-authored Tool ids. The normal ' +
-      "committed trust path is tools.trusted. Use '*' only to admit all project-authored " +
-      'tools. A project-authored sidecar tool under <project>/opensip-cli/tools/ is NOT ' +
-      'loaded unless its id appears in config or this override. Global-authored tools ' +
-      '(~/.opensip-cli/tools/) are trusted-by-default and ignore this list.',
+      'Override for comma/whitespace-separated project-authored Tool ids (exact match only). ' +
+      'The normal committed trust path is tools.trusted. The token * is retained as a ' +
+      'literal but is IGNORED for admission (emits cli.trust.tool_wildcard_ignored); only ' +
+      'exact ids admit project-authored tools. A project-authored sidecar tool under ' +
+      '<project>/opensip-cli/tools/ is NOT loaded unless its id appears in config or this ' +
+      'override. Global-authored tools (~/.opensip-cli/tools/) are trusted-by-default and ' +
+      'ignore this list.',
   },
   {
     canonical: 'OPENSIP_STATE_LOCK_WAIT_MS',

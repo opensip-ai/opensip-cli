@@ -1,7 +1,7 @@
 ---
 status: current
-last_verified: 2026-06-15
-release: v0.5.0
+last_verified: 2026-07-11
+release: v0.7.0
 title: "Adding a language to graph"
 audience: [contributors, plugin-authors]
 purpose: "Step-by-step guide for writing a new GraphLanguageAdapter — C/C++, or anything else — without touching the engine."
@@ -263,6 +263,27 @@ These are drawn from real bugs caught while shipping the tree-sitter adapters.
 - The interface JSDoc on [`packages/graph/engine/src/lang-adapter/types.ts`](../../../packages/graph/engine/src/lang-adapter/types.ts) documents every invariant and design decision in line with the code.
 
 ---
+
+
+## Audit evidence responsibilities (dependencies and semantics)
+
+Beyond the six callable methods, adapters that participate in MCP audit evidence
+must honour these presence rules ([ADR-0152](../../decisions/ADR-0152-dependency-and-declaration-audit-evidence.md)):
+
+1. **`DiscoverInput.diagnosticIntent`** — discovery may be asked for `quiet`
+   (coalesced) or verbose diagnostics. Prefer the shared quiet path under MCP
+   freshness verification so adapter discovery does not flood stderr.
+2. **Present-empty dependencies** — when a tier supports dependency emission,
+   every module-init with zero import sites must emit `dependencies: []` (or the
+   equivalent `dependenciesByOwner` empty list). Omitting the field means
+   **unsupported**, not empty.
+3. **Optional semantic bundle** — exact TypeScript may emit bounded
+   `semanticFacts` (cross-file only). Adapters or tiers that omit the plane
+   report unsupported coverage rather than complete-empty arrays.
+4. **Deterministic bounds** — respect production caps; path realpath must stay
+   inside the project root; lexical unsafe / control paths fail closed.
+5. **Never invent complete-empty** for an unsupported plane — inventory facets
+   must stay honest under MCP four-facet coverage.
 
 ## What's next
 

@@ -33,7 +33,7 @@ describe('runCommandSpecAction', () => {
   it('runs handler output through dispatch and lifecycle hooks', async () => {
     const beginRun = vi.fn();
     const completeRun = vi.fn();
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -57,7 +57,7 @@ describe('runCommandSpecAction', () => {
     const handler = vi.fn(() => ({ type: 'help' }) as const);
     const maybeDispatchExternal = vi.fn(() => Promise.resolve(true));
     const completeRun = vi.fn();
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -86,7 +86,7 @@ describe('runCommandSpecAction', () => {
           getDatastore: () => datastore,
         }),
       );
-      const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+      const spec = defineCommand<unknown, ToolCliContext>({
         name: 'fit',
         description: 'fixture',
         commonFlags: [],
@@ -163,7 +163,7 @@ describe('runCommandSpecAction', () => {
         }),
       );
       const error = new ConfigurationError('bad config');
-      const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+      const spec = defineCommand<unknown, ToolCliContext>({
         name: 'fit',
         description: 'fixture',
         commonFlags: [],
@@ -225,9 +225,128 @@ describe('runCommandSpecAction', () => {
     }
   });
 
+  it('skips a delegated supervisor row when its correlated child run is already persisted', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const runRepo = new RunRepo(datastore);
+      runRepo.saveRunWithSteps(
+        {
+          id: 'child-run',
+          name: 'graph',
+          source: 'implicit-tool',
+          correlationRunId: 'scope-run',
+          cwd: '/proj',
+          startedAt: '2026-07-09T23:22:20.000Z',
+          completedAt: '2026-07-09T23:22:40.000Z',
+          durationMs: 20_000,
+          exitCode: EXIT_CODES.SUCCESS,
+          aggregate: {
+            steps: 1,
+            passed: 1,
+            failed: 0,
+            faulted: 0,
+            errors: 0,
+            warnings: 0,
+          },
+        },
+        [
+          {
+            id: 'child-step',
+            runId: 'child-run',
+            logicalStepKey: '0:graph:graph',
+            ordinal: 0,
+            attempt: 1,
+            tool: 'graph',
+            command: 'graph',
+            stableId: 'graph',
+            exitCode: EXIT_CODES.SUCCESS,
+            outcome: 'passed',
+            durationMs: 20_000,
+          },
+        ],
+      );
+      const hooks = createRunActionHooks(
+        createRunPlaneFactory({
+          getDatastore: () => datastore,
+        }),
+      );
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'graph',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+        handler: () => ({
+          execution: { kind: 'delegated', startedAt: '2026-07-09T23:22:19.000Z' },
+        }),
+      });
+      const ctx = makeCtx({ getExitCode: vi.fn(() => EXIT_CODES.SUCCESS) });
+      const scope = new RunScope({ datastore: () => datastore, runId: 'scope-run' });
+
+      await runWithScope(scope, () =>
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], ctx, hooks),
+      );
+
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      expect(runRepo.listRuns().map((run) => run.id)).toEqual(['child-run']);
+      expect(runRepo.listStepsForRun('child-run')).toHaveLength(1);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('retains the missing-evidence fault when delegated child proof is absent', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(
+        createRunPlaneFactory({
+          getDatastore: () => datastore,
+        }),
+      );
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'graph',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+        handler: () => ({
+          execution: { kind: 'delegated', startedAt: '2026-07-09T23:22:19.000Z' },
+        }),
+      });
+      const ctx = makeCtx({ getExitCode: vi.fn(() => EXIT_CODES.RUNTIME_ERROR) });
+      const scope = new RunScope({ datastore: () => datastore, runId: 'scope-run' });
+
+      await runWithScope(scope, () =>
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], ctx, hooks),
+      );
+
+      const runRepo = new RunRepo(datastore);
+      const runs = runRepo.listRuns();
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({
+        name: 'graph',
+        correlationRunId: 'scope-run',
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        aggregate: { faulted: 1 },
+      });
+      expect(runRepo.listStepsForRun(runs[0]?.id ?? '')[0]).toMatchObject({
+        tool: 'graph',
+        command: 'graph',
+        outcome: 'faulted',
+        evidence: { missing: 'session-or-envelope' },
+      });
+    } finally {
+      datastore.close();
+    }
+  });
+
   it('captures reportFailure and skips dispatch when a reporting handler returns void', async () => {
     const reportFailure = vi.fn((_detail: ReportFailureDetail) => Promise.resolve());
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -251,9 +370,12 @@ describe('runCommandSpecAction', () => {
     expect(ctx.render).not.toHaveBeenCalled();
   });
 
-  it('maps ToolError through setExitCode when no reportFailure seam exists', async () => {
+  it('presents ToolError through render when no reportFailure seam exists', async () => {
+    // A typed failure must never exit silently: contexts without the
+    // reportFailure seam still get the error view through the guaranteed
+    // render seam (and setExitCode).
     const error = new ConfigurationError('bad config');
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],
@@ -268,13 +390,17 @@ describe('runCommandSpecAction', () => {
     await runCommandSpecAction(spec, { _args: [] }, [], ctx);
 
     expect(ctx.setExitCode).toHaveBeenCalledWith(mapToolErrorToExitCode(error));
-    expect(ctx.render).not.toHaveBeenCalled();
+    expect(ctx.render).toHaveBeenCalledWith({
+      type: 'error',
+      message: 'bad config',
+      exitCode: mapToolErrorToExitCode(error),
+    });
   });
 
   it('routes ToolError through reportFailure when available', async () => {
     const error = new NetworkError('upload failed');
     const reportFailure = vi.fn((_detail: ReportFailureDetail) => Promise.resolve());
-    const spec = defineCommand<Record<string, unknown>, ToolCliContext>({
+    const spec = defineCommand<unknown, ToolCliContext>({
       name: 'fixture',
       description: 'fixture',
       commonFlags: [],

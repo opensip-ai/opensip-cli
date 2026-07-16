@@ -359,6 +359,9 @@ describe('Tier 2 — differential test against TS Compiler API on real workspace
     });
   }
 
+  // Builds real TS catalogs over several monorepo samples — can exceed the
+  // shared 120s base under release-job load (same class of flake as the
+  // inventory-differential suite that raised vitest.base to 120s).
   it('coverage sanity: the 5 sample files together expose a substantial number of callables', () => {
     // Make sure our chosen sample is non-trivial — i.e. we're actually
     // exercising graph's detection on real code, not just empty type files.
@@ -384,5 +387,5 @@ describe('Tier 2 — differential test against TS Compiler API on real workspace
     // Belt-and-braces: at least 4 of the 5 samples are non-empty.
     const nonEmpty = Object.values(perFile).filter((n) => n > 0).length;
     expect(nonEmpty, detail).toBeGreaterThanOrEqual(4);
-  });
+  }, 180_000);
 });

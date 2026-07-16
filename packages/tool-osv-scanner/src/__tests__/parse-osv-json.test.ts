@@ -26,8 +26,11 @@ const EXPECTED = JSON.parse(
   ),
 ) as unknown[];
 
-/** A minimal context — the osv-scanner parser ignores it entirely. */
-const CTX = { tool: 'osv-scanner' } as unknown as AdapterRunContext;
+/** Minimal context — projectRoot is used to relativize absolute source paths. */
+const CTX = {
+  tool: 'osv-scanner',
+  projectRoot: '/proj',
+} as unknown as AdapterRunContext;
 
 // ── CVSS v3.1 base-score helper (A10 fixture-consistency guard) ──────────────
 //
@@ -312,6 +315,25 @@ describe('parseOsvJson', () => {
     // The acceptance-harness path passes only raw; the parser must still work.
     const signals = parseOsvJson({ kind: 'json', raw: GOLDEN_RAW }, CTX);
     expect(signals).toHaveLength(2);
+  });
+
+  it('relativizes absolute source.path under projectRoot', () => {
+    const doc = JSON.stringify({
+      results: [
+        {
+          source: { path: '/proj/package-lock.json' },
+          packages: [
+            {
+              package: { name: 'x', version: '1.0.0', ecosystem: 'npm' },
+              vulnerabilities: [{ id: 'V-1', summary: 'x' }],
+              groups: [{ ids: ['V-1'] }],
+            },
+          ],
+        },
+      ],
+    });
+    const [s] = parseOsvJson(parsed(doc), CTX);
+    expect(s?.filePath).toBe('package-lock.json');
   });
 });
 

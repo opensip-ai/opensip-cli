@@ -492,6 +492,66 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
+  // Agent-eval is a black-box harness (ADR-0157). Static package imports are covered by
+  // no-restricted-imports; ImportExpression needs an explicit syntax guard.
+  // import-x/no-relative-packages closes the equivalent relative-path escape.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['packages/agent-eval/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@opensip-cli/*', '@opensip-cli/**', 'opensip-cli', 'opensip-cli/**'],
+              message:
+                'agent-eval is a black-box harness: zero workspace source imports ' +
+                '(spawn the built CLI instead; use relative imports within the package).',
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression[source.value=/^(?:@opensip-cli\\/|opensip-cli(?:\\/|$))/]',
+          message:
+            'agent-eval is a black-box harness: dynamically import the built CLI by ' +
+            'file path instead of importing a workspace package.',
+        },
+      ],
+      'import-x/no-relative-packages': 'error',
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // mcp-no-current-scope (ADR-0084 / ADR-0149) — MCP production handlers use captured, pre-built
+  // dependencies. The server may re-enter its captured scope with runWithScope,
+  // but production MCP code must never recover ambient state with currentScope.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['packages/mcp/src/**/*.ts'],
+    ignores: ['packages/mcp/src/**/__tests__/**', 'packages/mcp/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@opensip-cli/core',
+              importNames: ['currentScope'],
+              message:
+                'MCP production must use captured, pre-built dependencies. ' +
+                'Only runWithScope at the server dispatch boundary is permitted.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
   // ADR-0010 ratchet — a migrated graph adapter must not import web-tree-sitter.
   //
   // A migrated graph adapter parses via its @opensip-cli/lang-* package and
@@ -663,6 +723,32 @@ export default tseslint.config(
             },
           ],
         },
+      ],
+    },
+  },
+
+  // Dependency-cruiser excludes test sources. Keep this complementary rule
+  // AFTER every package-specific no-restricted-imports block so flat-config
+  // replacement cannot erase the reverse agent-eval boundary. A separate rule
+  // name preserves those existing restrictions while covering static imports,
+  // re-exports, and ImportExpression uniformly in every test population.
+  {
+    files: ['packages/**/__tests__/**/*.{ts,tsx}', 'packages/**/*.{test,spec}.{ts,tsx}'],
+    ignores: ['packages/agent-eval/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...[
+          'ImportDeclaration',
+          'ExportNamedDeclaration',
+          'ExportAllDeclaration',
+          'ImportExpression',
+        ].map((nodeType) => ({
+          selector: `${nodeType}[source.value=/(?:^|\\/)agent-eval(?:\\/|$)/]`,
+          message:
+            'agent-eval is workspace-private black-box tooling with zero sanctioned ' +
+            'consumers, including tests.',
+        })),
       ],
     },
   },

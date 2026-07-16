@@ -18,11 +18,11 @@ import {
   type Logger,
   type ProjectContext,
   type RunScope,
+  type RuntimePaths,
   SystemError,
   currentScope,
   logger as defaultLogger,
-  resolveEphemeralProjectPaths,
-  resolveProjectPaths,
+  resolveRuntimePathsForScope,
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 
@@ -69,6 +69,28 @@ export function getCurrentProjectRoot(): string {
 }
 
 /**
+ * Runtime-state paths for the CURRENT run — project-local when initialized,
+ * user-cache when ephemeral (no-init).
+ *
+ * Prefer this over `resolveProjectPaths(getCurrentProjectRoot())`: the latter
+ * throws away the scope, so an ephemeral run writes runtime state into the
+ * user's repository. That is exactly how `report` came to create
+ * `opensip-cli/.runtime/reports/` in a project the user never initialized.
+ *
+ * @throws {SystemError} When accessed before the pre-action-hook resolved the context.
+ */
+export function getCurrentRuntimePaths(): RuntimePaths {
+  const project = readScope().projectContext;
+  if (!project) {
+    throw new SystemError(
+      'getCurrentRuntimePaths() called before pre-action-hook resolved the context.',
+      { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
+    );
+  }
+  return resolveRuntimePathsForScope(project);
+}
+
+/**
  * A lazy datastore accessor (callable) that also exposes a `dispose()` to close
  * the cached connection on scope teardown. Still assignable to the kernel's
  * `DataStoreThunk` (`() => unknown`) — `dispose` is additive.
@@ -109,10 +131,7 @@ export function buildDatastoreThunk(
         { code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT' },
       );
     }
-    const runtime =
-      project.scope === 'ephemeral'
-        ? resolveEphemeralProjectPaths(project.projectRoot)
-        : resolveProjectPaths(project.projectRoot);
+    const runtime = resolveRuntimePathsForScope(project);
     const path = `${runtime.runtimeDir}/datastore.sqlite`;
     cached = DataStoreFactory.open({
       backend: 'sqlite',

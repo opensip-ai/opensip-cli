@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { javaGraphAdapter } from '../index.js';
 
 function run(dir: string): ReturnType<typeof javaGraphAdapter.walkProject> {
-  const discovery = javaGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = javaGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = javaGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

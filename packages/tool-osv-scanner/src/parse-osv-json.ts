@@ -24,6 +24,8 @@
  * Pure: defensive JSON navigation (never throws on malformed input → `[]`).
  */
 
+import { isAbsolute, relative } from 'node:path';
+
 import { createSignal } from '@opensip-cli/core';
 import {
   asArray,
@@ -37,6 +39,22 @@ import {
 
 import type { Signal, SignalSeverity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
+
+/**
+ * Prefer a project-relative source path so fingerprints and UI stay stable across
+ * machines. Absolute paths under `projectRoot` are relativized; other absolute
+ * paths and already-relative paths are left as-is.
+ */
+function relativizeSourcePath(sourcePath: string, projectRoot: string | undefined): string {
+  if (sourcePath.length === 0 || projectRoot === undefined || projectRoot.length === 0) {
+    return sourcePath;
+  }
+  if (!isAbsolute(sourcePath)) return sourcePath;
+  const rel = relative(projectRoot, sourcePath);
+  // `relative` yields '' for the root itself and paths that leave the root start with '..'.
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return sourcePath;
+  return rel;
+}
 
 /**
  * Map a GHSA `database_specific.severity` LABEL to a four-bucket severity.
@@ -176,13 +194,14 @@ function normalizePackage(entry: unknown, sourcePath: string): Signal[] {
  * maps to a `security` signal whose severity comes from the CVSS `max_severity`
  * (preferred) or the GHSA label (`MODERATE ⇒ medium`), defaulting to `medium`.
  */
-export function parseOsvJson(raw: ParsedScannerOutput, _ctx: AdapterRunContext): readonly Signal[] {
+export function parseOsvJson(raw: ParsedScannerOutput, ctx: AdapterRunContext): readonly Signal[] {
   const doc = parsedObjectDocument(raw);
   const results = asArray(doc?.results) ?? [];
 
   const signals: Signal[] = [];
   for (const result of results) {
-    const sourcePath = getString(asObject(result)?.source, 'path') ?? '';
+    const rawSourcePath = getString(asObject(result)?.source, 'path') ?? '';
+    const sourcePath = relativizeSourcePath(rawSourcePath, ctx.projectRoot);
     for (const packageEntry of asArray(asObject(result)?.packages) ?? []) {
       signals.push(...normalizePackage(packageEntry, sourcePath));
     }

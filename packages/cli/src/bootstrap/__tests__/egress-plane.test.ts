@@ -8,8 +8,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const deliverEnvelope = vi.fn(() => Promise.resolve({ delivered: true }));
-const writeEnvelopeSarif = vi.fn(() => Promise.resolve());
+const deliverEnvelope = vi.fn((..._args: unknown[]) => Promise.resolve({ delivered: true }));
+const writeEnvelopeSarif = vi.fn((..._args: unknown[]) => Promise.resolve());
 
 vi.mock('../deliver-envelope.js', () => ({
   deliverEnvelope: (...args: unknown[]) => deliverEnvelope(...args),

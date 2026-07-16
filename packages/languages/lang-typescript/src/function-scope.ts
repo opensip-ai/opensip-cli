@@ -29,7 +29,9 @@ export type FunctionLikeNode =
   | ts.MethodDeclaration
   | ts.FunctionExpression
   | ts.ArrowFunction
-  | ts.ConstructorDeclaration;
+  | ts.ConstructorDeclaration
+  | ts.GetAccessorDeclaration
+  | ts.SetAccessorDeclaration;
 
 function isFunctionLike(node: ts.Node): node is FunctionLikeNode {
   return (
@@ -37,7 +39,9 @@ function isFunctionLike(node: ts.Node): node is FunctionLikeNode {
     ts.isMethodDeclaration(node) ||
     ts.isFunctionExpression(node) ||
     ts.isArrowFunction(node) ||
-    ts.isConstructorDeclaration(node)
+    ts.isConstructorDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node)
   );
 }
 
@@ -85,6 +89,12 @@ export function getEnclosingFunctionName(node: ts.Node, sourceFile: ts.SourceFil
   while (current && !ts.isSourceFile(current)) {
     if (ts.isMethodDeclaration(current)) {
       return current.name.getText(sourceFile);
+    }
+    if (ts.isGetAccessorDeclaration(current) || ts.isSetAccessorDeclaration(current)) {
+      return current.name.getText(sourceFile);
+    }
+    if (ts.isConstructorDeclaration(current)) {
+      return 'constructor';
     }
     if (ts.isFunctionDeclaration(current) && current.name) {
       return current.name.getText(sourceFile);

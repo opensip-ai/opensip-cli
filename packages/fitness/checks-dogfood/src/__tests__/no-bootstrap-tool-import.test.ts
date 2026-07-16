@@ -51,6 +51,63 @@ describe('analyzeBootstrapToolImport (AST)', () => {
     expect(v).toEqual([]);
   });
 
+  it('flags the generic `tool` alias and package-specific `*Tool` from every Tool family', () => {
+    const v = analyzeBootstrapToolImport(
+      [
+        "import { tool as yagni } from '@opensip-cli/yagni'",
+        "import { mcpTool } from '@opensip-cli/mcp'",
+        "import { gitleaksTool } from '@opensip-cli/tool-gitleaks'",
+        'export const t = [yagni, mcpTool, gitleaksTool]',
+      ].join('\n'),
+      CLI_PATH,
+    );
+    expect(v).toHaveLength(3);
+  });
+
+  it('flags default, namespace, and side-effect imports of a Tool-family package', () => {
+    expect(
+      analyzeBootstrapToolImport(
+        "import gt from '@opensip-cli/graph'\nexport const t = gt",
+        CLI_PATH,
+      ),
+    ).toHaveLength(1);
+    expect(
+      analyzeBootstrapToolImport(
+        "import * as fit from '@opensip-cli/fitness'\nexport const t = fit",
+        CLI_PATH,
+      ),
+    ).toHaveLength(1);
+    expect(analyzeBootstrapToolImport("import '@opensip-cli/simulation'", CLI_PATH)).toHaveLength(
+      1,
+    );
+  });
+
+  it('does NOT flag an `import type` declaration or an inline `type` specifier', () => {
+    expect(
+      analyzeBootstrapToolImport("import type { graphTool } from '@opensip-cli/graph'", CLI_PATH),
+    ).toEqual([]);
+    expect(
+      analyzeBootstrapToolImport(
+        "import { type graphTool } from '@opensip-cli/graph'\nexport const x = 1",
+        CLI_PATH,
+      ),
+    ).toEqual([]);
+  });
+
+  it('does NOT flag a `*Tool`/`tool` value import from a NON-Tool package (core helpers)', () => {
+    // `defineTool`/`admitTool`/`assertManifestMatchesTool` end in `Tool` but are
+    // core helpers, not tool runtimes. dependency-cruiser is the manifest-complete
+    // authority; this diagnostic is scoped to Tool-family packages.
+    const v = analyzeBootstrapToolImport(
+      [
+        "import { defineTool, admitTool, assertManifestMatchesTool } from '@opensip-cli/core'",
+        'export const x = [defineTool, admitTool, assertManifestMatchesTool]',
+      ].join('\n'),
+      CLI_PATH,
+    );
+    expect(v).toEqual([]);
+  });
+
   it('IGNORES a tool-runtime symbol appearing as TEXT in a template literal (the scaffold invariant)', () => {
     // This is exactly the shape `init/config-templates.ts` emits — scaffold
     // source the host returns as a STRING, never executes. The AST sees a string

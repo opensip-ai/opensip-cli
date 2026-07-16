@@ -34,7 +34,7 @@ interface Pipeline {
 }
 
 function pipeline(dir: string): Pipeline {
-  const discovery = goGraphAdapter.discoverFiles({ cwd: dir });
+  const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = goGraphAdapter.parseProject({
     projectDirAbs: discovery.projectDirAbs,
     files: discovery.files,

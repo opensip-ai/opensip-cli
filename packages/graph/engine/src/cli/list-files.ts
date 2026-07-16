@@ -127,7 +127,7 @@ async function discoverScopedFiles(opts: GraphCommandOptions): Promise<readonly 
   const scopes =
     opts.paths && opts.paths.length > 0 ? resolvePositionalPaths(opts.paths, opts.cwd) : [opts.cwd];
   const discoveredByScope = await mapInBatches(scopes, (scope) =>
-    adapter.discoverFiles({ cwd: scope }),
+    adapter.discoverFiles({ cwd: scope, diagnosticIntent: 'quiet' }),
   );
   return discoveredByScope.flatMap((discovered) => discovered.files);
 }
@@ -157,6 +157,7 @@ async function discoverWorkspaceFiles(
       return await adapter.discoverFiles({
         cwd: unit.rootDir,
         configPathOverride: unit.configPath,
+        diagnosticIntent: 'quiet',
       });
     } catch {
       return null; // a unit the graph adapter can't discover is skipped, not fatal

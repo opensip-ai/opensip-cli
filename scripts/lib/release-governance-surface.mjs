@@ -6,16 +6,217 @@
  * carry stale literal counts.
  */
 
+import { createRequire } from 'node:module';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RELEASE_PACKAGE_ORDER } from '../release-package-order.mjs';
 
+const require = createRequire(import.meta.url);
+const { readWorkspacePackageManifests } = require('./workspace-package-manifests.cjs');
+const { readProductionToolPackageInventory } = require('./workspace-tool-package-inventory.cjs');
+
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
-/** Private package.json files that share the product version during bump. */
-export const PRIVATE_VERSIONED_PACKAGE_JSON_COUNT = 2;
+/** The private, version-bumped root manifest (`@opensip-cli/root`), which is NOT
+ * a workspace package. */
+const PRIVATE_ROOT_NAME = '@opensip-cli/root';
+const BUNDLED_MANIFEST = 'packages/cli/src/bootstrap/bundled-tools.manifest.json';
+
+/** Contributor/agent docs whose bundled-tool prose is bound to the manifest. */
+const CONTRIBUTOR_DOCS = ['AGENTS.md', 'CLAUDE.md'];
+
+const NUMBER_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+];
+
+/** Small-integer English word (for prose counts), or the digits for larger n. */
+function numberWord(n) {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
+function byCodePoint(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+/**
+ * Pure text projection: a doc that enumerates the bundled Tools must state the
+ * manifest-derived count (as an English word) and cite the manifest as the source
+ * of truth — never a frozen literal. Returns actionable drift problems (ADR-0151).
+ *
+ * @param {string} docName
+ * @param {string} text doc contents ('' when the doc is absent)
+ * @param {{ bundledToolPackageNames: readonly string[] }} facts
+ * @returns {string[]}
+ */
+export function collectBundledToolDocProblems(docName, text, facts) {
+  const problems = [];
+  if (!text) {
+    problems.push(`${docName}: missing — cannot verify bundled-tool facts`);
+    return problems;
+  }
+  const bundledCount = facts.bundledToolPackageNames.length;
+  const word = numberWord(bundledCount);
+  // Accept the English word OR the digits (so "five" and "5" both pass — and a
+  // count > 10, where numberWord already returns digits, still works), and
+  // "bundled tools" or "bundled first-party tools" (README voice).
+  const countForm = word === String(bundledCount) ? word : `(?:${word}|${bundledCount})`;
+  if (
+    !new RegExp(String.raw`\b${countForm}\s+bundled\s+(?:first-party\s+)?tools\b`, 'i').test(text)
+  ) {
+    problems.push(
+      `${docName} must describe ${word} (${bundledCount}) bundled tools, derived from ` +
+        `${BUNDLED_MANIFEST}. Update the count if a bundled tool was added or removed.`,
+    );
+  }
+  if (!text.includes('bundled-tools.manifest.json')) {
+    problems.push(
+      `${docName} must cite bundled-tools.manifest.json as the bundled-tool source of truth.`,
+    );
+  }
+  return problems;
+}
+
+/**
+ * Pure text projection: a doc that states a publishable package count must match
+ * the derived count, and a doc that names any private workspace package by name
+ * must name them all — no stale literal survives (ADR-0151). Counts/names are
+ * derived from `facts`, never frozen in the check.
+ *
+ * @param {string} docName
+ * @param {string} text doc contents ('' when absent)
+ * @param {{ publishableCount: number, privateWorkspaceNames: readonly string[] }} facts
+ * @returns {string[]}
+ */
+export function collectPackageFactDocProblems(docName, text, facts) {
+  const problems = [];
+  if (!text) {
+    problems.push(`${docName}: missing — cannot verify package facts`);
+    return problems;
+  }
+  const countMatch = text.match(/\b(\d+)\s+publishable\s+(?:workspace\s+)?packages\b/i);
+  if (countMatch && Number.parseInt(countMatch[1], 10) !== facts.publishableCount) {
+    problems.push(
+      `${docName} claims ${countMatch[1]} publishable packages; expected ${facts.publishableCount} ` +
+        `(RELEASE_PACKAGE_ORDER). Use the derived count or source-of-truth wording.`,
+    );
+  }
+  const named = facts.privateWorkspaceNames.filter((name) => text.includes(name));
+  if (named.length > 0 && named.length !== facts.privateWorkspaceNames.length) {
+    const missing = facts.privateWorkspaceNames.filter((name) => !text.includes(name));
+    problems.push(
+      `${docName} names a private workspace package but omits ${missing.join(', ')}; ` +
+        `name every private workspace package.`,
+    );
+  }
+  return problems;
+}
+
+/**
+ * One immutable projection over the canonical package/Tool authorities:
+ * `readWorkspacePackageManifests`, `RELEASE_PACKAGE_ORDER`,
+ * `readProductionToolPackageInventory`, and `bundled-tools.manifest.json`.
+ * Generators and drift checks consume this instead of recomputing or freezing
+ * literal counts. Fails closed on any disagreement between the sources (ADR-0151).
+ *
+ * @param {string} [repoRoot]
+ */
+export function readGovernanceFacts(repoRoot = REPO_ROOT) {
+  const records = readWorkspacePackageManifests(repoRoot);
+  const workspaceNames = records.map((r) => r.name).sort(byCodePoint);
+  const privateNames = records
+    .filter((r) => r.private)
+    .map((r) => r.name)
+    .sort(byCodePoint);
+  const publishableNames = records
+    .filter((r) => !r.private)
+    .map((r) => r.name)
+    .sort(byCodePoint);
+  const releaseOrderNames = RELEASE_PACKAGE_ORDER.map((p) => p.name);
+
+  // RELEASE_PACKAGE_ORDER must equal the publishable workspace set.
+  const publishableSet = new Set(publishableNames);
+  const orderSet = new Set(releaseOrderNames);
+  if (orderSet.size !== releaseOrderNames.length) {
+    throw new Error('RELEASE_PACKAGE_ORDER contains a duplicate package');
+  }
+  for (const name of releaseOrderNames) {
+    if (!publishableSet.has(name)) {
+      throw new Error(
+        `RELEASE_PACKAGE_ORDER includes ${name}, not a publishable workspace package`,
+      );
+    }
+  }
+  for (const name of publishableNames) {
+    if (!orderSet.has(name)) {
+      throw new Error(
+        `publishable workspace package ${name} is missing from RELEASE_PACKAGE_ORDER`,
+      );
+    }
+  }
+  for (const name of privateNames) {
+    if (orderSet.has(name)) {
+      throw new Error(`private workspace package ${name} must not appear in RELEASE_PACKAGE_ORDER`);
+    }
+  }
+  if (workspaceNames.includes(PRIVATE_ROOT_NAME)) {
+    throw new Error(
+      `${PRIVATE_ROOT_NAME} is the private root manifest and must not be a workspace package`,
+    );
+  }
+
+  // Bundled Tool facts cross-checked against the production Tool inventory.
+  const bundledRaw = readRepoFile(BUNDLED_MANIFEST, repoRoot);
+  const bundled = bundledRaw ? JSON.parse(bundledRaw) : {};
+  const bundledToolPackageNames = Array.isArray(bundled.bundledPackages)
+    ? [...bundled.bundledPackages]
+    : [];
+  const toolInventory = readProductionToolPackageInventory(repoRoot);
+  const toolByName = new Map(toolInventory.map((t) => [t.name, t]));
+  for (const name of bundledToolPackageNames) {
+    const rec = toolByName.get(name);
+    if (!rec) {
+      throw new Error(`bundled manifest names ${name}, absent from the production Tool inventory`);
+    }
+    if (rec.bundled !== true) {
+      throw new Error(
+        `bundled manifest names ${name}, but the Tool inventory does not classify it bundled`,
+      );
+    }
+  }
+
+  // Versioned package.json files = every publishable + every private workspace
+  // package (all share the product version) + the private root manifest.
+  const versionedPackageJsonCount = publishableNames.length + privateNames.length + 1;
+
+  return Object.freeze({
+    workspacePackageNames: Object.freeze(workspaceNames),
+    workspacePackageCount: records.length,
+    publishableNames: Object.freeze(publishableNames),
+    publishableCount: publishableNames.length,
+    releaseOrderNames: Object.freeze([...releaseOrderNames]),
+    privateWorkspaceNames: Object.freeze(privateNames),
+    privateWorkspaceCount: privateNames.length,
+    scopedPublishableCount: publishableNames.filter((n) => n.startsWith('@opensip-cli/')).length,
+    privateRootName: PRIVATE_ROOT_NAME,
+    versionedPackageJsonCount,
+    bundledToolPackageNames: Object.freeze(bundledToolPackageNames),
+    productionToolPackageNames: Object.freeze(toolInventory.map((t) => t.name).sort(byCodePoint)),
+  });
+}
 
 const STALE_COUNT_PATTERNS = [
   /\ball\s+33\b/i,
@@ -28,8 +229,8 @@ const STALE_COUNT_PATTERNS = [
   /\b33\s+publishable\s+packages\b/i,
 ];
 
-function readRepoFile(relPath) {
-  const abs = join(REPO_ROOT, relPath);
+function readRepoFile(relPath, root = REPO_ROOT) {
+  const abs = join(root, relPath);
   return existsSync(abs) ? readFileSync(abs, 'utf8') : '';
 }
 
@@ -38,11 +239,10 @@ function readRepoFile(relPath) {
  */
 export function collectGovernanceDriftProblems() {
   const problems = [];
-  const publishableCount = RELEASE_PACKAGE_ORDER.length;
-  const scopedPublishableCount = RELEASE_PACKAGE_ORDER.filter((p) =>
-    p.name.startsWith('@opensip-cli/'),
-  ).length;
-  const versionedPackageJsonCount = publishableCount + PRIVATE_VERSIONED_PACKAGE_JSON_COUNT;
+  const facts = readGovernanceFacts();
+  const publishableCount = facts.publishableCount;
+  const scopedPublishableCount = facts.scopedPublishableCount;
+  const versionedPackageJsonCount = facts.versionedPackageJsonCount;
 
   const releasingMd = readRepoFile('RELEASING.md');
   const releaseYml = readRepoFile('.github/workflows/release.yml');
@@ -92,7 +292,7 @@ export function collectGovernanceDriftProblems() {
   const versionedProse = new RegExp(`${versionedPackageJsonCount}\\s+\`package\\.json\` files`);
   if (!versionedProse.test(releasingMd)) {
     problems.push(
-      `RELEASING.md must state ${versionedPackageJsonCount} package.json files for version bumps (${publishableCount} publishable + ${PRIVATE_VERSIONED_PACKAGE_JSON_COUNT} private).`,
+      `RELEASING.md must state ${versionedPackageJsonCount} package.json files for version bumps (${publishableCount} publishable + ${facts.privateWorkspaceCount} private workspace + the private root).`,
     );
   }
 
@@ -111,5 +311,83 @@ export function collectGovernanceDriftProblems() {
     }
   }
 
+  // Contributor/agent docs must describe the manifest-derived bundled-tool set.
+  for (const doc of CONTRIBUTOR_DOCS) {
+    problems.push(...collectBundledToolDocProblems(doc, readRepoFile(doc), facts));
+  }
+
+  // Audited public factual pages: the README enumerates packages AND bundled
+  // tools; the doc-conventions verification trail states a package count.
+  const publicReadme = 'docs/public/README.md';
+  const publicReadmeText = readRepoFile(publicReadme);
+  const docConventions = 'docs/public/80-implementation/06-doc-conventions.md';
+  problems.push(
+    ...collectBundledToolDocProblems(publicReadme, publicReadmeText, facts),
+    ...collectPackageFactDocProblems(publicReadme, publicReadmeText, facts),
+    ...collectPackageFactDocProblems(docConventions, readRepoFile(docConventions), facts),
+  );
+
+  return problems;
+}
+
+// ---------------------------------------------------------------------
+// Published-artifact classification (ADR-0150).
+//
+// Production package builds must ship runtime artifacts only. These pure
+// helpers classify package-relative paths (from a real `dist/` tree OR from a
+// `pnpm pack --dry-run --json` packlist) and flag anything that must not be
+// published. No filesystem access — the verifier script does the I/O.
+// ---------------------------------------------------------------------
+
+/** Max normalized package-relative path length (defense against pathological input). */
+export const MAX_PUBLISHED_ARTIFACT_PATH_BYTES = 4096;
+
+/**
+ * Classify a package-relative published-artifact path (POSIX or Windows
+ * separators). Returns a stable reason string when the path must NOT ship in a
+ * production tarball, or `null` when it is an allowed runtime artifact.
+ *
+ * A filename merely CONTAINING "test"/"spec" (e.g. `contest.js`, `latest.js`)
+ * is allowed — only the `.test.`/`.spec.` infix and the test/fixture/coverage/
+ * test-support trees are rejected.
+ *
+ * @param {string} relPath
+ * @returns {string | null}
+ */
+export function classifyPublishedArtifactPath(relPath) {
+  if (typeof relPath !== 'string' || relPath.length === 0) return 'empty-path';
+  if (relPath.length > MAX_PUBLISHED_ARTIFACT_PATH_BYTES) return 'oversized-path';
+  if (relPath.includes('\0')) return 'nul-in-path';
+  const p = relPath.replaceAll('\\', '/');
+  if (p.startsWith('/') || /^[a-zA-Z]:/.test(p)) return 'absolute-path';
+  const segments = p.split('/');
+  if (segments.includes('..')) return 'path-traversal';
+  const base = segments.at(-1);
+  if (segments.includes('__tests__')) return 'test-directory';
+  // `__test-support__` is a production-build exclude (packages/cli/tsconfig.json);
+  // the classifier backstops that exclude, so it must reject it too.
+  if (segments.includes('__test-support__')) return 'test-support-directory';
+  if (segments.includes('__fixtures__')) return 'fixture-directory';
+  if (segments.includes('coverage')) return 'coverage';
+  if (/\.(test|spec)\./.test(base)) return 'test-file';
+  return null;
+}
+
+/**
+ * Collect forbidden-published-artifact problems for one package's file list.
+ *
+ * @param {string} pkgName
+ * @param {readonly string[]} files package-relative paths
+ * @param {string} source `dist` or `packlist` (for the diagnostic)
+ * @returns {string[]}
+ */
+export function collectPublishedArtifactProblems(pkgName, files, source = 'dist') {
+  const problems = [];
+  for (const file of files) {
+    const reason = classifyPublishedArtifactPath(file);
+    if (reason !== null) {
+      problems.push(`${pkgName}: forbidden ${source} artifact (${reason}): ${file}`);
+    }
+  }
   return problems;
 }

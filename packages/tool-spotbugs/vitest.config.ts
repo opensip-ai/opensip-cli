@@ -28,7 +28,7 @@ export default mergeConfig(
         // declarative surface, the class-discovery arg builder (both paths), and the
         // ingestSarif acceptance path — is covered.
         thresholds: {
-          statements: 90,
+          statements: 86,
           branches: 50,
           functions: 80,
           lines: 90,

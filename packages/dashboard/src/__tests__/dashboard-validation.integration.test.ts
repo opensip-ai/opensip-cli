@@ -13,7 +13,7 @@
  * run the dashboard CLI separately and re-execute this test.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,8 +24,42 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, '..', '..', '..', '..');
 const REPORT = join(REPO_ROOT, 'opensip-cli', '.runtime', 'reports', 'latest.html');
 
+/**
+ * Upper bound on a report this test is willing to boot.
+ *
+ * jsdom must parse the whole document into a DOM, which costs many times the
+ * file size in heap. This test used to read the live report unconditionally, so
+ * a large one took the entire dashboard suite down with it: on a dogfood run of
+ * this repo (17.5k functions) `latest.html` reached 293 MB, and the worker died
+ * with "Ineffective mark-compacts near heap limit" — killing 9 tests in this
+ * file and failing the package lane, with no indication of why. No heap setting
+ * survives it (8 GB dies the same way); the only fix is not to load it.
+ *
+ * 24 MB sits above any DEFAULT report (the catalog budget is 8 MiB, so a real
+ * one lands ~9 MB) and below what wedges jsdom. It deliberately excludes a
+ * report generated with `opensip report --max-catalog-mb 64` — that artifact is
+ * for exploring a big repo locally, not the shareable default this test
+ * validates, and booting it would put the suite back where it started.
+ */
+const MAX_BOOTABLE_REPORT_BYTES = 24 * 1024 * 1024;
+
 function readReportOrSkip(): string | null {
   if (!existsSync(REPORT)) return null;
+
+  const { size } = statSync(REPORT);
+  if (size > MAX_BOOTABLE_REPORT_BYTES) {
+    // Skip LOUDLY. A silent skip here would hide the actual defect: a
+    // self-contained report is meant to be opened in a browser and attached to
+    // a PR, so one this large is a generator bug, not a test problem.
+    process.stderr.write(
+      `[dashboard-validation] SKIPPED — ${REPORT} is ${Math.round(size / 1e6)} MB, ` +
+        `above the ${MAX_BOOTABLE_REPORT_BYTES / 1e6} MB cap this test will boot. ` +
+        `Booting it exhausts the jsdom worker heap. A report this size is itself a ` +
+        `defect: the embedded graph catalog is not bounded.\n`,
+    );
+    return null;
+  }
+
   const html = readFileSync(REPORT, 'utf8');
   if (!html.includes('id="graph-catalog"')) return null;
   return html;
