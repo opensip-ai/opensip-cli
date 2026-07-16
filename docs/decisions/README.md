@@ -1,6 +1,6 @@
 ---
 status: active
-last_verified: 2026-07-13
+last_verified: 2026-07-15
 owner: opensip-cli
 ---
 
@@ -37,6 +37,7 @@ distinct from:
 
 ## Index (most recent first)
 
+- [ADR-0166](ADR-0166-agent-catalog-transport-parity.md) — The common `AgentCatalog` body (entry points, reserved names, bounded target conventions, and the Plan 02 `hostSupport` projection) is transport-equivalent for `opensip agent-catalog --json` and MCP `get_agent_catalog` via one pure contracts `assembleAgentCatalog`; MCP derives equivalent reserved-root/internal-command facts by projecting the complete `RunScope.runtimeCommands` inventory (plus implicit `help`) instead of importing or duplicating the CLI-local `HOST_RESERVED_ROOT_COMMANDS`; config keeps suite-name ownership (`RESERVED_SUITE_NAMES` via its barrel); the `mcp` connector overlay stays additive/transport-local; no `mcp -> cli` edge, no new fitness check.
 - [ADR-0165](ADR-0165-macos-ga-support-qualification.md) — First narrow macOS GA support tuple (macOS 26 · arm64 · Node 24/ABI 137 · npm 11 · APFS), launched as `preview` and promoted to `supported` only after 14-day burn-in; verified exact-version macOS evidence is a hard `stage → Mac verify → latest promote` gate (a failed gate may burn a staged version but never advances `latest`); Intel is `unsupported`, other tuples `unqualified`, `engines` is not support; one pure core registry projects the generated matrix + an additive `AgentCatalog.hostSupport`; no new command, datastore, or fitness check.
 - [ADR-0164](ADR-0164-installed-artifact-platform-acceptance-evidence.md) — Operating-system support qualification targets the exact installed bytes through a closed data profile and an independently verifiable `platform-acceptance.v1` evidence artifact; a pass proves only the measured candidate/host/profile tuple, not a support declaration, and the harness adds no command, datastore, or fitness check.
 - [ADR-0163](ADR-0163-local-cpu-profiling-independent-of-otel-export.md) — Explicit local Node inspector profiling independent of OTel export, bounded owner-only artifacts, clean-wall-only performance claims, and Pyroscope deferred (supersedes ADR-0049).

@@ -24,6 +24,9 @@ source-files:
   - packages/cli/src/commands/tools/index.ts
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/commands/completion.ts
+  - packages/cli/src/commands/agent-catalog.ts
+  - packages/contracts/src/agent-catalog.ts
+  - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/fitness/engine/src/tool.ts
   - packages/fitness/engine/src/cli/fit/changed-targeting.ts
   - packages/simulation/engine/src/tool.ts
@@ -1064,9 +1067,20 @@ The `--json` output is designed to be consumed directly by agents. It contains:
 - Primary entry points with ready-to-use examples (including `sessions show latest --tool <fit|graph|sim> --json --filter errors-only --filter top:20` and `sessions list --json --summary-only`).
 - Common composable agent workflows.
 - Notes on the core output shapes (`SignalEnvelope`, `SessionReplayResult` with `fidelity: "projection"`, etc.).
+- `reservedNames` — the host-owned root commands a Tool cannot mount and the built-in suite names a configured suite cannot claim (ADR-0159).
+- `hostSupport` — the honest, process-only platform-support assessment (Plan 02); the local `match` is never `exact`, so distinguish it from the row's published `status`.
+- Bounded `projectContext.targetConventions` when the project declares any.
 - Explicit call-out that human-readable renderers (tables, banners) are unchanged.
 
+The `--json` output is nested under `data.catalog` in the standard `CommandOutcome` wrapper.
+
 This is the recommended starting point for any agent that needs to discover how to drive OpenSIP programmatically or inspect prior runs.
+
+### Same catalog over the CLI and MCP
+
+`opensip agent-catalog --json` and the MCP `get_agent_catalog` tool return the **same common catalog body** for the same invocation and project — identical entry points, common patterns, output shapes, notes, `reservedNames`, bounded `projectContext.targetConventions`, and `hostSupport`. A single pure assembler in `@opensip-cli/contracts` produces that body for both transports ([ADR-0166](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0166-agent-catalog-transport-parity.md)). Assembling the catalog is **read-only** on either transport: it builds no graph, runs no analysis, invokes no Git or tests, and creates no session.
+
+The MCP response adds exactly one extra top-level object the CLI never emits — `mcp` — carrying live connector diagnosis (`version`, `surfaceEpoch`, `toolNames`, `toolCount`, `mutationPosture`, and `project.root`/`project.scope`). Treat it as connector identity only: when `surfaceEpoch`, `toolNames`, or `version` no longer match the cached inventory, **reconnect** the MCP process — `refresh_graph` rebuilds graph evidence and never repairs a stale connector inventory (ADR-0153). To compare the two surfaces, drop only the top-level `mcp` object; the rest is byte-identical to the CLI's `data.catalog`.
 
 ---
 

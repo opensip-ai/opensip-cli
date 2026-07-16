@@ -1,4 +1,5 @@
 import {
+  assembleAgentCatalog,
   buildSignalEnvelope,
   type CommandResult,
   type StoredSession,
@@ -76,8 +77,15 @@ function replay(stored: StoredSession): ToolSessionReplay<CommandResult> {
 
 const replayFor: (_tool: ToolShortId) => SessionReplayFn | undefined = () => replay;
 
+const AGENT_CATALOG = assembleAgentCatalog({ rootCommands: [], suiteNames: [] });
+
 function port(): SessionResultsReadPort {
-  return new SessionResultsReadPort({ store, projectRoot: '/repo', replayFor });
+  return new SessionResultsReadPort({
+    store,
+    projectRoot: '/repo',
+    replayFor,
+    agentCatalog: AGENT_CATALOG,
+  });
 }
 
 describe('SessionResultsReadPort repo scoping', () => {

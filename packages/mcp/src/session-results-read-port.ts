@@ -3,15 +3,16 @@
  *
  * Implements the result/history reads over the `@opensip-cli/session-store`
  * read API (`listSessionSummaries` / `resolveAndReplaySession` / the bundled
- * replay resolver) and the `@opensip-cli/contracts` `buildAgentCatalog`. It is
- * constructed from an injected `DataStore` (+ the live `ToolRegistry`) captured
- * once — it NEVER calls `currentScope()` inside a method (the long-lived server
- * captures scope at construction; Phase 3). It NEVER names `SessionRepo`, never
- * raw-queries the datastore, and never re-runs the underlying tool — replay only
- * (the `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
+ * replay resolver), and returns the already-assembled common `AgentCatalog`
+ * captured at construction (Plan 03 transport parity — `serveMcpStdio` composes
+ * it once through the contracts `assembleAgentCatalog`; the port never builds
+ * it). It is constructed from an injected `DataStore` (+ the live `ToolRegistry`)
+ * captured once — it NEVER calls `currentScope()` inside a method (the long-lived
+ * server captures scope at construction; Phase 3). It NEVER names `SessionRepo`,
+ * never raw-queries the datastore, and never re-runs the underlying tool — replay
+ * only (the `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
  */
 
-import { buildAgentCatalog } from '@opensip-cli/contracts';
 import { err, logger, mapWithConcurrency, ok } from '@opensip-cli/core';
 import { BaselineRepo } from '@opensip-cli/datastore';
 import {
@@ -53,12 +54,7 @@ import type {
   ShowRunData,
 } from './result-dto.js';
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from './results-read-port.js';
-import type {
-  AgentCatalog,
-  AgentHostSupport,
-  HistorySession,
-  StoredSession,
-} from '@opensip-cli/contracts';
+import type { AgentCatalog, HistorySession, StoredSession } from '@opensip-cli/contracts';
 import type { Result, ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -72,21 +68,20 @@ export interface SessionResultsReadPortDeps {
   readonly store: DataStore;
   /** Project root that scopes session result reads. Omitted keeps reads unscoped. */
   readonly projectRoot?: string;
-  /** Live tool registry — for the agent catalog + the bundled replay resolver. */
+  /** Live tool registry — for the bundled replay resolver default. */
   readonly tools?: ToolRegistry;
   /** Override the per-tool replay resolver (defaults to the bundled in-host one). */
   readonly replayFor?: (tool: ToolShortId) => SessionReplayFn | undefined;
-  /** Tier-3 internal command names excluded from the agent catalog. */
-  readonly internalCommands?: ReadonlySet<string>;
   /**
-   * Honest, process-only host-support projection (Plan 02, macOS GA). The
-   * long-lived server computes it ONCE at construction from the same process
-   * facts and the same shared mapper the CLI uses, so `get_agent_catalog`
-   * reaches byte-identical parity with `opensip agent-catalog --json`. The read
-   * port only forwards it — it never re-observes the process or reads ambient
-   * scope in a method.
+   * The already-assembled common agent catalog (Plan 03, agent-catalog transport
+   * parity). The long-lived server composes it ONCE from the captured scope
+   * (`serveMcpStdio`) via the shared contracts `assembleAgentCatalog`, so the
+   * common body reaches byte-identical parity with `opensip agent-catalog --json`
+   * (reserved roots, reserved suites, bounded target conventions, and Plan 02's
+   * process-only `hostSupport`). The read port is a pure conduit: `agentCatalog()`
+   * forwards this captured object verbatim and consults NO other dependency.
    */
-  readonly hostSupport?: AgentHostSupport;
+  readonly agentCatalog: AgentCatalog;
 }
 
 export class SessionResultsReadPort implements ResultsReadPort {
@@ -94,27 +89,20 @@ export class SessionResultsReadPort implements ResultsReadPort {
   private readonly projectRoot?: string;
   private readonly tools?: ToolRegistry;
   private readonly replayFor: (tool: ToolShortId) => SessionReplayFn | undefined;
-  private readonly internalCommands?: ReadonlySet<string>;
-  private readonly hostSupport?: AgentHostSupport;
+  private readonly capturedAgentCatalog: AgentCatalog;
 
   constructor(deps: SessionResultsReadPortDeps) {
     this.store = deps.store;
     this.projectRoot = deps.projectRoot;
     this.tools = deps.tools;
     this.replayFor = deps.replayFor ?? (deps.tools ? bundledReplayResolver(deps.tools) : noReplay);
-    this.internalCommands = deps.internalCommands;
-    this.hostSupport = deps.hostSupport;
+    this.capturedAgentCatalog = deps.agentCatalog;
   }
 
   agentCatalog(): Result<AgentCatalog, McpReadError> {
-    return ok(
-      buildAgentCatalog({
-        ...(this.tools ? { tools: this.tools } : {}),
-        ...(this.internalCommands ? { internalCommands: this.internalCommands } : {}),
-        ...(this.hostSupport ? { hostSupport: this.hostSupport } : {}),
-        validateOverlays: true,
-      }),
-    );
+    // Pure conduit: return the catalog assembled once at the composition root.
+    // No scope, filesystem, graph, Git, test, session, or datastore read here.
+    return ok(this.capturedAgentCatalog);
   }
 
   listRuns(opts: ListRunsOptions = {}): Result<readonly RunSummary[], McpReadError> {

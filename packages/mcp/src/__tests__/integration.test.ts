@@ -21,6 +21,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { assembleAgentCatalog } from '@opensip-cli/contracts';
 import {
   applyToolContributeScope,
   err,
@@ -202,6 +203,8 @@ const buildStubReplay: SessionReplayFn = (stored): ToolSessionReplay<CommandResu
 
 const stubResolver: (tool: string) => SessionReplayFn | undefined = () => buildStubReplay;
 
+const AGENT_CATALOG = assembleAgentCatalog({ rootCommands: [], suiteNames: [] });
+
 describe('MCP integration — session replay over a real DataStore', () => {
   it('lists, replays latest, and shows a seeded run (replay only, never re-run)', async () => {
     new SessionRepo(store).save(makeSession({ id: 'fit-int-1' }));
@@ -212,7 +215,11 @@ describe('MCP integration — session replay over a real DataStore', () => {
         completedAt: '2026-05-22T00:00:30.000Z',
       }),
     );
-    const results = new SessionResultsReadPort({ store, replayFor: stubResolver });
+    const results = new SessionResultsReadPort({
+      store,
+      replayFor: stubResolver,
+      agentCatalog: AGENT_CATALOG,
+    });
 
     const list = results.listRuns();
     expect(list.ok && list.value.map((r) => r.id)).toEqual(['fit-int-2', 'fit-int-1']);

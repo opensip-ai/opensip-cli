@@ -10,7 +10,7 @@
 
 import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
 import {
-  buildAgentCatalog,
+  assembleAgentCatalog,
   hostSupportFromRuntimeProjection,
   summarizeTargetConventions,
   type AgentHostSupport,
@@ -67,17 +67,19 @@ export function executeAgentCatalog(
     readonly internalCommands?: ReadonlySet<string>;
   } = {},
 ) {
+  // Scope access stays HERE, in the composition-root adapter — the shared
+  // contracts assembler is pure and receives every fact explicitly (Plan 03).
   const targetConventions = summarizeTargetConventions(currentScope()?.targets);
-  const catalog = buildAgentCatalog({
+  const catalog = assembleAgentCatalog({
     tools: opts.tools,
     internalCommands: opts.internalCommands,
-    validateOverlays: true,
-    // ADR-0159: advertise the reserved names so Tool authors and agents learn
-    // the constraint from discovery instead of an admission-time rejection.
-    reservedNames: {
-      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
-      suiteNames: [...RESERVED_SUITE_NAMES],
-    },
+    // ADR-0159: the CLI is the admission authority for host-reserved roots, so it
+    // passes its static set directly (sorted, preserving the historical CLI
+    // output) alongside config's reserved suite names. The assembler copies both
+    // WITHOUT reordering and advertises them so Tool authors/agents learn the
+    // constraint from discovery rather than an admission-time rejection.
+    rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+    suiteNames: RESERVED_SUITE_NAMES,
     hostSupport: liveHostSupport(),
     ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
   });

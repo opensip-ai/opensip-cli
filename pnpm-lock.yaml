@@ -1131,6 +1131,9 @@ importers:
       '@opensip-cli/codebase':
         specifier: workspace:*
         version: link:../codebase
+      '@opensip-cli/config':
+        specifier: workspace:*
+        version: link:../config
       '@opensip-cli/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -6249,6 +6252,7 @@ snapshots:
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0
       '@opensip-cli/codebase': file:packages/codebase(commander@15.0.0)
+      '@opensip-cli/config': file:packages/config
       '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)

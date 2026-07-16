@@ -6,6 +6,7 @@
  * the live registry (unknown → structured error), and surfaces the err arm.
  */
 
+import { assembleAgentCatalog } from '@opensip-cli/contracts';
 import { err, ok } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
@@ -31,7 +32,7 @@ import type {
   ShowRunData,
 } from '../../result-dto.js';
 import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from '../../results-read-port.js';
-import type { CallToolResult, McpStdioServer } from '../../server.js';
+import type { CallToolResult, McpStdioServer, McpSurfaceSnapshot } from '../../server.js';
 import type { McpToolDeps } from '../types.js';
 import type { AgentCatalog, RepairApplyVerifyResult, ReviewBrief } from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
@@ -657,17 +658,45 @@ describe('show_run handler', () => {
 // ── get_agent_catalog ────────────────────────────────────────────────
 
 describe('get_agent_catalog handler', () => {
-  it('returns the agent catalog', () => {
+  /** A representative common catalog with reserved names + project + hostSupport. */
+  function commonCatalog(): AgentCatalog {
+    return assembleAgentCatalog({
+      rootCommands: ['audit', 'init', 'sessions', 'suite'],
+      suiteNames: ['audit', 'agent-context'],
+      hostSupport: {
+        supportContractVersion: 1,
+        status: 'preview',
+        match: 'partial',
+        rowId: 'macos-26-arm64-node24-npm11-v1',
+        rowStatus: 'preview',
+        profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+        matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+        reasonCodes: [],
+        observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+        unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+      },
+    });
+  }
+
+  const SURFACE: McpSurfaceSnapshot = Object.freeze({
+    version: '9.9.9-test',
+    surfaceEpoch: 7,
+    toolNames: Object.freeze(['get_agent_catalog', 'search_symbols']),
+    toolCount: 2,
+    mutationPosture: 'read-only',
+    projectRoot: '/canonical/project/root',
+    projectScope: 'project',
+  });
+
+  it('returns the bare common catalog when mcpSurface is absent (no overlay)', () => {
+    const catalog = commonCatalog();
     const { server, handlers } = captureServer();
-    registerGetAgentCatalog(
-      server,
-      deps(
-        fakeResults({ agentCatalog: () => ok({ commands: ['fit'] } as unknown as AgentCatalog) }),
-      ),
-    );
+    // deps() does not set mcpSurface → the handler must return the bare catalog.
+    registerGetAgentCatalog(server, deps(fakeResults({ agentCatalog: () => ok(catalog) })));
     const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
     expect(out.isError).toBe(false);
-    expect(out.body.commands).toEqual(['fit']);
+    expect(out.body).toEqual(catalog);
+    expect(out.body).not.toHaveProperty('mcp');
   });
 
   it('surfaces an err arm', () => {
@@ -680,29 +709,45 @@ describe('get_agent_catalog handler', () => {
     expect(out.isError).toBe(true);
   });
 
-  it('passes the catalog hostSupport projection through to the agent unchanged', () => {
-    // The macOS-GA host-support projection lives INSIDE the catalog the read port
-    // builds; the transport must forward it verbatim (never drop, rename, or
-    // recompute it) so an MCP agent sees the same honest projection as the CLI.
-    const hostSupport = {
-      supportContractVersion: 1,
-      status: 'preview',
-      match: 'partial',
-      rowId: 'macos-26-arm64-node24-npm11-v1',
-      rowStatus: 'preview',
-      profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
-      matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
-      reasonCodes: [],
-      observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
-      unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
-    };
+  it('adds ONLY the additive mcp overlay from McpSurfaceSnapshot, leaving the common body unchanged', () => {
+    const catalog = commonCatalog();
     const { server, handlers } = captureServer();
-    registerGetAgentCatalog(
-      server,
-      deps(fakeResults({ agentCatalog: () => ok({ hostSupport } as unknown as AgentCatalog) })),
-    );
+    registerGetAgentCatalog(server, {
+      ...deps(fakeResults({ agentCatalog: () => ok(catalog) })),
+      mcpSurface: () => SURFACE,
+    });
     const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
     expect(out.isError).toBe(false);
-    expect(out.body.hostSupport).toEqual(hostSupport);
+
+    // The `mcp` overlay carries EXACTLY the McpSurfaceSnapshot fields, mapped
+    // verbatim (projectRoot → project.root, projectScope → project.scope).
+    expect(out.body.mcp).toEqual({
+      version: '9.9.9-test',
+      surfaceEpoch: 7,
+      toolNames: ['get_agent_catalog', 'search_symbols'],
+      toolCount: 2,
+      mutationPosture: 'read-only',
+      project: { root: '/canonical/project/root', scope: 'project' },
+    });
+
+    // Removing ONLY the named `mcp` overlay yields the untouched common catalog —
+    // no other field was added, renamed, or dropped (no wildcard omission list).
+    const common: Record<string, unknown> = { ...out.body };
+    delete common.mcp;
+    expect(common).toEqual(catalog);
+  });
+
+  it('never mutates the input catalog when composing the overlay', () => {
+    const catalog = commonCatalog();
+    const before = JSON.stringify(catalog);
+    const { server, handlers } = captureServer();
+    registerGetAgentCatalog(server, {
+      ...deps(fakeResults({ agentCatalog: () => ok(catalog) })),
+      mcpSurface: () => SURFACE,
+    });
+    void handlers.get('get_agent_catalog')!({});
+    // The catalog the read port returned is untouched — the overlay is additive.
+    expect(JSON.stringify(catalog)).toBe(before);
+    expect(catalog).not.toHaveProperty('mcp');
   });
 });

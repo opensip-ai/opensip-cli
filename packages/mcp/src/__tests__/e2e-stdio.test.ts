@@ -99,6 +99,41 @@ const CONFIG_YML = [
 const SOURCE = BASE_PROJECT_SOURCE;
 const OVERSIZED_SESSION_ID = 'graph-e2e-oversized';
 
+// A config with NON-EMPTY target conventions, so both transports emit an equal
+// bounded `projectContext.targetConventions` for the same fixture (Plan 03,
+// Task 2.2). Kept in a dedicated fixture so its conventions never perturb the
+// graph/dead-code assertions of the shared fixtures.
+const CATALOG_CONFIG_YML = [
+  'globalExcludes:',
+  "  - 'node_modules/**'",
+  'targets:',
+  '  app-src:',
+  "    description: 'App source'",
+  '    languages: [typescript]',
+  '    concerns: [backend]',
+  '    include:',
+  "      - 'src/**/*.ts'",
+  '    conventions:',
+  '      entrypoints:',
+  "        - 'src/routes/**'",
+  "        - 'src/actions/**'",
+  '      alwaysUsed:',
+  "        - 'src/config/runtime.ts'",
+  '      usedExports:',
+  "        - file: 'src/routes/page.ts'",
+  '          names:',
+  '            - loader',
+  '            - action',
+  'fitness:',
+  '  failOnErrors: 0',
+  '  failOnWarnings: 0',
+  '  disabledChecks: []',
+  'graph:',
+  '  failOnErrors: 0',
+  '  failOnWarnings: 0',
+  '',
+].join('\n');
+
 const SAFE_ENV: Record<string, string> = Object.fromEntries(
   Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
 );
@@ -130,6 +165,44 @@ async function runBuiltCli(root: string, args: readonly string[]): Promise<void>
       }
     });
   });
+}
+
+/** Spawn the built CLI and return its captured stdout (fails loudly on nonzero exit). */
+async function runBuiltCliCapture(root: string, args: readonly string[]): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const child = spawn(process.execPath, [CLI_DIST, ...args], {
+      cwd: root,
+      env: SAFE_ENV,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`built CLI exited ${String(code)}: stderr=${stderr.slice(0, 2000)}`));
+    });
+  });
+}
+
+/** Materialize a catalog-parity fixture with non-empty target conventions. */
+function scaffoldCatalogFixture(): string {
+  const root = mkdtempSync(join(tmpdir(), 'mcp-e2e-catalog-'));
+  mkdirSync(join(root, 'opensip-cli', '.runtime'), { recursive: true });
+  writeFileSync(
+    join(root, 'package.json'),
+    JSON.stringify({ name: '@fixture/catalog', private: true }),
+    'utf8',
+  );
+  writeFileSync(join(root, 'opensip-cli.config.yml'), CATALOG_CONFIG_YML, 'utf8');
+  writeFileSync(join(root, 'tsconfig.json'), TSCONFIG, 'utf8');
+  return root;
 }
 
 /** Materialize a fixture project layout; returns the project root. */
@@ -358,6 +431,7 @@ let fixtureA: string;
 let fixtureB: string;
 let lifecycleFixture: string;
 let contextFixture: string;
+let catalogFixture: string;
 let contextRunId: string;
 let contextManifest: TaskContextManifest;
 let entrySymbolId: string;
@@ -569,6 +643,11 @@ beforeAll(async () => {
   // Fixture B: a project with NO catalog (refresh_graph must build it).
   fixtureB = scaffold();
 
+  // Catalog-parity fixture: a project whose config declares non-empty target
+  // conventions, so `agent-catalog --json` and `get_agent_catalog` can be proven
+  // byte-identical over the common body (Plan 03, Task 2.2).
+  catalogFixture = scaffoldCatalogFixture();
+
   // Dedicated fixture for destructive/transient catalog lifecycle faults.
   lifecycleFixture = scaffold();
   await seedLifecycleFixture(lifecycleFixture);
@@ -609,6 +688,7 @@ afterAll(() => {
   if (fixtureB) rmSync(fixtureB, { recursive: true, force: true });
   if (lifecycleFixture) rmSync(lifecycleFixture, { recursive: true, force: true });
   if (contextFixture) rmSync(contextFixture, { recursive: true, force: true });
+  if (catalogFixture) rmSync(catalogFixture, { recursive: true, force: true });
 });
 
 describe('MCP e2e over real stdio', () => {
@@ -647,6 +727,69 @@ describe('MCP e2e over real stdio', () => {
           'why_depends',
         ].sort(),
       );
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
+
+  it('serves an agent catalog whose common body equals `agent-catalog --json` (Plan 03 parity)', async () => {
+    // The CLI transport: run the built `agent-catalog --json` with cwd = fixture
+    // (agent-catalog is scope:'none', so it has no --cwd flag; the subprocess cwd
+    // supplies the project so scope.targets — hence conventions — resolve).
+    const cliRaw = await runBuiltCliCapture(catalogFixture, ['agent-catalog', '--json']);
+    const cliCatalog = (JSON.parse(cliRaw) as { data: { catalog: Record<string, unknown> } }).data
+      .catalog;
+
+    const conn = await connect(catalogFixture);
+    try {
+      const toolList = await conn.client.listTools();
+      const listed = toolList.tools.map((tool) => tool.name).sort();
+      const response = await call(conn, 'get_agent_catalog', {});
+
+      // Split off ONLY the named top-level `mcp` overlay — no wildcard omission.
+      const { mcp, ...common } = response;
+
+      // Full-object parity: the common body is byte-for-byte the CLI catalog
+      // (reserved roots/suites, bounded target counts, entry points, notes,
+      // hostSupport). A divergence in ANY common field fails here.
+      expect(common).toEqual(cliCatalog);
+
+      // Bounded, non-empty target conventions rode through both transports.
+      expect((common.projectContext as { targetConventions: unknown[] }).targetConventions).toEqual(
+        [{ target: 'app-src', entrypointCount: 2, alwaysUsedCount: 1, usedExportCount: 2 }],
+      );
+      // Reserved facts present + identical on both sides.
+      expect(common.reservedNames as { suiteNames: string[]; rootCommands: string[] }).toEqual(
+        cliCatalog.reservedNames,
+      );
+      expect((common.reservedNames as { suiteNames: string[] }).suiteNames).toEqual([
+        'audit',
+        'agent-context',
+      ]);
+      // The honest Plan 02 hostSupport is present and identical across transports.
+      expect(common.hostSupport).toEqual(cliCatalog.hostSupport);
+      expect(common.hostSupport).not.toBeUndefined();
+
+      // The additive `mcp` overlay matches initialize/listTools/epoch/posture/root.
+      const overlay = mcp as {
+        version: string;
+        surfaceEpoch: number;
+        toolNames: string[];
+        toolCount: number;
+        mutationPosture: string;
+        project: { root: string; scope: string };
+      };
+      expect(overlay.surfaceEpoch).toBe(7);
+      expect(overlay.mutationPosture).toBe('read-only');
+      expect(overlay.project).toEqual({ root: realpathSync(catalogFixture), scope: 'project' });
+      expect([...overlay.toolNames].sort()).toEqual(listed);
+      expect(overlay.toolCount).toBe(listed.length);
+      expect(overlay.version).toBe(conn.client.getServerVersion()?.version);
+
+      // No absolute fixture path leaks into the common catalog body.
+      const commonSerialized = JSON.stringify(common);
+      expect(commonSerialized).not.toContain(catalogFixture);
+      expect(commonSerialized).not.toContain(realpathSync(catalogFixture));
     } finally {
       await conn.client.close();
     }
