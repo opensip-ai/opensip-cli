@@ -19,7 +19,7 @@ export function dashboardCssChangeImpact(): string {
 .change-impact-controls p { grid-column: 2; }
 
 .change-impact-hero { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 6px 12px; border-inline-start: 4px solid var(--border-light); }
-.change-impact-hero h2 { font-family: var(--font-display); font-size: 22px; font-weight: 500; }
+.change-impact-hero h2 { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
 .change-impact-hero > .text-muted,
 .change-impact-hero > p { grid-column: 2; overflow-wrap: anywhere; }
 
@@ -45,7 +45,7 @@ export function dashboardCssChangeImpact(): string {
 .change-impact-correlation { margin-top: 12px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .change-impact-correlation summary { color: var(--text-secondary); font-weight: 600; cursor: pointer; }
 .change-impact-correlation[open] summary { margin-bottom: 8px; }
-.change-impact-command { display: block; max-width: 100%; margin-top: 8px; padding: 8px 10px; overflow-x: auto; color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; }
+.change-impact-command { display: block; max-width: 100%; margin-top: 8px; padding: 8px 10px; overflow-x: auto; color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-mono); white-space: pre; }
 
 .change-impact-section .data-table { min-width: 680px; }
 .change-impact-section .card { max-width: 100%; overflow-x: auto; }

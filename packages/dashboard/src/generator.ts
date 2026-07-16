@@ -309,12 +309,18 @@ export function generateDashboardHtml(input: DashboardInput): string {
 <title>OpenSIP CLI${latest ? ` — Pass Rate: ${latestScoreSafe}%` : ''}</title>
 <link rel="icon" type="image/svg+xml" href="${REPORT_CUP_FAVICON_DATA_URI}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
 <style>
 ${dashboardCss()}
 </style>
 </head>
 <body>
+
+<div class="report-ambient" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
 
 <div class="header">
   <span class="header-icon">${REPORT_CUP_HEADER_HTML}</span>
