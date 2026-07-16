@@ -7,9 +7,12 @@
  */
 import { realpathSync } from 'node:fs';
 
+import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
 import {
+  assembleAgentCatalog,
   EXIT_CODES,
   hostSupportFromRuntimeProjection,
+  projectAgentCatalogRuntimeFacts,
   summarizeTargetConventions,
   type FileEvidenceSupport,
 } from '@opensip-cli/contracts';
@@ -154,11 +157,30 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     }),
     PLATFORM_SUPPORT_CONTRACT_VERSION,
   );
+  // Assemble the ONE common agent catalog here at the composition boundary
+  // (Plan 03 transport parity). `serveMcpStdio` is the only scope-reading site:
+  // it projects the reserved host roots + internal Tool commands from the
+  // complete, immutable runtime inventory (adding Commander's implicit `help`),
+  // reuses the SAME target-convention array computed once for registerMcpTools,
+  // imports the config-owned reserved suite names, and folds in the Plan 02
+  // hostSupport — then hands the finished catalog to the read port, which is a
+  // pure conduit. This makes the MCP common body byte-identical to
+  // `opensip agent-catalog --json` for the same admitted registry + project.
+  const targetConventions = summarizeTargetConventions(scope.targets);
+  const runtimeFacts = projectAgentCatalogRuntimeFacts(scope.runtimeCommands, ['help']);
+  const agentCatalog = assembleAgentCatalog({
+    tools: scope.tools,
+    internalCommands: new Set(runtimeFacts.internalCommands),
+    rootCommands: runtimeFacts.rootCommands,
+    suiteNames: RESERVED_SUITE_NAMES,
+    hostSupport,
+    ...(targetConventions.length === 0 ? {} : { projectContext: { targetConventions } }),
+  });
   const results = new SessionResultsReadPort({
     store,
     projectRoot,
     tools: scope.tools,
-    hostSupport,
+    agentCatalog,
   });
   const codebase = new LocalCodebaseReadPort({
     projectRoot,
@@ -222,7 +244,8 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   const validToolIds = new Set(
     scope.tools.list().map((t) => t.identity.layoutKey ?? t.identity.name),
   );
-  const targetConventions = summarizeTargetConventions(scope.targets);
+  // `targetConventions` is computed once above (shared with the agent-catalog
+  // assembly) — no second resolver read or alternate summarizer here.
   // Registration is synchronous; the Promise-shaped registerMcpTools return is
   // not a detached async job — fire-and-forget without awaiting is intentional.
   void registerMcpTools(server, {

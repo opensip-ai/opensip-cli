@@ -136,6 +136,11 @@ const TOOL_ALLOWED_PACKAGES = Object.freeze({
     '@opensip-cli/core',
     '@opensip-cli/contracts',
     '@opensip-cli/codebase',
+    // Layer-4→layer-3 edge permitted by the DAG (Plan 03, ADR-0159 authority):
+    // MCP imports the config-owned RESERVED_SUITE_NAMES to assemble the same
+    // reserved-name facts as the CLI. Ownership stays in config; the value is not
+    // copied into MCP or contracts. NO mcp -> cli edge is permitted.
+    '@opensip-cli/config',
     '@opensip-cli/datastore',
     '@opensip-cli/graph',
     '@opensip-cli/session-store',

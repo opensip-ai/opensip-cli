@@ -1,6 +1,18 @@
-import { defineCommand, ToolRegistry, ValidationError, type Tool } from '@opensip-cli/core';
+import {
+  createRuntimeCommandInventory,
+  defineCommand,
+  ToolRegistry,
+  ValidationError,
+  type RuntimeCommandGroup,
+  type RuntimeCommandLeaf,
+  type Tool,
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import {
+  assembleAgentCatalog,
+  projectAgentCatalogRuntimeFacts,
+} from '../agent-catalog-assembly.js';
 import {
   assertAgentCatalogOverlayKeys,
   buildAgentCatalog,
@@ -141,5 +153,121 @@ describe('agent-catalog host-support parity handoff (Plan 02 → Plan 03)', () =
     };
     const catalog: AgentCatalog = buildAgentCatalog(assemblerInput);
     expect(catalog.hostSupport).toEqual(assemblerInput.hostSupport);
+  });
+});
+
+// Plan 03 full-object parity fixture: one deterministic runtime/project fixture
+// (public/internal Tool commands, complete host inventory with aliases/groups,
+// reserved suites, non-empty target conventions, Plan 02's partial hostSupport)
+// exercised through the two NEW common-projection surfaces directly, so a future
+// common field cannot silently reach only one transport.
+describe('agent-catalog common projection surfaces (Plan 03)', () => {
+  const RESERVED_SUITE_NAMES = ['audit', 'agent-context'] as const;
+  const previewProjection = {
+    status: 'preview',
+    match: 'partial',
+    rowId: 'macos-26-arm64-node24-npm11-v1',
+    rowStatus: 'preview',
+    profile: { id: 'macos-26-arm64-node24-npm11-v1', version: 1 },
+    docsUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+    reasonCodes: [],
+    observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+    unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+  } as const;
+
+  function hostLeaf(
+    over: Partial<RuntimeCommandLeaf> & Pick<RuntimeCommandLeaf, 'path' | 'name'>,
+  ): RuntimeCommandLeaf {
+    return {
+      aliases: [],
+      owner: 'host',
+      ownerLabel: 'cli',
+      visibility: 'public',
+      scope: 'project',
+      output: 'command-result',
+      ...over,
+    };
+  }
+
+  function toolLeaf(
+    over: Partial<RuntimeCommandLeaf> & Pick<RuntimeCommandLeaf, 'path' | 'name' | 'ownerLabel'>,
+  ): RuntimeCommandLeaf {
+    return {
+      aliases: [],
+      owner: 'tool',
+      visibility: 'public',
+      scope: 'project',
+      output: 'command-result',
+      ...over,
+    };
+  }
+
+  function hostGroup(
+    over: Partial<RuntimeCommandGroup> & Pick<RuntimeCommandGroup, 'path' | 'name'>,
+  ): RuntimeCommandGroup {
+    return { owner: 'host', ownerLabel: 'cli', visibility: 'public', ...over };
+  }
+
+  const inventory = createRuntimeCommandInventory({
+    complete: true,
+    leaves: [
+      hostLeaf({ path: 'audit', name: 'audit' }),
+      hostLeaf({ path: 'init', name: 'init' }),
+      hostLeaf({ path: 'report', name: 'report', aliases: ['rpt'] }),
+      hostLeaf({ path: 'sessions list', name: 'list' }), // nested host leaf → excluded
+      toolLeaf({ path: 'graph', name: 'graph', ownerLabel: 'graph' }),
+      toolLeaf({
+        path: 'graph-run-worker',
+        name: 'graph-run-worker',
+        ownerLabel: 'graph',
+        visibility: 'internal',
+      }),
+    ],
+    groups: [hostGroup({ path: 'sessions', name: 'sessions' })],
+  });
+
+  const partialHostSupport = hostSupportFromRuntimeProjection(previewProjection, 1);
+  const targetConventions = [
+    { target: 'app', entrypointCount: 2, alwaysUsedCount: 1, usedExportCount: 3 },
+  ];
+
+  function overlayTools(): ToolRegistry {
+    const tools = new ToolRegistry();
+    for (const name of ['fitness', 'graph', 'sim', 'yagni']) tools.register(fixtureTool(name));
+    return tools;
+  }
+
+  it('projects reserved roots + internal commands from the complete inventory', () => {
+    const facts = projectAgentCatalogRuntimeFacts(inventory, ['help']);
+    expect(facts.rootCommands).toEqual(['audit', 'help', 'init', 'report', 'rpt', 'sessions']);
+    // Only the Tool-owned internal worker; the nested host leaf is not internal.
+    expect(facts.internalCommands).toEqual(['graph-run-worker']);
+  });
+
+  it('assembles the full common catalog surface directly from those facts', () => {
+    const facts = projectAgentCatalogRuntimeFacts(inventory, ['help']);
+    const catalog = assembleAgentCatalog({
+      tools: overlayTools(),
+      internalCommands: new Set(facts.internalCommands),
+      rootCommands: facts.rootCommands,
+      suiteNames: RESERVED_SUITE_NAMES,
+      hostSupport: partialHostSupport,
+      projectContext: { targetConventions },
+    });
+
+    // Reserved names carried verbatim (roots pre-sorted; suites keep audit first).
+    expect(catalog.reservedNames).toEqual({
+      rootCommands: ['audit', 'help', 'init', 'report', 'rpt', 'sessions'],
+      suiteNames: ['audit', 'agent-context'],
+    });
+    // Non-empty bounded target conventions present.
+    expect(catalog.projectContext?.targetConventions).toEqual(targetConventions);
+    // The ENTIRE Plan 02 partial hostSupport object is present, byte-identical.
+    expect(catalog.hostSupport).toEqual(partialHostSupport);
+    expect(JSON.stringify(catalog.hostSupport)).toBe(JSON.stringify(partialHostSupport));
+    // Public Tool commands surface as entry points; the internal worker never does.
+    const commands = catalog.entryPoints.map((entry) => entry.command);
+    expect(commands).toContain('graph');
+    expect(commands).not.toContain('graph-run-worker');
   });
 });

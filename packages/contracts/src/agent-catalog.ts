@@ -183,21 +183,30 @@ function deriveToolEntryPoints(
 }
 
 /**
+ * Named input for the sole catalog content builder {@link buildAgentCatalog}.
+ * Readonly and self-contained: it carries the admitted `tools`, the internal
+ * command denylist, an already-bounded project context, the caller-controlled
+ * `validateOverlays` flag, the injected reserved-name lists (ADR-0159), and
+ * Plan 02's process-only host-support projection. Extracted (was anonymous) so
+ * both transports name the same input and a new common field cannot silently
+ * reach only one adapter.
+ */
+export interface AgentCatalogBuildInput {
+  readonly tools?: ToolRegistry;
+  readonly internalCommands?: ReadonlySet<string>;
+  readonly projectContext?: AgentProjectContext;
+  readonly validateOverlays?: boolean;
+  readonly reservedNames?: AgentCatalog['reservedNames'];
+  readonly hostSupport?: AgentHostSupport;
+}
+
+/**
  * Build the {@link AgentCatalog} for this invocation: derive a Tier-2 entry
  * point per registered tool, append the static Tier-1 platform commands, assert
  * no Tier-3 (`internal`) command leaks into the surface, and return the assembled
  * catalog. With no `tools` registry the result carries only the platform entries.
  */
-export function buildAgentCatalog(
-  input: {
-    readonly tools?: ToolRegistry;
-    readonly internalCommands?: ReadonlySet<string>;
-    readonly projectContext?: AgentProjectContext;
-    readonly validateOverlays?: boolean;
-    readonly reservedNames?: AgentCatalog['reservedNames'];
-    readonly hostSupport?: AgentHostSupport;
-  } = {},
-): AgentCatalog {
+export function buildAgentCatalog(input: AgentCatalogBuildInput = {}): AgentCatalog {
   if (input.validateOverlays === true && input.tools !== undefined) {
     assertAgentCatalogOverlayKeys(input.tools, input.internalCommands ?? new Set());
   }

@@ -12,6 +12,7 @@
 
 import {
   type AgentHostSupport,
+  assembleAgentCatalog,
   type StoredRun,
   type StoredRunStep,
   buildSignalEnvelope,
@@ -226,8 +227,20 @@ const replayAndRecord: SessionReplayFn = (stored) => {
 /** A replay resolver that records every tool it replays (proving "no re-run"). */
 const recordingResolver: (tool: ToolShortId) => SessionReplayFn | undefined = () => replayAndRecord;
 
+/**
+ * A minimal already-assembled catalog for the replay-focused tests. Plan 03
+ * makes the assembled catalog a required construction dep; the catalog content
+ * is exercised in the dedicated `agentCatalog` describe below, so these tests
+ * inject this bare fixture and focus on session replay.
+ */
+const AGENT_CATALOG = assembleAgentCatalog({ rootCommands: [], suiteNames: [] });
+
 function port(): SessionResultsReadPort {
-  return new SessionResultsReadPort({ store, replayFor: recordingResolver });
+  return new SessionResultsReadPort({
+    store,
+    replayFor: recordingResolver,
+    agentCatalog: AGENT_CATALOG,
+  });
 }
 
 describe('SessionResultsReadPort — listRuns', () => {
@@ -373,6 +386,7 @@ describe('SessionResultsReadPort — reviewChange', () => {
     const out = await new SessionResultsReadPort({
       store,
       replayFor: reviewSuiteResolver,
+      agentCatalog: AGENT_CATALOG,
     }).reviewChange({
       suiteRunId: 'suite-1',
       files: ['src/a.ts'],
@@ -425,6 +439,7 @@ describe('SessionResultsReadPort — reviewChange', () => {
     const out = await new SessionResultsReadPort({
       store,
       replayFor: reviewSuiteResolver,
+      agentCatalog: AGENT_CATALOG,
     }).reviewChange({
       suiteRunId: 'suite-1',
     });
@@ -460,6 +475,7 @@ describe('SessionResultsReadPort — reviewChange', () => {
     const out = await new SessionResultsReadPort({
       store,
       replayFor: corruptPayloadResolver,
+      agentCatalog: AGENT_CATALOG,
     }).reviewChange({
       suiteRunId: 'suite-1',
     });
@@ -490,6 +506,7 @@ describe('SessionResultsReadPort — reviewChange', () => {
       store,
       projectRoot: '/proj',
       replayFor: reviewSuiteResolver,
+      agentCatalog: AGENT_CATALOG,
     }).reviewChange({ suiteRunId: 'suite-foreign' });
     expect(out.ok).toBe(false);
     expect(replayCalls).toEqual([]);
@@ -512,6 +529,7 @@ describe('SessionResultsReadPort — compareToBaseline', () => {
     const out = await new SessionResultsReadPort({
       store,
       replayFor: compareBaselineResolver,
+      agentCatalog: AGENT_CATALOG,
     }).compareToBaseline({
       tool: 'fit',
       includeResolved: true,
@@ -550,6 +568,7 @@ describe('SessionResultsReadPort — compareToBaseline', () => {
     const out = await new SessionResultsReadPort({
       store,
       replayFor: newFindingResolver,
+      agentCatalog: AGENT_CATALOG,
     }).compareToBaseline({
       tool: 'fit',
     });
@@ -567,6 +586,7 @@ describe('SessionResultsReadPort — compareToBaseline', () => {
       store,
       projectRoot: '/proj',
       replayFor: compareBaselineResolver,
+      agentCatalog: AGENT_CATALOG,
     }).compareToBaseline({ tool: 'fit' });
     expect(out.ok).toBe(false);
     if (!out.ok) expect(out.error.code).toBe('not-found');
@@ -575,45 +595,98 @@ describe('SessionResultsReadPort — compareToBaseline', () => {
 });
 
 describe('SessionResultsReadPort — agentCatalog', () => {
-  it('returns the self-describing agent catalog', () => {
-    const out = port().agentCatalog();
-    expect(out.ok).toBe(true);
+  const SENTINEL_HOST_SUPPORT: AgentHostSupport = Object.freeze({
+    supportContractVersion: 1,
+    status: 'preview',
+    match: 'partial',
+    rowId: 'injected-sentinel-row-v1',
+    rowStatus: 'preview',
+    profile: { id: 'injected-sentinel-row-v1', version: 1 },
+    matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
+    reasonCodes: [],
+    observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
+    unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
   });
 
-  it('omits hostSupport when the composition root injected none (absent-field)', () => {
-    const out = port().agentCatalog();
-    expect(out.ok).toBe(true);
-    if (out.ok) expect(out.value.hostSupport).toBeUndefined();
-  });
-
-  it('forwards the INJECTED host-support projection verbatim and never re-observes the process', () => {
-    // The long-lived server computes hostSupport once at construction. The read
-    // port must forward exactly what it was handed — proven with a sentinel that
-    // the live process could never produce (an injected rowId + a match/status
-    // combination the real classifier would never emit for THIS host). If the
-    // port re-observed the ambient process it would overwrite this value.
-    const injected: AgentHostSupport = Object.freeze({
-      supportContractVersion: 1,
-      status: 'preview',
-      match: 'partial',
-      rowId: 'injected-sentinel-row-v1',
-      rowStatus: 'preview',
-      profile: { id: 'injected-sentinel-row-v1', version: 1 },
-      matrixUrl: 'https://opensip.ai/docs/opensip-cli/70-reference/17-supported-platforms',
-      reasonCodes: [],
-      observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
-      unobserved: ['npm-major', 'filesystem-type', 'install-channel'],
+  /** A rich common catalog with reserved names + target conventions + hostSupport. */
+  function richCatalog() {
+    return assembleAgentCatalog({
+      rootCommands: ['audit', 'init', 'sessions', 'suite'],
+      suiteNames: ['audit', 'agent-context'],
+      hostSupport: SENTINEL_HOST_SUPPORT,
+      projectContext: {
+        targetConventions: [
+          { target: 'app', entrypointCount: 2, alwaysUsedCount: 1, usedExportCount: 3 },
+        ],
+      },
     });
+  }
+
+  /**
+   * A store whose every access throws — proves `agentCatalog()` is a pure conduit
+   * that never touches the datastore dependency the port owns for other methods.
+   */
+  const throwingStore = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error('agentCatalog() must not touch the datastore');
+      },
+    },
+  ) as unknown as DataStore;
+
+  /** A replay resolver that throws if consulted — must never fire for a catalog read. */
+  const throwingReplay: (tool: ToolShortId) => SessionReplayFn | undefined = () => {
+    throw new Error('agentCatalog() must not consult session replay');
+  };
+
+  it('returns the entire assembled catalog unchanged (whole-object, same reference)', () => {
+    const catalog = richCatalog();
     const out = new SessionResultsReadPort({
-      store,
-      replayFor: recordingResolver,
-      hostSupport: injected,
+      store: throwingStore,
+      replayFor: throwingReplay,
+      agentCatalog: catalog,
     }).agentCatalog();
     expect(out.ok).toBe(true);
     if (out.ok) {
-      expect(out.value.hostSupport).toEqual(injected);
-      // Byte-identical forwarding — the port is a pure conduit for the projection.
-      expect(JSON.stringify(out.value.hostSupport)).toBe(JSON.stringify(injected));
+      // No hand-picked field allowlist — the WHOLE object is forwarded verbatim.
+      expect(out.value).toEqual(catalog);
+      // Same reference: it is the captured object, not a rebuilt one.
+      expect(out.value).toBe(catalog);
     }
+  });
+
+  it('surfaces reserved/project facts and the ENTIRE Plan 02 hostSupport object', () => {
+    const catalog = richCatalog();
+    const out = new SessionResultsReadPort({
+      store: throwingStore,
+      replayFor: throwingReplay,
+      agentCatalog: catalog,
+    }).agentCatalog();
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.reservedNames).toEqual({
+      rootCommands: ['audit', 'init', 'sessions', 'suite'],
+      suiteNames: ['audit', 'agent-context'],
+    });
+    expect(out.value.projectContext?.targetConventions).toEqual([
+      { target: 'app', entrypointCount: 2, alwaysUsedCount: 1, usedExportCount: 3 },
+    ]);
+    // The full hostSupport object (status, match, dimensions, reason codes, URL).
+    expect(out.value.hostSupport).toEqual(SENTINEL_HOST_SUPPORT);
+    expect(JSON.stringify(out.value.hostSupport)).toBe(JSON.stringify(SENTINEL_HOST_SUPPORT));
+    // Internal commands are never surfaced on the catalog object.
+    expect(out.value).not.toHaveProperty('internalCommands');
+  });
+
+  it('forwards a catalog without hostSupport as-is (absent field stays absent)', () => {
+    const catalog = assembleAgentCatalog({ rootCommands: [], suiteNames: [] });
+    const out = new SessionResultsReadPort({
+      store: throwingStore,
+      replayFor: throwingReplay,
+      agentCatalog: catalog,
+    }).agentCatalog();
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.value.hostSupport).toBeUndefined();
   });
 });

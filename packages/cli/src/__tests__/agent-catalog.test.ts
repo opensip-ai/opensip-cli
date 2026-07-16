@@ -6,13 +6,16 @@
  * coverage-invisible.
  */
 
+import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
 import {
   agentCatalogOverlayKeys,
   agentCatalogPlatformEntryPoints,
+  assembleAgentCatalog,
   assertAgentCatalogOverlayKeys,
   buildAgentCatalog as buildAgentCatalogFromContracts,
   commonFlags,
   hostSupportFromRuntimeProjection,
+  summarizeTargetConventions,
   type AgentHostSupport,
 } from '@opensip-cli/contracts';
 import {
@@ -28,6 +31,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';
+import { HOST_RESERVED_ROOT_COMMANDS } from '../bootstrap/reserved-names.js';
 import { buildAgentCatalog, executeAgentCatalog } from '../commands/agent-catalog.js';
 import { buildTopLevelHostSpecs } from '../commands/host-command-specs.js';
 import { buildHostSubcommandGroups } from '../commands/host-subcommand-groups.js';
@@ -666,5 +670,44 @@ describe('CLI↔MCP catalog parity (Plan 03 handoff)', () => {
     expect(hostSupport?.match).not.toBe('exact');
     expect(['partial', 'none']).toContain(hostSupport?.match);
     expect(['supported', 'preview', 'unqualified', 'unsupported']).toContain(hostSupport?.status);
+  });
+
+  // Plan 03 Task 1.1/2.1: the CLI adapter must route through the SAME contracts
+  // `assembleAgentCatalog` seam MCP uses. These prove the CLI's rendered catalog
+  // is byte-for-byte what the shared assembler produces for the CLI's
+  // authoritative inputs — a full-object comparison, not a hand-picked subset.
+  it('executeAgentCatalog(--json) deep-equals the shared assembler result (no scope)', async () => {
+    const tools = await makeRegistry();
+    const out = executeAgentCatalog({ json: true, tools });
+    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
+    // The CLI's authority inputs: its sorted static reserved roots (ADR-0159),
+    // config's reserved suite names, and the live process-only hostSupport.
+    const assembled = assembleAgentCatalog({
+      tools,
+      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+      suiteNames: RESERVED_SUITE_NAMES,
+      hostSupport: liveHostSupport(),
+    });
+    expect(catalog).toEqual(assembled);
+    // No entered scope → no project context on either side.
+    expect(catalog.projectContext).toBeUndefined();
+  });
+
+  it('routes reserved names + bounded target conventions through the assembler (entered scope)', () => {
+    const scope = new RunScope();
+    Object.assign(scope, { targets: targetResolver() });
+    const out = runWithScopeSync(scope, () => executeAgentCatalog({ json: true }));
+    const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
+    const assembled = assembleAgentCatalog({
+      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+      suiteNames: RESERVED_SUITE_NAMES,
+      hostSupport: liveHostSupport(),
+      projectContext: { targetConventions: summarizeTargetConventions(targetResolver()) },
+    });
+    expect(catalog).toEqual(assembled);
+    // The deterministic reserved-name shape flows through the shared path.
+    expect(catalog.reservedNames?.suiteNames).toEqual(['audit', 'agent-context']);
+    expect(catalog.reservedNames?.rootCommands).toEqual([...HOST_RESERVED_ROOT_COMMANDS].sort());
+    expect(catalog.projectContext?.targetConventions.length).toBeGreaterThan(0);
   });
 });

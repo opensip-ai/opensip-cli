@@ -1,12 +1,14 @@
 ---
 status: current
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 release: v0.7.0
 title: "Use OpenSIP with AI agents"
 audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
 source-files:
   - packages/cli/src/commands/agent-catalog.ts
+  - packages/contracts/src/agent-catalog.ts
+  - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/contracts/src/agent-filters.ts
   - packages/contracts/src/impact-trust.ts
   - packages/contracts/src/review-brief-correlation.ts
@@ -31,6 +33,7 @@ related-docs:
   - ../../decisions/ADR-0156-bounded-stored-impact-proof.md
   - ../../decisions/ADR-0160-deterministic-task-context-evidence-plane.md
   - ../../decisions/ADR-0161-codebase-inventory-and-context-snapshot-ownership.md
+  - ../../decisions/ADR-0166-agent-catalog-transport-parity.md
 ---
 # Use OpenSIP with AI agents
 
@@ -214,6 +217,50 @@ register `opensip mcp` as a stdio server instead of shelling out for every graph
 or findings query. Treat live `listTools` and `get_agent_catalog.mcp.names` as
 the inventory authority. Mutation opt-in adds only `repair_apply_verify`; the
 default server remains read-only apart from explicit `refresh_graph` rebuilds.
+
+### The catalog is the same across both transports
+
+`opensip agent-catalog --json` and the MCP `get_agent_catalog` tool return the
+**same common catalog body** for the same invocation and project: identical
+entry points, common patterns, output shapes, notes, `reservedNames` (the
+host-owned root commands and built-in suite names from ADR-0159), bounded
+`projectContext.targetConventions`, and the same honest `hostSupport`
+assessment (the process-only platform-support projection from Plan 02). One pure
+assembler in `@opensip-cli/contracts` produces that body for both transports, so
+you can rely on either surface without re-deriving facts (see
+[ADR-0166](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0166-agent-catalog-transport-parity.md)).
+
+The MCP response adds **one** extra top-level object — `mcp` — that the CLI
+never emits. It is live connector diagnosis, not part of the shared catalog:
+
+| `mcp` field | Meaning |
+|---|---|
+| `version` | The running MCP server version. |
+| `surfaceEpoch` | The tool-surface epoch; a change means the registered tool set changed. |
+| `toolNames` / `toolCount` | The live registered tool inventory (authority for what you can call). |
+| `mutationPosture` | Whether mutation is enabled (`repair_apply_verify` present) or read-only. |
+| `project.root` / `project.scope` | The captured project root and its scope binding. |
+
+Treat the `mcp` object as connector identity only. When `surfaceEpoch`,
+`toolNames`, or `version` no longer match what your client cached, **reconnect
+the MCP process/connection** — do not call `refresh_graph`. `refresh_graph`
+rebuilds graph evidence and can never repair a stale connector inventory
+(ADR-0153).
+
+Both catalog reads are **read-only**: assembling the catalog builds no graph,
+runs no analysis, invokes no Git or tests, and creates no session — over either
+transport.
+
+To compare the two surfaces programmatically, drop only the top-level `mcp`
+object; the rest must match:
+
+```bash
+# CLI body (the catalog is nested under data.catalog in the CommandOutcome)
+opensip agent-catalog --json | jq '.data.catalog'
+
+# MCP get_agent_catalog result, minus the connector overlay, is byte-identical
+jq 'del(.mcp)' mcp-get-agent-catalog.json
+```
 
 Before using graph evidence, verify the canonical project context, distinct
 project and `g1:` generation identities, generation source, complete/partial
