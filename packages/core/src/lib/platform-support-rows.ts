@@ -303,12 +303,10 @@ function isSafeHttpsUrl(value: string): boolean {
   if (typeof value !== 'string' || value.length > 2048 || containsControlCharacter(value)) {
     return false;
   }
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
+  // `URL.canParse` returns a boolean instead of throwing, so a rejected URL is a
+  // normal negative result rather than a swallowed exception.
+  if (!URL.canParse(value)) return false;
+  const parsed = new URL(value);
   return (
     parsed.protocol === 'https:' &&
     parsed.hostname.length > 0 &&
@@ -422,12 +420,9 @@ function isImmutableEvidenceUrl(
   qualifiedVersion: string,
 ): boolean {
   if (value === null || !isSafeHttpsUrl(value) || !EVIDENCE_ARTIFACT.test(artifact)) return false;
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
+  // `isSafeHttpsUrl` already proved `value` parses as an https URL, so this
+  // construction cannot throw — there is no error to handle or swallow.
+  const parsed = new URL(value);
   const expectedPath = `${EVIDENCE_RELEASE_PREFIX}v${qualifiedVersion}/${artifact}`;
   return parsed.origin === EVIDENCE_RELEASE_ORIGIN && parsed.pathname === expectedPath;
 }
