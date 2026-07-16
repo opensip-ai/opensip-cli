@@ -931,6 +931,22 @@ test('a sealed evidence body round-trips through parseAcceptanceEvidence and fre
   assert.ok(Object.isFrozen(evidence.results));
 });
 
+test('completed evidence permits a pessimistic profile-dependent fail but never an impossible pass', () => {
+  const profileDependentFailure = makeEvidenceBody(BASE_PROFILE, { verdict: 'fail' });
+  assert.equal(parseAcceptanceEvidence(seal(profileDependentFailure)).verdict, 'fail');
+
+  const impossiblePass = makeEvidenceBody(BASE_PROFILE);
+  const requiredIndex = impossiblePass.results.findIndex((result) => result.required);
+  impossiblePass.results[requiredIndex] = {
+    ...impossiblePass.results[requiredIndex],
+    status: 'fail',
+    reasonCode: 'required-journey-failed',
+  };
+  impossiblePass.summary = computeSummary(BASE_PROFILE, impossiblePass.results);
+  impossiblePass.verdict = 'pass';
+  assert.throws(() => parseAcceptanceEvidence(seal(impossiblePass)), /completion-verdict-mismatch/);
+});
+
 test('parseAcceptanceEvidence rejects a completion digest that does not match the sealed body', () => {
   const sealed = seal(makeEvidenceBody(BASE_PROFILE));
   sealed.completion = { state: 'completed', evidenceDigest: 'f'.repeat(64) };

@@ -400,6 +400,43 @@ test('runs journeys in profile order, one result per id, and passes with an opti
   for (const event of result.progress) assert.ok(STAGE_VALUES.has(event.stage), event.stage);
 });
 
+test('lifecycle journey RSS aggregates the maximum child step instead of only the final child', async () => {
+  const result = await runWith({
+    createLifecycle: () => {
+      const lifecycle = fakeLifecycle();
+      lifecycle.removeCliState = () => ({
+        type: 'cli-state-removed',
+        ok: true,
+        state: 'cli-state-removed',
+        reasonCode: null,
+        diagnostics: [],
+        facts: { runtimeRemoved: true },
+        // Reproduce the real ordering: the final command used less memory than
+        // an earlier project-session command retained in the step evidence.
+        rss: { status: 'available', peakBytes: 100 },
+        steps: [
+          {
+            ...portResult(),
+            label: 'project-session-seed',
+            rss: { status: 'available', peakBytes: 200 },
+          },
+          {
+            ...portResult(),
+            label: 'cli-state-remove',
+            rss: { status: 'available', peakBytes: 100 },
+          },
+        ],
+      });
+      return lifecycle;
+    },
+  });
+
+  const removed = byId(result).get('lifecycle.cli-state-uninstall');
+  assert.equal(removed.status, 'pass');
+  assert.deepEqual(removed.rss, { status: 'available', peakBytes: 200 });
+  assert.equal(Math.max(...removed.steps.map((step) => step.rss.peakBytes)), 200);
+});
+
 test('a missing profile-level native capability gates every journey before lifecycle effects', async () => {
   const profile = structuredClone(RUNNER_PROFILE);
   profile.requiredCapabilities = ['process-tree-cleanup'];
@@ -1322,7 +1359,10 @@ test(
     const second = defineJourney({
       id: 'resilience.after-journeys-root-replacement',
       category: 'resilience',
-      value: { human: 'use fresh isolated root', agent: 'use fresh isolated root' },
+      value: {
+        human: 'use fresh isolated root',
+        agent: 'use fresh isolated root',
+      },
       isolated: true,
       steps: [{ label: 'must not execute beneath a substituted ancestor' }],
       executor: () => {

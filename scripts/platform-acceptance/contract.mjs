@@ -14,9 +14,9 @@
  *     keys, or code.
  *   - Every required journey passes only with status `pass`. A required
  *     `skipped` or `unavailable`, or any cleanup uncertainty, fails the verdict.
- *   - The versioned evidence artifact is authoritative. A verifier recomputes
- *     the profile digest, summary, verdict, and sealed-body digest from the
- *     artifact contents; it never trusts a claimed value.
+ *   - The versioned evidence artifact is authoritative. The schema recomputes
+ *     claims derivable without the profile; the independent verifier loads the
+ *     exact profile and recomputes its digest and profile-dependent verdict.
  *   - RSS is a tagged measurement. Bare `0`/`undefined` is never a measurement.
  */
 
@@ -1441,14 +1441,22 @@ export function parseAcceptanceEvidence(input) {
         'infrastructure-fault completion requires infrastructure-fault verdict',
       );
     }
-  } else {
-    const derivedVerdict = internallyPassing ? 'pass' : 'fail';
-    if (evidence.verdict !== derivedVerdict) {
-      throw contractError(
-        'completion-verdict-mismatch',
-        `completed evidence must carry derived verdict ${derivedVerdict}`,
-      );
-    }
+  } else if (
+    evidence.verdict === 'infrastructure-fault' ||
+    (evidence.verdict === 'pass' && !internallyPassing)
+  ) {
+    // The standalone schema can prove that a claimed pass is impossible from
+    // required statuses or cleanup. It cannot prove that an internally passing
+    // set satisfies profile-only predicates such as `rssRequired`, because the
+    // evidence carries a profile identity rather than the full profile. A
+    // pessimistic `fail` is therefore valid here; the independent verifier
+    // loads the bound profile and recomputes the exact verdict.
+    throw contractError(
+      'completion-verdict-mismatch',
+      evidence.verdict === 'infrastructure-fault'
+        ? 'completed evidence cannot carry an infrastructure-fault verdict'
+        : 'completed evidence cannot pass with failed required status or cleanup',
+    );
   }
 
   // Re-verify the sealed-body digest.

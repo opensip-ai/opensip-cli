@@ -11,9 +11,9 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
 
 import { boundedDiagnostic, checkScenario, expectEnvelope } from '../cli-acceptance-core.mjs';
@@ -94,6 +94,24 @@ function permissiveContext() {
     assert: makeAssert(),
   };
   return context;
+}
+
+function processResult(overrides = {}) {
+  return {
+    status: 0,
+    signal: null,
+    timedOut: false,
+    cancelled: false,
+    deliveredSignal: null,
+    outputTruncated: false,
+    durationMs: 1,
+    rss: { status: 'unavailable', reasonCode: 'rss-not-sampled' },
+    stdoutTail: '',
+    stderrTail: '',
+    stdoutCapture: '',
+    cleanup: { residualDescendants: 0 },
+    ...overrides,
+  };
 }
 
 const OK_TUPLE = Object.freeze({
@@ -288,6 +306,137 @@ test('PTY result classification enforces exit, cleanup, NO_COLOR, and JSON shape
     evaluatePtyFindingResult({ ...valid, cleanup: { residualDescendants: 1 } }, 'json').some(
       (failure) => failure.includes('residual descendants'),
     ),
+  );
+});
+
+test('PTY journey seeds a zero-init source project before all three terminal probes', async () => {
+  if (process.platform !== 'darwin') return;
+  const context = permissiveContext();
+  const invocations = [];
+  context.process.run = async (spec) => {
+    invocations.push(spec);
+    assert.equal(existsSync(join(context.paths.workRoot, 'src', 'bad.ts')), true);
+    assert.equal(existsSync(join(context.paths.workRoot, 'tsconfig.json')), true);
+    if (invocations.length < 3) {
+      return processResult({ status: 1, stdoutCapture: 'human finding\n' });
+    }
+    return processResult({
+      status: 1,
+      stdoutCapture: JSON.stringify({
+        kind: 'fit.run',
+        status: 'ok',
+        exitCode: 1,
+        envelope: {
+          schemaVersion: 2,
+          tool: 'fit',
+          verdict: { passed: false },
+          signals: [],
+        },
+      }),
+    });
+  };
+
+  const outcome = await getJourney('macos.pty-human-view').executor(context);
+
+  assert.equal(outcome.status, 'pass', JSON.stringify(outcome));
+  assert.equal(invocations.length, 3);
+  assert.ok(invocations.every((spec) => spec.pty === true));
+  assert.deepEqual(
+    invocations.map((spec) => spec.argv.slice(spec.argv.indexOf('fit'))),
+    [
+      ['fit', '--check', 'no-console-log'],
+      ['fit', '--check', 'no-console-log'],
+      ['fit', '--json', '--check', 'no-console-log'],
+    ],
+  );
+  assert.equal(invocations[1].env?.NO_COLOR, '1');
+});
+
+test('browser journey invokes the default-opening report command through its safe shim', async () => {
+  if (process.platform !== 'darwin') return;
+  const context = permissiveContext();
+  const invocations = [];
+  context.process.run = async (spec) => {
+    invocations.push(spec);
+    const reportIndex = spec.argv.indexOf('report');
+    if (reportIndex !== -1) {
+      const target = join(
+        context.paths.workRoot,
+        'opensip-cli',
+        '.runtime',
+        'reports',
+        'latest.html',
+      );
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, '<!doctype html>\n');
+      writeFileSync(join(context.paths.workRoot, 'open-capture.log'), `${target}\n`);
+    }
+    return processResult();
+  };
+
+  const outcome = await getJourney('macos.browser-open').executor(context);
+
+  assert.equal(outcome.status, 'pass', JSON.stringify(outcome));
+  assert.equal(invocations.length, 4);
+  const report = invocations[3];
+  assert.deepEqual(report.argv.slice(report.argv.indexOf('report')), ['report']);
+  assert.equal(report.pty, true);
+  assert.equal(report.env?.CI, '');
+  assert.ok(report.env?.PATH.startsWith(`${join(context.paths.workRoot, 'shim-bin')}:`));
+});
+
+test('native SQLite journey seeds a zero-init project before opening its cached store', async () => {
+  if (process.platform !== 'darwin') return;
+  const context = permissiveContext();
+  const installRoot = join(context.paths.workRoot, 'install', 'node_modules');
+  const paths = {
+    installedEntrypoint: join(installRoot, 'opensip-cli', 'dist', 'index.js'),
+    datastoreEntrypoint: join(installRoot, '@opensip-cli', 'datastore', 'dist', 'index.js'),
+    sqliteEntrypoint: join(installRoot, 'better-sqlite3', 'lib', 'index.js'),
+    nativeAddon: join(installRoot, 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node'),
+  };
+  for (const path of Object.values(paths)) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, 'fixture\n');
+  }
+  context.installed = {
+    ...context.installed,
+    jsEntrypoint: { kind: 'node-script', script: paths.installedEntrypoint },
+  };
+  const invocations = [];
+  context.process.run = async (spec) => {
+    invocations.push(spec);
+    if (invocations.length === 1) {
+      assert.equal(existsSync(join(context.paths.workRoot, 'src', 'bad.ts')), true);
+      assert.equal(existsSync(join(context.paths.workRoot, 'tsconfig.json')), true);
+      assert.equal(existsSync(join(context.paths.workRoot, 'package.json')), true);
+      return processResult({
+        stdoutCapture: JSON.stringify({
+          kind: 'history',
+          status: 'ok',
+          exitCode: 0,
+          data: { type: 'history', sessions: [] },
+        }),
+      });
+    }
+    return processResult({
+      stdoutCapture: JSON.stringify({
+        ok: true,
+        datastoreEntrypoint: paths.datastoreEntrypoint,
+        sqliteEntrypoint: paths.sqliteEntrypoint,
+        nativeAddon: paths.nativeAddon,
+      }),
+    });
+  };
+
+  const outcome = await getJourney('macos.native-sqlite').executor(context);
+
+  assert.equal(outcome.status, 'pass', JSON.stringify(outcome));
+  assert.equal(invocations.length, 2);
+  assert.deepEqual(invocations[0].argv.slice(-3), ['sessions', 'list', '--json']);
+  assert.equal(
+    invocations.some((spec) => spec.argv.includes('init')),
+    false,
   );
 });
 

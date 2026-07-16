@@ -144,6 +144,23 @@ function write(outPath, runRoot, deps) {
   );
 }
 
+test('seals a pessimistic fail whose profile-dependent cause is verified independently', () => {
+  const { outRoot } = fixture();
+  const body = evidenceBody();
+  body.verdict = 'fail';
+  const outPath = join(outRoot, 'rss-failed-evidence.json');
+
+  writeAcceptanceEvidence({
+    evidence: body,
+    completionState: 'completed',
+    outPath,
+    maxEvidenceBytes: PROFILE.bounds.maxEvidenceBytes,
+  });
+
+  const parsed = parseAcceptanceEvidence(JSON.parse(readFileSync(outPath, 'utf8')));
+  assert.equal(parsed.verdict, 'fail');
+});
+
 test('rejects an outside-looking destination whose existing parent resolves inside run root', () => {
   const { root, runRoot } = fixture();
   const linkedParent = join(root, 'linked-parent');

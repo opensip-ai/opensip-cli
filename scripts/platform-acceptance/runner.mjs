@@ -680,7 +680,9 @@ export async function runPlatformAcceptance(options, deps = {}) {
     execution: normalizeExecutionIdentity(options.execution, platform),
     lifecycle: Object.freeze({
       ...state.lifecycleEvidence,
-      integrityChecks: Object.freeze({ ...state.lifecycleEvidence.integrityChecks }),
+      integrityChecks: Object.freeze({
+        ...state.lifecycleEvidence.integrityChecks,
+      }),
     }),
     registryBindings: Object.freeze({ ...state.registryBindings }),
     harnessGitSha: options.harnessGitSha,
@@ -1016,13 +1018,18 @@ async function ensureRepresentativeState(state) {
 
 function lifecycleResult(state, journey, params, event, status, durationMs) {
   const diagnostics = status === 'pass' ? [] : [...(event.diagnostics ?? [])];
+  const steps = event.steps ?? [];
   return makeResult(state, journey, params.required, {
     status,
     reasonCode: status === 'pass' ? null : event.reasonCode,
     diagnostics,
     durationMs,
-    rss: event.rss,
-    steps: event.steps ?? [],
+    // Lifecycle events may expose the final child measurement as `rss` while
+    // retaining every child in `steps`. The journey aggregate must dominate
+    // all of those step peaks or an rssRequired profile will produce a
+    // contradictory all-pass result with a failing overall verdict.
+    rss: mergeRssMeasurements(event.rss, ...steps.map((step) => step.rss)),
+    steps,
   });
 }
 
@@ -1082,7 +1089,9 @@ async function runExecutorJourney(state, journey, params) {
               platform: state.platform,
               fs: state.fs,
             })
-          : verifyCandidatePeerBridge(state.candidatePeerBridge, { fs: state.fs });
+          : verifyCandidatePeerBridge(state.candidatePeerBridge, {
+              fs: state.fs,
+            });
       verifyBridgeResolution();
     } catch (error) {
       const reasonCode =

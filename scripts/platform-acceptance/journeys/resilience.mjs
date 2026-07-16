@@ -61,6 +61,24 @@ const FIT_ENVELOPE_EXPECT = {
   json: expectEnvelope({ tool: 'fit' }),
 };
 
+/** Prove a cancellation/timeout did not leave the installed CLI unusable. */
+async function proveCliReusable(context, reasonCode) {
+  const result = await runCli(context, { args: ['--version'] });
+  const commandOutcome = assertCommand(context, result, { exitCode: 0 }, reasonCode);
+  if (commandOutcome.status !== 'pass') return commandOutcome;
+  const expectedVersion = context.installed?.resolvedVersion;
+  if (
+    typeof expectedVersion === 'string' &&
+    expectedVersion.length > 0 &&
+    !result.stdoutCapture.includes(expectedVersion)
+  ) {
+    return fail(reasonCode, [
+      context.assert.diagnostic('the post-cleanup version probe returned the wrong version'),
+    ]);
+  }
+  return null;
+}
+
 const spacesUnicodeExecutor = async (context) => {
   const dir = join(context.paths.workRoot, 'wörk späce ✓');
   try {
@@ -176,6 +194,13 @@ const isolatedHomeExecutor = async (context) => {
 };
 
 const signalsExecutor = async (context) => {
+  try {
+    seedProject(context.paths.workRoot);
+  } catch (error) {
+    return fail('signal-setup-failed', [
+      context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
+    ]);
+  }
   // Cancel the run mid-startup (CLI startup loads every tool module, so a short
   // abort always lands before completion). The tree must be torn down cleanly.
   const controller = new AbortController();
@@ -194,15 +219,24 @@ const signalsExecutor = async (context) => {
   if (result.cancelled !== true) failures.push('run was not reported cancelled after abort');
   if (result.cleanup.residualDescendants > 0)
     failures.push(`cancellation left ${result.cleanup.residualDescendants} descendant(s)`);
-  return failures.length === 0
-    ? pass()
-    : fail(
-        'signal-cancellation-failed',
-        failures.map((f) => context.assert.diagnostic(f)),
-      );
+  if (failures.length > 0) {
+    return fail(
+      'signal-cancellation-failed',
+      failures.map((f) => context.assert.diagnostic(f)),
+    );
+  }
+  const reuseFailure = await proveCliReusable(context, 'signal-reuse-failed');
+  return reuseFailure ?? pass();
 };
 
 const timeoutCleanupExecutor = async (context) => {
+  try {
+    seedProject(context.paths.workRoot);
+  } catch (error) {
+    return fail('timeout-setup-failed', [
+      context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
+    ]);
+  }
   // A hard, short timeout must leave no residual descendant observed by the
   // POSIX process-group plus sampled process-table model.
   const result = await runCli(context, {
@@ -215,12 +249,14 @@ const timeoutCleanupExecutor = async (context) => {
     failures.push('run was not reported timed out under a 25ms timeout');
   if (result.cleanup.residualDescendants > 0)
     failures.push(`timeout left ${result.cleanup.residualDescendants} descendant(s)`);
-  return failures.length === 0
-    ? pass()
-    : fail(
-        'timeout-cleanup-failed',
-        failures.map((f) => context.assert.diagnostic(f)),
-      );
+  if (failures.length > 0) {
+    return fail(
+      'timeout-cleanup-failed',
+      failures.map((f) => context.assert.diagnostic(f)),
+    );
+  }
+  const reuseFailure = await proveCliReusable(context, 'timeout-reuse-failed');
+  return reuseFailure ?? pass();
 };
 
 export const resilienceJourneys = assertUniqueJourneyIds([
@@ -288,12 +324,14 @@ export const resilienceJourneys = assertUniqueJourneyIds([
     category: 'resilience',
     value: {
       human: 'Cancels cleanly',
-      agent: 'an aborted run is cancelled with no observed residual descendants',
+      agent: 'cancellation cleans descendants and leaves the installed CLI reusable',
     },
     isolated: true,
     steps: [
+      { label: 'seed a recognizable zero-init project' },
       { label: 'abort a run mid-startup' },
       { label: 'assert cancelled + no observed residual descendants' },
+      { label: 'run a clean version probe after cancellation' },
     ],
     executor: signalsExecutor,
   }),
@@ -302,12 +340,14 @@ export const resilienceJourneys = assertUniqueJourneyIds([
     category: 'resilience',
     value: {
       human: 'Times out cleanly',
-      agent: 'a timed-out run is timedOut with no observed residual descendants',
+      agent: 'a hard timeout cleans descendants and leaves the installed CLI reusable',
     },
     isolated: true,
     steps: [
+      { label: 'seed a recognizable zero-init project' },
       { label: 'run with a 25ms timeout' },
       { label: 'assert timedOut + no observed residual descendants' },
+      { label: 'run a clean version probe after timeout' },
     ],
     executor: timeoutCleanupExecutor,
   }),

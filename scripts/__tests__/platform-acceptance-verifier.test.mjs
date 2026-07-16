@@ -124,7 +124,8 @@ function makeValidBody() {
         steps: [],
       };
     }
-    const intentionalCancellation = journey.id === 'resilience.signals';
+    const intentionalCancellation =
+      journey.id === 'resilience.signals' || journey.id === 'persistence.interrupted-recovery';
     const intentionalTimeout = journey.id === 'resilience.timeout-cleanup';
     const intentionalNonZero = journey.id === 'persistence.contention-retry';
     return {
@@ -333,6 +334,30 @@ test('contention retry requires exactly one intentional positive exit', () => {
     ]);
     assert.equal(code, 1);
     assert.ok(failuresOf(stdout).includes('expected-abnormal-terminal-duplicate'));
+  });
+});
+
+test('interrupted recovery requires its intentional cancellation', () => {
+  withTempDir((dir) => {
+    const tampered = reseal(dir, 'interrupted-recovery-without-cancellation.json', (body) => {
+      const row = body.results.find((entry) => entry.id === 'persistence.interrupted-recovery');
+      row.steps[0] = {
+        ...row.steps[0],
+        exitCode: 0,
+        signal: null,
+        cancelled: false,
+        reasonCode: null,
+      };
+    });
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      tampered,
+      '--profile',
+      PROFILE_PATH,
+      '--json',
+    ]);
+    assert.equal(code, 1);
+    assert.ok(failuresOf(stdout).includes('expected-abnormal-terminal-missing'));
   });
 });
 
@@ -909,7 +934,8 @@ function makeMacosValidBody() {
     const rss = journey.required
       ? { status: 'available', peakBytes: 4096 + index }
       : { status: 'unavailable', reasonCode: 'rss-not-sampled' };
-    const intentionalCancellation = journey.id === 'resilience.signals';
+    const intentionalCancellation =
+      journey.id === 'resilience.signals' || journey.id === 'persistence.interrupted-recovery';
     const intentionalTimeout = journey.id === 'resilience.timeout-cleanup';
     const intentionalNonZero = journey.id === 'persistence.contention-retry';
     if (journey.id === 'macos.signals') {
@@ -937,6 +963,48 @@ function makeMacosValidBody() {
           reasonCode: 'command-failed',
           diagnostics: [],
         })),
+      };
+    }
+    if (journey.id === 'macos.contention-recovery') {
+      return {
+        id: journey.id,
+        category: 'macos',
+        required: journey.required,
+        status: 'pass',
+        reasonCode: null,
+        durationMs: 10,
+        rss,
+        diagnostics: [],
+        steps: [
+          {
+            label: 'bounded-contention',
+            stage: 'process',
+            exitCode: 1,
+            signal: null,
+            timedOut: false,
+            cancelled: false,
+            outputTruncated: false,
+            durationMs: 5,
+            rss,
+            residualDescendants: 0,
+            reasonCode: 'command-failed',
+            diagnostics: [],
+          },
+          {
+            label: 'interrupted-writer',
+            stage: 'process',
+            exitCode: null,
+            signal: 'SIGKILL',
+            timedOut: false,
+            cancelled: true,
+            outputTruncated: false,
+            durationMs: 5,
+            rss,
+            residualDescendants: 0,
+            reasonCode: 'cancelled',
+            diagnostics: [],
+          },
+        ],
       };
     }
     return {
@@ -1087,6 +1155,181 @@ test('support-row binding: the macOS profile verifies with the exact expected ro
     ]);
     assert.equal(code, 0, stdout);
     assert.equal(JSON.parse(stdout).verified, true);
+  });
+});
+
+test('macOS contention recovery requires both intentional abnormal terminals', () => {
+  withTempDir((dir) => {
+    const sealed = structuredClone(makeMacosValidBody());
+    const row = sealed.results.find((entry) => entry.id === 'macos.contention-recovery');
+    row.steps = row.steps.filter((step) => step.label !== 'bounded-contention');
+    const body = structuredClone(sealed);
+    delete body.completion;
+    const evidence = join(dir, 'macos-contention-terminal-missing.json');
+    writeFileSync(
+      evidence,
+      `${JSON.stringify(
+        {
+          ...body,
+          completion: { state: 'completed', evidenceDigest: evidenceDigest(body) },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--json',
+    ]);
+    assert.equal(code, 1);
+    assert.ok(failuresOf(stdout).includes('expected-abnormal-terminal-missing'));
+  });
+});
+
+test('macOS contention recovery rejects two positive exits without a cancellation', () => {
+  withTempDir((dir) => {
+    const sealed = structuredClone(makeMacosValidBody());
+    const row = sealed.results.find((entry) => entry.id === 'macos.contention-recovery');
+    const interrupted = row.steps.find((step) => step.label === 'interrupted-writer');
+    Object.assign(interrupted, {
+      exitCode: 2,
+      signal: null,
+      cancelled: false,
+      reasonCode: 'command-failed',
+    });
+    const body = structuredClone(sealed);
+    delete body.completion;
+    const evidence = join(dir, 'macos-contention-cancellation-substituted.json');
+    writeFileSync(
+      evidence,
+      `${JSON.stringify(
+        {
+          ...body,
+          completion: { state: 'completed', evidenceDigest: evidenceDigest(body) },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--json',
+    ]);
+    assert.equal(code, 1);
+    const failures = failuresOf(stdout);
+    assert.ok(failures.includes('expected-abnormal-terminal-missing'));
+    assert.ok(failures.includes('expected-abnormal-terminal-duplicate'));
+  });
+});
+
+test('macOS contention recovery rejects two cancellations without lock exhaustion', () => {
+  withTempDir((dir) => {
+    const sealed = structuredClone(makeMacosValidBody());
+    const row = sealed.results.find((entry) => entry.id === 'macos.contention-recovery');
+    const contention = row.steps.find((step) => step.label === 'bounded-contention');
+    Object.assign(contention, {
+      exitCode: null,
+      signal: 'SIGTERM',
+      cancelled: true,
+      reasonCode: 'cancelled',
+    });
+    const body = structuredClone(sealed);
+    delete body.completion;
+    const evidence = join(dir, 'macos-contention-exhaustion-substituted.json');
+    writeFileSync(
+      evidence,
+      `${JSON.stringify(
+        {
+          ...body,
+          completion: { state: 'completed', evidenceDigest: evidenceDigest(body) },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--json',
+    ]);
+    assert.equal(code, 1);
+    const failures = failuresOf(stdout);
+    assert.ok(failures.includes('expected-abnormal-terminal-missing'));
+    assert.ok(failures.includes('expected-abnormal-terminal-duplicate'));
+  });
+});
+
+test('an RSS-derived fail remains valid evidence and reaches independent verdict diagnostics', () => {
+  withTempDir((dir) => {
+    const sealed = structuredClone(makeMacosValidBody());
+    const body = { ...sealed };
+    delete body.completion;
+    const result = body.results.find((entry) => entry.id === 'lifecycle.install');
+    result.rss = { status: 'unavailable', reasonCode: 'rss-sampler-fault' };
+    result.steps[0].rss = { status: 'unavailable', reasonCode: 'rss-sampler-fault' };
+    body.verdict = computeVerdict(MACOS_PROFILE, body.results, body.cleanup);
+    const evidence = join(dir, 'macos-rss-fail-evidence.json');
+    writeFileSync(
+      evidence,
+      `${JSON.stringify(
+        {
+          ...body,
+          completion: { state: 'completed', evidenceDigest: evidenceDigest(body) },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const { code, stdout } = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      MACOS_PROFILE_PATH,
+      '--expected-support-row',
+      'macos-26-arm64-node24-npm11-v1',
+      '--expected-support-contract-version',
+      '1',
+      '--expected-manifest-digest',
+      'd'.repeat(64),
+      '--expect-no-previous-candidate',
+      '--expected-git-sha',
+      'abc1234',
+      '--expected-run-id',
+      '12345',
+      '--expected-run-attempt',
+      '1',
+      '--expected-runner-label',
+      'macos-26',
+      '--expected-sw-vers-major',
+      '26',
+      '--expected-kernel-major',
+      '25',
+      '--expect-uname-arch',
+      'arm64',
+      '--expect-case-sensitive',
+      'false',
+      '--expect-shell',
+      'zsh',
+      '--json',
+    ]);
+
+    assert.equal(code, 1, stdout);
+    const failures = JSON.parse(stdout).failures.map((failure) => failure.code);
+    assert.ok(failures.includes('verdict-not-pass'), stdout);
+    assert.ok(failures.includes('required-step-rss-untrustworthy'), stdout);
+    assert.ok(!failures.includes('invalid-evidence'), stdout);
   });
 });
 

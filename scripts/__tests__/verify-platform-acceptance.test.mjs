@@ -83,6 +83,11 @@ function expectedTerminalReason(intentionalCancellation, intentionalTimeout) {
   return null;
 }
 
+function expectedTerminalExit(intentionalCancellation, intentionalTimeout, intentionalNonZero) {
+  if (intentionalCancellation || intentionalTimeout) return null;
+  return intentionalNonZero ? 1 : 0;
+}
+
 function makeValidBody() {
   const results = PROFILE.journeys.map((journey) => {
     const rss = { status: 'unavailable', reasonCode: 'rss-not-sampled' };
@@ -99,8 +104,10 @@ function makeValidBody() {
         steps: [],
       };
     }
-    const intentionalCancellation = journey.id === 'resilience.signals';
+    const intentionalCancellation =
+      journey.id === 'resilience.signals' || journey.id === 'persistence.interrupted-recovery';
     const intentionalTimeout = journey.id === 'resilience.timeout-cleanup';
+    const intentionalNonZero = journey.id === 'persistence.contention-retry';
     return {
       id: journey.id,
       category: journey.id.split('.')[0],
@@ -114,7 +121,11 @@ function makeValidBody() {
         {
           label: 'process-1',
           stage: 'process',
-          exitCode: intentionalCancellation || intentionalTimeout ? null : 0,
+          exitCode: expectedTerminalExit(
+            intentionalCancellation,
+            intentionalTimeout,
+            intentionalNonZero,
+          ),
           signal: intentionalCancellation || intentionalTimeout ? 'SIGTERM' : null,
           timedOut: intentionalTimeout,
           cancelled: intentionalCancellation,
@@ -122,7 +133,9 @@ function makeValidBody() {
           durationMs: 5,
           rss,
           residualDescendants: 0,
-          reasonCode: expectedTerminalReason(intentionalCancellation, intentionalTimeout),
+          reasonCode: intentionalNonZero
+            ? 'command-failed'
+            : expectedTerminalReason(intentionalCancellation, intentionalTimeout),
           diagnostics: [],
         },
       ],

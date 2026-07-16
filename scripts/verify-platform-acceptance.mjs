@@ -164,11 +164,22 @@ const EXPECTED_POSITIVE_EXIT = new Set([
   'resilience.permissions',
   'macos.permissions',
   'macos.browser-open',
+  'macos.contention-recovery',
 ]);
-const EXPECTED_SINGLE_ABNORMAL_TERMINAL = new Set([
-  'persistence.contention-retry',
-  'resilience.signals',
-  'resilience.timeout-cleanup',
+const EXPECTED_ABNORMAL_TERMINAL_COUNTS = new Map([
+  ['persistence.contention-retry', new Map([['positive-exit', 1]])],
+  ['persistence.interrupted-recovery', new Map([['cancellation', 1]])],
+  ['resilience.signals', new Map([['cancellation', 1]])],
+  ['resilience.timeout-cleanup', new Map([['timeout', 1]])],
+  // This composite macOS journey proves both bounded lock exhaustion and
+  // cancellation of a blocked writer before replaying cleanly.
+  [
+    'macos.contention-recovery',
+    new Map([
+      ['positive-exit', 1],
+      ['cancellation', 1],
+    ]),
+  ],
 ]);
 
 const HELP = `verify-platform-acceptance — independently verify installed-artifact acceptance evidence
@@ -886,32 +897,36 @@ function isExpectedNonZeroExit(journeyId, step) {
   return exact?.has(step.exitCode) === true || EXPECTED_POSITIVE_EXIT.has(journeyId);
 }
 
-function isExpectedAbnormalTerminal(journeyId, step) {
-  if (isExpectedNonZeroExit(journeyId, step)) return true;
+function expectedAbnormalTerminalKind(journeyId, step) {
+  if (isExpectedNonZeroExit(journeyId, step)) return 'positive-exit';
   if (journeyId === 'resilience.signals') {
-    return step.cancelled === true && step.timedOut === false && step.reasonCode === 'cancelled';
+    return step.cancelled === true && step.timedOut === false && step.reasonCode === 'cancelled'
+      ? 'cancellation'
+      : null;
   }
   if (journeyId === 'resilience.timeout-cleanup') {
-    return step.timedOut === true && step.reasonCode === 'timed-out';
+    return step.timedOut === true && step.reasonCode === 'timed-out' ? 'timeout' : null;
   }
   if (
     journeyId === 'persistence.interrupted-recovery' ||
     journeyId === 'macos.contention-recovery'
   ) {
-    return step.cancelled === true && step.timedOut === false && step.reasonCode === 'cancelled';
+    return step.cancelled === true && step.timedOut === false && step.reasonCode === 'cancelled'
+      ? 'cancellation'
+      : null;
   }
   if (journeyId === 'macos.signals') {
     const delivered = step.deliveredSignal;
-    return (
-      step.timedOut === false &&
+    return step.timedOut === false &&
       step.cancelled === false &&
       (delivered === 'SIGINT' || delivered === 'SIGTERM') &&
       (step.signal === null || step.signal === delivered) &&
       (step.signal !== null || (step.exitCode !== null && step.exitCode !== 0)) &&
       step.reasonCode === 'command-failed'
-    );
+      ? `native-signal:${delivered}`
+      : null;
   }
-  return false;
+  return null;
 }
 
 /**
@@ -1068,7 +1083,7 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
     if (!Array.isArray(steps)) continue;
     let sampledStep = false;
     let maxStepPeak = 0;
-    let expectedAbnormalTerminals = 0;
+    const expectedAbnormalTerminalCounts = new Map();
     const nativeSignalObservations = [];
     for (const step of steps) {
       if (step.exitCode === null && step.signal === null) {
@@ -1080,8 +1095,12 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
         step.timedOut === true ||
         step.cancelled === true;
       if (abnormalTerminal) {
-        if (isExpectedAbnormalTerminal(entry.id, step)) {
-          expectedAbnormalTerminals += 1;
+        const terminalKind = expectedAbnormalTerminalKind(entry.id, step);
+        if (terminalKind !== null) {
+          expectedAbnormalTerminalCounts.set(
+            terminalKind,
+            (expectedAbnormalTerminalCounts.get(terminalKind) ?? 0) + 1,
+          );
           if (entry.id === 'macos.signals') {
             nativeSignalObservations.push(step.deliveredSignal);
           }
@@ -1101,11 +1120,16 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
         }
       }
     }
-    if (entry.status === 'pass' && EXPECTED_SINGLE_ABNORMAL_TERMINAL.has(entry.id)) {
-      if (expectedAbnormalTerminals === 0) {
-        fail('expected-abnormal-terminal-missing', entry.id);
-      } else if (expectedAbnormalTerminals !== 1) {
-        fail('expected-abnormal-terminal-duplicate', entry.id);
+    const requiredTerminalCounts = EXPECTED_ABNORMAL_TERMINAL_COUNTS.get(entry.id);
+    if (entry.status === 'pass' && requiredTerminalCounts !== undefined) {
+      for (const [terminalKind, requiredCount] of requiredTerminalCounts) {
+        const actualCount = expectedAbnormalTerminalCounts.get(terminalKind) ?? 0;
+        const detail = `${entry.id}:${terminalKind}:expected=${requiredCount}:actual=${actualCount}`;
+        if (actualCount < requiredCount) {
+          fail('expected-abnormal-terminal-missing', detail);
+        } else if (actualCount > requiredCount) {
+          fail('expected-abnormal-terminal-duplicate', detail);
+        }
       }
     }
     if (

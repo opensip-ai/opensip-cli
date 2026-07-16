@@ -854,6 +854,14 @@ const permissionsExecutor = async (context) => {
 const ptyHumanViewExecutor = async (context) => {
   const gate = requireDarwin(context);
   if (gate) return gate;
+  // Isolated journeys start from an empty directory. Seed a recognizable source
+  // project so the CLI enters its zero-init cache mode and the check has the
+  // finding this journey promises to render.
+  try {
+    seedProject(context.paths.workRoot);
+  } catch (error) {
+    return fail('pty-setup-failed', [context.assert.diagnostic(errText(error))]);
+  }
   // 1. Human render under a real PTY (/usr/bin/script) completes with the finding.
   const human = await runCli(context, { args: FIT_FINDING_ARGS, pty: true });
   const humanFailures = evaluatePtyFindingResult(human, 'human');
@@ -1023,7 +1031,9 @@ const browserOpenExecutor = async (context) => {
   }
   const nodeBinDir = dirname(process.execPath);
   const result = await runCli(context, {
-    args: ['report', '--open'],
+    // `report` opens by default. The public opt-out is `--no-open`; there is no
+    // positive `--open` flag.
+    args: ['report'],
     pty: true,
     // Prepend the shim; unset CI (empty is falsy) only for this child so the
     // launcher actually attempts to open under the PTY.
@@ -1031,9 +1041,7 @@ const browserOpenExecutor = async (context) => {
   });
   const reportResult = evaluateBrowserCommandResult(result, 'report');
   if (!reportResult.ok) {
-    const message = result.timedOut
-      ? 'report --open timed out'
-      : `report --open exited ${result.status}`;
+    const message = result.timedOut ? 'report timed out' : `report exited ${result.status}`;
     return fail(reportResult.reasonCode, [context.assert.diagnostic(message)]);
   }
 
@@ -1050,7 +1058,7 @@ const browserOpenExecutor = async (context) => {
   }
   if (captured.length === 0) {
     return fail('open-shim-not-invoked', [
-      context.assert.diagnostic('report --open did not resolve the run-owned open shim'),
+      context.assert.diagnostic('report did not resolve the run-owned open shim'),
     ]);
   }
   if (captured.length !== 1) {
@@ -1073,15 +1081,21 @@ const browserOpenExecutor = async (context) => {
   }
   return pass([
     context.assert.diagnostic(`browser-registered=${browserRegistered}`),
-    context.assert.diagnostic(
-      'report --open resolved exactly one safe generated file via the shim',
-    ),
+    context.assert.diagnostic('report resolved exactly one safe generated file via the shim'),
   ]);
 };
 
 const nativeSqliteExecutor = async (context) => {
   const gate = requireDarwin(context);
   if (gate) return gate;
+  // A completely empty directory is intentionally not treated as a project.
+  // Seed a recognizable source tree so this clean-install probe exercises the
+  // customer-facing zero-init cache path before loading the native binding.
+  try {
+    seedIdentifiedProject(context.paths.workRoot);
+  } catch (error) {
+    return fail('native-sqlite-setup-failed', [context.assert.diagnostic(errText(error))]);
+  }
   // The native better-sqlite3 binding (Node ABI 137) must load from a clean install.
   const list = await runCli(context, { args: ['sessions', 'list', '--json'] });
   if (list.timedOut) {
@@ -1348,14 +1362,14 @@ export const macosJourneys = assertUniqueJourneyIds([
     category: 'macos',
     value: {
       human: 'Never opens a stray browser',
-      agent: 'report --open resolves exactly one safe generated file through a capture shim',
+      agent: 'report resolves exactly one safe generated file through a capture shim',
     },
     capabilities: ['pty'],
     isolated: true,
     steps: [
       { label: 'probe /usr/bin/open availability without launching a GUI' },
       {
-        label: 'intercept report --open with a run-owned open shim under a PTY',
+        label: 'intercept the default report open with a run-owned shim under a PTY',
       },
       { label: 'assert exactly one safe generated file target' },
     ],
@@ -1370,7 +1384,9 @@ export const macosJourneys = assertUniqueJourneyIds([
     },
     isolated: true,
     steps: [
-      { label: 'open the store via sessions list --json' },
+      {
+        label: 'seed a recognizable zero-init project and open its cached store',
+      },
       {
         label: 'assert the entrypoint resolves outside the workspace checkout',
       },

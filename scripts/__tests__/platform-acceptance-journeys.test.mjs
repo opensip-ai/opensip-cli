@@ -983,9 +983,13 @@ test('resilience.isolated-home seeds a zero-init project and requires a successf
 test('resilience.signals requires cancellation with zero observed residual descendants', async () => {
   const executor = getJourney('resilience.signals').executor;
 
-  const clean = queuedContext([measured({ cancelled: true, cleanup: { residualDescendants: 0 } })]);
+  const clean = queuedContext([
+    measured({ cancelled: true, cleanup: { residualDescendants: 0 } }),
+    measured({ stdoutCapture: '9.9.9\n' }),
+  ]);
   const cleanOutcome = await executor(clean.context);
   assert.equal(cleanOutcome.status, 'pass');
+  assert.deepEqual(clean.calls[1].slice(-1), ['--version']);
 
   const residue = queuedContext([
     measured({ cancelled: true, cleanup: { residualDescendants: 3 } }),
@@ -997,14 +1001,26 @@ test('resilience.signals requires cancellation with zero observed residual desce
   const notCancelled = queuedContext([measured({ cancelled: false })]);
   const notCancelledOutcome = await executor(notCancelled.context);
   assert.equal(notCancelledOutcome.status, 'fail');
+
+  const notReusable = queuedContext([
+    measured({ cancelled: true }),
+    measured({ status: 2, stderrTail: 'version failed' }),
+  ]);
+  const notReusableOutcome = await executor(notReusable.context);
+  assert.equal(notReusableOutcome.status, 'fail');
+  assert.equal(notReusableOutcome.reasonCode, 'signal-reuse-failed');
 });
 
 test('resilience.timeout-cleanup requires timeout with zero observed residual descendants', async () => {
   const executor = getJourney('resilience.timeout-cleanup').executor;
 
-  const clean = queuedContext([measured({ timedOut: true, cleanup: { residualDescendants: 0 } })]);
+  const clean = queuedContext([
+    measured({ timedOut: true, cleanup: { residualDescendants: 0 } }),
+    measured({ stdoutCapture: '9.9.9\n' }),
+  ]);
   const cleanOutcome = await executor(clean.context);
   assert.equal(cleanOutcome.status, 'pass');
+  assert.deepEqual(clean.calls[1].slice(-1), ['--version']);
 
   const residue = queuedContext([
     measured({ timedOut: true, cleanup: { residualDescendants: 1 } }),
@@ -1012,6 +1028,14 @@ test('resilience.timeout-cleanup requires timeout with zero observed residual de
   const leaky = await executor(residue.context);
   assert.equal(leaky.status, 'fail');
   assert.equal(leaky.reasonCode, 'timeout-cleanup-failed');
+
+  const notReusable = queuedContext([
+    measured({ timedOut: true }),
+    measured({ status: 2, stderrTail: 'version failed' }),
+  ]);
+  const notReusableOutcome = await executor(notReusable.context);
+  assert.equal(notReusableOutcome.status, 'fail');
+  assert.equal(notReusableOutcome.reasonCode, 'timeout-reuse-failed');
 });
 
 function persistenceBarrierContext({
