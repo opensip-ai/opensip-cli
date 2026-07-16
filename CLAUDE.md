@@ -77,6 +77,12 @@ Turborepo + pnpm monorepo. Workspace scope: `@opensip-cli/*`. Layered —
 higher-level packages depend on lower-level substrates, never the other
 direction. Architecture rules are enforced by dependency-cruiser in CI.
 
+The generated inventory in `docs/public/80-implementation/architecture-map.md`
+is authoritative: 60 workspace packages, 57 publishable and three private
+(`@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
+`@opensip-cli/checks-dogfood`). The tree below is a hand-maintained orientation
+map, not the source of truth for the exact package set.
+
 ```
 opensip-cli/
 ├── packages/
@@ -98,6 +104,8 @@ opensip-cli/
 │   ├── clone-detection/         # @opensip-cli/clone-detection — shared
 │   │                            #   function-body clone-detection substrate
 │   │                            #   used by graph and yagni (ADR-0064)
+│   ├── format/                  # @opensip-cli/format — pure human-facing
+│   │                            #   formatters (no @opensip-cli deps; layer 2)
 │   ├── dashboard/               # @opensip-cli/dashboard — self-contained
 │   │                            #   HTML report generator (generateDashboardHtml);
 │   │                            #   consumed by the CLI-owned `report` command
@@ -130,6 +138,9 @@ opensip-cli/
 │   │                            #   runtime substrate (ADR-0037): TargetRegistry +
 │   │                            #   glob expansion w/ globalExcludes; built once
 │   │                            #   per run by the CLI bootstrap → scope.targets
+│   ├── codebase/                # @opensip-cli/codebase — bounded deterministic
+│   │                            #   project inventory + package-manifest facts
+│   │                            #   (deps: contracts + core; layer 3)
 │   ├── test-support/            # @opensip-cli/test-support — PRIVATE, never
 │   │                            #   published (ADR-0040): cross-package test
 │   │                            #   scaffolding (RunScope test sugar + the
@@ -143,7 +154,9 @@ opensip-cli/
 │   ├── external-tool-adapter/   # @opensip-cli/external-tool-adapter —
 │   │                            #   substrate for wrapping external scanners
 │   ├── mcp/                     # @opensip-cli/mcp — bundled MCP stdio server
-│   │                            #   over graph catalogs and stored sessions
+│   │                            #   over graph catalogs and stored sessions;
+│   │                            #   graph reads go through @opensip-cli/graph/read,
+│   │                            #   never @opensip-cli/graph/internal
 │   ├── tool-gitleaks/           # @opensip-cli/tool-gitleaks — external
 │   │                            #   scanner adapter for committed secrets
 │   ├── tool-osv-scanner/        # @opensip-cli/tool-osv-scanner — external
@@ -155,13 +168,15 @@ opensip-cli/
 │   │   ├── engine/              # @opensip-cli/fitness — fitness engine,
 │   │   │                        #   fit/report-data/fit-list/fit-recipes,
 │   │   │                        #   gate, SARIF
-│   │   ├── checks-typescript/   # @opensip-cli/checks-typescript (51 checks)
-│   │   ├── checks-universal/    # @opensip-cli/checks-universal (94 checks)
+│   │   ├── checks-typescript/   # @opensip-cli/checks-typescript (50 checks)
+│   │   ├── checks-universal/    # @opensip-cli/checks-universal (96 checks)
 │   │   ├── checks-python/       # @opensip-cli/checks-python
 │   │   ├── checks-go/           # @opensip-cli/checks-go
 │   │   ├── checks-java/         # @opensip-cli/checks-java
 │   │   ├── checks-cpp/          # @opensip-cli/checks-cpp
-│   │   └── checks-rust/         # @opensip-cli/checks-rust
+│   │   ├── checks-rust/         # @opensip-cli/checks-rust
+│   │   └── checks-dogfood/      # @opensip-cli/checks-dogfood — PRIVATE
+│   │                            #   repository-only architecture checks
 │   │
 │   ├── simulation/              # simulation namespace
 │   │   └── engine/              # @opensip-cli/simulation
@@ -309,14 +324,14 @@ Subcommands available out of the box:
 
 ## Fitness Check System
 
-151 checks across seven check packs (TypeScript, Universal, Python,
+152 checks across seven check packs (TypeScript, Universal, Python,
 Go, Java, C/C++, Rust). The authoritative per-pack list lives in
 `docs/public/70-reference/05-checks-index.md` (generated) — counts below
 are approximate and drift as checks are added:
 
-- `@opensip-cli/checks-typescript` (51 checks) — TS-AST-driven checks
+- `@opensip-cli/checks-typescript` (50 checks) — TS-AST-driven checks
   (drizzle-orm, typed-inject, react, package.json exports, tsconfig).
-- `@opensip-cli/checks-universal` (94 checks) — text/regex/glob checks
+- `@opensip-cli/checks-universal` (96 checks) — text/regex/glob checks
   (Docker, .env, Sentry, generic structure, dead-code via knip).
 - `@opensip-cli/checks-python|go|java|cpp|rust` — language-specific checks.
 
@@ -514,9 +529,9 @@ This is the mechanical realization of "only use documented seams".
 ```
 core (kernel)
   ↑
-contracts / cli-ui / datastore / tree-sitter / clone-detection / tool-test-kit (layer 2)
+contracts / cli-ui / datastore / tree-sitter / clone-detection / format / tool-test-kit (layer 2)
   ↑
-cli-live / output / config / targeting / lang-* / dashboard / external-tool-adapter (layer 3)
+cli-live / session-store / output / config / targeting / codebase / lang-* / dashboard / external-tool-adapter (layer 3)
   ↑
 fitness / graph / simulation / yagni / mcp / tool-* scanner adapters (layer 4 — tool engines)
   ↑
@@ -533,6 +548,13 @@ cli (layer 6 — composition root; depends on every tool)
   it (ADR-0058). Tool engines import `cli-live`, never `ink`'s `render`.
 - fitness / graph / simulation / yagni / mcp / tool-* adapters must NOT import
   from cli (would create a cycle).
+- MCP production reads graph catalogs through `@opensip-cli/graph/read`; it must
+  NOT import `@opensip-cli/graph/internal`.
+- External Tool workers enter `host-rpc-only` mode only when the exact internal
+  command and host marker both match. Their ambient datastore thunk is denied;
+  privileged OpenSIP effects use the enumerated host RPC surface. This is not an
+  OS sandbox: admitted code retains the current user's filesystem and network
+  authority. External trust lists accept exact ids only; `*` is ignored.
 - check packs must NOT import from cli or contracts.
 - lang-\* packs must NOT import from cli, contracts, fitness, simulation, or
   each other. (The historical lang-typescript exception for `filterContent`
