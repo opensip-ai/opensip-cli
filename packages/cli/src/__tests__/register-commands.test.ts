@@ -218,6 +218,23 @@ describe('sessions wiring', () => {
   });
 });
 
+describe('runs wiring', () => {
+  it('registers `runs list|show` with bounded read flags', () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    const cmd = findSubcommand(program, 'runs');
+    expect(cmd).toBeDefined();
+    expect(cmd?.description()).toBe('Inspect parent Runs and ordered RunSteps');
+    expect(cmd?.commands.map((command) => command.name())).toEqual(['list', 'show']);
+    expect(findSubcommand(cmd!, 'list')?.options.map((option) => option.long)).toEqual(
+      expect.arrayContaining(['--json', '--limit']),
+    );
+    expect(findSubcommand(cmd!, 'show')?.options.map((option) => option.long)).toEqual(
+      expect.arrayContaining(['--json', '--offset', '--limit']),
+    );
+  });
+});
+
 describe('uninstall wiring', () => {
   it('registers `uninstall` with the expected flags', () => {
     const { ctx } = makeCtx();
@@ -237,13 +254,14 @@ describe('documented subcommand-group exceptions', () => {
   // `command-surface-parity` guardrail allow-lists exactly these. This test
   // locks the list AND asserts every named group is actually a mounted
   // action-less parent (no action handler, has sub-subcommands).
-  it('is exactly [config, policy, repair, sessions, suite, tools]', () => {
+  it('is exactly [config, policy, repair, runs, sessions, suite, tools]', () => {
     // `plugin` was RETIRED as a top-level group: pack ops now mount under each
     // pack-supporting tool primary (`opensip fit plugin …`), not at the root.
     expect([...HOST_SUBCOMMAND_GROUPS].sort()).toEqual([
       'config',
       'policy',
       'repair',
+      'runs',
       'sessions',
       'suite',
       'tools',

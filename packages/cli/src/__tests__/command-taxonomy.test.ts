@@ -129,6 +129,12 @@ describe('command taxonomy — new discoverability commands exist (Step 3)', () 
     expect(resolveTopLevel(program, 'status')).toBeDefined();
   });
 
+  it('mounts canonical parent Run history under `runs`', () => {
+    const program = buildFullProgram();
+    expect(resolveNested(program, 'runs', 'list')).toBeDefined();
+    expect(resolveNested(program, 'runs', 'show')).toBeDefined();
+  });
+
   it('mounts `simulation recipes` (new — no legacy predecessor)', () => {
     const program = buildFullProgram();
     expect(resolveNested(program, 'simulation', 'recipes')).toBeDefined();

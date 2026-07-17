@@ -92,6 +92,11 @@
  *     `--open` presentation flag, and deliberately omits unsupported aggregate
  *     delivery flags (`--report-to` / `--api-key`).
  *
+ * 11. Plan 00 Phase 1 adds the read-only `runs list|show` group for canonical
+ *     parent Runs and ordered RunSteps. Both leaves are JSON-capable and expose
+ *     only bounded list/page options; exact Tool Session replay remains under
+ *     `sessions`.
+ *
  * Every other command is byte-identical to 2.10.0. Any change OTHER than the
  * deltas above is a regression to investigate.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -154,7 +159,7 @@ function buildFullProgram(): Command {
     for (const tool of BUNDLED_TOOLS) registry.register(tool);
     mountAllToolCommands(registry, program, makeStubToolContext(), [], {});
 
-    // Host-owned commands (init/report/sessions/configure/completion/uninstall/
+    // Host-owned commands (init/report/runs/sessions/configure/completion/uninstall/
     // tools), mounted via the same command plane — PLUS the domain-bound
     // per-tool `plugin` groups, which mount UNDER each pack-supporting tool
     // primary (`opensip fit plugin …`). Those primaries were just mounted above,
@@ -373,6 +378,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'agent-catalog',
       'completion',
       'uninstall',
+      'runs',
       'sessions',
       'tools',
     ]) {
@@ -401,6 +407,8 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       nestedChild(program, 'config', 'migrate'),
       '`config migrate` must be mounted',
     ).toBeDefined();
+    expect(nestedChild(program, 'runs', 'list'), '`runs list` must be mounted').toBeDefined();
+    expect(nestedChild(program, 'runs', 'show'), '`runs show` must be mounted').toBeDefined();
 
     // The per-tool `plugin` groups mount UNDER the pack-supporting tool primaries
     // (fit + sim; graph has no pluginLayout, so no `plugin` group).

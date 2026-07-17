@@ -78,6 +78,23 @@ const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
     tier: 'platform' as const,
   },
   {
+    command: 'runs list',
+    description:
+      'List canonical parent execution Runs. Use these records for audit/suite context; Tool Session replay remains under sessions.',
+    examples: ['opensip runs list --json', 'opensip runs list --limit 5 --json'],
+    tier: 'platform' as const,
+  },
+  {
+    command: 'runs show',
+    description:
+      'Retrieve one exact canonical parent Run and its ordered RunSteps. Linked Tool Sessions remain references and are not hydrated inline.',
+    examples: [
+      'opensip runs show RUN_EXAMPLE_01 --json',
+      'opensip runs show RUN_EXAMPLE_01 --offset 100 --limit 100 --json',
+    ],
+    tier: 'platform' as const,
+  },
+  {
     command: 'sessions list',
     description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
     examples: [

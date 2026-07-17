@@ -1,6 +1,6 @@
 /**
  * host-subcommand-groups — the action-less Commander subcommand GROUPS
- * (`sessions`, `tools`) and their leaf {@link CommandSpec}s, PLUS the
+ * (`runs`, `sessions`, `tools`, …) and their leaf {@link CommandSpec}s, PLUS the
  * DOMAIN-BOUND per-tool `plugin` group leaves (launch Phase 6 + the
  * command-surface-taxonomy "packs under the tool" refinement).
  *
@@ -20,6 +20,7 @@
 
 import { buildConfigGroupLeaves } from './host-subcommand-config.js';
 import { buildPolicyGroupLeaves } from './host-subcommand-policy.js';
+import { buildRunsGroupLeaves } from './host-subcommand-runs.js';
 import { buildSessionsGroupLeaves } from './host-subcommand-sessions.js';
 import { type HostSpec } from './host-subcommand-shared.js';
 import { buildRepairGroupLeaves } from './repair/command-specs.js';
@@ -55,6 +56,7 @@ export const HOST_SUBCOMMAND_GROUPS: readonly string[] = [
   'config',
   'policy',
   'repair',
+  'runs',
   'sessions',
   'suite',
   'tools',
@@ -77,6 +79,11 @@ export function buildHostSubcommandGroups(ctx: CliCommandsContext): readonly Hos
       name: 'repair',
       description: 'Preview and apply stored-session repair actions',
       leaves: buildRepairGroupLeaves(ctx),
+    },
+    {
+      name: 'runs',
+      description: 'Inspect parent Runs and ordered RunSteps',
+      leaves: buildRunsGroupLeaves(ctx),
     },
     {
       name: 'sessions',

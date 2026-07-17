@@ -72,7 +72,7 @@ export interface SpecLike {
   readonly parent?: string;
 }
 
-/** One action-less group (`sessions` / `tools`) and its leaf command names. */
+/** One action-less group (`runs` / `sessions` / `tools`) and its leaf command names. */
 export interface GroupLike {
   readonly name: string;
   readonly leaves: readonly { readonly name: string }[];

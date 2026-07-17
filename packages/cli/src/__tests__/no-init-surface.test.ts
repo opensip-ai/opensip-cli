@@ -44,6 +44,8 @@ const MUST_RUN_WITHOUT_INIT = [
   // A pre-init run records real evidence in the ephemeral datastore. The
   // commands that READ that evidence back must be first-run capable too —
   // otherwise the user accumulates history they cannot see until they init.
+  'runs list',
+  'runs show',
   'sessions list',
   'sessions show',
   'report',

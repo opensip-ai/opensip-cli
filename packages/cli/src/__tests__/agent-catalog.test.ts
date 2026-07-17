@@ -306,6 +306,8 @@ describe('buildAgentCatalog', () => {
         'third-party-tool',
         'suite run',
         'status',
+        'runs list',
+        'runs show',
         'sessions list',
         'sessions show',
         'agent-catalog',
@@ -446,6 +448,8 @@ describe('buildAgentCatalog', () => {
       expect(tierOf('fitness')).toBe('tool');
       expect(tierOf('graph')).toBe('tool');
       expect(tierOf('suite run')).toBe('platform');
+      expect(tierOf('runs list')).toBe('platform');
+      expect(tierOf('runs show')).toBe('platform');
       expect(tierOf('sessions list')).toBe('platform');
       expect(tierOf('sessions show')).toBe('platform');
       expect(tierOf('agent-catalog')).toBe('platform');

@@ -25,6 +25,7 @@ export const HOST_RESERVED_ROOT_COMMANDS: ReadonlySet<string> = new Set([
   'policy',
   'repair',
   'report',
+  'runs',
   'sessions',
   'status',
   'suite',

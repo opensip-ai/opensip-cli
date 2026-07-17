@@ -2,7 +2,7 @@
  * Tests for the CLI-owned command registration.
  *
  * `registerCliCommands` mounts the cross-tool housekeeping commands
- * (init, report, sessions, policy, configure, completion, uninstall, tools) onto a
+ * (init, report, runs, sessions, policy, configure, completion, uninstall, tools) onto a
  * Commander program. The pack-management `plugin {add,list,remove,sync}` ops
  * are NO LONGER a top-level group — they mount UNDER each pack-supporting tool
  * primary (`opensip fit plugin …`). The tests verify the full subcommand
@@ -79,6 +79,7 @@ describe('registerCliCommands', () => {
       'policy',
       'repair',
       'report',
+      'runs',
       'sessions',
       'status',
       'suite',
@@ -91,6 +92,12 @@ describe('registerCliCommands', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
     expect(subcommandNames(program, 'sessions')).toEqual(['list', 'purge', 'show']);
+  });
+
+  it('mounts the canonical parent Run read subcommands', () => {
+    const program = new Command('opensip');
+    registerCliCommands(program, makeContext());
+    expect(subcommandNames(program, 'runs')).toEqual(['list', 'show']);
   });
 
   it('mounts the documented repair subcommands', () => {

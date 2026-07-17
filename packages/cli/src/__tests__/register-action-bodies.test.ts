@@ -65,6 +65,25 @@ vi.mock('../commands/history.js', () => ({
   showHistory: vi.fn(() => Promise.resolve({ type: 'history' } as never)),
 }));
 
+vi.mock('../commands/run-history.js', () => ({
+  executeRunsList: vi.fn(() => ({
+    type: 'run-history',
+    runs: [],
+    requestedLimit: 20,
+    effectiveLimit: 20,
+    truncated: false,
+  })),
+  executeRunsShow: vi.fn(() => ({
+    type: 'run-detail',
+    run: { id: 'RUN_TEST' },
+    steps: [],
+    offset: 0,
+    limit: 100,
+    total: 0,
+    sessionFollowUps: [],
+  })),
+}));
+
 vi.mock('../commands/clear.js', () => ({
   executeClear: vi.fn((opts: unknown) => Promise.resolve({ type: 'clear', opts } as never)),
 }));
@@ -133,6 +152,7 @@ import {
 } from '../commands/host-subcommand-groups.js';
 import { executeInit } from '../commands/init.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plugin.js';
+import { executeRunsList, executeRunsShow } from '../commands/run-history.js';
 import { executeSessionShow } from '../commands/session-show.js';
 import { toolsList } from '../commands/tools/list.js';
 import { executeUninstall } from '../commands/uninstall.js';
@@ -550,6 +570,147 @@ describe('sessions spec — action bodies', () => {
   });
 });
 
+// --- runs --------------------------------------------------------------------
+
+describe('runs spec — action bodies and strict parsers', () => {
+  it('runs list uses the default bound and the active datastore', async () => {
+    const { ctx, rendered, datastore } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['runs', 'list'], { from: 'user' });
+
+    expect(executeRunsList).toHaveBeenCalledWith({
+      store: expect.anything(),
+      limit: 20,
+    });
+    expect(datastore).toHaveBeenCalledOnce();
+    expect(rendered).toHaveLength(1);
+  });
+
+  it('runs list forwards the maximum accepted full-string limit', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['runs', 'list', '--limit', '500'], { from: 'user' });
+
+    expect(executeRunsList).toHaveBeenCalledWith({
+      store: expect.anything(),
+      limit: 500,
+    });
+  });
+
+  it.each(['0', '501', '1.5', '12junk', '+1', ' 2'])(
+    'runs list rejects invalid --limit %j before its handler',
+    async (value) => {
+      const { ctx } = makeCtx();
+      const program = mount(ctx);
+      program.exitOverride();
+
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        await expect(
+          program.parseAsync(['runs', 'list', '--limit', value], { from: 'user' }),
+        ).rejects.toThrow(/Invalid --limit/u);
+      } finally {
+        stderr.mockRestore();
+      }
+      expect(executeRunsList).not.toHaveBeenCalled();
+    },
+  );
+
+  it('runs show forwards an exact safe ID and default page bounds', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['runs', 'show', 'opaque_id-WITH-123'], { from: 'user' });
+
+    expect(executeRunsShow).toHaveBeenCalledWith({
+      store: expect.anything(),
+      runId: 'opaque_id-WITH-123',
+      offset: 0,
+      limit: 100,
+    });
+  });
+
+  it('runs show forwards explicit offset and limit', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+
+    await program.parseAsync(['runs', 'show', 'RUN_01', '--offset', '12', '--limit', '25'], {
+      from: 'user',
+    });
+
+    expect(executeRunsShow).toHaveBeenCalledWith({
+      store: expect.anything(),
+      runId: 'RUN_01',
+      offset: 12,
+      limit: 25,
+    });
+  });
+
+  it.each(['-1', '1.5', '12junk', '+1', ' 2'])(
+    'runs show rejects invalid --offset %j before its handler',
+    async (value) => {
+      const { ctx } = makeCtx();
+      const program = mount(ctx);
+      program.exitOverride();
+
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        await expect(
+          program.parseAsync(['runs', 'show', 'RUN_01', '--offset', value], {
+            from: 'user',
+          }),
+        ).rejects.toThrow(/Invalid --offset/u);
+      } finally {
+        stderr.mockRestore();
+      }
+      expect(executeRunsShow).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['0', '501', '1.5', '12junk'])(
+    'runs show rejects invalid --limit %j before its handler',
+    async (value) => {
+      const { ctx } = makeCtx();
+      const program = mount(ctx);
+      program.exitOverride();
+
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        await expect(
+          program.parseAsync(['runs', 'show', 'RUN_01', '--limit', value], {
+            from: 'user',
+          }),
+        ).rejects.toThrow(/Invalid --limit/u);
+      } finally {
+        stderr.mockRestore();
+      }
+      expect(executeRunsShow).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['not.safe', 'slash/not-safe', 'contains space', 'x'.repeat(129)])(
+    'runs show rejects an invalid exact ID %j without reading persistence',
+    async (runId) => {
+      const { ctx, rendered, setExitCode } = makeCtx();
+      const program = mount(ctx);
+
+      await program.parseAsync(['runs', 'show', runId], { from: 'user' });
+
+      expect(executeRunsShow).not.toHaveBeenCalled();
+      expect(setExitCode).toHaveBeenCalledWith(2);
+      expect(rendered).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          exitCode: 2,
+          message: expect.stringMatching(/Parent Run ID/u),
+        }),
+      ]);
+    },
+  );
+});
+
 // --- configure ----------------------------------------------------------------
 
 describe('configure spec — action body', () => {
@@ -905,6 +1066,7 @@ describe('buildHostCommandInventory', () => {
     // The retired top-level `plugin` group is GONE; pack ops now mount under
     // each pack-supporting tool primary (`opensip fit plugin …`).
     const inventory = buildHostCommandInventory();
+    expect(inventory.groupSubcommands.runs).toEqual(['list', 'show']);
     expect(inventory.groupSubcommands.sessions).toEqual(['list', 'show', 'purge']);
     expect(inventory.groupSubcommands.plugin).toBeUndefined();
     expect(inventory.groupSubcommands.tools).toEqual([
@@ -925,6 +1087,7 @@ describe('buildHostCommandInventory', () => {
       'config',
       'policy',
       'repair',
+      'runs',
       'sessions',
       'suite',
       'tools',

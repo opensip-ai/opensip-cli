@@ -178,6 +178,20 @@ describe('completion subcommand parity', () => {
       expect.arrayContaining(['--cwd', '--json', '--debug']),
     );
   });
+
+  it('surfaces the canonical parent Run group and both read leaves', async () => {
+    const { inventory, program } = await buildLiveInventory();
+    const runs = program.commands.find((command) => command.name() === 'runs');
+
+    expect(runs).toBeDefined();
+    expect(inventory.subcommands).toContain('runs');
+    expect(inventory.groupSubcommands.runs).toEqual(['list', 'show']);
+
+    const bash = buildCompletionScript('bash', inventory);
+    const zsh = buildCompletionScript('zsh', inventory);
+    expect(bash).toContain('runs) COMPREPLY=($(compgen -W "list show"');
+    expect(zsh).toContain("runs) _values 'runs subcommand' list show");
+  });
 });
 
 describe('completion flag parity', () => {

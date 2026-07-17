@@ -50,6 +50,8 @@ describe('buildAgentCatalog', () => {
       'audit',
       'suite run',
       'status',
+      'runs list',
+      'runs show',
       'sessions list',
       'sessions show',
       'agent-catalog',
@@ -66,6 +68,8 @@ describe('buildAgentCatalog', () => {
     expect(JSON.stringify(catalog)).toContain('opensip audit --files src/server.ts --json');
     expect(JSON.stringify(catalog)).toContain('opensip suite run security --json');
     expect(JSON.stringify(catalog)).toContain('opensip status --json');
+    expect(JSON.stringify(catalog)).toContain('opensip runs list --json');
+    expect(JSON.stringify(catalog)).toContain('opensip runs show RUN_EXAMPLE_01 --json');
     expect(JSON.stringify(catalog)).toContain('opensip policy explain installed-tool:audit-sec');
     expect(catalog.outputShapes.reviewBrief).toMatch(/reviewBrief|version: 1/);
     expect(catalog.outputShapes.reviewBrief).toContain(

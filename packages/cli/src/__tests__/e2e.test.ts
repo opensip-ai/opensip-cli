@@ -341,6 +341,98 @@ describe('CLI e2e', () => {
       expect(exitCode).toBe(2);
       expect(stderr).toContain("argument 'bogus' is invalid");
     });
+
+    it('persists pre-init evidence that runs list/show and sessions show read from cache', () => {
+      const project = mkdtempSync(join(tmpdir(), 'opensip-e2e-runs-cache-'));
+      const home = mkdtempSync(join(tmpdir(), 'opensip-e2e-runs-home-'));
+      try {
+        mkdirSync(join(project, 'src'), { recursive: true });
+        writeFileSync(join(project, 'package.json'), '{"type":"module"}\n', 'utf8');
+        writeFileSync(join(project, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+        writeFileSync(
+          join(project, 'src', 'a.ts'),
+          'export function answer(): number { return 42; }\nanswer();\n',
+          'utf8',
+        );
+        const env = { HOME: home };
+
+        const graph = cli.run(['graph', '--json'], { cwd: project, env });
+        expect(graph.exitCode).toBe(0);
+
+        const listed = cli.run(['runs', 'list', '--json'], { cwd: project, env });
+        expect(listed.exitCode).toBe(0);
+        const history = (
+          JSON.parse(listed.stdout) as {
+            data?: {
+              type?: string;
+              runs?: { run?: { id?: string }; showCommand?: string }[];
+            };
+          }
+        ).data;
+        expect(history?.type).toBe('run-history');
+        expect(history?.runs).toHaveLength(1);
+        const runId = history?.runs?.[0]?.run?.id;
+        expect(runId).toMatch(/^[A-Za-z0-9_-]{1,128}$/u);
+        expect(history?.runs?.[0]?.showCommand).toBe(
+          `opensip runs show ${String(runId)} --json`,
+        );
+
+        const shown = cli.run(['runs', 'show', String(runId), '--json'], {
+          cwd: project,
+          env,
+        });
+        expect(shown.exitCode).toBe(0);
+        const detail = (
+          JSON.parse(shown.stdout) as {
+            data?: {
+              type?: string;
+              run?: { id?: string };
+              steps?: { sessionId?: string }[];
+              sessionFollowUps?: { sessionId?: string; showCommand?: string }[];
+            };
+          }
+        ).data;
+        expect(detail?.type).toBe('run-detail');
+        expect(detail?.run?.id).toBe(runId);
+        expect(detail?.steps).toHaveLength(1);
+        const sessionId = detail?.steps?.[0]?.sessionId;
+        expect(typeof sessionId).toBe('string');
+        expect(sessionId).toMatch(/^[A-Za-z0-9_-]{1,128}$/u);
+        expect(detail?.sessionFollowUps).toEqual([
+          {
+            runStepId: expect.any(String),
+            sessionId,
+            showCommand: `opensip sessions show ${String(sessionId)} --json`,
+          },
+        ]);
+
+        const replayed = cli.run(['sessions', 'show', String(sessionId), '--json'], {
+          cwd: project,
+          env,
+        });
+        expect(replayed.exitCode).toBe(0);
+        const replay = (
+          JSON.parse(replayed.stdout) as {
+            data?: { session?: { id?: string; tool?: string } };
+          }
+        ).data;
+        expect(replay?.session).toMatchObject({ id: sessionId, tool: 'graph' });
+
+        const listedAgain = cli.run(['runs', 'list', '--json'], { cwd: project, env });
+        expect(
+          (
+            JSON.parse(listedAgain.stdout) as {
+              data?: { runs?: unknown[] };
+            }
+          ).data?.runs,
+        ).toHaveLength(1);
+        expect(existsSync(join(project, 'opensip-cli'))).toBe(false);
+        expect(existsSync(join(home, '.opensip-cli', 'cache', 'ephemeral'))).toBe(true);
+      } finally {
+        rmSync(project, { recursive: true, force: true });
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('sessions list', () => {
