@@ -46,6 +46,16 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
+/** Wait for process-table reaping after SIGKILL (not instantaneous on loaded CI). */
+async function waitUntilDead(pid: number, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processIsAlive(pid)) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`process ${String(pid)} still alive after ${String(timeoutMs)} ms`);
+}
+
 function forceKillProcessGroup(pid: number): void {
   try {
     process.kill(-pid, 'SIGKILL');
@@ -288,7 +298,8 @@ describe('BoundedStdioClientTransport', () => {
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
       expect(transport.terminalStatus()).toEqual({ exitCode: 0, signal: null });
-      expect(() => process.kill(descendantPid, 0)).toThrow();
+      // close() arms TERM→KILL cleanup; reaping is asynchronous on loaded Linux CI.
+      await waitUntilDead(descendantPid);
     },
   );
 
@@ -325,7 +336,7 @@ describe('BoundedStdioClientTransport', () => {
       await expect(transport.close()).resolves.toBeUndefined();
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
-      expect(processIsAlive(descendantPid)).toBe(false);
+      await waitUntilDead(descendantPid);
     },
   );
 

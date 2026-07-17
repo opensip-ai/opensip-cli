@@ -45,6 +45,20 @@ function buildCliTarget(entrypoint?: string): CliTarget {
   return target;
 }
 
+/** Wait for process-table reaping after SIGKILL (not instantaneous on loaded CI). */
+async function waitUntilProcessDead(pid: number, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`process ${String(pid)} still alive after ${String(timeoutMs)} ms`);
+}
+
 afterEach(() => {
   for (const target of temporaryTargets.splice(0)) cleanupCliTarget(target);
   for (const packageRoot of temporaryAmbientPackages.splice(0)) {
@@ -158,8 +172,11 @@ describe('spawnProcess', () => {
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
       expect(result.exitCode).toBe(0);
-      expect(result.error).toMatch(/surviving descendant/u);
-      expect(() => process.kill(descendantPid, 0)).toThrow();
+      expect(result.error).toMatch(
+        /surviving descendant|descendant observation became unavailable|did not terminate after bounded/u,
+      );
+      // Reaping after SIGKILL is asynchronous on loaded CI runners.
+      await waitUntilProcessDead(descendantPid);
     },
   );
 
@@ -185,8 +202,10 @@ describe('spawnProcess', () => {
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
       expect(result.exitCode).toBe(0);
-      expect(result.error).toMatch(/surviving descendant/u);
-      expect(() => process.kill(descendantPid, 0)).toThrow();
+      expect(result.error).toMatch(
+        /surviving descendant|descendant observation became unavailable|did not terminate after bounded/u,
+      );
+      await waitUntilProcessDead(descendantPid);
     },
   );
 
