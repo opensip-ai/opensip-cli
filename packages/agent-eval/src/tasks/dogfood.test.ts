@@ -119,11 +119,12 @@ describe('dogfood tasks', () => {
     ).toEqual([{ kind: 'file', path: 'caller.ts', role: 'caller' }]);
   });
 
-  // The control arm exercises a REAL bounded graph analysis of this repo, whose
-  // traversal/ordering is intermittently non-deterministic and can omit a durable
-  // anchor on a given run (it passes on a re-run). A bounded retry keeps CI stable
-  // without masking a genuine regression — a persistent failure still fails every
-  // retry. (The underlying graph determinism is tracked separately.)
+  // The control arm exercises a REAL bounded dogfood run (git fixture inventory +
+  // graph analysis) of this repo. The workspace coverage lane runs every package's
+  // tests concurrently, and under that IO/CPU contention a step can occasionally
+  // exceed its bound; the git-inventory timeout ceiling is raised in
+  // fixture-inventory.ts as the primary mitigation, and this bounded retry is the
+  // belt-and-suspenders — a genuine regression still fails every retry.
   it('finds every durable anchor in a real bounded dogfood control run', { retry: 2 }, async () => {
     const result = await runTaskArm(entrypointTraceDogfoodTask, 'control');
 

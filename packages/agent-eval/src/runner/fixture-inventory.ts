@@ -8,7 +8,12 @@ import type { SpawnOptions, SpawnResult } from './spawn.js';
 
 const MAX_FIXTURE_FILES = 10_000;
 const MAX_GIT_INVENTORY_BYTES = 2 * 1024 * 1024;
-const GIT_INVENTORY_TIMEOUT_MS = 10_000;
+// `git ls-files` normally completes in well under a second, but the workspace
+// coverage lane runs every package's tests concurrently, and under that IO/CPU
+// contention the spawn+walk can exceed a tight bound. A generous ceiling keeps
+// the harness prerequisite from failing spuriously on a loaded CI runner while
+// staying bounded (it is still a hard timeout, not an unbounded wait).
+const GIT_INVENTORY_TIMEOUT_MS = 60_000;
 
 /** One validated Git-visible regular file belonging to a fixture. */
 export interface FixtureInventoryFile {
