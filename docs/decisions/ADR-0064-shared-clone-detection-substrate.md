@@ -169,7 +169,7 @@ byte-stable, and yagni becomes independently complete. The divergence is prevent
   fingerprint-golden / body-digest-golden / equivalence-guardrail tests gate every
   migration step.
 
-**Related specs / ADRs:** a build spec (`docs/plans/specs/shared-clone-detection.md`,
+**Related specs / ADRs:** a build spec (a local implementation spec,
 to be written) details the package API, the byte-stable graph migration order, the
 yagni TS extractor, and the parity test. Supersedes ADR-0063 (and the residual
 ADR-0057 graph-evidence seam). Related: ADR-0062 (near-clone detection — the MinHash

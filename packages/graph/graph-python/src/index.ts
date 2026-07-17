@@ -1,7 +1,7 @@
 /**
  * @opensip-cli/graph — Python language adapter.
  *
- * Lands in PR 5 of plan docs/plans/10-graph-language-pluggability.md.
+ * Lands in PR 5 of plan local planning notes
  * Exposes `pythonGraphAdapter`, a `GraphLanguageAdapter` backed by
  * tree-sitter-python.
  *

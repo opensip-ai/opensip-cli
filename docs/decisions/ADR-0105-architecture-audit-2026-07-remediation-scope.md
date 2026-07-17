@@ -26,7 +26,7 @@ enforcement-reason: >
 2026-07-01 architecture audit **P1 findings only** via targeted refactors,
 fail-closed policies, and repository-boundary tightening — no package merges,
 layer edge changes, or de-layering. Execution follows
-`docs/plans/architecture-audit-p1-remediation/plan.md`.
+local architecture planning notes.
 
 **Alternatives:**
 
@@ -59,7 +59,7 @@ cheaper to fix now than after ecosystem opening (ADR-0061).
   consumer requires typed governance/audit planes.
 
 **Related specs / ADRs:** [ADR-0056](ADR-0056-architecture-audit-remediation.md)
-(June scope); audit evidence under `docs/plans/architecture/`.
+(June scope); audit evidence under local architecture planning notes.
 
 ---
 

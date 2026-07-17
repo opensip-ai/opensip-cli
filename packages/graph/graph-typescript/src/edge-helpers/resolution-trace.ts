@@ -1,4 +1,4 @@
-// @fitness-ignore-file env-via-registry -- debug-only diagnostic harness, opt-in via the GRAPH_SITE_LOG / GRAPH_ENGINE env vars; NOT production configuration. Reading process.env directly is intentional and isolated to this one module so the production resolvers stay registry-clean. See docs/internal/graph-resolution-trace.md.
+// @fitness-ignore-file env-via-registry -- debug-only diagnostic harness, opt-in via the GRAPH_SITE_LOG / GRAPH_ENGINE env vars; NOT production configuration. Reading process.env directly is intentional and isolated to this one module so the production resolvers stay registry-clean. See a local working note
 /**
  * Per-site resolution trace (debug-only). When `GRAPH_SITE_LOG` points at a
  * file, every `resolveDeclToHash` decision appends one TSV row:

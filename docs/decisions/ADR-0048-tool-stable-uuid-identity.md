@@ -48,7 +48,7 @@ The DB persistence is additive (existing `tool` column keeps the human `name` va
 
 This is primarily an identity addition (orthogonal to contract surface evolution in ADR-0046/0047) but will be called out in JSDoc, the new check, and contributor documentation because it changes the meaning of `metadata.id` for anyone reading Tool objects.
 
-See the governing spec `docs/plans/specs/tool-stable-uuid-identity.md` for full technical context, DB schema details, first-party treatment, manifest evolution, and success criteria.
+See the governing local-only implementation spec for full technical context, DB schema details, first-party treatment, manifest evolution, and success criteria.
 
 **Consequences:**
 - `ToolMetadata` shape evolves: `id` (stable UUID) + `name` (human-facing, previously the value in `id`).
@@ -63,7 +63,7 @@ See the governing spec `docs/plans/specs/tool-stable-uuid-identity.md` for full 
 - Long-term: enables collision-free community tools, rename-stable history, and better global tool identity in catalogs/Cloud.
 
 **Related specs / ADRs:**
-- Governing spec: `docs/plans/specs/tool-stable-uuid-identity.md`
+- Governing local-only implementation spec (not committed)
 - ADR-0046 (Tool Contract Versioning Policy) and ADR-0047 (Per-Tool Contract Versioning) — this is identity, not contract surface.
 - ADR-0036 (host-owned baseline plane) — the stable `id` will become usable for durable tool scoping in baselines.
 - Recent check hygiene work (promotion of real `id` UUIDs for checks + `no-placeholder-check-ids` meta-check) — direct precedent and naming consistency driver.

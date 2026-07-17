@@ -5,7 +5,7 @@
  * the orchestrator (where they used to live in cli/orchestrate.ts:
  * buildAndResolveCatalog) into the adapter, so the orchestrator no
  * longer imports `'typescript'` after PR 3 of plan
- * docs/plans/10-graph-language-pluggability.md.
+ * local planning notes
  *
  * Per contract invariant I-7 (parseProject is total over `files`):
  * every file in `input.files` either parses successfully or surfaces

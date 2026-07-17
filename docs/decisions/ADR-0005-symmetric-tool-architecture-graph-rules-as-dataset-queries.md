@@ -118,13 +118,13 @@ for blast/SCC/coupling.
   `medium` and churn the baseline — rejected). The wiring lands in **Phase D**
   (which owns the severity model); Phase B stays identity-preserving.
 - Implemented in four phases (in-progress local plans under
-  `docs/plans/specs/`): `01-recipe-substrate-hoist` → `02-graph-rules-symmetry`
+  a local implementation spec): `01-recipe-substrate-hoist` → `02-graph-rules-symmetry`
   → `03-graph-feature-layer` → `04-graph-structural-rules`. Phase A is a
   no-behavior-change refactor (proven by existing recipe tests staying green).
 - Ships as **v2.6.0** (current line v2.5.2), gated on a full pre-publish review.
 
 **Related specs / ADRs:** Implemented by the four in-progress plans under
-`docs/plans/specs/` (`00-overview` indexes them; local-only). Governed by
+a local implementation spec (`00-overview` indexes them; local-only). Governed by
 [ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (rule quality
 bar); the feature layer follows
 [ADR-0006](./ADR-0006-derived-data-persistence-policy.md) (materialization

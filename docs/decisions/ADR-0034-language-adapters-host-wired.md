@@ -79,4 +79,4 @@ and is invisible to admission policy.
 **Related specs / ADRs:** ADR-0010 (lang-* canonical parse substrate),
 ADR-0027 (GA parity cutover), ADR-0029 (generic capability discovery — covers
 graph adapters and check packs, NOT language adapters), ADR-0030 (authored tool
-discovery), `docs/internal/parity-invariant-index.md` (invariant 1).
+discovery), a local working note (invariant 1).

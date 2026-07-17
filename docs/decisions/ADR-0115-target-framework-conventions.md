@@ -63,8 +63,7 @@ the documented `RunScope.targets` seam.
 
 **Related specs / ADRs:**
 
-- `docs/plans/completed/27-framework-convention-config.md`
-- `docs/plans/ready/framework-convention-config/`
+- Local implementation planning notes (not committed)
 - [ADR-0023](ADR-0023-config-package-and-schema-registry.md)
 - [ADR-0037](ADR-0037-generic-targeting-runtime.md)
 - [ADR-0084](ADR-0084-mcp-server-surface.md)

@@ -1,7 +1,7 @@
 /**
  * Unit tests for the language-adapter registry's `pickAdapter` heuristic.
  *
- * PR 6 of plan docs/plans/10-graph-language-pluggability.md introduced
+ * PR 6 of plan local planning notes introduced
  * file-extension dominance counting when ≥ 2 adapters are registered.
  * These tests cover the dominance heuristic + tie-breaking preference
  * order.

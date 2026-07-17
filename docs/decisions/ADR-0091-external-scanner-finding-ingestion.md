@@ -145,7 +145,7 @@ its enforcement:
 | The `message-hash` fingerprint is stamped worker-side; the host ratchet only reads `signal.fingerprint` | **No new check** | Compile-time (`synthesizeExternalTool` drops `fingerprintStrategy`) + the existing `saveBaseline`/`compareBaseline` dispatch tests proving the stamped fingerprint crosses the boundary; ADR-0036 plane never re-fingerprints. |
 | Native severity preserved on `metadata`; mapped four-bucket severity on `Signal.severity`; CVSS bands drive SARIF severity | **No check warranted** | Golden unit tests per scanner (normalized-signal goldens + the `ingestSarif` round-trip golden against `buildOpenSipSarif`). A structural check cannot assert value correctness. |
 
-**Related specs / ADRs:** implemented by `docs/plans/ready/04-external-tool-adapters/`.
+**Related specs / ADRs:** implemented in subsequent local planning work.
 Related: [ADR-0080](ADR-0080-host-owned-artifact-write-seam.md) (the host artifact
 seam this extends — no second seam), [ADR-0036](ADR-0036-host-owned-baseline-ratchet-plane.md)
 (the host ratchet that reads the worker-stamped fingerprint),

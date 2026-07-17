@@ -376,7 +376,7 @@ export interface ToolCliContext {
    *
    * See:
    * - the "Host-Owned Governance, Entitlements & Audit Plane" spec + plan
-   *   (local-only working docs under docs/plans/, by that title)
+   *   (local-only working docs, by that title)
    * - ADR-0042 (toolState baseline this reuses)
    *
    * Design: typed seams here (host provides the impl), opaque/namespaced storage under the

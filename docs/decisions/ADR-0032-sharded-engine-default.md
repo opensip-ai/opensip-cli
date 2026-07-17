@@ -149,6 +149,6 @@ residual on real repos.
 **Related specs / ADRs:** Supersedes ADR-0031 (graph determinism — one build, one
 finalize, many renderers), retaining all of its invariants except the default-engine
 choice. Builds on ADR-0015 (engine-version + mode cache stamping). Implements the
-flip tracked in `docs/plans/graph-sharded-exact-parity*` (local). Residual diagnosis
-recorded in `docs/internal/graph-false-findings-incident-log.md` and the
+flip tracked in local planning notes (local). Residual diagnosis
+recorded in local working notes and the
 `graph-engine-convergence` plan notes.

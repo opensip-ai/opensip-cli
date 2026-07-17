@@ -668,9 +668,8 @@ contract:
   `80-implementation`. Anything here is reader-facing and externally
   consumable.
 - **`docs/internal/`** — hand-edited, local-only and gitignored by default.
-  Private working context that must not be published or force-added. See the
-  local `docs/internal/README.md` for the charter. (Public formal decisions live
-  in `docs/decisions/`, not here.)
+  Private working context that must not be published or force-added.
+  (Public formal decisions live in `docs/decisions/`, not here.)
 - **`docs/decisions/`** — hand-edited, committed. The architecture
   decision log (ADRs): the durable _why_ behind a choice, with
   alternatives and consequences. One file per `ADR-NNNN-*.md`,
@@ -685,6 +684,8 @@ contract:
   `docs/decisions/`. NOTE: this deliberately overrides the spec skill's
   default `docs/specs/` output — author all specs under
   `docs/plans/specs/`.
+- **`docs/ai-helpers/`** — local-only (gitignored) agent prompt packs and
+  helpers used while drafting plans; not part of the committed product.
 - **`docs/web-generated/`** — generated output. Never hand-edit. It
   mirrors `docs/public/` rewritten for the website (links resolved to
   pinned GitHub URLs and root-relative website paths; `web:skip` /
@@ -700,12 +701,20 @@ contract:
 
 Boundary rule of thumb: a durable _decision_ (what we chose + why, with
 alternatives) is an ADR in `docs/decisions/`; the _how to build it_ is a
-spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
+spec under `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
 opensip-cli without naming a specific consumer, it goes in
 `docs/public/`; if naming a specific consumer (or other private context)
 is load-bearing, it goes in local-only `docs/internal/`; if it's pending work or
 design exploration not yet ready for external readers, it stays in
 `docs/plans/` (local-only).
+
+**No tracked → gitignored file pointers:** a *tracked* file must not point at a
+specific file or path *inside* the gitignored directories `docs/plans/`,
+`docs/internal/`, or `docs/ai-helpers/` (those trees are ephemeral and may be
+deleted anytime). Naming the directories here to describe the ignore boundary is
+fine. References *from within* those gitignored trees are fine. Prefer citing
+tracked artifacts instead: `ADR-NNNN`, committed docs under `docs/public/` /
+`docs/decisions/`, and source paths.
 
 - **Generator:** `scripts/build-web-docs.mjs`
 - **Scripts:** `pnpm docs:build` (write) · `pnpm docs:check` (CI staleness gate)

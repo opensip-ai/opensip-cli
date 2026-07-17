@@ -98,7 +98,7 @@ artifact/capability belongs in Cloud iff it needs >1 repo, >1 run, or >1 actor).
   cross-repo coordination): the full-fidelity ingest contract, SARIF-transform
   fidelity, and server-side authority/divergence enforcement live in the parent
   `opensip` repo and should be tracked there with a `DEC-NNN`.
-- **Dangling cross-repo doc:** ADR-0008 cites `docs/internal/consumers/opensip.md`,
+- **Dangling cross-repo doc:** ADR-0008 cites a local working note,
   which is absent on disk. Recreate it as the CLI-side mirror of DEC-587 + the
   `SignalBatch schemaVersion:1` contract, owned under spec 11, and update it in the
   same PR as any egress-fidelity change.
@@ -113,8 +113,8 @@ artifact/capability belongs in Cloud iff it needs >1 repo, >1 run, or >1 actor).
   remediation is the platform moat — see spec 21). Those affect *when*, not *whether*,
   the authority model holds.
 
-**Related specs / ADRs:** Implemented by `docs/plans/completed/20-platform-evidence-authority-and-egress-contract.md`
-and `docs/plans/completed/09-enterprise-trust-policy-plane.md` (local-only). Builds on
+**Related specs / ADRs:** Implemented in subsequent local planning work.
+and a local implementation plan (local-only). Builds on
 [ADR-0008](./ADR-0008-opensip-cloud-signal-sync.md) (Cloud signal sink + open-core
 boundary), [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (output
 plane), [ADR-0036](./ADR-0036-host-owned-baseline-ratchet-plane.md) (fingerprint

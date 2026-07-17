@@ -1,7 +1,7 @@
 ---
 name: frontend-plan
 description: >
-  Create UI implementation plans for opensip-cli's two presentation surfaces in docs/plans/: the Ink/React
+  Create UI implementation plans for opensip-cli's two presentation surfaces (local-only plan scratch): the Ink/React
   terminal UI (the @opensip-cli/cli-ui kit + tool "live view" CommandSpecs) and the self-contained HTML report
   generator (@opensip-cli/dashboard, assembled by the `report` command). Use this skill when the user asks to plan
   terminal-UI work — a live run view, a Banner/Spinner/RunHeader change, theme/colour work, TTY/no-colour handling
@@ -25,9 +25,9 @@ Query, no routing**. Its "frontend" is two things:
    **self-contained static HTML file** assembled by the CLI-owned `report` command
    (the composition root) from each tool's `collectReportData` contribution.
 
-Plan to those two surfaces only. Plans live in `docs/plans/` as a directory with a
-top-level `plan.md` and separate `phase-N-name.md` files. (`docs/plans/` is
-gitignored scratch — see `docs/plans/README.md`.)
+Plan to those two surfaces only. Plans live in the repo's local-only (gitignored) plan
+scratch as a directory with a top-level `plan.md` and separate `phase-N-name.md` files.
+See `CLAUDE.md` / `AGENTS.md` for the docs-tree boundary.
 
 ## Your workflow
 
@@ -58,8 +58,7 @@ the data isn't in the envelope yet (a backend-plan dependency).
 
 ## Before you write anything
 
-Read 1-2 existing plans for the structural format (`docs/plans/ready/*/plan.md`),
-and `docs/plans/README.md` + `CLAUDE.md` (layer DAG, the documented
+Read 1-2 existing ready plans for the structural format, and `CLAUDE.md` (layer DAG, the documented
 `ToolCliContext` seams, RunScope). Then research the surface you're touching:
 
 - **Ink live view:** read `@opensip-cli/cli-ui` (`packages/cli-ui/src/`) — the existing primitives (`Banner`, `Spinner`, `RunHeader`) and the theme. Read an existing tool that ships a live view (`output: 'live-view'`) to see how it renders via the `render` seam.

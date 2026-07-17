@@ -94,7 +94,7 @@ so nothing of value is lost.
   `onConflictDoUpdate` set must key on Drizzle column properties, not SQL names).
 
 **Related specs / ADRs:**
-- Governing spec / plan: `docs/plans/ready/host-owned-run-timing/` (local-only).
+- Governing spec / plan: a local implementation plan (local-only).
 - ADR-0011 (machine-output plane), ADR-0036 (baseline/ratchet plane),
   ADR-0042 (per-tool state plane) — the host-owned-plane precedent this follows.
 - ADR-0048 (tool stable UUID identity) — adjacent session/datastore evolution.

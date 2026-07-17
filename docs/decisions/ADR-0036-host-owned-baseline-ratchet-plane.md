@@ -125,7 +125,7 @@ a behavioral guess.
 builds on ADR-0011 (Signal is the output currency — fingerprints + baseline are a
 property of that currency) and ADR-0020 (dogfood gate hard-fail + net-new SARIF
 ratchet — this plane generalizes the ratchet to every tool). The implementing spec
-is `docs/plans/specs/host-baseline-ratchet-plane.md` (local-only), which carries
+is a local implementation spec (local-only), which carries
 the divergence table, the data model, the seam surface, and the per-tool no-flap +
 byte-identical verification matrix.
 

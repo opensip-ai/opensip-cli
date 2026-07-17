@@ -39,7 +39,7 @@ gates.
 Producer provenance already ships (`release.yml` OIDC + `--provenance`). The gap is
 consumer trust at install/load for third-party tools and capability packs.
 
-**Consequences:** `docs/internal/plugin-isolation-surface.md` carries the inventory
+**Consequences:** a local working note carries the inventory
 and strict-mode matrix. Public docs must not claim enforcement is active until spec
 03 lands.
 

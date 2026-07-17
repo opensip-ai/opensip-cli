@@ -13,11 +13,17 @@ so a future contributor can reconstruct the reasoning instead of re-litigating i
 ADRs are the **decision log** (the durable *why*). They complement, but are
 distinct from:
 - **`docs/plans/specs/`** — forward-looking *how to build it* specs, **local-only
-  (gitignored, under `docs/plans/`)** (an ADR records the decision; a spec
-  implements it).
+  (gitignored, under `docs/plans/`)** (an ADR records the decision; a local spec
+  may implement it).
 - **`docs/internal/`** — looser contributor notes, operational awareness,
-  cross-repo relationships.
+  cross-repo relationships (local-only / gitignored).
 - **`docs/public/`** — reader-facing product/usage docs.
+
+**Do not cite gitignored files from ADRs.** Tracked ADRs (and this index) must
+not point at a specific path inside `docs/plans/`, `docs/internal/`, or
+`docs/ai-helpers/` — those trees are ephemeral. Related links should name other
+`ADR-NNNN`s and committed docs. Naming the directories above to describe the
+boundary is fine.
 
 ## Conventions
 
@@ -26,9 +32,10 @@ distinct from:
   **`DEC-NNN`** and our code/specs sometimes cite parent DECs — reference those
   under `related:` as `DEC-NNN`. The two namespaces are deliberately separate so
   IDs never collide across repos.
-- **Append-only:** never rewrite a shipped decision. To change one, write a new
-  ADR, set the old one's `status: superseded` + `superseded_by: ADR-NNNN`, and the
-  new one's `supersedes: [ADR-NNNN]`.
+- **Append-only:** never rewrite a shipped *decision*. To change a decision, write
+  a new ADR, set the old one's `status: superseded` + `superseded_by: ADR-NNNN`,
+  and the new one's `supersedes: [ADR-NNNN]`. Removing a dangling pointer to an
+  ephemeral (gitignored) path is a maintenance correction, not a decision rewrite.
 - **Status** lives in each file's YAML block: `active` | `superseded` | `deferred`.
 - Start from [`TEMPLATE.md`](./TEMPLATE.md). The parent's SaaS-specific
   `Audit-history impact` block is intentionally omitted here.
@@ -99,7 +106,7 @@ distinct from:
 - [ADR-0108](ADR-0108-graph-cache-key-includes-resolution-mode.md) — Graph adapter cache keys must include `resolutionMode` (the `CacheKeyInput` MUST-fold contract; not invariant I-8, which is per-adapter prefix uniqueness); `makeConfigCacheKey` in graph-adapter-common appends or hashes mode alongside config-path hash.
 - [ADR-0107](ADR-0107-datastore-repository-only-boundary.md) — DataStore public barrel is repository-only; `DrizzleDataStore.db` moves behind `@internal` subpath for sibling persistence packages; extends ADR-0056 R18.
 - [ADR-0106](ADR-0106-fitness-bare-slug-fail-closed.md) — Fitness bare-slug resolution fails closed on ambiguity; built-in recipes use namespaced slugs (`pack:slug`).
-- [ADR-0105](ADR-0105-architecture-audit-2026-07-remediation-scope.md) — July 2026 architecture audit P1 remediation scope: preserve layered DAG; fix concurrency, determinism, persistence boundary, and extensibility gaps per `docs/plans/architecture-audit-p1-remediation/`.
+- [ADR-0105](ADR-0105-architecture-audit-2026-07-remediation-scope.md) — July 2026 architecture audit P1 remediation scope: preserve layered DAG; fix concurrency, determinism, persistence boundary, and extensibility gaps from the July 2026 architecture-audit P1 remediation.
 - [ADR-0104](ADR-0104-defer-host-owned-run-pipeline.md) — _(superseded by [ADR-0117](ADR-0117-host-owned-analysis-run-pipeline.md))_ Defer the host-owned run pipeline behind the assessment contract-conformance fixes; reserve `RunCommandPipeline`, `defineAnalysisRunCommand`, production `readToolConfig`, and typed lifecycle event APIs until a promoted implementation spec names the package boundary and migrates `yagni` first.
 - [ADR-0103](ADR-0103-scope-abi-compatibility-guard.md) — The single-core guard decides pack/core compatibility by a scope ABI version (declared in core's `package.json` as `opensipScopeAbiVersion`), not the npm version; cores ≥ v0.1.11 without the field are inferred as ABI 1. Fixes the "one global CLI, many consumer repos" workflow and emits a targeted diagnostic naming both core versions on a mismatch.
 - [ADR-0102](ADR-0102-coffee-cup-canonical-logo-and-live-activity-mark.md) — The OpenSIP coffee cup is the canonical CLI logo; legacy OPENSIP wordmark banners are removed, and live activity may use shared steam-animation cup variants in a fixed left column.
@@ -181,7 +188,7 @@ distinct from:
   key per occurrence, never the `byBodyHash` winner (body-twin de-union)
 - [ADR-0004](./ADR-0004-opt-in-opentelemetry.md) — Opt-in OpenTelemetry: env-var
   gate, `@opentelemetry/api` in `core` / SDK only in `cli`, tools instrument via
-  the `withSpan` seam (migrated from `docs/internal/decisions/`)
+  the `withSpan` seam (migrated into the ADR log)
 - [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md)
   — Symmetric tool architecture: `graph` reaches parity with `fitness`
   (`defineRule` ↔ `defineCheck`, shared recipe substrate hoisted to `core`,

@@ -67,7 +67,7 @@ forbid YAML projection anywhere else.
 - A **32nd publishable package** (`@opensip-cli/config`) — update `RELEASING.md`,
   `scripts/release-package-order.mjs` (and every surface ADR-0017 derives from it),
   and bootstrap its npm trusted publisher (brand-new name).
-- **2.10.0** (spec: `docs/plans/specs/release-2.10.0-capability-configuration.md`):
+- **2.10.0** (spec: a local implementation spec):
   create the package; the composer + `ToolConfigDeclaration`; tools contribute
   namespaced schemas; strict validation; capability model (§5.3) + scope-owned
   registries (§5.11).
@@ -82,9 +82,9 @@ forbid YAML projection anywhere else.
   acceptable pre-GA; called out in the 2.10.0 / 2.10.1 CHANGELOG.
 
 **Related specs / ADRs:** Implemented by
-`docs/plans/specs/release-2.10.0-capability-configuration.md` (composer core) and
+a local implementation spec (composer core) and
 the 2.10.1 consolidation plan. Part of the tool-plugin-parity roadmap
-(`docs/plans/tool-plugin-parity-roadmap.md`). Relates to ADR-0021 (the
+(local planning notes). Relates to ADR-0021 (the
 flag-currency guardrail template), ADR-0012 (pre-GA versioning that licenses the
 strict-validation break), ADR-0011 (output currency — the inner/outer split this
 mirrors for config).
@@ -95,7 +95,7 @@ mirrors for config).
 
 The decision and consequences above are unchanged. This amendment records three
 boundary refinements surfaced while planning the 2.10.1 migration
-(`docs/plans/ready/release-2.10.1-config-consolidation/`). They are clarifications
+(a local implementation plan). They are clarifications
 of *where the layer falls*, not a reversal — the package still owns the
 cross-cutting config machinery and the document blocks.
 

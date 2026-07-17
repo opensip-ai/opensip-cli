@@ -82,4 +82,4 @@ to protect.
 the private-package reverse-boundary precedent, and
 [ADR-0095](ADR-0095-ai-native-guardrail-platform-posture.md) keeps model
 execution out of the CLI. The local implementation plan is
-`docs/plans/ready/03-agent-eval-harness/`.
+a local implementation plan.

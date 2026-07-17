@@ -83,5 +83,5 @@ materialized for them.
 [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md)
 (applies this to the feature layer);
 [ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (rankings are
-dashboard insights). Implemented detail in `docs/plans/specs/03-graph-feature-layer.md`
+dashboard insights). Implemented detail in a local implementation spec
 (local-only).

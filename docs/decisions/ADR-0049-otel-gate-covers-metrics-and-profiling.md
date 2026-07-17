@@ -37,7 +37,7 @@ enforcement-reason: >
 - Adding `@opentelemetry/sdk-metrics` (and its OTLP exporter) only in the CLI root keeps the kernel and tools as pure `@opentelemetry/api` consumers.
 - The dedicated profiling flag gives operators explicit control over the expensive per-run profile artifact while still allowing simple "one knob" usage for teams that accept the cost.
 - The cardinality split (spans vs. metrics) is recorded here so every future instrumentation site has a single source of truth instead of re-litigating per PR.
-- The previous `docs/plans/ready/telemetry-opt-in/` work and the 2026-06 observability audit both showed that the existing trace seam + `sdk-init.ts` pattern generalizes cleanly to metrics and (conditionally) profiles.
+- The previous a local implementation plan work and the 2026-06 observability audit both showed that the existing trace seam + `sdk-init.ts` pattern generalizes cleanly to metrics and (conditionally) profiles.
 
 **Consequences:**
 - `packages/cli/package.json` gains two new runtime dependencies (pinned in `pnpm-workspace.yaml` for version consistency with the trace packages). This affects the published `opensip-cli` closure and the release ordering documented in RELEASING.md.
@@ -48,5 +48,5 @@ enforcement-reason: >
 
 **Related specs / ADRs:**
 - Implements and extends ADR-0004.
-- Implemented by `docs/plans/specs/observability-hardening.md` and the plan under `docs/plans/ready/observability-hardening/`.
+- Implemented via local-only observability-hardening planning notes.
 - The Phase 2 ADR task (ADR-00NN in early drafts) is realized by this document.

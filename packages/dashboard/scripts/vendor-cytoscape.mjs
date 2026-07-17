@@ -11,7 +11,7 @@
  * Why these two and not three: `cytoscape-dagre@3` bundles its own dagre
  * (`@dagrejs/dagre`) inside its UMD build, so the standalone `dagre`
  * package is dead weight (~280 KB) and is deliberately NOT vendored. See
- * Phase 0 of docs/plans/ready/graph-visualizer-view.
+ * Phase 0 of a local implementation plan
  *
  * Why `cytoscape.min.js` (minified UMD) and not `cytoscape.umd.js`
  * (unminified, ~1.17 MB): minified is the offline-distributable global

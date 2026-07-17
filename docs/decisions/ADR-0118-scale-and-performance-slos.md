@@ -50,4 +50,4 @@ loosening budgets by default. Budget changes must update the JSON source and
 regenerate the public SLO reference.
 
 **Related specs / ADRs:** Implements the scale-and-performance SLO plan promoted
-from `docs/plans/completed/18-scale-and-performance-slos.md`.
+from the scale-and-performance-slos planning work.
