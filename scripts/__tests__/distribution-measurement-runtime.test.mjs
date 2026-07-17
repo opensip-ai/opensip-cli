@@ -591,11 +591,15 @@ test('bounded JSON commands disable shells, cap output, and reject malformed chi
   assert.equal(spawnInput.options.shell, false);
   assert.deepEqual(spawnInput.options.stdio, ['ignore', 'pipe', 'ignore']);
 
+  // Size-cap and JSON-parse failures must not race a tight wall clock: on
+  // loaded macOS CI runners a real Node child can take >100ms to emit its first
+  // stdout chunk, which previously flipped this case into `exceeded 100 ms`
+  // and failed the lane before pack/acceptance could run.
   await assert.rejects(
     () =>
       runBoundedJsonCommand({
         command: ['pnpm'],
-        timeoutMs: 100,
+        timeoutMs: 5_000,
         maxBytes: 4,
         spawnChild: (_command, _args, options) => jsonChild('{"too":"large"}', 0, options),
       }),
@@ -605,7 +609,7 @@ test('bounded JSON commands disable shells, cap output, and reject malformed chi
     () =>
       runBoundedJsonCommand({
         command: ['pnpm'],
-        timeoutMs: 100,
+        timeoutMs: 5_000,
         maxBytes: 100,
         spawnChild: (_command, _args, options) => jsonChild('{broken', 0, options),
       }),
