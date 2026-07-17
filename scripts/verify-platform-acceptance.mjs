@@ -311,6 +311,10 @@ function parseArgs(argv) {
   const flags = {};
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
+    // pnpm 11 (and some npm versions) forward the bare `--` script separator
+    // as argv. Ignore end-of-options markers so package-script invocations match
+    // direct-node invocations (same contract as run-platform-acceptance.mjs).
+    if (token === '--') continue;
     if (typeof token !== 'string' || !token.startsWith('--')) {
       return invalid(`unexpected argument ${JSON.stringify(token)}`);
     }
