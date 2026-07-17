@@ -12,7 +12,6 @@ import {
   agentCatalogPlatformEntryPoints,
   assembleAgentCatalog,
   assertAgentCatalogOverlayKeys,
-  buildAgentCatalog as buildAgentCatalogFromContracts,
   commonFlags,
   hostSupportFromRuntimeProjection,
   summarizeTargetConventions,
@@ -615,13 +614,11 @@ describe('executeAgentCatalog', () => {
   });
 });
 
-// The Plan 03 catalog-parity handoff: the CLI and MCP composition roots both
-// build their catalog from `buildAgentCatalog` and both derive `hostSupport` from
-// the SAME core projection via the SAME contracts mapper. Feeding identical
-// process facts must produce EQUAL full AgentCatalog objects (including
-// hostSupport) — not merely equal hostSupport payloads — so a future common
-// parity assembler can accept `hostSupport?: AgentHostSupport` with no adapter or
-// rename. (The MCP read port's forwarding half is proven in
+// The Plan 03 catalog-parity seam: the CLI and MCP composition roots both use
+// `assembleAgentCatalog` and derive `hostSupport` from the SAME core projection
+// via the SAME contracts mapper. Feeding identical process facts must produce
+// EQUAL full AgentCatalog objects (including hostSupport), not merely equal
+// hostSupport payloads. (The MCP read port's forwarding half is proven in
 // packages/mcp/src/__tests__/session-results-read-port.test.ts.)
 describe('CLI↔MCP catalog parity (Plan 03 handoff)', () => {
   /** The exact live-process projection both composition roots compute. */
@@ -637,35 +634,37 @@ describe('CLI↔MCP catalog parity (Plan 03 handoff)', () => {
     );
   }
 
-  /** Exactly what `SessionResultsReadPort.agentCatalog()` builds for these deps. */
-  function mcpCatalog(tools: ToolRegistry, hostSupport: AgentHostSupport) {
-    return buildAgentCatalogFromContracts({ tools, hostSupport, validateOverlays: true });
+  /** The complete common body both production composition roots assemble. */
+  function commonCatalog(tools: ToolRegistry, hostSupport: AgentHostSupport) {
+    return assembleAgentCatalog({
+      tools,
+      hostSupport,
+      rootCommands: [...HOST_RESERVED_ROOT_COMMANDS].sort(),
+      suiteNames: RESERVED_SUITE_NAMES,
+    });
   }
 
-  it('CLI executeAgentCatalog equals the MCP-composed catalog for identical facts (incl. hostSupport)', async () => {
+  it('CLI executeAgentCatalog equals the complete common catalog for identical facts', async () => {
     const tools = await makeRegistry();
     const out = executeAgentCatalog({ json: true, tools });
     const { catalog } = out as { catalog: ReturnType<typeof buildAgentCatalog> };
 
-    // The ONE documented CLI-only overlay is reservedNames (ADR-0159); MCP omits
-    // it. Everything else — including the honest process-only hostSupport — must
-    // be byte-for-byte identical to the MCP composition.
-    const { reservedNames, ...cliRest } = catalog;
-    expect(reservedNames).toBeDefined();
-
-    const mcp = mcpCatalog(tools, liveHostSupport());
-    expect(cliRest).toEqual(mcp);
+    // Plan 03 makes reserved names part of the common body; MCP adds only its
+    // top-level connector overlay after this complete projection is assembled.
+    const common = commonCatalog(tools, liveHostSupport());
+    expect(catalog).toEqual(common);
+    expect(catalog.reservedNames).toBeDefined();
     // Prove the equality is not vacuous: hostSupport is present, additive, and
     // identical on both sides (the load-bearing Plan 03 field).
-    expect(cliRest.hostSupport).toBeDefined();
-    expect(cliRest.hostSupport).toEqual(mcp.hostSupport);
-    expect(cliRest.hostSupport).toEqual(liveHostSupport());
-    expect(JSON.stringify(cliRest.hostSupport)).toBe(JSON.stringify(mcp.hostSupport));
+    expect(catalog.hostSupport).toBeDefined();
+    expect(catalog.hostSupport).toEqual(common.hostSupport);
+    expect(catalog.hostSupport).toEqual(liveHostSupport());
+    expect(JSON.stringify(catalog.hostSupport)).toBe(JSON.stringify(common.hostSupport));
   });
 
   it('the shared hostSupport is honest: contract-versioned, never exact, closed vocabulary', async () => {
     const tools = await makeRegistry();
-    const hostSupport = mcpCatalog(tools, liveHostSupport()).hostSupport;
+    const hostSupport = commonCatalog(tools, liveHostSupport()).hostSupport;
     expect(hostSupport?.supportContractVersion).toBe(PLATFORM_SUPPORT_CONTRACT_VERSION);
     expect(hostSupport?.match).not.toBe('exact');
     expect(['partial', 'none']).toContain(hostSupport?.match);

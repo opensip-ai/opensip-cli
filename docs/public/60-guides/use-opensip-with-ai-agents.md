@@ -7,6 +7,7 @@ audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
 source-files:
   - packages/cli/src/commands/agent-catalog.ts
+  - packages/contracts/src/agent-catalog-assembly.ts
   - packages/contracts/src/agent-catalog.ts
   - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/contracts/src/agent-filters.ts
@@ -214,7 +215,7 @@ Projects can override built-in recipes in `opensip-cli.config.yml`.
 
 For agents that support [Model Context Protocol](https://modelcontextprotocol.io),
 register `opensip mcp` as a stdio server instead of shelling out for every graph
-or findings query. Treat live `listTools` and `get_agent_catalog.mcp.names` as
+or findings query. Treat live `listTools` and `get_agent_catalog.mcp.toolNames` as
 the inventory authority. Mutation opt-in adds only `repair_apply_verify`; the
 default server remains read-only apart from explicit `refresh_graph` rebuilds.
 

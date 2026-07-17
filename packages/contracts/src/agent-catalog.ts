@@ -94,7 +94,8 @@ export interface AgentCatalog {
    * Names no Tool or configured suite may claim (ADR-0159). Additive
    * (optional): the composition root injects the live lists (it owns them —
    * this contracts layer cannot import the cli or config packages), so
-   * catalogs built without them (e.g. over MCP) simply omit the field.
+   * bare contracts builds may omit the field. The production CLI and MCP
+   * composition roots both provide it through the shared assembler.
    * `rootCommands` = host-owned root commands a Tool cannot mount;
    * `suiteNames` = built-in suite names a configured suite cannot use.
    */

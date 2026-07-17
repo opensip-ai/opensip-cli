@@ -20,10 +20,8 @@ import { ValidationError } from '@opensip-cli/core';
 import { buildAgentCatalog } from './agent-catalog.js';
 import { compareCodePoint } from './code-point-order.js';
 
-import type { AgentCatalog } from './agent-catalog.js';
-import type { AgentHostSupport } from './host-support.js';
-import type { AgentProjectContext } from './target-conventions.js';
-import type { RuntimeCommandInventory, ToolRegistry } from '@opensip-cli/core';
+import type { AgentCatalog, AgentCatalogBuildInput } from './agent-catalog.js';
+import type { RuntimeCommandInventory } from '@opensip-cli/core';
 
 /**
  * Input for the shared, pure {@link assembleAgentCatalog} both transports call
@@ -37,16 +35,15 @@ import type { RuntimeCommandInventory, ToolRegistry } from '@opensip-cli/core';
  * `RESERVED_SUITE_NAMES`). The lists are authority-owned and pre-ordered — the
  * assembler copies them verbatim and never re-sorts or re-validates them.
  */
-export interface AgentCatalogAssemblyInput {
-  readonly tools?: ToolRegistry;
-  readonly internalCommands?: ReadonlySet<string>;
-  readonly projectContext?: AgentProjectContext;
-  readonly hostSupport?: AgentHostSupport;
+export type AgentCatalogAssemblyInput = Omit<
+  AgentCatalogBuildInput,
+  'reservedNames' | 'validateOverlays'
+> & {
   /** Host-owned root command names a Tool cannot mount (already ordered). */
   readonly rootCommands: readonly string[];
   /** Built-in suite names a configured suite cannot claim (already ordered). */
   readonly suiteNames: readonly string[];
-}
+};
 
 /**
  * The single pure path from captured runtime/project facts to the shared
@@ -59,16 +56,18 @@ export interface AgentCatalogAssemblyInput {
  * validator, entry points, notes, or normalization — projection only.
  */
 export function assembleAgentCatalog(input: AgentCatalogAssemblyInput): AgentCatalog {
+  const { projectContext, rootCommands, suiteNames, ...buildInput } = input;
   const hasProjectContext =
-    input.projectContext !== undefined && input.projectContext.targetConventions.length > 0;
+    projectContext !== undefined && projectContext.targetConventions.length > 0;
   return buildAgentCatalog({
-    ...(input.tools === undefined ? {} : { tools: input.tools }),
-    ...(input.internalCommands === undefined ? {} : { internalCommands: input.internalCommands }),
-    ...(hasProjectContext ? { projectContext: input.projectContext } : {}),
-    ...(input.hostSupport === undefined ? {} : { hostSupport: input.hostSupport }),
+    // Forward every common builder field structurally. A future optional
+    // AgentCatalogBuildInput field therefore reaches both transports through
+    // this shared seam instead of requiring a second hand-maintained list.
+    ...buildInput,
+    ...(hasProjectContext ? { projectContext } : {}),
     reservedNames: {
-      rootCommands: [...input.rootCommands],
-      suiteNames: [...input.suiteNames],
+      rootCommands: [...rootCommands],
+      suiteNames: [...suiteNames],
     },
     validateOverlays: true,
   });

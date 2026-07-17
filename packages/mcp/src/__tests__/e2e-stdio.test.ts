@@ -885,7 +885,7 @@ describe('MCP e2e over real stdio', () => {
   }, 60_000);
 
   it('lists repair_apply_verify only when mutation mode is enabled', async () => {
-    const conn = await connect(fixtureA, { allowMutations: true });
+    const conn = await connect(catalogFixture, { allowMutations: true });
     try {
       const tools = await conn.client.listTools();
       expect(tools.tools).toHaveLength(26);
@@ -920,6 +920,27 @@ describe('MCP e2e over real stdio', () => {
           'why_depends',
         ]),
       );
+
+      const cliRaw = await runBuiltCliCapture(catalogFixture, ['agent-catalog', '--json']);
+      const cliCatalog = (
+        JSON.parse(cliRaw) as {
+          data: { catalog: Record<string, unknown> };
+        }
+      ).data.catalog;
+      const response = await call(conn, 'get_agent_catalog', {});
+      const { mcp, ...common } = response;
+      expect(common).toEqual(cliCatalog);
+
+      const overlay = mcp as {
+        mutationPosture: string;
+        toolNames: string[];
+        toolCount: number;
+      };
+      expect(overlay.mutationPosture).toBe('mutations-enabled');
+      expect([...overlay.toolNames].sort()).toEqual([...names].sort());
+      expect(overlay.toolNames).toContain('repair_apply_verify');
+      expect(overlay.toolCount).toBe(names.length);
+
       await expectValidationError(conn, 'repair_apply_verify', {
         ref: 'latest',
         tool: 'fit',

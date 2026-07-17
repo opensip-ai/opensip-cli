@@ -25,6 +25,7 @@ source-files:
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/commands/completion.ts
   - packages/cli/src/commands/agent-catalog.ts
+  - packages/contracts/src/agent-catalog-assembly.ts
   - packages/contracts/src/agent-catalog.ts
   - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/fitness/engine/src/tool.ts
@@ -441,7 +442,7 @@ first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
 **Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
 
 The protocol inventory is surface-epoch versioned. Treat initialize/listTools
-and `get_agent_catalog.mcp.names` as authority; reconnect after an executable
+and `get_agent_catalog.mcp.toolNames` as authority; reconnect after an executable
 surface change. Starting with `--allow-mutations` adds only
 `repair_apply_verify`.
 

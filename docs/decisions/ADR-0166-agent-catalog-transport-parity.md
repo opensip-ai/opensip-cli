@@ -35,7 +35,7 @@ enforcement-reason: >
 `reservedNames`, and the Plan 02 `hostSupport` projection — is
 **transport-equivalent** for `opensip agent-catalog --json` and MCP
 `get_agent_catalog`, produced by **one pure contracts assembler**
-(`assembleAgentCatalog` in `packages/contracts/src/agent-catalog.ts`) that each
+(`assembleAgentCatalog` in `packages/contracts/src/agent-catalog-assembly.ts`) that each
 composition root calls with facts it captured itself. The CLI stays the static
 admission authority for host-reserved root commands and passes its local
 `HOST_RESERVED_ROOT_COMMANDS` directly; MCP — which may not import that CLI-local

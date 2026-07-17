@@ -222,6 +222,15 @@ describe('agent-catalog common projection surfaces (Plan 03)', () => {
         ownerLabel: 'graph',
         visibility: 'internal',
       }),
+      // Public-looking name deliberately classified internal by the captured
+      // inventory. Its matching registry primary below proves the projected
+      // internalCommands set survives shared-assembler forwarding.
+      toolLeaf({
+        path: 'hidden-primary',
+        name: 'hidden-primary',
+        ownerLabel: 'hidden-primary',
+        visibility: 'internal',
+      }),
     ],
     groups: [hostGroup({ path: 'sessions', name: 'sessions' })],
   });
@@ -234,14 +243,15 @@ describe('agent-catalog common projection surfaces (Plan 03)', () => {
   function overlayTools(): ToolRegistry {
     const tools = new ToolRegistry();
     for (const name of ['fitness', 'graph', 'sim', 'yagni']) tools.register(fixtureTool(name));
+    tools.register(fixtureTool('hidden-primary'));
     return tools;
   }
 
   it('projects reserved roots + internal commands from the complete inventory', () => {
     const facts = projectAgentCatalogRuntimeFacts(inventory, ['help']);
     expect(facts.rootCommands).toEqual(['audit', 'help', 'init', 'report', 'rpt', 'sessions']);
-    // Only the Tool-owned internal worker; the nested host leaf is not internal.
-    expect(facts.internalCommands).toEqual(['graph-run-worker']);
+    // Both Tool-owned internal primaries survive projection; the nested host leaf does not.
+    expect(facts.internalCommands).toEqual(['graph-run-worker', 'hidden-primary']);
   });
 
   it('assembles the full common catalog surface directly from those facts', () => {
@@ -269,5 +279,6 @@ describe('agent-catalog common projection surfaces (Plan 03)', () => {
     const commands = catalog.entryPoints.map((entry) => entry.command);
     expect(commands).toContain('graph');
     expect(commands).not.toContain('graph-run-worker');
+    expect(commands).not.toContain('hidden-primary');
   });
 });
