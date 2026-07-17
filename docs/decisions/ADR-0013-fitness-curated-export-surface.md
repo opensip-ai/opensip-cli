@@ -23,7 +23,6 @@ enforcement-reason: >
   export-surface test, `packages/fitness/engine/src/__tests__/public-api.test.ts`,
   asserts the exact set of value exports from the `@opensip-cli/fitness` barrel,
   so re-growth fails CI.
-```
 
 **Decision:** The `@opensip-cli/fitness` public barrel exports only the
 check / recipe / plugin **authoring** surface plus the `fitnessTool` plugin
@@ -68,6 +67,4 @@ the already-curated graph barrel.
   unexported — the inferred return type carries it where authors need it,
   matching the doc's "`FitnessRecipe` is internal" line.
 
-**Related specs / ADRs:** Implements ADR-0009 (public-API surface policy);
-adjacent to ADR-0011 (signal output currency — why egress lives at the
-composition root, not in the tool barrels).
+**Related ADRs:** ADR-0009 (public-API surface policy); adjacent to ADR-0011 (signal output currency — why egress lives at the composition root, not in the tool barrels).

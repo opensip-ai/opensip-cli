@@ -25,7 +25,6 @@ enforcement-reason: >
   validate` unchanged". Tier B enforcement is explicitly DEFERRED until the
   first-party persistence migration lands (tracked in the spec's Phase 3);
   until then it is direction, not a gate.
-```
 
 **Decision:** The tool storage contract is two tiers. **Tier A (enforced now,
 all tools including bundled):** no migrations, no DDL (`CREATE/ALTER/DROP
@@ -77,10 +76,7 @@ before it is demanded.
 - Payload size caps / per-tool budgets are an open question resolved in the
   implementation plan (error vs. evict).
 
-**Related specs / ADRs:** `docs/plans/specs/tool-management-command.md` (rev 2);
-ADR-0009 (public `db` handle + confined table symbols); ADR-0028 (engine
-persistence-free, caller persists); ADR-0036 (host-owned baseline plane —
-the generic-table pattern `tool_state` copies).
+**Related ADRs:** ADR-0009 (public `db` handle + confined table symbols); ADR-0028 (engine persistence-free, caller persists); ADR-0036 (host-owned baseline.
 
 ### Boundary hardening amendments (2026-07-09)
 Host compatibility blobs use the reserved namespace in [ADR-0146](ADR-0146-host-plane-reserved-state-namespace.md); every admitted/derived Tool-owned key rejects that namespace.

@@ -27,7 +27,6 @@ enforcement-reason: >
   independent workflow verifier `verify-platform-acceptance.mjs` are the
   mechanical enforcement. A release/OS workflow that trusts the runner console
   without the verifier gate is the failure this ADR forbids.
-```
 
 **Decision:** Operating-system support qualification targets the **exact installed
 bytes** a customer runs — never a workspace build — exercises them through a
@@ -156,22 +155,4 @@ grepping `.runtime/logs` or reading raw SQLite.
   uploaded, internally self-checking file whose authenticity comes from the
   retained workflow/release provenance.
 
-**Related specs / ADRs:**
-[ADR-0017](ADR-0017-release-gate-policy.md) owns the release-gate strictness and
-the single-source publishable-package set/order this harness installs;
-[ADR-0119](ADR-0119-verifiable-self-distribution.md) owns the release
-manifest / `SHA256SUMS` / SBOM the packed-candidate source re-verifies before
-trusting a tarball; [ADR-0150](ADR-0150-production-builds-publish-runtime-artifacts-only.md)
-fixes the "exact installed bytes" the candidate qualifies;
-[ADR-0121](ADR-0121-platform-compatibility-lts-policy.md) owns the named
-compatibility contract classes an OS support decision layers on;
-[ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and
-[ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) own the black-box,
-zero-workspace-import agent-eval posture whose installed smoke lane this plan
-targets at the installed candidate. Implementation:
-`docs/plans/ready/01-installed-artifact-platform-acceptance/` (local, gitignored);
-committed usage lives in the "Platform acceptance" section of `scripts/README.md`,
-with a deeper maintainer note kept locally under `docs/internal/` (private working
-context, not committed). The macOS qualification plan is the first downstream
-consumer and selects a profile, cadence, and publication policy on top of this
-evidence.
+**Related ADRs:** [ADR-0017](ADR-0017-release-gate-policy.md) owns the release-gate strictness and the single-source publishable-package set/order this harness installs; [ADR-0119](ADR-0119-verifiable-self-distribution.md) owns the release manifest / `SHA256SUMS` / SBOM the packed-candidate source re-verifies before trusting a tarball; [ADR-0150](ADR-0150-production-builds-publish-runtime-artifacts-only.md) fixes the "exact installed bytes" the candidate qualifies; [ADR-0121](ADR-0121-platform-compatibility-lts-policy.md) owns the named compatibility contract classes an OS support decision layers on; [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) own the black-box, zero-workspace-import agent-eval posture whose installed smoke lane thismd`, The macOS qualification.

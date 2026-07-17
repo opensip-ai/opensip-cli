@@ -23,7 +23,6 @@ enforcement-reason: >
   CONFIGURATION.TARGETS.INVALID; package tests cover graph, fitness, YAGNI, agent
   catalog, and MCP consumption; dependency-cruiser preserves the config/CLI-free
   tool consumption path.
-```
 
 **Decision:** `targets.<name>.conventions` is the CLI's project-scoped place for
 framework/runtime behavior that static analysis cannot infer. Tools consume it
@@ -61,10 +60,6 @@ the documented `RunScope.targets` seam.
   than suppressing findings.
 - `agent-catalog` and MCP `get_architecture` expose target convention counts only.
 
-**Related specs / ADRs:**
-
-- `docs/plans/completed/27-framework-convention-config.md`
-- `docs/plans/ready/framework-convention-config/`
 - [ADR-0023](ADR-0023-config-package-and-schema-registry.md)
 - [ADR-0037](ADR-0037-generic-targeting-runtime.md)
 - [ADR-0084](ADR-0084-mcp-server-surface.md)

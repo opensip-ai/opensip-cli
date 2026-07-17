@@ -21,7 +21,6 @@ enforcement-reason: >
   The project-local `impact-trust-conservative-fallback` fitness check prevents
   the old `fit --include-impacted` changed-only fallback from returning when the
   graph catalog is unavailable.
-```
 
 **Decision:** Impact analysis must carry an explicit trust verdict. Any changed
 or impacted verification path that cannot prove full coverage must surface
@@ -53,6 +52,4 @@ otherwise it warns and runs the full target set. Suite step summaries may carry
 evidence. Agents must not say targeted verification is complete when
 `fullyVerified` is false.
 
-**Related specs / ADRs:** Implements spec 06 impact analysis trust foundation.
-Extends [ADR-0085](ADR-0085-change-detection-substrate.md) and is ordered by
-[ADR-0122](ADR-0122-agent-workflow-product-wedge.md).
+**Related ADRs:** Extends [ADR-0085](ADR-0085-change-detection-substrate.md) and is ordered by [ADR-0122](ADR-0122-agent-workflow-product-wedge.md).

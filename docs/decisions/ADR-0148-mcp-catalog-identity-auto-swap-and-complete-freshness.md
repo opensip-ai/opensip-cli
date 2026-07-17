@@ -22,7 +22,6 @@ enforcement-reason: >
   tests, and the built stdio process test prove identity, auto-swap, freshness,
   prior-generation retention, and explicit refresh ownership. A separate
   fitness check or graph rule would duplicate these executable boundary tests.
-```
 
 ## Decision
 
@@ -44,8 +43,6 @@ g1: + lowercase_hex(
     identity.filesFingerprint,
     identity.builtAt
   ])))
-)
-```
 
 The tuple order, domain tag, and version are part of the contract. Components
 remain JSON array elements, so delimiters, controls, and Unicode cannot create

@@ -22,8 +22,7 @@
 // resolved cross-package edges. If the resolver breaks, this fails loudly.
 //
 // Wired into `pnpm lint` so CI catches re-inerting. Rule-FIRING (as opposed
-// to edge-resolution) is verified via inject-revert probes documented in
-// docs/plans/ready/depcruise-gate-activation/phase-7-verification.md.
+// to edge-resolution) is verified via inject-revert probes in local verification notes.
 //
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';

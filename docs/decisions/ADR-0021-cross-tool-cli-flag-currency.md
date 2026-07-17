@@ -24,7 +24,6 @@ enforcement-reason: >
   hand-written literal instead of `applyCommonFlags`. The verbose-render parity
   (TTY == pipe) is covered by the CLI acceptance harness (a `--verbose` snapshot
   per tool, run through both `renderToInk` and `renderToText`).
-```
 
 **Decision:** The common CLI flags shared by every tool are declared **once**,
 and `--verbose` (the per-tool detail body) is rendered **once** through the
@@ -131,7 +130,6 @@ regression mechanically impossible rather than a review burden.
   calling `applyCommonFlags` and populating the result's detail carrier — no
   bespoke flag wiring, no bespoke verbose renderer.
 
-**Related specs / ADRs:** `docs/plans/specs/cross-tool-cli-flag-currency.md`
 (local). Symmetric to ADR-0011 (output currency) and ADR-0016 (progress
 currency); the three together make flags-in, progress, and output-out all
 single-currency, single-seam.

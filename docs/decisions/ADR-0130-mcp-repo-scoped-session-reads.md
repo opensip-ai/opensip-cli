@@ -22,7 +22,6 @@ enforcement-reason: >
   packages/session-store/src/__tests__/session-cwd-scope.test.ts and by the MCP
   read-port contract tests in packages/mcp/src/__tests__/repo-scoping.test.ts.
   No source-shaped fitness check can express the containment/filter semantics.
-```
 
 **Decision:** MCP result tools serve only sessions whose stored `cwd` is inside
 the server's captured project root. The filter is fail-closed, boundary-aware,
@@ -63,10 +62,7 @@ through `SessionReadRepo.list({ cwdWithin })`.
 **Fitness check:** No new check warranted. This is runtime evidence-scoping
 behavior, enforced by `session-cwd-scope.test.ts` and `repo-scoping.test.ts`.
 
-**Related specs / ADRs:** Extends the MCP result-read posture in
-[ADR-0084](ADR-0084-mcp-server-surface.md) and preserves the tool-owned payload /
-host-owned persistence split from
-[ADR-0042](ADR-0042-tool-storage-contract-and-state-store.md).
+**Related ADRs:** Extends the MCP result-read posture in [ADR-0084](ADR-0084-mcp-server-surface.md) and preserves the tool-owned payload / host-owned persistence split from [ADR-0042](ADR-0042-tool-storage-contract-and-state-store.md).
 
 ---
 

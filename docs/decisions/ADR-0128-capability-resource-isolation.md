@@ -23,7 +23,6 @@ enforcement-reason: >
   contribution loader, policy must return a resource decision, worker-admitted
   packs must not fall through to host import, and default admission is
   fail-closed for external packs.
-```
 
 **Decision:** Non-bundled capability packs (`fit-pack`, `sim-pack`, and
 `graph-adapter`) run through resource-bounded worker bridges after trust-policy
@@ -79,11 +78,4 @@ contributions while real pack code runs in the hidden
 **Fitness check:** Check warranted —
 `opensip-cli/fit/checks/no-host-external-capability-pack-execution.mjs`.
 
-**Related specs / ADRs:** Implements
-`docs/plans/completed/10-capability-resource-isolation.md` through the ready plan
-under `docs/plans/ready/capability-resource-isolation/`. Supersedes the
-declaration-only resource posture of
-[ADR-0081](./ADR-0081-capability-pack-trust-and-resource-declarations.md) while
-building on the worker-fault boundary in [ADR-0054](./ADR-0054-tool-fault-isolation-boundary.md)
-and local trust policy plane in
-[ADR-0126](./ADR-0126-cli-local-trust-policy-plane.md).
+**Related ADRs:** Through the ready Supersedes the declaration-only resource posture of [ADR-0081](./ADR-0081-capability-pack-trust-and-resource-declarations.md) while building on the worker-fault boundary in [ADR-0054](./ADR-0054-tool-fault-isolation-boundary.md) and local trust policy/ADR-0126-cli-local-trust-policy-md).

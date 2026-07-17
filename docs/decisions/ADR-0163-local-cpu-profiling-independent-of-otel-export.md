@@ -22,7 +22,6 @@ enforcement-reason: >
   root. The governed environment surface and focused profiler lifecycle,
   artifact-path, worker-propagation, and benchmark-mode tests enforce the
   independent gates and bounded local-artifact contract.
-```
 
 **Decision:** Local Node inspector CPU profiles and OpenTelemetry export have
 independent, explicit gates. `OPENSIP_PROFILING=1` or `true` enables a local CPU
@@ -82,7 +81,4 @@ mode, reject profiled input at budget/public-snapshot boundaries, and treat
 profile artifacts as sensitive local files rather than stored sessions or
 default CI uploads.
 
-**Related specs / ADRs:** [ADR-0004](ADR-0004-opt-in-opentelemetry.md) owns the
-OTel export posture. [ADR-0118](ADR-0118-scale-and-performance-slos.md) owns the
-deterministic SLO lane. This decision implements the profiling boundary in the
-performance optimization program.
+**Related ADRs:** [ADR-0004](ADR-0004-opt-in-opentelemetry.md) owns the OTel export posture. [ADR-0118](ADR-0118-scale-and-performance-slos.md) owns the deterministic SLO lane. This decision the profiling boundary in the performance optimization program.

@@ -2,8 +2,7 @@
  * @fileoverview Generic registry — the single base class for every
  * registry in the workspace.
  *
- * Replaces the ten registry classes catalogued in
- * `docs/plans/ready/architecture-runscope-and-registry/phase-0-audit-and-design.md`.
+ * Replaces the previous ad-hoc registry classes with one shared base.
  *
  * Owns: by-id Map, by-name Map, the closed `DuplicatePolicy` branch,
  * the orthogonal `nameCollisionMode` guard, and the structured-event

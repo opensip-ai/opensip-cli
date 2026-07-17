@@ -31,7 +31,6 @@ enforcement-reason: >
   `Signal[]` and never `process.stdout.write`s its own output" — is guarded
   by a fitness check (`no-direct-stdout-in-tool-engine`) plus the
   `CommandResult` return-type contract.
-```
 
 **Decision:** `Signal` (`packages/core/src/types/signal.ts`) is the single
 output currency of every tool. A `fit` check, a `graph` rule, and a `sim`
@@ -150,12 +149,4 @@ finishes it rather than inventing it.
   (with backward-compatible aliases through the deprecation window) closes the
   Finding-5 drift and makes ADR-0009's no-tool-vocab claim literally true.
 
-**Related specs / ADRs:** To be implemented by a spec under
-`docs/plans/specs/` (the enforced migration: retire `CliOutput`, introduce the
-envelope, consolidate formatters, route at the composition root, add the
-dep-cruiser + fitness-check gates). Related: ADR-0005 (symmetric tool
-architecture — this extends symmetry to the output path), ADR-0008 (cloud
-signal sync — owns `Signal`/`SignalSink`/`SignalBatch`, the substrate reused
-here), ADR-0009 (public-API + "kernel carries no tool vocabulary" — this
-completes the vocabulary half and resolves audit Findings 1 and 5), ADR-0006
-(derived-data persistence — signals are derived data).
+**Related ADRs:** The enforced migration: retire `CliOutput`, introduce the envelope, consolidate formatters, route at the composition root, add the dep-cruiser + fitness-check gates). Related: ADR-0005 (symmetric tool architecture — this extends symmetry to the output path), ADR-0008 (cloud signal sync — owns `Signal`/`SignalSink`/`SignalBatch`, the substrate reused here), ADR-0009 (public-API + "kernel carries no tool vocabulary" — this completes the vocabulary half and resolves audit Findings 1 and 5), ADR-0006 (derived-data persistence — signals are derived data).

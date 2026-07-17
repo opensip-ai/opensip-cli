@@ -24,7 +24,6 @@ enforcement-reason: >
   code-review invariant — there are only three such sites and they are listed
   in the Consequences below; a missed site would surface as a stale-cache bug,
   not a type error.
-```
 
 **Decision:** The graph engine stamps its own package version onto the
 `Catalog.cacheKey` (via `stampEngineVersion`, prefix `eng=<version>|`) at every
@@ -80,5 +79,3 @@ shard fragments reused (3.1s vs 7.4s cold); the stored keys carry
   each invocation and keeps no persistent analysis cache, so it has no equivalent
   stale-engine gap. The fit gate baseline is a finding ratchet, not an analysis
   cache.
-
-**Related specs / ADRs:** None.

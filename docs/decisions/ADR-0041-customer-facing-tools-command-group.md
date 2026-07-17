@@ -24,7 +24,6 @@ enforcement-reason: >
   `tools validate` is rejected by bootstrap admission, and vice versa) shipped
   with the implementation. `tools list`'s zero-dynamic-import rule is pinned by
   the throwing-module-top-level fixture test.
-```
 
 **Decision:** Add a first-class `opensip tools` command group
 (`list | install | uninstall | validate | data purge`) as the documented,
@@ -76,6 +75,4 @@ provenance data only).
 - The spec's phased sequencing applies: veneer first, persistence plane second,
   admission-time storage enforcement last (ADR-0042).
 
-**Related specs / ADRs:** `docs/plans/specs/tool-management-command.md` (rev 2);
-ADR-0027 (3.0.0 parity GA cutover); ADR-0042 (storage contract);
-ADR-0043 (config-namespace tolerance).
+**Related ADRs:** ADR-0027 (3.0.0 parity GA cutover); ADR-0042 (storage contract); ADR-0043 (config-namespace tolerance).

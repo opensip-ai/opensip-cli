@@ -20,7 +20,6 @@ enforced-by: ['type-structural']
 enforcement-reason: >
   Template coherence tests typecheck the generated ts-local handler path, and
   report-failure unit tests cover ToolError, Error, and arbitrary thrown values.
-```
 
 **Decision:** `ToolCliContext.reportFailure(detail)` accepts
 `detail.error: unknown`. The CLI composition root normalizes typed `ToolError`,

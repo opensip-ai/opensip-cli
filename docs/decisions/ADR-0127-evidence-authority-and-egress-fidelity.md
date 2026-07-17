@@ -21,7 +21,6 @@ enforcement-reason: >
   The local invariant is guarded by opensip-cli/fit/checks/no-lossy-evidence-egress.mjs:
   shared SARIF output must preserve OpenSIP fingerprints/properties, and native
   SignalBatch output must keep the optional evidence authority header.
-```
 
 **Decision:** The CLI preserves OpenSIP evidence identity across both egress
 formats. SARIF carries `Signal.fingerprint` in
@@ -66,11 +65,4 @@ SARIF/native delivery, and output formatting remains in `@opensip-cli/output`.
 `opensip-cli/fit/checks/no-lossy-evidence-egress.mjs` guards the SARIF
 fingerprint/property mapping and the native `SignalBatch.evidence` header.
 
-**Related specs / ADRs:** Implements the CLI-local portion of
-`docs/plans/completed/20-platform-evidence-authority-and-egress-contract.md` and the
-ready plan under
-`docs/plans/ready/platform-evidence-authority-and-egress-contract/`. Builds on
-[ADR-0094](./ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md),
-[ADR-0097](./ADR-0097-gate-verdict-determinism.md),
-[ADR-0119](./ADR-0119-verifiable-self-distribution.md), and
-[ADR-0126](./ADR-0126-cli-local-trust-policy-plane.md).
+**Related ADRs:** The CLI-local portion of and the ready Builds on [ADR-0094](./ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md), [ADR-0097](./ADR-0097-gate-verdict-determinism.md), [ADR-0119](./ADR-0119-verifiable-self-distribution.md), and [ADR-0126](./ADR-0126-cli-local-trust-policy-md).

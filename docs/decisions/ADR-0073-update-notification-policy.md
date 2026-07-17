@@ -19,7 +19,6 @@ enforcement: mechanizable
 enforced-by: ['type-structural']
 enforcement-reason: >
   update-notifier and host-env-specs tests cover opt-outs and sticky state shape.
-```
 
 **Decision:** Keep **default-on TTY** npm update checks with **opt-out** via
 `OPENSIP_NO_UPDATE` / `NO_UPDATE_NOTIFIER`, CI, and non-TTY suppression. Hourly

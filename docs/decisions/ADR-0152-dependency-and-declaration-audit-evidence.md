@@ -21,7 +21,6 @@ enforcement-reason: >
   Adapter emission, CatalogRepo payload validation, independent cache ABI
   segments, incremental/sharded merge, and public graph/read views enforce the
   absence-sensitive dependency and optional semantic-fact contracts.
-```
 
 **Decision:** Exact graph catalogs preserve **absence-sensitive** module
 dependency evidence and an optional, bounded **declaration/reference** semantic
@@ -84,6 +83,4 @@ SQLite churn.
 runtime/persistence/equivalence invariant; a source-text fitness rule cannot
 prove it.
 
-**Related specs / ADRs:** ADR-0148 (generation/freshness, optional payload);
-ADR-0149/0153 (MCP query protocol over this evidence); ADR-0147 (public
-`graph/read` boundary).
+**Related ADRs:** ADR-0148 (generation/freshness, optional payload); ADR-0149/0153 (MCP query protocol over this evidence); ADR-0147 (public `graph/read` boundary).

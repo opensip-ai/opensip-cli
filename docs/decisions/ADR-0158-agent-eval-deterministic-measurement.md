@@ -23,7 +23,6 @@ enforcement-reason: >
   scorer, report-validator, and determinism tests. A repository fitness check
   would have to interpret harness-internal task data and would invert
   ADR-0157's black-box boundary.
-```
 
 **Decision:** Evaluate agent-facing context with deterministic, two-arm gold
 tasks. Author the native search/read/glob control strategy first, then run both
@@ -125,8 +124,4 @@ that limitation rather than inheriting the clean self-identifying claim.
 - Manual runs with real coding agents remain a calibration aid, not part of the
   deterministic score or a substitute for the two-arm report.
 
-**Related specs / ADRs:** [ADR-0095](ADR-0095-ai-native-guardrail-platform-posture.md)
-sets the no-model boundary, and
-[ADR-0157](ADR-0157-agent-eval-black-box-harness.md) defines where the
-instrument runs. The operational protocol is in
-[`packages/agent-eval/README.md`](../../packages/agent-eval/README.md).
+**Related ADRs:** [ADR-0095](ADR-0095-ai-native-guardrail-platform-posture.md) sets the no-model boundary, and [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) defines where the instrument runs. The operational protocol is in [`packages/agent-eval/README.md`](././packages/agent-eval/README.md).

@@ -35,7 +35,6 @@ enforcement-reason: >
   unconditionally. The freshness/coherence half is guarded by a test that asserts
   yagni reuses a content-valid cached catalog (no rebuild) and refuses
   time-stale persisted evidence — a behavioural test, not a static rule.
-```
 
 **Decision:** `yagni` owns **no detection logic of its own**. It becomes a
 **reduction coordinator**: it produces the reduction audit by running graph rules
@@ -104,7 +103,6 @@ hit) and self-heals when it changed (cache miss).
 - A `reduction` tag/taxonomy is added to the graph-rule and fitness-check metadata
   so the coordinator can discover its inputs without hard-coding them.
 
-**Related specs / ADRs:** `docs/plans/specs/yagni-reduction-coordinator.md`
 (implementation + dead-code removal), supersedes ADR-0057 (yagni as an engine),
 related ADR-0062 (near-clone detection — the duplicate work that belongs in graph),
 ADR-0036 (baseline fingerprints — the content-addressed machinery reuse relies on).

@@ -19,7 +19,6 @@ enforcement: not-mechanizable
 enforcement-reason: >
   Behavior-level policy enforced by error-handler and exit-code unit tests;
   getErrorSuggestion is advice-only and no longer carries exitCode.
-```
 
 **Decision:** Only typed `ToolError` subclasses, Commander parse errors, and explicit `BootstrapError` values choose semantic non-runtime exit codes. `getErrorSuggestion` provides message/action advice for untyped errors; untyped errors always exit `RUNTIME_ERROR` (1).
 
@@ -34,4 +33,4 @@ enforcement-reason: >
 
 **Fitness check:** No check warranted — `error-handler.test.ts`, `exit-codes.test.ts`, and `assemble-outcome.test.ts` lock the policy.
 
-**Related specs / ADRs:** [ADR-0024](ADR-0024-command-outcome-and-observability.md).
+**Related ADRs:** [ADR-0024](ADR-0024-command-outcome-and-observability.md).

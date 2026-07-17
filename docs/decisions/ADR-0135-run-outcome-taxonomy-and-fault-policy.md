@@ -22,7 +22,6 @@ enforcement-reason: >
   and the golden render fixtures, plus the existing `only-documented-toolcli-seams`
   architecture check. No single fitness check captures the taxonomy; it is a
   framework decision guarded by types + tests.
-```
 
 **Decision:** A run has ONE 3-way terminal outcome — `passed | failed | faulted` —
 derived once by `deriveOutcome(verdict)` from the `SignalEnvelope` verdict, where
@@ -93,9 +92,4 @@ not runtime faults.
   engine live runners and the cli composition root share one derivation, keeping
   the TTY and pipe surfaces byte-identical.
 
-**Related specs / ADRs:** ADR-0011 (SignalEnvelope), ADR-0035 (verdict headline),
-ADR-0060 (setup failures are command-errors before the envelope), ADR-0020 (exit
-codes), ADR-0008 (report failure never masks a real failure), ADR-0036
-(host-owned baseline plane / `failOnDegraded`), ADR-0131 / ADR-0093 / ADR-0111
-(the CommandSpec dispatch pipeline, suites built on it, and the rejected second
-composition path), ADR-0065 (public `--json` contract).
+**Related ADRs:** ADR-0011 (SignalEnvelope), ADR-0035 (verdict headline), ADR-0060 (setup failures are command-errors before the envelope), ADR-0020 (exit codes), ADR-0008 (report failure never masks a real failure), ADR-0036 (host-owned baseline.

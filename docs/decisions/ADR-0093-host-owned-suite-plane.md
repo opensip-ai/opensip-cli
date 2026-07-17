@@ -21,7 +21,6 @@ enforcement-reason: >
   The single-opts-assembly-seam fitness check forbids a second CommandSpec→opts
   projection; architecture-session-timing-not-host-owned keeps suite grouping keys
   host-stamped; dependency-cruiser enforces the host-owned orchestrator layer.
-```
 
 **Decision:** Add `suite` as a host-owned command group and `suites:` as a host-owned
 config namespace. A suite is not a Tool and tools do not gain a `runAsSuiteStep` API.
@@ -66,6 +65,4 @@ UUID, and `suite add` resolves a name or UUID into the canonical YAML shape.
 
 **Fitness check:** `single-opts-assembly-seam` (path-gated to `packages/cli/src/commands/`).
 
-**Related specs / ADRs:** Implements local plan `docs/plans/ready/05-tool-suites/`.
-Extended by ADR-0100 for suite per-step verdict and aggregate output.
-Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.
+**Related ADRs:** Local. Extended by ADR-0100 for suite per-step verdict and aggregate output. Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.

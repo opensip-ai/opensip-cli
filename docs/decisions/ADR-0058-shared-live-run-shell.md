@@ -20,7 +20,6 @@ enforced-by: ['local:live-view-through-cli-live']
 enforcement-reason: >
   The `live-view-through-cli-live` fitness check forbids direct `ink` render
   imports in first-party tool engines; dependency-cruiser pins cli-live's layer.
-```
 
 **Decision:** Extract a presentational `<LiveRun>` shell into `@opensip-cli/cli-ui`
 (plain-data props, no core/contracts) and a layer-3 `@opensip-cli/cli-live` package
@@ -44,4 +43,4 @@ narrow `produce()` port removes duplication while keeping worker transports tool
 `liveRunTable` instead of building per-tool table nodes; new tools get TTY parity by
 calling `runToolLiveView`. The `live-view-through-cli-live` check enforces the seam.
 
-**Related specs / ADRs:** ADR-0016 (shared live progress), ADR-0051 (host-owned run timing).
+**Related ADRs:** ADR-0016 (shared live progress); ADR-0051 (host-owned run timing).

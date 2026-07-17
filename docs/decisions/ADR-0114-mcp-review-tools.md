@@ -21,7 +21,6 @@ enforcement-reason: >
   MCP handler/read-port re-run imports are blocked by mcp-results-no-rerun.
   Package layering and tests cover the remaining boundaries: MCP imports
   session-store/datastore/contracts, not cli or output.
-```
 
 **Decision:** Add `review_change` and `compare_to_baseline` as read-only MCP
 tools over persisted OpenSIP evidence. They replay stored sessions and read
@@ -79,9 +78,5 @@ CLI. The new tools preserve those decisions:
 | MCP must not import `@opensip-cli/output` for baseline diff. | Not as a new check | Package dependency review and dep-cruiser catch the package edge; unit tests cover the MCP-local fingerprint comparison. |
 | Review output must stay bounded. | Not as a fitness check | Handler/read-port tests assert `limit`; this is DTO behavior, not a cross-repo structural invariant. |
 
-**Related specs / ADRs:**
-
-- `docs/plans/completed/07-agent-apply-verify-loop.md`
-- `docs/plans/ready/mcp-review-tools/`
 - [ADR-0084](ADR-0084-mcp-server-surface.md)
 - [ADR-0110](ADR-0110-host-owned-review-brief-contract.md)

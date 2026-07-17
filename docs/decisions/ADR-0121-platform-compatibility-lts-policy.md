@@ -22,7 +22,6 @@ enforcement-reason: >
   `pnpm compat:matrix:check`, `config migrate --check` covers committed project
   config migration readiness, and command-surface snapshots pin CLI shape. Human
   review is still required for deprecation notes and release communication.
-```
 
 **Decision:** OpenSIP CLI records public compatibility surfaces as named
 contract classes with explicit version markers, owners, deprecation windows, and
@@ -57,7 +56,6 @@ reviewers one place to inspect compatibility classes, while `config migrate
 
 **Related specs / docs:**
 
-- `docs/plans/completed/11-platform-compatibility-lts-and-migration.md`
 - [Compatibility policy](../public/70-reference/15-compatibility-policy.md)
 - [Configuration](../public/70-reference/03-configuration.md)
 - [JSON output schema](../public/70-reference/04-json-output-schema.md)

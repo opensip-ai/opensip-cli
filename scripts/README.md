@@ -74,9 +74,8 @@ independently re-validates that artifact. A workflow must run both: a passing
 runner console exit is never trusted on its own.
 
 The full architecture, evidence schema, cleanup model, and reason-code-keyed
-troubleshooting live in a local-only maintainer note under `docs/internal/`
-(private working context, not committed to the repo); the evidence-authority and
-non-product decision is
+troubleshooting live in local-only maintainer notes (not committed); the
+evidence-authority and non-product decision is
 [ADR-0164](../docs/decisions/ADR-0164-installed-artifact-platform-acceptance-evidence.md).
 
 - **Stable entry points (the only supported way to invoke the harness):**

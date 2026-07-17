@@ -21,7 +21,6 @@ enforcement-reason: >
   Mechanizable via unit tests for resolveDatastoreAccess + denied thunk,
   forked built-CLI dispatch modes for cli.scope/currentScope denial, and
   exact-id trust tests. Structural fitness gates complement runtime proof.
-```
 
 **Decision:** External-tool workers receive a full RunScope for project/config/parse
 state, but ambient datastore access is **denied**. Only when the internal command
@@ -59,5 +58,3 @@ tool seam.
 - `buildDeniedWorkerDatastoreThunk` + `resolveDatastoreAccess` are the sole mode gate.
 - Project/installed trust env docs say `*` is ignored, not admitted.
 - Residual OS authority must be documented; do not call the worker a sandbox.
-
-**Related specs / ADRs:** Modular monolith boundary hardening Spec 20; ADR-0054 fault isolation.

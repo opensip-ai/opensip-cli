@@ -129,8 +129,7 @@ Use the harness when promoting an agent-facing context capability:
    `contractFingerprint`. A mismatch means the question, assertions, edit
    contract, or fixture bytes changed and the runs are not a valid promotion
    comparison; review the source diff and establish a new baseline instead.
-4. Attach both clean JSON and Markdown artifacts to a review under
-   `docs/plans/reviews/`.
+4. Attach both clean JSON and Markdown artifacts to the review.
 5. Compare correctness first. A promotion must introduce no new incorrect
    `none` outcomes and must not regress required facts.
 6. Compare response bytes, turns, and time to first useful context against the

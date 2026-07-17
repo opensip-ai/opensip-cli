@@ -22,7 +22,6 @@ enforcement-reason: >
   block is parsed outside the composed schema; a `no-config-loader-outside-config`
   dep-cruiser/fitness rule keeps YAML projection out of contracts/tools. Modeled
   on the live `cross-tool-flag-parity` check (ADR-0021).
-```
 
 **Decision:** Introduce a dedicated **`@opensip-cli/config`** package that owns
 the cross-cutting configuration *machinery* — the namespaced-schema **composer**,
@@ -67,7 +66,7 @@ forbid YAML projection anywhere else.
 - A **32nd publishable package** (`@opensip-cli/config`) — update `RELEASING.md`,
   `scripts/release-package-order.mjs` (and every surface ADR-0017 derives from it),
   and bootstrap its npm trusted publisher (brand-new name).
-- **2.10.0** (spec: `docs/plans/specs/release-2.10.0-capability-configuration.md`):
+- **2.10.0**:
   create the package; the composer + `ToolConfigDeclaration`; tools contribute
   namespaced schemas; strict validation; capability model (§5.3) + scope-owned
   registries (§5.11).
@@ -81,13 +80,7 @@ forbid YAML projection anywhere else.
 - Strict validation is a **behaviour change** for any config with stray keys —
   acceptable pre-GA; called out in the 2.10.0 / 2.10.1 CHANGELOG.
 
-**Related specs / ADRs:** Implemented by
-`docs/plans/specs/release-2.10.0-capability-configuration.md` (composer core) and
-the 2.10.1 consolidation plan. Part of the tool-plugin-parity roadmap
-(`docs/plans/tool-plugin-parity-roadmap.md`). Relates to ADR-0021 (the
-flag-currency guardrail template), ADR-0012 (pre-GA versioning that licenses the
-strict-validation break), ADR-0011 (output currency — the inner/outer split this
-mirrors for config).
+**Related ADRs:** Composer core) and the 2.10.1 consolidation Part of the tool-plugin-parity roadmap. Relates to ADR-0021 (the flag-currency guardrail template), ADR-0012 (pre-GA versioning that licenses the strict-validation break), ADR-0011 (output currency — the inner/outer split this mirrors for config).
 
 ---
 
@@ -95,7 +88,7 @@ mirrors for config).
 
 The decision and consequences above are unchanged. This amendment records three
 boundary refinements surfaced while planning the 2.10.1 migration
-(`docs/plans/ready/release-2.10.1-config-consolidation/`). They are clarifications
+. They are clarifications
 of *where the layer falls*, not a reversal — the package still owns the
 cross-cutting config machinery and the document blocks.
 

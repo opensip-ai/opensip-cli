@@ -1,7 +1,7 @@
 ---
 name: backend-plan
 description: >
-  Create backend implementation plans for opensip-cli features in docs/plans/. Use this skill when the user asks
+  Create backend implementation plans for opensip-cli features (local-only plan scratch). Use this skill when the user asks
   to plan work on the opensip-cli codebase — a new tool or command, graph engine changes, fitness checks, language
   adapters, config schema additions, datastore/persistence work, the MCP server, or any packages/ change. Trigger
   on "create a plan", "plan this out", "make a backend plan", or "turn this into a plan" when the work involves
@@ -25,9 +25,8 @@ to the invariants that actually govern this repo (the layer DAG, `RunScope`, the
 documented `ToolCliContext` seams, the host-owned baseline/ratchet plane, the
 dogfood fitness gate, and the ADR log).
 
-Plans live in `docs/plans/` as a directory with a top-level `plan.md` and separate
-`phase-N-name.md` files for each phase. (`docs/plans/` is gitignored scratch space
-in this repo — see `docs/plans/README.md`.)
+Plans live in the local-only (gitignored) plans scratch as a directory with a
+top-level `plan.md` and separate `phase-N-name.md` files for each phase.
 
 ## Required output structure (HARD REQUIREMENT)
 
@@ -97,7 +96,7 @@ content inside `plan.md`, stop — move it into the appropriate `phase-*.md`.
 **Escape hatch — when NOT to use this skill:** if the request is an exploratory
 sketch or open-ended brainstorm not yet ready for implementation, do NOT use this
 skill. Suggest `/brainstorming`, or direct the user to a free-form doc under
-`docs/plans/backlog/<name>.md` (a single file is fine *outside* a plan directory).
+the local-only plans backlog (a single file is fine *outside* a plan directory).
 A plan directory containing only `plan.md` is always wrong for a new plan.
 
 ## Scope: this skill produces a draft, not a finished plan
@@ -107,7 +106,7 @@ real file paths, real line numbers, dependency-correct phase ordering, and
 placeholder Tests + Validation phases. Architectural compliance, persistence,
 observability, hardening, and ADR concerns are **deliberately NOT addressed in the
 draft** — they are owned by the downstream pipeline at
-`docs/ai-helpers/prompts/plan-improvements/plan-improvements.md` and your
+the local-only plan-improvements prompt pack and your
 speculation will be overwritten. See "Anti-overreach" below.
 
 ## Your workflow
@@ -121,8 +120,8 @@ Do all four steps in sequence.
 
 ## Step 0: Surface assumptions and confirm
 
-**Spec branch.** If a spec for this work exists under `docs/plans/specs/`, read it
-first (this repo keeps specs there, not `docs/specs/`). The spec grounds scope and
+**Spec branch.** If a local-only implementation spec for this work exists, read it
+first (specs live in gitignored plan scratch, not under a committed `docs/specs/`). The spec grounds scope and
 target state — your assumptions become a *confirmation* of the spec's framing.
 
 **No-spec branch.** If no spec exists, the assumptions block is the only alignment
@@ -146,8 +145,8 @@ only human checkpoint.
 ## Step 1: Research
 
 Read 1-2 existing plans to internalize the format: the split-file plans this
-pipeline produces, plus the existing single-file `docs/plans/ready/*/plan.md` for
-voice. Read `docs/plans/README.md` for the layout contract and `AGENTS.md` for the
+pipeline produces, plus any existing ready single-file plans for
+voice. Read `AGENTS.md` for the
 architecture (layer DAG, RunScope, seams, dogfood gate).
 
 Then read the actual code. Every file path, line number, function signature, and
@@ -157,7 +156,7 @@ line numbers are useless — Phase 1 expects them correct.
 ## Step 2: Draft `plan.md` AND every `phase-N-name.md`
 
 The plan directory is named descriptively (no date prefix). Example:
-`docs/plans/ready/graph-impact-command/`.
+a descriptive ready-plan directory name (example: `graph-impact-command`).
 
 **Before writing**, output the pre-flight commitment. Then write `plan.md` first,
 then each `phase-*.md` in order. At draft stage, if `plan.md` grows past ~250 lines
@@ -180,7 +179,7 @@ or contains task-level detail, split phases into `phase-*.md` now.
 
 **No backwards compatibility.** Changes replace the old approach entirely. No optional parameters preserving old behavior, no feature flags, no compatibility shims. (Forward-compatible *optional catalog/payload fields* with an absent-field default are NOT a shim — they are the documented persistence-evolution pattern, e.g. `FunctionOccurrence.bodySize?`.)
 
-**Plan-improvements pipeline.** Architectural compliance, persistence, observability, hardening, and ADR decisions are deferred to the 9-phase pipeline (`docs/ai-helpers/prompts/plan-improvements/plan-improvements.md`) which runs immediately after this draft. Do not pre-bake decisions in those areas.
+**Plan-improvements pipeline.** Architectural compliance, persistence, observability, hardening, and ADR decisions are deferred to the 9-phase pipeline (local-only plan-improvements prompt pack) which runs immediately after this draft. Do not pre-bake decisions in those areas.
 
 [Add 1–3 plan-specific principles only if load-bearing for the draft itself.]
 
@@ -398,7 +397,7 @@ Catch these before chaining into plan-improvements:
 After writing all plan files, **immediately** execute the 9-phase pipeline against
 the draft. Do not pause or stop — chain straight in.
 
-1. Read `docs/ai-helpers/prompts/plan-improvements/plan-improvements.md` to load the 9 phase prompts.
+1. Read the local-only plan-improvements prompt pack to load the 9 phase prompts.
 2. Set `PLAN_PATH` to the plan directory you just created.
 3. Create a TodoWrite list with one entry per phase **as listed in that file (Phase 1 through Phase 9).**
 4. For the next pending phase:

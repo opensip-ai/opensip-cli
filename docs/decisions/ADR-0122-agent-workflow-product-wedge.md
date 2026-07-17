@@ -30,7 +30,6 @@ enforcement-reason: >
   the specs and ADRs it pulls forward: impact trust, correlation, apply/verify,
   MCP/review surfaces, repair previews, evidence authority, and capability
   controls.
-```
 
 **Decision:** After the current hardening floor, OpenSIP's product wedge is
 **agent workflow**: deterministic evidence and guardrails that let coding agents

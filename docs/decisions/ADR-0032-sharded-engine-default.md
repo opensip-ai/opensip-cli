@@ -48,7 +48,6 @@ enforcement-reason: >
   merge-order tests in `determinism.test.ts`, the cold-vs-warm leg of
   `equivalence-repo-scale.test.ts`, and the datastore-backed warm-fragment leg in
   `sharded-graph.test.ts`.
-```
 
 **Decision:** The **sharded** build engine is the **default** for `graph`, and
 `--exact` is the explicit opt-out to the single-program engine. The build engine is
@@ -146,9 +145,4 @@ to close and is deferred. Wherever this ADR says "byte-equivalent," read: byte-e
 on the fixture corpus; equivalent within this budgeted, characterized, ratcheted
 residual on real repos.
 
-**Related specs / ADRs:** Supersedes ADR-0031 (graph determinism — one build, one
-finalize, many renderers), retaining all of its invariants except the default-engine
-choice. Builds on ADR-0015 (engine-version + mode cache stamping). Implements the
-flip tracked in `docs/plans/graph-sharded-exact-parity*` (local). Residual diagnosis
-recorded in `docs/internal/graph-false-findings-incident-log.md` and the
-`graph-engine-convergence` plan notes.
+**Related ADRs:** Supersedes ADR-0031 (graph determinism — one build, one finalize, many renderers), retaining all of its invariants except the default-engine choice. Builds on ADR-0015 (engine-version + mode cache stamping). the flip tracked in (local). Residual diagnosis recorded in and the `graph-engine-convergence`.

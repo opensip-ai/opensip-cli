@@ -1,6 +1,5 @@
 /**
- * Stage 1+2 unified walk — Phase 4 of
- * docs/plans/graph-performance-improvements.md.
+ * Stage 1+2 unified walk —.
  *
  * Legacy pipeline walked every source file twice: once for Stage 1
  * (emit FunctionOccurrence records) and once for Stage 2 (locate +

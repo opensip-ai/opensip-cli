@@ -22,7 +22,6 @@ enforcement-reason: >
   open runtime contractVersions map; opensip-cli/fit/checks/adr-plugin-contracts.mjs
   enforces bounded manifest and capability-pack epoch metadata for first-party
   packages.
-```
 
 **Decision:** Replace closed first-party runtime contract fields and exact plugin
 epoch lockstep with an open, bounded integer compatibility model:
@@ -67,8 +66,6 @@ already load in-process; epoch metadata is compatibility, not isolation.
   versions; its runtime field shape is superseded by this ADR.
 - Public plugin docs describe range admission and the open `contractVersions`
   map.
-
-**Related specs / ADRs:**
 
 - Builds on ADR-0046 (core Tool contract versioning policy).
 - Supersedes ADR-0047 for runtime field shape.

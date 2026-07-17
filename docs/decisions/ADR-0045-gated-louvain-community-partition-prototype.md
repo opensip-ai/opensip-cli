@@ -31,7 +31,6 @@ enforcement-reason: >
   tests — all green on every prototype commit. (3) The adopt-or-discard verdict
   is a NUMERIC gate (thresholds below), recorded in this ADR's Outcome section
   either way.
-```
 
 **Decision:** Prototype a `community` value for the flat-monorepo
 `partitionStrategy` (`packages/graph/engine/src/cli/orchestrate/flat-monorepo-strategy.ts`):
@@ -234,11 +233,4 @@ wall-time. The real-corpus cold win is therefore capturable structurally
 already exists) without graphology, the partition-time import scan, or the
 warm-path overhead.
 
-**Related specs / ADRs:** Implements
-`docs/plans/specs/louvain-community-shard-partitioning.md` (local), from
-`docs/plans/backlog/louvain-community-shard-partitioning/plan.md` (local).
-Builds on ADR-0031 (graph determinism — one build, one finalize; cold==warm
-obligations the partitioner must honor), ADR-0033 (one shared resolution hop +
-the zero-divergence directional guardrail this prototype rides as its
-continuous soundness gate), and ADR-0023 (the namespaced config plane carrying
-`graph.partitionStrategy`).
+**Related ADRs:** Local), from (local). Builds on ADR-0031 (graph determinism — one build, one finalize; cold==warm obligations the partitioner must honor), ADR-0033 (one shared resolution hop + the zero-divergence directional guardrail this prototype rides as its continuous soundness gate), and ADR-0023 (the namespaced configpartitionStrategy`).

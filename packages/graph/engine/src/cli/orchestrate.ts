@@ -6,7 +6,7 @@
  * Per spec §5, the orchestrator is straight-line code; every
  * interesting decision happens inside one of the stages.
  *
- * PR 3 of plan docs/plans/10-graph-language-pluggability.md: this
+ * Language-pluggability: this
  * module no longer imports `'typescript'` directly. The orchestrator
  * looks up an adapter from the lang-adapter registry and routes
  * file-discovery / parse / walk / resolution through its method

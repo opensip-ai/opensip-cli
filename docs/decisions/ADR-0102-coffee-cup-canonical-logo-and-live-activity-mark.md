@@ -20,7 +20,6 @@ enforcement-reason: >
   This is a brand and UX direction. It is enforced through cli-ui ownership,
   review, docs, and tests around the shared live-run shell rather than a source
   invariant that a fitness check can reliably prove.
-```
 
 **Decision:** The OpenSIP coffee cup is the canonical OpenSIP CLI logo mark. The
 legacy large/medium/small OPENSIP wordmark banners are removed from the
@@ -39,7 +38,6 @@ Frame 1    Frame 2    Frame 3
  ▟███▙     ▟███▙      ▟███▙
  ▐███▌     ▐███▌      ▐███▌
   ▀▀▀       ▀▀▀        ▀▀▀
-```
 
 The cup animation may have `sm`, `md`, and `lg` sprite sizes so the shared
 live-run shell can choose an appropriate scale for terminal width and command
@@ -91,9 +89,7 @@ language across `fit`, `graph`, `sim`, `yagni`, and future tools.
 - Expressive faces, stick bodies, dancing, and success poses remain backlog
   explorations, not the default activity indicator.
 
-**Related specs / ADRs:** Builds on [ADR-0058](ADR-0058-shared-live-run-shell.md)
-(shared live-run shell). Compatible with [ADR-0072](ADR-0072-i18n-posture.md)
-because the activity mark is non-textual chrome.
+**Related ADRs:** Builds on [ADR-0058](ADR-0058-shared-live-run-shell.md) (shared live-run shell). Compatible with [ADR-0072](ADR-0072-i18n-posture.md) because the activity mark is non-textual chrome.
 
 **Fitness check:** No check warranted. This is a brand/UX posture, and the most
 important invariants are visual review items: fixed frame dimensions, shell-owned

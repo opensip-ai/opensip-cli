@@ -19,7 +19,6 @@ enforcement: not-mechanizable
 enforcement-reason: >
   Policy-only until spec 03 implements loader enforcement; docs/script tests
   prevent overclaiming active enforcement.
-```
 
 **Decision:** Define consumption-side provenance verification for non-bundled npm
 packages as **install/sync + load** checks in enterprise strict mode: bundled
@@ -39,7 +38,7 @@ gates.
 Producer provenance already ships (`release.yml` OIDC + `--provenance`). The gap is
 consumer trust at install/load for third-party tools and capability packs.
 
-**Consequences:** `docs/internal/plugin-isolation-surface.md` carries the inventory
+**Consequences:** carries the inventory
 and strict-mode matrix. Public docs must not claim enforcement is active until spec
 03 lands.
 

@@ -17,7 +17,6 @@ related: [ADR-0084, ADR-0093, ADR-0100, ADR-0111, ADR-0129, ADR-0131, ADR-0143, 
 tags: [agents, evidence, suites, persistence, mcp]
 enforcement: mechanizable
 enforced-by: ['type-structural', 'local:mcp-results-no-rerun', 'script:command-spec.test.ts', 'script:evidence-snapshot-capture.test.ts', 'script:validate-suite.test.ts', 'script:task-context-manifest.test.ts', 'script:orchestrator.test.ts']
-```
 
 **Decision:** A deterministic context producer returns bounded
 `EvidenceSnapshotContribution` pointers through `ToolRunCompletion`. It does not
@@ -78,5 +77,5 @@ replay, [ADR-0143](ADR-0143-host-owned-run-step-ledger.md) owns the parent
 ledger, and [ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md) defines
 bounded coverage semantics.
 
-**Related spec:** `docs/plans/specs/agent-task-context.md` (local-only) retains
+**Related spec:** retains
 the broader deferred context-composer waves beyond this first implementation.

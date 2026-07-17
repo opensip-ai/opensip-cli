@@ -21,7 +21,6 @@ enforcement-reason: >
   `pnpm bench:slo:ci` enforces configured budgets in CI, and
   `pnpm docs:performance-slos:check` keeps the public SLO documentation derived
   from `.config/performance-slos.json`.
-```
 
 **Decision:** Performance SLOs for opensip-cli are measured by a root-level,
 dependency-free script lane over deterministic synthetic corpora. The lane runs
@@ -48,6 +47,3 @@ docs, and tests agree on the same thresholds.
 bootstrap behavior should inspect the artifact when the lane fails instead of
 loosening budgets by default. Budget changes must update the JSON source and
 regenerate the public SLO reference.
-
-**Related specs / ADRs:** Implements the scale-and-performance SLO plan promoted
-from `docs/plans/completed/18-scale-and-performance-slos.md`.

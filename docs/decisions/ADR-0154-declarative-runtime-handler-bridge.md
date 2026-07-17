@@ -21,7 +21,6 @@ enforcement-reason: >
   Validated CommandSpec descriptors, plain RunScope inventory projection, pure
   bridge matching, live port injection, first-party dogfood metadata completeness,
   and package-boundary depcruise rules enforce the runtime bridge contract.
-```
 
 **Decision:** Runtime wiring captures a **complete plain host+Tool command
 inventory** on per-invocation `RunScope` and optionally bridges author-declared
@@ -78,5 +77,4 @@ CLI imports while the composition root remains the only inventory authority.
 and repository-specific; assembled runtime tests remain the authoritative
 catch-all.
 
-**Related specs / ADRs:** ADR-0153 (compact MCP protocol / surface diagnosis);
-ADR-0152 (declaration plane used by the bridge); ADR-0148 (catalog auto-swap).
+**Related ADRs:** ADR-0153 (compact MCP protocol / surface diagnosis); ADR-0152 (declaration.

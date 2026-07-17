@@ -25,7 +25,6 @@ enforcement-reason: >
   set) is mechanized by `scripts/release-package-order.mjs` (single source of
   truth), `verify-release.mjs` check #10 (release-time), and
   `packages/cli/src/__tests__/release-package-order-contract.test.ts` (PR-time).
-```
 
 **Decision:** The tag-driven release workflow (`.github/workflows/release.yml`)
 must enforce every PR-quality gate — `pnpm lint`, `pnpm test:coverage` (per-package
@@ -95,10 +94,4 @@ boundary beats trusting external state.
   where `@opensip-cli/tree-sitter` was present in pack/publish but **omitted**
   from the release preflight loop.
 
-**Related specs / ADRs:** This decision is implemented by the local-only plan
-`docs/plans/release-gate-hardening/` (Phases 1–3). It complements
-[ADR-0012](./ADR-0012-versioning-and-release-policy.md) (versioning & release
-policy: npm version immutability is the reason the release lane is the last
-recoverable gate). The two underlying audit findings — the release gate being
-weaker than PR CI (P0) and the publishable-package-list drift risk (P0/P1) — are
-tracked in this repo's testing-strategy gap register / release-lane backlog.
+**Related ADRs:** Phases 1–3). It complements [ADR-0012](./ADR-0012-versioning-and-release-policy.md) (versioning & release policy: npm version immutability is the reason the release lane is the last recoverable gate). The two underlying audit findings — the release gate being weaker than PR CI (P0) and the publishable-package-list drift risk (P0/P1) — are tracked in this repo's testing-strategy gap register / release-lane backlog.

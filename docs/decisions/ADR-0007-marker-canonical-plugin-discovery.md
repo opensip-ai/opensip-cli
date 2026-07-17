@@ -22,7 +22,6 @@ enforcement-reason: >
   workspace package.json and asserts the marker contract in both directions
   (prefix-matching package ⇒ declared marker or explicit allowlist; declared
   kind ⇒ in the closed MARKER_KINDS vocabulary). It fails in CI on violation.
-```
 
 **Decision:** Plugin discovery treats the `opensipTools.kind` marker as the
 single canonical contract for all four plugin kinds (`tool`, `fit-pack`,
@@ -75,5 +74,4 @@ would otherwise silently fail to load.
 - Adding a `graph-*` / `checks-*` package that is *not* a plugin now requires a
   conscious one-line entry in the invariant test's allowlist, with a reason.
 
-**Related specs / ADRs:** [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md)
-(the symmetric tool architecture that shares this marker substrate).
+**Related ADRs:** [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md) (the symmetric tool architecture that shares this marker substrate).

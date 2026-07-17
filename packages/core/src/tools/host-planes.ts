@@ -19,8 +19,8 @@
  *   - use the existing `toolState` seam directly for custom records, or
  *   - supply compatible objects (the host will prefer a supplied implementation when present).
  *
- * See the governing "Host-Planes / Scope-Seams Hygiene" spec (local-only
- * working doc under docs/plans/, by that title) for the flexibility story.
+ * See the governing "Host-Planes / Scope-Seams Hygiene" local-only working
+ * spec (by that title; not a committed path) for the flexibility story.
  */
 export interface HostGovernance {
   /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */

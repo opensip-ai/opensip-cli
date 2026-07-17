@@ -20,13 +20,11 @@ enforcement-reason: >
   Remediation is a bounded hygiene program. Individual items are mechanized
   per-phase (fitness checks, integration tests, depcruise). The scope boundary
   ("no de-layering") is policy.
-```
 
 **Decision:** Preserve the layered plugin-host DAG unchanged. Remediate the
 2026-07-01 architecture audit **P1 findings only** via targeted refactors,
 fail-closed policies, and repository-boundary tightening — no package merges,
 layer edge changes, or de-layering. Execution follows
-`docs/plans/architecture-audit-p1-remediation/plan.md`.
 
 **Alternatives:**
 
@@ -58,8 +56,7 @@ cheaper to fix now than after ecosystem opening (ADR-0061).
 - Host-plane narrow typing (ADR-0056 R2/D1) remains deferred until a Cloud
   consumer requires typed governance/audit planes.
 
-**Related specs / ADRs:** [ADR-0056](ADR-0056-architecture-audit-remediation.md)
-(June scope); audit evidence under `docs/plans/architecture/`.
+**Related ADRs:** [ADR-0056](ADR-0056-architecture-audit-remediation.md).
 
 ---
 

@@ -28,7 +28,6 @@ enforcement-reason: >
   dependency-cruiser rules yagni-no-cli, yagni-no-check-packs,
   yagni-no-graph-adapter-packs; graph-evidence.ts is the sole allowlisted
   importer of @opensip-cli/graph/internal.
-```
 
 **Decision:** Ship `yagni` as a bundled first-party Tool (`@opensip-cli/yagni`) that consumes graph catalog data through a single in-process evidence seam (`packages/yagni/engine/src/evidence/graph-evidence.ts` importing `@opensip-cli/graph/internal`), not by subprocess or graph adapter packs.
 
@@ -47,4 +46,4 @@ enforcement-reason: >
 - CI dogfood pins `yagni.graphMode: build` (not `auto`) for determinism.
 - Dashboard accepts optional `yagniSummary` / `yagniCatalog` keys from `collectReportData`.
 
-**Related specs / ADRs:** `docs/plans/ready/yagni-reduction-audit/plan.md`, ADR-0014 (suppressions), ADR-0036 (baseline fingerprints).
+**Related ADRs:** ADR-0014 (suppressions); ADR-0036 (baseline fingerprints).

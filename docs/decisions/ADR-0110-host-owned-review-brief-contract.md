@@ -22,7 +22,6 @@ enforcement-reason: >
   root. Existing output-seam checks keep suite output on CommandResult /
   ToolCliContext.render and emitJson. No new fitness check is warranted unless
   a future change introduces a new structural seam for brief construction.
-```
 
 **Decision:** Define `ReviewBrief` as a versioned contract in
 `@opensip-cli/contracts`, but build it in the CLI host after suite steps finish.
@@ -59,6 +58,4 @@ from those surfaces to the CLI implementation.
 - Future MCP `review_change` work should serve this contract from persisted
   evidence rather than inventing another review payload shape.
 
-**Related specs / ADRs:** Spec 05 phase 0 (review brief contract), spec 07 phase
-0 (MCP review tools), spec 24 (audit suite preset), [ADR-0093](ADR-0093-host-owned-suite-plane.md),
-[ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md).
+**Related ADRs:** Md), [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md).

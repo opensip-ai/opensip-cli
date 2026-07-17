@@ -43,7 +43,6 @@ deterministic repair producers are fitness findings. The host reruns:
 
 ```bash
 opensip fit --check <rule> --changed --include-impacted --json
-```
 
 and classifies the returned `SignalEnvelope`. The verifier may report
 `verified` only when the selected check ran, the selected finding is absent, and

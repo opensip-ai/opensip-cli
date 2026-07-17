@@ -21,7 +21,6 @@ enforcement-reason: >
   Manifest-loader tests validate the `requires` field, capability-discovery
   tests prove denied packages are not imported, and CLI load tests cover the
   exact-name allowlist plus wildcard rejection.
-```
 
 **Decision:** Marker-discovered capability packs that run in the host process
 (fit packs, graph adapters, and future in-process contribution packages) are

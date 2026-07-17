@@ -19,7 +19,6 @@ enforcement: not-mechanizable
 enforcement-reason: >
   A modeling decision about package identity; carried in the catalog contract and
   exercised by the coupling grid + edge-constraint, not a lintable pattern.
-```
 
 **Decision:** A file's package identity is the `name` of its **nearest enclosing
 `package.json`** (e.g. `@opensip-cli/fitness`), falling back to the top-level

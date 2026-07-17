@@ -93,8 +93,7 @@ export interface BootstrapOptions {
  * Graph adapter discovery runs BEFORE `mountAllToolCommands`: the
  * graph tool's `register()` method assumes adapters are already
  * available so its lang-adapter registry isn't empty when the first
- * `pickAdapter()` lands during a real run. PR 1a of plan
- * docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
+ * `pickAdapter()` lands during a real run.
  */
 export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapResult> {
   const startupTimer = createStartupTimer();

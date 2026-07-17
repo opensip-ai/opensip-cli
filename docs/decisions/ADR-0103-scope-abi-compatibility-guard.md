@@ -23,7 +23,6 @@ enforcement-reason: >
   package.json field is asserted equal to the SCOPE_ABI_VERSION source
   constant). The user-facing diagnostic path is covered by the fitness
   load-outcome tests.
-```
 
 **Decision:** The single-`@opensip-cli/core` guard decides whether a discovered
 capability pack's resolved core is "the same core" by comparing a **scope ABI
@@ -88,7 +87,4 @@ sound, and pre-0.1.11 cores correctly fall back to exact-version identity.
 - The guard remains generic: the policy applies to every capability domain's
   packs (fit, sim, graph adapters), not just fit.
 
-**Related specs / ADRs:** ADR-0060 (capability discovery + `targetDomainApiVersion`
-epoch gate). Implemented in `packages/core/src/plugins/single-core-guard.ts`,
-`scope-abi.ts`, `capability-discovery.ts`, `lib/capability-diagnostic.ts`, and
-`packages/fitness/engine/src/cli/fit/load-outcome.ts`.
+**Related ADRs:** ADR-0060 (capability discovery + `targetDomainApiVersion` epoch gate).ts`, `scope-abi.ts`, `capability-discovery.ts`, `lib/capability-diagnostic.ts`, and `packages/fitness/engine/src/cli/fit/load-outcome.ts`.

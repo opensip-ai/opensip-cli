@@ -24,7 +24,6 @@ enforcement-reason: >
   full-replacement `body` slot for a tool to bypass the sections. The
   `live-view-through-cli-live` fitness check (ADR-0058) + dependency-cruiser keep
   tools rendering through the shell rather than importing `ink` directly.
-```
 
 **Decision:** Every run surface — a single tool (`fit`/`graph`/`sim`/`yagni`), a
 suite, or a third-party tool — renders as the SAME five fixed, ordered sections
@@ -74,7 +73,4 @@ line). A new run surface that needs a note under its summary uses `summaryNote`;
 one that needs extra verbose detail uses `verboseExtra`; neither may re-introduce a
 full-frame replacement.
 
-**Related specs / ADRs:** ADR-0058 (the shared live-run shell + `cli-live` this
-contract governs), ADR-0100 (suite per-step + aggregate output that §3/§4 render),
-ADR-0102 (the §1 banner / activity mark), ADR-0135 (the one 3-way run outcome the
-§4 summary headline shows).
+**Related ADRs:** ADR-0058 (the shared live-run shell + `cli-live` this contract governs); ADR-0100 (suite per-step + aggregate output that §3/§4 render); ADR-0102 (the §1 banner / activity mark); ADR-0135 (the one 3-way run outcome the §4 summary headline shows).

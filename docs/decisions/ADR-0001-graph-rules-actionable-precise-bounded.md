@@ -20,7 +20,6 @@ enforcement-reason: >
   A judgment about whether a finding is actionable; guides graph-rule design and
   review, not a lintable pattern. Partially observable via per-rule finding
   counts on the dogfood run.
-```
 
 **Decision:** A **graph rule** (the `graph` tool's Stage-4 rule pass — a `Rule`
 with a `graph:<slug>` id whose `evaluate(catalog, indexes, config)` emits
@@ -102,8 +101,3 @@ zero on a healthy codebase.
   with an aggregate cross-package signal.
 - A rule that fails any criterion is reshaped until it passes or relocated to the
   dashboard.
-
-**Related specs:**
-[`duplicated-body-cross-package-signal`](../specs/duplicated-body-cross-package-signal.md),
-[`high-blast-dashboard-only`](../specs/high-blast-dashboard-only.md),
-[`orphan-subtree-sharpening`](../specs/orphan-subtree-sharpening.md).

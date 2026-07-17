@@ -25,7 +25,6 @@ enforcement-reason: >
   wrappers to customers" half is upheld by review + the export-surface tests
   (ADR-0009/ADR-0013) plus the fact that wrappers presuming the host repo's config
   live only in OpenSIP CLI's own check packs, never in a customer-facing recipe.
-```
 
 **Decision:** opensip-cli standardizes on **wrapping mature external quality
 tools as first-party `command:` fit checks** so that `fit` is the single quality
@@ -117,13 +116,4 @@ snippet that can rot out of sync with what we actually run.
 - Expect **no speedup** and a small subprocess overhead; the value is single-surface
   reporting and the public example, not wall-clock.
 
-**Related specs / ADRs:** Implements the unification direction of
-[ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (`Signal` as the
-universal output currency) and [ADR-0014](./ADR-0014-shared-inline-signal-suppression.md)
-(one inline-suppression model) by bringing the last independent quality tools under
-that currency. The "teach, don't ship" half is the consumer-facing complement to
-[ADR-0009](./ADR-0009-public-api-surface-policy.md)/[ADR-0013](./ADR-0013-fitness-curated-export-surface.md)
-(curated surfaces — opinionated, config-coupled wrappers are not part of the
-published authoring surface) and to [ADR-0007](./ADR-0007-marker-canonical-plugin-discovery.md)
-(how a consumer authors and discovers their own plugin). The eslint wrapper and the
-`50-extend` guide are tracked as follow-up work (local plan).
+**Related ADRs:** The unification direction of [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (`Signal` as the universal output currency) and [ADR-0014](./ADR-0014-shared-inline-signal-suppression.md) (one inline-suppression model) by bringing the last independent quality tools under that currency. The "teach, don't ship" half is the consumer-facing complement to [ADR-0009](./ADR-0009-public-api-surface-policy.md)/[ADR-0013](./ADR-0013-fitness-curated-export-surface.md) (curated surfaces — opinionated, config-coupled wrappers are not part of the published authoring surface) and to [ADR-0007](./ADR-0007-marker-canonical-plugin-discovery.md) (how a consumer authors and discovers their own plugin). The eslint wrapper and the `50-extend` guide are tracked as follow-up work.

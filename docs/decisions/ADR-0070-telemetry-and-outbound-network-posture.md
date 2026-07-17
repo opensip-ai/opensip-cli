@@ -19,7 +19,6 @@ enforcement: not-mechanizable
 enforcement-reason: >
   Existing env-surface/update-notifier tests cover invariants; no new structural
   fitness check required beyond docs coherence tests.
-```
 
 **Decision:** Consolidate outbound posture: **OpenTelemetry stays opt-in** via
 `OTEL_EXPORTER_OTLP_ENDPOINT` (ADR-0004 unchanged); **cloud sync** is API-key and

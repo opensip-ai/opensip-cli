@@ -28,7 +28,6 @@ enforcement-reason: >
   version-range check, and a wildcard-admission deprecation warning — are
   specified in specs 01 and 03 and are NOT yet landed; this ADR records the
   decision, the specs land the enforcement.
-```
 
 **Decision:** OpenSIP CLI adopts an **ecosystem-ready, ecosystem-gated** posture.
 v0.1 is a **curated first-party platform** with support for **trusted/private
@@ -182,7 +181,7 @@ number rather than restating it.
   (`live-view-through-cli-live` only forbids ink `render` imports, not the
   off-thread selector).
 - **The three implementation specs are
-  `docs/plans/specs/arch-improvements/01..03`** (local-only; `docs/plans` is
+ ** (local-only; `docs/plans` is
   gitignored): 01 = posture/honesty corrections + the per-tier admission and
   wildcard-deprecation guards; 02 = subprocess execution model and the fork-cost
   investigation; 03 = the three-gate investigation (capability/permission +
@@ -201,17 +200,7 @@ number rather than restating it.
   with the full-privilege caveat, and the in-process capability-pack surface is
   documented as the **least** isolated extension surface.
 
-**Related specs / ADRs:** Implemented by
-`docs/plans/specs/arch-improvements/01-trust-framing-and-cheap-hardening.md`,
-`docs/plans/specs/arch-improvements/02-supervisor-and-execution-path-hardening.md`, and
-`docs/plans/specs/arch-improvements/03-ecosystem-readiness.md`
-(local-only). Builds on ADR-0030 (authored-tool discovery + trust tiers; this
-ADR's wildcard-deprecation and the user-global tier decision are ADR-0030
-amendments), ADR-0054 (external fault-isolation boundary + the supervisor
-resource-control gaps named here), ADR-0028 (off-main-process live runs; its
-enforcement text is stale, see spec 01), ADR-0058 (shared live-run shell that
-superseded ADR-0028's guard), ADR-0036 (host-owned baseline plane), ADR-0051
-(host-owned run timing), and ADR-0056 (architecture audit remediation).
+**Related ADRs:** . Builds on ADR-0030 (authored-tool discovery + trust tiers; this ADR's wildcard-deprecation and the user-global tier decision are ADR-0030 amendments), ADR-0054 (external fault-isolation boundary + the supervisor resource-control gaps named here), ADR-0028 (off-main-process live runs; its enforcement text is stale, see.
 
 **Extended by:** [ADR-0081](ADR-0081-capability-pack-trust-and-resource-declarations.md)
 adds exact-name admission for non-bundled in-process capability packs and records

@@ -21,7 +21,6 @@ enforcement-reason: >
   TypeScript, while the default/fallback behavior is host-plane control flow
   covered by resolver, orchestrator, command-spec, and end-to-end tests. Existing
   dependency-cruiser and seam checks already fence the structural boundaries.
-```
 
 **Decision:** The built-in `audit` suite runs changed-scope by default when the
 host can resolve git changes, exposes `--full` as the whole-repo opt-out, falls
@@ -53,7 +52,4 @@ fallback semantics still decide how each step handles unavailable git or graph
 evidence. Older stored suite payloads may omit `scope`; renderers treat absence
 as "not recorded".
 
-**Related specs / ADRs:** Extends [ADR-0111](ADR-0111-built-in-audit-suite-preset.md)
-and relies on [ADR-0085](ADR-0085-change-detection-substrate.md) plus
-[ADR-0093](ADR-0093-host-owned-suite-plane.md). Implemented by
-`docs/plans/ready/audit-suite-ergonomics/`.
+**Related ADRs:** [ADR-0111](ADR-0111-built-in-audit-suite-preset.md); [ADR-0085](ADR-0085-change-detection-substrate.md); [ADR-0093](ADR-0093-host-owned-suite-md).

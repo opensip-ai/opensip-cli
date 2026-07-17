@@ -19,7 +19,6 @@ enforcement: mechanizable
 enforced-by: ['script:no-init-ephemeral.test']
 enforcement-reason: >
   No check warranted yet — command allowlisting, config synthesis, runtime placement, init migration, and uninstall cleanup are covered by focused unit/e2e tests; the existing architecture checks already guard ToolCliContext and persistence boundaries.
-```
 
 **Decision:** `fit`, `graph`, `graph impact`, and `suite run audit` may run in a
 directory with no `opensip-cli.config.yml`. The CLI host synthesizes an in-memory
@@ -66,9 +65,4 @@ project.
 - MCP and commands that replay persisted project state still require initialized
   project state unless a future ADR extends their storage contract.
 
-**Related specs / ADRs:** Spec 25 (no-init first run),
-[ADR-0023](ADR-0023-project-config-schema.md),
-[ADR-0037](ADR-0037-host-owned-file-targeting.md),
-[ADR-0052](ADR-0052-bootstrap-orchestration-state-machine.md),
-[ADR-0093](ADR-0093-host-owned-suite-plane.md),
-[ADR-0111](ADR-0111-built-in-audit-suite-preset.md).
+**Related ADRs:** [ADR-0023](ADR-0023-project-config-schema.md); [ADR-0037](ADR-0037-host-owned-file-targeting.md); [ADR-0052](ADR-0052-bootstrap-orchestration-state-machine.md); [ADR-0093](ADR-0093-host-owned-suite-md); [ADR-0111](ADR-0111-built-in-audit-suite-preset.md).

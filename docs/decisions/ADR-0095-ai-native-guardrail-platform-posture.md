@@ -21,7 +21,6 @@ enforcement-reason: >
   Individual pieces remain mechanized elsewhere: JSON output, sessions, MCP,
   graph/fitness gates, and suite/session provenance each have their own tests
   and ADRs. This ADR records the cross-cutting intent those mechanisms serve.
-```
 
 **Decision:** Position opensip-cli as an **AI-native guardrail platform**, not an
 AI runtime. The CLI MUST NOT require model calls, embeddings, or autonomous code

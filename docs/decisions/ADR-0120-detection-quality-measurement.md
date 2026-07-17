@@ -22,7 +22,6 @@ enforcement-reason: >
   command registration is added. Regression is enforced by
   `quality:measure:check`, script tests, generated suppression-catalog checks,
   docs checks, and CI.
-```
 
 **Decision:** Measure detection quality with a root-level script lane over a
 checked-in labeled OSS corpus and committed baseline. Do not add a new OpenSIP
@@ -55,8 +54,5 @@ artifacts but should not become product commands.
 - Contributors changing checks should add or update labeled quality cases when a
   behavior change would affect precision, recall, or FPR.
 
-**Related specs / ADRs:**
-
-- `docs/plans/completed/17-detection-quality-measurement.md`
 - [ADR-0118](./ADR-0118-scale-and-performance-slos.md)
 - [Detection Quality](../public/70-reference/14-detection-quality.md)

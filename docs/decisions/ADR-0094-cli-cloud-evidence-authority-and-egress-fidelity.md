@@ -25,7 +25,6 @@ enforcement-reason: >
   divergence is reported not hidden — is a cross-repo design contract spanning
   the parent `opensip` Cloud repo; it is a posture, not a single mechanizable
   check.
-```
 
 **Decision:** `opensip-cli` and OpenSIP Cloud form **one identity/correlation
 model with three explicit evidence-authority tiers** — (1) **cloud-derived**
@@ -98,7 +97,7 @@ artifact/capability belongs in Cloud iff it needs >1 repo, >1 run, or >1 actor).
   cross-repo coordination): the full-fidelity ingest contract, SARIF-transform
   fidelity, and server-side authority/divergence enforcement live in the parent
   `opensip` repo and should be tracked there with a `DEC-NNN`.
-- **Dangling cross-repo doc:** ADR-0008 cites `docs/internal/consumers/opensip.md`,
+- **Dangling cross-repo doc:** ADR-0008 cites,
   which is absent on disk. Recreate it as the CLI-side mirror of DEC-587 + the
   `SignalBatch schemaVersion:1` contract, owned under spec 11, and update it in the
   same PR as any egress-fidelity change.
@@ -113,13 +112,4 @@ artifact/capability belongs in Cloud iff it needs >1 repo, >1 run, or >1 actor).
   remediation is the platform moat — see spec 21). Those affect *when*, not *whether*,
   the authority model holds.
 
-**Related specs / ADRs:** Implemented by `docs/plans/completed/20-platform-evidence-authority-and-egress-contract.md`
-and `docs/plans/completed/09-enterprise-trust-policy-plane.md` (local-only). Builds on
-[ADR-0008](./ADR-0008-opensip-cloud-signal-sync.md) (Cloud signal sink + open-core
-boundary), [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (output
-plane), [ADR-0036](./ADR-0036-host-owned-baseline-ratchet-plane.md) (fingerprint
-identity), [ADR-0061](./ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
-(trust tiers — provenance/signing the CLI-attested tier reuses), and
-[ADR-0065](./ADR-0065-public-json-output-and-raw-stream-policy.md) (public output
-contract). Cites parent decisions DEC-587 (SARIF handoff wire contract), DEC-589
-(ingest RBAC-only, billing downstream), DEC-520 (multi-repo materialization).
+**Related ADRs:** . Builds on [ADR-0008](./ADR-0008-opensip-cloud-signal-sync.md) (Cloud signal sink + open-core boundary), [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (output/ADR-0036-host-owned-baseline-ratchet-md) (fingerprint identity), [ADR-0061](./ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md) (trust tiers — provenance/signing the CLI-attested tier reuses), and [ADR-0065](./ADR-0065-public-json-output-and-raw-stream-policy.md) (public output contract). Cites parent decisions DEC-587 (SARIF handoff wire contract), DEC-589 (ingest RBAC-only, billing downstream), DEC-520 (multi-repo materialization).

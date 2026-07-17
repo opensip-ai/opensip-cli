@@ -21,7 +21,6 @@ enforcement-reason: >
   The project-local fitness check deferred-run-pipeline-boundary now permits the
   promoted contracts APIs only at approved boundaries and still forbids local
   RunCommandPipeline copies or tool-owned helper definitions.
-```
 
 **Decision:** Promote the deferred host-owned run pipeline as
 `defineAnalysisRunCommand` in `@opensip-cli/contracts`, with companion
@@ -79,11 +78,4 @@ choreography over documented `ToolCliContext` seams.
 - The `deferred-run-pipeline-boundary` fitness check stays active, renamed in
   meaning: it now enforces approved boundaries instead of total deferral.
 
-**Related specs / ADRs:** Supersedes
-[ADR-0104](ADR-0104-defer-host-owned-run-pipeline.md). Implements the promoted
-host-owned run pipeline roadmap item. See
-[ADR-0036](ADR-0036-host-owned-baseline-ratchet-plane.md),
-[ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md),
-[ADR-0058](ADR-0058-shared-live-run-shell.md),
-[ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md), and
-[ADR-0097](ADR-0097-gate-verdict-determinism.md).
+**Related ADRs:** Supersedes [ADR-0104](ADR-0104-defer-host-owned-run-pipeline.md). the promoted host-owned run pipeline roadmap item. See [ADR-0036](ADR-0036-host-owned-baseline-ratchet-md), [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md), [ADR-0058](ADR-0058-shared-live-run-shell.md), [ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md), and [ADR-0097](ADR-0097-gate-verdict-determinism.md).

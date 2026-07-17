@@ -24,7 +24,6 @@ enforcement-reason: >
   locks the exact value AND type namespace of every governed package via a TS-AST
   walker; the local no-bootstrap-tool-import dogfood check emits an actionable
   source diagnostic for every Tool-runtime import form.
-```
 
 **Decision:** Package boundaries are derived from manifests and locked by AST, not
 maintained by hand. Tool and fit-pack classification comes from
@@ -73,7 +72,4 @@ namespace, side-effect; `import type` exempt) scoped to Tool-family packages;
 dependency-cruiser's manifest-derived `cli-no-static-tool-package-import` remains
 the manifest-complete authority for a Tool with any package name.
 
-**Related specs / ADRs:** ADR-0147 (public graph/read + fail-closed boundaries,
-extended here to CLI dynamic load + exact type locks); ADR-0009 (published/internal
-subpaths); ADR-0013 (layer policy); ADR-0040 (private test-support); ADR-0133
-(manifest-derived Tool inventory).
+**Related ADRs:** ADR-0147 (public graph/read + fail-closed boundaries, extended here to CLI dynamic load + exact type locks); ADR-0009 (published/internal subpaths); ADR-0013 (layer policy); ADR-0040 (private test-support); ADR-0133 (manifest-derived Tool inventory).

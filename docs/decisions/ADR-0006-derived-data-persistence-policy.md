@@ -20,7 +20,6 @@ enforcement-reason: >
   A judgment about whether a derived field earns a stored copy. Partially
   observable (a reviewer can ask "can a rule recompute this cheaply in-engine?
   then don't persist it"), but there is no lint for it.
-```
 
 **Decision:** Derived data is a **plain recomputed view by default**.
 **Materialize** it (store a copy in the persisted catalog document) **only when
@@ -79,9 +78,4 @@ materialized for them.
   per-row tables, real SQL/materialized views become possible and this policy
   should be re-evaluated against them.
 
-**Related specs / ADRs:**
-[ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md)
-(applies this to the feature layer);
-[ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (rankings are
-dashboard insights). Implemented detail in `docs/plans/specs/03-graph-feature-layer.md`
-(local-only).
+**Related ADRs:** [ADR-0005](./ADR-0005-symmetric-tool-architecture-graph-rules-as-dataset-queries.md) (applies this to the feature layer); [ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (rankings are dashboard insights).

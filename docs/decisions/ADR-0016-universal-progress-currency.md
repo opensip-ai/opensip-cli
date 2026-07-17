@@ -23,7 +23,6 @@ enforcement-reason: >
   there are only three live-view renderers (fit/graph/sim). The renderer's two
   modes and the in-process transport's pre-subscribe buffering are covered by
   unit tests in cli-ui and core.
-```
 
 **Decision:** All three tools (`fit`, `graph`, `sim`) render their live run
 through **one** shared currency + renderer + transport seam — the run-time
@@ -123,5 +122,4 @@ invalidation) landed. ADR-0015 added `stampEngineVersion` to `catalog-builder.ts
 Rebasing onto current main must reconcile both (the stamp and the async are
 orthogonal; they coexist).
 
-**Related specs / ADRs:** `docs/plans/specs/universal-progress-currency.md`
 (local). Symmetric to ADR-0011 (signal output currency).

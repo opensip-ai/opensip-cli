@@ -375,8 +375,8 @@ export interface ToolCliContext {
    * H3: Entitlements/Licensing/Paid-Extension State).
    *
    * See:
-   * - the "Host-Owned Governance, Entitlements & Audit Plane" spec + plan
-   *   (local-only working docs under docs/plans/, by that title)
+   * - the "Host-Owned Governance, Entitlements & Audit Plane" local-only
+   *   working spec/plan (by that title; not a committed path)
    * - ADR-0042 (toolState baseline this reuses)
    *
    * Design: typed seams here (host provides the impl), opaque/namespaced storage under the

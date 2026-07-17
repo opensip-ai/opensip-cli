@@ -25,7 +25,6 @@ enforcement-reason: >
   The rule activates per-language as each `lang-*` adapter gains its real parser
   (it would false-fire against `graph-adapter-common` mid-migration), matching
   the existing `graph-typescript → lang-typescript` precedent.
-```
 
 **Decision:** Each `@opensip-cli/lang-<language>` package is the **one
 canonical place that parses that language** and exposes its AST + the
@@ -110,8 +109,4 @@ absorb the refactor cost.
   It gates real (non-regex) non-TS parity for the open deterministic signal
   foundry (DEC-521).
 
-**Related specs / ADRs:** [ADR-0009](./ADR-0009-public-api-surface-policy.md)
-(public-API surface discipline — the relocated primitives must land behind
-curated barrels / `internal` subpaths); parent-repo **DEC-521** (detection
-boundary — opensip-cli as the open, deterministic, polyglot signal foundry).
-A phased implementation spec should follow under `docs/plans/specs/`.
+**Related ADRs:** [ADR-0009](./ADR-0009-public-api-surface-policy.md) (public-API surface discipline — the relocated primitives must land behind curated barrels / `internal` subpaths); parent-repo **DEC-521** (detection boundary — opensip-cli as the open, deterministic, polyglot signal foundry).

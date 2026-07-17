@@ -23,7 +23,6 @@ enforcement-reason: >
   `@opensip-cli/tree-sitter`; the type-aware companion gate reuses the same
   ruleset, so type-only edges are caught too. Rule liveness verified by probe
   on introduction.
-```
 
 **Decision:** Fitness check packs may not depend on `@opensip-cli/tree-sitter`
 directly. AST-level checks consume the parser substrate **through their

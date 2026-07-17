@@ -23,7 +23,6 @@ enforcement-reason: >
   itself), and that sim emits ≥1 error-severity signal whenever a scenario fails
   (the currency precondition below). Both belong in the implementing spec's
   per-tool verification matrix and join the §8 completion-invariant index.
-```
 
 **Decision:** A run's pass/fail is **one** value — `envelope.verdict.passed` —
 computed by the host (`buildSignalEnvelope`) from the run's error/warning counts
@@ -145,12 +144,4 @@ contracts-layer function) keeps the verdict in the one place all sinks read.
   in the table below the summary (one row per check/rule/scenario with its own
   PASS/FAIL/ERROR), not in the headline.
 
-**Related specs / ADRs:** Implements onto ADR-0011 (Signal is the universal output
-currency — this ADR makes the verdict a first-class part of that currency and
-fixes sim's violation of it), ADR-0023 (tool config consolidation — supplies the
-config resolution pipeline the reserved keys reuse), ADR-0027 (tool-plugin parity
-GA — "host owns the plane, tool declares a manifest"; the verdict plane is one more
-host-owned plane a plugin inherits). The implementing spec
-(`docs/plans/specs/host-owned-verdict.md`, local-only) carries the per-tool
-verification matrix: fit (exact), graph gate-save (exact), graph gate-compare
-(verify `degraded` expressibility), sim (exact *after* the signal-emission fix).
+**Related ADRs:** ADR-0011 (Signal is the universal output currency — this ADR makes the verdict a first-class part of that currency and fixes sim's violation of it), ADR-0023 (tool config consolidation — supplies the config resolution pipeline the reserved keys reuse), ADR-0027 (tool-plugin parity GA — "host owns the.

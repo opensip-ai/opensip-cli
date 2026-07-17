@@ -21,7 +21,6 @@ enforcement-reason: >
   dependency-cruiser and ESLint keep the package-level direction acyclic. The
   sub-boundaries inside @opensip-cli/core are documented ownership rules rather
   than independently publishable packages today.
-```
 
 **Decision:** `@opensip-cli/core` remains one publishable kernel package, but it
 is treated as a set of explicit internal sub-boundaries:

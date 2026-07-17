@@ -21,7 +21,6 @@ enforcement-reason: >
   Strict Zod schemas, exclusive compact projections, cursor digests, privacy
   guards, 4 MiB serializer ceiling, and built stdio inventory tests enforce the
   faceted protocol. Graph/read package boundaries remain depcruise-enforced.
-```
 
 **Decision:** MCP graph tools use **four independent coverage facets**
 (inventory, evidence, grouping, projection) and **exclusive** compact
@@ -78,5 +77,4 @@ Exclusive modes prevent accidental dual projection.
 **Fitness check:** No check warranted — strict runtime protocol tests are the
 direct evaluator.
 
-**Related specs / ADRs:** Supersedes ADR-0149 (bounded labelled MCP audit
-evidence). Complements ADR-0152 (evidence planes) and ADR-0154 (runtime bridge).
+**Related ADRs:** ADR-0149 (bounded labelled MCP audit evidence); ADR-0152 (evidence.

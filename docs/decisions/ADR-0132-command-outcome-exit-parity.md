@@ -21,7 +21,6 @@ enforcement-reason: >
   The runtime contract is pinned by
   packages/cli/src/__tests__/command-outcome-exit-parity.test.ts across fit,
   graph, yagni, suite, and gate-compare paths.
-```
 
 **Decision:** The serialized `CommandOutcome.exitCode` always equals the process
 exit code for every public JSON command outcome.
@@ -66,9 +65,4 @@ in gate mode (the host owns the gate exit, ADR-0035), pinned by an un-mocked
 `yagni --gate-compare` row in `command-outcome-exit-parity.test.ts`. Any future
 adopter whose hooks mutate the exit code must respect the gate-owns-exit rule.
 
-**Related specs / ADRs:** Builds on the public JSON wrapper in
-[ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md), the signal
-currency in [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md), and
-the host-owned gate/delivery posture in
-[ADR-0035](ADR-0035-host-owned-verdict-from-tool-declared-policy.md) and
-[ADR-0117](ADR-0117-host-owned-analysis-run-pipeline.md).
+**Related ADRs:** Builds on the public JSON wrapper in [ADR-0065](ADR-0065-public-json-output-and-raw-stream-policy.md), the signal currency in [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md), and the host-owned gate/delivery posture in [ADR-0035](ADR-0035-host-owned-verdict-from-tool-declared-policy.md) and [ADR-0117](ADR-0117-host-owned-analysis-run-pipeline.md).

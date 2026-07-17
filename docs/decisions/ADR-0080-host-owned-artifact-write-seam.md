@@ -21,7 +21,6 @@ enforcement-reason: >
   Fitness check `no-raw-fs-artifact-write-in-tool-engine` forbids durable raw fs
   writes from first-party tool engine paths and allows the host-owned
   `cli.writeArtifact` seam.
-```
 
 **Decision:** Durable artifacts authored by a tool command must be written via
 `ToolCliContext.writeArtifact(path, bytes)` or a narrower host-owned seam such as

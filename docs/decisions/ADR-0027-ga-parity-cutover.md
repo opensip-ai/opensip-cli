@@ -23,10 +23,8 @@ enforcement-reason: >
   `register()` removal is enforced by the type system (the member is gone from the
   Tool contract); `checkCompatibility(undefined) ⇒ incompatible` is unit-pinned;
   and `parity-invariants.test.ts` asserts every one of the nine §8 completion
-  invariants maps to a live check (the index at
-  docs/internal/parity-invariant-index.md). The §1 acceptance test
+  invariants maps to a live check). The §1 acceptance test
   (fit-external-load.test.ts) is the executable GA bar.
-```
 
 **Decision:** At 3.0.0, remove the three privileged first-party paths the 2.x
 ladder built *alongside* the parity planes, so the only thing distinguishing a
@@ -83,8 +81,4 @@ fact, not a guarded convention. Grounded in: `packages/cli/src/bootstrap/registe
 - The grace-window provisions that lived in the 2.9.0/2.11.0 specs are retired;
   this ADR is the durable record of their removal.
 
-**Related specs / ADRs:** Implements
-`docs/plans/specs/release-3.0.0-ga-parity-cutover.md` (local-only). Realizes
-ADR-0012's 3.0.0 reservation; completes the parity ladder begun by ADR-0011
-(output currency) and continued through ADR-0021/0023/0024/0026. The completion-
-invariant enforcement record is `docs/internal/parity-invariant-index.md`.
+**Related ADRs:** Realizes ADR-0012's 3.0.0 reservation; completes the parity ladder begun by ADR-0011 (output currency) and continued through ADR-0021/0023/0024/0026.

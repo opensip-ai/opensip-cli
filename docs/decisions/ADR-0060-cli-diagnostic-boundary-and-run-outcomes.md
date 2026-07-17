@@ -23,7 +23,6 @@ enforcement-reason: >
   no loader/discovery direct stderr, command-error JSON shape, fail-closed empty
   fitness registry, command-scoped bootstrap diagnostics, and injected workspace
   copy freshness.
-```
 
 **Decision:** The CLI host owns user-facing diagnostic presentation and command
 outcome classification. Setup failures that prevent a credible scan produce a
@@ -105,8 +104,4 @@ command's normal output.
   injected `dist/` file sets and `package.json#opensipTools` must remain fresh
   against source.
 
-**Related specs / ADRs:** `docs/plans/specs/cli-diagnostic-boundary-and-run-outcomes.md`.
-Builds on ADR-0011 (signal output currency), ADR-0024 (command outcome and
-observability), ADR-0035 (host-owned verdict), ADR-0051 (host-owned lifecycle),
-ADR-0052 (bootstrap state machine), ADR-0053 (per-run logger scope), ADR-0054
-(tool fault-isolation boundary), and ADR-0059 (tool identity single source).
+**Related ADRs:** ADR-0011 (signal output currency); ADR-0024 (command outcome and observability); ADR-0035 (host-owned verdict); ADR-0051 (host-owned lifecycle); ADR-0052 (bootstrap state machine); ADR-0053 (per-run logger scope); ADR-0054 (tool fault-isolation boundary); ADR-0059 (tool identity single source).

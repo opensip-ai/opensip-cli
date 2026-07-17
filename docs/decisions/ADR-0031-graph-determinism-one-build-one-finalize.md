@@ -35,7 +35,6 @@ enforcement-reason: >
   is the only way to shard; TTY does not affect engine choice) and the cache-mode
   collision test in `engine-version.test.ts` (`mode=exact` vs `mode=sharded` keys
   never clobber).
-```
 
 **Decision:** A `graph` run is **one build → one finalize → many renderers**. (1)
 Suppression (`@graph-ignore`) is applied in exactly one seam — `finalizeGraphSignals`
@@ -87,7 +86,4 @@ must be the accurate engine; speed (sharding) is an explicit, opt-in trade.
   Reconciling sharded≡exact is a tracked perf follow-up; until then `--sharded`
   output should not be treated as authoritative for gating production code.
 
-**Related specs / ADRs:** Implements the fix tracked in
-`docs/internal/graph-false-findings-incident-log.md`. Builds on ADR-0014
-(the shared `@graph-ignore` suppression primitive) and ADR-0028 (the off-main-thread
-live-view worker, one of the producers now routed through the finalize seam).
+**Related ADRs:** The fix tracked in. Builds on ADR-0014 (the shared `@graph-ignore` suppression primitive) and ADR-0028 (the off-main-thread live-view worker, one of the producers now routed through the finalize seam).

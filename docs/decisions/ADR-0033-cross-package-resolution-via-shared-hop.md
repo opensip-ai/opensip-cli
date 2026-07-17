@@ -32,7 +32,6 @@ enforcement-reason: >
   byte-equivalence fixture suite (`equivalence-repo-scale.test.ts`) and the
   no-bodyhash-keying / ownerEdgeKey identity tests (ADR-0003). Engine-selection
   policy and cache stamping carry forward from ADR-0032 / ADR-0015.
-```
 
 **Decision:** Cross-package call edges resolve through **one shared hop** used by
 *both* engines — the `resolve-decl` declaration→bodyHash seam plus the
@@ -101,7 +100,6 @@ construction, so it is guarded by the pinned-corpus completeness floor.
 - The exact engine emits syntactic boundary calls (`emitBoundaryCalls`) and runs
   the cross-shard linker in `obtainCatalog`; a debug-only `GRAPH_SITE_LOG` trace
   harness (isolated, env-gated) is retained for the next investigation
-  (`docs/internal/graph-resolution-trace.md`).
 - **Build-state independence is partial and explicit:** the file+name pin made
   RELATIVE/intra-package imports clean-checkout-safe in both engines; WORKSPACE
   `@scope/pkg` imports still reach the linker in exact via the dep's built
@@ -113,15 +111,7 @@ construction, so it is guarded by the pinned-corpus completeness floor.
   remains in force. ADR-0031's suppression seam / `FinalizedSignals` /
   renderer-by-TTY / `mode=` cache stamping remain unchanged.
 
-**Related specs / ADRs:** Supersedes ADR-0032 (sharded default), carrying its
-engine-selection policy forward. Builds on ADR-0003 (ownerEdgeKey occurrence
-identity — body-twins must not union edges), ADR-0010 (cross-package export
-model), ADR-0014 (shared inline-suppression primitive), ADR-0015 (engine-version +
-mode cache stamping), ADR-0031 (one build / one finalize / many renderers).
-Implements the `graph-resolution-correctness` plan (local). Residual diagnosis +
-the `GRAPH_SITE_LOG` harness recorded in
-`docs/internal/graph-resolution-trace.md` and
-`docs/internal/graph-false-findings-incident-log.md`.
+**Related ADRs:** Supersedes ADR-0032 (sharded default), carrying its engine-selection policy forward. Builds on ADR-0003 (ownerEdgeKey occurrence identity — body-twins must not union edges), ADR-0010 (cross-package export model), ADR-0014 (shared inline-suppression primitive), ADR-0015 (engine-version + mode cache stamping), ADR-0031 (one build / one finalize / many renderers). the `graph-resolution-correctness` Residual diagnosis + the `GRAPH_SITE_LOG` harness recorded in and.
 
 **Amendment (2026-06-11) — the "conflict" class was MISDIAGNOSED; re-diagnosed +
 fixed (divergence 12 → 1).** This ADR's body calls the 11 conflicts

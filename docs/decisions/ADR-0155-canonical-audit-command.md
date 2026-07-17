@@ -21,7 +21,6 @@ enforcement-reason: >
   Command-surface, source-ownership, executor-parity, and ledger tests enforce
   the two local entry points. Existing dependency and session gates enforce the
   package boundary, so a new fitness check would duplicate narrower tests.
-```
 
 **Decision:** Reserve the host-owned top-level `opensip audit` command for the
 curated built-in audit definition. It and `opensip suite run audit` share one
@@ -89,10 +88,4 @@ resolution.
   report for the completed parent run when browser launch is allowed; other
   suites open the ordinary report without a closed Change Impact selection.
 
-**Related specs / ADRs:** Partially amends
-[ADR-0111](ADR-0111-built-in-audit-suite-preset.md) and
-[ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Suite-name reservation is
-ratified by [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md). Scope
-semantics remain in [ADR-0129](ADR-0129-audit-suite-scope-defaults.md); the suite
-plane remains in [ADR-0093](ADR-0093-host-owned-suite-plane.md). Implementation
-specification: `docs/plans/specs/visual-proof-of-change.md` (local, gitignored).
+**Related ADRs:** Partially amends [ADR-0111](ADR-0111-built-in-audit-suite-preset.md) and [ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Suite-name reservation is ratified by [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md). Scope semantics remain in [ADR-0129](ADR-0129-audit-suite-scope-defaults.md); the suitemd).

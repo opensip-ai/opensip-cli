@@ -51,7 +51,6 @@ enforcement-reason: >
   @opensip-cli/contracts, `SignalBatch.schemaVersion` in @opensip-cli/core).
   The judgment half — "batch breaking changes into deliberate majors; declare GA
   by announcement, not by the integer" — is a maintainer discipline, not a gate.
-```
 
 **Decision:** opensip-cli follows **semantic versioning honestly** for its
 published package APIs: a breaking change to any `@opensip-cli/*` or the
@@ -157,10 +156,4 @@ migration effort") instead of noisy.
 - **`1.0.0` (GA) is declared via the release announcement + CHANGELOG** when the
   public API freezes and real users depend on it, referencing this ADR.
 
-**Related specs / ADRs:** ADR-0011 (the breaking migration this batch ships, and
-the source of the independent `SignalEnvelope.schemaVersion`), ADR-0008
-(`SignalBatch.schemaVersion`, the cloud wire-contract version), ADR-0009
-(public-API surface policy — the other breaking changes in this batch). Release
-mechanics live in `RELEASING.md`; the `2.7.0` change log in `CHANGELOG.md`; the
-deferred-GA north star in
-`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`.
+**Related ADRs:** ADR-0011 (the breaking migration this batch ships, and the source of the independent `SignalEnvelope.schemaVersion`), ADR-0008 (`SignalBatch.schemaVersion`, the cloud wire-contract version), ADR-0009 (public-API surface policy — the other breaking changes in this batch). Release mechanics live in `RELEASING.md`; the `2.7.0` change log in `CHANGELOG.md`; the deferred-GA north star in.

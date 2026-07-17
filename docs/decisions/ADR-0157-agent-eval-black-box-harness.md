@@ -22,7 +22,6 @@ enforcement-reason: >
   cruiser's test-file exclusion gap, and the dependency-cruiser types
   companion reruns the complete base ruleset so type-only source edges are
   covered as well.
-```
 
 **Decision:** Measure OpenSIP's agent-facing surface from outside it.
 `@opensip-cli/agent-eval` is a workspace-private, never-published development
@@ -78,8 +77,4 @@ to protect.
   new ADR that replaces this posture; weakening an import rule is not a local
   implementation detail.
 
-**Related specs / ADRs:** [ADR-0040](ADR-0040-test-support-package.md) provides
-the private-package reverse-boundary precedent, and
-[ADR-0095](ADR-0095-ai-native-guardrail-platform-posture.md) keeps model
-execution out of the CLI. The local implementation plan is
-`docs/plans/ready/03-agent-eval-harness/`.
+**Related ADRs:** [ADR-0040](ADR-0040-test-support-package.md) provides the private-package reverse-boundary precedent, and [ADR-0095](ADR-0095-ai-native-guardrail-platform-posture.md) keeps model execution out of the CLI. The local.

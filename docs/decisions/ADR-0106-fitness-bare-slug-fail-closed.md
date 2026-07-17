@@ -20,7 +20,6 @@ enforced-by: ['script:registry-ambiguity.test.ts']
 enforcement-reason: >
   Integration test fixture with two packs registering the same bare slug;
   fitness check can grep built-in-recipes for unnamespaced explicit selectors.
-```
 
 **Decision:** When more than one registered check matches a bare slug (no `:`),
 fitness resolution **fails closed**: emit a structured diagnostic listing
@@ -53,6 +52,3 @@ for custom recipes; built-in recipes should model best practice.
 - Third-party check authors should register unique bare slugs or document
   namespace prefixes in recipe selectors.
 - Recipe docs under `docs/public/20-fit/` updated if examples use bare slugs.
-
-**Related specs / ADRs:** Phase 2 in
-`docs/plans/architecture-audit-p1-remediation/`.

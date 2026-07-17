@@ -28,7 +28,6 @@ enforcement-reason: >
   `tool-package-mcp-imports-allowlist` dependency-cruiser rule forbids an
   `mcp -> cli` edge while scoping the new `mcp -> config` edge. See "Fitness
   check" below for why no new source check is warranted.
-```
 
 **Decision:** The common `AgentCatalog` body — entry points, `commonPatterns`,
 `outputShapes`, `notes`, bounded `projectContext.targetConventions`,
@@ -124,16 +123,4 @@ reserved-root/suite parity both transports advertise; and the
 the `mcp -> cli` edge while scoping the config edge. Together these exercise the
 invariant more precisely than any pattern check over source could.
 
-**Related specs / ADRs:** [ADR-0084](ADR-0084-mcp-server-surface.md) established
-the shared catalog surface MCP serves (this makes its body transport-equivalent
-to the CLI's); [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md) owns
-name reservation and its rejection of a duplicated static reserved-command list
-(this preserves that boundary while giving MCP equivalent facts);
-[ADR-0154](ADR-0154-declarative-runtime-handler-bridge.md) owns the complete
-`RunScope.runtimeCommands` inventory MCP projects from;
-[ADR-0165](ADR-0165-macos-ga-support-qualification.md) defines the Plan 02
-`hostSupport` projection this parity preserves as an assembler input; and
-[ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md) owns the
-reconnect-versus-`refresh_graph` rule the additive `mcp` overlay obeys.
-Implementation: `docs/plans/ready/03-agent-catalog-transport-parity/` (local,
-gitignored). No existing ADR is superseded.
+**Related ADRs:** [ADR-0084](ADR-0084-mcp-server-surface.md) established the shared catalog surface MCP serves (this makes its body transport-equivalent to the CLI's); [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md) owns name reservation and its rejection of a duplicated static reserved-command list (this preserves that boundary while giving MCP equivalent facts); [ADR-0154](ADR-0154-declarative-runtime-handler-bridge.md) owns the complete `RunScope.runtimeCommands` inventory MCP projects from; [ADR-0165](ADR-0165-macos-ga-support-qualification.md) defines themd) owns the reconnect-versus-`refresh_graph` rule the additive `mcp` overlay obeys. No existing ADR is superseded.

@@ -1,7 +1,7 @@
 /**
  * Rust rule hints — language-specific signals for rules.
  *
- * Lands in PR 6 of plan docs/plans/10-graph-language-pluggability.md.
+ * Lands in PR 6.
  *
  * `isTestFile` is file-path-based here for simplicity: `tests/`
  * directory or `*_test.rs`. Note that Rust convention also supports

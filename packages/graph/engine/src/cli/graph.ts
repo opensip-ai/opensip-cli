@@ -1,6 +1,6 @@
 // @fitness-ignore-file module-coupling-fan-out -- composition root: the main graph command handler wires detection, orchestration, reporting, workspace, persistence, and recipe resolution; high intra-project fan-out is inherent to a CLI entry point (cf. the index.ts / code-paths.ts barrels that suppress the same check).
 
-// @fitness-ignore-file no-markdown-references -- docs/plans/* pointers in JSDoc are stable internal references.
+// @fitness-ignore-file no-markdown-references -- JSDoc may name local-only design notes by title, not as committed path pointers.
 /**
  * `opensip graph` — main subcommand handler.
  *
@@ -19,7 +19,7 @@
  * `graph-orphans`, `graph-entry-points`). The two filtered views are
  * now sections in this unified report. The TS-flavored `--package` /
  * `--packages` flags were retired in favor of the polyglot surface
- * above; see docs/plans/graph-cli-language-neutral-scoping/.
+ * above.
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
@@ -109,7 +109,7 @@ export async function executeGraph(
   // it — and a `complete` once the build returns. Rides on every `--json`
   // CommandOutcome via `scope.diagnostics.snapshot()`. Engine/library code emits
   // through the ambient `currentScope()?.diagnostics` accessor (the documented
-  // idiom; `cli.scope`/ToolScope deliberately omits the bus — see
+  // idiom; `cli.scope`/ToolScope deliberately omits the bus —.
   // diagnostics-bus.ts header).
   currentScope()?.diagnostics?.event('execute', 'debug', 'graph build started', {
     requestedEngine: opts.exact === true ? 'exact' : 'sharded',

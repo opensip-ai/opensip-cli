@@ -20,7 +20,6 @@ enforcement-reason: >
   Remediation is a bounded hygiene program (guards, generated docs, ratchets).
   Individual items are mechanized per-phase (fitness checks, verify scripts,
   docs:check gates). The overall scope boundary ("no de-layering") is policy.
-```
 
 **Decision:** Preserve the layered plugin-host DAG unchanged. Remediate the
 2026-06 first-look architecture audit via policy, ratchet, discoverability, and
@@ -38,14 +37,12 @@ documentation fixes only — no package merges, edge changes, or de-layering.
 **Rationale:** Tri-agent review (2026-06-22) validated findings against `main`
 @v0.1.9. Structural risks are bounded. Stale audit items (pre-ADR-0054 isolation
 narrative) were dropped. Executable work is captured in
-`docs/plans/ready/architecture-audit-remediation/plan.md`.
 
 **Consequences:** Implementation follows the plan's PR stack. Host-plane narrow
 typing (R2/D1) defers until a Cloud consumer exists (Q2). Public third-party
 ecosystem remains blocked until package attestation lands (Q7, per ADR-0054).
 
-**Related specs / ADRs:** ADR-0054 (isolation already shipped); execution plan
-under `docs/plans/ready/architecture-audit-remediation/`.
+**Related ADRs:** ADR-0054 (isolation already shipped).
 
 ---
 

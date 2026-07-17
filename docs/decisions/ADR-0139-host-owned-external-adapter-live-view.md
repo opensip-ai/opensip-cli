@@ -22,4 +22,4 @@ enforcement-reason: >
 
 **Fitness check:** `external-adapter-progress-private-bridge` enforces that the bridge remains private.
 
-**Related specs / ADRs:** ADR-0058, ADR-0082, ADR-0090, ADR-0091, ADR-0131.
+**Related ADRs:** ADR-0058; ADR-0082; ADR-0090; ADR-0091; ADR-0131.

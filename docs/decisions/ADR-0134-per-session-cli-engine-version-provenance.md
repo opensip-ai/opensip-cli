@@ -14,7 +14,6 @@ status: active
 related: [ADR-0060]
 enforcement: mechanizable
 enforced-by: ['script:verify-drizzle-migrations']
-```
 
 **Decision:** The host stamps two provenance columns on every persisted
 `StoredSession`: `cli_version` (the opensip-cli version that produced the run)
@@ -68,8 +67,4 @@ fresh DB materializes the columns) and by round-trip tests
 `RunSummary` test). The host-owns-the-row invariant this builds on is already
 guarded by the session-timing fitness check (ADR-0051/host-owned-run-timing).
 
-**Related specs / ADRs:** Extends the host-owned session row and the
-forward-compatible optional-column pattern of
-[ADR-0060](ADR-0060-cli-diagnostic-boundary-and-run-outcomes.md); the values reuse the report
-env-panel provenance introduced with `declaredInputs`
-([signal-envelope.ts](../../packages/contracts/src/signal-envelope.ts)).
+**Related ADRs:** Extends the host-owned session row and the forward-compatible optional-column pattern of [ADR-0060](ADR-0060-cli-diagnostic-boundary-and-run-outcomes.md); the values reuse the report env-panel provenance introduced with `declaredInputs` ([signal-envelope.ts](././packages/contracts/src/signal-envelope.ts)).

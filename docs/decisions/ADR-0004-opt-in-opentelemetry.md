@@ -23,7 +23,6 @@ enforcement-reason: >
   or a tool is a layering violation. The no-op contract is additionally
   asserted by tests across all three layers (core primitive, CLI SDK init,
   graph stage spans).
-```
 
 **Decision:** OpenTelemetry is **opt-in**, gated solely on the presence of
 `OTEL_EXPORTER_OTLP_ENDPOINT` (no bespoke flags). `@opentelemetry/api` (the no-op
@@ -96,13 +95,10 @@ child.
   the tool package): `runGraph` completes identically and its stage spans are
   non-recording with no provider.
 
-Still requires a **real OTLP collector** (out of CI scope; see
-`docs/plans/ready/telemetry-opt-in/phase-4-validation.md`): OTLP/HTTP over the
+Still requires a **real OTLP collector** (out of CI scope): OTLP/HTTP over the
 wire, end-to-end resource-attribute propagation from a spawned subprocess, and the
 standalone "no network attempt / no measurable overhead" timing comparison.
 
-**Related specs / ADRs:** Implemented per `docs/plans/ready/telemetry-opt-in/`
-(Phases 0–2). Supersedes the backlog `engine-otel-opt-in` design (engine-local SDK
-placement). _(Migrated 2026-06-02 from `docs/internal/decisions/01-otel-opt-in.md`,
-where it was recorded as "DEC 01" on 2026-05-30 before the `ADR-NNNN` log
-existed.)_
+**Related ADRs:** Supersedes the backlog `engine-otel-opt-in` design (engine-local SDK
+placement). Migrated 2026-06-02 from an earlier internal decision note recorded as
+"DEC 01" on 2026-05-30 before the `ADR-NNNN` log existed.

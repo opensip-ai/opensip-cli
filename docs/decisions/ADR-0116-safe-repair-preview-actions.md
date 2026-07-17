@@ -22,7 +22,6 @@ enforcement-reason: >
   session replay tests; command-surface parity pins the host-owned repair group;
   planner tests cover no-write preview, forced apply, advisory refusal, and
   project-root path rejection.
-```
 
 **Decision:** `signal.repair.actions[]` is an additive typed list of concrete
 repair actions, while `opensip repair preview|apply` is a CLI-host-owned command
@@ -57,10 +56,6 @@ rechecks file hashes immediately before writing.
   decoding; valid rows are preserved in JSON, session replay, review brief
   schema, and compact MCP finding DTOs.
 
-**Related specs / ADRs:**
-
-- `docs/plans/completed/07-agent-apply-verify-loop.md`
-- `docs/plans/ready/safe-fix-preview-actions/`
 - [ADR-0086](ADR-0086-signal-repair-metadata.md)
 - [ADR-0084](ADR-0084-mcp-server-surface.md)
 - [ADR-0095](ADR-0095-ai-native-guardrail-platform-posture.md)

@@ -21,7 +21,6 @@ enforcement-reason: >
   The `same-recipe-semantics` fitness check (release 2.13.0) verifies that fit + sim
   run their execution through the shared substrate, and carries graph as a
   documented exception per this ADR — graph declares no `execution` block to check.
-```
 
 **Decision:** Graph recipes are **selection-only**: a `GraphRecipe` is `{ id, name,
 rules, tags? }` with **no `execution` block**, and rule evaluation is a single pass
@@ -61,7 +60,4 @@ difference is a recorded decision, not an accident.
 - Graph's per-rule severity is owned by `SeverityPolicy` + `createGraphSignal`
   (release 2.13.0), not by an execution config.
 
-**Related specs / ADRs:** Implements part of
-`docs/plans/specs/release-2.13.0-execution-severity-proof.md` (north-star §5.8
-Execution substrate + §6.7 Intentional non-uniformity). Related: ADR-0024
-(CommandOutcome/diagnostics), ADR-0012 (versioning).
+**Related ADRs:** Part of (north-star §5.8 Execution substrate + §6.7 Intentional non-uniformity). Related: ADR-0024 (CommandOutcome/diagnostics), ADR-0012 (versioning).

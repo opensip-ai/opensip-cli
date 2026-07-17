@@ -30,7 +30,6 @@ enforcement-reason: >
   (Task 7.3): a static analysis pass cannot observe a native host completing a
   journey, so a fitness check for runtime APFS/PTY/SQLite/signal behavior would
   create false confidence. See "Mechanical enforcement" below.
-```
 
 **Decision:** OpenSIP CLI publishes its first narrow, evidence-backed macOS
 general-availability support claim as ONE exact host tuple, gated by verifiable
@@ -77,7 +76,6 @@ Ubuntu correctness/build/pack/verify
   -> evidence verification
   -> npm latest promotion
   -> latest-surface verification + GitHub Release
-```
 
 Verified exact-version macOS evidence is therefore a HARD dependency between npm
 staging publish and `latest` promotion. `latest` is never candidate identity
@@ -252,23 +250,4 @@ independent verifier. Existing dependency-cruiser already keeps core/contracts/C
 layering honest (no Tool→CLI edge, contracts imports no core, MCP imports no CLI), so no
 new architecture rule is required.
 
-**Related specs / ADRs:** [ADR-0017](ADR-0017-release-gate-policy.md) owns release-gate
-strictness and the single-source publishable set/order this qualifies;
-[ADR-0121](ADR-0121-platform-compatibility-lts-policy.md) owns the compatibility-contract
-classes (this adds the `platform-support` class version);
-[ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and
-[ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) own the black-box agent-eval
-posture whose installed smoke lane this targets at the installed candidate;
-[ADR-0164](ADR-0164-installed-artifact-platform-acceptance-evidence.md) owns the reusable
-installed-artifact evidence contract this consumes. Implementation: the spec, profile,
-workflows, verifier, generator, and support reference
-(`docs/plans/specs/02-macos-ga-qualification.md` and
-`docs/plans/ready/02-macos-ga-qualification/` — local, gitignored;
-`.config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json`;
-`.github/workflows/macos-qualification.yml` + the three-job `.github/workflows/release.yml`;
-`scripts/verify-platform-acceptance.mjs`; `scripts/build-supported-platforms-doc.mjs`;
-`docs/public/70-reference/17-supported-platforms.md`; the sealed
-`opensip-cli-macos-qualification.v1.json` release evidence). The ongoing operations runbook
-is kept locally under `docs/internal/` (private working context, not committed); committed
-release usage lives in `RELEASING.md`.
-```
+**Related ADRs:** [ADR-0017](ADR-0017-release-gate-policy.md) owns release-gate strictness and the single-source publishable set/order this qualifies; [ADR-0121](ADR-0121-platform-compatibility-lts-policy.md) owns the compatibility-contract classes (this adds the `platform-support` class version); [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) own the black-box agent-eval posture whose installed smoke lane this targets at the installed candidate; [ADR-0164](ADR-0164-installed-artifact-platform-acceptance-evidence.md) owns the reusable installed-artifact evidence contract this consumes. Committed implementation surfaces: `.config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json`, `.github/workflows/macos-qualification.yml` and the three-job `.github/workflows/release.yml`, `scripts/verify-platform-acceptance.mjs`, `scripts/build-supported-platforms-doc.mjs`, `docs/public/70-reference/17-supported-platforms.md`, and the sealed `opensip-cli-macos-qualification.v1.json` release evidence. Committed release usage lives in `RELEASING.md`.

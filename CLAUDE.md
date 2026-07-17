@@ -503,7 +503,7 @@ pre-scope holder, or raw datastore from action bodies is forbidden and caught
 by ESLint (no-restricted-properties + imports) + a fitness architecture check
 (`only-documented-toolcli-seams`) + the hard runtime guards added in the
 hygiene pass. The composition root (bootstrap, error/report seams, the
-`buildToolCliContext` factory itself) is exempted by design. See
+`buildToolCliContext` factory itself) is exempted by design — see
 ADR-0051 and `docs/public/80-implementation/03-session-and-persistence.md`.
 
 **Session timing rule (host-owned-run-timing):** `StoredSession.startedAt`,
@@ -668,9 +668,8 @@ contract:
   `80-implementation`. Anything here is reader-facing and externally
   consumable.
 - **`docs/internal/`** — hand-edited, local-only and gitignored by default.
-  Private working context that must not be published or force-added. See the
-  local `docs/internal/README.md` for the charter. (Public formal decisions live
-  in `docs/decisions/`, not here.)
+  Private working context that must not be published or force-added.
+  (Public formal decisions live in `docs/decisions/`, not here.)
 - **`docs/decisions/`** — hand-edited, committed. The architecture
   decision log (ADRs): the durable _why_ behind a choice, with
   alternatives and consequences. One file per `ADR-NNNN-*.md`,
@@ -678,34 +677,40 @@ contract:
   uses `ADR-NNNN`; the parent `opensip` repo uses `DEC-NNN` — cite a
   parent decision via `related: [DEC-NNN]`. See
   `docs/decisions/README.md` and `docs/decisions/TEMPLATE.md`.
-- **`docs/plans/specs/`** — hand-edited, **local-only (gitignored,
-  lives under `docs/plans/`)**. Forward-looking implementation specs
-  (the _how_ to build a feature), following the spec skill format; they
-  gate planning before code. A spec implements a decision recorded in
-  `docs/decisions/`. NOTE: this deliberately overrides the spec skill's
-  default `docs/specs/` output — author all specs under
-  `docs/plans/specs/`.
+- **`docs/plans/`** (including its `specs/` subtree) — local-only scratch
+  space, **gitignored**. Forward-looking implementation specs and
+  in-progress design notes that do not belong in a public OSS repo. Specs
+  implement decisions recorded in `docs/decisions/`; they are not committed
+  and are not visible to external contributors. Anything that matures into
+  a public durable record (decision → `docs/decisions/`, reader-facing fact
+  → `docs/public/`) graduates out of this tree; private durable context may
+  move to local-only `docs/internal/`.
+- **`docs/ai-helpers/`** — local-only, **gitignored** agent/helper scratch
+  (ephemeral; never a committed dependency).
 - **`docs/web-generated/`** — generated output. Never hand-edit. It
   mirrors `docs/public/` rewritten for the website (links resolved to
   pinned GitHub URLs and root-relative website paths; `web:skip` /
   `web:only` voice markers processed). Committed so PR reviewers see
   what will actually render.
-- **`docs/plans/`** — local-only scratch space, **gitignored**.
-  In-progress implementation plans and design notes that don't belong
-  in a public OSS repo. Not committed; not visible to external
-  contributors. Anything that matures into a public durable record (decision →
-  `docs/decisions/`, reader-facing fact → `docs/public/`) graduates out of
-  `docs/plans/`; private durable context may move to local-only
-  `docs/internal/`.
 
 Boundary rule of thumb: a durable _decision_ (what we chose + why, with
 alternatives) is an ADR in `docs/decisions/`; the _how to build it_ is a
-spec in `docs/plans/specs/` (local-only). For prose docs: if you can write the fact about
-opensip-cli without naming a specific consumer, it goes in
-`docs/public/`; if naming a specific consumer (or other private context)
-is load-bearing, it goes in local-only `docs/internal/`; if it's pending work or
-design exploration not yet ready for external readers, it stays in
-`docs/plans/` (local-only).
+local-only implementation spec under the gitignored plans tree. For prose
+docs: if you can write the fact about opensip-cli without naming a specific
+consumer, it goes in `docs/public/`; if naming a specific consumer (or other
+private context) is load-bearing, it stays local-only under `docs/internal/`;
+if it's pending work or design exploration not yet ready for external readers,
+it stays local-only under `docs/plans/`.
+
+**Tracked files must not point at gitignored files.** Directory names above
+are the ignore-boundary description only. A committed file (ADR, source
+comment, skill, config, test string, etc.) must not cite a specific path
+under `docs/plans/`, `docs/internal/`, or `docs/ai-helpers/` — those trees
+are ephemeral and can be deleted at any time, so a tracked pointer is a
+dangling reference. References *from within* those gitignored trees are fine.
+Cite durable artifacts instead: ADR-NNNN, other committed docs, and source
+paths. ADR "Related specs / ADRs" sections link related ADRs and tracked
+docs only — not ephemeral plan/spec files.
 
 - **Generator:** `scripts/build-web-docs.mjs`
 - **Scripts:** `pnpm docs:build` (write) · `pnpm docs:check` (CI staleness gate)
@@ -760,7 +765,7 @@ The new-customer flow leads with first value: `opensip audit` (and
 keeps rebuildable runtime state in the user cache, so nothing lands in
 the customer's repo. Initialization is customization after first
 value, not a prerequisite (`audit` is the canonical changed-code
-review, ADR-0155; posture documented in
+review, ADR-0155; posture.
 `docs/public/00-start/00-quick-start.md`). When the user wants
 explicit setup, `init` (language detection + scaffolded layout) writes
 the config, examples, `.gitignore`, and agent guidance; the
@@ -776,7 +781,7 @@ Re-running `init` on a non-pristine project refuses with exit 2 by
 default. Two explicit flags express user intent:
 `--keep` re-scaffolds examples while preserving custom files, and
 `--remove` deletes `opensip-cli/` entirely before scaffolding
-fresh. The flags are mutually exclusive. See
+fresh. The flags are mutually exclusive.
 `docs/public/70-reference/01-cli-commands.md#init---scaffold-the-project-layout`
 for the full state table.
 

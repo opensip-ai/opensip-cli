@@ -22,7 +22,6 @@ enforcement-reason: >
   through independent LoggerImpl instances. Existing no-module-singleton checks
   should then forbid new production configureLogger calls outside the CLI entry
   adapter.
-```
 
 **Decision:** Production run logging must move from mutating the process-wide
 `logger` singleton to constructing one `LoggerImpl` per `RunScope`. The exported
@@ -75,4 +74,3 @@ cross-run contamination risk for log directory and stderr/debug behavior.
 - Some lower-level imports of the singleton will remain during the transition;
   the final guardrail should only land after scoped logger reads are available
   along the high-blast-radius paths.
-

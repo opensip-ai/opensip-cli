@@ -23,7 +23,6 @@ enforcement-reason: >
   explicit flag value plus the active tool's `<tool>.recipe` value. Unit tests
   cover the shared precedence and the per-tool registry fallback paths
   (fit/graph/sim).
-```
 
 **Decision:** A default recipe is a **tool-scoped** setting. Each tool reads its
 default recipe from its own config block — `fitness.recipe`, `graph.recipe`,
@@ -80,6 +79,4 @@ strictness preserves the typo-catching guardrail.
   `fitness.recipe: <name>`, `graph.recipe: <name>`, or
   `simulation.recipe: <name>`.
 
-**Related specs / ADRs:** [ADR-0021](ADR-0021-cross-tool-cli-flag-currency.md)
-(cross-tool flag currency — the same "tools share a CLI surface but own their
-own semantics" principle applied to flags).
+**Related ADRs:** [ADR-0021](ADR-0021-cross-tool-cli-flag-currency.md) (cross-tool flag currency — the same "tools share a CLI surface but own their own semantics" principle applied to flags).

@@ -21,7 +21,6 @@ enforcement-reason: >
   Export path verifier, both depcruise lanes, tool inventory, and graph
   public-read surface lock prove complete source maps and MCP consumption of
   graph/read only.
-```
 
 **Decision:** Graph exposes a stable public subpath `@opensip-cli/graph/read` of
 free functions returning `Result` / canonical DTOs for catalog identity,
@@ -49,5 +48,3 @@ persistence objects.
   are the shared inventory.
 - Sanctioned datastore/internal consumers: session-store + graph persistence only.
 - Spec 21 MCP audit-readiness begins only after this architecture plan is green.
-
-**Related specs / ADRs:** Spec 20; Spec 21 (future consumer); ADR-0084 MCP surface.

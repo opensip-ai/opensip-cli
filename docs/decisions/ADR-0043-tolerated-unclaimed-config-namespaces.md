@@ -24,7 +24,6 @@ enforcement-reason: >
   claimed by a LOADED tool with no Tool.config contribution still hard-rejects;
   (3) a claimed namespace failing its strict block validation still
   hard-rejects; (4) host-block keys remain strict.
-```
 
 **Decision:** Make the composer's existing tolerance of unclaimed top-level
 config namespaces *observable and bounded*. Today `composeConfigSchema`
@@ -80,5 +79,4 @@ warn once and continue; typos warn with a correction.
 - Phase 3 revisits the declared-`externalTools` mechanism alongside Tier B
   enforcement (ADR-0042).
 
-**Related specs / ADRs:** `docs/plans/specs/tool-management-command.md` (rev 2);
-ADR-0023 (config consolidation — amended in this one clause); ADR-0041.
+**Related ADRs:** ADR-0023 (config consolidation — amended in this one clause); ADR-0041.

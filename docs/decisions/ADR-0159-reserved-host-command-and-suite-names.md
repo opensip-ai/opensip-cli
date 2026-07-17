@@ -23,7 +23,6 @@ enforcement-reason: >
   reservation is the admission gate in reject-host-command-collisions.ts. The
   two named tests pin both, and the cli reserved-names test also asserts the
   reserved root-command list stays in parity with the mounted host surface.
-```
 
 **Decision:** Reserve well-known names on both configurable planes. (a) A
 configured suite may not use a built-in suite name (today: `audit` and
@@ -86,13 +85,4 @@ same admission gate now enforces the full host surface.
   docs) so external Tool authors learn the constraint before trial and
   error; the discovery surface is specified in the implementation spec.
 
-**Related specs / ADRs:** Partially amends
-[ADR-0111](ADR-0111-built-in-audit-suite-preset.md) (the configured-override
-behavior no longer applies to reserved names) and
-[ADR-0155](ADR-0155-canonical-audit-command.md) (its Tool-plane rejection
-broadens from `audit`-only to the full host surface; its consequence "a
-configured `suites.audit` affects `suite run audit`" becomes unrepresentable).
-Document strictness posture:
-[ADR-0023](ADR-0023-config-package-and-schema-registry.md). Suite
-plane: [ADR-0093](ADR-0093-host-owned-suite-plane.md). Implementation
-specification: `docs/plans/specs/reserved-names.md` (local, gitignored).
+**Related ADRs:** Partially amends [ADR-0111](ADR-0111-built-in-audit-suite-preset.md) (the configured-override behavior no longer applies to reserved names) and [ADR-0155](ADR-0155-canonical-audit-command.md) (its Tool-audit` affects `suite run audit`" becomes unrepresentable). Document strictness posture: [ADR-0023](ADR-0023-config-package-and-schema-registry.md). Suitemd).

@@ -635,7 +635,7 @@ function renderTriageMarkdown(catalog) {
     '| **b** | `accepted-risk` | Waiver is correct and should remain documented. |',
     '| **c** | `false-positive` | Improve check logic; the implementation is acceptable. |',
     '',
-    'Full program spec: `docs/plans/specs/suppression-triage-and-reduction.md` (local).',
+    'Full program details live in local-only maintainer notes.',
     '',
   );
 

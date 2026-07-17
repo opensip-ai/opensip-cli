@@ -21,7 +21,6 @@ enforcement-reason: >
   Runtime/binder/migration/API tests prove reserved identities, copy-only
   migration 0009, purge of both namespaces, and rejection of reserved metadata.id.
   Value-pattern fitness checks cannot prove migration byte semantics.
-```
 
 **Decision:** Host governance/audit/entitlement blobs store under the reserved
 identity `@opensip-cli/host-plane:<toolId>` in `tool_state`. One shared predicate
@@ -49,5 +48,3 @@ separation is a logical identity, not a second table.
 - `LOGICAL_SCHEMA_VERSION = SCHEMA_VERSION_OFFSET + 10`.
 - Tools cannot address the reserved prefix; purge input rejects it.
 - Absent reserved rows keep current empty/permissive host-plane defaults.
-
-**Related specs / ADRs:** Spec 20 modular boundary; ADR-0042 tool storage.

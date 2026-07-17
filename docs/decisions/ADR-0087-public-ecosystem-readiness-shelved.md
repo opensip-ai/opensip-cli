@@ -20,7 +20,6 @@ enforcement-reason: >
   This is a gated launch decision from the plan 03 Phase 0 feasibility memos. The
   enforcement action is to not implement or flip the public ecosystem posture
   until a future ADR records a proven network-capability mechanism.
-```
 
 **Decision:** Shelve the public untrusted third-party ecosystem launch. Keep
 ADR-0061's interim private-extension posture in force because Phase 0 did not
@@ -77,6 +76,4 @@ network egress would violate the core capability-isolation gate.
 hold. Existing checks continue to enforce the current interim posture; future
 unshelving work must add the mechanized checks required by its own ADR.
 
-**Related specs / ADRs:** This records the shelving outcome for local plan
-`docs/plans/ready/03-ecosystem-readiness/` and keeps ADR-0061 active.
-
+**Related ADRs:** This records the shelving outcome for and keeps ADR-0061 active.

@@ -22,7 +22,6 @@ enforcement-reason: >
   errors must flow through `cli.emitError`, success through the `renderOutcome`
   seam — no bare `emitJson({ error })` / `process.stdout.write`). The
   decode-not-re-execute boundary is a design invariant, not mechanically checked.
-```
 
 **Decision:** A stored session is **replayed**, never re-executed. The opaque
 `StoredSession.payload` is decoded back into its structural shape
@@ -67,8 +66,4 @@ the currency; this is a faithful projection of it, not a fresh run).
   `cli.emitError` seam — `emitError` gained an optional `code` to carry the
   machine-readable category into `ErrorDetail.code`.
 
-**Related specs / ADRs:** Builds on [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md)
-(SignalEnvelope as output currency) and [ADR-0024](ADR-0024-command-outcome-and-observability.md)
-(CommandOutcome / `cli.emitError`). User-facing docs:
-`docs/public/70-reference/01-cli-commands.md` (`sessions show`, `--show`) and
-`docs/public/80-implementation/03-session-and-persistence.md`.
+**Related ADRs:** Builds on [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md) (SignalEnvelope as output currency) and [ADR-0024](ADR-0024-command-outcome-and-observability.md) (CommandOutcome / `cli.emitError`). User-facing docs: `docs/public/70-reference/01-cli-commands.md` (`sessions show`, `--show`) and `docs/public/80-md`.

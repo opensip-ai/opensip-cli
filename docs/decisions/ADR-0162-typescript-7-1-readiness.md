@@ -20,7 +20,6 @@ enforcement-reason: >
   Closing the gate depends on an upstream stable API commitment, ecosystem
   compatibility, capability probes, and measured migration evidence. Those are
   release-time judgments rather than a static repository invariant.
-```
 
 **Decision:** Keep every OpenSIP CLI TypeScript pin on `~6.0.3` and defer both a
 TypeScript 7 build-compiler change and a runtime compiler-API migration. Reopen
@@ -179,7 +178,4 @@ this performance program. The current 6.0.3 line remains the supported build
 and runtime substrate. Future proposals can use the toolchain benchmark as
 comparison evidence, but cannot use compiler throughput as a runtime win.
 
-**Related specs / ADRs:** [ADR-0010](ADR-0010-lang-canonical-parse-substrate.md)
-owns the canonical TypeScript parsing substrate; [ADR-0056](ADR-0056-architecture-audit-remediation.md)
-records the supported frontier toolchain posture; [ADR-0118](ADR-0118-scale-and-performance-slos.md)
-keeps runtime SLO evidence separate from this toolchain lane.
+**Related ADRs:** [ADR-0010](ADR-0010-lang-canonical-parse-substrate.md) owns the canonical TypeScript parsing substrate; [ADR-0056](ADR-0056-architecture-audit-remediation.md) records the supported frontier toolchain posture; [ADR-0118](ADR-0118-scale-and-performance-slos.md) keeps runtime SLO evidence separate from this toolchain lane.

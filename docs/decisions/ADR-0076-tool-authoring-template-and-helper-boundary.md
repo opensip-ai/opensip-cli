@@ -21,7 +21,6 @@ enforcement-reason: >
   opensip-cli/fit/checks/no-implicit-tool-extension-defaults.mjs enforces absence
   defaults in createTool/defineTool; template tests validate manifest/runtime
   coherence through loadToolManifest and assertManifestMatchesTool.
-```
 
 **Decision:** Add `createTool()` as a thin public wrapper over `defineTool()`;
 ship `minimal-js` and `ts-local` project-local scaffolds first; keep safe
@@ -57,8 +56,6 @@ emit conformant sidecars immediately. Typed local packages can depend on
 - 2026-07-01 note: `createTool()` remains exported as a compatibility wrapper
   for older authored tools, but `opensip tools create --template ts-local` now
   teaches `defineTool()` plus command-spec drafts directly.
-
-**Related specs / ADRs:**
 
 - ADR-0046 — core `TOOL_CONTRACT_VERSION` marker policy.
 - ADR-0061 — project-local deny-by-default trust.

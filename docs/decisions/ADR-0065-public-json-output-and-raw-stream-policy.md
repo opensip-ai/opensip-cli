@@ -22,7 +22,6 @@ enforcement-reason: >
   opensip-cli/fit/checks/raw-stream-output-guarded.mjs, and
   packages/fitness/checks-typescript/.../command-handler-host-owned-output.ts
   enforce host-owned public JSON and documented raw-stream transports.
-```
 
 **Decision:** Public `--json` commands return data through host-stamped `CommandOutcome` seams (`command-result`, `signal-envelope`, `cli.emitJson`, `cli.emitEnvelope`, `cli.emitError`). `output: 'raw-stream'` is allowed only for reviewed transport categories (`completion-script`, `file-export`, `worker-ipc`, `runtime-render-dispatch`, `session-replay`, `diagnostic-gate`, `host-orchestrated-evidence`, `mcp-stdio`) with in-file justification. `host-orchestrated-evidence` is limited to internal evidence producers whose return value is captured by the host run hook while their parent suite owns the sole visible result; it is not permission for a public command to write an ad hoc stream.
 
@@ -38,4 +37,4 @@ enforcement-reason: >
 
 **Fitness check:** Check warranted — `one-outcome-shape`, `raw-stream-output-guarded`, `command-handler-host-owned-output`.
 
-**Related specs / ADRs:** [ADR-0024](ADR-0024-command-outcome-and-observability.md), [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md).
+**Related ADRs:** [ADR-0024](ADR-0024-command-outcome-and-observability.md); [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md).

@@ -25,7 +25,6 @@ enforcement-reason: >
   pin the 700 KB budget, the six stamped sources, and the per-element blob
   budgets; the offline integration test pins zero network at view time; the
   strict-mode dogfood test pins zero GraphIssues on this repo's own catalog.
-```
 
 **Decision:** Upgrade the dashboard's existing Code Paths Visualization view
 (`packages/dashboard/src/code-paths/view-graph.ts`, view id `graph`) to a
@@ -131,12 +130,4 @@ remaining the bundle-size budget enforcement point), and nothing in
   ADR first; a layout web worker, if measurement ever demands one, must be a
   Blob-URL worker (single-file HTML constraint).
 
-**Related specs / ADRs:**
-`docs/plans/specs/dashboard-graph-containment-upgrade.md` (local-only;
-implements this decision);
-`docs/plans/backlog/dashboard-graph-containment-upgrade/plan.md` (local-only;
-provenance + the React Flow rejection);
-[ADR-0006](./ADR-0006-derived-data-persistence-policy.md) (the dashboard
-stays a decoupled reader; the projection is the sanctioned
-materialized-for-the-decoupled-consumer view, recomputed per report and never
-persisted back).
+**Related ADRs:** Local-only; this decision); (local-only; provenance + the React Flow rejection); [ADR-0006](./ADR-0006-derived-data-persistence-policy.md) (the dashboard stays a decoupled reader; the projection is the sanctioned materialized-for-the-decoupled-consumer view, recomputed per report and never persisted back).

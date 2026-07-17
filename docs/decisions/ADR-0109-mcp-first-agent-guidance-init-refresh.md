@@ -23,7 +23,6 @@ enforcement-reason: >
   agent guidance and MCP result-tool descriptions tell agents to use MCP /
   persisted results first, avoid .runtime/logs and datastore.sqlite as primary
   result sources, and avoid re-running tools for stored-result questions.
-```
 
 **Decision:** Agent-facing OpenSIP guidance MUST prefer the OpenSIP MCP server
 for questions about existing runs, findings, warnings, errors, scores, sessions,
@@ -66,5 +65,4 @@ or grep local files.
   use persisted replay first and must not instruct agents to grep logs, read the
   datastore directly, or re-run tools as the default answer path.
 
-**Related specs / ADRs:** Local implementation plan under
-`docs/plans/ready/mcp-first-agent-guidance-init-refresh/`; [ADR-0084](ADR-0084-mcp-server-surface.md).
+**Related ADRs:** [ADR-0084](ADR-0084-mcp-server-surface.md).

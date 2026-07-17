@@ -23,7 +23,6 @@ enforcement-reason: >
   `no-local-exit-or-stdout` (no process.exit; exit codes flow through the one
   boundary), and `env-via-registry` (no raw process.env reads). Each ships with a
   teeth fixture.
-```
 
 **Decision:** Adopt `CommandOutcome<T>` as the single OUTER currency for every
 command result and error — including the pre-handler bootstrap failures. The host
@@ -77,7 +76,6 @@ cross-layer pattern.
   composes them + the documented pre-scope exceptions into `describeHostEnv()` for
   the generated env-surface reference.
 
-**Related specs / ADRs:** Implements `docs/plans/specs/release-2.12.0-output-observability.md`
 (north-star §5.5 Command outcome, §5.10 Diagnostics, §4.7 bootstrap convergence,
 §5.12 Environment registry). Builds on ADR-0011 (inner currency), ADR-0021 (flag
 currency), ADR-0023 (config package). Part of the tool-plugin-parity ladder toward

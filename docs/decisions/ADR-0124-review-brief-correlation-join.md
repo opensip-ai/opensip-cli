@@ -21,7 +21,6 @@ enforcement-reason: >
   The project-local `review-brief-correlation-shared-helper` fitness check
   requires live suite review briefs and persisted MCP review briefs to call the
   same contracts helper instead of defining local correlation logic.
-```
 
 **Decision:** Review briefs may include optional `correlatedRisks[]` groups that
 join related findings by deterministic evidence keys while preserving every
@@ -54,7 +53,4 @@ available, not that source evidence was inspected and deduplicated. The join
 uses only bounded local signal data and must not read files, inspect logs, or
 perform outbound lookups.
 
-**Related specs / ADRs:** Implements spec 05 phase 1 correlation join. Extends
-[ADR-0110](ADR-0110-host-owned-review-brief-contract.md), follows the workflow
-ordering in [ADR-0122](ADR-0122-agent-workflow-product-wedge.md), and composes
-with [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md).
+**Related ADRs:** Extends [ADR-0110](ADR-0110-host-owned-review-brief-contract.md), follows the workflow ordering in [ADR-0122](ADR-0122-agent-workflow-product-wedge.md), and composes with [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md).

@@ -22,4 +22,4 @@ enforcement-reason: >
 
 **Fitness check:** No broader static check is warranted beyond `external-tool-adapter-contract`; binary ownership is primarily runtime behavior covered by doctor/version and broken-pin E2E tests.
 
-**Related specs / ADRs:** ADR-0071, ADR-0090, ADR-0091, ADR-0092, ADR-0140.
+**Related ADRs:** ADR-0071; ADR-0090; ADR-0091; ADR-0092; ADR-0140.

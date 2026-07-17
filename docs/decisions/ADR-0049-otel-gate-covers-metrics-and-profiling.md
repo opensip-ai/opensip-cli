@@ -23,7 +23,6 @@ enforcement-reason: >
   contract for metrics and profiling (when the gate is closed) is asserted by
   tests parallel to the existing trace no-op tests. A follow-up fitness check
   (Phase 4A) will enforce that new hot paths in engines carry spans.
-```
 
 **Decision:** The same opt-in environment-variable gate used for tracing (`OTEL_EXPORTER_OTLP_ENDPOINT`) is extended to cover metrics. Profiling is covered by the same gate but is **optional/severable** and, by default, further gated behind a dedicated `OPENSIP_PROFILING=1` flag (which also requires the OTEL endpoint). It remains possible to configure the system so that profiling follows the OTEL endpoint alone (with explicit documentation and warnings about cost). All new OpenTelemetry SDK packages (metrics and any profiling) are added only as runtime dependencies of the CLI composition root (`packages/cli`), never of `@opensip-cli/core` or any tool package. A committed cardinality split rule applies: spans may carry project-root-relative detail; metrics are restricted to low-cardinality labels only.
 
@@ -37,7 +36,7 @@ enforcement-reason: >
 - Adding `@opentelemetry/sdk-metrics` (and its OTLP exporter) only in the CLI root keeps the kernel and tools as pure `@opentelemetry/api` consumers.
 - The dedicated profiling flag gives operators explicit control over the expensive per-run profile artifact while still allowing simple "one knob" usage for teams that accept the cost.
 - The cardinality split (spans vs. metrics) is recorded here so every future instrumentation site has a single source of truth instead of re-litigating per PR.
-- The previous `docs/plans/ready/telemetry-opt-in/` work and the 2026-06 observability audit both showed that the existing trace seam + `sdk-init.ts` pattern generalizes cleanly to metrics and (conditionally) profiles.
+- The previous work and the 2026-06 observability audit both showed that the existing trace seam + `sdk-init.ts` pattern generalizes cleanly to metrics and (conditionally) profiles.
 
 **Consequences:**
 - `packages/cli/package.json` gains two new runtime dependencies (pinned in `pnpm-workspace.yaml` for version consistency with the trace packages). This affects the published `opensip-cli` closure and the release ordering documented in RELEASING.md.
@@ -46,7 +45,4 @@ enforcement-reason: >
 - Documentation (env-var reference, CLAUDE.md) must describe both the primary dedicated-flag mode for profiling and the "OTEL endpoint alone" configuration option, with warnings.
 - Phase 4A of the observability-hardening plan will deliver a mechanized guard (fitness check) that new expensive engine paths carry spans; that check becomes part of the enforcement story for this decision.
 
-**Related specs / ADRs:**
-- Implements and extends ADR-0004.
-- Implemented by `docs/plans/specs/observability-hardening.md` and the plan under `docs/plans/ready/observability-hardening/`.
-- The Phase 2 ADR task (ADR-00NN in early drafts) is realized by this document.
+**Related ADRs:** - and extends ADR-0004. - and the - The Phase 2 ADR task (ADR-00NN in early drafts) is realized by this document.

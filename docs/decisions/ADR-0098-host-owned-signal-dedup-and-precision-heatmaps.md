@@ -22,7 +22,6 @@ enforcement-reason: >
   terminal rendering, SARIF, cloud, and report egress. Unit tests assert
   conservative identity and near-identity collapse. Suppression catalog
   generation carries the disposition taxonomy used for precision heatmaps.
-```
 
 > **Amendment (2026-06-30, [ADR-0101](ADR-0101-cli-emits-full-fidelity-consumers-dedup.md)):**
 > The **signal-deduplication** decision below is **REVERSED**. The CLI no longer
@@ -81,7 +80,4 @@ and documented."
 - Suppression triage docs and JSON must expose the expanded taxonomy so agents
   can reason about precision work without reading tribal shorthand.
 
-**Related specs / ADRs:** Implements Plan 02 from
-`docs/plans/README.md` (precision and dedup hardening). Builds on ADR-0011
-(signal output currency), ADR-0036 (baseline identity), ADR-0064 (shared clone
-detection substrate), and ADR-0097 (gate verdict determinism).
+**Related ADRs:** Builds on ADR-0011 (signal output currency), ADR-0036 (baseline identity), ADR-0064 (shared clone detection substrate), and ADR-0097 (gate verdict determinism).

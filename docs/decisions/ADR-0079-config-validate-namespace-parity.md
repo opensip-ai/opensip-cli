@@ -21,7 +21,6 @@ enforcement-reason: >
   The pure namespace-policy helper is covered in config tests, and CLI coherence
   tests compare pre-dispatch and config validate verdicts for benign unknown
   blocks and loaded-tool namespaces with no config declaration.
-```
 
 **Decision:** `opensip config validate` must apply the same unclaimed-namespace
 policy as normal pre-dispatch config validation. Unknown top-level blocks remain

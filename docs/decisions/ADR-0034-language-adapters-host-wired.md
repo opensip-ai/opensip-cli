@@ -22,7 +22,6 @@ enforcement-reason: >
   other side: `no-bootstrap-tool-import` confines static first-party imports in
   the host to register-language-adapters.ts, and the §8 invariant-1 acceptance
   tests (fit/sim/graph-external-load) prove TOOLS take no such shortcut.
-```
 
 **Decision:** The six bundled `@opensip-cli/lang-*` language adapters are
 statically imported and registered by the host composition root
@@ -76,7 +75,4 @@ and is invisible to admission policy.
   path") is unchanged; this ADR records that language adapters are not tools
   and sit outside that invariant's scope.
 
-**Related specs / ADRs:** ADR-0010 (lang-* canonical parse substrate),
-ADR-0027 (GA parity cutover), ADR-0029 (generic capability discovery — covers
-graph adapters and check packs, NOT language adapters), ADR-0030 (authored tool
-discovery), `docs/internal/parity-invariant-index.md` (invariant 1).
+**Related ADRs:** ADR-0010 (lang-* canonical parse substrate), ADR-0027 (GA parity cutover), ADR-0029 (generic capability discovery — covers graph adapters and check packs, NOT language adapters), ADR-0030 (authored tool discovery), (invariant 1).

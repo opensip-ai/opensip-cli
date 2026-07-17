@@ -22,4 +22,4 @@ enforcement-reason: >
 
 **Fitness check:** `external-tool-adapter-contract` enforces the shipped package contract; `adapter-must-use-substrate` additionally covers first-party adapter source paths in this repo.
 
-**Related specs / ADRs:** ADR-0042, ADR-0051, ADR-0080, ADR-0082, ADR-0090, ADR-0091, ADR-0092.
+**Related ADRs:** ADR-0042; ADR-0051; ADR-0080; ADR-0082; ADR-0090; ADR-0091; ADR-0092.

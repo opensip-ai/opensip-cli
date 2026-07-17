@@ -23,7 +23,6 @@ enforcement-reason: >
   the CommandOutcome/process parity matrix in
   packages/cli/src/__tests__/command-outcome-exit-parity.test.ts, and the
   ratcheted suppression catalog.
-```
 
 **Decision:** Normal command mounting and `suite run` steps dispatch through the
 same `runCommandSpecAction` pipeline. Suite steps capture every exit source in a
@@ -63,8 +62,4 @@ when a typed/reportFailure code is available.
 `exit-code-correctness` guard plus suite/orchestrator and command-outcome parity
 tests cover the invariant.
 
-**Related specs / ADRs:** Extends [ADR-0093](ADR-0093-host-owned-suite-plane.md)
-and [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md). Builds
-on [ADR-0020](ADR-0020-dogfood-gate-hard-fail.md),
-[ADR-0035](ADR-0035-host-owned-verdict-from-tool-declared-policy.md), and
-[ADR-0066](ADR-0066-typed-errors-own-exit-codes.md).
+**Related ADRs:** [ADR-0093](ADR-0093-host-owned-suite-md); [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md); [ADR-0020](ADR-0020-dogfood-gate-hard-fail.md); [ADR-0035](ADR-0035-host-owned-verdict-from-tool-declared-policy.md); [ADR-0066](ADR-0066-typed-errors-own-exit-codes.md).

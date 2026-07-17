@@ -21,7 +21,6 @@ enforcement-reason: >
   set unchanged to every render and egress path. There is no host dedup module to
   guard; the invariant is "no normalization step is inserted before output/egress",
   reinforced by ADR-0094's egress-fidelity round-trip tests.
-```
 
 **Decision:** `opensip-cli` does **not** deduplicate signals. Every output and
 egress path — terminal render, `--json`, SARIF (`writeSarif` file and
@@ -74,11 +73,7 @@ This also keeps the CLI simpler: no identity-key heuristics, no recomputed
   `false-positive`/`accepted-risk`/`design-mismatch` taxonomy) stays — that is a
   triage aid, independent of dedup.
 
-**Related specs / ADRs:** Reverses the dedup half of ADR-0098 (Plan 02). Restores
-[ADR-0094](ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md) egress
-fidelity. Builds on [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md)
-(signal output currency) and [ADR-0008](ADR-0008-opensip-cloud-signal-sync.md)
-(cloud sync).
+**Related ADRs:** Reverses the dedup half of ADR-0098 ( Restores [ADR-0094](ADR-0094-cli-cloud-evidence-authority-and-egress-fidelity.md) egress fidelity. Builds on [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md) (signal output currency) and [ADR-0008](ADR-0008-opensip-cloud-signal-sync.md) (cloud sync).
 
 **Fitness check:** No check warranted. The decision is the *absence* of a
 transform — there is no host dedup module or seam to guard, and re-introduction

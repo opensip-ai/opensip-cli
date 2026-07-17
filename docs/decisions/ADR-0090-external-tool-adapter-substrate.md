@@ -27,7 +27,6 @@ enforcement-reason: >
   and no-`live-view` invariants are compile-time (the closed `ToolRuntimeImportPolicy`
   and `CommandResult` unions) and covered by the existing external-synthesis /
   `tools validate` tests (ADR-0082). See the Fitness check section.
-```
 
 **Decision:** Ship a non-bundled, opt-in **layer-3** substrate package
 `@opensip-cli/external-tool-adapter` exporting `defineExternalToolAdapter(spec) →
@@ -147,20 +146,4 @@ its enforcement (an ADR without this section is incomplete):
 | Adapters may not declare `output: "live-view"` | **No new check** | Existing ADR-0082 external-synthesis + `tools validate` `external-output-modes` coherence tests. |
 | Adapter `package.json#opensipTools.commands` matches the runtime `commandSpecs` (scan + doctor + version) | **No new check** | Existing `assertCommandNamesMatch` (throws at install/worker import) + the extended `build-tool-command-manifests.mjs --check` parity gate (`pnpm tool-manifests:check`). |
 
-**Related specs / ADRs:** implemented by the local plan
-`docs/plans/ready/04-external-tool-adapters/` (see its `IMPLEMENTATION-BRIEF.md`,
-the corrected source of truth). Related:
-[ADR-0084](ADR-0084-mcp-server-surface.md) (the precedent for adding a publishable
-first-party tool package), [ADR-0041](ADR-0041-customer-facing-tools-command-group.md)
-(the `tools` install/trust surface adapters mount through),
-[ADR-0054](ADR-0054-tool-fault-isolation-boundary.md) (the worker fault-isolation
-boundary external tools dispatch across),
-[ADR-0048](ADR-0048-tool-stable-uuid-identity.md) (stable adapter identity), and
-[ADR-0061](ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)
-(the launch posture that keeps the public ecosystem gated while first-party
-adapters ship). Finding ingestion/artifacts/exit modeling are
-[ADR-0091](ADR-0091-external-scanner-finding-ingestion.md); network/auth
-declaration + the trust bar are
-[ADR-0092](ADR-0092-external-adapter-network-auth-trust.md).
-</content>
-</invoke>
+**Related ADRs:** See its `md`, the corrected source of truth). Related: [ADR-0084](ADR-0084-mcp-server-surface.md) (the precedent for adding a publishable first-party tool package), [ADR-0041](ADR-0041-customer-facing-tools-command-group.md) (the `tools` install/trust surface adapters mount through), [ADR-0054](ADR-0054-tool-fault-isolation-boundary.md) (the worker fault-isolation boundary external tools dispatch across), [ADR-0048](ADR-0048-tool-stable-uuid-identity.md) (stable adapter identity), and [ADR-0061](ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md) (the launch posture that keeps the public ecosystem gated while first-party adapters ship). Finding ingestion/artifacts/exit modeling are [ADR-0091](ADR-0091-external-scanner-finding-ingestion.md); network/auth declaration + the trust bar are [ADR-0092](ADR-0092-external-adapter-network-auth-trust.md). </content> </invoke>.

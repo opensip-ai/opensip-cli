@@ -55,15 +55,23 @@ where they ground the decision.
 **Consequences:** What changes as a result — new constraints, follow-up specs,
 things future contributors must do. Omit if none.
 
-**Related specs / ADRs:** Links to the specs that implement this decision and any
-related ADRs. Omit if none.
+**Related ADRs:** Links to related architecture decisions (and other *tracked*
+docs/source when needed). Omit if none.
+
+Do **not** cite paths under the gitignored trees `docs/plans/`, `docs/internal/`,
+or `docs/ai-helpers/` — those are ephemeral local-only working areas; a tracked
+pointer becomes a dangling reference. Implementation specs live there locally
+but are not part of the durable ADR record. Name related ADRs (and committed
+artifacts) instead.
 
 <!--
 Conventions:
 - One decision per file. Filename = ADR-NNNN-kebab-title.md (zero-padded to 4).
-- ADRs are append-only: never rewrite a shipped decision. To change one, write a
-  new ADR and set the old one's `status: superseded` + `superseded_by`, and the
-  new one's `supersedes`.
+- ADRs are append-only: never rewrite a shipped *decision*. Maintenance may
+  remove dangling pointers to ephemeral local-only paths without changing the
+  decision itself.
+- To change a decision, write a new ADR and set the old one's `status:
+  superseded` + `superseded_by`, and the new one's `supersedes`.
 - This repo uses ADR-NNNN; the parent `opensip` repo uses DEC-NNN. Reference a
   parent decision as DEC-NNN under `related`.
 - The `Audit-history impact` block from the parent's DEC template is intentionally

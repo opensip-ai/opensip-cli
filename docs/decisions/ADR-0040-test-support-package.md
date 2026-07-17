@@ -25,7 +25,6 @@ enforcement-reason: >
   (scripts/release-package-order.mjs filters private packages), so it can
   never ship. Core no longer publishes a `test-utils` subpath (exports map +
   the ESLint barrel rule's sanction list).
-```
 
 **Decision:** Cross-package TEST scaffolding lives in `@opensip-cli/test-support`
 — a `private: true`, never-published workspace package consumed only as a

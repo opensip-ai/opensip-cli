@@ -21,7 +21,6 @@ enforcement-reason: >
   boundaries. The authoring convention that from-side layer rules use
   negative-lookahead allowlists is config-review judgment, recorded here and in
   .config/dependency-cruiser.cjs.
-```
 
 **Decision:** Cross-package from-side layer rules in
 `.config/dependency-cruiser.cjs` are authored as negative-lookahead allowlists:
@@ -56,7 +55,4 @@ authoring convention.
 `pnpm depcruise`, `pnpm depcruise:types`, and `node scripts/verify-gate-live.mjs`;
 the authoring form itself is a review convention.
 
-**Related specs / ADRs:** Aligns with the allowlist precedent in
-[ADR-0037](ADR-0037-generic-targeting-runtime.md),
-[ADR-0058](ADR-0058-shared-live-run-shell.md), and
-[ADR-0064](ADR-0064-shared-clone-detection-substrate.md).
+**Related ADRs:** Aligns with the allowlist precedent in [ADR-0037](ADR-0037-generic-targeting-runtime.md), [ADR-0058](ADR-0058-shared-live-run-shell.md), and [ADR-0064](ADR-0064-shared-clone-detection-substrate.md).

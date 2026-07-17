@@ -24,7 +24,6 @@ enforcement-reason: >
   migration is behavior-preserving). A dependency-cruiser rule pins the new
   `@opensip-cli/targeting` package's deps to `config` + `glob`/`minimatch` and
   forbids a `core` tool-vocabulary import.
-```
 
 **Decision:** The **generic half** of file targeting — named file-sets
 (`include`/`exclude` globs), `globalExcludes`, glob expansion, and tag/scope target
@@ -99,9 +98,4 @@ not fixed.
   graph honors `globalExcludes`/`targets:` (a later change) or a third-party tool
   adopts it. sim does no file discovery and is untouched.
 
-**Related specs / ADRs:** Finishes ADR-0023 (config consolidation moved the
-targeting types host-side; this supplies the runtime the types anticipated). Relates
-to ADR-0010 (`lang-*` canonical parse substrate — language canonicalization the
-substrate reads via the scope is a kernel/LanguageRegistry concern, not imported as
-tool vocabulary). The implementing spec is
-`docs/plans/specs/generic-targeting-runtime.md` (local-only).
+**Related ADRs:** Finishes ADR-0023 (config consolidation moved the targeting types host-side; this supplies the runtime the types anticipated). Relates to ADR-0010 (`lang-*` canonical parse substrate — language canonicalization the substrate reads via the scope is a kernel/LanguageRegistry concern, not imported as tool vocabulary).

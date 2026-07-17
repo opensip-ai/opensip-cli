@@ -22,7 +22,6 @@ enforcement-reason: >
   checks-universal/architecture) plus the requirement that changes to
   `TOOL_CONTRACT_VERSION` must be accompanied by an update to this ADR
   (or a superseding ADR) and an update to the JSDoc on the constant itself.
-```
 
 **Decision:** `TOOL_CONTRACT_VERSION` (exported from `@opensip-cli/core`) is bumped **only** when the shape or documented semantics of the `Tool` interface (or its `ToolExtensionPoints` contract) actually change in a way that could affect tool authors. When a contract change ships, the new value is set to the major.minor of the CLI release in which the change is first released (e.g. a breaking contract change released in CLI v1.2.0 results in `TOOL_CONTRACT_VERSION = '1.2'`). The constant remains at its previous value across releases that do not touch the Tool contract.
 
@@ -44,6 +43,4 @@ The `extensionPoints` bag (and the explicit rule to prefer it over new top-level
 - The constant will frequently lag the CLI version (e.g. stay at '1.0' through v1.1.0, v1.1.5, etc.) — this is intentional and must be documented in release notes when relevant.
 - Future compatibility logic (in the plugin loader, `compatibility.ts`, or host planes) can key off this value without being coupled to full CLI semver.
 
-**Related specs / ADRs:**
-- This ADR formalizes the lightweight future-proofing introduced when `TOOL_CONTRACT_VERSION` was first added (see hygiene work around ADR-0042 / host planes and the Tool contract surface).
-- Implementation: fitness check in `packages/fitness/checks-universal/src/checks/architecture/tool-contract-version-policy.ts`, JSDoc updates in `packages/core/src/tools/types.ts`, and this ADR itself.
+**Related ADRs:** - This ADR formalizes the lightweight future-proofing introduced when `TOOL_CONTRACT_VERSION` was first added (see hygiene work around ADR-0042 / host -ts`, JSDoc updates in `packages/core/src/tools/types.ts`, and this ADR itself.

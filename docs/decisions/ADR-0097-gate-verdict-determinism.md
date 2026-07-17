@@ -22,7 +22,6 @@ enforcement-reason: >
   and tests assert the manifest is additive, deterministic, and limited to an
   explicit allowlist. Gate/verdict tests continue to assert one envelope verdict
   drives the process exit.
-```
 
 **Decision:** A persisted or emitted gate verdict must carry a host-stamped,
 allowlisted `declaredInputs` manifest that explains the runtime inputs needed to

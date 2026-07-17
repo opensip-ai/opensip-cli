@@ -22,7 +22,6 @@ enforcement-reason: >
   actions/attest usage, generation and verification of release artifacts, and
   GitHub Release asset wiring. scripts/__tests__/release-artifacts.test.mjs
   locks the manifest/checksum/SBOM contract.
-```
 
 **Decision:** OpenSIP CLI releases must publish verifiable release metadata:
 a versioned manifest for packed npm tarballs plus the release SBOM,
@@ -62,8 +61,6 @@ npm workspace discovery.
 - Future release changes that remove attestations, permissions, generated
   artifacts, or release asset uploads must update this ADR and the supply-chain
   verifier in the same PR.
-
-**Related specs / ADRs:**
 
 - [ADR-0017](./ADR-0017-release-gate-policy.md)
 - [ADR-0068](./ADR-0068-consumption-side-verification-policy.md)

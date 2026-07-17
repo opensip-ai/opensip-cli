@@ -23,7 +23,6 @@ enforcement-reason: >
   format and forbid reimplementation sites; (3) a project-local fitness check
   forbids ad-hoc duration/score string construction outside the format package
   and guards format from owning suite/count/status business aggregation.
-```
 
 **Decision:** Canonical **raw facts** (for example `durationMs`, `score`, unit
 counts) remain host-stamped or tool-produced domain values stored and replayed
@@ -137,7 +136,6 @@ projectSessionDisplay(input: { durationMs: number; score: number }): {
   score: number;
   scoreLabel: string;
 };
-```
 
 Suite aggregate **duration** for overview rows is the **sum of constituent
 session (or step) `durationMs` values**, computed by the dashboard (or other
@@ -171,17 +169,11 @@ of `scripts/perf` local formatters.
 - Final CLI run summary duration must be the host-stamped duration for that
   run, not an independent live sample taken after tool return.
 - Implementation plan:
-  `docs/plans/ready/host-owned-presentation-values/` (local).
+ (local).
 - Follow-up enforcement: depcruise allowlist updates + project-local fitness
   check forbidding ad-hoc duration/score label construction outside
   `packages/format/` (allowlist `scripts/perf/` until a separate cleanup), plus
   a guard that `packages/format/` does not accept session arrays or compute
   suite/count/status aggregates.
 
-**Related specs / ADRs:** Sibling to
-[ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md) (raw timing ownership),
-[ADR-0058](ADR-0058-shared-live-run-shell.md) / [ADR-0137](ADR-0137-live-run-five-section-render-contract.md)
-(shared render shell — skins consume shared labels),
-[ADR-0117](ADR-0117-host-owned-analysis-run-pipeline.md) (host-owned run tail),
-[ADR-0143](ADR-0143-host-owned-run-step-ledger.md) (run/step ledger fields used
-by suite projections).
+**Related ADRs:** Sibling to [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md) (raw timing ownership), [ADR-0058](ADR-0058-shared-live-run-shell.md) / [ADR-0137](ADR-0137-live-run-five-section-render-contract.md) (shared render shell — skins consume shared labels), [ADR-0117](ADR-0117-host-owned-analysis-run-pipeline.md) (host-owned run tail), [ADR-0143](ADR-0143-host-owned-run-step-ledger.md) (run/step ledger fields used by suite projections).

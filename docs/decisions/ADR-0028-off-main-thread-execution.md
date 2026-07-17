@@ -25,7 +25,6 @@ enforcement-reason: >
   off-thread selector has lapsed (no longer present under `packages/`). The
   transport relay/buffer/error/fallback behaviour is covered by unit tests in core.
   Restoring off-thread-selector coverage is deferred (spec 01 / OQ4).
-```
 
 **Decision:** Interactive (TTY) runs execute the engine **off the main process**.
 The runner forks the CLI to a per-tool headless worker subcommand
@@ -105,7 +104,6 @@ the transport implementation behind it, exactly as that ADR anticipated.
   (`runOffThreadOrInProcess`) is live but no longer guarded by a fitness check —
   restoring that assertion is an open follow-up (spec 01 / OQ4).
 
-**Related specs / ADRs:** `docs/plans/ready/offload-engine-to-worker-thread/`
 (local). Exercises the reversibility ADR-0016 reserved; the progress currency +
 single `<LiveProgress>` renderer from ADR-0016 are unchanged. Slim results follow
 ADR-0011's `SignalEnvelope` output currency.

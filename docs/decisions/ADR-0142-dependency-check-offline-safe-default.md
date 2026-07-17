@@ -22,4 +22,4 @@ enforcement-reason: >
 
 **Fitness check:** No broad static check is warranted; the invariant is encoded in the Dependency-Check adapter argument-builder test and the external adapter worker E2E.
 
-**Related specs / ADRs:** ADR-0070, ADR-0090, ADR-0091, ADR-0092, ADR-0141.
+**Related ADRs:** ADR-0070; ADR-0090; ADR-0091; ADR-0092; ADR-0141.

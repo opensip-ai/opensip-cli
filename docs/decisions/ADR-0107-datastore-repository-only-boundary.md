@@ -20,7 +20,6 @@ enforced-by: ['local:restrict-raw-db-access']
 enforcement-reason: >
   Fitness restrict-raw-db-access check; depcruise rule on Drizzle query shapes;
   public barrel must not export DrizzleDataStore.
-```
 
 **Decision:** The `@opensip-cli/datastore` public barrel exports `DataStore`
 (capability interface), repository classes (`BaselineRepo`, `ToolStateRepo`, …),
@@ -55,5 +54,4 @@ substrates may.
 - Grep and migrate any `.datastore.db` usage outside allowed packages.
 - Extends ADR-0056 Phase 4 R18 from "documented trade-off" to enforced boundary.
 
-**Related specs / ADRs:** Phase 3A in
-`docs/plans/architecture-audit-p1-remediation/`; [ADR-0096](ADR-0096-host-owned-datastore-lifecycle.md).
+**Related ADRs:** [ADR-0096](ADR-0096-host-owned-datastore-lifecycle.md).

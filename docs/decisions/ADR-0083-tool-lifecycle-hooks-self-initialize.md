@@ -20,7 +20,6 @@ enforced-by: ['script:tool-lifecycle-hooks.test']
 enforcement-reason: >
   Worker-entry and lifecycle tests prove report/session hook paths do not assume
   command initialization ran, and source JSDoc/doc pages state the contract.
-```
 
 **Decision:** Tool lifecycle and contribution hooks are self-initializing. The
 host guarantees only local call-site ordering: `initialize` runs before an

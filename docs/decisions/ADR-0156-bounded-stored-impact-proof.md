@@ -22,7 +22,6 @@ enforcement-reason: >
   dashboard state/injection tests, dependency-cruiser, and existing session
   ownership checks cover the decision at its owners. No additional fitness
   check is needed.
-```
 
 **Decision:** Persist an optional, graph-owned, bounded impact projection inside
 `GraphSessionPayload.__version: 1`; join it to a report only through the parent
@@ -90,10 +89,4 @@ the graph engine.
   malformed evidence, overflow degradation, partial/unknown verification,
   truncation, and a verified zero-impact result. Absence never means zero.
 
-**Related specs / ADRs:** Extends the opaque payload policy in
-[ADR-0050](ADR-0050-payload-schema-evolution.md), host-owned timing/session
-policy in [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md), impact trust
-in [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md), and Run/RunStep
-authority in [ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Canonical audit
-placement is [ADR-0155](ADR-0155-canonical-audit-command.md). Implementation
-specification: `docs/plans/specs/visual-proof-of-change.md` (local, gitignored).
+**Related ADRs:** Extends the opaque payload policy in [ADR-0050](ADR-0050-payload-schema-evolution.md), host-owned timing/session policy in [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md), impact trust in [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md), and Run/RunStep authority in [ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Canonical audit placement is [ADR-0155](ADR-0155-canonical-audit-command.md).

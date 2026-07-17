@@ -17,7 +17,6 @@ related: [ADR-0037, ADR-0084, ADR-0147, ADR-0148, ADR-0149, ADR-0152, ADR-0153, 
 tags: [architecture, inventory, graph, persistence, mcp]
 enforcement: mechanizable
 enforced-by: ['depcruise:codebase-imports-core-contracts-targeting-only', 'depcruise:mcp-graph-internal-scope', 'script:inventory.test.ts', 'script:manifest-facts.test.ts', 'script:context-snapshot-repo.test.ts', 'script:sqlite-graph-read-port.test.ts', 'script:context-observability.test.ts', 'script:e2e-stdio.test.ts']
-```
 
 **Decision:** `@opensip-cli/codebase` is a layer-3, persistence-free substrate
 that derives bounded project, package, file-role, target, and allowlisted script
@@ -70,6 +69,6 @@ targets, [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundarie
 owns the graph facade, and [ADR-0160](ADR-0160-deterministic-task-context-evidence-plane.md)
 owns host aggregation.
 
-**Related spec:** `docs/plans/specs/agent-task-context.md` (local-only) records
+**Related spec:** records
 the deferred intent, history, observed-coverage, resource, snippet, Git, and
 task-composer waves.

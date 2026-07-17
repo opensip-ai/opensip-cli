@@ -28,7 +28,6 @@ enforcement-reason: >
   branch (`graph/engine/src/cli/graph-modes.ts`): on any error-rung signal
   (core's `isErrorSignal`, `critical`/`high`) in the post-`@graph-ignore` set it
   sets exit RUNTIME_ERROR. Pinned by `graph/engine/src/cli/__tests__/graph-gate-mode.test.ts`.
-```
 
 **Decision:** The dogfood gate (`pnpm fit:ci` = `fit --gate-save`, and by policy
 `pnpm graph:ci`) must **hard-fail the CI step itself** on a fail-threshold breach
@@ -119,9 +118,4 @@ lose the baseline or the inline PR annotations.
   invocation and no retained standalone `pnpm lint` eslint pass are needed for the
   gate guarantee.
 
-**Related specs / ADRs:** Applies [ADR-0017](./ADR-0017-release-gate-policy.md)'s
-"don't trust external config; the gate must enforce itself" principle to the
-dogfood gate. Builds on [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md)
-(severity lives on the `Signal`) and [ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md)
-(graph gate severities) for the graph follow-up. Unblocks
-[ADR-0019](./ADR-0019-external-tool-adapter-checks.md)'s eslint increment (OQ1).
+**Related ADRs:** Applies [ADR-0017](./ADR-0017-release-gate-policy.md)'s "don't trust external config; the gate must enforce itself" principle to the dogfood gate. Builds on [ADR-0011](./ADR-0011-signal-output-currency-formatter-sink.md) (severity lives on the `Signal`) and [ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (graph gate severities) for the graph follow-up. Unblocks [ADR-0019](./ADR-0019-external-tool-adapter-checks.md)'s eslint increment (OQ1).

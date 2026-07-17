@@ -21,7 +21,6 @@ enforcement-reason: >
   The ordered bootstrap phases can be unit-tested through a pure planner and
   table-driven hook tests. The architectural intent remains enforced by the
   no-module-singleton, only-documented-toolcli-seams, and env-via-registry checks.
-```
 
 **Decision:** Commander remains the integration boundary, but the logic currently
 sequenced inside `packages/cli/src/bootstrap/pre-action-hook.ts` must be modeled
@@ -95,4 +94,3 @@ making ordering executable in unit tests.
   over full Commander integration unless the behavior depends on Commander.
 - `pre-action-hook.ts` may keep its cognitive-complexity waiver while it is the
   Commander adapter, but the business rules should migrate behind phase helpers.
-

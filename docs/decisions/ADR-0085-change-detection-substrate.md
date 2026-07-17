@@ -21,7 +21,6 @@ enforcement-reason: >
   `single-changed-file-resolver` and `single-agent-filter-engine` enforce one
   implementation for changed-file derivation and agent filtering; the fitness→graph
   no-edge invariant is enforced by dependency-cruiser tool-engine rules.
-```
 
 **Decision:** Place the git changed-file resolver in `@opensip-cli/core`
 (`resolveChangedFiles`); place the agent-filter engine (`applyAgentFilters`,

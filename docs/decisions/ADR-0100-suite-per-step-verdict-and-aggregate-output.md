@@ -23,7 +23,6 @@ enforcement-reason: >
   Static guardrails such as only-documented-toolcli-seams and
   single-opts-assembly-seam continue to enforce the host-owned output plane and
   the single CommandSpec-to-options projection.
-```
 
 **Decision:** Extend the host-owned suite result contract additively with
 per-step counts-only `verdict` projections and a suite-level `aggregate`. Keep
@@ -86,6 +85,4 @@ verdicts are counts-only) and are locked by suite orchestrator, capture-context,
 and view tests. Existing static checks already guard the host-owned output
 seams and single options assembly path introduced by ADR-0093.
 
-**Related specs / ADRs:** Extends ADR-0093. Builds on ADR-0011
-(`SignalEnvelope` as output currency) and ADR-0035 (verdict policy).
-Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.
+**Related ADRs:** Extends ADR-0093. Builds on ADR-0011 (`SignalEnvelope` as output currency) and ADR-0035 (verdict policy). Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.

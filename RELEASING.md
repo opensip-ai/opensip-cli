@@ -85,10 +85,10 @@ suspension triggers — is
 [ADR-0165](docs/decisions/ADR-0165-macos-ga-support-qualification.md). The
 day-to-day maintainer playbook (14-day burn-in counting + resets, failure-class
 triage, burned-version recovery, runner/toolchain drift, the `preview → supported`
-promotion checklist, and reading `hostSupport` from the CLI/MCP catalogs) is kept
-locally under `docs/internal/` (private working context, not committed). The
-current, generated support-matrix STATUS is never restated in prose here — read it
-from [`docs/public/70-reference/17-supported-platforms.md`](docs/public/70-reference/17-supported-platforms.md),
+promotion checklist, and reading `hostSupport` from the CLI/MCP catalogs) is
+local-only maintainer context (not committed). The current, generated
+support-matrix STATUS is never restated in prose here — read it from
+[`docs/public/70-reference/17-supported-platforms.md`](docs/public/70-reference/17-supported-platforms.md),
 which is generated from the one core support registry.
 
 ### Producer provenance
@@ -102,7 +102,7 @@ that path uses a short-lived token and ships **without** provenance. Do not use
 bootstrap for names that already exist on npm.
 
 Consumption-side verification (install/load provenance checks for third-party
-packages) is a separate trust gate — see
+packages) is a separate trust gate —.
 [ADR-0068](../docs/decisions/ADR-0068-consumption-side-verification-policy.md)
 and [ADR-0061](../docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
@@ -338,7 +338,7 @@ gh release download "$TAG" \
   --pattern opensip-cli-sbom.cyclonedx.json
 ````
 
-Full hash and provenance verification commands are documented in
+Full hash and provenance verification commands are.
 [Verifiable releases](docs/public/70-reference/13-verifiable-releases.md).
 
 ## Release verification tiers
@@ -358,9 +358,8 @@ a different question:
    one sealed `platform-acceptance.v1` evidence artifact that a **separate**
    verifier re-validates. It is heavier and host-specific, so it is deliberately
    **not** wired into `release:preflight` or any developer build. See the
-   "Platform acceptance" section of [`scripts/README.md`](scripts/README.md); a
-   deeper maintainer note lives locally under `docs/internal/` (private working
-   context, not committed).
+   "Platform acceptance" section of [`scripts/README.md`](scripts/README.md);
+   deeper maintainer notes stay local-only (not committed).
 
 3. **OS support qualification.** Turning acceptance evidence into a _published
    supported platform_ is a separate, deliberate OS-specific plan that selects a
@@ -532,7 +531,7 @@ releases follow [Cutting A Release](#cutting-a-release) — no token required.
 
 npm versions are **immutable**. Removal means: stop shipping the package from
 this repo and **deprecate** it on the registry. Do not unpublish published
-versions or bump a patch version to "fix" a mistaken publish — see
+versions or bump a patch version to "fix" a mistaken publish —.
 [Partial publish recovery](#partial-publish-recovery).
 
 ### 1. Repo changes
@@ -590,6 +589,6 @@ The CLI applies pending migrations automatically when opening the datastore.
 `PRAGMA user_version` stores a **logical schema id** (`LOGICAL_SCHEMA_VERSION` in
 `packages/datastore/src/schema-version.ts`), not the Drizzle journal entry count.
 Bump the logical id only when squashing migrations or making an incompatible
-rewrite — not on every additive migration. Users upgrading from v0.1.0 may see
+rewrite — not on every additive migration. Users upgrading from v0.1.0 may.
 their local `.runtime/` cache re-stamped once across the v0.1.0→v0.1.1 squash
 boundary without deleting it.

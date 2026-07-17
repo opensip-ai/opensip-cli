@@ -23,7 +23,6 @@ enforcement-reason: >
   module-level loaded-state/cache singletons this work removed; the
   `plugin-kind-contract` test derives valid markers from manifests rather than a
   host union; per-package isolation + routing are covered by core unit tests.
-```
 
 **Decision:** Every capability domain (fit's `fit-pack`, sim's `sim-pack`, graph's
 `graph-adapter`, plus the co-located `fit-recipe`/`sim-recipe`) is discovered and
@@ -77,7 +76,4 @@ a foreign `@opensip-cli/core`) is hoisted into core and applied to EVERY domain.
   cannot tell a mutated Map from the ~71 read-only constant Sets in-tree); it was fixed
   structurally rather than guarded.
 
-**Related specs / ADRs:** Realizes the tool-plugin-parity north-star
-(`docs/internal/parity-invariant-index.md`); follows the GA cutover (ADR-0027).
-Spec: `docs/plans/specs/release-3.1.0-generic-capability-discovery.md` (local-only;
-shipped as part of the unreleased v3.0.0, no separate version).
+**Related ADRs:** Realizes the tool-plugin-parity north-star; follows the GA cutover (ADR-0027).0.0, no separate version).

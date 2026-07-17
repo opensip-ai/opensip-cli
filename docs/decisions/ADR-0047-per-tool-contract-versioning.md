@@ -25,7 +25,6 @@ enforcement-reason: >
   (updated) enforce the documentation/ADR reference obligation when any of
   these constants change. The core TOOL_CONTRACT_VERSION (ADR-0046) remains
   the bus-level marker.
-```
 
 **Decision:** Introduce independent contract versions for each tool's rich surface (`FITNESS_CONTRACT_VERSION`, `GRAPH_CONTRACT_VERSION`, `SIMULATION_CONTRACT_VERSION`, etc.), separate from the core `TOOL_CONTRACT_VERSION` (ADR-0046).
 
@@ -56,7 +55,4 @@ This is a direct extension of the pattern already used for `PLUGIN_API_VERSION` 
 - Tool authors extending a specific tool (e.g. a custom fitness check pack) now have a first-class version to pin against.
 - The core `TOOL_CONTRACT_VERSION` changes even less often.
 
-**Related specs / ADRs:**
-- Builds directly on ADR-0046 (core Tool contract versioning).
-- Will drive small follow-up ADRs or sections per tool (e.g. "Fitness Check API Versioning").
-- Implementation sketch lives in the fitness engine `tool.ts` and a new (or extended) fitness architecture check.
+**Related ADRs:** - Builds directly on ADR-0046 (core Tool contract versioning). - Will drive small follow-up ADRs or sections per tool (e.g. "Fitness Check API Versioning"). -ts` and a new (or extended) fitness architecture check.

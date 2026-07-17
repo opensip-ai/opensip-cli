@@ -18,7 +18,6 @@ tags: [i18n, localization]
 enforcement: not-mechanizable
 enforcement-reason: >
   Explicit deferral — no extraction catalog or locale runtime to enforce.
-```
 
 **Decision:** **Defer localization.** CLI and docs remain **English-only**. Programming-language
 adapters are unrelated to UI localization. Revisit when an enterprise contract requires

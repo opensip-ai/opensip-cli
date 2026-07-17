@@ -24,7 +24,6 @@ enforcement-reason: >
   `restrict-raw-db-access` self-checks (which auto-govern `packages/mcp/` once it
   joins `bundledPackages`); the no-`mcp→cli` edge and the scoped `graph/internal`
   exception by dependency-cruiser. See the Fitness check section.
-```
 
 **Decision:** Ship a bundled first-party tool package `@opensip-cli/mcp` that
 adds one long-lived, blocking command — `opensip mcp` — which serves the existing
@@ -135,13 +134,7 @@ its enforcement (an ADR without this section is incomplete):
 | `opensip mcp` uses `output:'raw-stream'` + `rawStreamReason:'mcp-stdio'` | **No new check** | `raw-stream-parity` inventory test + `command-handler-host-owned-output` (the in-file justification comment). |
 | MCP consumes graph only through declared public surfaces; catalog reads/rebuild use `graph/read` | **No check warranted** | ADR-0147's export-path verifier, workspace import verifier, and dependency-cruiser rules. |
 
-**Related specs / ADRs:** implemented by the local plan
-`docs/plans/ready/02-mcp-server/`. Related:
-[ADR-0009](ADR-0009-public-api-surface-policy.md) (internal-surface boundary),
-[ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
-(public graph/read boundary), [ADR-0006](ADR-0006-derived-data-persistence-policy.md) (catalog
-as derived data), [ADR-0030](ADR-0030-authored-tool-discovery.md) (tool trust
-tiers — `@opensip-cli/mcp` is bundled first-party and fails closed).
+**Related ADRs:** Related: [ADR-0009](ADR-0009-public-api-surface-policy.md) (internal-surface boundary), [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md) (public graph/read boundary), [ADR-0006](ADR-0006-derived-data-persistence-policy.md) (catalog as derived data), [ADR-0030](ADR-0030-authored-tool-discovery.md) (tool trust tiers — `@opensip-cli/mcp` is bundled first-party and fails closed).
 
 ### Boundary hardening amendment (2026-07-09)
 The former production graph/internal exception is removed. Catalog reads,

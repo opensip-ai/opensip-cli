@@ -21,7 +21,6 @@ enforcement-reason: >
   Superseded by ADR-0117. The project-local fitness check
   deferred-run-pipeline-boundary now permits the promoted contracts helpers only
   at approved boundaries and keeps RunCommandPipeline reserved.
-```
 
 **Superseded:** ADR-0117 promotes the deferred boundary into the
 `defineAnalysisRunCommand` contracts helper, config-read helpers, lifecycle event
@@ -79,8 +78,4 @@ contract, and migration sequence are intentionally specified.
   worker IPC, file exports, completion scripts, session raw replay, or diagnostic
   gates.
 
-**Related specs / ADRs:** ADR-0051 (host-owned run lifecycle timing), ADR-0060
-(diagnostic boundary and run outcomes), ADR-0065 (public JSON and raw-stream
-policy), ADR-0093 (suite plane). The implementation spec is intentionally not
-created in the committed tree yet; `docs/plans/` remains local-only planning
-scratch until a promoted plan has an owner and scope.
+**Related ADRs:** ADR-0051 (host-owned run lifecycle timing), ADR-0060 (diagnostic boundary and run outcomes), ADR-0065 (public JSON and raw-stream policy), ADR-0093 (suite The.

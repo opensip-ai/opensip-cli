@@ -23,7 +23,6 @@ enforcement-reason: >
   barrels expose only the curated public surface. Test-only helpers are reached
   via an explicit `<pkg>/internal` subpath that sibling production code may not
   import.
-```
 
 **Decision:** Every workspace package has a single, curated **public API** (its
 package barrel). Anything exported only to support cross-package *tests* — or
@@ -91,6 +90,4 @@ Concrete leaks found by the 2026-06-03 boundary audit:
   (M1 → M2 → M3), each gated independently. Each is API-shaped, so consumers
   (check packs, graph adapters) may need one-line import updates.
 
-**Related specs / ADRs:** [ADR-0007](./ADR-0007-marker-canonical-plugin-discovery.md)
-(explicit, enforced plugin-discovery contract — same posture, applied to
-discovery rather than module surfaces).
+**Related ADRs:** [ADR-0007](./ADR-0007-marker-canonical-plugin-discovery.md) (explicit, enforced plugin-discovery contract — same posture, applied to discovery rather than module surfaces).

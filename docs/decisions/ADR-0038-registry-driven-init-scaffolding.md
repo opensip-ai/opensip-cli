@@ -24,7 +24,6 @@ enforcement-reason: >
   `packages/cli` change (the registry-driven proof); (3) `graph` (no `pluginLayout`)
   produces no directory. A grep guard asserts no `'fit'`/`'sim'`/`'checks'`/
   `'recipes'`/`'scenarios'` literal remains in `scaffold-writer.ts`.
-```
 
 **Decision:** `init` scaffolds each **registered tool's** project layout from its
 `pluginLayout` (`{domain, userSubdirs}`) plus a **tool-shipped example
@@ -91,11 +90,4 @@ the authoring plane.
   (`renderDocumentHeader`); per-tool config blocks come from the tool (rendered from
   its `ToolConfigDeclaration` defaults where faithful; else a tool hook).
 
-**Related specs / ADRs:** Applies ADR-0009 (public-API surfaces; the kernel/CLI
-carries no per-tool vocabulary) to `init`, the last place it leaks. Reuses ADR-0023
-(tool config declarations) for the per-tool config-block rendering, and continues
-the ADR-0027 "host owns the plane, tool declares a manifest" parity model
-(scaffolding becomes one more host-owned plane driven off the tool's declaration).
-The implementing spec is `docs/plans/specs/registry-driven-init-scaffolding.md`
-(local-only); a pre-flight task confirms whether a byte-exact init golden test
-already exists and, if not, writes it against today's behavior before any refactor.
+**Related ADRs:** Applies ADR-0009 (public-API surfaces; the kernel/CLI carries no per-tool vocabulary) to `init`, the last place it leaks. Reuses ADR-0023 (tool config declarations) for the per-tool config-block rendering, and continues the ADR-0027 "host owns the.

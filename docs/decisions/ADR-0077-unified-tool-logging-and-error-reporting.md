@@ -20,7 +20,6 @@ enforced-by: ['local:tool-engine-no-direct-stderr-command-errors']
 enforcement-reason: >
   Fitness check `tool-engine-no-direct-stderr-command-errors` ratchets first-party
   tool engine CLI handlers away from direct command-error stderr writes.
-```
 
 **Decision:** Expose `ToolCliContext.reportFailure(detail)` and `createToolLogger(module)`
 from `@opensip-cli/core`; bind `cli.logger` to the per-run scope logger; implement
@@ -52,7 +51,3 @@ Layering: core types/helpers, contracts exit policy, CLI fan-out preserves the D
 `packages/{fitness,graph,simulation,yagni}/engine/src/cli/`; allows progress/worker
 transport stderr (heap preflight, shard worker, fit warnings). Bootstrap and host CLI
 paths remain governed by existing checks.
-
-**Related specs / ADRs:** Plan 06 spec
-`docs/plans/specs/unified-tool-logging-and-error-reporting.md`; ADR-0060 bootstrap
-diagnostics; ADR-0053 per-run logger scope; ADR-0054 worker dispatch replay.

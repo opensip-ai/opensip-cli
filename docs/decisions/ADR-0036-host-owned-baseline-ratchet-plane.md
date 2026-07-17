@@ -26,7 +26,6 @@ enforcement-reason: >
   JSON is byte-identical pre/post (the git-trackable consumer-repo artifact stays
   valid). A dependency-cruiser rule keeps the diff in `output` and the repo in
   `datastore` (kernel `core` carries no persistence).
-```
 
 **Decision:** Baseline **capture** (`--gate-save`), the **net-new ratchet**
 (`--gate-compare`), and baseline **export** (SARIF + git-trackable JSON
@@ -121,13 +120,7 @@ a behavioral guess.
   the ADR-0035 build is also editing — it must land **after** the host-owned-verdict
   work, not concurrently.
 
-**Related specs / ADRs:** Picks up the baseline-diff thread ADR-0035 deferred;
-builds on ADR-0011 (Signal is the output currency — fingerprints + baseline are a
-property of that currency) and ADR-0020 (dogfood gate hard-fail + net-new SARIF
-ratchet — this plane generalizes the ratchet to every tool). The implementing spec
-is `docs/plans/specs/host-baseline-ratchet-plane.md` (local-only), which carries
-the divergence table, the data model, the seam surface, and the per-tool no-flap +
-byte-identical verification matrix.
+**Related ADRs:** Picks up the baseline-diff thread ADR-0035 deferred; builds on ADR-0011 (Signal is the output currency — fingerprints + baseline are a property of that currency) and ADR-0020 (dogfood gate hard-fail + net-new SARIF ratchet — this.
 
 ---
 

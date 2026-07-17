@@ -20,7 +20,6 @@ enforcement-reason: >
   Near-clone similarity is a heuristic policy choice (char shingles, LSH
   parameters, threshold). Population symmetry is verified by
   graph-equivalence-check, not a static fitness check.
-```
 
 **Decision:** Persist a walk-time MinHash signature (`bodySignature?`, k=128) on
 each `FunctionOccurrence`, derived from the same normalized body string as
@@ -80,5 +79,4 @@ tests are algorithm-agnostic). `NEAR_DUP_SIGNATURE_VERSION` gates the cache key.
   retained for accuracy (SE ≈ 0.031); k=64 or a packed binary encoding are future
   options only if a very-large-repo consumer hits a memory/cache ceiling.
 
-**Related specs / ADRs:** ADR-0005 (rule purity), ADR-0006 (derived data
-persistence).
+**Related ADRs:** ADR-0005 (rule purity); ADR-0006 (derived data persistence).

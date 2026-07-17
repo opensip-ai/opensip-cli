@@ -1158,7 +1158,7 @@ module.exports = {
       to: { path: '^packages/graph/engine/src/(pipeline|rules)/' },
     },
     {
-      // PR 1b of plan docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
+      // PR 1b.
       // The visitors/resolvers disjoint rules now police the relocated
       // graph-typescript package. Path globs repath to the new home.
       name: 'graph-visitors-resolvers-disjoint',
@@ -1329,8 +1329,8 @@ module.exports = {
     // -------------------------------------------------------------------
     // graph dashboard — Code Paths panel architectural invariants. The
     // catalog-decoupling rule (dashboard consumes the graph catalog by JSON
-    // shape only, never importing @opensip-cli/graph) is documented in
-    // docs/plans/ready/graph-visualizer-view/. The panel lives in
+    // shape only, never importing @opensip-cli/graph) is.
+    //.
     // @opensip-cli/dashboard. Each rule below codifies a single
     // architectural-invariant claim.
     // -------------------------------------------------------------------

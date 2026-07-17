@@ -26,7 +26,6 @@ enforcement-reason: >
   extractors) asserts identical body hashes AND identical duplicate groups — the
   single-implementation guarantee that prevents the divergence ADR-0063 deleted
   its way around.
-```
 
 ## Why ADR-0063 is superseded (read this first)
 
@@ -169,11 +168,4 @@ byte-stable, and yagni becomes independently complete. The divergence is prevent
   fingerprint-golden / body-digest-golden / equivalence-guardrail tests gate every
   migration step.
 
-**Related specs / ADRs:** a build spec (`docs/plans/specs/shared-clone-detection.md`,
-to be written) details the package API, the byte-stable graph migration order, the
-yagni TS extractor, and the parity test. Supersedes ADR-0063 (and the residual
-ADR-0057 graph-evidence seam). Related: ADR-0062 (near-clone detection — the MinHash
-machinery that moves into the substrate), ADR-0036 (baseline fingerprints — the
-location-keyed strategy that makes the graph migration byte-stable), ADR-0061
-(launch posture / extension-trust tiers — the plugin-independence invariant this
-upholds).
+**Related ADRs:** to be written) details the package API, the byte-stable graph migration order, the yagni TS extractor, and the parity test. Supersedes ADR-0063 (and the residual ADR-0057 graph-evidence seam). Related: ADR-0062 (near-clone detection — the MinHash machinery that moves into the substrate), ADR-0036 (baseline fingerprints — the location-keyed strategy that makes the graph migration byte-stable), ADR-0061 (launch posture / extension-trust tiers — the plugin-independence invariant this upholds).

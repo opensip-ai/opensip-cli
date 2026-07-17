@@ -23,7 +23,6 @@ enforcement-reason: >
   any test/spec/fixture/coverage/hook path; typecheck-tests + build-test-tsconfigs
   keep the excluded test sources semantically checked in isolation. Both lanes run
   in PR/release/preflight.
-```
 
 **Decision:** The publish boundary is defined by two artifacts jointly, not by
 config intent alone: (1) production `tsc` output, where every package's
@@ -75,6 +74,4 @@ manifest declaring `prepack`/`prepare`/`postpack` is rejected before any pnpm sp
 emitted or packed bytes; the release script (`verify-published-artifacts`) is the
 direct invariant evaluator.
 
-**Related specs / ADRs:** ADR-0017 (release governance surface); ADR-0009
-(published/internal subpaths); ADR-0040 (private test-support never published);
-`RELEASING.md` (release order).
+**Related ADRs:** ADR-0017 (release governance surface); ADR-0009 (published/internal subpaths); ADR-0040 (private test-support never published).

@@ -22,7 +22,6 @@ enforcement-reason: >
   tool references to host-owned session retention and SQLite reclaim primitives.
   Unit tests cover the CLI retention policy, SessionRepo count pruning, config
   defaults, and datastore maintenance primitives.
-```
 
 **Decision:** The CLI host owns the lifecycle of the project-local datastore and
 generic run-session history. Tools may contribute opaque session payloads through

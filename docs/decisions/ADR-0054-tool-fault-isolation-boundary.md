@@ -31,7 +31,6 @@ enforcement-reason: >
   manifest-derived Tool with no runtime import (a sentinel confirms non-import)
   while the worker imports the real runtime, plus a `@ts-expect-error` proves the
   bundled-only policy type.
-```
 
 **Decision:** External-provenance tool runtime code must not load or execute in
 the CLI host process. The host may read static manifests as data; tool runtime
@@ -157,10 +156,7 @@ future explicit developer-only override says so in its name and warning text.
 - Guardrails: add a bootstrap test and fitness check for the capstone invariant,
   then make `OPENSIP_CLI_NO_WORKER` first-party-only by default.
 
-**Related specs / ADRs:** Generalizes the ADR-0028 worker transport into the
-target tool fault-isolation primitive. Interacts with ADR-0023 config
-composition, ADR-0027 parity, ADR-0029 capability discovery, ADR-0030 authored
-tool discovery, and ADR-0052 bootstrap sequencing.
+**Related ADRs:** Generalizes the ADR-0028 worker transport into the target tool fault-isolation primitive. Interacts with ADR-0023 config composition, ADR-0027 parity, ADR-0029 capability discovery, ADR-0030 authored tool discovery, and ADR-0052 bootstrap sequencing.
 
 ## Build Plan (sequenced)
 
@@ -234,9 +230,7 @@ command in a worker, reusing the existing transport shape.
 union rather than inventing a parallel one. The dispatch worker is a new
 internal CLI subcommand (mirrors `graph-run-worker`):
 
-```
 opensip __tool-command-worker <specPath>
-```
 
 Parent → child (the request, written to a temp JSON spec file — the same
 pattern graph uses; the path is `descriptor.argv[1]`):
@@ -252,7 +246,6 @@ interface ToolCommandWorkerSpec {
   readonly cwd: string;
   // correlation rides env (OPENSIP_*), not the spec — symmetric to graph
 }
-```
 
 Child → parent reuses `WorkerMessage<TEvent, TResult>` with two concrete
 bindings:
@@ -332,7 +325,6 @@ interface ToolCommandResult {
   readonly exitCode?: number;          // setExitCode last-write
   readonly session?: ToolSessionContribution;  // host persists after return
 }
-```
 
 The host-side supervisor, on receiving `ToolCommandResult`, replays it through
 the EXISTING seams (`ctx.render` / `ctx.emitEnvelope` / `dispatchOutput` /
@@ -478,7 +470,6 @@ holds when a bundled package is presented as installed.
 
 ### Sequencing summary
 
-```
 M4-A provenance threading      ─┐ (no behavior change)
 M4-B IPC protocol               ─┤ (types only)
 M4-C seam→RPC mapping (shim)    ─┤ (worker shim + host RPC switch)
@@ -486,7 +477,6 @@ M4-D supervisor + worker entry  ─┘ → VERTICAL SLICE (Deliverable 2)
 M4-E config two-pass + trust tier
 M4-F capability + lifecycle RPC
 M4-G command-shell descriptor + capstone guardrail  → invariant mechanized
-```
 
 A-D are the dispatch plane; E-F remove the remaining host-import consumers; G is
 the capstone. Each increment is independently green and never leaves the boundary

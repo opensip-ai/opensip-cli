@@ -21,7 +21,6 @@ enforcement-reason: >
   New unit test on makeConfigCacheKey asserting same config path + different
   resolutionMode yields different keys; cache-key tests in graph-adapter-common
   and per-adapter packages.
-```
 
 **Decision:** Every graph language adapter cache key MUST incorporate
 `resolutionMode` from `CacheKeyInput` (the `MUST`-fold contract documented on the
@@ -53,5 +52,4 @@ fast-tier lands.
 - Existing cached artifacts naturally miss (key shape change) — no migration.
 - Reference implementation remains `graph-typescript/src/cache-key.ts`.
 
-**Related specs / ADRs:** Phase 1 in
-`docs/plans/architecture-audit-p1-remediation/`; [ADR-0032](ADR-0032-sharded-engine-default.md).
+**Related ADRs:** [ADR-0032](ADR-0032-sharded-engine-default.md).

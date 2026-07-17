@@ -24,7 +24,6 @@ enforcement-reason: >
   Superseded by ADR-0153 for faceted exclusive compact projections and live
   surface diagnosis; carried-forward occurrence/package/runtime bounds remain
   authoritative via ADR-0153.
-```
 
 ## Decision
 

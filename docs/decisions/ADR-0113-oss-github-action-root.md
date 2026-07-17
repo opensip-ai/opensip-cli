@@ -19,7 +19,6 @@ enforcement: mechanizable
 enforced-by: ['script:action-lib.test']
 enforcement-reason: >
   No check warranted — the invariant is action metadata and script behavior outside packages/; script tests assert the root action has no Cloud inputs and the nested Cloud action keeps its upload inputs, while existing lint/dependency-cruiser rules still guard package layering.
-```
 
 **Decision:** The repository root action `opensip-ai/opensip-cli@v1` is the OSS
 PR-feedback action. It wraps local `opensip` evidence, runs the built-in `audit`
@@ -59,9 +58,4 @@ teaching tools about GitHub.
 - The prior Cloud action behavior remains available only through the nested
   upload-sarif action path or direct CLI handoff.
 
-**Related specs / ADRs:** Spec 26 (OSS GitHub Action),
-[ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md),
-[ADR-0093](ADR-0093-host-owned-suite-plane.md),
-[ADR-0110](ADR-0110-host-owned-review-brief-contract.md),
-[ADR-0111](ADR-0111-built-in-audit-suite-preset.md),
-[ADR-0112](ADR-0112-no-init-ephemeral-project-mode.md).
+**Related ADRs:** [ADR-0011](ADR-0011-signal-output-currency-formatter-sink.md); [ADR-0093](ADR-0093-host-owned-suite-md); [ADR-0110](ADR-0110-host-owned-review-brief-contract.md); [ADR-0111](ADR-0111-built-in-audit-suite-preset.md); [ADR-0112](ADR-0112-no-init-ephemeral-project-mode.md).

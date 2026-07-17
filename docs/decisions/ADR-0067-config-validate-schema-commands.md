@@ -19,7 +19,6 @@ enforcement: not-mechanizable
 enforcement-reason: >
   Command-surface parity snapshots, completion inventory, and config-command
   tests enforce the mounted `config validate|schema` surface.
-```
 
 **Decision:** Add a host `opensip config` group with `validate` and `schema` subcommands. Reuse `buildConfigDeclarations` and `@opensip-cli/config` composition primitives; do not overload `opensip configure` (user-global cloud key UX) or `opensip init`.
 
@@ -34,4 +33,4 @@ enforcement-reason: >
 
 **Fitness check:** No check warranted — command-surface snapshots and `config-command.test.ts` cover the surface.
 
-**Related specs / ADRs:** [ADR-0023](ADR-0023-config-package-and-schema-registry.md), [Configuration reference](../public/70-reference/03-configuration.md).
+**Related ADRs:** [ADR-0023](ADR-0023-config-package-and-schema-registry.md), [Configuration reference](./public/70-reference/03-configuration.md).

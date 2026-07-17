@@ -19,7 +19,6 @@ enforcement: not-mechanizable
 enforcement-reason: >
   An identity invariant across the catalog's derived graphs; guarded by tests
   (body-twin regressions), not a lintable pattern.
-```
 
 **Decision:** A content `bodyHash` identifies a *body*, not an *occurrence* —
 identical bodies in different files (a "body-twin") share one hash by design (it

@@ -2,7 +2,7 @@
  * GraphLanguageAdapter contract test suite.
  *
  * Validates each of the 9 behavioral invariants (I-1 through I-9)
- * defined in docs/plans/11-graph-language-adapter-contract.md §3
+ * (I-1 through I-9)
  * against the TS/Python/Rust adapters covered in this suite. Additional
  * adapter cohorts can add `describe` blocks against their own fixtures while
  * referencing the same invariants.
@@ -388,23 +388,19 @@ requires-python = ">=3.10"
 const PY_FIXTURE_FILES: Readonly<Record<string, string>> = {
   'main.py': `from util import helper, Greeter
 
-
 def entry(x):
     g = Greeter("hi")
     msg = g.greet(x)
     return helper(msg)
 
-
 def unused():
     print("orphan")
-
 
 if __name__ == "__main__":
     entry(7)
 `,
   'util.py': `def helper(value):
     return f"helper:{value}"
-
 
 class Greeter:
     def __init__(self, prefix):
@@ -413,11 +409,9 @@ class Greeter:
     def greet(self, who):
         return f"{self.prefix} {who}"
 
-
 add_one = lambda n: n + 1
 `,
   'tests/test_sample.py': `from util import helper
-
 
 def test_helper_returns_prefixed_value():
     assert helper("ok") == "helper:ok"

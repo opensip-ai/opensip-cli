@@ -23,7 +23,6 @@ enforcement-reason: >
   `pnpm graph:ci` stay green and new payloads carry __version. The "no tool
   payload types in host" rule is enforced by dependency-cruiser + fitness
   architecture checks + the contracts barrel public-api ratchet test.
-```
 
 **Decision:** Tool session payloads (`StoredSession.payload`) and versioned `tool_state` values carry a top-level numeric `"__version": N` (double-underscore, starting at 1). The host (contracts, session-store, datastore, CLI) remains ignorant of concrete tool shapes and only provides a small pure `extractPayloadVersion` helper, the outer `payload_version` storage column (for rare host-contract bumps), structured decode tolerance, warnings on future versions, and best-effort projection for legacy payloads. Tools own their evolution rules (additive = free; breaking = bump + deprecation window).
 
@@ -48,13 +47,13 @@ enforcement-reason: >
 - A datastore migration (0011) ensures column safety + records the strategy.
 
 **Enforcement & rollout:**
-- See the implementation plan `docs/plans/ready/payload-schema-evolution/plan.md` (phases 0-11) and the spec `docs/plans/specs/payload-schema-evolution.md`.
+- See the implementation plan (phases 0-11) and the.
 - Phase 8 owns the guard (test or fitness arch check).
 - Phases 9/10 own the roundtrip/legacy/future tests + explicit re-run of dogfood gates with zero net-new architecture/error findings.
 - This ADR is the durable record; the plan/spec contain the detailed tasks and cross-cutting contracts (data layer, observability via DiagnosticsBus + RunScope, hardening = defensive legacy=v1 + degrade+warn, no host import of tool payload interfaces, etc.).
 
 **References:**
-- Spec + full plan in `docs/plans/specs/payload-schema-evolution.md` and `docs/plans/ready/payload-schema-evolution/`.
+- Spec + full plan in and.
 - Related: ADR-0025 (session-replay-contract), ADR-0042 (tool-storage-contract-and-state-store).
 - Code: `packages/contracts/src/session-types.ts` (StoredSession.payload JSDoc), `packages/core/src/lib/payload-version.ts`, `packages/session-store/src/session-payload-decode.ts`, per-tool `persistence/session-payload.ts` + `session-replay.ts`, `SessionRepo`, `ToolStateRepo`.
 - Audit findings around opaque payloads and the 0010 migration.

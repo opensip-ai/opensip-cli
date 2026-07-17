@@ -20,7 +20,6 @@ enforced-by: ['type-structural']
 enforcement-reason: >
   cliConfigSchema rejects project cli.apiKey; whole-document and loadCliDefaults
   tests enforce the decision.
-```
 
 **Decision:** API keys are accepted only from **`--api-key`**, **`OPENSIP_API_KEY`**,
 or **`~/.opensip-cli/config.yml#apiKey`**. **Reject** `cli.apiKey` in project

@@ -20,7 +20,6 @@ enforced-by: ['type-structural', 'script:tools-validate-external-output.test']
 enforcement-reason: >
   External-tool synthesis tests reject `output: live-view`, and `tools validate`
   has an `external-output-modes` section that fails before runtime probing.
-```
 
 **Decision:** External-provenance Tool manifests may not declare a command shell
 with `output: "live-view"`. The host rejects that manifest shape during external

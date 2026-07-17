@@ -19,7 +19,6 @@ enforcement: mechanizable
 enforced-by: ['local:baseline-identity-metadata', 'local:state-locking-policy']
 enforcement-reason: >
   baseline-identity-metadata.mjs, state-locking-policy.mjs, baseline-repo tests, file-lock tests.
-```
 
 **Decision:** Persist baseline fingerprint strategy `{id, version}` in generic baseline meta;
 stamp `baselineIdentity` on every `SignalEnvelope`; guard datastore writes with a
@@ -37,5 +36,3 @@ strategy produced stored identities (outside ADR-0050 payload scope).
 must not contain secrets; OTel remains opt-in.
 
 **Fitness checks:** `baseline-identity-metadata`, `state-locking-policy`.
-
-**Related specs:** `docs/internal/state-observability-contract.md`, Plan 04.

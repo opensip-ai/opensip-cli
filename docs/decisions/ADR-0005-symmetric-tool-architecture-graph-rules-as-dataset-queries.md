@@ -21,7 +21,6 @@ enforcement-reason: >
   guides design and review. The layering half is partially mechanizable via
   dependency-cruiser (core must not import tools; tools must not import each
   other), but "author rules the way you author checks" is a judgment call.
-```
 
 **Decision:** Bring the **`graph`** tool to architectural symmetry with
 **`fitness`**. Both are peer Tools, authored via a parallel factory
@@ -118,15 +117,9 @@ for blast/SCC/coupling.
   `medium` and churn the baseline — rejected). The wiring lands in **Phase D**
   (which owns the severity model); Phase B stays identity-preserving.
 - Implemented in four phases (in-progress local plans under
-  `docs/plans/specs/`): `01-recipe-substrate-hoist` → `02-graph-rules-symmetry`
+`01-recipe-substrate-hoist` → `02-graph-rules-symmetry`
   → `03-graph-feature-layer` → `04-graph-structural-rules`. Phase A is a
   no-behavior-change refactor (proven by existing recipe tests staying green).
 - Ships as **v2.6.0** (current line v2.5.2), gated on a full pre-publish review.
 
-**Related specs / ADRs:** Implemented by the four in-progress plans under
-`docs/plans/specs/` (`00-overview` indexes them; local-only). Governed by
-[ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (rule quality
-bar); the feature layer follows
-[ADR-0006](./ADR-0006-derived-data-persistence-policy.md) (materialization
-policy); reachability/feature columns key per occurrence per
-[ADR-0003](./ADR-0003-per-occurrence-edge-keying.md).
+**Related ADRs:** The four in-progress Governed by [ADR-0001](./ADR-0001-graph-rules-actionable-precise-bounded.md) (rule quality bar); the feature layer follows [ADR-0006](./ADR-0006-derived-data-persistence-policy.md) (materialization policy); reachability/feature columns key per occurrence per [ADR-0003](./ADR-0003-per-occurrence-edge-keying.md).

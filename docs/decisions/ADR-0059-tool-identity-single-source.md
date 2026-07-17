@@ -22,7 +22,6 @@ enforcement-reason: >
   declarations, while the static manifest loader, runtime tool validator, and
   identity index reject missing, drifting, or conflicting identities during
   plugin admission.
-```
 
 **Decision:** Every Tool declares one required `identity` block. The host derives
 the runtime human name, primary command and aliases, config namespace, plugin
@@ -51,5 +50,4 @@ Config descriptors use the canonical identity name as namespace. Public examples
 must use `definePrimaryCommand`, `defineNestedCommand`, and `defineTool` so authors
 write names once.
 
-**Related specs / ADRs:** `docs/plans/specs/tool-identity-single-source.md`,
-ADR-0048 (stable UUID identity), ADR-0054 (tool fault-isolation boundary).
+**Related ADRs:** ADR-0048 (stable UUID identity); ADR-0054 (tool fault-isolation boundary).

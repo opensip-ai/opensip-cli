@@ -21,7 +21,6 @@ enforcement-reason: >
   There is no single fitness check that proves "the driver issues real
   requests"; the behaviour is enforced by the simulation test suites
   (run-load-window / fault-model / per-kind executor) and the test:coverage gate.
-```
 
 **Decision:** The `sim` tool's `load` and `chaos` kinds drive a **user-supplied
 `Target`** (an async function the shared load-window driver calls once per
@@ -70,6 +69,4 @@ audits was removing capabilities that look wired but aren't.
 - Server-side fault injection remains BYO-and-documented; a future ADR may add a
   first-party fault-injection integration if demand warrants.
 
-**Related specs / ADRs:** Implements the local spec
-`docs/plans/specs/chaos-resilience-harness.md`. Sibling to **ADR-0011** (signals
-as the universal *output* currency — this is the *input/driver* side).
+**Related ADRs:** The local Sibling to **ADR-0011** (signals as the universal *output* currency — this is the *input/driver* side).

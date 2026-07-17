@@ -20,7 +20,6 @@ enforcement-reason: >
   Field shape is TypeScript-enforced; additivity follows the persistence policy;
   producer honesty ("never invent a fake autofix") is a semantic judgment not
   structurally detectable.
-```
 
 **Decision:** Add an optional nested `signal.repair?: SignalRepair` on core
 `Signal` (not flattened top-level fields), additive with no

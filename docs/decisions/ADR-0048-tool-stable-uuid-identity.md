@@ -19,13 +19,12 @@ enforcement: mechanizable
 enforced-by: ['local:no-placeholder-check-ids']
 enforcement-reason: >
   A dedicated (or extended) fitness architecture check (parallel to `no-placeholder-check-ids` for checks) will enforce that Tool `id` fields (in manifests and exported Tool objects) are real promoted UUIDs and not placeholder patterns. The check will reference this ADR (and the governing spec). DB schema updates will be additive.
-```
 
-**Decision:** Tools receive a stable machine identity using the exact same field name and semantics as Checks: `id` (a real UUID) in `ToolMetadata` (and supported in `ToolPluginManifest` / `ToolProvenance`). 
+**Decision:** Tools receive a stable machine identity using the exact same field name and semantics as Checks: `id` (a real UUID) in `ToolMetadata` (and supported in `ToolPluginManifest` / `ToolProvenance`).
 
-The previous human-facing / current key string in `ToolMetadata.id` is renamed to `ToolMetadata.name` (freeing `id` for the stable UUID and providing clarity). 
+The previous human-facing / current key string in `ToolMetadata.id` is renamed to `ToolMetadata.name` (freeing `id` for the stable UUID and providing clarity).
 
-The stable `id` (UUID) for a tool will be persisted in the host datastore (additive column(s) in `tool_baseline_*`, `tool_state`, and related session tables) alongside the human `name` value (which continues to be stored in the existing `tool` column for compatibility and current human-facing queries). 
+The stable `id` (UUID) for a tool will be persisted in the host datastore (additive column(s) in `tool_baseline_*`, `tool_state`, and related session tables) alongside the human `name` value (which continues to be stored in the existing `tool` column for compatibility and current human-facing queries).
 
 A fitness architecture check (in the style of the recent check-ID hygiene) will enforce real UUID values for Tool `id` fields (no placeholder patterns) and, for non-bundled published tools, the presence of a real stable `id`.
 
@@ -37,8 +36,8 @@ This uses the name `id` (not `stableId`) for the stable UUID on tools to ensure 
 - Do not persist the stable `id` in the DB (only in provenance/JSON payloads) (rejected: fails the core goal of durable, queryable, collision-proof scoping for community tools in baselines, tool state, and sessions).
 - Repurpose the manifest `id` to mean the stable UUID at the same time as the runtime change (rejected: larger breaking surface for plugin discovery, package.json declarations, the loader, and existing storage keys; we keep manifest `id` as the declared human key for compat in this cycle and support the stable UUID additively).
 
-**Rationale:** 
-Checks already have a well-established, enforced, and recently-cleaned-up model: `id` = real stable UUID (for SARIF, fingerprints, ratchets, ignores, dedup, etc.), with a separate human `slug`. 
+**Rationale:**
+Checks already have a well-established, enforced, and recently-cleaned-up model: `id` = real stable UUID (for SARIF, fingerprints, ratchets, ignores, dedup, etc.), with a separate human `slug`.
 
 For future community tool authors (the explicit motivation), human-chosen string keys will collide and authors will want to rename tools without losing historical data. A stable UUID `id` (recorded durably in the DB) solves this while preserving the human `name` (and short-form ergonomics) for UX, CLI commands, current storage keys, and on-disk layout.
 
@@ -48,7 +47,7 @@ The DB persistence is additive (existing `tool` column keeps the human `name` va
 
 This is primarily an identity addition (orthogonal to contract surface evolution in ADR-0046/0047) but will be called out in JSDoc, the new check, and contributor documentation because it changes the meaning of `metadata.id` for anyone reading Tool objects.
 
-See the governing spec `docs/plans/specs/tool-stable-uuid-identity.md` for full technical context, DB schema details, first-party treatment, manifest evolution, and success criteria.
+See the governing spec for full technical context, DB schema details, first-party treatment, manifest evolution, and success criteria.
 
 **Consequences:**
 - `ToolMetadata` shape evolves: `id` (stable UUID) + `name` (human-facing, previously the value in `id`).
@@ -62,9 +61,4 @@ See the governing spec `docs/plans/specs/tool-stable-uuid-identity.md` for full 
 - No change to `TOOL_CONTRACT_VERSION` purely for this (per ADR-0046 policy; identity is tracked separately), but the evolution will be noted.
 - Long-term: enables collision-free community tools, rename-stable history, and better global tool identity in catalogs/Cloud.
 
-**Related specs / ADRs:**
-- Governing spec: `docs/plans/specs/tool-stable-uuid-identity.md`
-- ADR-0046 (Tool Contract Versioning Policy) and ADR-0047 (Per-Tool Contract Versioning) — this is identity, not contract surface.
-- ADR-0036 (host-owned baseline plane) — the stable `id` will become usable for durable tool scoping in baselines.
-- Recent check hygiene work (promotion of real `id` UUIDs for checks + `no-placeholder-check-ids` meta-check) — direct precedent and naming consistency driver.
-- ADR-0027 (GA parity / plugin model) and related tool discovery work.
+**Related ADRs:** - Governing - ADR-0036 (host-owned baseline - Recent check hygiene work (promotion of real `id` UUIDs for checks + `no-placeholder-check-ids` meta-check) — direct precedent and naming consistency driver. - ADR-0027 (GA parity / plugin model) and related tool discovery work.

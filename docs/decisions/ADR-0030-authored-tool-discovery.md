@@ -27,7 +27,6 @@ enforcement-reason: >
   by `host-env-specs.test.ts` + the `env-surface-doc` reference test. Layering
   (discovery in `core/plugins`, wiring in `cli/bootstrap`; `core` imports nothing
   from `contracts`/`cli`) is held by dependency-cruiser.
-```
 
 **Decision:** Wire **authored-Tool discovery** so the [ADR-0027](./ADR-0027-ga-parity-cutover.md)
 claim that "bundled, installed, and project-local tools travel the same manifest →
@@ -93,9 +92,7 @@ roots through the one runtime-load seam without a parallel admission hierarchy.
   only additive user-visible deltas are the new `plugin list` provenance rows and
   the un-allowlisted-project-tool exit-5 path.
 
-**Related specs / ADRs:** [ADR-0027](./ADR-0027-ga-parity-cutover.md) (the parity
-cutover whose three-sources-one-path claim this realizes);
-[ADR-0012](./ADR-0012-versioning-and-release-policy.md) (the 3.0.0 reservation).
+**Related ADRs:** [ADR-0027](./ADR-0027-ga-parity-cutover.md) (the parity cutover whose three-sources-one-path claim this realizes); [ADR-0012](./ADR-0012-versioning-and-release-policy.md) (the 3.0.0 reservation).
 
 ### Boundary hardening amendments (2026-07-09)
 Wildcard external trust is no longer admitted; exact-id admission is defined by [ADR-0145](ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md).

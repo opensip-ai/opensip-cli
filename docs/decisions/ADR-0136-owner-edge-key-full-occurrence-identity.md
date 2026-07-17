@@ -22,7 +22,6 @@ enforcement-reason: >
   cross-shard-resolve.test.ts), not a lintable pattern. The existing
   `no-bodyhash-keying-outside-identity` fitness check keeps all owner keying
   routed through `ownerEdgeKey`; this ADR only widens what `ownerEdgeKey` hashes.
-```
 
 **Decision:** The owner-edge key is **full occurrence identity** —
 `ownerEdgeKey(bodyHash, filePath, line, column)` — replacing the ADR-0003
@@ -87,4 +86,4 @@ is gate-visible instead of collapsed last-writer-wins.
   owning occurrence's `(line, column)` alongside `ownerHash`, and the
   contract→internal round-trip asserts their presence.
 
-**Related specs / ADRs:** Refines ADR-0003 (per-occurrence edge keying).
+**Related ADRs:** ADR-0003 (per-occurrence edge keying).

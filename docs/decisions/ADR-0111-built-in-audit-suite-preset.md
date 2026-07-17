@@ -19,7 +19,6 @@ enforcement: mechanizable
 enforced-by: ['script:suite-command-specs.test']
 enforcement-reason: >
   No check warranted — dependency-cruiser, command-spec tests, and e2e tests enforce this local suite-plane behavior; no new cross-package structural invariant is introduced.
-```
 
 **Decision:** Ship `audit` as a CLI-owned built-in suite preset. `opensip suite
 run audit` resolves to data shaped like `SuiteDefinition`. ~~When the user has
@@ -63,10 +62,7 @@ baseline behavior.
 - Aggregate suite SARIF remains deferred; users keep using source-tool SARIF
   until the GitHub Action/evidence-authority work defines that contract.
 
-**Related specs / ADRs:** Spec 24 (audit suite preset),
-[ADR-0093](ADR-0093-host-owned-suite-plane.md),
-[ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md),
-[ADR-0110](ADR-0110-host-owned-review-brief-contract.md).
+**Related ADRs:** [ADR-0093](ADR-0093-host-owned-suite-md); [ADR-0100](ADR-0100-suite-per-step-verdict-and-aggregate-output.md); [ADR-0110](ADR-0110-host-owned-review-brief-contract.md).
 
 ## Amendment: Canonical Root Entry (2026-07-12)
 

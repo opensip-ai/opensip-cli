@@ -22,7 +22,6 @@ enforcement-reason: >
   enforce. A meta-check asserting the exclude set equals the set of `private: true`
   packages would be disproportionate for the repo's three private packages, where
   adding one is already a deliberate, reviewed act. The config block IS the record.
-```
 
 **Decision:** The dogfood fit gate (`fit --gate-save`, run in CI's `build-and-test`
 "Fit (dogfood)" step and the `cold-gate` job) enforces the **shipped product**
@@ -79,8 +78,4 @@ are likewise dev-only, never-published surfaces.
 - No check is disabled and no per-check override is added; shipping packages keep
   full fit coverage.
 
-**Related specs / ADRs:** [ADR-0020](ADR-0020-dogfood-gate-hard-fail.md) (dogfood
-gate hard-fail policy), [ADR-0040](ADR-0040-test-support-package.md) (test-support
-is private), [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and
-[ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) (agent-eval black-box,
-zero-workspace-import posture).
+**Related ADRs:** [ADR-0020](ADR-0020-dogfood-gate-hard-fail.md) (dogfood gate hard-fail policy), [ADR-0040](ADR-0040-test-support-package.md) (test-support is private), [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) (agent-eval black-box, zero-workspace-import posture).
