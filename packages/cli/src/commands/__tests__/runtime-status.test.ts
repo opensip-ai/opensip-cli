@@ -93,11 +93,7 @@ describe('executeRuntimeStatus', () => {
       project: { exists: false },
       evidenceDatabase: { exists: true, sizeBytes: 8 },
       adoptionState: 'ready',
-      nextCommands: [
-        'opensip init',
-        'opensip runs list --json',
-        'opensip sessions list --json',
-      ],
+      nextCommands: ['opensip init', 'opensip runs list --json', 'opensip sessions list --json'],
     });
   });
 

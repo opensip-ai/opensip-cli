@@ -191,26 +191,26 @@ describe('executeInit (single language)', () => {
   it.each([false, true])(
     'keeps the initialized root authoritative from a nested cwd (cwdExplicit=%s)',
     (cwdExplicit) => {
-    const project = join(testDir, 'initialized');
-    const nested = join(project, 'packages', 'app');
-    mkdirSync(nested, { recursive: true });
-    writeFileSync(join(project, 'opensip-cli.config.yml'), 'schemaVersion: 1\n');
-    writeFileSync(join(project, 'tsconfig.json'), '{}');
-    const projectContext = resolveProjectContext({
-      cwd: nested,
-      cwdExplicit,
-      stopAt: project,
-    });
+      const project = join(testDir, 'initialized');
+      const nested = join(project, 'packages', 'app');
+      mkdirSync(nested, { recursive: true });
+      writeFileSync(join(project, 'opensip-cli.config.yml'), 'schemaVersion: 1\n');
+      writeFileSync(join(project, 'tsconfig.json'), '{}');
+      const projectContext = resolveProjectContext({
+        cwd: nested,
+        cwdExplicit,
+        stopAt: project,
+      });
 
-    const result = executeInit({
-      ...makeArgs({ cwd: nested, language: ['typescript'] }),
-      cwdExplicit,
-      projectContext,
-    });
-    expect(result.cwd).toBe(projectContext.projectRoot);
-    expect(result.insideExistingProject).toBeUndefined();
-    expect(existsSync(join(project, 'opensip-cli.config.yml'))).toBe(true);
-    expect(existsSync(join(nested, 'opensip-cli.config.yml'))).toBe(false);
+      const result = executeInit({
+        ...makeArgs({ cwd: nested, language: ['typescript'] }),
+        cwdExplicit,
+        projectContext,
+      });
+      expect(result.cwd).toBe(projectContext.projectRoot);
+      expect(result.insideExistingProject).toBeUndefined();
+      expect(existsSync(join(project, 'opensip-cli.config.yml'))).toBe(true);
+      expect(existsSync(join(nested, 'opensip-cli.config.yml'))).toBe(false);
     },
   );
 

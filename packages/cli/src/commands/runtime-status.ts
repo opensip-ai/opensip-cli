@@ -157,11 +157,7 @@ function boundedSize(root: string, limits: RuntimeSizeLimits): BoundedSize | und
 
 function inspectRuntimePath(anchor: string, runtimeDir: string): RuntimePathInspection {
   const relativePath = relative(anchor, runtimeDir);
-  if (
-    isAbsolute(relativePath) ||
-    relativePath === '..' ||
-    relativePath.startsWith(`..${sep}`)
-  ) {
+  if (isAbsolute(relativePath) || relativePath === '..' || relativePath.startsWith(`..${sep}`)) {
     return 'unsafe';
   }
   const parts = relativePath === '' ? [] : relativePath.split(sep);
@@ -243,10 +239,7 @@ function adoptionState(input: {
   return 'not-needed';
 }
 
-function activePlane(
-  projectInitialized: boolean,
-  cacheExists: boolean,
-): RuntimeStoragePlane {
+function activePlane(projectInitialized: boolean, cacheExists: boolean): RuntimeStoragePlane {
   if (projectInitialized) return 'project';
   return cacheExists ? 'cache' : 'none';
 }
@@ -320,11 +313,7 @@ export function executeRuntimeStatus(input: ExecuteRuntimeStatusInput): RuntimeS
   );
   const projectInspection = inspectRuntimePath(project.projectRoot, projectPaths.runtimeDir);
   const cache = cacheProjection(chosenCache, hasAdditionalLegacy, cacheInspection, limits);
-  const projectLocation = locationProjection(
-    projectPaths.runtimeDir,
-    projectInspection,
-    limits,
-  );
+  const projectLocation = locationProjection(projectPaths.runtimeDir, projectInspection, limits);
   const projectInitialized =
     project.scope === 'project' &&
     project.configPath !== undefined &&

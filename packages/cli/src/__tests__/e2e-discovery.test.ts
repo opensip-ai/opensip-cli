@@ -148,11 +148,11 @@ describe('no project found', () => {
     mkdirSync(join(project, '.git'), { recursive: true });
     mkdirSync(home);
 
-    const { stdout, exitCode } = runCli(
-      ['status', '--cwd', project, '--json'],
-      project,
-      { HOME: home, OPENSIP_NO_UPDATE: '1', NO_UPDATE_NOTIFIER: '1' },
-    );
+    const { stdout, exitCode } = runCli(['status', '--cwd', project, '--json'], project, {
+      HOME: home,
+      OPENSIP_NO_UPDATE: '1',
+      NO_UPDATE_NOTIFIER: '1',
+    });
     const outcome = JSON.parse(stdout) as {
       data: { type: string; activePlane: string };
     };

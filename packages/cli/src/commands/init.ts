@@ -89,10 +89,7 @@ import { resolveProjectPaths, type ProjectContext, type ProjectPaths } from '@op
 import { classifyFiles } from './init/file-classifier.js';
 import { resolveLanguages } from './init/language-detection.js';
 import { runRefresh, runScaffold } from './init/scaffold-writer.js';
-import {
-  buildPartialStateMessage,
-  classifyWorkingDir,
-} from './init/state-machine.js';
+import { buildPartialStateMessage, classifyWorkingDir } from './init/state-machine.js';
 
 import type { ToolScaffold } from './shared.js';
 import type { InitOptions, InitResult } from '@opensip-cli/contracts';
