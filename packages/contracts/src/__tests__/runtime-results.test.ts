@@ -39,7 +39,7 @@ const STEP: StoredRunStep = {
   sessionId: 'session-01',
 };
 
-function baseStatus(): RuntimeStatusResult {
+function baseStatus() {
   return {
     type: 'runtime-status',
     projectInitialized: false,
@@ -53,16 +53,16 @@ function baseStatus(): RuntimeStatusResult {
       evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
     },
     nextCommands: ['opensip init'],
-  };
+  } as const satisfies RuntimeStatusResult;
 }
 
 describe('runtime and parent Run result contracts', () => {
   it('admits a status result with absent optional recovery fields', () => {
     const status = baseStatus();
-    expect(status.recoveryPhase).toBeUndefined();
-    expect(status.recoveryCommand).toBeUndefined();
+    expect(status).not.toHaveProperty('recoveryPhase');
+    expect(status).not.toHaveProperty('recoveryCommand');
     expect(status.cache).not.toHaveProperty('path');
-    expectTypeOf(status).toMatchTypeOf<CommandResult>();
+    expectTypeOf(status).toExtend<CommandResult>();
   });
 
   it('admits open recovery and closed cleanup projections', () => {
@@ -112,9 +112,9 @@ describe('runtime and parent Run result contracts', () => {
     ];
     expect(reasons).toHaveLength(12);
     expect(commands).toHaveLength(3);
-    expectTypeOf('arbitrary recovery text').not.toMatchTypeOf<RuntimeRecoveryReasonCode>();
-    expectTypeOf('rm -rf /').not.toMatchTypeOf<RuntimeRecoveryCommand>();
-    expectTypeOf('rm -rf /').not.toMatchTypeOf<RuntimeNextCommand>();
+    expectTypeOf('arbitrary recovery text').not.toExtend<RuntimeRecoveryReasonCode>();
+    expectTypeOf('rm -rf /').not.toExtend<RuntimeRecoveryCommand>();
+    expectTypeOf('rm -rf /').not.toExtend<RuntimeNextCommand>();
   });
 
   it('preserves exact Run and ordered RunStep identities without Session payloads', () => {
@@ -144,8 +144,8 @@ describe('runtime and parent Run result contracts', () => {
     expect(detail.steps.map((step) => step.id)).toEqual(['step-01']);
     expect(detail.sessionFollowUps[0]?.sessionId).toBe('session-01');
     expect(detail).not.toHaveProperty('sessions');
-    expectTypeOf(history).toMatchTypeOf<CommandResult>();
-    expectTypeOf(detail).toMatchTypeOf<CommandResult>();
+    expectTypeOf(history).toExtend<CommandResult>();
+    expectTypeOf(detail).toExtend<CommandResult>();
   });
 
   it('serializes no recovery path, token, or digest fields', () => {

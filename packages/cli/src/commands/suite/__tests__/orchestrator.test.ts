@@ -108,14 +108,15 @@ function sessionCommand(
     rawStreamReason: 'host-orchestrated-evidence',
     producesVerdict: true,
     handler: async (opts, cli) => {
-      await beforeReturn?.(opts as Readonly<Record<string, unknown>>, cli);
+      const commandOptions = opts as Readonly<Record<string, unknown>>;
+      await beforeReturn?.(commandOptions, cli);
       const envelope = signalEnvelope({ passed: true, findings: 0 });
       cli.emitEnvelope(envelope);
       return {
         envelope,
         session: {
           tool: 'fit',
-          cwd: typeof opts.cwd === 'string' ? opts.cwd : '/repo',
+          cwd: typeof commandOptions.cwd === 'string' ? commandOptions.cwd : '/repo',
           score: 100,
           passed: true,
           payload: { __version: 1, command: name },
@@ -789,7 +790,10 @@ describe('runSuite', () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     const first = sessionCommand('first');
     const second = sessionCommand('second');
-    const commitEvidence = vi.fn(() => ({ status: 'failed', reason: 'write-failed' }) as const);
+    const commitEvidence = vi.fn<typeof commitEvidenceBundle>(() => ({
+      status: 'failed',
+      reason: 'write-failed',
+    }));
     const scope = new RunScope({ datastore: () => datastore });
 
     try {

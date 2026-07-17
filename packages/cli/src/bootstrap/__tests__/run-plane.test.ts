@@ -345,7 +345,9 @@ describe('live completion and immutable envelope capture', () => {
       fingerprint: `fp-${index}`,
     }));
     expect(() => hooks.completeRun?.({ envelope: huge })).not.toThrow();
-    const evidence = hooks.currentStagedEnvelope?.().evidence as {
+    const stagedEnvelope = hooks.currentStagedEnvelope?.();
+    expect(stagedEnvelope).toBeDefined();
+    const evidence = stagedEnvelope?.evidence as {
       readonly fingerprints?: readonly string[];
       readonly signalCount?: number;
     };
