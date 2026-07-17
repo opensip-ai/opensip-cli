@@ -9,6 +9,7 @@ import { join } from 'node:path';
 
 import {
   resolveEphemeralProjectPaths,
+  resolveProjectContext,
   resolveProjectPaths,
   resolveToolHooks,
 } from '@opensip-cli/core';
@@ -159,6 +160,60 @@ describe('parseLanguageFlag', () => {
 // =============================================================================
 
 describe('executeInit (single language)', () => {
+  it.each([false, true])(
+    'targets the canonical uninitialized workspace root from a nested cwd (cwdExplicit=%s)',
+    (cwdExplicit) => {
+      const project = join(testDir, cwdExplicit ? 'explicit' : 'implicit');
+      const nested = join(project, 'packages', 'app');
+      mkdirSync(join(project, '.git'), { recursive: true });
+      mkdirSync(nested, { recursive: true });
+      writeFileSync(join(project, 'tsconfig.json'), '{}');
+      const projectContext = resolveProjectContext({
+        cwd: nested,
+        cwdExplicit,
+        stopAt: project,
+      });
+
+      const result = executeInit({
+        ...makeArgs({ cwd: nested }),
+        cwdExplicit,
+        projectContext,
+      });
+
+      expect(result.created).toBe(true);
+      expect(result.cwd).toBe(projectContext.projectRoot);
+      expect(result.languages).toEqual(['typescript']);
+      expect(existsSync(join(project, 'opensip-cli.config.yml'))).toBe(true);
+      expect(existsSync(join(nested, 'opensip-cli.config.yml'))).toBe(false);
+    },
+  );
+
+  it.each([false, true])(
+    'keeps the initialized root authoritative from a nested cwd (cwdExplicit=%s)',
+    (cwdExplicit) => {
+    const project = join(testDir, 'initialized');
+    const nested = join(project, 'packages', 'app');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(join(project, 'opensip-cli.config.yml'), 'schemaVersion: 1\n');
+    writeFileSync(join(project, 'tsconfig.json'), '{}');
+    const projectContext = resolveProjectContext({
+      cwd: nested,
+      cwdExplicit,
+      stopAt: project,
+    });
+
+    const result = executeInit({
+      ...makeArgs({ cwd: nested, language: ['typescript'] }),
+      cwdExplicit,
+      projectContext,
+    });
+    expect(result.cwd).toBe(projectContext.projectRoot);
+    expect(result.insideExistingProject).toBeUndefined();
+    expect(existsSync(join(project, 'opensip-cli.config.yml'))).toBe(true);
+    expect(existsSync(join(nested, 'opensip-cli.config.yml'))).toBe(false);
+    },
+  );
+
   it('scaffolds the project layout for a Rust project', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
 

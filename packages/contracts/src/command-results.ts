@@ -94,6 +94,30 @@ export type {
   ErrorResult,
 } from './command-results-variants/session-results.js';
 export type {
+  ParentRunSummary,
+  RunDetailResult,
+  RunHistoryResult,
+  RunSessionFollowUp,
+  RuntimeAdoptionReasonCode,
+  RuntimeAdoptionResult,
+  RuntimeAdoptionState,
+  RuntimeAdoptionStatus,
+  RuntimeAuthoredMutationSummary,
+  RuntimeCacheRetentionPolicy,
+  RuntimeCacheLocationProjection,
+  RuntimeEvidenceDatabaseProjection,
+  RuntimeEvidenceRetentionPolicy,
+  RuntimeIdentityStrength,
+  RuntimeLeaseActivity,
+  RuntimeLocationProjection,
+  RuntimeNextCommand,
+  RuntimeRecoveryCommand,
+  RuntimeRecoveryPhase,
+  RuntimeRecoveryReasonCode,
+  RuntimeStatusResult,
+  RuntimeStoragePlane,
+} from './command-results-variants/runtime-results.js';
+export type {
   RepairApplyVerifyResult,
   RepairVerificationCommand,
   RepairVerificationCoverage,
@@ -151,6 +175,11 @@ import type {
   HelpResult,
   ErrorResult,
 } from './command-results-variants/session-results.js';
+import type {
+  RunDetailResult,
+  RunHistoryResult,
+  RuntimeStatusResult,
+} from './command-results-variants/runtime-results.js';
 import type {
   SuiteAddResult,
   SuiteListResult,
@@ -211,6 +240,9 @@ export type CommandResult =
   | RepairPreviewResult
   | RepairApplyResult
   | RepairApplyVerifyResult
+  | RuntimeStatusResult
+  | RunHistoryResult
+  | RunDetailResult
   | SessionReplayResult
   | HelpResult
   | ErrorResult;

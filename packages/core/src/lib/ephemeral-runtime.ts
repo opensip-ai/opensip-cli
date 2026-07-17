@@ -3,13 +3,15 @@
  *
  * A first run on an uninitialized project writes a full runtime tree (sessions
  * datastore, logs, reports, artifacts) to
- * `~/.opensip-cli/cache/ephemeral/<sha256(projectDir)>/` so that nothing lands
- * in the user's repository. Two consequences follow, and both are handled here:
+ * `~/.opensip-cli/cache/ephemeral/<project-generation-key>/` so that nothing
+ * lands in the user's repository. Two consequences follow, and both are handled
+ * here:
  *
  * 1. The cache key is a ONE-WAY hash, so an entry cannot be traced back to the
- *    directory it belongs to. Every ephemeral run therefore writes a small
- *    marker (`project.json`) recording its `projectDir` and `lastUsedAt`. The
- *    marker is what makes an orphan identifiable at all.
+ *    directory/generation it belongs to. Every ephemeral run therefore writes
+ *    a small versioned marker (`project.json`) recording its internal identity
+ *    proof and `lastUsedAt`. The marker is what makes an orphan or weak legacy
+ *    entry identifiable at all.
  * 2. Without pruning the cache grows forever — one directory per project path
  *    ever audited, kept even after that project is deleted, moved, renamed, or
  *    initialized. Retention mirrors the host-owned artifact/session retention
@@ -20,20 +22,35 @@
  */
 
 import {
+  closeSync,
   existsSync,
+  fstatSync,
+  lstatSync,
   mkdirSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
-import { resolveUserPaths, type EphemeralProjectPaths } from './paths.js';
+import {
+  legacyEphemeralProjectCacheKey,
+  resolveEphemeralProjectPaths,
+  resolveUserPaths,
+  type EphemeralProjectIdentityStrength,
+  type EphemeralProjectPaths,
+} from './paths.js';
 
 /** Marker file recording which project an ephemeral cache entry belongs to. */
 export const EPHEMERAL_MARKER_FILE = 'project.json';
+/** Current marker schema written beside an ephemeral runtime. */
+export const EPHEMERAL_MARKER_VERSION = 2;
+/** Hard read cap for the untrusted cache-owned marker. */
+export const EPHEMERAL_MARKER_MAX_BYTES = 4096;
 
 /** Throttle marker: pruning runs at most once per {@link PRUNE_INTERVAL_MS}. */
 const PRUNE_STAMP_FILE = '.last-prune';
@@ -48,10 +65,51 @@ export const DEFAULT_EPHEMERAL_MAX_AGE_DAYS = 30;
 export const DEFAULT_EPHEMERAL_KEEP = 50;
 
 export interface EphemeralMarker {
+  readonly version: typeof EPHEMERAL_MARKER_VERSION;
   /** Absolute project directory this runtime backs. */
   readonly projectDir: string;
+  /** Digest of the canonical project root. Internal only. */
+  readonly canonicalRootDigest: string;
+  /** Strength of the cache storage identity. */
+  readonly identityStrength: EphemeralProjectIdentityStrength;
+  /** Digest of reliable root/gitdir facts, present only when generation-bound. */
+  readonly generationDigest?: string;
   /** ISO timestamp of the most recent run against it. */
   readonly lastUsedAt: string;
+}
+
+/** Marker shape written before versioned generation-aware cache identities. */
+export interface LegacyEphemeralMarker {
+  readonly projectDir: string;
+  readonly lastUsedAt: string;
+}
+
+export type EphemeralMarkerInvalidReason = 'oversize' | 'malformed' | 'unreadable';
+
+/** Bounded, non-throwing result of inspecting one cache marker. */
+export type EphemeralMarkerReadResult =
+  | { readonly status: 'current'; readonly marker: EphemeralMarker }
+  | { readonly status: 'legacy'; readonly marker: LegacyEphemeralMarker }
+  | { readonly status: 'missing' }
+  | { readonly status: 'invalid'; readonly reason: EphemeralMarkerInvalidReason };
+
+export type EphemeralRuntimeCandidateIdentityStrength =
+  EphemeralProjectIdentityStrength | 'legacy-unverified';
+
+/** Read-only path/classification projection for the current project's cache. */
+export interface EphemeralRuntimeCandidate {
+  readonly kind: 'active' | 'legacy';
+  readonly runtimeDir: string;
+  readonly cacheKey: string;
+  readonly exists: boolean;
+  readonly identityStrength: EphemeralRuntimeCandidateIdentityStrength;
+  readonly marker: EphemeralMarkerReadResult;
+}
+
+export interface EphemeralRuntimeCandidates {
+  readonly active: EphemeralRuntimeCandidate;
+  /** Present only when a distinct path-key cache directory actually exists. */
+  readonly legacy?: EphemeralRuntimeCandidate;
 }
 
 export interface PruneEphemeralInput {
@@ -82,7 +140,11 @@ export function touchEphemeralRuntime(paths: EphemeralProjectPaths, now = Date.n
   try {
     mkdirSync(paths.runtimeDir, { recursive: true });
     const marker: EphemeralMarker = {
+      version: EPHEMERAL_MARKER_VERSION,
       projectDir: paths.projectDir,
+      canonicalRootDigest: paths.canonicalRootDigest,
+      identityStrength: paths.identityStrength,
+      ...(paths.generationDigest === undefined ? {} : { generationDigest: paths.generationDigest }),
       lastUsedAt: new Date(now).toISOString(),
     };
     writeFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), JSON.stringify(marker), 'utf8');
@@ -91,24 +153,214 @@ export function touchEphemeralRuntime(paths: EphemeralProjectPaths, now = Date.n
   }
 }
 
-function readMarker(entryDir: string): EphemeralMarker | undefined {
+function validTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const parsed = Date.parse(value);
+  return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value;
+}
+
+function validDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
+}
+
+function validIdentityStrength(value: unknown): value is EphemeralProjectIdentityStrength {
+  return value === 'generation-bound' || value === 'path-only';
+}
+
+function parseMarker(raw: string): EphemeralMarkerReadResult {
   try {
-    const raw = readFileSync(join(entryDir, EPHEMERAL_MARKER_FILE), 'utf8');
-    const parsed = JSON.parse(raw) as Partial<EphemeralMarker>;
-    if (typeof parsed.projectDir !== 'string' || typeof parsed.lastUsedAt !== 'string') {
-      return undefined;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (parsed.version === EPHEMERAL_MARKER_VERSION) {
+      const identityStrength = parsed.identityStrength;
+      const generationDigest = parsed.generationDigest;
+      const validGeneration =
+        validIdentityStrength(identityStrength) &&
+        (identityStrength === 'generation-bound'
+          ? validDigest(generationDigest)
+          : generationDigest === undefined);
+      if (
+        typeof parsed.projectDir !== 'string' ||
+        parsed.projectDir.length === 0 ||
+        !isAbsolute(parsed.projectDir) ||
+        !validTimestamp(parsed.lastUsedAt) ||
+        !validDigest(parsed.canonicalRootDigest) ||
+        !validGeneration
+      ) {
+        return { status: 'invalid', reason: 'malformed' };
+      }
+      return {
+        status: 'current',
+        marker: {
+          version: EPHEMERAL_MARKER_VERSION,
+          projectDir: parsed.projectDir,
+          canonicalRootDigest: parsed.canonicalRootDigest,
+          identityStrength,
+          ...(identityStrength === 'generation-bound'
+            ? { generationDigest: generationDigest as string }
+            : {}),
+          lastUsedAt: parsed.lastUsedAt,
+        },
+      };
     }
-    return { projectDir: parsed.projectDir, lastUsedAt: parsed.lastUsedAt };
+
+    if (
+      parsed.version === undefined &&
+      typeof parsed.projectDir === 'string' &&
+      parsed.projectDir.length > 0 &&
+      isAbsolute(parsed.projectDir) &&
+      validTimestamp(parsed.lastUsedAt)
+    ) {
+      return {
+        status: 'legacy',
+        marker: { projectDir: parsed.projectDir, lastUsedAt: parsed.lastUsedAt },
+      };
+    }
+    return { status: 'invalid', reason: 'malformed' };
   } catch {
-    // intentionally best-effort hygiene; never fail the user run
-    return undefined;
+    return { status: 'invalid', reason: 'malformed' };
   }
 }
 
+/**
+ * Read one marker through an explicit 4 KiB cap. Missing, malformed, oversize,
+ * unreadable, symlinked, and special-file markers are distinguished without
+ * throwing or mutating the cache.
+ */
+function markerReadPreflight(
+  entryDir: string,
+  markerPath: string,
+): EphemeralMarkerReadResult | undefined {
+  try {
+    const runtimeStat = lstatSync(entryDir);
+    if (!runtimeStat.isDirectory()) return { status: 'invalid', reason: 'unreadable' };
+  } catch (error) {
+    return isMissingFsError(error)
+      ? { status: 'missing' }
+      : { status: 'invalid', reason: 'unreadable' };
+  }
+
+  try {
+    const markerStat = lstatSync(markerPath);
+    if (!markerStat.isFile()) return { status: 'invalid', reason: 'unreadable' };
+    if (markerStat.size > EPHEMERAL_MARKER_MAX_BYTES) {
+      return { status: 'invalid', reason: 'oversize' };
+    }
+  } catch (error) {
+    return isMissingFsError(error)
+      ? { status: 'missing' }
+      : { status: 'invalid', reason: 'unreadable' };
+  }
+  return undefined;
+}
+
+/** Bounded, non-throwing public marker reader used by status and maintenance. */
+export function readEphemeralMarker(entryDir: string): EphemeralMarkerReadResult {
+  const markerPath = join(entryDir, EPHEMERAL_MARKER_FILE);
+  const preflight = markerReadPreflight(entryDir, markerPath);
+  if (preflight !== undefined) return preflight;
+  let fd: number | undefined;
+  try {
+    fd = openSync(markerPath, 'r');
+    const stat = fstatSync(fd);
+    if (!stat.isFile()) return { status: 'invalid', reason: 'unreadable' };
+    if (stat.size > EPHEMERAL_MARKER_MAX_BYTES) {
+      return { status: 'invalid', reason: 'oversize' };
+    }
+    const buffer = Buffer.alloc(EPHEMERAL_MARKER_MAX_BYTES + 1);
+    let bytesRead = 0;
+    while (bytesRead < buffer.length) {
+      const count = readSync(fd, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
+      if (count === 0) break;
+      bytesRead += count;
+    }
+    if (bytesRead > EPHEMERAL_MARKER_MAX_BYTES) {
+      return { status: 'invalid', reason: 'oversize' };
+    }
+    return parseMarker(buffer.toString('utf8', 0, bytesRead));
+  } catch {
+    return { status: 'invalid', reason: 'unreadable' };
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Best-effort read helper: closing failure does not make a parsed
+        // marker trustworthy enough to mutate anything.
+      }
+    }
+  }
+}
+
+function isMissingFsError(error: unknown): boolean {
+  return (
+    error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT'
+  );
+}
+
+function entryExists(entryDir: string): boolean {
+  try {
+    lstatSync(entryDir);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markerMatchesActiveIdentity(
+  marker: EphemeralMarkerReadResult,
+  paths: EphemeralProjectPaths,
+): boolean {
+  if (marker.status !== 'current') return false;
+  return (
+    marker.marker.projectDir === paths.projectDir &&
+    marker.marker.canonicalRootDigest === paths.canonicalRootDigest &&
+    marker.marker.identityStrength === paths.identityStrength &&
+    marker.marker.generationDigest === paths.generationDigest
+  );
+}
+
+/**
+ * Resolve only the current project's active cache and, when distinct and
+ * present, its pre-v2 path-key cache. No other HOME entries are enumerated.
+ */
+export function inspectEphemeralRuntimeCandidates(projectDir: string): EphemeralRuntimeCandidates {
+  const paths = resolveEphemeralProjectPaths(projectDir);
+  const activeExists = entryExists(paths.runtimeDir);
+  const activeMarker = readEphemeralMarker(paths.runtimeDir);
+  const active: EphemeralRuntimeCandidate = {
+    kind: 'active',
+    runtimeDir: paths.runtimeDir,
+    cacheKey: paths.cacheKey,
+    exists: activeExists,
+    identityStrength:
+      (!activeExists && activeMarker.status === 'missing') ||
+      markerMatchesActiveIdentity(activeMarker, paths)
+        ? paths.identityStrength
+        : 'legacy-unverified',
+    marker: activeMarker,
+  };
+
+  const legacyKey = legacyEphemeralProjectCacheKey(paths.projectDir);
+  if (legacyKey === paths.cacheKey) return { active };
+  const legacyDir = join(resolveUserPaths().ephemeralProjectsDir, legacyKey);
+  if (!entryExists(legacyDir)) return { active };
+  return {
+    active,
+    legacy: {
+      kind: 'legacy',
+      runtimeDir: legacyDir,
+      cacheKey: legacyKey,
+      exists: true,
+      identityStrength: 'legacy-unverified',
+      marker: readEphemeralMarker(legacyDir),
+    },
+  };
+}
+
 /** Last-used time for an entry: marker first, directory mtime for legacy entries. */
-function lastUsedAt(entryDir: string, marker: EphemeralMarker | undefined): number {
-  if (marker !== undefined) {
-    const parsed = Date.parse(marker.lastUsedAt);
+function lastUsedAt(entryDir: string, marker: EphemeralMarkerReadResult): number {
+  if (marker.status === 'current' || marker.status === 'legacy') {
+    const parsed = Date.parse(marker.marker.lastUsedAt);
     if (!Number.isNaN(parsed)) return parsed;
   }
   try {
@@ -171,12 +423,17 @@ type Verdict = 'orphaned' | 'stale' | 'keep';
  * deleted on suspicion.
  */
 function classifyEntry(
-  marker: EphemeralMarker | undefined,
+  marker: EphemeralMarkerReadResult,
   usedAt: number,
   now: number,
   maxAgeMs: number,
 ): Verdict {
-  if (marker !== undefined && !existsSync(marker.projectDir)) return 'orphaned';
+  if (
+    (marker.status === 'current' || marker.status === 'legacy') &&
+    !existsSync(marker.marker.projectDir)
+  ) {
+    return 'orphaned';
+  }
   if (now - usedAt > maxAgeMs) return 'stale';
   return 'keep';
 }
@@ -222,7 +479,7 @@ export function pruneEphemeralRuntimes(input: PruneEphemeralInput = {}): PruneEp
   for (const key of entries) {
     if (key === input.keepCacheKey) continue;
     const entryDir = join(root, key);
-    const marker = readMarker(entryDir);
+    const marker = readEphemeralMarker(entryDir);
     const usedAt = lastUsedAt(entryDir, marker);
 
     switch (classifyEntry(marker, usedAt, now, maxAgeMs)) {

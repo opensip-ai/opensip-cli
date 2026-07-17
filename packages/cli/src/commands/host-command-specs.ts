@@ -45,6 +45,7 @@ import {
 import { executeInit } from './init.js';
 import { showInternalCommands } from './internal-command-visibility.js';
 import { mountCommandSpec } from './mount-command-spec.js';
+import { executeRuntimeStatus } from './runtime-status.js';
 import { toolsList } from './tools/list.js';
 import { executeUninstall } from './uninstall.js';
 
@@ -167,6 +168,40 @@ function buildConfigureSpec(): HostSpec {
     scope: 'none',
     output: COMMAND_RESULT,
     handler: () => executeConfigure(),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// status
+// ---------------------------------------------------------------------------
+
+interface StatusOpts {
+  cwd?: string;
+  cwdExplicit?: boolean;
+  projectContext?: ProjectContext;
+}
+
+function buildStatusSpec(): HostSpec {
+  return defineCommand<unknown, CliCommandsContext>({
+    staticHandler: {
+      package: HOST_COMMAND_PACKAGE,
+      path: HOST_COMMAND_SPECS_PATH,
+      declaration: 'buildStatusSpec',
+    },
+    name: 'status',
+    description: "Show where this project's OpenSIP evidence is stored",
+    commonFlags: ['cwd', 'json', 'debug'],
+    scope: 'none',
+    noInit: true,
+    output: COMMAND_RESULT,
+    handler: (rawOpts) => {
+      const opts = rawOpts as StatusOpts;
+      return executeRuntimeStatus({
+        cwd: opts.cwd ?? process.cwd(),
+        cwdExplicit: opts.cwdExplicit === true,
+        projectContext: opts.projectContext,
+      });
+    },
   });
 }
 
@@ -439,6 +474,7 @@ function buildNonCompletionHostSpecs(ctx: CliCommandsContext): readonly HostSpec
     buildInitSpec(ctx),
     buildAuditCommandSpec(ctx),
     buildReportSpec(),
+    buildStatusSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),
     buildUninstallSpec(),
@@ -482,6 +518,7 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
     buildInitSpec(ctx),
     buildAuditCommandSpec(ctx),
     buildReportSpec(),
+    buildStatusSpec(),
     buildConfigureSpec(),
     buildAgentCatalogSpec(ctx),
     buildCompletionSpec(ctx),

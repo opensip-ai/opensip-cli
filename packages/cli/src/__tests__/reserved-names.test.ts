@@ -88,6 +88,14 @@ function mountedHostRootNames(): ReadonlySet<string> {
 }
 
 describe('host-reserved root commands (ADR-0159)', () => {
+  it('rejects a Tool that claims the status root', () => {
+    const tools = new ToolRegistry();
+    tools.register(fixtureTool('shadow-status', { root: 'status' }));
+
+    expect(rejectHostCommandCollisions(tools)).toEqual(['shadow-status']);
+    expect(tools.get('shadow-status')).toBeUndefined();
+  });
+
   it('rejects a Tool that claims a non-audit host root command', () => {
     const tools = new ToolRegistry();
     tools.register(fixtureTool('shadow-init', { root: 'init' }));

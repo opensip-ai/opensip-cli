@@ -35,6 +35,7 @@ import type { CliCommandsContext } from '../commands/shared.js';
  */
 const MUST_RUN_WITHOUT_INIT = [
   'audit',
+  'status',
   'suite run',
   'fitness',
   'fit', // the alias must inherit eligibility from the primary spec

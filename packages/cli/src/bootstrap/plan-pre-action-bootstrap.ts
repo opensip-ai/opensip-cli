@@ -104,7 +104,8 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   if (
     project.scope === 'none' &&
     explicitConfigPath === undefined &&
-    isNoInitEligibleCommand(commandPath, commandScopes)
+    isNoInitEligibleCommand(commandPath, commandScopes) &&
+    commandScopes.get(commandPath)?.scope === 'project'
   ) {
     const synthesized = synthesizeNoInitConfigDocument(project.projectRoot);
     if (synthesized !== undefined) {

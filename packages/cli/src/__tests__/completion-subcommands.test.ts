@@ -170,6 +170,14 @@ describe('completion subcommand parity', () => {
       ]),
     );
   });
+
+  it('surfaces status with its exact read-only flag set', async () => {
+    const { inventory } = await buildLiveInventory();
+    expect(inventory.subcommands).toContain('status');
+    expect(inventory.commandFlags.status).toEqual(
+      expect.arrayContaining(['--cwd', '--json', '--debug']),
+    );
+  });
 });
 
 describe('completion flag parity', () => {

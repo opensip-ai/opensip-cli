@@ -305,6 +305,7 @@ describe('buildAgentCatalog', () => {
         'yagni',
         'third-party-tool',
         'suite run',
+        'status',
         'sessions list',
         'sessions show',
         'agent-catalog',

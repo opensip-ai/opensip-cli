@@ -66,6 +66,7 @@ const COMMAND_SCOPES = buildCommandScopeIndex({
     scopeSpec('configure', 'none'),
     scopeSpec('completion', 'none'),
     scopeSpec('agent-catalog', 'none'),
+    scopeSpec('status', 'none', true),
     // `fit` is first-run capable (declares noInit); `fit-list` is not.
     scopeSpec('fit', 'project', true),
     scopeSpec('fit-list', 'project'),
@@ -202,6 +203,25 @@ describe('planPreActionBootstrap', () => {
     });
     expect(plan.project.scope).toBe('none');
     expect(plan.completedThrough).toBe(PRE_ACTION_PHASES.bailoutWindow);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('does not synthesize or select cache storage for an inspection-only scope:none command', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-plan-'));
+    writeFileSync(join(tmp, 'package.json'), '{"type":"module"}\n', 'utf8');
+    writeFileSync(join(tmp, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: tmp,
+      cwdExplicit: true,
+      runId: 'RUN_test',
+      commandName: 'status',
+      commandPath: 'status',
+      commandScopes: COMMAND_SCOPES,
+    });
+    expect(plan.project.scope).toBe('none');
+    expect(plan.project.ephemeralConfigDocument).toBeUndefined();
+    expect(plan.runLoggerOptions.logDir).toBeUndefined();
     rmSync(tmp, { recursive: true, force: true });
   });
 

@@ -368,6 +368,7 @@ describe('behaviour-parity snapshot (command surface = 2.10.0 + the --resolution
       'init',
       'audit',
       'report',
+      'status',
       'configure',
       'agent-catalog',
       'completion',

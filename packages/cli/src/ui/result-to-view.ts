@@ -52,6 +52,8 @@ import {
 import { viewPlugin } from './views/plugin-view.js';
 import { viewPolicyResult } from './views/policy-views.js';
 import { viewRepair } from './views/repair-views.js';
+import { viewRunDetail, viewRunHistory } from './views/run-views.js';
+import { viewRuntimeStatus } from './views/runtime-status-view.js';
 import { viewSuiteAdd, viewSuiteList, viewSuiteRun } from './views/suite-views.js';
 import { viewToolsResult } from './views/tools-views.js';
 
@@ -346,6 +348,15 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'report': {
       return viewReport(result);
+    }
+    case 'runtime-status': {
+      return viewRuntimeStatus(result);
+    }
+    case 'run-history': {
+      return viewRunHistory(result);
+    }
+    case 'run-detail': {
+      return viewRunDetail(result);
     }
     case 'init': {
       return viewInit(result);

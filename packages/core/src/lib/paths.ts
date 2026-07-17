@@ -42,9 +42,17 @@
  */
 
 import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readSync,
+  realpathSync,
+  statSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 
 import type { BundledToolShortId } from '../tools/ids.js';
 
@@ -100,10 +108,34 @@ export interface ProjectPaths extends RuntimePaths {
 
 /** Runtime paths for a no-init ephemeral project. */
 export interface EphemeralProjectPaths extends RuntimePaths {
-  /** Absolute project root whose no-init runtime this cache entry belongs to. */
+  /** Canonical absolute project root whose no-init runtime this cache entry belongs to. */
   readonly projectDir: string;
-  /** Stable hash key used in the user cache path. */
+  /** Generation-bound when reliable pre-existing filesystem facts are available. */
   readonly cacheKey: string;
+  /** Canonical-path-only key shared by all generations at this location. */
+  readonly coordinationKey: string;
+  /** Strength of the cache key's repository-generation claim. */
+  readonly identityStrength: EphemeralProjectIdentityStrength;
+  /** Internal digest of the canonical root. Never expose in customer output. */
+  readonly canonicalRootDigest: string;
+  /** Internal digest of reliable root/gitdir facts, when available. */
+  readonly generationDigest?: string;
+}
+
+/** Strength available for a current ephemeral cache storage key. */
+export type EphemeralProjectIdentityStrength = 'generation-bound' | 'path-only';
+
+/**
+ * Internal cache identity. Paths and digests are intentionally suitable for
+ * host coordination/markers only; customer-facing projections must omit them.
+ */
+export interface EphemeralProjectIdentity {
+  readonly projectDir: string;
+  readonly coordinationKey: string;
+  readonly cacheKey: string;
+  readonly identityStrength: EphemeralProjectIdentityStrength;
+  readonly canonicalRootDigest: string;
+  readonly generationDigest?: string;
 }
 
 /**
@@ -218,19 +250,173 @@ function canonicalProjectDir(projectDir: string): string {
   }
 }
 
-/** Stable user-cache key for a project's no-init runtime directory. */
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/** Canonical-path-only key used to serialize all generations at one location. */
+export function projectCoordinationKey(projectDir: string): string {
+  return sha256(canonicalProjectDir(projectDir)).slice(0, 24);
+}
+
+/**
+ * Cache key used before generation-bound identities existed. It remains an
+ * explicit lookup seam so status/Init/uninstall can classify old entries
+ * without confusing this path-only identity with current generation proof.
+ */
+export function legacyEphemeralProjectCacheKey(projectDir: string): string {
+  return projectCoordinationKey(projectDir);
+}
+
+interface StableDirectoryFact {
+  readonly role: 'root' | 'gitdir';
+  readonly device: string;
+  readonly inode: string;
+  readonly birthtimeNs?: string;
+}
+
+function stableDirectoryFact(
+  path: string,
+  role: StableDirectoryFact['role'],
+): StableDirectoryFact | undefined {
+  try {
+    const stat = statSync(path, { bigint: true });
+    if (!stat.isDirectory() || stat.dev <= 0n || stat.ino <= 0n) return undefined;
+    return {
+      role,
+      device: stat.dev.toString(),
+      inode: stat.ino.toString(),
+      ...(stat.birthtimeNs > 0n ? { birthtimeNs: stat.birthtimeNs.toString() } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read a small gitfile without allowing an atomic replacement to grow the read. */
+function readBoundedGitFile(path: string): string | undefined {
+  const limit = 4096;
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, 'r');
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > limit) return undefined;
+    const buffer = Buffer.alloc(limit + 1);
+    let bytesRead = 0;
+    while (bytesRead < buffer.length) {
+      const count = readSync(fd, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
+      if (count === 0) break;
+      bytesRead += count;
+    }
+    return bytesRead > limit ? undefined : buffer.toString('utf8', 0, bytesRead);
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Identity discovery is read-only and degrades to the root fact.
+      }
+    }
+  }
+}
+
+type GitDirectoryResolution =
+  | { readonly status: 'absent' }
+  | { readonly status: 'resolved'; readonly path: string }
+  | { readonly status: 'unreliable' };
+
+function resolveGitDirectory(projectDir: string): GitDirectoryResolution {
+  const dotGit = join(projectDir, '.git');
+  try {
+    const stat = lstatSync(dotGit);
+    if (stat.isDirectory() || stat.isSymbolicLink()) {
+      try {
+        return { status: 'resolved', path: realpathSync(dotGit) };
+      } catch {
+        return { status: 'unreliable' };
+      }
+    }
+    if (!stat.isFile()) return { status: 'unreliable' };
+  } catch (error) {
+    return isMissingPathError(error) ? { status: 'absent' } : { status: 'unreliable' };
+  }
+
+  const raw = readBoundedGitFile(dotGit);
+  const match = raw?.match(/^\s*gitdir:\s*(.+?)\s*$/iu);
+  if (match?.[1] === undefined || match[1].includes('\0')) return { status: 'unreliable' };
+  const candidate = isAbsolute(match[1]) ? match[1] : resolve(dirname(dotGit), match[1]);
+  try {
+    return { status: 'resolved', path: realpathSync(candidate) };
+  } catch {
+    return { status: 'unreliable' };
+  }
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return (
+    error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT'
+  );
+}
+
+function resolveGenerationDigest(projectDir: string): string | undefined {
+  const root = stableDirectoryFact(projectDir, 'root');
+  if (root === undefined) return undefined;
+
+  const gitDirectory = resolveGitDirectory(projectDir);
+  if (gitDirectory.status === 'unreliable') return undefined;
+  if (gitDirectory.status === 'absent') {
+    return sha256(`opensip-project-generation-v1\0${JSON.stringify([root])}`);
+  }
+  const gitdir = stableDirectoryFact(gitDirectory.path, 'gitdir');
+  if (gitdir === undefined) return undefined;
+  const facts = [root, gitdir];
+  return sha256(`opensip-project-generation-v1\0${JSON.stringify(facts)}`);
+}
+
+/**
+ * Resolve the current no-init cache identity exclusively from pre-existing
+ * canonical-root and stable filesystem facts. Mutable workspace manifests are
+ * deliberately absent, so normal editor atomic saves never rotate the cache.
+ */
+export function resolveEphemeralProjectIdentity(projectDir: string): EphemeralProjectIdentity {
+  const canonical = canonicalProjectDir(projectDir);
+  const canonicalRootDigest = sha256(canonical);
+  const coordinationKey = canonicalRootDigest.slice(0, 24);
+  const generationDigest = resolveGenerationDigest(canonical);
+  if (generationDigest === undefined) {
+    return {
+      projectDir: canonical,
+      coordinationKey,
+      cacheKey: coordinationKey,
+      identityStrength: 'path-only',
+      canonicalRootDigest,
+    };
+  }
+  return {
+    projectDir: canonical,
+    coordinationKey,
+    cacheKey: sha256(
+      `opensip-ephemeral-cache-v2\0${canonicalRootDigest}\0${generationDigest}`,
+    ).slice(0, 24),
+    identityStrength: 'generation-bound',
+    canonicalRootDigest,
+    generationDigest,
+  };
+}
+
+/** Current user-cache storage key for a project's no-init runtime directory. */
 export function ephemeralProjectCacheKey(projectDir: string): string {
-  return createHash('sha256').update(canonicalProjectDir(projectDir)).digest('hex').slice(0, 24);
+  return resolveEphemeralProjectIdentity(projectDir).cacheKey;
 }
 
 /** Resolve the no-init runtime path layout for a project directory. */
 export function resolveEphemeralProjectPaths(projectDir: string): EphemeralProjectPaths {
-  const projectDirAbsolute = resolve(projectDir);
-  const cacheKey = ephemeralProjectCacheKey(projectDirAbsolute);
+  const identity = resolveEphemeralProjectIdentity(projectDir);
   return {
-    ...buildRuntimePaths(join(resolveUserPaths().ephemeralProjectsDir, cacheKey)),
-    projectDir: projectDirAbsolute,
-    cacheKey,
+    ...buildRuntimePaths(join(resolveUserPaths().ephemeralProjectsDir, identity.cacheKey)),
+    ...identity,
   };
 }
 

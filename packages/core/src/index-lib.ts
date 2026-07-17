@@ -205,6 +205,9 @@ export type { RunTimer, RunLifecycle, RunTimingSnapshot } from './lib/run-timer.
 // this module so a layout change is a single-file edit.
 export {
   ephemeralProjectCacheKey,
+  legacyEphemeralProjectCacheKey,
+  projectCoordinationKey,
+  resolveEphemeralProjectIdentity,
   resolveProjectPaths,
   resolveEphemeralProjectPaths,
   resolveRuntimePathsForScope,
@@ -216,17 +219,29 @@ export {
   DEFAULT_EPHEMERAL_KEEP,
   DEFAULT_EPHEMERAL_MAX_AGE_DAYS,
   EPHEMERAL_MARKER_FILE,
+  EPHEMERAL_MARKER_MAX_BYTES,
+  EPHEMERAL_MARKER_VERSION,
+  inspectEphemeralRuntimeCandidates,
   pruneEphemeralRuntimes,
+  readEphemeralMarker,
   shouldPruneEphemeralRuntimes,
   touchEphemeralRuntime,
 } from './lib/ephemeral-runtime.js';
 export type {
   EphemeralMarker,
+  EphemeralMarkerInvalidReason,
+  EphemeralMarkerReadResult,
+  EphemeralRuntimeCandidate,
+  EphemeralRuntimeCandidateIdentityStrength,
+  EphemeralRuntimeCandidates,
+  LegacyEphemeralMarker,
   PruneEphemeralInput,
   PruneEphemeralResult,
 } from './lib/ephemeral-runtime.js';
 export type {
   EphemeralProjectPaths,
+  EphemeralProjectIdentity,
+  EphemeralProjectIdentityStrength,
   ProjectPaths,
   RuntimePaths,
   UserPaths,

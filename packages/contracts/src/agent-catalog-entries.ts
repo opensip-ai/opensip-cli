@@ -72,6 +72,12 @@ const PLATFORM_ENTRY_POINTS: readonly EntryPoint[] = [
     tier: 'platform' as const,
   },
   {
+    command: 'status',
+    description: "Show where this project's OpenSIP evidence is stored.",
+    examples: ['opensip status --json'],
+    tier: 'platform' as const,
+  },
+  {
     command: 'sessions list',
     description: 'List stored sessions. --summary-only is agent-friendly (omits heavy payloads).',
     examples: [

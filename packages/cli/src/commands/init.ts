@@ -92,7 +92,6 @@ import { runRefresh, runScaffold } from './init/scaffold-writer.js';
 import {
   buildPartialStateMessage,
   classifyWorkingDir,
-  formatInsideExistingProjectMessage,
 } from './init/state-machine.js';
 
 import type { ToolScaffold } from './shared.js';
@@ -150,7 +149,13 @@ function maybeRunConfigRefresh(
  * (CLI render layer) prints it.
  */
 export function executeInit(args: ExecuteInitArgs): InitResult {
-  const cwd = args.cwd;
+  const requestedCwd = args.cwd;
+  const project = args.projectContext;
+  // cwd is a discovery start, not an exact scaffold destination. Bootstrap's
+  // canonical project root remains authoritative for initialized and
+  // uninitialized projects alike, including explicit nested --cwd calls.
+  const cwd = project?.projectRoot ?? requestedCwd;
+  const targetArgs = cwd === args.cwd ? args : { ...args, cwd };
   const keep = args.keep === true;
   const remove = args.remove === true;
   const paths = resolveProjectPaths(cwd);
@@ -160,24 +165,6 @@ export function executeInit(args: ExecuteInitArgs): InitResult {
     cwd,
     configFilename: 'opensip-cli.config.yml',
   };
-
-  // Discovery-aware refusal: if cwd sits inside an existing project and
-  // the user did NOT pass --cwd explicitly, offer the three corrective
-  // actions instead of silently scaffolding a phantom nested project.
-  const project = args.projectContext;
-  const cwdExplicit = args.cwdExplicit === true;
-  if (project?.scope === 'project' && project.projectRoot !== cwd && !cwdExplicit) {
-    const message = formatInsideExistingProjectMessage(project.projectRoot);
-    return {
-      ...baseResult,
-      path: '', // no scaffold target — we refused
-      created: false,
-      insideExistingProject: {
-        discoveredRoot: project.projectRoot,
-        message,
-      },
-    };
-  }
 
   // Mutex: --keep and --remove are mutually exclusive.
   if (keep && remove) {
@@ -192,7 +179,7 @@ export function executeInit(args: ExecuteInitArgs): InitResult {
     };
   }
 
-  if (!existsSync(cwd)) {
+  if (!existsSync(requestedCwd)) {
     // A non-existent target directory is a user error, not a "pristine
     // success". Surface it through `ambiguousLanguageError` (which the
     // register-init layer already maps to CONFIGURATION_ERROR / exit 2)
@@ -203,7 +190,7 @@ export function executeInit(args: ExecuteInitArgs): InitResult {
       created: false,
       ambiguousLanguageError: {
         detected: [],
-        message: `Target directory does not exist: ${cwd}`,
+        message: `Target directory does not exist: ${requestedCwd}`,
       },
     };
   }
@@ -214,10 +201,16 @@ export function executeInit(args: ExecuteInitArgs): InitResult {
   // refreshes managed guidance and runtime ignores without rewriting config or
   // scaffold examples. If the user explicitly supplied --language, still
   // validate it so bad flags fail loud.
-  const refreshResult = maybeRunConfigRefresh(args, { paths, baseResult, state, keep, remove });
+  const refreshResult = maybeRunConfigRefresh(targetArgs, {
+    paths,
+    baseResult,
+    state,
+    keep,
+    remove,
+  });
   if (refreshResult !== undefined) return refreshResult;
 
-  const resolution = resolveLanguages(cwd, args.language);
+  const resolution = resolveLanguages(cwd, targetArgs.language);
   if (!resolution.ok) {
     return {
       ...baseResult,

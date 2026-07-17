@@ -6,7 +6,7 @@
  *  - Phantom-scaffold regression: running from a subdir uses the
  *    parent root, NOT a new .runtime/ in the subdir.
  *  - "No project found" error for project-scoped commands.
- *  - Init scaffolds fresh + refuses inside existing project.
+ *  - Init scaffolds fresh + keeps an initialized ancestor authoritative.
  *  - Uninstall safe default + --purge.
  *  - schemaVersion: 99 surfaces the upgrade-CLI message.
  *  - No-side-effects: --dry-run uninstall doesn't create .runtime/.
@@ -19,6 +19,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -140,6 +141,28 @@ describe('no project found', () => {
     expect(outcome.status).toBe('error');
     expect(outcome.errors[0].message).toContain('No opensip-cli.config.yml found');
   });
+
+  it('status --json inspects a fresh repo without creating project or cache state', () => {
+    const project = join(testDir, 'fresh-status');
+    const home = join(testDir, 'home');
+    mkdirSync(join(project, '.git'), { recursive: true });
+    mkdirSync(home);
+
+    const { stdout, exitCode } = runCli(
+      ['status', '--cwd', project, '--json'],
+      project,
+      { HOME: home, OPENSIP_NO_UPDATE: '1', NO_UPDATE_NOTIFIER: '1' },
+    );
+    const outcome = JSON.parse(stdout) as {
+      data: { type: string; activePlane: string };
+    };
+
+    expect(exitCode).toBe(0);
+    expect(outcome.data).toMatchObject({ type: 'runtime-status', activePlane: 'none' });
+    expect(existsSync(join(project, 'opensip-cli.config.yml'))).toBe(false);
+    expect(existsSync(join(project, 'opensip-cli'))).toBe(false);
+    expect(readdirSync(home)).toEqual([]);
+  });
 });
 
 describe('init from a fresh tmpdir', () => {
@@ -151,8 +174,8 @@ describe('init from a fresh tmpdir', () => {
   });
 });
 
-describe('init refusal inside existing project', () => {
-  it('refuses with exit 2 + three-option message when run from a subdir', () => {
+describe('init inside existing project', () => {
+  it('refreshes the canonical project root when run from a subdir', () => {
     writeFileSync(
       join(testDir, 'opensip-cli.config.yml'),
       'schemaVersion: 1\ntargets: {}\n',
@@ -164,13 +187,11 @@ describe('init refusal inside existing project', () => {
     const subdir = join(testDir, 'packages', 'api');
     mkdirSync(subdir, { recursive: true });
     const { stdout, stderr, exitCode } = runCli(['init'], subdir);
-    expect(exitCode).toBe(2);
+    expect(exitCode).toBe(0);
     const out = stdout + stderr;
-    expect(out).toContain('already inside an OpenSIP CLI project');
-    expect(out).toContain(testDir);
-    expect(out).toContain('opensip init --keep --cwd');
-    expect(out).toContain('opensip init --remove --cwd');
-    expect(out).toContain('opensip init --cwd .');
+    expect(out).not.toContain('already inside an OpenSIP CLI project');
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
+    expect(existsSync(join(subdir, 'opensip-cli.config.yml'))).toBe(false);
   });
 });
 

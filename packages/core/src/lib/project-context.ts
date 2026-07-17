@@ -1,10 +1,10 @@
 /**
  * @fileoverview Project-context resolver.
  *
- * Walks up from `cwd` looking for an opensip-cli project (i.e. an
- * ancestor where `resolveProjectConfigPath` would succeed). Returns a
- * single `ProjectContext` carrying everything downstream consumers
- * need: cwd, cwdExplicit, projectRoot, configPath, walkedUp, scope.
+ * Walks up from `cwd` looking first for an initialized opensip-cli project,
+ * then for the nearest strong repository/workspace root. Returns a single
+ * `ProjectContext` carrying everything downstream consumers need: cwd,
+ * cwdExplicit, projectRoot, configPath, walkedUp, scope.
  *
  * The walker leans on `resolveProjectConfigPath` at each ancestor so explicit
  * `--config` and canonical root `opensip-cli.config.yml` resolution stay
@@ -19,8 +19,16 @@
  * "no config at this directory" errors (that's the walking signal).
  */
 
-import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import {
+  closeSync,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readSync,
+  realpathSync,
+} from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
 
@@ -28,6 +36,7 @@ import { ValidationError } from './errors.js';
 import { logger } from './logger.js';
 
 const MODULE_TAG = 'core:project-context';
+const MAX_ROOT_MARKER_BYTES = 64 * 1024;
 
 export type ProjectContextScope = 'project' | 'ephemeral' | 'none';
 
@@ -38,8 +47,9 @@ export interface ProjectContext {
   /** True when the user passed `--cwd` on the command line (vs Commander defaulting it). */
   readonly cwdExplicit: boolean;
   /**
-   * Resolved project root. If an ancestor has a config file, that ancestor.
-   * Otherwise equals `cwd` (no discovery; commands like `init` fall back to here).
+   * Canonical project root. If an ancestor has a config file, that ancestor.
+   * Otherwise the nearest strong repository/workspace root, or `cwd` when no
+   * such root exists.
    */
   readonly projectRoot: string;
   /** Resolved config file path at `projectRoot`, or undefined when no project was found. */
@@ -85,11 +95,13 @@ export interface ResolveProjectContextInput {
  * `resolveProjectConfigPath` rejects it at the starting ancestor.
  */
 export function resolveProjectContext(input: ResolveProjectContextInput): ProjectContext {
-  const start = resolve(input.cwd);
-  const stop = input.stopAt ? resolve(input.stopAt) : null;
+  const cwd = resolve(input.cwd);
+  const start = canonicalDirectory(input.cwd);
+  const stop = input.stopAt ? canonicalDirectory(input.stopAt) : null;
   let dir = start;
   let prev = '';
   let walkedUp = 0;
+  let uninitializedRoot: { readonly path: string; readonly walkedUp: number } | undefined;
 
   while (dir !== prev) {
     const explicit = walkedUp === 0 ? input.explicitConfigPath : undefined;
@@ -104,7 +116,7 @@ export function resolveProjectContext(input: ResolveProjectContextInput): Projec
         walkedUp,
       });
       return {
-        cwd: start,
+        cwd,
         cwdExplicit: input.cwdExplicit,
         projectRoot: dir,
         configPath,
@@ -112,10 +124,31 @@ export function resolveProjectContext(input: ResolveProjectContextInput): Projec
         scope: 'project',
       };
     }
+    if (uninitializedRoot === undefined && isStrongProjectRoot(dir)) {
+      uninitializedRoot = { path: dir, walkedUp };
+    }
     if (stop && dir === stop) break;
     prev = dir;
     dir = dirname(dir);
     walkedUp++;
+  }
+
+  if (uninitializedRoot !== undefined) {
+    logger.debug({
+      evt: 'project.root.uninitialized-resolved',
+      module: MODULE_TAG,
+      cwd: start,
+      projectRoot: uninitializedRoot.path,
+      walkedUp: uninitializedRoot.walkedUp,
+    });
+    return {
+      cwd,
+      cwdExplicit: input.cwdExplicit,
+      projectRoot: uninitializedRoot.path,
+      configPath: undefined,
+      walkedUp: uninitializedRoot.walkedUp,
+      scope: 'none',
+    };
   }
 
   logger.debug({
@@ -125,13 +158,122 @@ export function resolveProjectContext(input: ResolveProjectContextInput): Projec
     walkedTo: dir,
   });
   return {
-    cwd: start,
+    cwd,
     cwdExplicit: input.cwdExplicit,
     projectRoot: start,
     configPath: undefined,
     walkedUp: 0,
     scope: 'none',
   };
+}
+
+/**
+ * Canonicalize existing directory aliases without requiring the path to exist.
+ * The fallback preserves the previous absolute-path behavior for callers that
+ * use a not-yet-created Init target.
+ */
+function canonicalDirectory(path: string): string {
+  const absolute = resolve(path);
+  try {
+    return realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
+}
+
+/** True for fixed marker names whose filesystem type is itself authoritative. */
+function hasFileSystemMarker(
+  dir: string,
+  name: string,
+  kinds: readonly ('file' | 'dir')[],
+): boolean {
+  try {
+    const stat = lstatSync(join(dir, name));
+    return (
+      (kinds.includes('file') && stat.isFile()) || (kinds.includes('dir') && stat.isDirectory())
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Git accepts a directory/file marker reached through a filesystem symlink. */
+function hasGitMarker(dir: string): boolean {
+  const markerPath = join(dir, '.git');
+  try {
+    const marker = lstatSync(markerPath);
+    if (marker.isFile() || marker.isDirectory()) return true;
+    if (!marker.isSymbolicLink()) return false;
+    const target = lstatSync(realpathSync(markerPath));
+    return target.isFile() || target.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read at most `limit` bytes. Opening and reading through the descriptor avoids
+ * a stat/read race turning a supposedly bounded root probe into an unbounded
+ * allocation.
+ */
+function readBoundedUtf8(path: string, limit = MAX_ROOT_MARKER_BYTES): string | undefined {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, 'r');
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > limit) return undefined;
+    const buffer = Buffer.alloc(limit + 1);
+    let bytesRead = 0;
+    while (bytesRead < buffer.length) {
+      const count = readSync(fd, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
+      if (count === 0) break;
+      bytesRead += count;
+    }
+    return bytesRead > limit ? undefined : buffer.toString('utf8', 0, bytesRead);
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Read-only discovery is best effort; a failed close cannot change the
+        // selected root and must not turn discovery into a project mutation.
+      }
+    }
+  }
+}
+
+function hasPackageWorkspaces(dir: string): boolean {
+  const raw = readBoundedUtf8(join(dir, 'package.json'));
+  if (raw === undefined) return false;
+  try {
+    const parsed = JSON.parse(raw) as { readonly workspaces?: unknown };
+    const workspaces = parsed.workspaces;
+    if (Array.isArray(workspaces)) return true;
+    if (typeof workspaces !== 'object' || workspaces === null) return false;
+    return Array.isArray((workspaces as { readonly packages?: unknown }).packages);
+  } catch {
+    return false;
+  }
+}
+
+function hasCargoWorkspace(dir: string): boolean {
+  const raw = readBoundedUtf8(join(dir, 'Cargo.toml'));
+  if (raw === undefined) return false;
+  return /^\s*\[workspace\]\s*(?:#.*)?$/mu.test(raw);
+}
+
+/** The closed, side-effect-free root-marker rule for uninitialized projects. */
+function isStrongProjectRoot(dir: string): boolean {
+  return (
+    hasGitMarker(dir) ||
+    hasFileSystemMarker(dir, '.hg', ['dir']) ||
+    hasFileSystemMarker(dir, 'pnpm-workspace.yaml', ['file']) ||
+    hasFileSystemMarker(dir, 'go.work', ['file']) ||
+    hasPackageWorkspaces(dir) ||
+    hasCargoWorkspace(dir)
+  );
 }
 
 /** True only for initialized projects backed by a real config file. */

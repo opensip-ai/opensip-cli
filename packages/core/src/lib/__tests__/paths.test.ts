@@ -2,7 +2,15 @@
  * @fileoverview Path resolver contract tests.
  */
 
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir, platform } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -11,7 +19,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ephemeralProjectCacheKey,
   isPathInside,
+  legacyEphemeralProjectCacheKey,
+  projectCoordinationKey,
   resolveEphemeralProjectPaths,
+  resolveEphemeralProjectIdentity,
   resolveProjectPaths,
   resolveUserPaths,
   toPosixRelative,
@@ -107,6 +118,111 @@ describe('resolveEphemeralProjectPaths', () => {
     expect(paths.runtimeDir).toBe(join(resolveUserPaths().ephemeralProjectsDir, paths.cacheKey));
     expect(paths.logsDir).toBe(join(paths.runtimeDir, 'logs'));
     expect(paths.graphCacheDir).toBe(join(paths.runtimeDir, 'cache', 'graph'));
+  });
+
+  it('separates the path-stable coordination key from generation-bound cache storage', () => {
+    const identity = resolveEphemeralProjectIdentity(testDir);
+
+    expect(identity.identityStrength).toBe('generation-bound');
+    expect(identity.generationDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(identity.canonicalRootDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(identity.coordinationKey).toBe(projectCoordinationKey(testDir));
+    expect(identity.cacheKey).not.toBe(identity.coordinationKey);
+    expect(identity.coordinationKey).toBe(legacyEphemeralProjectCacheKey(testDir));
+  });
+
+  it('canonicalizes symlink aliases to one coordination and storage identity', () => {
+    if (platform() === 'win32') return;
+    const alias = join(testDir, 'alias');
+    const project = join(testDir, 'project');
+    mkdirSync(project);
+    symlinkSync(project, alias);
+
+    expect(resolveEphemeralProjectIdentity(alias)).toEqual(
+      resolveEphemeralProjectIdentity(project),
+    );
+  });
+
+  it('keeps coordination stable while a recreated root receives a new cache key', () => {
+    const before = resolveEphemeralProjectIdentity(testDir);
+    const oldRoot = `${testDir}-old`;
+    renameSync(testDir, oldRoot);
+    mkdirSync(testDir);
+    try {
+      const after = resolveEphemeralProjectIdentity(testDir);
+      expect(after.coordinationKey).toBe(before.coordinationKey);
+      expect(after.cacheKey).not.toBe(before.cacheKey);
+      expect(after.generationDigest).not.toBe(before.generationDigest);
+    } finally {
+      rmSync(oldRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('does not rotate identity when mutable workspace manifests are atomically replaced', () => {
+    const manifests = [
+      ['pnpm-workspace.yaml', 'packages: []\n'],
+      ['go.work', 'go 1.24\n'],
+      ['package.json', JSON.stringify({ workspaces: ['packages/*'] })],
+      ['Cargo.toml', '[workspace]\n'],
+    ] as const;
+    for (const [name, content] of manifests) writeFileSync(join(testDir, name), content);
+    const before = resolveEphemeralProjectIdentity(testDir);
+
+    for (const [name, content] of manifests) {
+      const replacement = join(testDir, `${name}.replacement`);
+      writeFileSync(replacement, `${content}\n`);
+      renameSync(replacement, join(testDir, name));
+      expect(resolveEphemeralProjectIdentity(testDir)).toEqual(before);
+    }
+  });
+
+  it('rotates a git-backed cache when the stable git directory object changes', () => {
+    const gitDir = join(testDir, '.git');
+    mkdirSync(gitDir);
+    const before = resolveEphemeralProjectIdentity(testDir);
+    const oldGitDir = join(testDir, '.git-old');
+    renameSync(gitDir, oldGitDir);
+    mkdirSync(gitDir);
+
+    const after = resolveEphemeralProjectIdentity(testDir);
+    expect(after.coordinationKey).toBe(before.coordinationKey);
+    expect(after.cacheKey).not.toBe(before.cacheKey);
+  });
+
+  it('uses the resolved gitdir object for worktree-style .git files', () => {
+    const gitDir = join(testDir, '.git-data');
+    mkdirSync(gitDir);
+    writeFileSync(join(testDir, '.git'), 'gitdir: .git-data\n');
+    const before = resolveEphemeralProjectIdentity(testDir);
+
+    renameSync(gitDir, join(testDir, '.git-data-old'));
+    mkdirSync(gitDir);
+    const after = resolveEphemeralProjectIdentity(testDir);
+
+    expect(before.identityStrength).toBe('generation-bound');
+    expect(after.coordinationKey).toBe(before.coordinationKey);
+    expect(after.cacheKey).not.toBe(before.cacheKey);
+  });
+
+  it('does not claim generation proof when an existing gitfile is unresolvable', () => {
+    writeFileSync(join(testDir, '.git'), 'gitdir: missing-git-directory\n');
+
+    const identity = resolveEphemeralProjectIdentity(testDir);
+
+    expect(identity.identityStrength).toBe('path-only');
+    expect(identity.generationDigest).toBeUndefined();
+    expect(identity.cacheKey).toBe(identity.coordinationKey);
+  });
+
+  it('falls back to an explicitly path-only identity without creating the project', () => {
+    const missing = join(testDir, 'not-created');
+    const identity = resolveEphemeralProjectIdentity(missing);
+
+    expect(identity.identityStrength).toBe('path-only');
+    expect(identity.generationDigest).toBeUndefined();
+    expect(identity.cacheKey).toBe(identity.coordinationKey);
+    expect(identity.cacheKey).toBe(legacyEphemeralProjectCacheKey(missing));
+    expect(existsSync(missing)).toBe(false);
   });
 });
 

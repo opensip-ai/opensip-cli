@@ -96,6 +96,86 @@ describe('history view', () => {
   });
 });
 
+describe('parent Run views', () => {
+  const run = {
+    id: 'run-parent-01',
+    name: 'audit',
+    source: 'built-in-suite' as const,
+    cwd: '/private/project',
+    startedAt: '2026-07-16T00:00:00.000Z',
+    completedAt: '2026-07-16T00:00:01.000Z',
+    durationMs: 1000,
+    exitCode: 0,
+    aggregate: {
+      steps: 1,
+      passed: 1,
+      failed: 0,
+      faulted: 0,
+      errors: 0,
+      warnings: 1,
+    },
+  };
+
+  it('renders compact identities and exact show commands without emphasizing cwd', () => {
+    const out = text({
+      type: 'run-history',
+      runs: [{ run, showCommand: 'opensip runs show run-parent-01 --json' }],
+      requestedLimit: 20,
+      effectiveLimit: 20,
+      truncated: false,
+    });
+
+    expect(out).toContain('Parent Runs (1 shown)');
+    expect(out).toContain('run-parent-01');
+    expect(out).toContain('audit');
+    expect(out).toContain('built-in-suite');
+    expect(out).toContain('opensip runs show run-parent-01 --json');
+    expect(out).not.toContain('/private/project');
+  });
+
+  it('renders ordered RunSteps, page continuation, and linked Session follow-ups', () => {
+    const out = text({
+      type: 'run-detail',
+      run,
+      steps: [
+        {
+          id: 'step-01',
+          runId: run.id,
+          logicalStepKey: 'graph',
+          ordinal: 0,
+          attempt: 1,
+          tool: 'graph',
+          command: 'graph impact --changed --json',
+          stableId: 'graph-impact',
+          exitCode: 0,
+          outcome: 'passed',
+          durationMs: 250,
+          sessionId: 'session-01',
+        },
+      ],
+      offset: 0,
+      limit: 1,
+      total: 2,
+      nextOffset: 1,
+      sessionFollowUps: [
+        {
+          runStepId: 'step-01',
+          sessionId: 'session-01',
+          showCommand: 'opensip sessions show session-01 --json',
+        },
+      ],
+    });
+
+    expect(out).toContain('Parent Run run-parent-01');
+    expect(out).toContain('1 step · 1 passed');
+    expect(out).toContain('graph impact --changed --json');
+    expect(out).toContain('session-01');
+    expect(out).toContain('opensip runs show run-parent-01 --offset 1 --limit 1 --json');
+    expect(out).toContain('opensip sessions show session-01 --json');
+    expect(out).not.toContain('/private/project');
+  });
+});
+
 describe('session-replay view', () => {
   it('renders a header, recipe, FAIL verdict, and the shared envelope table (no live footer)', () => {
     const envelope = buildSignalEnvelope({
@@ -157,6 +237,99 @@ describe('sim notice + help + report views', () => {
     expect(text({ type: 'report', path: '/r.html', opened: false })).toContain(
       'Open the file in your browser',
     );
+  });
+});
+
+describe('runtime status view', () => {
+  it('renders storage, retention, identity strength, and exact next commands without paths', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: false,
+      activePlane: 'cache',
+      cache: {
+        exists: true,
+        identityStrength: 'generation-bound',
+        sizeBytes: 1536,
+        lastUsedAt: '2026-07-16T00:00:00.000Z',
+      },
+      project: { exists: false },
+      evidenceDatabase: { exists: true, sizeBytes: 1024 },
+      adoptionState: 'ready',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: ['opensip init', 'opensip runs list --json'],
+    });
+
+    expect(out).toContain('OpenSIP evidence storage');
+    expect(out).toContain('Active: user cache · project not initialized');
+    expect(out).toContain('Cache identity: generation-bound');
+    expect(out).toContain('Evidence database: present · 1.0 KB');
+    expect(out).toContain('Cache entries: keep 50 · 30 days');
+    expect(out).toContain('Evidence: keep 200 · 60 days · 150 MB');
+    expect(out).toContain('opensip init');
+    expect(out).toContain('opensip runs list --json');
+    expect(out).not.toContain('/Users/');
+    expect(out).not.toContain('project.json');
+  });
+
+  it('renders bounded recovery guidance and a capped-size disclosure', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: {
+        exists: true,
+        identityStrength: 'path-only',
+        sizeBytes: 4096,
+        sizeTruncated: true,
+      },
+      project: { exists: true, sizeBytes: 2048 },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'recovery-required',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      recoveryPhase: 'destination-install',
+      recoveryReasonCode: 'operation-interrupted',
+      sourcePreserved: true,
+      recoveryCommand: 'opensip init',
+      nextCommands: ['opensip init'],
+    });
+
+    expect(out).toContain('bounded scan; actual size may be larger');
+    expect(out).toContain('Runtime recovery is required');
+    expect(out).toContain('destination-install · operation-interrupted');
+    expect(out).toContain('Source evidence: preserved');
+    expect(out).toContain('Run: opensip init');
+  });
+
+  it('does not claim a retired source is preserved during terminal cleanup', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: { exists: false, identityStrength: 'generation-bound' },
+      project: { exists: true },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'not-needed',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      recoveryPhase: 'cleanup',
+      recoveryReasonCode: 'cleanup-pending',
+      sourcePreserved: false,
+      cleanupPending: true,
+      recoveryCommand: 'opensip init',
+      nextCommands: ['opensip init'],
+    });
+
+    expect(out).toContain('current project evidence remains authoritative');
+    expect(out).toContain('Source evidence: not preserved');
+    expect(out).not.toContain('source evidence remains preserved');
   });
 });
 

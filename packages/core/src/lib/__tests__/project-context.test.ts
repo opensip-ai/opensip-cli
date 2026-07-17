@@ -7,8 +7,8 @@
  * cwd). Tests that omit `stopAt` would be machine-dependent and flaky.
  */
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { platform, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,7 +26,7 @@ import {
 let testDir: string;
 
 beforeEach(() => {
-  testDir = mkdtempSync(join(tmpdir(), 'opensip-project-context-'));
+  testDir = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-project-context-')));
   vi.restoreAllMocks();
 });
 
@@ -126,6 +126,178 @@ describe('resolveProjectContext', () => {
         cwdExplicit: false,
         stopAt: testDir,
       });
+      expect(ctx.scope).toBe('none');
+    });
+  });
+
+  describe('uninitialized repository/workspace discovery', () => {
+    it.each([
+      {
+        name: '.git directory',
+        seed: (root: string) => mkdirSync(join(root, '.git')),
+      },
+      {
+        name: '.git file',
+        seed: (root: string) => writeFileSync(join(root, '.git'), 'gitdir: elsewhere\n'),
+      },
+      {
+        name: '.hg directory',
+        seed: (root: string) => mkdirSync(join(root, '.hg')),
+      },
+      {
+        name: 'pnpm workspace',
+        seed: (root: string) => writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n'),
+      },
+      {
+        name: 'Go workspace',
+        seed: (root: string) => writeFileSync(join(root, 'go.work'), 'go 1.24\n'),
+      },
+      {
+        name: 'package workspaces array',
+        seed: (root: string) =>
+          writeFileSync(join(root, 'package.json'), JSON.stringify({ workspaces: ['packages/*'] })),
+      },
+      {
+        name: 'package workspaces object',
+        seed: (root: string) =>
+          writeFileSync(
+            join(root, 'package.json'),
+            JSON.stringify({ workspaces: { packages: ['packages/*'] } }),
+          ),
+      },
+      {
+        name: 'Cargo workspace',
+        seed: (root: string) =>
+          writeFileSync(join(root, 'Cargo.toml'), '[package]\nname = "x"\n\n[workspace] # root\n'),
+      },
+    ])('finds the nearest strong $name root without initializing it', ({ seed }) => {
+      seed(testDir);
+      const deep = join(testDir, 'packages', 'app', 'src');
+      mkdirSync(deep, { recursive: true });
+
+      const implicit = resolveProjectContext({
+        cwd: deep,
+        cwdExplicit: false,
+        stopAt: testDir,
+      });
+      const explicit = resolveProjectContext({
+        cwd: deep,
+        cwdExplicit: true,
+        stopAt: testDir,
+      });
+
+      expect(implicit).toMatchObject({
+        projectRoot: testDir,
+        configPath: undefined,
+        walkedUp: 3,
+        scope: 'none',
+      });
+      expect(explicit.projectRoot).toBe(implicit.projectRoot);
+      expect(explicit.walkedUp).toBe(implicit.walkedUp);
+      expect(explicit.cwdExplicit).toBe(true);
+    });
+
+    it('chooses the nearest strong root when nested workspaces exist', () => {
+      mkdirSync(join(testDir, '.git'));
+      const workspace = join(testDir, 'nested');
+      const deep = join(workspace, 'src');
+      mkdirSync(deep, { recursive: true });
+      writeFileSync(join(workspace, 'go.work'), 'go 1.24\n');
+
+      const ctx = resolveProjectContext({
+        cwd: deep,
+        cwdExplicit: false,
+        stopAt: testDir,
+      });
+
+      expect(ctx.projectRoot).toBe(workspace);
+      expect(ctx.walkedUp).toBe(1);
+      expect(ctx.scope).toBe('none');
+    });
+
+    it('keeps an initialized ancestor authoritative over a nearer workspace marker', () => {
+      writeConfig(testDir);
+      const workspace = join(testDir, 'nested');
+      const deep = join(workspace, 'src');
+      mkdirSync(deep, { recursive: true });
+      writeFileSync(join(workspace, 'go.work'), 'go 1.24\n');
+
+      const ctx = resolveProjectContext({
+        cwd: deep,
+        cwdExplicit: true,
+        stopAt: testDir,
+      });
+
+      expect(ctx.projectRoot).toBe(testDir);
+      expect(ctx.scope).toBe('project');
+      expect(ctx.walkedUp).toBe(2);
+    });
+
+    it('canonicalizes a symlinked nested cwd to the same root', () => {
+      if (platform() === 'win32') return;
+      mkdirSync(join(testDir, '.git'));
+      const nested = join(testDir, 'nested');
+      mkdirSync(nested);
+      const alias = join(testDir, 'alias');
+      symlinkSync(nested, alias);
+
+      const direct = resolveProjectContext({
+        cwd: nested,
+        cwdExplicit: false,
+        stopAt: testDir,
+      });
+      const throughAlias = resolveProjectContext({
+        cwd: alias,
+        cwdExplicit: true,
+        stopAt: testDir,
+      });
+
+      expect(throughAlias.cwd).toBe(alias);
+      expect(throughAlias.projectRoot).toBe(direct.projectRoot);
+      expect(throughAlias.walkedUp).toBe(direct.walkedUp);
+    });
+
+    it('converges root and nested discovery when .git is a valid symlink', () => {
+      if (platform() === 'win32') return;
+      const gitTarget = join(testDir, '.git-target');
+      mkdirSync(gitTarget);
+      symlinkSync(gitTarget, join(testDir, '.git'));
+      const nested = join(testDir, 'packages', 'app');
+      mkdirSync(nested, { recursive: true });
+
+      const root = resolveProjectContext({
+        cwd: testDir,
+        cwdExplicit: false,
+        stopAt: testDir,
+      });
+      const child = resolveProjectContext({
+        cwd: nested,
+        cwdExplicit: true,
+        stopAt: testDir,
+      });
+
+      expect(root.projectRoot).toBe(testDir);
+      expect(child.projectRoot).toBe(root.projectRoot);
+      expect(child.walkedUp).toBe(2);
+    });
+
+    it('does not trust oversized workspace manifests', () => {
+      const nested = join(testDir, 'nested');
+      mkdirSync(nested);
+      writeFileSync(
+        join(testDir, 'package.json'),
+        `${' '.repeat(64 * 1024)}${JSON.stringify({ workspaces: ['packages/*'] })}`,
+      );
+      writeFileSync(join(testDir, 'Cargo.toml'), `${' '.repeat(64 * 1024)}\n[workspace]\n`);
+
+      const ctx = resolveProjectContext({
+        cwd: nested,
+        cwdExplicit: false,
+        stopAt: testDir,
+      });
+
+      expect(ctx.projectRoot).toBe(nested);
+      expect(ctx.walkedUp).toBe(0);
       expect(ctx.scope).toBe('none');
     });
   });

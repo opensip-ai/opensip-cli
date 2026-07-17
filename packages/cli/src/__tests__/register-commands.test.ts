@@ -123,6 +123,19 @@ describe('configure wiring', () => {
   });
 });
 
+describe('status wiring', () => {
+  it('registers the read-only first-run status surface', () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    const cmd = findSubcommand(program, 'status');
+    expect(cmd).toBeDefined();
+    expect(cmd!.description()).toBe("Show where this project's OpenSIP evidence is stored");
+    expect(cmd!.options.map((option) => option.long)).toEqual(
+      expect.arrayContaining(['--cwd', '--json', '--debug']),
+    );
+  });
+});
+
 describe('plugin wiring', () => {
   // The pack `plugin {add,list,remove,sync}` ops are NO LONGER a top-level
   // group: they mount UNDER each pack-supporting tool primary (`opensip fit

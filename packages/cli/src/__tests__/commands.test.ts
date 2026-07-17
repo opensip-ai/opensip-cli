@@ -80,6 +80,7 @@ describe('registerCliCommands', () => {
       'repair',
       'report',
       'sessions',
+      'status',
       'suite',
       'tools',
       'uninstall',

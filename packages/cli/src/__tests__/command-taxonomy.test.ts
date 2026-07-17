@@ -124,6 +124,11 @@ describe('command taxonomy — canonical resolves, legacy is gone (Step 2)', () 
 });
 
 describe('command taxonomy — new discoverability commands exist (Step 3)', () => {
+  it('mounts the host-owned read-only `status` command', () => {
+    const program = buildFullProgram();
+    expect(resolveTopLevel(program, 'status')).toBeDefined();
+  });
+
   it('mounts `simulation recipes` (new — no legacy predecessor)', () => {
     const program = buildFullProgram();
     expect(resolveNested(program, 'simulation', 'recipes')).toBeDefined();
