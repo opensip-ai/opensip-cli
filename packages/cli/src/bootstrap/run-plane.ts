@@ -351,7 +351,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     try {
       const policy = resolveRetentionPolicy();
       const diagnostic = {
-        evt: 'session.retention.policy_resolved',
+        evt: 'evidence.retention.policy_resolved',
         module: MODULE_TAG,
         source: policy.source,
         keep: policy.keep,
@@ -362,7 +362,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       currentScope()?.diagnostics?.event(
         'persist',
         'debug',
-        'session.retention.policy_resolved',
+        'evidence.retention.policy_resolved',
         diagnostic,
       );
       enforceSessionRetention(datastore, policy, { logger: log });

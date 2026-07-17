@@ -20,7 +20,7 @@
  */
 
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
-export { RunRepo, type RunListOptions } from './run-repo.js';
+export { RunRepo, type RunListOptions, type RunRetentionBatchResult } from './run-repo.js';
 export {
   MAX_EVIDENCE_BUNDLE_BYTES,
   MAX_EVIDENCE_BUNDLE_SESSIONS,

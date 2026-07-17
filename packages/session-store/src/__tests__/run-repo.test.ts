@@ -242,6 +242,13 @@ afterEach(() => {
 });
 
 describe('RunRepo', () => {
+  it('counts empty and populated parent Runs exactly', () => {
+    expect(repo.countRuns()).toBe(0);
+    repo.saveRun(makeRun({ id: 'run-a' }));
+    repo.saveRun(makeRun({ id: 'run-b' }));
+    expect(repo.countRuns()).toBe(2);
+  });
+
   it('round-trips a run with ordered steps', () => {
     const run = makeRun();
     repo.saveRunWithSteps(run, [
@@ -251,6 +258,186 @@ describe('RunRepo', () => {
 
     expect(repo.getRun(run.id)).toEqual(run);
     expect(repo.listStepsForRun(run.id).map((step) => step.id)).toEqual(['step-1', 'step-2']);
+  });
+
+  it('prunes deterministic count-excess parents while protecting retained Session links', () => {
+    const sessions = new SessionRepo(datastore);
+    sessions.save(makeSession({ id: 'session-protected' }));
+    const completedAt = '2026-07-08T12:00:01.000Z';
+    repo.saveRunWithSteps(makeRun({ id: 'run-a', completedAt }), [
+      makeStep({
+        id: 'step-a',
+        runId: 'run-a',
+        sessionId: 'session-protected',
+      }),
+    ]);
+    repo.saveRun(makeRun({ id: 'run-b', completedAt }));
+    repo.saveRun(makeRun({ id: 'run-c', completedAt }));
+
+    expect(repo.countRuns()).toBe(3);
+    expect(repo.pruneToCountBatch(1, 1)).toEqual({
+      examined: 2,
+      protected: 1,
+      deleted: 1,
+      remainingEligible: 0,
+    });
+    expect(repo.listRuns().map((run) => run.id)).toEqual(['run-c', 'run-a']);
+    expect(repo.getRun('run-b')).toBeNull();
+    expect(sessions.get('session-protected')).not.toBeNull();
+
+    expect(sessions.clearAll()).toBe(1);
+    expect(repo.listStepsForRun('run-a')[0]?.sessionId).toBeUndefined();
+    expect(repo.pruneToCountBatch(1, 1)).toEqual({
+      examined: 1,
+      protected: 0,
+      deleted: 1,
+      remainingEligible: 0,
+    });
+    expect(repo.listRuns().map((run) => run.id)).toEqual(['run-c']);
+  });
+
+  it('chunks age pruning oldest-first and reports protected and remaining candidates', () => {
+    const sessions = new SessionRepo(datastore);
+    sessions.save(makeSession({ id: 'session-protected' }));
+    repo.saveRunWithSteps(
+      makeRun({
+        id: 'run-old-a',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+      [
+        makeStep({
+          id: 'step-old-a',
+          runId: 'run-old-a',
+          sessionId: 'session-protected',
+        }),
+      ],
+    );
+    repo.saveRun(
+      makeRun({
+        id: 'run-old-b',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+    );
+    repo.saveRun(
+      makeRun({
+        id: 'run-old-c',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+    );
+    repo.saveRun(
+      makeRun({
+        id: 'run-new',
+        completedAt: '2026-07-10T00:00:00.000Z',
+      }),
+    );
+    const cutoff = new Date('2026-07-02T00:00:00.000Z');
+
+    expect(repo.pruneOlderThanBatch(cutoff, 1)).toEqual({
+      examined: 3,
+      protected: 1,
+      deleted: 1,
+      remainingEligible: 1,
+    });
+    expect(repo.getRun('run-old-b')).toBeNull();
+    expect(repo.pruneOlderThanBatch(cutoff, 1)).toEqual({
+      examined: 2,
+      protected: 1,
+      deleted: 1,
+      remainingEligible: 0,
+    });
+    expect(repo.getRun('run-old-c')).toBeNull();
+    expect(repo.pruneOlderThanBatch(cutoff, 1)).toEqual({
+      examined: 1,
+      protected: 1,
+      deleted: 0,
+      remainingEligible: 0,
+    });
+    expect(repo.listRuns().map((run) => run.id)).toEqual(['run-new', 'run-old-a']);
+  });
+
+  it('uses an exclusive age cutoff, cascades eligible steps, and preserves linked parents', () => {
+    const sessions = new SessionRepo(datastore);
+    sessions.save(makeSession({ id: 'session-protected' }));
+    repo.saveRunWithSteps(
+      makeRun({
+        id: 'run-old-eligible',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+      [
+        makeStep({
+          id: 'step-old-eligible',
+          runId: 'run-old-eligible',
+        }),
+      ],
+    );
+    repo.saveRunWithSteps(
+      makeRun({
+        id: 'run-old-protected',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+      [
+        makeStep({
+          id: 'step-old-unlinked',
+          runId: 'run-old-protected',
+        }),
+        makeStep({
+          id: 'step-old-linked',
+          runId: 'run-old-protected',
+          logicalStepKey: '1:fit:fitness',
+          ordinal: 1,
+          sessionId: 'session-protected',
+        }),
+      ],
+    );
+    repo.saveRun(
+      makeRun({
+        id: 'run-at-cutoff',
+        completedAt: '2026-07-02T00:00:00.000Z',
+      }),
+    );
+
+    expect(repo.pruneOlderThanBatch(new Date('2026-07-02T00:00:00.000Z'), 10)).toEqual({
+      examined: 2,
+      protected: 1,
+      deleted: 1,
+      remainingEligible: 0,
+    });
+    expect(repo.getRun('run-old-eligible')).toBeNull();
+    expect(repo.listStepsForRun('run-old-eligible')).toEqual([]);
+    expect(repo.getRun('run-old-protected')).not.toBeNull();
+    expect(repo.listStepsForRun('run-old-protected')).toHaveLength(2);
+    expect(repo.getRun('run-at-cutoff')).not.toBeNull();
+    expect(sessions.get('session-protected')).not.toBeNull();
+  });
+
+  it('rolls back a parent retention batch and validates its hard batch bound', () => {
+    repo.saveRun(
+      makeRun({
+        id: 'run-old-a',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+    );
+    repo.saveRun(
+      makeRun({
+        id: 'run-old-b',
+        completedAt: '2026-07-01T00:00:00.000Z',
+      }),
+    );
+    const handle = requireDrizzleHandle(datastore);
+    const originalTransaction = handle.transaction.bind(handle);
+    vi.spyOn(handle, 'transaction').mockImplementation((fn) =>
+      originalTransaction((tx) => {
+        fn(tx);
+        throw new Error('retention transaction failed');
+      }),
+    );
+
+    expect(() => repo.pruneOlderThanBatch(new Date('2026-07-02T00:00:00.000Z'), 1)).toThrow(
+      'retention transaction failed',
+    );
+    expect(repo.countRuns()).toBe(2);
+    expect(() => repo.pruneToCountBatch(1, 501)).toThrow(RangeError);
+    expect(() => repo.pruneOlderThanBatch(new Date(), 0)).toThrow(RangeError);
   });
 
   it('writes neither parent nor steps when the locked transactional precondition fails', () => {

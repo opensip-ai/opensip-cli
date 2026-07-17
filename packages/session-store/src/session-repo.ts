@@ -50,8 +50,16 @@ export class SessionRepo {
     return this.maintenance.pruneToCount(keep);
   }
 
+  pruneToCountBatch(keep: number, batchSize?: number): number {
+    return this.maintenance.pruneToCountBatch(keep, batchSize);
+  }
+
   purge(before: Date): number {
     return this.maintenance.purge(before);
+  }
+
+  purgeBatch(before: Date, batchSize?: number): number {
+    return this.maintenance.purgeBatch(before, batchSize);
   }
 
   clearAll(): number {
@@ -68,3 +76,4 @@ export class SessionRepo {
 }
 
 export { type SessionListOptions } from './session-read-repo.js';
+export { MAX_SESSION_MAINTENANCE_BATCH_SIZE } from './session-maintenance-repo.js';
