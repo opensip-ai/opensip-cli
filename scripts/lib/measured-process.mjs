@@ -84,54 +84,79 @@ export function parseProcessTable(stdout) {
     .map((line) => line.trim())
     .filter(Boolean);
   if (lines.length === 0) throw new TypeError('process table output was empty');
-  return lines.map((line, index) => {
-    // Both Darwin and procps `lstart` occupy five whitespace-delimited tokens.
-    // `ucomm` is last; retain the remainder defensively across ps implementations.
-    const fields = line.split(/\s+/);
-    if (fields.length < 11) {
-      throw new TypeError(`process table line ${index + 1} is malformed`);
-    }
-    const [pidRaw, ppidRaw, processGroupIdRaw, sessionTokenRaw, ...tail] = fields;
-    const startedAtRaw = tail.slice(0, 5).join(' ');
-    const rssRaw = tail[5];
-    const commandRaw = tail.slice(6).join(' ');
-    const pid = Number(pidRaw);
-    const ppid = Number(ppidRaw);
-    const processGroupId = Number(processGroupIdRaw);
-    const sessionToken = sessionTokenRaw.trim();
-    const startedAt = startedAtRaw.trim();
-    const rssKiB = Number(rssRaw);
-    const command = commandRaw.trim();
-    if (
-      !Number.isSafeInteger(pid) ||
-      !DECIMAL_INTEGER.test(pidRaw) ||
-      pid <= 0 ||
-      !Number.isSafeInteger(ppid) ||
-      !DECIMAL_INTEGER.test(ppidRaw) ||
-      ppid < 0 ||
-      !Number.isSafeInteger(processGroupId) ||
-      !DECIMAL_INTEGER.test(processGroupIdRaw) ||
-      processGroupId <= 0 ||
-      sessionToken.length === 0 ||
-      startedAt.length === 0 ||
-      !Number.isSafeInteger(rssKiB) ||
-      !DECIMAL_INTEGER.test(rssRaw) ||
-      rssKiB < 0 ||
-      !Number.isSafeInteger(rssKiB * 1024) ||
-      command.length === 0
-    ) {
-      throw new TypeError(`process table line ${index + 1} is out of range`);
-    }
-    return {
-      pid,
-      ppid,
-      processGroupId,
-      sessionToken,
-      startedAt,
-      command,
-      rssBytes: rssKiB * 1024,
-    };
-  });
+  const rows = [];
+  for (const line of lines) {
+    const row = parseProcessRow(line);
+    if (row !== null) rows.push(row);
+  }
+  // A non-empty system-wide `ps -e` snapshot always yields well-formed, relevant
+  // rows (at minimum this process and `ps` itself). Zero survivors means the
+  // output SHAPE itself is unusable — e.g. a `ps` format change — which is a
+  // table-level fault we surface rather than silently measuring nothing. (A lone
+  // malformed fixture row is the degenerate case of this and still throws.)
+  if (rows.length === 0) {
+    throw new TypeError('process table output contained no parseable process rows');
+  }
+  return rows;
+}
+
+/**
+ * Parse ONE `ps` row into a normalized record, or return `null` when the line is
+ * not a well-formed, relevant process row. A system-wide `ps -eo …` snapshot
+ * legitimately contains rows this harness never touches: kernel threads
+ * (process-group id 0, e.g. Linux `kthreadd`/`kworker`), zombies, and the
+ * occasional transient half-written line. Those are SKIPPED by the caller, never
+ * fatal — throwing on them broke RSS measurement on Linux CI, where `ps -e`
+ * always lists pgid-0 kernel threads. Retained descendants of a measured process
+ * always carry a positive pid/pgid and full identity fields, so skipping these
+ * rows can never hide a residual descendant; the field checks below are unchanged
+ * from when they threw — only the disposition (skip vs. throw) moved to the caller.
+ */
+function parseProcessRow(line) {
+  // Both Darwin and procps `lstart` occupy five whitespace-delimited tokens.
+  // `ucomm` is last; retain the remainder defensively across ps implementations.
+  const fields = line.split(/\s+/);
+  if (fields.length < 11) return null;
+  const [pidRaw, ppidRaw, processGroupIdRaw, sessionTokenRaw, ...tail] = fields;
+  const startedAtRaw = tail.slice(0, 5).join(' ');
+  const rssRaw = tail[5];
+  const commandRaw = tail.slice(6).join(' ');
+  const pid = Number(pidRaw);
+  const ppid = Number(ppidRaw);
+  const processGroupId = Number(processGroupIdRaw);
+  const sessionToken = sessionTokenRaw.trim();
+  const startedAt = startedAtRaw.trim();
+  const rssKiB = Number(rssRaw);
+  const command = commandRaw.trim();
+  if (
+    !Number.isSafeInteger(pid) ||
+    !DECIMAL_INTEGER.test(pidRaw) ||
+    pid <= 0 ||
+    !Number.isSafeInteger(ppid) ||
+    !DECIMAL_INTEGER.test(ppidRaw) ||
+    ppid < 0 ||
+    !Number.isSafeInteger(processGroupId) ||
+    !DECIMAL_INTEGER.test(processGroupIdRaw) ||
+    processGroupId <= 0 ||
+    sessionToken.length === 0 ||
+    startedAt.length === 0 ||
+    !Number.isSafeInteger(rssKiB) ||
+    !DECIMAL_INTEGER.test(rssRaw) ||
+    rssKiB < 0 ||
+    !Number.isSafeInteger(rssKiB * 1024) ||
+    command.length === 0
+  ) {
+    return null;
+  }
+  return {
+    pid,
+    ppid,
+    processGroupId,
+    sessionToken,
+    startedAt,
+    command,
+    rssBytes: rssKiB * 1024,
+  };
 }
 
 function validateProcessRows(rows) {
@@ -234,6 +259,11 @@ export function signalCapturedProcesses(processIdentities, signal = 'SIGTERM', o
   if (options.useProcessGroups !== false) {
     for (const identity of alive.toReversed()) {
       const groupId = identity.processGroupId;
+      // Defense-in-depth: never issue kill(-0) or kill(negative) — that signals
+      // THIS process's own group. `alive` identities always match a validated
+      // current row (pgid > 0) and `parseProcessTable` now filters pgid ≤ 0 rows,
+      // so this only guards against a caller supplying a malformed identity.
+      if (!Number.isSafeInteger(groupId) || groupId <= 0) continue;
       if (signalledGroups.has(groupId)) continue;
       try {
         killProcess(-groupId, signal);

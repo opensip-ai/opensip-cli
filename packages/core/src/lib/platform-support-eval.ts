@@ -22,8 +22,8 @@ import {
   MACOS_INTEL_ROW,
   MACOS_PREVIEW_ROW,
   PLATFORM_SUPPORT_ROWS,
-  assertPlatformSupportRowsValid,
 } from './platform-support-rows.js';
+import { assertPlatformSupportRowsValid } from './platform-support-validate.js';
 
 import type {
   HostSupportAssessment,
@@ -277,6 +277,10 @@ export function assessHostSupport(
   return freezeAssessment(macosRow.status, macosRow, matchLevel(macosEval), macosEval, []);
 }
 
+/**
+ * @throws {Error} When the registry is missing the required macOS preview or
+ *   Intel exclusion row, or either row's canonical tuple/status is invalid.
+ */
 function resolveRegistryRows(rows: readonly PlatformSupportRow[]): {
   readonly macosRow: PlatformSupportRow;
   readonly intelRow: PlatformSupportRow;

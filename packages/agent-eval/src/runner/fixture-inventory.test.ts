@@ -46,7 +46,7 @@ describe('listGitVisibleFixtureFiles', () => {
     expect(observed).toMatchObject({
       cwd: realpathSync(root),
       maxOutputBytes: 2 * 1024 * 1024,
-      timeoutMs: 10_000,
+      timeoutMs: 60_000,
     });
   });
 
