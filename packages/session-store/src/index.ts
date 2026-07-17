@@ -22,6 +22,19 @@
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
 export { RunRepo, type RunListOptions } from './run-repo.js';
 export {
+  MAX_EVIDENCE_BUNDLE_BYTES,
+  MAX_EVIDENCE_BUNDLE_SESSIONS,
+  MAX_EVIDENCE_BUNDLE_STEPS,
+  commitEvidenceBundle,
+  measureEvidenceBundleBytes,
+  type EvidenceBundleCommitResult,
+  type EvidenceBundleFailureReason,
+  type EvidenceBundleInput,
+  type EvidenceBundlePrecondition,
+  type EvidenceBundleRun,
+  type EvidenceBundleSession,
+} from './evidence-bundle.js';
+export {
   TASK_CONTEXT_RUN_NAME,
   readTaskContextRun,
   type StoredTaskContextRun,

@@ -1,12 +1,70 @@
-import { logger } from '@opensip-cli/core';
+import { ValidationError } from '@opensip-cli/core';
 import { eq, inArray } from 'drizzle-orm';
 
 import { sessionHostMetrics } from './schema/sessions.js';
 
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
-import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
+import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
 
-const MODULE_NAME = 'session-store:session-repo';
+const HOST_METRIC_KEYS = [
+  'ttyBusyMs',
+  'renderMs',
+  'persistMs',
+  'egressMs',
+  'totalCommandMs',
+] as const;
+
+/** Package-private validated metrics projection shared by both write paths. */
+export interface PreparedHostMetricsWrite {
+  readonly row: typeof sessionHostMetrics.$inferInsert;
+  readonly patch: Partial<typeof sessionHostMetrics.$inferInsert>;
+}
+
+export function prepareHostMetricsWrite(
+  sessionId: string,
+  metrics: StoredSessionHostMetrics,
+): PreparedHostMetricsWrite {
+  if (
+    typeof metrics !== 'object' ||
+    metrics === null ||
+    Array.isArray(metrics) ||
+    typeof sessionId !== 'string' ||
+    sessionId.length === 0
+  ) {
+    throw new ValidationError('Invalid host metrics input.', {
+      code: 'VALIDATION.SESSION.INVALID_HOST_METRICS',
+    });
+  }
+  for (const key of HOST_METRIC_KEYS) {
+    const value = metrics[key];
+    if (
+      value !== undefined &&
+      (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+    ) {
+      throw new ValidationError(`Invalid host metric ${key} for session ${sessionId}.`, {
+        code: 'VALIDATION.SESSION.INVALID_HOST_METRICS',
+      });
+    }
+  }
+
+  const patch: Partial<typeof sessionHostMetrics.$inferInsert> = {};
+  if (metrics.ttyBusyMs !== undefined) patch.ttyBusyMs = metrics.ttyBusyMs;
+  if (metrics.renderMs !== undefined) patch.renderMs = metrics.renderMs;
+  if (metrics.persistMs !== undefined) patch.persistMs = metrics.persistMs;
+  if (metrics.egressMs !== undefined) patch.egressMs = metrics.egressMs;
+  if (metrics.totalCommandMs !== undefined) patch.totalCommandMs = metrics.totalCommandMs;
+  return {
+    row: {
+      sessionId,
+      ttyBusyMs: metrics.ttyBusyMs ?? null,
+      renderMs: metrics.renderMs ?? null,
+      persistMs: metrics.persistMs ?? null,
+      egressMs: metrics.egressMs ?? null,
+      totalCommandMs: metrics.totalCommandMs ?? null,
+    },
+    patch,
+  };
+}
 
 /** Project a raw host-metrics row, dropping null columns (only captured metrics). */
 export function projectHostMetrics(
@@ -61,47 +119,22 @@ export function hostMetricsBySessionId(
   return byId;
 }
 
-/**
- * Best-effort upsert of host-side overhead metrics for a session. Only the
- * provided fields are written, merging onto any existing row. Never throws.
- */
-export function upsertHostMetricsRow(
-  datastore: DrizzleDataStore,
+/** Package-private strict metrics upsert used inside an owning transaction. */
+export function writeHostMetricsRowOrThrow(
+  tx: DrizzleHandle,
   sessionId: string,
   metrics: StoredSessionHostMetrics,
 ): void {
-  try {
-    // `set` keys are the Drizzle COLUMN PROPERTY names (camelCase), NOT the
-    // SQL column names — Drizzle silently ignores unknown keys, so snake_case
-    // here would no-op the ON CONFLICT update and the merge would be lost.
-    const patch: Partial<typeof sessionHostMetrics.$inferInsert> = {};
-    if (metrics.ttyBusyMs !== undefined) patch.ttyBusyMs = metrics.ttyBusyMs;
-    if (metrics.renderMs !== undefined) patch.renderMs = metrics.renderMs;
-    if (metrics.persistMs !== undefined) patch.persistMs = metrics.persistMs;
-    if (metrics.egressMs !== undefined) patch.egressMs = metrics.egressMs;
-    if (metrics.totalCommandMs !== undefined) patch.totalCommandMs = metrics.totalCommandMs;
-    if (Object.keys(patch).length === 0) return;
-    datastore.db
-      .insert(sessionHostMetrics)
-      .values({
-        sessionId,
-        ttyBusyMs: metrics.ttyBusyMs ?? null,
-        renderMs: metrics.renderMs ?? null,
-        persistMs: metrics.persistMs ?? null,
-        egressMs: metrics.egressMs ?? null,
-        totalCommandMs: metrics.totalCommandMs ?? null,
-      })
-      .onConflictDoUpdate({
-        target: sessionHostMetrics.sessionId,
-        set: patch,
-      })
-      .run();
-  } catch (error) {
-    logger.warn({
-      evt: 'session.host_metrics.upsert_failed',
-      module: MODULE_NAME,
-      sessionId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const prepared = prepareHostMetricsWrite(sessionId, metrics);
+  // `set` keys are the Drizzle COLUMN PROPERTY names (camelCase), NOT the
+  // SQL column names — Drizzle silently ignores unknown keys, so snake_case
+  // here would no-op the ON CONFLICT update and the merge would be lost.
+  if (Object.keys(prepared.patch).length === 0) return;
+  tx.insert(sessionHostMetrics)
+    .values(prepared.row)
+    .onConflictDoUpdate({
+      target: sessionHostMetrics.sessionId,
+      set: prepared.patch,
+    })
+    .run();
 }

@@ -3,10 +3,20 @@ import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 
 import { runs, runSteps } from './schema/runs.js';
+import {
+  isFiniteNonNegativeNumber,
+  isJsonSerializable,
+  isNonEmptyString,
+  isNonNegativeInteger,
+  isOptionalNonEmptyString,
+  isOptionalString,
+  isPlainJsonRecord,
+  isStringRecord,
+} from './write-shape-validation.js';
 
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
-import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
+import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
 
 const MAX_OPAQUE_RUN_CONTEXT_BYTES = 64 * 1024;
 
@@ -24,6 +34,55 @@ export interface RunListOptions {
   readonly source?: StoredRun['source'];
   readonly name?: string;
   readonly cwd?: string;
+}
+
+/** Package-private validated Run projection shared by both write paths. */
+export interface PreparedRunWrite {
+  readonly runId: string;
+  readonly row: typeof runs.$inferInsert;
+}
+
+/** Package-private validated RunStep projection shared by both write paths. */
+export interface PreparedRunStepWrite {
+  readonly stepId: string;
+  readonly runId: string;
+  readonly sessionId?: string;
+  readonly row: typeof runSteps.$inferInsert;
+}
+
+export function prepareRunWrite(run: StoredRun): PreparedRunWrite {
+  validateRun(run);
+  return { runId: run.id, row: runToRow(run) };
+}
+
+export function prepareRunStepWrite(step: StoredRunStep): PreparedRunStepWrite {
+  validateStep(step);
+  return {
+    stepId: step.id,
+    runId: step.runId,
+    ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId }),
+    row: stepToRow(step),
+  };
+}
+
+export function writePreparedRun(tx: DrizzleHandle, prepared: PreparedRunWrite): void {
+  tx.insert(runs)
+    .values(prepared.row)
+    .onConflictDoUpdate({
+      target: runs.id,
+      set: prepared.row,
+    })
+    .run();
+}
+
+export function writePreparedRunStep(tx: DrizzleHandle, prepared: PreparedRunStepWrite): void {
+  tx.insert(runSteps)
+    .values(prepared.row)
+    .onConflictDoUpdate({
+      target: runSteps.id,
+      set: prepared.row,
+    })
+    .run();
 }
 
 /** Repository for persisted host-owned runs and ordered run steps. */
@@ -60,28 +119,16 @@ export class RunRepo {
         code: 'VALIDATION.RUN_STEP.RUN_ID_MISMATCH',
       });
     }
-    this.validateRun(run);
-    for (const step of steps) this.validateStep(step);
+    const preparedRun = prepareRunWrite(run);
+    const preparedSteps = steps.map(prepareRunStepWrite);
 
     let saved = false;
     this.datastore.withWriteLock('run.save', () => {
       this.datastore.transaction((tx) => {
         if (!precondition()) return;
-        tx.insert(runs)
-          .values(runToRow(run))
-          .onConflictDoUpdate({
-            target: runs.id,
-            set: runToRow(run),
-          })
-          .run();
-        for (const step of steps) {
-          tx.insert(runSteps)
-            .values(stepToRow(step))
-            .onConflictDoUpdate({
-              target: runSteps.id,
-              set: stepToRow(step),
-            })
-            .run();
+        writePreparedRun(tx, preparedRun);
+        for (const preparedStep of preparedSteps) {
+          writePreparedRunStep(tx, preparedStep);
         }
         saved = true;
       });
@@ -94,13 +141,9 @@ export class RunRepo {
   }
 
   saveStep(step: StoredRunStep): void {
-    this.validateStep(step);
+    const prepared = prepareRunStepWrite(step);
     this.datastore.withWriteLock('run-step.save', () => {
-      this.datastore.db
-        .insert(runSteps)
-        .values(stepToRow(step))
-        .onConflictDoUpdate({ target: runSteps.id, set: stepToRow(step) })
-        .run();
+      writePreparedRunStep(this.datastore.db, prepared);
     });
   }
 
@@ -199,35 +242,133 @@ export class RunRepo {
       .get();
     return row !== undefined;
   }
+}
 
-  private validateRun(run: StoredRun): void {
-    const startedMs = new Date(run.startedAt).getTime();
-    const completedMs = new Date(run.completedAt).getTime();
-    if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
-      throw new ValidationError(
-        `Invalid run timing for run ${run.id}: startedAt=${JSON.stringify(run.startedAt)} completedAt=${JSON.stringify(run.completedAt)}`,
-        { code: 'VALIDATION.RUN.INVALID_TIMESTAMP' },
-      );
-    }
-    if (run.contextManifest !== undefined && !opaqueRunContextIsBounded(run.contextManifest)) {
-      throw new ValidationError(`Invalid bounded run context for run ${run.id}.`, {
-        code: 'VALIDATION.RUN.INVALID_CONTEXT_MANIFEST',
-      });
-    }
+function validateRun(run: StoredRun): void {
+  if (!runRowShapeIsValid(run)) {
+    throw new ValidationError('Invalid required Run row shape.', {
+      code: 'VALIDATION.RUN.INVALID_SHAPE',
+    });
   }
+  const startedMs = new Date(run.startedAt).getTime();
+  const completedMs = new Date(run.completedAt).getTime();
+  if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
+    throw new ValidationError(
+      `Invalid run timing for run ${run.id}: startedAt=${JSON.stringify(run.startedAt)} completedAt=${JSON.stringify(run.completedAt)}`,
+      { code: 'VALIDATION.RUN.INVALID_TIMESTAMP' },
+    );
+  }
+  if (run.contextManifest !== undefined && !opaqueRunContextIsBounded(run.contextManifest)) {
+    throw new ValidationError(`Invalid bounded run context for run ${run.id}.`, {
+      code: 'VALIDATION.RUN.INVALID_CONTEXT_MANIFEST',
+    });
+  }
+}
 
-  private validateStep(step: StoredRunStep): void {
-    if (!Number.isInteger(step.ordinal) || step.ordinal < 0) {
-      throw new ValidationError(`Invalid ordinal for run step ${step.id}: ${step.ordinal}`, {
-        code: 'VALIDATION.RUN_STEP.INVALID_ORDINAL',
-      });
-    }
-    if (!Number.isInteger(step.attempt) || step.attempt < 1) {
-      throw new ValidationError(`Invalid attempt for run step ${step.id}: ${step.attempt}`, {
-        code: 'VALIDATION.RUN_STEP.INVALID_ATTEMPT',
-      });
-    }
+function validateStep(step: StoredRunStep): void {
+  if (!runStepRowShapeIsValid(step)) {
+    throw new ValidationError('Invalid required RunStep row shape.', {
+      code: 'VALIDATION.RUN_STEP.INVALID_SHAPE',
+    });
   }
+  if (!Number.isInteger(step.ordinal) || step.ordinal < 0) {
+    throw new ValidationError(`Invalid ordinal for run step ${step.id}: ${step.ordinal}`, {
+      code: 'VALIDATION.RUN_STEP.INVALID_ORDINAL',
+    });
+  }
+  if (!Number.isInteger(step.attempt) || step.attempt < 1) {
+    throw new ValidationError(`Invalid attempt for run step ${step.id}: ${step.attempt}`, {
+      code: 'VALIDATION.RUN_STEP.INVALID_ATTEMPT',
+    });
+  }
+}
+
+function runRowShapeIsValid(value: unknown): value is StoredRun {
+  if (!isPlainRecord(value)) return false;
+  return (
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.name) &&
+    runSourceIsValid(value.source) &&
+    isOptionalString(value.correlationRunId) &&
+    isNonEmptyString(value.cwd) &&
+    typeof value.startedAt === 'string' &&
+    typeof value.completedAt === 'string' &&
+    isFiniteNonNegativeNumber(value.durationMs) &&
+    typeof value.exitCode === 'number' &&
+    Number.isInteger(value.exitCode) &&
+    runAggregateShapeIsValid(value.aggregate) &&
+    (value.scope === undefined || runScopeShapeIsValid(value.scope)) &&
+    (value.reviewBrief === undefined || isPlainJsonRecord(value.reviewBrief)) &&
+    isOptionalNonEmptyString(value.legacySuiteRunId) &&
+    isOptionalString(value.cliVersion) &&
+    (value.engineVersions === undefined || isStringRecord(value.engineVersions))
+  );
+}
+
+function runSourceIsValid(value: unknown): value is StoredRun['source'] {
+  return (
+    value === 'implicit-tool' ||
+    value === 'configured-suite' ||
+    value === 'built-in-suite' ||
+    value === 'reconstructed' ||
+    value === 'scheduled' ||
+    value === 'cloud-triggered' ||
+    value === 'mcp-triggered'
+  );
+}
+
+function runAggregateShapeIsValid(value: unknown): value is StoredRun['aggregate'] {
+  if (!isPlainRecord(value)) return false;
+  return ['steps', 'passed', 'failed', 'faulted', 'errors', 'warnings'].every((key) =>
+    isNonNegativeInteger(value[key]),
+  );
+}
+
+function runScopeShapeIsValid(value: unknown): boolean {
+  if (!isPlainJsonRecord(value)) return false;
+  return (
+    (value.mode === 'changed' || value.mode === 'full') &&
+    (value.source === 'default' || value.source === 'explicit' || value.source === 'fallback') &&
+    isOptionalString(value.ref) &&
+    (value.changedFiles === undefined || isNonNegativeInteger(value.changedFiles)) &&
+    isOptionalString(value.notice)
+  );
+}
+
+function runStepRowShapeIsValid(value: unknown): value is StoredRunStep {
+  if (!isPlainRecord(value)) return false;
+  return (
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.runId) &&
+    isNonEmptyString(value.logicalStepKey) &&
+    typeof value.ordinal === 'number' &&
+    Number.isInteger(value.ordinal) &&
+    typeof value.attempt === 'number' &&
+    Number.isInteger(value.attempt) &&
+    isNonEmptyString(value.tool) &&
+    isNonEmptyString(value.command) &&
+    isNonEmptyString(value.stableId) &&
+    (value.effectiveArgs === undefined || isPlainJsonRecord(value.effectiveArgs)) &&
+    typeof value.exitCode === 'number' &&
+    Number.isInteger(value.exitCode) &&
+    (value.outcome === 'passed' || value.outcome === 'failed' || value.outcome === 'faulted') &&
+    isFiniteNonNegativeNumber(value.durationMs) &&
+    (value.verdictSummary === undefined || verdictSummaryShapeIsValid(value.verdictSummary)) &&
+    isOptionalNonEmptyString(value.sessionId) &&
+    (value.evidence === undefined || isJsonSerializable(value.evidence)) &&
+    isOptionalNonEmptyString(value.parentStepId) &&
+    (value.dependency === undefined || isJsonSerializable(value.dependency))
+  );
+}
+
+function verdictSummaryShapeIsValid(value: unknown): boolean {
+  if (!isPlainRecord(value)) return false;
+  return (
+    typeof value.passed === 'boolean' &&
+    isNonNegativeInteger(value.errors) &&
+    isNonNegativeInteger(value.warnings) &&
+    isNonNegativeInteger(value.findings)
+  );
 }
 
 function runToRow(run: StoredRun): typeof runs.$inferInsert {

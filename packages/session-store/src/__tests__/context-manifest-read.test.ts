@@ -822,8 +822,23 @@ describe('readTaskContextRun', () => {
     for (const corrupt of corruptions) {
       const store = open();
       const steps = structuredClone(readySteps());
-      corrupt(steps);
       new RunRepo(store).saveRunWithSteps(readyRun(contextManifest), steps);
+      corrupt(steps);
+      const corrupted = steps[0];
+      if (corrupted === undefined) throw new TypeError('missing corruption fixture step');
+      // Preparation now rejects malformed required row fields before acquiring
+      // a write lock. Poison the durable row directly so this reader-hardening
+      // test still exercises legacy/hand-edited SQLite corruption.
+      requireDrizzleHandle(store)
+        .db.update(runSteps)
+        .set({
+          exit_code: corrupted.exitCode,
+          outcome: corrupted.outcome,
+          duration_ms: corrupted.durationMs,
+          verdict_summary: corrupted.verdictSummary ?? null,
+        })
+        .where(eq(runSteps.id, corrupted.id))
+        .run();
       expect(readTaskContextRun({ datastore: store, cwd: '/repo' })).toMatchObject({
         ok: false,
         error: { reason: 'invalid-manifest' },
