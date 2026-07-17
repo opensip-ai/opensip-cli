@@ -145,6 +145,19 @@ describe('SessionRepo bounded maintenance batches', () => {
     });
   });
 
+  it('normalizes fractional keep values consistently with pruneToCount', () => {
+    withRepo((repo) => {
+      for (let day = 1; day <= 4; day += 1) {
+        repo.save(makeSession(`s${String(day)}`, day));
+      }
+
+      expect(repo.pruneToCountBatch(2.9, 1)).toBe(1);
+      expect(repo.list().map((session) => session.id)).toEqual(['s4', 's3', 's2']);
+      expect(repo.pruneToCountBatch(2.9, 1)).toBe(1);
+      expect(repo.list().map((session) => session.id)).toEqual(['s4', 's3']);
+    });
+  });
+
   it('enforces the hard batch ceiling without truncating a request', () => {
     withRepo((repo) => {
       const cutoff = new Date('2026-02-01T00:00:00.000Z');
