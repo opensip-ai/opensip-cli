@@ -22,6 +22,23 @@
 export { SessionRepo, type SessionListOptions } from './session-repo.js';
 export { RunRepo, type RunListOptions, type RunRetentionBatchResult } from './run-repo.js';
 export {
+  listParentRuns,
+  resolveParentRun,
+  resolveParentRunEvidence,
+  type ListParentRunsOptions,
+  type ParentRunEvidenceFound,
+  type ParentRunEvidenceInclusion,
+  type ParentRunEvidenceMetadata,
+  type ParentRunEvidenceSnapshot,
+  type ParentRunFound,
+  type ParentRunList,
+  type ParentRunNotFound,
+  type ResolveParentRunEvidenceOptions,
+  type ResolveParentRunEvidenceResult,
+  type ResolveParentRunOptions,
+  type ResolveParentRunResult,
+} from './run-reads.js';
+export {
   MAX_EVIDENCE_BUNDLE_BYTES,
   MAX_EVIDENCE_BUNDLE_SESSIONS,
   MAX_EVIDENCE_BUNDLE_STEPS,

@@ -12,6 +12,7 @@ import {
   isNotNull,
   lt,
   notExists,
+  sql,
 } from 'drizzle-orm';
 
 import { runs, runSteps } from './schema/runs.js';
@@ -32,6 +33,12 @@ import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/int
 
 const MAX_OPAQUE_RUN_CONTEXT_BYTES = 64 * 1024;
 export const MAX_RUN_RETENTION_BATCH_SIZE = 500;
+const STORED_RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
+
+/** Package-private identity contract shared by Run writes and public reads. */
+export function isResolvableStoredRunId(value: unknown): value is string {
+  return typeof value === 'string' && STORED_RUN_ID_PATTERN.test(value);
+}
 
 export interface RunRetentionBatchResult {
   /** Rows inside the current count/age policy boundary before deletion. */
@@ -116,6 +123,67 @@ export function writePreparedRunStep(tx: DrizzleHandle, prepared: PreparedRunSte
     .run();
 }
 
+/** Package-private exact Run read for transaction-scoped projections. */
+export function readRunByIdFromTx(tx: DrizzleHandle, runId: string): StoredRun | null {
+  const row = tx.select().from(runs).where(eq(runs.id, runId)).get();
+  return row === undefined ? null : runFromRow(row);
+}
+
+/** Package-private deterministic newest-first Run page. */
+export function readRunsPageFromTx(
+  tx: DrizzleHandle,
+  offset: number,
+  limit: number,
+): readonly StoredRun[] {
+  return tx
+    .select()
+    .from(runs)
+    .orderBy(desc(runs.completed_at), desc(runs.id))
+    .offset(offset)
+    .limit(limit)
+    .all()
+    .map(runFromRow);
+}
+
+/** Package-private corruption probe used before exposing resolvable Run IDs. */
+export function readUnresolvableRunIdFromTx(tx: DrizzleHandle): string | null {
+  const row = tx
+    .select({ id: runs.id })
+    .from(runs)
+    .where(
+      sql<boolean>`NOT (length(${runs.id}) BETWEEN 1 AND 128 AND ${runs.id} NOT GLOB '*[^A-Za-z0-9_-]*')`,
+    )
+    .orderBy(desc(runs.completed_at), desc(runs.id))
+    .limit(1)
+    .get();
+  return row?.id ?? null;
+}
+
+/** Package-private exact RunStep count for one parent. */
+export function countRunStepsFromTx(tx: DrizzleHandle, runId: string): number {
+  return (
+    tx.select({ value: count() }).from(runSteps).where(eq(runSteps.run_id, runId)).get()?.value ?? 0
+  );
+}
+
+/** Package-private deterministic RunStep page for transaction-scoped projections. */
+export function readRunStepsPageFromTx(
+  tx: DrizzleHandle,
+  runId: string,
+  offset: number,
+  limit: number,
+): readonly StoredRunStep[] {
+  return tx
+    .select()
+    .from(runSteps)
+    .where(eq(runSteps.run_id, runId))
+    .orderBy(asc(runSteps.ordinal), asc(runSteps.attempt), asc(runSteps.id))
+    .offset(offset)
+    .limit(limit)
+    .all()
+    .map(stepFromRow);
+}
+
 /** Repository for persisted host-owned runs and ordered run steps. */
 export class RunRepo {
   private readonly datastore: DrizzleDataStore;
@@ -179,8 +247,7 @@ export class RunRepo {
   }
 
   getRun(id: string): StoredRun | null {
-    const row = this.datastore.db.select().from(runs).where(eq(runs.id, id)).get();
-    return row === undefined ? null : runFromRow(row);
+    return readRunByIdFromTx(this.datastore.db, id);
   }
 
   listRuns(opts: RunListOptions = {}): readonly StoredRun[] {
@@ -197,13 +264,24 @@ export class RunRepo {
   }
 
   listStepsForRun(runId: string, limit?: number): readonly StoredRunStep[] {
-    const ordered = this.datastore.db
+    if (limit !== undefined) {
+      return readRunStepsPageFromTx(this.datastore.db, runId, 0, limit);
+    }
+    return this.datastore.db
       .select()
       .from(runSteps)
       .where(eq(runSteps.run_id, runId))
-      .orderBy(asc(runSteps.ordinal), asc(runSteps.attempt), asc(runSteps.id));
-    const rows = limit === undefined ? ordered.all() : ordered.limit(limit).all();
-    return rows.map(stepFromRow);
+      .orderBy(asc(runSteps.ordinal), asc(runSteps.attempt), asc(runSteps.id))
+      .all()
+      .map(stepFromRow);
+  }
+
+  countStepsForRun(runId: string): number {
+    return countRunStepsFromTx(this.datastore.db, runId);
+  }
+
+  listStepsForRunPage(runId: string, offset: number, limit: number): readonly StoredRunStep[] {
+    return readRunStepsPageFromTx(this.datastore.db, runId, offset, limit);
   }
 
   listStepsForRuns(runIds: readonly string[]): ReadonlyMap<string, readonly StoredRunStep[]> {
@@ -411,6 +489,14 @@ function deleteRunRetentionCandidates(
 }
 
 function validateRun(run: StoredRun): void {
+  if (!isResolvableStoredRunId(run.id)) {
+    throw new ValidationError(
+      'Run ID must contain 1-128 letters, numbers, underscores, or hyphens.',
+      {
+        code: 'VALIDATION.RUN.INVALID_ID',
+      },
+    );
+  }
   if (!runRowShapeIsValid(run)) {
     throw new ValidationError('Invalid required Run row shape.', {
       code: 'VALIDATION.RUN.INVALID_SHAPE',
@@ -452,7 +538,7 @@ function validateStep(step: StoredRunStep): void {
 function runRowShapeIsValid(value: unknown): value is StoredRun {
   if (!isPlainRecord(value)) return false;
   return (
-    isNonEmptyString(value.id) &&
+    isResolvableStoredRunId(value.id) &&
     isNonEmptyString(value.name) &&
     runSourceIsValid(value.source) &&
     isOptionalString(value.correlationRunId) &&
@@ -580,7 +666,9 @@ function runFromRow(row: typeof runs.$inferSelect): StoredRun {
       : { reviewBrief: row.review_brief as StoredRun['reviewBrief'] }),
     ...(row.context_manifest == null
       ? {}
-      : { contextManifest: row.context_manifest as StoredRun['contextManifest'] }),
+      : {
+          contextManifest: row.context_manifest as StoredRun['contextManifest'],
+        }),
     ...(row.legacy_suite_run_id === null ? {} : { legacySuiteRunId: row.legacy_suite_run_id }),
     ...(row.cli_version === null ? {} : { cliVersion: row.cli_version }),
     ...(row.engine_versions == null
