@@ -81,14 +81,19 @@ function makeSession(id: string, overrides: Partial<StoredSession> = {}): Stored
   };
 }
 
-function insertLegacyRunRow(store: DataStore, id: string, completedAt: string): void {
+function insertLegacyRunRow(
+  store: DataStore,
+  id: string,
+  completedAt: string,
+  cwd = '/proj',
+): void {
   requireDrizzleHandle(store)
     .db.insert(runs)
     .values({
       id,
       name: 'legacy',
       source: 'reconstructed',
-      cwd: '/proj',
+      cwd,
       started_at: Date.parse('2026-07-08T12:00:00.000Z'),
       started_at_iso: '2026-07-08T12:00:00.000Z',
       completed_at: Date.parse(completedAt),
@@ -201,9 +206,74 @@ describe('listParentRuns', () => {
       });
     }
   });
+
+  it('applies cwd scope before the limit and ignores foreign unsafe legacy identities', () => {
+    runsRepo.saveRun(
+      makeRun('local-old', {
+        cwd: '/local',
+        completedAt: '2026-07-08T12:00:01.000Z',
+      }),
+    );
+    runsRepo.saveRun(
+      makeRun('foreign-new', {
+        cwd: '/foreign',
+        completedAt: '2026-07-10T12:00:01.000Z',
+      }),
+    );
+    insertLegacyRunRow(datastore, 'unsafe/foreign', '2026-07-11T12:00:01.000Z', '/foreign');
+
+    expect(listParentRuns(datastore, { limit: 1, cwdWithin: '/local' })).toMatchObject({
+      runs: [{ id: 'local-old' }],
+      truncated: false,
+    });
+    expect(() => listParentRuns(datastore, { limit: 1 })).toThrow(
+      expect.objectContaining({ code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID' }),
+    );
+  });
+
+  it('fails when a scoped unsafe legacy identity is older than the returned prefix', () => {
+    runsRepo.saveRun(
+      makeRun('local-new', {
+        cwd: '/local',
+        completedAt: '2026-07-10T12:00:01.000Z',
+      }),
+    );
+    insertLegacyRunRow(datastore, 'unsafe/local', '2026-01-01T00:00:00.000Z', '/local/nested');
+
+    expect(() => listParentRuns(datastore, { limit: 1, cwdWithin: '/local' })).toThrow(
+      expect.objectContaining({ code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID' }),
+    );
+  });
+
+  it('fails closed when a raw scoped prefix normalizes outside the project root', () => {
+    runsRepo.saveRun(makeRun('run-escape', { cwd: '/local/../foreign' }));
+
+    expect(() => listParentRuns(datastore, { cwdWithin: '/local' })).toThrow(
+      expect.objectContaining({ code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_CWD' }),
+    );
+  });
+
+  it('scopes non-BMP Unicode project paths by code point rather than UTF-16 width', () => {
+    runsRepo.saveRun(makeRun('run-unicode', { cwd: '/projects/🫖/nested' }));
+
+    expect(listParentRuns(datastore, { cwdWithin: '/projects/🫖' })).toMatchObject({
+      runs: [{ id: 'run-unicode' }],
+    });
+  });
 });
 
 describe('resolveParentRun', () => {
+  it('reports an exact foreign parent as not found under cwd scope', () => {
+    runsRepo.saveRun(makeRun('run-foreign', { cwd: '/foreign' }));
+
+    expect(
+      resolveParentRun(datastore, {
+        runId: 'run-foreign',
+        cwdWithin: '/local',
+      }),
+    ).toEqual({ status: 'not-found' });
+  });
+
   it('resolves only an exact ID with deterministic paged steps and totals', () => {
     const run = makeRun('run-detail', {
       aggregate: {

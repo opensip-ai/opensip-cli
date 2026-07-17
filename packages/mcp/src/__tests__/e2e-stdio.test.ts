@@ -43,6 +43,8 @@ import { BASE_PROJECT_SOURCE, highFanInProjectSource } from './fixtures/high-fan
 import { PACKAGE_EVIDENCE_FILES } from './fixtures/package-evidence-project.js';
 
 import type {
+  StoredRun,
+  StoredRunStep,
   StoredSession,
   TaskContextManifest,
   TaskContextSnapshotPointer,
@@ -451,7 +453,7 @@ function graphSession(root: string): StoredSession {
     tool: 'graph',
     startedAt: '2026-05-21T12:00:00.000Z',
     completedAt: '2026-05-21T12:00:30.000Z',
-    cwd: root,
+    cwd: realpathSync(root),
     suiteRunId: 'suite-e2e-1',
     suiteName: 'audit',
     recipe: 'default',
@@ -480,6 +482,52 @@ function graphSession(root: string): StoredSession {
       ],
     },
   };
+}
+
+function executionRun(root: string): StoredRun {
+  return {
+    id: 'run-e2e-1',
+    name: 'audit',
+    source: 'built-in-suite',
+    cwd: realpathSync(root),
+    startedAt: '2026-05-21T12:00:00.000Z',
+    completedAt: '2026-05-21T12:00:30.000Z',
+    durationMs: 30_000,
+    exitCode: 0,
+    aggregate: { steps: 2, passed: 2, failed: 0, faulted: 0, errors: 0, warnings: 1 },
+  };
+}
+
+function executionSteps(): readonly StoredRunStep[] {
+  return [
+    {
+      id: 'run-e2e-step-linked',
+      runId: 'run-e2e-1',
+      logicalStepKey: '0:graph:graph',
+      ordinal: 0,
+      attempt: 1,
+      tool: 'graph',
+      command: 'graph',
+      stableId: 'graph',
+      exitCode: 0,
+      outcome: 'passed',
+      durationMs: 20_000,
+      sessionId: 'graph-e2e-1',
+    },
+    {
+      id: 'run-e2e-step-only',
+      runId: 'run-e2e-1',
+      logicalStepKey: '1:host:review',
+      ordinal: 1,
+      attempt: 1,
+      tool: 'host',
+      command: 'review',
+      stableId: 'host-review',
+      exitCode: 0,
+      outcome: 'passed',
+      durationMs: 10_000,
+    },
+  ];
 }
 
 function oversizedGraphSession(root: string): StoredSession {
@@ -636,6 +684,7 @@ beforeAll(async () => {
   const sessions = new SessionRepo(store);
   sessions.save(oversizedGraphSession(fixtureA));
   sessions.save(graphSession(fixtureA));
+  new RunRepo(store).saveRunWithSteps(executionRun(fixtureA), executionSteps());
   store.close();
   if (!helperSymbolId) throw new Error('e2e seeding failed: helper symbol not found in catalog');
   if (!entrySymbolId) throw new Error('e2e seeding failed: entry symbol not found in catalog');
@@ -696,7 +745,7 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(fixtureA);
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(25);
+      expect(tools.tools).toHaveLength(27);
       const names = tools.tools.map((t) => t.name).sort();
       expect(names).toEqual(
         [
@@ -711,6 +760,7 @@ describe('MCP e2e over real stdio', () => {
           'get_latest_findings',
           'get_runtime_wiring',
           'get_symbol',
+          'list_execution_runs',
           'list_runs',
           'impact_files',
           'package_cycles',
@@ -721,6 +771,7 @@ describe('MCP e2e over real stdio', () => {
           'search_declarations',
           'search_symbols',
           'select_tests',
+          'show_execution_run',
           'show_run',
           'trace_path',
           'who_calls',
@@ -779,7 +830,7 @@ describe('MCP e2e over real stdio', () => {
         mutationPosture: string;
         project: { root: string; scope: string };
       };
-      expect(overlay.surfaceEpoch).toBe(7);
+      expect(overlay.surfaceEpoch).toBe(8);
       expect(overlay.mutationPosture).toBe('read-only');
       expect(overlay.project).toEqual({ root: realpathSync(catalogFixture), scope: 'project' });
       expect([...overlay.toolNames].sort()).toEqual(listed);
@@ -810,6 +861,7 @@ describe('MCP e2e over real stdio', () => {
         ['get_latest_findings', { tool: 'fit' }],
         ['get_runtime_wiring', {}],
         ['get_symbol', { file: 'src/a.ts', line: 1 }],
+        ['list_execution_runs', {}],
         ['list_runs', {}],
         ['impact_files', { files: ['src/a.ts'] }],
         ['package_cycles', {}],
@@ -820,6 +872,7 @@ describe('MCP e2e over real stdio', () => {
         ['search_declarations', { query: 'a' }],
         ['search_symbols', { query: 'a' }],
         ['select_tests', { files: ['src/a.ts'] }],
+        ['show_execution_run', { runId: 'run-e2e-1' }],
         ['show_run', { ref: 'latest', tool: 'fit' }],
         ['trace_path', { fromSymbolId: 'src/a.ts:1:0', toSymbolId: 'src/b.ts:1:0' }],
         ['who_calls', { symbolId: 'src/a.ts:1:0' }],
@@ -853,6 +906,10 @@ describe('MCP e2e over real stdio', () => {
           /packages|array|50/i,
         ],
         ['search_symbols', { query: 'helper', limit: 501 }, /limit|500|number/i],
+        ['list_execution_runs', { limit: 501 }, /limit|500|number/i],
+        ['show_execution_run', { runId: '../unsafe' }, /runId|safe|exact/i],
+        ['show_execution_run', { runId: 'run-e2e-1', offset: -1 }, /offset|number/i],
+        ['show_execution_run', { runId: 'run-e2e-1', limit: 501 }, /limit|500|number/i],
         [
           'get_context_status',
           {
@@ -888,7 +945,7 @@ describe('MCP e2e over real stdio', () => {
     const conn = await connect(catalogFixture, { allowMutations: true });
     try {
       const tools = await conn.client.listTools();
-      expect(tools.tools).toHaveLength(26);
+      expect(tools.tools).toHaveLength(28);
       const names = tools.tools.map((tool) => tool.name);
       expect(new Set(names)).toEqual(
         new Set([
@@ -903,6 +960,7 @@ describe('MCP e2e over real stdio', () => {
           'get_latest_findings',
           'get_runtime_wiring',
           'get_symbol',
+          'list_execution_runs',
           'list_runs',
           'impact_files',
           'package_cycles',
@@ -914,6 +972,7 @@ describe('MCP e2e over real stdio', () => {
           'search_declarations',
           'search_symbols',
           'select_tests',
+          'show_execution_run',
           'show_run',
           'trace_path',
           'who_calls',
@@ -989,7 +1048,7 @@ describe('MCP e2e over real stdio', () => {
       expect(agentCatalog).toMatchObject({
         mcp: {
           project: { root: realpathSync(contextFixture), scope: 'project' },
-          surfaceEpoch: 7,
+          surfaceEpoch: 8,
           mutationPosture: 'read-only',
           toolNames: expect.arrayContaining([
             'get_context_status',
@@ -1817,6 +1876,79 @@ describe('MCP e2e over real stdio', () => {
       rmSync(root, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it('serves exact parent execution history without changing legacy Session replay', async () => {
+    const conn = await connect(fixtureA);
+    try {
+      const history = await call(conn, 'list_execution_runs', { limit: 500 });
+      expect(history).toMatchObject({
+        type: 'run-history',
+        requestedLimit: 500,
+        effectiveLimit: 500,
+        truncated: false,
+      });
+      expect(history.runs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            run: expect.objectContaining({
+              id: 'run-e2e-1',
+              name: 'audit',
+              source: 'built-in-suite',
+            }),
+            showCommand: 'opensip runs show run-e2e-1 --json',
+          }),
+        ]),
+      );
+
+      const firstPage = await call(conn, 'show_execution_run', {
+        runId: 'run-e2e-1',
+        limit: 1,
+      });
+      expect(firstPage).toMatchObject({
+        type: 'run-detail',
+        run: { id: 'run-e2e-1' },
+        steps: [{ id: 'run-e2e-step-linked', sessionId: 'graph-e2e-1' }],
+        offset: 0,
+        limit: 1,
+        total: 2,
+        nextOffset: 1,
+        sessionFollowUps: [
+          {
+            runStepId: 'run-e2e-step-linked',
+            sessionId: 'graph-e2e-1',
+            showCommand: 'opensip sessions show graph-e2e-1 --json',
+          },
+        ],
+      });
+      expect(JSON.stringify(firstPage)).not.toContain('a seeded finding');
+
+      const secondPage = await call(conn, 'show_execution_run', {
+        runId: 'run-e2e-1',
+        offset: 1,
+        limit: 1,
+      });
+      expect(secondPage).toMatchObject({
+        steps: [{ id: 'run-e2e-step-only' }],
+        offset: 1,
+        limit: 1,
+        total: 2,
+        sessionFollowUps: [],
+      });
+      expect(secondPage).not.toHaveProperty('nextOffset');
+
+      for (const runId of ['graph-e2e-1', 'audit', 'latest']) {
+        const missing = await call(conn, 'show_execution_run', { runId });
+        expect(missing.error).toMatchObject({ code: 'not-found' });
+      }
+
+      const legacy = await call(conn, 'list_runs', { tool: 'graph' });
+      expect(legacy.runs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: 'graph-e2e-1', tool: 'graph' })]),
+      );
+    } finally {
+      await conn.client.close();
+    }
+  }, 60_000);
 
   it('serves the result-first path: get_latest_findings replays a seeded run (never re-runs)', async () => {
     const conn = await connect(fixtureA);

@@ -778,6 +778,51 @@ describe('runCommandSpecAction', () => {
     }
   });
 
+  it('stamps an envelope-only parent with the canonical host project root', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(createRunPlaneFactory({ getDatastore: () => datastore }));
+      const runEnvelope = buildSignalEnvelope({
+        tool: 'graph',
+        runId: 'canonical-envelope',
+        createdAt: '2026-07-16T00:00:00.000Z',
+        units: [{ slug: 'graph', passed: true, durationMs: 1 }],
+        signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      });
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'graph',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+        handler: () => ({ envelope: runEnvelope }),
+      });
+      const scope = new RunScope({
+        datastore: () => datastore,
+        projectContext: {
+          cwd: '/literal/alias',
+          cwdExplicit: true,
+          projectRoot: '/canonical/project',
+          configPath: '/canonical/project/opensip-cli.config.yml',
+          walkedUp: 0,
+          scope: 'project',
+        },
+      });
+
+      await runWithScope(scope, () =>
+        runCommandSpecAction(spec, { cwd: '/literal/alias', _args: [] }, [], makeCtx(), hooks),
+      );
+
+      expect(new RunRepo(datastore).listRuns()[0]?.cwd).toBe('/canonical/project');
+    } finally {
+      datastore.close();
+    }
+  });
+
   it('projects from the pre-output immutable envelope snapshot', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {

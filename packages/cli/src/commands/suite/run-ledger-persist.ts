@@ -9,6 +9,7 @@ import {
 } from '@opensip-cli/contracts';
 import { generatePrefixedId, readPackageVersion } from '@opensip-cli/core';
 
+import { authoritativeEvidenceCwd } from '../../bootstrap/evidence-cwd.js';
 import {
   projectEnvelopeEvidence,
   projectEvidenceSnapshotEvidence,
@@ -273,7 +274,7 @@ export function projectSuiteRun(input: ProjectSuiteRunInput): SuiteRunLedgerProj
     name: input.result.suite,
     source: input.source === 'built-in' ? 'built-in-suite' : 'configured-suite',
     ...(input.correlationRunId === undefined ? {} : { correlationRunId: input.correlationRunId }),
-    cwd: input.cwd,
+    cwd: authoritativeEvidenceCwd(input.cwd),
     startedAt: input.startedAt,
     completedAt: input.completedAt,
     durationMs: input.result.durationMs,

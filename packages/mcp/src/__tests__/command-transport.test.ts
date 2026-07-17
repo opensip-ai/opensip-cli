@@ -75,7 +75,7 @@ describe('mcp command — raw-stream transport contract', () => {
   });
 
   it('uses the current context-read surface epoch when constructed directly', () => {
-    expect(serverWithScope(new RunScope()).describeSurface().surfaceEpoch).toBe(7);
+    expect(serverWithScope(new RunScope()).describeSurface().surfaceEpoch).toBe(8);
   });
 
   it('advertises an explicitly captured canonical project root', () => {

@@ -23,7 +23,7 @@ import type { McpStdioServer } from '../server.js';
  * the exported value and the registered names are the protocol authority.
  * Actual registration names remain authoritative via server.describeSurface().
  */
-export const MCP_SURFACE_EPOCH = 7;
+export const MCP_SURFACE_EPOCH = 8;
 
 /**
  * Register the default protocol inventory. `refresh_graph` is the sole graph

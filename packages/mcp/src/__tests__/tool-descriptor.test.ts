@@ -39,6 +39,8 @@ const DEFAULT_TOOL_NAMES = [
   'get_runtime_wiring',
   'get_context_status',
   'get_agent_catalog',
+  'list_execution_runs',
+  'show_execution_run',
   'list_runs',
   'show_run',
   'get_latest_findings',
@@ -78,9 +80,9 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(25);
+    expect(names).toHaveLength(27);
     expect(new Set(names)).toEqual(new Set(DEFAULT_TOOL_NAMES));
-    expect(MCP_SURFACE_EPOCH).toBe(7);
+    expect(MCP_SURFACE_EPOCH).toBe(8);
   });
 
   it('adds repair_apply_verify only when mutation is explicitly enabled', () => {
@@ -104,7 +106,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(names).toHaveLength(26);
+    expect(names).toHaveLength(28);
     expect(new Set(names)).toEqual(new Set([...DEFAULT_TOOL_NAMES, 'repair_apply_verify']));
   });
 
@@ -129,7 +131,7 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    expect(configs.size).toBe(26);
+    expect(configs.size).toBe(28);
     for (const [name, config] of configs) {
       expect(config.inputSchema, `${name} must declare an input schema`).toBeInstanceOf(
         z.ZodObject,
@@ -161,7 +163,14 @@ describe('registerMcpTools', () => {
 
     registerMcpTools(server, deps);
 
-    for (const name of ['get_agent_catalog', 'list_runs', 'show_run', 'get_latest_findings']) {
+    for (const name of [
+      'get_agent_catalog',
+      'list_execution_runs',
+      'show_execution_run',
+      'list_runs',
+      'show_run',
+      'get_latest_findings',
+    ]) {
       const description = configs.get(name)?.description ?? '';
       expect(description).toMatch(/existing|prior/i);
       expect(description).toMatch(/persisted|stored/i);
@@ -169,6 +178,38 @@ describe('registerMcpTools', () => {
       expect(description).toContain('.runtime/logs');
       expect(description).toContain('datastore.sqlite');
     }
+  });
+
+  it('bounds canonical execution Run identities and pagination at the protocol boundary', () => {
+    const configs = new Map<string, { readonly inputSchema?: unknown }>();
+    const server = {
+      register: (name: string, config: { readonly inputSchema?: unknown }) => {
+        configs.set(name, config);
+        return undefined;
+      },
+    } as unknown as McpStdioServer;
+    registerMcpTools(server, {
+      graph: {} as GraphReadPort,
+      codebase: {} as McpToolDeps['codebase'],
+      context: {} as McpToolDeps['context'],
+      results: {} as ResultsReadPort,
+      runtimeWiring: {} as McpToolDeps['runtimeWiring'],
+      validToolIds: new Set(),
+    });
+
+    const listSchema = configs.get('list_execution_runs')?.inputSchema as z.ZodObject;
+    const showSchema = configs.get('show_execution_run')?.inputSchema as z.ZodObject;
+    expect(listSchema.safeParse({ limit: 500 }).success).toBe(true);
+    expect(listSchema.safeParse({ limit: 501 }).success).toBe(false);
+    expect(listSchema.safeParse({ surprise: true }).success).toBe(false);
+    expect(showSchema.safeParse({ runId: 'run_safe-01', offset: 0, limit: 500 }).success).toBe(
+      true,
+    );
+    expect(showSchema.safeParse({ runId: '../run' }).success).toBe(false);
+    expect(showSchema.safeParse({ runId: 'run\nunsafe' }).success).toBe(false);
+    expect(showSchema.safeParse({ runId: 'run-1', offset: -1 }).success).toBe(false);
+    expect(showSchema.safeParse({ runId: 'run-1', limit: 0 }).success).toBe(false);
+    expect(showSchema.safeParse({ runId: 'run-1', unexpected: true }).success).toBe(false);
   });
 
   it('describes get_architecture as including bounded target convention counts', () => {

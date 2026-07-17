@@ -102,6 +102,26 @@ describe('run-plane staging lifecycle', () => {
     expect(second?.completedAt).toBe(first?.completedAt);
   });
 
+  it('stamps the canonical host project root instead of a Tool cwd alias', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const scope = new RunScope({
+      projectContext: {
+        cwd: '/literal/alias',
+        cwdExplicit: true,
+        projectRoot: '/canonical/project',
+        configPath: '/canonical/project/opensip-cli.config.yml',
+        walkedUp: 0,
+        scope: 'project',
+      },
+    });
+
+    const staged = runWithScopeSync(scope, () =>
+      factory.current().completeAndStage(contribution({ cwd: '/literal/alias' })),
+    );
+
+    expect(staged?.cwd).toBe('/canonical/project');
+  });
+
   it('stages without a datastore and discards only at best-effort finalization', async () => {
     const resolver = vi.fn(() => undefined);
     const factory = createRunPlaneFactory({ getDatastore: resolver, logger: SILENT });

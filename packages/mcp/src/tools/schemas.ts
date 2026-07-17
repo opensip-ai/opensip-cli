@@ -47,6 +47,8 @@ export const MAX_CONTEXT_FILES = MAX_TASK_CONTEXT_FILES;
 export const MAX_CURSOR_LEN = 4096;
 /** Hard cap on package/tool/command value length. */
 export const MAX_PACKAGE_LEN = 256;
+/** Hard cap on a canonical parent execution Run identity. */
+export const MAX_EXECUTION_RUN_ID_LEN = 128;
 /** Max unique packages in a filter array. */
 export const MAX_PACKAGE_ARRAY = 50;
 /** Max unique kind/visibility enum entries. */
@@ -185,6 +187,29 @@ export const proofLimit = () => z.number().int().min(0).max(6).default(3);
 
 /** An optional result cap, clamped to `[1, MAX_LIMIT]`. */
 export const limit = () => z.number().int().positive().max(MAX_LIMIT).optional();
+
+/**
+ * Exact canonical parent execution Run identity.
+ *
+ * IDs are opaque to MCP: there is no `latest`, name, Session-id, or fuzzy
+ * resolution at this boundary. The safe alphabet also prevents control/path
+ * material from reaching persistence diagnostics.
+ */
+export const executionRunId = () =>
+  z
+    .string()
+    .min(1)
+    .max(MAX_EXECUTION_RUN_ID_LEN)
+    .regex(/^[A-Za-z0-9_-]+$/, 'runId must be a safe exact execution Run id');
+
+/** Zero-based bounded RunStep page offset. */
+export const executionRunOffset = () =>
+  z
+    .number()
+    .int()
+    .min(0)
+    .max(Number.MAX_SAFE_INTEGER - MAX_LIMIT)
+    .optional();
 
 /**
  * Page limit with default 100 and max 500. Use when a tool always pages.

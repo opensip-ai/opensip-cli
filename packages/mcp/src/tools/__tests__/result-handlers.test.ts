@@ -13,9 +13,11 @@ import { describe, expect, it } from 'vitest';
 import { registerCompareToBaseline } from '../compare-to-baseline.js';
 import { registerGetAgentCatalog } from '../get-agent-catalog.js';
 import { registerGetLatestFindings } from '../get-latest-findings.js';
+import { registerListExecutionRuns } from '../list-execution-runs.js';
 import { registerListRuns } from '../list-runs.js';
 import { registerRepairApplyVerify } from '../repair-apply-verify.js';
 import { registerReviewChange } from '../review-change.js';
+import { registerShowExecutionRun } from '../show-execution-run.js';
 import { registerShowRun } from '../show-run.js';
 
 import type { McpReadError } from '../../mcp-error.js';
@@ -24,6 +26,8 @@ import type {
   CompareToBaselineOptions,
   LatestFindingsOptions,
   McpBaselineComparisonData,
+  McpExecutionRunDetailData,
+  McpExecutionRunHistoryData,
   McpFinding,
   McpReviewChangeData,
   McpResultReplay,
@@ -31,10 +35,22 @@ import type {
   RunSummary,
   ShowRunData,
 } from '../../result-dto.js';
-import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from '../../results-read-port.js';
+import type {
+  ListExecutionRunsOptions,
+  ListRunsOptions,
+  ResultsReadPort,
+  ShowExecutionRunOptions,
+  ShowRunOptions,
+} from '../../results-read-port.js';
 import type { CallToolResult, McpStdioServer, McpSurfaceSnapshot } from '../../server.js';
 import type { McpToolDeps } from '../types.js';
-import type { AgentCatalog, RepairApplyVerifyResult, ReviewBrief } from '@opensip-cli/contracts';
+import type {
+  AgentCatalog,
+  RepairApplyVerifyResult,
+  ReviewBrief,
+  StoredRun,
+  StoredRunStep,
+} from '@opensip-cli/contracts';
 import type { Result } from '@opensip-cli/core';
 
 type Handler = (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
@@ -59,6 +75,15 @@ function parseResult(result: CallToolResult): { isError: boolean; body: Record<s
 function fakeResults(over: Partial<ResultsReadPort>): ResultsReadPort {
   const base: ResultsReadPort = {
     agentCatalog: () => ok({ commands: [] } as unknown as AgentCatalog),
+    listExecutionRuns: () =>
+      ok({
+        type: 'run-history',
+        runs: [],
+        requestedLimit: 20,
+        effectiveLimit: 20,
+        truncated: false,
+      }),
+    showExecutionRun: () => err({ code: 'x', message: 'x' }),
     listRuns: () => ok([]),
     showRun: () => Promise.resolve(err({ code: 'x', message: 'x' })),
     latestFindings: () => Promise.resolve(err({ code: 'x', message: 'x' })),
@@ -159,6 +184,37 @@ function reviewBrief(over: Partial<ReviewBrief> = {}): ReviewBrief {
     degraded: [],
     recommendedActions: [],
     ...over,
+  };
+}
+
+function executionRun(): StoredRun {
+  return {
+    id: 'run-1',
+    name: 'audit',
+    source: 'built-in-suite',
+    cwd: '/proj',
+    startedAt: '2026-07-02T00:00:00.000Z',
+    completedAt: '2026-07-02T00:00:01.000Z',
+    durationMs: 1000,
+    exitCode: 0,
+    aggregate: { steps: 1, passed: 1, failed: 0, faulted: 0, errors: 0, warnings: 0 },
+  };
+}
+
+function executionStep(): StoredRunStep {
+  return {
+    id: 'step-1',
+    runId: 'run-1',
+    logicalStepKey: 'fit',
+    ordinal: 0,
+    attempt: 1,
+    tool: 'fit',
+    command: 'opensip fit',
+    stableId: 'fit',
+    exitCode: 0,
+    outcome: 'passed',
+    durationMs: 1000,
+    sessionId: 'session-1',
   };
 }
 
@@ -524,6 +580,137 @@ describe('compare_to_baseline handler', () => {
       ),
     );
     const out = parseResult(await handlers.get('compare_to_baseline')!({ tool: 'fit' }));
+    expect(out.isError).toBe(true);
+    expect((out.body.error as McpReadError).code).toBe('not-found');
+  });
+});
+
+// ── canonical execution Runs ─────────────────────────────────────────
+
+describe('list_execution_runs handler', () => {
+  it('forwards the optional bound and returns the exact canonical history DTO', () => {
+    let seen: ListExecutionRunsOptions | undefined;
+    let legacyCalled = false;
+    const history: McpExecutionRunHistoryData = {
+      type: 'run-history',
+      runs: [{ run: executionRun(), showCommand: 'opensip runs show run-1 --json' }],
+      requestedLimit: 3,
+      effectiveLimit: 3,
+      truncated: false,
+    };
+    const { server, handlers } = captureServer();
+    registerListExecutionRuns(
+      server,
+      deps(
+        fakeResults({
+          listExecutionRuns: (opts) => {
+            seen = opts;
+            return ok(history);
+          },
+          listRuns: () => {
+            legacyCalled = true;
+            return ok([]);
+          },
+        }),
+      ),
+    );
+
+    const out = parseResult(handlers.get('list_execution_runs')!({ limit: 3 }) as CallToolResult);
+    expect(seen).toEqual({ limit: 3 });
+    expect(out.body).toEqual(history);
+    expect(legacyCalled).toBe(false);
+  });
+
+  it('passes an empty option object and surfaces a fixed port error arm', () => {
+    let seen: ListExecutionRunsOptions | undefined;
+    const { server, handlers } = captureServer();
+    registerListExecutionRuns(
+      server,
+      deps(
+        fakeResults({
+          listExecutionRuns: (opts) => {
+            seen = opts;
+            return err({ code: 'execution-run-read-failed', message: 'Stored evidence failed.' });
+          },
+        }),
+      ),
+    );
+
+    const out = parseResult(handlers.get('list_execution_runs')!({}) as CallToolResult);
+    expect(seen).toEqual({});
+    expect(out.isError).toBe(true);
+    expect((out.body.error as McpReadError).code).toBe('execution-run-read-failed');
+  });
+});
+
+describe('show_execution_run handler', () => {
+  it('forwards exact identity and pagination without invoking legacy Session replay', () => {
+    let seen: ShowExecutionRunOptions | undefined;
+    let legacyCalled = false;
+    const detail: McpExecutionRunDetailData = {
+      type: 'run-detail',
+      run: executionRun(),
+      steps: [executionStep()],
+      offset: 2,
+      limit: 4,
+      total: 7,
+      nextOffset: 3,
+      sessionFollowUps: [
+        {
+          runStepId: 'step-1',
+          sessionId: 'session-1',
+          showCommand: 'opensip sessions show session-1 --json',
+        },
+      ],
+    };
+    const { server, handlers } = captureServer();
+    registerShowExecutionRun(
+      server,
+      deps(
+        fakeResults({
+          showExecutionRun: (opts) => {
+            seen = opts;
+            return ok(detail);
+          },
+          showRun: () => {
+            legacyCalled = true;
+            return Promise.resolve(err({ code: 'unexpected', message: 'unexpected' }));
+          },
+        }),
+      ),
+    );
+
+    const out = parseResult(
+      handlers.get('show_execution_run')!({
+        runId: 'run-1',
+        offset: 2,
+        limit: 4,
+      }) as CallToolResult,
+    );
+    expect(seen).toEqual({ runId: 'run-1', offset: 2, limit: 4 });
+    expect(out.body).toEqual(detail);
+    expect(legacyCalled).toBe(false);
+  });
+
+  it('omits absent pagination fields and surfaces not-found', () => {
+    let seen: ShowExecutionRunOptions | undefined;
+    const { server, handlers } = captureServer();
+    registerShowExecutionRun(
+      server,
+      deps(
+        fakeResults({
+          showExecutionRun: (opts) => {
+            seen = opts;
+            return err({ code: 'not-found', message: 'Execution Run was not found.' });
+          },
+        }),
+      ),
+    );
+
+    const out = parseResult(
+      handlers.get('show_execution_run')!({ runId: 'missing' }) as CallToolResult,
+    );
+    expect(seen).toEqual({ runId: 'missing' });
     expect(out.isError).toBe(true);
     expect((out.body.error as McpReadError).code).toBe('not-found');
   });

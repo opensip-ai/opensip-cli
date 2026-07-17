@@ -2,15 +2,16 @@
  * Session-backed {@link ResultsReadPort} (ADR-0084).
  *
  * Implements the result/history reads over the `@opensip-cli/session-store`
- * read API (`listSessionSummaries` / `resolveAndReplaySession` / the bundled
- * replay resolver), and returns the already-assembled common `AgentCatalog`
- * captured at construction (Plan 03 transport parity — `serveMcpStdio` composes
- * it once through the contracts `assembleAgentCatalog`; the port never builds
- * it). It is constructed from an injected `DataStore` (+ the live `ToolRegistry`)
- * captured once — it NEVER calls `currentScope()` inside a method (the long-lived
- * server captures scope at construction; Phase 3). It NEVER names `SessionRepo`,
- * never raw-queries the datastore, and never re-runs the underlying tool — replay
- * only (the `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
+ * read API (canonical parent Run readers, Session summary/replay readers, and
+ * the bundled replay resolver), and returns the already-assembled common
+ * `AgentCatalog` captured at construction (Plan 03 transport parity —
+ * `serveMcpStdio` composes it once through the contracts
+ * `assembleAgentCatalog`; the port never builds it). It is constructed from an
+ * injected `DataStore` (+ the live `ToolRegistry`) captured once — it NEVER
+ * calls `currentScope()` inside a method (the long-lived server captures scope
+ * at construction; Phase 3). It NEVER names `SessionRepo`, never raw-queries
+ * the datastore, and never re-runs the underlying tool (the
+ * `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
  */
 
 import { err, logger, mapWithConcurrency, ok } from '@opensip-cli/core';
@@ -18,7 +19,9 @@ import { BaselineRepo } from '@opensip-cli/datastore';
 import {
   bundledReplayResolver,
   isSessionCwdWithin,
+  listParentRuns,
   listSessionSummaries,
+  resolveParentRun,
   resolveSession,
   resolveAndReplaySession,
   resolveSessionLedgerReference,
@@ -46,6 +49,8 @@ import type {
   CompareToBaselineOptions,
   LatestFindingsOptions,
   McpBaselineComparisonData,
+  McpExecutionRunDetailData,
+  McpExecutionRunHistoryData,
   McpFinding,
   McpReviewChangeData,
   McpResultReplay,
@@ -53,7 +58,13 @@ import type {
   RunSummary,
   ShowRunData,
 } from './result-dto.js';
-import type { ListRunsOptions, ResultsReadPort, ShowRunOptions } from './results-read-port.js';
+import type {
+  ListExecutionRunsOptions,
+  ListRunsOptions,
+  ResultsReadPort,
+  ShowExecutionRunOptions,
+  ShowRunOptions,
+} from './results-read-port.js';
 import type { AgentCatalog, HistorySession, StoredSession } from '@opensip-cli/contracts';
 import type { Result, ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -61,6 +72,13 @@ import type { DataStore } from '@opensip-cli/datastore';
 /** The no-op replay resolver used when no tool registry was supplied. */
 const noReplay = (): undefined => undefined;
 const REVIEW_REPLAY_CONCURRENCY = 8;
+const SAFE_STORED_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const EXECUTION_RUN_VALIDATION_CODES = new Set([
+  'VALIDATION.RUN_READ.LIST_LIMIT_INVALID',
+  'VALIDATION.RUN_READ.RUN_ID_INVALID',
+  'VALIDATION.RUN_READ.OFFSET_INVALID',
+  'VALIDATION.RUN_READ.STEP_LIMIT_INVALID',
+]);
 
 /** Construction deps — all captured once (no ambient scope reads). */
 export interface SessionResultsReadPortDeps {
@@ -101,6 +119,77 @@ export class SessionResultsReadPort implements ResultsReadPort {
     // Pure conduit: return the catalog assembled once at the composition root.
     // No scope, filesystem, graph, Git, test, session, or datastore read here.
     return ok(this.capturedAgentCatalog);
+  }
+
+  listExecutionRuns(
+    opts: ListExecutionRunsOptions = {},
+  ): Result<McpExecutionRunHistoryData, McpReadError> {
+    try {
+      const history = listParentRuns(this.store, {
+        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
+        ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
+      });
+      return ok({
+        type: 'run-history',
+        runs: history.runs.map((run) => ({
+          run,
+          showCommand: `opensip runs show ${run.id} --json`,
+        })),
+        requestedLimit: history.requestedLimit,
+        effectiveLimit: history.effectiveLimit,
+        truncated: history.truncated,
+      });
+    } catch (error) {
+      return err(executionRunReadError(error));
+    }
+  }
+
+  showExecutionRun(opts: ShowExecutionRunOptions): Result<McpExecutionRunDetailData, McpReadError> {
+    try {
+      const resolved = resolveParentRun(this.store, {
+        runId: opts.runId,
+        ...(opts.offset === undefined ? {} : { offset: opts.offset }),
+        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
+        ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
+      });
+      if (resolved.status === 'not-found') {
+        return err(readError('not-found', `Execution Run '${opts.runId}' was not found.`));
+      }
+      if (
+        resolved.steps.some(
+          (step) => step.sessionId !== undefined && !SAFE_STORED_ID.test(step.sessionId),
+        )
+      ) {
+        return err(
+          readError(
+            'execution-run-read-failed',
+            'Stored execution Run evidence could not be read.',
+          ),
+        );
+      }
+      return ok({
+        type: 'run-detail',
+        run: resolved.run,
+        steps: resolved.steps,
+        offset: resolved.offset,
+        limit: resolved.limit,
+        total: resolved.total,
+        ...(resolved.nextOffset === undefined ? {} : { nextOffset: resolved.nextOffset }),
+        sessionFollowUps: resolved.steps.flatMap((step) =>
+          step.sessionId === undefined
+            ? []
+            : [
+                {
+                  runStepId: step.id,
+                  sessionId: step.sessionId,
+                  showCommand: `opensip sessions show ${step.sessionId} --json`,
+                },
+              ],
+        ),
+      });
+    } catch (error) {
+      return err(executionRunReadError(error));
+    }
   }
 
   listRuns(opts: ListRunsOptions = {}): Result<readonly RunSummary[], McpReadError> {
@@ -352,4 +441,16 @@ function filterMeta(
 > {
   if (!filters?.length) return {};
   return { filtersApplied: filters, originalSignalCount, returnedSignalCount };
+}
+
+function executionRunReadError(error: unknown): McpReadError {
+  return isExecutionRunValidationError(error)
+    ? readError('invalid-argument', 'Execution Run identity or pagination bounds are invalid.')
+    : readError('execution-run-read-failed', 'Stored execution Run evidence could not be read.');
+}
+
+function isExecutionRunValidationError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
+  const code = error.code;
+  return typeof code === 'string' && EXECUTION_RUN_VALIDATION_CODES.has(code);
 }

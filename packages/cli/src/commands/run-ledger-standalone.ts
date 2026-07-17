@@ -15,6 +15,7 @@ import {
 } from '@opensip-cli/core';
 
 import { manifestVersionFor } from '../bootstrap/declared-inputs.js';
+import { authoritativeEvidenceCwd } from '../bootstrap/evidence-cwd.js';
 
 import { projectLedgerArgs } from './run-ledger-projection.js';
 
@@ -88,7 +89,7 @@ export function projectStandaloneRun<TCtx extends CommandMountContext>(
     name: command,
     source: 'implicit-tool',
     ...(input.correlationRunId === undefined ? {} : { correlationRunId: input.correlationRunId }),
-    cwd: session?.cwd ?? cwdFrom(input.opts),
+    cwd: session?.cwd ?? authoritativeEvidenceCwd(cwdFrom(input.opts)),
     ...timing,
     exitCode,
     aggregate: {

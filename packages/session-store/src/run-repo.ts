@@ -1,3 +1,5 @@
+import { resolve, sep } from 'node:path';
+
 import { isPlainRecord, tryCatch, ValidationError } from '@opensip-cli/core';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import {
@@ -12,6 +14,7 @@ import {
   isNotNull,
   lt,
   notExists,
+  or,
   sql,
 } from 'drizzle-orm';
 
@@ -134,10 +137,11 @@ export function readRunsPageFromTx(
   tx: DrizzleHandle,
   offset: number,
   limit: number,
+  cwdWithin?: string,
 ): readonly StoredRun[] {
-  return tx
-    .select()
-    .from(runs)
+  const query = tx.select().from(runs);
+  const scoped = cwdWithin === undefined ? query : query.where(runCwdWithinPredicate(cwdWithin));
+  return scoped
     .orderBy(desc(runs.completed_at), desc(runs.id))
     .offset(offset)
     .limit(limit)
@@ -146,17 +150,30 @@ export function readRunsPageFromTx(
 }
 
 /** Package-private corruption probe used before exposing resolvable Run IDs. */
-export function readUnresolvableRunIdFromTx(tx: DrizzleHandle): string | null {
+export function readUnresolvableRunIdFromTx(tx: DrizzleHandle, cwdWithin?: string): string | null {
+  const invalidId = sql<boolean>`NOT (length(${runs.id}) BETWEEN 1 AND 128 AND ${runs.id} NOT GLOB '*[^A-Za-z0-9_-]*')`;
+  const predicate =
+    cwdWithin === undefined ? invalidId : and(invalidId, runCwdWithinPredicate(cwdWithin));
   const row = tx
     .select({ id: runs.id })
     .from(runs)
-    .where(
-      sql<boolean>`NOT (length(${runs.id}) BETWEEN 1 AND 128 AND ${runs.id} NOT GLOB '*[^A-Za-z0-9_-]*')`,
-    )
+    .where(predicate)
     .orderBy(desc(runs.completed_at), desc(runs.id))
     .limit(1)
     .get();
   return row?.id ?? null;
+}
+
+function runCwdWithinPredicate(root: string) {
+  const normalizedRoot = resolve(root);
+  const descendantPrefix = normalizedRoot.endsWith(sep)
+    ? normalizedRoot
+    : `${normalizedRoot}${sep}`;
+  const prefixCodePoints = [...descendantPrefix].length;
+  return or(
+    eq(runs.cwd, normalizedRoot),
+    sql<boolean>`substr(${runs.cwd}, 1, ${prefixCodePoints}) = ${descendantPrefix}`,
+  );
 }
 
 /** Package-private exact RunStep count for one parent. */

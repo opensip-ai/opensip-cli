@@ -259,6 +259,230 @@ function registryWithCanonicalFitnessName(): ToolRegistry {
   return tools;
 }
 
+describe('SessionResultsReadPort — canonical execution Runs', () => {
+  it('lists bounded parent Runs newest-first with the exact CLI history DTO', () => {
+    const repo = new RunRepo(store);
+    repo.saveRun(makeRun({ id: 'run-old', completedAt: '2026-05-20T12:00:30.000Z' }));
+    repo.saveRun(makeRun({ id: 'run-new', completedAt: '2026-05-22T12:00:30.000Z' }));
+
+    const out = port().listExecutionRuns({ limit: 1 });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value).toEqual({
+      type: 'run-history',
+      runs: [
+        {
+          run: expect.objectContaining({ id: 'run-new' }),
+          showCommand: 'opensip runs show run-new --json',
+        },
+      ],
+      requestedLimit: 1,
+      effectiveLimit: 1,
+      truncated: true,
+    });
+    expect(replayCalls).toEqual([]);
+  });
+
+  it('returns one exact parent with deterministic pagination and Session references only', () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-linked' }));
+    const run = makeRun({
+      id: 'run-detail',
+      name: 'audit',
+      source: 'built-in-suite',
+      aggregate: { steps: 3, passed: 2, failed: 1, faulted: 0, errors: 1, warnings: 1 },
+    });
+    new RunRepo(store).saveRunWithSteps(run, [
+      makeStep({
+        id: 'step-later-attempt',
+        runId: run.id,
+        ordinal: 0,
+        attempt: 2,
+        sessionId: undefined,
+      }),
+      makeStep({
+        id: 'step-linked',
+        runId: run.id,
+        ordinal: 0,
+        attempt: 1,
+        sessionId: 'fit-linked',
+      }),
+      makeStep({
+        id: 'step-run-only',
+        runId: run.id,
+        ordinal: 1,
+        attempt: 1,
+        sessionId: undefined,
+      }),
+    ]);
+
+    const out = port().showExecutionRun({ runId: run.id, offset: 0, limit: 2 });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.type).toBe('run-detail');
+    expect(out.value.run).toEqual(run);
+    expect(out.value.steps.map((step) => step.id)).toEqual(['step-linked', 'step-later-attempt']);
+    expect(out.value).toMatchObject({
+      offset: 0,
+      limit: 2,
+      total: 3,
+      nextOffset: 2,
+      sessionFollowUps: [
+        {
+          runStepId: 'step-linked',
+          sessionId: 'fit-linked',
+          showCommand: 'opensip sessions show fit-linked --json',
+        },
+      ],
+    });
+    expect(out.value).not.toHaveProperty('sessions');
+    expect(out.value).not.toHaveProperty('payload');
+    expect(out.value).not.toHaveProperty('envelope');
+    expect(replayCalls).toEqual([]);
+  });
+
+  it('uses exact parent identity only and keeps legacy Session replay semantics unchanged', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-session', tool: 'fit' }));
+    new RunRepo(store).saveRunWithSteps(makeRun({ id: 'run-exact', name: 'audit' }), [
+      makeStep({ id: 'step-exact', runId: 'run-exact', sessionId: 'fit-session' }),
+    ]);
+
+    const results = port();
+    const parents = results.listExecutionRuns();
+    const sessions = results.listRuns();
+    const bySessionId = results.showExecutionRun({ runId: 'fit-session' });
+    const byName = results.showExecutionRun({ runId: 'audit' });
+    const byLatest = results.showExecutionRun({ runId: 'latest' });
+    const legacyLatest = await results.showRun({ ref: 'latest', tool: 'fit' });
+
+    expect(parents.ok && parents.value.runs.map((entry) => entry.run.id)).toEqual(['run-exact']);
+    expect(sessions.ok && sessions.value.map((entry) => entry.id)).toEqual(['fit-session']);
+    for (const missing of [bySessionId, byName, byLatest]) {
+      expect(missing.ok).toBe(false);
+      if (!missing.ok) expect(missing.error.code).toBe('not-found');
+    }
+    expect(legacyLatest.ok).toBe(true);
+    expect(replayCalls).toEqual(['fit']);
+  });
+
+  it('maps malformed identities and bounds to fixed safe invalid-argument errors', () => {
+    const results = port();
+    const outcomes = [
+      results.listExecutionRuns({ limit: 0 }),
+      results.showExecutionRun({ runId: '../unsafe' }),
+      results.showExecutionRun({ runId: 'run-safe', offset: -1 }),
+      results.showExecutionRun({ runId: 'run-safe', limit: 501 }),
+    ];
+
+    for (const outcome of outcomes) {
+      expect(outcome.ok).toBe(false);
+      if (!outcome.ok) {
+        expect(outcome.error).toEqual({
+          code: 'invalid-argument',
+          message: 'Execution Run identity or pagination bounds are invalid.',
+        });
+      }
+    }
+  });
+
+  it('rejects an unsafe retained Session id without interpolating it into a command or error', () => {
+    const unsafeId = 'unsafe/session';
+    new SessionRepo(store).save(makeSession({ id: unsafeId }));
+    new RunRepo(store).saveRunWithSteps(makeRun({ id: 'run-unsafe-link' }), [
+      makeStep({ id: 'step-unsafe-link', runId: 'run-unsafe-link', sessionId: unsafeId }),
+    ]);
+
+    const out = port().showExecutionRun({ runId: 'run-unsafe-link' });
+
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.error).toEqual({
+        code: 'execution-run-read-failed',
+        message: 'Stored execution Run evidence could not be read.',
+      });
+      expect(out.error.message).not.toContain(unsafeId);
+    }
+    expect(replayCalls).toEqual([]);
+  });
+
+  it('reads only the injected cache/project store with no cross-store fallback', () => {
+    const otherStore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      new RunRepo(store).saveRun(makeRun({ id: 'run-project' }));
+      new RunRepo(otherStore).saveRun(makeRun({ id: 'run-cache' }));
+      const projectPort = port();
+      const cachePort = new SessionResultsReadPort({
+        store: otherStore,
+        replayFor: recordingResolver,
+        agentCatalog: AGENT_CATALOG,
+      });
+
+      const projectRuns = projectPort.listExecutionRuns();
+      const cacheRuns = cachePort.listExecutionRuns();
+
+      expect(projectRuns.ok && projectRuns.value.runs.map((entry) => entry.run.id)).toEqual([
+        'run-project',
+      ]);
+      expect(cacheRuns.ok && cacheRuns.value.runs.map((entry) => entry.run.id)).toEqual([
+        'run-cache',
+      ]);
+      expect(projectPort.showExecutionRun({ runId: 'run-cache' }).ok).toBe(false);
+      expect(cachePort.showExecutionRun({ runId: 'run-project' }).ok).toBe(false);
+    } finally {
+      otherStore.close();
+    }
+  });
+
+  it('filters contaminated parent history by project cwd before applying its limit', () => {
+    const repo = new RunRepo(store);
+    repo.saveRun(
+      makeRun({ id: 'run-local-old', cwd: '/proj', completedAt: '2026-05-20T12:00:30.000Z' }),
+    );
+    repo.saveRun(
+      makeRun({ id: 'run-foreign-new', cwd: '/foreign', completedAt: '2026-05-22T12:00:30.000Z' }),
+    );
+    const scoped = new SessionResultsReadPort({
+      store,
+      projectRoot: '/proj',
+      replayFor: recordingResolver,
+      agentCatalog: AGENT_CATALOG,
+    });
+
+    const history = scoped.listExecutionRuns({ limit: 1 });
+
+    expect(history.ok && history.value.runs.map((entry) => entry.run.id)).toEqual([
+      'run-local-old',
+    ]);
+    expect(history.ok && history.value.truncated).toBe(false);
+    const foreign = scoped.showExecutionRun({ runId: 'run-foreign-new' });
+    expect(foreign.ok).toBe(false);
+    if (!foreign.ok) expect(foreign.error.code).toBe('not-found');
+  });
+
+  it('returns a coherent immutable snapshot even when retention later deletes its parent', () => {
+    const repo = new RunRepo(store);
+    const oldRun = makeRun({ id: 'run-snapshot', completedAt: '2026-05-20T12:00:30.000Z' });
+    repo.saveRunWithSteps(oldRun, [
+      makeStep({ id: 'step-snapshot', runId: oldRun.id, sessionId: undefined }),
+    ]);
+    const beforeRetention = port().showExecutionRun({ runId: oldRun.id });
+    expect(beforeRetention.ok).toBe(true);
+
+    repo.saveRun(makeRun({ id: 'run-retained', completedAt: '2026-05-22T12:00:30.000Z' }));
+    expect(repo.pruneToCountBatch(1).deleted).toBe(1);
+    expect(repo.getRun(oldRun.id)).toBeNull();
+
+    expect(beforeRetention.ok).toBe(true);
+    if (beforeRetention.ok) {
+      expect(beforeRetention.value.run.id).toBe(oldRun.id);
+      expect(beforeRetention.value.steps.map((step) => step.id)).toEqual(['step-snapshot']);
+      expect(Object.isFrozen(beforeRetention.value.run)).toBe(true);
+      expect(Object.isFrozen(beforeRetention.value.steps)).toBe(true);
+    }
+  });
+});
+
 describe('SessionResultsReadPort — listRuns', () => {
   it('lists stored runs as lean RunSummary pointers (newest first)', () => {
     new SessionRepo(store).save(

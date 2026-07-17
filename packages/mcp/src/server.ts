@@ -123,7 +123,7 @@ export class McpStdioServer {
     this.projectRoot = deps.projectRoot ?? this.scope.projectContext?.projectRoot ?? process.cwd();
     // Keep direct/test construction aligned with the current default surface.
     // The composition root still passes the authoritative exported epoch.
-    this.surfaceEpoch = deps.surfaceEpoch ?? 7;
+    this.surfaceEpoch = deps.surfaceEpoch ?? 8;
     this.mutationsEnabled = deps.mutationsEnabled === true;
     this.mcp = new McpServer({ name: SERVER_NAME, version: deps.version });
     // Default stdin/stdout; the transport owns stdout for JSON-RPC frames.

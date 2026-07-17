@@ -4,10 +4,11 @@
  * session reads and graph-catalog reads are distinct backends with distinct
  * consumers (SRP) — each has exactly one production impl + one test fake.
  *
- * Result tools **never** re-execute the underlying OpenSIP tool; they replay
- * persisted sessions only (paired with the `mcp-results-no-rerun` check). The
- * impl reads through the `@opensip-cli/session-store` read API — it never names
- * `SessionRepo` and never raw-queries the datastore.
+ * Result tools **never** re-execute the underlying OpenSIP tool; they read
+ * persisted parent execution Runs or replay persisted Tool Sessions (paired
+ * with the `mcp-results-no-rerun` check). The impl reads through the
+ * `@opensip-cli/session-store` read API — it never names `SessionRepo` and never
+ * raw-queries the datastore.
  */
 
 import type { McpReadError } from './mcp-error.js';
@@ -15,6 +16,8 @@ import type {
   CompareToBaselineOptions,
   LatestFindingsOptions,
   McpBaselineComparisonData,
+  McpExecutionRunDetailData,
+  McpExecutionRunHistoryData,
   McpFinding,
   McpReviewChangeData,
   McpResultReplay,
@@ -44,9 +47,27 @@ export interface ShowRunOptions {
   readonly raw?: boolean;
 }
 
+/** Options for the canonical parent-Run ledger list. */
+export interface ListExecutionRunsOptions {
+  readonly limit?: number;
+}
+
+/** Options for one exact, paged parent Run read. */
+export interface ShowExecutionRunOptions {
+  readonly runId: string;
+  readonly offset?: number;
+  readonly limit?: number;
+}
+
 export interface ResultsReadPort {
   /** The self-describing agent command catalog. */
   agentCatalog(): Result<AgentCatalog, McpReadError>;
+  /** List canonical parent execution Runs — distinct from Tool Sessions. */
+  listExecutionRuns(
+    opts?: ListExecutionRunsOptions,
+  ): Result<McpExecutionRunHistoryData, McpReadError>;
+  /** Read one exact parent Run and its bounded ordered RunStep page. */
+  showExecutionRun(opts: ShowExecutionRunOptions): Result<McpExecutionRunDetailData, McpReadError>;
   /** List stored runs as lean {@link RunSummary} pointers. */
   listRuns(opts?: ListRunsOptions): Result<readonly RunSummary[], McpReadError>;
   /** Replay one stored run (resolve `ref`, decode, filter) — never re-run. */

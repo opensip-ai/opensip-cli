@@ -37,6 +37,7 @@ import {
 } from '@opensip-cli/session-store';
 
 import { manifestVersionFor } from './declared-inputs.js';
+import { authoritativeEvidenceCwd } from './evidence-cwd.js';
 import { captureEvidenceSnapshots } from './evidence-snapshot-capture.js';
 import {
   createHostEvidenceAccumulator,
@@ -272,7 +273,7 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
         tool: contribution.tool,
         startedAt: snapshot.startedAt,
         completedAt: snapshot.completedAt,
-        cwd: contribution.cwd,
+        cwd: authoritativeEvidenceCwd(contribution.cwd),
         ...suiteSessionFields(),
         recipe: contribution.recipe,
         score: contribution.score,

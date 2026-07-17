@@ -9,7 +9,13 @@
  */
 
 import type { Freshness } from './symbol-dto.js';
-import type { ReviewBrief, RunStepReference, SignalEnvelope } from '@opensip-cli/contracts';
+import type {
+  ReviewBrief,
+  RunDetailResult,
+  RunHistoryResult,
+  RunStepReference,
+  SignalEnvelope,
+} from '@opensip-cli/contracts';
 import type {
   BaselineIdentityMetadata,
   SignalRepair,
@@ -161,6 +167,19 @@ export interface ShowRunData {
   readonly fidelity: 'projection';
   readonly envelope: SignalEnvelope;
 }
+
+/**
+ * Canonical parent execution history. This is deliberately the same contracts
+ * DTO returned by `opensip runs list --json`; legacy {@link RunSummary} remains
+ * the Session-oriented `list_runs` row.
+ */
+export type McpExecutionRunHistoryData = RunHistoryResult;
+
+/**
+ * One exact parent Run and its bounded ordered RunStep page. Linked Sessions
+ * remain follow-up references and are never hydrated into this projection.
+ */
+export type McpExecutionRunDetailData = RunDetailResult;
 
 /**
  * The shared result-replay envelope: `data` + session provenance + (when a

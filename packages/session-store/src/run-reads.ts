@@ -12,6 +12,7 @@ import {
 } from './run-repo.js';
 import { runSteps } from './schema/runs.js';
 import { sessions, sessionHostMetrics, sessionToolPayload } from './schema/sessions.js';
+import { isSessionCwdWithin } from './session-cwd-scope.js';
 import { buildSession } from './session-hydrator.js';
 import { projectHostMetrics } from './session-repo-host-metrics.js';
 
@@ -34,6 +35,8 @@ export const MAX_PARENT_RUN_EVIDENCE_BYTE_BUDGET = 8 * 1024 * 1024;
 
 export interface ListParentRunsOptions {
   readonly limit?: number;
+  /** Optional fail-closed project-root scope, applied before the public limit. */
+  readonly cwdWithin?: string;
 }
 
 export interface ParentRunList {
@@ -47,6 +50,8 @@ export interface ResolveParentRunOptions {
   readonly runId: string;
   readonly offset?: number;
   readonly limit?: number;
+  /** Optional fail-closed project-root scope for the exact parent. */
+  readonly cwdWithin?: string;
 }
 
 export interface ParentRunFound {
@@ -129,13 +134,18 @@ export function listParentRuns(
   );
   const datastore = requireDrizzleHandle(store);
   return datastore.transaction((tx) => {
-    if (readUnresolvableRunIdFromTx(tx) !== null) {
-      throw new SystemError(
-        'Stored parent Run history contains an unsupported legacy Run ID.',
-        { code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID' },
-      );
+    const cwdWithin = options.cwdWithin;
+    if (readUnresolvableRunIdFromTx(tx, cwdWithin) !== null) {
+      throw new SystemError('Stored parent Run history contains an unsupported legacy Run ID.', {
+        code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID',
+      });
     }
-    const rows = readRunsPageFromTx(tx, 0, effectiveLimit + 1);
+    const rows = readRunsPageFromTx(tx, 0, effectiveLimit + 1, cwdWithin);
+    if (cwdWithin !== undefined && rows.some((run) => !isSessionCwdWithin(run.cwd, cwdWithin))) {
+      throw new SystemError('Stored parent Run history contains an unsupported legacy cwd.', {
+        code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_CWD',
+      });
+    }
     return deepFreeze({
       runs: rows.slice(0, effectiveLimit),
       requestedLimit,
@@ -161,7 +171,12 @@ export function resolveParentRun(
   const datastore = requireDrizzleHandle(store);
   return datastore.transaction((tx) => {
     const run = readRunByIdFromTx(tx, runId);
-    if (run === null) return deepFreeze({ status: 'not-found' as const });
+    if (
+      run === null ||
+      (options.cwdWithin !== undefined && !isSessionCwdWithin(run.cwd, options.cwdWithin))
+    ) {
+      return deepFreeze({ status: 'not-found' as const });
+    }
     const total = countRunStepsFromTx(tx, runId);
     const steps = readRunStepsPageFromTx(tx, runId, offset, limit);
     const next = offset + steps.length;
