@@ -168,10 +168,9 @@ compatibility contract classes an OS support decision layers on;
 [ADR-0157](ADR-0157-agent-eval-black-box-harness.md) and
 [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) own the black-box,
 zero-workspace-import agent-eval posture whose installed smoke lane this plan
-targets at the installed candidate. Implementation:
-`docs/plans/ready/01-installed-artifact-platform-acceptance/` (local, gitignored);
-committed usage lives in the "Platform acceptance" section of `scripts/README.md`,
-with a deeper maintainer note kept locally under `docs/internal/` (private working
-context, not committed). The macOS qualification plan is the first downstream
+targets at the installed candidate. Committed usage lives in the "Platform
+acceptance" section of `scripts/README.md`; deeper maintainer notes stay in
+private local-only working context (not committed). The macOS qualification work
+is the first downstream
 consumer and selects a profile, cadence, and publication policy on top of this
 evidence.

@@ -78,5 +78,5 @@ replay, [ADR-0143](ADR-0143-host-owned-run-step-ledger.md) owns the parent
 ledger, and [ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md) defines
 bounded coverage semantics.
 
-**Related spec:** `docs/plans/specs/agent-task-context.md` (local-only) retains
+**Related:** The local-only agent-task-context spec retains
 the broader deferred context-composer waves beyond this first implementation.

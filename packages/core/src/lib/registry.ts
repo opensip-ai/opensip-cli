@@ -3,7 +3,7 @@
  * registry in the workspace.
  *
  * Replaces the ten registry classes catalogued in
- * `docs/plans/ready/architecture-runscope-and-registry/phase-0-audit-and-design.md`.
+ * a local implementation plan.
  *
  * Owns: by-id Map, by-name Map, the closed `DuplicatePolicy` branch,
  * the orthogonal `nameCollisionMode` guard, and the structured-event

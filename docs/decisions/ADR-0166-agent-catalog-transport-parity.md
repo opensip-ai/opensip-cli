@@ -135,5 +135,4 @@ name reservation and its rejection of a duplicated static reserved-command list
 `hostSupport` projection this parity preserves as an assembler input; and
 [ADR-0153](ADR-0153-faceted-compact-mcp-graph-protocol.md) owns the
 reconnect-versus-`refresh_graph` rule the additive `mcp` overlay obeys.
-Implementation: `docs/plans/ready/03-agent-catalog-transport-parity/` (local,
-gitignored). No existing ADR is superseded.
+No existing ADR is superseded.

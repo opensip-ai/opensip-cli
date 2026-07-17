@@ -82,6 +82,6 @@ and documented."
   can reason about precision work without reading tribal shorthand.
 
 **Related specs / ADRs:** Implements Plan 02 from
-`docs/plans/README.md` (precision and dedup hardening). Builds on ADR-0011
+local planning notes (precision and dedup hardening). Builds on ADR-0011
 (signal output currency), ADR-0036 (baseline identity), ADR-0064 (shared clone
 detection substrate), and ADR-0097 (gate verdict determinism).

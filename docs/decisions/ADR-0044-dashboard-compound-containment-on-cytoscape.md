@@ -132,9 +132,9 @@ remaining the bundle-size budget enforcement point), and nothing in
   Blob-URL worker (single-file HTML constraint).
 
 **Related specs / ADRs:**
-`docs/plans/specs/dashboard-graph-containment-upgrade.md` (local-only;
+a local implementation spec (local-only;
 implements this decision);
-`docs/plans/backlog/dashboard-graph-containment-upgrade/plan.md` (local-only;
+a local backlog note (local-only;
 provenance + the React Flow rejection);
 [ADR-0006](./ADR-0006-derived-data-persistence-policy.md) (the dashboard
 stays a decoupled reader; the projection is the sanctioned

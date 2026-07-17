@@ -56,4 +56,4 @@ as "not recorded".
 **Related specs / ADRs:** Extends [ADR-0111](ADR-0111-built-in-audit-suite-preset.md)
 and relies on [ADR-0085](ADR-0085-change-detection-substrate.md) plus
 [ADR-0093](ADR-0093-host-owned-suite-plane.md). Implemented by
-`docs/plans/ready/audit-suite-ergonomics/`.
+a local implementation plan.

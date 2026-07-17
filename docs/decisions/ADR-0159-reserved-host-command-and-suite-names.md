@@ -95,4 +95,4 @@ configured `suites.audit` affects `suite run audit`" becomes unrepresentable).
 Document strictness posture:
 [ADR-0023](ADR-0023-config-package-and-schema-registry.md). Suite
 plane: [ADR-0093](ADR-0093-host-owned-suite-plane.md). Implementation
-specification: `docs/plans/specs/reserved-names.md` (local, gitignored).
+specification retained as local-only planning notes (not committed).

@@ -80,5 +80,5 @@ warn once and continue; typos warn with a correction.
 - Phase 3 revisits the declared-`externalTools` mechanism alongside Tier B
   enforcement (ADR-0042).
 
-**Related specs / ADRs:** `docs/plans/specs/tool-management-command.md` (rev 2);
+**Related specs / ADRs:** a local implementation spec (rev 2);
 ADR-0023 (config consolidation — amended in this one clause); ADR-0041.

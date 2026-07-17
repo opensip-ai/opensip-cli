@@ -260,15 +260,14 @@ classes (this adds the `platform-support` class version);
 [ADR-0158](ADR-0158-agent-eval-deterministic-measurement.md) own the black-box agent-eval
 posture whose installed smoke lane this targets at the installed candidate;
 [ADR-0164](ADR-0164-installed-artifact-platform-acceptance-evidence.md) owns the reusable
-installed-artifact evidence contract this consumes. Implementation: the spec, profile,
-workflows, verifier, generator, and support reference
-(`docs/plans/specs/02-macos-ga-qualification.md` and
-`docs/plans/ready/02-macos-ga-qualification/` — local, gitignored;
+installed-artifact evidence contract this consumes. Implementation surfaces
+(profile, workflows, verifier, generator, and support reference):
 `.config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json`;
-`.github/workflows/macos-qualification.yml` + the three-job `.github/workflows/release.yml`;
-`scripts/verify-platform-acceptance.mjs`; `scripts/build-supported-platforms-doc.mjs`;
+`.github/workflows/macos-qualification.yml` + the three-job
+`.github/workflows/release.yml`; `scripts/verify-platform-acceptance.mjs`;
+`scripts/build-supported-platforms-doc.mjs`;
 `docs/public/70-reference/17-supported-platforms.md`; the sealed
-`opensip-cli-macos-qualification.v1.json` release evidence). The ongoing operations runbook
-is kept locally under `docs/internal/` (private working context, not committed); committed
+`opensip-cli-macos-qualification.v1.json` release evidence. Ongoing operations
+notes stay in private local-only working context (not committed); committed
 release usage lives in `RELEASING.md`.
 ```

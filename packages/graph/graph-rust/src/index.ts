@@ -1,7 +1,7 @@
 /**
  * @opensip-cli/graph — Rust language adapter.
  *
- * Lands in PR 6 of plan docs/plans/10-graph-language-pluggability.md.
+ * Lands in PR 6 of plan local planning notes
  * Exposes `rustGraphAdapter`, a `GraphLanguageAdapter` backed by
  * tree-sitter-rust.
  *

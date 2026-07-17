@@ -48,13 +48,13 @@ enforcement-reason: >
 - A datastore migration (0011) ensures column safety + records the strategy.
 
 **Enforcement & rollout:**
-- See the implementation plan `docs/plans/ready/payload-schema-evolution/plan.md` (phases 0-11) and the spec `docs/plans/specs/payload-schema-evolution.md`.
+- See the implementation plan a local implementation plan (phases 0-11) and the spec a local implementation spec.
 - Phase 8 owns the guard (test or fitness arch check).
 - Phases 9/10 own the roundtrip/legacy/future tests + explicit re-run of dogfood gates with zero net-new architecture/error findings.
 - This ADR is the durable record; the plan/spec contain the detailed tasks and cross-cutting contracts (data layer, observability via DiagnosticsBus + RunScope, hardening = defensive legacy=v1 + degrade+warn, no host import of tool payload interfaces, etc.).
 
 **References:**
-- Spec + full plan in `docs/plans/specs/payload-schema-evolution.md` and `docs/plans/ready/payload-schema-evolution/`.
+- Spec + full plan in a local implementation spec and a local implementation plan.
 - Related: ADR-0025 (session-replay-contract), ADR-0042 (tool-storage-contract-and-state-store).
 - Code: `packages/contracts/src/session-types.ts` (StoredSession.payload JSDoc), `packages/core/src/lib/payload-version.ts`, `packages/session-store/src/session-payload-decode.ts`, per-tool `persistence/session-payload.ts` + `session-replay.ts`, `SessionRepo`, `ToolStateRepo`.
 - Audit findings around opaque payloads and the 0010 migration.

@@ -105,7 +105,7 @@ command's normal output.
   injected `dist/` file sets and `package.json#opensipTools` must remain fresh
   against source.
 
-**Related specs / ADRs:** `docs/plans/specs/cli-diagnostic-boundary-and-run-outcomes.md`.
+**Related specs / ADRs:** a local implementation spec.
 Builds on ADR-0011 (signal output currency), ADR-0024 (command outcome and
 observability), ADR-0035 (host-owned verdict), ADR-0051 (host-owned lifecycle),
 ADR-0052 (bootstrap state machine), ADR-0053 (per-run logger scope), ADR-0054

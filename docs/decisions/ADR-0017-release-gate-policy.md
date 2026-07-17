@@ -96,7 +96,7 @@ boundary beats trusting external state.
   from the release preflight loop.
 
 **Related specs / ADRs:** This decision is implemented by the local-only plan
-`docs/plans/release-gate-hardening/` (Phases 1–3). It complements
+local planning notes (Phases 1–3). It complements
 [ADR-0012](./ADR-0012-versioning-and-release-policy.md) (versioning & release
 policy: npm version immutability is the reason the release lane is the last
 recoverable gate). The two underlying audit findings — the release gate being

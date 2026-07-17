@@ -101,7 +101,7 @@ construction, so it is guarded by the pinned-corpus completeness floor.
 - The exact engine emits syntactic boundary calls (`emitBoundaryCalls`) and runs
   the cross-shard linker in `obtainCatalog`; a debug-only `GRAPH_SITE_LOG` trace
   harness (isolated, env-gated) is retained for the next investigation
-  (`docs/internal/graph-resolution-trace.md`).
+  .
 - **Build-state independence is partial and explicit:** the file+name pin made
   RELATIVE/intra-package imports clean-checkout-safe in both engines; WORKSPACE
   `@scope/pkg` imports still reach the linker in exact via the dep's built
@@ -120,8 +120,8 @@ model), ADR-0014 (shared inline-suppression primitive), ADR-0015 (engine-version
 mode cache stamping), ADR-0031 (one build / one finalize / many renderers).
 Implements the `graph-resolution-correctness` plan (local). Residual diagnosis +
 the `GRAPH_SITE_LOG` harness recorded in
-`docs/internal/graph-resolution-trace.md` and
-`docs/internal/graph-false-findings-incident-log.md`.
+a local working note and
+a local working note.
 
 **Amendment (2026-06-11) — the "conflict" class was MISDIAGNOSED; re-diagnosed +
 fixed (divergence 12 → 1).** This ADR's body calls the 11 conflicts

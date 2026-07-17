@@ -55,4 +55,4 @@ for custom recipes; built-in recipes should model best practice.
 - Recipe docs under `docs/public/20-fit/` updated if examples use bare slugs.
 
 **Related specs / ADRs:** Phase 2 in
-`docs/plans/architecture-audit-p1-remediation/`.
+local architecture planning notes.

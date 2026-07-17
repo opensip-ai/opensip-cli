@@ -136,7 +136,7 @@ its enforcement (an ADR without this section is incomplete):
 | MCP consumes graph only through declared public surfaces; catalog reads/rebuild use `graph/read` | **No check warranted** | ADR-0147's export-path verifier, workspace import verifier, and dependency-cruiser rules. |
 
 **Related specs / ADRs:** implemented by the local plan
-`docs/plans/ready/02-mcp-server/`. Related:
+a local implementation plan. Related:
 [ADR-0009](ADR-0009-public-api-surface-policy.md) (internal-surface boundary),
 [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundaries.md)
 (public graph/read boundary), [ADR-0006](ADR-0006-derived-data-persistence-policy.md) (catalog

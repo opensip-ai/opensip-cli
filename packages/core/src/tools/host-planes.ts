@@ -20,7 +20,7 @@
  *   - supply compatible objects (the host will prefer a supplied implementation when present).
  *
  * See the governing "Host-Planes / Scope-Seams Hygiene" spec (local-only
- * working doc under docs/plans/, by that title) for the flexibility story.
+ * working doc, by that title) for the flexibility story.
  */
 export interface HostGovernance {
   /** Read the current governance state blob for a tool (installed/enabled/block/approvals). */

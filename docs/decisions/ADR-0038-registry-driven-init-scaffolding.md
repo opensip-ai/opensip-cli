@@ -96,6 +96,6 @@ carries no per-tool vocabulary) to `init`, the last place it leaks. Reuses ADR-0
 (tool config declarations) for the per-tool config-block rendering, and continues
 the ADR-0027 "host owns the plane, tool declares a manifest" parity model
 (scaffolding becomes one more host-owned plane driven off the tool's declaration).
-The implementing spec is `docs/plans/specs/registry-driven-init-scaffolding.md`
+The implementing spec is a local implementation spec
 (local-only); a pre-flight task confirms whether a byte-exact init golden test
 already exists and, if not, writes it against today's behavior before any refactor.

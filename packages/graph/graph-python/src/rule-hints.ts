@@ -1,7 +1,7 @@
 /**
  * Python rule hints — declares language-specific signals for rules.
  *
- * Lands in PR 5 of plan docs/plans/10-graph-language-pluggability.md.
+ * Lands in PR 5 of plan local planning notes
  * Each hint maps a generic rule input ("what counts as a test file?",
  * "what's a side-effect primitive?") onto Python conventions.
  *

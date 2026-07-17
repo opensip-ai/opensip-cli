@@ -95,4 +95,4 @@ resolution.
 ratified by [ADR-0159](ADR-0159-reserved-host-command-and-suite-names.md). Scope
 semantics remain in [ADR-0129](ADR-0129-audit-suite-scope-defaults.md); the suite
 plane remains in [ADR-0093](ADR-0093-host-owned-suite-plane.md). Implementation
-specification: `docs/plans/specs/visual-proof-of-change.md` (local, gitignored).
+specification retained as local-only planning notes (not committed).

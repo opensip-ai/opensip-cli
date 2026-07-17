@@ -2,7 +2,7 @@
  * GraphLanguageAdapter contract test suite.
  *
  * Validates each of the 9 behavioral invariants (I-1 through I-9)
- * defined in docs/plans/11-graph-language-adapter-contract.md §3
+ * defined in local planning notes §3
  * against the TS/Python/Rust adapters covered in this suite. Additional
  * adapter cohorts can add `describe` blocks against their own fixtures while
  * referencing the same invariants.

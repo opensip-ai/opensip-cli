@@ -82,5 +82,5 @@ contract, and migration sequence are intentionally specified.
 **Related specs / ADRs:** ADR-0051 (host-owned run lifecycle timing), ADR-0060
 (diagnostic boundary and run outcomes), ADR-0065 (public JSON and raw-stream
 policy), ADR-0093 (suite plane). The implementation spec is intentionally not
-created in the committed tree yet; `docs/plans/` remains local-only planning
+created in the committed tree yet; local-only plan scratch remains local-only planning
 scratch until a promoted plan has an owner and scope.

@@ -47,7 +47,7 @@ legacy `suiteRunId`.
 
 - **Keep session-only persistence with `suiteRunId` grouping.** Rejected. Child-session
   reconstruction is lossy (dual aggregates, missing steps, heuristic MCP ordering).
-  Evidence from the collaborative architecture review (`docs/internal/coop/agents-log.md`).
+  Evidence from the collaborative architecture review.
 - **Persist only a JSON blob parent row without normalized steps.** Rejected for the
   long-term read model. Acceptable only as a time-boxed first slice if it links
   forward to normalized `run_steps` in the same spec.
@@ -100,10 +100,8 @@ observed RunSteps.
 - ADR-0093 remains active, but its "no suite-level record" consequence is retired;
   do not infer that suites must remain session-grouping-only in new code.
 
-**Related specs / ADRs:** Implements `docs/plans/specs/33-host-owned-run-ledger.md`.
-Plan: `docs/plans/host-owned-run-ledger/`. Partially amends ADR-0093 and extends
-ADR-0051, ADR-0100.
-Complements ADR-0084 (MCP replay). Does not supersede ADR-0111.
+**Related specs / ADRs:** Partially amends ADR-0093 and extends ADR-0051,
+ADR-0100. Complements ADR-0084 (MCP replay). Does not supersede ADR-0111.
 
 ## Amendment: Reserved Audit Entry And Returned Run Identity (2026-07-12)
 

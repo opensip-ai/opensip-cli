@@ -78,6 +78,6 @@ a foreign `@opensip-cli/core`) is hoisted into core and applied to EVERY domain.
   structurally rather than guarded.
 
 **Related specs / ADRs:** Realizes the tool-plugin-parity north-star
-(`docs/internal/parity-invariant-index.md`); follows the GA cutover (ADR-0027).
-Spec: `docs/plans/specs/release-3.1.0-generic-capability-discovery.md` (local-only;
+; follows the GA cutover (ADR-0027).
+Spec: a local implementation spec (local-only;
 shipped as part of the unreleased v3.0.0, no separate version).

@@ -41,7 +41,7 @@ export const noLeakInternalImprovementPatterns = defineCheck({
         violations.push({
           line: i + 1,
           message:
-            'Public docs page references an internal improvement process detail, local mechanism slug, or remediation artifact. These belong in docs/internal/ or are not user-facing. Move, remove, or add // public-docs-ok with justification if this is deliberate (e.g. high-level "the project uses local checks for self-improvement").',
+            'Public docs page references an internal improvement process detail, local mechanism slug, or remediation artifact. These belong in private local-only working notes or are not user-facing. Move, remove, or add // public-docs-ok with justification if this is deliberate (e.g. high-level "the project uses local checks for self-improvement").',
           severity: 'warning',
         });
         break;

@@ -181,12 +181,11 @@ number rather than restating it.
   ADR-0028 "live-runs-off-thread" enforcement text superseded by ADR-0058
   (`live-view-through-cli-live` only forbids ink `render` imports, not the
   off-thread selector).
-- **The three implementation specs are
-  `docs/plans/specs/arch-improvements/01..03`** (local-only; `docs/plans` is
-  gitignored): 01 = posture/honesty corrections + the per-tier admission and
-  wildcard-deprecation guards; 02 = subprocess execution model and the fork-cost
-  investigation; 03 = the three-gate investigation (capability/permission +
-  network, extension-contract versioning, consumption-side verification).
+- **The three implementation tracks are:** 01 = posture/honesty corrections +
+  the per-tier admission and wildcard-deprecation guards; 02 = subprocess
+  execution model and the fork-cost investigation; 03 = the three-gate
+  investigation (capability/permission + network, extension-contract versioning,
+  consumption-side verification).
 - **Follow-up ADRs are authored from the specs' investigation phases** (numbers
   TBD): a follow-up ADR for the **capability/permission model incl. network**
   (from spec 03), a follow-up ADR for **extension-contract versioning** (range
@@ -201,13 +200,9 @@ number rather than restating it.
   with the full-privilege caveat, and the in-process capability-pack surface is
   documented as the **least** isolated extension surface.
 
-**Related specs / ADRs:** Implemented by
-`docs/plans/specs/arch-improvements/01-trust-framing-and-cheap-hardening.md`,
-`docs/plans/specs/arch-improvements/02-supervisor-and-execution-path-hardening.md`, and
-`docs/plans/specs/arch-improvements/03-ecosystem-readiness.md`
-(local-only). Builds on ADR-0030 (authored-tool discovery + trust tiers; this
-ADR's wildcard-deprecation and the user-global tier decision are ADR-0030
-amendments), ADR-0054 (external fault-isolation boundary + the supervisor
+**Related specs / ADRs:** Builds on ADR-0030 (authored-tool discovery + trust
+tiers; this ADR's wildcard-deprecation and the user-global tier decision are
+ADR-0030 amendments), ADR-0054 (external fault-isolation boundary + the supervisor
 resource-control gaps named here), ADR-0028 (off-main-process live runs; its
 enforcement text is stale, see spec 01), ADR-0058 (shared live-run shell that
 superseded ADR-0028's guard), ADR-0036 (host-owned baseline plane), ADR-0051

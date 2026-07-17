@@ -131,7 +131,7 @@ regression mechanically impossible rather than a review burden.
   calling `applyCommonFlags` and populating the result's detail carrier — no
   bespoke flag wiring, no bespoke verbose renderer.
 
-**Related specs / ADRs:** `docs/plans/specs/cross-tool-cli-flag-currency.md`
+**Related specs / ADRs:**
 (local). Symmetric to ADR-0011 (output currency) and ADR-0016 (progress
 currency); the three together make flags-in, progress, and output-out all
 single-currency, single-seam.

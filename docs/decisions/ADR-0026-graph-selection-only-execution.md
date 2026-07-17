@@ -62,6 +62,6 @@ difference is a recorded decision, not an accident.
   (release 2.13.0), not by an execution config.
 
 **Related specs / ADRs:** Implements part of
-`docs/plans/specs/release-2.13.0-execution-severity-proof.md` (north-star §5.8
+a local implementation spec (north-star §5.8
 Execution substrate + §6.7 Intentional non-uniformity). Related: ADR-0024
 (CommandOutcome/diagnostics), ADR-0012 (versioning).

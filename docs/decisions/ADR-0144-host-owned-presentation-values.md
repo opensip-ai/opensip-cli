@@ -171,7 +171,7 @@ of `scripts/perf` local formatters.
 - Final CLI run summary duration must be the host-stamped duration for that
   run, not an independent live sample taken after tool return.
 - Implementation plan:
-  `docs/plans/ready/host-owned-presentation-values/` (local).
+  a local implementation plan (local).
 - Follow-up enforcement: depcruise allowlist updates + project-local fitness
   check forbidding ad-hoc duration/score label construction outside
   `packages/format/` (allowlist `scripts/perf/` until a separate cleanup), plus

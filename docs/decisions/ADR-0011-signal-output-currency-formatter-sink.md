@@ -151,7 +151,7 @@ finishes it rather than inventing it.
   Finding-5 drift and makes ADR-0009's no-tool-vocab claim literally true.
 
 **Related specs / ADRs:** To be implemented by a spec under
-`docs/plans/specs/` (the enforced migration: retire `CliOutput`, introduce the
+a local implementation spec (the enforced migration: retire `CliOutput`, introduce the
 envelope, consolidate formatters, route at the composition root, add the
 dep-cruiser + fitness-check gates). Related: ADR-0005 (symmetric tool
 architecture — this extends symmetry to the output path), ADR-0008 (cloud

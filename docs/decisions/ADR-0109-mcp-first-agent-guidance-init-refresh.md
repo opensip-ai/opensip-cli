@@ -67,4 +67,4 @@ or grep local files.
   datastore directly, or re-run tools as the default answer path.
 
 **Related specs / ADRs:** Local implementation plan under
-`docs/plans/ready/mcp-first-agent-guidance-init-refresh/`; [ADR-0084](ADR-0084-mcp-server-surface.md).
+a local implementation plan; [ADR-0084](ADR-0084-mcp-server-surface.md).

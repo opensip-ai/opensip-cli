@@ -1,4 +1,4 @@
-// @fitness-ignore-file env-via-registry -- debug-only diagnostic harness, opt-in via the GRAPH_SITE_LOG / GRAPH_ENGINE env vars; NOT production configuration. Reading process.env directly is intentional and isolated to this one module so the cross-shard resolver stays registry-clean. See docs/internal/graph-resolution-trace.md.
+// @fitness-ignore-file env-via-registry -- debug-only diagnostic harness, opt-in via the GRAPH_SITE_LOG / GRAPH_ENGINE env vars; NOT production configuration. Reading process.env directly is intentional and isolated to this one module so the cross-shard resolver stays registry-clean. See a local working note
 /**
  * Per-boundary-call resolution trace (debug-only). The cross-shard counterpart
  * of graph-typescript's `traceResolveDecl`: when `GRAPH_SITE_LOG` points at a

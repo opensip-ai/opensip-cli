@@ -86,7 +86,7 @@ suspension triggers — is
 day-to-day maintainer playbook (14-day burn-in counting + resets, failure-class
 triage, burned-version recovery, runner/toolchain drift, the `preview → supported`
 promotion checklist, and reading `hostSupport` from the CLI/MCP catalogs) is kept
-locally under `docs/internal/` (private working context, not committed). The
+in private local-only working context (not committed). The
 current, generated support-matrix STATUS is never restated in prose here — read it
 from [`docs/public/70-reference/17-supported-platforms.md`](docs/public/70-reference/17-supported-platforms.md),
 which is generated from the one core support registry.
@@ -359,8 +359,8 @@ a different question:
    verifier re-validates. It is heavier and host-specific, so it is deliberately
    **not** wired into `release:preflight` or any developer build. See the
    "Platform acceptance" section of [`scripts/README.md`](scripts/README.md); a
-   deeper maintainer note lives locally under `docs/internal/` (private working
-   context, not committed).
+   deeper maintainer note lives in private local-only working context (not
+   committed).
 
 3. **OS support qualification.** Turning acceptance evidence into a _published
    supported platform_ is a separate, deliberate OS-specific plan that selects a
