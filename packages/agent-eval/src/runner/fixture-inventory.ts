@@ -99,7 +99,15 @@ async function gitInventory(
     result.outputLimitExceeded ||
     result.timedOut
   ) {
-    throw new HarnessPrerequisiteError('Agent-eval fixture Git inventory is unavailable.');
+    const stderrTail = result.stderr.trim().slice(0, 600);
+    const errorPart = result.error === undefined ? '' : `, error=${result.error}`;
+    const stderrPart = stderrTail.length === 0 ? '' : `, stderr=${stderrTail}`;
+    throw new HarnessPrerequisiteError(
+      'Agent-eval fixture Git inventory is unavailable ' +
+        `(exitCode=${String(result.exitCode)}, signal=${String(result.signal)}, ` +
+        `timedOut=${result.timedOut}, outputLimitExceeded=${result.outputLimitExceeded}` +
+        `${errorPart}${stderrPart}).`,
+    );
   }
   return result.stdout;
 }
