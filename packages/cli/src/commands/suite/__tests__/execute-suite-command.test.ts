@@ -15,6 +15,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeDispatchHostCtx } from '../../../__tests__/harness/dispatch-host-ctx.js';
+import { createRunActionHooks, createRunPlaneFactory } from '../../../bootstrap/run-plane.js';
 import { executeSuiteCommand } from '../execute-suite-command.js';
 
 import type { CliCommandsContext } from '../../shared.js';
@@ -79,7 +80,9 @@ describe('executeSuiteCommand embedded output isolation', () => {
       toolScaffolds: [],
       datastore: () => undefined,
       toolContext: host.ctx,
-      toolRunActionHooks: {},
+      toolRunActionHooks: createRunActionHooks(
+        createRunPlaneFactory({ getDatastore: () => undefined }),
+      ),
     } as unknown as CliCommandsContext;
     const writes: string[] = [];
     vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {

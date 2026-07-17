@@ -8,7 +8,6 @@ import {
 } from './host-subcommand-shared.js';
 import { BUILT_IN_AUDIT_SUITE, BUILT_IN_AUDIT_SUITE_NAME } from './suite/built-in-suites.js';
 import { executeSuiteCommand } from './suite/execute-suite-command.js';
-import { maybeOpenSuiteReport } from './suite/open-suite-report.js';
 import { SUITE_RUN_OPTIONS } from './suite/suite-run-options.js';
 
 import type { CliCommandsContext } from './shared.js';
@@ -16,6 +15,7 @@ import type { CliCommandsContext } from './shared.js';
 const AUDIT_SUITE_OPTION_KEYS = [
   'cwd',
   'json',
+  'open',
   'quiet',
   'verbose',
   'debug',
@@ -59,22 +59,13 @@ export function buildAuditCommandSpec(ctx: CliCommandsContext): HostSpec {
     rawStreamReason: 'runtime-render-dispatch',
     handler: async (rawOpts) => {
       const opts = rawOpts as Readonly<Record<string, unknown>>;
-      const result = await executeSuiteCommand({
+      return executeSuiteCommand({
         name: BUILT_IN_AUDIT_SUITE_NAME,
         resolved: { suite: BUILT_IN_AUDIT_SUITE, source: 'built-in' },
         opts: suiteOptsForAudit(opts),
         ctx,
         tools: currentScope()?.tools.list() ?? [],
         defaultChanged: true,
-      });
-      if (result === undefined) return;
-      return maybeOpenSuiteReport({
-        name: BUILT_IN_AUDIT_SUITE_NAME,
-        result,
-        // Preserve the original opts so --open / --json are visible even though
-        // they are stripped from the suite executor option bag.
-        opts,
-        ctx,
       });
     },
   });

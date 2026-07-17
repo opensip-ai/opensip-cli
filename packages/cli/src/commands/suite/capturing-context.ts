@@ -1,3 +1,4 @@
+import { isSignalEnvelope, type RunVerdict, type SignalEnvelope } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
@@ -13,8 +14,6 @@ import {
   resolveReportFailure,
   truncateDerivedMessage,
 } from '../../bootstrap/report-failure.js';
-
-import type { RunVerdict, SignalEnvelope } from '@opensip-cli/contracts';
 
 export interface StepEnvelopeStats {
   readonly verdict: RunVerdict;
@@ -45,30 +44,79 @@ export interface StepCapture {
    * value before returning the final command result.
    */
   readonly getEnvelope: () => SignalEnvelope | undefined;
+  /** Capture a handler/worker completion before output routing suppresses it. */
+  readonly captureCompletion: (value: unknown) => void;
   readonly getReportedFailure: () => ResolvedReportFailure | undefined;
   readonly signalDeliveries: readonly SignalDeliveryResult[];
   readonly context: ToolCliContext;
 }
 
 function captureEnvelope(envelope: unknown): SignalEnvelope | undefined {
-  const maybeEnvelope = envelope as Partial<SignalEnvelope> | undefined;
-  if (maybeEnvelope?.schemaVersion !== 2) return undefined;
-  if (typeof maybeEnvelope.tool !== 'string') return undefined;
-  if (typeof maybeEnvelope.runId !== 'string') return undefined;
-  if (maybeEnvelope.verdict?.summary === undefined) return undefined;
-  if (!Array.isArray(maybeEnvelope.signals)) return undefined;
-  return maybeEnvelope as SignalEnvelope;
+  try {
+    if (!isSignalEnvelope(envelope) || envelope.schemaVersion !== 2) return undefined;
+    const { summary } = envelope.verdict;
+    if (
+      typeof envelope.verdict.passed !== 'boolean' ||
+      !finiteNumber(envelope.verdict.score) ||
+      summary === null ||
+      typeof summary !== 'object' ||
+      !finiteNumber(summary.total) ||
+      !finiteNumber(summary.passed) ||
+      !finiteNumber(summary.failed) ||
+      !finiteNumber(summary.errors) ||
+      !finiteNumber(summary.warnings) ||
+      !envelope.signals.every(isReviewSafeSignal)
+    ) {
+      return undefined;
+    }
+    return envelope;
+  } catch {
+    return undefined;
+  }
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isReviewSafeSignal(signal: unknown): boolean {
+  if (signal === null || typeof signal !== 'object') return false;
+  const candidate = signal as Record<string, unknown>;
+  return (
+    typeof candidate.ruleId === 'string' &&
+    typeof candidate.message === 'string' &&
+    typeof candidate.severity === 'string' &&
+    typeof candidate.filePath === 'string' &&
+    candidate.metadata !== null &&
+    typeof candidate.metadata === 'object'
+  );
 }
 
 function captureEnvelopeStats(envelope: unknown): StepEnvelopeStats | undefined {
-  const maybeEnvelope = envelope as Partial<SignalEnvelope> | undefined;
-  const verdict = maybeEnvelope?.verdict;
-  if (verdict?.summary === undefined) return undefined;
-  const signals = maybeEnvelope?.signals;
-  return {
-    verdict,
-    findings: Array.isArray(signals) ? signals.length : 0,
+  try {
+    const captured = captureEnvelope(envelope);
+    if (captured === undefined) return undefined;
+    return {
+      verdict: captured.verdict,
+      findings: captured.signals.length,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function envelopeFromCompletion(value: unknown): SignalEnvelope | undefined {
+  const direct = captureEnvelope(value);
+  if (direct !== undefined) return direct;
+  if (value === null || typeof value !== 'object') return undefined;
+  const record = value as {
+    readonly envelope?: unknown;
+    readonly result?: unknown;
   };
+  const completion = captureEnvelope(record.envelope);
+  if (completion !== undefined) return completion;
+  if (record.result === null || typeof record.result !== 'object') return undefined;
+  return captureEnvelope((record.result as { readonly envelope?: unknown }).envelope);
 }
 
 export function createCapturingContext(
@@ -91,6 +139,12 @@ export function createCapturingContext(
   const signalDeliveries: SignalDeliveryResult[] = [];
   const writeExit = (code: number): void => {
     exitCode = code;
+  };
+  const captureCompletion = (value: unknown): void => {
+    const envelope = envelopeFromCompletion(value);
+    if (envelope === undefined) return;
+    lastEnvelope = envelope;
+    lastEnvelopeStats = captureEnvelopeStats(envelope);
   };
   // Route an error detail into the slot + reported-failure record, emitting
   // nothing to the host (the suite renders one CommandOutcome from the
@@ -128,7 +182,10 @@ export function createCapturingContext(
     render: {
       // The parent suite owns the only visible result. Embedded steps may call
       // their documented renderer, but cannot emit a second terminal body.
-      value: () => Promise.resolve(),
+      value: (value: unknown) => {
+        captureCompletion(value);
+        return Promise.resolve();
+      },
     },
     emitJson: {
       value: () => {
@@ -165,8 +222,7 @@ export function createCapturingContext(
       ) => {
         const result = await egress.deliverSignals(envelope, opts);
         signalDeliveries.push(result);
-        lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
-        lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
+        captureCompletion(envelope);
         return result;
       },
     },
@@ -180,8 +236,7 @@ export function createCapturingContext(
     },
     emitEnvelope: {
       value: (envelope: Parameters<ToolCliContext['emitEnvelope']>[0]) => {
-        lastEnvelopeStats = captureEnvelopeStats(envelope) ?? lastEnvelopeStats;
-        lastEnvelope = captureEnvelope(envelope) ?? lastEnvelope;
+        captureCompletion(envelope);
       },
     },
     // Isolate the public error seam: an external (ADR-0054 worker) step whose
@@ -198,6 +253,7 @@ export function createCapturingContext(
     getExitCode: () => exitCode,
     getEnvelopeStats: () => lastEnvelopeStats,
     getEnvelope: () => lastEnvelope,
+    captureCompletion,
     getReportedFailure: () => reportedFailure,
     signalDeliveries,
     context,

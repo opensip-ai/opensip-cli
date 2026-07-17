@@ -1,4 +1,5 @@
-import type { SignalEnvelope } from '@opensip-cli/contracts';
+import { isSignalEnvelope } from '@opensip-cli/contracts';
+
 import type { EvidenceSnapshotContribution } from '@opensip-cli/core';
 
 const OMIT_ARG_KEYS = new Set([
@@ -33,31 +34,55 @@ export function projectLedgerArgs(
   return Object.keys(projected).length === 0 ? undefined : projected;
 }
 
-export function projectEnvelopeEvidence(envelope: SignalEnvelope | undefined): unknown {
-  if (envelope === undefined) return undefined;
-  const fingerprints = envelope.signals
-    .map((signal) => signal.fingerprint)
-    .filter((fingerprint): fingerprint is string => typeof fingerprint === 'string')
-    .slice(0, 20);
-  return {
-    kind: 'signal-envelope',
-    schemaVersion: envelope.schemaVersion,
-    tool: envelope.tool,
-    runId: envelope.runId,
-    createdAt: envelope.createdAt,
-    verdict: {
-      passed: envelope.verdict.passed,
-      faulted: envelope.verdict.faulted === true,
-      score: envelope.verdict.score,
-      errors: envelope.verdict.summary.errors,
-      warnings: envelope.verdict.summary.warnings,
-      total: envelope.verdict.summary.total,
-    },
-    signalCount: envelope.signals.length,
-    unitCount: envelope.units.length,
-    ...(fingerprints.length === 0 ? {} : { fingerprints }),
-    ...(envelope.resolutionMode === undefined ? {} : { resolutionMode: envelope.resolutionMode }),
-  };
+export function projectEnvelopeEvidence(envelope: unknown): unknown {
+  try {
+    if (!isSignalEnvelope(envelope) || envelope.schemaVersion !== 2) return undefined;
+    const summary = envelope.verdict.summary;
+    if (
+      typeof envelope.verdict.passed !== 'boolean' ||
+      !finiteNumber(envelope.verdict.score) ||
+      summary === null ||
+      typeof summary !== 'object' ||
+      !finiteNumber(summary.errors) ||
+      !finiteNumber(summary.warnings) ||
+      !finiteNumber(summary.total)
+    ) {
+      return undefined;
+    }
+    const fingerprints: string[] = [];
+    const scanCount = Math.min(envelope.signals.length, 100);
+    for (let index = 0; index < scanCount && fingerprints.length < 20; index += 1) {
+      const signal = envelope.signals[index] as unknown;
+      if (signal === null || typeof signal !== 'object' || !('fingerprint' in signal)) continue;
+      const fingerprint = (signal as { readonly fingerprint?: unknown }).fingerprint;
+      if (typeof fingerprint === 'string') fingerprints.push(fingerprint);
+    }
+    return {
+      kind: 'signal-envelope',
+      schemaVersion: envelope.schemaVersion,
+      tool: envelope.tool,
+      runId: envelope.runId,
+      createdAt: envelope.createdAt,
+      verdict: {
+        passed: envelope.verdict.passed,
+        faulted: envelope.verdict.faulted === true,
+        score: envelope.verdict.score,
+        errors: summary.errors,
+        warnings: summary.warnings,
+        total: summary.total,
+      },
+      signalCount: envelope.signals.length,
+      unitCount: envelope.units.length,
+      ...(fingerprints.length === 0 ? {} : { fingerprints }),
+      ...(envelope.resolutionMode === undefined ? {} : { resolutionMode: envelope.resolutionMode }),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 /** Bounded metadata-only projection; snapshot payloads never enter the host ledger. */

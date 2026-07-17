@@ -171,7 +171,7 @@ export interface RunActionHooks {
   /** Replace child requests with one suite-owned exact post-commit effect. */
   readonly replaceEvidenceOwnerReportEffect?: (
     owner: HostEvidenceOwnerToken,
-    effect: DeferredReportEffect,
+    effect?: DeferredReportEffect,
   ) => boolean;
   readonly maybeDispatchExternal?: (
     commandName: string,
@@ -198,7 +198,7 @@ export interface RunPlaneFactory {
   discardEvidenceOwner(owner: HostEvidenceOwnerToken): void;
   replaceEvidenceOwnerReportEffect(
     owner: HostEvidenceOwnerToken,
-    effect: DeferredReportEffect,
+    effect?: DeferredReportEffect,
   ): boolean;
 }
 

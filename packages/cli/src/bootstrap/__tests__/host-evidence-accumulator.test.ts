@@ -166,6 +166,22 @@ describe('createHostEvidenceAccumulator', () => {
     });
   });
 
+  it('accepts the exact total byte bound for sessions and the parent run', () => {
+    const entry = { session: session('session-1'), hostMetrics: {} };
+    const run = parent(entry.session.id);
+    const bundleBytes = measureEvidenceBundleBytes({ sessions: [entry], run });
+    const accumulator = createHostEvidenceAccumulator({ maxBytes: bundleBytes });
+    const owner = stageOne(accumulator, entry.session.id);
+
+    expect(accumulator.drain(owner, { run })).toMatchObject({
+      status: 'drained',
+      input: {
+        sessions: [entry],
+        run,
+      },
+    });
+  });
+
   it('drain and discard are idempotent and discard deletes owner state', () => {
     const accumulator = createHostEvidenceAccumulator();
     const owner = stageOne(accumulator);
@@ -209,6 +225,20 @@ describe('createHostEvidenceAccumulator', () => {
         selection: { view: 'change-impact', runId: 'run-exact' },
       },
     });
+  });
+
+  it('clears a child queued report effect when the host replacement is undefined', () => {
+    const accumulator = createHostEvidenceAccumulator();
+    const owner = accumulator.createOwner('nested');
+    expect(
+      accumulator.queueReportEffect(owner, {
+        kind: 'compose-and-open',
+        selection: { view: 'change-impact', runId: 'child-run' },
+      }),
+    ).toBe(true);
+
+    expect(accumulator.replaceReportEffect(owner, undefined)).toBe(true);
+    expect(accumulator.drain(owner)).not.toHaveProperty('reportEffect');
   });
 
   it('removes only the requested current Session from a nested owner', () => {

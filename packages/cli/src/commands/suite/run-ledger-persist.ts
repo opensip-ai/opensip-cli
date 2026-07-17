@@ -7,13 +7,7 @@ import {
   type SuiteRunResult,
   type TaskContextManifest,
 } from '@opensip-cli/contracts';
-import {
-  currentLogger,
-  currentScope,
-  generatePrefixedId,
-  readPackageVersion,
-} from '@opensip-cli/core';
-import { RunRepo } from '@opensip-cli/session-store';
+import { generatePrefixedId, readPackageVersion } from '@opensip-cli/core';
 
 import {
   projectEnvelopeEvidence,
@@ -29,7 +23,7 @@ import {
 } from './built-in-suites.js';
 
 import type { SuiteStepReviewInput } from './review-brief.js';
-import type { DataStore } from '@opensip-cli/datastore';
+import type { EvidenceBundlePrecondition, EvidenceBundleRun } from '@opensip-cli/session-store';
 
 const CLI_VERSION = readPackageVersion(import.meta.url);
 const CONTEXT_RUN_ID = /^RUN_[0-9A-HJKMNP-TV-Z]{26}$/u;
@@ -44,7 +38,7 @@ function safeDuration(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
 }
 
-export interface PersistSuiteRunInput {
+export interface ProjectSuiteRunInput {
   readonly result: SuiteRunResult;
   readonly internalSteps: readonly SuiteStepReviewInput[];
   readonly source: SuiteSource;
@@ -52,8 +46,14 @@ export interface PersistSuiteRunInput {
   readonly startedAt: string;
   readonly completedAt: string;
   readonly identity: SuiteLedgerIdentity;
+  readonly correlationRunId?: string;
   /** Read-only guard evaluated under the datastore write lock before ledger insertion. */
   readonly persistencePrecondition?: () => boolean;
+}
+
+export interface SuiteRunLedgerProjection {
+  readonly evidence: EvidenceBundleRun;
+  readonly precondition?: EvidenceBundlePrecondition;
 }
 
 export interface SuiteLedgerStepIdentity {
@@ -96,7 +96,7 @@ export function allocateSuiteLedgerIdentity(
   });
 }
 
-function contextManifestMatchesHostAuthority(input: PersistSuiteRunInput): boolean {
+function contextManifestMatchesHostAuthority(input: ProjectSuiteRunInput): boolean {
   const manifest = input.result.contextManifest;
   const isContextRun =
     input.source === 'built-in' && input.result.suite === BUILT_IN_AGENT_CONTEXT_SUITE_NAME;
@@ -150,7 +150,7 @@ function contextStepResultIsSafe(step: SuiteStepReviewInput): boolean {
   );
 }
 
-function contextStepsMatchHostAuthority(input: PersistSuiteRunInput): boolean {
+function contextStepsMatchHostAuthority(input: ProjectSuiteRunInput): boolean {
   return (
     CONTEXT_RUN_ID.test(input.identity.runId) &&
     canonicalTimestamp(input.startedAt) &&
@@ -198,7 +198,7 @@ function aggregateExecutedContextSteps(
   return { steps: steps.length, passed, failed, faulted, errors, warnings };
 }
 
-function contextResultMatchesExecutedSteps(input: PersistSuiteRunInput): boolean {
+function contextResultMatchesExecutedSteps(input: ProjectSuiteRunInput): boolean {
   const aggregate = input.result.aggregate;
   const expectedAggregate = aggregateExecutedContextSteps(input.internalSteps);
   const summariesMatch =
@@ -262,116 +262,74 @@ function contextPlanesMatchLedgerIdentity(
   });
 }
 
-export function persistSuiteRun(input: PersistSuiteRunInput): string | undefined {
-  const scope = currentScope();
-  const log = currentLogger();
-  let datastore: DataStore | undefined;
-  try {
-    datastore = scope?.datastore() as DataStore | undefined;
-  } catch {
-    log.debug?.({
-      evt: 'cli.run-ledger.datastore_unavailable',
-      module: 'cli:suite-run-ledger',
-      reason: 'datastore-unavailable',
-    });
-    return;
+/** Build a validated parent Run + ordered RunSteps without datastore I/O. */
+export function projectSuiteRun(input: ProjectSuiteRunInput): SuiteRunLedgerProjection {
+  if (!contextManifestMatchesHostAuthority(input)) {
+    throw new TypeError('The task-context manifest does not match host persistence authority.');
   }
-  if (datastore === undefined) return;
-
-  try {
-    if (!contextManifestMatchesHostAuthority(input)) {
-      throw new TypeError('The task-context manifest does not match host persistence authority.');
-    }
-    const runId = input.identity.runId;
-    const run: StoredRun = {
-      id: runId,
-      name: input.result.suite,
-      source: input.source === 'built-in' ? 'built-in-suite' : 'configured-suite',
-      ...(scope?.runId === undefined ? {} : { correlationRunId: scope.runId }),
-      cwd: input.cwd,
-      startedAt: input.startedAt,
-      completedAt: input.completedAt,
-      durationMs: input.result.durationMs,
-      exitCode: input.result.exitCode,
-      aggregate: input.result.aggregate ?? {
-        steps: input.result.steps.length,
-        passed: 0,
-        failed: 0,
-        faulted: 0,
-        errors: 0,
-        warnings: 0,
-      },
-      ...(input.result.scope === undefined ? {} : { scope: input.result.scope }),
-      ...(input.result.reviewBrief === undefined ? {} : { reviewBrief: input.result.reviewBrief }),
-      ...(input.result.contextManifest === undefined
-        ? {}
-        : { contextManifest: input.result.contextManifest }),
-      legacySuiteRunId: input.result.suiteRunId,
-      cliVersion: CLI_VERSION,
-    };
-    const steps = input.internalSteps.map((step, position): StoredRunStep => {
-      const summary = step.summary;
-      const effectiveArgs = persistedEffectiveArgs(
-        step.effectiveArgs,
-        input.source === 'built-in' && input.result.suite === BUILT_IN_AGENT_CONTEXT_SUITE_NAME,
-      );
-      const identity = input.identity.steps[position];
-      if (identity?.ordinal !== step.stepIndex) {
-        throw new Error('Suite ledger identity does not match the executed step order.');
-      }
-      return {
-        id: identity.id,
-        runId,
-        logicalStepKey: identity.logicalStepKey,
-        ordinal: identity.ordinal,
-        attempt: identity.attempt,
-        tool: summary.tool,
-        command: summary.command,
-        stableId: summary.stableId,
-        ...(effectiveArgs === undefined ? {} : { effectiveArgs }),
-        exitCode: summary.exitCode,
-        outcome: summary.outcome,
-        durationMs: summary.durationMs,
-        ...(summary.verdict === undefined ? {} : { verdictSummary: summary.verdict }),
-        ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId }),
-        ...(() => {
-          const evidence =
-            step.evidenceSnapshots === undefined
-              ? projectEnvelopeEvidence(step.capturedEnvelope)
-              : projectEvidenceSnapshotEvidence(step.evidenceSnapshots);
-          return evidence === undefined ? {} : { evidence };
-        })(),
-      };
-    });
-    const saved = new RunRepo(datastore).saveRunWithStepsIf(
-      run,
-      steps,
-      input.persistencePrecondition ?? (() => true),
+  const runId = input.identity.runId;
+  const run: StoredRun = {
+    id: runId,
+    name: input.result.suite,
+    source: input.source === 'built-in' ? 'built-in-suite' : 'configured-suite',
+    ...(input.correlationRunId === undefined ? {} : { correlationRunId: input.correlationRunId }),
+    cwd: input.cwd,
+    startedAt: input.startedAt,
+    completedAt: input.completedAt,
+    durationMs: input.result.durationMs,
+    exitCode: input.result.exitCode,
+    aggregate: input.result.aggregate ?? {
+      steps: input.result.steps.length,
+      passed: 0,
+      failed: 0,
+      faulted: 0,
+      errors: 0,
+      warnings: 0,
+    },
+    ...(input.result.scope === undefined ? {} : { scope: input.result.scope }),
+    ...(input.result.reviewBrief === undefined ? {} : { reviewBrief: input.result.reviewBrief }),
+    ...(input.result.contextManifest === undefined
+      ? {}
+      : { contextManifest: input.result.contextManifest }),
+    legacySuiteRunId: input.result.suiteRunId,
+    cliVersion: CLI_VERSION,
+  };
+  const steps = input.internalSteps.map((step, position): StoredRunStep => {
+    const summary = step.summary;
+    const effectiveArgs = persistedEffectiveArgs(
+      step.effectiveArgs,
+      input.source === 'built-in' && input.result.suite === BUILT_IN_AGENT_CONTEXT_SUITE_NAME,
     );
-    if (!saved) {
-      log.warn?.({
-        evt: 'cli.run-ledger.suite_record_failed',
-        module: 'cli:suite-run-ledger',
-        suiteRunId: input.result.suiteRunId,
-        reason: 'ledger-precondition-failed',
-      });
-      return;
+    const identity = input.identity.steps[position];
+    if (identity?.ordinal !== step.stepIndex) {
+      throw new Error('Suite ledger identity does not match the executed step order.');
     }
-    log.info?.({
-      evt: 'cli.run-ledger.suite_recorded',
-      module: 'cli:suite-run-ledger',
+    const evidence =
+      step.evidenceSnapshots === undefined
+        ? (step.ledgerEvidence ?? projectEnvelopeEvidence(step.capturedEnvelope))
+        : projectEvidenceSnapshotEvidence(step.evidenceSnapshots);
+    return {
+      id: identity.id,
       runId,
-      suiteRunId: input.result.suiteRunId,
-      stepCount: steps.length,
-    });
-    return runId;
-  } catch {
-    log.warn?.({
-      evt: 'cli.run-ledger.suite_record_failed',
-      module: 'cli:suite-run-ledger',
-      suiteRunId: input.result.suiteRunId,
-      reason: 'ledger-write-failed',
-    });
-    return undefined;
-  }
+      logicalStepKey: identity.logicalStepKey,
+      ordinal: identity.ordinal,
+      attempt: identity.attempt,
+      tool: summary.tool,
+      command: summary.command,
+      stableId: summary.stableId,
+      ...(effectiveArgs === undefined ? {} : { effectiveArgs }),
+      exitCode: summary.exitCode,
+      outcome: summary.outcome,
+      durationMs: summary.durationMs,
+      ...(summary.verdict === undefined ? {} : { verdictSummary: summary.verdict }),
+      ...(step.sessionId === undefined ? {} : { sessionId: step.sessionId }),
+      ...(evidence === undefined ? {} : { evidence }),
+    };
+  });
+  return {
+    evidence: { run, steps },
+    ...(input.persistencePrecondition === undefined
+      ? {}
+      : { precondition: input.persistencePrecondition }),
+  };
 }

@@ -79,7 +79,7 @@ export interface HostEvidenceAccumulator {
   ) => boolean;
   readonly replaceReportEffect: (
     owner: HostEvidenceOwnerToken,
-    effect: DeferredReportEffect,
+    effect?: DeferredReportEffect,
   ) => boolean;
   readonly drain: (
     owner: HostEvidenceOwnerToken,
@@ -242,6 +242,10 @@ export function createHostEvidenceAccumulator(
     replaceReportEffect(owner, effect) {
       const state = activeState(owner);
       if (state === undefined) return false;
+      if (effect === undefined) {
+        state.reportEffect = undefined;
+        return true;
+      }
       try {
         state.reportEffect = immutableJsonClone(effect);
         return true;

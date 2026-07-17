@@ -9,6 +9,11 @@ export interface SuiteStepReviewInput {
   readonly summary: SuiteStepSummary;
   readonly effectiveArgs?: Readonly<Record<string, unknown>>;
   readonly sessionId?: string;
+  /**
+   * Detached, bounded evidence captured at the step boundary for durable ledger
+   * projection. The full envelope below remains review-only.
+   */
+  readonly ledgerEvidence?: unknown;
   readonly capturedEnvelope?: SignalEnvelope;
   readonly evidenceSnapshots?: readonly EvidenceSnapshotContribution[];
 }

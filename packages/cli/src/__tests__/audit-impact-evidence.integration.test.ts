@@ -1,11 +1,10 @@
-import { RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { RunRepo, SessionRepo } from '@opensip-cli/session-store';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { commitEvidenceBundle, RunRepo, SessionRepo } from '@opensip-cli/session-store';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   allocateSuiteLedgerIdentity,
-  persistSuiteRun,
+  projectSuiteRun,
 } from '../commands/suite/run-ledger-persist.js';
 
 import type { StoredSession, SuiteRunResult } from '@opensip-cli/contracts';
@@ -78,13 +77,6 @@ describe('audit Run to graph-session evidence join', () => {
     const sessions = new SessionRepo(store);
     sessions.save(graphSession('session-linked', 'available'));
     sessions.save(graphSession('session-same-time-unlinked', 'omitted-overflow'));
-    const logger = {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    };
-    const scope = new RunScope({ datastore: () => store, logger });
     const result: SuiteRunResult = {
       type: 'suite-run',
       suite: 'audit',
@@ -118,18 +110,22 @@ describe('audit Run to graph-session evidence join', () => {
         sessionId: 'session-linked',
       },
     ];
-    const runId = runWithScopeSync(scope, () =>
-      persistSuiteRun({
-        result,
-        internalSteps,
-        identity: allocateSuiteLedgerIdentity(internalSteps),
-        source: 'built-in',
-        cwd: '/repo',
-        startedAt: '2026-07-01T00:00:00.000Z',
-        completedAt: '2026-07-01T00:00:01.000Z',
-      }),
-    );
+    const projection = projectSuiteRun({
+      result,
+      internalSteps,
+      identity: allocateSuiteLedgerIdentity(internalSteps),
+      source: 'built-in',
+      cwd: '/repo',
+      startedAt: '2026-07-01T00:00:00.000Z',
+      completedAt: '2026-07-01T00:00:01.000Z',
+    });
+    const committed = commitEvidenceBundle(store, {
+      sessions: [],
+      run: projection.evidence,
+    });
 
+    expect(committed.status).toBe('committed');
+    const runId = committed.status === 'committed' ? committed.runId : undefined;
     expect(runId).toMatch(/^RUN_/u);
     const runs = new RunRepo(store);
     expect(runs.getRun(runId!)).toMatchObject({

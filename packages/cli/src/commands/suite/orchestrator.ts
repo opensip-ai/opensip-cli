@@ -18,8 +18,13 @@ import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabiliti
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 
 import { type SuiteSource } from './built-in-suites.js';
+import { planSuiteReportEffect } from './open-suite-report.js';
 import { buildReviewBrief } from './review-brief-builder.js';
-import { allocateSuiteLedgerIdentity, persistSuiteRun } from './run-ledger-persist.js';
+import {
+  allocateSuiteLedgerIdentity,
+  projectSuiteRun,
+  type SuiteLedgerIdentity,
+} from './run-ledger-persist.js';
 import { resolveSuiteScope } from './suite-scope.js';
 import { runStepsSerially, type SuiteStepEvent } from './suite-step-runner.js';
 import {
@@ -31,6 +36,7 @@ import {
 } from './task-context-orchestration.js';
 import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
+import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
 
 export interface RunSuiteInput {
@@ -46,11 +52,38 @@ export interface RunSuiteInput {
   readonly onStepEvent?: (event: SuiteStepEvent) => void;
 }
 
+type SuiteEvidenceOwner = ReturnType<NonNullable<RunActionHooks['createNestedEvidenceOwner']>>;
+
+interface SuiteEvidenceSeam {
+  readonly owner: SuiteEvidenceOwner;
+  readonly finalize: NonNullable<RunActionHooks['finalizeEvidenceOwner']>;
+  readonly discard: NonNullable<RunActionHooks['discardEvidenceOwner']>;
+  readonly replaceReport: NonNullable<RunActionHooks['replaceEvidenceOwnerReportEffect']>;
+}
+
+function createSuiteEvidenceSeam(hooks: RunActionHooks): SuiteEvidenceSeam {
+  const create = hooks.createNestedEvidenceOwner;
+  const finalize = hooks.finalizeEvidenceOwner;
+  const discard = hooks.discardEvidenceOwner;
+  const replaceReport = hooks.replaceEvidenceOwnerReportEffect;
+  if (
+    create === undefined ||
+    finalize === undefined ||
+    discard === undefined ||
+    replaceReport === undefined
+  ) {
+    throw new TypeError('The host supplied an incomplete atomic suite evidence seam.');
+  }
+  return { owner: create(), finalize, discard, replaceReport };
+}
+
 function contextPersistencePrecondition(manifest: SuiteRunResult['contextManifest']): {
   readonly persistencePrecondition?: () => boolean;
 } {
   if (manifest === undefined || manifest.readiness === 'unavailable') return {};
-  return { persistencePrecondition: () => taskContextPointersAvailable(manifest) };
+  return {
+    persistencePrecondition: () => taskContextPointersAvailable(manifest),
+  };
 }
 
 function logSuiteScope(
@@ -122,6 +155,40 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     tools: input.tools,
   });
   const suiteRunId = generatePrefixedId('suite');
+  const evidence = createSuiteEvidenceSeam(input.runActionHooks);
+  try {
+    return await runWithSuiteRunContext(
+      {
+        suiteRunId,
+        suiteName: suite.name,
+        evidenceOwner: evidence.owner,
+      },
+      () => runSuiteWithinOwner(input, suite, suiteRunId, evidence),
+    );
+  } catch (error) {
+    // Even failures before parent projection must pass through the one owner
+    // finalizer so retention and closed cleanup run exactly once. A rejecting
+    // precondition guarantees that staged children cannot commit alone.
+    await rejectSuiteEvidence(evidence);
+    throw error;
+  } finally {
+    try {
+      evidence.discard(evidence.owner);
+    } finally {
+      // The last child invocation still references the nested owner after its
+      // atomic finalizer. Clear only that invocation-local lifecycle so the next
+      // command cannot observe a stale child identity.
+      input.runActionHooks.resetRun?.();
+    }
+  }
+}
+
+async function runSuiteWithinOwner(
+  input: RunSuiteInput,
+  suite: ValidatedSuite,
+  suiteRunId: string,
+  evidence: SuiteEvidenceSeam,
+): Promise<SuiteRunResult> {
   const started = performance.now();
   const startedAt = new Date();
   const log = currentLogger();
@@ -147,21 +214,19 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
 
   await loadSuiteStepCapabilities(suite, context.aggregates ? cwd : undefined);
 
-  const internalSteps = await runWithSuiteRunContext({ suiteRunId, suiteName: suite.name }, () =>
-    runStepsSerially({
-      suite,
-      suiteRunId,
-      ctx: input.ctx,
-      runActionHooks: input.runActionHooks,
-      suiteOpts: stepSuiteOpts,
-      defaultChanged: scope.mode === 'changed' && scope.source === 'default',
-      fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
-        defaultChanged: input.defaultChanged === true,
-        fullScope: scope.mode === 'full',
-      }),
-      ...(input.onStepEvent === undefined ? {} : { onStepEvent: input.onStepEvent }),
+  const internalSteps = await runStepsSerially({
+    suite,
+    suiteRunId,
+    ctx: input.ctx,
+    runActionHooks: input.runActionHooks,
+    suiteOpts: stepSuiteOpts,
+    defaultChanged: scope.mode === 'changed' && scope.source === 'default',
+    fullScopeFiles: resolveBuiltInAuditFullScopeFiles(cwd, {
+      defaultChanged: input.defaultChanged === true,
+      fullScope: scope.mode === 'full',
     }),
-  );
+    ...(input.onStepEvent === undefined ? {} : { onStepEvent: input.onStepEvent }),
+  });
   const steps = internalSteps.map((step) => step.summary);
   const failOnFault = input.suite.execution?.failOnFault === true;
   const aggregate = deriveSuiteAggregate(steps);
@@ -196,22 +261,11 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     failOnFault,
     contextManifest?.readiness === 'unavailable',
   );
-  logTaskContextManifest(suite.name, contextManifest);
-
   // Source-end capture is part of the context run's evidence work. Freeze both
   // completion clocks only after it finishes so persisted wall time and the
   // reported monotonic duration cover the same operation boundary.
   const completedAt = new Date();
   const durationMs = Math.max(0, performance.now() - started);
-
-  log.info?.({
-    evt: 'cli.suite.run.complete',
-    suite: suite.name,
-    suiteRunId,
-    exitCode,
-    durationMs,
-    aggregate,
-  });
 
   const baseResult: SuiteRunResult = {
     type: 'suite-run',
@@ -226,7 +280,9 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     ...(contextManifest === undefined ? {} : { contextManifest }),
     verbose: input.suiteOpts.verbose === true,
   };
-  const runId = persistSuiteRun({
+
+  const committedRunId = await finalizeSuiteEvidence({
+    evidence,
     result: baseResult,
     internalSteps,
     source: input.source ?? 'configured',
@@ -234,9 +290,96 @@ export async function runSuite(input: RunSuiteInput): Promise<SuiteRunResult> {
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
     identity: ledgerIdentity,
-    ...contextPersistencePrecondition(contextManifest),
+    contextManifest,
+    suiteOpts: input.suiteOpts,
+    suiteName: suite.name,
+    suiteRunId,
+    correlationRunId: currentScope()?.runId,
   });
-  return resultWithPersistence(baseResult, runId);
+
+  const result = resultWithPersistence(baseResult, committedRunId);
+  logTaskContextManifest(suite.name, result.contextManifest);
+  log.info?.({
+    evt: 'cli.suite.run.complete',
+    suite: suite.name,
+    suiteRunId,
+    exitCode: result.exitCode,
+    durationMs,
+    aggregate,
+  });
+  return result;
+}
+
+interface FinalizeSuiteEvidenceInput {
+  readonly evidence: SuiteEvidenceSeam;
+  readonly result: SuiteRunResult;
+  readonly internalSteps: readonly SuiteStepReviewInput[];
+  readonly source: SuiteSource;
+  readonly cwd: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly identity: SuiteLedgerIdentity;
+  readonly contextManifest: SuiteRunResult['contextManifest'];
+  readonly suiteOpts: Readonly<Record<string, unknown>>;
+  readonly suiteName: string;
+  readonly suiteRunId: string;
+  readonly correlationRunId?: string;
+}
+
+async function finalizeSuiteEvidence(
+  input: FinalizeSuiteEvidenceInput,
+): Promise<string | undefined> {
+  try {
+    const projection = projectSuiteRun({
+      result: input.result,
+      internalSteps: input.internalSteps,
+      source: input.source,
+      cwd: input.cwd,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt,
+      identity: input.identity,
+      ...(input.correlationRunId === undefined ? {} : { correlationRunId: input.correlationRunId }),
+      ...contextPersistencePrecondition(input.contextManifest),
+    });
+    const reportEffect = planSuiteReportEffect({
+      name: input.suiteName,
+      runId: input.identity.runId,
+      opts: input.suiteOpts,
+    });
+    // Parent policy is authoritative even when it resolves to "do not open":
+    // clear any request a nested child or external replay attempted to queue.
+    if (!input.evidence.replaceReport(input.evidence.owner, reportEffect)) {
+      throw new TypeError('The suite evidence owner rejected its parent report policy.');
+    }
+    const finalized = await input.evidence.finalize(input.evidence.owner, {
+      run: projection.evidence,
+      ...(projection.precondition === undefined ? {} : { precondition: projection.precondition }),
+    });
+    return finalized.status === 'committed' && finalized.runId === input.identity.runId
+      ? finalized.runId
+      : undefined;
+  } catch (error) {
+    // Projection and custom-host failures must never allow child-only evidence
+    // to escape. A rejecting finalization still runs the host's one
+    // retention/cleanup pass while committing no prefix.
+    await rejectSuiteEvidence(input.evidence);
+    currentLogger().warn?.({
+      evt: 'cli.run-ledger.suite_record_failed',
+      module: 'cli:suite-run-ledger',
+      suiteRunId: input.suiteRunId,
+      reason: 'ledger-projection-or-finalization-failed',
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return;
+  }
+}
+
+async function rejectSuiteEvidence(evidence: SuiteEvidenceSeam): Promise<void> {
+  try {
+    await evidence.finalize(evidence.owner, { precondition: () => false });
+  } catch {
+    // The outer guaranteed cleanup discards the owner capability.
+  }
 }
 
 export function deriveSuiteAggregate(

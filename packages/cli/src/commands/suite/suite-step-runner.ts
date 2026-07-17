@@ -16,7 +16,7 @@ import {
 import { buildMaybeDispatchExternal } from '../../bootstrap/bind-external-dispatch.js';
 import { bindToolCliContext } from '../../bootstrap/bind-tool-context.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
-import { projectLedgerArgs } from '../run-ledger-projection.js';
+import { projectEnvelopeEvidence, projectLedgerArgs } from '../run-ledger-projection.js';
 
 import { BUILT_IN_GRAPH_TOOL_ID } from './built-in-suites.js';
 import { createCapturingContext } from './capturing-context.js';
@@ -188,6 +188,7 @@ function buildStepReview(input: {
   readonly summary: SuiteStepSummary;
   readonly opts: Readonly<Record<string, unknown>>;
   readonly sessionId: string | undefined;
+  readonly ledgerEvidence: unknown;
   readonly capturedEnvelope: ReturnType<ReturnType<typeof createCapturingContext>['getEnvelope']>;
   readonly evidenceSnapshots: readonly EvidenceSnapshotContribution[];
 }): SuiteStepReviewInput {
@@ -197,9 +198,20 @@ function buildStepReview(input: {
     summary: input.summary,
     ...(effectiveArgs === undefined ? {} : { effectiveArgs }),
     ...(input.sessionId === undefined ? {} : { sessionId: input.sessionId }),
+    ...(input.ledgerEvidence === undefined ? {} : { ledgerEvidence: input.ledgerEvidence }),
     ...(input.capturedEnvelope === undefined ? {} : { capturedEnvelope: input.capturedEnvelope }),
     ...(input.evidenceSnapshots.length === 0 ? {} : { evidenceSnapshots: input.evidenceSnapshots }),
   };
+}
+
+function durableLedgerEvidence(input: {
+  readonly capabilityMismatch: boolean;
+  readonly stepKind: ValidatedSuiteStep['kind'];
+  readonly stagedEvidence: unknown;
+  readonly capturedEnvelope: ReturnType<ReturnType<typeof createCapturingContext>['getEnvelope']>;
+}): unknown {
+  if (input.capabilityMismatch || input.stepKind === 'evidence') return;
+  return input.stagedEvidence ?? projectEnvelopeEvidence(input.capturedEnvelope);
 }
 
 async function runStep(args: RunStepInput): Promise<SuiteStepReviewInput> {
@@ -223,25 +235,34 @@ async function runStep(args: RunStepInput): Promise<SuiteStepReviewInput> {
     returnedEnvelope: false,
     returnedSession: false,
   };
+  const completeRun = capabilityBoundCompleteRun(
+    args.step,
+    args.runActionHooks.completeRun,
+    completionObservation,
+  );
   const hooks: RunActionHooks = {
     ...args.runActionHooks,
-    completeRun: capabilityBoundCompleteRun(
-      args.step,
-      args.runActionHooks.completeRun,
-      completionObservation,
-    ),
-    maybeDispatchExternal: buildMaybeDispatchExternal(
-      args.step.tool,
-      capture.context,
-      args.runActionHooks,
-    ),
+    completeRun: (value) => {
+      // Capture return-only in-process and worker envelopes before human/raw
+      // output routing suppresses them. This is the full-envelope review leg;
+      // the run plane independently retains the bounded durable projection.
+      capture.captureCompletion(value);
+      completeRun(value);
+    },
   };
+  // Worker replay must pass through the same capability-bound completeRun seam
+  // as an in-process handler. Passing the raw hooks here would let an external
+  // tool stage a forbidden Session/evidence leg before suite validation.
+  Object.assign(hooks, {
+    maybeDispatchExternal: buildMaybeDispatchExternal(args.step.tool, capture.context, hooks),
+  });
   const log = currentLogger();
   const executed = await executeStep({ args, opts, capture, hooks });
   const durationMs = Math.max(0, performance.now() - started);
   const rawEnvelopeStats = capture.getEnvelopeStats();
   const rawCapturedEnvelope = capture.getEnvelope();
-  const rawSessionId = hooks.currentSessionId?.();
+  const stagingStatus = hooks.currentSessionStagingStatus?.();
+  const rawSessionId = stagingStatus === 'staged' ? hooks.currentSessionId?.() : undefined;
   const rawEvidenceSnapshots = hooks.currentEvidenceSnapshots?.() ?? [];
   const capabilityMismatch =
     args.step.kind === 'evidence'
@@ -253,18 +274,30 @@ async function runStep(args: RunStepInput): Promise<SuiteStepReviewInput> {
   const completion = assertStepCompletion({
     executed,
     producesVerdict: commandProducesVerdict(args.step.spec),
-    hasSession: rawSessionId !== undefined,
+    // Persistence rejection/poison must not rewrite the command's analysis
+    // verdict. A returned Session is command evidence even when its staged row
+    // cannot be accepted into the owner's atomic bundle.
+    hasSession:
+      rawSessionId !== undefined ||
+      (args.step.kind === 'verdict' && completionObservation.returnedSession),
     hasEnvelope: rawCapturedEnvelope !== undefined,
     evidenceStep: args.step.kind === 'evidence',
     evidenceCount: rawEvidenceSnapshots.length,
     capabilityMismatch,
   });
+  if (capabilityMismatch) hooks.discardCurrentInvocationEvidence?.();
   const { errorMessage, errorCode } = completion;
   // A capability mismatch invalidates the whole returned proof object. Do not
   // let either leg enter the review brief, task-context manifest, or run ledger.
   const capturedEnvelope = capabilityMismatch ? undefined : rawCapturedEnvelope;
   const sessionId = capabilityMismatch ? undefined : rawSessionId;
   const evidenceSnapshots = capabilityMismatch ? [] : rawEvidenceSnapshots;
+  const ledgerEvidence = durableLedgerEvidence({
+    capabilityMismatch,
+    stepKind: args.step.kind,
+    stagedEvidence: hooks.currentStagedEnvelope?.()?.evidence,
+    capturedEnvelope: rawCapturedEnvelope,
+  });
   const envelopeStats = capabilityMismatch ? undefined : rawEnvelopeStats;
   const verification = verificationFromEnvelope(capturedEnvelope);
   const verdict =
@@ -329,6 +362,7 @@ async function runStep(args: RunStepInput): Promise<SuiteStepReviewInput> {
     summary,
     opts,
     sessionId,
+    ledgerEvidence,
     capturedEnvelope,
     evidenceSnapshots,
   });
@@ -354,13 +388,17 @@ function stepOpts(
   if (step.spec.commonFlags.includes('cwd') && common.cwd === undefined) {
     common.cwd = process.cwd();
   }
-  return {
+  const opts: Record<string, unknown> = {
     ...common,
     ...assembled,
     ...propagated,
     ...fullScopeFilesArg,
     _args: step.positionals,
   };
+  // The suite parent owns the only post-commit report request. A child Tool
+  // must never queue or open its own report while the suite is still staged.
+  delete opts.open;
+  return opts;
 }
 
 function builtInGraphImpactFullScopeFiles(

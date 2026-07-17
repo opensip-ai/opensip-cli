@@ -20,6 +20,7 @@ import {
   SystemError,
   TimeoutError,
   ValidationError,
+  currentScope,
   defineCommand,
   ok,
   runWithScope,
@@ -30,18 +31,25 @@ import {
   type ToolProvenance,
   type ToolRunCompletion,
 } from '@opensip-cli/core';
-import { DataStoreFactory } from '@opensip-cli/datastore';
-import { RunRepo } from '@opensip-cli/session-store';
+import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import { commitEvidenceBundle, RunRepo, SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeDispatchHostCtx } from '../../../__tests__/harness/dispatch-host-ctx.js';
+import {
+  createRunActionHooks,
+  createRunPlaneFactory,
+  type RunActionHooks,
+  type RunPlaneDeps,
+} from '../../../bootstrap/run-plane.js';
+import { runCommandSpecAction } from '../../run-command-spec-action.js';
 import {
   BUILT_IN_AGENT_CONTEXT_PLANES,
   BUILT_IN_AGENT_CONTEXT_SUITE,
   BUILT_IN_GRAPH_PACKAGE_NAME,
   BUILT_IN_GRAPH_TOOL_ID,
 } from '../built-in-suites.js';
-import { deriveSuiteAggregate, runSuite } from '../orchestrator.js';
+import { deriveSuiteAggregate, runSuite, type RunSuiteInput } from '../orchestrator.js';
 
 const dispatchSpy = vi.hoisted(() => vi.fn());
 const loadCapabilitiesSpy = vi.hoisted(() => vi.fn().mockResolvedValue(0));
@@ -59,6 +67,63 @@ const CONTEXT_INVENTORY_ID = `i1:${'1'.repeat(64)}`;
 const CONTEXT_GRAPH_ID = `g1:${'2'.repeat(64)}`;
 const CONTEXT_SELECTION_ID = `ts1:${'3'.repeat(64)}`;
 const tempDirs: string[] = [];
+
+function suiteRunHooks(
+  overrides: RunActionHooks = {},
+  deps: Partial<RunPlaneDeps> = {},
+): RunActionHooks {
+  const base = createRunActionHooks(
+    createRunPlaneFactory({
+      getDatastore: () => currentScope()?.datastore() as DataStore | undefined,
+      ...deps,
+    }),
+  );
+  return {
+    ...base,
+    ...overrides,
+    resetRun: () => {
+      base.resetRun?.();
+      overrides.resetRun?.();
+    },
+    completeRun: (value) => {
+      base.completeRun?.(value);
+      overrides.completeRun?.(value);
+    },
+  };
+}
+
+function sessionCommand(
+  name: string,
+  beforeReturn?: (
+    opts: Readonly<Record<string, unknown>>,
+    cli: ToolCliContext,
+  ) => void | Promise<void>,
+): NonNullable<Tool['commandSpecs']>[number] {
+  return defineCommand<unknown, ToolCliContext>({
+    name,
+    description: 'fixture session producer',
+    commonFlags: ['cwd', 'open'],
+    scope: 'project',
+    output: 'raw-stream',
+    rawStreamReason: 'host-orchestrated-evidence',
+    producesVerdict: true,
+    handler: async (opts, cli) => {
+      await beforeReturn?.(opts as Readonly<Record<string, unknown>>, cli);
+      const envelope = signalEnvelope({ passed: true, findings: 0 });
+      cli.emitEnvelope(envelope);
+      return {
+        envelope,
+        session: {
+          tool: 'fit',
+          cwd: typeof opts.cwd === 'string' ? opts.cwd : '/repo',
+          score: 100,
+          passed: true,
+          payload: { __version: 1, command: name },
+        },
+      } satisfies ToolRunCompletion;
+    },
+  });
+}
 
 function contextSnapshotId(kind: (typeof BUILT_IN_AGENT_CONTEXT_PLANES)[number]['kind']): string {
   if (kind === 'inventory') return CONTEXT_INVENTORY_ID;
@@ -343,7 +408,7 @@ describe('runSuite', () => {
         source: 'configured',
         tools: [tool(TOOL_ID, 'fitness', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { files: ['src/configured-suite-input.ts'] },
       }),
     );
@@ -368,7 +433,7 @@ describe('runSuite', () => {
             source: 'built-in',
             tools: [contextGraphTool()],
             ctx: makeDispatchHostCtx().ctx,
-            runActionHooks: {},
+            runActionHooks: suiteRunHooks(),
             suiteOpts,
             defaultChanged,
           }),
@@ -409,7 +474,7 @@ describe('runSuite', () => {
           source: 'built-in',
           tools: [graph],
           ctx: makeDispatchHostCtx().ctx,
-          runActionHooks: {},
+          runActionHooks: suiteRunHooks(),
           suiteOpts: {},
         }),
       ),
@@ -450,7 +515,7 @@ describe('runSuite', () => {
       graph: contextPointerGraphScope(),
     });
     let snapshots: readonly EvidenceSnapshotContribution[] = [];
-    const runActionHooks = {
+    const runActionHooks = suiteRunHooks({
       resetRun: () => {
         snapshots = [];
       },
@@ -458,7 +523,7 @@ describe('runSuite', () => {
         snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
       },
       currentEvidenceSnapshots: () => snapshots,
-    };
+    });
 
     try {
       const result = await runWithScope(scope, () =>
@@ -524,7 +589,7 @@ describe('runSuite', () => {
           source: 'built-in',
           tools: [graph],
           ctx: makeDispatchHostCtx().ctx,
-          runActionHooks: {
+          runActionHooks: suiteRunHooks({
             resetRun: () => {
               snapshots = [];
             },
@@ -532,7 +597,7 @@ describe('runSuite', () => {
               snapshots = (value as ToolRunCompletion | undefined)?.evidenceSnapshots ?? [];
             },
             currentEvidenceSnapshots: () => snapshots,
-          },
+          }),
           suiteOpts: { cwd, files: ['src/a.ts'] },
         }),
       );
@@ -551,6 +616,68 @@ describe('runSuite', () => {
     }
   });
 
+  it.each(['transaction-rollback', 'owner-poison', 'datastore-unavailable'] as const)(
+    'fails agent-context closed without a child or parent prefix: %s',
+    async (failure) => {
+      const cwd = makeChangedGitFixture();
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      const graph = contextGraphTool();
+      const scope = new RunScope({
+        datastore: () => datastore,
+        toolProvenance: [
+          {
+            source: 'bundled',
+            id: 'graph',
+            stableId: BUILT_IN_GRAPH_TOOL_ID,
+            version: '0.6.0',
+            packageName: BUILT_IN_GRAPH_PACKAGE_NAME,
+            manifestHash: 'fixture-manifest-hash',
+          },
+        ],
+      });
+      Object.assign(scope, {
+        projectContext: { projectRoot: cwd, scope: 'project' },
+        graph: contextPointerGraphScope(),
+      });
+      let deps: Partial<RunPlaneDeps>;
+      if (failure === 'transaction-rollback') {
+        deps = {
+          commitEvidence: () => ({ status: 'failed', reason: 'write-failed' }),
+        };
+      } else if (failure === 'owner-poison') {
+        deps = { evidenceLimits: { maxBytes: 1 } };
+      } else {
+        deps = { getDatastore: () => undefined };
+      }
+
+      try {
+        const result = await runWithScope(scope, () =>
+          runSuite({
+            name: 'agent-context',
+            suite: BUILT_IN_AGENT_CONTEXT_SUITE,
+            source: 'built-in',
+            tools: [graph],
+            ctx: makeDispatchHostCtx().ctx,
+            runActionHooks: suiteRunHooks({}, deps),
+            suiteOpts: { cwd, files: ['src/a.ts'] },
+          }),
+        );
+
+        expect(result.exitCode).toBeGreaterThanOrEqual(EXIT_CODES.RUNTIME_ERROR);
+        expect(result.runId).toBeUndefined();
+        expect(result.contextManifest).toMatchObject({
+          readiness: 'unavailable',
+          reasonCodes: expect.arrayContaining(['ledger-persist-failed']),
+          nextActions: ['opensip suite run agent-context --files <same-explicit-files> --json'],
+        });
+        expect(new RunRepo(datastore).listRuns()).toEqual([]);
+        expect(new SessionRepo(datastore).count()).toBe(0);
+      } finally {
+        datastore.close();
+      }
+    },
+  );
+
   it('returns the authoritative persisted run ID from the single ledger transaction', async () => {
     const datastore = DataStoreFactory.open({ backend: 'memory' });
     const spec = helpCommand('fit', (_opts, cli) => {
@@ -567,7 +694,7 @@ describe('runSuite', () => {
           source: 'built-in',
           tools: [tool(TOOL_ID, 'fitness', [spec])],
           ctx: makeDispatchHostCtx().ctx,
-          runActionHooks: {},
+          runActionHooks: suiteRunHooks(),
           suiteOpts: { cwd: '/repo' },
         }),
       );
@@ -576,6 +703,434 @@ describe('runSuite', () => {
       expect(runs).toHaveLength(1);
       expect(result.runId).toBe(runs[0]?.id);
       expect(runs[0]?.legacySuiteRunId).toBe(result.suiteRunId);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('accepts a return-only in-process envelope in human mode as complete verdict evidence', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const envelope = signalEnvelope({ passed: true, findings: 0 });
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'return-envelope',
+      description: 'return-only envelope fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'signal-envelope',
+      producesVerdict: true,
+      handler: () => envelope,
+    });
+
+    try {
+      const result = await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runSuite({
+          name: 'return-only-suite',
+          suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.SUCCESS,
+        outcome: 'passed',
+        verdict: { passed: true, errors: 0, warnings: 0, findings: 0 },
+      });
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toMatchObject({
+        kind: 'signal-envelope',
+        runId: envelope.runId,
+      });
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('commits every accepted child Session and the parent in preallocated step order', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const first = sessionCommand('first');
+    const second = sessionCommand('second');
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'atomic-suite',
+          suite: {
+            steps: [
+              { tool: TOOL_ID, command: first.name },
+              { tool: TOOL_ID, command: second.name },
+            ],
+          },
+          tools: [tool(TOOL_ID, 'fitness', [first, second])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks({}, { evidenceLimits: { maxSessions: 2 } }),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.runId).toMatch(/^RUN_/u);
+      const sessions = new SessionRepo(datastore).list();
+      const steps = new RunRepo(datastore).listStepsForRun(result.runId!);
+      expect(sessions).toHaveLength(2);
+      expect(steps.map((step) => step.command)).toEqual(['first', 'second']);
+      expect(steps.map((step) => step.ordinal)).toEqual([0, 1]);
+      expect(steps.every((step) => sessions.some((session) => session.id === step.sessionId))).toBe(
+        true,
+      );
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('rolls back every staged child Session and its parent without changing an ordinary suite verdict', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const first = sessionCommand('first');
+    const second = sessionCommand('second');
+    const commitEvidence = vi.fn(() => ({ status: 'failed', reason: 'write-failed' }) as const);
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'rollback-suite',
+          suite: {
+            steps: [
+              { tool: TOOL_ID, command: first.name },
+              { tool: TOOL_ID, command: second.name },
+            ],
+          },
+          tools: [tool(TOOL_ID, 'fitness', [first, second])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks({}, { commitEvidence }),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.SUCCESS);
+      expect(result.runId).toBeUndefined();
+      expect(commitEvidence).toHaveBeenCalledOnce();
+      const attemptedBundle = commitEvidence.mock.calls[0]?.[1];
+      expect(attemptedBundle?.sessions.map((entry) => entry.session.payload)).toEqual([
+        { __version: 1, command: 'first' },
+        { __version: 1, command: 'second' },
+      ]);
+      expect(attemptedBundle?.run?.run).toMatchObject({ name: 'rollback-suite' });
+      expect(attemptedBundle?.run?.steps.map((step) => step.command)).toEqual(['first', 'second']);
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      expect(new RunRepo(datastore).listRuns()).toEqual([]);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('commits a suite larger than the retention keep before the one post-commit prune', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const first = sessionCommand('first');
+    const second = sessionCommand('second');
+    const retentionPolicy = vi.fn(() => ({
+      source: 'scope' as const,
+      keep: 1,
+      maxAgeDays: 0,
+      maxSizeMb: 0,
+    }));
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'retained-suite',
+          suite: {
+            steps: [
+              { tool: TOOL_ID, command: first.name },
+              { tool: TOOL_ID, command: second.name },
+            ],
+          },
+          tools: [tool(TOOL_ID, 'fitness', [first, second])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks({}, { sessionRetentionPolicy: retentionPolicy }),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.runId).toMatch(/^RUN_/u);
+      expect(retentionPolicy).toHaveBeenCalledOnce();
+      expect(new SessionRepo(datastore).count()).toBe(1);
+      const steps = new RunRepo(datastore).listStepsForRun(result.runId!);
+      expect(steps).toHaveLength(2);
+      expect(steps.filter((step) => step.sessionId !== undefined)).toHaveLength(1);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('poisons an over-limit suite without committing a child prefix or changing its verdict', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const first = sessionCommand('first');
+    const second = sessionCommand('second');
+    const scope = new RunScope({ datastore: () => datastore });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'bounded-suite',
+          suite: {
+            steps: [
+              { tool: TOOL_ID, command: first.name },
+              { tool: TOOL_ID, command: second.name },
+            ],
+          },
+          tools: [tool(TOOL_ID, 'fitness', [first, second])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks({}, { evidenceLimits: { maxSessions: 1 } }),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.SUCCESS);
+      expect(result.runId).toBeUndefined();
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      expect(new RunRepo(datastore).listRuns()).toEqual([]);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('opens one exact suite report only after the atomic bundle commits', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const observedOpts: Readonly<Record<string, unknown>>[] = [];
+    const spec = sessionCommand('fit', async (opts, cli) => {
+      observedOpts.push(opts);
+      await cli.maybeOpenReport({ openRequested: true, jsonOutput: false });
+    });
+    const order: string[] = [];
+    const commitEvidence = vi.fn((...args: Parameters<typeof commitEvidenceBundle>) => {
+      order.push('commit');
+      return commitEvidenceBundle(...args);
+    });
+    const executeReportEffect = vi.fn(() => {
+      order.push('report');
+      return Promise.resolve();
+    });
+    const originalTty = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    const originalEnv = {
+      CI: process.env.CI,
+      SSH_CONNECTION: process.env.SSH_CONNECTION,
+      SSH_CLIENT: process.env.SSH_CLIENT,
+    };
+    Object.defineProperty(process.stdout, 'isTTY', {
+      configurable: true,
+      value: true,
+    });
+    delete process.env.CI;
+    delete process.env.SSH_CONNECTION;
+    delete process.env.SSH_CLIENT;
+
+    try {
+      const factory = createRunPlaneFactory({
+        getDatastore: () => currentScope()?.datastore() as DataStore | undefined,
+        commitEvidence,
+        executeReportEffect,
+      });
+      const host = makeDispatchHostCtx();
+      const ctx = {
+        ...host.ctx,
+        maybeOpenReport: (request: {
+          readonly openRequested: boolean;
+          readonly jsonOutput: boolean;
+        }) => {
+          if (request.openRequested && !request.jsonOutput) {
+            factory.queueReportEffect({ kind: 'compose-and-open' });
+          }
+          return Promise.resolve();
+        },
+      } satisfies ToolCliContext;
+      const result = await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runSuite({
+          name: 'audit',
+          source: 'built-in',
+          suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx,
+          runActionHooks: createRunActionHooks(factory),
+          suiteOpts: { cwd: '/repo', open: true },
+        }),
+      );
+
+      expect(order).toEqual(['commit', 'report']);
+      expect(executeReportEffect).toHaveBeenCalledOnce();
+      expect(executeReportEffect).toHaveBeenCalledWith({
+        kind: 'compose-and-open',
+        selection: { view: 'change-impact', runId: result.runId },
+      });
+      expect(observedOpts[0]).not.toHaveProperty('open');
+    } finally {
+      if (originalTty === undefined) delete (process.stdout as { isTTY?: boolean }).isTTY;
+      else Object.defineProperty(process.stdout, 'isTTY', originalTty);
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      datastore.close();
+    }
+  });
+
+  it.each([
+    { label: 'no open request', suiteOpts: { cwd: '/repo' } },
+    { label: 'JSON output', suiteOpts: { cwd: '/repo', open: true, json: true } },
+  ])(
+    'clears a child report request when the parent policy resolves to $label',
+    async ({ suiteOpts }) => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      const executeReportEffect = vi.fn(() => Promise.resolve());
+      const factory = createRunPlaneFactory({
+        getDatastore: () => currentScope()?.datastore() as DataStore | undefined,
+        executeReportEffect,
+      });
+      const host = makeDispatchHostCtx();
+      const ctx = {
+        ...host.ctx,
+        maybeOpenReport: (request: {
+          readonly openRequested: boolean;
+          readonly jsonOutput: boolean;
+        }) => {
+          if (request.openRequested && !request.jsonOutput) {
+            factory.queueReportEffect({ kind: 'compose-and-open' });
+          }
+          return Promise.resolve();
+        },
+      } satisfies ToolCliContext;
+      const spec = sessionCommand('fit', (_opts, cli) =>
+        cli.maybeOpenReport({ openRequested: true, jsonOutput: false }),
+      );
+
+      try {
+        const result = await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+          runSuite({
+            name: 'audit',
+            source: 'built-in',
+            suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+            tools: [tool(TOOL_ID, 'fitness', [spec])],
+            ctx,
+            runActionHooks: createRunActionHooks(factory),
+            suiteOpts,
+          }),
+        );
+
+        expect(result.runId).toMatch(/^RUN_/u);
+        expect(executeReportEffect).not.toHaveBeenCalled();
+      } finally {
+        datastore.close();
+      }
+    },
+  );
+
+  it('does not hold the evidence write lock while a suite child is paused', async () => {
+    const root = makeTempDir('suite-atomic-concurrency-');
+    const datastore = DataStoreFactory.open({
+      backend: 'sqlite',
+      path: join(root, 'runtime.sqlite'),
+    });
+    let enterChild!: () => void;
+    let releaseChild!: () => void;
+    const childEntered = new Promise<void>((resolve) => {
+      enterChild = resolve;
+    });
+    const childRelease = new Promise<void>((resolve) => {
+      releaseChild = resolve;
+    });
+    const paused = sessionCommand('paused', async () => {
+      enterChild();
+      await childRelease;
+    });
+    const standalone = sessionCommand('standalone');
+    const scope = new RunScope({ datastore: () => datastore });
+    const suiteHooks = suiteRunHooks();
+    const standaloneHooks = suiteRunHooks();
+
+    try {
+      const result = await runWithScope(scope, async () => {
+        const suitePromise = runSuite({
+          name: 'paused-suite',
+          suite: { steps: [{ tool: TOOL_ID, command: paused.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [paused])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteHooks,
+          suiteOpts: { cwd: root },
+        });
+        await childEntered;
+
+        await runCommandSpecAction(
+          standalone,
+          { cwd: root },
+          [],
+          makeDispatchHostCtx().ctx,
+          standaloneHooks,
+        );
+        const beforeResume = new RunRepo(datastore).listRuns();
+        expect(beforeResume).toHaveLength(1);
+        expect(new SessionRepo(datastore).count()).toBe(1);
+
+        releaseChild();
+        return suitePromise;
+      });
+
+      expect(result.runId).toMatch(/^RUN_/u);
+      const runs = new RunRepo(datastore).listRuns();
+      expect(runs).toHaveLength(2);
+      expect(new SessionRepo(datastore).count()).toBe(2);
+      expect(new RunRepo(datastore).listStepsForRun(result.runId!)[0]?.sessionId).toMatch(/^FIT_/u);
+    } finally {
+      releaseChild();
+      datastore.close();
+    }
+  });
+
+  it('discards a thrown orchestration owner before the same hooks are reused', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const spec = sessionCommand('fit');
+    const retentionPolicy = vi.fn(() => ({
+      source: 'scope' as const,
+      keep: 200,
+      maxAgeDays: 60,
+      maxSizeMb: 150,
+    }));
+    const hooks = suiteRunHooks({}, { sessionRetentionPolicy: retentionPolicy });
+    const input = {
+      name: 'cleanup-suite',
+      suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+      tools: [tool(TOOL_ID, 'fitness', [spec])],
+      ctx: makeDispatchHostCtx().ctx,
+      runActionHooks: hooks,
+      suiteOpts: { cwd: '/repo' },
+    } satisfies RunSuiteInput;
+
+    try {
+      await expect(
+        runWithScope(new RunScope({ datastore: () => datastore }), () =>
+          runSuite({
+            ...input,
+            onStepEvent: (event) => {
+              if (event.phase === 'done') {
+                throw new Error('fixture orchestration sink failed');
+              }
+            },
+          }),
+        ),
+      ).rejects.toThrow('fixture orchestration sink failed');
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      expect(new RunRepo(datastore).listRuns()).toEqual([]);
+      expect(retentionPolicy).toHaveBeenCalledOnce();
+
+      const result = await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runSuite(input),
+      );
+      expect(result.runId).toMatch(/^RUN_/u);
+      expect(new SessionRepo(datastore).count()).toBe(1);
+      expect(new RunRepo(datastore).listRuns()).toHaveLength(1);
+      expect(retentionPolicy).toHaveBeenCalledTimes(2);
     } finally {
       datastore.close();
     }
@@ -610,13 +1165,13 @@ describe('runSuite', () => {
           suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
           tools: [tool(TOOL_ID, 'fitness', [spec])],
           ctx: makeDispatchHostCtx().ctx,
-          runActionHooks: {
+          runActionHooks: suiteRunHooks({
             resetRun: () => {
               snapshots = [];
             },
             completeRun,
             currentEvidenceSnapshots: () => snapshots,
-          },
+          }),
           suiteOpts: { cwd: '/repo' },
         }),
       );
@@ -631,6 +1186,87 @@ describe('runSuite', () => {
       const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
       expect(persisted?.evidence).toBeUndefined();
       expect(persisted?.sessionId).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('bounds a malformed in-process verdict envelope as missing evidence instead of throwing orchestration', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const malformed = {
+      ...signalEnvelope({ passed: true, findings: 0 }),
+      units: undefined,
+    } as unknown as SignalEnvelope;
+    const spec = helpCommand('malformed-envelope', (_opts, cli) => {
+      cli.emitEnvelope(malformed);
+      return { type: 'help' };
+    });
+
+    try {
+      const result = await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runSuite({
+          name: 'malformed-suite',
+          suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        outcome: 'faulted',
+        errorCode: 'RUN.EVIDENCE.MISSING',
+      });
+      expect(result.steps[0]?.verdict).toBeUndefined();
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toBeUndefined();
+      expect(persisted?.sessionId).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('ignores malformed in-process impact trust without aborting the completed suite', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const envelope = {
+      ...signalEnvelope({ passed: true, findings: 0 }),
+      verification: {
+        coverage: 'partial',
+        fallback: 'full-run',
+        fullyVerified: false,
+        uncertainties: [null],
+      },
+    } as unknown as SignalEnvelope;
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'malformed-impact-trust',
+      description: 'malformed optional trust fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'signal-envelope',
+      producesVerdict: true,
+      handler: () => envelope,
+    });
+
+    try {
+      const result = await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runSuite({
+          name: 'malformed-trust-suite',
+          suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
+          tools: [tool(TOOL_ID, 'fitness', [spec])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.SUCCESS,
+        outcome: 'passed',
+      });
+      expect(result.steps[0]?.verification).toBeUndefined();
+      expect(new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0]?.evidence).toBeDefined();
     } finally {
       datastore.close();
     }
@@ -659,13 +1295,13 @@ describe('runSuite', () => {
           suite: { steps: [{ tool: TOOL_ID, command: spec.name }] },
           tools: [tool(TOOL_ID, 'fitness', [spec])],
           ctx: makeDispatchHostCtx().ctx,
-          runActionHooks: {
+          runActionHooks: suiteRunHooks({
             resetRun: () => {
               snapshots = [];
             },
             completeRun,
             currentEvidenceSnapshots: () => snapshots,
-          },
+          }),
           suiteOpts: { cwd: '/repo' },
         }),
       );
@@ -704,7 +1340,7 @@ describe('runSuite', () => {
         source: 'built-in',
         tools: [tool(TOOL_ID, 'fitness', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { cwd: '/repo' },
       }),
     );
@@ -758,7 +1394,7 @@ describe('runSuite', () => {
       },
       tools: [tool(TOOL_ID, 'fitness', [spec])],
       ctx: host.ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: { cwd: '/repo', json: false },
     });
 
@@ -804,7 +1440,7 @@ describe('runSuite', () => {
       suite: { steps: [{ tool: TOOL_ID, command: 'graph-impact' }] },
       tools: [tool(TOOL_ID, 'fitness', [spec])],
       ctx: makeDispatchHostCtx().ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: {},
     });
 
@@ -859,7 +1495,7 @@ describe('runSuite', () => {
         },
         tools: [fitness, graph],
         ctx: host.ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { cwd: '/repo', json: true },
       }),
     );
@@ -973,7 +1609,7 @@ describe('runSuite', () => {
         tool(EXTERNAL_TOOL_ID, 'yagni', [yagni]),
       ],
       ctx: makeDispatchHostCtx().ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: { changed: true, since: 'origin/main', files: ['src/a.ts'] },
     });
 
@@ -1025,7 +1661,7 @@ describe('runSuite', () => {
       suite,
       tools,
       ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: { cwd },
       defaultChanged: true,
     });
@@ -1034,7 +1670,7 @@ describe('runSuite', () => {
       suite,
       tools,
       ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: { cwd, since: 'origin/main' },
       defaultChanged: true,
     });
@@ -1085,7 +1721,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'impact' }] },
         tools: [tool(TOOL_ID, 'graph', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { cwd },
         defaultChanged: true,
       }),
@@ -1140,7 +1776,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'impact' }] },
         tools: [tool(TOOL_ID, 'graph', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { cwd },
         defaultChanged: true,
       }),
@@ -1188,7 +1824,7 @@ describe('runSuite', () => {
       suite: { steps: [{ tool: TOOL_ID, command: 'impact' }] },
       tools: [tool(TOOL_ID, 'graph', [spec])],
       ctx: makeDispatchHostCtx().ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: { cwd, full: true },
       defaultChanged: true,
     });
@@ -1252,7 +1888,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: BUILT_IN_GRAPH_TOOL_ID, command: 'impact' }] },
         tools: [tool(BUILT_IN_GRAPH_TOOL_ID, 'graph', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { cwd, full: true, changed: true },
         defaultChanged: true,
       }),
@@ -1284,7 +1920,7 @@ describe('runSuite', () => {
       suite: { steps: [{ tool: TOOL_ID, command: 'fit' }] },
       tools: [tool(TOOL_ID, 'fitness', [spec])],
       ctx: host.ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: {},
     });
 
@@ -1322,7 +1958,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'reported' }] },
         tools: [tool(TOOL_ID, 'fitness', [spec])],
         ctx: host.ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: { json: true },
       }),
     );
@@ -1380,7 +2016,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'typed-error' }] },
         tools: [tool(TOOL_ID, 'fitness', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: {},
       });
 
@@ -1430,7 +2066,7 @@ describe('runSuite', () => {
       },
       tools: [tool(TOOL_ID, 'fitness', [exiting, next])],
       ctx: makeDispatchHostCtx().ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: {},
     });
 
@@ -1479,7 +2115,7 @@ describe('runSuite', () => {
       },
       tools: [tool(TOOL_ID, 'fitness', [throws]), tool(OTHER_TOOL_ID, 'graph', [after])],
       ctx: makeDispatchHostCtx().ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: {},
     });
 
@@ -1515,7 +2151,7 @@ describe('runSuite', () => {
       suite: { steps: [{ tool: TOOL_ID, command: 'fault' }] },
       tools: [tool(TOOL_ID, 'fitness', [fault])],
       ctx: makeDispatchHostCtx().ctx,
-      runActionHooks: {},
+      runActionHooks: suiteRunHooks(),
       suiteOpts: {},
     });
 
@@ -1551,7 +2187,7 @@ describe('runSuite', () => {
           tool(TOOL_ID, 'fitness', [bundled]),
         ],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: {},
       }),
     );
@@ -1580,6 +2216,186 @@ describe('runSuite', () => {
         },
       ],
     });
+  });
+
+  it('accepts a return-only external envelope as complete verdict evidence', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const envelope = signalEnvelope({ passed: true, findings: 0 });
+    dispatchSpy.mockImplementation((args: { ctx: ToolCliContext & RunActionHooks }) => {
+      args.ctx.completeRun?.({ envelope });
+    });
+    const external = defineCommand<unknown, ToolCliContext>({
+      name: 'external-return-envelope',
+      description: 'external return-only envelope fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'signal-envelope',
+      producesVerdict: true,
+      handler: () => {
+        throw new Error('external handler should not run in-process');
+      },
+    });
+    const scope = new RunScope({
+      datastore: () => datastore,
+      toolProvenance: [externalProvenance()],
+    });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'external-return-only-suite',
+          suite: { steps: [{ tool: EXTERNAL_TOOL_ID, command: external.name }] },
+          tools: [tool(EXTERNAL_TOOL_ID, 'external-fixture', [external])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.SUCCESS,
+        outcome: 'passed',
+        verdict: { passed: true, errors: 0, warnings: 0, findings: 0 },
+      });
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toMatchObject({
+        kind: 'signal-envelope',
+        runId: envelope.runId,
+      });
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('bounds a malformed external verdict envelope as missing evidence instead of throwing orchestration', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const malformed = {
+      ...signalEnvelope({ passed: true, findings: 0 }),
+      units: undefined,
+    } as unknown as SignalEnvelope;
+    dispatchSpy.mockImplementation((args: { ctx: ToolCliContext }) => {
+      args.ctx.emitEnvelope(malformed);
+    });
+    const external = helpCommand('external-malformed', () => {
+      throw new Error('external handler should not run in-process');
+    });
+    const scope = new RunScope({
+      datastore: () => datastore,
+      toolProvenance: [externalProvenance()],
+    });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'external-malformed-suite',
+          suite: { steps: [{ tool: EXTERNAL_TOOL_ID, command: external.name }] },
+          tools: [tool(EXTERNAL_TOOL_ID, 'external-fixture', [external])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        outcome: 'faulted',
+        errorCode: 'RUN.EVIDENCE.MISSING',
+      });
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toBeUndefined();
+      expect(persisted?.sessionId).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('ignores malformed external impact trust without aborting the completed suite', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const envelope = {
+      ...signalEnvelope({ passed: true, findings: 0 }),
+      verification: {
+        coverage: 'partial',
+        fallback: 'full-run',
+        fullyVerified: false,
+        uncertainties: [null],
+      },
+    } as unknown as SignalEnvelope;
+    dispatchSpy.mockImplementation((args: { ctx: ToolCliContext & RunActionHooks }) => {
+      args.ctx.completeRun?.({ envelope });
+      args.ctx.emitEnvelope(envelope);
+    });
+    const external = helpCommand('external-malformed-trust', () => {
+      throw new Error('external handler should not run in-process');
+    });
+    const scope = new RunScope({
+      datastore: () => datastore,
+      toolProvenance: [externalProvenance()],
+    });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'external-malformed-trust-suite',
+          suite: { steps: [{ tool: EXTERNAL_TOOL_ID, command: external.name }] },
+          tools: [tool(EXTERNAL_TOOL_ID, 'external-fixture', [external])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.SUCCESS,
+        outcome: 'passed',
+      });
+      expect(result.steps[0]?.verification).toBeUndefined();
+      expect(new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0]?.evidence).toBeDefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('rejects capability-mismatched external verdict replay without staging either output leg', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const envelope = signalEnvelope({ passed: true, findings: 0 });
+    const evidence = contextContribution('inventory', 'external-verdict-with-snapshot');
+    dispatchSpy.mockImplementation((args: { ctx: ToolCliContext & RunActionHooks }) => {
+      args.ctx.emitEnvelope(envelope);
+      args.ctx.completeRun?.({ envelope, ...evidence });
+    });
+    const external = helpCommand('external-capability-mismatch', () => {
+      throw new Error('external handler should not run in-process');
+    });
+    const scope = new RunScope({
+      datastore: () => datastore,
+      toolProvenance: [externalProvenance()],
+    });
+
+    try {
+      const result = await runWithScope(scope, () =>
+        runSuite({
+          name: 'external-capability-mismatch-suite',
+          suite: { steps: [{ tool: EXTERNAL_TOOL_ID, command: external.name }] },
+          tools: [tool(EXTERNAL_TOOL_ID, 'external-fixture', [external])],
+          ctx: makeDispatchHostCtx().ctx,
+          runActionHooks: suiteRunHooks(),
+          suiteOpts: { cwd: '/repo' },
+        }),
+      );
+
+      expect(result.steps[0]).toMatchObject({
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        outcome: 'faulted',
+        errorCode: 'RUN.CAPABILITY.MISMATCH',
+      });
+      expect(result.steps[0]?.verdict).toBeUndefined();
+      const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
+      expect(persisted?.evidence).toBeUndefined();
+      expect(persisted?.sessionId).toBeUndefined();
+      expect(new SessionRepo(datastore).count()).toBe(0);
+    } finally {
+      datastore.close();
+    }
   });
 
   it('summarizes a mixed bundled/external suite without collapsing outcome classes', async () => {
@@ -1636,7 +2452,7 @@ describe('runSuite', () => {
           tool(EXTERNAL_TOOL_ID, 'external-fixture', [externalWarning]),
         ],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: {},
       }),
     );
@@ -1758,7 +2574,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'fault-with-findings' }] },
         tools: [tool(TOOL_ID, 'fitness', [faultWithFindings])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: {},
       }),
     );
@@ -1809,7 +2625,7 @@ describe('runSuite', () => {
           },
           tools: [tool(TOOL_ID, 'fitness', [ok, faultyCheck])],
           ctx: makeDispatchHostCtx().ctx,
-          runActionHooks: {},
+          runActionHooks: suiteRunHooks(),
           suiteOpts: {},
         }),
       );
@@ -1880,7 +2696,7 @@ describe('runSuite', () => {
         },
         tools: [tool(TOOL_ID, 'fitness', [fit]), tool(OTHER_TOOL_ID, 'graph', [graph])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: {},
       }),
     );
@@ -1936,7 +2752,7 @@ describe('runSuite', () => {
         suite: { steps: [{ tool: TOOL_ID, command: 'secret-finding' }] },
         tools: [tool(TOOL_ID, 'fitness', [spec])],
         ctx: makeDispatchHostCtx().ctx,
-        runActionHooks: {},
+        runActionHooks: suiteRunHooks(),
         suiteOpts: {},
       });
 

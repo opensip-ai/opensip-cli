@@ -96,6 +96,7 @@ export {
 export type * from './impact-trust.js';
 export {
   FULL_IMPACT_TRUST,
+  MAX_IMPACT_UNCERTAINTIES,
   buildImpactTrust,
   changedEntriesToImpactUncertainties,
   gitWarningsToImpactUncertainties,

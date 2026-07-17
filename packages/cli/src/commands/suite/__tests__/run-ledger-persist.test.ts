@@ -1,66 +1,20 @@
 import { buildTaskContextFileScope, buildTaskContextProjectIdentity } from '@opensip-cli/contracts';
-import { RunScope, runWithScopeSync, type Logger } from '@opensip-cli/core';
-import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { readTaskContextRun, RunRepo, SessionRepo } from '@opensip-cli/session-store';
-import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { describe, expect, it, vi } from 'vitest';
 
 import { BUILT_IN_AGENT_CONTEXT_PLANES, BUILT_IN_GRAPH_TOOL_ID } from '../built-in-suites.js';
 import {
   allocateSuiteLedgerIdentity,
-  persistSuiteRun,
-  type PersistSuiteRunInput,
+  projectSuiteRun,
+  type ProjectSuiteRunInput,
+  type SuiteLedgerIdentity,
 } from '../run-ledger-persist.js';
 
 import type { SuiteStepReviewInput } from '../review-brief.js';
-import type {
-  SignalEnvelope,
-  StoredSession,
-  SuiteRunResult,
-  TaskContextManifest,
-} from '@opensip-cli/contracts';
+import type { SignalEnvelope, SuiteRunResult, TaskContextManifest } from '@opensip-cli/contracts';
 
 const STARTED_AT = '2026-01-01T00:00:00.000Z';
 const COMPLETED_AT = '2026-01-01T00:00:02.000Z';
-
-const openDatastores: DataStore[] = [];
-
-interface TestLogger extends Logger {
-  readonly debug: Mock;
-  readonly info: Mock;
-  readonly warn: Mock;
-  readonly error: Mock;
-}
-
-function openMemoryDatastore(): DataStore {
-  const datastore = DataStoreFactory.open({ backend: 'memory' });
-  openDatastores.push(datastore);
-  return datastore;
-}
-
-function logger(): TestLogger {
-  return {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  };
-}
-
-function seedSession(datastore: DataStore): void {
-  const session: StoredSession = {
-    id: 'session-fit-1',
-    tool: 'fit',
-    startedAt: STARTED_AT,
-    completedAt: COMPLETED_AT,
-    cwd: '/repo',
-    score: 100,
-    passed: true,
-    durationMs: 11,
-    cliVersion: '0.0.0-test',
-    payload: { __version: 1 },
-  };
-  new SessionRepo(datastore).save(session);
-}
 
 function result(overrides: Partial<SuiteRunResult> = {}): SuiteRunResult {
   const steps = overrides.steps ?? [
@@ -99,11 +53,15 @@ function reviewStep(overrides: Partial<SuiteStepReviewInput> = {}): SuiteStepRev
   };
 }
 
-function persistWithIdentity(input: Omit<PersistSuiteRunInput, 'identity'>): string | undefined {
-  return persistSuiteRun({
-    ...input,
-    identity: allocateSuiteLedgerIdentity(input.internalSteps),
-  });
+function projectWithIdentity(input: Omit<ProjectSuiteRunInput, 'identity'>): {
+  readonly identity: SuiteLedgerIdentity;
+  readonly projection: ReturnType<typeof projectSuiteRun>;
+} {
+  const identity = allocateSuiteLedgerIdentity(input.internalSteps);
+  return {
+    identity,
+    projection: projectSuiteRun({ ...input, identity }),
+  };
 }
 
 function envelope(): SignalEnvelope {
@@ -160,88 +118,147 @@ function contextManifest(runId: string): TaskContextManifest {
   };
 }
 
-describe('persistSuiteRun', () => {
-  afterEach(() => {
-    for (const datastore of openDatastores.splice(0)) datastore.close();
-  });
+function contextSteps(
+  overrides: {
+    readonly resultDurationMs?: number;
+    readonly resultExitCode?: number;
+    readonly stepDurationMs?: number;
+    readonly stepExitCode?: number;
+    readonly includeVerdict?: boolean;
+    readonly effectiveArgs?: Readonly<Record<string, unknown>>;
+  } = {},
+): SuiteStepReviewInput[] {
+  return BUILT_IN_AGENT_CONTEXT_PLANES.map((plane, stepIndex) =>
+    reviewStep({
+      stepIndex,
+      summary: {
+        tool: 'graph',
+        stableId: BUILT_IN_GRAPH_TOOL_ID,
+        command: plane.command,
+        exitCode: stepIndex === 0 ? (overrides.stepExitCode ?? 1) : 1,
+        durationMs: stepIndex === 0 ? (overrides.stepDurationMs ?? 1) : 1,
+        outcome: 'faulted',
+        kind: 'evidence',
+        readiness: 'unavailable',
+        ...(stepIndex === 0 && overrides.includeVerdict === true
+          ? {
+              verdict: {
+                passed: false,
+                errors: 1,
+                warnings: 0,
+                findings: 1,
+              },
+            }
+          : {}),
+      },
+      ...(overrides.effectiveArgs === undefined ? {} : { effectiveArgs: overrides.effectiveArgs }),
+    }),
+  );
+}
 
-  it('persists a built-in suite run with step arguments, verdict, session, and evidence', () => {
-    const datastore = openMemoryDatastore();
-    seedSession(datastore);
-    const log = logger();
-    const scope = new RunScope({
-      datastore: () => datastore,
-      logger: log,
-      runId: 'correlation-run-1',
-    });
+function contextInput(input: {
+  readonly steps: readonly SuiteStepReviewInput[];
+  readonly identity: SuiteLedgerIdentity;
+  readonly manifest?: TaskContextManifest;
+  readonly source?: ProjectSuiteRunInput['source'];
+  readonly cwd?: string;
+  readonly startedAt?: string;
+  readonly completedAt?: string;
+  readonly resultDurationMs?: number;
+  readonly resultExitCode?: number;
+}): ProjectSuiteRunInput {
+  return {
+    result: result({
+      suite: 'agent-context',
+      durationMs: input.resultDurationMs ?? 2,
+      exitCode: input.resultExitCode ?? 1,
+      ...(input.manifest === undefined ? {} : { contextManifest: input.manifest }),
+      steps: input.steps.map((step) => step.summary),
+      aggregate: {
+        steps: 3,
+        passed: 0,
+        failed: 0,
+        faulted: 3,
+        errors: input.steps.some((step) => step.summary.verdict !== undefined) ? 1 : 0,
+        warnings: 0,
+      },
+    }),
+    internalSteps: input.steps,
+    source: input.source ?? 'built-in',
+    cwd: input.cwd ?? '/repo',
+    startedAt: input.startedAt ?? STARTED_AT,
+    completedAt: input.completedAt ?? COMPLETED_AT,
+    identity: input.identity,
+  };
+}
 
-    const persistedRunId = runWithScopeSync(scope, () =>
-      persistWithIdentity({
-        result: result({
-          aggregate: {
-            steps: 1,
-            passed: 1,
-            failed: 0,
-            faulted: 0,
+describe('projectSuiteRun', () => {
+  it('projects a built-in parent and ordered steps with explicit identity, session, and evidence', () => {
+    const internalSteps = [
+      reviewStep({
+        effectiveArgs: { recipe: 'agent-risk' },
+        sessionId: 'session-fit-1',
+        capturedEnvelope: envelope(),
+        summary: {
+          tool: 'fit',
+          stableId: 'fitness',
+          command: 'fit --recipe agent-risk',
+          exitCode: 0,
+          durationMs: 11,
+          outcome: 'passed',
+          verdict: {
+            passed: true,
             errors: 0,
             warnings: 0,
+            findings: 0,
           },
-          scope: {
-            mode: 'changed',
-            source: 'explicit',
-            ref: 'origin/main',
-            changedFiles: 2,
-          },
-          reviewBrief: {
-            version: 1,
-            suite: 'audit',
-            suiteRunId: 'suite-run-1',
-            verdict: 'pass',
-            changedFiles: 2,
-            topRisks: [],
-            newFindings: [],
-            baselineDelta: {
-              available: true,
-              added: 0,
-              removed: 0,
-              unchanged: 0,
-            },
-            degraded: [],
-            recommendedActions: [],
-          },
-        }),
-        internalSteps: [
-          reviewStep({
-            effectiveArgs: { recipe: 'agent-risk' },
-            sessionId: 'session-fit-1',
-            capturedEnvelope: envelope(),
-            summary: {
-              tool: 'fit',
-              stableId: 'fitness',
-              command: 'fit --recipe agent-risk',
-              exitCode: 0,
-              durationMs: 11,
-              outcome: 'passed',
-              verdict: {
-                passed: true,
-                errors: 0,
-                warnings: 0,
-                findings: 0,
-              },
-            },
-          }),
-        ],
-        source: 'built-in',
-        cwd: '/repo',
-        startedAt: STARTED_AT,
-        completedAt: COMPLETED_AT,
+        },
       }),
-    );
+    ];
+    const { identity, projection } = projectWithIdentity({
+      result: result({
+        aggregate: {
+          steps: 1,
+          passed: 1,
+          failed: 0,
+          faulted: 0,
+          errors: 0,
+          warnings: 0,
+        },
+        scope: {
+          mode: 'changed',
+          source: 'explicit',
+          ref: 'origin/main',
+          changedFiles: 2,
+        },
+        reviewBrief: {
+          version: 1,
+          suite: 'audit',
+          suiteRunId: 'suite-run-1',
+          verdict: 'pass',
+          changedFiles: 2,
+          topRisks: [],
+          newFindings: [],
+          baselineDelta: {
+            available: true,
+            added: 0,
+            removed: 0,
+            unchanged: 0,
+          },
+          degraded: [],
+          recommendedActions: [],
+        },
+      }),
+      internalSteps,
+      source: 'built-in',
+      cwd: '/repo',
+      startedAt: STARTED_AT,
+      completedAt: COMPLETED_AT,
+      correlationRunId: 'correlation-run-1',
+    });
 
-    const repo = new RunRepo(datastore);
-    const [run] = repo.listRuns();
-    expect(persistedRunId).toBe(run?.id);
-    expect(run).toMatchObject({
+    expect(projection.evidence.run).toMatchObject({
+      id: identity.runId,
       name: 'audit',
       source: 'built-in-suite',
       correlationRunId: 'correlation-run-1',
@@ -259,18 +276,18 @@ describe('persistSuiteRun', () => {
         errors: 0,
         warnings: 0,
       },
+      scope: {
+        mode: 'changed',
+        source: 'explicit',
+        ref: 'origin/main',
+        changedFiles: 2,
+      },
+      reviewBrief: { suite: 'audit', verdict: 'pass' },
     });
-    expect(run?.scope).toEqual({
-      mode: 'changed',
-      source: 'explicit',
-      ref: 'origin/main',
-      changedFiles: 2,
-    });
-    expect(run?.reviewBrief).toMatchObject({ suite: 'audit', verdict: 'pass' });
-
-    const [step] = repo.listStepsForRun(run?.id ?? '');
-    expect(step).toMatchObject({
-      runId: run?.id,
+    expect(projection.evidence.steps).toHaveLength(1);
+    expect(projection.evidence.steps[0]).toMatchObject({
+      id: identity.steps[0]?.id,
+      runId: identity.runId,
       logicalStepKey: '0:fitness:fit --recipe agent-risk',
       ordinal: 0,
       attempt: 1,
@@ -288,50 +305,32 @@ describe('persistSuiteRun', () => {
         findings: 0,
       },
       sessionId: 'session-fit-1',
+      evidence: {
+        tool: 'fit',
+        runId: 'run-fit-1',
+        signalCount: 1,
+        unitCount: 1,
+        fingerprints: ['fp-1'],
+        resolutionMode: 'fast',
+      },
     });
-    expect(step?.evidence).toMatchObject({
-      tool: 'fit',
-      runId: 'run-fit-1',
-      signalCount: 1,
-      unitCount: 1,
-      fingerprints: ['fp-1'],
-      resolutionMode: 'fast',
-    });
-    expect(log.info).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'cli.run-ledger.suite_recorded',
-        suiteRunId: 'suite-run-1',
-        stepCount: 1,
-      }),
-    );
   });
 
-  it('persists configured suites with default aggregate and omitted optional step fields', () => {
-    const datastore = openMemoryDatastore();
-    const scope = new RunScope({
-      datastore: () => datastore,
-      logger: logger(),
+  it('projects configured defaults and omits absent optional fields', () => {
+    const { projection } = projectWithIdentity({
+      result: result({
+        suite: 'security',
+        suiteRunId: 'suite-run-2',
+        steps: [],
+      }),
+      internalSteps: [reviewStep()],
+      source: 'configured',
+      cwd: '/repo',
+      startedAt: STARTED_AT,
+      completedAt: COMPLETED_AT,
     });
 
-    const persistedRunId = runWithScopeSync(scope, () =>
-      persistWithIdentity({
-        result: result({
-          suite: 'security',
-          suiteRunId: 'suite-run-2',
-          steps: [],
-        }),
-        internalSteps: [reviewStep()],
-        source: 'configured',
-        cwd: '/repo',
-        startedAt: STARTED_AT,
-        completedAt: COMPLETED_AT,
-      }),
-    );
-
-    const repo = new RunRepo(datastore);
-    const [run] = repo.listRuns();
-    expect(persistedRunId).toBe(run?.id);
-    expect(run).toMatchObject({
+    expect(projection.evidence.run).toMatchObject({
       name: 'security',
       source: 'configured-suite',
       aggregate: {
@@ -343,137 +342,85 @@ describe('persistSuiteRun', () => {
         warnings: 0,
       },
     });
-    expect(run?.scope).toBeUndefined();
-    expect(run?.reviewBrief).toBeUndefined();
-
-    const [step] = repo.listStepsForRun(run?.id ?? '');
-    expect(step?.effectiveArgs).toBeUndefined();
-    expect(step?.verdictSummary).toBeUndefined();
-    expect(step?.sessionId).toBeUndefined();
-    expect(step?.evidence).toBeUndefined();
+    expect(projection.evidence.run.scope).toBeUndefined();
+    expect(projection.evidence.run.reviewBrief).toBeUndefined();
+    expect(projection.evidence.run.correlationRunId).toBeUndefined();
+    expect(projection.evidence.steps[0]?.effectiveArgs).toBeUndefined();
+    expect(projection.evidence.steps[0]?.verdictSummary).toBeUndefined();
+    expect(projection.evidence.steps[0]?.sessionId).toBeUndefined();
+    expect(projection.evidence.steps[0]?.evidence).toBeUndefined();
   });
 
-  it('omits explicit file paths from context ledger args and logs without changing configured suites', () => {
+  it('redacts context file args, preserves configured file args, and validates identity before commit', () => {
     const secretPath = 'src/private-customer-task.ts';
-    const datastore = openMemoryDatastore();
-    const log = logger();
-    const scope = new RunScope({ datastore: () => datastore, logger: log });
+    const trustedSteps = contextSteps({
+      effectiveArgs: { files: [secretPath], selectionMode: 'focused' },
+    });
+    const trustedIdentity = allocateSuiteLedgerIdentity(trustedSteps);
+    const trusted = projectSuiteRun(
+      contextInput({
+        steps: trustedSteps,
+        identity: trustedIdentity,
+        manifest: contextManifest(trustedIdentity.runId),
+      }),
+    );
+    const configured = projectWithIdentity({
+      result: result({ suite: 'configured-context' }),
+      internalSteps: [reviewStep({ effectiveArgs: { files: [secretPath] } })],
+      source: 'configured',
+      cwd: '/repo',
+      startedAt: STARTED_AT,
+      completedAt: COMPLETED_AT,
+    }).projection;
 
-    const contextSteps = BUILT_IN_AGENT_CONTEXT_PLANES.map((plane, stepIndex) =>
-      reviewStep({
-        stepIndex,
-        summary: {
-          tool: 'graph',
-          stableId: BUILT_IN_GRAPH_TOOL_ID,
-          command: plane.command,
-          exitCode: 1,
-          durationMs: 1,
-          outcome: 'faulted',
-          kind: 'evidence',
-          readiness: 'unavailable',
-        },
-        effectiveArgs: { files: [secretPath], selectionMode: 'focused' },
-      }),
-    );
-    const contextIdentity = allocateSuiteLedgerIdentity(contextSteps);
-    runWithScopeSync(scope, () =>
-      persistSuiteRun({
-        result: result({
-          suite: 'agent-context',
-          exitCode: 1,
-          contextManifest: contextManifest(contextIdentity.runId),
-          steps: contextSteps.map((step) => step.summary),
-          aggregate: {
-            steps: 3,
-            passed: 0,
-            failed: 0,
-            faulted: 3,
-            errors: 0,
-            warnings: 0,
-          },
+    expect(trusted.evidence.steps[0]?.effectiveArgs).toEqual({
+      selectionMode: 'focused',
+    });
+    expect(configured.evidence.steps[0]?.effectiveArgs).toEqual({
+      files: [secretPath],
+    });
+
+    const duplicateId = trustedIdentity.steps[0]?.id;
+    if (duplicateId === undefined) throw new Error('fixture identity is missing');
+    const duplicateIdentity = {
+      ...trustedIdentity,
+      steps: trustedIdentity.steps.map((identity, index) =>
+        index === 1 ? { ...identity, id: duplicateId } : identity,
+      ),
+    };
+    expect(() =>
+      projectSuiteRun(
+        contextInput({
+          steps: trustedSteps,
+          identity: duplicateIdentity,
+          manifest: contextManifest(duplicateIdentity.runId),
         }),
-        internalSteps: contextSteps,
-        source: 'built-in',
-        cwd: '/repo',
-        startedAt: STARTED_AT,
-        completedAt: COMPLETED_AT,
-        identity: contextIdentity,
-      }),
-    );
-    runWithScopeSync(scope, () =>
-      persistWithIdentity({
-        result: result({ suite: 'configured-context' }),
-        internalSteps: [reviewStep({ effectiveArgs: { files: [secretPath] } })],
+      ),
+    ).toThrow(TypeError);
+
+    const wrongOrderIdentity = {
+      ...allocateSuiteLedgerIdentity([reviewStep()]),
+      steps: [
+        {
+          ...allocateSuiteLedgerIdentity([reviewStep()]).steps[0],
+          ordinal: 1,
+        },
+      ],
+    };
+    expect(() =>
+      projectSuiteRun({
+        result: result(),
+        internalSteps: [reviewStep()],
         source: 'configured',
         cwd: '/repo',
         startedAt: STARTED_AT,
         completedAt: COMPLETED_AT,
+        identity: wrongOrderIdentity,
       }),
-    );
-
-    const repo = new RunRepo(datastore);
-    const contextRun = repo.listRuns().find((run) => run.name === 'agent-context');
-    const configuredRun = repo.listRuns().find((run) => run.name === 'configured-context');
-    expect(repo.listStepsForRun(contextRun?.id ?? '')[0]?.effectiveArgs).toEqual({
-      selectionMode: 'focused',
-    });
-    expect(repo.listStepsForRun(configuredRun?.id ?? '')[0]?.effectiveArgs).toEqual({
-      files: [secretPath],
-    });
-    const replayed = readTaskContextRun({
-      datastore,
-      cwd: '/repo',
-      runId: contextIdentity.runId,
-    });
-    expect(replayed.ok).toBe(true);
-    const allocatedDuplicate = allocateSuiteLedgerIdentity(contextSteps);
-    const duplicateId = allocatedDuplicate.steps[0]?.id;
-    if (duplicateId === undefined) throw new Error('fixture identity is missing');
-    const duplicateIdentity = {
-      ...allocatedDuplicate,
-      steps: allocatedDuplicate.steps.map((identity, index) =>
-        index === 1 ? { ...identity, id: duplicateId } : identity,
-      ),
-    };
-    expect(
-      runWithScopeSync(scope, () =>
-        persistSuiteRun({
-          result: result({
-            suite: 'agent-context',
-            exitCode: 1,
-            contextManifest: contextManifest(duplicateIdentity.runId),
-            steps: contextSteps.map((step) => step.summary),
-            aggregate: {
-              steps: 3,
-              passed: 0,
-              failed: 0,
-              faulted: 3,
-              errors: 0,
-              warnings: 0,
-            },
-          }),
-          internalSteps: contextSteps,
-          source: 'built-in',
-          cwd: '/repo',
-          startedAt: STARTED_AT,
-          completedAt: COMPLETED_AT,
-          identity: duplicateIdentity,
-        }),
-      ),
-    ).toBeUndefined();
-    expect(JSON.stringify(log.info.mock.calls)).not.toContain(secretPath);
-    expect(JSON.stringify(log.debug.mock.calls)).not.toContain(secretPath);
-    expect(JSON.stringify(log.warn.mock.calls)).not.toContain(secretPath);
-    expect(JSON.stringify(log.error.mock.calls)).not.toContain(secretPath);
+    ).toThrow('Suite ledger identity does not match the executed step order.');
   });
 
   it('rejects noncanonical context timing, exits, durations, and verdict-bearing evidence rows', () => {
-    const datastore = openMemoryDatastore();
-    const scope = new RunScope({
-      datastore: () => datastore,
-      logger: logger(),
-    });
-
     const attempt = (options: {
       readonly startedAt?: string;
       readonly completedAt?: string;
@@ -482,161 +429,99 @@ describe('persistSuiteRun', () => {
       readonly stepDurationMs?: number;
       readonly stepExitCode?: number;
       readonly includeVerdict?: boolean;
-    }): string | undefined => {
-      const internalSteps = BUILT_IN_AGENT_CONTEXT_PLANES.map((plane, stepIndex) =>
-        reviewStep({
-          stepIndex,
-          summary: {
-            tool: 'graph',
-            stableId: BUILT_IN_GRAPH_TOOL_ID,
-            command: plane.command,
-            exitCode: stepIndex === 0 ? (options.stepExitCode ?? 1) : 1,
-            durationMs: stepIndex === 0 ? (options.stepDurationMs ?? 1) : 1,
-            outcome: 'faulted',
-            kind: 'evidence',
-            readiness: 'unavailable',
-            ...(stepIndex === 0 && options.includeVerdict === true
-              ? {
-                  verdict: {
-                    passed: false,
-                    errors: 1,
-                    warnings: 0,
-                    findings: 1,
-                  },
-                }
-              : {}),
-          },
-        }),
-      );
+    }): void => {
+      const internalSteps = contextSteps(options);
       const identity = allocateSuiteLedgerIdentity(internalSteps);
-      return runWithScopeSync(scope, () =>
-        persistSuiteRun({
-          result: result({
-            suite: 'agent-context',
-            durationMs: options.resultDurationMs ?? 2,
-            exitCode: options.resultExitCode ?? 1,
-            contextManifest: contextManifest(identity.runId),
-            steps: internalSteps.map((step) => step.summary),
-            aggregate: {
-              steps: 3,
-              passed: 0,
-              failed: 0,
-              faulted: 3,
-              errors: options.includeVerdict === true ? 1 : 0,
-              warnings: 0,
-            },
-          }),
-          internalSteps,
-          source: 'built-in',
-          cwd: '/repo',
-          startedAt: options.startedAt ?? STARTED_AT,
-          completedAt: options.completedAt ?? COMPLETED_AT,
+      projectSuiteRun(
+        contextInput({
+          steps: internalSteps,
           identity,
+          manifest: contextManifest(identity.runId),
+          ...options,
         }),
       );
     };
 
-    expect(attempt({ resultDurationMs: -1 })).toBeUndefined();
-    expect(attempt({ stepDurationMs: -1 })).toBeUndefined();
-    expect(attempt({ resultExitCode: 99 })).toBeUndefined();
-    expect(attempt({ stepExitCode: 99 })).toBeUndefined();
-    expect(attempt({ includeVerdict: true })).toBeUndefined();
-    expect(attempt({ startedAt: '2026-01-01T00:00:00Z' })).toBeUndefined();
-    expect(attempt({ completedAt: '2025-12-31T23:59:59.000Z' })).toBeUndefined();
-    expect(new RunRepo(datastore).listRuns()).toEqual([]);
+    expect(() => attempt({ resultDurationMs: -1 })).toThrow(TypeError);
+    expect(() => attempt({ stepDurationMs: -1 })).toThrow(TypeError);
+    expect(() => attempt({ resultExitCode: 99 })).toThrow(TypeError);
+    expect(() => attempt({ stepExitCode: 99 })).toThrow(TypeError);
+    expect(() => attempt({ includeVerdict: true })).toThrow(TypeError);
+    expect(() => attempt({ startedAt: '2026-01-01T00:00:00Z' })).toThrow(TypeError);
+    expect(() => attempt({ completedAt: '2025-12-31T23:59:59.000Z' })).toThrow(TypeError);
   });
 
   it('rejects context manifests outside the host-owned built-in Run authority', () => {
-    const datastore = openMemoryDatastore();
-    const log = logger();
-    const scope = new RunScope({ datastore: () => datastore, logger: log });
-    const internalSteps = [reviewStep()];
-
-    const persist = (
-      manifestForIdentity: (runId: string) => TaskContextManifest,
-      source: PersistSuiteRunInput['source'] = 'built-in',
-    ): string | undefined => {
+    const internalSteps = contextSteps();
+    const project = (
+      manifestForIdentity: (runId: string) => TaskContextManifest | undefined,
+      source: ProjectSuiteRunInput['source'] = 'built-in',
+    ): void => {
       const identity = allocateSuiteLedgerIdentity(internalSteps);
-      return runWithScopeSync(scope, () =>
-        persistSuiteRun({
-          result: result({
-            suite: 'agent-context',
-            contextManifest: manifestForIdentity(identity.runId),
-          }),
-          internalSteps,
-          source,
-          cwd: '/repo',
-          startedAt: STARTED_AT,
-          completedAt: COMPLETED_AT,
+      projectSuiteRun(
+        contextInput({
+          steps: internalSteps,
           identity,
+          manifest: manifestForIdentity(identity.runId),
+          source,
         }),
       );
     };
 
-    expect(persist(() => contextManifest('different-run'))).toBeUndefined();
-    expect(
-      persist((runId) => ({
+    expect(() => project(() => contextManifest('different-run'))).toThrow(TypeError);
+    expect(() =>
+      project((runId) => ({
         ...contextManifest(runId),
         projectIdentity: buildTaskContextProjectIdentity('/other'),
       })),
-    ).toBeUndefined();
-    expect(persist(contextManifest, 'configured')).toBeUndefined();
-    expect(
-      persist((runId) => ({
+    ).toThrow(TypeError);
+    expect(() => project(contextManifest, 'configured')).toThrow(TypeError);
+    expect(() =>
+      project((runId) => ({
         ...contextManifest(runId),
         createdAt: '2027-01-01T00:00:00.000Z',
       })),
-    ).toBeUndefined();
-    const missingIdentity = allocateSuiteLedgerIdentity(internalSteps);
-    expect(
-      runWithScopeSync(scope, () =>
-        persistSuiteRun({
-          result: result({ suite: 'agent-context' }),
-          internalSteps,
-          source: 'built-in',
-          cwd: '/repo',
-          startedAt: STARTED_AT,
-          completedAt: COMPLETED_AT,
-          identity: missingIdentity,
-        }),
-      ),
-    ).toBeUndefined();
-    expect(new RunRepo(datastore).listRuns()).toEqual([]);
-    expect(log.warn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'cli.run-ledger.suite_record_failed',
-        reason: 'ledger-write-failed',
-      }),
-    );
+    ).toThrow(TypeError);
+    expect(() => project(() => undefined)).toThrow(TypeError);
   });
 
-  it('logs and returns when the scoped datastore cannot be opened', () => {
-    const log = logger();
+  it('is side-effect free and returns, but does not evaluate, the locked precondition', () => {
+    const datastore = vi.fn(() => {
+      throw new Error('projection must not open the datastore');
+    });
+    const log = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const precondition = vi.fn(() => true);
     const scope = new RunScope({
-      datastore: () => {
-        throw new Error('datastore offline');
-      },
+      datastore,
       logger: log,
+      runId: 'ambient-correlation-must-not-be-read',
     });
 
-    const persistedRunId = runWithScopeSync(scope, () =>
-      persistWithIdentity({
+    const projection = runWithScopeSync(scope, () =>
+      projectWithIdentity({
         result: result(),
-        internalSteps: [],
+        internalSteps: [reviewStep()],
         source: 'configured',
         cwd: '/repo',
         startedAt: STARTED_AT,
         completedAt: COMPLETED_AT,
+        correlationRunId: 'explicit-correlation-run',
+        persistencePrecondition: precondition,
       }),
-    );
+    ).projection;
 
-    expect(log.debug).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'cli.run-ledger.datastore_unavailable',
-        reason: 'datastore-unavailable',
-      }),
-    );
-    expect(JSON.stringify(log.debug.mock.calls)).not.toContain('datastore offline');
-    expect(persistedRunId).toBeUndefined();
+    expect(projection.evidence.run.correlationRunId).toBe('explicit-correlation-run');
+    expect(projection.precondition).toBe(precondition);
+    expect(precondition).not.toHaveBeenCalled();
+    expect(datastore).not.toHaveBeenCalled();
+    expect(log.debug).not.toHaveBeenCalled();
+    expect(log.info).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
   });
 });

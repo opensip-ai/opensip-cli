@@ -87,7 +87,7 @@ describe('suite step helpers', () => {
             ] as unknown as SignalEnvelope['signals'],
           }),
         ),
-      ).toBe(TRUST);
+      ).toEqual(TRUST);
     });
 
     it('falls back to valid signal trust metadata', () => {
@@ -101,7 +101,22 @@ describe('suite step helpers', () => {
             ] as unknown as SignalEnvelope['signals'],
           }),
         ),
-      ).toBe(TRUST);
+      ).toEqual(TRUST);
+    });
+
+    it('rejects malformed uncertainty entries instead of exposing unsafe trust metadata', () => {
+      expect(
+        verificationFromEnvelope(
+          envelope({
+            verification: {
+              coverage: 'partial',
+              fallback: 'full-run',
+              fullyVerified: false,
+              uncertainties: [null],
+            } as unknown as ImpactTrust,
+          }),
+        ),
+      ).toBeUndefined();
     });
   });
 
