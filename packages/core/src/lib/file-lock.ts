@@ -1,26 +1,42 @@
 /**
- * @fileoverview Generic file-lock primitive for datastore and artifact writes.
+ * @fileoverview Generic file-lock primitive for datastore, artifact, and runtime writes.
  *
- * Uses atomic lockfile creation (`open(..., 'wx')`) with JSON metadata, heartbeat
- * updates, stale-lock recovery, and injected event callbacks. No CLI or diagnostics
- * imports — callers bridge events at the composition root.
+ * Publishes complete JSON records through a private temp + hard-link create,
+ * replaces heartbeats atomically, recovers unchanged abandoned records, and
+ * emits injected lifecycle events. No CLI or diagnostics imports — callers
+ * bridge events at the composition root.
  */
 
 // @fitness-ignore-file file-length-limit -- single lock state machine; splitting would scatter the lease protocol
 
+import { createHash } from 'node:crypto';
 import {
+  constants as fsConstants,
   closeSync,
+  fchmodSync,
+  fstatSync,
+  fsyncSync,
+  ftruncateSync,
+  linkSync,
+  lstatSync,
   openSync,
-  readFileSync,
+  readSync,
   renameSync,
-  statSync,
+  type BigIntStats,
   unlinkSync,
-  writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { hostname } from 'node:os';
-import { basename } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 import { SystemError, TimeoutError } from './errors.js';
+import {
+  createSafetyBiasedProcessInspector,
+  defaultHostInstanceIdentity,
+  deriveHostIdentity,
+  inspectProcessIncarnation,
+} from './host-process-identity.js';
 import { generateUUID } from './ids.js';
 
 /** Resolved lock timing policy (local vs CI overrides). */
@@ -35,11 +51,17 @@ export interface FileLockMetadata {
   ownerToken: string;
   pid: number;
   hostname: string;
+  /** Opaque boot/namespace identity; absent from legacy lock records. */
+  hostInstanceIdentity?: string;
+  hostIdentityProven?: boolean;
+  processIncarnation?: string;
   runId?: string;
   command?: string;
   cwdBasename: string;
   acquiredAt: number;
   lastHeartbeatAt: number;
+  /** Owner-selected recovery horizon. Legacy records fall back to contender policy. */
+  staleMs?: number;
 }
 
 /** Lock lifecycle event kinds emitted through {@link WithFileLockOptions.onEvent}. */
@@ -47,10 +69,12 @@ export type FileLockEventKind =
   'acquire.start' | 'acquire.wait' | 'acquire.complete' | 'acquire.timeout' | 'stale.recovered';
 
 /** Lock lifecycle event emitted through the injected callback. */
+export type FileLockResource = 'datastore' | 'artifact' | 'runtime';
+
 export interface FileLockEvent {
   readonly kind: FileLockEventKind;
   readonly lockPath: string;
-  readonly resource: 'datastore' | 'artifact';
+  readonly resource: FileLockResource;
   readonly operation?: string;
   readonly waitMs?: number;
   readonly ownerPid?: number;
@@ -60,7 +84,7 @@ export interface FileLockEvent {
 /** Options for {@link withFileLock} / {@link withFileLockAsync}. */
 export interface WithFileLockOptions {
   readonly policy: StateLockPolicy;
-  readonly resource: 'datastore' | 'artifact';
+  readonly resource: FileLockResource;
   readonly operation?: string;
   readonly runId?: string;
   readonly command?: string;
@@ -70,169 +94,695 @@ export interface WithFileLockOptions {
 
 const POLL_MS = 50;
 
+function monotonicNow(): number {
+  return performance.now();
+}
+
 function sleepSync(ms: number): void {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
+  const end = monotonicNow() + ms;
+  while (monotonicNow() < end) {
     /* spin */
   }
 }
 
-function isProcessAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
+const MAX_LOCKFILE_BYTES = 4096;
+const LOCKFILE_MODE = 0o600;
+const MAX_TIMER_MS = 2_147_483_647;
+const NO_FOLLOW = fsConstants.O_NOFOLLOW ?? 0;
+const PROCESS_PROBE_CACHE_MS = 250;
+const PROCESS_PROBE_CACHE_ENTRIES = 64;
+
+interface LockFileIdentity {
+  readonly dev: bigint;
+  readonly ino: bigint;
+  readonly size: bigint;
+  readonly mtimeNs: bigint;
+  readonly ctimeNs: bigint;
+  readonly nlink: bigint;
+}
+
+interface LockSnapshotBase {
+  readonly identity: LockFileIdentity;
+  readonly raw?: string;
+}
+
+interface LockRecordSnapshot extends LockSnapshotBase {
+  readonly kind: 'record';
+  readonly raw: string;
+  readonly metadata: FileLockMetadata;
+}
+
+type LockSnapshot =
+  | { readonly kind: 'missing' }
+  | { readonly kind: 'churn' }
+  | { readonly kind: 'unsafe'; readonly reason: string }
+  | ({ readonly kind: 'unreadable' } & LockSnapshotBase)
+  | ({ readonly kind: 'invalid' } & LockSnapshotBase)
+  | LockRecordSnapshot;
+
+function identityOf(stat: BigIntStats): LockFileIdentity {
+  return {
+    dev: stat.dev,
+    ino: stat.ino,
+    size: stat.size,
+    mtimeNs: stat.mtimeNs,
+    ctimeNs: stat.ctimeNs,
+    nlink: stat.nlink,
+  };
+}
+
+function sameInode(a: LockFileIdentity, b: LockFileIdentity): boolean {
+  return a.dev === b.dev && a.ino === b.ino;
+}
+
+function sameIdentity(a: LockFileIdentity, b: LockFileIdentity): boolean {
+  return (
+    sameInode(a, b) &&
+    a.size === b.size &&
+    a.mtimeNs === b.mtimeNs &&
+    a.ctimeNs === b.ctimeNs &&
+    a.nlink === b.nlink
+  );
+}
+
+function errnoCode(error: unknown): string | undefined {
+  return (error as NodeJS.ErrnoException).code;
+}
+
+function readBoundedFd(fd: number): Buffer | undefined {
+  const bytes = Buffer.allocUnsafe(MAX_LOCKFILE_BYTES + 1);
+  let offset = 0;
+  while (offset < bytes.length) {
+    const count = readSync(fd, bytes, offset, bytes.length - offset, offset);
+    if (count === 0) break;
+    offset += count;
+  }
+  if (offset > MAX_LOCKFILE_BYTES) return undefined;
+  return bytes.subarray(0, offset);
+}
+
+function isStructurallyValidMetadata(value: unknown): value is FileLockMetadata {
+  if (typeof value !== 'object' || value === null) return false;
+  const parsed = value as Partial<FileLockMetadata>;
+  return (
+    typeof parsed.ownerToken === 'string' &&
+    parsed.ownerToken.length > 0 &&
+    Number.isInteger(parsed.pid) &&
+    (parsed.pid ?? 0) > 0 &&
+    typeof parsed.hostname === 'string' &&
+    (parsed.hostInstanceIdentity === undefined ||
+      (typeof parsed.hostInstanceIdentity === 'string' &&
+        parsed.hostInstanceIdentity.length > 0)) &&
+    (parsed.hostIdentityProven === undefined || typeof parsed.hostIdentityProven === 'boolean') &&
+    (parsed.processIncarnation === undefined ||
+      (typeof parsed.processIncarnation === 'string' && parsed.processIncarnation.length > 0)) &&
+    typeof parsed.cwdBasename === 'string' &&
+    Number.isFinite(parsed.acquiredAt) &&
+    Number.isFinite(parsed.lastHeartbeatAt) &&
+    (parsed.staleMs === undefined ||
+      (Number.isSafeInteger(parsed.staleMs) &&
+        parsed.staleMs > 0 &&
+        parsed.staleMs <= MAX_TIMER_MS)) &&
+    (parsed.runId === undefined || typeof parsed.runId === 'string') &&
+    (parsed.command === undefined || typeof parsed.command === 'string')
+  );
+}
+
+function closeQuietly(fd: number): void {
   try {
-    process.kill(pid, 0);
-    return true;
+    closeSync(fd);
   } catch {
-    // @swallow-ok process.kill(0) throws when pid is not running; treat as stale
+    // @swallow-ok callers preserve their primary result or error
+  }
+}
+
+function pathHasIdentity(lockPath: string, expected: LockFileIdentity): boolean {
+  try {
+    return sameIdentity(expected, identityOf(lstatSync(lockPath, { bigint: true })));
+  } catch {
     return false;
   }
 }
 
-const MAX_LOCKFILE_BYTES = 4096;
-
-function readLockMetadata(lockPath: string): FileLockMetadata | undefined {
+function parseLockSnapshot(bytes: Buffer, identity: LockFileIdentity): LockSnapshot {
+  const raw = bytes.toString('utf8');
+  let parsed: unknown;
   try {
-    if (statSync(lockPath).size > MAX_LOCKFILE_BYTES) return undefined;
-    const raw = readFileSync(lockPath, 'utf8');
-    const parsed = JSON.parse(raw) as FileLockMetadata;
-    if (
-      typeof parsed.ownerToken !== 'string' ||
-      typeof parsed.pid !== 'number' ||
-      typeof parsed.hostname !== 'string' ||
-      typeof parsed.cwdBasename !== 'string' ||
-      typeof parsed.acquiredAt !== 'number' ||
-      typeof parsed.lastHeartbeatAt !== 'number'
-    ) {
-      return undefined;
-    }
-    return parsed;
+    parsed = JSON.parse(raw);
   } catch {
-    // @swallow-ok missing or corrupt lockfile reads as no lock held
-    return undefined;
+    return { kind: 'unreadable', identity, raw };
+  }
+  if (!isStructurallyValidMetadata(parsed)) {
+    return { kind: 'invalid', identity, raw };
+  }
+  return { kind: 'record', identity, raw, metadata: parsed };
+}
+
+function readOpenedLockSnapshot(
+  lockPath: string,
+  fd: number,
+  beforeIdentity: LockFileIdentity,
+): LockSnapshot {
+  const opened = fstatSync(fd, { bigint: true });
+  const openedIdentity = identityOf(opened);
+  if (!opened.isFile() || opened.nlink !== 1n || !sameIdentity(beforeIdentity, openedIdentity)) {
+    return { kind: 'churn' };
+  }
+
+  const bytes = readBoundedFd(fd);
+  if (bytes === undefined) {
+    return { kind: 'unreadable', identity: openedIdentity };
+  }
+
+  const afterRead = identityOf(fstatSync(fd, { bigint: true }));
+  if (!sameIdentity(openedIdentity, afterRead) || !pathHasIdentity(lockPath, afterRead)) {
+    return { kind: 'churn' };
+  }
+  return parseLockSnapshot(bytes, afterRead);
+}
+
+function publicationTempPath(lockPath: string, ownerToken: string): string {
+  const digest = createHash('sha256')
+    .update(`${basename(lockPath)}\0${ownerToken}`)
+    .digest('hex')
+    .slice(0, 32);
+  return join(dirname(lockPath), `.opensip-lock-${digest}.publish`);
+}
+
+function unlinkExactPath(path: string, expected: LockFileIdentity): boolean {
+  try {
+    if (!sameIdentity(identityOf(lstatSync(path, { bigint: true })), expected)) return false;
+    unlinkSync(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 
-function writeLockMetadata(lockPath: string, metadata: FileLockMetadata): void {
-  writeFileSync(lockPath, JSON.stringify(metadata), 'utf8');
+/**
+ * Complete the one safe interrupted publication state: target and its
+ * deterministic private publication temp are hard links to one fully written
+ * regular file. A contender may remove only that exact second link.
+ */
+type PublicationSettlement = 'settled' | 'churn' | 'unsafe';
+
+type LinkedPublicationInspection =
+  | {
+      readonly kind: 'linked';
+      readonly ownerToken: string;
+      readonly identity: LockFileIdentity;
+    }
+  | { readonly kind: Exclude<PublicationSettlement, 'settled'> };
+
+function inspectLinkedPublication(
+  lockPath: string,
+  fd: number,
+  beforeIdentity: LockFileIdentity,
+): LinkedPublicationInspection {
+  const opened = fstatSync(fd, { bigint: true });
+  const openedIdentity = identityOf(opened);
+  if (!opened.isFile() || opened.nlink !== 2n || !sameIdentity(beforeIdentity, openedIdentity)) {
+    return { kind: 'churn' };
+  }
+  const bytes = readBoundedFd(fd);
+  if (bytes === undefined) return { kind: 'unsafe' };
+  const parsed = parseLockSnapshot(bytes, openedIdentity);
+  if (parsed.kind !== 'record') return { kind: 'unsafe' };
+  const afterRead = identityOf(fstatSync(fd, { bigint: true }));
+  if (!sameIdentity(openedIdentity, afterRead) || !pathHasIdentity(lockPath, afterRead)) {
+    return { kind: 'churn' };
+  }
+  return {
+    kind: 'linked',
+    ownerToken: parsed.metadata.ownerToken,
+    identity: afterRead,
+  };
+}
+
+function classifySinglePublishedLink(
+  lockPath: string,
+  publishedIdentity: LockFileIdentity,
+): PublicationSettlement {
+  try {
+    const current = lstatSync(lockPath, { bigint: true });
+    return current.isFile() &&
+      current.nlink === 1n &&
+      sameInode(identityOf(current), publishedIdentity)
+      ? 'settled'
+      : 'unsafe';
+  } catch (error) {
+    return errnoCode(error) === 'ENOENT' ? 'churn' : 'unsafe';
+  }
+}
+
+function settlePublicationTempLink(
+  lockPath: string,
+  ownerToken: string,
+  publishedIdentity: LockFileIdentity,
+): PublicationSettlement {
+  const tempPath = publicationTempPath(lockPath, ownerToken);
+  let tempIdentity: LockFileIdentity;
+  try {
+    const temp = lstatSync(tempPath, { bigint: true });
+    tempIdentity = identityOf(temp);
+    if (!temp.isFile() || !sameIdentity(publishedIdentity, tempIdentity)) return 'unsafe';
+  } catch (error) {
+    return errnoCode(error) === 'ENOENT'
+      ? classifySinglePublishedLink(lockPath, publishedIdentity)
+      : 'unsafe';
+  }
+  if (!unlinkExactPath(tempPath, tempIdentity)) return 'churn';
+  return classifySinglePublishedLink(lockPath, publishedIdentity) === 'settled'
+    ? 'settled'
+    : 'churn';
+}
+
+function settleLinkedPublication(lockPath: string, before: BigIntStats): PublicationSettlement {
+  const beforeIdentity = identityOf(before);
+  let fd: number | undefined;
+  try {
+    fd = openSync(lockPath, fsConstants.O_RDONLY | NO_FOLLOW);
+    const inspection = inspectLinkedPublication(lockPath, fd, beforeIdentity);
+    return inspection.kind === 'linked'
+      ? settlePublicationTempLink(lockPath, inspection.ownerToken, inspection.identity)
+      : inspection.kind;
+  } catch (error) {
+    return errnoCode(error) === 'ENOENT' ? 'churn' : 'unsafe';
+  } finally {
+    if (fd !== undefined) closeQuietly(fd);
+  }
 }
 
 /**
- * Heartbeat update that refuses to clobber a stolen lock: write temp, re-check
- * owner, then atomic rename. Still best-effort under extreme races, but avoids
- * the classic read-then-blind-overwrite TOCTOU that restored a dead owner's
- * metadata into a newly acquired lockfile.
+ * Read a bounded regular lock record through a descriptor anchored to the
+ * lstat-observed inode. Symlinks, hard links, and non-files fail closed.
+ */
+function readLockSnapshot(lockPath: string): LockSnapshot {
+  let before: BigIntStats;
+  try {
+    before = lstatSync(lockPath, { bigint: true });
+  } catch (error) {
+    return errnoCode(error) === 'ENOENT'
+      ? { kind: 'missing' }
+      : { kind: 'unsafe', reason: errnoCode(error) ?? 'lstat' };
+  }
+
+  if (!before.isFile()) {
+    return { kind: 'unsafe', reason: 'not-owned-regular-file' };
+  }
+  if (before.nlink === 2n) {
+    const settled = settleLinkedPublication(lockPath, before);
+    if (settled === 'settled') return readLockSnapshot(lockPath);
+    return settled === 'churn'
+      ? { kind: 'churn' }
+      : { kind: 'unsafe', reason: 'unproven-linked-publication' };
+  }
+  if (before.nlink !== 1n) {
+    return { kind: 'unsafe', reason: 'not-owned-regular-file' };
+  }
+
+  const beforeIdentity = identityOf(before);
+  if (before.size > BigInt(MAX_LOCKFILE_BYTES)) {
+    return { kind: 'unreadable', identity: beforeIdentity };
+  }
+
+  let fd: number | undefined;
+  try {
+    fd = openSync(lockPath, fsConstants.O_RDONLY | NO_FOLLOW);
+    return readOpenedLockSnapshot(lockPath, fd, beforeIdentity);
+  } catch (error) {
+    if (errnoCode(error) === 'ENOENT') return { kind: 'churn' };
+    return { kind: 'unsafe', reason: errnoCode(error) ?? 'read' };
+  } finally {
+    if (fd !== undefined) closeQuietly(fd);
+  }
+}
+
+function sameSnapshot(a: LockSnapshotBase, b: LockSnapshotBase): boolean {
+  return (
+    sameIdentity(a.identity, b.identity) &&
+    (a.raw === undefined || b.raw === undefined || a.raw === b.raw)
+  );
+}
+
+/**
+ * Best portable pathname guard before unlink. Node has no atomic
+ * unlink-if-inode-matches primitive, so this narrows (but cannot eliminate) the
+ * final lstat-to-unlink race on a hostile shared filesystem.
+ */
+function unlinkSnapshotIfCurrent(lockPath: string, expected: LockSnapshotBase): boolean {
+  const current = readLockSnapshot(lockPath);
+  if (
+    (current.kind !== 'record' && current.kind !== 'unreadable' && current.kind !== 'invalid') ||
+    !sameSnapshot(expected, current)
+  ) {
+    return false;
+  }
+
+  try {
+    const immediate = identityOf(lstatSync(lockPath, { bigint: true }));
+    if (!sameIdentity(current.identity, immediate)) return false;
+    unlinkSync(lockPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function serializeLockMetadata(metadata: FileLockMetadata): Buffer {
+  const bytes = Buffer.from(JSON.stringify(metadata), 'utf8');
+  if (bytes.length > MAX_LOCKFILE_BYTES) {
+    throw new SystemError(`Lock metadata exceeds the ${MAX_LOCKFILE_BYTES}-byte limit`, {
+      code: 'SYSTEM.LOCK.METADATA_TOO_LARGE',
+    });
+  }
+  return bytes;
+}
+
+function hardenLockMode(fd: number): void {
+  if (process.platform === 'win32') return;
+  fchmodSync(fd, LOCKFILE_MODE);
+  if (Number(fstatSync(fd, { bigint: true }).mode & 0o777n) !== LOCKFILE_MODE) {
+    throw new SystemError('Lockfile mode could not be restricted to 0600', {
+      code: 'SYSTEM.LOCK.UNSAFE_MODE',
+    });
+  }
+}
+
+function writeAllAtStart(fd: number, bytes: Buffer): void {
+  let offset = 0;
+  while (offset < bytes.length) {
+    const count = writeSync(fd, bytes, offset, bytes.length - offset, offset);
+    if (count === 0) {
+      throw new SystemError('Lock metadata write made no progress', {
+        code: 'SYSTEM.LOCK.WRITE_STALLED',
+      });
+    }
+    offset += count;
+  }
+  ftruncateSync(fd, bytes.length);
+}
+
+function createCompletePrivateTemp(path: string, bytes: Buffer): LockFileIdentity {
+  let fd: number | undefined;
+  let identity: LockFileIdentity | undefined;
+  try {
+    fd = openSync(path, 'wx', LOCKFILE_MODE);
+    identity = identityOf(fstatSync(fd, { bigint: true }));
+    hardenLockMode(fd);
+    writeAllAtStart(fd, bytes);
+    fsyncSync(fd);
+    identity = identityOf(fstatSync(fd, { bigint: true }));
+    if (identity.nlink !== 1n || identity.size !== BigInt(bytes.length)) {
+      throw new SystemError('Lock temporary record could not be proven complete', {
+        code: 'SYSTEM.LOCK.UNSAFE_TEMP',
+      });
+    }
+    closeSync(fd);
+    fd = undefined;
+    return identity;
+  } catch (error) {
+    if (fd !== undefined) {
+      try {
+        identity = identityOf(fstatSync(fd, { bigint: true }));
+      } catch {
+        // @swallow-ok the original creation/write error remains primary
+      }
+      closeQuietly(fd);
+    }
+    if (identity !== undefined) unlinkExactPath(path, identity);
+    throw error;
+  }
+}
+
+/**
+ * Publish a complete heartbeat replacement only while the exact owner snapshot
+ * remains current. Node has no portable rename-if-inode-matches primitive, so
+ * the final recheck-to-rename syscall window remains within the documented
+ * cooperative same-UID boundary.
  */
 function writeLockMetadataIfOwner(
   lockPath: string,
   metadata: FileLockMetadata,
   ownerToken: string,
-): void {
-  const tmpPath = `${lockPath}.hb.${ownerToken.slice(0, 8)}`;
-  writeFileSync(tmpPath, JSON.stringify(metadata), 'utf8');
+): boolean {
+  const bytes = serializeLockMetadata(metadata);
+  const observed = readLockSnapshot(lockPath);
+  if (observed.kind !== 'record' || observed.metadata.ownerToken !== ownerToken) {
+    return false;
+  }
+  const tempPath = join(dirname(lockPath), `.opensip-lock-${generateUUID()}.heartbeat`);
+  let tempIdentity: LockFileIdentity | undefined;
   try {
-    const current = readLockMetadata(lockPath);
-    if (current?.ownerToken !== ownerToken) {
-      try {
-        unlinkSync(tmpPath);
-      } catch {
-        // @swallow-ok temp cleanup after lost ownership
-      }
-      return;
+    tempIdentity = createCompletePrivateTemp(tempPath, bytes);
+    const current = readLockSnapshot(lockPath);
+    if (
+      current.kind !== 'record' ||
+      current.metadata.ownerToken !== ownerToken ||
+      !sameSnapshot(observed, current)
+    ) {
+      return false;
     }
-    try {
-      renameSync(tmpPath, lockPath);
-    } catch {
-      // Windows may refuse rename-over-existing; fall back to checked write.
-      const stillOurs = readLockMetadata(lockPath);
-      if (stillOurs?.ownerToken === ownerToken) {
-        writeLockMetadata(lockPath, metadata);
-      }
-      try {
-        unlinkSync(tmpPath);
-      } catch {
-        // @swallow-ok temp cleanup after fallback write
-      }
+    const immediate = readLockSnapshot(lockPath);
+    if (
+      immediate.kind !== 'record' ||
+      immediate.metadata.ownerToken !== ownerToken ||
+      !sameSnapshot(current, immediate)
+    ) {
+      return false;
     }
+    renameSync(tempPath, lockPath);
+    tempIdentity = undefined;
+    const published = readLockSnapshot(lockPath);
+    return (
+      published.kind === 'record' &&
+      published.metadata.ownerToken === ownerToken &&
+      published.raw === bytes.toString('utf8')
+    );
   } catch {
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // @swallow-ok temp cleanup on unexpected failure
-    }
+    return false;
+  } finally {
+    if (tempIdentity !== undefined) unlinkExactPath(tempPath, tempIdentity);
   }
 }
 
-function isStale(metadata: FileLockMetadata, staleMs: number): boolean {
-  // Heartbeat age is the only cross-host-safe signal. Dead local PID alone
-  // must not reclaim a lock owned by another machine (shared FS / NFS / CI
-  // workspace) — that host's process.kill(pid, 0) would always fail.
-  const ageStale = Date.now() - metadata.lastHeartbeatAt > staleMs;
-  if (metadata.hostname !== hostname() && metadata.hostname.length > 0) {
-    // Different host: heartbeat age only.
-    return ageStale;
+function currentHostIdentity(): ReturnType<typeof deriveHostIdentity> {
+  return deriveHostIdentity(hostname(), defaultHostInstanceIdentity());
+}
+
+function currentProcessIncarnation(): string | undefined {
+  const inspection = inspectProcessIncarnation(process.pid);
+  return inspection.status === 'present' ? inspection.identity : undefined;
+}
+
+const processInspector = createSafetyBiasedProcessInspector({
+  inspect: inspectProcessIncarnation,
+  monotonicNow,
+  ttlMs: PROCESS_PROBE_CACHE_MS,
+  maxEntries: PROCESS_PROBE_CACHE_ENTRIES,
+});
+
+type OwnerRecoveryClassification = 'live' | 'proven-dead' | 'observe-unchanged';
+const OBSERVE_UNCHANGED: OwnerRecoveryClassification = 'observe-unchanged';
+
+function classifyOwnerForRecovery(
+  metadata: FileLockMetadata,
+  freshProcessProbe = false,
+): OwnerRecoveryClassification {
+  const localHost = currentHostIdentity();
+  const sameProvenHost =
+    metadata.hostIdentityProven === true &&
+    localHost.proven &&
+    metadata.hostInstanceIdentity === localHost.id;
+  const provenDifferentHost =
+    metadata.hostIdentityProven === true &&
+    localHost.proven &&
+    metadata.hostInstanceIdentity !== localHost.id;
+  if (provenDifferentHost) return OBSERVE_UNCHANGED;
+
+  const canUseLocalPidAsLiveVeto = sameProvenHost || metadata.hostname === hostname();
+  if (!canUseLocalPidAsLiveVeto) return OBSERVE_UNCHANGED;
+
+  const current = freshProcessProbe
+    ? processInspector.inspectFresh(metadata.pid)
+    : processInspector.inspect(metadata.pid);
+  if (current.status === 'unknown') return 'live';
+  if (current.status === 'present') {
+    // A legacy/malformed-old-version record has no way to prove that a reused
+    // PID is still the original owner. Its changing heartbeat snapshot is the
+    // only ownership signal, so an exact unchanged stale horizon is required.
+    if (metadata.processIncarnation === undefined) return OBSERVE_UNCHANGED;
+    return current.identity === metadata.processIncarnation ? 'live' : 'proven-dead';
   }
-  // Same host: a live process still owns the lock even when the event loop is
-  // blocked in a sync critical section and heartbeats cannot fire. Reclaim only
-  // when the PID is gone (or never was valid).
-  return !isProcessAlive(metadata.pid);
+  // A process-incarnation marker plus a proven current boot makes ESRCH an
+  // immediate owner-death proof. Legacy/unproven records still require the
+  // bounded unchanged-observation contract before removal.
+  return sameProvenHost && metadata.processIncarnation !== undefined
+    ? 'proven-dead'
+    : OBSERVE_UNCHANGED;
+}
+
+interface LockStaleObservation {
+  readonly snapshot: LockSnapshotBase;
+  readonly firstObservedAt: number;
+  readonly horizonMs: number;
+}
+
+interface LockStaleTracker {
+  observation?: LockStaleObservation;
+}
+
+function resetStaleObservation(tracker: LockStaleTracker): void {
+  tracker.observation = undefined;
+}
+
+function unchangedForRecoveryHorizon(
+  tracker: LockStaleTracker,
+  snapshot: LockSnapshotBase,
+  horizonMs: number,
+): boolean {
+  const now = monotonicNow();
+  const previous = tracker.observation;
+  const sameObservation =
+    previous?.horizonMs === horizonMs && sameSnapshot(previous.snapshot, snapshot);
+  if (!sameObservation) {
+    tracker.observation = {
+      snapshot,
+      firstObservedAt: now,
+      horizonMs,
+    };
+    return false;
+  }
+  return now - previous.firstObservedAt >= horizonMs;
 }
 
 function removeLockIfOwned(lockPath: string, ownerToken: string): void {
-  const existing = readLockMetadata(lockPath);
-  if (existing?.ownerToken === ownerToken) {
-    try {
-      unlinkSync(lockPath);
-    } catch {
-      // @swallow-ok best-effort lock release during teardown
-    }
+  const existing = readLockSnapshot(lockPath);
+  if (existing.kind === 'record' && existing.metadata.ownerToken === ownerToken) {
+    unlinkSnapshotIfCurrent(lockPath, existing);
   }
 }
 
 function tryAcquireLock(lockPath: string, metadata: FileLockMetadata): boolean {
+  const bytes = serializeLockMetadata(metadata);
+  const tempPath = publicationTempPath(lockPath, metadata.ownerToken);
+  let tempIdentity: LockFileIdentity | undefined;
+  let published = false;
   try {
-    const fd = openSync(lockPath, 'wx');
-    writeFileSync(fd, JSON.stringify(metadata), 'utf8');
-    closeSync(fd);
+    tempIdentity = createCompletePrivateTemp(tempPath, bytes);
+    try {
+      linkSync(tempPath, lockPath);
+      published = true;
+    } catch (error) {
+      if (errnoCode(error) === 'EEXIST') return false;
+      throw error;
+    }
+    const target = lstatSync(lockPath, { bigint: true });
+    const targetIdentity = identityOf(target);
+    const linkedTempIdentity = identityOf(lstatSync(tempPath, { bigint: true }));
+    if (
+      !target.isFile() ||
+      target.nlink !== 2n ||
+      !sameIdentity(targetIdentity, linkedTempIdentity)
+    ) {
+      throw new SystemError('Published lock record does not match its complete temporary record', {
+        code: 'SYSTEM.LOCK.UNSAFE_PUBLICATION',
+      });
+    }
+    tempIdentity = linkedTempIdentity;
+    if (!unlinkExactPath(tempPath, targetIdentity)) {
+      throw new SystemError('Published lock temporary link could not be retired', {
+        code: 'SYSTEM.LOCK.UNSAFE_PUBLICATION',
+      });
+    }
+    tempIdentity = undefined;
+    const settled = readLockSnapshot(lockPath);
+    if (
+      settled.kind !== 'record' ||
+      settled.metadata.ownerToken !== metadata.ownerToken ||
+      settled.raw !== bytes.toString('utf8')
+    ) {
+      throw new SystemError('Published lock record could not be revalidated', {
+        code: 'SYSTEM.LOCK.UNSAFE_PUBLICATION',
+      });
+    }
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    if (published) removeLockIfOwned(lockPath, metadata.ownerToken);
     throw error;
+  } finally {
+    if (tempIdentity !== undefined) unlinkExactPath(tempPath, tempIdentity);
   }
 }
 
 interface StaleLockRecoveryContext {
   readonly lockPath: string;
-  readonly metadata: FileLockMetadata | undefined;
-  readonly staleMs: number;
+  readonly snapshot: LockRecordSnapshot;
+  readonly policy: StateLockPolicy;
+  readonly tracker: LockStaleTracker;
   readonly onEvent?: (event: FileLockEvent) => void;
-  readonly resource: 'datastore' | 'artifact';
+  readonly resource: FileLockResource;
   readonly operation?: string;
 }
 
 function recoverStaleLock({
   lockPath,
-  metadata,
-  staleMs,
+  snapshot,
+  policy,
+  tracker,
   onEvent,
   resource,
   operation,
 }: StaleLockRecoveryContext): boolean {
-  if (!metadata || !isStale(metadata, staleMs)) return false;
+  const classification = classifyOwnerForRecovery(snapshot.metadata);
+  if (classification === 'live') {
+    resetStaleObservation(tracker);
+    return false;
+  }
+  const recoveryHorizonMs = Math.max(snapshot.metadata.staleMs ?? 0, policy.staleMs);
+  if (
+    classification === 'observe-unchanged' &&
+    !unchangedForRecoveryHorizon(tracker, snapshot, recoveryHorizonMs)
+  ) {
+    return false;
+  }
+
   try {
-    // Re-check ownership before unlink so a second waiter cannot delete a
-    // lock another contender already re-acquired after observing the same stale snapshot.
-    const current = readLockMetadata(lockPath);
-    if (current === undefined) return false;
-    if (current.ownerToken !== metadata.ownerToken) return false;
-    if (!isStale(current, staleMs)) return false;
-    unlinkSync(lockPath);
-    onEvent?.({
+    const current = readLockSnapshot(lockPath);
+    if (
+      current.kind !== 'record' ||
+      !sameSnapshot(snapshot, current) ||
+      current.metadata.ownerToken !== snapshot.metadata.ownerToken
+    ) {
+      resetStaleObservation(tracker);
+      return false;
+    }
+
+    // Cached process observations may delay recovery, but may never authorize
+    // deletion. Re-probe after the exact record re-read and immediately before
+    // the final exact-snapshot unlink guard.
+    const freshClassification = classifyOwnerForRecovery(current.metadata, true);
+    if (freshClassification === 'live') {
+      resetStaleObservation(tracker);
+      return false;
+    }
+    if (
+      freshClassification === 'observe-unchanged' &&
+      !unchangedForRecoveryHorizon(tracker, current, recoveryHorizonMs)
+    ) {
+      return false;
+    }
+    if (!unlinkSnapshotIfCurrent(lockPath, current)) {
+      return false;
+    }
+    resetStaleObservation(tracker);
+    emit(onEvent, {
       kind: 'stale.recovered',
       lockPath,
       resource,
       operation,
-      ownerPid: metadata.pid,
-      ownerHostname: metadata.hostname,
+      ownerPid: current.metadata.pid,
+      ownerHostname: current.metadata.hostname,
     });
     return true;
   } catch {
@@ -242,45 +792,101 @@ function recoverStaleLock({
 }
 
 function emit(onEvent: WithFileLockOptions['onEvent'], event: FileLockEvent): void {
-  onEvent?.(event);
+  try {
+    onEvent?.(event);
+  } catch {
+    // @swallow-ok diagnostics must not own or strand the lock lifecycle
+  }
 }
 
 type LockContentionOutcome = 'acquired' | 'retry' | 'timeout' | 'malformed';
+type NonRecordLockSnapshot = Exclude<LockSnapshot, LockRecordSnapshot>;
+
+function deadlineOutcome(deadline: number): Extract<LockContentionOutcome, 'retry' | 'timeout'> {
+  return monotonicNow() >= deadline ? 'timeout' : 'retry';
+}
+
+function recoverCorruptSnapshot(
+  lockPath: string,
+  snapshot: Extract<NonRecordLockSnapshot, { readonly kind: 'unreadable' | 'invalid' }>,
+  options: WithFileLockOptions,
+  tracker: LockStaleTracker,
+  deadline: number,
+): LockContentionOutcome {
+  if (!unchangedForRecoveryHorizon(tracker, snapshot, options.policy.staleMs)) {
+    return deadlineOutcome(deadline);
+  }
+  const current = readLockSnapshot(lockPath);
+  if (
+    (current.kind !== 'unreadable' && current.kind !== 'invalid') ||
+    !sameSnapshot(snapshot, current)
+  ) {
+    resetStaleObservation(tracker);
+    return deadlineOutcome(deadline);
+  }
+  if (!unlinkSnapshotIfCurrent(lockPath, current)) return 'retry';
+  resetStaleObservation(tracker);
+  emit(options.onEvent, {
+    kind: 'stale.recovered',
+    lockPath,
+    resource: options.resource,
+    operation: options.operation,
+  });
+  return 'retry';
+}
+
+function evaluateNonRecordContention(
+  lockPath: string,
+  metadata: FileLockMetadata,
+  snapshot: NonRecordLockSnapshot,
+  options: WithFileLockOptions,
+  tracker: LockStaleTracker,
+  deadline: number,
+): LockContentionOutcome {
+  if (snapshot.kind === 'missing') {
+    resetStaleObservation(tracker);
+    if (tryAcquireLock(lockPath, metadata)) return 'acquired';
+    return deadlineOutcome(deadline);
+  }
+  if (snapshot.kind === 'churn') {
+    resetStaleObservation(tracker);
+    return deadlineOutcome(deadline);
+  }
+  if (snapshot.kind === 'unsafe') {
+    resetStaleObservation(tracker);
+    return 'malformed';
+  }
+
+  // Invalid and unreadable records carry no trustworthy owner identity. They
+  // become recoverable only after the exact inode/content remains unchanged
+  // for one complete local-monotonic stale horizon. Wall time is irrelevant.
+  return recoverCorruptSnapshot(lockPath, snapshot, options, tracker, deadline);
+}
 
 function evaluateLockContention(
   lockPath: string,
   metadata: FileLockMetadata,
   options: WithFileLockOptions,
+  tracker: LockStaleTracker,
   deadline: number,
+  acquisitionStartedAt: number,
 ): LockContentionOutcome {
   if (tryAcquireLock(lockPath, metadata)) return 'acquired';
 
-  const existing = readLockMetadata(lockPath);
-  // Lockfile exists but is unreadable/corrupt (bad JSON, oversize, wrong types).
-  // After the wait deadline, treat as recoverably stale so callers are not
-  // permanently wedged until manual deletion.
-  if (!existing) {
-    if (Date.now() >= deadline) {
-      try {
-        const st = statSync(lockPath);
-        // Only auto-unlink when the file itself looks abandoned by mtime.
-        if (Date.now() - st.mtimeMs > options.policy.staleMs) {
-          unlinkSync(lockPath);
-          return 'retry';
-        }
-      } catch {
-        // @swallow-ok missing between stat and unlink
-      }
-      return 'timeout';
-    }
-    return 'retry';
+  const existing = readLockSnapshot(lockPath);
+  // Lockfile exists but may be unsafe, unreadable, or structurally invalid.
+  // Unsafe path types fail closed; corrupt regular-file snapshots require an
+  // exact unchanged monotonic stale horizon before guarded removal.
+  if (existing.kind !== 'record') {
+    return evaluateNonRecordContention(lockPath, metadata, existing, options, tracker, deadline);
   }
 
   if (
     recoverStaleLock({
       lockPath,
-      metadata: existing,
-      staleMs: options.policy.staleMs,
+      snapshot: existing,
+      policy: options.policy,
+      tracker,
       onEvent: options.onEvent,
       resource: options.resource,
       operation: options.operation,
@@ -289,31 +895,31 @@ function evaluateLockContention(
     return 'retry';
   }
 
-  if (!existing.ownerToken) return 'malformed';
-  if (Date.now() >= deadline) return 'timeout';
+  if (monotonicNow() >= deadline) return 'timeout';
 
   emit(options.onEvent, {
     kind: 'acquire.wait',
     lockPath,
     resource: options.resource,
     operation: options.operation,
-    waitMs: Date.now() - metadata.acquiredAt,
-    ownerPid: existing.pid,
-    ownerHostname: existing.hostname,
+    waitMs: monotonicNow() - acquisitionStartedAt,
+    ownerPid: existing.metadata.pid,
+    ownerHostname: existing.metadata.hostname,
   });
   return 'retry';
 }
 
 function throwLockTimeout(lockPath: string, options: WithFileLockOptions): never {
-  const existing = readLockMetadata(lockPath);
+  const existing = readLockSnapshot(lockPath);
+  const owner = existing.kind === 'record' ? existing.metadata : undefined;
   emit(options.onEvent, {
     kind: 'acquire.timeout',
     lockPath,
     resource: options.resource,
     operation: options.operation,
     waitMs: options.policy.waitMs,
-    ownerPid: existing?.pid,
-    ownerHostname: existing?.hostname,
+    ownerPid: owner?.pid,
+    ownerHostname: owner?.hostname,
   });
   throw new TimeoutError(
     `Timed out waiting for ${options.resource} write lock (${options.operation ?? 'write'}) after ${options.policy.waitMs}ms`,
@@ -326,10 +932,11 @@ function startLockHeartbeat(
   metadata: FileLockMetadata,
   heartbeatMs: number,
 ): ReturnType<typeof setInterval> {
-  return setInterval(() => {
+  const timer = setInterval(() => {
+    let stillOwned = false;
     try {
       metadata.lastHeartbeatAt = Date.now();
-      writeLockMetadataIfOwner(
+      stillOwned = writeLockMetadataIfOwner(
         lockPath,
         { ...metadata, lastHeartbeatAt: metadata.lastHeartbeatAt },
         metadata.ownerToken,
@@ -337,20 +944,45 @@ function startLockHeartbeat(
     } catch {
       // @swallow-ok heartbeat update is best-effort; stale recovery handles abandoned locks
     }
+    if (!stillOwned) clearInterval(timer);
   }, heartbeatMs);
+  return timer;
+}
+
+function normalizePolicyDuration(value: number, name: string): number {
+  if (!Number.isFinite(value) || value < 0 || value > MAX_TIMER_MS) {
+    throw new SystemError(
+      `${name} must be a finite non-negative duration no greater than ${MAX_TIMER_MS}ms`,
+      { code: 'SYSTEM.LOCK.INVALID_POLICY' },
+    );
+  }
+  return Math.floor(value);
 }
 
 function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
-  // staleMs must outlive several heartbeats or a live owner is reclaimed mid-critical-section.
-  const heartbeatMs = Math.max(1, Math.floor(policy.heartbeatMs));
+  // Retain the historical heartbeat/stale relationship for policy
+  // compatibility. Recovery itself now requires host/process-incarnation proof
+  // and never treats wall-clock heartbeat age as ownership evidence.
+  const heartbeatMs = Math.max(1, normalizePolicyDuration(policy.heartbeatMs, 'heartbeatMs'));
   const minStale = heartbeatMs * 3;
-  const staleMs = Math.max(minStale, Math.floor(policy.staleMs));
-  const waitMs = Math.max(0, Math.floor(policy.waitMs));
+  const staleMs = Math.max(minStale, normalizePolicyDuration(policy.staleMs, 'staleMs'));
+  if (staleMs > MAX_TIMER_MS) {
+    throw new SystemError(
+      `staleMs must remain no greater than ${MAX_TIMER_MS}ms after heartbeat safety normalization`,
+      { code: 'SYSTEM.LOCK.INVALID_POLICY' },
+    );
+  }
+  const waitMs = normalizePolicyDuration(policy.waitMs, 'waitMs');
   return { waitMs, staleMs, heartbeatMs };
 }
 
 /**
  * Acquire an exclusive file lock, run `fn`, and release the lock in `finally`.
+ *
+ * This is a cooperative file lease, not an OS-level fence. In particular, a
+ * synchronous callback blocks its in-process heartbeat. Proven-dead owners can
+ * be reclaimed immediately; legacy and foreign records require one exact,
+ * unchanged local-monotonic stale horizon before guarded removal.
  *
  * @throws {TimeoutError} when live contention exceeds `policy.waitMs`.
  * @throws {SystemError} when lock metadata is malformed and cannot be recovered.
@@ -360,15 +992,21 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
   const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
   const cwdBasename = options.cwdBasename ?? basename(process.cwd());
+  const hostnameValue = hostname();
+  const hostIdentity = deriveHostIdentity(hostnameValue, defaultHostInstanceIdentity());
   const metadata: FileLockMetadata = {
     ownerToken,
     pid: process.pid,
-    hostname: hostname(),
+    hostname: hostnameValue,
+    hostInstanceIdentity: hostIdentity.id,
+    hostIdentityProven: hostIdentity.proven,
+    processIncarnation: currentProcessIncarnation(),
     runId: options.runId,
     command: options.command,
     cwdBasename,
     acquiredAt: Date.now(),
     lastHeartbeatAt: Date.now(),
+    staleMs: policy.staleMs,
   };
 
   emit(options.onEvent, {
@@ -378,11 +1016,20 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     operation: options.operation,
   });
 
-  const deadline = Date.now() + policy.waitMs;
+  const acquisitionStartedAt = monotonicNow();
+  const deadline = acquisitionStartedAt + policy.waitMs;
+  const tracker: LockStaleTracker = {};
   let acquired = false;
 
   while (!acquired) {
-    const outcome = evaluateLockContention(lockPath, metadata, normalizedOptions, deadline);
+    const outcome = evaluateLockContention(
+      lockPath,
+      metadata,
+      normalizedOptions,
+      tracker,
+      deadline,
+      acquisitionStartedAt,
+    );
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -393,7 +1040,7 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
       });
     }
     if (outcome === 'timeout') break;
-    sleepSync(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
+    sleepSync(Math.min(POLL_MS, Math.max(0, deadline - monotonicNow())));
   }
 
   if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
@@ -412,7 +1059,7 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
       lockPath,
       resource: options.resource,
       operation: options.operation,
-      waitMs: Date.now() - metadata.acquiredAt,
+      waitMs: monotonicNow() - acquisitionStartedAt,
     });
     return result;
   } finally {
@@ -433,15 +1080,21 @@ export async function withFileLockAsync<T>(
   const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
   const cwdBasename = options.cwdBasename ?? basename(process.cwd());
+  const hostnameValue = hostname();
+  const hostIdentity = deriveHostIdentity(hostnameValue, defaultHostInstanceIdentity());
   const metadata: FileLockMetadata = {
     ownerToken,
     pid: process.pid,
-    hostname: hostname(),
+    hostname: hostnameValue,
+    hostInstanceIdentity: hostIdentity.id,
+    hostIdentityProven: hostIdentity.proven,
+    processIncarnation: currentProcessIncarnation(),
     runId: options.runId,
     command: options.command,
     cwdBasename,
     acquiredAt: Date.now(),
     lastHeartbeatAt: Date.now(),
+    staleMs: policy.staleMs,
   };
 
   emit(options.onEvent, {
@@ -451,13 +1104,22 @@ export async function withFileLockAsync<T>(
     operation: options.operation,
   });
 
-  const deadline = Date.now() + policy.waitMs;
+  const acquisitionStartedAt = monotonicNow();
+  const deadline = acquisitionStartedAt + policy.waitMs;
+  const tracker: LockStaleTracker = {};
   let acquired = false;
 
   const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
   while (!acquired) {
-    const outcome = evaluateLockContention(lockPath, metadata, normalizedOptions, deadline);
+    const outcome = evaluateLockContention(
+      lockPath,
+      metadata,
+      normalizedOptions,
+      tracker,
+      deadline,
+      acquisitionStartedAt,
+    );
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -468,7 +1130,7 @@ export async function withFileLockAsync<T>(
       });
     }
     if (outcome === 'timeout') break;
-    await sleep(Math.min(POLL_MS, Math.max(0, deadline - Date.now())));
+    await sleep(Math.min(POLL_MS, Math.max(0, deadline - monotonicNow())));
   }
 
   if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
@@ -487,7 +1149,7 @@ export async function withFileLockAsync<T>(
       lockPath,
       resource: options.resource,
       operation: options.operation,
-      waitMs: Date.now() - metadata.acquiredAt,
+      waitMs: monotonicNow() - acquisitionStartedAt,
     });
     return result;
   } finally {

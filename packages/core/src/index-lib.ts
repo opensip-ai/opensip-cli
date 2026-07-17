@@ -156,9 +156,61 @@ export type {
   FileLockEvent,
   FileLockEventKind,
   FileLockMetadata,
+  FileLockResource,
   StateLockPolicy,
   WithFileLockOptions,
 } from './lib/file-lock.js';
+
+// Lib — external runtime coordination. Shared project/user readers and bounded
+// FIFO exclusive maintenance intents live outside the deletable user-data tree.
+export {
+  acquireGlobalRuntimeMaintenanceLease,
+  acquireRuntimeAccessLease,
+  acquireRuntimeExclusiveLease,
+  acquireRuntimeReadLease,
+  acquireUserStateReadLease,
+  cleanupEmptyRuntimeLeaseKey,
+  COORDINATION_MUTATION_STRATEGY,
+  DEFAULT_RUNTIME_LEASE_POLICY,
+  discardRuntimePromotionJournal,
+  discardUserUninstallReceipt,
+  inspectRuntimePromotionRecoveryHeader,
+  inspectRuntimeLeaseState,
+  inspectUserUninstallRecoveryHeader,
+  listActiveRuntimeLeaseKeys,
+  mutateAnchoredRecord,
+  mutateRuntimePromotionJournal,
+  mutateUserUninstallReceipt,
+  readAnchoredRecord,
+} from './lib/runtime-lease.js';
+export type {
+  AcquireGlobalRuntimeMaintenanceLeaseInput,
+  AcquireRuntimeAccessLeaseInput,
+  AcquireRuntimeExclusiveLeaseInput,
+  AcquireRuntimeReadLeaseInput,
+  AcquireUserStateReadLeaseInput,
+  AnchoredRecordMutation,
+  AnchoredRecordRead,
+  AnchoredRecordReadResult,
+  EmptyRuntimeLeaseKeyCleanup,
+  GlobalRuntimeMaintenanceLease,
+  GlobalRuntimeMaintenancePosture,
+  RecoveryHeaderInspection,
+  RuntimeAccessLease,
+  RuntimeExclusiveLease,
+  RuntimeExclusivePosture,
+  RuntimeLease,
+  RuntimeLeaseEvent,
+  RuntimeLeasePolicy,
+  RuntimeLeaseStateInspection,
+  StableRuntimeLeaseStateInspection,
+  BusyRuntimeLeaseStateInspection,
+  RuntimeLeaseWaitKind,
+  RuntimeReadLease,
+  RuntimeRecoveryRecordMutation,
+  RuntimeRecoveryStateProjection,
+  UserStateReadLease,
+} from './lib/runtime-lease.js';
 
 // Lib — execution substrate (north-star §5.8, launch). One bounded
 // scheduler + per-unit timeout/retry that fit + sim recipes run on, so
@@ -204,10 +256,13 @@ export type { RunTimer, RunLifecycle, RunTimingSnapshot } from './lib/run-timer.
 // ~/.opensip-cli/config.yml). Every consumer constructs paths through
 // this module so a layout change is a single-file edit.
 export {
+  RUNTIME_PROMOTION_JOURNAL_FILE,
+  USER_UNINSTALL_RECEIPT_FILE,
   ephemeralProjectCacheKey,
   legacyEphemeralProjectCacheKey,
   projectCoordinationKey,
   resolveEphemeralProjectIdentity,
+  resolveCoordinationPaths,
   resolveProjectPaths,
   resolveEphemeralProjectPaths,
   resolveRuntimePathsForScope,
@@ -215,6 +270,7 @@ export {
   isPathInside,
   toPosixRelative,
 } from './lib/paths.js';
+export type { CoordinationPaths } from './lib/paths.js';
 export {
   DEFAULT_EPHEMERAL_KEEP,
   DEFAULT_EPHEMERAL_MAX_AGE_DAYS,

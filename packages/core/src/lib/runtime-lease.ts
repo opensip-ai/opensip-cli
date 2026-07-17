@@ -1,0 +1,5673 @@
+/**
+ * @fileoverview Shared-reader/exclusive-maintainer runtime coordination.
+ *
+ * Coordination lives outside the deletable OpenSIP user-data tree. All state
+ * transitions are serialized through one short mutex; long-lived leases are
+ * represented by bounded, heartbeat-bearing records rather than by holding an
+ * OS file descriptor. The portable mutation fallback retains and revalidates a
+ * trusted parent handle around every path-based mutation. This detects parent
+ * replacement but does not claim isolation from an actively malicious same-UID
+ * process in the unobservable syscall window.
+ */
+
+// @fitness-ignore-file file-length-limit -- one security-sensitive lease state machine
+/* eslint-disable sonarjs/cognitive-complexity, sonarjs/no-duplicate-string -- audited state-machine branches */
+
+import { createHash } from 'node:crypto';
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  existsSync,
+  fchmodSync,
+  fstatSync,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  opendirSync,
+  openSync,
+  readSync,
+  realpathSync,
+  renameSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { hostname } from 'node:os';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
+
+import { ConfigurationError, SystemError, TimeoutError } from './errors.js';
+import { type FileLockEvent, type StateLockPolicy } from './file-lock.js';
+import {
+  createSafetyBiasedProcessInspector,
+  defaultHostInstanceIdentity,
+  deriveHostIdentity,
+  inspectProcessIncarnation,
+  type ProcessIncarnationInspection,
+  type SafetyBiasedProcessInspector,
+} from './host-process-identity.js';
+import { generateUUID } from './ids.js';
+import {
+  projectCoordinationKey,
+  resolveCoordinationPaths,
+  RUNTIME_PROMOTION_JOURNAL_FILE,
+  type CoordinationPaths,
+  USER_UNINSTALL_RECEIPT_FILE,
+} from './paths.js';
+
+import type { BigIntStats, Stats } from 'node:fs';
+
+const STATE_VERSION = 1;
+const RECOVERY_HEADER_VERSION = 1;
+const MAX_RECORD_BYTES = 4096;
+const MAX_RECOVERY_BYTES = 24 * 1024;
+const MAX_WRITER_QUEUE = 8;
+const MAX_PROJECT_KEYS = 256;
+const MAX_READERS_PER_DIMENSION = 128;
+const MAX_MUTEX_TEMPS = 256;
+const MAX_REFERENCES_PER_OWNER = 64;
+const MAX_SAFE_TEXT = 96;
+const MAX_HOST_IDENTITY_BYTES = 32;
+const MAX_METADATA_TEXT_BYTES = 32;
+const MAX_NEW_METADATA_TEXT_BYTES = 16;
+const MAX_WAIT_MS = 60 * 60 * 1000;
+const MAX_STALE_MS = 24 * 60 * 60 * 1000;
+const MIN_HEARTBEAT_MS = 10;
+const MAX_HEARTBEAT_MS = 60 * 1000;
+const MAX_POLL_MS = 10 * 1000;
+const MAX_FAILED_PUBLICATION_CLEANUP_WAIT_MS = 1000;
+const MAX_CACHED_PROCESS_INSPECTIONS = 256;
+const RUNTIME_MUTEX_PROCESS_PROBE_CACHE_MS = 250;
+const MAX_DEFERRED_PUBLICATION_CLEANUPS = 256;
+const MAX_CONCURRENT_DEFERRED_CLEANUPS = 2;
+const DEFERRED_CLEANUP_TICK_MS = 50;
+const MAX_DEFERRED_CLEANUP_BACKOFF_MS = 30_000;
+const RUNTIME_MUTEX_EVENT_PATH = 'coordination.lock';
+const PROJECT_KEY_PATTERN = /^[a-f0-9]{24}$/u;
+const REFERENCE_TOKEN_PATTERN = /^[a-f0-9]{24}$/u;
+const OWNER_TOKEN_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]{15,127}$/u;
+const OPERATION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
+const PROCESS_INCARNATION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_:-]{0,95}$/u;
+const READER_FILE_PATTERN = /^reader-([a-zA-Z0-9][a-zA-Z0-9-]{15,127})\.json$/u;
+const READER_TEMP_FILE_PATTERN =
+  /^\.((?:reader-[a-zA-Z0-9][a-zA-Z0-9-]{15,127}\.json))\.tmp-[a-zA-Z0-9-]{16,128}$/u;
+const MUTEX_TEMP_FILE_PATTERN = /^\.coordination\.lock\.tmp-[a-zA-Z0-9-]{16,128}$/u;
+const ROOT_TRANSITION_TEMP_FILE_PATTERN =
+  /^\.(state\.json|user-uninstall\.json)\.tmp-[a-zA-Z0-9-]{16,128}$/u;
+const PROJECT_TRANSITION_TEMP_FILE_PATTERN =
+  /^\.(runtime-promotion\.json)\.tmp-[a-zA-Z0-9-]{16,128}$/u;
+const ROOT_ENTRY_PATTERN =
+  /^(?:coordination\.lock|state\.json|projects|user-readers|user-uninstall\.json|\.(?:coordination\.lock|state\.json|user-uninstall\.json)\.tmp-[a-zA-Z0-9-]{16,128})$/u;
+const PROJECT_ENTRY_PATTERN =
+  /^(?:readers|runtime-promotion\.json|\.runtime-promotion\.json\.tmp-[a-zA-Z0-9-]{16,128})$/u;
+
+/** Default bounded polling and stale-owner policy. */
+export const DEFAULT_RUNTIME_LEASE_POLICY: RuntimeLeasePolicy = Object.freeze({
+  waitMs: 35_000,
+  staleMs: 30_000,
+  heartbeatMs: 5000,
+  pollMs: 25,
+});
+
+/** Policy shared by all runtime lease acquisition forms. */
+export interface RuntimeLeasePolicy extends StateLockPolicy {
+  readonly pollMs: number;
+}
+
+/** Recovery posture for one project runtime. */
+export type RuntimeExclusivePosture = 'normal' | 'init-recovery' | 'destructive-discard';
+
+/** Recovery posture for global user-state maintenance. */
+export type GlobalRuntimeMaintenancePosture = 'normal' | 'user-recovery' | 'receipt-only-discard';
+
+/** Stable timeout discriminator for customer-facing lease diagnostics. */
+export type RuntimeLeaseWaitKind =
+  | 'runtime-read'
+  | 'runtime-exclusive'
+  | 'runtime-access-composite'
+  | 'user-state-read'
+  | 'runtime-global-maintenance';
+
+/** Safe lifecycle event. Raw owner tokens are never included. */
+export interface RuntimeLeaseEvent {
+  readonly kind:
+    | 'lease.acquire.start'
+    | 'lease.acquire.wait'
+    | 'lease.acquire.complete'
+    | 'lease.release'
+    | 'lease.stale.recovered'
+    | 'lease.recovery.required';
+  readonly resource: 'runtime';
+  readonly operation: RuntimeLeaseWaitKind;
+  readonly waitMs?: number;
+  readonly ownerPid?: number;
+  readonly ownerHostname?: string;
+}
+
+interface RuntimeLeaseCommonInput {
+  readonly ownerToken?: string;
+  readonly command?: string;
+  readonly cwdBasename?: string;
+  readonly policy?: Partial<RuntimeLeasePolicy>;
+  readonly onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void;
+  readonly signal?: AbortSignal;
+}
+
+/** Injectable process/time seams for deterministic lease and stale-owner tests. */
+export interface RuntimeLeaseEnvironment {
+  readonly now: () => number;
+  readonly monotonicNow: () => number;
+  readonly hostname: () => string;
+  /** Stable local machine/boot identity; absent means hostname-only is unproven. */
+  readonly hostInstanceIdentity: () => string | undefined;
+  /** Proven process-start identity when the platform can distinguish PID reuse. */
+  readonly inspectProcessIncarnation: (pid: number) => ProcessIncarnationInspection;
+  readonly pid: number;
+  readonly isProcessAlive: (pid: number) => boolean;
+  readonly generateToken: () => string;
+  readonly poll: (ms: number, signal?: AbortSignal) => Promise<void>;
+  readonly pollSync: (ms: number) => void;
+  readonly transition?: (name: string) => void;
+  /** Direct-module fault harness; intentionally absent from the public barrel. */
+  readonly coordinationCheckpoint?: (
+    name:
+      | 'mutex-entered'
+      | 'before-mutex-postcondition'
+      | 'before-stale-reader-unlink'
+      | 'empty-scaffold-parents-opened',
+  ) => void;
+}
+
+const RUNTIME_ENVIRONMENT = Symbol('runtime-lease-environment');
+type InternalRuntimeLeaseInput = RuntimeLeaseCommonInput & {
+  readonly [RUNTIME_ENVIRONMENT]?: RuntimeLeaseEnvironment;
+};
+
+interface RuntimeWriterAuthority {
+  readonly ownerToken: string;
+  readonly acquiredAt: number;
+  readonly sequence: number;
+  readonly kind: 'project' | 'global';
+  readonly coordinationKey?: string;
+  readonly mutationCapability:
+    'project-record' | 'project-discard-only' | 'user-record' | 'receipt-discard-only';
+}
+
+type WriterLeaseWithAuthority = RuntimeExclusiveLease | GlobalRuntimeMaintenanceLease;
+
+/**
+ * An exact-object capability registry. Returning the authority as an own
+ * property (including a symbol property) would let callers reflect, copy, and
+ * alter it. WeakMap branding keeps recovery authority unforgeable while
+ * allowing released lease objects to be collected.
+ */
+const RUNTIME_WRITER_AUTHORITIES = new WeakMap<object, Readonly<RuntimeWriterAuthority>>();
+
+export interface AcquireRuntimeReadLeaseInput extends RuntimeLeaseCommonInput {
+  readonly projectDir: string;
+}
+
+export interface AcquireRuntimeExclusiveLeaseInput extends RuntimeLeaseCommonInput {
+  readonly projectDir: string;
+  readonly posture?: RuntimeExclusivePosture;
+  /** Required for `init-recovery`; compared only with the bounded core header. */
+  readonly recoveryOperationId?: string;
+}
+
+export type AcquireUserStateReadLeaseInput = RuntimeLeaseCommonInput;
+
+export interface AcquireGlobalRuntimeMaintenanceLeaseInput extends RuntimeLeaseCommonInput {
+  readonly posture?: GlobalRuntimeMaintenancePosture;
+  /** Required for `user-recovery`; compared only with the bounded core header. */
+  readonly recoveryOperationId?: string;
+}
+
+export interface AcquireRuntimeAccessLeaseInput extends RuntimeLeaseCommonInput {
+  readonly projectRead?: { readonly projectDir: string } | false;
+  readonly userStateRead?: boolean;
+}
+
+/** Idempotent synchronous lease handle suitable for `RunScope.onDispose`. */
+export interface RuntimeLease {
+  readonly ownerToken: string;
+  readonly acquiredAt: number;
+  readonly release: () => void;
+}
+
+export interface RuntimeReadLease extends RuntimeLease {
+  readonly kind: 'runtime-read';
+  readonly coordinationKey: string;
+}
+
+export interface RuntimeExclusiveLease extends RuntimeLease {
+  readonly kind: 'runtime-exclusive';
+  readonly coordinationKey: string;
+  readonly posture: RuntimeExclusivePosture;
+}
+
+export interface UserStateReadLease extends RuntimeLease {
+  readonly kind: 'user-state-read';
+}
+
+export interface GlobalRuntimeMaintenanceLease extends RuntimeLease {
+  readonly kind: 'runtime-global-maintenance';
+  readonly posture: GlobalRuntimeMaintenancePosture;
+  /**
+   * True only for the malformed-receipt posture. It authorizes callers to
+   * unlink the fixed receipt basename and no other path.
+   */
+  readonly receiptOnlyDiscard: boolean;
+}
+
+export interface RuntimeAccessLease extends RuntimeLease {
+  readonly kind: 'runtime-access-composite';
+  readonly coordinationKey?: string;
+  readonly projectRead: boolean;
+  readonly userStateRead: boolean;
+}
+
+export type RecoveryHeaderInspection =
+  | { readonly status: 'absent' }
+  | {
+      readonly status: 'valid';
+      readonly state: 'open' | 'closed';
+      readonly operationId: string;
+      readonly reason?: string;
+    }
+  | {
+      readonly status: 'malformed';
+      readonly reason:
+        | 'oversize'
+        | 'unsafe-file'
+        | 'invalid-json'
+        | 'invalid-header'
+        | 'coordination-key-mismatch';
+    };
+
+export type RuntimeRecoveryStateProjection =
+  | { readonly status: 'absent' }
+  | { readonly status: 'valid'; readonly state: 'open' | 'closed' }
+  | { readonly status: 'malformed' };
+
+/** Bounded, stable current-project coordination projection. */
+export interface StableRuntimeLeaseStateInspection {
+  readonly status: 'stable';
+  readonly projectReaders: number;
+  readonly userStateReaders: number;
+  readonly writer: 'none' | 'queued' | 'intent';
+  readonly globalWriter: 'none' | 'queued' | 'intent';
+  readonly promotion: RuntimeRecoveryStateProjection;
+  readonly userUninstall: RuntimeRecoveryStateProjection;
+}
+
+/** Read-only inspection refuses to combine records that changed mid-snapshot. */
+export interface BusyRuntimeLeaseStateInspection {
+  readonly status: 'busy';
+  readonly reason: 'changed-during-inspection';
+}
+
+export type RuntimeLeaseStateInspection =
+  StableRuntimeLeaseStateInspection | BusyRuntimeLeaseStateInspection;
+
+/** Portable Node currently exposes no proven descriptor-relative renameat/unlinkat seam. */
+export const COORDINATION_MUTATION_STRATEGY = 'portable-anchored' as const;
+
+export interface CoordinationRecordMutation {
+  readonly parentDir: string;
+  readonly basename: string;
+  readonly operation: 'create' | 'replace' | 'unlink';
+  readonly content?: string;
+  readonly maxBytes?: number;
+  /**
+   * Optional caller-observed conflict proof for replace/unlink. Portable Node
+   * cannot make the final digest-check-to-rename/unlink window linearizable;
+   * callers coordinating multiple writers must hold an external lock.
+   */
+  readonly expectedContentSha256?: string;
+}
+
+/** Fixed recovery-record mutation; parent and basename are never caller-controlled. */
+export type RuntimeRecoveryRecordMutation =
+  | {
+      readonly operation: 'create';
+      readonly content: string;
+    }
+  | {
+      readonly operation: 'replace';
+      readonly content: string;
+      readonly expectedContentSha256: string;
+    }
+  | {
+      readonly operation: 'unlink';
+      readonly expectedContentSha256: string;
+    };
+
+/** General anchored mutation seam used by coordination and cache metadata. */
+export interface AnchoredRecordMutation extends CoordinationRecordMutation {
+  /** Existing trusted containment root; it is never created by this primitive. */
+  readonly trustedAnchorDir: string;
+  /**
+   * Coordination uses `private`; cache metadata may use owner-controlled 0755
+   * parents while still rejecting group/world-writable directories.
+   */
+  readonly permissionPosture?: 'private' | 'owner-controlled';
+}
+
+export interface AnchoredRecordRead {
+  readonly trustedAnchorDir: string;
+  readonly parentDir: string;
+  readonly basename: string;
+  readonly maxBytes?: number;
+  readonly permissionPosture?: 'private' | 'owner-controlled';
+}
+
+export type AnchoredRecordReadResult =
+  | { readonly status: 'absent' }
+  | {
+      readonly status: 'present';
+      readonly content: string;
+      readonly sha256: string;
+    };
+
+interface RecordMetadata {
+  readonly ownerToken: string;
+  readonly pid: number;
+  readonly hostname: string;
+  readonly hostIdentityProven: boolean;
+  readonly processIncarnation?: string;
+  readonly command: string;
+  readonly cwdBasename: string;
+  readonly acquiredAt: number;
+  readonly lastHeartbeatAt: number;
+  /** Owner-selected bounded expiry horizon; contenders must never shorten it. */
+  readonly staleMs: number;
+  readonly sequence: number;
+}
+
+interface ReaderRecord extends RecordMetadata {
+  readonly version: 1;
+  readonly dimension: 'project' | 'user';
+  readonly refs: number;
+  readonly references: readonly string[];
+}
+
+interface WriterRecord extends RecordMetadata {
+  readonly kind: 'project' | 'global';
+  readonly coordinationKey?: string;
+  readonly phase: 'queued' | 'intent';
+}
+
+interface LeaseStateFile {
+  readonly version: 1;
+  readonly nextSequence: number;
+  readonly writers: readonly WriterRecord[];
+}
+
+function unsafeCoordination(message: string): SystemError {
+  return new SystemError(message, {
+    code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+  });
+}
+
+class RuntimeSnapshotChangedError extends SystemError {
+  constructor(message: string) {
+    super(message, { code: 'SYSTEM.RUNTIME_COORDINATION.BUSY' });
+  }
+}
+
+function recoveryRequired(message: string): ConfigurationError {
+  return new ConfigurationError(message, {
+    code: 'CONFIGURATION.RECOVERY_REQUIRED',
+  });
+}
+
+function timeoutError(kind: RuntimeLeaseWaitKind, waitMs: number): TimeoutError {
+  const guidance =
+    kind === 'runtime-exclusive' || kind === 'runtime-global-maintenance'
+      ? ' Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.'
+      : '';
+  return new TimeoutError(
+    `Timed out waiting for ${kind} coordination after ${waitMs}ms.${guidance}`,
+    { code: `TIMEOUT.${kind.toUpperCase().replaceAll('-', '_')}` },
+  );
+}
+
+function mapCoordinationTimeout(error: unknown, kind: RuntimeLeaseWaitKind, waitMs: number): never {
+  if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION_MUTEX') {
+    throw timeoutError(kind, waitMs);
+  }
+  throw error;
+}
+
+function boundedPolicyDuration(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  field: string,
+): number {
+  const candidate = value ?? fallback;
+  if (!Number.isFinite(candidate) || candidate < 0) {
+    throw new SystemError(`Runtime lease ${field} policy is invalid`, {
+      code: 'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
+    });
+  }
+  return Math.min(maximum, Math.max(minimum, Math.floor(candidate)));
+}
+
+function boundedRecordSize(value: number | undefined): number {
+  const candidate = value ?? MAX_RECORD_BYTES;
+  if (!Number.isSafeInteger(candidate) || candidate < 1) {
+    throw unsafeCoordination('Anchored record size bound is invalid');
+  }
+  return Math.min(MAX_RECOVERY_BYTES, candidate);
+}
+
+function normalizePolicy(policy?: Partial<RuntimeLeasePolicy>): RuntimeLeasePolicy {
+  const heartbeatMs = boundedPolicyDuration(
+    policy?.heartbeatMs,
+    DEFAULT_RUNTIME_LEASE_POLICY.heartbeatMs,
+    MIN_HEARTBEAT_MS,
+    MAX_HEARTBEAT_MS,
+    'heartbeatMs',
+  );
+  return {
+    waitMs: boundedPolicyDuration(
+      policy?.waitMs,
+      DEFAULT_RUNTIME_LEASE_POLICY.waitMs,
+      0,
+      MAX_WAIT_MS,
+      'waitMs',
+    ),
+    staleMs: boundedPolicyDuration(
+      policy?.staleMs,
+      DEFAULT_RUNTIME_LEASE_POLICY.staleMs,
+      heartbeatMs * 3,
+      MAX_STALE_MS,
+      'staleMs',
+    ),
+    heartbeatMs,
+    pollMs: boundedPolicyDuration(
+      policy?.pollMs,
+      DEFAULT_RUNTIME_LEASE_POLICY.pollMs,
+      1,
+      MAX_POLL_MS,
+      'pollMs',
+    ),
+  };
+}
+
+function safeText(value: string | undefined, fallback: string, maxBytes = MAX_SAFE_TEXT): string {
+  let candidate = '';
+  for (const character of value ?? fallback) {
+    const code = character.codePointAt(0) ?? 0;
+    const sanitized = code < 32 || code === 127 ? '?' : character;
+    if (Buffer.byteLength(candidate + sanitized, 'utf8') > maxBytes) break;
+    candidate += sanitized;
+  }
+  if (candidate.length > 0) return candidate;
+  return Buffer.from(fallback, 'utf8').subarray(0, maxBytes).toString('utf8');
+}
+
+function noHostInstanceIdentity(): string | undefined {
+  return;
+}
+
+interface RuntimeHostIdentity {
+  readonly id: string;
+  readonly proven: boolean;
+}
+
+function runtimeHostIdentity(environment: RuntimeLeaseEnvironment): RuntimeHostIdentity {
+  return deriveHostIdentity(environment.hostname(), environment.hostInstanceIdentity());
+}
+
+function sameProvenRuntimeHost(
+  record: { readonly hostname: string; readonly hostIdentityProven: boolean },
+  environment: RuntimeLeaseEnvironment,
+): boolean {
+  const local = runtimeHostIdentity(environment);
+  return record.hostIdentityProven && local.proven && record.hostname === local.id;
+}
+
+interface ProcessInspectionCache {
+  readonly present: Map<number, ProcessIncarnationInspection & { readonly status: 'present' }>;
+  probes: number;
+}
+
+function createProcessInspectionCache(): ProcessInspectionCache {
+  return { present: new Map(), probes: 0 };
+}
+
+function inspectProcessForStaleScan(
+  pid: number,
+  environment: RuntimeLeaseEnvironment,
+  cache?: ProcessInspectionCache,
+  fresh = false,
+): ProcessIncarnationInspection {
+  if (cache === undefined) return environment.inspectProcessIncarnation(pid);
+  if (!fresh) {
+    const cached = cache.present.get(pid);
+    if (cached !== undefined) return cached;
+  }
+  if (cache.probes >= MAX_CACHED_PROCESS_INSPECTIONS) {
+    // Preserve excess owners rather than performing an unbounded number of
+    // synchronous platform probes while the coordination mutex is held.
+    return { status: 'unknown' };
+  }
+  cache.probes += 1;
+  const inspection = environment.inspectProcessIncarnation(pid);
+  if (!fresh && inspection.status === 'present') cache.present.set(pid, inspection);
+  // Absence is deliberately not cached. A fresh probe is required immediately
+  // before exact stale-record deletion.
+  return inspection;
+}
+
+function ownedByRuntimeProcess(
+  record: {
+    readonly pid: number;
+    readonly hostname: string;
+    readonly hostIdentityProven: boolean;
+    readonly processIncarnation?: string;
+  },
+  environment: RuntimeLeaseEnvironment,
+): boolean {
+  const local = runtimeHostIdentity(environment);
+  const currentProcess =
+    record.processIncarnation === undefined
+      ? undefined
+      : environment.inspectProcessIncarnation(environment.pid);
+  return (
+    record.pid === environment.pid &&
+    record.hostname === local.id &&
+    record.hostIdentityProven === local.proven &&
+    (record.processIncarnation === undefined ||
+      (currentProcess?.status === 'present' &&
+        currentProcess.identity === record.processIncarnation))
+  );
+}
+
+function currentProcessIncarnation(environment: RuntimeLeaseEnvironment): string | undefined {
+  const processIdentity = environment.inspectProcessIncarnation(environment.pid);
+  return processIdentity.status === 'present' ? processIdentity.identity : undefined;
+}
+
+function sameHostOwnerIsStale(
+  record: {
+    readonly pid: number;
+    readonly processIncarnation?: string;
+  },
+  environment: RuntimeLeaseEnvironment,
+  processInspectionCache?: ProcessInspectionCache,
+  freshProcessProof = false,
+): boolean {
+  if (record.processIncarnation === undefined) {
+    // Legacy/unproven process records retain the conservative ESRCH-only rule.
+    return !environment.isProcessAlive(record.pid);
+  }
+  const current = inspectProcessForStaleScan(
+    record.pid,
+    environment,
+    processInspectionCache,
+    freshProcessProof,
+  );
+  if (current.status === 'absent') return true;
+  if (current.status === 'unknown') return false;
+  return current.identity !== record.processIncarnation;
+}
+
+function validateOwnerToken(ownerToken: string): void {
+  if (!OWNER_TOKEN_PATTERN.test(ownerToken)) {
+    throw new SystemError('Runtime lease owner token is invalid', {
+      code: 'SYSTEM.RUNTIME_LEASE.INVALID_OWNER',
+    });
+  }
+}
+
+function validateOperationId(operationId: string | undefined): operationId is string {
+  return operationId !== undefined && OPERATION_ID_PATTERN.test(operationId);
+}
+
+function currentUid(): number | undefined {
+  return typeof process.getuid === 'function' ? process.getuid() : undefined;
+}
+
+function isContainedPath(path: string, root: string): boolean {
+  const rel = relative(root, path);
+  return rel === '' || (!rel.startsWith(`..${sep}`) && rel !== '..' && !isAbsolute(rel));
+}
+
+interface DirectoryIdentity {
+  readonly dev: bigint;
+  readonly ino: bigint;
+}
+
+interface RecordIdentity extends DirectoryIdentity {
+  readonly uid: bigint;
+  readonly mode: bigint;
+  readonly nlink: bigint;
+  readonly size: bigint;
+  readonly mtimeNs: bigint;
+  readonly ctimeNs: bigint;
+}
+
+function assertDirectory(
+  path: string,
+  root?: string,
+  permissionPosture: 'private' | 'owner-controlled' = 'private',
+): DirectoryIdentity {
+  let stat;
+  try {
+    stat = lstatSync(path, { bigint: true });
+  } catch {
+    throw unsafeCoordination('Runtime coordination directory is unavailable');
+  }
+  if (!stat.isDirectory() || stat.isSymbolicLink() || stat.nlink < 1n) {
+    throw unsafeCoordination('Runtime coordination directory has an unsafe type');
+  }
+  const uid = currentUid();
+  if (uid !== undefined && stat.uid !== BigInt(uid)) {
+    throw unsafeCoordination('Runtime coordination directory has an unexpected owner');
+  }
+  const mode = Number(stat.mode & 0o777n);
+  if (
+    process.platform !== 'win32' &&
+    (permissionPosture === 'private' ? mode !== 0o700 : (mode & 0o022) !== 0)
+  ) {
+    throw unsafeCoordination(
+      permissionPosture === 'private'
+        ? 'Runtime coordination directory permissions must be 0700'
+        : 'Anchored directory must not be group/world writable',
+    );
+  }
+  let canonical: string;
+  try {
+    canonical = realpathSync(path);
+  } catch {
+    throw unsafeCoordination('Runtime coordination directory cannot be canonicalized');
+  }
+  if (root !== undefined) {
+    let canonicalRoot: string;
+    try {
+      canonicalRoot = realpathSync(root);
+    } catch {
+      throw unsafeCoordination('Runtime coordination root cannot be canonicalized');
+    }
+    if (!isContainedPath(canonical, canonicalRoot)) {
+      throw unsafeCoordination('Runtime coordination directory escapes its trusted root');
+    }
+  }
+  return { dev: stat.dev, ino: stat.ino };
+}
+
+function sameIdentity(left: DirectoryIdentity, right: DirectoryIdentity): boolean {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+function recordIdentity(stat: BigIntStats): RecordIdentity {
+  return {
+    dev: stat.dev,
+    ino: stat.ino,
+    uid: stat.uid,
+    mode: stat.mode,
+    nlink: stat.nlink,
+    size: stat.size,
+    mtimeNs: stat.mtimeNs,
+    ctimeNs: stat.ctimeNs,
+  };
+}
+
+function sameRecordIdentity(left: RecordIdentity, right: RecordIdentity): boolean {
+  return (
+    sameIdentity(left, right) &&
+    left.uid === right.uid &&
+    left.mode === right.mode &&
+    left.nlink === right.nlink &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
+}
+
+function assertRegularRecordStat(
+  stat: BigIntStats,
+  maxBytes: number | undefined,
+  permissionPosture: 'private' | 'owner-controlled' = 'private',
+): void {
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1n) {
+    throw unsafeCoordination('Runtime coordination record has an unsafe type or link count');
+  }
+  const uid = currentUid();
+  if (uid !== undefined && stat.uid !== BigInt(uid)) {
+    throw unsafeCoordination('Runtime coordination record has an unexpected owner');
+  }
+  const mode = Number(stat.mode & 0o777n);
+  if (
+    process.platform !== 'win32' &&
+    (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)
+  ) {
+    throw unsafeCoordination(
+      permissionPosture === 'private'
+        ? 'Runtime coordination record permissions must be 0600'
+        : 'Anchored record must not be group/world writable',
+    );
+  }
+  if (maxBytes !== undefined && stat.size > BigInt(maxBytes)) {
+    throw unsafeCoordination('Runtime coordination record exceeds its size bound');
+  }
+}
+
+function assertRegularRecord(
+  path: string,
+  maxBytes: number,
+  permissionPosture: 'private' | 'owner-controlled' = 'private',
+): void {
+  let stat;
+  try {
+    stat = lstatSync(path, { bigint: true });
+  } catch {
+    throw unsafeCoordination('Runtime coordination record is unavailable');
+  }
+  assertRegularRecordStat(stat, maxBytes, permissionPosture);
+}
+
+function mkdirSecure(path: string, root?: string): void {
+  let created = false;
+  try {
+    mkdirSync(path, { recursive: false, mode: 0o700 });
+    created = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+  }
+  if (created && process.platform !== 'win32') {
+    try {
+      chmodSync(path, 0o700);
+    } catch {
+      throw unsafeCoordination('Runtime coordination directory permissions cannot be secured');
+    }
+  }
+  assertDirectory(path, root);
+}
+
+function readDirectoryBounded(path: string, cap: number, description: string): readonly string[] {
+  const directory = opendirSync(path);
+  const entries: string[] = [];
+  try {
+    for (;;) {
+      const entry = directory.readSync();
+      if (entry === null) return entries;
+      entries.push(entry.name);
+      if (entries.length > cap) {
+        throw unsafeCoordination(`${description} exceeds its entry bound`);
+      }
+    }
+  } finally {
+    directory.closeSync();
+  }
+}
+
+function lstatIfPresent(path: string, description: string): BigIntStats | undefined {
+  try {
+    return lstatSync(path, { bigint: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw unsafeCoordination(`${description} cannot be inspected`);
+  }
+}
+
+function assertPrivateRecordEntry(
+  path: string,
+  maxBytes: number | undefined,
+  allowedLinks: readonly bigint[] = [1n],
+  allowConcurrentAbsence = false,
+): BigIntStats | undefined {
+  const stat = lstatIfPresent(path, 'Runtime coordination record');
+  if (stat === undefined && allowConcurrentAbsence) return undefined;
+  if (
+    stat === undefined ||
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    !allowedLinks.includes(stat.nlink) ||
+    (maxBytes !== undefined && stat.size > BigInt(maxBytes))
+  ) {
+    throw unsafeCoordination('Runtime coordination record has an unsafe type, size, or link count');
+  }
+  const uid = currentUid();
+  if (uid !== undefined && stat.uid !== BigInt(uid)) {
+    throw unsafeCoordination('Runtime coordination record has an unexpected owner');
+  }
+  if (process.platform !== 'win32' && Number(stat.mode & 0o777n) !== 0o600) {
+    throw unsafeCoordination('Runtime coordination record permissions must be 0600');
+  }
+  return stat;
+}
+
+function validateReaderDirectoryEntries(
+  readersDir: string,
+  coordinationRoot: string,
+  guard?: RuntimeMutexGuard,
+): readonly string[] {
+  assertDirectory(readersDir, coordinationRoot);
+  const entries = readDirectoryBounded(
+    readersDir,
+    MAX_READERS_PER_DIMENSION * 2,
+    'Runtime reader directory',
+  );
+  for (const [index, entry] of entries.entries()) {
+    if (index % 16 === 0) guard?.refresh();
+    if (READER_FILE_PATTERN.test(entry)) {
+      assertPrivateRecordEntry(join(readersDir, entry), MAX_RECORD_BYTES);
+    } else if (READER_TEMP_FILE_PATTERN.test(entry)) {
+      assertPrivateRecordEntry(join(readersDir, entry), MAX_RECORD_BYTES, [1n, 2n]);
+    } else {
+      throw unsafeCoordination('Runtime reader directory contains an unexpected entry');
+    }
+  }
+  return entries;
+}
+
+function validateProjectCoordinationEntries(
+  paths: CoordinationPaths,
+  coordinationKey: string,
+  guard?: RuntimeMutexGuard,
+): void {
+  guard?.refresh();
+  const projectPaths = paths.forProject(coordinationKey);
+  assertDirectory(projectPaths.projectCoordinationDir, paths.coordinationDir);
+  const entries = readDirectoryBounded(
+    projectPaths.projectCoordinationDir,
+    MAX_MUTEX_TEMPS + 2,
+    'Runtime project coordination directory',
+  );
+  let hasReaders = false;
+  for (const entry of entries) {
+    if (entry === 'readers') {
+      hasReaders = true;
+      validateReaderDirectoryEntries(projectPaths.readersDir, paths.coordinationDir, guard);
+    } else if (entry === RUNTIME_PROMOTION_JOURNAL_FILE) {
+      // The fixed header may be oversize after a crash/corrupt write. Its
+      // posture-specific inspector classifies that state without reading it,
+      // so destructive recovery remains reachable.
+      assertPrivateRecordEntry(projectPaths.promotionJournalFile, undefined, [1n, 2n]);
+    } else if (PROJECT_ENTRY_PATTERN.test(entry)) {
+      assertPrivateRecordEntry(
+        join(projectPaths.projectCoordinationDir, entry),
+        MAX_RECOVERY_BYTES,
+        [1n, 2n],
+      );
+      if (guard !== undefined) {
+        const targetBasename = PROJECT_TRANSITION_TEMP_FILE_PATTERN.exec(entry)?.[1];
+        if (targetBasename !== undefined) {
+          reconcileOrphanedTransitionTemp(
+            projectPaths.projectCoordinationDir,
+            entry,
+            targetBasename,
+            MAX_RECOVERY_BYTES,
+            guard,
+          );
+        }
+      }
+    } else {
+      throw unsafeCoordination(
+        'Runtime project coordination directory contains an unexpected entry',
+      );
+    }
+  }
+  if (!hasReaders) {
+    throw unsafeCoordination('Runtime project coordination directory is incomplete');
+  }
+}
+
+function validateCoordinationRootEntries(
+  paths: CoordinationPaths,
+  guard?: RuntimeMutexGuard,
+): void {
+  const entries = readDirectoryBounded(
+    paths.coordinationDir,
+    MAX_MUTEX_TEMPS + 8,
+    'Runtime coordination root',
+  );
+  for (const [index, entry] of entries.entries()) {
+    if (index % 16 === 0) guard?.refresh();
+    const path = join(paths.coordinationDir, entry);
+    if (entry === 'projects') {
+      assertDirectory(path, paths.coordinationDir);
+    } else if (entry === 'user-readers') {
+      validateReaderDirectoryEntries(path, paths.coordinationDir, guard);
+    } else if (
+      entry === 'coordination.lock' ||
+      entry === 'state.json' ||
+      entry === USER_UNINSTALL_RECEIPT_FILE
+    ) {
+      assertPrivateRecordEntry(
+        path,
+        entry === USER_UNINSTALL_RECEIPT_FILE ? undefined : MAX_RECORD_BYTES,
+        [1n, 2n],
+      );
+    } else if (ROOT_ENTRY_PATTERN.test(entry)) {
+      assertPrivateRecordEntry(
+        path,
+        entry.includes(USER_UNINSTALL_RECEIPT_FILE) ? MAX_RECOVERY_BYTES : MAX_RECORD_BYTES,
+        [1n, 2n],
+        entry.startsWith('.coordination.lock.tmp-'),
+      );
+      if (guard !== undefined) {
+        if (MUTEX_TEMP_FILE_PATTERN.test(entry)) {
+          reconcileOrphanedMutexTemp(paths, entry, guard);
+        } else {
+          const targetBasename = ROOT_TRANSITION_TEMP_FILE_PATTERN.exec(entry)?.[1];
+          if (targetBasename !== undefined) {
+            reconcileOrphanedTransitionTemp(
+              paths.coordinationDir,
+              entry,
+              targetBasename,
+              targetBasename === USER_UNINSTALL_RECEIPT_FILE
+                ? MAX_RECOVERY_BYTES
+                : MAX_RECORD_BYTES,
+              guard,
+            );
+          }
+        }
+      }
+    } else {
+      throw unsafeCoordination('Runtime coordination root contains an unexpected entry');
+    }
+  }
+}
+
+function ensureCoordinationScaffold(): CoordinationPaths {
+  const paths = resolveCoordinationPaths();
+  mkdirSecure(paths.coordinationDir);
+  mkdirSecure(paths.projectsDir, paths.coordinationDir);
+  mkdirSecure(paths.userReadersDir, paths.coordinationDir);
+  return paths;
+}
+
+function ensureProjectScaffold(
+  paths: CoordinationPaths,
+  coordinationKey: string,
+  guard?: RuntimeMutexGuard,
+): void {
+  if (!PROJECT_KEY_PATTERN.test(coordinationKey)) {
+    throw unsafeCoordination('Runtime coordination key is invalid');
+  }
+  const projectPaths = paths.forProject(coordinationKey);
+  const projectStat = lstatIfPresent(
+    projectPaths.projectCoordinationDir,
+    'Runtime project coordination state',
+  );
+  const projectExists = projectStat !== undefined;
+  if (projectStat !== undefined) {
+    assertDirectory(projectPaths.projectCoordinationDir, paths.coordinationDir);
+    const entries = readDirectoryBounded(
+      projectPaths.projectCoordinationDir,
+      MAX_MUTEX_TEMPS + 2,
+      'Runtime project coordination directory',
+    );
+    if (!entries.includes('readers') && entries.length === 0) {
+      // A process can stop between creating the key directory and its readers
+      // directory (including cleanup stopping between the inverse operations).
+      // Repair only the uniquely provable empty scaffold, while holding the
+      // coordination mutex. Any content makes the state ambiguous and the
+      // ordinary validator below fails closed.
+      if (guard === undefined) {
+        throw unsafeCoordination('Runtime project coordination directory is incomplete');
+      }
+      guard.refresh();
+      mkdirSecure(projectPaths.readersDir, paths.coordinationDir);
+    }
+  }
+  let existingKeys = listProjectCoordinationKeys(paths, guard);
+  if (!projectExists && existingKeys.length >= MAX_PROJECT_KEYS && guard !== undefined) {
+    const cleanupPolicy = normalizePolicy({ waitMs: 250 });
+    for (const existingKey of existingKeys) {
+      guard.refresh();
+      cleanupEmptyRuntimeLeaseKeyWhileOwned(
+        paths,
+        existingKey,
+        cleanupPolicy,
+        DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+        guard,
+      );
+      if (
+        readDirectoryBounded(paths.projectsDir, MAX_PROJECT_KEYS, 'Runtime coordination projects')
+          .length < MAX_PROJECT_KEYS
+      ) {
+        break;
+      }
+    }
+    existingKeys = listProjectCoordinationKeys(paths, guard);
+  }
+  if (!projectExists && existingKeys.length >= MAX_PROJECT_KEYS) {
+    throw new SystemError('Runtime project coordination capacity is exhausted', {
+      code: 'SYSTEM.RUNTIME_LEASE.CAPACITY',
+    });
+  }
+  guard?.refresh();
+  mkdirSecure(projectPaths.projectCoordinationDir, paths.coordinationDir);
+  guard?.refresh();
+  mkdirSecure(projectPaths.readersDir, paths.coordinationDir);
+  validateProjectCoordinationEntries(paths, coordinationKey, guard);
+}
+
+function openParentIdentity(
+  parentDir: string,
+  root: string,
+): {
+  readonly fd: number;
+  readonly identity: DirectoryIdentity;
+} {
+  const validated = assertDirectory(parentDir, root);
+  const fd = openSync(parentDir, 'r');
+  try {
+    const stat = fstatSync(fd, { bigint: true });
+    const opened = { dev: stat.dev, ino: stat.ino };
+    const uid = currentUid();
+    if (
+      !stat.isDirectory() ||
+      !sameIdentity(validated, opened) ||
+      (uid !== undefined && stat.uid !== BigInt(uid)) ||
+      (process.platform !== 'win32' && Number(stat.mode & 0o777n) !== 0o700)
+    ) {
+      throw unsafeCoordination('Runtime coordination parent changed before its handle was opened');
+    }
+    return { fd, identity: opened };
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+}
+
+function openAnchoredParentIdentity(
+  parentDir: string,
+  root: string,
+  permissionPosture: 'private' | 'owner-controlled',
+): {
+  readonly fd: number;
+  readonly identity: DirectoryIdentity;
+} {
+  assertNoFollowDirectoryWalk(parentDir, root, permissionPosture);
+  const validated = assertDirectory(parentDir, root, permissionPosture);
+  const fd = openSync(parentDir, 'r');
+  try {
+    const stat = fstatSync(fd, { bigint: true });
+    const opened = { dev: stat.dev, ino: stat.ino };
+    const uid = currentUid();
+    const mode = Number(stat.mode & 0o777n);
+    if (
+      !stat.isDirectory() ||
+      !sameIdentity(validated, opened) ||
+      (uid !== undefined && stat.uid !== BigInt(uid)) ||
+      (process.platform !== 'win32' &&
+        (permissionPosture === 'private' ? mode !== 0o700 : (mode & 0o022) !== 0))
+    ) {
+      throw unsafeCoordination('Anchored parent changed before its handle was opened');
+    }
+    return { fd, identity: opened };
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+}
+
+function assertNoFollowDirectoryWalk(
+  parentDir: string,
+  root: string,
+  permissionPosture: 'private' | 'owner-controlled',
+): void {
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = realpathSync(root);
+  } catch {
+    throw unsafeCoordination('Anchored root cannot be canonicalized');
+  }
+  const rel = relative(root, parentDir);
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw unsafeCoordination('Anchored parent escapes its trusted root');
+  }
+  assertDirectory(root, undefined, permissionPosture);
+  let cursor = root;
+  if (rel === '') return;
+  for (const segment of rel.split(sep)) {
+    if (segment === '' || segment === '.' || segment === '..') {
+      throw unsafeCoordination('Anchored parent contains an invalid segment');
+    }
+    cursor = join(cursor, segment);
+    let stat;
+    try {
+      stat = lstatSync(cursor);
+    } catch {
+      throw unsafeCoordination('Anchored directory walk encountered an unavailable component');
+    }
+    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+      throw unsafeCoordination('Anchored directory walk encountered a symlink or non-directory');
+    }
+    assertDirectory(cursor, root, permissionPosture);
+  }
+  let canonicalCursor: string;
+  let canonicalParent: string;
+  try {
+    canonicalCursor = realpathSync(cursor);
+    canonicalParent = realpathSync(parentDir);
+  } catch {
+    throw unsafeCoordination('Anchored parent cannot be canonicalized');
+  }
+  if (canonicalCursor !== canonicalParent || !isContainedPath(canonicalCursor, canonicalRoot)) {
+    throw unsafeCoordination('Anchored directory walk changed during validation');
+  }
+}
+
+function assertParentUnchanged(
+  fd: number,
+  before: DirectoryIdentity,
+  parentDir: string,
+  root: string,
+): void {
+  const handle = fstatSync(fd, { bigint: true });
+  const fromHandle = { dev: handle.dev, ino: handle.ino };
+  const fromPath = assertDirectory(parentDir, root);
+  if (!sameIdentity(before, fromHandle) || !sameIdentity(before, fromPath)) {
+    throw unsafeCoordination('Runtime coordination parent changed during mutation');
+  }
+}
+
+function assertAnchoredParentUnchanged(
+  fd: number,
+  before: DirectoryIdentity,
+  parentDir: string,
+  root: string,
+  permissionPosture: 'private' | 'owner-controlled',
+): void {
+  const handle = fstatSync(fd, { bigint: true });
+  const fromHandle = { dev: handle.dev, ino: handle.ino };
+  const fromPath = assertDirectory(parentDir, root, permissionPosture);
+  if (!sameIdentity(before, fromHandle) || !sameIdentity(before, fromPath)) {
+    throw unsafeCoordination('Anchored parent changed during mutation');
+  }
+}
+
+function assertSafeBasename(value: string): void {
+  if (
+    value.length === 0 ||
+    value.length > 180 ||
+    basename(value) !== value ||
+    value.includes('/') ||
+    value.includes('\\') ||
+    value.includes('\0') ||
+    value === '.' ||
+    value === '..'
+  ) {
+    throw unsafeCoordination('Runtime coordination record basename is invalid');
+  }
+}
+
+function targetIdentity(
+  path: string,
+  maxBytes: number,
+  permissionPosture: 'private' | 'owner-controlled' = 'private',
+  linkedCreateCanBeBusy = false,
+): RecordIdentity | undefined {
+  let stat;
+  try {
+    stat = lstatSync(path, { bigint: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw unsafeCoordination('Runtime coordination record cannot be inspected');
+  }
+  if (
+    linkedCreateCanBeBusy &&
+    stat.isFile() &&
+    !stat.isSymbolicLink() &&
+    (stat.nlink === 0n || stat.nlink === 2n)
+  ) {
+    throw new RuntimeSnapshotChangedError('Anchored create publication is still in progress');
+  }
+  assertRegularRecordStat(stat, maxBytes, permissionPosture);
+  return recordIdentity(stat);
+}
+
+function fsyncParent(fd: number): void {
+  try {
+    fsyncSync(fd);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (process.platform === 'win32' && (code === 'EINVAL' || code === 'ENOTSUP')) return;
+    throw error;
+  }
+}
+
+function createExclusiveRecord(
+  path: string,
+  content: string,
+  permissionPosture: 'private' | 'owner-controlled' = 'private',
+): RecordIdentity {
+  let fd: number | undefined;
+  let identity: RecordIdentity | undefined;
+  let openedIdentity: DirectoryIdentity | undefined;
+  const desiredMode = permissionPosture === 'private' ? 0o600 : 0o644;
+  try {
+    fd = openSync(path, 'wx', desiredMode);
+    const opened = fstatSync(fd, { bigint: true });
+    openedIdentity = { dev: opened.dev, ino: opened.ino };
+    if (process.platform !== 'win32') fchmodSync(fd, desiredMode);
+    writeFileSync(fd, content, 'utf8');
+    const stat = fstatSync(fd, { bigint: true });
+    const uid = currentUid();
+    if (
+      !stat.isFile() ||
+      stat.nlink !== 1n ||
+      stat.size !== BigInt(Buffer.byteLength(content, 'utf8')) ||
+      (uid !== undefined && stat.uid !== BigInt(uid)) ||
+      (process.platform !== 'win32' && Number(stat.mode & 0o777n) !== desiredMode)
+    ) {
+      throw unsafeCoordination('Anchored create could not prove its temporary record');
+    }
+    fsyncSync(fd);
+    identity = recordIdentity(fstatSync(fd, { bigint: true }));
+  } catch (error) {
+    if (fd !== undefined && openedIdentity !== undefined) {
+      try {
+        const descriptor = fstatSync(fd, { bigint: true });
+        const target = lstatSync(path, { bigint: true });
+        if (
+          descriptor.dev === openedIdentity.dev &&
+          descriptor.ino === openedIdentity.ino &&
+          target.dev === openedIdentity.dev &&
+          target.ino === openedIdentity.ino &&
+          descriptor.nlink === 1n &&
+          target.nlink === 1n
+        ) {
+          unlinkSync(path);
+        }
+      } catch {
+        // Fail closed: never erase a path whose exact create identity cannot
+        // still be proven after a partial write/fsync failure.
+      }
+    }
+    throw error;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+  if (identity === undefined) {
+    throw unsafeCoordination('Anchored create did not capture its temporary record identity');
+  }
+  return identity;
+}
+
+function assertLinkedCreateStat(
+  stat: Stats,
+  maxBytes: number,
+  permissionPosture: 'private' | 'owner-controlled',
+): void {
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 2) {
+    throw unsafeCoordination('Anchored create has an unproven link state');
+  }
+  const uid = currentUid();
+  if (uid !== undefined && stat.uid !== uid) {
+    throw unsafeCoordination('Anchored create has an unexpected owner');
+  }
+  const mode = stat.mode & 0o777;
+  if (
+    process.platform !== 'win32' &&
+    (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)
+  ) {
+    throw unsafeCoordination('Anchored create has unsafe permissions');
+  }
+  if (stat.size > maxBytes) {
+    throw unsafeCoordination('Anchored create exceeds its size bound');
+  }
+}
+
+function recoverCompletedLinkedCreate(
+  input: AnchoredRecordMutation,
+  parent: { readonly fd: number; readonly identity: DirectoryIdentity },
+  target: string,
+  maxBytes: number,
+  permissionPosture: 'private' | 'owner-controlled',
+): void {
+  const prefix = `.${input.basename}.tmp-`;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let targetStat: Stats;
+    try {
+      targetStat = lstatSync(target);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw unsafeCoordination('Anchored create target cannot be inspected');
+    }
+    if (targetStat.nlink <= 1) {
+      return;
+    }
+    assertLinkedCreateStat(targetStat, maxBytes, permissionPosture);
+    const entries = readDirectoryBounded(input.parentDir, 512, 'Anchored parent recovery scan');
+    const matching: string[] = [];
+    for (const entry of entries) {
+      if (!entry.startsWith(prefix) || entry.length > prefix.length + 128) continue;
+      try {
+        const stat = lstatSync(join(input.parentDir, entry));
+        if (stat.dev === targetStat.dev && stat.ino === targetStat.ino) {
+          matching.push(entry);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+    if (matching.length > 1) {
+      throw unsafeCoordination('Anchored create link recovery is ambiguous');
+    }
+    if (matching.length === 0) {
+      let current: Stats;
+      try {
+        current = lstatSync(target);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+        throw error;
+      }
+      if (current.dev === targetStat.dev && current.ino === targetStat.ino && current.nlink > 1) {
+        throw unsafeCoordination('Anchored create link recovery is ambiguous');
+      }
+      continue;
+    }
+    const tempPath = join(input.parentDir, matching[0]);
+    let tempStat: Stats;
+    try {
+      tempStat = lstatSync(tempPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (tempStat.nlink <= 1) continue;
+    assertLinkedCreateStat(tempStat, maxBytes, permissionPosture);
+    const currentTarget = lstatSync(target);
+    if (
+      currentTarget.dev !== targetStat.dev ||
+      currentTarget.ino !== targetStat.ino ||
+      tempStat.dev !== targetStat.dev ||
+      tempStat.ino !== targetStat.ino
+    ) {
+      continue;
+    }
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      input.parentDir,
+      input.trustedAnchorDir,
+      permissionPosture,
+    );
+    try {
+      unlinkSync(tempPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    fsyncParent(parent.fd);
+    return;
+  }
+  throw new RuntimeSnapshotChangedError('Anchored create publication changed during recovery');
+}
+
+function settleCoordinationLinkedCreate(path: string, maxBytes: number): void {
+  const paths = resolveCoordinationPaths();
+  if (!existsSync(paths.coordinationDir)) return;
+  const parentDir = dirname(path);
+  const parent = openAnchoredParentIdentity(parentDir, paths.coordinationDir, 'private');
+  try {
+    recoverCompletedLinkedCreate(
+      {
+        trustedAnchorDir: paths.coordinationDir,
+        parentDir,
+        basename: basename(path),
+        operation: 'create',
+        permissionPosture: 'private',
+      },
+      parent,
+      path,
+      maxBytes,
+      'private',
+    );
+  } finally {
+    closeSync(parent.fd);
+  }
+}
+
+function performAnchoredRecordMutation(
+  input: AnchoredRecordMutation,
+  assertPublicationAllowed?: () => void,
+): {
+  readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
+} {
+  const permissionPosture = input.permissionPosture ?? 'owner-controlled';
+  assertDirectory(input.trustedAnchorDir, undefined, permissionPosture);
+  assertSafeBasename(input.basename);
+  if (join(input.parentDir, input.basename) !== join(input.parentDir, basename(input.basename))) {
+    throw unsafeCoordination('Runtime coordination mutation target is invalid');
+  }
+  const maxBytes = boundedRecordSize(input.maxBytes);
+  const content = input.content ?? '';
+  if (
+    input.expectedContentSha256 !== undefined &&
+    !/^[a-f0-9]{64}$/u.test(input.expectedContentSha256)
+  ) {
+    throw unsafeCoordination('Anchored mutation expected digest is invalid');
+  }
+  if (input.operation === 'create' && input.expectedContentSha256 !== undefined) {
+    throw unsafeCoordination('Anchored create cannot carry an expected-content digest');
+  }
+  if (Buffer.byteLength(content, 'utf8') > maxBytes) {
+    throw unsafeCoordination('Runtime coordination mutation exceeds its size bound');
+  }
+  const target = join(input.parentDir, input.basename);
+  const parent = openAnchoredParentIdentity(
+    input.parentDir,
+    input.trustedAnchorDir,
+    permissionPosture,
+  );
+  try {
+    if (input.operation === 'create') {
+      recoverCompletedLinkedCreate(input, parent, target, maxBytes, permissionPosture);
+    }
+    const beforeTarget = targetIdentity(
+      target,
+      maxBytes,
+      permissionPosture,
+      input.operation === 'create',
+    );
+    const assertExpectedDigest = (): void => {
+      if (input.expectedContentSha256 === undefined) return;
+      const observed = readAnchoredRecord({
+        trustedAnchorDir: input.trustedAnchorDir,
+        parentDir: input.parentDir,
+        basename: input.basename,
+        maxBytes,
+        permissionPosture,
+      });
+      if (observed.status !== 'present' || observed.sha256 !== input.expectedContentSha256) {
+        throw new SystemError('Anchored record changed since the caller observed it', {
+          code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+        });
+      }
+    };
+    assertExpectedDigest();
+    let tempPath: string | undefined;
+    let tempIdentity: RecordIdentity | undefined;
+    try {
+      if (input.operation === 'create') {
+        if (beforeTarget !== undefined) {
+          throw new SystemError('Runtime coordination record already exists', {
+            code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+          });
+        }
+        const tempBasename = `.${input.basename}.tmp-${generateUUID()}`;
+        tempPath = join(input.parentDir, tempBasename);
+        tempIdentity = createExclusiveRecord(tempPath, content, permissionPosture);
+        assertAnchoredParentUnchanged(
+          parent.fd,
+          parent.identity,
+          input.parentDir,
+          input.trustedAnchorDir,
+          permissionPosture,
+        );
+        try {
+          assertPublicationAllowed?.();
+          linkSync(tempPath, target);
+          assertPublicationAllowed?.();
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+            throw new SystemError('Runtime coordination record already exists', {
+              code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+            });
+          }
+          throw error;
+        }
+        try {
+          assertPublicationAllowed?.();
+          unlinkSync(tempPath);
+          assertPublicationAllowed?.();
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+        tempPath = undefined;
+        tempIdentity = undefined;
+        assertRegularRecord(target, maxBytes, permissionPosture);
+        fsyncParent(parent.fd);
+      } else if (input.operation === 'replace') {
+        if (beforeTarget === undefined) {
+          throw unsafeCoordination('Runtime coordination record disappeared before replacement');
+        }
+        const current = targetIdentity(target, maxBytes, permissionPosture);
+        if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
+          throw new RuntimeSnapshotChangedError(
+            'Runtime coordination record changed before replacement',
+          );
+        }
+        const tempBasename = `.${input.basename}.tmp-${generateUUID()}`;
+        tempPath = join(input.parentDir, tempBasename);
+        tempIdentity = createExclusiveRecord(tempPath, content, permissionPosture);
+        assertAnchoredParentUnchanged(
+          parent.fd,
+          parent.identity,
+          input.parentDir,
+          input.trustedAnchorDir,
+          permissionPosture,
+        );
+        const immediatelyBefore = targetIdentity(target, maxBytes, permissionPosture);
+        if (
+          immediatelyBefore === undefined ||
+          !sameRecordIdentity(beforeTarget, immediatelyBefore)
+        ) {
+          throw new RuntimeSnapshotChangedError(
+            'Runtime coordination record changed during replacement',
+          );
+        }
+        assertExpectedDigest();
+        const afterDigest = targetIdentity(target, maxBytes, permissionPosture);
+        if (afterDigest === undefined || !sameRecordIdentity(immediatelyBefore, afterDigest)) {
+          throw new RuntimeSnapshotChangedError(
+            'Runtime coordination record changed after CAS verification',
+          );
+        }
+        assertPublicationAllowed?.();
+        renameSync(tempPath, target);
+        assertPublicationAllowed?.();
+        tempPath = undefined;
+        tempIdentity = undefined;
+        assertRegularRecord(target, maxBytes, permissionPosture);
+        fsyncParent(parent.fd);
+      } else {
+        if (beforeTarget === undefined) {
+          return { strategy: COORDINATION_MUTATION_STRATEGY };
+        }
+        const current = targetIdentity(target, maxBytes, permissionPosture);
+        if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
+          throw new RuntimeSnapshotChangedError(
+            'Runtime coordination record changed before unlink',
+          );
+        }
+        assertAnchoredParentUnchanged(
+          parent.fd,
+          parent.identity,
+          input.parentDir,
+          input.trustedAnchorDir,
+          permissionPosture,
+        );
+        assertExpectedDigest();
+        const afterDigest = targetIdentity(target, maxBytes, permissionPosture);
+        if (afterDigest === undefined || !sameRecordIdentity(current, afterDigest)) {
+          throw new RuntimeSnapshotChangedError(
+            'Runtime coordination record changed after CAS verification',
+          );
+        }
+        assertPublicationAllowed?.();
+        unlinkSync(target);
+        assertPublicationAllowed?.();
+        if (existsSync(target)) {
+          throw unsafeCoordination('Runtime coordination record remained after unlink');
+        }
+        fsyncParent(parent.fd);
+      }
+      assertAnchoredParentUnchanged(
+        parent.fd,
+        parent.identity,
+        input.parentDir,
+        input.trustedAnchorDir,
+        permissionPosture,
+      );
+      return { strategy: COORDINATION_MUTATION_STRATEGY };
+    } catch (error) {
+      if (tempPath !== undefined) {
+        try {
+          assertAnchoredParentUnchanged(
+            parent.fd,
+            parent.identity,
+            input.parentDir,
+            input.trustedAnchorDir,
+            permissionPosture,
+          );
+          const observedTemp = targetIdentity(tempPath, maxBytes, permissionPosture);
+          if (
+            tempIdentity === undefined ||
+            observedTemp === undefined ||
+            !sameRecordIdentity(tempIdentity, observedTemp)
+          ) {
+            throw new RuntimeSnapshotChangedError(
+              'Anchored temporary record changed before failure cleanup',
+            );
+          }
+          assertPublicationAllowed?.();
+          unlinkSync(tempPath);
+          assertPublicationAllowed?.();
+        } catch {
+          // Fail closed: never clean a newly observed/replaced path.
+        }
+      }
+      throw error;
+    }
+  } finally {
+    closeSync(parent.fd);
+  }
+}
+
+function unlinkFixedAnchoredRecordWithoutSize(
+  trustedAnchorDir: string,
+  parentDir: string,
+  basenameValue: string,
+  assertPublicationAllowed: () => void,
+): void {
+  assertSafeBasename(basenameValue);
+  const target = join(parentDir, basenameValue);
+  const parent = openAnchoredParentIdentity(parentDir, trustedAnchorDir, 'private');
+  try {
+    const beforeStat = lstatIfPresent(target, 'Fixed recovery record');
+    if (beforeStat === undefined) return;
+    assertRegularRecordStat(beforeStat, undefined, 'private');
+    const before = recordIdentity(beforeStat);
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      parentDir,
+      trustedAnchorDir,
+      'private',
+    );
+    assertPublicationAllowed();
+    const immediatelyBeforeStat = lstatIfPresent(target, 'Fixed recovery record');
+    if (immediatelyBeforeStat === undefined) {
+      throw new RuntimeSnapshotChangedError(
+        'Fixed recovery record disappeared before destructive discard',
+      );
+    }
+    assertRegularRecordStat(immediatelyBeforeStat, undefined, 'private');
+    if (!sameRecordIdentity(before, recordIdentity(immediatelyBeforeStat))) {
+      throw new RuntimeSnapshotChangedError(
+        'Fixed recovery record changed before destructive discard',
+      );
+    }
+    unlinkSync(target);
+    assertPublicationAllowed();
+    if (lstatIfPresent(target, 'Fixed recovery record') !== undefined) {
+      throw unsafeCoordination('Fixed recovery record remained after destructive discard');
+    }
+    fsyncParent(parent.fd);
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      parentDir,
+      trustedAnchorDir,
+      'private',
+    );
+  } finally {
+    closeSync(parent.fd);
+  }
+}
+
+/**
+ * General audited portable mutation under an explicit trusted containment
+ * anchor. Task-specific wrappers remain responsible for fixed basenames.
+ * Replace/unlink callers that need atomic multi-writer CAS must hold an
+ * external lock across their read and mutation.
+ */
+export function mutateAnchoredRecord(input: AnchoredRecordMutation): {
+  readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
+} {
+  const coordinationRoot = resolveCoordinationPaths().coordinationDir;
+  let canonicalTarget: string;
+  let canonicalCoordinationRoot: string;
+  try {
+    canonicalTarget = join(realpathSync(input.parentDir), input.basename);
+    canonicalCoordinationRoot = join(
+      realpathSync(dirname(coordinationRoot)),
+      basename(coordinationRoot),
+    );
+  } catch {
+    throw unsafeCoordination('Anchored mutation containment cannot be established');
+  }
+  if (isContainedPath(canonicalTarget, canonicalCoordinationRoot)) {
+    throw new SystemError('Generic anchored mutation cannot target runtime coordination records', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  return performAnchoredRecordMutation(input);
+}
+
+function mutateCoordinationRecordWhileOwned(
+  input: CoordinationRecordMutation,
+  guard?: RuntimeMutexGuard,
+): {
+  readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
+} {
+  const paths = ensureCoordinationScaffold();
+  return performAnchoredRecordMutation(
+    {
+      ...input,
+      trustedAnchorDir: paths.coordinationDir,
+      permissionPosture: 'private',
+    },
+    guard === undefined ? undefined : () => guard.assertOwned(),
+  );
+}
+
+function readAnchoredBoundedRecord(
+  path: string,
+  maxBytes: number,
+  trustedAnchorDir: string,
+  permissionPosture: 'private' | 'owner-controlled',
+  linkedCreateCanBeBusy = false,
+): string | undefined {
+  let before;
+  try {
+    before = lstatSync(path, { bigint: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw unsafeCoordination('Runtime coordination record cannot be inspected');
+  }
+  const beforeIdentity = recordIdentity(before);
+  if (linkedCreateCanBeBusy && before.nlink === 2n) {
+    const uid = currentUid();
+    const mode = Number(before.mode & 0o777n);
+    if (
+      !before.isFile() ||
+      before.isSymbolicLink() ||
+      (uid !== undefined && before.uid !== BigInt(uid)) ||
+      (process.platform !== 'win32' &&
+        (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)) ||
+      before.size > BigInt(maxBytes)
+    ) {
+      throw unsafeCoordination('Runtime coordination linked create is unsafe');
+    }
+    throw new RuntimeSnapshotChangedError(
+      'Runtime coordination create publication is still in progress',
+    );
+  }
+  try {
+    assertRegularRecord(path, maxBytes, permissionPosture);
+  } catch (error) {
+    const current = lstatIfPresent(path, 'Runtime coordination record');
+    if (current === undefined || !sameRecordIdentity(beforeIdentity, recordIdentity(current))) {
+      throw new RuntimeSnapshotChangedError('Runtime coordination record disappeared before read');
+    }
+    throw error;
+  }
+  const parent = openAnchoredParentIdentity(dirname(path), trustedAnchorDir, permissionPosture);
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const opened = fstatSync(fd, { bigint: true });
+    const openedIdentity = recordIdentity(opened);
+    if (!sameRecordIdentity(beforeIdentity, openedIdentity)) {
+      throw new RuntimeSnapshotChangedError('Runtime coordination record changed before read');
+    }
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const count = readSync(fd, buffer, offset, buffer.length - offset, offset);
+      if (count === 0) break;
+      offset += count;
+    }
+    if (offset > maxBytes) {
+      throw unsafeCoordination('Runtime coordination record exceeds its size bound');
+    }
+    const openedAfter = recordIdentity(fstatSync(fd, { bigint: true }));
+    let after;
+    try {
+      after = recordIdentity(lstatSync(path, { bigint: true }));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new RuntimeSnapshotChangedError(
+          'Runtime coordination record disappeared during read',
+        );
+      }
+      throw error;
+    }
+    if (
+      !sameRecordIdentity(beforeIdentity, openedAfter) ||
+      !sameRecordIdentity(beforeIdentity, after)
+    ) {
+      throw new RuntimeSnapshotChangedError('Runtime coordination record changed during read');
+    }
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      dirname(path),
+      trustedAnchorDir,
+      permissionPosture,
+    );
+    return buffer.toString('utf8', 0, offset);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new RuntimeSnapshotChangedError('Runtime coordination record disappeared before read');
+    }
+    throw error;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    closeSync(parent.fd);
+  }
+}
+
+/**
+ * Read one bounded record without repair and return a conflict-detection
+ * digest. A later replace/unlink still requires external writer serialization
+ * when linearizable compare-and-swap semantics are needed.
+ */
+export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordReadResult {
+  assertSafeBasename(input.basename);
+  const permissionPosture = input.permissionPosture ?? 'owner-controlled';
+  const maxBytes = boundedRecordSize(input.maxBytes);
+  const target = join(input.parentDir, input.basename);
+  const parent = openAnchoredParentIdentity(
+    input.parentDir,
+    input.trustedAnchorDir,
+    permissionPosture,
+  );
+  try {
+    const content = readAnchoredBoundedRecord(
+      target,
+      maxBytes,
+      input.trustedAnchorDir,
+      permissionPosture,
+    );
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      input.parentDir,
+      input.trustedAnchorDir,
+      permissionPosture,
+    );
+    if (content === undefined) return { status: 'absent' };
+    return {
+      status: 'present',
+      content,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
+  } finally {
+    closeSync(parent.fd);
+  }
+}
+
+function readBoundedRecord(
+  path: string,
+  maxBytes: number,
+  repairLinkedCreate = true,
+): string | undefined {
+  if (repairLinkedCreate) settleCoordinationLinkedCreate(path, maxBytes);
+  return readAnchoredBoundedRecord(
+    path,
+    maxBytes,
+    resolveCoordinationPaths().coordinationDir,
+    'private',
+    repairLinkedCreate,
+  );
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validRecordMetadata(value: unknown): value is RecordMetadata {
+  if (!isPlainRecord(value)) return false;
+  return (
+    typeof value.ownerToken === 'string' &&
+    OWNER_TOKEN_PATTERN.test(value.ownerToken) &&
+    Number.isSafeInteger(value.pid) &&
+    (value.pid as number) > 0 &&
+    typeof value.hostname === 'string' &&
+    value.hostname.length > 0 &&
+    Buffer.byteLength(value.hostname, 'utf8') <= MAX_HOST_IDENTITY_BYTES &&
+    typeof value.hostIdentityProven === 'boolean' &&
+    (value.processIncarnation === undefined ||
+      (typeof value.processIncarnation === 'string' &&
+        PROCESS_INCARNATION_PATTERN.test(value.processIncarnation))) &&
+    typeof value.command === 'string' &&
+    value.command.length > 0 &&
+    Buffer.byteLength(value.command, 'utf8') <= MAX_METADATA_TEXT_BYTES &&
+    typeof value.cwdBasename === 'string' &&
+    value.cwdBasename.length > 0 &&
+    Buffer.byteLength(value.cwdBasename, 'utf8') <= MAX_METADATA_TEXT_BYTES &&
+    Number.isSafeInteger(value.acquiredAt) &&
+    (value.acquiredAt as number) >= 0 &&
+    Number.isSafeInteger(value.lastHeartbeatAt) &&
+    (value.lastHeartbeatAt as number) >= 0 &&
+    Number.isSafeInteger(value.staleMs) &&
+    (value.staleMs as number) >= MIN_HEARTBEAT_MS * 3 &&
+    (value.staleMs as number) <= MAX_STALE_MS &&
+    Number.isSafeInteger(value.sequence) &&
+    (value.sequence as number) > 0
+  );
+}
+
+function validWriterRecord(value: unknown): value is WriterRecord {
+  if (!validRecordMetadata(value) || !isPlainRecord(value)) return false;
+  if (value.kind !== 'project' && value.kind !== 'global') return false;
+  if (value.phase !== 'queued' && value.phase !== 'intent') return false;
+  if (value.kind === 'project') {
+    return (
+      typeof value.coordinationKey === 'string' && PROJECT_KEY_PATTERN.test(value.coordinationKey)
+    );
+  }
+  return value.coordinationKey === undefined;
+}
+
+function initialState(): LeaseStateFile {
+  return { version: STATE_VERSION, nextSequence: 1, writers: [] };
+}
+
+function readLeaseState(paths: CoordinationPaths): LeaseStateFile {
+  const raw = readBoundedRecord(paths.stateFile, MAX_RECORD_BYTES);
+  return parseLeaseState(raw);
+}
+
+function inspectLeaseState(paths: CoordinationPaths): LeaseStateFile {
+  const raw = readBoundedRecord(paths.stateFile, MAX_RECORD_BYTES, false);
+  return parseLeaseState(raw);
+}
+
+function parseLeaseState(raw: string | undefined): LeaseStateFile {
+  if (raw === undefined) return initialState();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw unsafeCoordination('Runtime coordination writer queue is malformed');
+  }
+  if (
+    !isPlainRecord(parsed) ||
+    parsed.version !== STATE_VERSION ||
+    !Number.isSafeInteger(parsed.nextSequence) ||
+    (parsed.nextSequence as number) < 1 ||
+    !Array.isArray(parsed.writers) ||
+    parsed.writers.length > MAX_WRITER_QUEUE ||
+    !parsed.writers.every(validWriterRecord)
+  ) {
+    throw unsafeCoordination('Runtime coordination writer queue is malformed');
+  }
+  const writers = parsed.writers;
+  const tickets = new Set(writers.map((writer) => writer.sequence));
+  const owners = new Set(writers.map((writer) => writer.ownerToken));
+  if (tickets.size !== writers.length || owners.size !== writers.length) {
+    throw unsafeCoordination('Runtime coordination writer queue has duplicate ownership');
+  }
+  const sorted = [...writers].sort((left, right) => left.sequence - right.sequence);
+  if (sorted.some((writer, index) => writer !== writers[index])) {
+    throw unsafeCoordination('Runtime coordination writer queue is not FIFO ordered');
+  }
+  if (
+    writers.some((writer) => writer.sequence >= (parsed as { nextSequence: number }).nextSequence)
+  ) {
+    throw unsafeCoordination('Runtime coordination writer queue has an invalid ticket');
+  }
+  return {
+    version: STATE_VERSION,
+    nextSequence: (parsed as { nextSequence: number }).nextSequence,
+    writers,
+  };
+}
+
+function writeLeaseState(
+  paths: CoordinationPaths,
+  previous: LeaseStateFile,
+  state: LeaseStateFile,
+  guard?: RuntimeMutexGuard,
+): void {
+  if (state.writers.length > MAX_WRITER_QUEUE || !Number.isSafeInteger(state.nextSequence)) {
+    throw unsafeCoordination('Runtime coordination writer queue exceeds its bound');
+  }
+  const content = JSON.stringify(state);
+  if (Buffer.byteLength(content, 'utf8') > MAX_RECORD_BYTES) {
+    throw unsafeCoordination('Runtime coordination writer queue exceeds its byte bound');
+  }
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: paths.coordinationDir,
+    parentDir: paths.coordinationDir,
+    basename: basename(paths.stateFile),
+    maxBytes: MAX_RECORD_BYTES,
+    permissionPosture: 'private',
+  });
+  const operation = observed.status === 'absent' ? 'create' : 'replace';
+  if (
+    (observed.status === 'absent' && JSON.stringify(previous) !== JSON.stringify(initialState())) ||
+    (observed.status === 'present' &&
+      JSON.stringify(parseLeaseState(observed.content)) !== JSON.stringify(previous))
+  ) {
+    throw new RuntimeSnapshotChangedError(
+      'Runtime coordination writer queue changed before publication',
+    );
+  }
+  guard?.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir: paths.coordinationDir,
+      basename: basename(paths.stateFile),
+      operation,
+      content,
+      maxBytes: MAX_RECORD_BYTES,
+      ...(observed.status === 'present' ? { expectedContentSha256: observed.sha256 } : {}),
+    },
+    guard,
+  );
+}
+
+interface RuntimeMutexRecord {
+  readonly ownerToken: string;
+  readonly pid: number;
+  readonly hostname: string;
+  readonly hostIdentityProven: boolean;
+  readonly processIncarnation?: string;
+  readonly acquiredAt: number;
+  readonly lastHeartbeatAt: number;
+  readonly staleMs: number;
+}
+
+interface ObservedRuntimeMutex {
+  readonly record: RuntimeMutexRecord;
+  readonly sha256: string;
+}
+
+function parseMutexRecord(raw: string): RuntimeMutexRecord {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw unsafeCoordination('Runtime coordination mutex is malformed');
+  }
+  if (
+    !isPlainRecord(parsed) ||
+    typeof parsed.ownerToken !== 'string' ||
+    !OWNER_TOKEN_PATTERN.test(parsed.ownerToken) ||
+    !Number.isSafeInteger(parsed.pid) ||
+    (parsed.pid as number) <= 0 ||
+    typeof parsed.hostname !== 'string' ||
+    parsed.hostname.length === 0 ||
+    Buffer.byteLength(parsed.hostname, 'utf8') > MAX_HOST_IDENTITY_BYTES ||
+    typeof parsed.hostIdentityProven !== 'boolean' ||
+    (parsed.processIncarnation !== undefined &&
+      (typeof parsed.processIncarnation !== 'string' ||
+        !PROCESS_INCARNATION_PATTERN.test(parsed.processIncarnation))) ||
+    !Number.isSafeInteger(parsed.acquiredAt) ||
+    !Number.isSafeInteger(parsed.lastHeartbeatAt) ||
+    !Number.isSafeInteger(parsed.staleMs) ||
+    (parsed.staleMs as number) < MIN_HEARTBEAT_MS * 3 ||
+    (parsed.staleMs as number) > MAX_STALE_MS
+  ) {
+    throw unsafeCoordination('Runtime coordination mutex is malformed');
+  }
+  return parsed as unknown as RuntimeMutexRecord;
+}
+
+function observeRuntimeMutex(paths: CoordinationPaths): ObservedRuntimeMutex | undefined {
+  const content = readBoundedRecord(paths.globalMutexFile, MAX_RECORD_BYTES);
+  if (content === undefined) return undefined;
+  return {
+    record: parseMutexRecord(content),
+    sha256: createHash('sha256').update(content).digest('hex'),
+  };
+}
+
+interface RemoteStaleObservation {
+  readonly lastHeartbeatAt: number;
+  readonly firstObservedAt: number;
+}
+
+type RemoteStaleTracker = Map<string, RemoteStaleObservation>;
+
+function foreignOwnerExpired(
+  record: {
+    readonly ownerToken: string;
+    readonly pid: number;
+    readonly hostname: string;
+    readonly hostIdentityProven: boolean;
+    readonly acquiredAt: number;
+    readonly lastHeartbeatAt: number;
+    readonly staleMs: number;
+    readonly sequence?: number;
+  },
+  environment: RuntimeLeaseEnvironment,
+  tracker?: RemoteStaleTracker,
+): boolean {
+  if (tracker === undefined) return false;
+  const key = [
+    record.hostname,
+    record.hostIdentityProven,
+    record.pid,
+    record.ownerToken,
+    record.acquiredAt,
+    record.staleMs,
+    record.sequence ?? 'mutex',
+  ].join(':');
+  const observedAt = environment.monotonicNow();
+  const previous = tracker.get(key);
+  if (previous?.lastHeartbeatAt !== record.lastHeartbeatAt) {
+    tracker.set(key, {
+      lastHeartbeatAt: record.lastHeartbeatAt,
+      firstObservedAt: observedAt,
+    });
+    return false;
+  }
+  return observedAt - previous.firstObservedAt > record.staleMs;
+}
+
+function mutexOwnerIsStale(
+  record: RuntimeMutexRecord,
+  _policy: RuntimeLeasePolicy,
+  _now: number,
+  environment: RuntimeLeaseEnvironment,
+  tracker?: RemoteStaleTracker,
+  processInspector?: SafetyBiasedProcessInspector,
+  freshProcessProof = false,
+): boolean {
+  if (!sameProvenRuntimeHost(record, environment)) {
+    return foreignOwnerExpired(record, environment, tracker);
+  }
+  if (record.processIncarnation === undefined) {
+    return !environment.isProcessAlive(record.pid);
+  }
+  let current: ProcessIncarnationInspection;
+  if (processInspector === undefined) {
+    current = environment.inspectProcessIncarnation(record.pid);
+  } else {
+    current = freshProcessProof
+      ? processInspector.inspectFresh(record.pid)
+      : processInspector.inspect(record.pid);
+  }
+  if (current.status === 'absent') return true;
+  if (current.status === 'unknown') return false;
+  return current.identity !== record.processIncarnation;
+}
+
+function createRuntimeMutexProcessInspector(
+  environment: RuntimeLeaseEnvironment,
+): SafetyBiasedProcessInspector {
+  return createSafetyBiasedProcessInspector({
+    inspect: environment.inspectProcessIncarnation,
+    monotonicNow: environment.monotonicNow,
+    ttlMs: RUNTIME_MUTEX_PROCESS_PROBE_CACHE_MS,
+    maxEntries: 8,
+  });
+}
+
+function emitMutexEvent(
+  environment: RuntimeLeaseEnvironment,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  event: FileLockEvent,
+): void {
+  try {
+    environment.transition?.(`mutex.${event.kind}`);
+  } catch {
+    // @swallow-ok diagnostic observers never own coordination state
+  }
+  try {
+    onEvent?.(event);
+  } catch {
+    // @swallow-ok diagnostic observers never own coordination state
+  }
+}
+
+function tryCreateRuntimeMutex(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  policy: RuntimeLeasePolicy,
+  environment: RuntimeLeaseEnvironment,
+  processIncarnation: string | undefined,
+): boolean {
+  const now = environment.now();
+  const hostIdentity = runtimeHostIdentity(environment);
+  const content = JSON.stringify({
+    ownerToken,
+    pid: environment.pid,
+    hostname: hostIdentity.id,
+    hostIdentityProven: hostIdentity.proven,
+    ...(processIncarnation === undefined ? {} : { processIncarnation }),
+    acquiredAt: now,
+    lastHeartbeatAt: now,
+    staleMs: policy.staleMs,
+  } satisfies RuntimeMutexRecord);
+  try {
+    mutateCoordinationRecordWhileOwned({
+      parentDir: paths.coordinationDir,
+      basename: basename(paths.globalMutexFile),
+      operation: 'create',
+      content,
+      maxBytes: MAX_RECORD_BYTES,
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof RuntimeSnapshotChangedError) return false;
+    if (
+      (error as NodeJS.ErrnoException).code === 'ENOENT' ||
+      (error as NodeJS.ErrnoException).code === 'EEXIST' ||
+      (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.EXISTS')
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function recoverStaleRuntimeMutex(
+  paths: CoordinationPaths,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment,
+  tracker: RemoteStaleTracker,
+  processInspector: SafetyBiasedProcessInspector,
+): boolean {
+  let observed: ObservedRuntimeMutex | undefined;
+  try {
+    observed = observeRuntimeMutex(paths);
+  } catch (error) {
+    if (error instanceof RuntimeSnapshotChangedError) return false;
+    throw error;
+  }
+  if (observed === undefined) return true;
+  if (
+    !mutexOwnerIsStale(
+      observed.record,
+      policy,
+      environment.now(),
+      environment,
+      tracker,
+      processInspector,
+    )
+  )
+    return false;
+  let current: ObservedRuntimeMutex | undefined;
+  try {
+    current = observeRuntimeMutex(paths);
+  } catch (error) {
+    if (error instanceof RuntimeSnapshotChangedError) return false;
+    throw error;
+  }
+  if (current === undefined) return true;
+  if (
+    current.record.ownerToken !== observed.record.ownerToken ||
+    !mutexOwnerIsStale(
+      current.record,
+      policy,
+      environment.now(),
+      environment,
+      tracker,
+      processInspector,
+      true,
+    )
+  ) {
+    return false;
+  }
+  try {
+    mutateCoordinationRecordWhileOwned({
+      parentDir: paths.coordinationDir,
+      basename: basename(paths.globalMutexFile),
+      operation: 'unlink',
+      maxBytes: MAX_RECORD_BYTES,
+      expectedContentSha256: current.sha256,
+    });
+  } catch (error) {
+    if (error instanceof RuntimeSnapshotChangedError) return false;
+    if (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH') {
+      return false;
+    }
+    throw error;
+  }
+  emitMutexEvent(environment, onEvent, {
+    kind: 'stale.recovered',
+    lockPath: RUNTIME_MUTEX_EVENT_PATH,
+    resource: 'runtime',
+    operation: 'coordination-transition',
+    ownerPid: current.record.pid,
+    ownerHostname: current.record.hostname,
+  });
+  return true;
+}
+
+function assertObservedMutexOwner(
+  observed: ObservedRuntimeMutex | undefined,
+  ownerToken: string,
+  environment: RuntimeLeaseEnvironment,
+): ObservedRuntimeMutex {
+  if (
+    observed?.record.ownerToken !== ownerToken ||
+    !ownedByRuntimeProcess(observed.record, environment)
+  ) {
+    throw unsafeCoordination('Runtime coordination mutex ownership changed during transition');
+  }
+  return observed;
+}
+
+interface RuntimeMutexGuard {
+  readonly assertOwned: () => void;
+  readonly refresh: () => void;
+  readonly release: () => void;
+}
+
+function ownedRuntimeMutex(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  policy: RuntimeLeasePolicy,
+  environment: RuntimeLeaseEnvironment,
+): RuntimeMutexGuard {
+  let released = false;
+  let lastHeartbeatPublicationAt = environment.monotonicNow();
+  const observeOwned = (): ObservedRuntimeMutex =>
+    assertObservedMutexOwner(observeRuntimeMutex(paths), ownerToken, environment);
+  return {
+    assertOwned: () => {
+      if (released) {
+        throw unsafeCoordination('Runtime coordination mutex was already released');
+      }
+      observeOwned();
+    },
+    refresh: () => {
+      if (released) {
+        throw unsafeCoordination('Runtime coordination mutex was already released');
+      }
+      const observed = observeOwned();
+      const monotonicNow = environment.monotonicNow();
+      if (
+        monotonicNow - lastHeartbeatPublicationAt <
+        Math.max(1, Math.floor(policy.heartbeatMs / 2))
+      ) {
+        return;
+      }
+      const wallNow = environment.now();
+      mutateCoordinationRecordWhileOwned({
+        parentDir: paths.coordinationDir,
+        basename: basename(paths.globalMutexFile),
+        operation: 'replace',
+        content: JSON.stringify({
+          ...observed.record,
+          lastHeartbeatAt: wallNow,
+        } satisfies RuntimeMutexRecord),
+        maxBytes: MAX_RECORD_BYTES,
+        expectedContentSha256: observed.sha256,
+      });
+      lastHeartbeatPublicationAt = monotonicNow;
+    },
+    release: () => {
+      if (released) return;
+      const observed = observeOwned();
+      mutateCoordinationRecordWhileOwned({
+        parentDir: paths.coordinationDir,
+        basename: basename(paths.globalMutexFile),
+        operation: 'unlink',
+        maxBytes: MAX_RECORD_BYTES,
+        expectedContentSha256: observed.sha256,
+      });
+      released = true;
+    },
+  };
+}
+
+function readOrphanedTemp(
+  parentDir: string,
+  entry: string,
+  maxBytes: number,
+): AnchoredRecordReadResult {
+  try {
+    return readAnchoredRecord({
+      trustedAnchorDir: resolveCoordinationPaths().coordinationDir,
+      parentDir,
+      basename: entry,
+      maxBytes,
+      permissionPosture: 'private',
+    });
+  } catch (error) {
+    if (
+      lstatIfPresent(join(parentDir, entry), 'Runtime coordination temporary record') === undefined
+    ) {
+      return { status: 'absent' };
+    }
+    throw error;
+  }
+}
+
+function reconcileOrphanedTransitionTemp(
+  parentDir: string,
+  entry: string,
+  targetBasename: string,
+  maxBytes: number,
+  guard: RuntimeMutexGuard,
+): void {
+  settleCoordinationLinkedCreate(join(parentDir, targetBasename), maxBytes);
+  const observed = readOrphanedTemp(parentDir, entry, maxBytes);
+  if (observed.status === 'absent') return;
+  guard.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir,
+      basename: entry,
+      operation: 'unlink',
+      maxBytes,
+      expectedContentSha256: observed.sha256,
+    },
+    guard,
+  );
+}
+
+function reconcileOrphanedMutexTemp(
+  paths: CoordinationPaths,
+  entry: string,
+  guard: RuntimeMutexGuard,
+): void {
+  const observed = readOrphanedTemp(paths.coordinationDir, entry, MAX_RECORD_BYTES);
+  if (observed.status === 'absent') return;
+  // The fixed mutex is already owned. A competing one-link prepublication
+  // temp cannot publish successfully; deleting it is safe whether its creator
+  // is running or crashed. A live creator treats the lost temp as contention.
+  guard.refresh();
+  try {
+    mutateCoordinationRecordWhileOwned(
+      {
+        parentDir: paths.coordinationDir,
+        basename: entry,
+        operation: 'unlink',
+        maxBytes: MAX_RECORD_BYTES,
+        expectedContentSha256: observed.sha256,
+      },
+      guard,
+    );
+  } catch (error) {
+    if (
+      ((error as NodeJS.ErrnoException).code === 'ENOENT' ||
+        error instanceof RuntimeSnapshotChangedError ||
+        (error instanceof SystemError &&
+          error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH')) &&
+      lstatIfPresent(join(paths.coordinationDir, entry), 'Runtime mutex temporary record') ===
+        undefined
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function tryAcquireRuntimeMutexNow(
+  paths: CoordinationPaths,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  ownerToken: string,
+  environment: RuntimeLeaseEnvironment,
+  tracker: RemoteStaleTracker,
+  processInspector: SafetyBiasedProcessInspector,
+  processIncarnation: string | undefined,
+): RuntimeMutexGuard | undefined {
+  if (tryCreateRuntimeMutex(paths, ownerToken, policy, environment, processIncarnation)) {
+    return ownedRuntimeMutex(paths, ownerToken, policy, environment);
+  }
+  if (
+    recoverStaleRuntimeMutex(paths, policy, onEvent, environment, tracker, processInspector) &&
+    tryCreateRuntimeMutex(paths, ownerToken, policy, environment, processIncarnation)
+  ) {
+    return ownedRuntimeMutex(paths, ownerToken, policy, environment);
+  }
+  return undefined;
+}
+
+function acquireRuntimeMutex(
+  paths: CoordinationPaths,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  remainingMs: number,
+  environment: RuntimeLeaseEnvironment,
+  signal?: AbortSignal,
+): RuntimeMutexGuard | Promise<RuntimeMutexGuard> {
+  const ownerToken = environment.generateToken();
+  validateOwnerToken(ownerToken);
+  const waitMs = Math.max(0, remainingMs);
+  const startedAt = environment.monotonicNow();
+  const deadline = startedAt + waitMs;
+  const remoteStaleTracker: RemoteStaleTracker = new Map();
+  const processInspector = createRuntimeMutexProcessInspector(environment);
+  const processIncarnation = currentProcessIncarnation(environment);
+  emitMutexEvent(environment, onEvent, {
+    kind: 'acquire.start',
+    lockPath: RUNTIME_MUTEX_EVENT_PATH,
+    resource: 'runtime',
+    operation: 'coordination-transition',
+  });
+  const immediate = tryAcquireRuntimeMutexNow(
+    paths,
+    policy,
+    onEvent,
+    ownerToken,
+    environment,
+    remoteStaleTracker,
+    processInspector,
+    processIncarnation,
+  );
+  if (immediate !== undefined) return immediate;
+  return (async () => {
+    for (;;) {
+      if (signal?.aborted === true) throw abortedError();
+      if (environment.monotonicNow() >= deadline) {
+        emitMutexEvent(environment, onEvent, {
+          kind: 'acquire.timeout',
+          lockPath: RUNTIME_MUTEX_EVENT_PATH,
+          resource: 'runtime',
+          operation: 'coordination-transition',
+          waitMs,
+        });
+        throw new TimeoutError(
+          `Timed out waiting for runtime coordination mutex after ${waitMs}ms`,
+          { code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' },
+        );
+      }
+      emitMutexEvent(environment, onEvent, {
+        kind: 'acquire.wait',
+        lockPath: RUNTIME_MUTEX_EVENT_PATH,
+        resource: 'runtime',
+        operation: 'coordination-transition',
+        waitMs: Math.min(waitMs, Math.max(0, environment.monotonicNow() - startedAt)),
+      });
+      await environment.poll(
+        Math.min(policy.pollMs, Math.max(1, deadline - environment.monotonicNow())),
+        signal,
+      );
+      const acquired = tryAcquireRuntimeMutexNow(
+        paths,
+        policy,
+        onEvent,
+        ownerToken,
+        environment,
+        remoteStaleTracker,
+        processInspector,
+        processIncarnation,
+      );
+      if (acquired !== undefined) return acquired;
+    }
+  })();
+}
+
+function acquireRuntimeMutexSync(
+  paths: CoordinationPaths,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment,
+): RuntimeMutexGuard {
+  const ownerToken = environment.generateToken();
+  validateOwnerToken(ownerToken);
+  const maxWaitMs = Math.min(policy.waitMs, 5000);
+  let waitedMs = 0;
+  const remoteStaleTracker: RemoteStaleTracker = new Map();
+  const processInspector = createRuntimeMutexProcessInspector(environment);
+  const processIncarnation = currentProcessIncarnation(environment);
+  for (;;) {
+    const acquired = tryAcquireRuntimeMutexNow(
+      paths,
+      policy,
+      onEvent,
+      ownerToken,
+      environment,
+      remoteStaleTracker,
+      processInspector,
+      processIncarnation,
+    );
+    if (acquired !== undefined) return acquired;
+    if (waitedMs >= maxWaitMs) {
+      throw new TimeoutError('Timed out releasing runtime coordination state', {
+        code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX',
+      });
+    }
+    const delay = Math.min(policy.pollMs, Math.max(1, maxWaitMs - waitedMs));
+    environment.pollSync(delay);
+    waitedMs += delay;
+  }
+}
+
+async function withCoordinationMutex<T>(
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  remainingMs: number,
+  fn: (paths: CoordinationPaths, guard: RuntimeMutexGuard) => T | Promise<T>,
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  signal?: AbortSignal,
+): Promise<T> {
+  const paths = ensureCoordinationScaffold();
+  const acquisition = acquireRuntimeMutex(paths, policy, onEvent, remainingMs, environment, signal);
+  const guard = acquisition instanceof Promise ? await acquisition : acquisition;
+  try {
+    environment.coordinationCheckpoint?.('mutex-entered');
+    guard.refresh();
+    assertRegularRecord(paths.globalMutexFile, MAX_RECORD_BYTES);
+    assertDirectory(paths.coordinationDir);
+    validateCoordinationRootEntries(paths, guard);
+    guard.refresh();
+    const result = fn(paths, guard);
+    const resolved = result instanceof Promise ? await result : result;
+    environment.coordinationCheckpoint?.('before-mutex-postcondition');
+    guard.assertOwned();
+    assertDirectory(paths.coordinationDir);
+    return resolved;
+  } finally {
+    guard.release();
+  }
+}
+
+function withCoordinationMutexSync<T>(
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  fn: (paths: CoordinationPaths, guard: RuntimeMutexGuard) => T,
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+): T {
+  const paths = ensureCoordinationScaffold();
+  const guard = acquireRuntimeMutexSync(paths, policy, onEvent, environment);
+  try {
+    guard.refresh();
+    assertRegularRecord(paths.globalMutexFile, MAX_RECORD_BYTES);
+    validateCoordinationRootEntries(paths, guard);
+    guard.refresh();
+    const result = fn(paths, guard);
+    guard.assertOwned();
+    assertDirectory(paths.coordinationDir);
+    return result;
+  } finally {
+    guard.release();
+  }
+}
+
+function processIsAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+async function defaultPoll(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted === true) throw abortedError();
+  await new Promise<void>((resolve, reject) => {
+    const complete = () => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    };
+    const timer = setTimeout(complete, ms);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      reject(abortedError());
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+}
+
+function defaultPollSync(ms: number): void {
+  const monotonicNow = (): number => Number(process.hrtime.bigint() / 1_000_000n);
+  const deadline = monotonicNow() + ms;
+  while (monotonicNow() < deadline) {
+    // Synchronous release handles are required by RunScope.onDispose.
+  }
+}
+
+const DEFAULT_RUNTIME_LEASE_ENVIRONMENT: RuntimeLeaseEnvironment = Object.freeze({
+  now: () => Date.now(),
+  monotonicNow: () => Number(process.hrtime.bigint() / 1_000_000n),
+  hostname,
+  hostInstanceIdentity: defaultHostInstanceIdentity,
+  inspectProcessIncarnation,
+  pid: process.pid,
+  isProcessAlive: processIsAlive,
+  generateToken: generateUUID,
+  poll: defaultPoll,
+  pollSync: defaultPollSync,
+});
+
+function runtimeEnvironment(input?: InternalRuntimeLeaseInput): RuntimeLeaseEnvironment {
+  return input?.[RUNTIME_ENVIRONMENT] ?? DEFAULT_RUNTIME_LEASE_ENVIRONMENT;
+}
+
+function ownerIsStale(
+  metadata: RecordMetadata,
+  _policy: RuntimeLeasePolicy,
+  _now: number,
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  tracker?: RemoteStaleTracker,
+  processInspectionCache?: ProcessInspectionCache,
+  freshProcessProof = false,
+): boolean {
+  if (!sameProvenRuntimeHost(metadata, environment)) {
+    return foreignOwnerExpired(metadata, environment, tracker);
+  }
+  return sameHostOwnerIsStale(metadata, environment, processInspectionCache, freshProcessProof);
+}
+
+function emitLeaseEvent(
+  input: RuntimeLeaseCommonInput,
+  event: Omit<RuntimeLeaseEvent, 'resource'>,
+): void {
+  notifyRuntimeLeaseEvent(runtimeEnvironment(input), input.onEvent, {
+    ...event,
+    resource: 'runtime',
+  });
+}
+
+function notifyRuntimeLeaseEvent(
+  environment: RuntimeLeaseEnvironment,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  event: RuntimeLeaseEvent,
+): void {
+  try {
+    environment.transition?.(event.kind);
+  } catch {
+    // @swallow-ok diagnostic observers never own coordination state
+  }
+  try {
+    onEvent?.(event);
+  } catch {
+    // @swallow-ok diagnostic observers never own coordination state
+  }
+}
+
+function readerFile(readersDir: string, ownerToken: string): string {
+  validateOwnerToken(ownerToken);
+  return join(readersDir, `reader-${ownerToken}.json`);
+}
+
+function parseReaderRecord(raw: string, dimension: ReaderRecord['dimension']): ReaderRecord {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw unsafeCoordination('Runtime reader record is malformed');
+  }
+  if (
+    !validRecordMetadata(parsed) ||
+    !isPlainRecord(parsed) ||
+    parsed.version !== STATE_VERSION ||
+    parsed.dimension !== dimension ||
+    !Number.isSafeInteger(parsed.refs) ||
+    (parsed.refs as number) < 1 ||
+    (parsed.refs as number) > MAX_REFERENCES_PER_OWNER ||
+    !Array.isArray(parsed.references) ||
+    parsed.references.length !== parsed.refs ||
+    parsed.references.length > MAX_REFERENCES_PER_OWNER ||
+    !parsed.references.every(
+      (reference) => typeof reference === 'string' && REFERENCE_TOKEN_PATTERN.test(reference),
+    ) ||
+    new Set(parsed.references).size !== parsed.references.length
+  ) {
+    throw unsafeCoordination('Runtime reader record is malformed');
+  }
+  return parsed as unknown as ReaderRecord;
+}
+
+/**
+ * Reader records are created only while the global mutex is held. Once a new
+ * mutex owner reaches this scan, an unlinked reader temp predates that owner
+ * and cannot belong to a live cooperating creator.
+ */
+function recoverReaderTemporaryUnderMutex(
+  readersDir: string,
+  entry: string,
+  guard?: RuntimeMutexGuard,
+): void {
+  const targetBasename = READER_TEMP_FILE_PATTERN.exec(entry)?.[1];
+  if (targetBasename === undefined) return;
+  settleCoordinationLinkedCreate(join(readersDir, targetBasename), MAX_RECORD_BYTES);
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: resolveCoordinationPaths().coordinationDir,
+    parentDir: readersDir,
+    basename: entry,
+    maxBytes: MAX_RECORD_BYTES,
+    permissionPosture: 'private',
+  });
+  if (observed.status === 'absent') return;
+  guard?.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir: readersDir,
+      basename: entry,
+      operation: 'unlink',
+      maxBytes: MAX_RECORD_BYTES,
+      expectedContentSha256: observed.sha256,
+    },
+    guard,
+  );
+}
+
+interface ObservedReaderRecord {
+  readonly path: string;
+  readonly record: ReaderRecord;
+  readonly sha256: string;
+}
+
+function readObservedReaderRecord(
+  path: string,
+  dimension: ReaderRecord['dimension'],
+): ObservedReaderRecord | undefined {
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: resolveCoordinationPaths().coordinationDir,
+    parentDir: dirname(path),
+    basename: basename(path),
+    maxBytes: MAX_RECORD_BYTES,
+    permissionPosture: 'private',
+  });
+  return observed.status === 'absent'
+    ? undefined
+    : {
+        path,
+        record: parseReaderRecord(observed.content, dimension),
+        sha256: observed.sha256,
+      };
+}
+
+function readReaderRecords(
+  readersDir: string,
+  dimension: ReaderRecord['dimension'],
+  repairLinkedCreates = true,
+  guard?: RuntimeMutexGuard,
+): readonly ObservedReaderRecord[] {
+  let entries = [
+    ...validateReaderDirectoryEntries(
+      readersDir,
+      resolveCoordinationPaths().coordinationDir,
+      guard,
+    ),
+  ];
+  if (
+    entries.length >
+    (repairLinkedCreates ? MAX_READERS_PER_DIMENSION * 2 : MAX_READERS_PER_DIMENSION)
+  ) {
+    throw unsafeCoordination('Runtime reader count exceeds its bound');
+  }
+  if (repairLinkedCreates) {
+    for (const [index, entry] of entries.entries()) {
+      if (index % 16 === 0) guard?.refresh();
+      recoverReaderTemporaryUnderMutex(readersDir, entry, guard);
+    }
+    entries = [
+      ...readDirectoryBounded(readersDir, MAX_READERS_PER_DIMENSION, 'Runtime reader count'),
+    ];
+  } else if (entries.some((entry) => READER_TEMP_FILE_PATTERN.test(entry))) {
+    throw new RuntimeSnapshotChangedError('Runtime reader publication is in progress');
+  }
+  return entries.map((entry, index) => {
+    if (index % 16 === 0) guard?.refresh();
+    const match = READER_FILE_PATTERN.exec(entry);
+    if (match?.[1] === undefined) {
+      throw unsafeCoordination('Runtime reader directory contains an unexpected entry');
+    }
+    const path = join(readersDir, entry);
+    const observed = readObservedReaderRecord(path, dimension);
+    if (observed === undefined) {
+      throw unsafeCoordination('Runtime reader record disappeared during inspection');
+    }
+    return observed;
+  });
+}
+
+function removeObservedReaderRecord(
+  observed: ObservedReaderRecord,
+  guard?: RuntimeMutexGuard,
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+): boolean {
+  guard?.refresh();
+  environment.coordinationCheckpoint?.('before-stale-reader-unlink');
+  try {
+    mutateCoordinationRecordWhileOwned(
+      {
+        parentDir: dirname(observed.path),
+        basename: basename(observed.path),
+        operation: 'unlink',
+        maxBytes: MAX_RECORD_BYTES,
+        expectedContentSha256: observed.sha256,
+      },
+      guard,
+    );
+    return true;
+  } catch (error) {
+    if (
+      error instanceof SystemError &&
+      (error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH' ||
+        error.code === 'SYSTEM.RUNTIME_COORDINATION.BUSY')
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function removeRecordIfOwned(
+  path: string,
+  ownerToken: string,
+  dimension: ReaderRecord['dimension'],
+  guard?: RuntimeMutexGuard,
+): void {
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: resolveCoordinationPaths().coordinationDir,
+    parentDir: dirname(path),
+    basename: basename(path),
+    maxBytes: MAX_RECORD_BYTES,
+    permissionPosture: 'private',
+  });
+  if (observed.status === 'absent') return;
+  const record = parseReaderRecord(observed.content, dimension);
+  if (record.ownerToken !== ownerToken) {
+    throw unsafeCoordination('Runtime reader ownership changed before unlink');
+  }
+  guard?.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir: dirname(path),
+      basename: basename(path),
+      operation: 'unlink',
+      maxBytes: MAX_RECORD_BYTES,
+      expectedContentSha256: observed.sha256,
+    },
+    guard,
+  );
+}
+
+function cleanAndListReaders(
+  readersDir: string,
+  dimension: ReaderRecord['dimension'],
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  guard?: RuntimeMutexGuard,
+  observedAt?: number,
+  remoteStaleTracker?: RemoteStaleTracker,
+  processInspectionCache: ProcessInspectionCache = createProcessInspectionCache(),
+): readonly ReaderRecord[] {
+  const now = observedAt ?? environment.now();
+  const records = readReaderRecords(readersDir, dimension, true, guard);
+  const live: ReaderRecord[] = [];
+  for (const [index, { path, record }] of records.entries()) {
+    if (index % 16 === 0) guard?.refresh();
+    if (
+      !ownerIsStale(record, policy, now, environment, remoteStaleTracker, processInspectionCache)
+    ) {
+      live.push(record);
+      continue;
+    }
+    const current = readObservedReaderRecord(path, dimension);
+    if (current === undefined) continue;
+    if (
+      current.record.ownerToken !== record.ownerToken ||
+      // Re-probe without the cache immediately before deletion. In particular,
+      // an earlier absent result is never sufficient deletion proof.
+      !ownerIsStale(
+        current.record,
+        policy,
+        now,
+        environment,
+        remoteStaleTracker,
+        processInspectionCache,
+        true,
+      )
+    ) {
+      live.push(current.record);
+      continue;
+    }
+    if (!removeObservedReaderRecord(current, guard, environment)) {
+      const successor = readObservedReaderRecord(path, dimension);
+      if (successor !== undefined) live.push(successor.record);
+      continue;
+    }
+    notifyRuntimeLeaseEvent(environment, onEvent, {
+      kind: 'lease.stale.recovered',
+      resource: 'runtime',
+      operation: dimension === 'project' ? 'runtime-read' : 'user-state-read',
+      ownerPid: current.record.pid,
+      ownerHostname: current.record.hostname,
+    });
+  }
+  return live;
+}
+
+function cleanStaleWriters(
+  paths: CoordinationPaths,
+  state: LeaseStateFile,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+): LeaseStateFile {
+  const now = environment.now();
+  const live = state.writers.filter((writer) => {
+    const stale = ownerIsStale(writer, policy, now, environment, remoteStaleTracker);
+    if (stale) {
+      notifyRuntimeLeaseEvent(environment, onEvent, {
+        kind: 'lease.stale.recovered',
+        resource: 'runtime',
+        operation: writer.kind === 'project' ? 'runtime-exclusive' : 'runtime-global-maintenance',
+        ownerPid: writer.pid,
+        ownerHostname: writer.hostname,
+      });
+    }
+    return !stale;
+  });
+  if (live.length === state.writers.length) return state;
+  const next = { ...state, writers: live };
+  writeLeaseState(paths, state, next, guard);
+  return next;
+}
+
+function buildMetadata(
+  ownerToken: string,
+  sequence: number,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+): RecordMetadata {
+  const environment = runtimeEnvironment(input);
+  const now = environment.now();
+  const hostIdentity = runtimeHostIdentity(environment);
+  const processIncarnation = currentProcessIncarnation(environment);
+  return {
+    ownerToken,
+    pid: environment.pid,
+    hostname: hostIdentity.id,
+    hostIdentityProven: hostIdentity.proven,
+    ...(processIncarnation === undefined ? {} : { processIncarnation }),
+    command: safeText(input.command, 'opensip', MAX_NEW_METADATA_TEXT_BYTES),
+    cwdBasename: safeText(
+      input.cwdBasename,
+      safeText(basename(process.cwd()), 'project'),
+      MAX_NEW_METADATA_TEXT_BYTES,
+    ),
+    acquiredAt: now,
+    lastHeartbeatAt: now,
+    staleMs: policy.staleMs,
+    sequence,
+  };
+}
+
+function writeReaderRecord(
+  readersDir: string,
+  metadata: RecordMetadata,
+  dimension: ReaderRecord['dimension'],
+  referenceToken: string,
+  guard?: RuntimeMutexGuard,
+): void {
+  const path = readerFile(readersDir, metadata.ownerToken);
+  const content = JSON.stringify({
+    version: STATE_VERSION,
+    dimension,
+    refs: 1,
+    references: [referenceToken],
+    ...metadata,
+  });
+  guard?.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir: readersDir,
+      basename: basename(path),
+      operation: 'create',
+      content,
+      maxBytes: MAX_RECORD_BYTES,
+    },
+    guard,
+  );
+}
+
+function replaceReaderRecord(
+  readersDir: string,
+  record: ReaderRecord,
+  guard?: RuntimeMutexGuard,
+): void {
+  const path = readerFile(readersDir, record.ownerToken);
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: resolveCoordinationPaths().coordinationDir,
+    parentDir: readersDir,
+    basename: basename(path),
+    maxBytes: MAX_RECORD_BYTES,
+    permissionPosture: 'private',
+  });
+  if (observed.status !== 'present') {
+    throw new RuntimeSnapshotChangedError('Runtime reader record disappeared before replacement');
+  }
+  const current = parseReaderRecord(observed.content, record.dimension);
+  if (current.ownerToken !== record.ownerToken) {
+    throw unsafeCoordination('Runtime reader ownership changed before replacement');
+  }
+  guard?.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir: readersDir,
+      basename: basename(path),
+      operation: 'replace',
+      content: JSON.stringify(record),
+      maxBytes: MAX_RECORD_BYTES,
+      expectedContentSha256: observed.sha256,
+    },
+    guard,
+  );
+}
+
+function replaceReaderHeartbeat(
+  readersDir: string,
+  ownerToken: string,
+  dimension: ReaderRecord['dimension'],
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  guard?: RuntimeMutexGuard,
+): void {
+  const path = readerFile(readersDir, ownerToken);
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: resolveCoordinationPaths().coordinationDir,
+    parentDir: readersDir,
+    basename: basename(path),
+    maxBytes: MAX_RECORD_BYTES,
+    permissionPosture: 'private',
+  });
+  if (observed.status === 'absent') return;
+  const record = parseReaderRecord(observed.content, dimension);
+  if (record.ownerToken !== ownerToken || !ownedByRuntimeProcess(record, environment)) {
+    return;
+  }
+  guard?.refresh();
+  mutateCoordinationRecordWhileOwned(
+    {
+      parentDir: readersDir,
+      basename: basename(path),
+      operation: 'replace',
+      content: JSON.stringify({
+        ...record,
+        lastHeartbeatAt: environment.now(),
+      }),
+      maxBytes: MAX_RECORD_BYTES,
+      expectedContentSha256: observed.sha256,
+    },
+    guard,
+  );
+}
+
+function inspectRecoveryHeader(
+  path: string,
+  expectedKind: 'init-promotion' | 'user-uninstall',
+  expectedCoordinationKey?: string,
+  repairLinkedCreate = true,
+): RecoveryHeaderInspection {
+  if (repairLinkedCreate) {
+    try {
+      settleCoordinationLinkedCreate(path, MAX_RECOVERY_BYTES);
+    } catch {
+      return { status: 'malformed', reason: 'unsafe-file' };
+    }
+  }
+  try {
+    const prefix = `.${basename(path)}.tmp-`;
+    const siblings = readDirectoryBounded(
+      dirname(path),
+      MAX_MUTEX_TEMPS + 8,
+      'Runtime recovery-header directory',
+    );
+    if (siblings.some((entry) => entry.startsWith(prefix))) {
+      return { status: 'malformed', reason: 'unsafe-file' };
+    }
+  } catch {
+    return { status: 'malformed', reason: 'unsafe-file' };
+  }
+  let stat;
+  try {
+    stat = lstatSync(path, { bigint: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { status: 'absent' };
+    return { status: 'malformed', reason: 'unsafe-file' };
+  }
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.nlink !== 1n ||
+    (currentUid() !== undefined && stat.uid !== BigInt(currentUid()!)) ||
+    (process.platform !== 'win32' && Number(stat.mode & 0o777n) !== 0o600)
+  ) {
+    return { status: 'malformed', reason: 'unsafe-file' };
+  }
+  if (stat.size > BigInt(MAX_RECOVERY_BYTES)) {
+    return { status: 'malformed', reason: 'oversize' };
+  }
+  let raw: string;
+  try {
+    const read = readBoundedRecord(path, MAX_RECOVERY_BYTES, repairLinkedCreate);
+    if (read === undefined) return { status: 'absent' };
+    raw = read;
+  } catch {
+    return { status: 'malformed', reason: 'unsafe-file' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { status: 'malformed', reason: 'invalid-json' };
+  }
+  if (
+    !isPlainRecord(parsed) ||
+    parsed.kind !== expectedKind ||
+    parsed.version !== RECOVERY_HEADER_VERSION ||
+    (parsed.state !== 'open' && parsed.state !== 'closed') ||
+    typeof parsed.operationId !== 'string' ||
+    !validateOperationId(parsed.operationId)
+  ) {
+    return { status: 'malformed', reason: 'invalid-header' };
+  }
+  if (
+    expectedKind === 'init-promotion' &&
+    (typeof parsed.coordinationKey !== 'string' ||
+      parsed.coordinationKey !== expectedCoordinationKey)
+  ) {
+    return { status: 'malformed', reason: 'coordination-key-mismatch' };
+  }
+  if (
+    parsed.reason !== undefined &&
+    (typeof parsed.reason !== 'string' || Buffer.byteLength(parsed.reason, 'utf8') > MAX_SAFE_TEXT)
+  ) {
+    return { status: 'malformed', reason: 'invalid-header' };
+  }
+  return {
+    status: 'valid',
+    state: parsed.state,
+    operationId: parsed.operationId,
+    ...(typeof parsed.reason === 'string' ? { reason: safeText(parsed.reason, 'recovery') } : {}),
+  };
+}
+
+function inspectPromotionHeader(
+  paths: CoordinationPaths,
+  coordinationKey: string,
+  guard?: RuntimeMutexGuard,
+): RecoveryHeaderInspection {
+  ensureProjectScaffold(paths, coordinationKey, guard);
+  return inspectRecoveryHeader(
+    paths.forProject(coordinationKey).promotionJournalFile,
+    'init-promotion',
+    coordinationKey,
+  );
+}
+
+function inspectUserReceiptHeader(paths: CoordinationPaths): RecoveryHeaderInspection {
+  return inspectRecoveryHeader(paths.userUninstallReceiptFile, 'user-uninstall');
+}
+
+function assertNormalSharedAccess(
+  paths: CoordinationPaths,
+  coordinationKey: string | undefined,
+  input: RuntimeLeaseCommonInput,
+  kind: RuntimeLeaseWaitKind,
+  guard?: RuntimeMutexGuard,
+): void {
+  const userReceipt = inspectUserReceiptHeader(paths);
+  if (
+    userReceipt.status === 'malformed' ||
+    (userReceipt.status === 'valid' && userReceipt.state === 'open')
+  ) {
+    emitLeaseEvent(input, { kind: 'lease.recovery.required', operation: kind });
+    throw recoveryRequired(
+      'An interrupted user uninstall requires recovery. Run `opensip status` and retry uninstall.',
+    );
+  }
+  if (coordinationKey === undefined) return;
+  const promotion = inspectPromotionHeader(paths, coordinationKey, guard);
+  if (
+    promotion.status === 'malformed' ||
+    (promotion.status === 'valid' && promotion.state === 'open')
+  ) {
+    emitLeaseEvent(input, { kind: 'lease.recovery.required', operation: kind });
+    throw recoveryRequired(
+      'An interrupted Init promotion requires recovery. Run `opensip status`, then `opensip init`.',
+    );
+  }
+}
+
+function assertProjectExclusivePosture(
+  paths: CoordinationPaths,
+  coordinationKey: string,
+  posture: RuntimeExclusivePosture,
+  recoveryOperationId: string | undefined,
+  guard?: RuntimeMutexGuard,
+): void {
+  const header = inspectPromotionHeader(paths, coordinationKey, guard);
+  if (posture === 'normal') {
+    if (header.status !== 'absent') {
+      throw recoveryRequired(
+        'Runtime maintenance is blocked by an Init promotion journal. Run `opensip init` to recover it.',
+      );
+    }
+    return;
+  }
+  if (posture === 'init-recovery') {
+    if (
+      header.status !== 'valid' ||
+      !validateOperationId(recoveryOperationId) ||
+      header.operationId !== recoveryOperationId
+    ) {
+      throw recoveryRequired('Init recovery requires a matching promotion operation.');
+    }
+    return;
+  }
+  if (header.status === 'absent') {
+    throw recoveryRequired(
+      'Destructive promotion-journal discard requires an existing recovery journal.',
+    );
+  }
+}
+
+function assertGlobalExclusivePosture(
+  paths: CoordinationPaths,
+  posture: GlobalRuntimeMaintenancePosture,
+  recoveryOperationId: string | undefined,
+): void {
+  const header = inspectUserReceiptHeader(paths);
+  if (posture === 'normal') {
+    if (header.status !== 'absent') {
+      throw recoveryRequired(
+        'User-state maintenance is blocked by an uninstall receipt. Retry uninstall recovery.',
+      );
+    }
+    return;
+  }
+  if (posture === 'user-recovery') {
+    if (
+      header.status !== 'valid' ||
+      !validateOperationId(recoveryOperationId) ||
+      header.operationId !== recoveryOperationId
+    ) {
+      throw recoveryRequired('User uninstall recovery requires a matching operation.');
+    }
+    return;
+  }
+  if (header.status !== 'malformed') {
+    throw recoveryRequired(
+      'Receipt-only discard is allowed only for a malformed or oversize uninstall receipt.',
+    );
+  }
+}
+
+interface ExistingReader {
+  readonly coordinationKey?: string;
+  readonly readersDir: string;
+  readonly record: ReaderRecord;
+}
+
+function listProjectCoordinationKeys(
+  paths: CoordinationPaths,
+  guard?: RuntimeMutexGuard,
+): readonly string[] {
+  assertDirectory(paths.projectsDir, paths.coordinationDir);
+  const entries = readDirectoryBounded(
+    paths.projectsDir,
+    MAX_PROJECT_KEYS,
+    'Runtime coordination project count',
+  );
+  for (const entry of entries) {
+    guard?.refresh();
+    if (!PROJECT_KEY_PATTERN.test(entry)) {
+      throw unsafeCoordination('Runtime coordination projects contain an invalid key');
+    }
+    validateProjectCoordinationEntries(paths, entry, guard);
+  }
+  return [...entries].sort();
+}
+
+function readOwnerRecordIfPresent(
+  readersDir: string,
+  ownerToken: string,
+  dimension: ReaderRecord['dimension'],
+): ObservedReaderRecord | undefined {
+  return readObservedReaderRecord(readerFile(readersDir, ownerToken), dimension);
+}
+
+function findExistingOwnerReaders(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+): {
+  readonly projects: readonly ExistingReader[];
+  readonly user?: ExistingReader;
+} {
+  const projects: ExistingReader[] = [];
+  for (const coordinationKey of listProjectCoordinationKeys(paths, guard)) {
+    guard?.refresh();
+    const projectPaths = paths.forProject(coordinationKey);
+    assertDirectory(projectPaths.readersDir, paths.coordinationDir);
+    const observed = readOwnerRecordIfPresent(projectPaths.readersDir, ownerToken, 'project');
+    if (observed === undefined) continue;
+    const { record } = observed;
+    if (ownerIsStale(record, policy, environment.now(), environment, remoteStaleTracker)) {
+      if (!removeObservedReaderRecord(observed, guard, environment)) {
+        const successor = readOwnerRecordIfPresent(projectPaths.readersDir, ownerToken, 'project');
+        if (successor !== undefined) {
+          projects.push({
+            coordinationKey,
+            readersDir: projectPaths.readersDir,
+            record: successor.record,
+          });
+        }
+        continue;
+      }
+      notifyRuntimeLeaseEvent(environment, onEvent, {
+        kind: 'lease.stale.recovered',
+        resource: 'runtime',
+        operation: 'runtime-read',
+        ownerPid: record.pid,
+        ownerHostname: record.hostname,
+      });
+      continue;
+    }
+    projects.push({
+      coordinationKey,
+      readersDir: projectPaths.readersDir,
+      record,
+    });
+  }
+  const userObserved = readOwnerRecordIfPresent(paths.userReadersDir, ownerToken, 'user');
+  let user: ExistingReader | undefined;
+  if (userObserved !== undefined) {
+    const { record: userRecord } = userObserved;
+    if (ownerIsStale(userRecord, policy, environment.now(), environment, remoteStaleTracker)) {
+      if (!removeObservedReaderRecord(userObserved, guard, environment)) {
+        const successor = readOwnerRecordIfPresent(paths.userReadersDir, ownerToken, 'user');
+        if (successor !== undefined) {
+          user = { readersDir: paths.userReadersDir, record: successor.record };
+        }
+        return { projects, ...(user === undefined ? {} : { user }) };
+      }
+      notifyRuntimeLeaseEvent(environment, onEvent, {
+        kind: 'lease.stale.recovered',
+        resource: 'runtime',
+        operation: 'user-state-read',
+        ownerPid: userRecord.pid,
+        ownerHostname: userRecord.hostname,
+      });
+    } else {
+      user = { readersDir: paths.userReadersDir, record: userRecord };
+    }
+  }
+  return { projects, ...(user === undefined ? {} : { user }) };
+}
+
+function assertOwnerRecordsCompatible(
+  existing: ReturnType<typeof findExistingOwnerReaders>,
+  projectKey: string | undefined,
+  environment: RuntimeLeaseEnvironment,
+): void {
+  if (existing.projects.length > 1) {
+    throw new SystemError('One runtime lease owner cannot span multiple project keys', {
+      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+    });
+  }
+  const records = [
+    ...existing.projects.map((entry) => entry.record),
+    ...(existing.user === undefined ? [] : [existing.user.record]),
+  ];
+  if (records.some((record) => !ownedByRuntimeProcess(record, environment))) {
+    throw new SystemError('Runtime lease owner token belongs to another process', {
+      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+    });
+  }
+  const existingKey = existing.projects[0]?.coordinationKey;
+  if (existingKey !== undefined && projectKey !== undefined && existingKey !== projectKey) {
+    throw new SystemError('Runtime lease owner token belongs to another project', {
+      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+    });
+  }
+}
+
+function writerBlocksSharedRegistration(
+  writer: WriterRecord,
+  projectKey: string | undefined,
+  wantsProject: boolean,
+  existing: ReturnType<typeof findExistingOwnerReaders>,
+  ownedProjectWriter?: WriterRecord,
+): boolean {
+  const existingProject = existing.projects[0];
+  const existingRecords = [
+    ...(existingProject === undefined ? [] : [existingProject.record]),
+    ...(existing.user === undefined ? [] : [existing.user.record]),
+  ];
+  const oldestExisting = Math.min(
+    ...existingRecords.map((record) => record.sequence),
+    ...(ownedProjectWriter === undefined ? [] : [ownedProjectWriter.sequence]),
+  );
+  const hasExisting = Number.isFinite(oldestExisting);
+  if (writer.kind === 'global') {
+    return !hasExisting || writer.sequence < oldestExisting;
+  }
+  if (!wantsProject || writer.coordinationKey !== projectKey) return false;
+  if (existingProject?.coordinationKey !== projectKey) return true;
+  return writer.sequence < existingProject.record.sequence;
+}
+
+interface SharedRegistrationResult {
+  readonly acquiredAt: number;
+  readonly sequence: number;
+}
+
+function validateOwnedWriterUserReentry(
+  paths: CoordinationPaths,
+  writer: WriterRecord,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  environment: RuntimeLeaseEnvironment,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+): boolean {
+  if (!ownedByRuntimeProcess(writer, environment)) {
+    throw new SystemError('Runtime lease owner token belongs to another process', {
+      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+    });
+  }
+  if (writer.kind !== 'project' || writer.phase !== 'intent' || wantsProject || !wantsUser) {
+    throw new SystemError('Exclusive runtime leases cannot be upgraded or nested', {
+      code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+    });
+  }
+  // Init discovers project-local state under this writer before it discovers
+  // user policy/tool state. The writer's earlier sequence is the ordering
+  // anchor; publish no user reader until its project dimension has drained.
+  return (
+    cleanAndListReaders(
+      paths.forProject(writer.coordinationKey!).readersDir,
+      'project',
+      policy,
+      input.onEvent,
+      environment,
+      guard,
+      undefined,
+      remoteStaleTracker,
+    ).length === 0
+  );
+}
+
+function incrementReaderRef(
+  existing: ExistingReader,
+  environment: RuntimeLeaseEnvironment,
+  referenceToken: string,
+  policy: RuntimeLeasePolicy,
+  guard?: RuntimeMutexGuard,
+): void {
+  if (
+    existing.record.references.includes(referenceToken) ||
+    existing.record.refs >= MAX_REFERENCES_PER_OWNER
+  ) {
+    throw new SystemError('Runtime reader reference capacity is exhausted', {
+      code: 'SYSTEM.RUNTIME_LEASE.CAPACITY',
+    });
+  }
+  replaceReaderRecord(
+    existing.readersDir,
+    {
+      ...existing.record,
+      refs: existing.record.refs + 1,
+      references: [...existing.record.references, referenceToken],
+      lastHeartbeatAt: environment.now(),
+      staleMs: Math.max(existing.record.staleMs, policy.staleMs),
+    },
+    guard,
+  );
+}
+
+function registerSharedDimensions(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  projectKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  referenceToken: string,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+): SharedRegistrationResult | undefined {
+  const environment = runtimeEnvironment(input);
+  if (projectKey !== undefined) ensureProjectScaffold(paths, projectKey, guard);
+  assertNormalSharedAccess(
+    paths,
+    wantsProject ? projectKey : undefined,
+    input,
+    sharedWaitKind(wantsProject, wantsUser),
+    guard,
+  );
+  const state = cleanStaleWriters(
+    paths,
+    readLeaseState(paths),
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  const ownedWriter = state.writers.find((writer) => writer.ownerToken === ownerToken);
+  if (
+    ownedWriter !== undefined &&
+    !validateOwnedWriterUserReentry(
+      paths,
+      ownedWriter,
+      wantsProject,
+      wantsUser,
+      input,
+      policy,
+      environment,
+      guard,
+      remoteStaleTracker,
+    )
+  ) {
+    return undefined;
+  }
+  const existing = findExistingOwnerReaders(
+    paths,
+    ownerToken,
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  assertOwnerRecordsCompatible(existing, projectKey, environment);
+  if (
+    state.writers.some((writer) =>
+      writerBlocksSharedRegistration(writer, projectKey, wantsProject, existing, ownedWriter),
+    )
+  ) {
+    return undefined;
+  }
+
+  const existingProject =
+    existing.projects[0]?.coordinationKey === projectKey ? existing.projects[0] : undefined;
+  const existingUser = existing.user;
+  if (wantsProject && existingProject === undefined) {
+    const projectReaders = cleanAndListReaders(
+      paths.forProject(projectKey!).readersDir,
+      'project',
+      policy,
+      input.onEvent,
+      environment,
+      guard,
+      undefined,
+      remoteStaleTracker,
+    );
+    if (projectReaders.length >= MAX_READERS_PER_DIMENSION) return undefined;
+  }
+  if (wantsUser && existingUser === undefined) {
+    const userReaders = cleanAndListReaders(
+      paths.userReadersDir,
+      'user',
+      policy,
+      input.onEvent,
+      environment,
+      guard,
+      undefined,
+      remoteStaleTracker,
+    );
+    if (userReaders.length >= MAX_READERS_PER_DIMENSION) return undefined;
+  }
+  if (
+    (wantsProject &&
+      existingProject !== undefined &&
+      existingProject.record.refs >= MAX_REFERENCES_PER_OWNER) ||
+    (wantsUser &&
+      existingUser !== undefined &&
+      existingUser.record.refs >= MAX_REFERENCES_PER_OWNER)
+  ) {
+    return undefined;
+  }
+  const existingSequence =
+    existingProject?.record.sequence ?? existingUser?.record.sequence ?? ownedWriter?.sequence;
+  const sequence = existingSequence ?? state.nextSequence;
+  if (existingSequence === undefined) {
+    const nextState = { ...state, nextSequence: state.nextSequence + 1 };
+    writeLeaseState(paths, state, nextState, guard);
+  }
+  const metadata = buildMetadata(ownerToken, sequence, input, policy);
+  const created: { path: string; dimension: ReaderRecord['dimension'] }[] = [];
+  const replaced: ExistingReader[] = [];
+  try {
+    if (wantsProject) {
+      const readersDir = paths.forProject(projectKey!).readersDir;
+      if (existingProject === undefined) {
+        writeReaderRecord(readersDir, metadata, 'project', referenceToken, guard);
+        created.push({
+          path: readerFile(readersDir, ownerToken),
+          dimension: 'project',
+        });
+      } else {
+        incrementReaderRef(existingProject, environment, referenceToken, policy, guard);
+        replaced.push(existingProject);
+      }
+    }
+    if (wantsUser) {
+      if (existingUser === undefined) {
+        writeReaderRecord(paths.userReadersDir, metadata, 'user', referenceToken, guard);
+        created.push({
+          path: readerFile(paths.userReadersDir, ownerToken),
+          dimension: 'user',
+        });
+      } else {
+        incrementReaderRef(existingUser, environment, referenceToken, policy, guard);
+        replaced.push(existingUser);
+      }
+    }
+  } catch (error) {
+    for (let index = created.length - 1; index >= 0; index -= 1) {
+      const entry = created[index];
+      try {
+        removeRecordIfOwned(entry.path, ownerToken, entry.dimension, guard);
+      } catch {
+        // Fail closed: a partial live record is safer than erasing ambiguous state.
+      }
+    }
+    for (let index = replaced.length - 1; index >= 0; index -= 1) {
+      const entry = replaced[index];
+      try {
+        replaceReaderRecord(entry.readersDir, entry.record, guard);
+      } catch {
+        // Fail closed: an elevated refcount remains owned by this live process.
+      }
+    }
+    throw error;
+  }
+  return {
+    acquiredAt:
+      existingProject?.record.acquiredAt ??
+      existingUser?.record.acquiredAt ??
+      ownedWriter?.acquiredAt ??
+      metadata.acquiredAt,
+    sequence,
+  };
+}
+
+function abortedError(): SystemError {
+  return new SystemError('Runtime lease acquisition was cancelled', {
+    code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+  });
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted === true) throw abortedError();
+}
+
+async function pollDelay(
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  deadline: number,
+) {
+  const environment = runtimeEnvironment(input);
+  if (input.signal?.aborted === true) throw abortedError();
+  const delay = Math.min(policy.pollMs, Math.max(1, deadline - environment.monotonicNow()));
+  await environment.poll(delay, input.signal);
+}
+
+function sharedWaitKind(wantsProject: boolean, wantsUser: boolean): RuntimeLeaseWaitKind {
+  if (wantsProject && wantsUser) return 'runtime-access-composite';
+  return wantsProject ? 'runtime-read' : 'user-state-read';
+}
+
+function generateReferenceToken(): string {
+  return createHash('sha256').update(generateUUID()).digest('hex').slice(0, 24);
+}
+
+interface DeferredPublicationCleanup {
+  readonly key: string;
+  run?: () => Promise<void>;
+  baseDelayMs: number;
+  nextAttemptAt: number;
+  attempts: number;
+  inFlight: boolean;
+}
+
+interface DeferredPublicationCleanupReservation {
+  readonly complete: () => void;
+  readonly defer: (run: () => Promise<void>, baseDelayMs: number) => void;
+}
+
+/*
+ * Failed post-publication cleanup outlives the invocation that initiated it,
+ * so it is process infrastructure rather than RunScope state. One bounded
+ * registry and one coalesced timer prevent an attacker or repeated I/O fault
+ * from creating an unbounded number of retained closures and intervals.
+ */
+const deferredPublicationCleanups = new Map<string, DeferredPublicationCleanup>();
+let deferredPublicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
+let deferredPublicationCleanupInFlight = 0;
+
+function stopDeferredPublicationCleanupSchedulerIfIdle(): void {
+  if (
+    deferredPublicationCleanupTimer === undefined ||
+    [...deferredPublicationCleanups.values()].some(
+      (cleanup) => cleanup.run !== undefined || cleanup.inFlight,
+    )
+  ) {
+    return;
+  }
+  clearInterval(deferredPublicationCleanupTimer);
+  deferredPublicationCleanupTimer = undefined;
+}
+
+function deferredCleanupBackoff(cleanup: DeferredPublicationCleanup): number {
+  return Math.min(
+    MAX_DEFERRED_CLEANUP_BACKOFF_MS,
+    cleanup.baseDelayMs * 2 ** Math.min(cleanup.attempts, 10),
+  );
+}
+
+function drainDeferredPublicationCleanups(): void {
+  const now = Date.now();
+  for (const cleanup of deferredPublicationCleanups.values()) {
+    if (deferredPublicationCleanupInFlight >= MAX_CONCURRENT_DEFERRED_CLEANUPS) break;
+    if (cleanup.run === undefined || cleanup.inFlight || cleanup.nextAttemptAt > now) {
+      continue;
+    }
+    const run = cleanup.run;
+    cleanup.inFlight = true;
+    deferredPublicationCleanupInFlight += 1;
+    void run()
+      .then(() => {
+        if (deferredPublicationCleanups.get(cleanup.key) === cleanup) {
+          deferredPublicationCleanups.delete(cleanup.key);
+        }
+      })
+      .catch(() => {
+        if (deferredPublicationCleanups.get(cleanup.key) !== cleanup) return;
+        cleanup.attempts += 1;
+        cleanup.nextAttemptAt = Date.now() + deferredCleanupBackoff(cleanup);
+      })
+      .finally(() => {
+        cleanup.inFlight = false;
+        deferredPublicationCleanupInFlight -= 1;
+        stopDeferredPublicationCleanupSchedulerIfIdle();
+      });
+  }
+}
+
+function ensureDeferredPublicationCleanupScheduler(): void {
+  if (deferredPublicationCleanupTimer !== undefined) return;
+  deferredPublicationCleanupTimer = setInterval(
+    drainDeferredPublicationCleanups,
+    DEFERRED_CLEANUP_TICK_MS,
+  );
+  deferredPublicationCleanupTimer.unref?.();
+}
+
+function reserveDeferredPublicationCleanup(key: string): DeferredPublicationCleanupReservation {
+  if (
+    deferredPublicationCleanups.size >= MAX_DEFERRED_PUBLICATION_CLEANUPS ||
+    deferredPublicationCleanups.has(key)
+  ) {
+    throw new SystemError('Runtime publication cleanup capacity is exhausted', {
+      code: 'SYSTEM.RUNTIME_LEASE.CLEANUP_CAPACITY',
+    });
+  }
+  const cleanup: DeferredPublicationCleanup = {
+    key,
+    baseDelayMs: DEFERRED_CLEANUP_TICK_MS,
+    nextAttemptAt: Number.POSITIVE_INFINITY,
+    attempts: 0,
+    inFlight: false,
+  };
+  deferredPublicationCleanups.set(key, cleanup);
+  let settled = false;
+  return Object.freeze({
+    complete: () => {
+      if (settled) return;
+      settled = true;
+      if (deferredPublicationCleanups.get(key) === cleanup) {
+        deferredPublicationCleanups.delete(key);
+      }
+      stopDeferredPublicationCleanupSchedulerIfIdle();
+    },
+    defer: (run: () => Promise<void>, baseDelayMs: number) => {
+      if (settled) return;
+      settled = true;
+      cleanup.run = run;
+      cleanup.baseDelayMs = Math.max(DEFERRED_CLEANUP_TICK_MS, baseDelayMs);
+      cleanup.nextAttemptAt = Date.now();
+      ensureDeferredPublicationCleanupScheduler();
+    },
+  });
+}
+
+async function cleanupFailedSharedRegistration(
+  ownerToken: string,
+  coordinationKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  referenceToken: string,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  reservation: DeferredPublicationCleanupReservation,
+): Promise<void> {
+  const environment = runtimeEnvironment(input);
+  const cleanupWaitMs = Math.min(
+    MAX_FAILED_PUBLICATION_CLEANUP_WAIT_MS,
+    Math.max(100, policy.pollMs * 4),
+  );
+  const cleanup = () =>
+    withCoordinationMutex(
+      policy,
+      input.onEvent,
+      cleanupWaitMs,
+      (paths, guard) =>
+        removeSharedRegistrationWhileOwned(
+          paths,
+          ownerToken,
+          coordinationKey,
+          wantsProject,
+          wantsUser,
+          referenceToken,
+          policy,
+          environment,
+          guard,
+        ),
+      environment,
+    );
+  try {
+    await cleanup();
+    reservation.complete();
+  } catch {
+    const retryEveryMs = Math.max(policy.pollMs, Math.min(policy.heartbeatMs, 1000));
+    reservation.defer(cleanup, retryEveryMs);
+  }
+}
+
+async function acquireSharedDimensions(
+  input: RuntimeLeaseCommonInput,
+  projectDir: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+): Promise<{
+  readonly ownerToken: string;
+  readonly coordinationKey?: string;
+  readonly acquiredAt: number;
+  readonly referenceToken: string;
+  readonly policy: RuntimeLeasePolicy;
+  readonly timer: ReturnType<typeof setInterval>;
+}> {
+  if (!wantsProject && !wantsUser) {
+    throw new SystemError('Runtime access lease requires at least one shared dimension', {
+      code: 'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
+    });
+  }
+  const environment = runtimeEnvironment(input);
+  const ownerToken = input.ownerToken ?? environment.generateToken();
+  validateOwnerToken(ownerToken);
+  const referenceToken = generateReferenceToken();
+  const coordinationKey =
+    wantsProject && projectDir !== undefined ? projectCoordinationKey(projectDir) : undefined;
+  const policy = normalizePolicy(input.policy);
+  const waitKind = sharedWaitKind(wantsProject, wantsUser);
+  const startedAt = environment.monotonicNow();
+  const deadline = startedAt + policy.waitMs;
+  const remoteStaleTracker: RemoteStaleTracker = new Map();
+  emitLeaseEvent(input, { kind: 'lease.acquire.start', operation: waitKind });
+  for (;;) {
+    if (input.signal?.aborted === true) throw abortedError();
+    const remaining = Math.max(0, deadline - environment.monotonicNow());
+    const cleanupReservation = reserveDeferredPublicationCleanup(
+      `shared:${ownerToken}:${referenceToken}`,
+    );
+    let result: SharedRegistrationResult | undefined;
+    let registrationAttempted = false;
+    try {
+      result = await withCoordinationMutex(
+        policy,
+        input.onEvent,
+        remaining,
+        (paths, guard) => {
+          registrationAttempted = true;
+          return registerSharedDimensions(
+            paths,
+            ownerToken,
+            coordinationKey,
+            wantsProject,
+            wantsUser,
+            referenceToken,
+            input,
+            policy,
+            guard,
+            remoteStaleTracker,
+          );
+        },
+        environment,
+        input.signal,
+      );
+    } catch (error) {
+      if (registrationAttempted) {
+        await cleanupFailedSharedRegistration(
+          ownerToken,
+          coordinationKey,
+          wantsProject,
+          wantsUser,
+          referenceToken,
+          input,
+          policy,
+          cleanupReservation,
+        );
+      } else {
+        cleanupReservation.complete();
+      }
+      mapCoordinationTimeout(error, waitKind, policy.waitMs);
+    }
+    cleanupReservation.complete();
+    if (result !== undefined) {
+      const timer = startSharedHeartbeat(
+        ownerToken,
+        coordinationKey,
+        wantsProject,
+        wantsUser,
+        input,
+        policy,
+      );
+      emitLeaseEvent(input, {
+        kind: 'lease.acquire.complete',
+        operation: waitKind,
+        waitMs: Math.min(policy.waitMs, environment.monotonicNow() - startedAt),
+      });
+      return {
+        ownerToken,
+        ...(coordinationKey === undefined ? {} : { coordinationKey }),
+        acquiredAt: result.acquiredAt,
+        referenceToken,
+        policy,
+        timer,
+      };
+    }
+    if (environment.monotonicNow() >= deadline) throw timeoutError(waitKind, policy.waitMs);
+    emitLeaseEvent(input, {
+      kind: 'lease.acquire.wait',
+      operation: waitKind,
+      waitMs: Math.min(policy.waitMs, environment.monotonicNow() - startedAt),
+    });
+    await pollDelay(input, policy, deadline);
+  }
+}
+
+async function heartbeatSharedDimensions(
+  ownerToken: string,
+  coordinationKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+): Promise<void> {
+  const environment = runtimeEnvironment(input);
+  const heartbeat = async (dimension: ReaderRecord['dimension']): Promise<void> => {
+    try {
+      await withCoordinationMutex(
+        policy,
+        input.onEvent,
+        Math.min(policy.waitMs, 1000),
+        (paths, guard) => {
+          if (dimension === 'project') {
+            if (coordinationKey === undefined) return;
+            replaceReaderHeartbeat(
+              paths.forProject(coordinationKey).readersDir,
+              ownerToken,
+              'project',
+              environment,
+              guard,
+            );
+            return;
+          }
+          replaceReaderHeartbeat(paths.userReadersDir, ownerToken, 'user', environment, guard);
+        },
+        environment,
+      );
+    } catch {
+      // Each dimension is best effort and isolated. A broken/missing project
+      // record must not prevent the user-state record from being refreshed.
+    }
+  };
+  if (wantsProject && coordinationKey !== undefined) {
+    await heartbeat('project');
+  }
+  if (wantsUser) {
+    await heartbeat('user');
+  }
+}
+
+function startSharedHeartbeat(
+  ownerToken: string,
+  coordinationKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+): ReturnType<typeof setInterval> {
+  let inFlight = false;
+  const timer = setInterval(() => {
+    if (inFlight) return;
+    inFlight = true;
+    void heartbeatSharedDimensions(
+      ownerToken,
+      coordinationKey,
+      wantsProject,
+      wantsUser,
+      input,
+      policy,
+    ).finally(() => {
+      inFlight = false;
+    });
+  }, policy.heartbeatMs);
+  timer.unref?.();
+  return timer;
+}
+
+function decrementReaderRef(
+  readersDir: string,
+  ownerToken: string,
+  dimension: ReaderRecord['dimension'],
+  referenceToken: string,
+  environment: RuntimeLeaseEnvironment,
+  guard?: RuntimeMutexGuard,
+): void {
+  try {
+    lstatSync(readersDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' && dimension === 'project') return;
+    throw unsafeCoordination('Runtime reader directory is unavailable during release');
+  }
+  assertDirectory(readersDir, resolveCoordinationPaths().coordinationDir);
+  const path = readerFile(readersDir, ownerToken);
+  const raw = readBoundedRecord(path, MAX_RECORD_BYTES);
+  if (raw === undefined) return;
+  const record = parseReaderRecord(raw, dimension);
+  if (record.ownerToken !== ownerToken || !ownedByRuntimeProcess(record, environment)) {
+    throw unsafeCoordination('Runtime reader ownership changed before release');
+  }
+  if (!record.references.includes(referenceToken)) return;
+  const references = record.references.filter((candidate) => candidate !== referenceToken);
+  if (references.length === 0) {
+    removeRecordIfOwned(path, ownerToken, dimension, guard);
+  } else {
+    replaceReaderRecord(
+      readersDir,
+      {
+        ...record,
+        refs: references.length,
+        references,
+        lastHeartbeatAt: environment.now(),
+      },
+      guard,
+    );
+  }
+}
+
+function removeSharedRegistrationWhileOwned(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  coordinationKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  referenceToken: string,
+  policy: RuntimeLeasePolicy,
+  environment: RuntimeLeaseEnvironment,
+  guard: RuntimeMutexGuard,
+): void {
+  if (wantsProject && coordinationKey !== undefined) {
+    decrementReaderRef(
+      paths.forProject(coordinationKey).readersDir,
+      ownerToken,
+      'project',
+      referenceToken,
+      environment,
+      guard,
+    );
+  }
+  if (wantsUser) {
+    decrementReaderRef(
+      paths.userReadersDir,
+      ownerToken,
+      'user',
+      referenceToken,
+      environment,
+      guard,
+    );
+  }
+  // Cleanup follows both exact decrements. If either dimension faults, a retry
+  // can still reach the other record before the project scaffold disappears.
+  if (wantsProject && coordinationKey !== undefined) {
+    cleanupEmptyRuntimeLeaseKeyWhileOwned(paths, coordinationKey, policy, environment, guard);
+  }
+}
+
+function releaseSharedDimensions(
+  ownerToken: string,
+  coordinationKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  referenceToken: string,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+): void {
+  const environment = runtimeEnvironment(input);
+  withCoordinationMutexSync(
+    policy,
+    input.onEvent,
+    (paths, guard) =>
+      removeSharedRegistrationWhileOwned(
+        paths,
+        ownerToken,
+        coordinationKey,
+        wantsProject,
+        wantsUser,
+        referenceToken,
+        policy,
+        environment,
+        guard,
+      ),
+    environment,
+  );
+}
+
+function sharedReleaseHandle(
+  acquired: Awaited<ReturnType<typeof acquireSharedDimensions>>,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  input: RuntimeLeaseCommonInput,
+  operation: RuntimeLeaseWaitKind,
+): () => void {
+  let released = false;
+  return () => {
+    if (released) return;
+    releaseSharedDimensions(
+      acquired.ownerToken,
+      acquired.coordinationKey,
+      wantsProject,
+      wantsUser,
+      acquired.referenceToken,
+      input,
+      acquired.policy,
+    );
+    clearInterval(acquired.timer);
+    released = true;
+    emitLeaseEvent(input, { kind: 'lease.release', operation });
+  };
+}
+
+function captureRuntimeIdentity<T extends RuntimeLeaseCommonInput>(input: T): T {
+  const environment = runtimeEnvironment(input);
+  const capturedHostname = environment.hostname().normalize('NFC');
+  const capturedHostInstanceIdentity = environment.hostInstanceIdentity();
+  return {
+    ...input,
+    [RUNTIME_ENVIRONMENT]: Object.freeze({
+      ...environment,
+      hostname: () => capturedHostname,
+      hostInstanceIdentity: () => capturedHostInstanceIdentity,
+    }),
+  };
+}
+
+/** Acquire a shared lease for one canonical project runtime. */
+export async function acquireRuntimeReadLease(
+  input: AcquireRuntimeReadLeaseInput,
+): Promise<RuntimeReadLease> {
+  const stableInput = captureRuntimeIdentity(input);
+  const acquired = await acquireSharedDimensions(stableInput, stableInput.projectDir, true, false);
+  return {
+    kind: 'runtime-read',
+    ownerToken: acquired.ownerToken,
+    acquiredAt: acquired.acquiredAt,
+    coordinationKey: acquired.coordinationKey!,
+    release: sharedReleaseHandle(acquired, true, false, stableInput, 'runtime-read'),
+  };
+}
+
+/** Acquire a shared lease for user-root state mutation. */
+export async function acquireUserStateReadLease(
+  input: AcquireUserStateReadLeaseInput = {},
+): Promise<UserStateReadLease> {
+  const stableInput = captureRuntimeIdentity(input);
+  const acquired = await acquireSharedDimensions(stableInput, undefined, false, true);
+  return {
+    kind: 'user-state-read',
+    ownerToken: acquired.ownerToken,
+    acquiredAt: acquired.acquiredAt,
+    release: sharedReleaseHandle(acquired, false, true, stableInput, 'user-state-read'),
+  };
+}
+
+/** Atomically acquire project and/or user shared dimensions under one owner. */
+export async function acquireRuntimeAccessLease(
+  input: AcquireRuntimeAccessLeaseInput,
+): Promise<RuntimeAccessLease> {
+  const stableInput = captureRuntimeIdentity(input);
+  const wantsProject = stableInput.projectRead !== false && stableInput.projectRead !== undefined;
+  const wantsUser = stableInput.userStateRead === true;
+  const projectDir = wantsProject ? stableInput.projectRead.projectDir : undefined;
+  const acquired = await acquireSharedDimensions(stableInput, projectDir, wantsProject, wantsUser);
+  return {
+    kind: 'runtime-access-composite',
+    ownerToken: acquired.ownerToken,
+    acquiredAt: acquired.acquiredAt,
+    ...(acquired.coordinationKey === undefined
+      ? {}
+      : { coordinationKey: acquired.coordinationKey }),
+    projectRead: wantsProject,
+    userStateRead: wantsUser,
+    release: sharedReleaseHandle(
+      acquired,
+      wantsProject,
+      wantsUser,
+      stableInput,
+      'runtime-access-composite',
+    ),
+  };
+}
+
+function projectWriterEligible(writer: WriterRecord, writers: readonly WriterRecord[]): boolean {
+  return !writers.some(
+    (other) =>
+      (other.ownerToken !== writer.ownerToken &&
+        other.phase === 'intent' &&
+        (other.kind === 'global' ||
+          (other.kind === 'project' && other.coordinationKey === writer.coordinationKey))) ||
+      (other.sequence < writer.sequence &&
+        (other.kind === 'global' ||
+          (other.kind === 'project' && other.coordinationKey === writer.coordinationKey))),
+  );
+}
+
+function globalWriterEligible(writer: WriterRecord, writers: readonly WriterRecord[]): boolean {
+  return !writers.some(
+    (other) =>
+      other.ownerToken !== writer.ownerToken &&
+      (other.phase === 'intent' || other.sequence < writer.sequence),
+  );
+}
+
+function scanAllProjectReaders(
+  paths: CoordinationPaths,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  guard?: RuntimeMutexGuard,
+  observedAt = environment.now(),
+  remoteStaleTracker?: RemoteStaleTracker,
+  processInspectionCache: ProcessInspectionCache = createProcessInspectionCache(),
+): readonly ReaderRecord[] {
+  const readers: ReaderRecord[] = [];
+  for (const coordinationKey of listProjectCoordinationKeys(paths, guard)) {
+    guard?.refresh();
+    const readerDir = paths.forProject(coordinationKey).readersDir;
+    readers.push(
+      ...cleanAndListReaders(
+        readerDir,
+        'project',
+        policy,
+        onEvent,
+        environment,
+        guard,
+        observedAt,
+        remoteStaleTracker,
+        processInspectionCache,
+      ),
+    );
+    if (readers.length > MAX_PROJECT_KEYS * MAX_READERS_PER_DIMENSION) {
+      throw unsafeCoordination('Runtime global reader scan exceeds its bound');
+    }
+  }
+  return readers;
+}
+
+function assertNoProjectRecoveryJournals(
+  paths: CoordinationPaths,
+  guard?: RuntimeMutexGuard,
+): void {
+  for (const coordinationKey of listProjectCoordinationKeys(paths, guard)) {
+    guard?.refresh();
+    const projectPaths = paths.forProject(coordinationKey);
+    const header = inspectRecoveryHeader(
+      projectPaths.promotionJournalFile,
+      'init-promotion',
+      coordinationKey,
+    );
+    if (header.status !== 'absent') {
+      throw recoveryRequired(
+        'Global user-state maintenance is blocked by project Init recovery state.',
+      );
+    }
+  }
+}
+
+interface WriterAcquisitionOptions {
+  readonly kind: 'project' | 'global';
+  readonly coordinationKey?: string;
+  readonly waitKind: 'runtime-exclusive' | 'runtime-global-maintenance';
+  readonly projectPosture?: RuntimeExclusivePosture;
+  readonly globalPosture?: GlobalRuntimeMaintenancePosture;
+  readonly recoveryOperationId?: string;
+}
+
+function assertWriterPosture(
+  paths: CoordinationPaths,
+  options: WriterAcquisitionOptions,
+  guard?: RuntimeMutexGuard,
+): void {
+  if (options.kind === 'project') {
+    const receipt = inspectUserReceiptHeader(paths);
+    if (
+      receipt.status === 'malformed' ||
+      (receipt.status === 'valid' && receipt.state === 'open')
+    ) {
+      throw recoveryRequired('Project maintenance is blocked by user-uninstall recovery state.');
+    }
+    assertProjectExclusivePosture(
+      paths,
+      options.coordinationKey!,
+      options.projectPosture ?? 'normal',
+      options.recoveryOperationId,
+      guard,
+    );
+  } else {
+    const posture = options.globalPosture ?? 'normal';
+    assertGlobalExclusivePosture(paths, posture, options.recoveryOperationId);
+    // Receipt-only discard cannot mutate project state. Allowing it through is
+    // necessary to break the otherwise cyclic recovery dependency where a
+    // malformed receipt blocks project recovery and a project journal blocks
+    // removal of that malformed receipt.
+    if (posture !== 'receipt-only-discard') {
+      assertNoProjectRecoveryJournals(paths, guard);
+    }
+  }
+}
+
+function enqueueWriter(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  options: WriterAcquisitionOptions,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+  onPublicationPrepared?: (writer: WriterRecord) => void,
+): WriterRecord {
+  const environment = runtimeEnvironment(input);
+  assertWriterPosture(paths, options, guard);
+  const state = cleanStaleWriters(
+    paths,
+    readLeaseState(paths),
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  if (state.writers.some((writer) => writer.ownerToken === ownerToken)) {
+    throw new SystemError('Duplicate runtime writer request for one owner token', {
+      code: 'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER',
+    });
+  }
+  const existing = findExistingOwnerReaders(
+    paths,
+    ownerToken,
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  if (existing.projects.length > 0 || existing.user !== undefined) {
+    throw new SystemError('Shared runtime leases cannot be upgraded to exclusive', {
+      code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+    });
+  }
+  if (state.writers.length >= MAX_WRITER_QUEUE) {
+    throw new SystemError('Runtime writer queue capacity is exhausted', {
+      code: 'SYSTEM.RUNTIME_LEASE.CAPACITY',
+    });
+  }
+  const metadata = buildMetadata(ownerToken, state.nextSequence, input, policy);
+  const writer: WriterRecord = {
+    ...metadata,
+    kind: options.kind,
+    ...(options.coordinationKey === undefined ? {} : { coordinationKey: options.coordinationKey }),
+    phase: 'queued',
+  };
+  const nextState = {
+    ...state,
+    nextSequence: state.nextSequence + 1,
+    writers: [...state.writers, writer],
+  };
+  // Stage an exact cleanup receipt before publication. The enclosing mutex can
+  // still fail its post-callback ownership check after the state write lands.
+  onPublicationPrepared?.(writer);
+  writeLeaseState(paths, state, nextState, guard);
+  return writer;
+}
+
+interface WriterProgress {
+  readonly acquired: boolean;
+  readonly acquiredAt: number;
+  readonly timedOut?: boolean;
+  readonly heartbeatPublished?: boolean;
+}
+
+function progressWriter(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  options: WriterAcquisitionOptions,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  heartbeatDue: boolean,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+): WriterProgress {
+  const environment = runtimeEnvironment(input);
+  assertWriterPosture(paths, options, guard);
+  const state = cleanStaleWriters(
+    paths,
+    readLeaseState(paths),
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  const index = state.writers.findIndex((writer) => writer.ownerToken === ownerToken);
+  if (index < 0) {
+    throw new SystemError('Runtime writer request disappeared during acquisition', {
+      code: 'SYSTEM.RUNTIME_LEASE.REQUEST_LOST',
+    });
+  }
+  let writer = state.writers[index];
+  let heartbeatPublished = false;
+  if (!ownedByRuntimeProcess(writer, environment)) {
+    throw new SystemError('Runtime writer owner token belongs to another process', {
+      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+    });
+  }
+  const eligible =
+    writer.kind === 'project'
+      ? projectWriterEligible(writer, state.writers)
+      : globalWriterEligible(writer, state.writers);
+  if (writer.phase === 'queued' && eligible) {
+    writer = {
+      ...writer,
+      phase: 'intent',
+      lastHeartbeatAt: environment.now(),
+    };
+    const writers = [...state.writers];
+    writers[index] = writer;
+    const nextState = { ...state, writers };
+    writeLeaseState(paths, state, nextState, guard);
+    heartbeatPublished = true;
+  } else if (heartbeatDue) {
+    writer = { ...writer, lastHeartbeatAt: environment.now() };
+    const writers = [...state.writers];
+    writers[index] = writer;
+    const nextState = { ...state, writers };
+    writeLeaseState(paths, state, nextState, guard);
+    heartbeatPublished = true;
+  }
+  if (writer.phase !== 'intent') {
+    return {
+      acquired: false,
+      acquiredAt: writer.acquiredAt,
+      ...(heartbeatPublished ? { heartbeatPublished: true } : {}),
+    };
+  }
+  // One cutoff covers the whole global scan. A remote reader that was healthy
+  // when scanning began cannot become reclaimable merely because this mutex
+  // holder delayed its heartbeat while walking other projects.
+  const staleObservationTime = environment.now();
+  const processInspectionCache = createProcessInspectionCache();
+  const readers =
+    writer.kind === 'project'
+      ? cleanAndListReaders(
+          paths.forProject(writer.coordinationKey!).readersDir,
+          'project',
+          policy,
+          input.onEvent,
+          environment,
+          guard,
+          staleObservationTime,
+          remoteStaleTracker,
+          processInspectionCache,
+        )
+      : [
+          ...cleanAndListReaders(
+            paths.userReadersDir,
+            'user',
+            policy,
+            input.onEvent,
+            environment,
+            guard,
+            staleObservationTime,
+            remoteStaleTracker,
+            processInspectionCache,
+          ),
+          ...scanAllProjectReaders(
+            paths,
+            policy,
+            input.onEvent,
+            environment,
+            guard,
+            staleObservationTime,
+            remoteStaleTracker,
+            processInspectionCache,
+          ),
+        ];
+  return {
+    acquired: readers.length === 0,
+    acquiredAt: writer.acquiredAt,
+    ...(heartbeatPublished ? { heartbeatPublished: true } : {}),
+  };
+}
+
+function removeWriterRequest(
+  paths: CoordinationPaths,
+  expected: WriterRecord,
+  policy: RuntimeLeasePolicy,
+  onEvent: RuntimeLeaseCommonInput['onEvent'],
+  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+  guard?: RuntimeMutexGuard,
+  replacementIsAbsent = false,
+): void {
+  const state = cleanStaleWriters(
+    paths,
+    readLeaseState(paths),
+    policy,
+    onEvent,
+    environment,
+    guard,
+  );
+  const writer = state.writers.find((entry) => entry.ownerToken === expected.ownerToken);
+  if (writer === undefined) return;
+  if (
+    writer.pid !== expected.pid ||
+    writer.hostname !== expected.hostname ||
+    writer.hostIdentityProven !== expected.hostIdentityProven ||
+    writer.acquiredAt !== expected.acquiredAt ||
+    writer.sequence !== expected.sequence ||
+    writer.kind !== expected.kind ||
+    writer.coordinationKey !== expected.coordinationKey ||
+    !ownedByRuntimeProcess(writer, environment)
+  ) {
+    if (replacementIsAbsent) return;
+    throw unsafeCoordination('Runtime writer ownership changed before release');
+  }
+  const nextState = {
+    ...state,
+    writers: state.writers.filter((entry) => entry.ownerToken !== expected.ownerToken),
+  };
+  writeLeaseState(paths, state, nextState, guard);
+}
+
+function startWriterHeartbeat(
+  ownerToken: string,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+): ReturnType<typeof setInterval> {
+  const environment = runtimeEnvironment(input);
+  let inFlight = false;
+  const timer = setInterval(() => {
+    if (inFlight) return;
+    inFlight = true;
+    void withCoordinationMutex(
+      policy,
+      input.onEvent,
+      Math.min(policy.waitMs, 1000),
+      (paths, guard) => {
+        const state = readLeaseState(paths);
+        const index = state.writers.findIndex((writer) => writer.ownerToken === ownerToken);
+        if (index < 0) return;
+        const writer = state.writers[index];
+        if (!ownedByRuntimeProcess(writer, environment)) return;
+        const writers = [...state.writers];
+        writers[index] = {
+          ...writer,
+          lastHeartbeatAt: environment.now(),
+        };
+        writeLeaseState(paths, state, { ...state, writers }, guard);
+      },
+      environment,
+    )
+      .catch(() => {
+        // Best effort. Same-host PID liveness remains authoritative.
+      })
+      .finally(() => {
+        inFlight = false;
+      });
+  }, policy.heartbeatMs);
+  timer.unref?.();
+  return timer;
+}
+
+async function cleanupFailedWriter(
+  expected: WriterRecord | undefined,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  reservation: DeferredPublicationCleanupReservation,
+): Promise<void> {
+  if (expected === undefined) {
+    reservation.complete();
+    return;
+  }
+  const environment = runtimeEnvironment(input);
+  const cleanupWaitMs = Math.min(
+    MAX_FAILED_PUBLICATION_CLEANUP_WAIT_MS,
+    Math.max(100, policy.pollMs * 4),
+  );
+  const cleanup = () =>
+    withCoordinationMutex(
+      policy,
+      input.onEvent,
+      cleanupWaitMs,
+      (paths, guard) =>
+        removeWriterRequest(paths, expected, policy, input.onEvent, environment, guard, true),
+      environment,
+    );
+  try {
+    await cleanup();
+    reservation.complete();
+  } catch {
+    const retryEveryMs = Math.max(policy.pollMs, Math.min(policy.heartbeatMs, 1000));
+    reservation.defer(cleanup, retryEveryMs);
+  }
+}
+
+async function acquireWriter(
+  input: RuntimeLeaseCommonInput,
+  options: WriterAcquisitionOptions,
+): Promise<{
+  readonly ownerToken: string;
+  readonly acquiredAt: number;
+  readonly policy: RuntimeLeasePolicy;
+  readonly timer: ReturnType<typeof setInterval>;
+  readonly writer: WriterRecord;
+}> {
+  const environment = runtimeEnvironment(input);
+  const ownerToken = input.ownerToken ?? environment.generateToken();
+  validateOwnerToken(ownerToken);
+  const policy = normalizePolicy(input.policy);
+  const startedAt = environment.monotonicNow();
+  const deadline = startedAt + policy.waitMs;
+  const remoteStaleTracker: RemoteStaleTracker = new Map();
+  let enqueuedWriter: WriterRecord | undefined;
+  let stagedWriter: WriterRecord | undefined;
+  let lastWriterHeartbeatPublicationAt = environment.monotonicNow();
+  const cleanupReservation = reserveDeferredPublicationCleanup(
+    `writer:${ownerToken}:${generateReferenceToken()}`,
+  );
+  emitLeaseEvent(input, {
+    kind: 'lease.acquire.start',
+    operation: options.waitKind,
+  });
+  try {
+    throwIfAborted(input.signal);
+    enqueuedWriter = await withCoordinationMutex(
+      policy,
+      input.onEvent,
+      Math.max(0, deadline - environment.monotonicNow()),
+      (paths, guard) => {
+        if (options.coordinationKey !== undefined) {
+          ensureProjectScaffold(paths, options.coordinationKey, guard);
+        }
+        return enqueueWriter(
+          paths,
+          ownerToken,
+          options,
+          input,
+          policy,
+          guard,
+          remoteStaleTracker,
+          (writer) => {
+            stagedWriter = writer;
+          },
+        );
+      },
+      environment,
+      input.signal,
+    );
+    for (;;) {
+      throwIfAborted(input.signal);
+      const progressObservedAt = environment.monotonicNow();
+      const heartbeatDue =
+        progressObservedAt - lastWriterHeartbeatPublicationAt >=
+        Math.max(1, Math.floor(policy.heartbeatMs / 2));
+      const progress = await withCoordinationMutex(
+        policy,
+        input.onEvent,
+        Math.max(0, deadline - environment.monotonicNow()),
+        (paths, guard) => {
+          const current = progressWriter(
+            paths,
+            ownerToken,
+            options,
+            input,
+            policy,
+            heartbeatDue,
+            guard,
+            remoteStaleTracker,
+          );
+          if (!current.acquired && environment.monotonicNow() >= deadline) {
+            removeWriterRequest(paths, enqueuedWriter!, policy, input.onEvent, environment, guard);
+            return { ...current, timedOut: true };
+          }
+          return current;
+        },
+        environment,
+        input.signal,
+      );
+      if (progress.heartbeatPublished === true) {
+        lastWriterHeartbeatPublicationAt = progressObservedAt;
+      }
+      if (progress.acquired) {
+        const timer = startWriterHeartbeat(ownerToken, input, policy);
+        cleanupReservation.complete();
+        emitLeaseEvent(input, {
+          kind: 'lease.acquire.complete',
+          operation: options.waitKind,
+          waitMs: Math.min(policy.waitMs, environment.monotonicNow() - startedAt),
+        });
+        return {
+          ownerToken,
+          acquiredAt: progress.acquiredAt,
+          policy,
+          timer,
+          writer: enqueuedWriter,
+        };
+      }
+      if (progress.timedOut === true) throw timeoutError(options.waitKind, policy.waitMs);
+      if (environment.monotonicNow() >= deadline)
+        throw timeoutError(options.waitKind, policy.waitMs);
+      emitLeaseEvent(input, {
+        kind: 'lease.acquire.wait',
+        operation: options.waitKind,
+        waitMs: Math.min(policy.waitMs, environment.monotonicNow() - startedAt),
+      });
+      await pollDelay(input, policy, deadline);
+    }
+  } catch (error) {
+    await cleanupFailedWriter(enqueuedWriter ?? stagedWriter, input, policy, cleanupReservation);
+    if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION_MUTEX') {
+      throw timeoutError(options.waitKind, policy.waitMs);
+    }
+    throw error;
+  }
+}
+
+function writerReleaseHandle(
+  acquired: Awaited<ReturnType<typeof acquireWriter>>,
+  input: RuntimeLeaseCommonInput,
+  operation: WriterAcquisitionOptions['waitKind'],
+  coordinationKey?: string,
+): () => void {
+  let released = false;
+  return () => {
+    if (released) return;
+    const environment = runtimeEnvironment(input);
+    withCoordinationMutexSync(
+      acquired.policy,
+      input.onEvent,
+      (paths, guard) => {
+        removeWriterRequest(
+          paths,
+          acquired.writer,
+          acquired.policy,
+          input.onEvent,
+          environment,
+          guard,
+        );
+        if (coordinationKey !== undefined) {
+          cleanupEmptyRuntimeLeaseKeyWhileOwned(
+            paths,
+            coordinationKey,
+            acquired.policy,
+            environment,
+            guard,
+          );
+        }
+      },
+      environment,
+    );
+    clearInterval(acquired.timer);
+    released = true;
+    emitLeaseEvent(input, { kind: 'lease.release', operation });
+  };
+}
+
+function attachWriterAuthority<T extends RuntimeExclusiveLease | GlobalRuntimeMaintenanceLease>(
+  lease: T,
+  writer: WriterRecord,
+): T {
+  let mutationCapability: RuntimeWriterAuthority['mutationCapability'];
+  if (lease.kind === 'runtime-exclusive') {
+    mutationCapability =
+      lease.posture === 'destructive-discard' ? 'project-discard-only' : 'project-record';
+  } else {
+    mutationCapability = lease.receiptOnlyDiscard ? 'receipt-discard-only' : 'user-record';
+  }
+  const frozenLease = Object.freeze(lease);
+  RUNTIME_WRITER_AUTHORITIES.set(
+    frozenLease,
+    Object.freeze({
+      ownerToken: writer.ownerToken,
+      acquiredAt: writer.acquiredAt,
+      sequence: writer.sequence,
+      kind: writer.kind,
+      ...(writer.coordinationKey === undefined ? {} : { coordinationKey: writer.coordinationKey }),
+      mutationCapability,
+    } satisfies RuntimeWriterAuthority),
+  );
+  return frozenLease;
+}
+
+/** Acquire one path-stable project exclusive maintenance lease. */
+export async function acquireRuntimeExclusiveLease(
+  input: AcquireRuntimeExclusiveLeaseInput,
+): Promise<RuntimeExclusiveLease> {
+  const stableInput = captureRuntimeIdentity(input);
+  const coordinationKey = projectCoordinationKey(stableInput.projectDir);
+  const posture = stableInput.posture ?? 'normal';
+  const acquired = await acquireWriter(stableInput, {
+    kind: 'project',
+    coordinationKey,
+    waitKind: 'runtime-exclusive',
+    projectPosture: posture,
+    recoveryOperationId: stableInput.recoveryOperationId,
+  });
+  return attachWriterAuthority(
+    {
+      kind: 'runtime-exclusive',
+      ownerToken: acquired.ownerToken,
+      acquiredAt: acquired.acquiredAt,
+      coordinationKey,
+      posture,
+      release: writerReleaseHandle(acquired, stableInput, 'runtime-exclusive', coordinationKey),
+    },
+    acquired.writer,
+  );
+}
+
+/** Acquire the global exclusive user-runtime maintenance lease. */
+export async function acquireGlobalRuntimeMaintenanceLease(
+  input: AcquireGlobalRuntimeMaintenanceLeaseInput = {},
+): Promise<GlobalRuntimeMaintenanceLease> {
+  const stableInput = captureRuntimeIdentity(input);
+  const posture = stableInput.posture ?? 'normal';
+  const acquired = await acquireWriter(stableInput, {
+    kind: 'global',
+    waitKind: 'runtime-global-maintenance',
+    globalPosture: posture,
+    recoveryOperationId: stableInput.recoveryOperationId,
+  });
+  return attachWriterAuthority(
+    {
+      kind: 'runtime-global-maintenance',
+      ownerToken: acquired.ownerToken,
+      acquiredAt: acquired.acquiredAt,
+      posture,
+      receiptOnlyDiscard: posture === 'receipt-only-discard',
+      release: writerReleaseHandle(acquired, stableInput, 'runtime-global-maintenance'),
+    },
+    acquired.writer,
+  );
+}
+
+function assertRecoveryMutationAuthority(
+  paths: CoordinationPaths,
+  lease: WriterLeaseWithAuthority,
+  kind: 'project' | 'global',
+  mutationCapability: RuntimeWriterAuthority['mutationCapability'],
+  coordinationKey?: string,
+): void {
+  const authority = RUNTIME_WRITER_AUTHORITIES.get(lease);
+  const writer = readLeaseState(paths).writers.find(
+    (candidate) => candidate.ownerToken === lease.ownerToken,
+  );
+  if (
+    authority?.ownerToken !== lease.ownerToken ||
+    authority.acquiredAt !== lease.acquiredAt ||
+    authority.kind !== kind ||
+    authority.mutationCapability !== mutationCapability ||
+    authority.coordinationKey !== coordinationKey ||
+    writer?.phase !== 'intent' ||
+    writer.kind !== kind ||
+    writer.acquiredAt !== authority.acquiredAt ||
+    writer.sequence !== authority.sequence ||
+    (kind === 'project' && writer.coordinationKey !== coordinationKey)
+  ) {
+    throw new SystemError('Runtime recovery mutation no longer holds exclusive authority', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+    });
+  }
+}
+
+function fixedRecoveryMutation(
+  paths: CoordinationPaths,
+  parentDir: string,
+  basenameValue: string,
+  mutation: RuntimeRecoveryRecordMutation,
+  guard: RuntimeMutexGuard,
+): { readonly strategy: typeof COORDINATION_MUTATION_STRATEGY } {
+  return performAnchoredRecordMutation(
+    {
+      trustedAnchorDir: paths.coordinationDir,
+      parentDir,
+      basename: basenameValue,
+      operation: mutation.operation,
+      ...(mutation.operation === 'unlink' ? {} : { content: mutation.content }),
+      maxBytes: MAX_RECOVERY_BYTES,
+      ...(mutation.operation === 'create'
+        ? {}
+        : { expectedContentSha256: mutation.expectedContentSha256 }),
+      permissionPosture: 'private',
+    },
+    () => guard.assertOwned(),
+  );
+}
+
+function assertValidRecoveryMutationContent(
+  mutation: RuntimeRecoveryRecordMutation,
+  expectedKind: 'init-promotion' | 'user-uninstall',
+  expectedCoordinationKey?: string,
+): void {
+  if (mutation.operation === 'unlink') return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(mutation.content);
+  } catch {
+    throw unsafeCoordination('Recovery mutation content is not valid JSON');
+  }
+  if (
+    !isPlainRecord(parsed) ||
+    parsed.kind !== expectedKind ||
+    parsed.version !== RECOVERY_HEADER_VERSION ||
+    (parsed.state !== 'open' && parsed.state !== 'closed') ||
+    typeof parsed.operationId !== 'string' ||
+    !validateOperationId(parsed.operationId) ||
+    (parsed.reason !== undefined &&
+      (typeof parsed.reason !== 'string' ||
+        Buffer.byteLength(parsed.reason, 'utf8') > MAX_SAFE_TEXT)) ||
+    (expectedKind === 'init-promotion' &&
+      (typeof parsed.coordinationKey !== 'string' ||
+        parsed.coordinationKey !== expectedCoordinationKey))
+  ) {
+    throw unsafeCoordination('Recovery mutation content has an invalid bounded header');
+  }
+}
+
+/** Mutate only the fixed project promotion journal while its writer is live. */
+export async function mutateRuntimePromotionJournal(
+  lease: RuntimeExclusiveLease,
+  mutation: RuntimeRecoveryRecordMutation,
+): Promise<{ readonly strategy: typeof COORDINATION_MUTATION_STRATEGY }> {
+  if (lease.posture === 'destructive-discard') {
+    throw new SystemError('Destructive journal authority can only discard the fixed record', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  const policy = normalizePolicy();
+  return withCoordinationMutex(policy, undefined, policy.waitMs, (paths, guard) => {
+    assertRecoveryMutationAuthority(
+      paths,
+      lease,
+      'project',
+      'project-record',
+      lease.coordinationKey,
+    );
+    assertValidRecoveryMutationContent(mutation, 'init-promotion', lease.coordinationKey);
+    const projectPaths = paths.forProject(lease.coordinationKey);
+    return fixedRecoveryMutation(
+      paths,
+      projectPaths.projectCoordinationDir,
+      RUNTIME_PROMOTION_JOURNAL_FILE,
+      mutation,
+      guard,
+    );
+  });
+}
+
+/** Mutate only the fixed user-uninstall receipt while its global writer is live. */
+export async function mutateUserUninstallReceipt(
+  lease: GlobalRuntimeMaintenanceLease,
+  mutation: RuntimeRecoveryRecordMutation,
+): Promise<{ readonly strategy: typeof COORDINATION_MUTATION_STRATEGY }> {
+  if (lease.receiptOnlyDiscard) {
+    throw new SystemError('Receipt-only authority can only discard the fixed receipt', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  const policy = normalizePolicy();
+  return withCoordinationMutex(policy, undefined, policy.waitMs, (paths, guard) => {
+    assertRecoveryMutationAuthority(paths, lease, 'global', 'user-record');
+    assertValidRecoveryMutationContent(mutation, 'user-uninstall');
+    return fixedRecoveryMutation(
+      paths,
+      paths.coordinationDir,
+      USER_UNINSTALL_RECEIPT_FILE,
+      mutation,
+      guard,
+    );
+  });
+}
+
+/** Discard only the fixed promotion journal under explicit destructive posture. */
+export async function discardRuntimePromotionJournal(lease: RuntimeExclusiveLease): Promise<void> {
+  if (lease.posture !== 'destructive-discard') {
+    throw new SystemError('Promotion-journal discard requires destructive authority', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  const policy = normalizePolicy();
+  await withCoordinationMutex(policy, undefined, policy.waitMs, (paths, guard) => {
+    assertRecoveryMutationAuthority(
+      paths,
+      lease,
+      'project',
+      'project-discard-only',
+      lease.coordinationKey,
+    );
+    const projectPaths = paths.forProject(lease.coordinationKey);
+    unlinkFixedAnchoredRecordWithoutSize(
+      paths.coordinationDir,
+      projectPaths.projectCoordinationDir,
+      RUNTIME_PROMOTION_JOURNAL_FILE,
+      () => guard.assertOwned(),
+    );
+  });
+}
+
+/** Discard only the fixed malformed receipt under receipt-only posture. */
+export async function discardUserUninstallReceipt(
+  lease: GlobalRuntimeMaintenanceLease,
+): Promise<void> {
+  if (!lease.receiptOnlyDiscard) {
+    throw new SystemError('User receipt discard requires receipt-only authority', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  const policy = normalizePolicy();
+  await withCoordinationMutex(policy, undefined, policy.waitMs, (paths, guard) => {
+    assertRecoveryMutationAuthority(paths, lease, 'global', 'receipt-discard-only');
+    if (inspectUserReceiptHeader(paths).status !== 'malformed') {
+      throw recoveryRequired('Receipt-only discard requires a malformed fixed receipt.');
+    }
+    unlinkFixedAnchoredRecordWithoutSize(
+      paths.coordinationDir,
+      paths.coordinationDir,
+      USER_UNINSTALL_RECEIPT_FILE,
+      () => guard.assertOwned(),
+    );
+  });
+}
+
+export interface RuntimeLeaseCoordinator {
+  readonly acquireRuntimeReadLease: (
+    input: AcquireRuntimeReadLeaseInput,
+  ) => Promise<RuntimeReadLease>;
+  readonly acquireRuntimeExclusiveLease: (
+    input: AcquireRuntimeExclusiveLeaseInput,
+  ) => Promise<RuntimeExclusiveLease>;
+  readonly acquireUserStateReadLease: (
+    input?: AcquireUserStateReadLeaseInput,
+  ) => Promise<UserStateReadLease>;
+  readonly acquireGlobalRuntimeMaintenanceLease: (
+    input?: AcquireGlobalRuntimeMaintenanceLeaseInput,
+  ) => Promise<GlobalRuntimeMaintenanceLease>;
+  readonly acquireRuntimeAccessLease: (
+    input: AcquireRuntimeAccessLeaseInput,
+  ) => Promise<RuntimeAccessLease>;
+}
+
+function bindRuntimeEnvironment<T extends RuntimeLeaseCommonInput>(
+  input: T,
+  environment: RuntimeLeaseEnvironment,
+): T {
+  return { ...input, [RUNTIME_ENVIRONMENT]: environment };
+}
+
+/**
+ * Build an isolated coordinator with deterministic clock/process/poll seams.
+ * Production top-level APIs use the frozen default environment; tests and
+ * fault harnesses close over overrides here without module-global run state.
+ */
+export function createRuntimeLeaseCoordinator(
+  overrides: Partial<RuntimeLeaseEnvironment> = {},
+): RuntimeLeaseCoordinator {
+  const environment: RuntimeLeaseEnvironment = Object.freeze({
+    ...DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+    ...overrides,
+    monotonicNow:
+      overrides.monotonicNow ?? overrides.now ?? DEFAULT_RUNTIME_LEASE_ENVIRONMENT.monotonicNow,
+    hostInstanceIdentity:
+      overrides.hostInstanceIdentity ??
+      (overrides.hostname === undefined
+        ? DEFAULT_RUNTIME_LEASE_ENVIRONMENT.hostInstanceIdentity
+        : noHostInstanceIdentity),
+  });
+  return Object.freeze({
+    acquireRuntimeReadLease: (input: AcquireRuntimeReadLeaseInput) =>
+      acquireRuntimeReadLease(bindRuntimeEnvironment(input, environment)),
+    acquireRuntimeExclusiveLease: (input: AcquireRuntimeExclusiveLeaseInput) =>
+      acquireRuntimeExclusiveLease(bindRuntimeEnvironment(input, environment)),
+    acquireUserStateReadLease: (input: AcquireUserStateReadLeaseInput = {}) =>
+      acquireUserStateReadLease(bindRuntimeEnvironment(input, environment)),
+    acquireGlobalRuntimeMaintenanceLease: (input: AcquireGlobalRuntimeMaintenanceLeaseInput = {}) =>
+      acquireGlobalRuntimeMaintenanceLease(bindRuntimeEnvironment(input, environment)),
+    acquireRuntimeAccessLease: (input: AcquireRuntimeAccessLeaseInput) =>
+      acquireRuntimeAccessLease(bindRuntimeEnvironment(input, environment)),
+  });
+}
+
+function coordinationRootPresence(paths: CoordinationPaths): 'absent' | 'present' {
+  try {
+    lstatSync(paths.coordinationDir);
+    return 'present';
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+    throw unsafeCoordination('Runtime coordination root cannot be inspected');
+  }
+}
+
+function assertExistingScaffold(paths: CoordinationPaths): void {
+  assertDirectory(paths.coordinationDir);
+  assertDirectory(paths.projectsDir, paths.coordinationDir);
+  assertDirectory(paths.userReadersDir, paths.coordinationDir);
+  validateCoordinationRootEntries(paths);
+}
+
+/** Trusted Init seam for the bounded fixed promotion header only. */
+export function inspectRuntimePromotionRecoveryHeader(
+  projectDir: string,
+): RecoveryHeaderInspection {
+  const paths = resolveCoordinationPaths();
+  if (coordinationRootPresence(paths) === 'absent') return { status: 'absent' };
+  assertExistingScaffold(paths);
+  const coordinationKey = projectCoordinationKey(projectDir);
+  const projectPaths = paths.forProject(coordinationKey);
+  if (
+    lstatIfPresent(projectPaths.projectCoordinationDir, 'Runtime project coordination state') ===
+    undefined
+  ) {
+    return { status: 'absent' };
+  }
+  validateProjectCoordinationEntries(paths, coordinationKey);
+  return inspectRecoveryHeader(
+    projectPaths.promotionJournalFile,
+    'init-promotion',
+    coordinationKey,
+    false,
+  );
+}
+
+/** Trusted uninstall seam for the bounded fixed user receipt header only. */
+export function inspectUserUninstallRecoveryHeader(): RecoveryHeaderInspection {
+  const paths = resolveCoordinationPaths();
+  if (coordinationRootPresence(paths) === 'absent') return { status: 'absent' };
+  assertExistingScaffold(paths);
+  return inspectRecoveryHeader(paths.userUninstallReceiptFile, 'user-uninstall', undefined, false);
+}
+
+function sanitizedRecovery(inspection: RecoveryHeaderInspection): RuntimeRecoveryStateProjection {
+  if (inspection.status === 'absent') return { status: 'absent' };
+  if (inspection.status === 'malformed') return { status: 'malformed' };
+  return { status: 'valid', state: inspection.state };
+}
+
+function readProjectInspection(
+  paths: CoordinationPaths,
+  coordinationKey: string,
+  policy: RuntimeLeasePolicy,
+): {
+  readonly readers: number;
+  readonly promotion: RecoveryHeaderInspection;
+} {
+  const projectDir = join(paths.projectsDir, coordinationKey);
+  try {
+    lstatSync(projectDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { readers: 0, promotion: { status: 'absent' } };
+    }
+    throw unsafeCoordination('Runtime project coordination state cannot be inspected');
+  }
+  validateProjectCoordinationEntries(paths, coordinationKey);
+  const projectPaths = paths.forProject(coordinationKey);
+  const readers = readReaderRecords(projectPaths.readersDir, 'project', false).filter(
+    ({ record }) => !ownerIsStale(record, policy, Date.now()),
+  ).length;
+  return {
+    readers,
+    promotion: inspectRecoveryHeader(
+      projectPaths.promotionJournalFile,
+      'init-promotion',
+      coordinationKey,
+      false,
+    ),
+  };
+}
+
+function inspectionIdentity(path: string): string {
+  try {
+    const stat = lstatSync(path, { bigint: true });
+    if (stat.isSymbolicLink()) return 'unsafe-symlink';
+    return [stat.dev, stat.ino, stat.mode, stat.nlink, stat.size, stat.mtimeNs].join(':');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+    throw unsafeCoordination('Runtime coordination snapshot identity cannot be inspected');
+  }
+}
+
+function captureInspectionIdentities(
+  paths: CoordinationPaths,
+  coordinationKey: string,
+): readonly string[] {
+  const project = paths.forProject(coordinationKey);
+  return [
+    paths.coordinationDir,
+    paths.globalMutexFile,
+    paths.stateFile,
+    paths.projectsDir,
+    paths.userReadersDir,
+    paths.userUninstallReceiptFile,
+    project.projectCoordinationDir,
+    project.readersDir,
+    project.promotionJournalFile,
+  ].map(inspectionIdentity);
+}
+
+function hasRuntimeMutexPublicationTemp(paths: CoordinationPaths): boolean {
+  return readDirectoryBounded(
+    paths.coordinationDir,
+    MAX_MUTEX_TEMPS + 8,
+    'Runtime coordination root',
+  ).some((entry) => MUTEX_TEMP_FILE_PATTERN.test(entry));
+}
+
+/**
+ * Inspect the current project's coordination state without creating or
+ * repairing any directory, mutex, queue, reader record, or recovery file.
+ */
+export async function inspectRuntimeLeaseState(
+  projectDir: string,
+): Promise<RuntimeLeaseStateInspection> {
+  await Promise.resolve();
+  const coordinationKey = projectCoordinationKey(projectDir);
+  const paths = resolveCoordinationPaths();
+  if (coordinationRootPresence(paths) === 'absent') {
+    return {
+      status: 'stable',
+      projectReaders: 0,
+      userStateReaders: 0,
+      writer: 'none',
+      globalWriter: 'none',
+      promotion: { status: 'absent' },
+      userUninstall: { status: 'absent' },
+    };
+  }
+  const policy = normalizePolicy();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const before = captureInspectionIdentities(paths, coordinationKey);
+    // A stable-looking filesystem snapshot can still be an intermediate
+    // composite transition while the mutex holder is between dimensions.
+    if (before[1] !== 'absent' || hasRuntimeMutexPublicationTemp(paths)) {
+      await Promise.resolve();
+      continue;
+    }
+    try {
+      assertExistingScaffold(paths);
+      const state = inspectLeaseState(paths);
+      const now = Date.now();
+      const liveWriters = state.writers.filter((writer) => !ownerIsStale(writer, policy, now));
+      const project = readProjectInspection(paths, coordinationKey, policy);
+      const userReaders = readReaderRecords(paths.userReadersDir, 'user', false).filter(
+        ({ record }) => !ownerIsStale(record, policy, now),
+      ).length;
+      const projectWriter = liveWriters.find(
+        (writer) => writer.kind === 'project' && writer.coordinationKey === coordinationKey,
+      );
+      const globalWriter = liveWriters.find((writer) => writer.kind === 'global');
+      const result: StableRuntimeLeaseStateInspection = {
+        status: 'stable',
+        projectReaders: project.readers,
+        userStateReaders: userReaders,
+        writer: projectWriter?.phase ?? 'none',
+        globalWriter: globalWriter?.phase ?? 'none',
+        promotion: sanitizedRecovery(project.promotion),
+        userUninstall: sanitizedRecovery(
+          inspectRecoveryHeader(paths.userUninstallReceiptFile, 'user-uninstall', undefined, false),
+        ),
+      };
+      const after = captureInspectionIdentities(paths, coordinationKey);
+      if (before.some((identity, index) => identity !== after[index])) {
+        await Promise.resolve();
+        continue;
+      }
+      return result;
+    } catch (error) {
+      let changed = error instanceof RuntimeSnapshotChangedError;
+      if (before[3] === 'absent' || before[4] === 'absent') {
+        changed = true;
+      }
+      if (!changed) {
+        try {
+          const after = captureInspectionIdentities(paths, coordinationKey);
+          changed = before.some((identity, index) => identity !== after[index]);
+        } catch {
+          changed = true;
+        }
+      }
+      if (!changed) throw error;
+      await Promise.resolve();
+    }
+  }
+  return { status: 'busy', reason: 'changed-during-inspection' };
+}
+
+/**
+ * Return bounded active project coordination keys for cache-prune optimization.
+ *
+ * Unsafe, malformed, or over-cap state throws rather than returning a false
+ * empty set; pruning must treat that uncertainty as "skip deletion".
+ */
+export async function listActiveRuntimeLeaseKeys(): Promise<readonly string[]> {
+  const paths = resolveCoordinationPaths();
+  if (coordinationRootPresence(paths) === 'absent') return [];
+  assertExistingScaffold(paths);
+  const policy = normalizePolicy();
+  return withCoordinationMutex(policy, undefined, policy.waitMs, (lockedPaths, guard) => {
+    let state = cleanStaleWriters(
+      lockedPaths,
+      readLeaseState(lockedPaths),
+      policy,
+      undefined,
+      DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+      guard,
+    );
+    if (state.writers.some((writer) => writer.kind === 'global')) {
+      throw unsafeCoordination('Global runtime maintenance prevents safe cache pruning');
+    }
+    if (inspectUserReceiptHeader(lockedPaths).status !== 'absent') {
+      throw unsafeCoordination('User-uninstall recovery state prevents safe cache pruning');
+    }
+    const active = new Set<string>();
+    for (const writer of state.writers) {
+      if (writer.kind === 'project' && writer.coordinationKey !== undefined) {
+        active.add(writer.coordinationKey);
+      }
+    }
+    const processInspectionCache = createProcessInspectionCache();
+    for (const coordinationKey of listProjectCoordinationKeys(lockedPaths, guard)) {
+      const projectPaths = lockedPaths.forProject(coordinationKey);
+      const promotion = inspectRecoveryHeader(
+        projectPaths.promotionJournalFile,
+        'init-promotion',
+        coordinationKey,
+      );
+      // Open, closed, and malformed journals all preserve the source cache key
+      // until Init recovery or explicit discard has completed.
+      if (promotion.status !== 'absent') active.add(coordinationKey);
+      if (
+        cleanAndListReaders(
+          projectPaths.readersDir,
+          'project',
+          policy,
+          undefined,
+          DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+          guard,
+          undefined,
+          undefined,
+          processInspectionCache,
+        ).length > 0
+      ) {
+        active.add(coordinationKey);
+      }
+    }
+    state = readLeaseState(lockedPaths);
+    if (state.writers.length > MAX_WRITER_QUEUE) {
+      throw unsafeCoordination('Runtime writer state became uncertain during enumeration');
+    }
+    if (state.writers.some((writer) => writer.kind === 'global')) {
+      throw unsafeCoordination('Global runtime maintenance changed during cache-prune enumeration');
+    }
+    return Object.freeze([...active].sort());
+  });
+}
+
+export type EmptyRuntimeLeaseKeyCleanup = 'absent' | 'kept' | 'removed';
+
+function cleanupEmptyRuntimeLeaseKeyWhileOwned(
+  lockedPaths: CoordinationPaths,
+  coordinationKey: string,
+  policy: RuntimeLeasePolicy,
+  environment: RuntimeLeaseEnvironment,
+  guard: RuntimeMutexGuard,
+): EmptyRuntimeLeaseKeyCleanup {
+  const projectPaths = lockedPaths.forProject(coordinationKey);
+  try {
+    lstatSync(projectPaths.projectCoordinationDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+    throw unsafeCoordination('Runtime key directory cannot be inspected');
+  }
+  assertDirectory(projectPaths.projectCoordinationDir, lockedPaths.coordinationDir);
+  validateProjectCoordinationEntries(lockedPaths, coordinationKey, guard);
+  const state = cleanStaleWriters(
+    lockedPaths,
+    readLeaseState(lockedPaths),
+    policy,
+    undefined,
+    environment,
+    guard,
+  );
+  if (
+    state.writers.some(
+      (writer) => writer.kind === 'project' && writer.coordinationKey === coordinationKey,
+    )
+  ) {
+    return 'kept';
+  }
+  if (
+    inspectRecoveryHeader(projectPaths.promotionJournalFile, 'init-promotion', coordinationKey)
+      .status !== 'absent'
+  ) {
+    return 'kept';
+  }
+  if (
+    cleanAndListReaders(projectPaths.readersDir, 'project', policy, undefined, environment, guard)
+      .length > 0
+  ) {
+    return 'kept';
+  }
+  const readerEntries = validateReaderDirectoryEntries(
+    projectPaths.readersDir,
+    lockedPaths.coordinationDir,
+    guard,
+  );
+  validateProjectCoordinationEntries(lockedPaths, coordinationKey, guard);
+  const projectEntries = readDirectoryBounded(
+    projectPaths.projectCoordinationDir,
+    MAX_MUTEX_TEMPS + 2,
+    'Runtime project coordination directory',
+  );
+  if (readerEntries.length > 0 || projectEntries.some((entry) => entry !== 'readers')) {
+    return 'kept';
+  }
+  const projectParent = openParentIdentity(
+    projectPaths.projectCoordinationDir,
+    lockedPaths.coordinationDir,
+  );
+  try {
+    const readersIdentity = assertDirectory(projectPaths.readersDir, lockedPaths.coordinationDir);
+    const projectsParent = openParentIdentity(lockedPaths.projectsDir, lockedPaths.coordinationDir);
+    try {
+      environment.coordinationCheckpoint?.('empty-scaffold-parents-opened');
+      assertParentUnchanged(
+        projectParent.fd,
+        projectParent.identity,
+        projectPaths.projectCoordinationDir,
+        lockedPaths.coordinationDir,
+      );
+      const readersNow = assertDirectory(projectPaths.readersDir, lockedPaths.coordinationDir);
+      if (
+        !sameIdentity(readersIdentity, readersNow) ||
+        validateReaderDirectoryEntries(projectPaths.readersDir, lockedPaths.coordinationDir, guard)
+          .length > 0
+      ) {
+        return 'kept';
+      }
+      guard.refresh();
+      guard.assertOwned();
+      rmdirSync(projectPaths.readersDir);
+      guard.assertOwned();
+      fsyncParent(projectParent.fd);
+      assertParentUnchanged(
+        projectsParent.fd,
+        projectsParent.identity,
+        lockedPaths.projectsDir,
+        lockedPaths.coordinationDir,
+      );
+      if (
+        readDirectoryBounded(
+          projectPaths.projectCoordinationDir,
+          MAX_MUTEX_TEMPS + 2,
+          'Runtime project coordination directory',
+        ).length > 0
+      ) {
+        mkdirSecure(projectPaths.readersDir, lockedPaths.coordinationDir);
+        return 'kept';
+      }
+      const projectNow = assertDirectory(
+        projectPaths.projectCoordinationDir,
+        lockedPaths.coordinationDir,
+      );
+      if (!sameIdentity(projectParent.identity, projectNow)) {
+        mkdirSecure(projectPaths.readersDir, lockedPaths.coordinationDir);
+        return 'kept';
+      }
+      guard.refresh();
+      guard.assertOwned();
+      rmdirSync(projectPaths.projectCoordinationDir);
+      guard.assertOwned();
+      fsyncParent(projectsParent.fd);
+      return 'removed';
+    } finally {
+      closeSync(projectsParent.fd);
+    }
+  } finally {
+    closeSync(projectParent.fd);
+  }
+}
+
+/**
+ * Remove only a proven-empty per-key scaffold under the global mutex.
+ * Recovery journals, live/malformed readers, writer requests, temporary or
+ * unknown entries all preserve the directory.
+ */
+export async function cleanupEmptyRuntimeLeaseKey(
+  coordinationKey: string,
+): Promise<EmptyRuntimeLeaseKeyCleanup> {
+  if (!PROJECT_KEY_PATTERN.test(coordinationKey)) {
+    throw new SystemError('Runtime coordination key is invalid', {
+      code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+    });
+  }
+  const paths = resolveCoordinationPaths();
+  if (coordinationRootPresence(paths) === 'absent') return 'absent';
+  assertExistingScaffold(paths);
+  const policy = normalizePolicy({ waitMs: 250 });
+  return withCoordinationMutex(policy, undefined, policy.waitMs, (lockedPaths, guard) =>
+    cleanupEmptyRuntimeLeaseKeyWhileOwned(
+      lockedPaths,
+      coordinationKey,
+      policy,
+      DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+      guard,
+    ),
+  );
+}

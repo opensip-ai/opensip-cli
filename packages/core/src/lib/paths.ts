@@ -54,6 +54,8 @@ import {
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 
+import { SystemError } from './errors.js';
+
 import type { BundledToolShortId } from '../tools/ids.js';
 
 // =============================================================================
@@ -226,6 +228,34 @@ export interface UserPaths {
   readonly updateStateFile: string;
 }
 
+/** Fixed per-project Init promotion journal basename. */
+export const RUNTIME_PROMOTION_JOURNAL_FILE = 'runtime-promotion.json';
+
+/** Fixed user-uninstall recovery receipt basename. */
+export const USER_UNINSTALL_RECEIPT_FILE = 'user-uninstall.json';
+
+/** Stable paths used only for runtime coordination, never customer evidence. */
+export interface CoordinationPaths {
+  /** Sibling of `~/.opensip-cli`; user uninstall must never recursively remove it. */
+  readonly coordinationDir: string;
+  /** Short-lived global mutex used only while publishing coordination transitions. */
+  readonly globalMutexFile: string;
+  /** Bounded FIFO writer queue and monotonic sequence record. */
+  readonly stateFile: string;
+  /** Container for path-stable canonical project coordination keys. */
+  readonly projectsDir: string;
+  /** Shared user-state reader records. */
+  readonly userReadersDir: string;
+  /** Fixed external user-uninstall recovery receipt. */
+  readonly userUninstallReceiptFile: string;
+  /** Resolve the fixed, non-generation-bound layout for one coordination key. */
+  readonly forProject: (coordinationKey: string) => {
+    readonly projectCoordinationDir: string;
+    readonly readersDir: string;
+    readonly promotionJournalFile: string;
+  };
+}
+
 /** Resolve the user-level path layout. */
 export function resolveUserPaths(): UserPaths {
   const userHomeDir = join(homedir(), '.opensip-cli');
@@ -238,6 +268,39 @@ export function resolveUserPaths(): UserPaths {
     updateStateFile: join(userHomeDir, 'update-state.json'),
     authoredToolsDir: join(userHomeDir, 'tools'),
     pluginsDir: (domain) => join(userHomeDir, 'plugins', domain),
+  };
+}
+
+/**
+ * Resolve the small coordination-only sibling root.
+ *
+ * This root deliberately lives outside `~/.opensip-cli/`: global uninstall can
+ * move or remove the user-data tree, but it must not remove and recreate the
+ * mutex that prevents another process from entering that tree concurrently.
+ */
+export function resolveCoordinationPaths(): CoordinationPaths {
+  const coordinationDir = join(homedir(), '.opensip-cli-coordination');
+  const projectsDir = join(coordinationDir, 'projects');
+  return {
+    coordinationDir,
+    globalMutexFile: join(coordinationDir, 'coordination.lock'),
+    stateFile: join(coordinationDir, 'state.json'),
+    projectsDir,
+    userReadersDir: join(coordinationDir, 'user-readers'),
+    userUninstallReceiptFile: join(coordinationDir, USER_UNINSTALL_RECEIPT_FILE),
+    forProject: (coordinationKey) => {
+      if (!/^[a-f0-9]{24}$/u.test(coordinationKey)) {
+        throw new SystemError('Runtime coordination key is invalid', {
+          code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+        });
+      }
+      const projectCoordinationDir = join(projectsDir, coordinationKey);
+      return {
+        projectCoordinationDir,
+        readersDir: join(projectCoordinationDir, 'readers'),
+        promotionJournalFile: join(projectCoordinationDir, RUNTIME_PROMOTION_JOURNAL_FILE),
+      };
+    },
   };
 }
 
