@@ -717,10 +717,17 @@ test('lifecycle.version passes on a matching version and fails on a wrong exit',
 
 test('a command journey step whose setup throws fails with command-step-setup-failed', async () => {
   const fitPackExecutor = getJourney('extensions.fit-pack').executor;
-  // The first fit-pack step's setup mkdirs under the workRoot; an unwritable root
-  // makes it throw before any port call.
+  // The first fit-pack step's setup does `mkdirSync(join(workRoot, 'src'), …)`.
+  // Route the workRoot THROUGH a regular file so that recursive mkdir fails with
+  // ENOTDIR before any port call — deterministically on macOS and Linux, root or
+  // non-root. A bare `/proc/…` path is environment-dependent: on Linux the
+  // recursive mkdir neither throws nor returns as this test assumed, wedging the
+  // executor (the cause of the pre-existing `test:scripts` hang on the Linux CI
+  // runner, where `test:scripts` first reaches this file).
+  const blockingFile = join(tmpRoot(), 'not-a-directory');
+  writeFileSync(blockingFile, 'x');
   const { context } = queuedContext([], {
-    workRoot: '/proc/nonexistent-acceptance-root/deep',
+    workRoot: join(blockingFile, 'deep'),
   });
   const outcome = await fitPackExecutor(context);
   assert.equal(outcome.status, 'fail');

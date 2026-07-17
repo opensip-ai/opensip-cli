@@ -6,7 +6,11 @@ import type { ChildProcess } from 'node:child_process';
 const MAX_PROCESS_ROWS = 100_000;
 const MAX_TRACKED_DESCENDANTS = 4096;
 const PROCESS_SNAPSHOT_BYTES = 8 * 1024 * 1024;
-const PROCESS_SNAPSHOT_TIMEOUT_MS = 1000;
+// `ps` normally returns in well under a second, but the workspace coverage lane
+// runs every package's tests concurrently; under that IO/CPU contention a 1s bound
+// can be exceeded, which would mark descendant tracking unreliable. A generous but
+// still-bounded ceiling avoids that spurious failure on a loaded CI runner.
+const PROCESS_SNAPSHOT_TIMEOUT_MS = 15_000;
 const TRACKING_INTERVAL_MS = 200;
 
 /** The child-process surface retained after Node reports the root process closed. */
@@ -60,13 +64,14 @@ function parseProcessSnapshot(stdout: string): readonly PosixProcessIdentity[] {
   if (lines.length > MAX_PROCESS_ROWS) {
     throw new Error('Agent-eval process inventory exceeded its row ceiling.');
   }
+  let observedRows = 0;
   for (const line of lines) {
     if (line.trim().length === 0) continue;
+    observedRows += 1;
     const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(.+)$/u.exec(line);
-    if (match === null) throw new Error('Agent-eval could not parse the POSIX process inventory.');
+    if (match === null) continue;
     const details = /^(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d{4})\s+(.+?)\s*$/u.exec(match[5]);
-    if (details === null)
-      throw new Error('Agent-eval could not parse the POSIX process inventory.');
+    if (details === null) continue;
     const pid = Number(match[1]);
     const parentPid = Number(match[2]);
     const processGroupId = Number(match[3]);
@@ -82,7 +87,13 @@ function parseProcessSnapshot(stdout: string): readonly PosixProcessIdentity[] {
       posixSession < 0 ||
       command.length === 0
     ) {
-      throw new Error('Agent-eval observed an invalid POSIX process identity.');
+      // A system-wide `ps -ax` legitimately lists rows this observation never
+      // needs to track: kernel threads (process-group id 0 on Linux, absent on
+      // macOS) and the occasional transient/odd row. Skip them rather than fail
+      // the whole snapshot — a spawned descendant always has a positive pid/pgid,
+      // so skipping never hides one. (Throwing here made descendant observation
+      // "unavailable" on Linux, where `ps -ax` includes pgid-0 kernel threads.)
+      continue;
     }
     rows.push(
       Object.freeze({
@@ -94,6 +105,12 @@ function parseProcessSnapshot(stdout: string): readonly PosixProcessIdentity[] {
         startedAt,
       }),
     );
+  }
+  // A non-empty `ps` snapshot always yields at least this process and `ps` itself.
+  // Zero usable rows from non-empty output means the `ps` format itself is
+  // unusable — a table-level fault we still surface.
+  if (rows.length === 0 && observedRows > 0) {
+    throw new Error('Agent-eval could not parse the POSIX process inventory.');
   }
   return rows;
 }

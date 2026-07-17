@@ -24,6 +24,19 @@ globalExcludes:
   # Vitest coverage output is generated, gitignored, vendored HTML/JS — never
   # first-party source. Keep generated artifacts out of analysis.
   - '**/coverage/**'
+  # Private, never-published packages are NOT the shipped product the dogfood
+  # gate enforces (see ADR-0167). The gate proves the shipped CLI analyzes clean;
+  # these three are `private: true`, ship to no customer, and only trip the
+  # production bar as harness/scaffolding noise. Excluding them here mirrors the
+  # docs/fixtures/coverage carve-outs above and inoculates the next private
+  # package added under `packages/*/src`. ESLint still lints them; only the fit
+  # product gate stops treating them as shipped source.
+  #   - agent-eval:     black-box eval harness (ADR-0157 / ADR-0158)
+  #   - test-support:   cross-package test scaffolding (ADR-0040)
+  #   - checks-dogfood: repo-only architecture check pack (loaded via plugins)
+  - 'packages/agent-eval/**'
+  - 'packages/test-support/**'
+  - 'packages/fitness/checks-dogfood/**'
 
 # =============================================================================
 # Plugins

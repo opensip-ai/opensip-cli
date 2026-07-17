@@ -1944,7 +1944,7 @@ test('the scheduled packed macOS shape skips published-only installer and absent
 // measured-process substrate — RSS tagging + outcome classification
 // ---------------------------------------------------------------------------
 
-test('parseProcessTable parses valid rows and rejects any malformed sample', () => {
+test('parseProcessTable keeps relevant rows, skips kernel/malformed rows, rejects unusable tables', () => {
   const rows = parseProcessTable(
     '100 1 100 100 Wed Jul 15 10:00:00 2026 2048 /usr/bin/node\n' +
       '200 100 100 100 Wed Jul 15 10:00:01 2026 1024 /Applications/OpenSIP CLI/node\n',
@@ -1969,8 +1969,26 @@ test('parseProcessTable parses valid rows and rejects any malformed sample', () 
       rssBytes: 1024 * 1024,
     },
   ]);
-  for (const malformed of [
-    '100 1 100 100 Wed Jul 15 10:00:00 2026 2048 /usr/bin/node\nbad line\n',
+
+  // A system-wide `ps -e` snapshot legitimately mixes relevant rows with kernel
+  // threads (process-group id 0, e.g. Linux `kthreadd`/`kworker`) and transient
+  // half-written lines. Those are SKIPPED, not fatal — the valid rows still
+  // parse. Regression guard: throwing on pgid-0 kernel threads is exactly what
+  // broke RSS measurement on Linux CI (`maxRssBytes was not measured`).
+  const mixed = parseProcessTable(
+    '2 0 0 0 Wed Jul 15 09:59:00 2026 0 kthreadd\n' + // kernel thread: pgid 0 -> skipped
+      '100 1 100 100 Wed Jul 15 10:00:00 2026 2048 /usr/bin/node\n' + // relevant -> kept
+      'bad line\n' + // transient malformed -> skipped
+      '200 100 100 100 Wed Jul 15 10:00:01 2026 1024 /usr/bin/node\n', // relevant -> kept
+  );
+  assert.deepEqual(
+    mixed.map((row) => row.pid),
+    [100, 200],
+  );
+
+  // Inputs that leave NOTHING parseable are a table-level fault — this surfaces a
+  // real `ps`-format regression instead of silently measuring an empty tree.
+  for (const unusable of [
     'bad line\nno rows\n',
     '-1 0 1 1 Wed Jul 15 10:00:00 2026 10 /usr/bin/node\n',
     '1 -1 1 1 Wed Jul 15 10:00:00 2026 10 /usr/bin/node\n',
@@ -1987,7 +2005,7 @@ test('parseProcessTable parses valid rows and rejects any malformed sample', () 
     '1 0 1 10\n',
     '',
   ]) {
-    assert.throws(() => parseProcessTable(malformed), /process table/);
+    assert.throws(() => parseProcessTable(unusable), /process table/);
   }
   assert.throws(
     () => parseProcessTable(Buffer.from('1 0 1 1 Wed Jul 15 10:00:00 2026 10 /usr/bin/node\n')),

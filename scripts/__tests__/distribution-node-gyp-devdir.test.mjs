@@ -217,14 +217,28 @@ test('Windows node-gyp devdir cloning rejects links and special files', async (t
     const fixture = await createValidFixture();
     try {
       const collisionPath = win32.join(fixture.versionRoot, 'INCLUDE');
+      const includePath = win32.join(fixture.versionRoot, 'include');
+      // The synthetic `INCLUDE` entry — AND everything beneath it — resolves to
+      // the real `include` directory. A case-INSENSITIVE filesystem (macOS)
+      // does this silently, so the original mock only redirected the exact
+      // `INCLUDE` path; on a case-SENSITIVE FS (Linux CI) the walk descends into
+      // `INCLUDE/node`, `INCLUDE/…`, etc., so the whole subtree must be
+      // redirected or lstat/opendir throw ENOENT before the case-collision is
+      // detected. Handle either path separator (win32 `\` and posix `/`).
+      const toIncludeSubtree = (path) => {
+        if (path === collisionPath) return includePath;
+        for (const sep of ['/', '\\']) {
+          if (path.startsWith(collisionPath + sep)) {
+            return includePath + path.slice(collisionPath.length);
+          }
+        }
+        return path;
+      };
       const filesystem = {
         ...fixture.mapping.filesystem,
-        lstat: async (path) =>
-          await fixture.mapping.filesystem.lstat(
-            path === collisionPath ? win32.join(fixture.versionRoot, 'include') : path,
-          ),
+        lstat: async (path) => await fixture.mapping.filesystem.lstat(toIncludeSubtree(path)),
         opendir: async (path) => {
-          const handle = await fixture.mapping.filesystem.opendir(path);
+          const handle = await fixture.mapping.filesystem.opendir(toIncludeSubtree(path));
           if (path !== fixture.versionRoot) return handle;
           return {
             async *[Symbol.asyncIterator]() {

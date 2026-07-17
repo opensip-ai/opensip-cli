@@ -9,11 +9,8 @@ import {
   type PlatformQualification,
   type PlatformSupportRow,
 } from '../../index.js';
-import {
-  MACOS_INTEL_ROW,
-  MACOS_PREVIEW_ROW,
-  assertPlatformSupportRowsValid,
-} from '../platform-support-rows.js';
+import { MACOS_INTEL_ROW, MACOS_PREVIEW_ROW } from '../platform-support-rows.js';
+import { assertPlatformSupportRowsValid } from '../platform-support-validate.js';
 
 /** The exact supported tuple (spec §4), fully observed. */
 const EXACT_MACOS: ObservedHost = Object.freeze({
@@ -83,6 +80,14 @@ describe('platform-support registry', () => {
 
   it('accepts only complete, immutable GA qualification metadata', () => {
     expect(() => assertPlatformSupportRowsValid([supportedRow()])).not.toThrow();
+
+    // A supported row must carry a profile + evidence + qualification block.
+    expect(() =>
+      assertPlatformSupportRowsValid([{ ...supportedRow(), profile: undefined }]),
+    ).toThrow(/lacks a qualification profile\/evidence/u);
+    expect(() =>
+      assertPlatformSupportRowsValid([{ ...supportedRow(), qualification: undefined }]),
+    ).toThrow(/lacks qualification metadata/u);
 
     for (const consecutiveDailyPasses of [13, 14.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN]) {
       expect(() =>
@@ -192,6 +197,22 @@ describe('platform-support registry', () => {
         },
         /duplicate install channel/u,
       ],
+      // A non-lowercase-token tuple field is rejected (exercises assertLowercaseToken).
+      [
+        { ...MACOS_PREVIEW_ROW, tuple: { ...MACOS_PREVIEW_ROW.tuple, arch: 'ARM64' } },
+        /tuple arch is invalid/u,
+      ],
+      [
+        { ...MACOS_PREVIEW_ROW, tuple: { ...MACOS_PREVIEW_ROW.tuple, nodeAbi: 'v137' } },
+        /invalid tuple nodeAbi/u,
+      ],
+      [
+        {
+          ...MACOS_PREVIEW_ROW,
+          tuple: { ...MACOS_PREVIEW_ROW.tuple, caseSensitive: 'no' as unknown as boolean },
+        },
+        /invalid tuple caseSensitive/u,
+      ],
       [{ ...MACOS_PREVIEW_ROW, profile: { id: 'Not Stable', version: 1 } }, /invalid profile id/u],
       [
         {
@@ -203,6 +224,17 @@ describe('platform-support registry', () => {
       [{ ...MACOS_PREVIEW_ROW, docsPath: '../private.md' }, /invalid public docs path/u],
       [
         { ...MACOS_PREVIEW_ROW, docsUrl: ['http:', '', 'opensip.ai', 'support'].join('/') },
+        /invalid public docs URL/u,
+      ],
+      // A control character in the URL is rejected by the bounded-input guard
+      // (exercises containsControlCharacter's positive branch).
+      [
+        { ...MACOS_PREVIEW_ROW, docsUrl: `https://opensip.ai/${String.fromCodePoint(1)}` },
+        /invalid public docs URL/u,
+      ],
+      // An over-length URL (> 2048) is rejected before parsing.
+      [
+        { ...MACOS_PREVIEW_ROW, docsUrl: `https://opensip.ai/${'a'.repeat(2049)}` },
         /invalid public docs URL/u,
       ],
       [
