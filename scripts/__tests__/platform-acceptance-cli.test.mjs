@@ -180,6 +180,28 @@ test('packed-release invocation without --expected-version is rejected before ca
   assert.match(result.stderr, /--expected-version is required with --packed-release/);
 });
 
+test('bare -- end-of-options markers (pnpm script separator) are ignored', () => {
+  // pnpm 11 forwards `pnpm platform:acceptance -- --profile …` as
+  // argv `["--", "--profile", …]`. The grammar must not reject that as
+  // `unknown flag --` — that exact misparse classified every macOS
+  // packed-candidate qualification run as candidate-fault before any journey.
+  const withSeparators = run(['--', ...validShapeArgs(), '--', '--json-summary']);
+  assert.equal(withSeparators.code, 2, withSeparators.stderr);
+  assert.equal(withSeparators.stdout, '');
+  // Must progress past flag parsing into real validation / candidate resolution,
+  // not stop at "unknown flag --".
+  assert.doesNotMatch(withSeparators.stderr, /unknown flag --/);
+  assert.match(
+    withSeparators.stderr,
+    /does-not-exist|profile|candidate|infrastructure|harness-git-sha|could not|ENOENT|not found|invalid/i,
+  );
+
+  const onlySeparator = run(['--']);
+  assert.equal(onlySeparator.code, 2);
+  assert.match(onlySeparator.stderr, /--profile is required/);
+  assert.doesNotMatch(onlySeparator.stderr, /unknown flag --/);
+});
+
 test('SIGINT/SIGTERM defer native re-raise until the active child, cleanup, and evidence finish', async () => {
   for (const signal of ['SIGINT', 'SIGTERM']) {
     // eslint-disable-next-line unicorn/prefer-event-target -- the coordinator accepts the process EventEmitter contract.

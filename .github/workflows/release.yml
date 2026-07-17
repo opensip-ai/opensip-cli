@@ -968,6 +968,9 @@ jobs:
           set -u
           out="$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json"
           set +e
+          # The bare `--` is the pnpm script-arg separator. pnpm 11 forwards it as
+          # argv; run-platform-acceptance.mjs ignores end-of-options markers so this
+          # package-script form matches a direct `node scripts/…` invocation.
           if [ -n "${PREVIOUS:-}" ]; then
             pnpm platform:acceptance -- \
               --profile "$MACOS_PROFILE" \
