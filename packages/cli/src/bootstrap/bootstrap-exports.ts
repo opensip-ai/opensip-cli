@@ -14,7 +14,7 @@ export {
 } from './admit-tool-package.js';
 
 export { renderResult } from './render.js';
-export { maybeOpenReport } from './report.js';
+export { executeReportOpen, maybeOpenReport } from './report.js';
 export { installPreActionHook } from './pre-action-hook.js';
 export { buildCommandRegistrationInput } from './build-command-registration-input.js';
 export { buildHostPlanes } from './host-planes.js';

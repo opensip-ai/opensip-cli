@@ -1,21 +1,10 @@
-/**
- * Narrow unit coverage for the host run-lifecycle plane (host-owned-run-timing
- * Phase 6 §6.1 / Task 6.2). Exercises the plane in isolation with an in-memory
- * datastore (or none): contribution → persisted `StoredSession` row with the
- * host-stamped timing fields, host-metric accumulation, the best-effort
- * never-throw contract, and the two glue helpers (`createRunSessionSeam` /
- * `createRunActionHooks`) the assembler wires into the context.
- */
-
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
 import {
+  HOST_VERDICT_POLICY_FALLBACK,
   RunScope,
+  runWithScope,
   runWithScopeSync,
   type Logger,
-  type ProjectContext,
   type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
@@ -23,7 +12,6 @@ import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { listSessionSummaries, SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { disposeCurrentScope } from '../pre-action-hook.js';
 import {
   createRunActionHooks,
   createRunPlaneFactory,
@@ -31,10 +19,8 @@ import {
   runWithSuiteRunContext,
   type RunPlaneFactory,
 } from '../run-plane.js';
-import * as sessionRetentionMod from '../session-retention.js';
-import { resolveCurrentSessionRetentionPolicy } from '../session-retention.js';
+import * as retentionModule from '../session-retention.js';
 
-/** Silent logger so the best-effort warn/info paths don't spam test output. */
 const SILENT: Logger = {
   debug: vi.fn(),
   info: vi.fn(),
@@ -45,7 +31,7 @@ const SILENT: Logger = {
 function contribution(overrides: Partial<ToolSessionContribution> = {}): ToolSessionContribution {
   return {
     tool: 'fit',
-    cwd: '/proj',
+    cwd: '/project',
     score: 92,
     passed: true,
     payload: { summary: { total: 3 } },
@@ -53,577 +39,510 @@ function contribution(overrides: Partial<ToolSessionContribution> = {}): ToolSes
   };
 }
 
-function writeRetentionConfig(root: string, keep: number): void {
-  writeFileSync(
-    join(root, 'opensip-cli.config.yml'),
-    `cli:
-  sessions:
-    keep: ${keep}
-    maxAgeDays: 0
-    maxSizeMb: 0
-`,
-    'utf8',
-  );
-}
-
-function projectContext(root: string): ProjectContext {
-  return {
-    cwd: root,
-    cwdExplicit: true,
-    projectRoot: root,
-    configPath: join(root, 'opensip-cli.config.yml'),
-    walkedUp: 0,
-    scope: 'project',
-  };
-}
-
-function withCwd<T>(cwd: string, fn: () => T): T {
-  const previous = process.cwd();
-  process.chdir(cwd);
-  try {
-    return fn();
-  } finally {
-    process.chdir(previous);
-  }
-}
-
-describe('createRunPlaneFactory — invocation lifecycle', () => {
-  it('beginRun and current return the same single invocation', () => {
-    const factory = createRunPlaneFactory({
-      getDatastore: () => undefined,
-      logger: SILENT,
-    });
-    const a = factory.beginRun();
-    const b = factory.current();
-    expect(b).toBe(a);
-    expect(a.lifecycle.startedAt).toBe(b.lifecycle.startedAt);
+function envelope(passed = true) {
+  return buildSignalEnvelope({
+    tool: 'fit',
+    runId: 'fit-run',
+    createdAt: '2026-07-16T00:00:00.000Z',
+    units: [{ slug: 'fit', passed, durationMs: 1 }],
+    signals: [],
+    policy: HOST_VERDICT_POLICY_FALLBACK,
+    runFaulted: false,
   });
+}
 
-  it('does NOT start a lifecycle at construction — startedAt reflects first beginRun, not factory creation', () => {
-    // Command-scoping invariant: the factory holds stable deps only; the
-    // lifecycle (and its startedAt wall clock) must be created when the command
-    // action calls beginRun, NOT eagerly at buildToolCliContext time. Capture a
-    // boundary AFTER construction, spin, then begin — a lazily-created lifecycle
-    // starts after the boundary; an eagerly-created one would start before it.
-    const factory = createRunPlaneFactory({
-      getDatastore: () => undefined,
-      logger: SILENT,
-    });
+describe('run-plane staging lifecycle', () => {
+  it('creates the lifecycle lazily and reuses it for one invocation', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
     const afterConstruction = Date.now();
-    const spinStart = Date.now();
-    while (Date.now() - spinStart < 5) {
-      /* spin so the boundary is measurably before beginRun */
+    const first = factory.beginRun();
+    expect(first).toBe(factory.current());
+    expect(first.lifecycle.startedAtEpochMs).toBeGreaterThanOrEqual(afterConstruction);
+  });
+
+  it('preallocates identity and freezes an immutable Session before persistence', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const payload = { summary: { total: 3 } };
+      const invocation = factory.current();
+      const staged = invocation.completeAndStage(contribution({ payload }));
+
+      expect(staged?.id).toBe(invocation.sessionId());
+      expect(staged?.startedAt).toBe(invocation.lifecycle.startedAt);
+      expect(staged?.durationMs).toBeGreaterThanOrEqual(0);
+      expect(new SessionRepo(datastore).count()).toBe(0);
+
+      payload.summary.total = 999;
+      expect(staged?.payload).toEqual({ summary: { total: 3 } });
+
+      const result = await factory.finalizeCurrent();
+      expect(result.status).toBe('committed');
+      const row = new SessionRepo(datastore).get(staged!.id);
+      expect(row).toMatchObject({
+        id: staged?.id,
+        tool: 'fit',
+        score: 92,
+        passed: true,
+        payload: { summary: { total: 3 } },
+      });
+      expect(row?.hostMetrics?.persistMs).toBeGreaterThanOrEqual(0);
+    } finally {
+      datastore.close();
     }
-    const inv = factory.beginRun();
-    expect(inv.lifecycle.startedAtEpochMs).toBeGreaterThanOrEqual(afterConstruction);
   });
 
-  it('completeAndPersist is best-effort with no datastore — returns undefined, never throws', () => {
-    const factory = createRunPlaneFactory({
-      getDatastore: () => undefined,
-      logger: SILENT,
-    });
-    const inv = factory.current();
-    expect(inv.completeAndPersist(contribution())).toBeUndefined();
-    expect(inv.sessionId()).toBeUndefined();
-  });
-
-  it('swallows a persistence failure (broken datastore) and returns undefined', () => {
-    // A datastore whose `.db` is absent makes SessionRepo.save throw; the plane
-    // must degrade to undefined rather than propagate.
-    const factory = createRunPlaneFactory({
-      getDatastore: () => ({}) as DataStore,
-      logger: SILENT,
-    });
-    const inv = factory.current();
-    expect(() => inv.completeAndPersist(contribution())).not.toThrow();
-    expect(inv.completeAndPersist(contribution())).toBeUndefined();
-    expect(inv.sessionId()).toBeUndefined();
-  });
-});
-
-describe('createRunPlaneFactory — datastore resolver failures (best-effort)', () => {
-  it('swallows a THROWING datastore resolver during persist (degrades to undefined)', () => {
-    const debug = vi.fn();
-    const factory = createRunPlaneFactory({
-      getDatastore: () => {
-        throw new Error('resolver boom');
-      },
-      logger: { ...SILENT, debug },
-    });
-    const inv = factory.current();
-    expect(() => inv.completeAndPersist(contribution())).not.toThrow();
-    expect(inv.completeAndPersist(contribution())).toBeUndefined();
-    expect(debug).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: 'cli.run-plane.datastore_unavailable' }),
-    );
-  });
-
-  it('warns and continues when host-metric upsert fails after a successful persist', () => {
-    const warn = vi.fn();
-    const memory = DataStoreFactory.open({ backend: 'memory' });
-    let resolved: DataStore = memory;
-    const factory = createRunPlaneFactory({
-      getDatastore: () => resolved,
-      logger: { ...SILENT, warn },
-    });
-    const inv = factory.current();
-    // Persist with the real store → sessionId is set.
-    expect(inv.completeAndPersist(contribution())).toBeDefined();
-    expect(inv.sessionId()).toBeDefined();
-    // Swap to a non-drizzle store → `new SessionRepo(...)` throws inside
-    // recordHostMetrics, which must warn rather than propagate.
-    resolved = {} as DataStore;
-    expect(() => inv.recordHostMetrics({ renderMs: 5 })).not.toThrow();
-    expect(warn).toHaveBeenCalledWith(
-      expect.objectContaining({ evt: expect.stringContaining('host_metrics') }),
-    );
-    memory.close();
-  });
-});
-
-describe('createRunPlaneFactory — persistence (in-memory datastore)', () => {
-  let datastore: DataStore;
-  let factory: RunPlaneFactory;
-
-  beforeEach(() => {
-    datastore = DataStoreFactory.open({ backend: 'memory' });
-    factory = createRunPlaneFactory({
-      getDatastore: () => datastore,
-      logger: SILENT,
-    });
-  });
-  afterEach(() => {
-    datastore.close();
-  });
-
-  it('persists a StoredSession with host-stamped timing + the tool contribution', () => {
-    const inv = factory.current();
-    const recorded = inv.completeAndPersist(contribution({ recipe: 'example' }));
-
-    expect(recorded).toBeDefined();
-    expect(recorded?.tool).toBe('fit');
-    expect(inv.sessionId()).toBe(recorded?.id);
-    // The host stamps timing from the lifecycle; the snapshot is frozen by complete().
-    expect(recorded?.startedAt).toBe(inv.lifecycle.startedAt);
-    expect(recorded?.durationMs).toBeGreaterThanOrEqual(0);
-
-    const repo = new SessionRepo(datastore);
-    const row = repo.get(recorded!.id);
-    expect(row).not.toBeNull();
-    expect(row?.tool).toBe('fit');
-    expect(row?.recipe).toBe('example');
-    expect(row?.score).toBe(92);
-    expect(row?.passed).toBe(true);
-    expect(row?.startedAt).toBe(recorded?.startedAt);
-    expect(row?.completedAt).toBe(recorded?.completedAt);
-    expect(row?.durationMs).toBe(recorded?.durationMs);
-    expect(row?.payload).toEqual({ summary: { total: 3 } });
-    // The host stamps the real opensip-cli version as run provenance.
-    expect(row?.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
-  });
-
-  it('stamps engineVersion from the entered scope tool manifest', () => {
-    const scope = new RunScope({
-      toolManifests: [
-        { id: 'fit', identity: { name: 'fit' }, version: '9.9.9' },
-      ] as unknown as NonNullable<ConstructorParameters<typeof RunScope>[0]>['toolManifests'],
-    });
-    const recorded = runWithScopeSync(scope, () =>
-      factory.current().completeAndPersist(contribution()),
-    );
-    const row = new SessionRepo(datastore).get(recorded!.id);
-    expect(row?.engineVersion).toBe('9.9.9');
-    expect(row?.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
-  });
-
-  it('records persistMs on the sibling host-metrics row', () => {
-    const inv = factory.current();
-    const recorded = inv.completeAndPersist(contribution());
-    const row = new SessionRepo(datastore).get(recorded!.id);
-    expect(row?.hostMetrics?.persistMs).toBeGreaterThanOrEqual(0);
-  });
-
-  it('stamps suite grouping fields from the active suite context', () => {
-    let sessionId: string | undefined;
-    runWithSuiteRunContext({ suiteRunId: 'suite-run-1', suiteName: 'security' }, () => {
-      const recorded = factory.current().completeAndPersist(contribution());
-      sessionId = recorded?.id;
-    });
-
-    const row = new SessionRepo(datastore).get(sessionId!);
-    expect(row?.suiteRunId).toBe('suite-run-1');
-    expect(row?.suiteName).toBe('security');
-  });
-
-  it('is idempotent for repeated completion on the same invocation', () => {
-    const inv = factory.current();
-    const first = inv.completeAndPersist(contribution());
-    const second = inv.completeAndPersist(contribution({ tool: 'graph' }));
-    expect(second?.id).toBe(first?.id);
-    expect(second?.startedAt).toBe(first?.startedAt);
+  it('freezes lifecycle and contribution exactly once', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const invocation = factory.current();
+    const first = invocation.completeAndStage(contribution());
+    const second = invocation.completeAndStage(contribution({ tool: 'graph' }));
+    expect(second).toBe(first);
+    expect(second?.tool).toBe('fit');
     expect(second?.completedAt).toBe(first?.completedAt);
-    expect(second?.durationMs).toBe(first?.durationMs);
-    expect(new SessionRepo(datastore).count()).toBe(1);
   });
 
-  it('recordHostMetrics is a no-op before a session row exists', () => {
-    const inv = factory.current();
-    expect(() => inv.recordHostMetrics({ renderMs: 5 })).not.toThrow();
-    // No row was written, so nothing to read back.
-    expect(inv.sessionId()).toBeUndefined();
+  it('stages without a datastore and discards only at best-effort finalization', async () => {
+    const resolver = vi.fn(() => undefined);
+    const factory = createRunPlaneFactory({ getDatastore: resolver, logger: SILENT });
+    const invocation = factory.current();
+    expect(invocation.completeAndStage(contribution())).toBeDefined();
+    expect(invocation.sessionId()).toBeDefined();
+    await expect(factory.finalizeCurrent()).resolves.toEqual({
+      status: 'datastore-unavailable',
+    });
+    expect(invocation.sessionId()).toBeUndefined();
+    expect(resolver).toHaveBeenCalledOnce();
   });
 
-  it('recordHostMetrics upserts onto the persisted session', () => {
-    const inv = factory.current();
-    const recorded = inv.completeAndPersist(contribution());
-    inv.recordHostMetrics({ renderMs: 7, egressMs: 3 });
-    const row = new SessionRepo(datastore).get(recorded!.id);
-    expect(row?.hostMetrics?.renderMs).toBe(7);
-    expect(row?.hostMetrics?.egressMs).toBe(3);
-    // persistMs from the original write survives the upsert merge.
-    expect(row?.hostMetrics?.persistMs).toBeGreaterThanOrEqual(0);
+  it('does not resolve/open a datastore for a truly empty no-run/no-report action', async () => {
+    const resolver = vi.fn(() => {
+      throw new Error('must not open');
+    });
+    const factory = createRunPlaneFactory({ getDatastore: resolver, logger: SILENT });
+    await expect(factory.finalizeCurrent()).resolves.toEqual({ status: 'discarded' });
+    expect(resolver).not.toHaveBeenCalled();
   });
 
-  it('resolves session retention from the entered scope project, not the invoking cwd', () => {
-    const invokingRoot = mkdtempSync(join(tmpdir(), 'opensip-retention-invoking-'));
-    const projectRoot = mkdtempSync(join(tmpdir(), 'opensip-retention-project-'));
-    const scopedDatastore = DataStoreFactory.open({ backend: 'memory' });
+  it('stamps manifest provenance and suite grouping before drain', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      writeRetentionConfig(invokingRoot, 1);
-      writeRetentionConfig(projectRoot, 3);
-      const debug = vi.fn();
-      const log: Logger = { ...SILENT, debug };
-      let scope: RunScope | undefined;
-      const repo = new SessionRepo(scopedDatastore);
-      for (let i = 0; i < 3; i += 1) {
-        repo.save({
-          ...contribution({ cwd: projectRoot }),
-          id: `seed-${i}`,
-          startedAt: `2026-01-0${i + 1}T00:00:00.000Z`,
-          completedAt: `2026-01-0${i + 1}T00:00:00.000Z`,
-          durationMs: 1,
-        });
-      }
-
-      withCwd(invokingRoot, () => {
-        const scopedFactory = createRunPlaneFactory({
-          getDatastore: () => scopedDatastore,
-          sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
-          logger: log,
-        });
-        scope = new RunScope({
-          logger: log,
-          runId: 'run-retention-scope',
-          projectContext: projectContext(projectRoot),
-          datastore: () => scopedDatastore,
-        });
-        runWithScopeSync(scope, () => {
-          scopedFactory.current().completeAndPersist(contribution({ cwd: projectRoot }));
-        });
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const scope = new RunScope({
+        toolManifests: [{ id: 'fit', identity: { name: 'fit' }, version: '9.9.9' }] as never,
       });
-
-      expect(repo.count()).toBe(3);
-      expect(debug).toHaveBeenCalledWith(
-        expect.objectContaining({
-          evt: 'session.retention.policy_resolved',
-          source: 'scope',
-          keep: 3,
-          maxAgeDays: 0,
-          maxSizeMb: 0,
+      let id: string | undefined;
+      await runWithScope(scope, () =>
+        runWithSuiteRunContext({ suiteRunId: 'suite-1', suiteName: 'security' }, async () => {
+          id = factory.current().completeAndStage(contribution())?.id;
+          await factory.finalizeCurrent();
         }),
       );
-      expect(scope?.diagnostics.snapshot().events).toContainEqual(
-        expect.objectContaining({
-          phase: 'persist',
-          level: 'debug',
-          message: 'session.retention.policy_resolved',
-          data: expect.objectContaining({
-            evt: 'session.retention.policy_resolved',
-            source: 'scope',
-            keep: 3,
-            maxAgeDays: 0,
-            maxSizeMb: 0,
-          }),
-        }),
-      );
+      expect(new SessionRepo(datastore).get(id!)).toMatchObject({
+        engineVersion: '9.9.9',
+        suiteRunId: 'suite-1',
+        suiteName: 'security',
+      });
     } finally {
-      scopedDatastore.close();
-      rmSync(invokingRoot, { recursive: true, force: true });
-      rmSync(projectRoot, { recursive: true, force: true });
+      datastore.close();
     }
   });
 
-  it('resolves session retention from process.cwd() when no scope is entered', () => {
-    const cwdRoot = mkdtempSync(join(tmpdir(), 'opensip-retention-cwd-'));
-    const fallbackDatastore = DataStoreFactory.open({ backend: 'memory' });
+  it('keeps a committed Session ID observable for the legacy suite review handoff', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
     try {
-      writeRetentionConfig(cwdRoot, 2);
-      const debug = vi.fn();
-      const log: Logger = { ...SILENT, debug };
-      const repo = new SessionRepo(fallbackDatastore);
-      for (let i = 0; i < 3; i += 1) {
-        repo.save({
-          ...contribution({ cwd: cwdRoot }),
-          id: `fallback-seed-${i}`,
-          startedAt: `2026-02-0${i + 1}T00:00:00.000Z`,
-          completedAt: `2026-02-0${i + 1}T00:00:00.000Z`,
-          durationMs: 1,
-        });
-      }
-
-      withCwd(cwdRoot, () => {
-        const fallbackFactory = createRunPlaneFactory({
-          getDatastore: () => fallbackDatastore,
-          sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
-          logger: log,
-        });
-        fallbackFactory.current().completeAndPersist(contribution({ cwd: cwdRoot }));
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const hooks = createRunActionHooks(factory);
+      await runWithSuiteRunContext({ suiteRunId: 'suite-legacy', suiteName: 'audit' }, async () => {
+        hooks.completeRun?.({ session: contribution() });
+        const stagedId = hooks.currentSessionId?.();
+        expect(stagedId).toBeDefined();
+        await hooks.finalizeRun?.();
+        expect(hooks.currentSessionId?.()).toBe(stagedId);
+        expect(hooks.currentStagedSession?.()?.id).toBe(stagedId);
       });
-
-      expect(repo.count()).toBe(2);
-      expect(debug).toHaveBeenCalledWith(
-        expect.objectContaining({
-          evt: 'session.retention.policy_resolved',
-          source: 'cwd-fallback',
-          keep: 2,
-          maxAgeDays: 0,
-          maxSizeMb: 0,
-        }),
-      );
     } finally {
-      fallbackDatastore.close();
-      rmSync(cwdRoot, { recursive: true, force: true });
+      datastore.close();
+    }
+  });
+
+  it('merges host metrics before the atomic commit', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const invocation = factory.current();
+      const id = invocation.completeAndStage(contribution())!.id;
+      invocation.recordHostMetrics({ renderMs: 7 });
+      invocation.recordHostMetrics({ egressMs: 3 });
+      await factory.finalizeCurrent();
+      expect(new SessionRepo(datastore).get(id)?.hostMetrics).toMatchObject({
+        renderMs: 7,
+        egressMs: 3,
+        persistMs: expect.any(Number),
+      });
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('ignores metrics recorded after drain without hiding committed evidence', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const invocation = factory.current();
+      const id = invocation.completeAndStage(contribution())!.id;
+      await factory.finalizeCurrent();
+
+      invocation.recordHostMetrics({ renderMs: 99 });
+
+      expect(invocation.sessionId()).toBe(id);
+      expect(invocation.sessionStagingStatus()).toBe('staged');
+      expect(new SessionRepo(datastore).get(id)?.hostMetrics?.renderMs).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('marks metrics-driven byte poison rejected and unlinks the identity', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const factory = createRunPlaneFactory({
+        getDatastore: () => datastore,
+        evidenceLimits: { maxBytes: 380 },
+        logger: SILENT,
+      });
+      const invocation = factory.current();
+      invocation.completeAndStage(contribution({ payload: null }));
+      expect(invocation.sessionStagingStatus()).toBe('staged');
+      invocation.recordHostMetrics({
+        totalCommandMs: 'x'.repeat(500),
+      } as unknown as Parameters<typeof invocation.recordHostMetrics>[0]);
+      expect(invocation.sessionStagingStatus()).toBe('rejected');
+      expect(invocation.sessionId()).toBeUndefined();
+      expect(await factory.finalizeCurrent()).toMatchObject({ status: 'poisoned' });
+      expect(new SessionRepo(datastore).count()).toBe(0);
+    } finally {
+      datastore.close();
     }
   });
 });
 
-describe('completeLiveRender', () => {
+describe('nested evidence owners', () => {
   let datastore: DataStore;
   let factory: RunPlaneFactory;
 
   beforeEach(() => {
     datastore = DataStoreFactory.open({ backend: 'memory' });
-    factory = createRunPlaneFactory({
-      getDatastore: () => datastore,
-      logger: SILENT,
-    });
+    factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
   });
-  afterEach(() => {
-    datastore.close();
+  afterEach(() => datastore.close());
+
+  it('retains accepted children across invocation reset and defers ordinary finalization', async () => {
+    const owner = factory.createNestedEvidenceOwner();
+    const ids: string[] = [];
+    await runWithSuiteRunContext(
+      { suiteRunId: 'suite-1', suiteName: 'audit', evidenceOwner: owner },
+      async () => {
+        ids.push(factory.current().completeAndStage(contribution({ tool: 'fit' }))!.id);
+        expect(await factory.finalizeCurrent()).toEqual({ status: 'deferred' });
+        factory.reset();
+        ids.push(factory.current().completeAndStage(contribution({ tool: 'graph' }))!.id);
+      },
+    );
+    expect(new SessionRepo(datastore).count()).toBe(0);
+    const result = await factory.finalizeEvidenceOwner(owner);
+    expect(result).toMatchObject({ status: 'committed', sessionCount: 2 });
+    expect(ids.map((id) => new SessionRepo(datastore).get(id)?.tool)).toEqual(['fit', 'graph']);
   });
 
-  it('returns the completion without session and persists its session + ttyBusyMs', async () => {
-    const inv = factory.current();
-    const envelope = { ok: true };
-    const result = { done: true };
-    const completion: ToolRunCompletion = { session: contribution(), envelope, result };
-    const out = await inv.completeLiveRender(() => Promise.resolve(completion));
-    expect(out).toEqual({ envelope, result });
-    const id = inv.sessionId();
-    expect(id).toBeDefined();
-    const row = new SessionRepo(datastore).get(id!);
-    expect(row?.tool).toBe('fit');
-    expect(row?.hostMetrics?.ttyBusyMs).toBeGreaterThanOrEqual(0);
-    expect(new SessionRepo(datastore).count()).toBe(1);
+  it('discards only a capability-mismatched current invocation', async () => {
+    const hooks = createRunActionHooks(factory);
+    const owner = hooks.createNestedEvidenceOwner!();
+    runWithSuiteRunContext(
+      { suiteRunId: 'suite-1', suiteName: 'audit', evidenceOwner: owner },
+      () => {
+        hooks.beginRun?.();
+        hooks.completeRun?.({ session: contribution({ tool: 'fit' }) });
+        hooks.resetRun?.();
+        hooks.beginRun?.();
+        hooks.completeRun?.({ session: contribution({ tool: 'graph' }) });
+        expect(hooks.currentSessionStagingStatus?.()).toBe('staged');
+        hooks.discardCurrentInvocationEvidence?.();
+        expect(hooks.currentSessionStagingStatus?.()).toBe('discarded');
+      },
+    );
+    const result = await hooks.finalizeEvidenceOwner!(owner);
+    expect(result).toMatchObject({ status: 'committed', sessionCount: 1 });
+    expect(new SessionRepo(datastore).list().map((row) => row.tool)).toEqual(['fit']);
   });
 
-  it('persists nothing when the renderer returns void', async () => {
-    const inv = factory.current();
-    const out = await inv.completeLiveRender(() => Promise.resolve());
-    expect(out).toBeUndefined();
-    expect(inv.sessionId()).toBeUndefined();
+  it('aborts a nested owner without drain or prefix commit', async () => {
+    const hooks = createRunActionHooks(factory);
+    const owner = hooks.createNestedEvidenceOwner!();
+    runWithSuiteRunContext(
+      { suiteRunId: 'suite-1', suiteName: 'audit', evidenceOwner: owner },
+      () => {
+        hooks.completeRun?.({ session: contribution() });
+      },
+    );
+    hooks.discardEvidenceOwner?.(owner);
+    expect(await hooks.finalizeEvidenceOwner!(owner)).toEqual({ status: 'discarded' });
+    expect(new SessionRepo(datastore).count()).toBe(0);
   });
 });
 
-describe('createRunSessionSeam', () => {
-  it('exposes the current invocation lifecycle as `timing`', () => {
-    const factory = createRunPlaneFactory({
-      getDatastore: () => undefined,
-      logger: SILENT,
+describe('live completion and immutable envelope capture', () => {
+  it('stages live evidence, records ttyBusyMs, and strips only Session', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const signalEnvelope = envelope();
+      const completion: ToolRunCompletion = {
+        session: contribution(),
+        envelope: signalEnvelope,
+        result: { done: true },
+        execution: { kind: 'delegated', startedAt: '2026-07-16T00:00:00.000Z' },
+      };
+      const output = await factory.current().completeLiveRender(() => Promise.resolve(completion));
+      expect(output).toEqual({
+        envelope: signalEnvelope,
+        result: { done: true },
+        execution: { kind: 'delegated', startedAt: '2026-07-16T00:00:00.000Z' },
+      });
+      const id = factory.current().sessionId()!;
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      await factory.finalizeCurrent();
+      expect(new SessionRepo(datastore).get(id)?.hostMetrics?.ttyBusyMs).toBeGreaterThanOrEqual(0);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('captures bounded immutable envelope facts before later mutation', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const hooks = createRunActionHooks(factory);
+    const mutable = envelope() as unknown as {
+      verdict: { passed: boolean; summary: { errors: number } };
+      signals: unknown[];
+    };
+    hooks.completeRun?.({ envelope: mutable });
+    mutable.verdict.passed = false;
+    mutable.verdict.summary.errors = 99;
+    mutable.signals.push({ fingerprint: 'late' });
+    expect(hooks.currentStagedEnvelope?.()).toMatchObject({
+      passed: true,
+      errors: 0,
+      findings: 0,
+      evidence: { signalCount: 0 },
     });
-    const seam = createRunSessionSeam(factory);
-    expect(seam.timing).toBe(factory.current().lifecycle);
-  });
-});
-
-describe('createRunActionHooks', () => {
-  let datastore: DataStore;
-  let factory: RunPlaneFactory;
-
-  beforeEach(() => {
-    datastore = DataStoreFactory.open({ backend: 'memory' });
-    factory = createRunPlaneFactory({
-      getDatastore: () => datastore,
-      logger: SILENT,
-    });
-  });
-  afterEach(() => {
-    datastore.close();
   });
 
-  it('completeRun persists when the result carries a session contribution', () => {
+  it('bounds fingerprint sampling for very large arrays and ignores malformed envelopes', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
     const hooks = createRunActionHooks(factory);
-    hooks.beginRun?.();
-    hooks.completeRun?.({
-      session: contribution(),
-    } satisfies ToolRunCompletion);
-    expect(factory.current().sessionId()).toBeDefined();
-    expect(hooks.currentSessionId?.()).toBe(factory.current().sessionId());
-  });
+    const huge = envelope() as unknown as { signals: { fingerprint: string }[] };
+    huge.signals = Array.from({ length: 50_000 }, (_, index) => ({
+      fingerprint: `fp-${index}`,
+    }));
+    expect(() => hooks.completeRun?.({ envelope: huge })).not.toThrow();
+    const evidence = hooks.currentStagedEnvelope?.().evidence as {
+      readonly fingerprints?: readonly string[];
+      readonly signalCount?: number;
+    };
+    expect(evidence.signalCount).toBe(50_000);
+    expect(evidence.fingerprints).toHaveLength(20);
 
-  it('completeRun is a no-op for a plain CommandResult (no session)', () => {
-    const hooks = createRunActionHooks(factory);
-    hooks.completeRun?.({ type: 'help' });
-    expect(factory.current().sessionId()).toBeUndefined();
-  });
-
-  it('resetRun clears the current invocation so a later beginRun starts fresh', () => {
-    const hooks = createRunActionHooks(factory);
-    hooks.beginRun?.();
-    hooks.completeRun?.({ session: contribution() } satisfies ToolRunCompletion);
-    expect(factory.current().sessionId()).toBeDefined();
     hooks.resetRun?.();
-    hooks.beginRun?.();
-    expect(factory.current().sessionId()).toBeUndefined();
-    expect(hooks.currentSessionId?.()).toBeUndefined();
+    expect(() =>
+      hooks.completeRun?.({
+        envelope: {
+          ...envelope(),
+          verdict: { passed: true, score: Number.NaN, summary: null },
+        },
+      }),
+    ).not.toThrow();
+    expect(hooks.currentStagedEnvelope?.()).toBeUndefined();
+  });
+});
+
+describe('finalizer side effects', () => {
+  let datastore: DataStore;
+
+  beforeEach(() => {
+    datastore = DataStoreFactory.open({ backend: 'memory' });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    datastore.close();
   });
 
-  it('warns and returns undefined when session persistence throws', () => {
-    const warn = vi.fn();
-    const memory = DataStoreFactory.open({ backend: 'memory' });
-    const saveSpy = vi.spyOn(SessionRepo.prototype, 'save').mockImplementation(() => {
-      throw new Error('disk full');
-    });
-    try {
-      const factoryWithBrokenSave = createRunPlaneFactory({
-        getDatastore: () => memory,
-        logger: { ...SILENT, warn },
+  it.each(['committed', 'precondition-rejected', 'failed', 'poisoned'] as const)(
+    'runs retention exactly once after a %s attempt',
+    async (mode) => {
+      const retention = vi
+        .spyOn(retentionModule, 'enforceSessionRetention')
+        .mockImplementation(() => ({ deleted: 0 }) as never);
+      const factory = createRunPlaneFactory({
+        getDatastore: () => datastore,
+        ...(mode === 'failed'
+          ? {
+              commitEvidence: () => ({ status: 'failed', reason: 'write-failed' }) as const,
+            }
+          : {}),
+        ...(mode === 'precondition-rejected'
+          ? {
+              commitEvidence: () => ({ status: 'precondition-rejected' }) as const,
+            }
+          : {}),
+        ...(mode === 'poisoned' ? { evidenceLimits: { maxSessions: 0 } } : {}),
+        logger: SILENT,
       });
-      expect(factoryWithBrokenSave.current().completeAndPersist(contribution())).toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          evt: 'cli.run-session.record_failed',
-          error: 'disk full',
-        }),
-      );
-    } finally {
-      saveSpy.mockRestore();
-      memory.close();
-    }
-  });
+      factory.current().completeAndStage(contribution());
+      await factory.finalizeCurrent();
+      expect(retention).toHaveBeenCalledOnce();
+    },
+  );
 
-  it('warns with a stringified error when session persistence throws a non-Error', () => {
-    const warn = vi.fn();
-    const memory = DataStoreFactory.open({ backend: 'memory' });
-    const saveSpy = vi.spyOn(SessionRepo.prototype, 'save').mockImplementation(() => {
-      // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercises host handling of non-Error throwables.
-      throw 'disk string fault';
+  it('commits, opens, retains, and cleans up only once across repeated finalization', async () => {
+    const execute = vi.fn(() => Promise.resolve());
+    const retention = vi
+      .spyOn(retentionModule, 'enforceSessionRetention')
+      .mockImplementation(() => ({ deleted: 0 }) as never);
+    const factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      executeReportEffect: execute,
+      logger: SILENT,
     });
-    try {
-      const factoryWithBrokenSave = createRunPlaneFactory({
-        getDatastore: () => memory,
-        logger: { ...SILENT, warn },
-      });
-      expect(factoryWithBrokenSave.current().completeAndPersist(contribution())).toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          evt: 'cli.run-session.record_failed',
-          error: 'disk string fault',
-        }),
-      );
-    } finally {
-      saveSpy.mockRestore();
-      memory.close();
-    }
+    factory.current().completeAndStage(contribution());
+    factory.queueReportEffect({ kind: 'compose-and-open' });
+    const first = factory.finalizeCurrent();
+    const second = factory.finalizeCurrent();
+    expect(await second).toBe(await first);
+    expect(new SessionRepo(datastore).count()).toBe(1);
+    expect(execute).toHaveBeenCalledOnce();
+    expect(retention).toHaveBeenCalledOnce();
   });
 
-  it('warns with a stringified error when session retention enforcement throws a non-Error', () => {
-    const warn = vi.fn();
-    const memory = DataStoreFactory.open({ backend: 'memory' });
-    const enforce = vi
-      .spyOn(sessionRetentionMod, 'enforceSessionRetention')
+  it('waits for deferred report completion before retention', async () => {
+    let finishReport: (() => void) | undefined;
+    let markReportStarted: (() => void) | undefined;
+    const reportStarted = new Promise<void>((resolve) => {
+      markReportStarted = resolve;
+    });
+    const reportRelease = new Promise<void>((resolve) => {
+      finishReport = resolve;
+    });
+    const events: string[] = [];
+    const retention = vi
+      .spyOn(retentionModule, 'enforceSessionRetention')
       .mockImplementation(() => {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- exercises host handling of non-Error throwables.
-        throw 'retention boom';
+        events.push('retain');
+        return { deleted: 0 } as never;
       });
-    try {
-      const factoryWithRetention = createRunPlaneFactory({
-        getDatastore: () => memory,
-        sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
-        logger: { ...SILENT, warn },
-      });
-      const recorded = factoryWithRetention.current().completeAndPersist(contribution());
-      expect(recorded).toBeDefined();
-      expect(warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          evt: 'cli.run-session.retention_failed',
-          error: 'retention boom',
-        }),
-      );
-    } finally {
-      enforce.mockRestore();
-      memory.close();
-    }
+    const factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      executeReportEffect: async () => {
+        events.push('report-start');
+        markReportStarted?.();
+        await reportRelease;
+        events.push('report-finish');
+      },
+      logger: SILENT,
+    });
+    const invocation = factory.current();
+    const id = invocation.completeAndStage(contribution())!.id;
+    factory.queueReportEffect({ kind: 'compose-and-open' });
+
+    const finalizing = factory.finalizeCurrent();
+    await reportStarted;
+    expect(events).toEqual(['report-start']);
+    expect(invocation.sessionId()).toBeDefined();
+    expect(retention).not.toHaveBeenCalled();
+
+    finishReport?.();
+    await finalizing;
+    expect(events).toEqual(['report-start', 'report-finish', 'retain']);
+    expect(invocation.sessionId()).toBe(id);
   });
 
-  it('round-trips a failing YAGNI verdict through host persistence into session summaries', () => {
-    // Exercises the generic ToolRunCompletion -> StoredSession host path for a
-    // failing verdict. The contribution is constructed directly: this is a
-    // host-plane unit test and must not run a tool implementation. YAGNI (like
-    // every analysis tool) returns exactly this shape; `passed: false` derives
-    // `runOutcome: 'failed'`, and `payload.summary` projects into the session.
-    const cwd = '/proj/yagni-subject';
-    const failingCompletion = {
-      session: {
-        tool: 'yagni',
-        cwd,
-        score: 0,
-        passed: false,
-        payload: { summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 1 } },
-      },
-    } satisfies ToolRunCompletion;
+  it('discards the report request after rollback', async () => {
+    const execute = vi.fn(() => Promise.resolve());
+    const factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      executeReportEffect: execute,
+      commitEvidence: () => ({ status: 'failed', reason: 'write-failed' }),
+      logger: SILENT,
+    });
+    factory.current().completeAndStage(contribution());
+    factory.queueReportEffect({ kind: 'compose-and-open' });
+    expect(await factory.finalizeCurrent()).toEqual({
+      status: 'failed',
+      reason: 'write-failed',
+    });
+    expect(execute).not.toHaveBeenCalled();
+  });
 
-    const hooks = createRunActionHooks(factory);
-    hooks.beginRun?.();
-    hooks.completeRun?.(failingCompletion);
-
-    const summaries = listSessionSummaries(datastore, { summaryOnly: true });
-    expect(summaries.sessions).toHaveLength(1);
-    expect(summaries.sessions[0]).toMatchObject({
-      tool: 'yagni',
-      cwd,
-      passed: false,
-      runOutcome: 'failed',
-      summary: {
-        total: 1,
-        passed: 1,
-        failed: 0,
-        errors: 0,
-        warnings: 1,
-      },
+  it('presents deferred report failure while preserving the committed verdict', async () => {
+    const failure = vi.fn(() => Promise.resolve());
+    const factory = createRunPlaneFactory({
+      getDatastore: () => datastore,
+      executeReportEffect: () => Promise.reject(new TypeError('private path')),
+      onReportEffectFailure: failure,
+      logger: SILENT,
+    });
+    factory.current().completeAndStage(contribution());
+    factory.queueReportEffect({ kind: 'compose-and-open' });
+    expect(await factory.finalizeCurrent()).toMatchObject({ status: 'committed' });
+    expect(failure).toHaveBeenCalledWith({
+      effect: { kind: 'compose-and-open' },
+      errorName: 'TypeError',
     });
   });
 });
 
-/** Task 3: Run Lifecycle And Cleanup Contract (aligns with host-owned-run-timing ADR-0051). */
-describe('Task 3 lifecycle + cleanup contract (narrow seams)', () => {
-  it('disposeCurrentScope is safe with no scope (no throw, for CLI-only / early errors)', () => {
-    // Mirrors postAction / potential error-path call sites.
-    expect(() => disposeCurrentScope()).not.toThrow();
+describe('run action hooks and session reads', () => {
+  it('round-trips a staged failing verdict only after finalization', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const factory = createRunPlaneFactory({ getDatastore: () => datastore, logger: SILENT });
+      const hooks = createRunActionHooks(factory);
+      hooks.beginRun?.();
+      hooks.completeRun?.({
+        session: contribution({
+          tool: 'yagni',
+          passed: false,
+          score: 0,
+          payload: {
+            summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 1 },
+          },
+        }),
+      });
+      expect(listSessionSummaries(datastore).sessions).toHaveLength(0);
+      await hooks.finalizeRun?.();
+      expect(listSessionSummaries(datastore, { summaryOnly: true }).sessions[0]).toMatchObject({
+        tool: 'yagni',
+        passed: false,
+        runOutcome: 'failed',
+        summary: { total: 1, warnings: 1 },
+      });
+    } finally {
+      datastore.close();
+    }
   });
 
-  it('disposeCurrentScope swallows dispose errors (best-effort shutdown)', () => {
-    // We can't easily inject a broken scope without broader wiring, but the seam
-    // itself swallows; exercising the call path is the high-signal part.
-    expect(() => disposeCurrentScope()).not.toThrow();
+  it('exposes the same lifecycle through the read-only runSession seam', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    expect(createRunSessionSeam(factory).timing).toBe(factory.current().lifecycle);
   });
 
-  // Scope-entered-before-action is asserted inside pre-action-hook (hard guard after enterScope)
-  // and covered by e2e + register-action-bodies tests. The beginRun happens in mount action
-  // AFTER the hook's enterScope, per the run-plane factory contract (tested above).
-
-  // Datastore handle cleanup: lazy thunk on RunScope; dispose (called from postAction seam)
-  // is the owner. When scope moves ownership, explicit close lives on the thunked store;
-  // the plane itself is best-effort and does not own the datastore (see scope-access).
+  it('captures engine version from the entered scope before staging', () => {
+    const factory = createRunPlaneFactory({ getDatastore: () => undefined, logger: SILENT });
+    const scope = new RunScope({
+      toolManifests: [{ id: 'fit', identity: { name: 'fit' }, version: '1.2.3' }] as never,
+    });
+    const staged = runWithScopeSync(scope, () =>
+      factory.current().completeAndStage(contribution()),
+    );
+    expect(staged?.engineVersion).toBe('1.2.3');
+  });
 });

@@ -1,8 +1,5 @@
 import {
   EXIT_CODES,
-  deriveOutcome,
-  isSignalEnvelope,
-  type SignalEnvelope,
   type StoredRun,
   type StoredRunStep,
   type StoredRunVerdictSummary,
@@ -10,162 +7,63 @@ import {
 } from '@opensip-cli/contracts';
 import {
   commandProducesVerdict,
-  currentLogger,
-  currentScope,
   generatePrefixedId,
   readPackageVersion,
   type CommandMountContext,
   type CommandSpec,
   type ToolRunCompletion,
 } from '@opensip-cli/core';
-import { RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
 import { manifestVersionFor } from '../bootstrap/declared-inputs.js';
-import { currentSuiteRunContext, type RunActionHooks } from '../bootstrap/run-plane.js';
 
-import { projectEnvelopeEvidence, projectLedgerArgs } from './run-ledger-projection.js';
+import { projectLedgerArgs } from './run-ledger-projection.js';
 
-import type { DataStore } from '@opensip-cli/datastore';
+import type { StagedEnvelopeEvidence } from '../bootstrap/run-plane.js';
+import type { EvidenceBundleRun } from '@opensip-cli/session-store';
 
 const CLI_VERSION = readPackageVersion(import.meta.url);
-const MODULE_TAG = 'cli:standalone-run-ledger';
 
-export interface PersistStandaloneRunInput<TCtx extends CommandMountContext> {
+export interface ProjectStandaloneRunInput<TCtx extends CommandMountContext> {
   readonly spec: CommandSpec<unknown, TCtx>;
   readonly opts: Readonly<Record<string, unknown>>;
   readonly positionals: readonly unknown[];
   readonly ctx: TCtx;
-  readonly hooks: RunActionHooks;
-  readonly result?: unknown;
+  readonly stagedSession?: StoredSession;
+  readonly stagedEnvelope?: StagedEnvelopeEvidence;
+  readonly correlationRunId?: string;
+  /** A separately proven delegated child already owns the authoritative row. */
+  readonly skipDelegatedSupervisor?: boolean;
+  readonly suppressParent?: boolean;
 }
 
-export function persistStandaloneRun<TCtx extends CommandMountContext>(
-  input: PersistStandaloneRunInput<TCtx>,
-): void {
-  if (shouldSkipStandaloneRun(input)) return;
-
-  const log = currentLogger();
-  const scope = currentScope();
-  const datastore = resolveDatastore(scope, log);
-  if (datastore === undefined) return;
-
-  try {
-    if (shouldSkipProvenDelegation(input, datastore, scope?.runId, log)) return;
-    const projection = buildStandaloneLedgerProjection(input, datastore, scope?.runId);
-    const { run, step, missingEvidence, sessionId, tool, command } = projection;
-    new RunRepo(datastore).saveRunWithSteps(run, [step]);
-    log.info?.({
-      evt: 'cli.run-ledger.standalone_recorded',
-      module: MODULE_TAG,
-      runId: run.id,
-      tool,
-      command,
-      ...(sessionId === undefined ? {} : { sessionId }),
-    });
-    if (missingEvidence) {
-      log.warn?.({
-        evt: 'cli.run-ledger.standalone_missing_evidence',
-        module: MODULE_TAG,
-        runId: run.id,
-        tool,
-        command,
-        msg: 'Verdict-producing command completed without a persisted session or signal envelope.',
-      });
-    }
-  } catch (error) {
-    log.warn?.({
-      evt: 'cli.run-ledger.standalone_record_failed',
-      module: MODULE_TAG,
-      command: commandLabel(input.spec),
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-/**
- * Suppress a subprocess supervisor row only after its child has written the
- * authoritative implicit run for this exact invocation. The completion marker
- * alone is deliberately insufficient: a child that crashes before persistence
- * must still leave the parent missing-evidence fault in the ledger.
- */
-function shouldSkipProvenDelegation<TCtx extends CommandMountContext>(
-  input: PersistStandaloneRunInput<TCtx>,
-  datastore: DataStore,
-  correlationRunId: string | undefined,
-  log: ReturnType<typeof currentLogger>,
-): boolean {
-  if (!isDelegatedCompletion(input.result)) return false;
-  const tool = input.spec.parent ?? input.spec.name;
-  const command = commandLabel(input.spec);
-  const delegatedAt = input.result.execution?.startedAt;
-  const proven =
-    correlationRunId !== undefined &&
-    delegatedAt !== undefined &&
-    new RunRepo(datastore).hasImplicitRunForCommand(correlationRunId, tool, command, delegatedAt);
-  if (proven) {
-    log.info?.({
-      evt: 'cli.run-ledger.delegated_parent_skipped',
-      module: MODULE_TAG,
-      correlationRunId,
-      tool,
-      command,
-      delegatedAt,
-    });
-    return true;
-  }
-  log.warn?.({
-    evt: 'cli.run-ledger.delegated_evidence_missing',
-    module: MODULE_TAG,
-    ...(correlationRunId === undefined ? {} : { correlationRunId }),
-    tool,
-    command,
-    ...(delegatedAt === undefined ? {} : { delegatedAt }),
-    msg: 'Delegated command returned without a correlated child run; recording a missing-evidence fault.',
-  });
-  return false;
-}
-
-function shouldSkipStandaloneRun<TCtx extends CommandMountContext>(
-  input: PersistStandaloneRunInput<TCtx>,
-): boolean {
-  return (
-    !commandProducesVerdict(input.spec) ||
-    currentSuiteRunContext() !== undefined ||
-    isNonRunMode(input.opts)
-  );
-}
-
-function resolveDatastore(
-  scope: ReturnType<typeof currentScope>,
-  log: ReturnType<typeof currentLogger>,
-): DataStore | undefined {
-  try {
-    return scope?.datastore() as DataStore | undefined;
-  } catch (error) {
-    log.debug?.({
-      evt: 'cli.run-ledger.datastore_unavailable',
-      module: MODULE_TAG,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return undefined;
-  }
-}
-
-function buildStandaloneLedgerProjection<TCtx extends CommandMountContext>(
-  input: PersistStandaloneRunInput<TCtx>,
-  datastore: DataStore,
-  correlationRunId: string | undefined,
-): {
-  readonly run: StoredRun;
-  readonly step: StoredRunStep;
+export interface StandaloneRunProjection {
+  readonly evidence: EvidenceBundleRun;
   readonly missingEvidence: boolean;
   readonly sessionId?: string;
   readonly tool: string;
   readonly command: string;
-} {
-  const sessionId = input.hooks.currentSessionId?.();
-  const session = sessionId === undefined ? null : new SessionRepo(datastore).get(sessionId);
-  const envelope = extractSignalEnvelope(input.result);
+}
+
+/**
+ * Pure parent projection over evidence already staged by the host. This module
+ * performs no datastore reads or writes: the command finalizer sends the
+ * returned Run/RunStep beside the staged Session to one atomic bundle commit.
+ */
+export function projectStandaloneRun<TCtx extends CommandMountContext>(
+  input: ProjectStandaloneRunInput<TCtx>,
+): StandaloneRunProjection | undefined {
+  if (
+    input.skipDelegatedSupervisor === true ||
+    !commandProducesVerdict(input.spec) ||
+    input.suppressParent === true ||
+    isNonRunMode(input.opts)
+  ) {
+    return undefined;
+  }
+
+  const session = input.stagedSession ?? null;
+  const sessionId = session?.id;
+  const envelope = input.stagedEnvelope;
   const missingEvidence = session === null && envelope === undefined;
   const tool = session?.tool ?? envelope?.tool ?? input.spec.parent ?? input.spec.name;
   const command = commandLabel(input.spec);
@@ -184,12 +82,12 @@ function buildStandaloneLedgerProjection<TCtx extends CommandMountContext>(
     ...(input.positionals.length === 0 ? {} : { args: input.positionals }),
   });
   const engineVersion =
-    session?.engineVersion ?? envelope?.declaredInputs?.engineVersion ?? manifestVersionFor(tool);
+    session?.engineVersion ?? envelope?.engineVersion ?? manifestVersionFor(tool);
   const run: StoredRun = {
     id: runId,
     name: command,
     source: 'implicit-tool',
-    ...(correlationRunId === undefined ? {} : { correlationRunId }),
+    ...(input.correlationRunId === undefined ? {} : { correlationRunId: input.correlationRunId }),
     cwd: session?.cwd ?? cwdFrom(input.opts),
     ...timing,
     exitCode,
@@ -225,8 +123,7 @@ function buildStandaloneLedgerProjection<TCtx extends CommandMountContext>(
     })(),
   };
   return {
-    run,
-    step,
+    evidence: { run, steps: [step] },
     missingEvidence,
     ...(sessionId === undefined ? {} : { sessionId }),
     tool,
@@ -234,23 +131,37 @@ function buildStandaloneLedgerProjection<TCtx extends CommandMountContext>(
   };
 }
 
+export function isDelegatedCompletion(value: unknown): value is ToolRunCompletion {
+  const execution = (value as ToolRunCompletion | null)?.execution;
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    execution?.kind === 'delegated' &&
+    typeof execution.startedAt === 'string'
+  );
+}
+
+export function commandLabel(spec: Pick<CommandSpec, 'name' | 'parent'>): string {
+  return spec.parent === undefined ? spec.name : `${spec.parent} ${spec.name}`;
+}
+
 function standaloneExitCode<TCtx extends CommandMountContext>(
   ctx: TCtx,
   missingEvidence: boolean,
-  envelope: SignalEnvelope | undefined,
+  envelope: StagedEnvelopeEvidence | undefined,
   session: StoredSession | null,
 ): number {
   const explicit = ctx.getExitCode?.();
   if (explicit !== undefined) return explicit;
   if (missingEvidence) return EXIT_CODES.RUNTIME_ERROR;
-  if (envelope?.verdict.passed === false) return EXIT_CODES.RUNTIME_ERROR;
+  if (envelope?.passed === false) return EXIT_CODES.RUNTIME_ERROR;
   if (session?.passed === false) return EXIT_CODES.RUNTIME_ERROR;
   return EXIT_CODES.SUCCESS;
 }
 
 function standaloneTiming(
   session: StoredSession | null,
-  envelope: SignalEnvelope | undefined,
+  envelope: StagedEnvelopeEvidence | undefined,
 ): Pick<StoredRun, 'startedAt' | 'completedAt' | 'durationMs'> {
   const now = new Date().toISOString();
   const startedAt = session?.startedAt ?? envelope?.createdAt ?? now;
@@ -265,10 +176,6 @@ function cwdFrom(opts: Readonly<Record<string, unknown>>): string {
   return typeof opts.cwd === 'string' ? opts.cwd : process.cwd();
 }
 
-function commandLabel(spec: Pick<CommandSpec, 'name' | 'parent'>): string {
-  return spec.parent === undefined ? spec.name : `${spec.parent} ${spec.name}`;
-}
-
 function isNonRunMode(opts: Readonly<Record<string, unknown>>): boolean {
   return (
     opts.list === true ||
@@ -277,49 +184,16 @@ function isNonRunMode(opts: Readonly<Record<string, unknown>>): boolean {
   );
 }
 
-function extractSignalEnvelope(value: unknown): SignalEnvelope | undefined {
-  if (isSignalEnvelope(value)) return value;
-  if (value === null || typeof value !== 'object') return undefined;
-  const maybeCompletion = value as ToolRunCompletion & {
-    readonly envelope?: unknown;
-  };
-  if (isSignalEnvelope(maybeCompletion.envelope)) return maybeCompletion.envelope;
-  const maybePresentation = value as {
-    readonly result?: unknown;
-    readonly envelope?: unknown;
-  };
-  if (isSignalEnvelope(maybePresentation.envelope)) return maybePresentation.envelope;
-  if (
-    maybePresentation.result !== undefined &&
-    typeof maybePresentation.result === 'object' &&
-    maybePresentation.result !== null
-  ) {
-    const nested = maybePresentation.result as { readonly envelope?: unknown };
-    if (isSignalEnvelope(nested.envelope)) return nested.envelope;
-  }
-  return undefined;
-}
-
-function isDelegatedCompletion(value: unknown): value is ToolRunCompletion {
-  const execution = (value as ToolRunCompletion | null)?.execution;
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    execution?.kind === 'delegated' &&
-    typeof execution.startedAt === 'string'
-  );
-}
-
 function verdictSummaryFrom(
-  envelope: SignalEnvelope | undefined,
+  envelope: StagedEnvelopeEvidence | undefined,
   session: StoredSession | null,
 ): StoredRunVerdictSummary | undefined {
   if (envelope !== undefined) {
     return {
-      passed: envelope.verdict.passed,
-      errors: envelope.verdict.summary.errors,
-      warnings: envelope.verdict.summary.warnings,
-      findings: envelope.signals.length,
+      passed: envelope.passed,
+      errors: envelope.errors,
+      warnings: envelope.warnings,
+      findings: envelope.findings,
     };
   }
   const summary = sessionSummary(session);
@@ -333,12 +207,15 @@ function verdictSummaryFrom(
 }
 
 function standaloneOutcome(input: {
-  readonly envelope: SignalEnvelope | undefined;
+  readonly envelope: StagedEnvelopeEvidence | undefined;
   readonly session: StoredSession | null;
   readonly exitCode: number;
   readonly missingEvidence: boolean;
 }): StoredRunStep['outcome'] {
-  if (input.envelope !== undefined) return deriveOutcome(input.envelope.verdict);
+  if (input.envelope !== undefined) {
+    if (input.envelope.faulted) return 'faulted';
+    return input.envelope.passed ? 'passed' : 'failed';
+  }
   if (input.session?.runOutcome === 'error') return 'faulted';
   if (input.session !== null) return input.session.passed ? 'passed' : 'failed';
   if (input.missingEvidence) return 'faulted';
@@ -346,12 +223,11 @@ function standaloneOutcome(input: {
 }
 
 function evidenceFrom(
-  envelope: SignalEnvelope | undefined,
+  envelope: StagedEnvelopeEvidence | undefined,
   session: StoredSession | null,
   missingEvidence: boolean,
 ): unknown {
-  const envelopeEvidence = projectEnvelopeEvidence(envelope);
-  if (envelopeEvidence !== undefined) return envelopeEvidence;
+  if (envelope !== undefined) return envelope.evidence;
   if (session !== null) {
     return {
       sessionId: session.id,

@@ -34,9 +34,9 @@ import { Command } from 'commander';
 import { buildRuntimeCommandInventory } from './bootstrap/build-runtime-command-inventory.js';
 import {
   bootstrapCli,
+  executeReportOpen,
   installPreActionHook,
   isRootVersionRequest,
-  maybeOpenReport,
   mountAllToolCommands,
   renderResult,
   buildCommandRegistrationInput,
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
   const { ctx, runActionHooks, getExitCode } = buildToolCliContext({
     render: renderResult,
     liveViews: createLiveViewRegistry(logger),
-    maybeOpenReport,
+    maybeOpenReport: executeReportOpen,
     logger,
   });
 

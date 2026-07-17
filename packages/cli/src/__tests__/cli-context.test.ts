@@ -11,6 +11,7 @@ import {
   type Logger,
 } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
+import { SessionRepo } from '@opensip-cli/session-store';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -166,6 +167,46 @@ describe('buildToolCliContext', () => {
     await expect(ctx.renderLive('missing', {})).rejects.toBeInstanceOf(UnknownLiveViewError);
   });
 
+  it('acknowledges an eligible report request but executes it only after evidence commits', async () => {
+    const savedEnv = { ...process.env };
+    const savedTTY = process.stdout.isTTY;
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      delete process.env.CI;
+      delete process.env.SSH_CONNECTION;
+      delete process.env.SSH_CLIENT;
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
+      const opts = makeBuildOpts();
+      const handle = buildToolCliContext(opts);
+
+      await withScope(makeTestScope({ datastore: () => datastore }), async () => {
+        handle.runActionHooks.beginRun?.();
+        await handle.ctx.maybeOpenReport({
+          openRequested: true,
+          jsonOutput: false,
+        });
+        expect(opts.maybeOpenReport).not.toHaveBeenCalled();
+
+        handle.runActionHooks.completeRun?.({ session: RESOLVER_CONTRIBUTION });
+        await handle.runActionHooks.finalizeRun?.();
+      });
+
+      expect(opts.maybeOpenReport).toHaveBeenCalledOnce();
+      expect(opts.maybeOpenReport).toHaveBeenCalledWith({ kind: 'compose-and-open' });
+      expect(new SessionRepo(datastore).count()).toBe(1);
+    } finally {
+      process.env = { ...savedEnv };
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: savedTTY,
+        configurable: true,
+      });
+      datastore.close();
+    }
+  });
+
   it('emitJson writes JSON-encoded output to stdout', () => {
     const opts = makeBuildOpts();
     const { ctx } = buildToolCliContext(opts);
@@ -247,11 +288,12 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
     process.exitCode = savedExit;
   });
 
-  it('swallows a NOT_ENTERED scope and debug-logs datastore_unavailable', () => {
+  it('defers a NOT_ENTERED datastore read until finalization, then degrades safely', async () => {
     const debug = vi.fn<Logger['debug']>();
     const handle = buildCtxWithDebug(debug);
-    // No entered scope → readScope() throws → resolver catch → undefined → no-op.
+    // Staging is memory-only. The resolver is first touched by finalization.
     expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
+    await handle.runActionHooks.finalizeRun?.();
     expect(debug).toHaveBeenCalledWith(
       expect.objectContaining({ evt: 'cli.context.datastore_unavailable' }),
     );
@@ -259,19 +301,20 @@ describe('buildToolCliContext — run-plane datastore resolver', () => {
 
   it('returns undefined when the entered scope carries no datastore thunk', async () => {
     const handle = buildCtxWithDebug(vi.fn<Logger['debug']>());
-    await withScope(makeTestScope({}), () => {
+    await withScope(makeTestScope({}), async () => {
       expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
-      return Promise.resolve();
+      await handle.runActionHooks.finalizeRun?.();
     });
   });
 
   it('reads through the scope datastore thunk when one is present', async () => {
     const handle = buildCtxWithDebug(vi.fn<Logger['debug']>());
     const ds = DataStoreFactory.open({ backend: 'memory' });
-    await withScope(makeTestScope({ datastore: () => ds }), () => {
+    await withScope(makeTestScope({ datastore: () => ds }), async () => {
       expect(() => completeRunOf(handle)({ session: RESOLVER_CONTRIBUTION })).not.toThrow();
-      return Promise.resolve();
+      await handle.runActionHooks.finalizeRun?.();
     });
+    expect(new SessionRepo(ds).count()).toBe(1);
     ds.close();
   });
 });

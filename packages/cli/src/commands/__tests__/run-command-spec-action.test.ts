@@ -216,13 +216,7 @@ describe('runCommandSpecAction', () => {
         });
 
         await runWithScope(scope, () =>
-          runCommandSpecAction(
-            spec,
-            { cwd: '/proj', ...modeOptions, _args: [] },
-            [],
-            ctx,
-            hooks,
-          ),
+          runCommandSpecAction(spec, { cwd: '/proj', ...modeOptions, _args: [] }, [], ctx, hooks),
         );
 
         expect(new SessionRepo(datastore).count()).toBe(1);
@@ -604,5 +598,259 @@ describe('runCommandSpecAction', () => {
 
     expect(reportFailure).toHaveBeenCalledWith({ error, jsonRequested: true });
     expect(ctx.setExitCode).not.toHaveBeenCalled();
+  });
+
+  it('runs its one finalizer after normal output replay', async () => {
+    const events: string[] = [];
+    const finalizeRun = vi.fn(() => {
+      events.push('finalize');
+      return Promise.resolve({ status: 'discarded' as const });
+    });
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'fixture',
+      description: 'fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      handler: () => {
+        events.push('handler');
+        return { type: 'help' };
+      },
+    });
+    const ctx = makeCtx({
+      render: vi.fn(() => {
+        events.push('render');
+        return Promise.resolve();
+      }),
+    });
+    await runCommandSpecAction(spec, { _args: [] }, [], ctx, {
+      completeRun: () => events.push('complete'),
+      finalizeRun,
+    });
+    expect(events).toEqual(['handler', 'complete', 'render', 'finalize']);
+    expect(finalizeRun).toHaveBeenCalledOnce();
+  });
+
+  it('finalizes exactly once when output replay throws and preserves the output error', async () => {
+    const outputError = new Error('render failed');
+    const finalizeRun = vi.fn(() =>
+      Promise.resolve({
+        status: 'committed' as const,
+        sessionIds: [],
+        sessionCount: 0,
+        stepCount: 0,
+        serializedBytes: 0,
+        persistMs: 0,
+      }),
+    );
+    const spec = defineCommand<unknown, ToolCliContext>({
+      name: 'fixture',
+      description: 'fixture',
+      commonFlags: [],
+      scope: 'project',
+      output: 'command-result',
+      handler: () => ({ type: 'help' }),
+    });
+    const ctx = makeCtx({ render: vi.fn(() => Promise.reject(outputError)) });
+    await expect(runCommandSpecAction(spec, { _args: [] }, [], ctx, { finalizeRun })).rejects.toBe(
+      outputError,
+    );
+    expect(finalizeRun).toHaveBeenCalledOnce();
+  });
+
+  it.each(['reported-failure', 'tool-error', 'unexpected', 'external'] as const)(
+    'finalizes exactly once on the %s exit branch',
+    async (branch) => {
+      const finalizeRun = vi.fn(() => Promise.resolve({ status: 'discarded' as const }));
+      const error =
+        branch === 'tool-error' ? new ConfigurationError('typed') : new Error('unexpected');
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'fixture',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        handler:
+          branch === 'reported-failure'
+            ? async (_opts, cli) => {
+                await cli.reportFailure?.({ message: 'reported', exitCode: 2 });
+              }
+            : () => {
+                throw error;
+              },
+      });
+      const ctx = makeCtx({
+        reportFailure: vi.fn(() => Promise.resolve()),
+      });
+      const action = runCommandSpecAction(spec, { _args: [] }, [], ctx, {
+        finalizeRun,
+        ...(branch === 'external' ? { maybeDispatchExternal: () => Promise.resolve(true) } : {}),
+      });
+      if (branch === 'unexpected') await expect(action).rejects.toBe(error);
+      else await expect(action).resolves.toBeUndefined();
+      expect(finalizeRun).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('commits a legitimate non-verdict Session without inventing a parent Run', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(createRunPlaneFactory({ getDatastore: () => datastore }));
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'inventory',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        handler: () => ({ session: { tool: 'fit', cwd: '/proj', score: 100, passed: true } }),
+      });
+      await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runCommandSpecAction(spec, { _args: [] }, [], makeCtx(), hooks),
+      );
+      expect(new SessionRepo(datastore).count()).toBe(1);
+      expect(new RunRepo(datastore).listRuns()).toHaveLength(0);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('does not invent a parent for a verdict command running in list mode', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(createRunPlaneFactory({ getDatastore: () => datastore }));
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'fit',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'command-result',
+        producesVerdict: true,
+        handler: () => ({ type: 'help' }),
+      });
+      await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runCommandSpecAction(spec, { list: true, _args: [] }, [], makeCtx(), hooks),
+      );
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      expect(new RunRepo(datastore).listRuns()).toHaveLength(0);
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('commits an envelope-backed parent without requiring a Session', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(createRunPlaneFactory({ getDatastore: () => datastore }));
+      const runEnvelope = buildSignalEnvelope({
+        tool: 'graph',
+        runId: 'envelope-only',
+        createdAt: '2026-07-16T00:00:00.000Z',
+        units: [{ slug: 'graph', passed: true, durationMs: 1 }],
+        signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      });
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'graph',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+        handler: () => ({ envelope: runEnvelope }),
+      });
+      await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], makeCtx(), hooks),
+      );
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      const runs = new RunRepo(datastore).listRuns();
+      expect(runs).toHaveLength(1);
+      const step = new RunRepo(datastore).listStepsForRun(runs[0].id)[0];
+      expect(step).toMatchObject({
+        outcome: 'passed',
+        evidence: { kind: 'signal-envelope', runId: 'envelope-only' },
+      });
+      expect(step.sessionId).toBeUndefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('projects from the pre-output immutable envelope snapshot', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(createRunPlaneFactory({ getDatastore: () => datastore }));
+      const runEnvelope = buildSignalEnvelope({
+        tool: 'graph',
+        runId: 'immutable-envelope',
+        createdAt: '2026-07-16T00:00:00.000Z',
+        units: [{ slug: 'graph', passed: true, durationMs: 1 }],
+        signals: [],
+        policy: HOST_VERDICT_POLICY_FALLBACK,
+        runFaulted: false,
+      });
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'graph',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'signal-envelope',
+        producesVerdict: true,
+        handler: () => runEnvelope,
+      });
+      const ctx = makeCtx({
+        render: vi.fn((value: unknown) => {
+          const mutable = value as { verdict: { passed: boolean }; signals: unknown[] };
+          mutable.verdict.passed = false;
+          mutable.signals.push({ fingerprint: 'late' });
+          return Promise.resolve();
+        }),
+      });
+      await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], ctx, hooks),
+      );
+      const run = new RunRepo(datastore).listRuns()[0];
+      expect(new RunRepo(datastore).listStepsForRun(run.id)[0]).toMatchObject({
+        outcome: 'passed',
+        evidence: { verdict: { passed: true }, signalCount: 0 },
+      });
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it('rolls back both Session and parent without changing the Tool verdict on bundle failure', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(
+        createRunPlaneFactory({
+          getDatastore: () => datastore,
+          commitEvidence: () => ({ status: 'failed', reason: 'write-failed' }),
+        }),
+      );
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'fit',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+        handler: () => ({
+          session: { tool: 'fit', cwd: '/proj', score: 100, passed: true },
+        }),
+      });
+      const ctx = makeCtx({ getExitCode: vi.fn(() => EXIT_CODES.SUCCESS) });
+      await runWithScope(new RunScope({ datastore: () => datastore }), () =>
+        runCommandSpecAction(spec, { cwd: '/proj', _args: [] }, [], ctx, hooks),
+      );
+      expect(ctx.setExitCode).not.toHaveBeenCalled();
+      expect(new SessionRepo(datastore).count()).toBe(0);
+      expect(new RunRepo(datastore).listRuns()).toHaveLength(0);
+    } finally {
+      datastore.close();
+    }
   });
 });

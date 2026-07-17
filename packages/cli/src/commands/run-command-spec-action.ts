@@ -2,17 +2,25 @@ import { mapToolErrorToExitCode, type CommandResult } from '@opensip-cli/contrac
 import {
   SystemError,
   ToolError,
+  currentLogger,
   currentScope,
   type CommandMountContext,
   type LiveViewContext,
   type ReportFailureDetail,
   type CommandSpec,
 } from '@opensip-cli/core';
+import { RunRepo } from '@opensip-cli/session-store';
 
-import { type RunActionHooks } from '../bootstrap/run-plane.js';
+import { currentSuiteRunContext, type RunActionHooks } from '../bootstrap/run-plane.js';
 
 import { emitCommandResult } from './mount-result-command.js';
-import { persistStandaloneRun } from './run-ledger-standalone.js';
+import {
+  commandLabel,
+  isDelegatedCompletion,
+  projectStandaloneRun,
+} from './run-ledger-standalone.js';
+
+import type { DataStore } from '@opensip-cli/datastore';
 
 export async function runCommandSpecAction<TCtx extends CommandMountContext>(
   spec: CommandSpec<unknown, TCtx>,
@@ -22,6 +30,7 @@ export async function runCommandSpecAction<TCtx extends CommandMountContext>(
   hooks: RunActionHooks = {},
 ): Promise<void> {
   let failureReported = false;
+  let result: unknown;
   const actionCtx =
     ctx.reportFailure === undefined
       ? ctx
@@ -39,50 +48,21 @@ export async function runCommandSpecAction<TCtx extends CommandMountContext>(
     const dispatched = await hooks.maybeDispatchExternal?.(spec.name, optsWithArgs, positionals);
     if (dispatched === true) {
       diagnostics?.event('execute', 'debug', `command '${spec.name}' dispatched out-of-process`);
-      persistStandaloneRun({
-        spec,
-        opts: optsWithArgs,
-        positionals,
-        ctx,
-        hooks,
-      });
       return;
     }
-    const result = await spec.handler(optsWithArgs, actionCtx);
+    result = await spec.handler(optsWithArgs, actionCtx);
     diagnostics?.event('execute', 'debug', `command '${spec.name}' completed`);
     hooks.completeRun?.(result);
     if (failureReported && result === undefined) {
-      persistStandaloneRun({
-        spec,
-        opts: optsWithArgs,
-        positionals,
-        ctx,
-        hooks,
-      });
       return;
     }
     await dispatchOutput(result, spec, optsWithArgs, positionals, ctx);
-    persistStandaloneRun({
-      spec,
-      opts: optsWithArgs,
-      positionals,
-      ctx,
-      hooks,
-      result,
-    });
   } catch (error) {
     if (error instanceof ToolError) {
       if (ctx.reportFailure !== undefined) {
         await ctx.reportFailure({
           error,
           jsonRequested: optsWithArgs.json === true,
-        });
-        persistStandaloneRun({
-          spec,
-          opts: optsWithArgs,
-          positionals,
-          ctx,
-          hooks,
         });
         return;
       }
@@ -97,18 +77,115 @@ export async function runCommandSpecAction<TCtx extends CommandMountContext>(
       } else {
         await ctx.render({ type: 'error', message: error.message, exitCode });
       }
-      persistStandaloneRun({
-        spec,
-        opts: optsWithArgs,
-        positionals,
-        ctx,
-        hooks,
-      });
       return;
     }
-    persistStandaloneRun({ spec, opts: optsWithArgs, positionals, ctx, hooks });
     throw error;
+  } finally {
+    await finalizeCommandEvidence({
+      spec,
+      opts: optsWithArgs,
+      positionals,
+      ctx,
+      hooks,
+      result,
+    });
   }
+}
+
+async function finalizeCommandEvidence<TCtx extends CommandMountContext>(input: {
+  readonly spec: CommandSpec<unknown, TCtx>;
+  readonly opts: Readonly<Record<string, unknown>>;
+  readonly positionals: readonly unknown[];
+  readonly ctx: TCtx;
+  readonly hooks: RunActionHooks;
+  readonly result?: unknown;
+}): Promise<void> {
+  if (input.hooks.finalizeRun === undefined) return;
+  const log = currentLogger();
+  try {
+    const skipDelegatedSupervisor = hasProvenDelegatedChild(input);
+    const projection = projectStandaloneRun({
+      spec: input.spec,
+      opts: input.opts,
+      positionals: input.positionals,
+      ctx: input.ctx,
+      stagedSession: input.hooks.currentStagedSession?.(),
+      stagedEnvelope: input.hooks.currentStagedEnvelope?.(),
+      correlationRunId: currentScope()?.runId,
+      skipDelegatedSupervisor,
+      suppressParent: currentSuiteRunContext() !== undefined,
+    });
+    const finalized = await input.hooks.finalizeRun(
+      projection === undefined ? undefined : { run: projection.evidence },
+    );
+    if (finalized.status === 'committed' && projection?.missingEvidence === true) {
+      log.warn?.({
+        evt: 'cli.run-ledger.standalone_missing_evidence',
+        module: 'cli:standalone-run-ledger',
+        runId: projection.evidence.run.id,
+        tool: projection.tool,
+        command: projection.command,
+        msg: 'Verdict-producing command completed without a staged session or signal envelope.',
+      });
+    }
+  } catch (error) {
+    // Persistence/report finalization is secondary to the Tool verdict. Custom
+    // host contexts may supply their own hook, so keep this boundary defensive.
+    log.warn?.({
+      evt: 'cli.run-evidence.finalize_failed',
+      module: 'cli:run-plane',
+      command: commandLabel(input.spec),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Preserve the subprocess-supervisor de-duplication rule without contaminating
+ * the standalone projection with a repository dependency.
+ */
+function hasProvenDelegatedChild<TCtx extends CommandMountContext>(input: {
+  readonly spec: CommandSpec<unknown, TCtx>;
+  readonly result?: unknown;
+}): boolean {
+  if (!isDelegatedCompletion(input.result)) return false;
+  const log = currentLogger();
+  const correlationRunId = currentScope()?.runId;
+  const tool = input.spec.parent ?? input.spec.name;
+  const command = commandLabel(input.spec);
+  const delegatedAt = input.result.execution?.startedAt;
+  let proven = false;
+  try {
+    const datastore = currentScope()?.datastore() as DataStore | null | undefined;
+    proven =
+      datastore != null &&
+      correlationRunId !== undefined &&
+      delegatedAt !== undefined &&
+      new RunRepo(datastore).hasImplicitRunForCommand(correlationRunId, tool, command, delegatedAt);
+  } catch {
+    proven = false;
+  }
+  if (proven) {
+    log.info?.({
+      evt: 'cli.run-ledger.delegated_parent_skipped',
+      module: 'cli:standalone-run-ledger',
+      correlationRunId,
+      tool,
+      command,
+      delegatedAt,
+    });
+    return true;
+  }
+  log.warn?.({
+    evt: 'cli.run-ledger.delegated_evidence_missing',
+    module: 'cli:standalone-run-ledger',
+    ...(correlationRunId === undefined ? {} : { correlationRunId }),
+    tool,
+    command,
+    ...(delegatedAt === undefined ? {} : { delegatedAt }),
+    msg: 'Delegated command returned without a correlated child run; recording a missing-evidence fault.',
+  });
+  return false;
 }
 
 /**

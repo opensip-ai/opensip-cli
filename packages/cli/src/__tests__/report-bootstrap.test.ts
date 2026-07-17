@@ -8,6 +8,21 @@ afterEach(() => {
 });
 
 describe('maybeOpenReport', () => {
+  it('plans an eligible request without composing or opening', async () => {
+    const compose = vi.spyOn(composeMod, 'composeAndWriteReport');
+    const mod = await import('../bootstrap/report.js');
+    expect(
+      mod.planReportOpen(
+        { openRequested: true, jsonOutput: false },
+        { stdoutIsTTY: true, env: {} },
+      ),
+    ).toEqual({
+      status: 'open',
+      effect: { kind: 'compose-and-open' },
+    });
+    expect(compose).not.toHaveBeenCalled();
+  });
+
   it('does nothing when openRequested is false', async () => {
     const launch = vi.spyOn(openReportMod, 'launchReport');
     const mod = await import('../bootstrap/report.js');
@@ -55,6 +70,23 @@ describe('maybeOpenReport', () => {
       const mod = await import('../bootstrap/report.js');
       await mod.maybeOpenReport({ openRequested: true, jsonOutput: false });
       expect(compose).toHaveBeenCalledWith({ open: true });
+    });
+
+    it('executes an exact queued report selection', async () => {
+      const compose = vi.spyOn(composeMod, 'composeAndWriteReport').mockResolvedValue({
+        type: 'report',
+        path: 'reports/exact.html',
+        opened: true,
+      });
+      const mod = await import('../bootstrap/report.js');
+      await mod.executeReportOpen({
+        kind: 'compose-and-open',
+        selection: { view: 'change-impact', runId: 'run-exact' },
+      });
+      expect(compose).toHaveBeenCalledWith({
+        open: true,
+        selection: { view: 'change-impact', runId: 'run-exact' },
+      });
     });
   });
 });

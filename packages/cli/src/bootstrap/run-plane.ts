@@ -1,26 +1,20 @@
 /**
- * run-plane — the host-owned run lifecycle plane (host-owned-run-timing §6, §8).
+ * Host-owned run lifecycle and evidence staging.
  *
- * The single place that:
- *  - creates the per-invocation {@link RunLifecycle} (inside the command action,
- *    after `RunScope` entry, before tool work — NOT at context construction);
- *  - turns a tool-returned {@link ToolSessionContribution} into a persisted
- *    generic `StoredSession` row (host stamps `startedAt` / `completedAt` /
- *    `durationMs` from the lifecycle; the tool supplies only verdict/payload);
- *  - records host-side overhead (persistMs now; render/egress/ttyBusy/total in
- *    later phases) in the sibling host-metrics record keyed by session id.
- *
- * `buildToolCliContext` constructs only the FACTORY (stable deps). The command
- * action begins the invocation lifecycle and, after the handler / live renderer
- * returns its completion, asks the plane to complete + persist.
- *
- * Best-effort contract: persistence never throws, never affects the primary
- * result or exit code. When no datastore is in scope (non-project commands,
- * tests) the plane writes nothing and returns `undefined`.
+ * Tool handlers return a ToolSessionContribution. The host freezes lifecycle
+ * timing, assigns identity, and stages a complete immutable StoredSession in a
+ * bounded memory owner. The command boundary later commits that Session and its
+ * optional parent Run atomically; analysis never holds a datastore write lock.
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import {
+  isSignalEnvelope,
+  type SignalEnvelope,
+  type StoredSession,
+  type StoredSessionHostMetrics,
+} from '@opensip-cli/contracts';
 import {
   createRunLifecycle,
   currentScope,
@@ -28,38 +22,48 @@ import {
   generatePrefixedId,
   logger as defaultLogger,
   readPackageVersion,
-  type Logger,
-  type RecordedToolRunSession,
-  type RunLifecycle,
-  type RunTimingSnapshot,
-  type ToolRunCompletion,
   type EvidenceSnapshotContribution,
+  type Logger,
+  type RunLifecycle,
+  type ToolRunCompletion,
   type ToolRunSessions,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
-import { SessionRepo } from '@opensip-cli/session-store';
+import {
+  commitEvidenceBundle,
+  type EvidenceBundleCommitResult,
+  type EvidenceBundlePrecondition,
+  type EvidenceBundleRun,
+} from '@opensip-cli/session-store';
 
 import { manifestVersionFor } from './declared-inputs.js';
 import { captureEvidenceSnapshots } from './evidence-snapshot-capture.js';
+import {
+  createHostEvidenceAccumulator,
+  type HostEvidenceAccumulatorLimits,
+  type HostEvidenceDrainResult,
+  type HostEvidenceOwnerToken,
+} from './host-evidence-accumulator.js';
+import { type DeferredReportEffect } from './report.js';
 import {
   enforceSessionRetention,
   resolveCurrentSessionRetentionPolicy,
   type ResolvedSessionRetentionPolicy,
 } from './session-retention.js';
 
-// The opensip-cli version, resolved once from this package's package.json. An
-// immutable build fact (not per-run state); host-stamped onto every session row
-// as run provenance.
-const CLI_VERSION = readPackageVersion(import.meta.url);
-
-import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
+const CLI_VERSION = readPackageVersion(import.meta.url);
 const MODULE_TAG = 'cli:run-plane';
 
 export interface SuiteRunContext {
   readonly suiteRunId: string;
   readonly suiteName: string;
+  /**
+   * Task 1.4 supplies this explicit nested owner. Until then, a suite context
+   * without one retains the legacy per-step ordinary finalization behavior.
+   */
+  readonly evidenceOwner?: HostEvidenceOwnerToken;
 }
 
 const suiteContextStorage = new AsyncLocalStorage<SuiteRunContext>();
@@ -72,79 +76,103 @@ export function runWithSuiteRunContext<T>(ctx: SuiteRunContext, fn: () => T): T 
   return suiteContextStorage.run(ctx, fn);
 }
 
-/** Stable dependencies the run-plane factory captures (no per-invocation state). */
 export interface RunPlaneDeps {
-  /** Resolve the project datastore, or undefined when none is in scope. Must not throw. */
   readonly getDatastore: () => DataStore | undefined;
   readonly sessionRetentionPolicy?: () => ResolvedSessionRetentionPolicy;
+  readonly executeReportEffect?: (effect: DeferredReportEffect) => Promise<void>;
+  readonly onReportEffectFailure?: (detail: {
+    readonly effect: DeferredReportEffect;
+    readonly errorName: string;
+  }) => Promise<void>;
+  readonly evidenceLimits?: HostEvidenceAccumulatorLimits;
+  /** Test seam; production uses session-store's closed atomic API. */
+  readonly commitEvidence?: typeof commitEvidenceBundle;
   readonly logger?: Logger;
 }
 
-/**
- * The per-invocation run lifecycle handle. Created once per command action by
- * {@link RunPlaneFactory.beginRun} (or lazily by {@link RunPlaneFactory.current}).
- */
+export interface HostEvidenceFinalizeInput {
+  readonly run?: EvidenceBundleRun;
+  readonly precondition?: EvidenceBundlePrecondition;
+}
+
+export type HostEvidenceFinalizeResult =
+  | EvidenceBundleCommitResult
+  | {
+      readonly status: 'deferred';
+    }
+  | {
+      readonly status: 'poisoned';
+      readonly reason: 'session-limit' | 'byte-limit' | 'invalid-evidence';
+    }
+  | {
+      readonly status: 'datastore-unavailable' | 'discarded';
+    };
+
+export type RunSessionStagingStatus = 'none' | 'staged' | 'rejected' | 'discarded';
+
+/** Immutable bounded envelope facts retained before any output side effect. */
+export interface StagedEnvelopeEvidence {
+  readonly tool: string;
+  readonly createdAt: string;
+  readonly engineVersion?: string;
+  readonly passed: boolean;
+  readonly faulted: boolean;
+  readonly score: number;
+  readonly errors: number;
+  readonly warnings: number;
+  readonly findings: number;
+  readonly evidence: Readonly<Record<string, unknown>>;
+}
+
 export interface RunPlaneInvocation {
-  /** The lifecycle for this invocation (display elapsed; host completion source). */
   readonly lifecycle: RunLifecycle;
-  /**
-   * The launch path: freeze the lifecycle (`complete()`) and persist the
-   * contribution with the frozen `startedAt` / `completedAt` / `durationMs`.
-   * Idempotent on the lifecycle; best-effort on persistence.
-   */
-  completeAndPersist(contribution: ToolSessionContribution): RecordedToolRunSession | undefined;
-  /** Best-effort upsert of host-side overhead metrics for the persisted session. */
+  /** Freeze timing and stage one complete Session. Idempotent per invocation. */
+  completeAndStage(contribution: ToolSessionContribution): StoredSession | undefined;
+  /** Merge host-only metrics into the staged sibling row before drain. */
   recordHostMetrics(metrics: StoredSessionHostMetrics): void;
-  /**
-   * Run a live render and own its completion: time the TTY occupancy, then —
-   * if the renderer returned a `session` contribution — freeze the lifecycle,
-   * persist it, and record `ttyBusyMs`. Returns the renderer's completion with
-   * `.session` stripped so the caller can still read `.envelope` for egress
-   * without giving `completeRun` a second write opportunity.
-   *
-   * This is the live-path analogue of `completeAndPersist`: the renderer no
-   * longer calls a session writer inside the Ink tree; the host persists here
-   * after `await render()`.
-   */
+  /** Stage a live renderer's Session and strip only `.session` from its return. */
   completeLiveRender(
     render: () => Promise<ToolRunCompletion | void>,
   ): Promise<ToolRunCompletion | void>;
-  /** The persisted session id, once a row has been written (else undefined). */
+  /** Preallocated, still-linkable Session identity. */
   sessionId(): string | undefined;
+  /** Immutable Session used by the pure standalone parent projection. */
+  stagedSession(): StoredSession | undefined;
+  /** Capture and expose bounded immutable envelope facts before output replay. */
+  captureEnvelope(result: unknown): void;
+  stagedEnvelope(): StagedEnvelopeEvidence | undefined;
+  /** Remove only this invocation's staged Session from its owner. */
+  discardEvidence(): void;
+  /** Closed observation used by suite capability validation. */
+  sessionStagingStatus(): RunSessionStagingStatus;
+  readonly owner: HostEvidenceOwnerToken;
 }
 
-/**
- * Internal run-lifecycle hooks the host attaches to the command context so the
- * mount dispatch can mark the lifecycle boundaries. NOT part of the public
- * `ToolCliContext` — read via cast at the dispatch site (like `runSession`).
- */
 export interface RunActionHooks {
-  /** Begin the invocation lifecycle — called by the command action before the handler runs. */
   readonly beginRun?: () => void;
-  /**
-   * Called after the handler returns. If the result carries a
-   * {@link ToolSessionContribution} (a `ToolRunCompletion`), the host freezes
-   * the lifecycle and persists it. A plain `CommandResult` (no `session`) is a
-   * no-op — every first-party tool now returns a contribution (Phase 3); there
-   * is no transitional generic-session writer left on the launch surface.
-   */
   readonly completeRun?: (result: unknown) => void;
-  /** Reset the invocation slot so a host-owned multi-step command can time the next step. */
   readonly resetRun?: () => void;
-  /** Current persisted session id for this command/step invocation, when one exists. */
   readonly currentSessionId?: () => string | undefined;
-  /** Validated evidence returned by the current in-process command invocation. */
+  readonly currentStagedSession?: () => StoredSession | undefined;
+  readonly currentStagedEnvelope?: () => StagedEnvelopeEvidence | undefined;
+  readonly currentSessionStagingStatus?: () => RunSessionStagingStatus;
   readonly currentEvidenceSnapshots?: () => readonly EvidenceSnapshotContribution[];
-  /**
-   * ADR-0054 out-of-process dispatch seam. When present AND the owning tool is
-   * EXTERNAL-provenance, the command action calls this INSTEAD of invoking
-   * `spec.handler(...)` in-process — the worker imports the untrusted runtime,
-   * runs the handler, and this seam replays the slim result through the host
-   * seams. Returns `true` when it dispatched (the action skips the in-process
-   * path); `false`/absent when the tool is bundled (the action runs the handler
-   * in-process as today). Bound per-tool by `mountOneTool` with the tool's
-   * provenance; absent for host commands (whose lean context has no run plane).
-   */
+  /** Remove a capability-mismatched step's staged Session without poisoning siblings. */
+  readonly discardCurrentInvocationEvidence?: () => void;
+  /** Ordinary command-boundary finalizer; nested owners deliberately defer. */
+  readonly finalizeRun?: (input?: HostEvidenceFinalizeInput) => Promise<HostEvidenceFinalizeResult>;
+  /** Task 1.4 host-only nested owner capabilities. */
+  readonly createNestedEvidenceOwner?: () => HostEvidenceOwnerToken;
+  readonly finalizeEvidenceOwner?: (
+    owner: HostEvidenceOwnerToken,
+    input?: HostEvidenceFinalizeInput,
+  ) => Promise<HostEvidenceFinalizeResult>;
+  readonly discardEvidenceOwner?: (owner: HostEvidenceOwnerToken) => void;
+  /** Replace child requests with one suite-owned exact post-commit effect. */
+  readonly replaceEvidenceOwnerReportEffect?: (
+    owner: HostEvidenceOwnerToken,
+    effect: DeferredReportEffect,
+  ) => boolean;
   readonly maybeDispatchExternal?: (
     commandName: string,
     opts: Record<string, unknown>,
@@ -152,38 +180,47 @@ export interface RunActionHooks {
   ) => Promise<boolean>;
 }
 
-/**
- * The factory `buildToolCliContext` creates. Holds only stable deps; the
- * lifecycle is created per command action.
- */
 export interface RunPlaneFactory {
-  /** Begin (or return the already-begun) invocation lifecycle for this command action. */
   beginRun(): RunPlaneInvocation;
-  /** The current invocation — lazily begun if the command action has not yet called beginRun. */
   current(): RunPlaneInvocation;
-  /** Drop the current invocation slot. Intended for host-owned suite step boundaries. */
+  /**
+   * Clear invocation-local timing and identity. Explicit nested-owner rows stay
+   * in the accumulator for their sole owner to drain later.
+   */
   reset(): void;
+  queueReportEffect(effect: DeferredReportEffect): boolean;
+  finalizeCurrent(input?: HostEvidenceFinalizeInput): Promise<HostEvidenceFinalizeResult>;
+  createNestedEvidenceOwner(): HostEvidenceOwnerToken;
+  finalizeEvidenceOwner(
+    owner: HostEvidenceOwnerToken,
+    input?: HostEvidenceFinalizeInput,
+  ): Promise<HostEvidenceFinalizeResult>;
+  discardEvidenceOwner(owner: HostEvidenceOwnerToken): void;
+  replaceEvidenceOwnerReportEffect(
+    owner: HostEvidenceOwnerToken,
+    effect: DeferredReportEffect,
+  ): boolean;
 }
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- factory and invocation closure intentionally share the per-command lifecycle slot.
 export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
   const log = deps.logger ?? defaultLogger;
-  // One command per CLI invocation: a single mutable invocation slot is correct.
+  const accumulator = createHostEvidenceAccumulator(deps.evidenceLimits);
+  const commit = deps.commitEvidence ?? commitEvidenceBundle;
+  const finalizations = new WeakMap<HostEvidenceOwnerToken, Promise<HostEvidenceFinalizeResult>>();
+  const committedSessionIds = new Set<string>();
   let invocation: RunPlaneInvocation | undefined;
 
   function safeDatastore(): DataStore | undefined {
     try {
       return deps.getDatastore();
     } catch (error) {
-      // @swallow-ok absence of a datastore is a NORMAL control-flow signal
-      // (non-project commands / tests) — the resolver throwing means the same.
-      // Debug-log for diagnosability and degrade to "no datastore".
       log.debug?.({
         evt: 'cli.run-plane.datastore_unavailable',
         module: MODULE_TAG,
         error: error instanceof Error ? error.message : String(error),
       });
-      return;
+      return undefined;
     }
   }
 
@@ -191,134 +228,87 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     return deps.sessionRetentionPolicy?.() ?? resolveCurrentSessionRetentionPolicy();
   }
 
+  function ownerForInvocation(): HostEvidenceOwnerToken {
+    const nested = currentSuiteRunContext()?.evidenceOwner;
+    return nested !== undefined && accumulator.ownerKind(nested) === 'nested'
+      ? nested
+      : accumulator.createOwner('ordinary');
+  }
+
   function makeInvocation(): RunPlaneInvocation {
     const lifecycle = createRunLifecycle();
-    let sessionId: string | undefined;
-    let recordedSession: RecordedToolRunSession | undefined;
+    const owner = ownerForInvocation();
+    let completionAttempted = false;
+    let stagingStatus: RunSessionStagingStatus = 'none';
+    let stagedId: string | undefined;
+    let stagedSnapshot: StoredSession | undefined;
+    let envelopeSnapshot: StagedEnvelopeEvidence | undefined;
 
-    function persist(
-      contribution: ToolSessionContribution,
-      snapshot: RunTimingSnapshot,
-    ): RecordedToolRunSession | undefined {
-      const datastore = safeDatastore();
-      if (!datastore) return;
+    function sessionId(): string | undefined {
+      if (stagedId === undefined) return undefined;
+      return accumulator.isSessionLinkable(owner, stagedId) || committedSessionIds.has(stagedId)
+        ? stagedId
+        : undefined;
+    }
+
+    function stagedSession(): StoredSession | undefined {
+      const id = sessionId();
+      if (id === undefined) return undefined;
+      return accumulator.stagedSession(owner, id) ?? stagedSnapshot;
+    }
+
+    function completeAndStage(contribution: ToolSessionContribution): StoredSession | undefined {
+      if (completionAttempted) return stagedSession();
+      completionAttempted = true;
+      const snapshot = lifecycle.complete();
       const id = generatePrefixedId(contribution.tool);
-      const persistStart = performance.now();
-      try {
-        const repo = new SessionRepo(datastore);
-        const runOutcome = deriveRunOutcome({
-          passed: contribution.passed,
-          explicit: contribution.runOutcome,
-        });
-        repo.save({
-          id,
-          tool: contribution.tool,
-          startedAt: snapshot.startedAt,
-          completedAt: snapshot.completedAt,
-          cwd: contribution.cwd,
-          ...suiteSessionFields(),
-          recipe: contribution.recipe,
-          score: contribution.score,
-          passed: contribution.passed,
-          runOutcome,
-          durationMs: snapshot.durationMs,
-          // Run provenance (host-stamped, like timing/id): the CLI version that
-          // produced the run and the producing tool's engine version. engineVersion
-          // is undefined for a tool with no manifest version.
-          cliVersion: CLI_VERSION,
-          ...((): { engineVersion?: string } => {
-            const engineVersion = manifestVersionFor(contribution.tool);
-            return engineVersion === undefined ? {} : { engineVersion };
-          })(),
-          payload: contribution.payload,
-        });
-        sessionId = id;
-        recordedSession = {
-          id,
-          tool: contribution.tool,
-          startedAt: snapshot.startedAt,
-          completedAt: snapshot.completedAt,
-          durationMs: snapshot.durationMs,
-          ...suiteSessionFields(),
-        };
-        // persistMs: host-side write cost, recorded on the sibling metrics row
-        // (separate clock from canonical durationMs).
-        repo.upsertHostMetrics(id, {
-          persistMs: Math.max(0, performance.now() - persistStart),
-        });
-        log.info?.({
-          evt: 'cli.run-session.recorded',
-          module: MODULE_TAG,
-          tool: contribution.tool,
-          sessionId: id,
-          durationMs: snapshot.durationMs,
-        });
-        try {
-          const policy = resolveRetentionPolicy();
-          log.debug?.({
-            evt: 'session.retention.policy_resolved',
-            module: MODULE_TAG,
-            source: policy.source,
-            keep: policy.keep,
-            maxAgeDays: policy.maxAgeDays,
-            maxSizeMb: policy.maxSizeMb,
-          });
-          currentScope()?.diagnostics?.event(
-            'persist',
-            'debug',
-            'session.retention.policy_resolved',
-            {
-              evt: 'session.retention.policy_resolved',
-              module: MODULE_TAG,
-              source: policy.source,
-              keep: policy.keep,
-              maxAgeDays: policy.maxAgeDays,
-              maxSizeMb: policy.maxSizeMb,
-            },
-          );
-          enforceSessionRetention(datastore, policy, { logger: log });
-        } catch (error) {
-          log.warn?.({
-            evt: 'cli.run-session.retention_failed',
-            module: MODULE_TAG,
-            tool: contribution.tool,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      } catch (error) {
-        // @swallow-ok best-effort session persistence already warned; degrade to undefined
-        log.warn?.({
-          evt: 'cli.run-session.record_failed',
-          module: MODULE_TAG,
-          tool: contribution.tool,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return;
+      const runOutcome = deriveRunOutcome({
+        passed: contribution.passed,
+        explicit: contribution.runOutcome,
+      });
+      const engineVersion = manifestVersionFor(contribution.tool);
+      const session: StoredSession = {
+        id,
+        tool: contribution.tool,
+        startedAt: snapshot.startedAt,
+        completedAt: snapshot.completedAt,
+        cwd: contribution.cwd,
+        ...suiteSessionFields(),
+        recipe: contribution.recipe,
+        score: contribution.score,
+        passed: contribution.passed,
+        runOutcome,
+        durationMs: snapshot.durationMs,
+        cliVersion: CLI_VERSION,
+        ...(engineVersion === undefined ? {} : { engineVersion }),
+        payload: contribution.payload,
+      };
+      if (!accumulator.stageSession(owner, session)) {
+        stagingStatus = 'rejected';
+        return undefined;
       }
-      return recordedSession;
+      stagedId = id;
+      stagedSnapshot = accumulator.stagedSession(owner, id);
+      stagingStatus = 'staged';
+      return stagedSession();
     }
 
     function recordHostMetrics(metrics: StoredSessionHostMetrics): void {
-      if (sessionId === undefined) return;
-      const datastore = safeDatastore();
-      if (!datastore) return;
-      try {
-        new SessionRepo(datastore).upsertHostMetrics(sessionId, metrics);
-      } catch (error) {
-        log.warn?.({
-          evt: 'cli.run-session.host_metrics_failed',
-          module: MODULE_TAG,
-          sessionId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+      const id = sessionId();
+      if (id === undefined) return;
+      const merged = accumulator.mergeHostMetrics(owner, id, metrics);
+      // A drained/committed row is intentionally immutable: late metrics are
+      // ignored without relabelling durable evidence as rejected. A poison
+      // transition, by contrast, makes the ID unlinkable and rejects it.
+      if (!merged && !accumulator.isSessionLinkable(owner, id) && !committedSessionIds.has(id)) {
+        stagedId = undefined;
+        stagedSnapshot = undefined;
+        stagingStatus = 'rejected';
       }
     }
 
-    function completeAndPersist(
-      contribution: ToolSessionContribution,
-    ): RecordedToolRunSession | undefined {
-      if (recordedSession !== undefined) return recordedSession;
-      return persist(contribution, lifecycle.complete());
+    function captureEnvelope(result: unknown): void {
+      envelopeSnapshot ??= captureEnvelopeEvidence(result);
     }
 
     async function completeLiveRender(
@@ -327,30 +317,172 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
       const ttyStart = performance.now();
       const completion = await render();
       const ttyBusyMs = Math.max(0, performance.now() - ttyStart);
-      if (completion?.session) {
-        // Both calls are SYNCHRONOUS best-effort writes (they return a value /
-        // void, not a promise); the detached-promise heuristic flags un-awaited
-        // calls inside this async fn by name. Nothing to await.
-        completeAndPersist(completion.session);
-        recordHostMetrics({ ttyBusyMs });
-        return {
-          ...(completion.result === undefined ? {} : { result: completion.result }),
-          ...(completion.envelope === undefined ? {} : { envelope: completion.envelope }),
-        };
-      }
-      return completion;
+      captureEnvelope(completion);
+      if (completion?.session === undefined) return completion;
+      completeAndStage(completion.session);
+      recordHostMetrics({ ttyBusyMs });
+      return completionWithoutSession(completion);
+    }
+
+    function discardEvidence(): void {
+      const id = stagedId;
+      if (id !== undefined) accumulator.discardSession(owner, id);
+      stagedId = undefined;
+      stagedSnapshot = undefined;
+      stagingStatus = 'discarded';
     }
 
     return {
       lifecycle,
-      completeAndPersist,
+      owner,
+      completeAndStage,
       recordHostMetrics,
       completeLiveRender,
-      sessionId: () => sessionId,
+      sessionId,
+      stagedSession,
+      captureEnvelope,
+      stagedEnvelope: () => envelopeSnapshot,
+      discardEvidence,
+      sessionStagingStatus: () => stagingStatus,
     };
   }
 
-  return {
+  function enforceRetentionOnce(datastore: DataStore): void {
+    try {
+      const policy = resolveRetentionPolicy();
+      const diagnostic = {
+        evt: 'session.retention.policy_resolved',
+        module: MODULE_TAG,
+        source: policy.source,
+        keep: policy.keep,
+        maxAgeDays: policy.maxAgeDays,
+        maxSizeMb: policy.maxSizeMb,
+      };
+      log.debug?.(diagnostic);
+      currentScope()?.diagnostics?.event(
+        'persist',
+        'debug',
+        'session.retention.policy_resolved',
+        diagnostic,
+      );
+      enforceSessionRetention(datastore, policy, { logger: log });
+    } catch (error) {
+      log.warn?.({
+        evt: 'cli.run-session.retention_failed',
+        module: MODULE_TAG,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  async function executeDeferredReport(
+    drained: Extract<HostEvidenceDrainResult, { readonly status: 'drained' }>,
+  ): Promise<void> {
+    if (drained.reportEffect === undefined || deps.executeReportEffect === undefined) return;
+    try {
+      await deps.executeReportEffect(drained.reportEffect);
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      log.warn?.({
+        evt: 'cli.report.deferred_open_failed',
+        module: MODULE_TAG,
+        errorName,
+      });
+      try {
+        await deps.onReportEffectFailure?.({
+          effect: drained.reportEffect,
+          errorName,
+        });
+      } catch {
+        log.warn?.({
+          evt: 'cli.report.deferred_failure_presentation_failed',
+          module: MODULE_TAG,
+        });
+      }
+    }
+  }
+
+  async function commitDrainedEvidence(
+    datastore: DataStore,
+    drained: Extract<HostEvidenceDrainResult, { readonly status: 'drained' }>,
+  ): Promise<EvidenceBundleCommitResult> {
+    let result: EvidenceBundleCommitResult;
+    try {
+      result = commit(datastore, drained.input);
+    } catch {
+      result = { status: 'failed', reason: 'write-failed' };
+    }
+    if (result.status !== 'committed') {
+      log.warn?.({
+        evt: 'cli.run-evidence.commit_failed',
+        module: MODULE_TAG,
+        status: result.status,
+        ...(result.status === 'failed' ? { reason: result.reason } : {}),
+      });
+      return result;
+    }
+    for (const sessionId of result.sessionIds) {
+      committedSessionIds.add(sessionId);
+      log.info?.({
+        evt: 'cli.run-session.recorded',
+        module: MODULE_TAG,
+        sessionId,
+      });
+    }
+    if (result.runId !== undefined) {
+      log.info?.({
+        evt: 'cli.run-ledger.standalone_recorded',
+        module: MODULE_TAG,
+        runId: result.runId,
+      });
+    }
+    await executeDeferredReport(drained);
+    return result;
+  }
+
+  async function finalizeOwner(
+    owner: HostEvidenceOwnerToken,
+    input: HostEvidenceFinalizeInput = {},
+  ): Promise<HostEvidenceFinalizeResult> {
+    const existing = finalizations.get(owner);
+    if (existing !== undefined) return existing;
+
+    const pending = (async (): Promise<HostEvidenceFinalizeResult> => {
+      let datastore: DataStore | undefined;
+      let retentionRequired = false;
+      try {
+        const drained = accumulator.drain(owner, input);
+        if (drained.status === 'discarded') return drained;
+        const hasCommitWork =
+          drained.status === 'poisoned' ||
+          drained.input.sessions.length > 0 ||
+          drained.input.run !== undefined ||
+          drained.reportEffect !== undefined;
+        if (!hasCommitWork) return { status: 'discarded' };
+
+        datastore = safeDatastore();
+        if (datastore === undefined) return { status: 'datastore-unavailable' };
+        retentionRequired = true;
+        if (drained.status === 'poisoned') {
+          log.warn?.({
+            evt: 'cli.run-evidence.bundle_discarded',
+            module: MODULE_TAG,
+            reason: drained.reason,
+          });
+          return drained;
+        }
+        const committed = await commitDrainedEvidence(datastore, drained);
+        return committed;
+      } finally {
+        if (retentionRequired && datastore !== undefined) enforceRetentionOnce(datastore);
+        accumulator.discard(owner);
+      }
+    })();
+    finalizations.set(owner, pending);
+    return pending;
+  }
+
+  const factory: RunPlaneFactory = {
     beginRun() {
       invocation ??= makeInvocation();
       return invocation;
@@ -362,7 +494,30 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     reset() {
       invocation = undefined;
     },
+    queueReportEffect(effect) {
+      return accumulator.queueReportEffect(factory.current().owner, effect);
+    },
+    finalizeCurrent(input) {
+      const current = factory.current();
+      if (accumulator.ownerKind(current.owner) === 'nested') {
+        return Promise.resolve({ status: 'deferred' });
+      }
+      return finalizeOwner(current.owner, input);
+    },
+    createNestedEvidenceOwner() {
+      return accumulator.createOwner('nested');
+    },
+    finalizeEvidenceOwner(owner, input) {
+      return finalizeOwner(owner, input);
+    },
+    discardEvidenceOwner(owner) {
+      accumulator.discard(owner);
+    },
+    replaceEvidenceOwnerReportEffect(owner, effect) {
+      return accumulator.replaceReportEffect(owner, effect);
+    },
   };
+  return factory;
 }
 
 function suiteSessionFields(): { suiteRunId?: string; suiteName?: string } {
@@ -370,14 +525,6 @@ function suiteSessionFields(): { suiteRunId?: string; suiteName?: string } {
   return suite === undefined ? {} : { suiteRunId: suite.suiteRunId, suiteName: suite.suiteName };
 }
 
-/**
- * The public run seam (host-owned-run-timing §6.5): `timing` exposes the current
- * invocation lifecycle for display-only elapsed. There is NO public
- * generic-session writer — tools return a {@link ToolSessionContribution} (inside
- * a {@link ToolRunCompletion}) and the host run plane persists it via the action
- * hooks below. The getter lazily begins the lifecycle so a tool that reads
- * `timing` before the action hook fires still observes a live timer.
- */
 export function createRunSessionSeam(factory: RunPlaneFactory): ToolRunSessions {
   return {
     get timing() {
@@ -386,14 +533,6 @@ export function createRunSessionSeam(factory: RunPlaneFactory): ToolRunSessions 
   };
 }
 
-/**
- * The internal run-lifecycle hooks the command-mount dispatch reads (via cast,
- * like `runSession`) to mark the lifecycle boundaries. `beginRun` starts the
- * lifecycle at the command-action boundary (after RunScope entry, before the
- * handler); `completeRun` freezes + persists when the handler returned a
- * {@link ToolRunCompletion} carrying a session contribution. A plain
- * `CommandResult` (no `session`) is a no-op.
- */
 export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
   let evidenceSnapshots: readonly EvidenceSnapshotContribution[] = Object.freeze([]);
   return {
@@ -403,20 +542,137 @@ export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
     },
     completeRun: (result) => {
       const completion = result as ToolRunCompletion | undefined;
+      factory.current().captureEnvelope(result);
       evidenceSnapshots =
         completion?.evidenceSnapshots === undefined
           ? Object.freeze([])
           : captureEvidenceSnapshots(completion.evidenceSnapshots);
-      const session = completion?.session;
-      // host-owned-run-timing Phase 3: the host freezes the lifecycle and
-      // persists the returned session contribution. Best-effort.
-      if (session) factory.current().completeAndPersist(session);
+      if (completion?.session !== undefined) {
+        factory.current().completeAndStage(completion.session);
+      }
     },
     resetRun: () => {
       factory.reset();
       evidenceSnapshots = Object.freeze([]);
     },
     currentSessionId: () => factory.current().sessionId(),
+    currentStagedSession: () => factory.current().stagedSession(),
+    currentStagedEnvelope: () => factory.current().stagedEnvelope(),
+    currentSessionStagingStatus: () => factory.current().sessionStagingStatus(),
     currentEvidenceSnapshots: () => evidenceSnapshots,
+    discardCurrentInvocationEvidence: () => {
+      factory.current().discardEvidence();
+      evidenceSnapshots = Object.freeze([]);
+    },
+    finalizeRun: (input) => factory.finalizeCurrent(input),
+    createNestedEvidenceOwner: () => factory.createNestedEvidenceOwner(),
+    finalizeEvidenceOwner: (owner, input) => factory.finalizeEvidenceOwner(owner, input),
+    discardEvidenceOwner: (owner) => factory.discardEvidenceOwner(owner),
+    replaceEvidenceOwnerReportEffect: (owner, effect) =>
+      factory.replaceEvidenceOwnerReportEffect(owner, effect),
   };
+}
+
+function completionWithoutSession(completion: ToolRunCompletion): ToolRunCompletion {
+  return {
+    ...(completion.result === undefined ? {} : { result: completion.result }),
+    ...(completion.envelope === undefined ? {} : { envelope: completion.envelope }),
+    ...(completion.evidenceSnapshots === undefined
+      ? {}
+      : { evidenceSnapshots: completion.evidenceSnapshots }),
+    ...(completion.execution === undefined ? {} : { execution: completion.execution }),
+  };
+}
+
+function captureEnvelopeEvidence(value: unknown): StagedEnvelopeEvidence | undefined {
+  try {
+    const envelope = extractEnvelope(value);
+    if (envelope === undefined) return undefined;
+    const { verdict } = envelope;
+    const summary = verdict?.summary;
+    if (
+      typeof envelope.tool !== 'string' ||
+      typeof envelope.runId !== 'string' ||
+      typeof envelope.createdAt !== 'string' ||
+      typeof verdict?.passed !== 'boolean' ||
+      !finiteNumber(verdict.score) ||
+      !finiteNumber(summary?.errors) ||
+      !finiteNumber(summary.warnings) ||
+      !finiteNumber(summary.total) ||
+      !Array.isArray(envelope.signals) ||
+      !Array.isArray(envelope.units)
+    ) {
+      return undefined;
+    }
+
+    const fingerprints: string[] = [];
+    const scanCount = Math.min(envelope.signals.length, 100);
+    for (let index = 0; index < scanCount && fingerprints.length < 20; index += 1) {
+      const signal = envelope.signals[index] as unknown;
+      if (signal === null || typeof signal !== 'object') continue;
+      const fingerprint = (signal as { readonly fingerprint?: unknown }).fingerprint;
+      if (typeof fingerprint === 'string') fingerprints.push(fingerprint);
+    }
+    const frozenFingerprints = Object.freeze(fingerprints);
+    const faulted = verdict.faulted === true;
+    const evidence = Object.freeze({
+      kind: 'signal-envelope',
+      schemaVersion: envelope.schemaVersion,
+      tool: envelope.tool,
+      runId: envelope.runId,
+      createdAt: envelope.createdAt,
+      verdict: Object.freeze({
+        passed: verdict.passed,
+        faulted,
+        score: verdict.score,
+        errors: summary.errors,
+        warnings: summary.warnings,
+        total: summary.total,
+      }),
+      signalCount: envelope.signals.length,
+      unitCount: envelope.units.length,
+      ...(frozenFingerprints.length === 0 ? {} : { fingerprints: frozenFingerprints }),
+      ...(typeof envelope.resolutionMode === 'string'
+        ? { resolutionMode: envelope.resolutionMode }
+        : {}),
+    });
+    const engineVersion =
+      typeof envelope.declaredInputs?.engineVersion === 'string'
+        ? envelope.declaredInputs.engineVersion
+        : undefined;
+    return Object.freeze({
+      tool: envelope.tool,
+      createdAt: envelope.createdAt,
+      ...(engineVersion === undefined ? {} : { engineVersion }),
+      passed: verdict.passed,
+      faulted,
+      score: verdict.score,
+      errors: summary.errors,
+      warnings: summary.warnings,
+      findings: envelope.signals.length,
+      evidence,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function extractEnvelope(value: unknown): SignalEnvelope | undefined {
+  if (isSignalEnvelope(value)) return value;
+  if (value === null || typeof value !== 'object') return undefined;
+  const completion = value as ToolRunCompletion;
+  if (isSignalEnvelope(completion.envelope)) return completion.envelope;
+  if (
+    completion.result !== undefined &&
+    completion.result !== null &&
+    typeof completion.result === 'object'
+  ) {
+    const nested = completion.result as { readonly envelope?: unknown };
+    if (isSignalEnvelope(nested.envelope)) return nested.envelope;
+  }
+  return undefined;
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }

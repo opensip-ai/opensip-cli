@@ -17,6 +17,7 @@
  * `.runtime/datastore.sqlite`.
  */
 
+import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
 import {
   createRunTimer,
   currentScope,
@@ -36,6 +37,7 @@ import { buildHostPlanes } from './bootstrap/host-planes.js';
 import { createIoPlane, type LiveViewRegistry } from './bootstrap/io-plane.js';
 import { createOutputPlane } from './bootstrap/output-plane.js';
 import { createReportFailure } from './bootstrap/report-failure.js';
+import { planReportOpen, type DeferredReportEffect } from './bootstrap/report.js';
 import {
   createRunActionHooks,
   createRunPlaneFactory,
@@ -45,8 +47,6 @@ import {
 import { createDatastoreResolver, readScope } from './bootstrap/scope-access.js';
 import { resolveCurrentSessionRetentionPolicy } from './bootstrap/session-retention.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
-
-import type { CommandResult } from '@opensip-cli/contracts';
 
 // ---------------------------------------------------------------------------
 // No module-global bootstrap-handoff bag.
@@ -76,10 +76,12 @@ export { createLiveViewRegistry, type LiveViewRegistry } from './bootstrap/io-pl
 export interface BuildToolCliContextOptions {
   readonly render: (result: CommandResult) => Promise<void>;
   readonly liveViews: LiveViewRegistry;
-  readonly maybeOpenReport: (opts: {
-    openRequested: boolean;
-    jsonOutput: boolean;
-  }) => Promise<void>;
+  /**
+   * Execute a report request that the context already admitted. The historical
+   * property name stays local to this bootstrap seam; production injects
+   * `executeReportOpen`.
+   */
+  readonly maybeOpenReport: (effect: DeferredReportEffect) => Promise<void>;
   readonly logger?: Logger;
 }
 
@@ -110,6 +112,13 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   // `--json` emit seams (launch §5.5). Its `setExitCode` is the one threaded
   // into egress so the run's exit code has exactly one author.
   const outputPlane = createOutputPlane({ render: opts.render, logger: log });
+  const reportFailure = createReportFailure({
+    getLogger: () => currentScope()?.logger ?? log,
+    setExitCode: outputPlane.setExitCode,
+    render: (result) => opts.render(result),
+    emitError: outputPlane.emits.emitError,
+    getDiagnostics: () => currentScope()?.diagnostics,
+  });
 
   // Host planes with stable deps only (same lazy datastore resolver):
   //  - baseline/ratchet persistence + diff + exports (ADR-0036);
@@ -138,33 +147,38 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
   const runPlane = createRunPlaneFactory({
     getDatastore: createDatastoreResolver('best-effort', log),
     sessionRetentionPolicy: resolveCurrentSessionRetentionPolicy,
+    executeReportEffect: opts.maybeOpenReport,
+    onReportEffectFailure: async () => {
+      const analysisExitCode = outputPlane.getExitCode() ?? EXIT_CODES.SUCCESS;
+      try {
+        await reportFailure({
+          message: 'The analysis completed, but its report could not be generated or opened.',
+          exitCode: EXIT_CODES.REPORT_FAILED,
+        });
+      } finally {
+        // Report presentation is secondary; restore the analysis verdict.
+        outputPlane.setExitCode(analysisExitCode);
+      }
+    },
     logger: log,
   });
 
   // Public run seam (display-only timing) + internal action hooks (the mount
   // dispatch reads the hooks via cast). Both bind the run plane factory above;
-  // there is NO public generic-session writer — tools return a contribution and
-  // the action hook persists it.
+  // there is NO public generic-session writer — tools return a contribution,
+  // the action hook stages it, and the command boundary commits it.
   const runSession = createRunSessionSeam(runPlane);
   const runActionHooks = createRunActionHooks(runPlane);
 
   // Live plane binds the per-invocation registry (built in `main()`) to the run
   // plane so `renderLive` owns the live run lifecycle: it times the TTY
-  // occupancy and persists the renderer's returned `session` contribution.
+  // occupancy and stages the renderer's returned `session` contribution.
   const ioPlane = createIoPlane({
     setExitCode: outputPlane.setExitCode,
     logger: log,
     liveViews: opts.liveViews,
     runPlane,
     runSession,
-  });
-
-  const reportFailure = createReportFailure({
-    getLogger: () => currentScope()?.logger ?? log,
-    setExitCode: outputPlane.setExitCode,
-    render: (result) => opts.render(result),
-    emitError: outputPlane.emits.emitError,
-    getDiagnostics: () => currentScope()?.diagnostics,
   });
 
   const ctx: ToolCliContext = {
@@ -178,7 +192,11 @@ export function buildToolCliContext(opts: BuildToolCliContextOptions): ToolCliCo
     render: (result) => opts.render(result as CommandResult),
     registerLiveView: ioPlane.register,
     renderLive: ioPlane.renderLive,
-    maybeOpenReport: opts.maybeOpenReport,
+    maybeOpenReport: (request) => {
+      const plan = planReportOpen(request);
+      if (plan.status === 'open') runPlane.queueReportEffect(plan.effect);
+      return Promise.resolve();
+    },
     get logger(): Logger {
       return currentScope()?.logger ?? log;
     },

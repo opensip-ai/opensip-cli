@@ -4,11 +4,12 @@
  *
  * Split out of `dispatch-external-tool-command.ts` (the fork/IPC supervisor) so
  * the replay concern — turning the slim serialized result the worker posted back
- * into host-side output + persistence — lives on its own seam. The host is the
- * only process that performs the privileged effect (render / stdout / exit code /
- * session persist).
+ * into host-side output + evidence staging — lives on its own seam. The host is
+ * the only process that performs the privileged effect (render / stdout / exit
+ * code / final evidence commit).
  */
 
+import { isSignalEnvelope } from '@opensip-cli/contracts';
 import { type CommandSpec, type ToolCliContext } from '@opensip-cli/core';
 
 import { dispatchOutput } from '../commands/mount-command-spec.js';
@@ -19,9 +20,9 @@ import type { ToolCommandResult } from './tool-command-dispatch-types.js';
 
 /**
  * The host context the supervisor replays through: the full `ToolCliContext` plus
- * the run-action hooks (`completeRun` persists the worker's returned session —
- * host-owned-run-timing). `completeRun` is optional (a lean context carries no run
- * plane), so a test ctx without it is still valid.
+ * the run-action hooks (`completeRun` stages the worker's returned Session for
+ * the command-boundary atomic commit). `completeRun` is optional (a lean context
+ * carries no run plane), so a test ctx without it is still valid.
  */
 export type DispatchHostCtx = ToolCliContext & Partial<RunActionHooks>;
 
@@ -60,6 +61,23 @@ export async function replayResult(
   ctx: DispatchHostCtx,
   invocation: ReplayContext,
 ): Promise<void> {
+  // Stage host evidence before any replayed output can mutate or throw. The
+  // run-plane validates/captures only a real SignalEnvelope from these bounded
+  // worker-return candidates.
+  const completionEnvelope = [
+    result.completionEnvelope,
+    result.returned,
+    result.envelope,
+    result.render,
+  ]
+    .map(envelopeFromReplayCandidate)
+    .find((candidate) => candidate !== undefined);
+  if (result.session !== undefined || completionEnvelope !== undefined) {
+    ctx.completeRun?.({
+      ...(result.session === undefined ? {} : { session: result.session }),
+      ...(completionEnvelope === undefined ? {} : { envelope: completionEnvelope }),
+    });
+  }
   if (result.reportedFailure !== undefined) {
     await ctx.reportFailure(result.reportedFailure);
   }
@@ -95,11 +113,17 @@ export async function replayResult(
   if (result.exitCode !== undefined) {
     ctx.setExitCode(result.exitCode);
   }
-  // host-owned-run-timing: the worker handler RETURNED a session contribution;
-  // the HOST persists it (the host owns the generic row + its timing). The mount
-  // action took the early-return dispatch branch, so it did NOT call completeRun —
-  // the supervisor drives it here with the worker's session.
-  if (result.session !== undefined) {
-    ctx.completeRun?.({ session: result.session });
-  }
+}
+
+function envelopeFromReplayCandidate(value: unknown): unknown {
+  if (isSignalEnvelope(value)) return value;
+  if (value === null || typeof value !== 'object') return undefined;
+  const record = value as {
+    readonly envelope?: unknown;
+    readonly result?: unknown;
+  };
+  if (isSignalEnvelope(record.envelope)) return record.envelope;
+  if (record.result === null || typeof record.result !== 'object') return undefined;
+  const nested = record.result as { readonly envelope?: unknown };
+  return isSignalEnvelope(nested.envelope) ? nested.envelope : undefined;
 }

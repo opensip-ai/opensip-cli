@@ -9,12 +9,14 @@
  *     envelope-vs-render for `signal-envelope` (ADR-0027 parity);
  *   - the explicit FRR seam fields (`render`/`envelope`/`json`/`raw`/`error`/
  *     `exitCode`) replay through their host counterparts, exit code LAST;
- *   - a returned `session` is persisted via the host `completeRun` hook.
+ *   - a returned `session` is staged via the host `completeRun` hook.
  *
  * The forked end-to-end boundary is proven in `external-tool-dispatch.test.ts`;
  * this isolates the replay routing for deterministic branch coverage.
  */
 
+import { buildSignalEnvelope } from '@opensip-cli/contracts';
+import { HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -157,7 +159,7 @@ describe('replayResult', () => {
     expect(cap.calls.at(-1)).toBe('exit:7');
   });
 
-  it('persists a returned session via completeRun', async () => {
+  it('stages a returned session via completeRun', async () => {
     const { ctx, completedSessions } = makeCtx();
     const result: ToolCommandResult = {
       output: 'signal-envelope',
@@ -168,6 +170,55 @@ describe('replayResult', () => {
     expect(completedSessions[0]).toEqual({
       session: { tool: 'ext', cwd: '/x', score: 100, passed: true },
     });
+  });
+
+  it('captures a valid explicit envelope even when returned is a non-envelope CommandResult', async () => {
+    const { ctx, completedSessions } = makeCtx();
+    const explicitEnvelope = buildSignalEnvelope({
+      tool: 'ext',
+      runId: 'external-run',
+      createdAt: '2026-07-16T00:00:00.000Z',
+      units: [{ slug: 'ext', passed: true, durationMs: 1 }],
+      signals: [],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
+    });
+    await replayResult(
+      {
+        output: 'command-result',
+        returned: { type: 'help' },
+        envelope: explicitEnvelope,
+      },
+      ctx,
+      invocation(),
+    );
+    expect(completedSessions).toEqual([{ envelope: explicitEnvelope }]);
+  });
+
+  it('captures the envelope from a human raw-stream render presentation', async () => {
+    const { ctx, completedSessions } = makeCtx();
+    const renderedEnvelope = buildSignalEnvelope({
+      tool: 'ext',
+      runId: 'external-human-run',
+      createdAt: '2026-07-16T00:00:00.000Z',
+      units: [{ slug: 'ext', passed: false, durationMs: 1 }],
+      signals: [],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: true,
+    });
+    const session = { tool: 'ext', cwd: '/x', score: 0, passed: false } as const;
+
+    await replayResult(
+      {
+        output: 'raw-stream',
+        render: { type: 'run-presentation', envelope: renderedEnvelope },
+        session,
+      },
+      ctx,
+      invocation(),
+    );
+
+    expect(completedSessions).toEqual([{ session, envelope: renderedEnvelope }]);
   });
 
   it('is a no-op for an empty result (no returned, no seams, no session)', async () => {
