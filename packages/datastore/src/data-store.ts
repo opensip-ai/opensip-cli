@@ -20,6 +20,38 @@ export interface DatastoreMaintenance {
   fileSizeBytes(): number;
 }
 
+/** Stable, bounded reasons returned when SQLite lifecycle shutdown is incomplete. */
+export type DatastoreCloseFailureReason =
+  'checkpoint-busy' | 'checkpoint-failed' | 'native-close-failed' | 'checkpoint-and-close-failed';
+
+/**
+ * Proof that a datastore checkpoint/close attempt did (or did not) leave the
+ * native SQLite connection closed.
+ *
+ * `closed` is the authority-bearing field: callers that protect a runtime with
+ * a lease must retain that lease unless this result proves `closed: true`.
+ */
+export type DatastoreCloseResult =
+  | {
+      readonly checkpointed: true;
+      readonly closed: true;
+    }
+  | {
+      readonly checkpointed: false;
+      readonly closed: true;
+      readonly reason: 'checkpoint-busy' | 'checkpoint-failed';
+    }
+  | {
+      readonly checkpointed: true;
+      readonly closed: false;
+      readonly reason: 'native-close-failed';
+    }
+  | {
+      readonly checkpointed: false;
+      readonly closed: false;
+      readonly reason: 'checkpoint-and-close-failed';
+    };
+
 /**
  * Host-owned persistence handle used by repositories and CLI bootstrap code.
  * It exposes lifecycle, maintenance, and serialized write-lock coordination
@@ -30,6 +62,13 @@ export interface DatastoreMaintenance {
 export interface DataStore<_TSchema extends Record<string, unknown> = Record<string, unknown>> {
   readonly maintenance?: DatastoreMaintenance;
   close(): void;
+  /**
+   * Close with an explicit proof result for host lifecycle coordination.
+   *
+   * Optional for compatibility with external/custom DataStore implementations;
+   * every first-party backend implements it.
+   */
+  closeForLifecycle?(): DatastoreCloseResult;
   /** Serialize datastore-file writes (no-op for in-memory backends). */
   withWriteLock<T>(operation: string, fn: () => T): T;
 }
@@ -61,6 +100,8 @@ export interface DrizzleDataStore<
 export interface SqliteBackendHandle<
   TSchema extends Record<string, unknown> = Record<string, unknown>,
 > extends DrizzleDataStore<TSchema> {
+  /** First-party SQLite backends always expose an explicit lifecycle proof. */
+  closeForLifecycle(): DatastoreCloseResult;
   /** Read SQLite's `PRAGMA user_version` (0 on a fresh or pre-guard database). */
   readUserVersion(): number;
   /** Write SQLite's `PRAGMA user_version` schema-stamp. */

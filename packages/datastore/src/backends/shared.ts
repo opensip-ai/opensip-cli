@@ -2,7 +2,102 @@ import { logger, withFileLock } from '@opensip-cli/core';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 
-import type { DataStoreLockContext, DrizzleHandle, SqliteBackendHandle } from '../data-store.js';
+import type {
+  DataStoreLockContext,
+  DatastoreCloseResult,
+  DrizzleHandle,
+  SqliteBackendHandle,
+} from '../data-store.js';
+
+/** Minimal native lifecycle surface, separated so close faults are unit-testable. */
+export interface SqliteLifecycleConnection {
+  readonly open: boolean;
+  pragma(source: string): unknown;
+  close(): void;
+}
+
+interface CheckpointOutcome {
+  readonly checkpointed: boolean;
+  readonly busy: boolean;
+}
+
+function checkpointSqlite(sqlite: SqliteLifecycleConnection): CheckpointOutcome {
+  try {
+    const result: unknown = sqlite.pragma('wal_checkpoint(TRUNCATE)');
+    const first: unknown = Array.isArray(result) && result.length === 1 ? result[0] : undefined;
+    if (
+      typeof first !== 'object' ||
+      first === null ||
+      !('busy' in first) ||
+      !('log' in first) ||
+      !('checkpointed' in first)
+    ) {
+      return { checkpointed: false, busy: false };
+    }
+    const row = first as Record<string, unknown>;
+    if (
+      !Number.isSafeInteger(row.busy) ||
+      !Number.isSafeInteger(row.log) ||
+      !Number.isSafeInteger(row.checkpointed) ||
+      (row.busy as number) < 0 ||
+      (row.log as number) < -1 ||
+      (row.checkpointed as number) < -1
+    ) {
+      return { checkpointed: false, busy: false };
+    }
+    const busy = row.busy as number;
+    return { checkpointed: busy === 0, busy: busy !== 0 };
+  } catch {
+    // The bounded result deliberately does not expose arbitrary native errors.
+    return { checkpointed: false, busy: false };
+  }
+}
+
+/**
+ * Fold WAL contents into the main SQLite file and always attempt native close.
+ *
+ * This helper is shared by ordinary backend shutdown and explicit file
+ * checkpointing so their WAL/close semantics cannot drift.
+ */
+export function checkpointAndCloseSqlite(sqlite: SqliteLifecycleConnection): DatastoreCloseResult {
+  const checkpoint = checkpointSqlite(sqlite);
+
+  try {
+    sqlite.close();
+  } catch {
+    // The native `open` property below is the proof; an exception alone is not.
+  }
+
+  const closed = sqlite.open === false;
+  if (checkpoint.checkpointed && closed) {
+    return { checkpointed: true, closed: true };
+  }
+  if (!checkpoint.checkpointed && closed) {
+    return {
+      checkpointed: false,
+      closed: true,
+      reason: checkpoint.busy ? 'checkpoint-busy' : 'checkpoint-failed',
+    };
+  }
+  if (checkpoint.checkpointed) {
+    return {
+      checkpointed: true,
+      closed: false,
+      reason: 'native-close-failed',
+    };
+  }
+  return {
+    checkpointed: false,
+    closed: false,
+    reason: 'checkpoint-and-close-failed',
+  };
+}
+
+function throwCloseFailure(
+  result: Exclude<DatastoreCloseResult, { checkpointed: true; closed: true }>,
+): never {
+  throw new Error(`SQLite datastore close did not complete cleanly (${result.reason})`);
+}
 
 export function buildSqliteDataStore(
   dbPath: string,
@@ -38,7 +133,7 @@ export function buildSqliteDataStore(
     }
   }
   const db: DrizzleHandle = drizzle(sqlite);
-  let closed = false;
+  let closeResult: DatastoreCloseResult | undefined;
 
   const lockPath = isMemory ? undefined : `${dbPath}.write.lock`;
 
@@ -62,13 +157,13 @@ export function buildSqliteDataStore(
   return {
     db,
     close(): void {
-      if (closed) return;
-      // Fold the WAL back into the main DB and truncate the -wal/-shm sidecars so
-      // they don't grow unbounded across runs (better-sqlite3 close() checkpoints,
-      // but TRUNCATE also shrinks the file on disk).
-      sqlite.pragma('wal_checkpoint(TRUNCATE)');
-      sqlite.close();
-      closed = true;
+      const result = closeResult ?? checkpointAndCloseSqlite(sqlite);
+      closeResult = result;
+      if (!result.checkpointed || !result.closed) throwCloseFailure(result);
+    },
+    closeForLifecycle(): DatastoreCloseResult {
+      closeResult ??= checkpointAndCloseSqlite(sqlite);
+      return closeResult;
     },
     transaction<T>(fn: (tx: DrizzleHandle) => T): T {
       return db.transaction(fn);

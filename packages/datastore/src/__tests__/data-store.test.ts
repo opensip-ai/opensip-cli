@@ -15,7 +15,7 @@ import {
   requireDrizzleHandle,
 } from '../data-store.js';
 
-import type { DataStore } from '../data-store.js';
+import type { DataStore, DatastoreCloseResult } from '../data-store.js';
 
 /** A minimal object that satisfies the Drizzle-backed shape. */
 const drizzleLike = (): unknown => ({
@@ -89,5 +89,24 @@ describe('DataStoreMigrationError', () => {
     const err = new DataStoreMigrationError('boom');
     expect(err.migrationFile).toBeUndefined();
     expect(err.cause).toBeUndefined();
+  });
+});
+
+describe('DatastoreCloseResult', () => {
+  it('keeps lifecycle closure optional for compatible custom stores', () => {
+    const custom: DataStore = {
+      close: () => undefined,
+      withWriteLock: (_operation, fn) => fn(),
+    };
+    expect('closeForLifecycle' in custom).toBe(false);
+  });
+
+  it('provides a closed discriminant for lease-safe teardown', () => {
+    const result: DatastoreCloseResult = {
+      checkpointed: true,
+      closed: false,
+      reason: 'native-close-failed',
+    };
+    expect(result.closed).toBe(false);
   });
 });

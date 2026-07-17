@@ -1,11 +1,29 @@
 export type {
   DataStore,
   DataStoreOpenOptions,
+  DatastoreCloseFailureReason,
+  DatastoreCloseResult,
   DataStoreVersionMismatch,
   DatastoreMaintenance,
 } from './data-store.js';
 export { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
 export { DataStoreFactory } from './factory.js';
+export {
+  checkpointSqliteFile,
+  inspectSqliteFile,
+  SQLITE_FOREIGN_KEY_MAX_SAMPLES,
+  SQLITE_QUICK_CHECK_MAX_ISSUES,
+} from './sqlite-integrity.js';
+export type {
+  SqliteForeignKeyCheckResult,
+  SqliteForeignKeyRowId,
+  SqliteForeignKeyViolation,
+  SqliteIntegrityFacts,
+  SqliteIntegrityResult,
+  SqliteQuickCheckResult,
+  SqliteSidecarPresence,
+  SqliteSidecarState,
+} from './sqlite-integrity.js';
 export { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 // Generic host-owned baseline/ratchet plane (ADR-0036): repository only —
 // table objects stay package-internal (ADR-0009 / ADR-0107).
