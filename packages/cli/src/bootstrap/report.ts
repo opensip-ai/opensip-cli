@@ -21,59 +21,21 @@
  * (audit 2026-05-22 F3) — tool packages now own their own renderers.
  */
 
-import { decideReportOpen } from '../open-report.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
-import type { ReportViewSelection } from '@opensip-cli/dashboard';
+import {
+  planReportOpen,
+  type DeferredReportEffect,
+  type ReportOpenRequest,
+} from './report-open-policy.js';
 
-export interface ReportOpenRequest {
-  readonly openRequested: boolean;
-  readonly jsonOutput: boolean;
-}
-
-/** Host-only effect queued behind an evidence owner's successful commit. */
-export interface DeferredReportEffect {
-  readonly kind: 'compose-and-open';
-  readonly selection?: ReportViewSelection;
-}
-
-export type ReportOpenPlan =
-  | {
-      readonly status: 'skipped';
-      readonly reason: string;
-    }
-  | {
-      readonly status: 'open';
-      readonly effect: DeferredReportEffect;
-    };
-
-export interface ReportOpenPlanningContext {
-  readonly stdoutIsTTY: boolean;
-  readonly env: NodeJS.ProcessEnv;
-}
-
-/**
- * Decide whether a report request is eligible without composing, writing, or
- * opening anything. The command context calls this while the Tool handler is
- * still running, then queues only an allowed request on its evidence owner.
- */
-export function planReportOpen(
-  opts: ReportOpenRequest,
-  context?: ReportOpenPlanningContext,
-): ReportOpenPlan {
-  const currentContext = context ?? {
-    stdoutIsTTY: process.stdout.isTTY === true,
-    env: process.env,
-  };
-  const decision = decideReportOpen({
-    ...opts,
-    stdoutIsTTY: currentContext.stdoutIsTTY,
-    env: currentContext.env,
-  });
-  return decision.shouldOpen
-    ? { status: 'open', effect: Object.freeze({ kind: 'compose-and-open' }) }
-    : { status: 'skipped', reason: decision.reason };
-}
+export {
+  planReportOpen,
+  type DeferredReportEffect,
+  type ReportOpenPlan,
+  type ReportOpenPlanningContext,
+  type ReportOpenRequest,
+} from './report-open-policy.js';
 
 /**
  * Execute one request that already passed {@link planReportOpen}. This function

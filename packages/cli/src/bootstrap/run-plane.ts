@@ -45,7 +45,7 @@ import {
   type HostEvidenceDrainResult,
   type HostEvidenceOwnerToken,
 } from './host-evidence-accumulator.js';
-import { type DeferredReportEffect } from './report.js';
+import { type DeferredReportEffect } from './report-open-policy.js';
 import {
   enforceSessionRetention,
   resolveCurrentSessionRetentionPolicy,

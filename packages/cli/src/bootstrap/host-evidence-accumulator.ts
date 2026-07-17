@@ -8,7 +8,7 @@ import {
   type EvidenceBundleSession,
 } from '@opensip-cli/session-store';
 
-import type { DeferredReportEffect } from './report.js';
+import type { DeferredReportEffect } from './report-open-policy.js';
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
 
 /** Host buffer limits intentionally match the atomic session-store boundary. */

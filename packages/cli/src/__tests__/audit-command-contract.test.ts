@@ -9,12 +9,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const executeSuiteCommand = vi.hoisted(() => vi.fn());
 const decideCurrentReportOpen = vi.hoisted(() => vi.fn(() => ({ shouldOpen: false })));
+const planReportOpen = vi.hoisted(() =>
+  vi.fn(() => ({ status: 'skipped', reason: 'not-requested' })),
+);
 
 vi.mock('../commands/suite/execute-suite-command.js', () => ({
   executeSuiteCommand,
 }));
 vi.mock('../bootstrap/report-open-policy.js', () => ({
   decideCurrentReportOpen,
+  planReportOpen,
 }));
 vi.mock('../report-compose.js', () => ({ composeAndWriteReport: vi.fn() }));
 

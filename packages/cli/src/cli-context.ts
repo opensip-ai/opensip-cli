@@ -37,7 +37,7 @@ import { buildHostPlanes } from './bootstrap/host-planes.js';
 import { createIoPlane, type LiveViewRegistry } from './bootstrap/io-plane.js';
 import { createOutputPlane } from './bootstrap/output-plane.js';
 import { createReportFailure } from './bootstrap/report-failure.js';
-import { planReportOpen, type DeferredReportEffect } from './bootstrap/report.js';
+import { planReportOpen, type DeferredReportEffect } from './bootstrap/report-open-policy.js';
 import {
   createRunActionHooks,
   createRunPlaneFactory,

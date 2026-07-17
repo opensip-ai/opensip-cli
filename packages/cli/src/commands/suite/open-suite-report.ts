@@ -1,4 +1,4 @@
-import { planReportOpen, type DeferredReportEffect } from '../../bootstrap/report.js';
+import { planReportOpen, type DeferredReportEffect } from '../../bootstrap/report-open-policy.js';
 
 import { BUILT_IN_AUDIT_SUITE_NAME } from './built-in-suites.js';
 

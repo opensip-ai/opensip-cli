@@ -6,7 +6,7 @@ const planReportOpen = vi.hoisted(() => vi.fn());
 vi.mock('../commands/suite/execute-suite-command.js', () => ({
   executeSuiteCommand,
 }));
-vi.mock('../bootstrap/report.js', () => ({ planReportOpen }));
+vi.mock('../bootstrap/report-open-policy.js', () => ({ planReportOpen }));
 
 import { buildAuditCommandSpec } from '../commands/audit-command-spec.js';
 import { planSuiteReportEffect } from '../commands/suite/open-suite-report.js';
