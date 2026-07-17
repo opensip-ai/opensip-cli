@@ -599,7 +599,7 @@ test('bounded JSON commands disable shells, cap output, and reject malformed chi
     () =>
       runBoundedJsonCommand({
         command: ['pnpm'],
-        timeoutMs: 5_000,
+        timeoutMs: 5000,
         maxBytes: 4,
         spawnChild: (_command, _args, options) => jsonChild('{"too":"large"}', 0, options),
       }),
@@ -609,7 +609,7 @@ test('bounded JSON commands disable shells, cap output, and reject malformed chi
     () =>
       runBoundedJsonCommand({
         command: ['pnpm'],
-        timeoutMs: 5_000,
+        timeoutMs: 5000,
         maxBytes: 100,
         spawnChild: (_command, _args, options) => jsonChild('{broken', 0, options),
       }),

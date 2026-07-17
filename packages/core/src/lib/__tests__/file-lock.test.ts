@@ -161,7 +161,7 @@ describe('withFileLock', () => {
   it('treats oversized and corrupt lockfiles as unreadable metadata', () => {
     dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
     const oversized = join(dir, 'oversized.lock');
-    writeFileSync(oversized, 'x'.repeat(5_000));
+    writeFileSync(oversized, 'x'.repeat(5000));
     // Fresh mtime + short wait: contention times out without reclaiming a
     // non-stale unreadable lockfile (covers the oversize read path).
     expect(() =>
