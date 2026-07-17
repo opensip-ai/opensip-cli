@@ -5,6 +5,7 @@ import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppression
 import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
 import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
+import { graphCompletionLogFields } from './graph-run-outcome.js';
 import { buildGraphSessionContribution } from './graph-session-contribution.js';
 import { readGraphEnv } from './pressure-monitor.js';
 import { GraphProfileBuilder, writeGraphProfile } from './profile.js';
@@ -20,6 +21,11 @@ const log = createToolLogger('graph:cli');
 const EVT_GRAPH_COMPLETE = 'graph.cli.graph.complete';
 const MODULE_GRAPH_CLI = 'graph:cli';
 const MODULE_GRAPH_RENDER = 'graph:render';
+
+function renderedDeliveryMode(opts: GraphCommandOptions): 'json' | 'human' | 'report-to' {
+  if (typeof opts.reportTo === 'string' && opts.reportTo.length > 0) return 'report-to';
+  return opts.json === true ? 'json' : 'human';
+}
 
 /** Profile bucket for the run shape: workspace fan-out, multi-path, or single graph. */
 function profileMode(opts: GraphCommandOptions): string {
@@ -81,9 +87,8 @@ function envelopeFor(
 }
 
 /**
- * Dispatch a completed graph run to its output mode and return the run outcome
- * for signal delivery and session persistence (undefined for plain `--json`,
- * unless the composition root requested the envelope for a sibling artifact).
+ * Dispatch a completed graph run to its output mode and return its truthful
+ * evidence for signal delivery and session persistence.
  */
 export async function dispatchGraphResult(
   opts: GraphCommandOptions,
@@ -124,9 +129,9 @@ export async function dispatchGraphResult(
 
 /**
  * Deliver an already-waived run to its output mode (gate / catalog-json /
- * render) and, on the human-facing render path, BUILD the generic-session
- * contribution the host run plane persists (host-owned-run-timing Phase 3 —
- * graph never writes the row itself). Split out of {@link dispatchGraphResult}
+ * render) and BUILD the generic-session contribution the host run plane
+ * persists (host-owned-run-timing Phase 3 — graph never writes the row itself).
+ * Split out of {@link dispatchGraphResult}
  * so the multi-path path — which must waive each path's signals against ITS
  * OWN root before aggregating (the roots differ) — can aggregate the kept
  * signals and deliver once, without a second (wrong-root) suppression pass.
@@ -144,6 +149,8 @@ export async function deliverGraphResult(
 ): Promise<GraphRunOutcome | undefined> {
   const suppressedCount = finalized.suppressedCount;
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
+  const isWorkspaceChild = readGraphEnv<boolean>('OPENSIP_GRAPH_WORKSPACE_CHILD') === true;
+  const session = buildGraphSessionContribution(opts, finalized);
   if (opts.gateSave === true || opts.gateCompare === true) {
     // ADR-0036: the envelope arrives fingerprint-stamped — `buildGraphEnvelope`
     // passes graph's byte-preserved strategy into `buildSignalEnvelope`, which
@@ -157,8 +164,9 @@ export async function deliverGraphResult(
       evt: EVT_GRAPH_COMPLETE,
       module: MODULE_GRAPH_CLI,
       suppressed: suppressedCount,
+      ...graphCompletionLogFields({ kind: 'direct', deliveryMode: 'gate' }),
     });
-    return { envelope };
+    return { kind: 'direct', envelope, session };
   }
   if (typeof opts.catalogOutput === 'string' && opts.catalogOutput.length > 0) {
     await runCatalogJsonMode(opts, result, cli, startedAt);
@@ -166,23 +174,15 @@ export async function deliverGraphResult(
       evt: EVT_GRAPH_COMPLETE,
       module: MODULE_GRAPH_CLI,
       suppressed: suppressedCount,
+      ...graphCompletionLogFields({ kind: 'direct', deliveryMode: 'catalog' }),
     });
-    return { envelope: envelopeFor(opts, result, durationMs) };
+    return {
+      kind: 'direct',
+      envelope: envelopeFor(opts, result, durationMs),
+      session,
+    };
   }
   const envelope = await renderGraphResult(opts, result, startedAt, cli);
-  // Session persistence is dashboard history — populated on human-facing runs
-  // only. Skipped for:
-  //   - `--json` (the machine-artifact mode AND the carrier each
-  //     `executeWorkspaceGraph` child runs under — keeps "one human invocation
-  //     = one session"; the --workspace parent persists the single aggregate);
-  //   - `--report-to` (an export mode; like gate/catalog it opts out of session
-  //     history — the root delivers the envelope to the receiver instead).
-  // The host persists the returned `session` after the handler resolves; graph
-  // builds it here from the BRANDED FinalizedSignals so the contribution can
-  // only ever carry post-waiver findings regardless of which path reached here.
-  const isReportTo = typeof opts.reportTo === 'string' && opts.reportTo.length > 0;
-  const session =
-    opts.json !== true && !isReportTo ? buildGraphSessionContribution(opts, finalized) : undefined;
   if (opts.json !== true) {
     cli.setExitCode(EXIT_CODES.SUCCESS);
   }
@@ -191,19 +191,21 @@ export async function deliverGraphResult(
     module: MODULE_GRAPH_CLI,
     signals: result.signals.length,
     suppressed: suppressedCount,
+    ...graphCompletionLogFields(
+      isWorkspaceChild
+        ? { kind: 'workspace-child', deliveryMode: 'json' }
+        : { kind: 'direct', deliveryMode: renderedDeliveryMode(opts) },
+    ),
   });
-  // Plain `--json` delivers INLINE in `renderGraphResult` (H2 exit parity) and
-  // normally returns `undefined` so the composition root does not deliver a
-  // second time. When the root also owns a side-file artifact (`--sarif`), it
-  // explicitly asks to retain the already-delivered envelope; its egress path
-  // still skips JSON, while the side-file sink consumes this return value. A
-  // `--workspace` child has no such request and retains the historical
-  // undefined outcome. Every other mode returns the outcome for root delivery;
-  // only the non-export render path carries a `session`.
-  if (opts.json !== true) {
-    return { envelope, ...(session ? { session } : {}) };
-  }
-  return opts.returnJsonEnvelope === true ? { envelope } : undefined;
+  // Plain `--json` still delivers INLINE in `renderGraphResult` (H2 exit
+  // parity). Returning its evidence does not deliver again: graph is a
+  // raw-stream command and the composition-root egress seam explicitly skips
+  // JSON. Workspace children use the same JSON carrier but deliberately return
+  // only their envelope and perform no egress; the parent owns the one
+  // aggregate session.
+  return isWorkspaceChild
+    ? { kind: 'workspace-child', envelope }
+    : { kind: 'direct', envelope, session };
 }
 
 /**

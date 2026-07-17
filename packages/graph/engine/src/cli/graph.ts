@@ -67,18 +67,13 @@ const MODULE_GRAPH_CLI = 'graph:cli';
  * {@link SignalEnvelope} (so the composition root can cloud + `--report-to`
  * deliver it, ADR-0011) plus the optional generic-session contribution the
  * host run plane persists (host-owned-run-timing Phase 3; graph never writes
- * the row itself). Returns `undefined` for the paths that do NOT hand an
- * envelope back to the composition root: plain `--json` (which delivers INLINE
- * in renderGraphResult for H2 exit parity) unless the root explicitly retains
- * that envelope for a sibling artifact such as `--sarif`, and `--workspace`
- * itself (the parent aggregates per-unit
- * findings for the dashboard, not signals for the cloud — audit P1-2), and any
- * error path. A `--workspace` child (`graph <unit> --json`) additionally skips
- * its own inline delivery via the OPENSIP_GRAPH_WORKSPACE_CHILD sentinel, so no
- * child emits cloud signals or exits per-verdict. The `--workspace` path returns
- * its outcome through `executeWorkspaceGraph` so the host persists the single
- * aggregate session. tool.ts calls `cli.deliverSignals` only when an envelope
- * comes back.
+ * the row itself). Every completed direct analysis returns both evidence forms,
+ * including plain `--json` (which still delivers INLINE in renderGraphResult for
+ * H2 exit parity). A `--workspace` child (`graph <unit> --json`) skips inline
+ * delivery via the OPENSIP_GRAPH_WORKSPACE_CHILD sentinel and returns only its
+ * envelope; the workspace parent returns only its aggregate session, with no
+ * invented aggregate envelope. Error and early non-run paths may return
+ * `undefined`.
  */
 export async function executeGraph(
   opts: GraphCommandOptions,

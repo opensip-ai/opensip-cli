@@ -27,17 +27,30 @@ export function buildGraphSessionContribution(
 /**
  * Build the aggregate generic-session contribution for a `--workspace` run.
  * Child envelopes carry Option-A-mapped OpenSIP rule IDs; reverse-map back to
- * engine slugs so dashboard per-rule metric columns keep working.
+ * engine slugs so dashboard per-rule metric columns keep working. A failed
+ * child makes the aggregate incomplete, so its session is explicitly an
+ * error with a score of zero regardless of the surviving signals.
  */
 export function buildWorkspaceSessionContribution(
   opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
   signals: readonly Signal[],
+  anyChildFailed: boolean,
 ): ToolSessionContribution {
   const engineSignals = signals.map((s) => {
     const ruleId = mapOpenSipRuleIdToEngineSlug(s.ruleId);
     return { ...s, ruleId, source: ruleId };
   });
-  return contributionFromSignals(opts, engineSignals);
+  const contribution = contributionFromSignals(opts, engineSignals);
+  if (!anyChildFailed) return contribution;
+  // A failed child means the aggregate evidence is incomplete. The signals
+  // collected from the remaining children cannot justify a green verdict or
+  // their otherwise-derived pass-rate score.
+  return {
+    ...contribution,
+    score: 0,
+    passed: false,
+    runOutcome: 'error',
+  };
 }
 
 /**

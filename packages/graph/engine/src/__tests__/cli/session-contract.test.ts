@@ -2,14 +2,13 @@
  * D12: one CLI invocation = one session.
  *
  * Regression test asserting that every dispatch branch of executeGraph
- * either CONTRIBUTES exactly one session or zero (for opt-out modes). The
- * commit 2ed25d3 contract must not regress.
+ * CONTRIBUTES exactly one session. Workspace children are the sole deliberate
+ * exception; their parent owns the aggregate session.
  *
  * host-owned-run-timing Phase 3: graph no longer writes the generic session
  * row itself — `executeGraph` RETURNS a `GraphRunOutcome` whose optional
- * `session` the HOST persists after the handler resolves. So "one invocation =
- * one session" is now pinned on the RETURNED contribution (present ⇔ the host
- * persists one row; absent ⇔ opt-out). The payload-shape test persists the
+ * `session` the HOST persists after the handler resolves. The payload-shape
+ * test persists the
  * returned contribution inline (as the host would) to verify it round-trips
  * through the StoredSession contract.
  */
@@ -102,6 +101,17 @@ function mockCli(datastore: DataStore, languages?: LanguageRegistry): ToolCliCon
     datastore,
     setExitCode: vi.fn(),
     render: () => Promise.resolve(),
+    emitEnvelope: vi.fn(),
+    deliverSignals: vi.fn(() => Promise.resolve({ delivered: false })),
+    saveBaseline: vi.fn(() => Promise.resolve()),
+    compareBaseline: vi.fn(() =>
+      Promise.resolve({
+        degraded: false,
+        added: [],
+        resolved: [],
+        unchanged: [],
+      }),
+    ),
     scope: {
       datastore: () => datastore,
       languages: languages ?? new LanguageRegistry(),
@@ -230,28 +240,34 @@ describe('D12 — one CLI invocation = one session', () => {
     expect(outcome?.envelope).toBeUndefined();
   });
 
-  it('--json opts out of session contribution', async () => {
+  it('--json contributes exactly one session', async () => {
     const outcome = await executeGraph(
       { cwd: projectDir, noCache: true, json: true },
       mockCli(datastore),
     );
-    expect(outcome?.session).toBeUndefined();
+    expect(outcome?.kind).toBe('direct');
+    expect(outcome?.envelope).toBeDefined();
+    expect(outcome?.session).toBeDefined();
   });
 
-  it('--gate-save opts out of session contribution', async () => {
+  it('--gate-save contributes exactly one session', async () => {
     const outcome = await executeGraph(
       { cwd: projectDir, noCache: true, gateSave: true },
       mockCli(datastore),
     );
-    expect(outcome?.session).toBeUndefined();
+    expect(outcome?.kind).toBe('direct');
+    expect(outcome?.envelope).toBeDefined();
+    expect(outcome?.session).toBeDefined();
   });
 
-  it('--report-to opts out of session contribution (even on failure)', async () => {
+  it('--report-to contributes exactly one session', async () => {
     const outcome = await executeGraph(
       { cwd: projectDir, noCache: true, reportTo: 'http://127.0.0.1:1' },
       mockCli(datastore),
     );
-    expect(outcome?.session).toBeUndefined();
+    expect(outcome?.kind).toBe('direct');
+    expect(outcome?.envelope).toBeDefined();
+    expect(outcome?.session).toBeDefined();
   });
 });
 

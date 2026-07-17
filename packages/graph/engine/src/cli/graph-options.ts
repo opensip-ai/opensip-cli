@@ -148,10 +148,4 @@ export interface GraphCommandOptions {
   readonly top?: string;
   /** Emit unwrapped agent-filtered payload (no CommandOutcome wrapper). */
   readonly raw?: boolean;
-  /**
-   * Composition-root artifact hint: retain the already-emitted JSON envelope
-   * so a sibling side-file sink (currently `graph --json --sarif`) can consume
-   * it without rebuilding the graph or delivering signals twice.
-   */
-  readonly returnJsonEnvelope?: boolean;
 }

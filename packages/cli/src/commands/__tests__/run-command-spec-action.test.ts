@@ -1,6 +1,7 @@
-import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import { buildSignalEnvelope, EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
+  HOST_VERDICT_POLICY_FALLBACK,
   NetworkError,
   RunScope,
   defineCommand,
@@ -149,6 +150,193 @@ describe('runCommandSpecAction', () => {
         verdictSummary: { passed: true, errors: 0, warnings: 0, findings: 0 },
       });
       expect(steps[0]?.sessionId).toBeDefined();
+    } finally {
+      datastore.close();
+    }
+  });
+
+  it.each([
+    ['human', {}],
+    ['json', { json: true }],
+    ['gate', { gateSave: true }],
+    ['catalog', { catalogOutput: '/proj/catalog.json' }],
+    ['sarif', { sarif: '/proj/graph.sarif' }],
+    ['report-to', { reportTo: 'https://example.invalid/receiver' }],
+  ] as const)(
+    'persists linked, non-faulted graph evidence for %s presentation',
+    async (_mode, modeOptions) => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const hooks = createRunActionHooks(
+          createRunPlaneFactory({
+            getDatastore: () => datastore,
+          }),
+        );
+        const envelope = buildSignalEnvelope({
+          tool: 'graph',
+          runId: 'graph-run',
+          createdAt: '2026-07-16T00:00:00.000Z',
+          units: [{ slug: 'graph', passed: true, durationMs: 1 }],
+          signals: [],
+          policy: HOST_VERDICT_POLICY_FALLBACK,
+          runFaulted: false,
+        });
+        const spec = defineCommand<unknown, ToolCliContext>({
+          name: 'graph',
+          description: 'fixture',
+          commonFlags: [],
+          scope: 'project',
+          output: 'raw-stream',
+          rawStreamReason: 'runtime-render-dispatch',
+          producesVerdict: true,
+          handler: () => ({
+            envelope,
+            session: {
+              tool: 'graph',
+              cwd: '/proj',
+              recipe: 'default',
+              score: 100,
+              passed: true,
+              payload: {
+                summary: {
+                  total: 0,
+                  passed: 0,
+                  failed: 0,
+                  errors: 0,
+                  warnings: 0,
+                },
+              },
+            },
+          }),
+        });
+        const ctx = makeCtx({ getExitCode: vi.fn(() => EXIT_CODES.SUCCESS) });
+        const scope = new RunScope({
+          datastore: () => datastore,
+          runId: 'scope-graph-run',
+        });
+
+        await runWithScope(scope, () =>
+          runCommandSpecAction(
+            spec,
+            { cwd: '/proj', ...modeOptions, _args: [] },
+            [],
+            ctx,
+            hooks,
+          ),
+        );
+
+        expect(new SessionRepo(datastore).count()).toBe(1);
+        const runRepo = new RunRepo(datastore);
+        const runs = runRepo.listRuns();
+        expect(runs).toHaveLength(1);
+        expect(runs[0]).toMatchObject({
+          name: 'graph',
+          source: 'implicit-tool',
+          correlationRunId: 'scope-graph-run',
+          aggregate: {
+            steps: 1,
+            passed: 1,
+            failed: 0,
+            faulted: 0,
+          },
+        });
+        const steps = runRepo.listStepsForRun(runs[0]?.id ?? '');
+        expect(steps).toHaveLength(1);
+        expect(steps[0]).toMatchObject({
+          tool: 'graph',
+          command: 'graph',
+          outcome: 'passed',
+        });
+        expect(steps[0]?.sessionId).toBeDefined();
+        expect(steps[0]?.evidence).toBeDefined();
+        expect(steps[0]?.evidence).not.toMatchObject({
+          missing: 'session-or-envelope',
+        });
+      } finally {
+        datastore.close();
+      }
+    },
+  );
+
+  it('records a failed workspace child as a faulted aggregate graph parent step', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const hooks = createRunActionHooks(
+        createRunPlaneFactory({
+          getDatastore: () => datastore,
+        }),
+      );
+      const spec = defineCommand<unknown, ToolCliContext>({
+        name: 'graph',
+        description: 'fixture',
+        commonFlags: [],
+        scope: 'project',
+        output: 'raw-stream',
+        rawStreamReason: 'runtime-render-dispatch',
+        producesVerdict: true,
+        handler: () => ({
+          session: {
+            tool: 'graph',
+            cwd: '/proj',
+            recipe: 'default',
+            score: 0,
+            passed: false,
+            runOutcome: 'error',
+            payload: {
+              summary: {
+                total: 0,
+                passed: 0,
+                failed: 0,
+                errors: 0,
+                warnings: 0,
+              },
+            },
+          },
+        }),
+      });
+      const ctx = makeCtx({ getExitCode: vi.fn(() => EXIT_CODES.RUNTIME_ERROR) });
+      const scope = new RunScope({
+        datastore: () => datastore,
+        runId: 'scope-workspace-run',
+      });
+
+      await runWithScope(scope, () =>
+        runCommandSpecAction(
+          spec,
+          { cwd: '/proj', workspace: true, json: true, _args: [] },
+          [],
+          ctx,
+          hooks,
+        ),
+      );
+
+      expect(new SessionRepo(datastore).count()).toBe(1);
+      const runRepo = new RunRepo(datastore);
+      const runs = runRepo.listRuns();
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({
+        name: 'graph',
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        aggregate: {
+          steps: 1,
+          passed: 0,
+          failed: 0,
+          faulted: 1,
+        },
+      });
+      const steps = runRepo.listStepsForRun(runs[0]?.id ?? '');
+      expect(steps).toHaveLength(1);
+      expect(steps[0]).toMatchObject({
+        tool: 'graph',
+        command: 'graph',
+        outcome: 'faulted',
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+      });
+      expect(steps[0]?.sessionId).toBeDefined();
+      expect(steps[0]?.evidence).toBeDefined();
+      expect(steps[0]?.evidence).not.toMatchObject({
+        missing: 'session-or-envelope',
+      });
     } finally {
       datastore.close();
     }

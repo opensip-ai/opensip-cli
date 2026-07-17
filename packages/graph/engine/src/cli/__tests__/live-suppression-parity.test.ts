@@ -188,6 +188,7 @@ describe('live-view suppression parity', () => {
       dispatchGraphResult(opts, result, mockCli(), '2026-06-09T00:00:00.000Z', buildRoot),
     );
 
+    expect(fileOf(outcome?.envelope?.signals ?? [])).toEqual(['other.ts']);
     const payload = outcome?.session?.payload as GraphSessionPayload | undefined;
     expect(payload).toBeDefined();
     // Exactly one finding survives the waiver (other.ts:9) and lands in the

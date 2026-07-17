@@ -62,7 +62,11 @@ function mockCli(): {
 beforeEach(() => {
   vi.clearAllMocks();
   h.runHeapPreflight.mockResolvedValue(false);
-  h.executeGraph.mockResolvedValue({ envelope, session: { tool: 'graph', cwd: '/repo' } });
+  h.executeGraph.mockResolvedValue({
+    kind: 'direct',
+    envelope,
+    session: { tool: 'graph', cwd: '/repo' },
+  });
 });
 
 describe('graph --open report delivery', () => {
@@ -80,9 +84,12 @@ describe('graph --open report delivery', () => {
   });
 
   it('calls the host report-open seam after a non-gate run', async () => {
-    const { ctx, maybeOpenReport } = mockCli();
+    const { ctx, deliverSignals, maybeOpenReport } = mockCli();
 
-    await graphCommandSpec.handler({ cwd: '/repo', open: true, language: 'typescript' }, ctx);
+    const completion = await graphCommandSpec.handler(
+      { cwd: '/repo', open: true, language: 'typescript' },
+      ctx,
+    );
 
     expect(h.executeGraph).toHaveBeenCalledWith(
       expect.objectContaining({ cwd: '/repo', language: 'typescript' }),
@@ -92,10 +99,15 @@ describe('graph --open report delivery', () => {
       openRequested: true,
       jsonOutput: false,
     });
+    expect(completion).toEqual({
+      envelope,
+      session: { tool: 'graph', cwd: '/repo' },
+    });
+    expect(deliverSignals).toHaveBeenCalledTimes(1);
   });
 
   it('does not auto-open reports for gate modes', async () => {
-    const { ctx, maybeOpenReport } = mockCli();
+    const { ctx, deliverSignals, maybeOpenReport } = mockCli();
 
     await graphCommandSpec.handler(
       { cwd: '/repo', open: true, language: 'typescript', gateSave: true },
@@ -103,21 +115,92 @@ describe('graph --open report delivery', () => {
     );
 
     expect(maybeOpenReport).not.toHaveBeenCalled();
+    // Gate delivery is owned inside executeGraph/runGateMode.
+    expect(deliverSignals).not.toHaveBeenCalled();
   });
 
   it('retains JSON output for --sarif and writes the side artifact exactly once', async () => {
-    const { ctx, deliverSignals, writeSarif } = mockCli();
+    const { ctx, deliverSignals, maybeOpenReport, writeSarif } = mockCli();
 
-    await graphCommandSpec.handler({ cwd: '/repo', json: true, sarif: '/repo/graph.sarif' }, ctx);
+    const completion = await graphCommandSpec.handler(
+      { cwd: '/repo', json: true, sarif: '/repo/graph.sarif' },
+      ctx,
+    );
 
     expect(h.executeGraph).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true, returnJsonEnvelope: true }),
+      expect.objectContaining({ json: true }),
       ctx,
     );
     expect(writeSarif).toHaveBeenCalledTimes(1);
     expect(writeSarif).toHaveBeenCalledWith(envelope, '/repo/graph.sarif');
     // executeGraph's JSON renderer owns signal delivery; the root must not
-    // deliver the retained envelope a second time.
+    // deliver the returned evidence a second time.
     expect(deliverSignals).not.toHaveBeenCalled();
+    expect(maybeOpenReport).not.toHaveBeenCalled();
+    expect(completion).toEqual({
+      envelope,
+      session: { tool: 'graph', cwd: '/repo' },
+    });
+  });
+
+  it('delivers report-to exactly once at the composition root and preserves both evidence forms', async () => {
+    const { ctx, deliverSignals } = mockCli();
+
+    const completion = await graphCommandSpec.handler(
+      {
+        cwd: '/repo',
+        reportTo: 'https://receiver.example.test/graph',
+        apiKey: 'test-api-key',
+        language: 'typescript',
+      },
+      ctx,
+    );
+
+    expect(deliverSignals).toHaveBeenCalledTimes(1);
+    expect(deliverSignals).toHaveBeenCalledWith(envelope, {
+      cwd: '/repo',
+      reportTo: 'https://receiver.example.test/graph',
+      apiKey: 'test-api-key',
+    });
+    expect(completion).toEqual({
+      envelope,
+      session: { tool: 'graph', cwd: '/repo' },
+    });
+  });
+
+  it('preserves a workspace parent aggregate session without inventing an envelope', async () => {
+    const { ctx, deliverSignals } = mockCli();
+    h.executeGraph.mockResolvedValueOnce({
+      kind: 'workspace-parent',
+      session: { tool: 'graph', cwd: '/repo' },
+    });
+
+    const completion = await graphCommandSpec.handler(
+      { cwd: '/repo', workspace: true, json: true },
+      ctx,
+    );
+
+    expect(completion).toEqual({ session: { tool: 'graph', cwd: '/repo' } });
+    expect(deliverSignals).not.toHaveBeenCalled();
+  });
+
+  it('preserves a workspace child envelope without a session or duplicate egress', async () => {
+    const prior = process.env.OPENSIP_GRAPH_WORKSPACE_CHILD;
+    process.env.OPENSIP_GRAPH_WORKSPACE_CHILD = '1';
+    try {
+      const { ctx, deliverSignals } = mockCli();
+      h.executeGraph.mockResolvedValueOnce({ kind: 'workspace-child', envelope });
+
+      const completion = await graphCommandSpec.handler(
+        { cwd: '/repo', json: true, language: 'typescript' },
+        ctx,
+      );
+
+      expect(completion).toEqual({ envelope });
+      expect(deliverSignals).not.toHaveBeenCalled();
+    } finally {
+      if (prior === undefined) delete process.env.OPENSIP_GRAPH_WORKSPACE_CHILD;
+      else process.env.OPENSIP_GRAPH_WORKSPACE_CHILD = prior;
+    }
   });
 });

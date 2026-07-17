@@ -45,6 +45,7 @@ import { executeListFiles } from '../list-files.js';
 import { loadGraphConfig, resolveGraphRecipeSelection } from '../orchestrate.js';
 
 import type { GraphConfig, ResolutionMode, Rule } from '../../types.js';
+import type { GraphRunOutcome } from '../graph-run-outcome.js';
 import type { Shard } from '../orchestrate/shard-model.js';
 import type { ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -194,10 +195,6 @@ async function dispatchGraphLiveView(
   });
 }
 
-function shouldRetainJsonEnvelope(opts: GraphCommandOptions): boolean {
-  return opts.json === true && typeof opts.sarif === 'string' && opts.sarif.length > 0;
-}
-
 /**
  * The `graph` command handler — the former `registerGraphCommand()` action body,
  * lifted to a spec handler. The host (`raw-stream`) renders nothing, so the
@@ -336,7 +333,6 @@ async function runGraphCommand(
       filter: opts.filter,
       top: opts.top,
       raw: opts.raw,
-      returnJsonEnvelope: shouldRetainJsonEnvelope(opts),
     },
     cli,
   );
@@ -363,25 +359,32 @@ async function runGraphCommand(
 }
 
 /**
- * Build graph's run completion from the run outcome (host-owned-run-timing
- * Phase 3): the generic-session contribution the host run plane persists. The
- * export/carrier modes (`--json`, gate, `--report-to`) carry no session.
+ * Preserve graph's truthful evidence handoff for the host run plane. Direct
+ * analyses contribute both their post-suppression envelope and session;
+ * workspace children contribute only their envelope; workspace parents
+ * contribute only their aggregate session.
  */
-function graphRunCompletion(
-  outcome: { readonly envelope?: SignalEnvelope; readonly session?: unknown } | undefined,
-): ToolRunCompletion {
-  return {
-    session: outcome?.session as ToolRunCompletion['session'],
-  };
+function graphRunCompletion(outcome: GraphRunOutcome | undefined): ToolRunCompletion {
+  if (outcome === undefined) return {};
+  switch (outcome.kind) {
+    case 'direct': {
+      return { envelope: outcome.envelope, session: outcome.session };
+    }
+    case 'workspace-child': {
+      return { envelope: outcome.envelope };
+    }
+    case 'workspace-parent': {
+      return { session: outcome.session };
+    }
+  }
 }
 
 /**
  * Effectful egress at the composition root (ADR-0011 / ADR-0008): cloud sync +
  * `--report-to` (which owns exit 4). `executeGraph` returns the envelope for every
- * mode that should deliver (catalog / default render / `--report-to`). Plain
- * `--json`, `--workspace`, and error paths normally return `undefined`; JSON +
- * SARIF is the narrow exception that retains an already-delivered envelope for
- * the side-file sink below, and this egress function explicitly skips it.
+ * directly completed analysis mode (catalog / default render / `--report-to` /
+ * JSON). Plain JSON already delivered inline and workspace parents have no
+ * envelope; this egress function explicitly skips both.
  *
  * ADR-0036: gate modes (`--gate-save`/`--gate-compare`) own their OWN
  * deliverSignals call inside `runGateMode` — they feed the gate verdict to the
@@ -396,8 +399,8 @@ async function deliverNonGateEgress(
 ): Promise<void> {
   const isGateMode = opts.gateSave === true || opts.gateCompare === true;
   // JSON runs already deliver inline so the emitted CommandOutcome carries the
-  // final host-derived exit. A retained envelope exists only for a sibling
-  // side-file sink such as --sarif and must never trigger duplicate egress.
+  // final host-derived exit. The returned evidence must never trigger duplicate
+  // egress.
   if (envelope === undefined || isGateMode || opts.json === true) return;
   await cli.deliverSignals(envelope, {
     cwd: opts.cwd,
@@ -412,10 +415,13 @@ async function maybeOpenGraphReport(
   cli: ToolCliContext,
 ): Promise<void> {
   const isGateMode = opts.gateSave === true || opts.gateCompare === true;
-  if (envelope === undefined || isGateMode) return;
+  // JSON (including workspace children) remains a machine-only surface. It did
+  // not reach the report-open seam before JSON evidence was returned to the
+  // host, so keep that side-effect boundary unchanged.
+  if (envelope === undefined || isGateMode || opts.json === true) return;
   await cli.maybeOpenReport({
     openRequested: opts.open === true,
-    jsonOutput: opts.json === true,
+    jsonOutput: false,
   });
 }
 

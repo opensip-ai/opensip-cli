@@ -7,6 +7,7 @@ import {
   type ToolSessionContribution,
 } from '@opensip-cli/core';
 
+import { graphCompletionLogFields } from './graph-run-outcome.js';
 import { buildWorkspaceSessionContribution } from './graph-session-contribution.js';
 import {
   type GraphProfileBuilder,
@@ -100,13 +101,16 @@ export async function executeWorkspaceGraph(
     signals: allSignals.length,
   });
 
-  let session: ToolSessionContribution | undefined;
   if (opts.json === true) {
     cli.emitJson(buildWorkspaceJsonDocument(result.perUnit, durationMs));
   } else {
     await writeWorkspaceReport(result.perUnit, durationMs, cli);
-    session = buildWorkspaceSessionContribution(opts, allSignals);
   }
+  const session: ToolSessionContribution = buildWorkspaceSessionContribution(
+    opts,
+    allSignals,
+    result.anyChildFailed,
+  );
 
   if (result.anyChildFailed) {
     cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
@@ -123,7 +127,11 @@ export async function executeWorkspaceGraph(
     findings: allSignals.length,
     failed: result.anyChildFailed,
     durationMs,
+    ...graphCompletionLogFields({
+      kind: 'workspace-parent',
+      deliveryMode: 'workspace-parent',
+    }),
   });
 
-  return session === undefined ? undefined : { session };
+  return { kind: 'workspace-parent', session };
 }
