@@ -22,10 +22,7 @@ import {
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 
 function readCompositeSetup() {
-  return readFileSync(
-    join(REPO_ROOT, '.github/actions/setup-workspace/action.yml'),
-    'utf8',
-  );
+  return readFileSync(join(REPO_ROOT, '.github/actions/setup-workspace/action.yml'), 'utf8');
 }
 
 const REQUIRED_LANES = [
@@ -45,7 +42,10 @@ test('ci.yml declares workflow-level default-deny permissions (exactly contents:
   assert.ok(block, 'workflow-level permissions block is required');
   // Exclusivity: a widened default (e.g. an added `actions: write`) must fail —
   // the block is default-deny only if contents: read is its ONLY scope.
-  const scopes = block[1].trim().split('\n').map((l) => l.trim());
+  const scopes = block[1]
+    .trim()
+    .split('\n')
+    .map((l) => l.trim());
   assert.deepEqual(
     scopes,
     ['contents: read'],
@@ -55,7 +55,7 @@ test('ci.yml declares workflow-level default-deny permissions (exactly contents:
 
 test('ci.yml build-and-test aggregator needs every required lane including cold-gate', () => {
   const raw = readWorkflow('ci.yml');
-  const block = raw.match(/build-and-test:\s*\n([\s\S]*?)(?=\n  [a-z]|\n*$)/);
+  const block = raw.match(/build-and-test:\s*\n([\s\S]*?)(?=\n {2}[a-z]|\n*$)/);
   assert.ok(block, 'build-and-test job must exist');
   const needs = block[1].match(/needs:\s*\n((?:\s+-\s+[^\n]+\n)+)/);
   assert.ok(needs, 'build-and-test must declare needs:');
@@ -169,7 +169,11 @@ test('ci.yml concurrency cancels in-progress PR runs', () => {
 
 test('ci.yml SARIF uploads are guarded for fork PRs', () => {
   const raw = readWorkflow('ci.yml');
-  const uploadBlocks = [...raw.matchAll(/Upload (?:fit|graph|yagni) SARIF[\s\S]*?uses:\s*github\/codeql-action\/upload-sarif@/g)];
+  const uploadBlocks = [
+    ...raw.matchAll(
+      /Upload (?:fit|graph|yagni) SARIF[\s\S]*?uses:\s*github\/codeql-action\/upload-sarif@/g,
+    ),
+  ];
   assert.equal(uploadBlocks.length, 3, 'three SARIF upload steps');
   for (const block of uploadBlocks) {
     assert.match(
@@ -178,11 +182,7 @@ test('ci.yml SARIF uploads are guarded for fork PRs', () => {
       'each upload-sarif if: must guard same-repo',
     );
   }
-  assert.match(
-    raw,
-    /SARIF upload skipped on fork PR/,
-    'fork skip notice step required',
-  );
+  assert.match(raw, /SARIF upload skipped on fork PR/, 'fork skip notice step required');
 });
 
 test('warm lanes restore shared workspace and verify injection; cold-gate does not', () => {
@@ -231,10 +231,6 @@ test('warm lanes restore shared workspace and verify injection; cold-gate does n
   // Cross-run Turbo task caches for the turbo-task lanes (test re-use is the
   // PR-push cost win; content-addressed entries union safely with the tar's).
   for (const job of ['lint', 'test']) {
-    assert.match(
-      jobs.get(job),
-      /path:\s*\.turbo/,
-      `${job} must restore a cross-run .turbo cache`,
-    );
+    assert.match(jobs.get(job), /path:\s*\.turbo/, `${job} must restore a cross-run .turbo cache`);
   }
 });

@@ -5,8 +5,6 @@
  *
  * @module scripts/lib/github-workflow-asserts
  */
-'use strict';
-
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,9 +63,12 @@ export function collectActionRefs(wf) {
  * @param {string} raw
  * @param {(msg: string) => void} [fail]
  */
-export function assertThirdPartyActionsPinned(raw, fail = (msg) => {
-  throw new Error(msg);
-}) {
+export function assertThirdPartyActionsPinned(
+  raw,
+  fail = (msg) => {
+    throw new Error(msg);
+  },
+) {
   const lines = stripComments(raw).split('\n');
   for (const line of lines) {
     const m = /uses:\s*(\S+)/.exec(line);
