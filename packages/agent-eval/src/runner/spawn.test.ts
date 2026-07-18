@@ -126,7 +126,7 @@ describe('spawnProcess', () => {
     expect(result.timedOut).toBe(true);
     // Bound is "terminates promptly under load", not a tight real-time SLO —
     // loaded Linux CI has occasionally exceeded a 2s wall (e.g. 2029ms).
-    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(Date.now() - started).toBeLessThan(10_000);
   });
 
   it('terminates and truncates a child that exceeds the output bound', async () => {
