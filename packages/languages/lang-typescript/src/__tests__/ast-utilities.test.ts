@@ -192,6 +192,10 @@ describe('isInStringLiteral', () => {
     void found;
   });
 
+  // Note: isInStringLiteral walks ancestors (not the node itself), so a
+  // TemplateHead/Middle/Tail token is not "in" a string — it *is* the span.
+  // Interpolation expressions are covered by the substitution tests below.
+
   it('returns false for nodes outside string literals', () => {
     const sf = parse('const x = 1; const y = x;');
     if (!sf) throw new Error('parse failed');
@@ -200,6 +204,32 @@ describe('isInStringLiteral', () => {
       if (ts.isIdentifier(n) && n.text === 'y' && !isInStringLiteral(n)) foundOutside = true;
     });
     expect(foundOutside).toBe(true);
+  });
+
+  it('returns false for an identifier inside a template-literal substitution (live code, not string content)', () => {
+    const sf = parse('const x = `${foo}`;');
+    if (!sf) throw new Error('parse failed');
+    let sawFoo = false;
+    walkNodes(sf, (n) => {
+      if (ts.isIdentifier(n) && n.text === 'foo') {
+        sawFoo = true;
+        expect(isInStringLiteral(n)).toBe(false);
+      }
+    });
+    expect(sawFoo).toBe(true);
+  });
+
+  it('returns false for a call expression nested inside a template-literal substitution', () => {
+    const sf = parse('const x = `hello ${dangerousCall()} world`;');
+    if (!sf) throw new Error('parse failed');
+    let sawCall = false;
+    walkNodes(sf, (n) => {
+      if (ts.isCallExpression(n)) {
+        sawCall = true;
+        expect(isInStringLiteral(n)).toBe(false);
+      }
+    });
+    expect(sawCall).toBe(true);
   });
 });
 

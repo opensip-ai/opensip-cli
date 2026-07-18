@@ -1,8 +1,8 @@
-import { dirname } from "node:path";
-import { TextDecoder } from "node:util";
+import { dirname } from 'node:path';
+import { TextDecoder } from 'node:util';
 
-import { MAX_AGENT_GUIDANCE_FILE_BYTES } from "./agent-guidance-renderer.js";
-import { listAgentGuidanceTargetSpecs } from "./agent-guidance.js";
+import { MAX_AGENT_GUIDANCE_FILE_BYTES } from './agent-guidance-renderer.js';
+import { listAgentGuidanceTargetSpecs } from './agent-guidance.js';
 import {
   INIT_AUTHORED_PLAN_CAPS,
   authoredPlanFailure,
@@ -11,26 +11,23 @@ import {
   directoryDigest,
   normalizeProjectRelativePath,
   sha256Bytes,
-} from "./init-authored-plan-types.js";
+} from './init-authored-plan-types.js';
 
-import type { AgentGuidanceTargetSnapshot } from "./agent-guidance.js";
-import type { InitAuthoredSnapshotRecord } from "./init-authored-plan-types.js";
+import type { AgentGuidanceTargetSnapshot } from './agent-guidance.js';
+import type { InitAuthoredSnapshotRecord } from './init-authored-plan-types.js';
 
-const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+const UTF8_DECODER = new TextDecoder('utf-8', { fatal: true });
 
 function decodeBase64(value: string, field: string): Buffer {
-  const bytes = Buffer.from(value, "base64");
-  if (bytes.toString("base64") !== value) {
+  const bytes = Buffer.from(value, 'base64');
+  if (bytes.toString('base64') !== value) {
     authoredPlanFailure(`${field} is noncanonical base64`);
   }
   return bytes;
 }
 
-export function decodeSnapshotUtf8(
-  record: InitAuthoredSnapshotRecord,
-  field: string,
-): string {
-  if (!record.exists || record.type !== "file") {
+export function decodeSnapshotUtf8(record: InitAuthoredSnapshotRecord, field: string): string {
+  if (!record.exists || record.type !== 'file') {
     authoredPlanFailure(`${field} must be a file`);
   }
   const bytes = decodeBase64(record.contentBase64, `${field}.contentBase64`);
@@ -50,30 +47,24 @@ export function buildGuidanceSnapshots(
       authoredPlanFailure(`snapshot is missing ${spec.relativePath}`);
     }
     if (!record.exists) {
-      const parent = dirname(spec.relativePath).replaceAll("\\", "/");
-      const parentRecord = parent === "." ? undefined : preimages.get(parent);
+      const parent = dirname(spec.relativePath).replaceAll('\\', '/');
+      const parentRecord = parent === '.' ? undefined : preimages.get(parent);
       return {
         relativePath: spec.relativePath,
-        status: "missing",
+        status: 'missing',
         parentExists:
-          parent === "." ||
-          (parentRecord?.exists === true && parentRecord.type === "directory"),
+          parent === '.' || (parentRecord?.exists === true && parentRecord.type === 'directory'),
       };
     }
-    if (record.type !== "file") {
+    if (record.type !== 'file') {
       authoredPlanFailure(`${spec.relativePath} must be a file`);
     }
-    if (
-      Buffer.from(record.contentBase64, "base64").length >
-      MAX_AGENT_GUIDANCE_FILE_BYTES
-    ) {
-      authoredPlanFailure(
-        `${spec.relativePath} exceeds the managed guidance cap`,
-      );
+    if (Buffer.from(record.contentBase64, 'base64').length > MAX_AGENT_GUIDANCE_FILE_BYTES) {
+      authoredPlanFailure(`${spec.relativePath} exceeds the managed guidance cap`);
     }
     return {
       relativePath: spec.relativePath,
-      status: "present",
+      status: 'present',
       content: decodeSnapshotUtf8(record, spec.relativePath),
     };
   });
@@ -110,19 +101,13 @@ function validateExistingRecord(
   record: Extract<InitAuthoredSnapshotRecord, { readonly exists: true }>,
 ): number {
   validateExistingIdentity(record);
-  if (record.type === "directory") {
-    if (
-      record.contentBase64 !== null ||
-      record.digest !== directoryDigest(record.mode)
-    ) {
+  if (record.type === 'directory') {
+    if (record.contentBase64 !== null || record.digest !== directoryDigest(record.mode)) {
       authoredPlanFailure(`${record.path} has an invalid directory snapshot`);
     }
     return 0;
   }
-  const bytes = decodeBase64(
-    record.contentBase64,
-    `${record.path}.contentBase64`,
-  );
+  const bytes = decodeBase64(record.contentBase64, `${record.path}.contentBase64`);
   if (bytes.length > INIT_AUTHORED_PLAN_CAPS.maxFileBytes) {
     authoredPlanFailure(`${record.path} exceeds the authored file cap`);
   }
@@ -142,7 +127,7 @@ export function validateAuthoredSnapshot(
   records: readonly InitAuthoredSnapshotRecord[],
 ): ReadonlyMap<string, InitAuthoredSnapshotRecord> {
   if (records.length > INIT_AUTHORED_PLAN_CAPS.maxTraversalEntries) {
-    authoredPlanFailure("snapshot record count exceeds the traversal cap");
+    authoredPlanFailure('snapshot record count exceeds the traversal cap');
   }
   const indexed = new Map<string, InitAuthoredSnapshotRecord>();
   const folded = new Set<string>();
@@ -150,20 +135,18 @@ export function validateAuthoredSnapshot(
   for (const [index, record] of records.entries()) {
     const path = normalizeProjectRelativePath(record.path);
     if (index > 0 && compareUtf8(records[index - 1].path, path) >= 0) {
-      authoredPlanFailure(
-        "snapshot records are not in canonical UTF-8 path order",
-      );
+      authoredPlanFailure('snapshot records are not in canonical UTF-8 path order');
     }
     const caseFolded = caseFoldPath(path);
     if (folded.has(caseFolded)) {
-      authoredPlanFailure("snapshot paths collide under case folding");
+      authoredPlanFailure('snapshot paths collide under case folding');
     }
     folded.add(caseFolded);
     aggregateBytes += validateRecord(record);
     indexed.set(path, record);
   }
   if (aggregateBytes > INIT_AUTHORED_PLAN_CAPS.maxAggregateBlobBytes) {
-    authoredPlanFailure("snapshot content exceeds the aggregate content cap");
+    authoredPlanFailure('snapshot content exceeds the aggregate content cap');
   }
   return indexed;
 }

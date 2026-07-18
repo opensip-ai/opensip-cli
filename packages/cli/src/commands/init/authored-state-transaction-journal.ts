@@ -3,26 +3,22 @@ import {
   type RuntimePromotionJournal,
   type RuntimePromotionOwnedSlotName,
   type RuntimePromotionPostconditionOutcome,
-} from "./runtime-promotion-journal-schema.js";
+} from './runtime-promotion-journal-schema.js';
 
 import type {
   DurableClosedPromotionJournal,
   DurableOpenPromotionJournal,
   RuntimePromotionJournalController,
-} from "./runtime-promotion-journal.js";
+} from './runtime-promotion-journal.js';
 
-function transitionTime(
-  record: RuntimePromotionJournal,
-  now: () => number,
-): number {
+function transitionTime(record: RuntimePromotionJournal, now: () => number): number {
   return Math.max(record.timestamps.updatedAt, now());
 }
 
 export async function recordOpenIntent(
   controller: RuntimePromotionJournalController,
   receipt: DurableOpenPromotionJournal,
-  kind:
-    "authored-prepare" | "authored-target-commit" | "authored-target-rollback",
+  kind: 'authored-prepare' | 'authored-target-commit' | 'authored-target-rollback',
   slot: RuntimePromotionOwnedSlotName,
   cursor: number | null,
   now: () => number,
@@ -55,7 +51,7 @@ export async function recordOpenIntent(
 }
 
 interface AuthoredPostconditionInput {
-  readonly phase: RuntimePromotionJournal["progress"]["phase"];
+  readonly phase: RuntimePromotionJournal['progress']['phase'];
   readonly outcome: RuntimePromotionPostconditionOutcome;
   readonly authoredDelta?: 0 | 1;
   readonly rollbackDelta?: 0 | 1;
@@ -70,8 +66,7 @@ export async function recordOpenPostcondition(
 ): Promise<DurableOpenPromotionJournal> {
   const current = await controller.verifyOpen(receipt);
   const pending = current.progress.pendingIntent;
-  if (pending === null)
-    throw new Error("Authored postcondition requires a pending intent");
+  if (pending === null) throw new Error('Authored postcondition requires a pending intent');
   const recordedAt = transitionTime(current, now);
   const authoredDelta = input.authoredDelta ?? 0;
   const rollbackDelta = input.rollbackDelta ?? 0;
@@ -93,9 +88,9 @@ export async function recordOpenPostcondition(
     cleanup: input.prepareArtifacts
       ? {
           ...current.cleanup,
-          authoredStage: "pending",
-          authoredBackup: "pending",
-          replayManifest: "pending",
+          authoredStage: 'pending',
+          authoredBackup: 'pending',
+          replayManifest: 'pending',
         }
       : current.cleanup,
     counts: {
@@ -124,8 +119,8 @@ export async function beginAuthoredRollback(
     revision: current.revision + 1,
     progress: {
       ...current.progress,
-      direction: "rollback",
-      phase: "rollback-started",
+      direction: 'rollback',
+      phase: 'rollback-started',
     },
     timestamps: {
       ...current.timestamps,
@@ -138,7 +133,7 @@ export async function beginAuthoredRollback(
 export async function advanceAuthoredPhase(
   controller: RuntimePromotionJournalController,
   receipt: DurableOpenPromotionJournal,
-  phase: "authored-committed" | "authored-rolled-back",
+  phase: 'authored-committed' | 'authored-rolled-back',
   now: () => number,
 ): Promise<DurableOpenPromotionJournal> {
   const current = await controller.verifyOpen(receipt);
@@ -155,19 +150,16 @@ export async function advanceAuthoredPhase(
       updatedAt: recordedAt,
     },
   });
-  return (await controller.replace(
-    receipt,
-    desired,
-  )) as DurableOpenPromotionJournal;
+  return (await controller.replace(receipt, desired)) as DurableOpenPromotionJournal;
 }
 
 export async function recordCleanupIntent(
   controller: RuntimePromotionJournalController,
   receipt: DurableClosedPromotionJournal,
-  slot: "authoredStage" | "authoredBackup" | "replayManifest",
+  slot: 'authoredStage' | 'authoredBackup' | 'replayManifest',
   now: () => number,
 ): Promise<DurableClosedPromotionJournal> {
-  const current = await controller.verifyReceipt(receipt, { state: "closed" });
+  const current = await controller.verifyReceipt(receipt, { state: 'closed' });
   const recordedAt = transitionTime(current, now);
   const desired = canonicalRuntimePromotionJournal({
     ...current,
@@ -176,7 +168,7 @@ export async function recordCleanupIntent(
       ...current.progress,
       pendingIntent: {
         sequence: current.counts.intentCount + 1,
-        kind: "owned-slot-cleanup",
+        kind: 'owned-slot-cleanup',
         slot,
         cursor: null,
         recordedAt,
@@ -200,12 +192,10 @@ export async function recordCleanupPostcondition(
   outcome: RuntimePromotionPostconditionOutcome,
   now: () => number,
 ): Promise<DurableClosedPromotionJournal> {
-  const current = await controller.verifyReceipt(receipt, { state: "closed" });
+  const current = await controller.verifyReceipt(receipt, { state: 'closed' });
   const pending = current.progress.pendingIntent;
-  if (pending?.kind !== "owned-slot-cleanup" || pending.slot === null) {
-    throw new Error(
-      "Authored cleanup postcondition requires its exact pending intent",
-    );
+  if (pending?.kind !== 'owned-slot-cleanup' || pending.slot === null) {
+    throw new Error('Authored cleanup postcondition requires its exact pending intent');
   }
   const recordedAt = transitionTime(current, now);
   const desired = canonicalRuntimePromotionJournal({
@@ -213,7 +203,7 @@ export async function recordCleanupPostcondition(
     revision: current.revision + 1,
     progress: {
       ...current.progress,
-      phase: "cleanup",
+      phase: 'cleanup',
       pendingIntent: null,
       lastPostcondition: {
         ...pending,
@@ -223,7 +213,7 @@ export async function recordCleanupPostcondition(
     },
     cleanup: {
       ...current.cleanup,
-      [pending.slot]: "removed",
+      [pending.slot]: 'removed',
     },
     counts: {
       ...current.counts,

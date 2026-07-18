@@ -148,7 +148,7 @@ its enforcement (an ADR without this section is incomplete):
 | Adapter `package.json#opensipTools.commands` matches the runtime `commandSpecs` (scan + doctor + version) | **No new check** | Existing `assertCommandNamesMatch` (throws at install/worker import) + the extended `build-tool-command-manifests.mjs --check` parity gate (`pnpm tool-manifests:check`). |
 
 **Related specs / ADRs:** implemented by the local plan
-`docs/plans/ready/04-external-tool-adapters/` (see its `IMPLEMENTATION-BRIEF.md`,
+a local implementation plan (see its `IMPLEMENTATION-BRIEF.md`,
 the corrected source of truth). Related:
 [ADR-0084](ADR-0084-mcp-server-surface.md) (the precedent for adding a publishable
 first-party tool package), [ADR-0041](ADR-0041-customer-facing-tools-command-group.md)

@@ -1,4 +1,4 @@
-// @fitness-ignore-file no-markdown-references -- docs/plans/* pointers in JSDoc are stable internal references.
+// @fitness-ignore-file no-markdown-references -- JSDoc cites tracked ADRs and committed design notes.
 /**
  * @fileoverview Public option shape for `executeGraph`.
  *

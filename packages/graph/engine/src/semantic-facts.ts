@@ -318,15 +318,13 @@ function applyDeclarationCap(
     reasons.push('declaration-cap');
     return { keptDecls: primary, keptRefs: downgradeMissingTargets(keptRefs, primaryIds, reasons) };
   }
-  // Still over hard cap when closure is large — keep primary only and downgrade.
-  if (withClosure.length > limits.maxDeclarations && closureExtras.length > 0) {
-    reasons.push('declaration-cap');
-    return { keptDecls: primary, keptRefs: downgradeMissingTargets(keptRefs, primaryIds, reasons) };
-  }
-  const keptDecls = withClosure.slice(0, limits.maxDeclarations);
-  if (sortedDecls.length > keptDecls.length) reasons.push('declaration-cap');
-  const ids = new Set(keptDecls.map((d) => d.declarationId));
-  return { keptDecls, keptRefs: downgradeMissingTargets(keptRefs, ids, reasons) };
+  // Within the modest overflow budget: keep the full closure-preserving set
+  // (do not re-truncate to maxDeclarations — that would discard every
+  // closureExtra, since they always sort after primary under the
+  // deterministic comparator).
+  if (sortedDecls.length > withClosure.length) reasons.push('declaration-cap');
+  const ids = new Set(withClosure.map((d) => d.declarationId));
+  return { keptDecls: withClosure, keptRefs: downgradeMissingTargets(keptRefs, ids, reasons) };
 }
 
 function downgradeMissingTargets(

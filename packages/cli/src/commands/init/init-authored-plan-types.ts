@@ -1,24 +1,19 @@
-import { createHash } from "node:crypto";
-import { posix } from "node:path";
+import { createHash } from 'node:crypto';
+import { posix } from 'node:path';
 
 import {
   RUNTIME_PROMOTION_AUTHORED_MODES,
   RUNTIME_PROMOTION_JOURNAL_CAPS,
   RUNTIME_PROMOTION_LANGUAGES,
-} from "./runtime-promotion-journal-types.js";
+} from './runtime-promotion-journal-types.js';
 
-import type {
-  RenderedToolScaffold,
-  ToolScaffold,
-  ToolScaffoldIdentity,
-} from "../shared.js";
+import type { RenderedToolScaffold, ToolScaffold, ToolScaffoldIdentity } from '../shared.js';
 import type {
   RuntimePromotionAuthoredMode,
   RuntimePromotionLanguage,
-} from "./runtime-promotion-journal-types.js";
+} from './runtime-promotion-journal-types.js';
 
-export const AUTHORED_REPLAY_MANIFEST_KIND =
-  "opensip-init-authored-replay" as const;
+export const AUTHORED_REPLAY_MANIFEST_KIND = 'opensip-init-authored-replay' as const;
 export const AUTHORED_REPLAY_MANIFEST_VERSION = 1 as const;
 
 export const INIT_AUTHORED_PLAN_CAPS = Object.freeze({
@@ -34,9 +29,8 @@ export const INIT_AUTHORED_PLAN_CAPS = Object.freeze({
 });
 
 export type InitAuthoredMode = RuntimePromotionAuthoredMode;
-export type InitAuthoredMutationAction =
-  "create" | "replace" | "delete" | "preserve";
-export type InitAuthoredTargetType = "file" | "directory";
+export type InitAuthoredMutationAction = 'create' | 'replace' | 'delete' | 'preserve';
+export type InitAuthoredTargetType = 'file' | 'directory';
 
 export interface InitAuthoredPathState {
   readonly exists: boolean;
@@ -84,7 +78,7 @@ export type InitAuthoredSnapshotRecord =
   | {
       readonly path: string;
       readonly exists: true;
-      readonly type: "directory";
+      readonly type: 'directory';
       readonly mode: number;
       readonly digest: string;
       readonly contentBase64: null;
@@ -92,7 +86,7 @@ export type InitAuthoredSnapshotRecord =
   | {
       readonly path: string;
       readonly exists: true;
-      readonly type: "file";
+      readonly type: 'file';
       readonly mode: number;
       readonly digest: string;
       readonly contentBase64: string;
@@ -165,62 +159,53 @@ export function authoredPlanFailure(message: string): never {
 }
 
 export function sha256Bytes(value: string | Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
+  return createHash('sha256').update(value).digest('hex');
 }
 
 export function compareUtf8(left: string, right: string): number {
-  return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+  return Buffer.compare(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8'));
 }
 
 export function pathDepth(value: string): number {
-  return value.split("/").length;
+  return value.split('/').length;
 }
 
 export function isRuntimeAuthoredPath(value: string): boolean {
-  return (
-    value === "opensip-cli/.runtime" ||
-    value.startsWith("opensip-cli/.runtime/")
-  );
+  return value === 'opensip-cli/.runtime' || value.startsWith('opensip-cli/.runtime/');
 }
 
 export function normalizeProjectRelativePath(value: string): string {
   if (
     value.length === 0 ||
-    value !== value.normalize("NFC") ||
-    value.includes("\\") ||
-    value.includes("\0") ||
+    value !== value.normalize('NFC') ||
+    value.includes('\\') ||
+    value.includes('\0') ||
     posix.isAbsolute(value) ||
     posix.normalize(value) !== value ||
-    value === "." ||
-    value === ".." ||
-    value.startsWith("../") ||
-    value.endsWith("/") ||
-    Buffer.byteLength(value, "utf8") > INIT_AUTHORED_PLAN_CAPS.maxPathBytes
+    value === '.' ||
+    value === '..' ||
+    value.startsWith('../') ||
+    value.endsWith('/') ||
+    Buffer.byteLength(value, 'utf8') > INIT_AUTHORED_PLAN_CAPS.maxPathBytes
   ) {
-    authoredPlanFailure(
-      `unsafe or noncanonical project-relative path '${value}'`,
-    );
+    authoredPlanFailure(`unsafe or noncanonical project-relative path '${value}'`);
   }
-  for (const segment of value.split("/")) {
-    if (segment.length === 0 || segment === "." || segment === "..") {
+  for (const segment of value.split('/')) {
+    if (segment.length === 0 || segment === '.' || segment === '..') {
       authoredPlanFailure(`unsafe project-relative path '${value}'`);
     }
   }
   if (isRuntimeAuthoredPath(value)) {
-    authoredPlanFailure(
-      "opensip-cli/.runtime is immutable authored-plan state",
-    );
+    authoredPlanFailure('opensip-cli/.runtime is immutable authored-plan state');
   }
   if (pathDepth(value) > INIT_AUTHORED_PLAN_CAPS.maxTraversalDepth) {
-    authoredPlanFailure(
-      `path depth exceeds ${INIT_AUTHORED_PLAN_CAPS.maxTraversalDepth}`,
-    );
+    authoredPlanFailure(`path depth exceeds ${INIT_AUTHORED_PLAN_CAPS.maxTraversalDepth}`);
   }
   return value;
 }
 
 export function caseFoldPath(value: string): string {
-  return value.normalize("NFC").toLowerCase();
+  return value.normalize('NFC').toLowerCase();
 }
 
 export function normalizeLanguages(
@@ -230,33 +215,24 @@ export function normalizeLanguages(
   if (
     selected.size === 0 ||
     selected.size !== languages.length ||
-    languages.some(
-      (language) => !RUNTIME_PROMOTION_LANGUAGES.includes(language),
-    )
+    languages.some((language) => !RUNTIME_PROMOTION_LANGUAGES.includes(language))
   ) {
-    authoredPlanFailure("languages must be a nonempty supported set");
+    authoredPlanFailure('languages must be a nonempty supported set');
   }
-  return RUNTIME_PROMOTION_LANGUAGES.filter((language) =>
-    selected.has(language),
-  );
+  return RUNTIME_PROMOTION_LANGUAGES.filter((language) => selected.has(language));
 }
 
 export function validateMode(value: string): asserts value is InitAuthoredMode {
-  if (
-    !(RUNTIME_PROMOTION_AUTHORED_MODES as readonly string[]).includes(value)
-  ) {
+  if (!(RUNTIME_PROMOTION_AUTHORED_MODES as readonly string[]).includes(value)) {
     authoredPlanFailure(`unsupported authored mode '${value}'`);
   }
 }
 
-export function validateToolIdentity(
-  identity: ToolScaffoldIdentity,
-  field: string,
-): void {
+export function validateToolIdentity(identity: ToolScaffoldIdentity, field: string): void {
   const values = [
-    ["stableId", identity.stableId],
-    ["name", identity.name],
-    ["version", identity.version],
+    ['stableId', identity.stableId],
+    ['name', identity.name],
+    ['version', identity.version],
   ] as const;
   for (const [name, value] of values) {
     if (
@@ -266,8 +242,7 @@ export function validateToolIdentity(
         const code = character.codePointAt(0) ?? 0;
         return code <= 0x1f || code === 0x7f;
       }) ||
-      Buffer.byteLength(value, "utf8") >
-        INIT_AUTHORED_PLAN_CAPS.maxIdentityBytes
+      Buffer.byteLength(value, 'utf8') > INIT_AUTHORED_PLAN_CAPS.maxIdentityBytes
     ) {
       authoredPlanFailure(`${field}.${name} is invalid`);
     }
@@ -281,11 +256,8 @@ export function normalizeToolIdentities(
   const names = new Set<string>();
   return scaffolds.map((scaffold, index) => {
     validateToolIdentity(scaffold.identity, `tools[${String(index)}]`);
-    if (
-      stableIds.has(scaffold.identity.stableId) ||
-      names.has(scaffold.identity.name)
-    ) {
-      authoredPlanFailure("Tool stable ids and names must be unique");
+    if (stableIds.has(scaffold.identity.stableId) || names.has(scaffold.identity.name)) {
+      authoredPlanFailure('Tool stable ids and names must be unique');
     }
     stableIds.add(scaffold.identity.stableId);
     names.add(scaffold.identity.name);
@@ -301,9 +273,7 @@ export function absentPathState(): InitAuthoredPathState {
   return { exists: false, type: null, mode: null, digest: null };
 }
 
-export function stateFromSnapshot(
-  record: InitAuthoredSnapshotRecord,
-): InitAuthoredPathState {
+export function stateFromSnapshot(record: InitAuthoredSnapshotRecord): InitAuthoredPathState {
   return {
     exists: record.exists,
     type: record.type,

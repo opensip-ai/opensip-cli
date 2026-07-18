@@ -77,7 +77,7 @@ cross-layer pattern.
   composes them + the documented pre-scope exceptions into `describeHostEnv()` for
   the generated env-surface reference.
 
-**Related specs / ADRs:** Implements `docs/plans/specs/release-2.12.0-output-observability.md`
+**Related specs / ADRs:** Implements the output-observability work
 (north-star §5.5 Command outcome, §5.10 Diagnostics, §4.7 bootstrap convergence,
 §5.12 Environment registry). Builds on ADR-0011 (inner currency), ADR-0021 (flag
 currency), ADR-0023 (config package). Part of the tool-plugin-parity ladder toward

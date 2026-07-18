@@ -378,6 +378,29 @@ describe('defineCheck — analyze mode end-to-end run', () => {
     expect(result.errors).toBe(0);
   });
 
+  it('surfaces a thrown error in per-file analyze() as an error result, not a silent file skip', async () => {
+    fixture('a.ts', 'TRIGGER\n');
+    fixture('b.ts', 'fine content\n');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'aa000000-aa00-4aa0-8aa0-aa0000000004',
+      slug: 'analyze-crash-rt',
+      description: 'd',
+      tags: ['quality'],
+      analyze: (content) => {
+        if (content.includes('TRIGGER')) {
+          throw new TypeError('analyze blew up on this file');
+        }
+        return [];
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.passed).toBe(false);
+    expect(result.errors).toBeGreaterThanOrEqual(1);
+  });
+
   it('captures a thrown error in analyzeAll and surfaces it as an error result', async () => {
     fixture('a.ts', 'const x = 1;');
     await fileCache.prewarm(testDir, ['**/*.ts']);

@@ -140,6 +140,13 @@ export class SqliteGraphPackageQueries {
         }
         const matcher = this.deps.context.sourceRoleMatcherFor(gen);
         if (!matcher.ok) return matcher;
+        // groupBy: 'file' derives its key from a row's first sample site
+        // (dependencyGroupKey); at the tool's own sampleLimit:0 default, every
+        // row's `sample` is empty and grouping silently collapses into a
+        // single bogus '<unlocated>' bucket. Requesting file grouping is an
+        // implicit request for at least one concrete site per row.
+        const effectiveSampleLimit =
+          groupBy === 'file' ? Math.max(sampleLimit ?? 0, 1) : sampleLimit;
         const views: PackageEvidenceView[] = [];
         for (const selector of packageSelectors(query.package, direction)) {
           const view = buildPackageEvidence(
@@ -154,7 +161,7 @@ export class SqliteGraphPackageQueries {
               // avoid building ≤10k unused rows and a spurious *-evidence-cap on
               // large graphs (P2 Phase 2.4).
               evidenceLimit: 0,
-              ...(sampleLimit === undefined ? {} : { sampleLimit }),
+              ...(effectiveSampleLimit === undefined ? {} : { sampleLimit: effectiveSampleLimit }),
             },
             matcher.value,
             this.deps.features(gen),

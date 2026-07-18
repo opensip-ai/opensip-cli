@@ -128,10 +128,10 @@ substrate to core" symmetry principle from recipes to suppression.
 - Out of scope, stays per-tool: whole-rule disable (`disabledChecks` /
   `disabledRules`) and the baseline ratchet. They solve different problems
   (don't-run / don't-regress) than the inline waiver (this-one-is-fine-because).
-- Follow-up spec required under `docs/plans/specs/` before implementation.
+- Follow-up local-only implementation spec required before implementation.
 
 **Related specs / ADRs:** Implemented by a forthcoming spec in
-`docs/plans/specs/` (graph inline-suppression / shared-core extraction).
+Local-only planning notes (graph inline-suppression / shared-core extraction).
 Related: ADR-0005 (symmetric tool architecture; hoist shared substrate to core),
 ADR-0011 (Signal as universal output currency), ADR-0001 (graph rules
 actionable/precise/bounded — the waiver is how an intentional finding leaves the

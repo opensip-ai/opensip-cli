@@ -54,4 +54,4 @@ fast-tier lands.
 - Reference implementation remains `graph-typescript/src/cache-key.ts`.
 
 **Related specs / ADRs:** Phase 1 in
-`docs/plans/architecture-audit-p1-remediation/`; [ADR-0032](ADR-0032-sharded-engine-default.md).
+local architecture planning notes; [ADR-0032](ADR-0032-sharded-engine-default.md).

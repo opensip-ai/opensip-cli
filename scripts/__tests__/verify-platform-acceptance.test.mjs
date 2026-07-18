@@ -659,6 +659,15 @@ test('invalid invocation and unreadable inputs exit 2', () => {
   const badFlag = runVerifier(['--evidence', 'a', '--profile', 'p', '--nope', 'x']);
   assert.equal(badFlag.code, 2);
 
+  // pnpm 11 forwards the bare `--` script separator; the grammar must ignore it.
+  const withSeparator = runVerifier(['--', '--evidence', 'a', '--profile', 'p']);
+  assert.equal(withSeparator.code, 2);
+  assert.doesNotMatch(withSeparator.stderr, /unknown flag --/);
+  assert.match(
+    withSeparator.stderr,
+    /--evidence|--profile|evidence|profile|not found|ENOENT|invalid/i,
+  );
+
   for (const args of [
     ['--expected-candidate-kind', 'source-tree'],
     ['--expected-registry', 'http://registry.example/'],

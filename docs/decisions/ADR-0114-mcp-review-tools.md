@@ -81,7 +81,6 @@ CLI. The new tools preserve those decisions:
 
 **Related specs / ADRs:**
 
-- `docs/plans/completed/07-agent-apply-verify-loop.md`
-- `docs/plans/ready/mcp-review-tools/`
+- Local implementation planning notes (not committed)
 - [ADR-0084](ADR-0084-mcp-server-surface.md)
 - [ADR-0110](ADR-0110-host-owned-review-brief-contract.md)

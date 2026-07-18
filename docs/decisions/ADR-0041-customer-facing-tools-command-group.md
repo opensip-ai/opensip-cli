@@ -76,6 +76,6 @@ provenance data only).
 - The spec's phased sequencing applies: veneer first, persistence plane second,
   admission-time storage enforcement last (ADR-0042).
 
-**Related specs / ADRs:** `docs/plans/specs/tool-management-command.md` (rev 2);
+**Related specs / ADRs:** a local implementation spec (rev 2);
 ADR-0027 (3.0.0 parity GA cutover); ADR-0042 (storage contract);
 ADR-0043 (config-namespace tolerance).

@@ -101,6 +101,33 @@ describe('filterSignalsByDirectives — line-level ignore', () => {
     expect(out.appliedDirectives[0]?.type).toBe('next-line');
   });
 
+  it('reports the directive in appliedDirectives when a stacked block-comment line separates it from its target', async () => {
+    const file = fixture(
+      'src/a.ts',
+      [
+        'const a = 1',
+        '// @fitness-ignore-next-line no-foo -- justified',
+        '/* eslint-disable-next-line some-rule */',
+        'const x = "FOO"', // line 4 — suppressed (stacked /* */ directive skipped)
+        'const y = "FOO"', // line 5 — not suppressed
+      ].join('\n'),
+    );
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const signals = [mkSignal(file, 4), mkSignal(file, 5)];
+    const out = await filterSignalsByDirectives(signals, 'no-foo', 0);
+    // The suppression itself already resolves target lines through the
+    // shared core scanner, so this half was never in doubt.
+    expect(out.filteredSignals).toHaveLength(1);
+    expect(out.filteredSignals[0]?.code?.line).toBe(5);
+    expect(out.ignoredCount).toBe(1);
+    // The audit reconstruction must agree: it independently resolves the
+    // same target line, so the directive that caused the suppression is
+    // reported rather than silently dropped from appliedDirectives.
+    expect(out.appliedDirectives).toHaveLength(1);
+    expect(out.appliedDirectives[0]?.type).toBe('next-line');
+  });
+
   it('never suppresses a signal pointing at a directive line itself (anti-recursion)', async () => {
     const file = fixture(
       'src/a.ts',

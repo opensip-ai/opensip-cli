@@ -66,6 +66,6 @@ UUID, and `suite add` resolves a name or UUID into the canonical YAML shape.
 
 **Fitness check:** `single-opts-assembly-seam` (path-gated to `packages/cli/src/commands/`).
 
-**Related specs / ADRs:** Implements local plan `docs/plans/ready/05-tool-suites/`.
+**Related specs / ADRs:** Implements the corresponding local tool-suites plan.
 Extended by ADR-0100 for suite per-step verdict and aggregate output.
 Extended by ADR-0131 for the shared step dispatch pipeline, step-scoped exit capture, and ratified numeric worst-of.

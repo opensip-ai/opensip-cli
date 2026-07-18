@@ -48,4 +48,19 @@ describe('killTree', () => {
     await Promise.all([childExited, waitUntilDead(grandPid)]);
     expect(isAlive(grandPid)).toBe(false);
   });
+
+  it('is a no-op for a never-spawned child without a pid', () => {
+    // Covers the pid-less early return (spawn failures / already-exited handles).
+    expect(() =>
+      killTree(
+        {
+          pid: undefined,
+          kill: () => {
+            throw new Error('already exited');
+          },
+        } as never,
+        'SIGTERM',
+      ),
+    ).not.toThrow();
+  });
 });

@@ -1,7 +1,7 @@
 /**
  * @opensip-cli/graph — TypeScript language adapter.
  *
- * Lands in PR 3 of plan docs/plans/10-graph-language-pluggability.md.
+ * Lands in PR 3 of plan local planning notes
  * Exposes `typescriptGraphAdapter`, the GraphLanguageAdapter
  * implementation that wraps the existing TypeScript-specific
  * walk/discover/edges machinery into the contract surface defined

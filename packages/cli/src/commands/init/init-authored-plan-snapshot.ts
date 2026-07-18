@@ -7,8 +7,8 @@ import {
   readSync,
   readdirSync,
   realpathSync,
-} from "node:fs";
-import { join, resolve } from "node:path";
+} from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import {
   INIT_AUTHORED_PLAN_CAPS,
@@ -19,15 +19,15 @@ import {
   isRuntimeAuthoredPath,
   normalizeProjectRelativePath,
   sha256Bytes,
-} from "./init-authored-plan-types.js";
+} from './init-authored-plan-types.js';
 
 import type {
   InitAuthoredSnapshot,
   InitAuthoredSnapshotHooks,
   InitAuthoredSnapshotRecord,
   ReadInitAuthoredSnapshotInput,
-} from "./init-authored-plan-types.js";
-import type { BigIntStats } from "node:fs";
+} from './init-authored-plan-types.js';
+import type { BigIntStats } from 'node:fs';
 
 interface SnapshotBudget {
   entries: number;
@@ -56,28 +56,20 @@ function safeOwner(stat: BigIntStats): boolean {
   return getuid === undefined || stat.uid === BigInt(getuid.call(process));
 }
 
-function validateSafeStat(
-  stat: BigIntStats,
-  expected: "file" | "directory",
-  path: string,
-): void {
-  const correctType = expected === "file" ? stat.isFile() : stat.isDirectory();
+function validateSafeStat(stat: BigIntStats, expected: 'file' | 'directory', path: string): void {
+  const correctType = expected === 'file' ? stat.isFile() : stat.isDirectory();
   if (!correctType) authoredPlanFailure(`${path} is not a ${expected}`);
-  if (!safeOwner(stat))
-    authoredPlanFailure(`${path} is not owned by the current user`);
+  if (!safeOwner(stat)) authoredPlanFailure(`${path} is not owned by the current user`);
   if ((statMode(stat) & 0o022) !== 0) {
     authoredPlanFailure(`${path} is group/world writable`);
   }
-  if (expected === "file" && stat.nlink !== 1n) {
+  if (expected === 'file' && stat.nlink !== 1n) {
     authoredPlanFailure(`${path} is hard-linked`);
   }
 }
 
 function openNoFollow(path: string, directory: boolean): number {
-  const flags =
-    constants.O_RDONLY |
-    constants.O_NOFOLLOW |
-    (directory ? constants.O_DIRECTORY : 0);
+  const flags = constants.O_RDONLY | constants.O_NOFOLLOW | (directory ? constants.O_DIRECTORY : 0);
   try {
     return openSync(path, flags);
   } catch {
@@ -96,12 +88,11 @@ function stableDirectoryNames(
   } catch {
     authoredPlanFailure(`could not inspect ${relativePath}`);
   }
-  validateSafeStat(before, "directory", relativePath);
+  validateSafeStat(before, 'directory', relativePath);
   const descriptor = openNoFollow(absolutePath, true);
   try {
     const opened = fstatSync(descriptor, { bigint: true });
-    if (!sameStat(before, opened))
-      authoredPlanFailure(`${relativePath} changed before listing`);
+    if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed before listing`);
   } finally {
     closeSync(descriptor);
   }
@@ -118,8 +109,7 @@ function stableDirectoryNames(
   } catch {
     authoredPlanFailure(`${relativePath} disappeared while planning`);
   }
-  if (!sameStat(before, after))
-    authoredPlanFailure(`${relativePath} changed while planning`);
+  if (!sameStat(before, after)) authoredPlanFailure(`${relativePath} changed while planning`);
   return names.sort(compareUtf8);
 }
 
@@ -144,12 +134,9 @@ function readStableFile(
   } catch {
     authoredPlanFailure(`could not inspect ${relativePath}`);
   }
-  validateSafeStat(before, "file", relativePath);
+  validateSafeStat(before, 'file', relativePath);
   const size = Number(before.size);
-  if (
-    !Number.isSafeInteger(size) ||
-    size > INIT_AUTHORED_PLAN_CAPS.maxFileBytes
-  ) {
+  if (!Number.isSafeInteger(size) || size > INIT_AUTHORED_PLAN_CAPS.maxFileBytes) {
     authoredPlanFailure(
       `${relativePath} exceeds ${String(INIT_AUTHORED_PLAN_CAPS.maxFileBytes)} bytes`,
     );
@@ -164,20 +151,17 @@ function readStableFile(
   let bytes: Buffer;
   try {
     const opened = fstatSync(descriptor, { bigint: true });
-    if (!sameStat(before, opened))
-      authoredPlanFailure(`${relativePath} changed before reading`);
+    if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed before reading`);
     bytes = Buffer.alloc(size);
     let offset = 0;
     while (offset < size) {
       const count = readSync(descriptor, bytes, offset, size - offset, null);
-      if (count === 0)
-        authoredPlanFailure(`${relativePath} changed while reading`);
+      if (count === 0) authoredPlanFailure(`${relativePath} changed while reading`);
       offset += count;
     }
     hooks?.afterFileRead?.(relativePath);
     const afterRead = fstatSync(descriptor, { bigint: true });
-    if (!sameStat(before, afterRead))
-      authoredPlanFailure(`${relativePath} changed while reading`);
+    if (!sameStat(before, afterRead)) authoredPlanFailure(`${relativePath} changed while reading`);
   } finally {
     closeSync(descriptor);
   }
@@ -187,27 +171,23 @@ function readStableFile(
   } catch {
     authoredPlanFailure(`${relativePath} disappeared while planning`);
   }
-  if (!sameStat(before, after))
-    authoredPlanFailure(`${relativePath} changed while planning`);
+  if (!sameStat(before, after)) authoredPlanFailure(`${relativePath} changed while planning`);
   return {
     path: relativePath,
     exists: true,
-    type: "file",
+    type: 'file',
     mode: statMode(before),
     digest: sha256Bytes(bytes),
-    contentBase64: bytes.toString("base64"),
+    contentBase64: bytes.toString('base64'),
   };
 }
 
-function directoryRecord(
-  path: string,
-  stat: BigIntStats,
-): InitAuthoredSnapshotRecord {
+function directoryRecord(path: string, stat: BigIntStats): InitAuthoredSnapshotRecord {
   const mode = statMode(stat);
   return {
     path,
     exists: true,
-    type: "directory",
+    type: 'directory',
     mode,
     digest: directoryDigest(mode),
     contentBase64: null,
@@ -222,8 +202,7 @@ function revalidateDirectory(
   const descriptor = openNoFollow(absolutePath, true);
   try {
     const opened = fstatSync(descriptor, { bigint: true });
-    if (!sameStat(before, opened))
-      authoredPlanFailure(`${relativePath} changed while opening`);
+    if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed while opening`);
   } finally {
     closeSync(descriptor);
   }
@@ -233,8 +212,7 @@ function revalidateDirectory(
   } catch {
     authoredPlanFailure(`${relativePath} disappeared while planning`);
   }
-  if (!sameStat(before, after))
-    authoredPlanFailure(`${relativePath} changed while planning`);
+  if (!sameStat(before, after)) authoredPlanFailure(`${relativePath} changed while planning`);
 }
 
 function inspectExistingPath(
@@ -250,13 +228,10 @@ function inspectExistingPath(
     authoredPlanFailure(`could not inspect ${relativePath}`);
   }
   addBudgetEntry(budget);
-  if (stat.isSymbolicLink())
-    authoredPlanFailure(`${relativePath} is a symbolic link`);
-  if (stat.isFile())
-    return readStableFile(absolutePath, relativePath, budget, hooks);
-  if (!stat.isDirectory())
-    authoredPlanFailure(`${relativePath} has an unsupported file type`);
-  validateSafeStat(stat, "directory", relativePath);
+  if (stat.isSymbolicLink()) authoredPlanFailure(`${relativePath} is a symbolic link`);
+  if (stat.isFile()) return readStableFile(absolutePath, relativePath, budget, hooks);
+  if (!stat.isDirectory()) authoredPlanFailure(`${relativePath} has an unsupported file type`);
+  validateSafeStat(stat, 'directory', relativePath);
   revalidateDirectory(absolutePath, relativePath, stat);
   return directoryRecord(relativePath, stat);
 }
@@ -268,16 +243,11 @@ function addRecord(
 ): void {
   const prior = folded.get(caseFoldPath(record.path));
   if (prior !== undefined && prior !== record.path) {
-    authoredPlanFailure(
-      `case-folded path collision between '${prior}' and '${record.path}'`,
-    );
+    authoredPlanFailure(`case-folded path collision between '${prior}' and '${record.path}'`);
   }
   folded.set(caseFoldPath(record.path), record.path);
   const existing = records.get(record.path);
-  if (
-    existing !== undefined &&
-    JSON.stringify(existing) !== JSON.stringify(record)
-  ) {
+  if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(record)) {
     authoredPlanFailure(`${record.path} changed between snapshot observations`);
   }
   records.set(record.path, record);
@@ -291,28 +261,16 @@ function walkAuthoredTree(
   hooks: InitAuthoredSnapshotHooks | undefined,
 ): void {
   const visit = (relativePath: string): void => {
-    const absolutePath = join(root, ...relativePath.split("/"));
-    const record = inspectExistingPath(
-      absolutePath,
-      relativePath,
-      budget,
-      hooks,
-    );
+    const absolutePath = join(root, ...relativePath.split('/'));
+    const record = inspectExistingPath(absolutePath, relativePath, budget, hooks);
     addRecord(records, folded, record);
-    if (!record.exists || record.type !== "directory") return;
+    if (!record.exists || record.type !== 'directory') return;
     const names = stableDirectoryNames(absolutePath, relativePath, hooks);
     const localFolded = new Map<string, string>();
     for (const name of names) {
-      const normalizedName = name.normalize("NFC");
-      if (
-        normalizedName !== name ||
-        name.includes("/") ||
-        name.includes("\\") ||
-        name === ".."
-      ) {
-        authoredPlanFailure(
-          `${relativePath} contains a noncanonical entry name`,
-        );
+      const normalizedName = name.normalize('NFC');
+      if (normalizedName !== name || name.includes('/') || name.includes('\\') || name === '..') {
+        authoredPlanFailure(`${relativePath} contains a noncanonical entry name`);
       }
       const foldedName = caseFoldPath(name);
       const prior = localFolded.get(foldedName);
@@ -323,13 +281,13 @@ function walkAuthoredTree(
       const child = `${relativePath}/${name}`;
       if (isRuntimeAuthoredPath(child)) {
         const runtimeStat = inspectExistingPath(
-          join(root, ...child.split("/")),
+          join(root, ...child.split('/')),
           child,
           budget,
           hooks,
         );
-        if (!runtimeStat.exists || runtimeStat.type !== "directory") {
-          authoredPlanFailure("opensip-cli/.runtime must be a real directory");
+        if (!runtimeStat.exists || runtimeStat.type !== 'directory') {
+          authoredPlanFailure('opensip-cli/.runtime must be a real directory');
         }
         continue;
       }
@@ -337,14 +295,14 @@ function walkAuthoredTree(
     }
   };
 
-  const authoredRoot = join(root, "opensip-cli");
+  const authoredRoot = join(root, 'opensip-cli');
   try {
     lstatSync(authoredRoot);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-    authoredPlanFailure("could not inspect opensip-cli");
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    authoredPlanFailure('could not inspect opensip-cli');
   }
-  visit("opensip-cli");
+  visit('opensip-cli');
 }
 
 function observeTarget(
@@ -356,22 +314,18 @@ function observeTarget(
   hooks: InitAuthoredSnapshotHooks | undefined,
 ): void {
   if (records.has(relativePath)) return;
-  const segments = relativePath.split("/");
+  const segments = relativePath.split('/');
   let parent = root;
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
-    const parentRelative =
-      index === 0 ? "<project-root>" : segments.slice(0, index).join("/");
+    const parentRelative = index === 0 ? '<project-root>' : segments.slice(0, index).join('/');
     const names = stableDirectoryNames(parent, parentRelative, hooks);
     const exact = names.includes(segment);
     const colliding = names.find(
-      (name) =>
-        name !== segment && caseFoldPath(name) === caseFoldPath(segment),
+      (name) => name !== segment && caseFoldPath(name) === caseFoldPath(segment),
     );
     if (colliding !== undefined) {
-      authoredPlanFailure(
-        `case-folded path collision between '${colliding}' and '${segment}'`,
-      );
+      authoredPlanFailure(`case-folded path collision between '${colliding}' and '${segment}'`);
     }
     if (!exact) {
       addRecord(records, folded, {
@@ -384,26 +338,17 @@ function observeTarget(
       });
       return;
     }
-    const currentRelative = segments.slice(0, index + 1).join("/");
+    const currentRelative = segments.slice(0, index + 1).join('/');
     const absolutePath = join(parent, segment);
     if (index < segments.length - 1) {
-      const ancestor = inspectExistingPath(
-        absolutePath,
-        currentRelative,
-        budget,
-        hooks,
-      );
-      if (!ancestor.exists || ancestor.type !== "directory") {
+      const ancestor = inspectExistingPath(absolutePath, currentRelative, budget, hooks);
+      if (!ancestor.exists || ancestor.type !== 'directory') {
         authoredPlanFailure(`${currentRelative} is not a directory`);
       }
       parent = absolutePath;
       continue;
     }
-    addRecord(
-      records,
-      folded,
-      inspectExistingPath(absolutePath, relativePath, budget, hooks),
-    );
+    addRecord(records, folded, inspectExistingPath(absolutePath, relativePath, budget, hooks));
   }
 }
 
@@ -415,35 +360,31 @@ export function readInitAuthoredSnapshot(
   try {
     requestedStat = lstatSync(requestedRoot, { bigint: true });
   } catch {
-    authoredPlanFailure("project root is unreadable");
+    authoredPlanFailure('project root is unreadable');
   }
-  if (requestedStat.isSymbolicLink())
-    authoredPlanFailure("project root must not be a symlink");
-  validateSafeStat(requestedStat, "directory", "<project-root>");
+  if (requestedStat.isSymbolicLink()) authoredPlanFailure('project root must not be a symlink');
+  validateSafeStat(requestedStat, 'directory', '<project-root>');
   const root = realpathSync(requestedRoot);
   const rootBefore = lstatSync(root, { bigint: true });
   if (!sameStat(requestedStat, rootBefore))
-    authoredPlanFailure("project root changed while opening");
+    authoredPlanFailure('project root changed while opening');
 
   const records = new Map<string, InitAuthoredSnapshotRecord>();
   const folded = new Map<string, string>();
   const budget: SnapshotBudget = { entries: 0, bytes: 0 };
   walkAuthoredTree(root, records, folded, budget, input.hooks);
-  const targets = [
-    ...new Set(input.targetPaths.map(normalizeProjectRelativePath)),
-  ].sort(compareUtf8);
+  const targets = [...new Set(input.targetPaths.map(normalizeProjectRelativePath))].sort(
+    compareUtf8,
+  );
   for (const target of targets) {
     observeTarget(root, target, records, folded, budget, input.hooks);
   }
   const rootAfter = lstatSync(root, { bigint: true });
-  if (!sameStat(rootBefore, rootAfter))
-    authoredPlanFailure("project root changed while planning");
+  if (!sameStat(rootBefore, rootAfter)) authoredPlanFailure('project root changed while planning');
 
   return {
     records: Object.freeze(
-      [...records.values()].sort((left, right) =>
-        compareUtf8(left.path, right.path),
-      ),
+      [...records.values()].sort((left, right) => compareUtf8(left.path, right.path)),
     ),
   };
 }

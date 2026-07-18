@@ -105,7 +105,7 @@ the transport implementation behind it, exactly as that ADR anticipated.
   (`runOffThreadOrInProcess`) is live but no longer guarded by a fitness check —
   restoring that assertion is an open follow-up (spec 01 / OQ4).
 
-**Related specs / ADRs:** `docs/plans/ready/offload-engine-to-worker-thread/`
+**Related specs / ADRs:**
 (local). Exercises the reversibility ADR-0016 reserved; the progress currency +
 single `<LiveProgress>` renderer from ADR-0016 are unchanged. Slim results follow
 ADR-0011's `SignalEnvelope` output currency.

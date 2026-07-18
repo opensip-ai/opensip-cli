@@ -116,7 +116,7 @@ its enforcement:
 | No raw scanner artifact (or matched secret) is egressed — only normalized `Signal`s leave the process | **Check warranted** | The NEW negative secret-egress E2E test (shared with ADR-0091): asserts the `deliverSignals` / cloud-egress payload contains only normalized `Signal`s, no `Secret`/`Match` substring and no raw artifact bytes. |
 | `auth-required` adapters follow ADR-0071 credential handling | **No new check** | Existing credential-handling policy + its checks (ADR-0071); no MVP adapter exercises this, recorded for forward adapters. |
 
-**Related specs / ADRs:** implemented by `docs/plans/ready/04-external-tool-adapters/`.
+**Related specs / ADRs:** implemented in subsequent local planning work.
 Related: [ADR-0081](ADR-0081-capability-pack-trust-and-resource-declarations.md)
 (the deny-by-default + declaration-only-`requires` posture this extends to
 adapters), [ADR-0061](ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)

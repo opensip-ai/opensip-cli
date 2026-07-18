@@ -96,4 +96,4 @@ policy in [ADR-0051](ADR-0051-host-owned-run-lifecycle-timing.md), impact trust
 in [ADR-0123](ADR-0123-impact-analysis-trust-foundation.md), and Run/RunStep
 authority in [ADR-0143](ADR-0143-host-owned-run-step-ledger.md). Canonical audit
 placement is [ADR-0155](ADR-0155-canonical-audit-command.md). Implementation
-specification: `docs/plans/specs/visual-proof-of-change.md` (local, gitignored).
+specification retained as local-only planning notes (not committed).

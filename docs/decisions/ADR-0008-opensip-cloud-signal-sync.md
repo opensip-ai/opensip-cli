@@ -65,7 +65,7 @@ client and the wire contract (a `SignalBatch` envelope) only.
 **Rationale:** Signals already exist internally (the check framework produces
 them; graph works in `Signal[]` for baseline/gate). The parent platform already
 ingests opensip-cli output into Postgres via local subprocess spawn
-(`docs/internal/consumers/opensip.md`, Mode 2); the cheap tier is the
+(Mode 2); the cheap tier is the
 over-the-network, customer-machine version of that path. Modeling the cloud as
 a *sink* rather than an *operational store* keeps the hard database problems
 (async, dialects, credentials) server-side — solved once by us — instead of
@@ -99,7 +99,7 @@ shipped into every CLI install. Reusing the existing API key
     the entitlement cache, so a lapsed plan stops syncing immediately rather than
     after the cache TTL.
 - A new cross-repo contract (`SignalBatch` + the idempotency/`Retry-After`
-  obligations) is recorded in `docs/internal/consumers/opensip.md` as Mode 3;
+  obligations) is recorded as Mode 3;
   changing it follows the coordination rule there.
 - This feature is not end-to-end usable until the parent `opensip` repo ships
   the ingestion + entitlement endpoints (tracked as a cross-repo follow-up).
@@ -110,8 +110,7 @@ shipped into every CLI install. Reusing the existing API key
 > `SignalBatch` shape should be reconciled with it before the wire contract is
 > frozen at `schemaVersion: 1`.
 
-**Related specs / ADRs:** Implemented by the plan at
-`docs/plans/ready/opensip-cloud-signal-sync/`. Related: ADR-0004 (opt-in
+**Related specs / ADRs:** ADR-0004 (opt-in
 OpenTelemetry — the observability substrate this reuses), ADR-0006
 (derived-data persistence policy — signals are derived data; this governs their
 egress, not local materialization).

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from 'node:crypto';
 
 import {
   mutateRuntimePromotionJournal,
@@ -8,7 +8,7 @@ import {
   type AnchoredRecordReadResult,
   type RuntimeExclusiveLease,
   type RuntimeRecoveryRecordMutation,
-} from "@opensip-cli/core";
+} from '@opensip-cli/core';
 
 import {
   asClosed,
@@ -27,22 +27,22 @@ import {
   type PromotionJournalReceiptExpectation,
   type ReceiptMetadata,
   type RuntimePromotionJournalController,
-} from "./runtime-promotion-journal-controller-internal.js";
+} from './runtime-promotion-journal-controller-internal.js';
 import {
   assertInitialRuntimePromotionJournal,
   assertRuntimePromotionTransition,
-} from "./runtime-promotion-journal-machine.js";
+} from './runtime-promotion-journal-machine.js';
 import {
   createJournalMutationCoordinator,
   isExactJournalContent,
   sha256,
-} from "./runtime-promotion-journal-mutation.js";
+} from './runtime-promotion-journal-mutation.js';
 import {
   canonicalRuntimePromotionJournal,
   encodeRuntimePromotionJournal,
   parseRuntimePromotionJournal,
   type RuntimePromotionJournal,
-} from "./runtime-promotion-journal-schema.js";
+} from './runtime-promotion-journal-schema.js';
 
 export type {
   DurableClosedPromotionJournal,
@@ -57,27 +57,25 @@ export type {
   RuntimePromotionJournalController,
   RuntimeStageMaterializationAuthority,
   RuntimeStageMaterializationIdentity,
-} from "./runtime-promotion-journal-controller-internal.js";
+} from './runtime-promotion-journal-controller-internal.js';
 
-const JOURNAL_ERROR_CODE = "SYSTEM.INIT.PROMOTION_JOURNAL";
-const RECOVERY_REQUIRED_CODE = "SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED";
+const JOURNAL_ERROR_CODE = 'SYSTEM.INIT.PROMOTION_JOURNAL';
+const RECOVERY_REQUIRED_CODE = 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED';
 
-export { RUNTIME_PROMOTION_JOURNAL_FILE } from "@opensip-cli/core";
+export { RUNTIME_PROMOTION_JOURNAL_FILE } from '@opensip-cli/core';
 
 export type RuntimePromotionJournalCheckpoint =
-  | "after-create-mutation"
-  | "after-replace-mutation"
-  | "after-unlink-mutation"
-  | "before-ambiguity-reconciliation"
-  | "after-reconciliation-mutation";
+  | 'after-create-mutation'
+  | 'after-replace-mutation'
+  | 'after-unlink-mutation'
+  | 'before-ambiguity-reconciliation'
+  | 'after-reconciliation-mutation';
 
 export interface RuntimePromotionJournalControllerDependencies {
   readonly now: () => number;
   readonly generateOperationId: () => string;
   readonly generateRecoveryOwnerToken: () => string;
-  readonly read: (
-    lease: RuntimeExclusiveLease,
-  ) => Promise<AnchoredRecordReadResult>;
+  readonly read: (lease: RuntimeExclusiveLease) => Promise<AnchoredRecordReadResult>;
   readonly mutate: (
     lease: RuntimeExclusiveLease,
     mutation: RuntimeRecoveryRecordMutation,
@@ -100,18 +98,18 @@ function recoveryRequired(message: string, cause?: unknown): SystemError {
 }
 
 function parseCanonicalRecord(content: string): RuntimePromotionJournal {
-  if (Buffer.byteLength(content, "utf8") > RUNTIME_RECOVERY_RECORD_MAX_BYTES) {
-    throw recoveryRequired("The promotion journal exceeds its bounded size.");
+  if (Buffer.byteLength(content, 'utf8') > RUNTIME_RECOVERY_RECORD_MAX_BYTES) {
+    throw recoveryRequired('The promotion journal exceeds its bounded size.');
   }
   try {
     const parsed = parseRuntimePromotionJournal(content);
     if (encodeRuntimePromotionJournal(parsed) !== content) {
-      throw journalError("The promotion journal is not canonically encoded.");
+      throw journalError('The promotion journal is not canonically encoded.');
     }
     return parsed;
   } catch (error) {
     if (error instanceof SystemError) throw error;
-    throw recoveryRequired("The promotion journal is malformed.", error);
+    throw recoveryRequired('The promotion journal is malformed.', error);
   }
 }
 
@@ -123,17 +121,15 @@ function assertDesiredIdentity(
     desired.coordinationKey !== current.coordinationKey ||
     desired.operationId !== current.operationId
   ) {
-    throw journalError(
-      "A journal transition changed immutable receipt identity.",
-    );
+    throw journalError('A journal transition changed immutable receipt identity.');
   }
 }
 
 function isTerminalSeal(
   desired: RuntimePromotionJournal,
-  outcome: "committed" | "rolled-back",
+  outcome: 'committed' | 'rolled-back',
 ): boolean {
-  return desired.state === "open" && desired.terminal?.outcome === outcome;
+  return desired.state === 'open' && desired.terminal?.outcome === outcome;
 }
 
 /**
@@ -153,9 +149,7 @@ export function createRuntimePromotionJournalController(
     mutate: mutateRuntimePromotionJournal,
     ...dependencyOverrides,
   };
-  const capabilities = new PromotionJournalCapabilityRegistry((message) =>
-    journalError(message),
-  );
+  const capabilities = new PromotionJournalCapabilityRegistry((message) => journalError(message));
 
   const readCurrent = async (): Promise<{
     readonly record: RuntimePromotionJournal;
@@ -163,26 +157,21 @@ export function createRuntimePromotionJournalController(
     readonly sha256: string;
   }> => {
     const observed = await dependencies.read(lease);
-    if (observed.status === "absent") {
-      throw recoveryRequired("The promotion journal is absent.");
+    if (observed.status === 'absent') {
+      throw recoveryRequired('The promotion journal is absent.');
     }
     const record = parseCanonicalRecord(observed.content);
     if (record.coordinationKey !== lease.coordinationKey) {
-      throw recoveryRequired(
-        "The promotion journal belongs to another project key.",
-      );
+      throw recoveryRequired('The promotion journal belongs to another project key.');
     }
     if (sha256(observed.content) !== observed.sha256) {
-      throw recoveryRequired(
-        "The promotion journal read digest is inconsistent.",
-      );
+      throw recoveryRequired('The promotion journal read digest is inconsistent.');
     }
     return { record, content: observed.content, sha256: observed.sha256 };
   };
 
-  const metadataForReceipt = (
-    receipt: DurablePromotionJournal,
-  ): ReceiptMetadata => capabilities.receipt(receipt);
+  const metadataForReceipt = (receipt: DurablePromotionJournal): ReceiptMetadata =>
+    capabilities.receipt(receipt);
 
   const verifyReceipt = async (
     receipt: DurablePromotionJournal,
@@ -199,13 +188,9 @@ export function createRuntimePromotionJournalController(
       current.record.state !== receipt.state
     ) {
       capabilities.retire(receipt);
-      throw recoveryRequired(
-        "The promotion journal changed after this receipt was issued.",
-      );
+      throw recoveryRequired('The promotion journal changed after this receipt was issued.');
     }
-    assertExpectation(current.record, expectation, (message) =>
-      journalError(message),
-    );
+    assertExpectation(current.record, expectation, (message) => journalError(message));
     return current.record;
   };
 
@@ -216,21 +201,14 @@ export function createRuntimePromotionJournalController(
     try {
       observed = await dependencies.read(lease);
     } catch (error) {
-      throw recoveryRequired(
-        "The promotion journal could not be verified after mutation.",
-        error,
-      );
+      throw recoveryRequired('The promotion journal could not be verified after mutation.', error);
     }
     if (!isExactJournalContent(observed, desiredContent)) {
-      throw recoveryRequired(
-        "The promotion journal mutation has an ambiguous result.",
-      );
+      throw recoveryRequired('The promotion journal mutation has an ambiguous result.');
     }
     const record = parseCanonicalRecord(observed.content);
     if (record.coordinationKey !== lease.coordinationKey) {
-      throw recoveryRequired(
-        "The promotion journal changed project authority.",
-      );
+      throw recoveryRequired('The promotion journal changed project authority.');
     }
     return capabilities.issueReceipt(record, observed.content, observed.sha256);
   };
@@ -254,7 +232,7 @@ export function createRuntimePromotionJournalController(
     const desiredContent = encodeRuntimePromotionJournal(desired);
     capabilities.retire(receipt);
     const mutation = {
-      operation: "replace",
+      operation: 'replace',
       content: desiredContent,
       expectedContentSha256: metadata.sha256,
     } as const;
@@ -276,9 +254,7 @@ export function createRuntimePromotionJournalController(
     name: string,
   ): void => {
     if (!predicate(current, desired)) {
-      throw journalError(
-        `The requested ${name} transition has the wrong shape.`,
-      );
+      throw journalError(`The requested ${name} transition has the wrong shape.`);
     }
   };
 
@@ -291,11 +267,9 @@ export function createRuntimePromotionJournalController(
     ) => boolean,
     name: string,
   ): Promise<DurableOpenPromotionJournal> => {
-    const current = await verifyReceipt(receipt, { state: "open" });
+    const current = await verifyReceipt(receipt, { state: 'open' });
     assertNamedTransition(current, desired, predicate, name);
-    return asOpen(await replace(receipt, desired), (message) =>
-      journalError(message),
-    );
+    return asOpen(await replace(receipt, desired), (message) => journalError(message));
   };
 
   const namedClosedTransition = async (
@@ -307,11 +281,9 @@ export function createRuntimePromotionJournalController(
     ) => boolean,
     name: string,
   ): Promise<DurableClosedPromotionJournal> => {
-    const current = await verifyReceipt(receipt, { state: "closed" });
+    const current = await verifyReceipt(receipt, { state: 'closed' });
     assertNamedTransition(current, desired, predicate, name);
-    return asClosed(await replace(receipt, desired), (message) =>
-      journalError(message),
-    );
+    return asClosed(await replace(receipt, desired), (message) => journalError(message));
   };
 
   const controller: RuntimePromotionJournalController = {
@@ -328,12 +300,10 @@ export function createRuntimePromotionJournalController(
         record.operationId !== identity.operationId ||
         record.recoveryOwnerToken !== identity.recoveryOwnerToken ||
         record.timestamps.createdAt !== identity.createdAt ||
-        record.state !== "open" ||
-        record.progress.phase !== "prepared"
+        record.state !== 'open' ||
+        record.progress.phase !== 'prepared'
       ) {
-        throw journalError(
-          "The initial promotion journal has invalid allocation identity.",
-        );
+        throw journalError('The initial promotion journal has invalid allocation identity.');
       }
       const content = encodeRuntimePromotionJournal(record);
       return capabilities.allocate(identity, record, content);
@@ -341,7 +311,7 @@ export function createRuntimePromotionJournalController(
     create: async (allocation) => {
       const metadata = capabilities.takeAllocation(allocation);
       const mutation = {
-        operation: "create",
+        operation: 'create',
         content: metadata.content,
       } as const;
       const receipt = await mutationCoordinator.mutateContent(
@@ -354,21 +324,12 @@ export function createRuntimePromotionJournalController(
     },
     claim: async (expectedOperationId) => {
       const current = await readCurrent();
-      if (
-        expectedOperationId !== undefined &&
-        current.record.operationId !== expectedOperationId
-      ) {
-        throw recoveryRequired(
-          "The promotion journal operation does not match recovery input.",
-        );
+      if (expectedOperationId !== undefined && current.record.operationId !== expectedOperationId) {
+        throw recoveryRequired('The promotion journal operation does not match recovery input.');
       }
-      return capabilities.issueReceipt(
-        current.record,
-        current.content,
-        current.sha256,
-      );
+      return capabilities.issueReceipt(current.record, current.content, current.sha256);
     },
-    verifyOpen: (receipt) => verifyReceipt(receipt, { state: "open" }),
+    verifyOpen: (receipt) => verifyReceipt(receipt, { state: 'open' }),
     verifyReceipt,
     replace,
     handoffRecoveryOwner: async (receipt, build) => {
@@ -382,128 +343,92 @@ export function createRuntimePromotionJournalController(
         desired.recoveryOwnerToken !== identity.recoveryOwnerToken ||
         desired.timestamps.updatedAt !== identity.claimedAt
       ) {
-        throw journalError(
-          "The recovery-owner handoff does not match its controller allocation.",
-        );
+        throw journalError('The recovery-owner handoff does not match its controller allocation.');
       }
-      assertNamedTransition(
-        current,
-        desired,
-        isRecoveryOwnerHandoff,
-        "recovery-owner handoff",
-      );
+      assertNamedTransition(current, desired, isRecoveryOwnerHandoff, 'recovery-owner handoff');
       return replace(receipt, desired);
     },
     recordIntent: (receipt, desired) =>
-      namedOpenTransition(receipt, desired, isIntentTransition, "intent"),
+      namedOpenTransition(receipt, desired, isIntentTransition, 'intent'),
     recordPostcondition: (receipt, desired) =>
-      namedOpenTransition(
-        receipt,
-        desired,
-        isPostconditionTransition,
-        "postcondition",
-      ),
+      namedOpenTransition(receipt, desired, isPostconditionTransition, 'postcondition'),
     beginRollback: (receipt, desired) =>
-      namedOpenTransition(receipt, desired, isRollbackTransition, "rollback"),
+      namedOpenTransition(receipt, desired, isRollbackTransition, 'rollback'),
     sealCommitted: (receipt, desired) =>
       namedOpenTransition(
         receipt,
         desired,
-        (_current, next) => isTerminalSeal(next, "committed"),
-        "committed seal",
+        (_current, next) => isTerminalSeal(next, 'committed'),
+        'committed seal',
       ),
     sealRolledBack: (receipt, desired) =>
       namedOpenTransition(
         receipt,
         desired,
-        (_current, next) => isTerminalSeal(next, "rolled-back"),
-        "rolled-back seal",
+        (_current, next) => isTerminalSeal(next, 'rolled-back'),
+        'rolled-back seal',
       ),
     close: async (receipt, desired) => {
-      const current = await verifyReceipt(receipt, { state: "open" });
+      const current = await verifyReceipt(receipt, { state: 'open' });
       assertNamedTransition(
         current,
         desired,
-        (_previous, next) => next.state === "closed",
-        "close",
+        (_previous, next) => next.state === 'closed',
+        'close',
       );
-      return asClosed(await replace(receipt, desired), (message) =>
-        journalError(message),
-      );
+      return asClosed(await replace(receipt, desired), (message) => journalError(message));
     },
     recordCleanupIntent: (receipt, desired) =>
-      namedClosedTransition(
-        receipt,
-        desired,
-        isIntentTransition,
-        "cleanup intent",
-      ),
+      namedClosedTransition(receipt, desired, isIntentTransition, 'cleanup intent'),
     recordCleanupPostcondition: (receipt, desired) =>
-      namedClosedTransition(
-        receipt,
-        desired,
-        isPostconditionTransition,
-        "cleanup postcondition",
-      ),
+      namedClosedTransition(receipt, desired, isPostconditionTransition, 'cleanup postcondition'),
     unlinkClosed: async (receipt) => {
       const metadata = metadataForReceipt(receipt);
-      const record = await verifyReceipt(receipt, { state: "closed" });
+      const record = await verifyReceipt(receipt, { state: 'closed' });
       if (!hasCompleteOwnedCleanup(record)) {
-        throw journalError(
-          "The closed promotion journal still has owned cleanup work.",
-        );
+        throw journalError('The closed promotion journal still has owned cleanup work.');
       }
       capabilities.retire(receipt);
       const mutation = {
-        operation: "unlink",
+        operation: 'unlink',
         expectedContentSha256: metadata.sha256,
       } as const;
       await mutationCoordinator.unlinkClosed(mutation, metadata.content);
     },
     authorizeRuntimeStage: async (receipt, stageBasename) => {
       const record = await verifyReceipt(receipt, {
-        state: "open",
-        ownedSlot: { name: "runtimeStage", basename: stageBasename },
+        state: 'open',
+        ownedSlot: { name: 'runtimeStage', basename: stageBasename },
       });
       if (!hasRuntimeStageIntent(record)) {
-        throw journalError(
-          "Runtime-stage materialization requires a durable creation intent.",
-        );
+        throw journalError('Runtime-stage materialization requires a durable creation intent.');
       }
-      return capabilities.issueRuntimeStageAuthority(
-        receipt,
-        record,
-        stageBasename,
-      );
+      return capabilities.issueRuntimeStageAuthority(receipt, record, stageBasename);
     },
     assertRuntimeStageAuthority: (authority, stageBasename) =>
       capabilities.consumeRuntimeStageAuthority(authority, stageBasename),
     assertBoundLease: (candidate) => {
       if (candidate !== lease) {
-        throw journalError(
-          "The promotion-journal controller is bound to another writer lease.",
-        );
+        throw journalError('The promotion-journal controller is bound to another writer lease.');
       }
     },
     authorizeAuthoredState: async (receipt, candidate) => {
       if (candidate !== lease) {
-        throw journalError(
-          "Authored-state materialization requires the controller-bound lease.",
-        );
+        throw journalError('Authored-state materialization requires the controller-bound lease.');
       }
-      const record = await verifyReceipt(receipt, { state: "open" });
+      const record = await verifyReceipt(receipt, { state: 'open' });
       const pending = record.progress.pendingIntent;
       if (
-        record.progress.direction !== "forward" ||
-        pending?.kind !== "authored-prepare" ||
-        pending.slot !== "authoredStage" ||
+        record.progress.direction !== 'forward' ||
+        pending?.kind !== 'authored-prepare' ||
+        pending.slot !== 'authoredStage' ||
         pending.cursor !== null ||
-        record.cleanup.authoredStage !== "unmaterialized" ||
-        record.cleanup.authoredBackup !== "unmaterialized" ||
-        record.cleanup.replayManifest !== "unmaterialized"
+        record.cleanup.authoredStage !== 'unmaterialized' ||
+        record.cleanup.authoredBackup !== 'unmaterialized' ||
+        record.cleanup.replayManifest !== 'unmaterialized'
       ) {
         throw journalError(
-          "Authored-state materialization requires its exact durable preparation intent.",
+          'Authored-state materialization requires its exact durable preparation intent.',
         );
       }
       return capabilities.issueAuthoredStateAuthority(receipt, record);

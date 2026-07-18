@@ -80,8 +80,8 @@ contributions while real pack code runs in the hidden
 `opensip-cli/fit/checks/no-host-external-capability-pack-execution.mjs`.
 
 **Related specs / ADRs:** Implements
-`docs/plans/completed/10-capability-resource-isolation.md` through the ready plan
-under `docs/plans/ready/capability-resource-isolation/`. Supersedes the
+a local implementation plan through the ready plan
+under local capability-resource-isolation planning notes. Supersedes the
 declaration-only resource posture of
 [ADR-0081](./ADR-0081-capability-pack-trust-and-resource-declarations.md) while
 building on the worker-fault boundary in [ADR-0054](./ADR-0054-tool-fault-isolation-boundary.md)

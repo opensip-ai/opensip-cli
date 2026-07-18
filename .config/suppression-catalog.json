@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-18T00:28:34.220Z",
+  "generatedAt": "2026-07-18T04:58:26.859Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -288,7 +288,7 @@
     },
     "tests": {
       "fitness": {
-        "total": 62,
+        "total": 63,
         "bySlug": {
           "module-coupling-fan-out": 1,
           "test-file-naming": 3,
@@ -321,7 +321,7 @@
           "second-id": 1,
           "my-rule": 1,
           "target-b": 1,
-          "no-foo": 3,
+          "no-foo": 4,
           "flag-todo": 1,
           "duplicate-utility-functions": 1
         },
@@ -331,7 +331,7 @@
           "core": 2,
           "dashboard": 1,
           "fitness/checks-universal": 26,
-          "fitness/engine": 27,
+          "fitness/engine": 28,
           "graph/engine": 2
         }
       },
@@ -469,7 +469,7 @@
     "productRuntimeCombined": 102,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
-    "testsFitness": 62,
+    "testsFitness": 63,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,

@@ -1,7 +1,7 @@
 /**
  * Rust walkProject — emit FunctionOccurrences + CallSiteRecords.
  *
- * Lands in PR 6 of plan docs/plans/10-graph-language-pluggability.md.
+ * Lands in PR 6 of plan local planning notes
  *
  * Identifies the callable shapes:
  *

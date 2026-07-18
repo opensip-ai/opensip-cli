@@ -78,5 +78,5 @@ hold. Existing checks continue to enforce the current interim posture; future
 unshelving work must add the mechanized checks required by its own ADR.
 
 **Related specs / ADRs:** This records the shelving outcome for local plan
-`docs/plans/ready/03-ecosystem-readiness/` and keeps ADR-0061 active.
+a local implementation plan and keeps ADR-0061 active.
 

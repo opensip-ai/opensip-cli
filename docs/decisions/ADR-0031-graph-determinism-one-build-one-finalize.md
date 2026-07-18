@@ -88,6 +88,6 @@ must be the accurate engine; speed (sharding) is an explicit, opt-in trade.
   output should not be treated as authoritative for gating production code.
 
 **Related specs / ADRs:** Implements the fix tracked in
-`docs/internal/graph-false-findings-incident-log.md`. Builds on ADR-0014
+a local working note. Builds on ADR-0014
 (the shared `@graph-ignore` suppression primitive) and ADR-0028 (the off-main-thread
 live-view worker, one of the producers now routed through the finalize seam).

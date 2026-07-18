@@ -23,7 +23,7 @@
  *     over the wire to an `otel-collector`, end-to-end resource-attribute
  *     propagation from a spawned subprocess (OTEL_RESOURCE_ATTRIBUTES +
  *     TRACEPARENT env), and the no-network-attempt guarantee in standalone mode.
- *     Those are documented in docs/plans/ready/telemetry-opt-in/phase-4-validation.md.
+ *     Those are documented in a local implementation plan
  */
 
 import { tmpdir } from 'node:os';

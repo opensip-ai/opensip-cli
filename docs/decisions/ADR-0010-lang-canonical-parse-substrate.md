@@ -114,4 +114,4 @@ absorb the refactor cost.
 (public-API surface discipline — the relocated primitives must land behind
 curated barrels / `internal` subpaths); parent-repo **DEC-521** (detection
 boundary — opensip-cli as the open, deterministic, polyglot signal foundry).
-A phased implementation spec should follow under `docs/plans/specs/`.
+A phased local-only implementation spec should follow before coding.

@@ -1,5 +1,5 @@
-import type { RuntimePromotionJournal } from "./runtime-promotion-journal-schema.js";
-import type { RuntimeExclusiveLease } from "@opensip-cli/core";
+import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
+import type { RuntimeExclusiveLease } from '@opensip-cli/core';
 
 declare const ALLOCATION_BRAND: unique symbol;
 declare const OPEN_RECEIPT_BRAND: unique symbol;
@@ -31,18 +31,17 @@ interface DurablePromotionJournalReceipt extends PromotionJournalIdentity {
 
 /** Exact-object proof that a matching open journal was durably observed. */
 export interface DurableOpenPromotionJournal extends DurablePromotionJournalReceipt {
-  readonly state: "open";
+  readonly state: 'open';
   readonly [OPEN_RECEIPT_BRAND]: never;
 }
 
 /** Exact-object proof that a matching closed journal was durably observed. */
 export interface DurableClosedPromotionJournal extends DurablePromotionJournalReceipt {
-  readonly state: "closed";
+  readonly state: 'closed';
   readonly [CLOSED_RECEIPT_BRAND]: never;
 }
 
-export type DurablePromotionJournal =
-  DurableOpenPromotionJournal | DurableClosedPromotionJournal;
+export type DurablePromotionJournal = DurableOpenPromotionJournal | DurableClosedPromotionJournal;
 
 /**
  * Path-neutral, exact-object authority for Task 3.2 stage materialization.
@@ -77,10 +76,10 @@ export interface AuthoredStateOwnedBasenames {
 }
 
 export interface PromotionJournalReceiptExpectation {
-  readonly state?: "open" | "closed";
-  readonly allowedPhases?: readonly RuntimePromotionJournal["progress"]["phase"][];
+  readonly state?: 'open' | 'closed';
+  readonly allowedPhases?: readonly RuntimePromotionJournal['progress']['phase'][];
   readonly ownedSlot?: {
-    readonly name: keyof RuntimePromotionJournal["owned"];
+    readonly name: keyof RuntimePromotionJournal['owned'];
     readonly basename: string;
   };
 }
@@ -99,15 +98,9 @@ export interface RuntimePromotionJournalController {
   readonly allocate: (
     build: (identity: PromotionJournalIdentity) => RuntimePromotionJournal,
   ) => PromotionJournalAllocation;
-  readonly create: (
-    allocation: PromotionJournalAllocation,
-  ) => Promise<DurableOpenPromotionJournal>;
-  readonly claim: (
-    expectedOperationId?: string,
-  ) => Promise<DurablePromotionJournal>;
-  readonly verifyOpen: (
-    receipt: DurableOpenPromotionJournal,
-  ) => Promise<RuntimePromotionJournal>;
+  readonly create: (allocation: PromotionJournalAllocation) => Promise<DurableOpenPromotionJournal>;
+  readonly claim: (expectedOperationId?: string) => Promise<DurablePromotionJournal>;
+  readonly verifyOpen: (receipt: DurableOpenPromotionJournal) => Promise<RuntimePromotionJournal>;
   readonly verifyReceipt: (
     receipt: DurablePromotionJournal,
     expectation?: PromotionJournalReceiptExpectation,
@@ -134,9 +127,7 @@ export interface RuntimePromotionJournalController {
   ) => Promise<DurableClosedPromotionJournal>;
   readonly recordCleanupIntent: ClosedJournalTransition;
   readonly recordCleanupPostcondition: ClosedJournalTransition;
-  readonly unlinkClosed: (
-    receipt: DurableClosedPromotionJournal,
-  ) => Promise<void>;
+  readonly unlinkClosed: (receipt: DurableClosedPromotionJournal) => Promise<void>;
   readonly authorizeRuntimeStage: (
     receipt: DurableOpenPromotionJournal,
     stageBasename: string,
@@ -157,26 +148,26 @@ export interface RuntimePromotionJournalController {
 }
 
 export interface AllocationMetadata {
-  readonly kind: "allocation";
+  readonly kind: 'allocation';
   readonly record: RuntimePromotionJournal;
   readonly content: string;
 }
 
 export interface ReceiptMetadata {
-  readonly kind: "receipt";
+  readonly kind: 'receipt';
   readonly record: RuntimePromotionJournal;
   readonly content: string;
   readonly sha256: string;
 }
 
 interface RuntimeStageAuthorityMetadata {
-  readonly kind: "runtime-stage-authority";
+  readonly kind: 'runtime-stage-authority';
   readonly receipt: DurableOpenPromotionJournal;
   readonly identity: RuntimeStageMaterializationIdentity;
 }
 
 interface AuthoredStateAuthorityMetadata {
-  readonly kind: "authored-state-authority";
+  readonly kind: 'authored-state-authority';
   readonly receipt: DurableOpenPromotionJournal;
   readonly basenames: AuthoredStateOwnedBasenames;
 }
@@ -208,17 +199,15 @@ export class PromotionJournalCapabilityRegistry {
     if (this.#currentAllocation !== undefined) {
       this.#capabilities.delete(this.#currentAllocation);
     }
-    this.#capabilities.set(allocation, { kind: "allocation", record, content });
+    this.#capabilities.set(allocation, { kind: 'allocation', record, content });
     this.#currentAllocation = allocation;
     return allocation;
   }
 
   takeAllocation(allocation: PromotionJournalAllocation): AllocationMetadata {
     const metadata = this.#capabilities.get(allocation);
-    if (metadata?.kind !== "allocation") {
-      throw this.#journalError(
-        "The promotion-journal allocation is stale or foreign.",
-      );
+    if (metadata?.kind !== 'allocation') {
+      throw this.#journalError('The promotion-journal allocation is stale or foreign.');
     }
     this.#capabilities.delete(allocation);
     if (this.#currentAllocation === allocation) {
@@ -245,7 +234,7 @@ export class PromotionJournalCapabilityRegistry {
       state: record.state,
     }) as DurablePromotionJournal;
     this.#capabilities.set(receipt, {
-      kind: "receipt",
+      kind: 'receipt',
       record,
       content,
       sha256,
@@ -256,10 +245,8 @@ export class PromotionJournalCapabilityRegistry {
 
   receipt(receipt: DurablePromotionJournal): ReceiptMetadata {
     const metadata = this.#capabilities.get(receipt);
-    if (metadata?.kind !== "receipt") {
-      throw this.#journalError(
-        "The promotion-journal receipt is stale or foreign.",
-      );
+    if (metadata?.kind !== 'receipt') {
+      throw this.#journalError('The promotion-journal receipt is stale or foreign.');
     }
     if (
       receipt.operationId !== metadata.record.operationId ||
@@ -269,9 +256,7 @@ export class PromotionJournalCapabilityRegistry {
       receipt.state !== metadata.record.state ||
       receipt.sha256 !== metadata.sha256
     ) {
-      throw this.#journalError(
-        "The promotion-journal receipt projection was altered.",
-      );
+      throw this.#journalError('The promotion-journal receipt projection was altered.');
     }
     return metadata;
   }
@@ -301,7 +286,7 @@ export class PromotionJournalCapabilityRegistry {
       ownershipId: identity.ownershipId,
     }) as RuntimeStageMaterializationAuthority;
     this.#capabilities.set(authority, {
-      kind: "runtime-stage-authority",
+      kind: 'runtime-stage-authority',
       receipt,
       identity,
     });
@@ -314,18 +299,16 @@ export class PromotionJournalCapabilityRegistry {
   ): RuntimeStageMaterializationIdentity {
     const metadata = this.#capabilities.get(authority);
     if (
-      metadata?.kind !== "runtime-stage-authority" ||
+      metadata?.kind !== 'runtime-stage-authority' ||
       metadata.identity.stageBasename !== stageBasename ||
       authority.coordinationKey !== metadata.receipt.coordinationKey ||
       authority.operationId !== metadata.identity.operationId ||
       authority.revision !== metadata.receipt.revision ||
       authority.stageBasename !== metadata.identity.stageBasename ||
       authority.ownershipId !== metadata.identity.ownershipId ||
-      this.#capabilities.get(metadata.receipt)?.kind !== "receipt"
+      this.#capabilities.get(metadata.receipt)?.kind !== 'receipt'
     ) {
-      throw this.#journalError(
-        "The runtime-stage authority is stale or foreign.",
-      );
+      throw this.#journalError('The runtime-stage authority is stale or foreign.');
     }
     this.#capabilities.delete(authority);
     return metadata.identity;
@@ -341,7 +324,7 @@ export class PromotionJournalCapabilityRegistry {
       revision: record.revision,
     }) as AuthoredStateMaterializationAuthority;
     this.#capabilities.set(authority, {
-      kind: "authored-state-authority",
+      kind: 'authored-state-authority',
       receipt,
       basenames: {
         authoredStage: record.owned.authoredStage.basename,
@@ -358,15 +341,13 @@ export class PromotionJournalCapabilityRegistry {
   ): void {
     const metadata = this.#capabilities.get(authority);
     if (
-      metadata?.kind !== "authored-state-authority" ||
+      metadata?.kind !== 'authored-state-authority' ||
       metadata.basenames.authoredStage !== basenames.authoredStage ||
       metadata.basenames.authoredBackup !== basenames.authoredBackup ||
       metadata.basenames.replayManifest !== basenames.replayManifest ||
-      this.#capabilities.get(metadata.receipt)?.kind !== "receipt"
+      this.#capabilities.get(metadata.receipt)?.kind !== 'receipt'
     ) {
-      throw this.#journalError(
-        "The authored-state authority is stale or foreign.",
-      );
+      throw this.#journalError('The authored-state authority is stale or foreign.');
     }
     this.#capabilities.delete(authority);
   }
@@ -374,31 +355,27 @@ export class PromotionJournalCapabilityRegistry {
 
 export function ownedBasename(
   record: RuntimePromotionJournal,
-  slot: keyof RuntimePromotionJournal["owned"],
+  slot: keyof RuntimePromotionJournal['owned'],
 ): string {
   return record.owned[slot].basename;
 }
 
-export function hasRuntimeStageIntent(
-  record: RuntimePromotionJournal,
-): boolean {
+export function hasRuntimeStageIntent(record: RuntimePromotionJournal): boolean {
   const pending = record.progress.pendingIntent;
   return (
-    record.state === "open" &&
-    record.progress.direction === "forward" &&
-    pending?.kind === "runtime-stage-create" &&
-    pending.slot === "runtimeStage"
+    record.state === 'open' &&
+    record.progress.direction === 'forward' &&
+    pending?.kind === 'runtime-stage-create' &&
+    pending.slot === 'runtimeStage'
   );
 }
 
 /** Pending slots remain visible recovery work and keep the receipt. */
-export function hasCompleteOwnedCleanup(
-  record: RuntimePromotionJournal,
-): boolean {
+export function hasCompleteOwnedCleanup(record: RuntimePromotionJournal): boolean {
   return (
     record.progress.pendingIntent === null &&
     Object.values(record.cleanup).every(
-      (state) => state === "unmaterialized" || state === "removed",
+      (state) => state === 'unmaterialized' || state === 'removed',
     )
   );
 }
@@ -409,22 +386,19 @@ export function assertExpectation(
   journalError: JournalErrorFactory,
 ): void {
   if (expectation?.state !== undefined && record.state !== expectation.state) {
-    throw journalError("The promotion journal is not in the required state.");
+    throw journalError('The promotion journal is not in the required state.');
   }
   if (
     expectation?.allowedPhases !== undefined &&
     !expectation.allowedPhases.includes(record.progress.phase)
   ) {
-    throw journalError("The promotion journal is not in an allowed phase.");
+    throw journalError('The promotion journal is not in an allowed phase.');
   }
   if (
     expectation?.ownedSlot !== undefined &&
-    ownedBasename(record, expectation.ownedSlot.name) !==
-      expectation.ownedSlot.basename
+    ownedBasename(record, expectation.ownedSlot.name) !== expectation.ownedSlot.basename
   ) {
-    throw journalError(
-      "The promotion journal does not own the requested artifact.",
-    );
+    throw journalError('The promotion journal does not own the requested artifact.');
   }
 }
 
@@ -432,10 +406,8 @@ export function asOpen(
   receipt: DurablePromotionJournal,
   journalError: JournalErrorFactory,
 ): DurableOpenPromotionJournal {
-  if (receipt.state !== "open") {
-    throw journalError(
-      "The transition did not leave an open promotion journal.",
-    );
+  if (receipt.state !== 'open') {
+    throw journalError('The transition did not leave an open promotion journal.');
   }
   return receipt;
 }
@@ -444,8 +416,8 @@ export function asClosed(
   receipt: DurablePromotionJournal,
   journalError: JournalErrorFactory,
 ): DurableClosedPromotionJournal {
-  if (receipt.state !== "closed") {
-    throw journalError("The transition did not close the promotion journal.");
+  if (receipt.state !== 'closed') {
+    throw journalError('The transition did not close the promotion journal.');
   }
   return receipt;
 }
@@ -454,10 +426,7 @@ export function isIntentTransition(
   current: RuntimePromotionJournal,
   desired: RuntimePromotionJournal,
 ): boolean {
-  return (
-    current.progress.pendingIntent === null &&
-    desired.progress.pendingIntent !== null
-  );
+  return current.progress.pendingIntent === null && desired.progress.pendingIntent !== null;
 }
 
 export function isPostconditionTransition(
@@ -475,10 +444,7 @@ export function isRollbackTransition(
   current: RuntimePromotionJournal,
   desired: RuntimePromotionJournal,
 ): boolean {
-  return (
-    current.progress.direction === "forward" &&
-    desired.progress.direction === "rollback"
-  );
+  return current.progress.direction === 'forward' && desired.progress.direction === 'rollback';
 }
 
 export function isRecoveryOwnerHandoff(

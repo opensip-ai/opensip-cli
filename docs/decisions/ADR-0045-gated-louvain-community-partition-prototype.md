@@ -235,8 +235,8 @@ already exists) without graphology, the partition-time import scan, or the
 warm-path overhead.
 
 **Related specs / ADRs:** Implements
-`docs/plans/specs/louvain-community-shard-partitioning.md` (local), from
-`docs/plans/backlog/louvain-community-shard-partitioning/plan.md` (local).
+a local implementation spec (local), from
+a local backlog note (local).
 Builds on ADR-0031 (graph determinism — one build, one finalize; cold==warm
 obligations the partitioner must honor), ADR-0033 (one shared resolution hop +
 the zero-divergence directional guardrail this prototype rides as its

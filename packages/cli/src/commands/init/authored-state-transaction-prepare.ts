@@ -1,35 +1,32 @@
-import { lstatSync } from "node:fs";
+import { lstatSync } from 'node:fs';
 
 import {
   publishAuthoredReplayManifest,
   settleAuthoredReplayPublication,
-} from "./authored-state-replay-publication.js";
-import { resetIncompleteAuthoredArtifacts } from "./authored-state-transaction-artifact-recovery.js";
+} from './authored-state-replay-publication.js';
+import { resetIncompleteAuthoredArtifacts } from './authored-state-transaction-artifact-recovery.js';
 import {
   authoredArtifactPaths,
   loadAuthoredReplayManifest,
   validateAuthoredArtifacts,
-} from "./authored-state-transaction-artifacts.js";
+} from './authored-state-transaction-artifacts.js';
 import {
   authoredBlobAvailability,
   authoredExecutionOrder,
   executionIndex,
-} from "./authored-state-transaction-execution.js";
+} from './authored-state-transaction-execution.js';
 import {
   authoredTransactionFailure,
   openStableAuthoredRoot,
-} from "./authored-state-transaction-fs.js";
-import {
-  recordOpenIntent,
-  recordOpenPostcondition,
-} from "./authored-state-transaction-journal.js";
-import { materializeAuthoredBlobRoots } from "./authored-state-transaction-materialization.js";
+} from './authored-state-transaction-fs.js';
+import { recordOpenIntent, recordOpenPostcondition } from './authored-state-transaction-journal.js';
+import { materializeAuthoredBlobRoots } from './authored-state-transaction-materialization.js';
 import {
   authoredDependencies,
   issueTransaction,
   stateFor,
   summaryFor,
-} from "./authored-state-transaction-registry.js";
+} from './authored-state-transaction-registry.js';
 
 import type {
   AuthoredTransactionState,
@@ -38,44 +35,35 @@ import type {
   LoadClosedAuthoredStateInput,
   PrepareAuthoredStateInput,
   PreparedAuthoredState,
-} from "./authored-state-transaction-types.js";
-import type { InitAuthoredPlan } from "./init-authored-plan.js";
-import type { RuntimePromotionJournal } from "./runtime-promotion-journal-schema.js";
+} from './authored-state-transaction-types.js';
+import type { InitAuthoredPlan } from './init-authored-plan.js';
+import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
 import type {
   DurableClosedPromotionJournal,
   DurableOpenPromotionJournal,
-} from "./runtime-promotion-journal.js";
+} from './runtime-promotion-journal.js';
 
-function assertPlanMatchesJournal(
-  plan: InitAuthoredPlan,
-  journal: RuntimePromotionJournal,
-): void {
+function assertPlanMatchesJournal(plan: InitAuthoredPlan, journal: RuntimePromotionJournal): void {
   if (
     plan.digest !== journal.plan.authoredDigest ||
     plan.replayManifestDigest !== journal.plan.replayDigest ||
     plan.mutations.length !== journal.plan.mutationCount ||
     plan.replayManifestBytes !== JSON.stringify(plan.replayManifest)
   ) {
-    authoredTransactionFailure(
-      "the in-memory authored plan does not match the durable journal",
-    );
+    authoredTransactionFailure('the in-memory authored plan does not match the durable journal');
   }
 }
 
-function artifactPresence(
-  paths: AuthoredTransactionState["paths"],
-): readonly boolean[] {
-  return [paths.stageRoot, paths.backupRoot, paths.replayManifest].map(
-    (path) => {
-      try {
-        lstatSync(path);
-        return true;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-        throw error;
-      }
-    },
-  );
+function artifactPresence(paths: AuthoredTransactionState['paths']): readonly boolean[] {
+  return [paths.stageRoot, paths.backupRoot, paths.replayManifest].map((path) => {
+    try {
+      lstatSync(path);
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw error;
+    }
+  });
 }
 
 function buildState(
@@ -88,15 +76,15 @@ function buildState(
   settleAuthoredReplayPublication(root, journal, paths);
   const presence = artifactPresence(paths);
   const replayCleanupPending =
-    journal.state === "closed" &&
-    journal.progress.pendingIntent?.kind === "owned-slot-cleanup" &&
-    journal.progress.pendingIntent.slot === "replayManifest";
+    journal.state === 'closed' &&
+    journal.progress.pendingIntent?.kind === 'owned-slot-cleanup' &&
+    journal.progress.pendingIntent.slot === 'replayManifest';
   const cleanupOnlyWithoutReplay =
-    journal.state === "closed" &&
+    journal.state === 'closed' &&
     !presence[2] &&
-    journal.cleanup.authoredStage === "removed" &&
-    journal.cleanup.authoredBackup === "removed" &&
-    (journal.cleanup.replayManifest === "removed" || replayCleanupPending);
+    journal.cleanup.authoredStage === 'removed' &&
+    journal.cleanup.authoredBackup === 'removed' &&
+    (journal.cleanup.replayManifest === 'removed' || replayCleanupPending);
   if (cleanupOnlyWithoutReplay) {
     return {
       projectRoot: root.path,
@@ -167,22 +155,17 @@ async function finishPrepare(
   const receipt = state.receipt as DurableOpenPromotionJournal;
   const current = await state.controller.verifyOpen(receipt);
   const root = openStableAuthoredRoot(state.projectRoot);
-  const authority = await state.controller.authorizeAuthoredState(
-    receipt,
-    state.lease,
-  );
+  const authority = await state.controller.authorizeAuthoredState(receipt, state.lease);
   state.controller.assertAuthoredStateAuthority(authority, {
     authoredStage: current.owned.authoredStage.basename,
     authoredBackup: current.owned.authoredBackup.basename,
     replayManifest: current.owned.replayManifest.basename,
   });
-  state.dependencies.checkpoint("before-manifest-materialization");
+  state.dependencies.checkpoint('before-manifest-materialization');
   const manifest = state.manifest;
   const manifestBytes = state.manifestBytes;
   if (manifest === null || manifestBytes === null) {
-    authoredTransactionFailure(
-      "fresh preparation requires its exact replay manifest",
-    );
+    authoredTransactionFailure('fresh preparation requires its exact replay manifest');
   }
   const replayOutcome = publishAuthoredReplayManifest(
     root,
@@ -190,78 +173,41 @@ async function finishPrepare(
     state.paths,
     plan.replayManifestBytes,
   );
-  state.dependencies.checkpoint("after-replay-materialization");
-  let outcome: "applied" | "already-satisfied";
+  state.dependencies.checkpoint('after-replay-materialization');
+  let outcome: 'applied' | 'already-satisfied';
   const [stagePresent, backupPresent] = artifactPresence(state.paths);
   if (stagePresent || backupPresent) {
     try {
-      validateAuthoredArtifacts(
-        root,
-        current,
-        manifest,
-        manifestBytes,
-        state.paths,
-        {
-          desiredConsumed: new Set(),
-          preimageConsumed: new Set(),
-        },
-      );
+      validateAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths, {
+        desiredConsumed: new Set(),
+        preimageConsumed: new Set(),
+      });
       outcome = replayOutcome;
     } catch {
-      resetIncompleteAuthoredArtifacts(
-        root,
-        current,
-        manifest,
-        manifestBytes,
-        state.paths,
-      );
-      publishAuthoredReplayManifest(
-        root,
-        current,
-        state.paths,
-        plan.replayManifestBytes,
-      );
-      state.dependencies.checkpoint("after-replay-materialization");
-      materializeAuthoredBlobRoots(
-        root,
-        current,
-        plan,
-        state.paths,
-        state.dependencies.checkpoint,
-      );
-      outcome = "applied";
+      resetIncompleteAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths);
+      publishAuthoredReplayManifest(root, current, state.paths, plan.replayManifestBytes);
+      state.dependencies.checkpoint('after-replay-materialization');
+      materializeAuthoredBlobRoots(root, current, plan, state.paths, state.dependencies.checkpoint);
+      outcome = 'applied';
     }
   } else {
-    materializeAuthoredBlobRoots(
-      root,
-      current,
-      plan,
-      state.paths,
-      state.dependencies.checkpoint,
-    );
-    outcome = "applied";
+    materializeAuthoredBlobRoots(root, current, plan, state.paths, state.dependencies.checkpoint);
+    outcome = 'applied';
   }
-  validateAuthoredArtifacts(
-    root,
-    current,
-    manifest,
-    manifestBytes,
-    state.paths,
-    {
-      desiredConsumed: new Set(),
-      preimageConsumed: new Set(),
-    },
-  );
-  state.dependencies.checkpoint("after-manifest-materialization");
-  state.dependencies.checkpoint("before-prepare-postcondition");
+  validateAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths, {
+    desiredConsumed: new Set(),
+    preimageConsumed: new Set(),
+  });
+  state.dependencies.checkpoint('after-manifest-materialization');
+  state.dependencies.checkpoint('before-prepare-postcondition');
   const next = await recordOpenPostcondition(
     state.controller,
     receipt,
-    { phase: "authored-prepared", outcome, prepareArtifacts: true },
+    { phase: 'authored-prepared', outcome, prepareArtifacts: true },
     state.dependencies.now,
   );
   state.receipt = next;
-  state.dependencies.checkpoint("after-prepare-postcondition");
+  state.dependencies.checkpoint('after-prepare-postcondition');
   return next;
 }
 
@@ -271,10 +217,7 @@ export async function prepareAuthoredState(
   input.controller.assertBoundLease(input.lease);
   let journal = await input.controller.verifyOpen(input.receipt);
   assertPlanMatchesJournal(input.plan, journal);
-  if (
-    journal.progress.pendingIntent === null &&
-    journal.progress.phase === "authored-prepared"
-  ) {
+  if (journal.progress.pendingIntent === null && journal.progress.phase === 'authored-prepared') {
     const state = buildState(input, input.receipt, journal);
     return {
       transaction: issueTransaction(state),
@@ -285,27 +228,25 @@ export async function prepareAuthoredState(
   let receipt = input.receipt;
   if (journal.progress.pendingIntent === null) {
     if (
-      journal.progress.direction !== "forward" ||
-      !["prepared", "destination-verified"].includes(journal.progress.phase)
+      journal.progress.direction !== 'forward' ||
+      !['prepared', 'destination-verified'].includes(journal.progress.phase)
     ) {
-      authoredTransactionFailure(
-        "the journal is not ready for authored preparation",
-      );
+      authoredTransactionFailure('the journal is not ready for authored preparation');
     }
     const localDependencies = authoredDependencies(input.dependencies);
-    localDependencies.checkpoint("before-prepare-intent");
+    localDependencies.checkpoint('before-prepare-intent');
     receipt = await recordOpenIntent(
       input.controller,
       receipt,
-      "authored-prepare",
-      "authoredStage",
+      'authored-prepare',
+      'authoredStage',
       null,
       localDependencies.now,
     );
-    localDependencies.checkpoint("after-prepare-intent");
+    localDependencies.checkpoint('after-prepare-intent');
     journal = await input.controller.verifyOpen(receipt);
-  } else if (journal.progress.pendingIntent.kind !== "authored-prepare") {
-    authoredTransactionFailure("another promotion intent is unresolved");
+  } else if (journal.progress.pendingIntent.kind !== 'authored-prepare') {
+    authoredTransactionFailure('another promotion intent is unresolved');
   }
   const state = freshState(input, receipt, journal);
   receipt = await finishPrepare(state, input.plan);
@@ -323,12 +264,10 @@ export async function loadAuthoredState(
   input.controller.assertBoundLease(input.lease);
   const journal = await input.controller.verifyOpen(input.receipt);
   if (
-    journal.progress.pendingIntent?.kind === "authored-prepare" ||
-    journal.cleanup.replayManifest !== "pending"
+    journal.progress.pendingIntent?.kind === 'authored-prepare' ||
+    journal.cleanup.replayManifest !== 'pending'
   ) {
-    authoredTransactionFailure(
-      "the authored replay state is not durably prepared",
-    );
+    authoredTransactionFailure('the authored replay state is not durably prepared');
   }
   const state = buildState(input, input.receipt, journal);
   return {
@@ -343,7 +282,7 @@ export async function loadClosedAuthoredState(
 ): Promise<InitAuthoredTransaction> {
   input.controller.assertBoundLease(input.lease);
   const journal = await input.controller.verifyReceipt(input.receipt, {
-    state: "closed",
+    state: 'closed',
   });
   return issueTransaction(buildState(input, input.receipt, journal));
 }
@@ -356,9 +295,7 @@ export async function bindAuthoredStateReceipt(
   state.controller.assertBoundLease(state.lease);
   const journal = await state.controller.verifyOpen(receipt);
   if (journal.operationId !== transaction.operationId) {
-    authoredTransactionFailure(
-      "the replacement receipt belongs to another operation",
-    );
+    authoredTransactionFailure('the replacement receipt belongs to another operation');
   }
   state.receipt = receipt;
 }

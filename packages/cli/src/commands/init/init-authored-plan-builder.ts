@@ -1,12 +1,12 @@
-import { renderAgentGuidanceTargets } from "./agent-guidance.js";
-import { generateConfigFromRenderedScaffolds } from "./config-templates.js";
-import { encodeAuthoredReplayManifest } from "./init-authored-plan-manifest.js";
+import { renderAgentGuidanceTargets } from './agent-guidance.js';
+import { generateConfigFromRenderedScaffolds } from './config-templates.js';
+import { encodeAuthoredReplayManifest } from './init-authored-plan-manifest.js';
 import {
   buildGuidanceSnapshots,
   decodeSnapshotUtf8,
   validateAuthoredSnapshot,
-} from "./init-authored-plan-snapshot-validation.js";
-import { collectToolDesiredEntries } from "./init-authored-plan-targets.js";
+} from './init-authored-plan-snapshot-validation.js';
+import { collectToolDesiredEntries } from './init-authored-plan-targets.js';
 import {
   AUTHORED_REPLAY_MANIFEST_KIND,
   AUTHORED_REPLAY_MANIFEST_VERSION,
@@ -19,10 +19,10 @@ import {
   normalizeToolIdentities,
   sha256Bytes,
   stateFromSnapshot,
-} from "./init-authored-plan-types.js";
-import { renderGitignore } from "./scaffold-writer.js";
+} from './init-authored-plan-types.js';
+import { renderGitignore } from './scaffold-writer.js';
 
-import type { InitAuthoredDesiredTarget } from "./init-authored-plan-targets.js";
+import type { InitAuthoredDesiredTarget } from './init-authored-plan-targets.js';
 import type {
   AuthoredReplayManifest,
   BuildInitAuthoredPlanInput,
@@ -31,9 +31,9 @@ import type {
   InitAuthoredPathState,
   InitAuthoredPlan,
   InitAuthoredSnapshotRecord,
-} from "./init-authored-plan-types.js";
+} from './init-authored-plan-types.js';
 
-export { collectInitAuthoredTargetPaths } from "./init-authored-plan-targets.js";
+export { collectInitAuthoredTargetPaths } from './init-authored-plan-targets.js';
 
 interface DesiredEntry {
   readonly state: InitAuthoredPathState;
@@ -44,13 +44,13 @@ const FILE_MODE = 0o644;
 const DIRECTORY_MODE = 0o755;
 
 function generatedFile(content: string, mode: number): DesiredEntry {
-  const bytes = Buffer.from(content, "utf8");
+  const bytes = Buffer.from(content, 'utf8');
   if (bytes.length > INIT_AUTHORED_PLAN_CAPS.maxFileBytes) {
-    authoredPlanFailure("generated authored file exceeds the file cap");
+    authoredPlanFailure('generated authored file exceeds the file cap');
   }
   return {
-    state: { exists: true, type: "file", mode, digest: sha256Bytes(bytes) },
-    contentBase64: bytes.toString("base64"),
+    state: { exists: true, type: 'file', mode, digest: sha256Bytes(bytes) },
+    contentBase64: bytes.toString('base64'),
   };
 }
 
@@ -58,7 +58,7 @@ function generatedDirectory(mode: number): DesiredEntry {
   return {
     state: {
       exists: true,
-      type: "directory",
+      type: 'directory',
       mode,
       digest: directoryDigest(mode),
     },
@@ -66,10 +66,7 @@ function generatedDirectory(mode: number): DesiredEntry {
   };
 }
 
-function sameState(
-  left: InitAuthoredPathState,
-  right: InitAuthoredPathState,
-): boolean {
+function sameState(left: InitAuthoredPathState, right: InitAuthoredPathState): boolean {
   return (
     left.exists === right.exists &&
     left.type === right.type &&
@@ -82,9 +79,9 @@ function mutationAction(
   preimage: InitAuthoredPathState,
   desired: InitAuthoredPathState,
 ): InitAuthoredMutationAction {
-  if (!preimage.exists) return "create";
-  if (!desired.exists) return "delete";
-  return sameState(preimage, desired) ? "preserve" : "replace";
+  if (!preimage.exists) return 'create';
+  if (!desired.exists) return 'delete';
+  return sameState(preimage, desired) ? 'preserve' : 'replace';
 }
 
 function snapshotDesired(record: InitAuthoredSnapshotRecord): DesiredEntry {
@@ -98,36 +95,34 @@ function renderedToolDesired(
   path: string,
   preimage: InitAuthoredSnapshotRecord,
   entry: InitAuthoredDesiredTarget,
-  mode: BuildInitAuthoredPlanInput["mode"],
+  mode: BuildInitAuthoredPlanInput['mode'],
 ): DesiredEntry {
-  if (mode === "keep" && preimage.exists) {
+  if (mode === 'keep' && preimage.exists) {
     if (preimage.type !== entry.type) {
       authoredPlanFailure(`${path} has a conflicting target type`);
     }
     return snapshotDesired(preimage);
   }
-  if (preimage.exists && preimage.type !== entry.type && mode !== "remove") {
+  if (preimage.exists && preimage.type !== entry.type && mode !== 'remove') {
     authoredPlanFailure(`${path} has a conflicting target type`);
   }
-  if (entry.type === "directory") {
+  if (entry.type === 'directory') {
     const modeBits =
-      preimage.exists && preimage.type === "directory" && mode !== "remove"
+      preimage.exists && preimage.type === 'directory' && mode !== 'remove'
         ? preimage.mode
         : DIRECTORY_MODE;
     return generatedDirectory(modeBits);
   }
   const modeBits =
-    preimage.exists && preimage.type === "file" && mode !== "remove"
-      ? preimage.mode
-      : FILE_MODE;
-  return generatedFile(entry.content ?? "", modeBits);
+    preimage.exists && preimage.type === 'file' && mode !== 'remove' ? preimage.mode : FILE_MODE;
+  return generatedFile(entry.content ?? '', modeBits);
 }
 
 function setToolDesired(
   desired: Map<string, DesiredEntry>,
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
   entries: ReadonlyMap<string, InitAuthoredDesiredTarget>,
-  mode: BuildInitAuthoredPlanInput["mode"],
+  mode: BuildInitAuthoredPlanInput['mode'],
 ): void {
   for (const [path, entry] of entries) {
     const preimage = preimages.get(path);
@@ -144,13 +139,8 @@ function buildDesiredEntries(
 ): Map<string, DesiredEntry> {
   const desired = new Map<string, DesiredEntry>();
   seedExistingAuthored(desired, preimages, input.mode);
-  if (input.mode !== "refresh") {
-    setToolDesired(
-      desired,
-      preimages,
-      collectToolDesiredEntries(input.toolScaffolds),
-      input.mode,
-    );
+  if (input.mode !== 'refresh') {
+    setToolDesired(desired, preimages, collectToolDesiredEntries(input.toolScaffolds), input.mode);
   }
   setConfigDesired(desired, preimages, input);
   setGitignoreDesired(desired, preimages);
@@ -161,12 +151,11 @@ function buildDesiredEntries(
 function seedExistingAuthored(
   desired: Map<string, DesiredEntry>,
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
-  mode: BuildInitAuthoredPlanInput["mode"],
+  mode: BuildInitAuthoredPlanInput['mode'],
 ): void {
   for (const [path, record] of preimages) {
-    const isAuthored =
-      path === "opensip-cli" || path.startsWith("opensip-cli/");
-    if (isAuthored && (mode !== "remove" || path === "opensip-cli")) {
+    const isAuthored = path === 'opensip-cli' || path.startsWith('opensip-cli/');
+    if (isAuthored && (mode !== 'remove' || path === 'opensip-cli')) {
       desired.set(path, snapshotDesired(record));
     }
   }
@@ -177,30 +166,27 @@ function setConfigDesired(
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
   input: BuildInitAuthoredPlanInput,
 ): void {
-  const config = preimages.get("opensip-cli.config.yml");
+  const config = preimages.get('opensip-cli.config.yml');
   if (config === undefined) {
-    authoredPlanFailure("snapshot is missing opensip-cli.config.yml");
+    authoredPlanFailure('snapshot is missing opensip-cli.config.yml');
   }
   if (
-    input.mode === "fresh" ||
-    input.mode === "remove" ||
-    (input.mode === "keep" && !config.exists)
+    input.mode === 'fresh' ||
+    input.mode === 'remove' ||
+    (input.mode === 'keep' && !config.exists)
   ) {
-    if (config.exists && config.type !== "file") {
-      authoredPlanFailure("opensip-cli.config.yml must be a file");
+    if (config.exists && config.type !== 'file') {
+      authoredPlanFailure('opensip-cli.config.yml must be a file');
     }
     desired.set(
-      "opensip-cli.config.yml",
+      'opensip-cli.config.yml',
       generatedFile(
-        generateConfigFromRenderedScaffolds(
-          input.languages,
-          input.toolScaffolds,
-        ),
+        generateConfigFromRenderedScaffolds(input.languages, input.toolScaffolds),
         config.exists ? config.mode : FILE_MODE,
       ),
     );
   } else if (config.exists) {
-    desired.set("opensip-cli.config.yml", snapshotDesired(config));
+    desired.set('opensip-cli.config.yml', snapshotDesired(config));
   }
 }
 
@@ -208,22 +194,19 @@ function setGitignoreDesired(
   desired: Map<string, DesiredEntry>,
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
 ): void {
-  const gitignore = preimages.get(".gitignore");
+  const gitignore = preimages.get('.gitignore');
   if (gitignore === undefined) {
-    authoredPlanFailure("snapshot is missing .gitignore");
+    authoredPlanFailure('snapshot is missing .gitignore');
   }
-  if (gitignore.exists && gitignore.type !== "file") {
-    authoredPlanFailure(".gitignore must be a file");
+  if (gitignore.exists && gitignore.type !== 'file') {
+    authoredPlanFailure('.gitignore must be a file');
   }
   const renderedGitignore = renderGitignore(
-    gitignore.exists ? decodeSnapshotUtf8(gitignore, ".gitignore") : undefined,
+    gitignore.exists ? decodeSnapshotUtf8(gitignore, '.gitignore') : undefined,
   );
   desired.set(
-    ".gitignore",
-    generatedFile(
-      renderedGitignore.content,
-      gitignore.exists ? gitignore.mode : FILE_MODE,
-    ),
+    '.gitignore',
+    generatedFile(renderedGitignore.content, gitignore.exists ? gitignore.mode : FILE_MODE),
   );
 }
 
@@ -232,12 +215,9 @@ function setGuidanceDesired(
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
   input: BuildInitAuthoredPlanInput,
 ): void {
-  const renderedGuidance = renderAgentGuidanceTargets(
-    buildGuidanceSnapshots(preimages),
-    {
-      toolScaffolds: input.toolScaffolds,
-    },
-  );
+  const renderedGuidance = renderAgentGuidanceTargets(buildGuidanceSnapshots(preimages), {
+    toolScaffolds: input.toolScaffolds,
+  });
   for (const target of renderedGuidance.targets) {
     if (target.content === undefined) continue;
     const preimage = preimages.get(target.relativePath);
@@ -246,10 +226,7 @@ function setGuidanceDesired(
     }
     desired.set(
       target.relativePath,
-      generatedFile(
-        target.content,
-        preimage.exists ? preimage.mode : FILE_MODE,
-      ),
+      generatedFile(target.content, preimage.exists ? preimage.mode : FILE_MODE),
     );
   }
 }
@@ -262,24 +239,19 @@ function freezeMutation(mutation: InitAuthoredMutation): InitAuthoredMutation {
   });
 }
 
-export function buildInitAuthoredPlan(
-  input: BuildInitAuthoredPlanInput,
-): InitAuthoredPlan {
+export function buildInitAuthoredPlan(input: BuildInitAuthoredPlanInput): InitAuthoredPlan {
   const languages = normalizeLanguages(input.languages);
   const tools = normalizeToolIdentities(input.toolScaffolds);
   const preimages = validateAuthoredSnapshot(input.snapshot.records);
   const desired = buildDesiredEntries({ ...input, languages }, preimages);
   const paths = new Set<string>(desired.keys());
   for (const path of preimages.keys()) {
-    if (path === "opensip-cli" || path.startsWith("opensip-cli/"))
-      paths.add(path);
+    if (path === 'opensip-cli' || path.startsWith('opensip-cli/')) paths.add(path);
   }
 
   const orderedPaths = [...paths].sort(compareUtf8);
   if (orderedPaths.length > INIT_AUTHORED_PLAN_CAPS.maxMutations) {
-    authoredPlanFailure(
-      `mutation count exceeds ${String(INIT_AUTHORED_PLAN_CAPS.maxMutations)}`,
-    );
+    authoredPlanFailure(`mutation count exceeds ${String(INIT_AUTHORED_PLAN_CAPS.maxMutations)}`);
   }
   const desiredBlobs: Record<string, string> = {};
   const preimageBlobs: Record<string, string> = {};
@@ -288,49 +260,34 @@ export function buildInitAuthoredPlan(
     const preimageRecord = preimages.get(path);
     const desiredEntry = desired.get(path);
     const preimage =
-      preimageRecord === undefined
-        ? absentPathState()
-        : stateFromSnapshot(preimageRecord);
+      preimageRecord === undefined ? absentPathState() : stateFromSnapshot(preimageRecord);
     const desiredState = desiredEntry?.state ?? absentPathState();
-    if (!preimage.exists && !desiredState.exists)
-      authoredPlanFailure(`${path} has no plan effect`);
+    if (!preimage.exists && !desiredState.exists) authoredPlanFailure(`${path} has no plan effect`);
     const target = desiredState.exists ? desiredState : preimage;
     if (!target.exists || target.type === null || target.mode === null) {
       authoredPlanFailure(`${path} has no target identity`);
     }
     const desiredBlob =
-      desiredState.exists && desiredState.type === "file"
-        ? `desired/${String(sequence).padStart(4, "0")}.blob`
+      desiredState.exists && desiredState.type === 'file'
+        ? `desired/${String(sequence).padStart(4, '0')}.blob`
         : null;
     const preimageBlob =
-      preimage.exists && preimage.type === "file"
-        ? `preimage/${String(sequence).padStart(4, "0")}.blob`
+      preimage.exists && preimage.type === 'file'
+        ? `preimage/${String(sequence).padStart(4, '0')}.blob`
         : null;
     if (desiredBlob !== null) {
-      if (
-        desiredEntry?.contentBase64 === null ||
-        desiredEntry?.contentBase64 === undefined
-      ) {
+      if (desiredEntry?.contentBase64 === null || desiredEntry?.contentBase64 === undefined) {
         authoredPlanFailure(`${path} is missing desired bytes`);
       }
       desiredBlobs[desiredBlob] = desiredEntry.contentBase64;
-      aggregateBlobBytes += Buffer.from(
-        desiredEntry.contentBase64,
-        "base64",
-      ).length;
+      aggregateBlobBytes += Buffer.from(desiredEntry.contentBase64, 'base64').length;
     }
     if (preimageBlob !== null) {
-      if (
-        preimageRecord?.contentBase64 === null ||
-        preimageRecord?.contentBase64 === undefined
-      ) {
+      if (preimageRecord?.contentBase64 === null || preimageRecord?.contentBase64 === undefined) {
         authoredPlanFailure(`${path} is missing preimage bytes`);
       }
       preimageBlobs[preimageBlob] = preimageRecord.contentBase64;
-      aggregateBlobBytes += Buffer.from(
-        preimageRecord.contentBase64,
-        "base64",
-      ).length;
+      aggregateBlobBytes += Buffer.from(preimageRecord.contentBase64, 'base64').length;
     }
     return freezeMutation({
       sequence,
@@ -345,7 +302,7 @@ export function buildInitAuthoredPlan(
     });
   });
   if (aggregateBlobBytes > INIT_AUTHORED_PLAN_CAPS.maxAggregateBlobBytes) {
-    authoredPlanFailure("planned blobs exceed the aggregate content cap");
+    authoredPlanFailure('planned blobs exceed the aggregate content cap');
   }
   const inputs = Object.freeze({
     languages: Object.freeze([...languages]),
@@ -362,10 +319,10 @@ export function buildInitAuthoredPlan(
   const normalizedInputBytes = JSON.stringify(inputs);
   const digest = sha256Bytes(
     Buffer.concat([
-      Buffer.from("opensip-init-authored-plan\0v1\0", "utf8"),
-      Buffer.from(normalizedInputBytes, "utf8"),
-      Buffer.from("\0", "utf8"),
-      Buffer.from(replayManifestBytes, "utf8"),
+      Buffer.from('opensip-init-authored-plan\0v1\0', 'utf8'),
+      Buffer.from(normalizedInputBytes, 'utf8'),
+      Buffer.from('\0', 'utf8'),
+      Buffer.from(replayManifestBytes, 'utf8'),
     ]),
   );
   return Object.freeze({

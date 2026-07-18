@@ -54,5 +54,5 @@ transport stderr (heap preflight, shard worker, fit warnings). Bootstrap and hos
 paths remain governed by existing checks.
 
 **Related specs / ADRs:** Plan 06 spec
-`docs/plans/specs/unified-tool-logging-and-error-reporting.md`; ADR-0060 bootstrap
+a local implementation spec; ADR-0060 bootstrap
 diagnostics; ADR-0053 per-run logger scope; ADR-0054 worker dispatch replay.

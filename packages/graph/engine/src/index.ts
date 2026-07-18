@@ -107,7 +107,7 @@ export {
 // ── GraphLanguageAdapter contract surface ─────────────────────────
 //
 // Promoted to the public barrel by PR 1a of plan
-// docs/plans/architecture/2026-05-23-plan-graph-adapter-package-split.md.
+// local architecture planning notes
 // External adapter packs (e.g. @opensip-cli/graph-typescript) import
 // these types to satisfy the contract defined in lang-adapter/types.ts.
 //

@@ -38,7 +38,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "web-tree-sitter": "0.26.10"
+    "web-tree-sitter": "0.26.11"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

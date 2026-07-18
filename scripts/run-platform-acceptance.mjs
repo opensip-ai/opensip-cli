@@ -188,6 +188,10 @@ function parseArgs(argv, env = process.env) {
   const flags = {};
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
+    // pnpm 11 (and some npm versions) forward the bare `--` script separator
+    // as argv (`pnpm platform:acceptance -- --profile …` → `["--", "--profile", …]`).
+    // Ignore end-of-options markers so package-script and direct-node invocations match.
+    if (token === '--') continue;
     if (typeof token !== 'string' || !token.startsWith('--')) {
       return invalid(`unexpected argument ${JSON.stringify(token)}`);
     }

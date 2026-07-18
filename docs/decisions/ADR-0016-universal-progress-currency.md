@@ -123,5 +123,5 @@ invalidation) landed. ADR-0015 added `stampEngineVersion` to `catalog-builder.ts
 Rebasing onto current main must reconcile both (the stamp and the async are
 orthogonal; they coexist).
 
-**Related specs / ADRs:** `docs/plans/specs/universal-progress-currency.md`
+**Related specs / ADRs:**
 (local). Symmetric to ADR-0011 (signal output currency).

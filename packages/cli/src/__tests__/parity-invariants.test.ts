@@ -3,7 +3,7 @@
  *
  * GA's bar is "the acceptance test passes AND all nine completion invariants are
  * live guardrails." This test asserts the second half mechanically: every check
- * slug the index (`docs/internal/parity-invariant-index.md`) names as the
+ * slug the index (a local working note) names as the
  * enforcement for a §8 invariant resolves to a registered fitness check. So
  * deleting or renaming a parity guardrail — without updating the index — fails
  * CI. (The dogfood gate `fit --gate-save` independently asserts each is at 0
@@ -49,7 +49,7 @@ describe('parity completion-invariant index (§8)', () => {
       for (const slug of slugs) {
         expect(
           ALL_SLUGS.has(slug),
-          `the parity-invariant index names check '${slug}' (for '${invariant}'), but no registered check has that slug — update docs/internal/parity-invariant-index.md and this map together`,
+          `the parity-invariant index names check '${slug}' (for '${invariant}'), but no registered check has that slug — update a local working note and this map together`,
         ).toBe(true);
       }
     }

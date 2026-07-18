@@ -806,6 +806,66 @@ describe('withFileLock', () => {
       ),
     ).toBe('recovered');
   });
+
+  it('treats oversized and corrupt lockfiles as unreadable metadata', () => {
+    dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+    const oversized = join(dir, 'oversized.lock');
+    writeFileSync(oversized, 'x'.repeat(5000));
+    // Fresh mtime + short wait: contention times out without reclaiming a
+    // non-stale unreadable lockfile (covers the oversize read path).
+    expect(() =>
+      withFileLock(
+        oversized,
+        {
+          policy: { waitMs: 50, staleMs: 600_000, heartbeatMs: 20 },
+          resource: 'datastore',
+        },
+        () => 'x',
+      ),
+    ).toThrow(TimeoutError);
+
+    const corrupt = join(dir, 'corrupt.lock');
+    writeFileSync(corrupt, '{not-json');
+    expect(() =>
+      withFileLock(
+        corrupt,
+        {
+          policy: { waitMs: 50, staleMs: 600_000, heartbeatMs: 20 },
+          resource: 'datastore',
+        },
+        () => 'x',
+      ),
+    ).toThrow(TimeoutError);
+  });
+
+  it('reclaims a cross-host lock only when its heartbeat age is stale', () => {
+    dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+    const lockPath = join(dir, 'remote.lock');
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        ownerToken: 'remote-owner',
+        // A "live" PID must not matter for a different hostname — only age does.
+        pid: process.pid,
+        hostname: 'other-host.example',
+        cwdBasename: 'tmp',
+        acquiredAt: Date.now() - 60_000,
+        lastHeartbeatAt: Date.now() - 60_000,
+      }),
+    );
+    const events: string[] = [];
+    const out = withFileLock(
+      lockPath,
+      {
+        policy: { waitMs: 500, staleMs: 1, heartbeatMs: 20 },
+        resource: 'datastore',
+        onEvent: (e) => events.push(e.kind),
+      },
+      () => 'reclaimed',
+    );
+    expect(out).toBe('reclaimed');
+    expect(events).toContain('stale.recovered');
+  });
 });
 
 describe('withFileLockAsync', () => {

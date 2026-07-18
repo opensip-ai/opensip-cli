@@ -1,5 +1,5 @@
-import { opendirSync } from "node:fs";
-import { join } from "node:path";
+import { opendirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   ANCHORED_CREATE_RECOVERY_MAX_ENTRIES,
@@ -8,29 +8,24 @@ import {
   mutateAnchoredRecord,
   readAnchoredRecord,
   SystemError,
-} from "@opensip-cli/core";
+} from '@opensip-cli/core';
 
 import {
   assertStableAuthoredRoot,
   authoredTransactionFailure,
   type StableAuthoredRoot,
-} from "./authored-state-transaction-fs.js";
-import {
-  INIT_AUTHORED_PLAN_CAPS,
-  sha256Bytes,
-} from "./init-authored-plan-types.js";
+} from './authored-state-transaction-fs.js';
+import { INIT_AUTHORED_PLAN_CAPS, sha256Bytes } from './init-authored-plan-types.js';
 
-import type { AuthoredArtifactPaths } from "./authored-state-transaction-types.js";
-import type { RuntimePromotionJournal } from "./runtime-promotion-journal-schema.js";
-import type { AnchoredRecordReadResult } from "@opensip-cli/core";
+import type { AuthoredArtifactPaths } from './authored-state-transaction-types.js';
+import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
+import type { AnchoredRecordReadResult } from '@opensip-cli/core';
 
 function replayCreateIdentity(journal: RuntimePromotionJournal): string {
   return journal.owned.replayManifest.ownershipId;
 }
 
-function exactReplayTemporaryBasename(
-  journal: RuntimePromotionJournal,
-): string {
+function exactReplayTemporaryBasename(journal: RuntimePromotionJournal): string {
   return anchoredRecordTemporaryBasename(
     journal.owned.replayManifest.basename,
     replayCreateIdentity(journal),
@@ -52,19 +47,15 @@ function assertNoForeignReplayTemporaries(
       const entry = directory.readSync();
       if (entry === null) return;
       entries += 1;
-      nameBytes += Buffer.byteLength(entry.name, "utf8");
+      nameBytes += Buffer.byteLength(entry.name, 'utf8');
       if (
         entries > ANCHORED_CREATE_RECOVERY_MAX_ENTRIES ||
         nameBytes > ANCHORED_CREATE_RECOVERY_MAX_ENTRIES * 255
       ) {
-        authoredTransactionFailure(
-          "the replay publication parent exceeds its scan bound",
-        );
+        authoredTransactionFailure('the replay publication parent exceeds its scan bound');
       }
       if (entry.name.startsWith(prefix) && entry.name !== exactTemporary) {
-        authoredTransactionFailure(
-          "a foreign replay publication temporary is present",
-        );
+        authoredTransactionFailure('a foreign replay publication temporary is present');
       }
     }
   } finally {
@@ -74,9 +65,7 @@ function assertNoForeignReplayTemporaries(
 
 function assertReplayCapacity(): void {
   if (INIT_AUTHORED_PLAN_CAPS.maxManifestBytes !== ANCHORED_RECORD_MAX_BYTES) {
-    authoredTransactionFailure(
-      "the replay manifest and anchored record caps disagree",
-    );
+    authoredTransactionFailure('the replay manifest and anchored record caps disagree');
   }
 }
 
@@ -87,12 +76,9 @@ function assertReplayPath(
 ): void {
   if (
     paths.projectRoot !== root.path ||
-    paths.replayManifest !==
-      join(root.path, journal.owned.replayManifest.basename)
+    paths.replayManifest !== join(root.path, journal.owned.replayManifest.basename)
   ) {
-    authoredTransactionFailure(
-      "the replay manifest path does not match its durable identity",
-    );
+    authoredTransactionFailure('the replay manifest path does not match its durable identity');
   }
 }
 
@@ -110,10 +96,10 @@ export function settleAuthoredReplayPublication(
     parentDir: root.path,
     basename: journal.owned.replayManifest.basename,
     maxBytes: INIT_AUTHORED_PLAN_CAPS.maxManifestBytes,
-    permissionPosture: "owner-controlled",
-    recordPosture: "private",
+    permissionPosture: 'owner-controlled',
+    recordPosture: 'private',
     linkedCreateRecovery: {
-      effect: "settle-or-discard-owned-temporary",
+      effect: 'settle-or-discard-owned-temporary',
       expectedContentSha256: journal.plan.replayDigest,
       createIdentity: replayCreateIdentity(journal),
       maxEntries: ANCHORED_CREATE_RECOVERY_MAX_ENTRIES,
@@ -125,24 +111,16 @@ export function settleAuthoredReplayPublication(
 }
 
 function isAnchoredCreateConflict(error: unknown): boolean {
-  return (
-    error instanceof SystemError &&
-    error.code === "SYSTEM.RUNTIME_COORDINATION.EXISTS"
-  );
+  return error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.EXISTS';
 }
 
-function assertExactReplay(
-  observed: AnchoredRecordReadResult,
-  manifestBytes: string,
-): void {
+function assertExactReplay(observed: AnchoredRecordReadResult, manifestBytes: string): void {
   if (
-    observed.status !== "present" ||
+    observed.status !== 'present' ||
     observed.content !== manifestBytes ||
     observed.sha256 !== sha256Bytes(manifestBytes)
   ) {
-    authoredTransactionFailure(
-      "the published replay manifest is not its exact planned content",
-    );
+    authoredTransactionFailure('the published replay manifest is not its exact planned content');
   }
 }
 
@@ -151,16 +129,14 @@ export function publishAuthoredReplayManifest(
   journal: RuntimePromotionJournal,
   paths: AuthoredArtifactPaths,
   manifestBytes: string,
-): "applied" | "already-satisfied" {
+): 'applied' | 'already-satisfied' {
   if (sha256Bytes(manifestBytes) !== journal.plan.replayDigest) {
-    authoredTransactionFailure(
-      "the replay manifest bytes disagree with the durable journal",
-    );
+    authoredTransactionFailure('the replay manifest bytes disagree with the durable journal');
   }
   const before = settleAuthoredReplayPublication(root, journal, paths);
-  if (before.status === "present") {
+  if (before.status === 'present') {
     assertExactReplay(before, manifestBytes);
-    return "already-satisfied";
+    return 'already-satisfied';
   }
   let created = true;
   try {
@@ -168,11 +144,11 @@ export function publishAuthoredReplayManifest(
       trustedAnchorDir: root.path,
       parentDir: root.path,
       basename: journal.owned.replayManifest.basename,
-      operation: "create",
+      operation: 'create',
       content: manifestBytes,
       maxBytes: INIT_AUTHORED_PLAN_CAPS.maxManifestBytes,
-      permissionPosture: "owner-controlled",
-      recordPosture: "private",
+      permissionPosture: 'owner-controlled',
+      recordPosture: 'private',
       createIdentity: replayCreateIdentity(journal),
     });
   } catch (error) {
@@ -181,5 +157,5 @@ export function publishAuthoredReplayManifest(
   }
   const after = settleAuthoredReplayPublication(root, journal, paths);
   assertExactReplay(after, manifestBytes);
-  return created ? "applied" : "already-satisfied";
+  return created ? 'applied' : 'already-satisfied';
 }

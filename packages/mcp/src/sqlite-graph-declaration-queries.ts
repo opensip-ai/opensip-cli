@@ -51,6 +51,7 @@ import {
 import {
   DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS,
   dedupeStaticHandlerRefs,
+  descriptorKey,
   matchStaticHandlerCandidates,
   MAX_STATIC_HANDLER_CACHE_ENTRIES,
   MAX_STATIC_HANDLER_DESCRIPTORS,
@@ -233,13 +234,16 @@ export class SqliteGraphDeclarationQueries {
     if (!captured.ok) return captured;
 
     const data: BridgeBatchPayload = captured.value.data;
-    // Expand outcomes to one per input ref (preserve caller order).
+    // Expand outcomes to one per input ref (preserve caller order). Key on
+    // the full claim identity (descriptorKey), not just package/path/
+    // declaration — otherwise two differently-provenanced refs sharing that
+    // triple would collapse onto each other's outcome here too.
     const byKey = new Map<string, StaticHandlerBridgeOutcome>();
     for (const outcome of data.outcomes) {
-      byKey.set(`${outcome.ref.package}\0${outcome.ref.path}\0${outcome.ref.declaration}`, outcome);
+      byKey.set(descriptorKey(outcome.ref), outcome);
     }
     const ordered: StaticHandlerBridgeOutcome[] = refs.map((ref) => {
-      const key = `${ref.package}\0${ref.path}\0${ref.declaration}`;
+      const key = descriptorKey(ref);
       const hit = byKey.get(key);
       if (hit !== undefined) return { ...hit, ref };
       if (data.catalogStatus === 'missing') {
@@ -500,6 +504,20 @@ export class SqliteGraphDeclarationQueries {
         }
 
         const inventory = [...view.value.references].sort(compareReferenceSites);
+        const totalMatches = view.value.totalMatches;
+        // View page is capped at MAX_INVENTORY; when more matches exist the
+        // exclusive projection inventory is partial (honest facet) — same
+        // patch searchDeclarations applies for its own inventory cap.
+        const coverage =
+          totalMatches > inventory.length
+            ? {
+                ...view.value.coverage,
+                inventory: makeFacet(
+                  true,
+                  new Set([...view.value.coverage.inventory.reasons, 'inventory-cap']),
+                ),
+              }
+            : view.value.coverage;
 
         return projectReferenceDetail({
           context: this.context,
@@ -512,8 +530,8 @@ export class SqliteGraphDeclarationQueries {
           filter,
           declarationId,
           inventory,
-          totalMatches: view.value.totalMatches,
-          coverage: view.value.coverage,
+          totalMatches,
+          coverage,
           binding: {
             projectKey: this.context.projectKey,
             generationKey: gen.key,

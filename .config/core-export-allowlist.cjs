@@ -100,6 +100,8 @@ const EXPORT_ALLOWLIST = {
   projectJsonScalarMetadata: 'shared-data-contracts',
   resolveFailOnDegraded: 'shared-data-contracts',
   resolveVerdictPolicy: 'shared-data-contracts',
+  isKnownDirectiveLine: 'shared-data-contracts',
+  MAX_DIRECTIVE_SKIP: 'shared-data-contracts',
   scanSuppressionDirectives: 'shared-data-contracts',
   stampFingerprints: 'shared-data-contracts',
   stripCommentOpener: 'shared-data-contracts',

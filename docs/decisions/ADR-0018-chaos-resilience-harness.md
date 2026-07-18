@@ -71,5 +71,5 @@ audits was removing capabilities that look wired but aren't.
   first-party fault-injection integration if demand warrants.
 
 **Related specs / ADRs:** Implements the local spec
-`docs/plans/specs/chaos-resilience-harness.md`. Sibling to **ADR-0011** (signals
+a local implementation spec. Sibling to **ADR-0011** (signals
 as the universal *output* currency — this is the *input/driver* side).

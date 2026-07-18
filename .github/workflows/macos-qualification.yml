@@ -257,6 +257,9 @@ jobs:
           echo "manifest_digest=$MANIFEST_DIGEST" >> "$GITHUB_OUTPUT"
           echo "candidate_digest=$CANDIDATE_DIGEST" >> "$GITHUB_OUTPUT"
           set +e
+          # The bare `--` is the pnpm script-arg separator. pnpm 11 forwards it as
+          # argv; run-platform-acceptance.mjs ignores end-of-options markers so this
+          # package-script form matches a direct `node scripts/…` invocation.
           pnpm platform:acceptance -- \
             --profile "$MACOS_PROFILE" \
             --packed-release "$TARBALL_DIR" \

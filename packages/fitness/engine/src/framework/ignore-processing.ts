@@ -14,8 +14,10 @@ import { readFile as readFileFromDisk } from 'node:fs/promises';
 import {
   currentScope,
   filterSignalsBySuppressions,
+  isKnownDirectiveLine,
   logger,
   mapWithConcurrency,
+  MAX_DIRECTIVE_SKIP,
 } from '@opensip-cli/core';
 
 import { countErrors, countWarnings } from '../types/severity.js';
@@ -180,11 +182,14 @@ async function collectLineIgnoreDirectives(
           const parsed = parseDirectiveLine(lines[i] ?? '');
           if (parsed?.type !== 'next-line' || parsed.checkId !== checkId) continue;
           let targetLine = i + 1;
+          let skipped = 0;
           while (
             targetLine < lines.length &&
-            (lines[targetLine] ?? '').trimStart().startsWith('//')
+            skipped < MAX_DIRECTIVE_SKIP &&
+            isKnownDirectiveLine(lines[targetLine] ?? '')
           ) {
             targetLine++;
+            skipped++;
           }
           if (suppressedLines.has(targetLine + 1)) {
             found.push(toDirectiveEntry(filePath, i + 1, parsed));

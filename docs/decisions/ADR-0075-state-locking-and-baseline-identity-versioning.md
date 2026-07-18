@@ -38,4 +38,4 @@ must not contain secrets; OTel remains opt-in.
 
 **Fitness checks:** `baseline-identity-metadata`, `state-locking-policy`.
 
-**Related specs:** `docs/internal/state-observability-contract.md`, Plan 04.
+**Related specs:** a local working note, Plan 04.

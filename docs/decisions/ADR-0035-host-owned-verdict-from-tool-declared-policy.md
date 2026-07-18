@@ -151,6 +151,6 @@ fixes sim's violation of it), ADR-0023 (tool config consolidation — supplies t
 config resolution pipeline the reserved keys reuse), ADR-0027 (tool-plugin parity
 GA — "host owns the plane, tool declares a manifest"; the verdict plane is one more
 host-owned plane a plugin inherits). The implementing spec
-(`docs/plans/specs/host-owned-verdict.md`, local-only) carries the per-tool
+(a local implementation spec, local-only) carries the per-tool
 verification matrix: fit (exact), graph gate-save (exact), graph gate-compare
 (verify `degraded` expressibility), sim (exact *after* the signal-emission fix).

@@ -70,6 +70,6 @@ targets, [ADR-0147](ADR-0147-public-graph-read-and-fail-closed-package-boundarie
 owns the graph facade, and [ADR-0160](ADR-0160-deterministic-task-context-evidence-plane.md)
 owns host aggregation.
 
-**Related spec:** `docs/plans/specs/agent-task-context.md` (local-only) records
+**Related:** The local-only agent-task-context spec records
 the deferred intent, history, observed-coverage, resource, snippet, Git, and
 task-composer waves.

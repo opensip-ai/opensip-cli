@@ -1,6 +1,6 @@
 // @fitness-ignore-file module-coupling-fan-out -- composition root: the main graph command handler wires detection, orchestration, reporting, workspace, persistence, and recipe resolution; high intra-project fan-out is inherent to a CLI entry point (cf. the index.ts / code-paths.ts barrels that suppress the same check).
 
-// @fitness-ignore-file no-markdown-references -- docs/plans/* pointers in JSDoc are stable internal references.
+// @fitness-ignore-file no-markdown-references -- JSDoc cites tracked ADRs and committed design notes.
 /**
  * `opensip graph` — main subcommand handler.
  *
@@ -19,7 +19,7 @@
  * `graph-orphans`, `graph-entry-points`). The two filtered views are
  * now sections in this unified report. The TS-flavored `--package` /
  * `--packages` flags were retired in favor of the polyglot surface
- * above; see docs/plans/graph-cli-language-neutral-scoping/.
+ * above; see the graph CLI language-neutral scoping design notes
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';

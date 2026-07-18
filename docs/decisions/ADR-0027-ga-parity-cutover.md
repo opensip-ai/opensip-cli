@@ -24,7 +24,7 @@ enforcement-reason: >
   Tool contract); `checkCompatibility(undefined) ⇒ incompatible` is unit-pinned;
   and `parity-invariants.test.ts` asserts every one of the nine §8 completion
   invariants maps to a live check (the index at
-  docs/internal/parity-invariant-index.md). The §1 acceptance test
+  a local working note). The §1 acceptance test
   (fit-external-load.test.ts) is the executable GA bar.
 ```
 
@@ -84,7 +84,7 @@ fact, not a guarded convention. Grounded in: `packages/cli/src/bootstrap/registe
   this ADR is the durable record of their removal.
 
 **Related specs / ADRs:** Implements
-`docs/plans/specs/release-3.0.0-ga-parity-cutover.md` (local-only). Realizes
+a local implementation spec (local-only). Realizes
 ADR-0012's 3.0.0 reservation; completes the parity ladder begun by ADR-0011
 (output currency) and continued through ADR-0021/0023/0024/0026. The completion-
-invariant enforcement record is `docs/internal/parity-invariant-index.md`.
+invariant enforcement record is a local working note.

@@ -163,4 +163,4 @@ the source of the independent `SignalEnvelope.schemaVersion`), ADR-0008
 (public-API surface policy — the other breaking changes in this batch). Release
 mechanics live in `RELEASING.md`; the `2.7.0` change log in `CHANGELOG.md`; the
 deferred-GA north star in
-`docs/plans/tool-plugin-parity-architecture-2026-06-06.md`.
+local planning notes.

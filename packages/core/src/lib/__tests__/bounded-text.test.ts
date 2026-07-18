@@ -16,4 +16,19 @@ describe('appendBoundedUtf8Text', () => {
       truncated: true,
     });
   });
+
+  it('keeps the existing buffer when it is already at or past the limit', () => {
+    expect(appendBoundedUtf8Text('abcdef', Buffer.from('xyz'), 6)).toEqual({
+      value: 'abcdef',
+      truncated: true,
+    });
+    expect(appendBoundedUtf8Text('abcdefg', Buffer.from('xyz'), 6)).toEqual({
+      value: 'abcdef',
+      truncated: true,
+    });
+    expect(appendBoundedUtf8Text('abc', Buffer.from('xyz'), 0)).toEqual({
+      value: '',
+      truncated: true,
+    });
+  });
 });

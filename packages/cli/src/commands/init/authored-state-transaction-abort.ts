@@ -1,40 +1,40 @@
-import { settleAuthoredReplayPublication } from "./authored-state-replay-publication.js";
+import { settleAuthoredReplayPublication } from './authored-state-replay-publication.js';
 import {
   discardIncompleteAuthoredArtifacts,
   validateIncompleteAuthoredArtifacts,
-} from "./authored-state-transaction-artifact-recovery.js";
+} from './authored-state-transaction-artifact-recovery.js';
 import {
   authoredArtifactPaths,
   loadAuthoredReplayManifest,
-} from "./authored-state-transaction-artifacts.js";
+} from './authored-state-transaction-artifacts.js';
 import {
   authoredExecutionOrder,
   executionIndex,
   verifyEveryAuthoredTarget,
-} from "./authored-state-transaction-execution.js";
+} from './authored-state-transaction-execution.js';
 import {
   authoredTransactionFailure,
   openStableAuthoredRoot,
-} from "./authored-state-transaction-fs.js";
+} from './authored-state-transaction-fs.js';
 import {
   advanceAuthoredPhase,
   beginAuthoredRollback,
   recordOpenPostcondition,
-} from "./authored-state-transaction-journal.js";
+} from './authored-state-transaction-journal.js';
 import {
   authoredDependencies,
   issueTransaction,
   summaryFor,
-} from "./authored-state-transaction-registry.js";
+} from './authored-state-transaction-registry.js';
 
 import type {
   AbortPendingAuthoredPreparationInput,
   AuthoredTransactionState,
   PreparedAuthoredState,
-} from "./authored-state-transaction-types.js";
-import type { AuthoredReplayManifest } from "./init-authored-plan.js";
-import type { RuntimePromotionJournal } from "./runtime-promotion-journal-schema.js";
-import type { DurableOpenPromotionJournal } from "./runtime-promotion-journal.js";
+} from './authored-state-transaction-types.js';
+import type { AuthoredReplayManifest } from './init-authored-plan.js';
+import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
+import type { DurableOpenPromotionJournal } from './runtime-promotion-journal.js';
 
 function assertZeroAuthoredProgress(journal: RuntimePromotionJournal): void {
   if (
@@ -42,11 +42,9 @@ function assertZeroAuthoredProgress(journal: RuntimePromotionJournal): void {
     journal.progress.rollbackCursor !== 0 ||
     journal.counts.authoredCompleted !== 0 ||
     journal.counts.authoredRolledBack !== 0 ||
-    journal.progress.runtimeInstallState === "installed"
+    journal.progress.runtimeInstallState === 'installed'
   ) {
-    authoredTransactionFailure(
-      "authored preparation can no longer be aborted safely",
-    );
+    authoredTransactionFailure('authored preparation can no longer be aborted safely');
   }
 }
 
@@ -62,7 +60,7 @@ function storedReplay(
   const root = openStableAuthoredRoot(projectRoot);
   const paths = authoredArtifactPaths(root, journal);
   const replayState = settleAuthoredReplayPublication(root, journal, paths);
-  if (replayState.status === "absent") {
+  if (replayState.status === 'absent') {
     return { root, paths, manifest: null, bytes: null };
   }
   const replay = loadAuthoredReplayManifest(root, journal, paths);
@@ -75,8 +73,7 @@ function abortState(
   journal: RuntimePromotionJournal,
   replay: ReturnType<typeof storedReplay>,
 ): AuthoredTransactionState {
-  const order =
-    replay.manifest === null ? [] : authoredExecutionOrder(replay.manifest);
+  const order = replay.manifest === null ? [] : authoredExecutionOrder(replay.manifest);
   return {
     projectRoot: replay.root.path,
     lease: input.lease,
@@ -95,8 +92,8 @@ function abortState(
 function isAbortedPreparation(journal: RuntimePromotionJournal): boolean {
   return (
     journal.progress.pendingIntent === null &&
-    journal.progress.lastPostcondition?.kind === "authored-prepare" &&
-    journal.progress.lastPostcondition.outcome === "aborted"
+    journal.progress.lastPostcondition?.kind === 'authored-prepare' &&
+    journal.progress.lastPostcondition.outcome === 'aborted'
   );
 }
 
@@ -109,8 +106,7 @@ export async function abortPendingAuthoredPreparation(
   assertZeroAuthoredProgress(journal);
   const replay = storedReplay(input.projectRoot, journal);
   const state = abortState(input, receipt, journal, replay);
-  const pendingPrepare =
-    journal.progress.pendingIntent?.kind === "authored-prepare";
+  const pendingPrepare = journal.progress.pendingIntent?.kind === 'authored-prepare';
   if (pendingPrepare) {
     validateIncompleteAuthoredArtifacts(
       replay.root,
@@ -119,7 +115,7 @@ export async function abortPendingAuthoredPreparation(
       replay.bytes,
       replay.paths,
     );
-    state.dependencies.checkpoint("before-abort-cleanup");
+    state.dependencies.checkpoint('before-abort-cleanup');
     discardIncompleteAuthoredArtifacts(
       replay.root,
       journal,
@@ -127,55 +123,42 @@ export async function abortPendingAuthoredPreparation(
       replay.bytes,
       replay.paths,
     );
-    state.dependencies.checkpoint("after-abort-cleanup");
-    state.dependencies.checkpoint("before-abort-postcondition");
+    state.dependencies.checkpoint('after-abort-cleanup');
+    state.dependencies.checkpoint('before-abort-postcondition');
     receipt = await recordOpenPostcondition(
       input.controller,
       receipt,
       {
         phase: journal.progress.phase,
-        outcome: "aborted",
+        outcome: 'aborted',
       },
       state.dependencies.now,
     );
     state.receipt = receipt;
-    state.dependencies.checkpoint("after-abort-postcondition");
+    state.dependencies.checkpoint('after-abort-postcondition');
     journal = await input.controller.verifyOpen(receipt);
-  } else if (
-    !isAbortedPreparation(journal) &&
-    journal.progress.direction === "forward"
-  ) {
-    authoredTransactionFailure(
-      "the journal has no abortable authored preparation",
-    );
+  } else if (!isAbortedPreparation(journal) && journal.progress.direction === 'forward') {
+    authoredTransactionFailure('the journal has no abortable authored preparation');
   }
-  if (journal.progress.direction === "forward") {
-    receipt = await beginAuthoredRollback(
-      input.controller,
-      receipt,
-      state.dependencies.now,
-    );
+  if (journal.progress.direction === 'forward') {
+    receipt = await beginAuthoredRollback(input.controller, receipt, state.dependencies.now);
     state.receipt = receipt;
     journal = await input.controller.verifyOpen(receipt);
   }
   if (
-    journal.progress.direction !== "rollback" ||
-    !["rollback-started", "authored-rolled-back"].includes(
-      journal.progress.phase,
-    )
+    journal.progress.direction !== 'rollback' ||
+    !['rollback-started', 'authored-rolled-back'].includes(journal.progress.phase)
   ) {
-    authoredTransactionFailure(
-      "the aborted authored preparation has invalid rollback state",
-    );
+    authoredTransactionFailure('the aborted authored preparation has invalid rollback state');
   }
   if (replay.manifest !== null) {
-    verifyEveryAuthoredTarget(replay.root, replay.manifest, "preimage");
+    verifyEveryAuthoredTarget(replay.root, replay.manifest, 'preimage');
   }
-  if (journal.progress.phase === "rollback-started") {
+  if (journal.progress.phase === 'rollback-started') {
     receipt = await advanceAuthoredPhase(
       input.controller,
       receipt,
-      "authored-rolled-back",
+      'authored-rolled-back',
       state.dependencies.now,
     );
     state.receipt = receipt;

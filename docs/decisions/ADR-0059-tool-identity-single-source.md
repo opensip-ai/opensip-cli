@@ -51,5 +51,5 @@ Config descriptors use the canonical identity name as namespace. Public examples
 must use `definePrimaryCommand`, `defineNestedCommand`, and `defineTool` so authors
 write names once.
 
-**Related specs / ADRs:** `docs/plans/specs/tool-identity-single-source.md`,
+**Related specs / ADRs:** a local implementation spec,
 ADR-0048 (stable UUID identity), ADR-0054 (tool fault-isolation boundary).

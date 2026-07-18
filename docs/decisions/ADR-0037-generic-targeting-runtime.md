@@ -104,4 +104,4 @@ targeting types host-side; this supplies the runtime the types anticipated). Rel
 to ADR-0010 (`lang-*` canonical parse substrate — language canonicalization the
 substrate reads via the scope is a kernel/LanguageRegistry concern, not imported as
 tool vocabulary). The implementing spec is
-`docs/plans/specs/generic-targeting-runtime.md` (local-only).
+a local implementation spec (local-only).

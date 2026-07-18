@@ -968,6 +968,9 @@ jobs:
           set -u
           out="$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json"
           set +e
+          # The bare `--` is the pnpm script-arg separator. pnpm 11 forwards it as
+          # argv; run-platform-acceptance.mjs ignores end-of-options markers so this
+          # package-script form matches a direct `node scripts/…` invocation.
           if [ -n "${PREVIOUS:-}" ]; then
             pnpm platform:acceptance -- \
               --profile "$MACOS_PROFILE" \
@@ -1403,7 +1406,7 @@ jobs:
       # verified macOS evidence. The evidence version/git SHA/profile digest were
       # rechecked above and must match this exact tag.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ needs.stage-release.outputs.tag }}
           generate_release_notes: true

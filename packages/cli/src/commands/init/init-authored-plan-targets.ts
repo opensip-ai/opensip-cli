@@ -1,19 +1,19 @@
-import { posix } from "node:path";
+import { posix } from 'node:path';
 
-import { listAgentGuidanceTargetSpecs } from "./agent-guidance.js";
+import { listAgentGuidanceTargetSpecs } from './agent-guidance.js';
 import {
   INIT_AUTHORED_PLAN_CAPS,
   authoredPlanFailure,
   caseFoldPath,
   compareUtf8,
   normalizeProjectRelativePath,
-} from "./init-authored-plan-types.js";
+} from './init-authored-plan-types.js';
 
 import type {
   BuildInitAuthoredPlanInput,
   InitAuthoredTargetType,
   RenderedInitToolScaffold,
-} from "./init-authored-plan-types.js";
+} from './init-authored-plan-types.js';
 
 export interface InitAuthoredDesiredTarget {
   readonly type: InitAuthoredTargetType;
@@ -23,11 +23,11 @@ export interface InitAuthoredDesiredTarget {
 function safeSegment(value: string, field: string): string {
   if (
     value.length === 0 ||
-    value.includes("/") ||
-    value.includes("\\") ||
-    value === "." ||
-    value === ".." ||
-    value !== value.normalize("NFC")
+    value.includes('/') ||
+    value.includes('\\') ||
+    value === '.' ||
+    value === '..' ||
+    value !== value.normalize('NFC')
   ) {
     authoredPlanFailure(`${field} must be one safe path segment`);
   }
@@ -36,10 +36,7 @@ function safeSegment(value: string, field: string): string {
 
 type AddTarget = (path: string, entry: InitAuthoredDesiredTarget) => void;
 
-function scaffoldKinds(
-  scaffold: RenderedInitToolScaffold,
-  toolIndex: number,
-): ReadonlySet<string> {
+function scaffoldKinds(scaffold: RenderedInitToolScaffold, toolIndex: number): ReadonlySet<string> {
   const kinds = new Set<string>();
   const foldedKinds = new Set<string>();
   for (const [kindIndex, rawKind] of scaffold.layout.userSubdirs.entries()) {
@@ -48,9 +45,7 @@ function scaffoldKinds(
       `tools[${String(toolIndex)}].userSubdirs[${String(kindIndex)}]`,
     );
     if (kinds.has(kind) || foldedKinds.has(caseFoldPath(kind))) {
-      authoredPlanFailure(
-        `Tool ${scaffold.identity.name} has duplicate user directories`,
-      );
+      authoredPlanFailure(`Tool ${scaffold.identity.name} has duplicate user directories`);
     }
     kinds.add(kind);
     foldedKinds.add(caseFoldPath(kind));
@@ -75,11 +70,11 @@ function addToolDirectories(
     );
   }
   domains.set(domainFolded, scaffold.identity.name);
-  if (!desired.has("opensip-cli")) add("opensip-cli", { type: "directory" });
+  if (!desired.has('opensip-cli')) add('opensip-cli', { type: 'directory' });
   const domainPath = `opensip-cli/${domain}`;
-  add(domainPath, { type: "directory" });
+  add(domainPath, { type: 'directory' });
   for (const kind of kinds) {
-    add(`${domainPath}/${kind}`, { type: "directory" });
+    add(`${domainPath}/${kind}`, { type: 'directory' });
   }
 }
 
@@ -101,19 +96,17 @@ function addToolExamples(
       example.filename,
       `tools[${String(toolIndex)}].examples[${String(exampleIndex)}].filename`,
     );
-    const stableIdBytes = Buffer.byteLength(example.stableId, "utf8");
+    const stableIdBytes = Buffer.byteLength(example.stableId, 'utf8');
     if (
       example.stableId.length === 0 ||
       stableIdBytes > INIT_AUTHORED_PLAN_CAPS.maxIdentityBytes ||
       stableIds.has(example.stableId)
     ) {
-      authoredPlanFailure(
-        `Tool example ${filename} has an invalid or duplicate stable id`,
-      );
+      authoredPlanFailure(`Tool example ${filename} has an invalid or duplicate stable id`);
     }
     stableIds.add(example.stableId);
     add(`opensip-cli/${domain}/${example.kind}/${filename}`, {
-      type: "file",
+      type: 'file',
       content: example.content,
     });
   }
@@ -138,14 +131,9 @@ export function collectToolDesiredEntries(
   };
 
   for (const [toolIndex, scaffold] of scaffolds.entries()) {
-    const domain = safeSegment(
-      scaffold.layout.domain,
-      `tools[${String(toolIndex)}].domain`,
-    );
+    const domain = safeSegment(scaffold.layout.domain, `tools[${String(toolIndex)}].domain`);
     if (!scaffold.createsExampleDirectories && scaffold.examples.length > 0) {
-      authoredPlanFailure(
-        `Tool ${scaffold.identity.name} rendered examples without a hook`,
-      );
+      authoredPlanFailure(`Tool ${scaffold.identity.name} rendered examples without a hook`);
     }
     const kinds = scaffoldKinds(scaffold, toolIndex);
     addToolDirectories(scaffold, domain, kinds, domains, desired, add);
@@ -155,18 +143,17 @@ export function collectToolDesiredEntries(
 }
 
 export function collectInitAuthoredTargetPaths(
-  mode: BuildInitAuthoredPlanInput["mode"],
+  mode: BuildInitAuthoredPlanInput['mode'],
   toolScaffolds: readonly RenderedInitToolScaffold[],
 ): readonly string[] {
-  const paths = new Set<string>(["opensip-cli.config.yml", ".gitignore"]);
+  const paths = new Set<string>(['opensip-cli.config.yml', '.gitignore']);
   for (const spec of listAgentGuidanceTargetSpecs()) {
     paths.add(normalizeProjectRelativePath(spec.relativePath));
     const parent = posix.dirname(spec.relativePath);
-    if (parent !== ".") paths.add(normalizeProjectRelativePath(parent));
+    if (parent !== '.') paths.add(normalizeProjectRelativePath(parent));
   }
-  if (mode !== "refresh") {
-    for (const path of collectToolDesiredEntries(toolScaffolds).keys())
-      paths.add(path);
+  if (mode !== 'refresh') {
+    for (const path of collectToolDesiredEntries(toolScaffolds).keys()) paths.add(path);
   }
   return [...paths].sort(compareUtf8);
 }

@@ -23,7 +23,7 @@
 //
 // Wired into `pnpm lint` so CI catches re-inerting. Rule-FIRING (as opposed
 // to edge-resolution) is verified via inject-revert probes documented in
-// docs/plans/ready/depcruise-gate-activation/phase-7-verification.md.
+// a local implementation plan
 //
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -470,7 +470,7 @@ function verifyWorkspaceReaderGuards() {
       process.exit(1);
     }
 
-    rmSync(join(root, 'packages', 'escape'), { force: true });
+    rmSync(join(root, 'packages', 'escape'), { recursive: true, force: true });
     const manifestEscapeDir = join(root, 'packages', 'manifest-escape');
     mkdirSync(manifestEscapeDir, { recursive: true });
     symlinkSync(join(outside, 'package.json'), join(manifestEscapeDir, 'package.json'));
