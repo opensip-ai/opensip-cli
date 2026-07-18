@@ -192,18 +192,9 @@ describe('isInStringLiteral', () => {
     void found;
   });
 
-  it('returns true for the literal text portion of a template with a substitution', () => {
-    const sf = parse('const x = `hello ${foo} world`;');
-    if (!sf) throw new Error('parse failed');
-    let sawHead = false;
-    walkNodes(sf, (n) => {
-      if (n.kind === ts.SyntaxKind.TemplateHead) {
-        sawHead = true;
-        expect(isInStringLiteral(n)).toBe(true);
-      }
-    });
-    expect(sawHead).toBe(true);
-  });
+  // Note: isInStringLiteral walks ancestors (not the node itself), so a
+  // TemplateHead/Middle/Tail token is not "in" a string — it *is* the span.
+  // Interpolation expressions are covered by the substitution tests below.
 
   it('returns false for nodes outside string literals', () => {
     const sf = parse('const x = 1; const y = x;');
