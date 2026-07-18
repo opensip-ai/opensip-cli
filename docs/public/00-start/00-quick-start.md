@@ -84,18 +84,28 @@ opensip fit --recipe example
 opensip sim --recipe example
 ```
 
-`fit`, `graph`, `graph impact`, and `audit` work in supported projects before
+`fit`, `graph`, `graph impact`, `audit`, `report`, `status`, `runs`,
+`sessions`, and project-scoped `mcp` work in supported projects before
 `init`. In a git repo, `audit` is changed-scope by default and
 prints the resolved scope; pass `--full` for a whole-repo run. The CLI uses a
 validated in-memory config and stores generated runtime state in a managed
 user cache. That cache is file-backed and survives normal command exits and
 reboots, but it is retention-managed and can be evicted; it is not permanent
-history.
+history. Direct `sim` and standalone `yagni` still require Init.
+
+Inspect retained evidence with `opensip status`, `opensip runs list|show`, and
+`opensip sessions list|show`. Agents can attach `opensip mcp` before Init —
+the server uses the same host-selected cache store and holds a shared runtime
+lease for the lifetime of the stdio process (Init/removal may report busy until
+the client disconnects). Re-open an exact Change Impact report with
+`opensip report --run <run-id>` (run-addressed under `reports/runs/`; missing
+or pruned ids fail closed rather than falling back to “latest”).
 
 `opensip init` is a transition command, not a storage location. It changes the
 project state from **zero-config project** to **initialized project**: it writes
-the config, examples, `.gitignore`, and agent guidance into the project, and
-subsequent local runtime state belongs under `opensip-cli/.runtime/`.
+the config, examples, `.gitignore`, and agent guidance into the project,
+transactionally adopts retained cache evidence into `opensip-cli/.runtime/`,
+and subsequent local runtime state belongs under that project runtime.
 
 For a human review with the stored Change Impact report, run `opensip audit
 --open`. For CI or an agent, run `opensip audit --json`; JSON, CI, non-TTY, and
