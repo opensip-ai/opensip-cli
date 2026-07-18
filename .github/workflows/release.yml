@@ -479,11 +479,16 @@ jobs:
       previous-version: ${{ steps.identity.outputs.previous-version }}
       release-metadata-artifact: ${{ steps.identity.outputs.release-metadata-artifact }}
     env:
-      BUNDLE_DIR: ${{ runner.temp }}/release-bundle
       NPM_CONFIG_IGNORE_SCRIPTS: 'true'
       NPM_CONFIG_PROVENANCE: 'true'
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
     steps:
+      # The runner context is unavailable in job-level env — GitHub rejects the
+      # entire workflow file at parse time — so BUNDLE_DIR must resolve inside a
+      # step, before any consumer.
+      - name: Resolve bundle directory
+        run: echo "BUNDLE_DIR=$RUNNER_TEMP/release-bundle" >> "$GITHUB_ENV"
+
       # Provision a reviewed, exact Node distribution through the pinned
       # first-party action. This supplies npm 11 without npm-installing code in
       # the credentialed boundary and does not read a checkout (there is none).
@@ -1134,9 +1139,14 @@ jobs:
       SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
       SUPPORT_CONTRACT_VERSION: '1'
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-      PROMOTION_ORDER: ${{ runner.temp }}/promotion-order.txt
       PROMOTION_ORDER_SHA256: 11c99ddf52f6f001054179e71a600e9a5d3dfb8bc05014a93b91295f63e7327d
     steps:
+      # The runner context is unavailable in job-level env — GitHub rejects the
+      # entire workflow file at parse time — so PROMOTION_ORDER must resolve
+      # inside a step, before any consumer.
+      - name: Resolve promotion order path
+        run: echo "PROMOTION_ORDER=$RUNNER_TEMP/promotion-order.txt" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.stage-release.outputs.git-sha }}
