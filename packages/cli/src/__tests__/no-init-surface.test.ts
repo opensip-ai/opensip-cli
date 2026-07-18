@@ -52,6 +52,8 @@ const MUST_RUN_WITHOUT_INIT = [
   // same store list/show read — first-run capable so pre-init history can be cleared.
   'sessions purge',
   'report',
+  // MCP serves the same entered cache/project evidence plane before Init.
+  'mcp',
 ] as const;
 
 /**

@@ -70,9 +70,9 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   const store = cli.scope.datastore() as DataStore | undefined;
   if (store === undefined) {
     await cli.reportFailure({
-      message: 'opensip mcp requires a project datastore, but none is available.',
+      message: 'opensip mcp requires an entered host datastore, but none is available.',
       suggestion:
-        'Run `opensip mcp` from inside an opensip-cli project (where `opensip init` has been run).',
+        'Inspect storage with `opensip status --json` and verify cache/project permissions. MCP works before Init against the user-cache evidence plane.',
       code: 'MCP.DATASTORE_UNAVAILABLE',
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
       log: { evt: 'mcp.server.datastore_unavailable', level: 'error' },
@@ -84,13 +84,23 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   // existing stored rows may predate canonical-root advertisement. Filesystem
   // and response-context seams use the physical root so every live MCP context
   // agrees without rebinding historical session rows.
+  // No-init: configPath may be absent (cache plane); never realpath a missing path.
   const projectRoot = scope.projectContext?.projectRoot ?? process.cwd();
-  const canonicalProjectRoot = realpathSync(projectRoot);
+  let canonicalProjectRoot = projectRoot;
+  try {
+    canonicalProjectRoot = realpathSync(projectRoot);
+  } catch {
+    // Path absent or unreadable — keep the host-provided root string.
+  }
   const configPath = scope.projectContext?.configPath ?? 'opensip-cli.config.yml';
-  const canonicalConfigPath =
-    scope.projectContext?.configPath === undefined
-      ? configPath
-      : realpathSync(scope.projectContext.configPath);
+  let canonicalConfigPath = configPath;
+  if (scope.projectContext?.configPath !== undefined) {
+    try {
+      canonicalConfigPath = realpathSync(scope.projectContext.configPath);
+    } catch {
+      canonicalConfigPath = scope.projectContext.configPath;
+    }
+  }
   const graphConfig = loadGraphReadConfig(projectRoot, configPath);
   // Capture graph adapters once from the entered scope — never currentScope().
   const graphScope = scope.graph;
@@ -285,6 +295,9 @@ export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
     },
   ],
   scope: 'project',
+  // First-run capable: serve cache-backed evidence before Init from the
+  // host-entered ephemeral scope (same project root; no second datastore).
+  noInit: true,
   output: 'raw-stream',
   rawStreamReason: 'mcp-stdio',
   handler: serveMcpStdio,
