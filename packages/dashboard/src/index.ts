@@ -24,4 +24,4 @@ export {
   encodeReportViewSelection,
   normalizeReportViewSelection,
 } from './report-selection.js';
-export type { ReportViewSelection } from './report-selection.js';
+export type { ReportSelectionEvidence, ReportViewSelection } from './report-selection.js';

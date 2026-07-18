@@ -227,7 +227,7 @@ describe('composeAndWriteReport', () => {
     expect(opened.opened).toBe(true);
   });
 
-  it('embeds and launches a matching stored-run selection without changing the result path', async () => {
+  it('embeds and launches a matching stored-run selection on a run-addressed path', async () => {
     const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
     const info = vi.fn();
     const datastore = openMemoryDatastore();
@@ -246,9 +246,15 @@ describe('composeAndWriteReport', () => {
       }),
     );
 
-    expect(result.path).toBe(join(resolveProjectPaths(projectRoot).reportsDir, 'latest.html'));
+    const reportsDir = resolveProjectPaths(projectRoot).reportsDir;
+    expect(result.path).toMatch(new RegExp(`${reportsDir}/runs/[a-f0-9]{64}\\.html$`));
+    expect(result.path).not.toBe(join(reportsDir, 'latest.html'));
     expect(launch).toHaveBeenCalledWith(`file://${result.path}#change-impact/run-parent-1`);
     expect(readFileSync(result.path, 'utf8')).toContain(
+      'const REPORT_SELECTION = {"view":"change-impact","runId":"run-parent-1"};',
+    );
+    // Convenience alias is refreshed but is not the returned/launch path.
+    expect(readFileSync(join(reportsDir, 'latest.html'), 'utf8')).toContain(
       'const REPORT_SELECTION = {"view":"change-impact","runId":"run-parent-1"};',
     );
     expect(info).toHaveBeenCalledWith({

@@ -96,8 +96,26 @@ export function renderChangeImpact(): void {
   }
 
   const requested = requestedRunId();
-  const selected =
-    changeImpactRuns.find((model) => model.runId === requested) ?? changeImpactRuns[0];
+  const exactMatch =
+    requested === undefined
+      ? undefined
+      : changeImpactRuns.find((model) => model.runId === requested);
+  // Host-embedded exact selection must never fall back to another Run.
+  // Unselected reports (no runId) keep the previous "first available" default.
+  const hostSelection = typeof REPORT_SELECTION === 'undefined' ? null : REPORT_SELECTION;
+  const exactHostSelection =
+    hostSelection?.view === 'change-impact' && typeof hostSelection.runId === 'string';
+  if (exactHostSelection && requested && exactMatch === undefined) {
+    panel.append(
+      el('div', {
+        class: 'card change-impact-selection-unavailable',
+        text: `Requested run ${requested} is not available in this report's Change Impact projection. Inspect with: opensip runs show ${requested} --json`,
+      }),
+    );
+    if (shouldActivate()) activateReportTab('change-impact');
+    return;
+  }
+  const selected = exactMatch ?? changeImpactRuns[0];
   if (!selected) return;
   const controls = el('section', { class: 'card change-impact-controls' }, [
     el('label', { for: 'change-impact-run-select', text: 'Audit run' }),
@@ -124,14 +142,6 @@ export function renderChangeImpact(): void {
     text: selectionAnnouncement(selected),
   });
   controls.append(select, liveStatus);
-  if (requested && requested !== selected.runId) {
-    controls.append(
-      el('p', {
-        class: 'text-muted change-impact-selection-fallback',
-        text: `Requested run ${requested} is unavailable; showing the latest stored audit run.`,
-      }),
-    );
-  }
   const omission = omittedRunsNotice();
   if (omission) controls.append(omission);
   panel.append(controls);

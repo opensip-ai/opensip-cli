@@ -23,7 +23,7 @@ import { normalizeReportViewSelection } from './report-selection.js';
 import { serializeJsonForScriptContext } from './script-context-json.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
-import type { ReportViewSelection } from './report-selection.js';
+import type { ReportSelectionEvidence, ReportViewSelection } from './report-selection.js';
 import type {
   StoredRun,
   StoredRunStep,
@@ -104,6 +104,11 @@ export interface DashboardInput {
   runs?: readonly DashboardRun[];
   /** Initial report navigation. Absence retains the current Overview default. */
   selection?: ReportViewSelection;
+  /**
+   * Host metadata for an exact `report --run` selection (counts/caps).
+   * Reserved merge key — tools must never contribute this.
+   */
+  selectionEvidence?: ReportSelectionEvidence;
   declaredInputs?: DeclaredInputs;
   // Tool-owned catalog data, consumed structurally by the dashboard's
   // renderers (audit 2026-05-29, L1). Typed `unknown[]` because the entry

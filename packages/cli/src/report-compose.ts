@@ -21,6 +21,7 @@
  * `ToolScope` view as the `collectReportData` parameter.
  */
 
+import { createHash } from 'node:crypto';
 import { basename, join } from 'node:path';
 
 import {
@@ -37,6 +38,7 @@ import {
   generateDashboardHtml,
   normalizeReportViewSelection,
   type DashboardInput as HtmlReportInput,
+  type ReportSelectionEvidence,
   type ReportViewSelection,
 } from '@opensip-cli/dashboard';
 import {
@@ -72,9 +74,16 @@ import type { DataStore } from '@opensip-cli/datastore';
  * must never set. Sessions/runs are durable cross-tool history and selection is
  * host-owned navigation. A tool that returns one is ignored with a warning.
  */
-const RESERVED_DASHBOARD_KEYS = new Set(['runs', 'selection', 'sessions']);
+const RESERVED_DASHBOARD_KEYS = new Set([
+  'runs',
+  'selection',
+  'selectionEvidence',
+  'sessions',
+]);
 const UNSAFE_DASHBOARD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const REPORT_MODULE = 'cli:report';
+/** Domain-separated filename material for run-addressed report artifacts. */
+const RUN_REPORT_FILENAME_DOMAIN = 'opensip-cli/report-run-artifact/v1\0';
 
 interface ComposeReportOptions {
   readonly open: boolean;
@@ -130,6 +139,7 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
   const requestedRunId = normalizedSelection?.runId;
   let matchedStoredRun =
     requestedRunId !== undefined && recentRuns.some((run) => run.id === requestedRunId);
+  let selectionEvidence: ReportSelectionEvidence | undefined;
 
   // Exact retained Run selection (Task 5.1): not limited to the recent-20 window.
   if (requestedRunId !== undefined && datastore !== undefined) {
@@ -156,6 +166,15 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
     const byId = new Map(reportSessions.map((s) => [s.id, s]));
     for (const session of evidence.snapshot.sessions) byId.set(session.id, session);
     reportSessions = orderSessionsForSuiteGrouping([...byId.values()]);
+    selectionEvidence = {
+      requestedRunId,
+      matched: true,
+      totalSteps: evidence.metadata.steps.total,
+      includedSteps: evidence.metadata.steps.included,
+      totalSessions: evidence.metadata.sessions.total,
+      includedSessions: evidence.metadata.sessions.included,
+      truncated: evidence.metadata.truncated,
+    };
   }
 
   const resolvedSelection =
@@ -180,6 +199,7 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
       steps: stepsByRun.get(run.id) ?? [],
     })),
     ...(resolvedSelection === undefined ? {} : { selection: resolvedSelection }),
+    ...(selectionEvidence === undefined ? {} : { selectionEvidence }),
     declaredInputs: collectDeclaredInputsForTool('report'),
   };
   const claimedKeys = new Map<string, string>();
@@ -313,8 +333,40 @@ function mergeContribution(
 }
 
 /**
- * Compose the cross-tool report, write it to
- * `<reportsDir>/latest.html`, and (optionally) open it in the browser.
+ * Fixed safe filename for a run-addressed report artifact.
+ * Domain-separated SHA-256 of the opaque Run ID — never path-interpolated.
+ */
+export function runAddressedReportFilename(runId: string): string {
+  const digest = createHash('sha256')
+    .update(RUN_REPORT_FILENAME_DOMAIN)
+    .update(runId)
+    .digest('hex');
+  return `${digest}.html`;
+}
+
+function writeReportHtml(
+  reportPath: string,
+  html: string,
+  scope: ReturnType<typeof currentScope>,
+  logger: typeof defaultLogger,
+): void {
+  void writeArtifactAtomically(reportPath, html, {
+    policy: resolveStateLockPolicy(),
+    logger,
+    runId: scope?.runId,
+    command: 'report',
+    cwdBasename:
+      scope?.projectContext?.projectRoot === undefined
+        ? basename(process.cwd())
+        : basename(scope.projectContext.projectRoot),
+  });
+}
+
+/**
+ * Compose the cross-tool report and write it under the active runtime
+ * reports directory. An explicit matched Run selection writes a
+ * run-addressed artifact under `reports/runs/` (returned/launched path)
+ * and may also refresh `latest.html` as a convenience alias.
  *
  * Returns a `ReportResult` describing the written path and whether a
  * browser was launched. Browser-launch failures never propagate — they
@@ -330,22 +382,24 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
 
   // Scope-aware: an ephemeral (no-init) run must write its report into the user
   // cache, never into the user's repository. Atomic write avoids concurrent
-  // audit --open / report races corrupting latest.html mid-write.
+  // audit --open / report races corrupting artifacts mid-write.
   const paths = getCurrentRuntimePaths();
-  const reportPath = join(paths.reportsDir, 'latest.html');
   const scope = currentScope();
   const logger = scope?.logger ?? defaultLogger;
-  // Synchronous lock+write (void silences detached-promises on sync helpers in async fns).
-  void writeArtifactAtomically(reportPath, html, {
-    policy: resolveStateLockPolicy(),
-    logger,
-    runId: scope?.runId,
-    command: 'report',
-    cwdBasename:
-      scope?.projectContext?.projectRoot === undefined
-        ? basename(process.cwd())
-        : basename(scope.projectContext.projectRoot),
-  });
+  const matchedRunId =
+    input.selectionEvidence?.matched === true ? input.selectionEvidence.requestedRunId : undefined;
+  const latestPath = join(paths.reportsDir, 'latest.html');
+  // Exact selection → run-addressed path so two concurrent selections cannot
+  // substitute each other through a shared latest.html launch target.
+  const reportPath =
+    matchedRunId === undefined
+      ? latestPath
+      : join(paths.reportsDir, 'runs', runAddressedReportFilename(matchedRunId));
+
+  writeReportHtml(reportPath, html, scope, logger);
+  if (matchedRunId !== undefined && reportPath !== latestPath) {
+    writeReportHtml(latestPath, html, scope, logger);
+  }
 
   const fragment =
     input.selection === undefined ? undefined : encodeReportViewSelection(input.selection);

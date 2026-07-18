@@ -4,6 +4,20 @@ export interface ReportViewSelection {
   readonly runId?: string;
 }
 
+/**
+ * Host-owned proof that an exact retained parent Run was resolved for report
+ * composition. Never contributed by tools; reserved against external hooks.
+ */
+export interface ReportSelectionEvidence {
+  readonly requestedRunId: string;
+  readonly matched: boolean;
+  readonly totalSteps: number;
+  readonly includedSteps: number;
+  readonly totalSessions: number;
+  readonly includedSessions: number;
+  readonly truncated: boolean;
+}
+
 const CHANGE_IMPACT_FRAGMENT = '#change-impact';
 const CHANGE_IMPACT_VIEW = 'change-impact';
 const REPORT_RUN_ID = /^[A-Za-z0-9_-]{1,128}$/;
