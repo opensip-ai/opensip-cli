@@ -410,8 +410,17 @@ exports[`init golden — single language (typescript) > scaffolds the exact fit+
 schemaVersion: 1
 
 globalExcludes:
+  - "**/.git/**"
   - "**/node_modules/**"
   - "**/dist/**"
+  - "**/build/**"
+  - "**/coverage/**"
+  - "**/.next/**"
+  - "**/.turbo/**"
+  - "**/target/**"
+  - "**/__pycache__/**"
+  - "**/.venv/**"
+  - "**/venv/**"
 
 targets:
   typescript-source:

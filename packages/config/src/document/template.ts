@@ -9,11 +9,18 @@
  * live in the CLI's init templates and could drift from what the composed schema
  * accepts (ADR-0023).
  *
- * The CLI supplies the per-language target *content* (include/exclude globs) and
- * appends the per-tool blocks (e.g. `fitness:`) — those are tool-owned and the
- * CLI is the composition root that knows them. A round-trip test
- * (`renderDocumentHeader` output parses clean through the composed schema)
- * guarantees the skeleton never drifts from validation.
+ * The CLI composition root supplies starter *content* (the full global-exclude
+ * list, per-language target templates, language order) via
+ * {@link DocumentHeaderInput}. This package stays generic: it renders whatever
+ * excludes/targets the caller provides. The small library default below is only
+ * a fallback for other consumers that omit `globalExcludes` — it is not the
+ * product starter set (that lives in the CLI's `starter-config` model so cache
+ * and Init share one host-owned semantics).
+ *
+ * Per-tool blocks (e.g. `fitness:`) remain Tool-owned and are appended by the
+ * CLI after this header. A round-trip test (`renderDocumentHeader` output
+ * parses clean through the composed schema) guarantees the skeleton never
+ * drifts from validation.
  */
 
 /** One named target as the template should scaffold it. */
@@ -32,10 +39,18 @@ export interface DocumentHeaderInput {
   readonly schemaVersion: number;
   /** The named targets to scaffold (the CLI provides per-language content). */
   readonly targets: readonly TargetTemplateInput[];
-  /** Global exclude globs; a sensible default set is used when omitted. */
+  /**
+   * Global exclude globs. When omitted, {@link DEFAULT_GLOBAL_EXCLUDES} is used
+   * as a small library fallback — product starter semantics pass the full list
+   * explicitly from the CLI composition root.
+   */
   readonly globalExcludes?: readonly string[];
 }
 
+/**
+ * Small library default when callers omit `globalExcludes`. Not the product
+ * starter set; the CLI host supplies the full starter list for cache/Init.
+ */
 const DEFAULT_GLOBAL_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
 
 /** Render one target into the `targets:` block, matching `targetsRecordSchema`. */

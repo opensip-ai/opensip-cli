@@ -3,6 +3,9 @@
  * config owns the document-shape rendering; this asserts the output is the
  * expected YAML AND that it parses clean through the host declarations (no
  * drift between the template and the schema that validates it).
+ *
+ * Product starter excludes live in the CLI composition root; this package keeps
+ * only a small library default when callers omit `globalExcludes`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -20,6 +23,9 @@ const TS_TARGET: TargetTemplateInput = {
   exclude: ['**/*.test.ts'],
 };
 
+/** Library fallback only — not the product starter list (CLI-owned). */
+const LIBRARY_DEFAULT_EXCLUDES = ['**/node_modules/**', '**/dist/**'] as const;
+
 describe('renderDocumentHeader', () => {
   it('renders schemaVersion, globalExcludes, and the targets block', () => {
     const out = renderDocumentHeader({ schemaVersion: 1, targets: [TS_TARGET] });
@@ -32,6 +38,14 @@ describe('renderDocumentHeader', () => {
     expect(out).toContain('      - "src/**/*.ts"');
   });
 
+  it('uses the small library default excludes when the caller omits them', () => {
+    const out = renderDocumentHeader({ schemaVersion: 1, targets: [TS_TARGET] });
+    const parsed = parseYaml(out) as { globalExcludes: string[] };
+    expect(parsed.globalExcludes).toEqual([...LIBRARY_DEFAULT_EXCLUDES]);
+    // Product starter has eleven entries; the library default stays two.
+    expect(parsed.globalExcludes).toHaveLength(2);
+  });
+
   it('honours an explicit globalExcludes + concerns override', () => {
     const out = renderDocumentHeader({
       schemaVersion: 2,
@@ -41,6 +55,29 @@ describe('renderDocumentHeader', () => {
     expect(out).toContain('schemaVersion: 2');
     expect(out).toContain('  - "custom/**"');
     expect(out).toContain('    concerns: [backend, api]');
+  });
+
+  it('renders a full caller-supplied starter exclude list without truncation', () => {
+    const starterExcludes = [
+      '**/.git/**',
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/.next/**',
+      '**/.turbo/**',
+      '**/target/**',
+      '**/__pycache__/**',
+      '**/.venv/**',
+      '**/venv/**',
+    ];
+    const out = renderDocumentHeader({
+      schemaVersion: 1,
+      globalExcludes: starterExcludes,
+      targets: [TS_TARGET],
+    });
+    const parsed = parseYaml(out) as { globalExcludes: string[] };
+    expect(parsed.globalExcludes).toEqual(starterExcludes);
   });
 
   it('produces a document the host declarations accept (no drift)', () => {
