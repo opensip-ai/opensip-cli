@@ -54,10 +54,10 @@ const WORKSPACE_VERSION = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'
 const STAGE_GIT_SHA = 'a'.repeat(40);
 
 const COMMON_PROFILE = parseAcceptanceProfile(
-  JSON.parse(readFileSync(join(PROFILE_ROOT, 'common-v1.json'), 'utf8')),
+  JSON.parse(readFileSync(join(PROFILE_ROOT, 'common-v2.json'), 'utf8')),
 );
 const MACOS_PROFILE_RAW = JSON.parse(
-  readFileSync(join(PROFILE_ROOT, 'macos-26-arm64-node24-npm11-v1.json'), 'utf8'),
+  readFileSync(join(PROFILE_ROOT, 'macos-26-arm64-node24-npm11-v2.json'), 'utf8'),
 );
 const MACOS_PROFILE = composeProfile(COMMON_PROFILE, MACOS_PROFILE_RAW);
 
@@ -230,7 +230,7 @@ test('macos-qualification.yml binds the exact profile + independent verifier and
   const wf = stripComments(readWorkflow('macos-qualification.yml'));
   assert.match(
     wf,
-    /\.config\/platform-acceptance\/macos-26-arm64-node24-npm11-v1\.json/,
+    /\.config\/platform-acceptance\/macos-26-arm64-node24-npm11-v2\.json/,
     'the exact macOS support profile must be pinned',
   );
   assert.match(
@@ -982,7 +982,7 @@ test('published qualification delegates the canonical install to the acceptance 
   assert.match(macos, /--published-version/);
   assert.match(
     macos,
-    /macos-26-arm64-node24-npm11-v1\.json/,
+    /macos-26-arm64-node24-npm11-v2\.json/,
     'the profile that selects macos.installer-sh must drive the lifecycle',
   );
   assert.doesNotMatch(
@@ -1014,7 +1014,7 @@ test('the GitHub Release attaches the complete macOS verification bundle', () =>
   const promote = stripComments(sliceJobs(readWorkflow('release.yml')).get('promote-release'));
   const releaseStep = promote.slice(promote.indexOf('Create GitHub Release'));
   for (const file of [
-    'opensip-cli-macos-qualification.v1.json',
+    'opensip-cli-macos-qualification.v2.json',
     'opensip-cli-registry-integrity.v1.json',
     'agent-eval-installed-smoke.json',
     'host-preflight.json',
