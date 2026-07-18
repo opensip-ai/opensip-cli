@@ -1181,7 +1181,8 @@ function persistenceBarrierContext({
         const timer = setInterval(() => {
           if (existsSync(writeLock)) return;
           clearInterval(timer);
-          sessions.push({ id: 'graph-session-waiter', tool: 'graph' });
+          // No session push: graph's `--json` carrier mode carries no
+          // session contribution by documented contract.
           resolve(waiterSuccessJson({ withWaitEvent: !waiterOmitsWaitEvents }));
         }, 5);
         spec.signal?.addEventListener(
@@ -1351,7 +1352,9 @@ test('persistence.contention-retry proves bounded exhaustion, a queued writer, a
   assert.equal(harness.exhaustionCalls, 1);
   assert.equal(harness.waiterCalls, 1);
   assert.equal(harness.sessionGraphCalls, 1);
-  assert.equal(harness.calls.filter(({ argv }) => argv.includes('show')).length, 2);
+  // One replay: the phase-B owner. The --json waiter carries no session by
+  // graph's documented carrier-mode contract.
+  assert.equal(harness.calls.filter(({ argv }) => argv.includes('show')).length, 1);
   // Every competitor contended against an already-held lock.
   assert.equal(harness.competitorStartedBeforeOwnerLock, false);
   assert.ok(

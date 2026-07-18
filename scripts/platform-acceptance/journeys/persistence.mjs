@@ -890,12 +890,19 @@ export async function runSqliteContentionProbe(context, cwd) {
       return fail('contention-write-lock-not-released', []);
     }
 
+    // Exactly ONE new session: the phase-B owner (a rendering run). The
+    // queued waiter runs `--json`, and graph's documented contract is that
+    // export/carrier modes carry no session contribution
+    // (graph-command-spec.ts: "the export/carrier modes (`--json`, gate,
+    // `--report-to`) carry no session"). Note fit's `--json` DOES record a
+    // session — the cross-tool inconsistency is tracked separately; this
+    // journey asserts the contract as specified, it does not editorialize it.
     const replay = await verifyNewGraphSessions(
       context,
       cwd,
       readable.sessionIds,
       'post-contention',
-      2,
+      1,
     );
     if (!replay.ok) return replay.outcome;
     completed = true;
