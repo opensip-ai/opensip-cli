@@ -52,7 +52,7 @@ import {
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { compareReleaseVersions, parseReleaseVersion } from './lib/release-version-policy.mjs';
+import { compareReleaseVersions } from './lib/release-version-policy.mjs';
 import {
   MAX_RELEASE_MANIFEST_BYTES,
   normalizeReleaseManifest,
@@ -291,11 +291,14 @@ function normalizeRegistryInput(raw) {
 /** Leading integer major of a version string (`v24.16.0`/`11.0.0` → "24"/"11"), else null. */
 function versionMajor(value) {
   if (typeof value !== 'string') return null;
-  try {
-    return String(parseReleaseVersion(value, { allowV: true }).major);
-  } catch {
-    return null;
-  }
+  // Host-fact versions are NOT release semver: `sw_vers -productVersion`
+  // reports two-component versions ("26.4") except on patch releases, and a
+  // semver parser rejecting them fired host-sw-vers-major-mismatch on every
+  // correctly-versioned macOS 26 runner. Accept v?MAJOR(.N)* and compare the
+  // major; anything else (empty, leading zero, non-numeric) stays null so an
+  // absent or malformed fact still fails loudly.
+  const match = /^v?(0|[1-9]\d*)(?:\.\d+)*$/.exec(value.trim());
+  return match === null ? null : match[1];
 }
 
 function positiveSafeIntegerString(value) {

@@ -277,10 +277,15 @@ jobs:
 
       # Independent verifier as a SEPARATE process, with the exact expected host
       # constraints, candidate version, and support-row binding. `set +e` so a
-      # verification failure still records + uploads evidence.
+      # verification failure still records + uploads evidence. Guarded on the
+      # acceptance step having produced its identity outputs: when an earlier
+      # step dies (e.g. a repo-gate test failure), running the verifier with
+      # empty VERSION/digest env yields a misleading flag-parse error that
+      # buries the real cause — skip it and let the classification step report
+      # infrastructure-fault from the missing run_rc.
       - name: Verify acceptance evidence (independent)
         id: verify
-        if: always() && steps.preflight.outputs.host_ok == 'true'
+        if: always() && steps.preflight.outputs.host_ok == 'true' && steps.acceptance.outputs.version != ''
         env:
           VERSION: ${{ steps.acceptance.outputs.version }}
           MANIFEST_DIGEST: ${{ steps.acceptance.outputs.manifest_digest }}

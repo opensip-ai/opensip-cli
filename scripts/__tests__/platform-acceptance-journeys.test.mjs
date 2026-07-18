@@ -1047,6 +1047,7 @@ test('resilience.timeout-cleanup requires timeout with zero observed residual de
 
 function persistenceBarrierContext({
   exhaustionSucceeds = false,
+  exhaustionSettleDelayMs = 20,
   interrupt = false,
   interruptLockOutcome = 'stale',
   ownerLockDelayMs = 0,
@@ -1108,7 +1109,7 @@ function persistenceBarrierContext({
       if (exhaustionSucceeds) return Promise.resolve(measured());
       const waitMs = Number(lockWaitMs);
       return new Promise((resolve) => {
-        setTimeout(
+        const timer = setTimeout(
           () =>
             resolve(
               jsonResult(
@@ -1130,7 +1131,15 @@ function persistenceBarrierContext({
                 { status: 1 },
               ),
             ),
-          20,
+          exhaustionSettleDelayMs,
+        );
+        spec.signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer);
+            resolve(measured({ status: null, cancelled: true }));
+          },
+          { once: true },
         );
       });
     }
@@ -1332,6 +1341,19 @@ test('persistence contention launches competitors only after the head-start owne
   const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
   assert.equal(outcome.status, 'pass');
   assert.equal(harness.competitorStartedBeforeOwnerLock, false);
+});
+
+test('persistence contention fails with a timing reason when the short-wait writer never engages', async () => {
+  // The regression that kept the macOS qualification lane red: on a slow
+  // 3-core VM the short-wait writer was still in Node startup when the old
+  // fixed barrier expired, arrived after release, succeeded against a free
+  // lock, and the journey misreported the CLI's bounded timeout as broken.
+  // The engagement gate must instead fail with an infrastructure-timing
+  // reason and release the native holder.
+  const harness = persistenceBarrierContext({ exhaustionSettleDelayMs: 4200 });
+  const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
+  assert.equal(outcome.status, 'fail');
+  assert.equal(outcome.reasonCode, 'contention-competitor-not-engaged');
 });
 
 test('persistence contention cannot pass when bounded retry unexpectedly succeeds', async () => {

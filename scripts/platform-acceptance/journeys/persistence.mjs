@@ -43,6 +43,14 @@ const MAX_RUNTIME_STATE_BYTES = 128 * 1024 * 1024;
 /** Bounded directory walk so a pathological tree cannot exhaust the harness. */
 const MAX_WALK_ENTRIES = 4096;
 const SQLITE_PROBE_WAIT_MS = 10_000;
+// Engagement bound for the short-wait writer: it must SETTLE (fail its bounded
+// lock acquisition, or terminally misbehave) inside this window while the
+// native transaction is still held. Sized against the shipped datastore's
+// SQLite `busy_timeout = 5000` (packages/datastore/src/backends/shared.ts):
+// the blocked owner survives ~5s of native contention, so
+// stable-observation (150ms) + this bound + the unchanged-lock recheck must
+// stay comfortably under it.
+const SQLITE_EXHAUSTION_SETTLE_MS = 3500;
 const SQLITE_PROBE_PROCESS_TIMEOUT_MS = 15_000;
 const SQLITE_WRITE_LOCK_STABLE_MS = 150;
 const SQLITE_COMPETITOR_BARRIER_MS = 1250;
@@ -275,6 +283,15 @@ async function waitForUnchangedWriteLock(
     await delay(10);
   }
   return false;
+}
+
+async function waitForSettled(observation, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (observation.settled) return true;
+    await delay(10);
+  }
+  return observation.settled;
 }
 
 function releaseSqliteHolder(path, lockIdentity) {
@@ -612,7 +629,8 @@ const crossProcessReplayExecutor = async (context) => {
 /**
  * Deterministically force an installed CLI writer to wait on an active SQLite
  * transaction. The helper resolves better-sqlite3 from the installed candidate,
- * then holds BEGIN IMMEDIATE until it observes the CLI's own `.write.lock`.
+ * then holds BEGIN IMMEDIATE until the journey writes the release marker (or
+ * the SQLITE_PROBE_WAIT_MS deadline expires, whichever comes first).
  */
 export async function runSqliteContentionProbe(context, cwd) {
   const readable = await ensureReadableStore(context, cwd);
@@ -695,6 +713,11 @@ export async function runSqliteContentionProbe(context, cwd) {
         timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
       }),
     );
+    // The waiter keeps the DEFAULT lock policy deliberately: it proves the
+    // shipped queue behavior, and with the engagement-driven release below the
+    // lock frees well inside the CI default wait (release ≤ settle bound +
+    // recheck after the owner locked; the waiter's own wait stays ~2s worst
+    // case on a slow VM).
     waiter = observeProcess(
       runCli(context, {
         args: ['graph'],
@@ -704,19 +727,39 @@ export async function runSqliteContentionProbe(context, cwd) {
       }),
     );
 
-    // Keep the native transaction active for longer than the short-wait policy
-    // while both normal-policy writers remain in flight and the exact OpenSIP
-    // lock owner stays unchanged. The short-wait process can remain in SQLite
-    // close/checkpoint cleanup after emitting its timeout, so classify its
-    // public result only after the native holder is released.
+    // Engagement proof: the short-wait writer must SETTLE while the owner
+    // still holds the datastore lock and the native transaction is active. A
+    // launch-order barrier alone cannot prove engagement — on a slow VM the
+    // short-wait process can still be in Node startup when a time-based
+    // barrier expires; it then arrives after release, succeeds against a free
+    // lock, and misreports the CLI's bounded timeout as broken. (That exact
+    // sequence kept the qualification lane red: every process exit 0, reason
+    // `contention-retry-not-exhausted`, on 3-core virtual runners whose
+    // installed-CLI startup exceeded the old fixed barrier.)
+    if (!(await waitForSettled(exhaustion, SQLITE_EXHAUSTION_SETTLE_MS))) {
+      holderReleased = releaseSqliteHolder(releaseMarker, lockIdentity);
+      return fail('contention-competitor-not-engaged', [
+        context.assert.diagnostic(
+          'the short-wait CLI writer did not settle inside the contention window — infrastructure timing (slow spawn/startup on this host), not candidate lock behavior',
+        ),
+      ]);
+    }
+
+    // The owner must still hold the SAME lock after the competitor settled —
+    // this converts "the short-wait writer settled" into "the short-wait
+    // writer settled UNDER contention", while the queued waiter remains in
+    // flight behind the unchanged owner. The stability window here is the
+    // short SQLITE_WRITE_LOCK_STABLE_MS: engagement is already proven above,
+    // and the total native-hold time must stay inside the owner's SQLite
+    // busy_timeout.
     if (
       !(await waitForUnchangedWriteLock(
         writeLock,
         cwd,
         lockIdentity,
         [holder, owner, waiter],
-        SQLITE_PROBE_WAIT_MS,
         SQLITE_COMPETITOR_BARRIER_MS,
+        SQLITE_WRITE_LOCK_STABLE_MS,
       ))
     ) {
       return fail('contention-waiter-not-observed', [
