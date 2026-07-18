@@ -3,6 +3,7 @@ import {
   chmodSync,
   existsSync,
   linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -58,6 +59,7 @@ import type {
   VerifiedRuntimeManifest,
 } from '../runtime-manifest.js';
 import type { RuntimePromotionJournal } from '../runtime-promotion-journal-schema.js';
+import type { RuntimePromotionRootIdentity } from '../runtime-promotion-journal-types.js';
 import type {
   DurableOpenPromotionJournal,
   RuntimePromotionJournalController,
@@ -261,12 +263,14 @@ function authorityHarness(
     readonly rejectAuthorization?: Error;
     readonly rejectLease?: Error;
     readonly sourceManifest?: RuntimeManifestIdentity;
+    readonly sourceRootIdentity?: RuntimePromotionRootIdentity;
   } = {},
 ): AuthorityHarness {
   const events: string[] = [];
   const issued = new WeakSet<object>();
   const verifyOpen = vi.fn((): Promise<RuntimePromotionJournal> => {
     const sourceDir = realpathSync(join(resolveUserPaths().ephemeralProjectsDir, SOURCE_CACHE_KEY));
+    const sourceRoot = lstatSync(sourceDir, { bigint: true });
     return Promise.resolve({
       route: 'promote-cache',
       source: {
@@ -274,6 +278,10 @@ function authorityHarness(
         cacheKey: SOURCE_CACHE_KEY,
         generationDigest: null,
         markerSha256: 'b'.repeat(64),
+        rootIdentity: options.sourceRootIdentity ?? {
+          device: sourceRoot.dev.toString(),
+          inode: sourceRoot.ino.toString(),
+        },
       },
       manifests: {
         source:
@@ -898,6 +906,34 @@ describe('journal-authorized runtime stage copy', () => {
     expect(readFileSync(join(stage, 'evidence.txt'), 'utf8')).toBe('preserved');
   });
 
+  it('binds stage materialization to the expected source-root identity', () => {
+    const source = makeRuntime('source-root-identity-mismatch');
+    writeRuntimeFile(source, 'evidence.txt', 'preserved');
+    const sourceManifest = inspectRuntimeTree(source, 'project-runtime');
+    const sourceRoot = lstatSync(source, { bigint: true });
+    const destinationParent = makeRuntime('source-root-identity-mismatch-parent');
+    const stage = join(realpathSync(destinationParent), STAGE_BASENAME);
+
+    expect(() =>
+      materializeRuntimeStage(
+        source,
+        destinationParent,
+        STAGE_BASENAME,
+        sourceManifest,
+        STAGE_OWNERSHIP,
+        {
+          expectedSourceRootIdentity: {
+            device: sourceRoot.dev === 0n ? '1' : '0',
+            inode: sourceRoot.ino.toString(),
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed' }));
+
+    expect(existsSync(stage)).toBe(false);
+    expect(readFileSync(join(source, 'evidence.txt'), 'utf8')).toBe('preserved');
+  });
+
   it('fails closed at every stage-marker crash window', () => {
     const source = makeRuntime('marker-crash-source');
     writeRuntimeFile(source, 'evidence.txt', 'preserved');
@@ -1308,6 +1344,54 @@ describe('journal-authorized runtime stage copy', () => {
     expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
   });
 
+  it('rejects a selected cache child whose root identity differs from the journal', async () => {
+    const source = makeCopySource();
+    const sourceRoot = lstatSync(source, { bigint: true });
+    const sentinel = writeRuntimeFile(source, 'sentinel.txt', 'selected cache data');
+    const destinationParent = makeCopyDestinationParent('root-identity-mismatch-destination');
+    const harness = authorityHarness({
+      sourceRootIdentity: {
+        device: sourceRoot.dev === 0n ? '1' : '0',
+        inode: sourceRoot.ino.toString(),
+      },
+    });
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>();
+
+    await expect(
+      copyRuntimeToStage(copyInput(source, destinationParent, harness), {
+        materialize,
+      }),
+    ).rejects.toMatchObject({ reason: 'changed' });
+
+    expect(materialize).not.toHaveBeenCalled();
+    expect(harness.authorize).not.toHaveBeenCalled();
+    expect(readFileSync(sentinel, 'utf8')).toBe('selected cache data');
+    expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
+  });
+
+  it('rejects a selected cache symlink instead of following it to foreign data', async () => {
+    if (process.platform === 'win32') return;
+    const selectedSource = makeCopySource();
+    rmSync(selectedSource, { recursive: true });
+    const foreignSource = makeRuntime('foreign-cache-symlink-target');
+    const sentinel = writeRuntimeFile(foreignSource, 'sentinel.txt', 'foreign data');
+    symlinkSync(foreignSource, selectedSource);
+    const destinationParent = makeCopyDestinationParent('source-symlink-destination');
+    const harness = authorityHarness();
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>();
+
+    await expect(
+      copyRuntimeToStage(copyInput(realpathSync(selectedSource), destinationParent, harness), {
+        materialize,
+      }),
+    ).rejects.toMatchObject({ reason: 'invalid-path' });
+
+    expect(materialize).not.toHaveBeenCalled();
+    expect(harness.authorize).not.toHaveBeenCalled();
+    expect(readFileSync(sentinel, 'utf8')).toBe('foreign data');
+    expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
+  });
+
   it('rejects selected-cache bytes that no longer match the journal source manifest', async () => {
     const source = makeCopySource();
     const sourceFile = writeRuntimeFile(source, 'evidence.txt', 'before');
@@ -1515,6 +1599,53 @@ describe('journal-authorized runtime stage copy', () => {
     expect(readFileSync(sourceFile, 'utf8')).toBe('after');
     expect(readFileSync(join(destinationParent, STAGE_BASENAME, 'evidence.txt'), 'utf8')).toBe(
       'before',
+    );
+  });
+
+  it('detects a byte-identical source-root replacement and preserves the replacement', async () => {
+    if (process.platform === 'win32') return;
+    const source = makeCopySource();
+    const sourceFile = writeRuntimeFile(source, 'evidence.txt', 'same bytes');
+    const sourceIdentity = lstatSync(source, { bigint: true });
+    const sourceManifest = inspectVerifiedRuntimeManifest(source, 'cache-source').identity;
+    const destinationParent = makeCopyDestinationParent('source-root-replacement-parent');
+    const displacedSource = `${source}-displaced`;
+    const harness = authorityHarness({ sourceManifest });
+    let replaced = false;
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>(
+      (sourceDir, parent, basename, sourceTree, ownership, expectedSourceRootIdentity) =>
+        materializeRuntimeStage(sourceDir, parent, basename, sourceTree, ownership, {
+          expectedSourceRootIdentity,
+          checkpoint: (checkpoint) => {
+            if (replaced || checkpoint !== 'after-source-entry') return;
+            replaced = true;
+            renameSync(source, displacedSource);
+            makeDirectory(source);
+            writeRuntimeFile(source, 'evidence.txt', 'same bytes');
+          },
+        }),
+    );
+
+    await expect(
+      copyRuntimeToStage(copyInput(source, destinationParent, harness), {
+        materialize,
+      }),
+    ).rejects.toMatchObject({ reason: 'changed' });
+
+    const replacementIdentity = lstatSync(source, { bigint: true });
+    expect(replaced).toBe(true);
+    expect({
+      device: replacementIdentity.dev.toString(),
+      inode: replacementIdentity.ino.toString(),
+    }).not.toEqual({
+      device: sourceIdentity.dev.toString(),
+      inode: sourceIdentity.ino.toString(),
+    });
+    expect(readFileSync(sourceFile, 'utf8')).toBe('same bytes');
+    expect(readFileSync(join(displacedSource, 'evidence.txt'), 'utf8')).toBe('same bytes');
+    expect(inspectVerifiedRuntimeManifest(source, 'cache-source').identity).toEqual(sourceManifest);
+    expect(readFileSync(join(destinationParent, STAGE_BASENAME, 'evidence.txt'), 'utf8')).toBe(
+      'same bytes',
     );
   });
 });

@@ -52,7 +52,12 @@ function optionalToolsFooter(
   const idWidth = Math.max(...recommendations.map((row) => row.id.length));
   return [
     { kind: 'spacer' },
-    line([{ text: '  Optional tools for this project (not installed):', bold: true }]),
+    line([
+      {
+        text: '  Optional tools for this project (not installed):',
+        bold: true,
+      },
+    ]),
     ...recommendations.map((row) =>
       line([
         { text: '    ' },
@@ -112,6 +117,21 @@ function ambiguousView(message: string): ViewNode {
   );
 }
 
+function authoredStateChangedView(message: string): ViewNode {
+  return group(
+    [
+      line([
+        { text: '⚠', tone: 'warning' },
+        { text: ' ' },
+        { text: 'Init state changed while planning', bold: true },
+      ]),
+      { kind: 'spacer' },
+      line([{ text: `  ${message}` }]),
+    ],
+    2,
+  );
+}
+
 function partialStateView(
   err: NonNullable<InitResult['partialStateError']>,
   cwd: string,
@@ -148,7 +168,15 @@ function partialStateView(
     line([
       { text: '    ' },
       { text: 'opensip init --remove', tone: 'brand' },
-      { text: '  Delete opensip-cli/ and scaffold fresh.', dim: true },
+      {
+        text: '  Reset Init-authored files; preserve .runtime evidence.',
+        dim: true,
+      },
+    ]),
+    line([
+      { text: '    ' },
+      { text: 'opensip uninstall --project --dry-run', tone: 'brand' },
+      { text: '  Preview removal of retained runtime evidence.', dim: true },
     ]),
   );
   return group(children, 2);
@@ -238,6 +266,8 @@ export function viewInit(result: InitResult): ViewNode {
     return verbatim(result.insideExistingProject.message);
   if (result.ambiguousLanguageError !== undefined)
     return ambiguousView(result.ambiguousLanguageError.message);
+  if (result.authoredStateChangedError !== undefined)
+    return authoredStateChangedView(result.authoredStateChangedError.message);
   if (result.partialStateError !== undefined)
     return partialStateView(result.partialStateError, result.cwd, result.configFilename);
   if (result.created) return createdView(result);

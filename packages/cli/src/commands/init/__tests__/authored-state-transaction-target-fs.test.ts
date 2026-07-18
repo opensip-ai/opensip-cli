@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
+  constants,
+  fsyncSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -18,6 +21,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { reconcileAuthoredMutation } from '../authored-state-transaction-execution.js';
 import { openStableAuthoredRoot } from '../authored-state-transaction-fs.js';
+import {
+  applyAuthoredDirectory,
+  withBoundAuthoredTarget,
+} from '../authored-state-transaction-target-fs.js';
 import { directoryDigest, sha256Bytes } from '../init-authored-plan-types.js';
 
 import type {
@@ -44,6 +51,10 @@ afterEach(() => {
 function mkdirSafe(path: string, mode = 0o700): void {
   mkdirSync(path, { recursive: true, mode });
   chmodSync(path, mode);
+}
+
+function capabilityError(code: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(code), { code });
 }
 
 function targetHarness(): TargetHarness {
@@ -182,6 +193,195 @@ function fileTemporaryPath(harness: TargetHarness, authoredMutation: InitAuthore
 }
 
 describe('authored target mutation filesystem authority', () => {
+  it('creates a directory through the narrow Windows target and parent handle fallback', () => {
+    const harness = targetHarness();
+    const target = join(harness.project, 'windows-created-directory');
+    let directoryOpenAttempts = 0;
+
+    withBoundAuthoredTarget(
+      openStableAuthoredRoot(harness.project),
+      'windows-created-directory',
+      (authority, current) => {
+        expect(current).toEqual(absent());
+        applyAuthoredDirectory(authority, 0o755);
+      },
+      {
+        platform: 'win32',
+        open: (path, flags) => {
+          if ((flags & constants.O_DIRECTORY) !== 0) {
+            directoryOpenAttempts += 1;
+            throw capabilityError('EINVAL');
+          }
+          return openSync(path, flags);
+        },
+      },
+    );
+
+    expect(directoryOpenAttempts).toBeGreaterThanOrEqual(3);
+    expect(lstatSync(target).isDirectory()).toBe(true);
+    expect(Number(lstatSync(target, { bigint: true }).mode & 0o777n)).toBe(0o755);
+  });
+
+  it('falls back from Windows directory fchmod and fsync while preserving identity', () => {
+    const harness = targetHarness();
+    const target = join(harness.project, 'windows-existing-directory');
+    mkdirSafe(target, 0o700);
+    let pathChmodCalls = 0;
+    let descriptorFsyncCalls = 0;
+
+    withBoundAuthoredTarget(
+      openStableAuthoredRoot(harness.project),
+      'windows-existing-directory',
+      (authority) => {
+        applyAuthoredDirectory(authority, 0o755);
+      },
+      {
+        platform: 'win32',
+        fchmodDirectory: () => {
+          throw capabilityError('EPERM');
+        },
+        chmodDirectoryPath: (path, mode) => {
+          pathChmodCalls += 1;
+          chmodSync(path, mode);
+        },
+        fsyncDirectoryDescriptor: () => {
+          descriptorFsyncCalls += 1;
+          throw capabilityError('ENOTSUP');
+        },
+      },
+    );
+
+    expect(pathChmodCalls).toBe(1);
+    expect(descriptorFsyncCalls).toBe(1);
+    expect(Number(lstatSync(target, { bigint: true }).mode & 0o777n)).toBe(0o755);
+  });
+
+  it('keeps regular authored files fail-closed when Windows open reports a capability error', () => {
+    const harness = targetHarness();
+    const target = join(harness.project, 'windows-file.txt');
+    writeFileSync(target, 'customer', { mode: 0o600 });
+    let callbackCalled = false;
+
+    expect(() =>
+      withBoundAuthoredTarget(
+        openStableAuthoredRoot(harness.project),
+        'windows-file.txt',
+        () => {
+          callbackCalled = true;
+        },
+        {
+          platform: 'win32',
+          open: (path, flags) => {
+            if ((flags & constants.O_DIRECTORY) !== 0) return openSync(path, flags);
+            throw capabilityError('EINVAL');
+          },
+        },
+      ),
+    ).toThrow(/target could not be pinned/iu);
+
+    expect(callbackCalled).toBe(false);
+    expect(readFileSync(target, 'utf8')).toBe('customer');
+  });
+
+  it('rejects a parent replacement during Windows directory-open fallback', () => {
+    const harness = targetHarness();
+    const parent = join(harness.project, 'windows-parent');
+    const displaced = join(harness.project, 'windows-parent.displaced');
+    mkdirSafe(parent);
+
+    expect(() =>
+      withBoundAuthoredTarget(
+        openStableAuthoredRoot(harness.project),
+        'windows-parent/target',
+        () => {
+          throw new Error('callback must not run');
+        },
+        {
+          platform: 'win32',
+          open: (path, flags) => {
+            if (path === parent && (flags & constants.O_DIRECTORY) !== 0) {
+              renameSync(parent, displaced);
+              mkdirSafe(parent);
+              throw capabilityError('EINVAL');
+            }
+            return openSync(path, flags);
+          },
+        },
+      ),
+    ).toThrow(/parent changed during Windows handle fallback/iu);
+
+    expect(lstatSync(parent).isDirectory()).toBe(true);
+    expect(lstatSync(displaced).isDirectory()).toBe(true);
+  });
+
+  it('rejects a directory replacement during the Windows path-chmod fallback', () => {
+    const harness = targetHarness();
+    const target = join(harness.project, 'windows-path-chmod');
+    const displaced = join(harness.project, 'windows-path-chmod.displaced');
+    mkdirSafe(target, 0o700);
+
+    expect(() =>
+      withBoundAuthoredTarget(
+        openStableAuthoredRoot(harness.project),
+        'windows-path-chmod',
+        (authority) => {
+          applyAuthoredDirectory(authority, 0o755);
+        },
+        {
+          platform: 'win32',
+          open: (path, flags) => {
+            if (path === target && (flags & constants.O_DIRECTORY) !== 0) {
+              throw capabilityError('EINVAL');
+            }
+            return openSync(path, flags);
+          },
+          chmodDirectoryPath: (path, mode) => {
+            renameSync(path, displaced);
+            mkdirSafe(path, mode);
+          },
+        },
+      ),
+    ).toThrow(/was replaced/iu);
+
+    expect(Number(lstatSync(displaced, { bigint: true }).mode & 0o777n)).toBe(0o700);
+    expect(Number(lstatSync(target, { bigint: true }).mode & 0o777n)).toBe(0o755);
+  });
+
+  it('rejects a parent replacement during Windows directory-fsync fallback', () => {
+    const harness = targetHarness();
+    const parent = join(harness.project, 'windows-fsync-parent');
+    const displaced = join(harness.project, 'windows-fsync-parent.displaced');
+    mkdirSafe(parent);
+    let fsyncCalls = 0;
+
+    expect(() =>
+      withBoundAuthoredTarget(
+        openStableAuthoredRoot(harness.project),
+        'windows-fsync-parent/created',
+        (authority) => {
+          applyAuthoredDirectory(authority, 0o755);
+        },
+        {
+          platform: 'win32',
+          fsyncDirectoryDescriptor: (descriptor) => {
+            fsyncCalls += 1;
+            if (fsyncCalls === 1) {
+              fsyncSync(descriptor);
+              return;
+            }
+            renameSync(parent, displaced);
+            mkdirSafe(parent);
+            throw capabilityError('EPERM');
+          },
+        },
+      ),
+    ).toThrow(/ancestor changed before mutation/iu);
+
+    expect(fsyncCalls).toBe(2);
+    expect(lstatSync(join(displaced, 'created')).isDirectory()).toBe(true);
+    expect(lstatSync(parent).isDirectory()).toBe(true);
+  });
+
   it('does not overwrite a file injected into an absent create target', () => {
     const harness = targetHarness();
     const target = join(harness.project, 'created.txt');

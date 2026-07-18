@@ -21,6 +21,7 @@ export const RUNTIME_PROMOTION_JOURNAL_CAPS = Object.freeze({
 export const RUNTIME_PROMOTION_COORDINATION_KEY_PATTERN = /^[a-f0-9]{24}$/u;
 export const RUNTIME_PROMOTION_CACHE_KEY_PATTERN = /^[a-f0-9]{24}$/u;
 export const RUNTIME_PROMOTION_DIGEST_PATTERN = /^[a-f0-9]{64}$/u;
+export const RUNTIME_PROMOTION_ROOT_IDENTITY_PATTERN = /^\d{1,40}$/u;
 export const RUNTIME_PROMOTION_OPERATION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
 export const RUNTIME_PROMOTION_OWNER_TOKEN_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]{15,127}$/u;
 export const RUNTIME_PROMOTION_OWNERSHIP_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{15,127}$/u;
@@ -135,11 +136,17 @@ export type RuntimePromotionTerminalOutcome = (typeof RUNTIME_PROMOTION_TERMINAL
 export const RUNTIME_PROMOTION_AUTHORITIES = ['project', 'cache', 'none'] as const;
 export type RuntimePromotionAuthority = (typeof RUNTIME_PROMOTION_AUTHORITIES)[number];
 
+export interface RuntimePromotionRootIdentity {
+  readonly device: string;
+  readonly inode: string;
+}
+
 export interface RuntimePromotionSource {
   readonly classification: RuntimePromotionSourceClassification;
   readonly cacheKey: string | null;
   readonly generationDigest: string | null;
   readonly markerSha256: string | null;
+  readonly rootIdentity: RuntimePromotionRootIdentity | null;
 }
 
 export interface RuntimePromotionInputs {
@@ -249,6 +256,7 @@ export interface RuntimePromotionJournal {
   readonly route: RuntimePromotionRoute;
   readonly destinationParentPreexisting: boolean;
   readonly destinationRuntimePreexisting: boolean;
+  readonly destinationRootIdentity: RuntimePromotionRootIdentity | null;
   readonly source: RuntimePromotionSource;
   readonly inputs: RuntimePromotionInputs;
   readonly plan: RuntimePromotionPlanIdentity;
@@ -269,6 +277,7 @@ export interface CreateRuntimePromotionJournalInput {
   readonly route: RuntimePromotionRoute;
   readonly destinationParentPreexisting: boolean;
   readonly destinationRuntimePreexisting: boolean;
+  readonly destinationRootIdentity: RuntimePromotionRootIdentity | null;
   readonly source: RuntimePromotionSource;
   readonly inputs: RuntimePromotionInputs;
   readonly plan: RuntimePromotionPlanIdentity;

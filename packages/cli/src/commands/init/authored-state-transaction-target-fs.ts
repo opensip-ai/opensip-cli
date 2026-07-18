@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   closeSync,
   constants,
   fchmodSync,
@@ -14,6 +15,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
+import { normalizeAuthoredPathMode } from './authored-path-mode.js';
 import {
   assertSafeAuthoredOwnerMode,
   assertStableAuthoredEntry,
@@ -32,6 +34,7 @@ import {
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import { normalizeProjectRelativePath } from './init-authored-plan-types.js';
+import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fallback.js';
 
 import type { InitAuthoredPathState } from './init-authored-plan.js';
 import type { BigIntStats } from 'node:fs';
@@ -42,9 +45,25 @@ interface BoundAuthoredAncestor {
 }
 
 interface BoundAuthoredTargetEntry {
-  readonly descriptor: number;
+  readonly descriptor: number | null;
   readonly identity: AuthoredEntryIdentity;
   readonly type: 'directory' | 'file';
+}
+
+export interface AuthoredTargetFilesystemDependencies {
+  readonly platform?: NodeJS.Platform;
+  readonly open?: (path: string, flags: number) => number;
+  readonly chmodDirectoryPath?: (path: string, mode: number) => void;
+  readonly fchmodDirectory?: (descriptor: number, mode: number) => void;
+  readonly fsyncDirectoryDescriptor?: (descriptor: number) => void;
+}
+
+interface ResolvedAuthoredTargetFilesystemDependencies {
+  readonly platform: NodeJS.Platform;
+  readonly open: (path: string, flags: number) => number;
+  readonly chmodDirectoryPath: (path: string, mode: number) => void;
+  readonly fchmodDirectory: (descriptor: number, mode: number) => void;
+  readonly fsyncDirectoryDescriptor: (descriptor: number) => void;
 }
 
 const FILE_BLOB_DESCRIPTION = 'an authored file blob';
@@ -63,9 +82,10 @@ export interface BoundAuthoredTarget {
   readonly relativePath: string;
   readonly path: string;
   readonly parentPath: string;
-  readonly parentDescriptor: number;
+  readonly parentDescriptor: number | null;
   readonly parentIdentity: AuthoredEntryIdentity;
   readonly ancestors: readonly BoundAuthoredAncestor[];
+  readonly filesystem: ResolvedAuthoredTargetFilesystemDependencies;
   target: BoundAuthoredTargetEntry | null;
 }
 
@@ -104,7 +124,51 @@ function assertSafeTargetStat(stat: BigIntStats, description: string): void {
   assertSafeAuthoredOwnerMode(stat, description);
 }
 
-function openTargetEntry(path: string): BoundAuthoredTargetEntry | null {
+function resolveFilesystemDependencies(
+  dependencies: AuthoredTargetFilesystemDependencies,
+): ResolvedAuthoredTargetFilesystemDependencies {
+  return {
+    platform: dependencies.platform ?? process.platform,
+    open: dependencies.open ?? openSync,
+    chmodDirectoryPath: dependencies.chmodDirectoryPath ?? chmodSync,
+    fchmodDirectory: dependencies.fchmodDirectory ?? fchmodSync,
+    fsyncDirectoryDescriptor: dependencies.fsyncDirectoryDescriptor ?? fsyncSync,
+  };
+}
+
+function bindWindowsDirectoryTargetFallback(
+  path: string,
+  before: BigIntStats,
+): BoundAuthoredTargetEntry {
+  let after: BigIntStats;
+  try {
+    after = lstatSync(path, { bigint: true });
+  } catch (error) {
+    authoredTransactionFailure(
+      'an authored directory target changed during Windows handle fallback',
+      error,
+    );
+  }
+  assertSafeTargetStat(after, 'an authored directory target');
+  if (
+    entryType(after) !== 'directory' ||
+    !sameAuthoredEntryIdentity(authoredEntryIdentity(before), authoredEntryIdentity(after))
+  ) {
+    authoredTransactionFailure(
+      'an authored directory target changed during Windows handle fallback',
+    );
+  }
+  return {
+    descriptor: null,
+    identity: authoredEntryIdentity(after),
+    type: 'directory',
+  };
+}
+
+function openTargetEntry(
+  path: string,
+  filesystem: ResolvedAuthoredTargetFilesystemDependencies,
+): BoundAuthoredTargetEntry | null {
   let before: BigIntStats;
   try {
     before = lstatSync(path, { bigint: true });
@@ -116,7 +180,7 @@ function openTargetEntry(path: string): BoundAuthoredTargetEntry | null {
   const type = entryType(before);
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(
+    descriptor = filesystem.open(
       path,
       constants.O_RDONLY |
         constants.O_NOFOLLOW |
@@ -136,15 +200,30 @@ function openTargetEntry(path: string): BoundAuthoredTargetEntry | null {
       type,
     };
   } catch (error) {
+    const openFailed = descriptor === undefined;
     if (descriptor !== undefined) closeSync(descriptor);
+    if (
+      openFailed &&
+      type === 'directory' &&
+      isWindowsDirectoryHandleFallback(error, filesystem.platform)
+    ) {
+      return bindWindowsDirectoryTargetFallback(path, before);
+    }
     authoredTransactionFailure('an authored target could not be pinned', error);
   }
 }
 
-function openParentDescriptor(path: string, identity: AuthoredEntryIdentity): number {
+function openParentDescriptor(
+  path: string,
+  identity: AuthoredEntryIdentity,
+  filesystem: ResolvedAuthoredTargetFilesystemDependencies,
+): number | null {
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    descriptor = filesystem.open(
+      path,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
     const opened = fstatSync(descriptor, { bigint: true });
     if (
       !opened.isDirectory() ||
@@ -156,12 +235,27 @@ function openParentDescriptor(path: string, identity: AuthoredEntryIdentity): nu
     assertSafeAuthoredOwnerMode(opened, 'an authored target parent');
     return descriptor;
   } catch (error) {
+    const openFailed = descriptor === undefined;
     if (descriptor !== undefined) closeSync(descriptor);
+    if (openFailed && isWindowsDirectoryHandleFallback(error, filesystem.platform)) {
+      const after = currentDirectoryIdentity(path, 'an authored target parent');
+      if (!sameAuthoredDirectoryAuthority(identity, after)) {
+        authoredTransactionFailure(
+          'an authored target parent changed during Windows handle fallback',
+        );
+      }
+      return null;
+    }
     authoredTransactionFailure('an authored target parent could not be pinned', error);
   }
 }
 
-function bindAuthoredTarget(root: StableAuthoredRoot, relativePath: string): BoundAuthoredTarget {
+function bindAuthoredTarget(
+  root: StableAuthoredRoot,
+  relativePath: string,
+  dependencies: AuthoredTargetFilesystemDependencies,
+): BoundAuthoredTarget {
+  const filesystem = resolveFilesystemDependencies(dependencies);
   assertStableAuthoredRoot(root);
   const normalized = normalizeProjectRelativePath(relativePath);
   const segments = normalized.split('/');
@@ -185,7 +279,7 @@ function bindAuthoredTarget(root: StableAuthoredRoot, relativePath: string): Bou
     });
   }
   const parentIdentity = ancestors.at(-1)?.identity ?? root.identity;
-  const parentDescriptor = openParentDescriptor(currentPath, parentIdentity);
+  const parentDescriptor = openParentDescriptor(currentPath, parentIdentity, filesystem);
   const path = resolveAuthoredTarget(root, normalized);
   try {
     return {
@@ -196,17 +290,22 @@ function bindAuthoredTarget(root: StableAuthoredRoot, relativePath: string): Bou
       parentDescriptor,
       parentIdentity,
       ancestors,
-      target: openTargetEntry(path),
+      filesystem,
+      target: openTargetEntry(path, filesystem),
     };
   } catch (error) {
-    closeSync(parentDescriptor);
+    if (parentDescriptor !== null) closeSync(parentDescriptor);
     throw error;
   }
 }
 
 function closeBoundAuthoredTarget(authority: BoundAuthoredTarget): void {
-  if (authority.target !== null) closeSync(authority.target.descriptor);
-  closeSync(authority.parentDescriptor);
+  closeTargetDescriptor(authority.target);
+  if (authority.parentDescriptor !== null) closeSync(authority.parentDescriptor);
+}
+
+function closeTargetDescriptor(target: BoundAuthoredTargetEntry | null): void {
+  if (target?.descriptor !== null && target !== null) closeSync(target.descriptor);
 }
 
 function currentDirectoryIdentity(path: string, description: string): AuthoredEntryIdentity {
@@ -231,13 +330,15 @@ function assertPinnedParentAndAncestors(authority: BoundAuthoredTarget): void {
       authoredTransactionFailure('an authored target ancestor changed before mutation');
     }
   }
-  const openedParent = fstatSync(authority.parentDescriptor, { bigint: true });
-  if (
-    !openedParent.isDirectory() ||
-    openedParent.isSymbolicLink() ||
-    !sameAuthoredDirectoryAuthority(authority.parentIdentity, authoredEntryIdentity(openedParent))
-  ) {
-    authoredTransactionFailure('the pinned authored target parent changed before mutation');
+  if (authority.parentDescriptor !== null) {
+    const openedParent = fstatSync(authority.parentDescriptor, { bigint: true });
+    if (
+      !openedParent.isDirectory() ||
+      openedParent.isSymbolicLink() ||
+      !sameAuthoredDirectoryAuthority(authority.parentIdentity, authoredEntryIdentity(openedParent))
+    ) {
+      authoredTransactionFailure('the pinned authored target parent changed before mutation');
+    }
   }
   const pathParent = currentDirectoryIdentity(
     authority.parentPath,
@@ -268,17 +369,115 @@ function assertPinnedTarget(authority: BoundAuthoredTarget): void {
   ) {
     authoredTransactionFailure('the authored target changed before mutation');
   }
-  const opened = fstatSync(expected.descriptor, { bigint: true });
-  if (
-    entryType(opened) !== expected.type ||
-    !sameAuthoredEntryIdentity(expected.identity, authoredEntryIdentity(opened))
-  ) {
-    authoredTransactionFailure('the pinned authored target changed before mutation');
+  if (expected.descriptor !== null) {
+    const opened = fstatSync(expected.descriptor, { bigint: true });
+    if (
+      entryType(opened) !== expected.type ||
+      !sameAuthoredEntryIdentity(expected.identity, authoredEntryIdentity(opened))
+    ) {
+      authoredTransactionFailure('the pinned authored target changed before mutation');
+    }
   }
 }
 
 function sameFilesystemObject(left: AuthoredEntryIdentity, right: AuthoredEntryIdentity): boolean {
   return left.dev === right.dev && left.ino === right.ino && left.uid === right.uid;
+}
+
+function assertDirectoryObjectAfterOperation(
+  authority: BoundAuthoredTarget,
+  expectedObject: AuthoredEntryIdentity,
+  mode: number,
+  description: string,
+): AuthoredEntryIdentity {
+  assertPinnedParentAndAncestors(authority);
+  const current = currentDirectoryIdentity(authority.path, description);
+  if (!sameFilesystemObject(expectedObject, current)) {
+    authoredTransactionFailure(`${description} was replaced`);
+  }
+  const normalizedMode = normalizeAuthoredPathMode(
+    current.mode,
+    'directory',
+    authority.filesystem.platform,
+  );
+  const expectedMode = normalizeAuthoredPathMode(mode, 'directory', authority.filesystem.platform);
+  if (normalizedMode !== expectedMode) {
+    authoredTransactionFailure(`${description} has the wrong committed mode`);
+  }
+  const descriptor = authority.target?.descriptor;
+  if (descriptor !== null && descriptor !== undefined) {
+    const opened = fstatSync(descriptor, { bigint: true });
+    const openedIdentity = authoredEntryIdentity(opened);
+    if (
+      entryType(opened) !== 'directory' ||
+      !sameFilesystemObject(expectedObject, openedIdentity) ||
+      normalizeAuthoredPathMode(opened.mode, 'directory', authority.filesystem.platform) !==
+        expectedMode
+    ) {
+      authoredTransactionFailure(`${description} changed through its descriptor`);
+    }
+  }
+  return current;
+}
+
+function commitPinnedDirectoryMode(
+  authority: BoundAuthoredTarget,
+  target: BoundAuthoredTargetEntry,
+  mode: number,
+  description: string,
+): void {
+  let pathChmodRequired = target.descriptor === null;
+  if (target.descriptor !== null) {
+    try {
+      authority.filesystem.fchmodDirectory(target.descriptor, mode);
+    } catch (error) {
+      if (!isWindowsDirectoryHandleFallback(error, authority.filesystem.platform)) {
+        authoredTransactionFailure(`${description} mode could not be committed`, error);
+      }
+      pathChmodRequired = true;
+    }
+  }
+  if (!pathChmodRequired) return;
+  const before = currentDirectoryIdentity(authority.path, description);
+  if (!sameFilesystemObject(target.identity, before)) {
+    authoredTransactionFailure(`${description} was replaced before path chmod`);
+  }
+  assertPinnedParentAndAncestors(authority);
+  try {
+    authority.filesystem.chmodDirectoryPath(authority.path, mode);
+  } catch (error) {
+    authoredTransactionFailure(`${description} mode could not be committed by path`, error);
+  }
+}
+
+function syncPinnedDirectory(
+  authority: BoundAuthoredTarget,
+  target: BoundAuthoredTargetEntry,
+  description: string,
+): void {
+  if (target.descriptor === null) return;
+  try {
+    authority.filesystem.fsyncDirectoryDescriptor(target.descriptor);
+  } catch (error) {
+    if (!isWindowsDirectoryHandleFallback(error, authority.filesystem.platform)) {
+      authoredTransactionFailure(`${description} could not be synced`, error);
+    }
+  }
+}
+
+function finalizePinnedAuthoredDirectory(
+  authority: BoundAuthoredTarget,
+  target: BoundAuthoredTargetEntry,
+  mode: number,
+  description: string,
+): AuthoredEntryIdentity {
+  if (target.type !== 'directory') {
+    authoredTransactionFailure(`${description} has the wrong pinned type`);
+  }
+  commitPinnedDirectoryMode(authority, target, mode, description);
+  assertDirectoryObjectAfterOperation(authority, target.identity, mode, description);
+  syncPinnedDirectory(authority, target, description);
+  return assertDirectoryObjectAfterOperation(authority, target.identity, mode, description);
 }
 
 function refreshTarget(
@@ -287,8 +486,8 @@ function refreshTarget(
 ): void {
   const previous = authority.target;
   authority.target = null;
-  if (previous !== null) closeSync(previous.descriptor);
-  authority.target = openTargetEntry(authority.path);
+  closeTargetDescriptor(previous);
+  authority.target = openTargetEntry(authority.path, authority.filesystem);
   if (
     expectedObject !== undefined &&
     (authority.target === null || !sameFilesystemObject(expectedObject, authority.target.identity))
@@ -299,17 +498,17 @@ function refreshTarget(
 }
 
 function fsyncPinnedParent(authority: BoundAuthoredTarget): void {
-  try {
-    fsyncSync(authority.parentDescriptor);
-  } catch (error) {
-    if (
-      process.platform === 'win32' &&
-      (hasCode(error, 'EINVAL') || hasCode(error, 'ENOTSUP') || hasCode(error, 'EPERM'))
-    ) {
-      return;
+  assertPinnedParentAndAncestors(authority);
+  if (authority.parentDescriptor !== null) {
+    try {
+      authority.filesystem.fsyncDirectoryDescriptor(authority.parentDescriptor);
+    } catch (error) {
+      if (!isWindowsDirectoryHandleFallback(error, authority.filesystem.platform)) {
+        throw error;
+      }
     }
-    throw error;
   }
+  assertPinnedParentAndAncestors(authority);
 }
 
 export function observeBoundAuthoredTarget(authority: BoundAuthoredTarget): InitAuthoredPathState {
@@ -323,8 +522,9 @@ export function withBoundAuthoredTarget<T>(
   root: StableAuthoredRoot,
   relativePath: string,
   callback: (authority: BoundAuthoredTarget, current: InitAuthoredPathState) => T,
+  dependencies: AuthoredTargetFilesystemDependencies = {},
 ): T {
-  const authority = bindAuthoredTarget(root, relativePath);
+  const authority = bindAuthoredTarget(root, relativePath, dependencies);
   try {
     return callback(authority, observeBoundAuthoredTarget(authority));
   } finally {
@@ -492,13 +692,13 @@ export function applyAuthoredDirectory(
       authoredTransactionFailure('a directory target has the wrong pinned type');
     }
     mutationBoundary(authority, 'chmod-directory', hooks);
-    try {
-      fchmodSync(current.descriptor, mode);
-      fsyncSync(current.descriptor);
-    } catch (error) {
-      authoredTransactionFailure('an authored directory mode could not be committed', error);
-    }
-    refreshTarget(authority, current.identity);
+    const finalized = finalizePinnedAuthoredDirectory(
+      authority,
+      current,
+      mode,
+      'an authored directory',
+    );
+    refreshTarget(authority, finalized);
     return;
   }
   mutationBoundary(authority, 'create-directory', hooks);
@@ -507,21 +707,18 @@ export function applyAuthoredDirectory(
   } catch (error) {
     authoredTransactionFailure('an authored directory could not be created exclusively', error);
   }
-  const created = openTargetEntry(authority.path);
+  const created = openTargetEntry(authority.path, authority.filesystem);
   if (created?.type !== 'directory') {
-    if (created !== null) closeSync(created.descriptor);
+    closeTargetDescriptor(created);
     authoredTransactionFailure('a newly created authored directory has the wrong type');
   }
-  let createdIdentity: AuthoredEntryIdentity;
-  try {
-    fchmodSync(created.descriptor, mode);
-    fsyncSync(created.descriptor);
-    createdIdentity = authoredEntryIdentity(fstatSync(created.descriptor, { bigint: true }));
-  } catch (error) {
-    authoredTransactionFailure('a newly created authored directory could not be finalized', error);
-  } finally {
-    closeSync(created.descriptor);
-  }
+  authority.target = created;
+  const createdIdentity = finalizePinnedAuthoredDirectory(
+    authority,
+    created,
+    mode,
+    'a newly created authored directory',
+  );
   fsyncPinnedParent(authority);
   refreshTarget(authority, createdIdentity);
 }
@@ -543,7 +740,7 @@ export function removeAuthoredTarget(
   }
   fsyncPinnedParent(authority);
   if (authority.target !== null) {
-    closeSync(authority.target.descriptor);
+    if (authority.target.descriptor !== null) closeSync(authority.target.descriptor);
     authority.target = null;
   }
   assertPinnedParentAndAncestors(authority);

@@ -10,14 +10,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename as pathBasename, join } from 'node:path';
 
+import { INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES } from './init-authored-plan-types.js';
 import { ALL_LANGUAGES } from './language-detection.js';
 
+import type { InitAuthoredSnapshotRecord } from './init-authored-plan-types.js';
 import type { SupportedLanguage } from './language-detection.js';
 import type { RenderedToolScaffold, ToolScaffold } from '../shared.js';
 import type { PreExistingFile } from '@opensip-cli/contracts';
 import type { ProjectPaths } from '@opensip-cli/core';
 
-const GENERATED_DIR_NAMES = new Set(['node_modules', 'dist', 'coverage', '.turbo']);
+const GENERATED_DIR_NAMES = new Set<string>(INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES);
 
 /**
  * Build the full set of scaffold templates that init would write for the given
@@ -43,6 +45,42 @@ function buildScaffoldTemplates(
 
 function sha256(content: string): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+interface FileClassificationContext {
+  readonly templateHashes: ReadonlyMap<string, string>;
+  readonly currentLangSet: ReadonlySet<string>;
+  readonly staleIds: readonly string[];
+}
+
+function buildFileClassificationContext(
+  paths: ProjectPaths,
+  currentLanguages: readonly SupportedLanguage[],
+  toolScaffolds: readonly RenderedToolScaffold[],
+): FileClassificationContext {
+  const templates = buildScaffoldTemplates(paths, toolScaffolds);
+  const templateHashes = new Map<string, string>();
+  for (const [absPath, body] of templates) {
+    templateHashes.set(absPath, sha256(body));
+  }
+
+  // Stale-id detection (ADR-0038): the COMPLETE id universe each tool owns
+  // (`stableExampleIds`), minus the ids the CURRENT languages scaffold. A file
+  // carrying a complete-but-not-current id is a stale scaffold for a config the
+  // project no longer uses; current-config ids are excluded so an edited
+  // current-language example (no content-hash match) stays `custom`.
+  const completeIds = new Set<string>(
+    toolScaffolds.flatMap((toolScaffold) => toolScaffold.stableExampleIds),
+  );
+  const currentIds = new Set<string>(
+    toolScaffolds.flatMap((toolScaffold) => toolScaffold.examples.map((file) => file.stableId)),
+  );
+
+  return {
+    templateHashes,
+    currentLangSet: new Set<string>(currentLanguages),
+    staleIds: [...completeIds].filter((id) => !currentIds.has(id)),
+  };
 }
 
 /**
@@ -104,25 +142,7 @@ export function classifyFilesFromRenderedScaffolds(
 ): PreExistingFile[] {
   if (!existsSync(paths.userSourceDir)) return [];
 
-  const templates = buildScaffoldTemplates(paths, toolScaffolds);
-  const templateHashes = new Map<string, string>();
-  for (const [absPath, body] of templates) {
-    templateHashes.set(absPath, sha256(body));
-  }
-  const currentLangSet = new Set<string>(currentLanguages);
-
-  // Stale-id detection (ADR-0038): the COMPLETE id universe each tool owns
-  // (`stableExampleIds`), minus the ids the CURRENT languages scaffold. A file
-  // carrying a complete-but-not-current id is a stale scaffold for a config the
-  // project no longer uses; current-config ids are excluded so an edited
-  // current-language example (no content-hash match) stays `custom`.
-  const completeIds = new Set<string>(
-    toolScaffolds.flatMap((toolScaffold) => toolScaffold.stableExampleIds),
-  );
-  const currentIds = new Set<string>(
-    toolScaffolds.flatMap((toolScaffold) => toolScaffold.examples.map((file) => file.stableId)),
-  );
-  const staleIds = [...completeIds].filter((id) => !currentIds.has(id));
+  const context = buildFileClassificationContext(paths, currentLanguages, toolScaffolds);
 
   const out: PreExistingFile[] = [];
 
@@ -157,7 +177,7 @@ export function classifyFilesFromRenderedScaffolds(
         continue;
       }
       if (!st.isFile()) continue;
-      out.push(classifyOneFile(full, templateHashes, currentLangSet, staleIds));
+      out.push(classifyOneFile(full, context));
     }
   };
   visit(paths.userSourceDir);
@@ -168,14 +188,68 @@ export function classifyFilesFromRenderedScaffolds(
   return out;
 }
 
+function hasGeneratedDirectoryAncestor(
+  relativePath: string,
+  records: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
+): boolean {
+  const segments = relativePath.split('/');
+  let ancestor = segments[0] ?? '';
+  for (let index = 1; index < segments.length - 1; index += 1) {
+    const segment = segments[index];
+    ancestor += `/${segment}`;
+    const record = records.get(ancestor);
+    if (
+      GENERATED_DIR_NAMES.has(segment) &&
+      record?.exists === true &&
+      record.type === 'directory'
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Classify the exact authored bytes captured by the durable Init snapshot.
+ *
+ * This is the planner-facing counterpart to the filesystem walker above. It
+ * deliberately performs no filesystem I/O: presentation must describe the
+ * same bounded preimage used to construct the replay plan, even if a customer
+ * path changes after snapshot capture. Generated-output subtrees retain the
+ * same exclusions as the legacy walker.
+ */
+export function classifySnapshotFilesFromRenderedScaffolds(
+  paths: ProjectPaths,
+  currentLanguages: readonly SupportedLanguage[],
+  toolScaffolds: readonly RenderedToolScaffold[],
+  records: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
+): PreExistingFile[] {
+  const context = buildFileClassificationContext(paths, currentLanguages, toolScaffolds);
+  const out: PreExistingFile[] = [];
+
+  for (const [relativePath, record] of records) {
+    if (
+      !relativePath.startsWith('opensip-cli/') ||
+      relativePath === 'opensip-cli/.runtime' ||
+      relativePath.startsWith('opensip-cli/.runtime/') ||
+      !record.exists ||
+      record.type !== 'file' ||
+      hasGeneratedDirectoryAncestor(relativePath, records)
+    ) {
+      continue;
+    }
+    const absolutePath = join(paths.projectDir, ...relativePath.split('/'));
+    const content = Buffer.from(record.contentBase64, 'base64').toString('utf8');
+    out.push(classifyFileContent(absolutePath, content, context));
+  }
+
+  out.sort((left, right) => left.path.localeCompare(right.path));
+  return out;
+}
+
 const STALE_FILENAME_PATTERN = /^example-check-([a-z+]+)\.mjs$/;
 
-function classifyOneFile(
-  absPath: string,
-  templateHashes: ReadonlyMap<string, string>,
-  currentLangSet: ReadonlySet<string>,
-  staleIds: readonly string[],
-): PreExistingFile {
+function classifyOneFile(absPath: string, context: FileClassificationContext): PreExistingFile {
   let content: string;
   try {
     content = readFileSync(absPath, 'utf8');
@@ -183,10 +257,17 @@ function classifyOneFile(
     // Unreadable: surface as custom so we err on the side of preservation.
     return { path: absPath, classification: 'custom' };
   }
+  return classifyFileContent(absPath, content, context);
+}
 
+function classifyFileContent(
+  absPath: string,
+  content: string,
+  context: FileClassificationContext,
+): PreExistingFile {
   // 1) Content-hash match against current-template set.
   const hash = sha256(content);
-  if (templateHashes.get(absPath) === hash) {
+  if (context.templateHashes.get(absPath) === hash) {
     return { path: absPath, classification: 'scaffolded' };
   }
 
@@ -203,7 +284,7 @@ function classifyOneFile(
     const fileLang = filenameMatch[1];
     if (
       fileLang &&
-      !currentLangSet.has(fileLang) &&
+      !context.currentLangSet.has(fileLang) &&
       (ALL_LANGUAGES as readonly string[]).includes(fileLang)
     ) {
       return { path: absPath, classification: 'stale-scaffolded' };
@@ -212,7 +293,7 @@ function classifyOneFile(
 
   // 3) Stale-by-pinned-id: any of the aggregated stale ids (the complete tool id
   //    universe minus the current-config ids) embedded in the file.
-  for (const id of staleIds) {
+  for (const id of context.staleIds) {
     if (content.includes(id)) {
       return { path: absPath, classification: 'stale-scaffolded' };
     }

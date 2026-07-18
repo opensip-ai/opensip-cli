@@ -1,5 +1,6 @@
 import type {
   RuntimePromotionConflictPolicy,
+  RuntimePromotionRootIdentity,
   RuntimePromotionRoute,
   RuntimePromotionSource,
 } from './runtime-promotion-journal-schema.js';
@@ -32,6 +33,7 @@ export interface RuntimePromotionPreflightSelected {
   readonly source: RuntimePromotionSource;
   readonly destinationParentPreexisting: boolean;
   readonly destinationRuntimePreexisting: boolean;
+  readonly destinationRootIdentity: RuntimePromotionRootIdentity | null;
   /** Internal canonical paths; never copy these into customer output or the journal. */
   readonly sourceRuntimeDir?: string;
   readonly destinationParentDir: string;

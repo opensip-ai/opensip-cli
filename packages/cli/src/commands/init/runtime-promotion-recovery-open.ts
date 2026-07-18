@@ -376,16 +376,32 @@ async function verifyInitialDestination(
   operation: RuntimePromotionRecoveryOperation,
 ): Promise<void> {
   assertRecoveryProjectRoot(operation);
-  const observed = operation.journal.destinationRuntimePreexisting
-    ? operation.dependencies.inspectManifest(
-        join(operation.input.projectRoot, 'opensip-cli', '.runtime'),
-        'project-runtime',
-      ).identity
-    : null;
+  const destinationRuntime = join(operation.input.projectRoot, 'opensip-cli', '.runtime');
+  let observed: RuntimeManifestIdentity | null = null;
+  if (operation.journal.destinationRuntimePreexisting) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: destinationRuntime,
+      journal: operation.journal,
+    });
+    observed = operation.dependencies.inspectManifest(
+      destinationRuntime,
+      'project-runtime',
+    ).identity;
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: destinationRuntime,
+      journal: operation.journal,
+    });
+  }
   assertRecoveryProjectRoot(operation);
   await transition(operation, () =>
     operation.writer.verifyDestination(asRecoveryOpen(operation), observed),
   );
+  if (operation.journal.destinationRuntimePreexisting) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: destinationRuntime,
+      journal: operation.journal,
+    });
+  }
 }
 
 async function beginRollback(operation: RuntimePromotionRecoveryOperation): Promise<void> {

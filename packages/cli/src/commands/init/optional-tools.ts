@@ -14,6 +14,14 @@ type EligibleInitResult = InitResult & {
   readonly languages: NonNullable<InitResult['languages']>;
 };
 
+const OPTIONAL_TOOL_ADOPTION_SUCCESSES = new Set([
+  'not-found',
+  'promoted',
+  'already-project',
+  'deduplicated',
+  'kept-project',
+]);
+
 /** Recommendations belong only to a newly-created pristine, language-qualified project. */
 export function isOptionalToolRecommendationEligible(
   result: InitResult,
@@ -22,7 +30,9 @@ export function isOptionalToolRecommendationEligible(
     result.created === true &&
     result.state === 'pristine' &&
     result.languages !== undefined &&
-    result.languages.length > 0
+    result.languages.length > 0 &&
+    (result.runtimeAdoption === undefined ||
+      OPTIONAL_TOOL_ADOPTION_SUCCESSES.has(result.runtimeAdoption.status))
   );
 }
 

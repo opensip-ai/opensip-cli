@@ -31,11 +31,13 @@ function initial(): RuntimePromotionJournal {
     route: 'authored-only',
     destinationParentPreexisting: false,
     destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
     source: {
       classification: 'none',
       cacheKey: null,
       generationDigest: null,
       markerSha256: null,
+      rootIdentity: null,
     },
     inputs: {
       conflict: 'abort',
@@ -74,6 +76,7 @@ function promoteCache(): RuntimePromotionJournal {
       cacheKey: 'c'.repeat(24),
       generationDigest: 'c'.repeat(64),
       markerSha256: 'd'.repeat(64),
+      rootIdentity: { device: '1', inode: '2' },
     },
     inputs: {
       conflict: 'use-cache',
@@ -191,6 +194,113 @@ describe('runtime promotion journal canonical schema', () => {
       }),
     ).toThrow(/marker/iu);
   });
+
+  it('requires a closed decimal root identity exactly for source-backed routes', () => {
+    const sourceBacked = promoteCache();
+    expect(() =>
+      canonicalRuntimePromotionJournal({
+        ...sourceBacked,
+        source: { ...sourceBacked.source, rootIdentity: null },
+      }),
+    ).toThrow(/root identity/iu);
+    expect(() =>
+      canonicalRuntimePromotionJournal({
+        ...initial(),
+        source: { ...initial().source, rootIdentity: { device: '1', inode: '2' } },
+      }),
+    ).toThrow(/none source/iu);
+
+    for (const rootIdentity of [
+      { device: '-1', inode: '2' },
+      { device: '1', inode: '2.5' },
+      { device: '1'.repeat(41), inode: '2' },
+      { device: '1', inode: '2', foreign: 'field' },
+    ]) {
+      expect(() =>
+        canonicalRuntimePromotionJournal({
+          ...sourceBacked,
+          source: { ...sourceBacked.source, rootIdentity },
+        }),
+      ).toThrow(/rootIdentity|root identity/iu);
+    }
+  });
+
+  it('requires a closed decimal destination identity exactly for a preexisting runtime', () => {
+    const journal = initial();
+    expect(() =>
+      canonicalRuntimePromotionJournal({
+        ...journal,
+        destinationRuntimePreexisting: true,
+      }),
+    ).toThrow(/destinationRootIdentity/iu);
+    expect(() =>
+      canonicalRuntimePromotionJournal({
+        ...journal,
+        destinationRootIdentity: { device: '3', inode: '4' },
+      }),
+    ).toThrow(/destinationRootIdentity/iu);
+
+    for (const destinationRootIdentity of [
+      { device: '-3', inode: '4' },
+      { device: '3', inode: '4.5' },
+      { device: '3'.repeat(41), inode: '4' },
+      { device: '3', inode: '4', foreign: 'field' },
+    ]) {
+      expect(() =>
+        canonicalRuntimePromotionJournal({
+          ...journal,
+          destinationRuntimePreexisting: true,
+          destinationRootIdentity,
+        }),
+      ).toThrow(/destinationRootIdentity/iu);
+    }
+  });
+
+  it('accepts empty languages only for an implicit refresh', () => {
+    const journal = initial();
+    const implicitRefresh = canonicalRuntimePromotionJournal({
+      ...journal,
+      inputs: {
+        conflict: 'abort',
+        authoredMode: 'refresh',
+        languages: [],
+        languageExplicit: false,
+      },
+    });
+
+    expect(
+      parseRuntimePromotionJournal(encodeRuntimePromotionJournal(implicitRefresh)).inputs,
+    ).toEqual({
+      conflict: 'abort',
+      authoredMode: 'refresh',
+      languages: [],
+      languageExplicit: false,
+    });
+    expect(() =>
+      canonicalRuntimePromotionJournal({
+        ...implicitRefresh,
+        inputs: { ...implicitRefresh.inputs, languageExplicit: true },
+      }),
+    ).toThrow(/empty only for implicit refresh/iu);
+  });
+
+  it.each(['fresh', 'keep', 'remove'] as const)(
+    'rejects empty languages for %s journal inputs',
+    (authoredMode) => {
+      const journal = initial();
+      expect(() =>
+        canonicalRuntimePromotionJournal({
+          ...journal,
+          inputs: {
+            ...journal.inputs,
+            authoredMode,
+            languages: [],
+            languageExplicit: false,
+          },
+        }),
+      ).toThrow(/empty only for implicit refresh/iu);
+    },
+  );
 
   it('bounds manifest counts and accepts only the closed SQLite union', () => {
     const journal = initial();
@@ -622,6 +732,25 @@ describe('runtime promotion journal canonical schema', () => {
     });
     expect(() => assertRuntimePromotionTransition(journal, authoredBypass)).toThrow(
       /postcondition|execution/iu,
+    );
+  });
+
+  it('keeps the journal-selected destination root identity immutable', () => {
+    const previous = canonicalRuntimePromotionJournal({
+      ...promoteCache(),
+      destinationParentPreexisting: true,
+      destinationRuntimePreexisting: true,
+      destinationRootIdentity: { device: '3', inode: '4' },
+    });
+    const changed = canonicalRuntimePromotionJournal({
+      ...previous,
+      revision: 1,
+      destinationRootIdentity: { device: '3', inode: '5' },
+      timestamps: { ...previous.timestamps, updatedAt: 101 },
+    });
+
+    expect(() => assertRuntimePromotionTransition(previous, changed)).toThrow(
+      /destinationRootIdentity.*immutable/iu,
     );
   });
 });

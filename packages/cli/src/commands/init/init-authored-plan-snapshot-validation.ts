@@ -3,6 +3,7 @@ import { TextDecoder } from 'node:util';
 
 import { MAX_AGENT_GUIDANCE_FILE_BYTES } from './agent-guidance-renderer.js';
 import { listAgentGuidanceTargetSpecs } from './agent-guidance.js';
+import { isCanonicalAuthoredPathMode } from './authored-path-mode.js';
 import {
   INIT_AUTHORED_PLAN_CAPS,
   authoredPlanFailure,
@@ -87,10 +88,7 @@ function validateExistingIdentity(
   record: Extract<InitAuthoredSnapshotRecord, { readonly exists: true }>,
 ): void {
   if (
-    !Number.isInteger(record.mode) ||
-    record.mode < 0 ||
-    record.mode > 0o777 ||
-    (record.mode & 0o022) !== 0 ||
+    !isCanonicalAuthoredPathMode(record.mode, record.type) ||
     !/^[a-f0-9]{64}$/u.test(record.digest)
   ) {
     authoredPlanFailure(`${record.path} has an invalid snapshot identity`);

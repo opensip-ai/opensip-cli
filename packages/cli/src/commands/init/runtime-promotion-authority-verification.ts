@@ -2,6 +2,7 @@ import {
   isRuntimeManifestReleaseUnsafe,
   runtimeManifestIdentityEqual,
 } from './runtime-manifest.js';
+import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
 import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
 
 import type {
@@ -167,14 +168,31 @@ function verifySelectedSource(
 
 function verifyProjectRuntime(
   operation: RuntimePromotionOperation,
+  journal: RuntimePromotionJournal,
+  outcome: 'committed' | 'rolled-back',
   expected: RuntimeManifestIdentity,
   message: string,
 ): RuntimeManifestIdentity {
   assertFreshRuntimePromotionProjectRoot(operation);
-  const observed = operation.dependencies.inspectManifest(
-    operation.preflight.destinationRuntimeDir,
-    'project-runtime',
-  );
+  const inspect = () =>
+    operation.dependencies.inspectManifest(
+      operation.preflight.destinationRuntimeDir,
+      'project-runtime',
+    );
+  const requiresOriginal = runtimePromotionOutcomeRequiresOriginalDestination(journal, outcome);
+  if (requiresOriginal) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: operation.preflight.destinationRuntimeDir,
+      journal,
+    });
+  }
+  const observed = inspect();
+  if (requiresOriginal) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: operation.preflight.destinationRuntimeDir,
+      journal,
+    });
+  }
   assertFreshRuntimePromotionProjectRoot(operation);
   assertExactManifest(expected, observed.identity, message);
   return observed.identity;
@@ -189,6 +207,8 @@ function verifyCommittedRuntimeAuthority(
     ? null
     : verifyProjectRuntime(
         operation,
+        journal,
+        'committed',
         expected,
         'Project runtime changed before committed authority completed',
       );
@@ -206,6 +226,8 @@ function verifyRolledBackRuntimeAuthority(
       ? selectedSource
       : verifyProjectRuntime(
           operation,
+          journal,
+          'rolled-back',
           expected,
           'Project runtime changed before rolled-back authority completed',
         );

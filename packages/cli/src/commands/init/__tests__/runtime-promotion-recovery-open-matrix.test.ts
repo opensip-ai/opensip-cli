@@ -124,11 +124,13 @@ function initialPromotion(destinationPreexisting: boolean): RuntimePromotionJour
     route: 'promote-cache',
     destinationParentPreexisting: destinationPreexisting,
     destinationRuntimePreexisting: destinationPreexisting,
+    destinationRootIdentity: destinationPreexisting ? { device: '1', inode: '2' } : null,
     source: {
       classification: 'legacy',
       cacheKey: PROJECT_KEY,
       generationDigest: null,
       markerSha256: SOURCE_DIGEST,
+      rootIdentity: { device: '1', inode: '2' },
     },
     inputs: {
       conflict: 'use-cache',
@@ -154,11 +156,13 @@ function initialAuthoredOnly(): RuntimePromotionJournal {
     route: 'authored-only',
     destinationParentPreexisting: false,
     destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
     source: {
       classification: 'none',
       cacheKey: null,
       generationDigest: null,
       markerSha256: null,
+      rootIdentity: null,
     },
     inputs: {
       conflict: 'abort',
@@ -446,6 +450,7 @@ function createHarness(
       destinationParent: null,
     }),
     assertProjectRootAuthority: () => undefined,
+    assertDestinationRootAuthority: () => undefined,
     inspectManifest: () => verified(SOURCE_IDENTITY),
     classifyPath: () => ({ status: 'directory', mode: 0o700, owner: 'current' }),
     authorizeFilesystem: (input) =>
@@ -828,8 +833,9 @@ describe('runtime promotion open recovery intent matrix', () => {
     });
 
     await expect(harness.run()).resolves.toMatchObject({
-      status: 'cleanup-pending',
+      status: 'rolled-back',
       cleanupPending: true,
+      reasonCode: 'operation-failed',
     });
     expect(storedJournal(harness.store)).toMatchObject({
       state: 'closed',
@@ -837,8 +843,9 @@ describe('runtime promotion open recovery intent matrix', () => {
     });
 
     await expect(harness.run()).resolves.toMatchObject({
-      status: 'cleanup-pending',
+      status: 'rolled-back',
       cleanupPending: true,
+      reasonCode: 'operation-failed',
     });
     expect(storedJournal(harness.store)).toMatchObject({
       state: 'closed',

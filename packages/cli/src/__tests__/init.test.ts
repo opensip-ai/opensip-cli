@@ -3,20 +3,35 @@
  * gitignore append, ambiguous-language prompt.
  */
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  acquireRuntimeExclusiveLease,
+  logger,
   resolveEphemeralProjectPaths,
   resolveProjectContext,
   resolveProjectPaths,
   resolveToolHooks,
+  touchEphemeralRuntime,
 } from '@opensip-cli/core';
+import { DataStoreFactory } from '@opensip-cli/datastore';
 import { fitnessTool } from '@opensip-cli/fitness';
 import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { buildDatastoreLockContext } from '../bootstrap/state-lock-policy.js';
+import { createInitAuthoredPlan } from '../commands/init/init-authored-plan.js';
 import {
   detectLanguages,
   parseLanguageFlag,
@@ -60,16 +75,37 @@ afterEach(() => {
 
 // ADR-0038: executeInit now takes the registered tools' scaffold contributions.
 // makeArgs injects the first-party set so every existing call site is unchanged.
-function makeArgs(
-  overrides: Partial<InitOptions> = {},
-): InitOptions & { toolScaffolds: ToolScaffold[] } {
+function makeArgs(overrides: Partial<InitOptions> = {}): Parameters<typeof executeInit>[0] {
   return {
     json: false,
     cwd: testDir,
     debug: false,
+    datastoreLockContext: buildDatastoreLockContext(logger, {
+      commandName: 'opensip init test',
+      cwd: overrides.cwd ?? testDir,
+    }),
     toolScaffolds: firstPartyScaffolds(),
     ...overrides,
   };
+}
+
+function seedVerifiedRuntime(runtimeDir: string, log: string): void {
+  mkdirSync(join(runtimeDir, 'logs'), { recursive: true, mode: 0o700 });
+  if (process.platform !== 'win32') {
+    chmodSync(runtimeDir, 0o700);
+    chmodSync(join(runtimeDir, 'logs'), 0o700);
+  }
+  writeFileSync(join(runtimeDir, 'logs', 'run.jsonl'), log, {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
+  const datastore = DataStoreFactory.open({
+    backend: 'sqlite',
+    path: join(runtimeDir, 'datastore.sqlite'),
+  });
+  const closed = datastore.closeForLifecycle?.();
+  if (closed === undefined) datastore.close();
+  else if (!closed.closed) throw new Error('Init test datastore did not close');
 }
 
 // =============================================================================
@@ -168,7 +204,7 @@ describe('parseLanguageFlag', () => {
 describe('executeInit (single language)', () => {
   it.each([false, true])(
     'targets the canonical uninitialized workspace root from a nested cwd (cwdExplicit=%s)',
-    (cwdExplicit) => {
+    async (cwdExplicit) => {
       const project = join(testDir, cwdExplicit ? 'explicit' : 'implicit');
       const nested = join(project, 'packages', 'app');
       mkdirSync(join(project, '.git'), { recursive: true });
@@ -180,7 +216,7 @@ describe('executeInit (single language)', () => {
         stopAt: project,
       });
 
-      const result = executeInit({
+      const result = await executeInit({
         ...makeArgs({ cwd: nested }),
         cwdExplicit,
         projectContext,
@@ -196,7 +232,7 @@ describe('executeInit (single language)', () => {
 
   it.each([false, true])(
     'keeps the initialized root authoritative from a nested cwd (cwdExplicit=%s)',
-    (cwdExplicit) => {
+    async (cwdExplicit) => {
       const project = join(testDir, 'initialized');
       const nested = join(project, 'packages', 'app');
       mkdirSync(nested, { recursive: true });
@@ -208,7 +244,7 @@ describe('executeInit (single language)', () => {
         stopAt: project,
       });
 
-      const result = executeInit({
+      const result = await executeInit({
         ...makeArgs({ cwd: nested, language: ['typescript'] }),
         cwdExplicit,
         projectContext,
@@ -220,10 +256,10 @@ describe('executeInit (single language)', () => {
     },
   );
 
-  it('scaffolds the project layout for a Rust project', () => {
+  it('scaffolds the project layout for a Rust project', async () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
 
-    const result = executeInit(makeArgs());
+    const result = await executeInit(makeArgs());
 
     expect(result.created).toBe(true);
     expect(result.languages).toEqual(['rust']);
@@ -263,23 +299,55 @@ describe('executeInit (single language)', () => {
     expect(gitignore).toContain('opensip-cli/.runtime/');
   });
 
-  it('scaffolds for TypeScript when --language is explicit', () => {
-    const result = executeInit(makeArgs({ language: ['typescript'] }));
+  it('scaffolds for TypeScript when --language is explicit', async () => {
+    const result = await executeInit(makeArgs({ language: ['typescript'] }));
     expect(result.languages).toEqual(['typescript']);
     const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('typescript-source:');
   });
 
-  it('moves no-init runtime state into the project runtime during adoption', () => {
+  it('reclassifies authored state after waiting for the exclusive lease', async () => {
+    writeFileSync(join(testDir, 'tsconfig.json'), '{}');
+    const existingConfig = 'schemaVersion: 1\n# initialized by the winning invocation\n';
+    let injected = false;
+
+    const result = await executeInit(makeArgs(), {
+      acquireLease: async (input) => {
+        const lease = await acquireRuntimeExclusiveLease(input);
+        mkdirSync(join(testDir, 'opensip-cli'), { recursive: true });
+        writeFileSync(join(testDir, 'opensip-cli.config.yml'), existingConfig);
+        writeFileSync(join(testDir, 'opensip-cli', 'winner.txt'), 'preserve\n');
+        injected = true;
+        return lease;
+      },
+    });
+
+    expect(injected).toBe(true);
+    expect(result).toMatchObject({
+      created: false,
+      refreshed: true,
+      state: 'fully-initialized',
+    });
+    expect(result.languages).toBeUndefined();
+    expect(readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8')).toBe(existingConfig);
+    expect(readFileSync(join(testDir, 'opensip-cli', 'winner.txt'), 'utf8')).toBe('preserve\n');
+    expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
+      false,
+    );
+  }, 15_000);
+
+  it('moves no-init runtime state into the project runtime during adoption', async () => {
     const oldHome = process.env.HOME;
-    process.env.HOME = join(testDir, '.home');
+    const isolatedHome = mkdtempSync(join(tmpdir(), 'opensip-init-home-'));
+    process.env.HOME = isolatedHome;
     try {
       writeFileSync(join(testDir, 'tsconfig.json'), '{}');
-      const ephemeralRuntime = resolveEphemeralProjectPaths(testDir).runtimeDir;
-      mkdirSync(join(ephemeralRuntime, 'logs'), { recursive: true });
-      writeFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), '{}\n', 'utf8');
+      const ephemeralPaths = resolveEphemeralProjectPaths(testDir);
+      touchEphemeralRuntime(ephemeralPaths);
+      const ephemeralRuntime = ephemeralPaths.runtimeDir;
+      seedVerifiedRuntime(ephemeralRuntime, '{}\n');
 
-      const result = executeInit(makeArgs());
+      const result = await executeInit(makeArgs());
       const projectRuntime = resolveProjectPaths(testDir).runtimeDir;
 
       expect(result.created).toBe(true);
@@ -288,37 +356,45 @@ describe('executeInit (single language)', () => {
     } finally {
       if (oldHome === undefined) delete process.env.HOME;
       else process.env.HOME = oldHome;
+      rmSync(isolatedHome, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
-  it('does not overwrite existing project runtime state during adoption', () => {
+  it('reports divergent runtime authority without overwriting either tree', async () => {
     const oldHome = process.env.HOME;
-    process.env.HOME = join(testDir, '.home');
+    const isolatedHome = mkdtempSync(join(tmpdir(), 'opensip-init-home-'));
+    process.env.HOME = isolatedHome;
     try {
       writeFileSync(join(testDir, 'tsconfig.json'), '{}');
-      const ephemeralRuntime = resolveEphemeralProjectPaths(testDir).runtimeDir;
-      mkdirSync(join(ephemeralRuntime, 'logs'), { recursive: true });
-      writeFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), 'ephemeral\n', 'utf8');
+      const ephemeralPaths = resolveEphemeralProjectPaths(testDir);
+      touchEphemeralRuntime(ephemeralPaths);
+      const ephemeralRuntime = ephemeralPaths.runtimeDir;
+      seedVerifiedRuntime(ephemeralRuntime, 'ephemeral\n');
       const projectRuntime = resolveProjectPaths(testDir).runtimeDir;
-      mkdirSync(join(projectRuntime, 'logs'), { recursive: true });
-      writeFileSync(join(projectRuntime, 'logs', 'run.jsonl'), 'project\n', 'utf8');
+      seedVerifiedRuntime(projectRuntime, 'project\n');
 
-      const result = executeInit(makeArgs());
+      const result = await executeInit(makeArgs());
 
-      expect(result.created).toBe(true);
+      expect(result.created).toBe(false);
+      expect(result.runtimeAdoption).toMatchObject({
+        status: 'conflict',
+        reasonCode: 'divergent',
+        sourcePreserved: true,
+      });
       expect(readFileSync(join(projectRuntime, 'logs', 'run.jsonl'), 'utf8')).toBe('project\n');
       expect(readFileSync(join(ephemeralRuntime, 'logs', 'run.jsonl'), 'utf8')).toBe('ephemeral\n');
     } finally {
       if (oldHome === undefined) delete process.env.HOME;
       else process.env.HOME = oldHome;
+      rmSync(isolatedHome, { recursive: true, force: true });
     }
   });
 });
 
 describe('executeInit (polyglot)', () => {
-  it('scaffolds one example check per language with distinct slugs', () => {
-    const result = executeInit(makeArgs({ language: ['rust', 'typescript'] }));
-    expect(result.languages).toEqual(['rust', 'typescript']);
+  it('scaffolds one example check per language with distinct slugs', async () => {
+    const result = await executeInit(makeArgs({ language: ['rust', 'typescript'] }));
+    expect(result.languages).toEqual(['typescript', 'rust']);
 
     expect(
       existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-rust.mjs')),
@@ -347,11 +423,11 @@ describe('executeInit (polyglot)', () => {
 // =============================================================================
 
 describe('executeInit (ambiguous language)', () => {
-  it('refuses to scaffold when multiple language markers present and no --language', () => {
+  it('refuses to scaffold when multiple language markers present and no --language', async () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
     writeFileSync(join(testDir, 'tsconfig.json'), '{}');
 
-    const result = executeInit(makeArgs());
+    const result = await executeInit(makeArgs());
 
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError).toBeDefined();
@@ -366,16 +442,16 @@ describe('executeInit (ambiguous language)', () => {
     expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
   });
 
-  it('refuses to scaffold when no language markers present and no --language', () => {
-    const result = executeInit(makeArgs());
+  it('refuses to scaffold when no language markers present and no --language', async () => {
+    const result = await executeInit(makeArgs());
 
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError).toBeDefined();
     expect(result.ambiguousLanguageError?.detected).toEqual([]);
   });
 
-  it('returns an error result when --language is unknown', () => {
-    const result = executeInit(makeArgs({ language: ['cobol'] }));
+  it('returns an error result when --language is unknown', async () => {
+    const result = await executeInit(makeArgs({ language: ['cobol'] }));
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError?.message).toContain("Unknown language 'cobol'");
   });
@@ -384,9 +460,9 @@ describe('executeInit (ambiguous language)', () => {
   // --cwd returned `{ created: false, state: 'pristine' }` with no error
   // discriminant, so register-init mapped it to exit 0. The fix surfaces
   // it as ambiguousLanguageError so the existing exit-2 path fires.
-  it('surfaces a structured error when --cwd does not exist on disk', () => {
+  it('surfaces a structured error when --cwd does not exist on disk', async () => {
     const missing = join(testDir, 'definitely-does-not-exist');
-    const result = executeInit(makeArgs({ cwd: missing }));
+    const result = await executeInit(makeArgs({ cwd: missing }));
     expect(result.created).toBe(false);
     expect(result.ambiguousLanguageError).toBeDefined();
     expect(result.ambiguousLanguageError?.detected).toEqual([]);
@@ -399,13 +475,13 @@ describe('executeInit (fully-initialized state)', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
   });
 
-  it('refreshes guidance without overwriting config or examples by default', () => {
-    executeInit(makeArgs());
+  it('refreshes guidance without overwriting config or examples by default', async () => {
+    await executeInit(makeArgs());
     const before = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     const examplePath = join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs');
     const exampleBefore = readFileSync(examplePath, 'utf8');
 
-    const second = executeInit(makeArgs());
+    const second = await executeInit(makeArgs());
     expect(second.created).toBe(false);
     expect(second.refreshed).toBe(true);
     expect(second.state).toBe('fully-initialized');
@@ -417,13 +493,18 @@ describe('executeInit (fully-initialized state)', () => {
     expect(readFileSync(examplePath, 'utf8')).toBe(exampleBefore);
   });
 
-  it('--remove blows away opensip-cli/ and rewrites everything', () => {
-    executeInit(makeArgs());
+  it('--remove rebuilds authored files while preserving runtime evidence', async () => {
+    await executeInit(makeArgs());
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# manually edited');
     // Custom file in the dir — should be removed by --remove.
     writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
+    const retainedEvidence = join(testDir, 'opensip-cli', '.runtime', 'logs', 'retained.jsonl');
+    mkdirSync(join(testDir, 'opensip-cli', '.runtime', 'logs'), {
+      recursive: true,
+    });
+    writeFileSync(retainedEvidence, '{"retained":true}\n', 'utf8');
 
-    const result = executeInit(makeArgs({ remove: true }));
+    const result = await executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
     expect(result.state).toBe('fully-initialized');
 
@@ -434,10 +515,30 @@ describe('executeInit (fully-initialized state)', () => {
     expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'))).toBe(
       false,
     );
+    expect(readFileSync(retainedEvidence, 'utf8')).toBe('{"retained":true}\n');
   });
 
-  it('--keep preserves existing config and custom files', () => {
-    executeInit(makeArgs());
+  it('--remove preserves generated output and a pnpm-like dependency symlink opaquely', async () => {
+    if (process.platform === 'win32') return;
+    await executeInit(makeArgs());
+    const generated = join(testDir, 'opensip-cli', 'fit', 'dist', 'bundle.js');
+    mkdirSync(join(generated, '..'), { recursive: true });
+    writeFileSync(generated, 'generated output\n');
+    const dependencyTarget = join(testDir, 'dependency-store');
+    mkdirSync(dependencyTarget, { recursive: true });
+    writeFileSync(join(dependencyTarget, 'sentinel.txt'), 'dependency data\n');
+    const dependencyLink = join(testDir, 'opensip-cli', 'fit', 'node_modules');
+    symlinkSync(dependencyTarget, dependencyLink);
+
+    const result = await executeInit(makeArgs({ remove: true }));
+
+    expect(result.created).toBe(true);
+    expect(readFileSync(generated, 'utf8')).toBe('generated output\n');
+    expect(readFileSync(join(dependencyLink, 'sentinel.txt'), 'utf8')).toBe('dependency data\n');
+  });
+
+  it('--keep preserves existing config and custom files', async () => {
+    await executeInit(makeArgs());
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# manually edited');
     // A user-authored file that --keep must preserve.
     const customPath = join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs');
@@ -448,7 +549,7 @@ describe('executeInit (fully-initialized state)', () => {
     const tweakedPath = join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs');
     writeFileSync(tweakedPath, '// I edited this');
 
-    const result = executeInit(makeArgs({ keep: true }));
+    const result = await executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
     expect(result.state).toBe('fully-initialized');
 
@@ -470,8 +571,8 @@ describe('executeInit (partial-config-only state)', () => {
     writeFileSync(join(testDir, 'opensip-cli.config.yml'), '# stub');
   });
 
-  it('refreshes guidance by default without scaffolding examples', () => {
-    const result = executeInit(makeArgs());
+  it('refreshes guidance by default without scaffolding examples', async () => {
+    const result = await executeInit(makeArgs());
     expect(result.created).toBe(false);
     expect(result.refreshed).toBe(true);
     expect(result.state).toBe('partial-config-only');
@@ -482,9 +583,9 @@ describe('executeInit (partial-config-only state)', () => {
     );
   });
 
-  it('--keep scaffolds the missing dir', () => {
+  it('--keep scaffolds the missing dir', async () => {
     const configBefore = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
-    const result = executeInit(makeArgs({ keep: true }));
+    const result = await executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
     expect(readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8')).toBe(configBefore);
     expect(result.createdFiles).not.toContain(join(testDir, 'opensip-cli.config.yml'));
@@ -493,12 +594,31 @@ describe('executeInit (partial-config-only state)', () => {
     );
   });
 
-  it('--remove scaffolds (no dir to remove)', () => {
-    const result = executeInit(makeArgs({ remove: true }));
+  it('--remove scaffolds (no dir to remove)', async () => {
+    const result = await executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       true,
     );
+  });
+});
+
+describe('executeInit (concurrent authored-state changes)', () => {
+  it('fails before journaling when the exact plan snapshot disagrees with classification', async () => {
+    const configPath = join(testDir, 'opensip-cli.config.yml');
+    const result = await executeInit(makeArgs({ language: ['typescript'] }), {
+      createPlan: (input) => {
+        writeFileSync(configPath, '# created by another process\n');
+        return createInitAuthoredPlan(input);
+      },
+    });
+
+    expect(result.created).toBe(false);
+    expect(result.state).toBe('partial-config-only');
+    expect(result.authoredStateChangedError?.observedState).toBe('partial-config-only');
+    expect(result.authoredStateChangedError?.message).toContain('No files were changed');
+    expect(readFileSync(configPath, 'utf8')).toBe('# created by another process\n');
+    expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
   });
 });
 
@@ -512,8 +632,8 @@ describe('executeInit (partial-dir-only state)', () => {
     writeFileSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'), '// custom');
   });
 
-  it('refuses by default with a partial-state error listing the custom file', () => {
-    const result = executeInit(makeArgs());
+  it('refuses by default with a partial-state error listing the custom file', async () => {
+    const result = await executeInit(makeArgs());
     expect(result.created).toBe(false);
     expect(result.state).toBe('partial-dir-only');
     expect(result.partialStateError?.state).toBe('partial-dir-only');
@@ -523,8 +643,8 @@ describe('executeInit (partial-dir-only state)', () => {
     expect(customFile?.classification).toBe('custom');
   });
 
-  it('--keep preserves the custom file and writes the YAML', () => {
-    const result = executeInit(makeArgs({ keep: true }));
+  it('--keep preserves the custom file and writes the YAML', async () => {
+    const result = await executeInit(makeArgs({ keep: true }));
     expect(result.created).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
     expect(result.createdFiles).toContain(join(testDir, 'opensip-cli.config.yml'));
@@ -533,8 +653,8 @@ describe('executeInit (partial-dir-only state)', () => {
     ).toBe('// custom');
   });
 
-  it('--remove blows away the dir and writes the YAML', () => {
-    const result = executeInit(makeArgs({ remove: true }));
+  it('--remove blows away the dir and writes the YAML', async () => {
+    const result = await executeInit(makeArgs({ remove: true }));
     expect(result.created).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'my-real-check.mjs'))).toBe(
@@ -548,9 +668,9 @@ describe('executeInit (partial-dir-only state)', () => {
 });
 
 describe('executeInit (polyglot drift)', () => {
-  it('classifies a stale-language scaffold and surfaces it under --keep', () => {
+  it('classifies a stale-language scaffold and surfaces it under --keep', async () => {
     // Initial polyglot scaffold.
-    executeInit(makeArgs({ language: ['typescript', 'rust'] }));
+    await executeInit(makeArgs({ language: ['typescript', 'rust'] }));
     expect(
       existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check-rust.mjs')),
     ).toBe(true);
@@ -558,7 +678,7 @@ describe('executeInit (polyglot drift)', () => {
     // Re-init with only typescript + --keep. The rust example should be
     // tagged stale-scaffolded and preserved (we don't remove it; user
     // may have been working with it).
-    const result = executeInit(makeArgs({ language: ['typescript'], keep: true }));
+    const result = await executeInit(makeArgs({ language: ['typescript'], keep: true }));
     expect(result.created).toBe(true);
     expect(result.state).toBe('fully-initialized');
 
@@ -577,8 +697,8 @@ describe('executeInit (mutex flags)', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
   });
 
-  it('rejects --keep --remove together', () => {
-    const result = executeInit(makeArgs({ keep: true, remove: true }));
+  it('rejects --keep --remove together', async () => {
+    const result = await executeInit(makeArgs({ keep: true, remove: true }));
     expect(result.created).toBe(false);
     expect(result.partialStateError?.message).toContain('mutually exclusive');
   });
@@ -593,16 +713,19 @@ describe('executeInit (.gitignore)', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
   });
 
-  it('creates .gitignore when absent', () => {
+  it('creates .gitignore when absent', async () => {
     expect(existsSync(join(testDir, '.gitignore'))).toBe(false);
-    const result = executeInit(makeArgs());
+    const result = await executeInit(makeArgs());
     expect(result.gitignoreUpdated).toBe(true);
     expect(readFileSync(join(testDir, '.gitignore'), 'utf8')).toContain('opensip-cli/.runtime/');
   });
 
   it('purely renders the same create, append, and idempotent bytes', () => {
     const created = renderGitignore(undefined);
-    expect(created).toEqual({ content: 'opensip-cli/.runtime/\n', changed: true });
+    expect(created).toEqual({
+      content: 'opensip-cli/.runtime/\n',
+      changed: true,
+    });
 
     const appended = renderGitignore('node_modules/\n');
     expect(appended).toEqual({
@@ -615,9 +738,9 @@ describe('executeInit (.gitignore)', () => {
     });
   });
 
-  it('appends to an existing .gitignore', () => {
+  it('appends to an existing .gitignore', async () => {
     writeFileSync(join(testDir, '.gitignore'), 'node_modules/\ntarget/\n');
-    const result = executeInit(makeArgs());
+    const result = await executeInit(makeArgs());
     expect(result.gitignoreUpdated).toBe(true);
     const content = readFileSync(join(testDir, '.gitignore'), 'utf8');
     expect(content).toContain('node_modules/');
@@ -625,11 +748,11 @@ describe('executeInit (.gitignore)', () => {
     expect(content).toContain('opensip-cli/.runtime/');
   });
 
-  it('does NOT duplicate the line on re-init with --remove', () => {
-    executeInit(makeArgs());
+  it('does NOT duplicate the line on re-init with --remove', async () => {
+    await executeInit(makeArgs());
     const first = readFileSync(join(testDir, '.gitignore'), 'utf8');
 
-    const result = executeInit(makeArgs({ remove: true }));
+    const result = await executeInit(makeArgs({ remove: true }));
     expect(result.gitignoreUpdated).toBe(false);
 
     const second = readFileSync(join(testDir, '.gitignore'), 'utf8');
@@ -646,8 +769,8 @@ describe('executeInit (AGENTS.md)', () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
   });
 
-  it('creates AGENTS.md on pristine init', () => {
-    const result = executeInit(makeArgs());
+  it('creates AGENTS.md on pristine init', async () => {
+    const result = await executeInit(makeArgs());
     expect(result.agentsMdCreated).toBe(true);
     expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(true);
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('Agent Playbook');
@@ -659,8 +782,8 @@ describe('executeInit (AGENTS.md)', () => {
     expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toContain('trust.fullyVerified');
   });
 
-  it('creates a graph-only AGENTS.md when no fit scaffold domain is registered', () => {
-    const result = executeInit({ ...makeArgs(), toolScaffolds: [] });
+  it('creates a graph-only AGENTS.md when no fit scaffold domain is registered', async () => {
+    const result = await executeInit({ ...makeArgs(), toolScaffolds: [] });
     const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     expect(result.agentsMdCreated).toBe(true);
     expect(agents).toContain('opensip graph impact --changed --json --top 20');
@@ -669,9 +792,9 @@ describe('executeInit (AGENTS.md)', () => {
     expect(agents).not.toContain('agent-fast');
   });
 
-  it('updates an existing AGENTS.md managed block and preserves custom content', () => {
+  it('updates an existing AGENTS.md managed block and preserves custom content', async () => {
     writeFileSync(join(testDir, 'AGENTS.md'), '# Custom playbook\n', 'utf8');
-    const result = executeInit(makeArgs());
+    const result = await executeInit(makeArgs());
     expect(result.agentsMdCreated).toBe(false);
     const agents = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     expect(agents).toContain('# Custom playbook');
@@ -681,20 +804,20 @@ describe('executeInit (AGENTS.md)', () => {
     ).toBe('updated');
   });
 
-  it('refreshes AGENTS.md on re-init with --keep without duplicating the block', () => {
-    executeInit(makeArgs());
+  it('refreshes AGENTS.md on re-init with --keep without duplicating the block', async () => {
+    await executeInit(makeArgs());
     const first = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
-    const result = executeInit(makeArgs({ keep: true }));
+    const result = await executeInit(makeArgs({ keep: true }));
     expect(result.agentsMdCreated).toBe(false);
     const second = readFileSync(join(testDir, 'AGENTS.md'), 'utf8');
     expect(second).toBe(first);
     expect(second.split('<!-- opensip:agent-guidance start -->')).toHaveLength(2);
   });
 
-  it('updates an existing CLAUDE.md during refresh', () => {
-    executeInit(makeArgs());
+  it('updates an existing CLAUDE.md during refresh', async () => {
+    await executeInit(makeArgs());
     writeFileSync(join(testDir, 'CLAUDE.md'), '# Claude\n\nCustom guidance.\n', 'utf8');
-    const result = executeInit(makeArgs());
+    const result = await executeInit(makeArgs());
     const claude = readFileSync(join(testDir, 'CLAUDE.md'), 'utf8');
     expect(result.refreshed).toBe(true);
     expect(
@@ -710,10 +833,10 @@ describe('executeInit (AGENTS.md)', () => {
 // =============================================================================
 
 describe('SupportedLanguage', () => {
-  it('exhausts the known set', () => {
+  it('exhausts the known set', async () => {
     const all: SupportedLanguage[] = ['typescript', 'rust', 'python', 'go', 'java', 'cpp'];
     for (const lang of all) {
-      const result = executeInit(makeArgs({ language: [lang] }));
+      const result = await executeInit(makeArgs({ language: [lang] }));
       expect(result.languages).toEqual([lang]);
       // Cleanup so each language gets a fresh testDir state
       rmSync(join(testDir, 'opensip-cli.config.yml'), { force: true });

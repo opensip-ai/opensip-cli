@@ -1,3 +1,5 @@
+import type { RuntimeAdoptionResult } from './runtime-results.js';
+
 /** Classification for a file present under `opensip-cli/` before init ran. */
 export interface PreExistingFile {
   readonly path: string;
@@ -53,6 +55,15 @@ export interface InitResult {
   state?: 'pristine' | 'fully-initialized' | 'partial-config-only' | 'partial-dir-only';
   /** Languages selected for this scaffold (post-detection or from --language). */
   languages?: readonly ('typescript' | 'rust' | 'python' | 'go' | 'java' | 'cpp')[];
+  /**
+   * Bounded, path-neutral outcome from Init's runtime-adoption coordinator.
+   * Absent when Init refuses before runtime adoption starts or when reading a
+   * result produced by an older CLI.
+   *
+   * Authored mutation counts live at `runtimeAdoption.authored`; they are not
+   * duplicated on InitResult.
+   */
+  runtimeAdoption?: RuntimeAdoptionResult;
   /** Relevant uninstalled adapters after an eligible pristine init; absent otherwise. */
   optionalTools?: readonly InitOptionalToolRecommendation[];
   /**
@@ -86,6 +97,15 @@ export interface InitResult {
   partialStateError?: {
     readonly state: 'partial-config-only' | 'partial-dir-only' | 'fully-initialized';
     readonly preExistingFiles: readonly PreExistingFile[];
+    readonly message: string;
+  };
+  /**
+   * Set when customer-authored Init state changed between classification and
+   * the transaction's exact preimage snapshot. No journal or customer
+   * mutation exists yet; retrying performs a new classification and plan.
+   */
+  authoredStateChangedError?: {
+    readonly observedState: NonNullable<InitResult['state']>;
     readonly message: string;
   };
   /**

@@ -84,17 +84,35 @@ async function verifySelectedRuntimes(operation: RuntimePromotionOperation): Pro
   }
   if (operation.preflight.route === 'authored-only') return;
   assertFreshRuntimePromotionProjectRoot(operation);
+  const journal = await operation.controller.verifyOpen(operation.receipt);
   operation.destinationManifest = operation.preflight.destinationRuntimePreexisting
-    ? operation.dependencies.inspectManifest(
-        operation.preflight.destinationRuntimeDir,
-        'project-runtime',
-      )
+    ? (() => {
+        operation.dependencies.assertDestinationRootAuthority({
+          runtimeDir: operation.preflight.destinationRuntimeDir,
+          journal,
+        });
+        const manifest = operation.dependencies.inspectManifest(
+          operation.preflight.destinationRuntimeDir,
+          'project-runtime',
+        );
+        operation.dependencies.assertDestinationRootAuthority({
+          runtimeDir: operation.preflight.destinationRuntimeDir,
+          journal,
+        });
+        return manifest;
+      })()
     : null;
   assertFreshRuntimePromotionProjectRoot(operation);
   operation.receipt = await operation.writer.verifyDestination(
     operation.receipt,
     operation.destinationManifest?.identity ?? null,
   );
+  if (operation.preflight.destinationRuntimePreexisting) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: operation.preflight.destinationRuntimeDir,
+      journal,
+    });
+  }
   operation.dependencies.checkpoint?.('after-destination-verified');
   if (
     operation.preflight.route === 'deduplicate-cache' &&
@@ -209,7 +227,17 @@ async function backupDestinationIfNeeded(operation: RuntimePromotionOperation): 
     throw new Error('Destination backup requires a verified project runtime');
   }
   assertFreshRuntimePromotionProjectRoot(operation);
+  let journal = await operation.controller.verifyOpen(operation.receipt);
+  operation.dependencies.assertDestinationRootAuthority({
+    runtimeDir: operation.preflight.destinationRuntimeDir,
+    journal,
+  });
   operation.receipt = await operation.writer.recordDestinationBackupCreateIntent(operation.receipt);
+  journal = await operation.controller.verifyOpen(operation.receipt);
+  operation.dependencies.assertDestinationRootAuthority({
+    runtimeDir: operation.preflight.destinationRuntimeDir,
+    journal,
+  });
   const authority = await operation.dependencies.authorizeFilesystem({
     action: 'destination-backup-create',
     projectRoot: operation.input.projectRoot,

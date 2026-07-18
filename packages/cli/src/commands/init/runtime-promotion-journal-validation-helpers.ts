@@ -9,6 +9,7 @@ import {
   RUNTIME_PROMOTION_LANGUAGES,
   RUNTIME_PROMOTION_OWNED_SLOT_NAMES,
   RUNTIME_PROMOTION_OWNERSHIP_ID_PATTERN,
+  RUNTIME_PROMOTION_ROOT_IDENTITY_PATTERN,
   RUNTIME_PROMOTION_SAFE_BASENAME_PATTERN,
   RUNTIME_PROMOTION_SOURCE_CLASSIFICATIONS,
   RuntimePromotionJournalValidationError,
@@ -90,9 +91,22 @@ export function isSafeRuntimePromotionBasename(value: string): boolean {
   );
 }
 
+export function validateNullableRootIdentity(value: unknown, field: string): boolean {
+  if (value === null) return false;
+  const rootIdentity = journalObject(value, field);
+  journalKeys(rootIdentity, ['device', 'inode'], field);
+  journalPattern(rootIdentity.device, RUNTIME_PROMOTION_ROOT_IDENTITY_PATTERN, `${field}.device`);
+  journalPattern(rootIdentity.inode, RUNTIME_PROMOTION_ROOT_IDENTITY_PATTERN, `${field}.inode`);
+  return true;
+}
+
 export function validateSource(value: unknown): void {
   const source = journalObject(value, 'source');
-  journalKeys(source, ['classification', 'cacheKey', 'generationDigest', 'markerSha256'], 'source');
+  journalKeys(
+    source,
+    ['classification', 'cacheKey', 'generationDigest', 'markerSha256', 'rootIdentity'],
+    'source',
+  );
   const classification = journalChoice(
     source.classification,
     RUNTIME_PROMOTION_SOURCE_CLASSIFICATIONS,
@@ -113,8 +127,18 @@ export function validateSource(value: unknown): void {
     RUNTIME_PROMOTION_DIGEST_PATTERN,
     'source.markerSha256',
   );
-  if (classification === 'none' && (cacheKey !== null || generation !== null || marker !== null)) {
+  const rootIdentityPresent = validateNullableRootIdentity(
+    source.rootIdentity,
+    'source.rootIdentity',
+  );
+  if (
+    classification === 'none' &&
+    (cacheKey !== null || generation !== null || marker !== null || rootIdentityPresent)
+  ) {
     journalFailure('a none source cannot carry cache identity');
+  }
+  if (classification !== 'none' && !rootIdentityPresent) {
+    journalFailure('a source-backed route requires a root identity');
   }
   if (
     classification === 'generation-bound' &&
@@ -138,8 +162,17 @@ export function validateInputs(value: unknown): void {
   journalKeys(inputs, ['conflict', 'authoredMode', 'languages', 'languageExplicit'], 'inputs');
   journalChoice(inputs.conflict, RUNTIME_PROMOTION_CONFLICT_POLICIES, 'inputs.conflict');
   journalChoice(inputs.authoredMode, RUNTIME_PROMOTION_AUTHORED_MODES, 'inputs.authoredMode');
-  if (!Array.isArray(inputs.languages) || inputs.languages.length === 0) {
-    journalFailure('inputs.languages must be a nonempty canonical list');
+  if (!Array.isArray(inputs.languages)) {
+    journalFailure('inputs.languages must be a canonical list');
+  }
+  if (typeof inputs.languageExplicit !== 'boolean') {
+    journalFailure('inputs.languageExplicit must be boolean');
+  }
+  if (
+    inputs.languages.length === 0 &&
+    (inputs.authoredMode !== 'refresh' || inputs.languageExplicit)
+  ) {
+    journalFailure('inputs.languages may be empty only for implicit refresh');
   }
   const languages = inputs.languages as unknown[];
   const canonical = RUNTIME_PROMOTION_LANGUAGES.filter((language) => languages.includes(language));
@@ -148,9 +181,6 @@ export function validateInputs(value: unknown): void {
     canonical.some((language, index) => languages[index] !== language)
   ) {
     journalFailure('inputs.languages must be unique and in canonical order');
-  }
-  if (typeof inputs.languageExplicit !== 'boolean') {
-    journalFailure('inputs.languageExplicit must be boolean');
   }
 }
 

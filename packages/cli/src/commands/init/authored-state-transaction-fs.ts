@@ -17,11 +17,13 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { projectCoordinationKey, SystemError } from '@opensip-cli/core';
 
+import { normalizeAuthoredPathMode } from './authored-path-mode.js';
 import {
   INIT_AUTHORED_PLAN_CAPS,
   directoryDigest,
   normalizeProjectRelativePath,
 } from './init-authored-plan-types.js';
+import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fallback.js';
 
 import type { InitAuthoredPathState } from './init-authored-plan.js';
 import type { RuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
@@ -241,9 +243,30 @@ function fsyncStableDirectoryAuthority(
   identity: AuthoredEntryIdentity,
   description: string,
 ): void {
+  const assertPathAuthority = (): void => {
+    const current = lstatSync(path, { bigint: true });
+    if (
+      !current.isDirectory() ||
+      current.isSymbolicLink() ||
+      !sameAuthoredDirectoryAuthority(identity, authoredEntryIdentity(current))
+    ) {
+      authoredTransactionFailure(`${description} path changed while it was synced`);
+    }
+    assertSafeAuthoredOwnerMode(current, description);
+  };
+  assertPathAuthority();
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    try {
+      descriptor = openSync(
+        path,
+        constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+      );
+    } catch (error) {
+      if (!isWindowsDirectoryHandleFallback(error)) throw error;
+      assertPathAuthority();
+      return;
+    }
     const opened = fstatSync(descriptor, { bigint: true });
     if (
       !opened.isDirectory() ||
@@ -252,27 +275,16 @@ function fsyncStableDirectoryAuthority(
     ) {
       authoredTransactionFailure(`${description} changed before it was synced`);
     }
-    fsyncSync(descriptor);
+    try {
+      fsyncSync(descriptor);
+    } catch (error) {
+      if (!isWindowsDirectoryHandleFallback(error)) throw error;
+    }
     const after = fstatSync(descriptor, { bigint: true });
     if (!sameAuthoredDirectoryAuthority(identity, authoredEntryIdentity(after))) {
       authoredTransactionFailure(`${description} changed while it was synced`);
     }
-    const pathAfter = lstatSync(path, { bigint: true });
-    if (
-      !pathAfter.isDirectory() ||
-      pathAfter.isSymbolicLink() ||
-      !sameAuthoredDirectoryAuthority(identity, authoredEntryIdentity(pathAfter))
-    ) {
-      authoredTransactionFailure(`${description} path changed while it was synced`);
-    }
-  } catch (error) {
-    if (
-      process.platform === 'win32' &&
-      (hasCode(error, 'EINVAL') || hasCode(error, 'ENOTSUP') || hasCode(error, 'EPERM'))
-    ) {
-      return;
-    }
-    throw error;
+    assertPathAuthority();
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
@@ -413,7 +425,7 @@ export function readStableArtifactFile(path: string): {
     return {
       digest: digest.digest('hex'),
       bytes,
-      mode: Number(before.mode & 0o777n),
+      mode: normalizeAuthoredPathMode(before.mode, 'file'),
     };
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
@@ -439,7 +451,7 @@ export function observeAuthoredPath(
   }
   if (stat.isSymbolicLink()) authoredTransactionFailure('a target is a symbolic link');
   assertSafeAuthoredOwnerMode(stat, 'a target');
-  const mode = Number(stat.mode & 0o777n);
+  const mode = normalizeAuthoredPathMode(stat.mode, stat.isDirectory() ? 'directory' : 'file');
   if (stat.isDirectory()) {
     return {
       exists: true,
@@ -507,18 +519,53 @@ function writeAll(descriptor: number, bytes: Uint8Array, start: number, end: num
 }
 
 export function fsyncDirectory(path: string): void {
+  const before = lstatSync(path, { bigint: true });
+  if (!before.isDirectory() || before.isSymbolicLink()) {
+    authoredTransactionFailure('a directory sync target is not a real directory');
+  }
+  assertSafeAuthoredOwnerMode(before, 'a directory sync target');
+  const identity = authoredEntryIdentity(before);
+  const assertPathAuthority = (): void => {
+    const current = lstatSync(path, { bigint: true });
+    if (
+      !current.isDirectory() ||
+      current.isSymbolicLink() ||
+      !sameAuthoredDirectoryAuthority(identity, authoredEntryIdentity(current))
+    ) {
+      authoredTransactionFailure('a directory sync target changed');
+    }
+    assertSafeAuthoredOwnerMode(current, 'a directory sync target');
+  };
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-    fsyncSync(descriptor);
-  } catch (error) {
-    if (
-      process.platform === 'win32' &&
-      (hasCode(error, 'EINVAL') || hasCode(error, 'ENOTSUP') || hasCode(error, 'EPERM'))
-    ) {
+    try {
+      descriptor = openSync(
+        path,
+        constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+      );
+    } catch (error) {
+      if (!isWindowsDirectoryHandleFallback(error)) throw error;
+      assertPathAuthority();
       return;
     }
-    throw error;
+    const opened = fstatSync(descriptor, { bigint: true });
+    if (
+      !opened.isDirectory() ||
+      opened.isSymbolicLink() ||
+      !sameAuthoredDirectoryAuthority(identity, authoredEntryIdentity(opened))
+    ) {
+      authoredTransactionFailure('a directory sync target changed before it was synced');
+    }
+    try {
+      fsyncSync(descriptor);
+    } catch (error) {
+      if (!isWindowsDirectoryHandleFallback(error)) throw error;
+    }
+    const after = fstatSync(descriptor, { bigint: true });
+    if (!sameAuthoredDirectoryAuthority(identity, authoredEntryIdentity(after))) {
+      authoredTransactionFailure('a directory sync target changed while it was synced');
+    }
+    assertPathAuthority();
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
@@ -532,10 +579,7 @@ interface DurableDirectoryFinalizationDependencies {
 }
 
 function isWindowsDirectoryCapabilityError(error: unknown, platform: NodeJS.Platform): boolean {
-  return (
-    platform === 'win32' &&
-    (hasCode(error, 'EINVAL') || hasCode(error, 'ENOTSUP') || hasCode(error, 'EPERM'))
-  );
+  return isWindowsDirectoryHandleFallback(error, platform);
 }
 
 function assertCreatedDirectoryObject(

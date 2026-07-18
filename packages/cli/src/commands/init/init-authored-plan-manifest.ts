@@ -220,6 +220,8 @@ function parseIdentity(value: unknown, index: number): ToolScaffoldIdentity {
 function parseInputs(value: unknown): InitAuthoredNormalizedInputs {
   const object = plainObject(value, 'inputs');
   exactKeys(object, ['languages', 'mode', 'tools'], 'inputs');
+  if (typeof object.mode !== 'string') authoredPlanFailure('inputs.mode must be a string');
+  validateMode(object.mode);
   if (!Array.isArray(object.languages)) authoredPlanFailure('inputs.languages must be an array');
   const languages = object.languages.map((language, index) => {
     if (typeof language !== 'string') {
@@ -229,6 +231,7 @@ function parseInputs(value: unknown): InitAuthoredNormalizedInputs {
   });
   const normalizedLanguages = normalizeLanguages(
     languages as InitAuthoredNormalizedInputs['languages'],
+    { allowEmpty: object.mode === 'refresh' },
   );
   if (
     normalizedLanguages.length !== languages.length ||
@@ -236,8 +239,6 @@ function parseInputs(value: unknown): InitAuthoredNormalizedInputs {
   ) {
     authoredPlanFailure('inputs.languages must be in canonical order');
   }
-  if (typeof object.mode !== 'string') authoredPlanFailure('inputs.mode must be a string');
-  validateMode(object.mode);
   if (!Array.isArray(object.tools)) authoredPlanFailure('inputs.tools must be an array');
   const tools = object.tools.map(parseIdentity);
   const stableIds = new Set(tools.map((tool) => tool.stableId));

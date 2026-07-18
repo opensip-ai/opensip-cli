@@ -12,9 +12,16 @@ import type {
   RuntimePromotionAuthoredMode,
   RuntimePromotionLanguage,
 } from './runtime-promotion-journal-types.js';
+import type { AgentGuidanceResult, PreExistingFile } from '@opensip-cli/contracts';
 
 export const AUTHORED_REPLAY_MANIFEST_KIND = 'opensip-init-authored-replay' as const;
 export const AUTHORED_REPLAY_MANIFEST_VERSION = 1 as const;
+export const INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES = Object.freeze([
+  'node_modules',
+  'dist',
+  'coverage',
+  '.turbo',
+] as const);
 
 export const INIT_AUTHORED_PLAN_CAPS = Object.freeze({
   maxMutations: RUNTIME_PROMOTION_JOURNAL_CAPS.maxAuthoredMutations,
@@ -29,6 +36,8 @@ export const INIT_AUTHORED_PLAN_CAPS = Object.freeze({
 });
 
 export type InitAuthoredMode = RuntimePromotionAuthoredMode;
+export type InitAuthoredWorkingDirState =
+  'pristine' | 'fully-initialized' | 'partial-config-only' | 'partial-dir-only';
 export type InitAuthoredMutationAction = 'create' | 'replace' | 'delete' | 'preserve';
 export type InitAuthoredTargetType = 'file' | 'directory';
 
@@ -95,6 +104,10 @@ export type InitAuthoredSnapshotRecord =
 export interface InitAuthoredSnapshot {
   /** Existing tree entries plus explicit present/missing target observations. */
   readonly records: readonly InitAuthoredSnapshotRecord[];
+  /** Generated/dependency roots preserved opaquely without following or snapshotting them. */
+  readonly opaquePaths: readonly string[];
+  /** Classification derived from these exact snapshot observations. */
+  readonly workingDirState: InitAuthoredWorkingDirState;
 }
 
 export interface RenderedInitToolScaffold extends RenderedToolScaffold {
@@ -130,6 +143,16 @@ export interface InitAuthoredPlan {
   readonly digest: string;
   readonly aggregateBlobBytes: number;
   readonly blobs: InitAuthoredPlanBlobs;
+  /**
+   * Attempt-local compatibility projection for the Init presenter. It is never
+   * serialized into the replay manifest and is intentionally absent when a
+   * later process reconstructs a plan from durable recovery artifacts.
+   */
+  readonly presentation?: {
+    readonly preExistingFiles: readonly PreExistingFile[];
+    readonly agentGuidance: AgentGuidanceResult;
+    readonly workingDirState: InitAuthoredWorkingDirState;
+  };
 }
 
 export interface InitAuthoredSnapshotHooks {
@@ -210,14 +233,19 @@ export function caseFoldPath(value: string): string {
 
 export function normalizeLanguages(
   languages: readonly RuntimePromotionLanguage[],
+  options: { readonly allowEmpty?: boolean } = {},
 ): readonly RuntimePromotionLanguage[] {
   const selected = new Set<string>(languages);
   if (
-    selected.size === 0 ||
+    (selected.size === 0 && options.allowEmpty !== true) ||
     selected.size !== languages.length ||
     languages.some((language) => !RUNTIME_PROMOTION_LANGUAGES.includes(language))
   ) {
-    authoredPlanFailure('languages must be a nonempty supported set');
+    authoredPlanFailure(
+      options.allowEmpty === true
+        ? 'languages must be a supported set'
+        : 'languages must be a nonempty supported set',
+    );
   }
   return RUNTIME_PROMOTION_LANGUAGES.filter((language) => selected.has(language));
 }

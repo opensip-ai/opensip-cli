@@ -10,6 +10,7 @@ import {
 import {
   AUTHORED_REPLAY_MANIFEST_KIND,
   AUTHORED_REPLAY_MANIFEST_VERSION,
+  type InitAuthoredMode,
   type InitAuthoredPlan,
 } from '../init-authored-plan.js';
 import { RuntimeManifestError, type VerifiedRuntimeManifest } from '../runtime-manifest.js';
@@ -75,10 +76,10 @@ function manifest(digest: string): VerifiedRuntimeManifest {
   return { identity: manifestIdentity(digest), entries: [] };
 }
 
-function plan(): InitAuthoredPlan {
+function plan(mode: InitAuthoredMode = 'fresh'): InitAuthoredPlan {
   const inputs = {
     languages: ['typescript'] as const,
-    mode: 'fresh' as const,
+    mode,
     tools: [],
   };
   return {
@@ -148,6 +149,7 @@ const PREPARED_SUMMARY = { ...SUMMARY, completed: 0, verified: false } as const;
 
 interface HarnessOptions {
   readonly route: RuntimePromotionRoute;
+  readonly authoredMode?: FreshRuntimePromotionInput['authoredMode'];
   readonly destinationRuntimePreexisting?: boolean;
   readonly destinationParentPreexisting?: boolean;
   readonly inputRoot?: string;
@@ -218,15 +220,18 @@ function selectedPreflight(
           cacheKey: '9'.repeat(24),
           generationDigest: GENERATION_DIGEST,
           markerSha256: MARKER_DIGEST,
+          rootIdentity: { device: '1', inode: '2' },
         }
       : {
           classification: 'none',
           cacheKey: null,
           generationDigest: null,
           markerSha256: null,
+          rootIdentity: null,
         },
     destinationParentPreexisting,
     destinationRuntimePreexisting,
+    destinationRootIdentity: destinationRuntimePreexisting ? { device: '3', inode: '4' } : null,
     ...(sourceRoute(options.route) ? { sourceRuntimeDir: SOURCE_RUNTIME } : {}),
     destinationParentDir: `${canonicalRoot}/opensip-cli`,
     destinationRuntimeDir: `${canonicalRoot}/opensip-cli/.runtime`,
@@ -319,6 +324,9 @@ function createHarness(options: HarnessOptions): Harness {
       state.events.push('project-root:assert');
       if (state.projectRootChanged) throw new Error('project root changed');
     },
+    assertDestinationRootAuthority: () => {
+      state.events.push('destination-root:assert');
+    },
     checkpointDatastores: ({ candidates }) => {
       state.events.push(`datastores:${candidates.map(({ kind }) => kind).join(',')}`);
       return [];
@@ -326,7 +334,7 @@ function createHarness(options: HarnessOptions): Harness {
     createPlan: (input) => {
       state.events.push(`plan:${input.projectRoot}`);
       if (options.planFailure) throw new Error('plan failed');
-      return plan();
+      return plan(input.mode);
     },
     createController: (actualLease) => {
       controller = createRuntimePromotionJournalController(actualLease, {
@@ -599,7 +607,7 @@ function createHarness(options: HarnessOptions): Harness {
     projectRoot: options.inputRoot ?? canonicalRoot,
     languages: ['typescript'],
     languageExplicit: false,
-    authoredMode: 'fresh',
+    authoredMode: options.authoredMode ?? 'fresh',
     toolScaffolds: [],
     datastoreLockContext: {
       policy: { waitMs: 100, staleMs: 1000, heartbeatMs: 100 },
@@ -621,6 +629,24 @@ function createHarness(options: HarnessOptions): Harness {
 }
 
 describe('fresh runtime promotion coordinator', () => {
+  it.each(['keep', 'remove'] as const)(
+    'records explicit %s mode durably for a pristine authored-only operation',
+    async (authoredMode) => {
+      let recordedMode: RuntimePromotionJournal['inputs']['authoredMode'] | undefined;
+      const harness = createHarness({
+        route: 'authored-only',
+        authoredMode,
+        checkpointHook: (checkpoint, state) => {
+          if (checkpoint !== 'after-journal-created' || state.content === undefined) return;
+          recordedMode = (JSON.parse(state.content) as RuntimePromotionJournal).inputs.authoredMode;
+        },
+      });
+
+      await expect(harness.run()).resolves.toMatchObject({ status: 'not-found' });
+      expect(recordedMode).toBe(authoredMode);
+    },
+  );
+
   it.each([
     ['authored-only', 'not-found', 'source-absent'],
     ['project-authority', 'already-project', 'source-absent'],
@@ -876,9 +902,11 @@ describe('fresh runtime promotion coordinator', () => {
     });
 
     expect(result).toMatchObject({
-      status: 'cleanup-pending',
+      status: 'rolled-back',
       cleanupPending: true,
       sourcePreserved: false,
+      reasonCode: 'operation-failed',
+      nextCommand: 'opensip init',
     });
     expect(harness.state.released).toBe(0);
     expect(harness.journal()).toMatchObject({

@@ -89,7 +89,8 @@ export function buildPartialStateMessage(
     '',
     'Choose one:',
     '  opensip init --keep    Re-scaffold examples; preserve config and custom files.',
-    '  opensip init --remove  Delete opensip-cli/ and scaffold fresh.',
+    '  opensip init --remove  Reset Init-authored files; preserve .runtime evidence.',
+    '  opensip uninstall --project --dry-run  Preview removal of retained runtime evidence.',
   );
   return lines.join('\n');
 }
@@ -110,8 +111,11 @@ export function formatInsideExistingProjectMessage(discoveredRoot: string): stri
     `    • Re-scaffold examples, keep your custom files:`,
     `        opensip init --keep --cwd ${discoveredRoot}`,
     ``,
-    `    • Reset the existing project (delete everything, start over):`,
+    `    • Reset Init-authored files (preserve .runtime evidence):`,
     `        opensip init --remove --cwd ${discoveredRoot}`,
+    ``,
+    `    • Preview removal of retained runtime evidence:`,
+    `        opensip uninstall --project ${discoveredRoot} --dry-run`,
     ``,
     `    • Create a NEW separate project here (rare — only for`,
     `      truly independent sub-projects in a monorepo):`,

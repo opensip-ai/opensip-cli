@@ -90,11 +90,13 @@ function initialJournal(
     route,
     destinationParentPreexisting: destination,
     destinationRuntimePreexisting: destination,
+    destinationRootIdentity: destination ? { device: '1', inode: '2' } : null,
     source: {
       classification: sourceSelected ? 'legacy' : 'none',
       cacheKey: sourceSelected ? PROJECT_KEY : null,
       generationDigest: null,
       markerSha256: sourceSelected ? DIGEST : null,
+      rootIdentity: sourceSelected ? { device: '1', inode: '2' } : null,
     },
     inputs: {
       conflict: sourceSelected ? 'use-cache' : 'abort',
@@ -216,6 +218,7 @@ function createHarness(
       destinationParent: null,
     }),
     assertProjectRootAuthority: () => undefined,
+    assertDestinationRootAuthority: () => undefined,
     ...options.dependencyOverrides,
   };
   return {
@@ -467,7 +470,26 @@ describe('runtime promotion recovery', () => {
     ).toBe(true);
     expect(recoveryInputsCompatible(journal, { languages: ['python'] })).toBe(false);
     expect(recoveryInputsCompatible(journal, { authoredMode: 'remove' })).toBe(false);
-    expect(recoveryInputsCompatible(journal, { conflict: 'use-cache' })).toBe(false);
+    expect(recoveryInputsCompatible(journal, { conflict: 'use-cache' })).toBe(true);
+    expect(recoveryInputsCompatible(journal, { conflict: 'keep-project' })).toBe(true);
+
+    const sourceBacked = initialJournal({ route: 'promote-cache' });
+    expect(recoveryInputsCompatible(sourceBacked, { conflict: 'use-cache' })).toBe(true);
+    expect(recoveryInputsCompatible(sourceBacked, { conflict: 'abort' })).toBe(false);
+  });
+
+  it('compares recovery languages in their durable canonical order', () => {
+    const journal: RuntimePromotionJournal = {
+      ...initialJournal(),
+      inputs: {
+        ...initialJournal().inputs,
+        languages: ['typescript', 'rust'],
+        languageExplicit: true,
+      },
+    };
+
+    expect(recoveryInputsCompatible(journal, { languages: ['typescript', 'rust'] })).toBe(true);
+    expect(recoveryInputsCompatible(journal, { languages: ['rust', 'typescript'] })).toBe(false);
   });
 
   it('rolls back a journal that has no durable authored replay instead of rebuilding defaults', async () => {
@@ -682,9 +704,11 @@ describe('runtime promotion recovery', () => {
       const result = await harness.run();
 
       expect(result).toMatchObject({
-        status: 'cleanup-pending',
+        status: 'rolled-back',
         cleanupPending: true,
         sourcePreserved: false,
+        reasonCode: 'operation-failed',
+        nextCommand: 'opensip init',
       });
       expect(storedJournal(harness.store).state).toBe('closed');
       expect(harness.released.count).toBe(1);
@@ -708,8 +732,10 @@ describe('runtime promotion recovery', () => {
     const result = await harness.run();
 
     expect(result).toMatchObject({
-      status: 'cleanup-pending',
+      status: 'rolled-back',
       cleanupPending: true,
+      reasonCode: 'operation-failed',
+      nextCommand: 'opensip init',
     });
     expect(storedJournal(harness.store).state).toBe('closed');
     expect(harness.released.count).toBe(1);

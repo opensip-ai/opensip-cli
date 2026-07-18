@@ -41,11 +41,13 @@ function initial(): RuntimePromotionJournal {
     route: 'authored-only',
     destinationParentPreexisting: false,
     destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
     source: {
       classification: 'none',
       cacheKey: null,
       generationDigest: null,
       markerSha256: null,
+      rootIdentity: null,
     },
     inputs: {
       conflict: 'abort',
@@ -68,12 +70,14 @@ function promote(destinationRuntimePreexisting = false): RuntimePromotionJournal
     ...initial(),
     destinationParentPreexisting: true,
     destinationRuntimePreexisting,
+    destinationRootIdentity: destinationRuntimePreexisting ? { device: '3', inode: '4' } : null,
     route: 'promote-cache',
     source: {
       classification: 'generation-bound',
       cacheKey: 'c'.repeat(24),
       generationDigest: 'c'.repeat(64),
       markerSha256: 'd'.repeat(64),
+      rootIdentity: { device: '1', inode: '2' },
     },
     inputs: { ...initial().inputs, conflict: 'use-cache' },
   });
@@ -118,6 +122,7 @@ function rolledBackReceipt(
     ...journal,
     destinationParentPreexisting: destinationRuntimePreexisting,
     destinationRuntimePreexisting,
+    destinationRootIdentity: destinationRuntimePreexisting ? { device: '3', inode: '4' } : null,
     route,
     revision: 2,
     source: sourceRoute
@@ -126,6 +131,7 @@ function rolledBackReceipt(
           cacheKey: 'c'.repeat(24),
           generationDigest: 'c'.repeat(64),
           markerSha256: 'd'.repeat(64),
+          rootIdentity: { device: '1', inode: '2' },
         }
       : journal.source,
     inputs: { ...journal.inputs, conflict },
@@ -239,6 +245,7 @@ describe('runtime promotion journal route evidence', () => {
         ...project,
         destinationParentPreexisting: true,
         destinationRuntimePreexisting: true,
+        destinationRootIdentity: { device: '3', inode: '4' },
         route: 'project-authority',
         revision: 1,
         progress: { ...project.progress, phase: 'destination-verified' },
@@ -252,12 +259,14 @@ describe('runtime promotion journal route evidence', () => {
       ...initial(),
       destinationParentPreexisting: true,
       destinationRuntimePreexisting: true,
+      destinationRootIdentity: { device: '3', inode: '4' },
       route: 'deduplicate-cache',
       source: {
         classification: 'generation-bound',
         cacheKey: 'c'.repeat(24),
         generationDigest: 'c'.repeat(64),
         markerSha256: 'd'.repeat(64),
+        rootIdentity: { device: '1', inode: '2' },
       },
     });
     const deduplicated = canonicalRuntimePromotionJournal({
@@ -294,6 +303,7 @@ describe('runtime promotion journal route evidence', () => {
       canonicalRuntimePromotionJournal({
         ...sourceOnly,
         destinationRuntimePreexisting: true,
+        destinationRootIdentity: { device: '3', inode: '4' },
       }),
     ).toThrow(/use-cache|conflict authority/iu);
     expect(() =>
@@ -304,6 +314,7 @@ describe('runtime promotion journal route evidence', () => {
           cacheKey: 'c'.repeat(24),
           generationDigest: null,
           markerSha256: 'd'.repeat(64),
+          rootIdentity: { device: '1', inode: '2' },
         },
       }),
     ).toThrow(/use-cache|conflict authority/iu);

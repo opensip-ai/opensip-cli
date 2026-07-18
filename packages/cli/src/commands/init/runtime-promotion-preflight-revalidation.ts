@@ -1,9 +1,14 @@
 import { realpathSync } from 'node:fs';
 
-import { resolveEphemeralProjectPaths, type RuntimeExclusiveLease } from '@opensip-cli/core';
+import {
+  resolveEphemeralProjectPaths,
+  resolveUserPaths,
+  type RuntimeExclusiveLease,
+} from '@opensip-cli/core';
 
 import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 import {
+  canonicalRuntimePromotionCacheChild,
   inspectRuntimePromotionFilesystem,
   readRuntimePromotionMarkerSha256,
   RuntimePromotionFilesystemLeaseMismatchError,
@@ -181,12 +186,38 @@ function sameSourceAuthority(
   selected: RuntimePromotionPreflightSelected,
   inspection: RuntimePromotionFilesystemInspection,
 ): boolean {
+  const selectedSource = selected.revalidation.source;
+  const observedSource = inspection.sourceRevalidation;
+  if (selectedSource === undefined || observedSource === undefined) return false;
+  let canonicalObservedRuntime: string;
+  try {
+    canonicalObservedRuntime = canonicalRuntimePromotionCacheChild(
+      resolveUserPaths().ephemeralProjectsDir,
+      observedSource.cacheKey,
+    ).runtimeDir;
+  } catch {
+    return false;
+  }
+  const selectedIdentity = selectedSource.runtime.identity;
+  const observedIdentity = observedSource.runtime.identity;
+  const sameDirectoryAuthority =
+    selectedSource.runtime.presence === 'directory' &&
+    observedSource.runtime.presence === 'directory' &&
+    selectedIdentity !== undefined &&
+    selectedIdentity.dev === observedIdentity?.dev &&
+    selectedIdentity.ino === observedIdentity?.ino &&
+    selectedIdentity.uid === observedIdentity?.uid &&
+    selectedIdentity.mode === observedIdentity?.mode;
   return (
     selected.source.classification === inspection.source.classification &&
     selected.source.cacheKey === inspection.source.cacheKey &&
     selected.source.generationDigest === inspection.source.generationDigest &&
     selected.source.markerSha256 === inspection.source.markerSha256 &&
-    selected.sourceRuntimeDir === inspection.sourceRevalidation?.runtimeDir
+    selectedSource.kind === observedSource.kind &&
+    selectedSource.cacheKey === observedSource.cacheKey &&
+    selectedSource.markerSha256 === observedSource.markerSha256 &&
+    selected.sourceRuntimeDir === canonicalObservedRuntime &&
+    sameDirectoryAuthority
   );
 }
 

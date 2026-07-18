@@ -156,14 +156,14 @@ function recoveredRolledBackResult(
   const strength = proofStrength(input.journal.source.classification);
   const authoredSummary = authored(input.authored);
   return {
-    status: input.cleanupPending ? 'cleanup-pending' : 'rolled-back',
+    status: 'rolled-back',
     ...(strength === undefined ? {} : { proofStrength: strength }),
     sourcePreserved: terminal.sourcePreserved,
     sourceRetired: false,
     ...(input.cleanupPending ? { cleanupPending: true } : {}),
     ...(authoredSummary === undefined ? {} : { authored: authoredSummary }),
     durationMs: duration(input.startedAt, input.now),
-    reasonCode: input.cleanupPending ? 'cleanup-pending' : 'operation-failed',
+    reasonCode: 'operation-failed',
     nextCommand: INIT_COMMAND,
   };
 }

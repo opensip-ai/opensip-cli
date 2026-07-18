@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { EPHEMERAL_MARKER_FILE, EPHEMERAL_MARKER_MAX_BYTES } from '@opensip-cli/core';
 
 import { runtimeManifestIdentityEqual } from './runtime-manifest.js';
+import { withRuntimePromotionDestinationRootAuthority } from './runtime-promotion-destination-authority.js';
 import {
   consumeRuntimePromotionFilesystemAuthority,
   openCapabilityDirectory,
@@ -31,6 +32,17 @@ import type {
   RuntimePromotionFilesystemAuthority,
   RuntimePromotionRetireResult,
 } from './runtime-promotion-filesystem-types.js';
+import type { RuntimePromotionRootIdentity } from './runtime-promotion-journal-schema.js';
+
+function journalSourceRootIdentity(
+  state: RuntimePromotionFilesystemCapabilityState,
+): RuntimePromotionRootIdentity {
+  const identity = state.journal.source.rootIdentity;
+  if (identity === null) {
+    runtimePromotionFilesystemFailure('source retirement lacks journal root identity');
+  }
+  return identity;
+}
 
 function assertSelectedSourceMarker(runtime: string, expectedSha256: string | null): void {
   const markerPath = join(runtime, EPHEMERAL_MARKER_FILE);
@@ -57,7 +69,13 @@ function assertProjectSuccessor(state: RuntimePromotionFilesystemCapabilityState
   if (successor === null) {
     runtimePromotionFilesystemFailure('source retirement lacks project successor authority');
   }
-  inspectExactRuntimeManifest(state.paths.destinationRuntime, 'project-runtime', successor);
+  if (state.journal.route === 'promote-cache') {
+    inspectExactRuntimeManifest(state.paths.destinationRuntime, 'project-runtime', successor);
+    return;
+  }
+  withRuntimePromotionDestinationRootAuthority(state.paths.destinationRuntime, state.journal, () =>
+    inspectExactRuntimeManifest(state.paths.destinationRuntime, 'project-runtime', successor),
+  );
 }
 
 export async function retireRuntimePromotionSource(
@@ -82,18 +100,21 @@ export async function retireRuntimePromotionSource(
   const parent = openCapabilityDirectory(state.sourceParent, 'the selected cache parent');
   try {
     assertProjectSuccessor(state);
+    const sourceRootIdentity = journalSourceRootIdentity(state);
     const source = artifactPresence(state.paths.sourceRuntime);
     const tombstone = artifactPresence(state.paths.sourceTombstone);
     if (source === 'directory' && tombstone === 'directory') {
       runtimePromotionFilesystemFailure('both source and source tombstone are present');
     }
     if (source === 'directory') {
+      assertPromotionRootIdentity(state.paths.sourceRuntime, sourceRootIdentity);
       assertSelectedSourceMarker(state.paths.sourceRuntime, state.journal.source.markerSha256);
       const verified = inspectExactRuntimeManifest(
         state.paths.sourceRuntime,
         'cache-source',
         expected,
       );
+      assertPromotionRootIdentity(state.paths.sourceRuntime, sourceRootIdentity);
       const owner = ensureBoundOwnerMarker({
         state,
         parent,
@@ -110,10 +131,12 @@ export async function retireRuntimePromotionSource(
         state.dependencies,
         'source-retire-rename',
         () => {
+          assertPromotionRootIdentity(state.paths.sourceRuntime!, sourceRootIdentity);
           assertPromotionRootIdentity(state.paths.sourceRuntime!, owner.rootIdentity);
           assertSelectedSourceMarker(state.paths.sourceRuntime!, state.journal.source.markerSha256);
           inspectExactRuntimeManifest(state.paths.sourceRuntime!, 'cache-source', expected);
           assertProjectSuccessor(state);
+          assertPromotionRootIdentity(state.paths.sourceRuntime!, sourceRootIdentity);
         },
       );
       assertSelectedSourceMarker(state.paths.sourceTombstone, state.journal.source.markerSha256);
@@ -133,6 +156,7 @@ export async function retireRuntimePromotionSource(
       return { status: 'applied', manifest: verified };
     }
     if (tombstone === 'directory') {
+      assertPromotionRootIdentity(state.paths.sourceTombstone, sourceRootIdentity);
       const owner = inspectBoundOwnedMarker(
         state.paths.sourceTombstoneMarker,
         state.paths.sourceTombstone,

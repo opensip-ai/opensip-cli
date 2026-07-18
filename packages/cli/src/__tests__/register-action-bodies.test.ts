@@ -16,6 +16,7 @@
  * simulate the hook (the same way they set `projectContext`).
  */
 
+import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
   LanguageRegistry,
   RunScope,
@@ -103,17 +104,30 @@ vi.mock('../commands/configure.js', () => ({
 }));
 
 vi.mock('../commands/init.js', () => ({
-  executeInit: vi.fn(
-    (args: { cwd: string }) =>
-      ({
-        type: 'init',
-        path: `${args.cwd}/opensip-cli.config.yml`,
-        cwd: args.cwd,
-        configFilename: 'opensip-cli.config.yml',
-        created: true,
-        state: 'pristine',
-        languages: ['python'],
-      }) as never,
+  executeInit: vi.fn((args: { cwd: string }) =>
+    Promise.resolve({
+      type: 'init',
+      path: `${args.cwd}/opensip-cli.config.yml`,
+      cwd: args.cwd,
+      configFilename: 'opensip-cli.config.yml',
+      created: true,
+      state: 'pristine',
+      languages: ['python'],
+    } as never),
+  ),
+  executeInitRecovery: vi.fn((args: { cwd: string }) =>
+    Promise.resolve({
+      type: 'init',
+      path: `${args.cwd}/opensip-cli.config.yml`,
+      cwd: args.cwd,
+      configFilename: 'opensip-cli.config.yml',
+      created: false,
+      runtimeAdoption: {
+        status: 'already-project',
+        sourcePreserved: false,
+        durationMs: 1,
+      },
+    } as never),
   ),
 }));
 
@@ -142,7 +156,7 @@ vi.mock('../commands/uninstall.js', () => ({
 import { executeClear } from '../commands/clear.js';
 import { executeConfigure } from '../commands/configure.js';
 import { showHistory } from '../commands/history.js';
-import { mountHostCommands } from '../commands/host-command-specs.js';
+import { buildInitRecoverySpec, mountHostCommands } from '../commands/host-command-specs.js';
 import {
   buildHostCommandInventory,
   buildToolPluginLeaves,
@@ -150,7 +164,8 @@ import {
   effectiveCwd,
   mountToolPluginGroups,
 } from '../commands/host-subcommand-groups.js';
-import { executeInit } from '../commands/init.js';
+import { executeInit, executeInitRecovery } from '../commands/init.js';
+import { mountCommandSpec } from '../commands/mount-command-spec.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from '../commands/plugin.js';
 import { executeRunsList, executeRunsShow } from '../commands/run-history.js';
 import { executeSessionShow } from '../commands/session-show.js';
@@ -158,7 +173,13 @@ import { toolsList } from '../commands/tools/list.js';
 import { executeUninstall } from '../commands/uninstall.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
-import type { CommandOutcome, CommandResult, InitResult } from '@opensip-cli/contracts';
+import type {
+  CommandOutcome,
+  CommandResult,
+  InitResult,
+  RuntimeAdoptionResult,
+  RuntimeAdoptionStatus,
+} from '@opensip-cli/contracts';
 
 interface MakeCtxResult {
   ctx: CliCommandsContext;
@@ -238,6 +259,13 @@ async function dispatchInit(
 function mount(ctx: CliCommandsContext): Command {
   const program = new Command('opensip');
   mountHostCommands(program, ctx);
+  return program;
+}
+
+/** Mount only the pre-discovery recovery variant of the canonical Init spec. */
+function mountInitRecovery(ctx: CliCommandsContext): Command {
+  const program = new Command('opensip');
+  mountCommandSpec(program, buildInitRecoverySpec(ctx), ctx);
   return program;
 }
 
@@ -744,6 +772,94 @@ describe('configure spec — action body', () => {
 
 // --- init ---------------------------------------------------------------------
 
+interface AdoptionExitCase {
+  readonly adoption: RuntimeAdoptionResult;
+  readonly exitCode: number | undefined;
+}
+
+const ADOPTION_EXIT_CASES = {
+  'not-found': {
+    adoption: { status: 'not-found', sourcePreserved: false, durationMs: 1 },
+    exitCode: undefined,
+  },
+  promoted: {
+    adoption: { status: 'promoted', sourcePreserved: false, durationMs: 1 },
+    exitCode: undefined,
+  },
+  'already-project': {
+    adoption: { status: 'already-project', sourcePreserved: false, durationMs: 1 },
+    exitCode: undefined,
+  },
+  deduplicated: {
+    adoption: { status: 'deduplicated', sourcePreserved: false, durationMs: 1 },
+    exitCode: undefined,
+  },
+  'kept-project': {
+    adoption: { status: 'kept-project', sourcePreserved: false, durationMs: 1 },
+    exitCode: undefined,
+  },
+  conflict: {
+    adoption: {
+      status: 'conflict',
+      sourcePreserved: true,
+      durationMs: 1,
+      reasonCode: 'divergent',
+      nextCommand: 'opensip init --runtime-conflict keep-project',
+    },
+    exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+  },
+  busy: {
+    adoption: {
+      status: 'busy',
+      durationMs: 1,
+      reasonCode: 'lease-busy',
+      nextCommand: 'opensip init',
+    },
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+  },
+  'recovery-required': {
+    adoption: {
+      status: 'recovery-required',
+      durationMs: 1,
+      reasonCode: 'operation-failed',
+      nextCommand: 'opensip init',
+    },
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+  },
+  'rolled-back': {
+    adoption: {
+      status: 'rolled-back',
+      sourcePreserved: false,
+      durationMs: 1,
+      reasonCode: 'operation-failed',
+      nextCommand: 'opensip init',
+    },
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+  },
+  'cleanup-pending': {
+    adoption: {
+      status: 'cleanup-pending',
+      sourcePreserved: false,
+      cleanupPending: true,
+      durationMs: 1,
+      reasonCode: 'cleanup-pending',
+      nextCommand: 'opensip init',
+    },
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+  },
+} satisfies Record<RuntimeAdoptionStatus, AdoptionExitCase>;
+
+function initResultWithAdoption(runtimeAdoption: RuntimeAdoptionResult): InitResult {
+  return {
+    type: 'init',
+    path: '/project/opensip-cli.config.yml',
+    cwd: '/project',
+    configFilename: 'opensip-cli.config.yml',
+    created: false,
+    runtimeAdoption,
+  };
+}
+
 describe('init spec — action body', () => {
   it('init: enriches an eligible result from the entered scope inventory', async () => {
     const { ctx, rendered } = makeCtx();
@@ -752,14 +868,20 @@ describe('init spec — action body', () => {
 
     await dispatchInit(program, ['init'], harness);
     expect(executeInit).toHaveBeenCalledTimes(1);
-    const callArgs = vi.mocked(executeInit).mock.calls[0]?.[0] as {
-      cwd: string;
-      cwdExplicit: boolean;
-      json: boolean;
-      language?: string;
-    };
+    const callArgs = vi.mocked(executeInit).mock.calls[0]?.[0];
+    expect(callArgs).toBeDefined();
     expect(callArgs.json).toBe(false);
     expect(callArgs.cwdExplicit).toBe(false);
+    expect(callArgs).not.toHaveProperty('runtimeConflict');
+    expect(callArgs.datastoreLockContext).toMatchObject({
+      command: 'opensip init',
+      cwdBasename: expect.any(String),
+      policy: {
+        waitMs: expect.any(Number),
+        staleMs: expect.any(Number),
+        heartbeatMs: expect.any(Number),
+      },
+    });
     expect(rendered).toHaveLength(1);
     expect(toolsList).toHaveBeenCalledWith({
       cwd: callArgs.cwd,
@@ -788,16 +910,104 @@ describe('init spec — action body', () => {
     topCmd(program, 'init').setOptionValue('cwdExplicit', true);
 
     await dispatchInit(program, ['init', '--cwd', '/explicit']);
-    const callArgs = vi.mocked(executeInit).mock.calls.at(-1)?.[0] as {
-      cwd: string;
-      cwdExplicit: boolean;
-    };
+    const callArgs = vi.mocked(executeInit).mock.calls.at(-1)?.[0];
+    if (callArgs === undefined) throw new Error('executeInit was not called');
     expect(callArgs.cwd).toBe('/explicit');
     expect(callArgs.cwdExplicit).toBe(true);
+    expect(callArgs.datastoreLockContext.cwdBasename).toBe('explicit');
+  });
+
+  it.each(['abort', 'keep-project', 'use-cache'] as const)(
+    'init --runtime-conflict %s: forwards the explicit policy',
+    async (runtimeConflict) => {
+      const { ctx } = makeCtx();
+      const program = mount(ctx);
+
+      await dispatchInit(program, ['init', '--runtime-conflict', runtimeConflict]);
+
+      expect(executeInit).toHaveBeenCalledWith(expect.objectContaining({ runtimeConflict }));
+    },
+  );
+
+  it('init rejects an unsupported --runtime-conflict before executing', async () => {
+    const { ctx } = makeCtx();
+    const program = mount(ctx);
+    program.exitOverride();
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    try {
+      await expect(
+        dispatchInit(program, ['init', '--runtime-conflict', 'merge']),
+      ).rejects.toThrow();
+    } finally {
+      stderr.mockRestore();
+    }
+    expect(executeInit).not.toHaveBeenCalled();
+  });
+
+  it('recovery-only init uses canonical options, omits untyped policy, and skips Tool work', async () => {
+    const { ctx, rendered, setExitCode } = makeCtx();
+    const program = mountInitRecovery(ctx);
+
+    await dispatchInit(program, ['init']);
+
+    expect(executeInitRecovery).toHaveBeenCalledOnce();
+    const recoveryArgs = vi.mocked(executeInitRecovery).mock.calls[0]?.[0];
+    expect(recoveryArgs).toBeDefined();
+    expect(executeInitRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwdExplicit: false,
+        datastoreLockContext: expect.objectContaining({
+          command: 'opensip init',
+        }),
+      }),
+    );
+    expect(recoveryArgs).not.toHaveProperty('runtimeConflict');
+    expect(executeInit).not.toHaveBeenCalled();
+    expect(toolsList).not.toHaveBeenCalled();
+    expect(setExitCode).not.toHaveBeenCalled();
+    expect(rendered).toHaveLength(1);
+  });
+
+  it('recovery-only init forwards explicit retry inputs through the canonical grammar', async () => {
+    const { ctx } = makeCtx();
+    const program = mountInitRecovery(ctx);
+
+    await dispatchInit(program, [
+      'init',
+      '--language',
+      'rust,typescript',
+      '--keep',
+      '--runtime-conflict',
+      'keep-project',
+    ]);
+
+    expect(executeInitRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        language: ['rust,typescript'],
+        keep: true,
+        runtimeConflict: 'keep-project',
+      }),
+    );
+    expect(executeInit).not.toHaveBeenCalled();
+  });
+
+  it('recovery-only init applies the shared adoption exit mapping', async () => {
+    vi.mocked(executeInitRecovery).mockResolvedValueOnce(
+      initResultWithAdoption(ADOPTION_EXIT_CASES['rolled-back'].adoption),
+    );
+    const { ctx, setExitCode } = makeCtx();
+    const program = mountInitRecovery(ctx);
+
+    await dispatchInit(program, ['init']);
+
+    expect(setExitCode).toHaveBeenCalledOnce();
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+    expect(toolsList).not.toHaveBeenCalled();
   });
 
   it('init: sets exit-code 2 when result.ambiguousLanguageError is set', async () => {
-    vi.mocked(executeInit).mockReturnValueOnce({
+    vi.mocked(executeInit).mockResolvedValueOnce({
       type: 'init',
       path: '',
       cwd: process.cwd(),
@@ -817,7 +1027,7 @@ describe('init spec — action body', () => {
   });
 
   it('init: sets exit-code 2 when result.partialStateError is set', async () => {
-    vi.mocked(executeInit).mockReturnValueOnce({
+    vi.mocked(executeInit).mockResolvedValueOnce({
       type: 'init',
       path: '',
       cwd: process.cwd(),
@@ -841,7 +1051,7 @@ describe('init spec — action body', () => {
   });
 
   it('init: sets exit-code 2 when result.insideExistingProject is set', async () => {
-    vi.mocked(executeInit).mockReturnValueOnce({
+    vi.mocked(executeInit).mockResolvedValueOnce({
       type: 'init',
       path: '',
       cwd: process.cwd(),
@@ -861,7 +1071,7 @@ describe('init spec — action body', () => {
   });
 
   it('init: does not set exit-code when result is a refresh success', async () => {
-    vi.mocked(executeInit).mockReturnValueOnce({
+    vi.mocked(executeInit).mockResolvedValueOnce({
       type: 'init',
       path: '',
       cwd: process.cwd(),
@@ -881,10 +1091,60 @@ describe('init spec — action body', () => {
     expect(harness.debug).not.toHaveBeenCalled();
   });
 
+  for (const [status, { adoption, exitCode }] of Object.entries(ADOPTION_EXIT_CASES) as [
+    RuntimeAdoptionStatus,
+    AdoptionExitCase,
+  ][]) {
+    it(`init: maps runtime adoption status ${status} to its public exit contract`, async () => {
+      vi.mocked(executeInit).mockResolvedValueOnce(initResultWithAdoption(adoption));
+      const { ctx, setExitCode } = makeCtx();
+      const program = mount(ctx);
+
+      await dispatchInit(program, ['init']);
+
+      if (exitCode === undefined) {
+        expect(setExitCode).not.toHaveBeenCalled();
+      } else {
+        expect(setExitCode).toHaveBeenCalledOnce();
+        expect(setExitCode).toHaveBeenCalledWith(exitCode);
+      }
+    });
+  }
+
+  it.each([
+    [
+      {
+        status: 'conflict',
+        durationMs: 1,
+        reasonCode: 'destination-unverified',
+        nextCommand: 'opensip init',
+      },
+      EXIT_CODES.RUNTIME_ERROR,
+    ],
+    [
+      {
+        status: 'recovery-required',
+        durationMs: 1,
+        reasonCode: 'operation-interrupted',
+        nextCommand: 'opensip init',
+      },
+      EXIT_CODES.CONFIGURATION_ERROR,
+    ],
+  ] as const)('init: maps the %s reason override to exit code %s', async (adoption, exitCode) => {
+    vi.mocked(executeInit).mockResolvedValueOnce(initResultWithAdoption(adoption));
+    const { ctx, setExitCode } = makeCtx();
+    const program = mount(ctx);
+
+    await dispatchInit(program, ['init']);
+
+    expect(setExitCode).toHaveBeenCalledOnce();
+    expect(setExitCode).toHaveBeenCalledWith(exitCode);
+  });
+
   it.each(['fully-initialized', 'partial-config-only', 'partial-dir-only'] as const)(
     'init: leaves a created %s recovery result footer-free',
     async (state) => {
-      vi.mocked(executeInit).mockReturnValueOnce({
+      vi.mocked(executeInit).mockResolvedValueOnce({
         type: 'init',
         path: '/project/opensip-cli.config.yml',
         cwd: '/project',
@@ -924,6 +1184,36 @@ describe('init spec — action body', () => {
       expect(rendered[0]).not.toHaveProperty('optionalTools');
     },
   );
+
+  it('init: keeps cleanup-pending retry guidance free of optional-tool inventory work', async () => {
+    vi.mocked(executeInit).mockResolvedValueOnce({
+      type: 'init',
+      path: '/project/opensip-cli.config.yml',
+      cwd: '/project',
+      configFilename: 'opensip-cli.config.yml',
+      created: true,
+      state: 'pristine',
+      languages: ['python'],
+      runtimeAdoption: {
+        status: 'cleanup-pending',
+        sourcePreserved: false,
+        cleanupPending: true,
+        durationMs: 1,
+        reasonCode: 'cleanup-pending',
+        nextCommand: 'opensip init',
+      },
+    });
+    const { ctx, rendered, setExitCode } = makeCtx();
+    const program = mount(ctx);
+    const harness = makeInitScope();
+
+    await dispatchInit(program, ['init'], harness);
+
+    expect(toolsList).not.toHaveBeenCalled();
+    expect(harness.debug).not.toHaveBeenCalled();
+    expect(rendered[0]).not.toHaveProperty('optionalTools');
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
+  });
 
   it('init: treats denied manifest-only inventory rows as identity-only installed evidence', async () => {
     vi.mocked(toolsList).mockReturnValueOnce({

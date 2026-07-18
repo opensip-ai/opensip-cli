@@ -3,10 +3,9 @@
  *
  * Pins TODAY's `init` scaffold output — the config bytes, every example file's
  * bytes (including the pinned check ids), the `.gitignore` patch, and the
- * created-directory set — BEFORE the registry-driven refactor (Phases 1–3). The
- * refactor must leave these snapshots UNCHANGED; any diff is a behavior
- * regression, not a re-snapshot. (Phase 2 re-points the `executeInit` call to its
- * new signature but does NOT loosen these assertions.)
+ * created-directory set. Any intentional byte change must update the exact
+ * snapshot in the same change so this test continues to describe what Init
+ * actually writes.
  */
 
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -22,6 +21,7 @@ import { executeInit } from '../commands/init.js';
 
 import type { ToolScaffold } from '../commands/shared.js';
 import type { InitOptions } from '@opensip-cli/contracts';
+import type { DataStoreLockContext } from '@opensip-cli/datastore';
 
 /** The first-party scaffold contributions, mirroring the host's registry aggregation. */
 function firstPartyScaffolds(): ToolScaffold[] {
@@ -60,17 +60,39 @@ function pinnedCheckId(language: string): string {
 }
 
 let testDir: string;
+let homeDir: string;
+let priorHome: string | undefined;
+
+const DATASTORE_LOCK_CONTEXT = {
+  policy: { waitMs: 100, staleMs: 1000, heartbeatMs: 100 },
+  command: 'opensip init',
+  cwdBasename: 'init-golden-fixture',
+} as const satisfies DataStoreLockContext;
 
 beforeEach(() => {
+  priorHome = process.env.HOME;
+  homeDir = mkdtempSync(join(tmpdir(), 'opensip-init-golden-home-'));
+  process.env.HOME = homeDir;
   testDir = mkdtempSync(join(tmpdir(), 'opensip-init-golden-'));
 });
 
 afterEach(() => {
+  if (priorHome === undefined) delete process.env.HOME;
+  else process.env.HOME = priorHome;
+  rmSync(homeDir, { recursive: true, force: true });
   rmSync(testDir, { recursive: true, force: true });
 });
 
-function makeArgs(overrides: Partial<InitOptions> = {}): InitOptions {
-  return { json: false, cwd: testDir, debug: false, ...overrides };
+function makeArgs(
+  overrides: Partial<InitOptions> = {},
+): InitOptions & { readonly datastoreLockContext: DataStoreLockContext } {
+  return {
+    json: false,
+    cwd: testDir,
+    debug: false,
+    datastoreLockContext: DATASTORE_LOCK_CONTEXT,
+    ...overrides,
+  };
 }
 
 function read(rel: string): string {
@@ -78,8 +100,8 @@ function read(rel: string): string {
 }
 
 describe('init golden — single language (typescript)', () => {
-  it('scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs', () => {
-    const result = executeInit({
+  it('scaffolds the exact fit+sim layout, config bytes, ids, .gitignore, and dirs', async () => {
+    const result = await executeInit({
       ...makeArgs({ language: ['typescript'] }),
       toolScaffolds: firstPartyScaffolds(),
     });
@@ -116,8 +138,8 @@ describe('init golden — single language (typescript)', () => {
     expect(read('.gitignore')).toMatchSnapshot('.gitignore');
   });
 
-  it('the config contains the host-rendered fitness: block (Phase 3 must reproduce it)', () => {
-    executeInit({
+  it('the config contains the host-rendered fitness: block (Phase 3 must reproduce it)', async () => {
+    await executeInit({
       ...makeArgs({ language: ['typescript'] }),
       toolScaffolds: firstPartyScaffolds(),
     });
@@ -130,8 +152,8 @@ describe('init golden — single language (typescript)', () => {
 });
 
 describe('init golden — polyglot (rust,typescript)', () => {
-  it('scaffolds per-language check files + the polyglot recipe slug list', () => {
-    const result = executeInit({
+  it('scaffolds per-language check files + the polyglot recipe slug list', async () => {
+    const result = await executeInit({
       ...makeArgs({ language: ['rust', 'typescript'] }),
       toolScaffolds: firstPartyScaffolds(),
     });

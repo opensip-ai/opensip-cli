@@ -19,7 +19,6 @@ import {
   fsyncPromotionDirectory,
   openStablePromotionDirectory,
   promotionIdentityOf,
-  promotionFilesystemCheckpoint,
   runtimePromotionFilesystemFailure,
   withPromotionMutation,
 } from './runtime-promotion-filesystem-io.js';
@@ -118,6 +117,7 @@ function removeOwnedDirectoryContents(
   relativeDirectory: string,
   budget: CleanupBudget,
   dependencies: RuntimePromotionFilesystemDependencies,
+  revalidateBeforeMutation: (() => void) | undefined,
   heldRoot?: StablePromotionDirectory,
 ): void {
   const directory =
@@ -139,7 +139,14 @@ function removeOwnedDirectoryContents(
       const stat = lstatSync(child, { bigint: true });
       if (stat.isDirectory() && !stat.isSymbolicLink()) {
         assertSafeCleanupDirectory(stat);
-        removeOwnedDirectoryContents(root, child, relativePath, budget, dependencies);
+        removeOwnedDirectoryContents(
+          root,
+          child,
+          relativePath,
+          budget,
+          dependencies,
+          revalidateBeforeMutation,
+        );
         assertPromotionDirectoryObjectIdentity(
           child,
           promotionIdentityOf(stat),
@@ -150,6 +157,7 @@ function removeOwnedDirectoryContents(
           'an emptied owned cleanup directory',
         );
         withPromotionMutation(dependencies, 'owned-directory-remove', () => {
+          revalidateBeforeMutation?.();
           assertStablePromotionDirectory(directory, 'an owned cleanup parent');
           assertPromotionPathIdentity(child, emptiedIdentity, 'an emptied owned cleanup directory');
           rmdirSync(child);
@@ -164,6 +172,7 @@ function removeOwnedDirectoryContents(
       }
       const childIdentity = promotionIdentityOf(stat);
       withPromotionMutation(dependencies, 'owned-entry-unlink', () => {
+        revalidateBeforeMutation?.();
         assertStablePromotionDirectory(directory, 'an owned cleanup parent');
         assertPromotionPathIdentity(child, childIdentity, 'an owned cleanup entry');
         unlinkSync(child);
@@ -184,6 +193,7 @@ export function removeBoundedOwnedTree(
   root: string,
   dependencies: RuntimePromotionFilesystemDependencies,
   expectedRootIdentity: NonNullable<RuntimePromotionArtifactMarker['rootIdentity']>,
+  revalidateBeforeMutation?: () => void,
 ): boolean {
   const classification = classifyRuntimePromotionPath(root);
   if (classification.status === 'absent') {
@@ -212,17 +222,19 @@ export function removeBoundedOwnedTree(
       '',
       { entries: 0, pathBytes: 0 },
       dependencies,
+      revalidateBeforeMutation,
       heldRoot,
     );
     assertStablePromotionDirectory(heldRoot, 'an owned cleanup root');
   } finally {
     closeStablePromotionDirectory(heldRoot);
   }
-  promotionFilesystemCheckpoint(dependencies, 'before', 'mutation', 'owned-directory-remove');
-  assertStablePromotionDirectory(parent, 'an owned cleanup parent');
-  assertPromotionRootIdentity(root, expectedRootIdentity);
-  rmdirSync(root);
-  promotionFilesystemCheckpoint(dependencies, 'after', 'mutation', 'owned-directory-remove');
+  withPromotionMutation(dependencies, 'owned-directory-remove', () => {
+    revalidateBeforeMutation?.();
+    assertStablePromotionDirectory(parent, 'an owned cleanup parent');
+    assertPromotionRootIdentity(root, expectedRootIdentity);
+    rmdirSync(root);
+  });
   fsyncPromotionDirectory(parent, dependencies);
   return true;
 }

@@ -336,11 +336,13 @@ function initialJournal(
     route: 'authored-only',
     destinationParentPreexisting: true,
     destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
     source: {
       classification: 'none',
       cacheKey: null,
       generationDigest: null,
       markerSha256: null,
+      rootIdentity: null,
     },
     inputs: {
       conflict: 'abort',
@@ -826,11 +828,13 @@ describe('authored state transaction', () => {
         route: 'promote-cache',
         destinationParentPreexisting: false,
         destinationRuntimePreexisting: false,
+        destinationRootIdentity: null,
         source: {
           classification: 'generation-bound',
           cacheKey: 'b'.repeat(24),
           generationDigest: 'c'.repeat(64),
           markerSha256: 'd'.repeat(64),
+          rootIdentity: { device: '1', inode: '2' },
         },
         inputs: {
           conflict: 'use-cache',

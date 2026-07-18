@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { projectCoordinationKey, type RuntimeExclusiveLease } from '@opensip-cli/core';
@@ -8,6 +8,7 @@ import {
   type RuntimeTreePosture,
   type VerifiedRuntimeManifest,
 } from '../runtime-manifest.js';
+import { capturePromotionRootIdentity } from '../runtime-promotion-filesystem-io.js';
 import {
   authorizeRuntimePromotionFilesystem,
   runtimePromotionOwnerMarkerBasename,
@@ -18,6 +19,7 @@ import {
   type RuntimeManifestIdentity,
   type RuntimePromotionJournal,
   type RuntimePromotionOwnedSlotName,
+  type RuntimePromotionRootIdentity,
   type RuntimePromotionRoute,
 } from '../runtime-promotion-journal-schema.js';
 import { captureRuntimePromotionProjectRootAuthority } from '../runtime-promotion-root-authority.js';
@@ -112,6 +114,32 @@ export function writePrivateFile(path: string, content: string): void {
   if (process.platform !== 'win32') chmodSync(path, 0o600);
 }
 
+function captureDestinationRootIdentity(
+  destinationRuntimePreexisting: boolean,
+  destinationRuntime: string,
+  destinationBackup: string,
+): RuntimePromotionRootIdentity | null {
+  if (!destinationRuntimePreexisting) return null;
+  // Lifecycle fixtures often materialize a journal after simulating the
+  // destination-backup rename. In that state the original project runtime is
+  // the backup object, not the newly installed public destination.
+  if (existsSync(destinationBackup)) {
+    return capturePromotionRootIdentity(destinationBackup);
+  }
+  if (existsSync(destinationRuntime)) {
+    return capturePromotionRootIdentity(destinationRuntime);
+  }
+  return { device: '1', inode: '2' };
+}
+
+function defaultFilesystemRoute(
+  destinationRuntimePreexisting: boolean,
+  mutatesPreexistingDestination: boolean,
+): RuntimePromotionRoute {
+  if (mutatesPreexistingDestination) return 'promote-cache';
+  return destinationRuntimePreexisting ? 'project-authority' : 'authored-only';
+}
+
 export function verifiedRuntime(
   root: string,
   posture: Extract<RuntimeTreePosture, 'cache-source' | 'project-runtime'> = 'project-runtime',
@@ -121,9 +149,18 @@ export function verifiedRuntime(
 
 export function makeFilesystemJournal(options: FilesystemJournalOptions): RuntimePromotionJournal {
   const operationId = TEST_OPERATION_ID;
+  const owned = createRuntimePromotionOwnedSlots(operationId);
+  const destinationRuntimePreexisting =
+    options.destinationRuntimePreexisting ?? options.cleanupSlot === 'destinationBackup';
+  const mutatesPreexistingDestination =
+    destinationRuntimePreexisting &&
+    (options.cleanupSlot === 'destinationBackup' ||
+      ['destination-backup-create', 'destination-install', 'runtime-rollback'].includes(
+        options.action,
+      ));
   const route =
     options.route ??
-    (options.destinationRuntimePreexisting ? 'project-authority' : 'authored-only');
+    defaultFilesystemRoute(destinationRuntimePreexisting, mutatesPreexistingDestination);
   const source =
     options.source ??
     (['promote-cache', 'keep-project', 'deduplicate-cache'].includes(route)
@@ -132,22 +169,36 @@ export function makeFilesystemJournal(options: FilesystemJournalOptions): Runtim
           cacheKey: 'e'.repeat(24),
           generationDigest: null,
           markerSha256: null,
+          rootIdentity: { device: '1', inode: '1' },
         }
       : {
           classification: 'none' as const,
           cacheKey: null,
           generationDigest: null,
           markerSha256: null,
+          rootIdentity: null,
         });
   let conflict: 'abort' | 'keep-project' | 'use-cache' = 'abort';
   if (route === 'keep-project') conflict = 'keep-project';
   else if (route === 'promote-cache') conflict = 'use-cache';
+  const destinationRuntime = join(options.projectRoot, 'opensip-cli', '.runtime');
+  const destinationBackup = join(
+    options.projectRoot,
+    'opensip-cli',
+    owned.destinationBackup.basename,
+  );
+  const destinationRoot = captureDestinationRootIdentity(
+    destinationRuntimePreexisting,
+    destinationRuntime,
+    destinationBackup,
+  );
   const initial = createInitialRuntimePromotionJournal({
     coordinationKey: projectCoordinationKey(options.projectRoot),
     operationId,
     recoveryOwnerToken: TEST_OWNER_TOKEN,
     destinationParentPreexisting: options.destinationParentPreexisting ?? true,
-    destinationRuntimePreexisting: options.destinationRuntimePreexisting ?? false,
+    destinationRuntimePreexisting,
+    destinationRootIdentity: destinationRoot,
     route,
     source,
     inputs: {
@@ -161,7 +212,7 @@ export function makeFilesystemJournal(options: FilesystemJournalOptions): Runtim
       replayDigest: 'b'.repeat(64),
       mutationCount: 1,
     },
-    owned: createRuntimePromotionOwnedSlots(operationId),
+    owned,
     createdAt: TEST_TIMESTAMP,
   });
   const selected = INTENT_BY_ACTION[options.action];

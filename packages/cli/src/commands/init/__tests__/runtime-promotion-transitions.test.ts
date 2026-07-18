@@ -90,18 +90,21 @@ function initialForRoute(
     route,
     destinationParentPreexisting,
     destinationRuntimePreexisting,
+    destinationRootIdentity: destinationRuntimePreexisting ? { device: '1', inode: '2' } : null,
     source: sourcePresent
       ? {
           classification: 'generation-bound',
           cacheKey: 'f'.repeat(24),
           generationDigest: '1'.repeat(64),
           markerSha256: '2'.repeat(64),
+          rootIdentity: { device: '1', inode: '2' },
         }
       : {
           classification: 'none',
           cacheKey: null,
           generationDigest: null,
           markerSha256: null,
+          rootIdentity: null,
         },
     inputs: {
       conflict: conflictForRoute(route),

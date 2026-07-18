@@ -43,6 +43,7 @@ export function assertTransitionIdentity(
       next.destinationRuntimePreexisting,
       'destinationRuntimePreexisting',
     ],
+    [previous.destinationRootIdentity, next.destinationRootIdentity, 'destinationRootIdentity'],
     [previous.source, next.source, 'source'],
     [previous.inputs, next.inputs, 'inputs'],
     [previous.plan, next.plan, 'plan'],

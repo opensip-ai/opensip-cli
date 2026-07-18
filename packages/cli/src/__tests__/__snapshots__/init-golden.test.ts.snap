@@ -385,7 +385,7 @@ export const recipes = [{
   name: 'example',
   displayName: 'Example',
   description: 'Demo recipe — runs only the example check(s)',
-  checks: { type: 'explicit', checkIds: ['example-check-rust', 'example-check-typescript'] },
+  checks: { type: 'explicit', checkIds: ['example-check-typescript', 'example-check-rust'] },
   execution: { mode: 'parallel', stopOnFirstFailure: false, timeout: 30_000 },
   reporting: { format: 'table', verbose: false },
 }];

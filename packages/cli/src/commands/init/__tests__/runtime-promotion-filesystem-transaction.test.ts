@@ -28,6 +28,7 @@ import {
   retireRuntimePromotionSource,
   rollbackRuntimePromotion,
   runtimePromotionCleanupMarkerBasename,
+  runtimePromotionOwnerMarkerBasename,
 } from '../runtime-promotion-filesystem.js';
 import { materializeRuntimeStage } from '../runtime-stage-io.js';
 
@@ -247,7 +248,7 @@ describe('forward rename transaction boundaries', () => {
 });
 
 describe('source retirement successor proof', () => {
-  it('preserves cache authority when the project successor changes at the rename hook', async () => {
+  it('preserves cache authority when a byte-identical keep-project successor is replaced at the rename hook', async () => {
     const cacheKey = 'd'.repeat(24);
     const cacheParent = makePrivateDirectory(resolveUserPaths().ephemeralProjectsDir);
     const source = makePrivateDirectory(join(cacheParent, cacheKey));
@@ -255,19 +256,23 @@ describe('source retirement successor proof', () => {
     const expected = verifiedRuntime(source, 'cache-source');
     const destination = makePrivateDirectory(join(project, 'opensip-cli', '.runtime'));
     writePrivateFile(join(destination, 'evidence.txt'), 'same-authority');
+    const destinationExpected = verifiedRuntime(destination);
+    const heldDestination = `${destination}.held`;
     const journal = makeFilesystemJournal({
       action: 'source-retire',
       projectRoot: project,
-      route: 'promote-cache',
+      route: 'keep-project',
       source: {
         classification: 'legacy',
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(source),
       },
       sourceManifest: expected.identity,
-      stageManifest: expected.identity,
+      destinationManifest: destinationExpected.identity,
       destinationParentPreexisting: true,
+      destinationRuntimePreexisting: true,
     });
     const authority = await authorizeFilesystem(
       project,
@@ -282,7 +287,10 @@ describe('source retirement successor proof', () => {
               checkpoint.effect === 'mutation' &&
               checkpoint.operation === 'source-retire-rename'
             ) {
-              writePrivateFile(join(destination, 'evidence.txt'), 'changed-successor');
+              renameSync(destination, heldDestination);
+              makePrivateDirectory(destination);
+              writePrivateFile(join(destination, 'evidence.txt'), 'same-authority');
+              expect(verifiedRuntime(destination).identity).toEqual(destinationExpected.identity);
             }
           },
         },
@@ -290,10 +298,12 @@ describe('source retirement successor proof', () => {
     );
 
     await expect(retireRuntimePromotionSource(authority, expected.identity)).rejects.toThrow(
-      /runtime tree/u,
+      /replaced after journal creation/u,
     );
     expect(existsSync(source)).toBe(true);
     expect(existsSync(join(cacheParent, journal.owned.sourceTombstone.basename))).toBe(false);
+    expect(existsSync(destination)).toBe(true);
+    expect(existsSync(heldDestination)).toBe(true);
   });
 });
 
@@ -455,6 +465,116 @@ function destinationBackupCleanupFixture(): CleanupFixture {
 }
 
 describe('closed cleanup write-ahead proof', () => {
+  it('preserves a resumed source tombstone when its keep-project successor is replaced at the delete boundary', async () => {
+    const cacheKey = '7'.repeat(24);
+    const cacheParent = makePrivateDirectory(resolveUserPaths().ephemeralProjectsDir);
+    const destination = makePrivateDirectory(join(project, 'opensip-cli', '.runtime'));
+    writePrivateFile(join(destination, 'current.txt'), 'project-authority');
+    const destinationManifest = verifiedRuntime(destination);
+    const provisional = makeFilesystemJournal({
+      action: 'owned-slot-cleanup',
+      projectRoot: project,
+      route: 'keep-project',
+      destinationRuntimePreexisting: true,
+      destinationManifest: destinationManifest.identity,
+      source: {
+        classification: 'legacy',
+        cacheKey,
+        generationDigest: null,
+        markerSha256: null,
+        rootIdentity: { device: '1', inode: '2' },
+      },
+      cleanupSlot: 'sourceTombstone',
+    });
+    const tombstone = makePrivateDirectory(
+      join(cacheParent, provisional.owned.sourceTombstone.basename),
+    );
+    writePrivateFile(join(tombstone, 'old.txt'), 'cache-authority');
+    const tombstoneManifest = verifiedRuntime(tombstone, 'cache-source');
+    const journal = makeFilesystemJournal({
+      action: 'owned-slot-cleanup',
+      projectRoot: project,
+      route: 'keep-project',
+      destinationRuntimePreexisting: true,
+      destinationManifest: destinationManifest.identity,
+      source: {
+        classification: 'legacy',
+        cacheKey,
+        generationDigest: null,
+        markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(tombstone),
+      },
+      sourceManifest: tombstoneManifest.identity,
+      cleanupSlot: 'sourceTombstone',
+      terminal: committedTerminal(destinationManifest.identity),
+    });
+    const rootIdentity = capturePromotionRootIdentity(tombstone);
+    const ownerPath = join(
+      cacheParent,
+      runtimePromotionOwnerMarkerBasename(journal.owned.sourceTombstone.basename),
+    );
+    const cleanupPath = join(
+      cacheParent,
+      runtimePromotionCleanupMarkerBasename(journal.owned.sourceTombstone.basename),
+    );
+    writeArtifactMarker(
+      ownerPath,
+      markerForOwnedSlot(
+        journal.operationId,
+        'sourceTombstone',
+        'owner',
+        tombstoneManifest.identity,
+        rootIdentity,
+      ),
+    );
+    writeArtifactMarker(
+      cleanupPath,
+      markerForOwnedSlot(
+        journal.operationId,
+        'sourceTombstone',
+        'cleanup',
+        tombstoneManifest.identity,
+        rootIdentity,
+      ),
+    );
+    const heldDestination = `${destination}.held`;
+    let swapped = false;
+    const authority = await authorizeFilesystem(
+      project,
+      'owned-slot-cleanup',
+      makeAuthorityHarness(journal),
+      {
+        cleanupSlot: 'sourceTombstone',
+        sourceRuntime: join(realpathSync(cacheParent), cacheKey),
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (
+              !swapped &&
+              checkpoint.boundary === 'before' &&
+              checkpoint.effect === 'mutation' &&
+              checkpoint.operation === 'owned-entry-unlink'
+            ) {
+              swapped = true;
+              renameSync(destination, heldDestination);
+              makePrivateDirectory(destination);
+              writePrivateFile(join(destination, 'current.txt'), 'project-authority');
+              expect(verifiedRuntime(destination).identity).toEqual(destinationManifest.identity);
+            }
+          },
+        },
+      },
+    );
+
+    await expect(cleanupRuntimePromotionOwnedSlot(authority)).rejects.toThrow(
+      /replaced after journal creation/u,
+    );
+    expect(readFileSync(join(tombstone, 'old.txt'), 'utf8')).toBe('cache-authority');
+    expect(existsSync(ownerPath)).toBe(true);
+    expect(existsSync(cleanupPath)).toBe(true);
+    expect(existsSync(destination)).toBe(true);
+    expect(existsSync(heldDestination)).toBe(true);
+  });
+
   it('preserves an identical backup replacement that lacks the recorded inode binding', async () => {
     const fixture = destinationBackupCleanupFixture();
     rmSync(fixture.paths.backup, { recursive: true, force: true });
@@ -469,7 +589,7 @@ describe('closed cleanup write-ahead proof', () => {
     );
 
     await expect(cleanupRuntimePromotionOwnedSlot(authority)).rejects.toThrow(
-      /identity is ambiguous/u,
+      /replaced after journal creation/u,
     );
     expect(existsSync(fixture.paths.backup)).toBe(true);
     expect(readFileSync(join(fixture.paths.backup, 'backup.txt'), 'utf8')).toBe('old-backup');

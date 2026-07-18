@@ -52,12 +52,14 @@ function initialJournal(
     recoveryOwnerToken: identity.recoveryOwnerToken,
     destinationParentPreexisting: false,
     destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
     route: 'authored-only',
     source: {
       classification: 'none',
       cacheKey: null,
       generationDigest: null,
       markerSha256: null,
+      rootIdentity: null,
     },
     inputs: {
       conflict: 'abort',
@@ -86,6 +88,7 @@ function promoteCacheJournal(identity: PromotionJournalIdentity): RuntimePromoti
       cacheKey: 'c'.repeat(24),
       generationDigest: 'c'.repeat(64),
       markerSha256: 'd'.repeat(64),
+      rootIdentity: { device: '1', inode: '2' },
     },
     inputs: {
       conflict: 'use-cache',
@@ -109,6 +112,7 @@ function authorityVerifiedJournal(
     ...initial,
     destinationParentPreexisting: true,
     destinationRuntimePreexisting: route === 'project-authority',
+    destinationRootIdentity: route === 'project-authority' ? { device: '3', inode: '4' } : null,
     route,
     revision: 5,
     manifests: {

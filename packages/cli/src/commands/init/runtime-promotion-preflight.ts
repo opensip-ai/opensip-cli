@@ -1,7 +1,12 @@
+import { resolveUserPaths } from '@opensip-cli/core';
+
 import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 import {
+  bindRuntimePromotionCacheChild,
   inspectRuntimePromotionFilesystem,
+  runtimePromotionPathSnapshot,
   RuntimePromotionFilesystemLeaseMismatchError,
+  sameRuntimePromotionPathSnapshot,
   type RuntimePromotionFilesystemInspection,
 } from './runtime-promotion-preflight-fs.js';
 import {
@@ -21,7 +26,10 @@ import {
   buildRuntimePromotionPreflightToken,
 } from './runtime-promotion-preflight-revalidation.js';
 
-import type { RuntimePromotionConflictPolicy } from './runtime-promotion-journal-schema.js';
+import type {
+  RuntimePromotionConflictPolicy,
+  RuntimePromotionRootIdentity,
+} from './runtime-promotion-journal-schema.js';
 import type {
   RuntimePromotionPreflightConflict,
   RuntimePromotionPreflightDependencies,
@@ -51,6 +59,37 @@ function conflictFromPolicy(
   selection: Extract<RuntimePromotionAuthorityPolicySelection, { readonly status: 'conflict' }>,
 ): RuntimePromotionPreflightConflict {
   return selection;
+}
+
+function canonicalSourceRuntimeDir(
+  inspection: RuntimePromotionFilesystemInspection,
+): string | undefined {
+  const source = inspection.sourceRevalidation;
+  if (source === undefined) return undefined;
+  const canonical = bindRuntimePromotionCacheChild(
+    resolveUserPaths().ephemeralProjectsDir,
+    source.cacheKey,
+  );
+  if (
+    !sameRuntimePromotionPathSnapshot(
+      source.runtime,
+      runtimePromotionPathSnapshot(canonical.runtimeDir),
+    )
+  ) {
+    throw new RuntimePromotionPreflightError('changed-after-preflight');
+  }
+  return canonical.runtimeDir;
+}
+
+function destinationRootIdentity(
+  inspection: RuntimePromotionFilesystemInspection,
+): RuntimePromotionRootIdentity | null {
+  if (inspection.destinationRuntime.presence !== 'directory') return null;
+  const identity = inspection.destinationRuntime.identity;
+  if (identity === undefined) {
+    throw new RuntimePromotionPreflightError('changed-after-preflight');
+  }
+  return { device: identity.dev, inode: identity.ino };
 }
 
 function preliminaryEquality(input: {
@@ -131,6 +170,7 @@ export function preflightRuntimePromotionAuthority(
   if (policy.status === 'conflict') return conflictFromPolicy(policy);
 
   const token = buildRuntimePromotionPreflightToken(filesystem.inspection, preliminary.proof);
+  const sourceRuntimeDir = canonicalSourceRuntimeDir(filesystem.inspection);
   dependencies.checkpoint?.('before-return');
   assertRuntimePromotionPreflightUnchanged({ lease: input.lease, token }, dependencies);
   return {
@@ -141,9 +181,8 @@ export function preflightRuntimePromotionAuthority(
     destinationParentPreexisting: filesystem.inspection.destinationParent.presence === 'directory',
     destinationRuntimePreexisting:
       filesystem.inspection.destinationRuntime.presence === 'directory',
-    ...(filesystem.inspection.sourceRevalidation === undefined
-      ? {}
-      : { sourceRuntimeDir: filesystem.inspection.sourceRevalidation.runtimeDir }),
+    destinationRootIdentity: destinationRootIdentity(filesystem.inspection),
+    ...(sourceRuntimeDir === undefined ? {} : { sourceRuntimeDir }),
     destinationParentDir: filesystem.inspection.destinationParentDir,
     destinationRuntimeDir: filesystem.inspection.destinationRuntimeDir,
     preliminaryEquality: preliminary.equality,

@@ -1,6 +1,8 @@
 import { join } from 'node:path';
 
 import { runtimeManifestIdentityEqual } from './runtime-manifest.js';
+import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
+import { canonicalRuntimePromotionCacheChild } from './runtime-promotion-preflight-fs.js';
 
 import type { VerifiedRuntimeManifest } from './runtime-manifest.js';
 import type {
@@ -38,7 +40,11 @@ export function recoveryInputsCompatible(
   ) {
     return false;
   }
-  return explicit.conflict === undefined || explicit.conflict === journal.inputs.conflict;
+  return (
+    explicit.conflict === undefined ||
+    journal.source.classification === 'none' ||
+    explicit.conflict === journal.inputs.conflict
+  );
 }
 
 export function deriveRecoverySourceRuntime(
@@ -46,7 +52,15 @@ export function deriveRecoverySourceRuntime(
   ephemeralProjectsDir: string,
 ): string | undefined {
   const cacheKey = journal.source.cacheKey;
-  return cacheKey === null ? undefined : join(ephemeralProjectsDir, cacheKey);
+  if (cacheKey === null) return undefined;
+  try {
+    return canonicalRuntimePromotionCacheChild(ephemeralProjectsDir, cacheKey).runtimeDir;
+  } catch {
+    // Test seams and a temporarily unavailable root may not be canonicalizable
+    // at this path-only derivation step. Every source read/mutation boundary
+    // independently binds the exact canonical cache child and journaled inode.
+    return join(ephemeralProjectsDir, cacheKey);
+  }
 }
 
 export function assertRecoveryProjectRoot(operation: RuntimePromotionRecoveryOperation): void {
@@ -243,10 +257,25 @@ export function inspectOpenRecoveryRuntimeAuthority(
     }
     return selectedSource;
   }
-  return inspectExactRecoveryManifest(
-    operation,
-    join(operation.input.projectRoot, 'opensip-cli', '.runtime'),
-    'project-runtime',
-    expected,
-  ).identity;
+  const destinationRuntime = join(operation.input.projectRoot, 'opensip-cli', '.runtime');
+  const inspect = () =>
+    inspectExactRecoveryManifest(operation, destinationRuntime, 'project-runtime', expected);
+  const requiresOriginal = runtimePromotionOutcomeRequiresOriginalDestination(
+    operation.journal,
+    outcome,
+  );
+  if (requiresOriginal) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: destinationRuntime,
+      journal: operation.journal,
+    });
+  }
+  const observed = inspect();
+  if (requiresOriginal) {
+    operation.dependencies.assertDestinationRootAuthority({
+      runtimeDir: destinationRuntime,
+      journal: operation.journal,
+    });
+  }
+  return observed.identity;
 }

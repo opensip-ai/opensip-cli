@@ -67,12 +67,26 @@ function pinnedCheckId(language: string): string {
 }
 
 let testDir: string;
+let homeDir: string;
+let priorHome: string | undefined;
+
+const DATASTORE_LOCK_CONTEXT = {
+  policy: { waitMs: 100, staleMs: 1000, heartbeatMs: 100 },
+  command: 'opensip init',
+  cwdBasename: 'init-registry-fixture',
+} as const;
 
 beforeEach(() => {
+  priorHome = process.env.HOME;
+  homeDir = mkdtempSync(join(tmpdir(), 'opensip-init-registry-home-'));
+  process.env.HOME = homeDir;
   testDir = mkdtempSync(join(tmpdir(), 'opensip-init-registry-'));
 });
 
 afterEach(() => {
+  if (priorHome === undefined) delete process.env.HOME;
+  else process.env.HOME = priorHome;
+  rmSync(homeDir, { recursive: true, force: true });
   rmSync(testDir, { recursive: true, force: true });
 });
 
@@ -83,12 +97,13 @@ function makeArgs(toolScaffolds: ToolScaffold[], overrides: Record<string, unkno
     debug: false,
     language: ['typescript'],
     toolScaffolds,
+    datastoreLockContext: DATASTORE_LOCK_CONTEXT,
     ...overrides,
   } as Parameters<typeof executeInit>[0];
 }
 
 describe('init — fixture tool scaffolds with no CLI change (ADR-0038)', () => {
-  it("writes an arbitrary tool's example under its own pluginLayout domain", () => {
+  it("writes an arbitrary tool's example under its own pluginLayout domain", async () => {
     // A fake tool the CLI has never heard of. Nothing in packages/cli references
     // 'toy' / 'rules' — the directory + bytes come entirely from this contribution.
     const toyScaffold: ToolScaffold = {
@@ -109,7 +124,7 @@ describe('init — fixture tool scaffolds with no CLI change (ADR-0038)', () => 
       stableExampleIds: () => ['toy-1'],
     };
 
-    const result = executeInit(
+    const result = await executeInit(
       makeArgs([...scaffoldsFor([fitnessTool, simulationTool]), toyScaffold]),
     );
     expect(result.created).toBe(true);
@@ -121,18 +136,20 @@ describe('init — fixture tool scaffolds with no CLI change (ADR-0038)', () => 
 });
 
 describe('init — a tool with no pluginLayout produces no directory', () => {
-  it('graph contributes nothing (no opensip-cli/graph/)', () => {
+  it('graph contributes nothing (no opensip-cli/graph/)', async () => {
     // graphTool declares no pluginLayout, so scaffoldsFor() filters it out — the
     // dir must never appear even when graphTool is in the considered set.
-    const result = executeInit(makeArgs(scaffoldsFor([fitnessTool, simulationTool, graphTool])));
+    const result = await executeInit(
+      makeArgs(scaffoldsFor([fitnessTool, simulationTool, graphTool])),
+    );
     expect(result.created).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli/graph'))).toBe(false);
   });
 });
 
 describe('init — the scaffolded set equals the registered set', () => {
-  it('with only fitness registered, fit/ exists and sim/ does not', () => {
-    const result = executeInit(makeArgs(scaffoldsFor([fitnessTool])));
+  it('with only fitness registered, fit/ exists and sim/ does not', async () => {
+    const result = await executeInit(makeArgs(scaffoldsFor([fitnessTool])));
     expect(result.created).toBe(true);
     expect(existsSync(join(testDir, 'opensip-cli/fit/checks'))).toBe(true);
     // The load-bearing behavioral change: not a hardcoded fit/sim pair.
@@ -140,13 +157,13 @@ describe('init — the scaffolded set equals the registered set', () => {
   });
 });
 
-function initTsOnly(): void {
-  executeInit(makeArgs(scaffoldsFor([fitnessTool, simulationTool])));
+async function initTsOnly(): Promise<void> {
+  await executeInit(makeArgs(scaffoldsFor([fitnessTool, simulationTool])));
 }
 
 describe('init — stale-detection over the aggregated full-language id universe', () => {
-  it('flags example-check-<lang>.mjs for an un-detected language (filename branch)', () => {
-    initTsOnly();
+  it('flags example-check-<lang>.mjs for an un-detected language (filename branch)', async () => {
+    await initTsOnly();
     // python ∉ the detected set (TS-only) but ∈ ALL_LANGUAGES → stale by filename.
     const stale = join(testDir, 'opensip-cli/fit/checks/example-check-python.mjs');
     writeFileSync(stale, '// drifted python example\n', 'utf8');
@@ -161,8 +178,8 @@ describe('init — stale-detection over the aggregated full-language id universe
     expect(entry?.classification).toBe('stale-scaffolded');
   });
 
-  it('flags a file embedding a pinned id for an un-detected language (UUID branch)', () => {
-    initTsOnly();
+  it('flags a file embedding a pinned id for an un-detected language (UUID branch)', async () => {
+    await initTsOnly();
     // A custom filename (no filename-pattern match) whose body carries the RUST
     // pinned id — caught only because the classifier aggregates the FULL id
     // universe (Σ stableExampleIds), not just the TS-context ids.
@@ -179,8 +196,8 @@ describe('init — stale-detection over the aggregated full-language id universe
     expect(classified.find((f) => f.path === stale)?.classification).toBe('stale-scaffolded');
   });
 
-  it('does NOT flag a detected-language id as stale', () => {
-    initTsOnly();
+  it('does NOT flag a detected-language id as stale', async () => {
+    await initTsOnly();
     // TS id is in the CURRENT-config id set → excluded from the stale universe.
     // A drifted (non-byte-identical) file carrying it is custom, never stale.
     const tsId = pinnedCheckId('typescript');
@@ -196,8 +213,8 @@ describe('init — stale-detection over the aggregated full-language id universe
     expect(classified.find((f) => f.path === custom)?.classification).toBe('custom');
   });
 
-  it('classifies from one callback-free Tool render with identical results', () => {
-    initTsOnly();
+  it('classifies from one callback-free Tool render with identical results', async () => {
+    await initTsOnly();
     const paths = resolveProjectPaths(testDir);
     const toolScaffolds = scaffoldsFor([fitnessTool, simulationTool]);
     const rendered = enumerateToolScaffolds(toolScaffolds, {
@@ -209,8 +226,8 @@ describe('init — stale-detection over the aggregated full-language id universe
     );
   });
 
-  it('skips generated dependency and build output dirs while classifying', () => {
-    initTsOnly();
+  it('skips generated dependency and build output dirs while classifying', async () => {
+    await initTsOnly();
     const fitDir = join(testDir, 'opensip-cli/fit');
     const generatedFiles = [
       join(fitDir, 'node_modules/pkg/index.js'),
@@ -239,13 +256,13 @@ describe('init — stale-detection over the aggregated full-language id universe
     }
   });
 
-  it('--keep preserves a stale-scaffolded file', () => {
-    initTsOnly();
+  it('--keep preserves a stale-scaffolded file', async () => {
+    await initTsOnly();
     const stale = join(testDir, 'opensip-cli/fit/checks/example-check-python.mjs');
     const body = '// drifted python example\n';
     writeFileSync(stale, body, 'utf8');
 
-    executeInit(makeArgs(scaffoldsFor([fitnessTool, simulationTool]), { keep: true }));
+    await executeInit(makeArgs(scaffoldsFor([fitnessTool, simulationTool]), { keep: true }));
     expect(existsSync(stale)).toBe(true);
     expect(readFileSync(stale, 'utf8')).toBe(body);
   });

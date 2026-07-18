@@ -1,10 +1,13 @@
 import {
   chmodSync,
+  cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -54,6 +57,7 @@ import {
   type RuntimePromotionJournalController,
 } from '../runtime-promotion-journal.js';
 import { preflightRuntimePromotionAuthority } from '../runtime-promotion-preflight.js';
+import { recoverRuntimePromotion } from '../runtime-promotion-recovery.js';
 import {
   bindRuntimePromotionFreshProjectRootAuthority,
   type RuntimePromotionProjectRootAuthority,
@@ -171,6 +175,7 @@ async function createPreparedPromotion(input: {
         route: preflight.route,
         destinationParentPreexisting: preflight.destinationParentPreexisting,
         destinationRuntimePreexisting: preflight.destinationRuntimePreexisting,
+        destinationRootIdentity: preflight.destinationRootIdentity,
         source: preflight.source,
         inputs: {
           conflict: preflight.effectiveConflict,
@@ -345,6 +350,80 @@ describe('production-wired runtime promotion filesystem', () => {
       lease.release();
     }
   }, 15_000);
+
+  it('rejects a byte-identical project runtime replacement after datastore checkpointing', async () => {
+    const projectRuntime = makeDirectory(resolveProjectPaths(project).runtimeDir);
+    writePrivate(join(projectRuntime, 'evidence.txt'), 'project authority');
+    createValidDatastore(projectRuntime);
+    const replacement = join(sandbox, 'project-runtime-replacement');
+    const displaced = join(sandbox, 'project-runtime-selected');
+    const rejected = join(sandbox, 'project-runtime-rejected');
+    cpSync(projectRuntime, replacement, { recursive: true, preserveTimestamps: true });
+    if (process.platform !== 'win32') chmodSync(replacement, 0o700);
+    expect(inspectVerifiedRuntimeManifest(replacement, 'project-runtime').identity).toEqual(
+      inspectVerifiedRuntimeManifest(projectRuntime, 'project-runtime').identity,
+    );
+    const selectedIdentity = lstatSync(projectRuntime, { bigint: true });
+    const replacementIdentity = lstatSync(replacement, { bigint: true });
+    expect({
+      dev: replacementIdentity.dev,
+      ino: replacementIdentity.ino,
+    }).not.toEqual({
+      dev: selectedIdentity.dev,
+      ino: selectedIdentity.ino,
+    });
+
+    let swapped = false;
+    const result = await runFreshRuntimePromotion(
+      {
+        projectRoot: project,
+        languages: ['typescript'],
+        languageExplicit: false,
+        authoredMode: 'fresh',
+        toolScaffolds: [],
+        datastoreLockContext: LOCK_CONTEXT,
+      },
+      {
+        checkpoint: (checkpoint) => {
+          if (swapped || checkpoint !== 'after-datastore-checkpoint') return;
+          swapped = true;
+          renameSync(projectRuntime, displaced);
+          renameSync(replacement, projectRuntime);
+        },
+      },
+    );
+
+    expect(swapped).toBe(true);
+    expect(result).toMatchObject({
+      status: 'recovery-required',
+      reasonCode: 'operation-failed',
+    });
+    expect(lstatSync(projectRuntime, { bigint: true }).ino).toBe(replacementIdentity.ino);
+
+    await expect(
+      recoverRuntimePromotion({
+        projectRoot: project,
+        datastoreLockContext: LOCK_CONTEXT,
+      }),
+    ).resolves.toMatchObject({
+      status: 'recovery-required',
+      reasonCode: 'artifact-mismatch',
+    });
+    expect(lstatSync(projectRuntime, { bigint: true }).ino).toBe(replacementIdentity.ino);
+
+    renameSync(projectRuntime, rejected);
+    renameSync(displaced, projectRuntime);
+    await expect(
+      recoverRuntimePromotion({
+        projectRoot: project,
+        datastoreLockContext: LOCK_CONTEXT,
+      }),
+    ).resolves.toMatchObject({
+      status: 'rolled-back',
+    });
+    expect(lstatSync(projectRuntime, { bigint: true }).ino).toBe(selectedIdentity.ino);
+    expect(lstatSync(rejected, { bigint: true }).ino).toBe(replacementIdentity.ino);
+  }, 20_000);
 
   it('removes a staged runtime when rollback starts before install in a preexisting parent', async () => {
     const cache = seedCacheRuntime();

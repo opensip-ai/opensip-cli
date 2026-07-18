@@ -14,6 +14,7 @@ import {
   type RuntimePromotionOwnedSlot,
   type RuntimePromotionPendingIntent,
   type RuntimePromotionPostcondition,
+  type RuntimePromotionRootIdentity,
   type RuntimePromotionTerminal,
 } from './runtime-promotion-journal-types.js';
 import {
@@ -52,6 +53,17 @@ function nullableManifest(
 
 function ownedSlot(slot: RuntimePromotionOwnedSlot): RuntimePromotionOwnedSlot {
   return { basename: slot.basename, ownershipId: slot.ownershipId };
+}
+
+function rootIdentity(
+  identity: RuntimePromotionRootIdentity | null,
+): RuntimePromotionRootIdentity | null {
+  return identity === null
+    ? null
+    : {
+        device: identity.device,
+        inode: identity.inode,
+      };
 }
 
 function intent(value: RuntimePromotionPendingIntent): RuntimePromotionPendingIntent {
@@ -112,11 +124,13 @@ export function canonicalRuntimePromotionJournal(
     route: journal.route,
     destinationParentPreexisting: journal.destinationParentPreexisting,
     destinationRuntimePreexisting: journal.destinationRuntimePreexisting,
+    destinationRootIdentity: rootIdentity(journal.destinationRootIdentity),
     source: {
       classification: journal.source.classification,
       cacheKey: journal.source.cacheKey,
       generationDigest: journal.source.generationDigest,
       markerSha256: journal.source.markerSha256,
+      rootIdentity: rootIdentity(journal.source.rootIdentity),
     },
     inputs: {
       conflict: journal.inputs.conflict,
@@ -244,6 +258,7 @@ export function createInitialRuntimePromotionJournal(
     route: input.route,
     destinationParentPreexisting: input.destinationParentPreexisting,
     destinationRuntimePreexisting: input.destinationRuntimePreexisting,
+    destinationRootIdentity: input.destinationRootIdentity,
     source: input.source,
     inputs: input.inputs,
     plan: input.plan,

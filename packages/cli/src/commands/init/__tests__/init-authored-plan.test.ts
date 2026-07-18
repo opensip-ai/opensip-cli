@@ -156,6 +156,97 @@ describe('Init authored replay plan', () => {
     );
   });
 
+  it.each(['refresh', 'remove'] as const)(
+    'preserves generated and dependency roots opaquely during %s',
+    (mode) => {
+      writeProjectFile('opensip-cli.config.yml', 'custom: true\n');
+      writeProjectFile('opensip-cli/fit/dist/bundle.js', 'generated output\n');
+      const dependencyTarget = join(projectRoot, 'external-dependencies');
+      mkdirSync(dependencyTarget, { recursive: true });
+      writeFileSync(join(dependencyTarget, 'sentinel.txt'), 'dependency data\n');
+      if (process.platform === 'win32') {
+        mkdirSync(join(projectRoot, 'opensip-cli/fit/node_modules'), {
+          recursive: true,
+        });
+      } else {
+        symlinkSync(dependencyTarget, join(projectRoot, 'opensip-cli/fit/node_modules'));
+      }
+
+      const plan = build(mode);
+
+      expect(
+        plan.mutations.some(
+          (entry) =>
+            entry.path === 'opensip-cli/fit/dist' ||
+            entry.path.startsWith('opensip-cli/fit/dist/') ||
+            entry.path === 'opensip-cli/fit/node_modules' ||
+            entry.path.startsWith('opensip-cli/fit/node_modules/'),
+        ),
+      ).toBe(false);
+      expect(mutation(plan, 'opensip-cli/fit').action).toBe('preserve');
+      expect(plan.presentation?.workingDirState).toBe('fully-initialized');
+      expect(readFileSync(join(dependencyTarget, 'sentinel.txt'), 'utf8')).toBe(
+        'dependency data\n',
+      );
+    },
+  );
+
+  it('permits a durable language-neutral refresh without invoking Tool render callbacks', () => {
+    writeProjectFile('opensip-cli.config.yml', 'custom: true\n');
+    writeProjectFile('opensip-cli/fit/checks/custom.mjs', 'export default 1;\n');
+    const examples = vi.fn(() => [
+      {
+        kind: 'checks' as const,
+        filename: 'must-not-render.mjs',
+        content: SECRET_EXAMPLE,
+        stableId: 'must-not-render',
+      },
+    ]);
+    const stableIds = vi.fn(() => ['must-not-render']);
+    const config = vi.fn(() => 'fitness:\n  failOnErrors: true\n');
+    const tool = {
+      ...fixtureTool(),
+      scaffoldExamples: examples,
+      stableExampleIds: stableIds,
+      scaffoldConfigBlock: config,
+    };
+
+    const plan = createInitAuthoredPlan({
+      projectRoot,
+      languages: [],
+      mode: 'refresh',
+      toolScaffolds: [tool],
+    });
+
+    expect(plan.inputs).toMatchObject({
+      languages: [],
+      mode: 'refresh',
+      tools: [tool.identity],
+    });
+    expect(parseAuthoredReplayManifest(plan.replayManifestBytes).inputs.languages).toEqual([]);
+    expect(mutation(plan, 'opensip-cli.config.yml').action).toBe('preserve');
+    expect(mutation(plan, 'opensip-cli/fit/checks/custom.mjs').action).toBe('preserve');
+    expect(plan.mutations.some((entry) => entry.path.includes('must-not-render'))).toBe(false);
+    expect(plan.presentation?.preExistingFiles).toEqual([]);
+    expect(examples).not.toHaveBeenCalled();
+    expect(stableIds).not.toHaveBeenCalled();
+    expect(config).not.toHaveBeenCalled();
+  });
+
+  it.each(['fresh', 'keep', 'remove'] as const)(
+    'rejects an empty language set for %s plans',
+    (mode) => {
+      expect(() =>
+        createInitAuthoredPlan({
+          projectRoot,
+          languages: [],
+          mode,
+          toolScaffolds: [fixtureTool()],
+        }),
+      ).toThrow(/languages must be a nonempty supported set/iu);
+    },
+  );
+
   it('keeps custom targets and creates only missing Tool examples', () => {
     const examples: readonly ScaffoldFile[] = [
       {

@@ -8,10 +8,22 @@
  * top-level specs. Built per-invocation so `--cwd` defaults stay fresh.
  */
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
-import { ConfigurationError, currentScope, type ProjectContext } from '@opensip-cli/core';
+import {
+  EXIT_CODES,
+  type InitResult,
+  type RuntimeAdoptionResult,
+  type CliProgram,
+  type InitOptions,
+} from '@opensip-cli/contracts';
+import {
+  ConfigurationError,
+  currentLogger,
+  currentScope,
+  type ProjectContext,
+} from '@opensip-cli/core';
 
 import { capabilityWorkerCommandSpec } from '../bootstrap/capability-worker/entry.js';
+import { buildDatastoreLockContext } from '../bootstrap/state-lock-policy.js';
 import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-entry.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
@@ -38,7 +50,7 @@ import {
   attachOptionalToolRecommendations,
   isOptionalToolRecommendationEligible,
 } from './init/optional-tools.js';
-import { executeInit } from './init.js';
+import { executeInit, executeInitRecovery } from './init.js';
 import { showInternalCommands } from './internal-command-visibility.js';
 import { mountCommandSpec } from './mount-command-spec.js';
 import { executeRuntimeStatus } from './runtime-status.js';
@@ -47,7 +59,6 @@ import { executeUninstall } from './uninstall.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { CommandActionScopeRunner } from '../bootstrap/command-action-scope-runner.js';
-import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
 
 /** Shared `output` mode for the host commands that return a renderable result. */
 const COMMAND_RESULT = 'command-result' as const;
@@ -66,7 +77,60 @@ interface InitOpts extends InitOptions {
   cwdExplicit?: boolean;
 }
 
-function buildInitSpec(ctx: CliCommandsContext): HostSpec {
+function adoptionExitCode(adoption: RuntimeAdoptionResult): number | undefined {
+  switch (adoption.status) {
+    case 'not-found':
+    case 'promoted':
+    case 'already-project':
+    case 'deduplicated':
+    case 'kept-project': {
+      return undefined;
+    }
+    case 'conflict': {
+      return adoption.reasonCode === 'destination-unverified'
+        ? EXIT_CODES.RUNTIME_ERROR
+        : EXIT_CODES.CONFIGURATION_ERROR;
+    }
+    case 'recovery-required': {
+      return adoption.reasonCode === 'operation-interrupted'
+        ? EXIT_CODES.CONFIGURATION_ERROR
+        : EXIT_CODES.RUNTIME_ERROR;
+    }
+    case 'busy':
+    case 'rolled-back':
+    case 'cleanup-pending': {
+      return EXIT_CODES.RUNTIME_ERROR;
+    }
+  }
+}
+
+function applyInitExitCode(result: InitResult, ctx: CliCommandsContext): void {
+  if (
+    result.ambiguousLanguageError !== undefined ||
+    result.partialStateError !== undefined ||
+    result.authoredStateChangedError !== undefined ||
+    result.insideExistingProject !== undefined
+  ) {
+    ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+    return;
+  }
+  if (result.runtimeAdoption === undefined) return;
+  const code = adoptionExitCode(result.runtimeAdoption);
+  if (code !== undefined) ctx.setExitCode(code);
+}
+
+function initDatastoreLockContext(opts: InitOpts) {
+  const cwd = opts.projectContext?.projectRoot ?? opts.cwd;
+  return buildDatastoreLockContext(currentScope()?.logger ?? currentLogger(), {
+    commandName: 'opensip init',
+    cwd,
+  });
+}
+
+function buildInitSpec(
+  ctx: CliCommandsContext,
+  execution: 'normal' | 'recovery-only' = 'normal',
+): HostSpec {
   return defineCommand<unknown, CliCommandsContext>({
     staticHandler: {
       package: HOST_COMMAND_PACKAGE,
@@ -95,24 +159,40 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
       },
       {
         flag: '--remove',
-        description: 'Delete opensip-cli/ entirely, then scaffold fresh.',
+        description:
+          'Reset Init-authored files and scaffold fresh. Preserve opensip-cli/.runtime evidence.',
         default: false,
+      },
+      {
+        flag: '--runtime-conflict',
+        value: '<policy>',
+        choices: ['abort', 'keep-project', 'use-cache'],
+        description:
+          'Choose runtime authority when evidence conflicts. Default for a new operation: abort; an omitted recovery retry replays the recorded policy.',
       },
     ],
     scope: 'none',
     output: COMMAND_RESULT,
-    handler: (rawOpts) => {
+    handler: async (rawOpts) => {
       const opts = rawOpts as InitOpts;
       // `cwdExplicit` is stashed on opts by the pre-action hook (the single
       // source for "was --cwd typed on the CLI?"); the former register-init
       // recomputed `cmd.getOptionValueSource('cwd') === 'cli'` on its own
       // Commander command — identical, since the hook's actionCommand IS init.
-      let result = executeInit({
+      const shared = {
         ...opts,
         cwdExplicit: opts.cwdExplicit === true,
-        toolScaffolds: ctx.toolScaffolds,
-      });
+        datastoreLockContext: initDatastoreLockContext(opts),
+      };
+      let result =
+        execution === 'recovery-only'
+          ? await executeInitRecovery(shared)
+          : await executeInit({
+              ...shared,
+              toolScaffolds: ctx.toolScaffolds,
+            });
       if (
+        execution === 'normal' &&
         opts.keep !== true &&
         opts.remove !== true &&
         isOptionalToolRecommendationEligible(result)
@@ -133,19 +213,18 @@ function buildInitSpec(ctx: CliCommandsContext): HostSpec {
           recommendedCount: result.optionalTools?.length ?? 0,
         });
       }
-      // Exit 2 for any non-success path the user can act on: ambiguous-language
-      // detection, partial-state refusal, mutex flag error, inside-existing-
-      // project refusal.
-      if (
-        result.ambiguousLanguageError ||
-        result.partialStateError ||
-        result.insideExistingProject
-      ) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-      }
+      applyInitExitCode(result, ctx);
       return result;
     },
   });
+}
+
+/**
+ * Canonical Init grammar with a recovery-only action. The lightweight probe
+ * mounts this one spec before Tool discovery whenever a fixed journal exists.
+ */
+export function buildInitRecoverySpec(ctx: CliCommandsContext): HostSpec {
+  return buildInitSpec(ctx, 'recovery-only');
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,10 @@ import {
   runtimeManifestIdentityEqual,
 } from './runtime-manifest.js';
 import {
+  assertRuntimePromotionDestinationRootAuthority,
+  runtimePromotionOutcomeRequiresOriginalDestination,
+} from './runtime-promotion-destination-authority.js';
+import {
   consumeRuntimePromotionFilesystemAuthority,
   openCapabilityDirectory,
 } from './runtime-promotion-filesystem-authority.js';
@@ -147,6 +151,7 @@ function cleanupRuntimeStage(
         verifyCurrentTerminalAuthority(state);
         verifyCompleteOwnedStage(state, expected);
       },
+      revalidateBeforeMutation: () => verifyCurrentTerminalAuthority(state),
     })
       ? 'removed'
       : CLEANUP_ALREADY_ABSENT;
@@ -198,10 +203,15 @@ function verifyCurrentTerminalAuthority(state: RuntimePromotionFilesystemCapabil
         'the canonical cache runtime authority is no longer a directory',
       );
     }
-  } else if (classifyRuntimePromotionPath(state.paths.destinationRuntime).status !== 'directory') {
-    runtimePromotionFilesystemFailure(
-      'the canonical project runtime authority is no longer a directory',
-    );
+  } else {
+    if (classifyRuntimePromotionPath(state.paths.destinationRuntime).status !== 'directory') {
+      runtimePromotionFilesystemFailure(
+        'the canonical project runtime authority is no longer a directory',
+      );
+    }
+    if (runtimePromotionOutcomeRequiresOriginalDestination(state.journal, terminal.outcome)) {
+      assertRuntimePromotionDestinationRootAuthority(state.paths.destinationRuntime, state.journal);
+    }
   }
 }
 
@@ -273,6 +283,9 @@ function cleanupExternalOwnedTree(
       : {}),
     verifyBefore: () => {
       verifyCurrentTerminalAuthority(input.state);
+      if (input.slot === 'destinationBackup') {
+        assertRuntimePromotionDestinationRootAuthority(input.root, input.state.journal);
+      }
       if (
         inspectBoundOwnedMarker(
           input.ownerPath,
@@ -287,6 +300,7 @@ function cleanupExternalOwnedTree(
       }
       inspectExactRuntimeManifest(input.root, input.posture, input.expected);
     },
+    revalidateBeforeMutation: () => verifyCurrentTerminalAuthority(input.state),
   });
   return removed ? 'removed' : CLEANUP_ALREADY_ABSENT;
 }
@@ -300,6 +314,9 @@ function cleanupDestinationBackup(
   }
   const parent = openExactDestinationParent(state);
   try {
+    if (artifactPresence(state.paths.destinationBackup) === 'directory') {
+      assertRuntimePromotionDestinationRootAuthority(state.paths.destinationBackup, state.journal);
+    }
     return cleanupExternalOwnedTree({
       state,
       parent,

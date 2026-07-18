@@ -275,11 +275,13 @@ async function createHarness(plan: InitAuthoredPlan): Promise<AuthoredRecoveryHa
       route: 'authored-only',
       destinationParentPreexisting: false,
       destinationRuntimePreexisting: false,
+      destinationRootIdentity: null,
       source: {
         classification: 'none',
         cacheKey: null,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: null,
       },
       inputs: {
         conflict: 'abort',

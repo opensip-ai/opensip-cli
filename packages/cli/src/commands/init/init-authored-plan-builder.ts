@@ -10,12 +10,15 @@ import { collectToolDesiredEntries } from './init-authored-plan-targets.js';
 import {
   AUTHORED_REPLAY_MANIFEST_KIND,
   AUTHORED_REPLAY_MANIFEST_VERSION,
+  INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES,
   INIT_AUTHORED_PLAN_CAPS,
   absentPathState,
   authoredPlanFailure,
+  caseFoldPath,
   compareUtf8,
   directoryDigest,
   normalizeLanguages,
+  normalizeProjectRelativePath,
   normalizeToolIdentities,
   sha256Bytes,
   stateFromSnapshot,
@@ -136,9 +139,10 @@ function setToolDesired(
 function buildDesiredEntries(
   input: BuildInitAuthoredPlanInput,
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
+  opaquePaths: readonly string[],
 ): Map<string, DesiredEntry> {
   const desired = new Map<string, DesiredEntry>();
-  seedExistingAuthored(desired, preimages, input.mode);
+  seedExistingAuthored(desired, preimages, input.mode, opaquePaths);
   if (input.mode !== 'refresh') {
     setToolDesired(desired, preimages, collectToolDesiredEntries(input.toolScaffolds), input.mode);
   }
@@ -152,11 +156,60 @@ function seedExistingAuthored(
   desired: Map<string, DesiredEntry>,
   preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
   mode: BuildInitAuthoredPlanInput['mode'],
+  opaquePaths: readonly string[],
 ): void {
   for (const [path, record] of preimages) {
     const isAuthored = path === 'opensip-cli' || path.startsWith('opensip-cli/');
-    if (isAuthored && (mode !== 'remove' || path === 'opensip-cli')) {
+    const preservesOpaqueChild = opaquePaths.some((opaque) => opaque.startsWith(`${path}/`));
+    if (isAuthored && (mode !== 'remove' || path === 'opensip-cli' || preservesOpaqueChild)) {
       desired.set(path, snapshotDesired(record));
+    }
+  }
+}
+
+function validateOpaquePaths(
+  paths: readonly string[],
+  preimages: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
+): readonly string[] {
+  const normalized = paths.map(normalizeProjectRelativePath).sort(compareUtf8);
+  const folded = new Set<string>();
+  for (const [index, path] of normalized.entries()) {
+    if (path !== paths[index] || path === normalized[index - 1]) {
+      authoredPlanFailure('opaque snapshot paths must be unique and in canonical order');
+    }
+    const name = path.slice(path.lastIndexOf('/') + 1);
+    if (
+      !path.startsWith('opensip-cli/') ||
+      !(INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES as readonly string[]).includes(name)
+    ) {
+      authoredPlanFailure(`unsupported opaque snapshot path ${path}`);
+    }
+    const foldedPath = caseFoldPath(path);
+    if (folded.has(foldedPath)) {
+      authoredPlanFailure(`case-folded opaque snapshot collision at ${path}`);
+    }
+    folded.add(foldedPath);
+    const segments = path.split('/');
+    for (let depth = 1; depth < segments.length; depth += 1) {
+      const ancestor = segments.slice(0, depth).join('/');
+      const record = preimages.get(ancestor);
+      if (record?.exists !== true || record.type !== 'directory') {
+        authoredPlanFailure(`opaque snapshot path ${path} lacks directory ancestor ${ancestor}`);
+      }
+    }
+  }
+  return normalized;
+}
+
+function assertNoOpaqueTargetConflict(
+  opaquePaths: readonly string[],
+  desired: ReadonlyMap<string, DesiredEntry>,
+): void {
+  for (const opaque of opaquePaths) {
+    for (const target of desired.keys()) {
+      if (target === opaque || target.startsWith(`${opaque}/`)) {
+        authoredPlanFailure(`Init target ${target} conflicts with preserved opaque path ${opaque}`);
+      }
     }
   }
 }
@@ -240,10 +293,14 @@ function freezeMutation(mutation: InitAuthoredMutation): InitAuthoredMutation {
 }
 
 export function buildInitAuthoredPlan(input: BuildInitAuthoredPlanInput): InitAuthoredPlan {
-  const languages = normalizeLanguages(input.languages);
+  const languages = normalizeLanguages(input.languages, {
+    allowEmpty: input.mode === 'refresh',
+  });
   const tools = normalizeToolIdentities(input.toolScaffolds);
   const preimages = validateAuthoredSnapshot(input.snapshot.records);
-  const desired = buildDesiredEntries({ ...input, languages }, preimages);
+  const opaquePaths = validateOpaquePaths(input.snapshot.opaquePaths, preimages);
+  const desired = buildDesiredEntries({ ...input, languages }, preimages, opaquePaths);
+  assertNoOpaqueTargetConflict(opaquePaths, desired);
   const paths = new Set<string>(desired.keys());
   for (const path of preimages.keys()) {
     if (path === 'opensip-cli' || path.startsWith('opensip-cli/')) paths.add(path);

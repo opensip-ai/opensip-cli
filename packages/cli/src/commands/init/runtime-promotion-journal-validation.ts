@@ -32,6 +32,7 @@ import {
   journalObject,
   journalPattern,
   validateInputs,
+  validateNullableRootIdentity,
   validateOwned,
   validatePlan,
   validateSource,
@@ -49,6 +50,7 @@ const TOP_LEVEL_KEYS = [
   'route',
   'destinationParentPreexisting',
   'destinationRuntimePreexisting',
+  'destinationRootIdentity',
   'source',
   'inputs',
   'plan',
@@ -268,6 +270,15 @@ export function assertRuntimePromotionJournalShape(
   }
   if (typeof journal.destinationRuntimePreexisting !== 'boolean') {
     journalFailure('destinationRuntimePreexisting must be boolean');
+  }
+  const destinationRootIdentityPresent = validateNullableRootIdentity(
+    journal.destinationRootIdentity,
+    'destinationRootIdentity',
+  );
+  if (destinationRootIdentityPresent !== journal.destinationRuntimePreexisting) {
+    journalFailure(
+      'destinationRootIdentity must be present exactly when the destination runtime preexists',
+    );
   }
   validateSource(journal.source);
   validateInputs(journal.inputs);

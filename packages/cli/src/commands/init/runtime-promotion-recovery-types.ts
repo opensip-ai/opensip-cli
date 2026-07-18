@@ -67,6 +67,8 @@ export type RuntimePromotionRecoveryCheckpoint =
 export interface RuntimePromotionRecoveryDependencies {
   readonly now: () => number;
   readonly checkpoint?: (checkpoint: RuntimePromotionRecoveryCheckpoint) => void;
+  /** Attempt-local observer for validated durable inputs; never serialized or rendered directly. */
+  readonly onJournal?: (journal: RuntimePromotionJournal) => void;
   readonly canonicalizeProjectRoot: (projectRoot: string) => string;
   readonly inspectHeader: (projectRoot: string) => RecoveryHeaderInspection;
   readonly acquireLease: (input: {
@@ -114,6 +116,10 @@ export interface RuntimePromotionRecoveryDependencies {
   readonly assertProjectRootAuthority: (input: {
     readonly lease: RuntimeExclusiveLease;
     readonly authority: RuntimePromotionProjectRootAuthority;
+  }) => void;
+  readonly assertDestinationRootAuthority: (input: {
+    readonly runtimeDir: string;
+    readonly journal: RuntimePromotionJournal;
   }) => void;
   readonly inspectManifest: (
     runtimeDir: string,

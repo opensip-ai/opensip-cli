@@ -299,6 +299,13 @@ interface CleanupOwnedRuntimeTreeInput {
    * complete manifest or a narrowly recoverable incomplete stage.
    */
   readonly verifyBefore: () => void;
+  /**
+   * Runs inside every destructive mutation after its before-checkpoint. Closed
+   * cleanup supplies its terminal-authority guard; transactional stage cleanup
+   * supplies its stable parent authority. Unlike verifyBefore, it must remain
+   * valid after partial tree removal.
+   */
+  readonly revalidateBeforeMutation: () => void;
 }
 
 /**
@@ -363,6 +370,14 @@ export function cleanupOwnedRuntimeTree(input: CleanupOwnedRuntimeTreeInput): bo
     input.root,
     input.state.dependencies,
     rootIdentity,
+    () => {
+      if (inspectExactPromotionMarker(cleanupPath, cleanupContent).status !== 'exact') {
+        runtimePromotionFilesystemFailure(
+          'the cleanup-start proof changed before an owned-tree mutation',
+        );
+      }
+      input.revalidateBeforeMutation();
+    },
   );
   if (input.externalOwner !== undefined) {
     removeExactPromotionMarker(

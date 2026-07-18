@@ -23,6 +23,7 @@ import {
   isRuntimeManifestReleaseUnsafe,
   RuntimeManifestError,
 } from './runtime-manifest.js';
+import { assertRuntimePromotionDestinationRootAuthority } from './runtime-promotion-destination-authority.js';
 import {
   authorizeRuntimePromotionFilesystem,
   backupRuntimePromotionDestination,
@@ -99,6 +100,8 @@ function defaultDependencies(
     createWriter: (controller) => createRuntimePromotionTransitionWriter(controller, { now }),
     captureProjectRootAuthority: captureRuntimePromotionRecoveryProjectRootAuthority,
     assertProjectRootAuthority: assertRuntimePromotionProjectRootAuthority,
+    assertDestinationRootAuthority: ({ runtimeDir, journal }) =>
+      assertRuntimePromotionDestinationRootAuthority(runtimeDir, journal),
     inspectManifest: inspectVerifiedRuntimeManifest,
     classifyPath: classifyRuntimePromotionPath,
     copyStage: copyRuntimeToStage,
@@ -335,6 +338,7 @@ async function executeRecoveryUnderLease(input: {
     operationId: input.operationId,
   });
   input.state.journal = claimed.journal;
+  input.dependencies.onJournal?.(claimed.journal);
   input.dependencies.checkpoint?.('after-journal-claimed');
   if (!recoveryInputsCompatible(claimed.journal, input.request.explicit)) {
     return recoveryInputConflictResult(claimed.journal, input.startedAt, input.dependencies.now);

@@ -13,8 +13,9 @@ import { ToolRegistry } from '@opensip-cli/core';
 import { Command } from 'commander';
 import { describe, it, expect } from 'vitest';
 
-import { mountHostCommands } from '../commands/host-command-specs.js';
+import { buildInitRecoverySpec, mountHostCommands } from '../commands/host-command-specs.js';
 import { HOST_SUBCOMMAND_GROUPS } from '../commands/host-subcommand-groups.js';
+import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import type { CliCommandsContext } from '../commands/shared.js';
 
@@ -50,16 +51,51 @@ function findSubcommand(program: Command, name: string): Command | undefined {
 }
 
 describe('init wiring', () => {
-  it('registers `init` with the expected flags', () => {
+  it('registers `init` with the expected flags and bounded conflict policy', () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
     const cmd = findSubcommand(program, 'init');
     expect(cmd).toBeDefined();
     const flagNames = cmd!.options.map((o) => o.long);
     expect(flagNames).toEqual(
-      expect.arrayContaining(['--cwd', '--language', '--keep', '--remove', '--json', '--debug']),
+      expect.arrayContaining([
+        '--cwd',
+        '--language',
+        '--keep',
+        '--remove',
+        '--runtime-conflict',
+        '--json',
+        '--debug',
+      ]),
     );
+    const runtimeConflict = cmd!.options.find((option) => option.long === '--runtime-conflict');
+    expect(runtimeConflict?.argChoices).toEqual(['abort', 'keep-project', 'use-cache']);
+    expect(runtimeConflict?.defaultValue).toBeUndefined();
     expect(cmd!.description()).toMatch(/Scaffold/i);
+  });
+
+  it('mounts the recovery-only Init spec with byte-for-byte canonical grammar', () => {
+    const { ctx } = makeCtx();
+    const regular = findSubcommand(mount(ctx), 'init');
+    const recoveryProgram = new Command('opensip');
+    mountCommandSpec(recoveryProgram, buildInitRecoverySpec(ctx), ctx);
+    const recovery = findSubcommand(recoveryProgram, 'init');
+
+    expect(recovery).toBeDefined();
+    expect(recovery?.description()).toBe(regular?.description());
+    expect(
+      recovery?.options.map((option) => ({
+        flags: option.flags,
+        choices: option.argChoices,
+        defaultValue: option.defaultValue,
+      })),
+    ).toEqual(
+      regular?.options.map((option) => ({
+        flags: option.flags,
+        choices: option.argChoices,
+        defaultValue: option.defaultValue,
+      })),
+    );
   });
 });
 

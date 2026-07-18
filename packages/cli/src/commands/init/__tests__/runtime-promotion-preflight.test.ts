@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   linkSync,
   lstatSync,
   mkdirSync,
@@ -42,6 +43,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { inspectRuntimeTree } from '../runtime-manifest-io.js';
 import {
   assertStablePromotionDirectory,
+  capturePromotionRootIdentity,
   closeStablePromotionDirectory,
 } from '../runtime-promotion-filesystem-io.js';
 import {
@@ -50,7 +52,10 @@ import {
   type RuntimeManifestIdentity,
   type RuntimePromotionSource,
 } from '../runtime-promotion-journal-schema.js';
-import { bindRuntimePromotionDatastoreSet } from '../runtime-promotion-preflight-datastore-authority.js';
+import {
+  bindRuntimePromotionDatastoreSet,
+  closeBoundRuntimePromotionDatastoreSet,
+} from '../runtime-promotion-preflight-datastore-authority.js';
 import {
   assertRuntimePromotionRecoverySourceAuthority,
   assertRuntimePromotionRecoverySourceLocation,
@@ -136,6 +141,7 @@ function recordedSource(
     generationDigest:
       classification === 'generation-bound' ? (paths.generationDigest ?? null) : null,
     markerSha256,
+    rootIdentity: capturePromotionRootIdentity(paths.runtimeDir),
   };
 }
 
@@ -163,6 +169,9 @@ function datastoreRootAuthority(
     .digest('hex');
   const sourceExpected = expectedKinds.includes('source');
   const destinationExpected = expectedKinds.includes('destination');
+  const selectedDestinationRuntime = destinationExpected
+    ? makeDirectory(resolveProjectPaths(projectRoot).runtimeDir)
+    : undefined;
   let route: 'deduplicate-cache' | 'project-authority' | 'promote-cache';
   if (sourceExpected && destinationExpected) route = 'deduplicate-cache';
   else if (sourceExpected) route = 'promote-cache';
@@ -174,18 +183,24 @@ function datastoreRootAuthority(
     route,
     destinationParentPreexisting: true,
     destinationRuntimePreexisting: destinationExpected,
+    destinationRootIdentity:
+      selectedDestinationRuntime === undefined
+        ? null
+        : capturePromotionRootIdentity(selectedDestinationRuntime),
     source: sourceExpected
       ? {
           classification: paths.identityStrength,
           cacheKey: paths.cacheKey,
           generationDigest: paths.generationDigest ?? null,
           markerSha256,
+          rootIdentity: capturePromotionRootIdentity(paths.runtimeDir),
         }
       : {
           classification: 'none',
           cacheKey: null,
           generationDigest: null,
           markerSha256: null,
+          rootIdentity: null,
         },
     inputs: {
       conflict: 'abort',
@@ -1180,6 +1195,43 @@ describe('recovery source-marker authority', () => {
 });
 
 describe('post-journal datastore checkpoint preparation', () => {
+  it('returns a canonical selected source when HOME uses a lexical filesystem alias', () => {
+    const lexicalHome = home.startsWith('/private/var/') ? home.slice('/private'.length) : home;
+    process.env.HOME = lexicalHome;
+    const source = activeRuntime('cache');
+
+    const result = preflightRuntimePromotionAuthority({
+      projectRoot: project,
+      lease: matchingLease(),
+    });
+
+    expect(result).toMatchObject({
+      status: 'selected',
+      route: 'promote-cache',
+      sourceRuntimeDir: realpathSync(source.runtimeDir),
+    });
+  });
+
+  it('binds a canonical cache runtime when HOME uses a lexical filesystem alias', () => {
+    const lexicalHome = home.startsWith('/private/var/') ? home.slice('/private'.length) : home;
+    process.env.HOME = lexicalHome;
+    const authority = datastoreRootAuthority(project);
+    const source = datastoreSourceCandidate(project);
+
+    const bound = bindRuntimePromotionDatastoreSet({
+      candidates: [source],
+      journal: authority.journal,
+      lease: authority.lease,
+      projectRootAuthority: authority.projectRootAuthority,
+    });
+    try {
+      expect(bound.candidates).toHaveLength(1);
+      expect(bound.candidates[0]?.runtimeRoot.path).toBe(realpathSync(source.runtimeDir));
+    } finally {
+      closeBoundRuntimePromotionDatastoreSet(bound);
+    }
+  });
+
   it('checkpoints, closes, and inspects candidates strictly sequentially', async () => {
     const events: string[] = [];
     const source = datastoreSourceCandidate();
@@ -1451,6 +1503,118 @@ describe('post-journal datastore checkpoint preparation', () => {
     expect(checkpointCalls).toBe(0);
   });
 
+  it('rejects a byte-identical selected-source root replacement before checkpointing', async () => {
+    const authority = datastoreRootAuthority();
+    const candidate = datastoreSourceCandidate();
+    createDatastoreFile(candidate.runtimeDir);
+    const cacheRoot = resolveUserPaths().ephemeralProjectsDir;
+    const replacement = makeDirectory(join(cacheRoot, 'source-root-replacement'));
+    copyFileSync(
+      join(candidate.runtimeDir, EPHEMERAL_MARKER_FILE),
+      join(replacement, EPHEMERAL_MARKER_FILE),
+    );
+    copyFileSync(
+      join(candidate.runtimeDir, 'datastore.sqlite'),
+      join(replacement, 'datastore.sqlite'),
+    );
+    expect(capturePromotionRootIdentity(replacement)).not.toEqual(
+      authority.journal.source.rootIdentity,
+    );
+    const displaced = `${candidate.runtimeDir}-journal-selected`;
+    let callbacks = 0;
+
+    await expect(
+      checkpointRuntimePromotionDatastores(
+        {
+          candidates: [candidate],
+          lockContext: LOCK_CONTEXT,
+          ...authority,
+          controller: {
+            ...authority.controller,
+            verifyOpen: async (receipt) => {
+              const journal = await authority.controller.verifyOpen(receipt);
+              renameSync(candidate.runtimeDir, displaced);
+              renameSync(replacement, candidate.runtimeDir);
+              return journal;
+            },
+          },
+        },
+        {
+          mainFilePresence: () => {
+            callbacks += 1;
+            return 'file';
+          },
+          checkpoint: () => {
+            callbacks += 1;
+            return { checkpointed: true, closed: true };
+          },
+          inspect: () => {
+            callbacks += 1;
+            return validIntegrity();
+          },
+        },
+      ),
+    ).rejects.toThrow(expect.objectContaining({ reason: 'candidate-set-invalid' }));
+
+    expect(callbacks).toBe(0);
+    expect(existsSync(candidate.runtimeDir)).toBe(true);
+    expect(existsSync(displaced)).toBe(true);
+  });
+
+  it('rejects a byte-identical project-runtime root replacement before checkpointing', async () => {
+    const authority = datastoreRootAuthority(home, ['destination']);
+    const candidate = datastoreDestinationCandidate();
+    createDatastoreFile(candidate.runtimeDir);
+    const runtimeParent = dirname(candidate.runtimeDir);
+    const replacement = makeDirectory(join(runtimeParent, '.runtime-replacement'));
+    copyFileSync(
+      join(candidate.runtimeDir, 'datastore.sqlite'),
+      join(replacement, 'datastore.sqlite'),
+    );
+    expect(capturePromotionRootIdentity(replacement)).not.toEqual(
+      authority.journal.destinationRootIdentity,
+    );
+    const displaced = join(runtimeParent, '.runtime-journal-selected');
+    let callbacks = 0;
+
+    await expect(
+      checkpointRuntimePromotionDatastores(
+        {
+          candidates: [candidate],
+          lockContext: LOCK_CONTEXT,
+          ...authority,
+          controller: {
+            ...authority.controller,
+            verifyOpen: async (receipt) => {
+              const journal = await authority.controller.verifyOpen(receipt);
+              renameSync(candidate.runtimeDir, displaced);
+              renameSync(replacement, candidate.runtimeDir);
+              return journal;
+            },
+          },
+        },
+        {
+          mainFilePresence: () => {
+            callbacks += 1;
+            return 'file';
+          },
+          checkpoint: () => {
+            callbacks += 1;
+            return { checkpointed: true, closed: true };
+          },
+          inspect: () => {
+            callbacks += 1;
+            return validIntegrity();
+          },
+        },
+      ),
+    ).rejects.toThrow(expect.objectContaining({ reason: 'candidate-set-invalid' }));
+
+    expect(callbacks).toBe(0);
+    expect(existsSync(candidate.runtimeDir)).toBe(true);
+    expect(existsSync(displaced)).toBe(true);
+  });
+
   it('rejects same-inode database mutation after integrity inspection', async () => {
     const authority = datastoreRootAuthority();
     const candidate = datastoreSourceCandidate();
@@ -1717,6 +1881,7 @@ describe('post-journal datastore checkpoint preparation', () => {
         cacheKey: other.cacheKey,
         generationDigest: other.generationDigest ?? null,
         markerSha256,
+        rootIdentity: capturePromotionRootIdentity(other.runtimeDir),
       },
     };
     let callbacks = 0;
@@ -1766,11 +1931,13 @@ describe('post-journal datastore checkpoint preparation', () => {
       route: 'promote-cache',
       destinationParentPreexisting: true,
       destinationRuntimePreexisting: false,
+      destinationRootIdentity: null,
       source: {
         classification: 'legacy',
         cacheKey: resolveEphemeralProjectPaths(home).cacheKey,
         generationDigest: null,
         markerSha256,
+        rootIdentity: capturePromotionRootIdentity(source.runtimeDir),
       },
       inputs: {
         ...authority.journal.inputs,

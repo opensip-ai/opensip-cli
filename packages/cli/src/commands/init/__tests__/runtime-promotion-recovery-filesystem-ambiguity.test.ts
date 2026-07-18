@@ -175,11 +175,16 @@ async function advanceToRuntimeStaged(input: {
       route: 'promote-cache',
       destinationParentPreexisting: true,
       destinationRuntimePreexisting: input.destinationManifest !== null,
+      destinationRootIdentity:
+        input.destinationManifest === null
+          ? null
+          : capturePromotionRootIdentity(join(project, 'opensip-cli', '.runtime')),
       source: {
         classification: 'legacy',
         cacheKey: input.lease.coordinationKey,
         generationDigest: null,
         markerSha256: source.identity.digest,
+        rootIdentity: capturePromotionRootIdentity(input.sourceRuntime),
       },
       inputs: {
         conflict: 'use-cache',

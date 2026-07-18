@@ -351,18 +351,23 @@ function initialJournal(
     route: scenario.route,
     destinationParentPreexisting: scenario.destinationParentPreexisting,
     destinationRuntimePreexisting: scenario.destinationRuntimePreexisting,
+    destinationRootIdentity: scenario.destinationRuntimePreexisting
+      ? { device: '1', inode: '2' }
+      : null,
     source: sourceRoute(scenario.route)
       ? {
           classification: 'generation-bound',
           cacheKey: SOURCE_CACHE_KEY,
           generationDigest: GENERATION_DIGEST,
           markerSha256: MARKER_DIGEST,
+          rootIdentity: { device: '1', inode: '2' },
         }
       : {
           classification: 'none',
           cacheKey: null,
           generationDigest: null,
           markerSha256: null,
+          rootIdentity: null,
         },
     inputs: {
       conflict: conflictForRoute(scenario.route),
@@ -561,6 +566,7 @@ async function createRecoveryHarness(
     createWriter: (controller) => createRuntimePromotionTransitionWriter(controller, { now }),
     captureProjectRootAuthority: ({ lease }) => recoveryRootAuthority(scenario, lease),
     assertProjectRootAuthority: () => undefined,
+    assertDestinationRootAuthority: () => undefined,
     inspectManifest: (_runtimeDir, posture) => {
       if (posture === 'cache-source') return verified(SOURCE_IDENTITY);
       if (scenario.route === 'authored-only') {

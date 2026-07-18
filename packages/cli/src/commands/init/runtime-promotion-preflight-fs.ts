@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { lstatSync, realpathSync, type BigIntStats } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import {
   EPHEMERAL_MARKER_FILE,
@@ -18,6 +18,12 @@ import {
   type RuntimeExclusiveLease,
 } from '@opensip-cli/core';
 
+import {
+  assertStablePromotionDirectory,
+  closeStablePromotionDirectory,
+  openStablePromotionDirectory,
+  type StablePromotionDirectory,
+} from './runtime-promotion-filesystem-io.js';
 import {
   RUNTIME_PROMOTION_CACHE_KEY_PATTERN,
   RUNTIME_PROMOTION_DIGEST_PATTERN,
@@ -139,22 +145,27 @@ export function assertRuntimePromotionRecoverySourceLocation(
     cacheKey: input.source.cacheKey,
     generationDigest: input.source.generationDigest,
     markerSha256: input.source.markerSha256,
+    rootIdentity: input.source.rootIdentity,
   };
   if (!recoverySourceShapeValid(source) || source.cacheKey === null) {
     recoverySourceChanged();
   }
-  const cacheRoot = resolveUserPaths().ephemeralProjectsDir;
-  const expectedSourceRuntime = join(cacheRoot, source.cacheKey);
-  if (input.sourceRuntime !== expectedSourceRuntime) {
+  const canonical = bindRuntimePromotionCacheChild(
+    resolveUserPaths().ephemeralProjectsDir,
+    source.cacheKey,
+  );
+  if (input.sourceRuntime !== canonical.runtimeDir) {
     recoverySourceChanged();
   }
-  const rootBefore = runtimePromotionPathSnapshot(cacheRoot);
-  const sourceBefore = runtimePromotionPathSnapshot(expectedSourceRuntime);
-  const sourceAfter = runtimePromotionPathSnapshot(expectedSourceRuntime);
-  const rootAfter = runtimePromotionPathSnapshot(cacheRoot);
+  const rootBefore = runtimePromotionPathSnapshot(canonical.cacheRoot);
+  const sourceBefore = runtimePromotionPathSnapshot(canonical.runtimeDir);
+  const sourceAfter = runtimePromotionPathSnapshot(canonical.runtimeDir);
+  const rootAfter = runtimePromotionPathSnapshot(canonical.cacheRoot);
   if (
     rootBefore.presence !== 'directory' ||
     sourceBefore.presence !== 'directory' ||
+    canonical.rootIdentity.device !== source.rootIdentity?.device ||
+    canonical.rootIdentity.inode !== source.rootIdentity?.inode ||
     !sameRuntimePromotionPathSnapshot(rootBefore, rootAfter) ||
     !sameRuntimePromotionPathSnapshot(sourceBefore, sourceAfter)
   ) {
@@ -314,11 +325,95 @@ function recoverySourceChanged(): never {
   throw new RuntimePromotionPreflightError('changed-after-preflight');
 }
 
+export interface RuntimePromotionCanonicalCacheChild {
+  readonly cacheRoot: string;
+  readonly runtimeDir: string;
+}
+
+export interface RuntimePromotionBoundCacheChild extends RuntimePromotionCanonicalCacheChild {
+  readonly rootIdentity: {
+    readonly device: string;
+    readonly inode: string;
+  };
+}
+
+/**
+ * Resolve a cache-key child from the canonical cache root without following the
+ * selected leaf. Callers bind the returned path to a captured leaf identity
+ * before treating it as authority.
+ */
+export function canonicalRuntimePromotionCacheChild(
+  cacheRootInput: string,
+  cacheKey: string,
+): RuntimePromotionCanonicalCacheChild {
+  if (!RUNTIME_PROMOTION_CACHE_KEY_PATTERN.test(cacheKey)) recoverySourceChanged();
+  let cacheRoot: string;
+  try {
+    cacheRoot = realpathSync(cacheRootInput);
+  } catch {
+    recoverySourceChanged();
+  }
+  if (runtimePromotionPathSnapshot(cacheRoot).presence !== 'directory') {
+    recoverySourceChanged();
+  }
+  return {
+    cacheRoot,
+    runtimeDir: join(cacheRoot, cacheKey),
+  };
+}
+
+/**
+ * Bind an existing exact cache-key child to a stable directory object. Unlike
+ * canonicalRuntimePromotionCacheChild, this requires the leaf to exist. Keep
+ * the path-only helper for recovery phases where the source was already
+ * renamed to its journal-owned tombstone.
+ */
+export function bindRuntimePromotionCacheChild(
+  cacheRootInput: string,
+  cacheKey: string,
+): RuntimePromotionBoundCacheChild {
+  const canonical = canonicalRuntimePromotionCacheChild(cacheRootInput, cacheKey);
+  let root: StablePromotionDirectory | undefined;
+  let child: StablePromotionDirectory | undefined;
+  try {
+    root = openStablePromotionDirectory(canonical.cacheRoot, 'the OpenSIP cache root');
+    if (root.path !== canonical.cacheRoot) recoverySourceChanged();
+    const exactChild = join(root.path, cacheKey);
+    if (dirname(exactChild) !== root.path || basename(exactChild) !== cacheKey) {
+      recoverySourceChanged();
+    }
+    child = openStablePromotionDirectory(exactChild, 'the selected OpenSIP cache runtime');
+    if (
+      child.path !== exactChild ||
+      dirname(child.path) !== root.path ||
+      basename(child.path) !== cacheKey
+    ) {
+      recoverySourceChanged();
+    }
+    assertStablePromotionDirectory(root, 'the OpenSIP cache root');
+    assertStablePromotionDirectory(child, 'the selected OpenSIP cache runtime');
+    return {
+      cacheRoot: root.path,
+      runtimeDir: child.path,
+      rootIdentity: {
+        device: child.identity.dev.toString(),
+        inode: child.identity.ino.toString(),
+      },
+    };
+  } catch {
+    return recoverySourceChanged();
+  } finally {
+    if (child !== undefined) closeStablePromotionDirectory(child);
+    if (root !== undefined) closeStablePromotionDirectory(root);
+  }
+}
+
 function recoverySourceShapeValid(source: RuntimePromotionSource): boolean {
   if (
     source.classification === 'none' ||
     source.cacheKey === null ||
     source.markerSha256 === null ||
+    source.rootIdentity === null ||
     !RUNTIME_PROMOTION_CACHE_KEY_PATTERN.test(source.cacheKey) ||
     !RUNTIME_PROMOTION_DIGEST_PATTERN.test(source.markerSha256)
   ) {
@@ -425,23 +520,32 @@ export function assertRuntimePromotionRecoverySourceAuthority(
     cacheKey: input.source.cacheKey,
     generationDigest: input.source.generationDigest,
     markerSha256: input.source.markerSha256,
+    rootIdentity: input.source.rootIdentity,
   };
   if (!recoverySourceShapeValid(source)) recoverySourceChanged();
   const cacheKey = source.cacheKey;
   const markerSha256 = source.markerSha256;
   if (cacheKey === null || markerSha256 === null) recoverySourceChanged();
-  const cacheRoot = resolveUserPaths().ephemeralProjectsDir;
-  const expectedSourceRuntime = join(cacheRoot, cacheKey);
-  if (input.sourceRuntime !== expectedSourceRuntime) recoverySourceChanged();
+  const canonical = bindRuntimePromotionCacheChild(
+    resolveUserPaths().ephemeralProjectsDir,
+    cacheKey,
+  );
+  if (input.sourceRuntime !== canonical.runtimeDir) recoverySourceChanged();
+  if (
+    source.rootIdentity?.device !== canonical.rootIdentity.device ||
+    source.rootIdentity?.inode !== canonical.rootIdentity.inode
+  ) {
+    recoverySourceChanged();
+  }
 
-  const before = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  const before = runtimePromotionPathSnapshot(canonical.runtimeDir);
   if (before.presence !== 'directory') recoverySourceChanged();
-  const firstMarker = recoveryMarkerRead(cacheRoot, expectedSourceRuntime);
+  const firstMarker = recoveryMarkerRead(canonical.cacheRoot, canonical.runtimeDir);
   dependencies.afterMarkerRead?.();
-  const afterFirstRead = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  const afterFirstRead = runtimePromotionPathSnapshot(canonical.runtimeDir);
   if (!sameRuntimePromotionPathSnapshot(before, afterFirstRead)) recoverySourceChanged();
-  const confirmedMarker = recoveryMarkerRead(cacheRoot, expectedSourceRuntime);
-  const afterConfirmation = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  const confirmedMarker = recoveryMarkerRead(canonical.cacheRoot, canonical.runtimeDir);
+  const afterConfirmation = runtimePromotionPathSnapshot(canonical.runtimeDir);
   if (!sameRuntimePromotionPathSnapshot(before, afterConfirmation)) recoverySourceChanged();
   if (
     firstMarker.sha256 !== markerSha256 ||
@@ -502,6 +606,7 @@ function inspectSource(input: {
         cacheKey: null,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: null,
       },
     };
   }
@@ -521,7 +626,19 @@ function inspectSource(input: {
           snapshot: input.active,
         };
   if (selected.snapshot.presence !== 'directory') {
-    return { status: 'conflict', reason: 'cache-path-unsafe', sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: 'cache-path-unsafe',
+      sourcePreserved: true,
+    };
+  }
+  const selectedIdentity = selected.snapshot.identity;
+  if (selectedIdentity === undefined) {
+    return {
+      status: 'conflict',
+      reason: 'cache-path-unsafe',
+      sourcePreserved: true,
+    };
   }
 
   let observed;
@@ -535,19 +652,35 @@ function inspectSource(input: {
       recordPosture: OWNER_CONTROLLED,
     });
   } catch {
-    return { status: 'conflict', reason: 'cache-marker-invalid', sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: 'cache-marker-invalid',
+      sourcePreserved: true,
+    };
   }
   input.dependencies.afterMarkerRead?.();
   if (observed.status !== 'present') {
-    return { status: 'conflict', reason: 'cache-marker-invalid', sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: 'cache-marker-invalid',
+      sourcePreserved: true,
+    };
   }
   const marker = parseMarker(observed.content);
   if (marker?.marker.projectDir !== input.projectRoot) {
-    return { status: 'conflict', reason: 'cache-marker-invalid', sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: 'cache-marker-invalid',
+      sourcePreserved: true,
+    };
   }
   const runtimeAfter = runtimePromotionPathSnapshot(selected.runtimeDir);
   if (!sameRuntimePromotionPathSnapshot(selected.snapshot, runtimeAfter)) {
-    return { status: 'conflict', reason: 'cache-path-unsafe', sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: 'cache-path-unsafe',
+      sourcePreserved: true,
+    };
   }
 
   const exactCurrent =
@@ -563,6 +696,10 @@ function inspectSource(input: {
       generationDigest:
         classification === GENERATION_BOUND ? (input.paths.generationDigest ?? null) : null,
       markerSha256: observed.sha256,
+      rootIdentity: {
+        device: selectedIdentity.dev,
+        inode: selectedIdentity.ino,
+      },
     },
     revalidation: {
       kind: selected.kind,
@@ -591,18 +728,30 @@ export function inspectRuntimePromotionFilesystem(
   try {
     projectRoot = realpathSync(projectRootInput);
   } catch {
-    return { status: 'conflict', reason: PROJECT_PATH_UNSAFE, sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: PROJECT_PATH_UNSAFE,
+      sourcePreserved: true,
+    };
   }
   const projectRootBefore = runtimePromotionPathSnapshot(projectRoot);
   if (projectRootBefore.presence !== 'directory') {
-    return { status: 'conflict', reason: PROJECT_PATH_UNSAFE, sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: PROJECT_PATH_UNSAFE,
+      sourcePreserved: true,
+    };
   }
 
   let paths: EphemeralProjectPaths;
   try {
     paths = resolveEphemeralProjectPaths(projectRoot);
   } catch {
-    return { status: 'conflict', reason: PROJECT_PATH_UNSAFE, sourcePreserved: true };
+    return {
+      status: 'conflict',
+      reason: PROJECT_PATH_UNSAFE,
+      sourcePreserved: true,
+    };
   }
   if (!leaseMatches(lease, paths)) {
     throw new RuntimePromotionFilesystemLeaseMismatchError();

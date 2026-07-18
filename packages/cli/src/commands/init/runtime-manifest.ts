@@ -2,7 +2,7 @@
  * Verified whole-runtime manifests and journal-authorized stage copies.
  */
 
-import { realpathSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { resolveUserPaths } from '@opensip-cli/core';
@@ -13,6 +13,7 @@ import {
   RUNTIME_MANIFEST_DIFF_SAMPLE_LIMIT,
   RuntimeManifestError,
 } from './runtime-manifest-model.js';
+import { RUNTIME_PROMOTION_CACHE_KEY_PATTERN } from './runtime-promotion-journal-types.js';
 import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 import { materializeRuntimeStage } from './runtime-stage-io.js';
 import { RUNTIME_STAGE_OWNERSHIP_FILE } from './runtime-stage-ownership.js';
@@ -23,6 +24,7 @@ import type {
   RuntimeTreePosture,
 } from './runtime-manifest-model.js';
 import type { RuntimeManifestIdentity } from './runtime-promotion-journal-schema.js';
+import type { RuntimePromotionRootIdentity } from './runtime-promotion-journal-types.js';
 import type {
   DurableOpenPromotionJournal,
   RuntimePromotionJournalController,
@@ -58,6 +60,7 @@ export type { RuntimeStageOwnershipIdentity } from './runtime-stage-ownership.js
 export type { RuntimeManifestIdentity } from './runtime-promotion-journal-schema.js';
 
 const DATASTORE_FILE = 'datastore.sqlite';
+const INVALID_PATH = 'invalid-path';
 
 export interface VerifiedRuntimeManifest {
   readonly identity: RuntimeManifestIdentity;
@@ -96,6 +99,7 @@ export interface RuntimeManifestDependencies {
     stageBasename: string,
     source: RuntimeTreeManifest,
     ownership: RuntimeStageMaterializationIdentity,
+    sourceRootIdentity: RuntimePromotionRootIdentity,
   ) => string;
   readonly checkpoint?: (checkpoint: RuntimeManifestCheckpoint) => void;
 }
@@ -124,7 +128,17 @@ const DEFAULT_DEPENDENCIES: RuntimeManifestDependencies = Object.freeze({
     stageOwnership?: RuntimeStageOwnershipIdentity,
   ) => inspectRuntimeTree(runtimeDir, posture, {}, stageOwnership),
   inspectSqlite: inspectSqliteFile,
-  materialize: materializeRuntimeStage,
+  materialize: (
+    sourceDir: string,
+    destinationParent: string,
+    stageBasename: string,
+    source: RuntimeTreeManifest,
+    ownership: RuntimeStageMaterializationIdentity,
+    sourceRootIdentity: RuntimePromotionRootIdentity,
+  ) =>
+    materializeRuntimeStage(sourceDir, destinationParent, stageBasename, source, ownership, {
+      expectedSourceRootIdentity: sourceRootIdentity,
+    }),
 });
 
 function fail(reason: ConstructorParameters<typeof RuntimeManifestError>[0]): never {
@@ -140,32 +154,68 @@ function assertCopyProjectRoot(input: CopyRuntimeToStageInput): void {
 
 function copyDestinationParent(input: CopyRuntimeToStageInput): string {
   const expected = join(input.projectRootAuthority.projectRoot, 'opensip-cli');
-  if (input.destinationParent !== expected) fail('invalid-path');
+  if (input.destinationParent !== expected) fail(INVALID_PATH);
   return expected;
 }
 
 async function copySourceAuthority(input: CopyRuntimeToStageInput): Promise<{
   readonly sourceDir: string;
   readonly manifest: RuntimeManifestIdentity;
+  readonly rootIdentity: RuntimePromotionRootIdentity;
 }> {
   const journal = await input.controller.verifyOpen(input.receipt);
   if (
     journal.route !== 'promote-cache' ||
     journal.source.cacheKey === null ||
-    journal.source.classification === 'none'
+    journal.source.classification === 'none' ||
+    !RUNTIME_PROMOTION_CACHE_KEY_PATTERN.test(journal.source.cacheKey)
   ) {
-    fail('invalid-path');
+    fail(INVALID_PATH);
   }
-  const expected = join(resolveUserPaths().ephemeralProjectsDir, journal.source.cacheKey);
-  let canonicalExpected: string;
+  if (journal.source.rootIdentity === null) fail('changed');
+  let canonicalCacheRoot: string;
   try {
-    canonicalExpected = realpathSync(expected);
+    canonicalCacheRoot = realpathSync(resolveUserPaths().ephemeralProjectsDir);
   } catch {
-    fail('invalid-path');
+    fail(INVALID_PATH);
   }
-  if (input.sourceDir !== canonicalExpected) fail('invalid-path');
+  const expected = join(canonicalCacheRoot, journal.source.cacheKey);
+  if (input.sourceDir !== expected) fail(INVALID_PATH);
+
+  let before: ReturnType<typeof lstatSync>;
+  let canonicalExpected: string;
+  let after: ReturnType<typeof lstatSync>;
+  try {
+    before = lstatSync(expected, { bigint: true });
+    canonicalExpected = realpathSync(expected);
+    after = lstatSync(expected, { bigint: true });
+  } catch {
+    fail(INVALID_PATH);
+  }
+  if (
+    !before.isDirectory() ||
+    before.isSymbolicLink() ||
+    canonicalExpected !== expected ||
+    !after.isDirectory() ||
+    after.isSymbolicLink()
+  ) {
+    fail(INVALID_PATH);
+  }
+  const rootIdentity = journal.source.rootIdentity;
+  if (
+    before.dev !== after.dev ||
+    before.ino !== after.ino ||
+    before.dev.toString() !== rootIdentity.device ||
+    before.ino.toString() !== rootIdentity.inode
+  ) {
+    fail('changed');
+  }
   if (journal.manifests.source === null) fail('changed');
-  return { sourceDir: canonicalExpected, manifest: journal.manifests.source };
+  return {
+    sourceDir: canonicalExpected,
+    manifest: journal.manifests.source,
+    rootIdentity,
+  };
 }
 
 function verifiedRuntimeTree(manifest: VerifiedRuntimeManifest): RuntimeTreeManifest {
@@ -411,6 +461,7 @@ export async function copyRuntimeToStage(
     input.stageBasename,
     sourceTree,
     ownership,
+    sourceAuthority.rootIdentity,
   );
   assertCopyProjectRoot(input);
   dependencies.checkpoint?.('after-stage-materialization');

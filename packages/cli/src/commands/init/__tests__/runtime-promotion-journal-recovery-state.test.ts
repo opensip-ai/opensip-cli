@@ -35,11 +35,13 @@ function initial(): RuntimePromotionJournal {
     route: 'authored-only',
     destinationParentPreexisting: false,
     destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
     source: {
       classification: 'none',
       cacheKey: null,
       generationDigest: null,
       markerSha256: null,
+      rootIdentity: null,
     },
     inputs: {
       conflict: 'abort',
@@ -68,6 +70,7 @@ function promote(): RuntimePromotionJournal {
       cacheKey: 'c'.repeat(24),
       generationDigest: 'c'.repeat(64),
       markerSha256: 'd'.repeat(64),
+      rootIdentity: { device: '1', inode: '2' },
     },
     inputs: { ...journal.inputs, conflict: 'use-cache' },
   });
@@ -141,6 +144,7 @@ function runtimeBackedUpBeforeInstall(): RuntimePromotionJournal {
   return canonicalRuntimePromotionJournal({
     ...journal,
     destinationRuntimePreexisting: true,
+    destinationRootIdentity: { device: '3', inode: '4' },
     revision: 6,
     manifests: {
       source: manifest(),
@@ -365,6 +369,7 @@ describe('runtime promotion rollback and closed evidence', () => {
       ...journal,
       destinationParentPreexisting: true,
       destinationRuntimePreexisting: true,
+      destinationRootIdentity: { device: '3', inode: '4' },
       route: 'project-authority',
       revision: 1,
       manifests: { ...journal.manifests, destination: manifest() },

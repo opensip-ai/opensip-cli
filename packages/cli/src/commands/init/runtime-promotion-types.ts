@@ -25,6 +25,7 @@ import type {
 import type {
   RuntimeManifestIdentity,
   RuntimePromotionConflictPolicy,
+  RuntimePromotionJournal,
   RuntimePromotionLanguage,
   RuntimePromotionOwnedSlotName,
 } from './runtime-promotion-journal-schema.js';
@@ -115,6 +116,10 @@ export interface RuntimePromotionDependencies {
   readonly assertProjectRootAuthority: (input: {
     readonly lease: RuntimeExclusiveLease;
     readonly authority: RuntimePromotionProjectRootAuthority;
+  }) => void;
+  readonly assertDestinationRootAuthority: (input: {
+    readonly runtimeDir: string;
+    readonly journal: RuntimePromotionJournal;
   }) => void;
   readonly checkpointDatastores: (input: {
     readonly candidates: readonly RuntimePromotionDatastoreCandidate[];

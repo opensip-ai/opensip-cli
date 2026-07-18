@@ -68,10 +68,19 @@ export interface InitOptions {
    */
   keep?: boolean;
   /**
-   * Delete `opensip-cli/` entirely, then scaffold fresh. Mutually
-   * exclusive with `keep`.
+   * Replace Init-authored content under `opensip-cli/`, then scaffold fresh.
+   * Project runtime evidence under `opensip-cli/.runtime/` is preserved.
+   * Use `opensip uninstall --project` when evidence deletion is intended.
+   * Mutually exclusive with `keep`.
    */
   remove?: boolean;
+  /**
+   * Select runtime authority when retained cache evidence and project-local
+   * evidence cannot be adopted automatically. Omission means `abort` for a new
+   * operation; on recovery, omission replays the policy recorded by the
+   * interrupted operation.
+   */
+  runtimeConflict?: 'abort' | 'keep-project' | 'use-cache';
 }
 
 /** Options for `sim` subcommand. */

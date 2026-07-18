@@ -18,6 +18,7 @@ import {
   isRuntimeManifestReleaseUnsafe,
 } from './runtime-manifest.js';
 import { cleanupFreshClosedRuntimePromotion } from './runtime-promotion-cleanup.js';
+import { assertRuntimePromotionDestinationRootAuthority } from './runtime-promotion-destination-authority.js';
 import { executeRuntimePromotionForward } from './runtime-promotion-execution.js';
 import {
   authorizeRuntimePromotionFilesystem,
@@ -86,6 +87,8 @@ function defaultDependencies(
     assertPreflightUnchanged: assertRuntimePromotionPreflightUnchanged,
     bindProjectRootAuthority: bindRuntimePromotionFreshProjectRootAuthority,
     assertProjectRootAuthority: assertRuntimePromotionProjectRootAuthority,
+    assertDestinationRootAuthority: ({ runtimeDir, journal }) =>
+      assertRuntimePromotionDestinationRootAuthority(runtimeDir, journal),
     checkpointDatastores: checkpointRuntimePromotionDatastores,
     createPlan: createInitAuthoredPlan,
     createController: (lease) => createRuntimePromotionJournalController(lease, { now }),
@@ -168,6 +171,7 @@ async function createOperation(input: {
       route: input.preflight.route,
       destinationParentPreexisting: input.preflight.destinationParentPreexisting,
       destinationRuntimePreexisting: input.preflight.destinationRuntimePreexisting,
+      destinationRootIdentity: input.preflight.destinationRootIdentity,
       source: input.preflight.source,
       inputs: {
         conflict: input.preflight.effectiveConflict,

@@ -13,21 +13,35 @@
  *   final parse failures because external Tools cannot extend that surface.
  */
 
-import { LanguageRegistry, SystemError, ToolRegistry, logger } from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  LoggerImpl,
+  RunScope,
+  SystemError,
+  ToolRegistry,
+  generatePrefixedId,
+  inspectRuntimePromotionRecoveryHeader,
+  logger,
+} from '@opensip-cli/core';
 import { CommanderError, type Command } from 'commander';
 
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from '../cli-context.js';
+import { buildInitRecoverySpec } from '../commands/host-command-specs.js';
 import { registerCliCommands } from '../commands/index.js';
+import { mountCommandSpec } from '../commands/mount-command-spec.js';
 import { handleParseError } from '../error-handler.js';
 
 import { buildCommandRegistrationInput } from './build-command-registration-input.js';
+import { createCommandActionScopeRunner } from './pre-action-hook.js';
 import { mountAllToolCommands } from './register-tools-mount.js';
 import { renderResult } from './render.js';
 import { executeReportOpen } from './report.js';
+import { resolveStartupProjectSelection } from './startup-runtime-lease.js';
 
 import { bootstrapCli } from './index.js';
 
 import type { ToolRuntimeExecutionMode } from './worker-datastore.js';
+import type { CliCommandsContext } from '../commands/shared.js';
 
 class ContinueToLeasedBootstrap extends Error {
   constructor() {
@@ -142,6 +156,128 @@ function unknownRootRequiresDiscovery(program: Command, argv: readonly string[])
   return helpTargetRequiresDiscovery(program, argv, operand.index);
 }
 
+function createProbeToolContext() {
+  return buildToolCliContext({
+    render: renderResult,
+    liveViews: createLiveViewRegistry(logger),
+    maybeOpenReport: executeReportOpen,
+    logger,
+  });
+}
+
+/**
+ * Recovery must be reachable before the ordinary trusted-surface probe imports
+ * bundled Tool runtimes. This context carries only the established output/error
+ * seams. Any accidental datastore access fails loud instead of silently
+ * materializing runtime state before recovery has acquired exclusive authority.
+ */
+function createInitRecoveryCommandContext(
+  handle: ReturnType<typeof createProbeToolContext>,
+): CliCommandsContext {
+  return {
+    setExitCode: handle.ctx.setExitCode,
+    getExitCode: handle.getExitCode,
+    render: renderResult,
+    reportFailure: handle.ctx.reportFailure,
+    emitJson: handle.ctx.emitJson,
+    emitRaw: handle.ctx.emitRaw,
+    emitError: handle.ctx.emitError,
+    pluginLayouts: [],
+    toolScaffolds: [],
+    datastore: () => {
+      throw new SystemError('The lean Init recovery probe cannot open the datastore.', {
+        code: 'SYSTEM.INIT.RECOVERY_PROBE_DATASTORE',
+      });
+    },
+  };
+}
+
+function createInitRecoveryScope(
+  project: ReturnType<typeof resolveStartupProjectSelection>['project'],
+  debug: boolean,
+): RunScope {
+  const runId = generatePrefixedId('run');
+  const scopeLogger = new LoggerImpl({
+    runId,
+    debugMode: debug,
+    silent: !debug,
+  });
+  return new RunScope({
+    logger: scopeLogger,
+    projectContext: project,
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+    runId,
+    datastore: () => {
+      throw new SystemError('The lean Init recovery scope cannot open the datastore.', {
+        code: 'SYSTEM.INIT.RECOVERY_PROBE_DATASTORE',
+      });
+    },
+  });
+}
+
+async function presentProbeError(
+  error: unknown,
+  input: LightweightCommandProbeInput,
+  capture: ReturnType<typeof createBoundedOutputCapture>,
+  ctx: ReturnType<typeof createProbeToolContext>['ctx'],
+): Promise<void> {
+  flushCapturedOutput(capture.stdout, capture.stderr);
+  await handleParseError(error, {
+    setExitCode: ctx.setExitCode,
+    render: renderResult,
+    jsonRequested: input.argv.includes('--json'),
+  });
+}
+
+/**
+ * Parse the canonical Init grammar before inspecting the fixed journal.
+ *
+ * `undefined` means this is not an exact root Init invocation. A boolean has
+ * the same meaning as the public probe: true was handled, false must continue
+ * through normal leased startup. The recovery-only handler can never fall back
+ * to fresh Init if the journal disappears between header inspection and action.
+ */
+async function runInitRecoveryProbe(
+  input: LightweightCommandProbeInput,
+  capture: ReturnType<typeof createBoundedOutputCapture>,
+): Promise<boolean | undefined> {
+  if (findRootOperand(input.argv)?.value !== 'init') return undefined;
+
+  const handle = createProbeToolContext();
+  const commandContext = createInitRecoveryCommandContext(handle);
+  const actionScope = createCommandActionScopeRunner();
+  input.program.hook('preAction', (_thisCommand, actionCommand) => {
+    const selection = resolveStartupProjectSelection(input.argv, input.cwd);
+    const opts = actionCommand.opts();
+    Object.assign(opts, {
+      projectContext: selection.project,
+      cwdExplicit: selection.cwdExplicit,
+    });
+    const header = inspectRuntimePromotionRecoveryHeader(selection.project.projectRoot);
+    if (header.status === 'absent') throw new ContinueToLeasedBootstrap();
+    actionScope.stage(createInitRecoveryScope(selection.project, opts.debug === true));
+  });
+  mountCommandSpec(
+    input.program,
+    buildInitRecoverySpec(commandContext),
+    commandContext,
+    {},
+    actionScope,
+  );
+
+  try {
+    await input.program.parseAsync(input.argv, { from: 'user' });
+    return true;
+  } catch (error) {
+    if (error instanceof ContinueToLeasedBootstrap) return false;
+    await actionScope.runWithOwnedScope(() => presentProbeError(error, input, capture, handle.ctx));
+    return true;
+  } finally {
+    actionScope.disposeStaged();
+  }
+}
+
 /**
  * Return `true` when the trusted probe completely handled this invocation.
  * `false` means the caller must perform the normal leased discovery/dispatch.
@@ -155,6 +291,9 @@ export async function runLightweightCommandProbe(
     writeErr: capture.writeErr,
   });
 
+  const initRecoveryHandled = await runInitRecoveryProbe(input, capture);
+  if (initRecoveryHandled !== undefined) return initRecoveryHandled;
+
   const languages = new LanguageRegistry();
   const tools = new ToolRegistry();
   const { provenance, manifests } = await bootstrapCli({
@@ -167,12 +306,7 @@ export async function runLightweightCommandProbe(
     runtimeMode: input.runtimeMode,
     discoveryMode: 'bundled-surface-only',
   });
-  const { ctx, runActionHooks, getExitCode } = buildToolCliContext({
-    render: renderResult,
-    liveViews: createLiveViewRegistry(logger),
-    maybeOpenReport: executeReportOpen,
-    logger,
-  });
+  const { ctx, runActionHooks, getExitCode } = createProbeToolContext();
   const registrationInput = buildCommandRegistrationInput(tools, {
     provenance,
     cwd: input.cwd,
@@ -217,12 +351,7 @@ export async function runLightweightCommandProbe(
     ) {
       return false;
     }
-    flushCapturedOutput(capture.stdout, capture.stderr);
-    await handleParseError(error, {
-      setExitCode: ctx.setExitCode,
-      render: renderResult,
-      jsonRequested: input.argv.includes('--json'),
-    });
+    await presentProbeError(error, input, capture, ctx);
     return true;
   }
 }

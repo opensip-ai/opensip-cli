@@ -21,7 +21,10 @@ import {
 } from './runtime-promotion-filesystem-io.js';
 import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 
-import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
+import type {
+  RuntimePromotionJournal,
+  RuntimePromotionRootIdentity,
+} from './runtime-promotion-journal-schema.js';
 import type { RuntimePromotionDatastoreCandidate } from './runtime-promotion-preflight-datastore-types.js';
 import type { RuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 
@@ -95,12 +98,28 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function markerRecord(runtimeDir: string): {
+function assertJournalRootIdentity(
+  directory: StablePromotionDirectory,
+  expected: RuntimePromotionRootIdentity | null,
+  description: string,
+): void {
+  if (
+    directory.identity.dev.toString() !== expected?.device ||
+    directory.identity.ino.toString() !== expected?.inode
+  ) {
+    runtimePromotionFilesystemFailure(`${description} was replaced after journal creation`);
+  }
+}
+
+function markerRecord(
+  runtimeDir: string,
+  trustedAnchorDir: string,
+): {
   readonly content: string;
   readonly sha256: string;
 } {
   const observed = readAnchoredRecord({
-    trustedAnchorDir: resolveUserPaths().ephemeralProjectsDir,
+    trustedAnchorDir,
     parentDir: runtimeDir,
     basename: EPHEMERAL_MARKER_FILE,
     maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
@@ -176,6 +195,7 @@ function currentMarkerAuthoritative(
 
 function assertSourceMarkerAuthority(
   runtimeDir: string,
+  trustedAnchorDir: string,
   journal: RuntimePromotionJournal,
   authority: RuntimePromotionProjectRootAuthority,
 ): void {
@@ -184,7 +204,7 @@ function assertSourceMarkerAuthority(
   if (expectedHash === null || cacheKey === null) {
     runtimePromotionFilesystemFailure('the selected cache marker lacks journal authority');
   }
-  const observed = markerRecord(runtimeDir);
+  const observed = markerRecord(runtimeDir, trustedAnchorDir);
   if (observed.sha256 !== expectedHash) {
     runtimePromotionFilesystemFailure('the selected cache marker changed after journal creation');
   }
@@ -229,15 +249,21 @@ function bindSource(
       dependencies,
     );
     const boundRuntimeRoot = runtimeRoot;
-    const assertMarker = (): void =>
-      assertSourceMarkerAuthority(boundRuntimeRoot.path, journal, authority);
-    assertMarker();
+    const assertSourceAuthority = (): void => {
+      assertJournalRootIdentity(
+        boundRuntimeRoot,
+        journal.source.rootIdentity,
+        'the selected cache runtime',
+      );
+      assertSourceMarkerAuthority(boundRuntimeRoot.path, cacheRoot.path, journal, authority);
+    };
+    assertSourceAuthority();
     return {
       candidate,
       runtimeRoot: boundRuntimeRoot,
       ancestors: [cacheRoot],
       databasePath: join(boundRuntimeRoot.path, 'datastore.sqlite'),
-      assertAdditionalAuthority: assertMarker,
+      assertAdditionalAuthority: assertSourceAuthority,
     };
   } catch (error) {
     if (runtimeRoot !== undefined) dependencies.closeStableDirectory(runtimeRoot);
@@ -284,11 +310,20 @@ function bindProjectCandidate(
       'the project runtime',
       dependencies,
     );
+    const boundRuntimeRoot = runtimeRoot;
+    const assertDestinationAuthority = (): void =>
+      assertJournalRootIdentity(
+        boundRuntimeRoot,
+        journal.destinationRootIdentity,
+        'the project runtime',
+      );
+    assertDestinationAuthority();
     return {
       candidate,
-      runtimeRoot,
+      runtimeRoot: boundRuntimeRoot,
       ancestors: [project, authoredRoot],
-      databasePath: join(runtimeRoot.path, 'datastore.sqlite'),
+      databasePath: join(boundRuntimeRoot.path, 'datastore.sqlite'),
+      assertAdditionalAuthority: assertDestinationAuthority,
     };
   } catch (error) {
     if (runtimeRoot !== undefined) dependencies.closeStableDirectory(runtimeRoot);

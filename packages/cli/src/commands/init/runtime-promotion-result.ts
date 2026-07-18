@@ -193,14 +193,14 @@ export function rolledBackResult(input: {
   const strength = proofStrength(input.preflight);
   const authored = authoredResult(input.authored);
   return {
-    status: input.cleanupPending ? 'cleanup-pending' : 'rolled-back',
+    status: 'rolled-back',
     ...(strength === undefined ? {} : { proofStrength: strength }),
     sourcePreserved: input.sourcePreserved,
     sourceRetired: false,
     ...(input.cleanupPending ? { cleanupPending: true } : {}),
     ...(authored === undefined ? {} : { authored }),
     durationMs: promotionDuration(input.startedAt, input.now),
-    reasonCode: input.cleanupPending ? 'cleanup-pending' : 'operation-failed',
+    reasonCode: 'operation-failed',
     nextCommand: 'opensip init',
   };
 }

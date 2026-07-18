@@ -4,11 +4,17 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  acquireRuntimeExclusiveLease,
+  mutateRuntimePromotionJournal,
+  projectCoordinationKey,
+  resolveCoordinationPaths,
+} from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const CLI_DIST = fileURLToPath(new URL('../../dist/index.js', import.meta.url));
@@ -37,6 +43,54 @@ function stageIncompatibleAuthoredTool(home: string): void {
     }),
     'utf8',
   );
+}
+
+function cliEnv(home: string): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    HOME: home,
+    XDG_CACHE_HOME: join(home, 'xdg-cache'),
+    XDG_CONFIG_HOME: join(home, 'xdg-config'),
+    NO_COLOR: '1',
+  };
+}
+
+function runCli(home: string, project: string, argv: readonly string[]) {
+  return spawnSync(process.execPath, [CLI_DIST, ...argv], {
+    cwd: project,
+    encoding: 'utf8',
+    env: cliEnv(home),
+  });
+}
+
+async function stageOpenPromotionHeader(home: string, project: string): Promise<string> {
+  const previousHome = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    const writer = await acquireRuntimeExclusiveLease({ projectDir: project });
+    try {
+      await mutateRuntimePromotionJournal(writer, {
+        operation: 'create',
+        // This is deliberately only a valid bounded header. Recovery must route
+        // before Tool discovery, then fail closed when the full canonical body
+        // is claimed. No test needs to manufacture an owned recovery artifact.
+        content: JSON.stringify({
+          kind: 'init-promotion',
+          version: 1,
+          coordinationKey: writer.coordinationKey,
+          operationId: 'lightweight-init-recovery-probe',
+          state: 'open',
+        }),
+      });
+      return resolveCoordinationPaths().forProject(projectCoordinationKey(project))
+        .promotionJournalFile;
+    } finally {
+      writer.release();
+    }
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+  }
 }
 
 afterEach(() => {
@@ -92,17 +146,7 @@ describe('lightweight trusted command probe', () => {
       const home = temp('opensip-lightweight-probe-home-');
       const project = temp('opensip-lightweight-probe-project-');
       stageIncompatibleAuthoredTool(home);
-      const result = spawnSync(process.execPath, [CLI_DIST, ...argv], {
-        cwd: project,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          HOME: home,
-          XDG_CACHE_HOME: join(home, 'xdg-cache'),
-          XDG_CONFIG_HOME: join(home, 'xdg-config'),
-          NO_COLOR: '1',
-        },
-      });
+      const result = runCli(home, project, argv);
 
       expect(result.status, result.stderr).toBe(exitCode);
       expect(existsSync(join(home, '.opensip-cli-coordination'))).toBe(false);
@@ -121,17 +165,7 @@ describe('lightweight trusted command probe', () => {
     const home = temp('opensip-lightweight-probe-home-');
     const project = temp('opensip-lightweight-probe-project-');
     stageIncompatibleAuthoredTool(home);
-    const result = spawnSync(process.execPath, [CLI_DIST, ...argv], {
-      cwd: project,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        HOME: home,
-        XDG_CACHE_HOME: join(home, 'xdg-cache'),
-        XDG_CONFIG_HOME: join(home, 'xdg-config'),
-        NO_COLOR: '1',
-      },
-    });
+    const result = runCli(home, project, argv);
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('bailout-discovery-trap');
@@ -142,17 +176,7 @@ describe('lightweight trusted command probe', () => {
     const home = temp('opensip-lightweight-probe-home-');
     const project = temp('opensip-lightweight-probe-project-');
     stageIncompatibleAuthoredTool(home);
-    const result = spawnSync(process.execPath, [CLI_DIST, 'agent-catalog', '--json'], {
-      cwd: project,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        HOME: home,
-        XDG_CACHE_HOME: join(home, 'xdg-cache'),
-        XDG_CONFIG_HOME: join(home, 'xdg-config'),
-        NO_COLOR: '1',
-      },
-    });
+    const result = runCli(home, project, ['agent-catalog', '--json']);
 
     expect(result.status, result.stderr).toBe(5);
     const outcome = JSON.parse(result.stdout) as {
@@ -162,5 +186,78 @@ describe('lightweight trusted command probe', () => {
     };
     expect(outcome).toMatchObject({ kind: 'bootstrap.error', status: 'error' });
     expect(outcome.errors[0]?.message).toContain('bailout-discovery-trap');
+  });
+
+  it.each([
+    ['help', ['init', '--help'], 0],
+    ['invalid option', ['init', '--definitely-invalid'], 1],
+    ['invalid recovery policy', ['init', '--runtime-conflict', 'not-a-policy'], 2],
+  ] as const)(
+    'parses Init %s before inspecting or mutating an existing journal',
+    async (_label, argv, exitCode) => {
+      const home = temp('opensip-lightweight-init-parse-home-');
+      const project = temp('opensip-lightweight-init-parse-project-');
+      const journal = await stageOpenPromotionHeader(home, project);
+      const before = readFileSync(journal, 'utf8');
+      stageIncompatibleAuthoredTool(home);
+
+      const result = runCli(home, project, argv);
+
+      expect(result.status, result.stderr).toBe(exitCode);
+      expect(result.stderr).not.toContain('bailout-discovery-trap');
+      expect(readFileSync(journal, 'utf8')).toBe(before);
+    },
+    30_000,
+  );
+
+  it('falls through to protected Tool discovery when the fixed Init journal is absent', () => {
+    const home = temp('opensip-lightweight-init-absent-home-');
+    const project = temp('opensip-lightweight-init-absent-project-');
+    stageIncompatibleAuthoredTool(home);
+
+    const result = runCli(home, project, [
+      'init',
+      '--json',
+      '--language',
+      'typescript',
+      '--cwd',
+      project,
+    ]);
+
+    expect(result.status, result.stderr).toBe(5);
+    expect(result.stdout).toContain('"bootstrap.error"');
+    expect(result.stdout).toContain('bailout-discovery-trap');
+  });
+
+  it('routes journal-bearing Init to bounded recovery without Tool discovery', async () => {
+    const home = temp('opensip-lightweight-init-recovery-home-');
+    const project = temp('opensip-lightweight-init-recovery-project-');
+    await stageOpenPromotionHeader(home, project);
+    stageIncompatibleAuthoredTool(home);
+
+    const result = runCli(home, project, ['init', '--json', '--cwd', project]);
+
+    expect(result.status).not.toBe(5);
+    expect(result.stderr).not.toContain('bailout-discovery-trap');
+    expect(result.stdout).toContain('"runtimeAdoption"');
+    expect(result.stdout).toContain('"recovery-required"');
+  });
+
+  it('fails closed when the fixed-header inspection itself is unsafe', async () => {
+    const home = temp('opensip-lightweight-init-unsafe-home-');
+    const project = temp('opensip-lightweight-init-unsafe-project-');
+    const journal = await stageOpenPromotionHeader(home, project);
+    const before = readFileSync(journal, 'utf8');
+    writeFileSync(join(home, '.opensip-cli-coordination', 'unexpected-entry'), 'unsafe\n', 'utf8');
+    stageIncompatibleAuthoredTool(home);
+
+    const result = runCli(home, project, ['init', '--json', '--cwd', project]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.status).not.toBe(5);
+    expect(result.stderr).not.toContain('bailout-discovery-trap');
+    expect(result.stdout).not.toContain('bailout-discovery-trap');
+    expect(readFileSync(journal, 'utf8')).toBe(before);
+    expect(existsSync(join(project, 'opensip-cli.config.yml'))).toBe(false);
   });
 });

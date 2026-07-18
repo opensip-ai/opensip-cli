@@ -79,6 +79,16 @@ describe('isOptionalToolRecommendationEligible', () => {
       init({ state: 'partial-dir-only' }),
       init({ languages: [] }),
       init({ languages: undefined }),
+      init({
+        runtimeAdoption: {
+          status: 'cleanup-pending',
+          sourcePreserved: false,
+          cleanupPending: true,
+          durationMs: 1,
+          reasonCode: 'cleanup-pending',
+          nextCommand: 'opensip init',
+        },
+      }),
     ]) {
       expect(isOptionalToolRecommendationEligible(candidate)).toBe(false);
     }
@@ -175,6 +185,19 @@ describe('attachOptionalToolRecommendations', () => {
       init({
         created: false,
         ambiguousLanguageError: { detected: ['python', 'go'], message: 'choose a language' },
+      }),
+    ],
+    [
+      'cleanup pending',
+      init({
+        runtimeAdoption: {
+          status: 'cleanup-pending',
+          sourcePreserved: false,
+          cleanupPending: true,
+          durationMs: 1,
+          reasonCode: 'cleanup-pending',
+          nextCommand: 'opensip init',
+        },
       }),
     ],
     ['failure', init({ created: false, state: undefined, languages: undefined })],

@@ -10,7 +10,9 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { isSafeAuthoredPathMode, normalizeAuthoredPathMode } from './authored-path-mode.js';
 import {
+  INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES,
   INIT_AUTHORED_PLAN_CAPS,
   authoredPlanFailure,
   caseFoldPath,
@@ -20,11 +22,13 @@ import {
   normalizeProjectRelativePath,
   sha256Bytes,
 } from './init-authored-plan-types.js';
+import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fallback.js';
 
 import type {
   InitAuthoredSnapshot,
   InitAuthoredSnapshotHooks,
   InitAuthoredSnapshotRecord,
+  InitAuthoredWorkingDirState,
   ReadInitAuthoredSnapshotInput,
 } from './init-authored-plan-types.js';
 import type { BigIntStats } from 'node:fs';
@@ -34,8 +38,8 @@ interface SnapshotBudget {
   bytes: number;
 }
 
-function statMode(stat: BigIntStats): number {
-  return Number(stat.mode & 0o777n);
+function statMode(stat: BigIntStats, type: 'file' | 'directory'): number {
+  return normalizeAuthoredPathMode(stat.mode, type);
 }
 
 function sameStat(left: BigIntStats, right: BigIntStats): boolean {
@@ -60,7 +64,7 @@ function validateSafeStat(stat: BigIntStats, expected: 'file' | 'directory', pat
   const correctType = expected === 'file' ? stat.isFile() : stat.isDirectory();
   if (!correctType) authoredPlanFailure(`${path} is not a ${expected}`);
   if (!safeOwner(stat)) authoredPlanFailure(`${path} is not owned by the current user`);
-  if ((statMode(stat) & 0o022) !== 0) {
+  if (!isSafeAuthoredPathMode(stat.mode)) {
     authoredPlanFailure(`${path} is group/world writable`);
   }
   if (expected === 'file' && stat.nlink !== 1n) {
@@ -68,11 +72,26 @@ function validateSafeStat(stat: BigIntStats, expected: 'file' | 'directory', pat
   }
 }
 
-function openNoFollow(path: string, directory: boolean): number {
+export interface InitAuthoredSnapshotOpenDependencies {
+  readonly platform?: NodeJS.Platform;
+  readonly open?: (path: string, flags: number) => number;
+}
+
+export function openInitAuthoredSnapshotPath(
+  path: string,
+  directory: boolean,
+  dependencies: InitAuthoredSnapshotOpenDependencies = {},
+): number | undefined {
   const flags = constants.O_RDONLY | constants.O_NOFOLLOW | (directory ? constants.O_DIRECTORY : 0);
   try {
-    return openSync(path, flags);
-  } catch {
+    return (dependencies.open ?? openSync)(path, flags);
+  } catch (error) {
+    if (
+      directory &&
+      isWindowsDirectoryHandleFallback(error, dependencies.platform ?? process.platform)
+    ) {
+      return undefined;
+    }
     authoredPlanFailure(`could not safely open ${path}`);
   }
 }
@@ -89,12 +108,14 @@ function stableDirectoryNames(
     authoredPlanFailure(`could not inspect ${relativePath}`);
   }
   validateSafeStat(before, 'directory', relativePath);
-  const descriptor = openNoFollow(absolutePath, true);
-  try {
-    const opened = fstatSync(descriptor, { bigint: true });
-    if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed before listing`);
-  } finally {
-    closeSync(descriptor);
+  const descriptor = openInitAuthoredSnapshotPath(absolutePath, true);
+  if (descriptor !== undefined) {
+    try {
+      const opened = fstatSync(descriptor, { bigint: true });
+      if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed before listing`);
+    } finally {
+      closeSync(descriptor);
+    }
   }
   let names: string[];
   try {
@@ -147,7 +168,8 @@ function readStableFile(
       `snapshot content exceeds ${String(INIT_AUTHORED_PLAN_CAPS.maxAggregateBlobBytes)} bytes`,
     );
   }
-  const descriptor = openNoFollow(absolutePath, false);
+  const descriptor = openInitAuthoredSnapshotPath(absolutePath, false);
+  if (descriptor === undefined) authoredPlanFailure(`could not safely open ${relativePath}`);
   let bytes: Buffer;
   try {
     const opened = fstatSync(descriptor, { bigint: true });
@@ -176,14 +198,14 @@ function readStableFile(
     path: relativePath,
     exists: true,
     type: 'file',
-    mode: statMode(before),
+    mode: statMode(before, 'file'),
     digest: sha256Bytes(bytes),
     contentBase64: bytes.toString('base64'),
   };
 }
 
 function directoryRecord(path: string, stat: BigIntStats): InitAuthoredSnapshotRecord {
-  const mode = statMode(stat);
+  const mode = statMode(stat, 'directory');
   return {
     path,
     exists: true,
@@ -199,12 +221,14 @@ function revalidateDirectory(
   relativePath: string,
   before: BigIntStats,
 ): void {
-  const descriptor = openNoFollow(absolutePath, true);
-  try {
-    const opened = fstatSync(descriptor, { bigint: true });
-    if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed while opening`);
-  } finally {
-    closeSync(descriptor);
+  const descriptor = openInitAuthoredSnapshotPath(absolutePath, true);
+  if (descriptor !== undefined) {
+    try {
+      const opened = fstatSync(descriptor, { bigint: true });
+      if (!sameStat(before, opened)) authoredPlanFailure(`${relativePath} changed while opening`);
+    } finally {
+      closeSync(descriptor);
+    }
   }
   let after: BigIntStats;
   try {
@@ -236,6 +260,37 @@ function inspectExistingPath(
   return directoryRecord(relativePath, stat);
 }
 
+function isOpaqueGeneratedEntry(
+  absolutePath: string,
+  relativePath: string,
+  budget: SnapshotBudget,
+): boolean {
+  const name = relativePath.slice(relativePath.lastIndexOf('/') + 1);
+  if (!(INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES as readonly string[]).includes(name)) return false;
+  let before: BigIntStats;
+  try {
+    before = lstatSync(absolutePath, { bigint: true });
+  } catch {
+    authoredPlanFailure(`could not inspect ${relativePath}`);
+  }
+  if (!before.isDirectory() && !before.isSymbolicLink()) return false;
+  addBudgetEntry(budget);
+  if (!safeOwner(before)) authoredPlanFailure(`${relativePath} is not owned by the current user`);
+  if (before.isDirectory()) {
+    validateSafeStat(before, 'directory', relativePath);
+    revalidateDirectory(absolutePath, relativePath, before);
+    return true;
+  }
+  let after: BigIntStats;
+  try {
+    after = lstatSync(absolutePath, { bigint: true });
+  } catch {
+    authoredPlanFailure(`${relativePath} disappeared while planning`);
+  }
+  if (!sameStat(before, after)) authoredPlanFailure(`${relativePath} changed while planning`);
+  return true;
+}
+
 function addRecord(
   records: Map<string, InitAuthoredSnapshotRecord>,
   folded: Map<string, string>,
@@ -258,6 +313,7 @@ function walkAuthoredTree(
   records: Map<string, InitAuthoredSnapshotRecord>,
   folded: Map<string, string>,
   budget: SnapshotBudget,
+  opaquePaths: Set<string>,
   hooks: InitAuthoredSnapshotHooks | undefined,
 ): void {
   const visit = (relativePath: string): void => {
@@ -291,6 +347,16 @@ function walkAuthoredTree(
         }
         continue;
       }
+      if (
+        isOpaqueGeneratedEntry(
+          join(root, ...child.split('/')),
+          normalizeProjectRelativePath(child),
+          budget,
+        )
+      ) {
+        opaquePaths.add(normalizeProjectRelativePath(child));
+        continue;
+      }
       visit(normalizeProjectRelativePath(child));
     }
   };
@@ -303,6 +369,24 @@ function walkAuthoredTree(
     authoredPlanFailure('could not inspect opensip-cli');
   }
   visit('opensip-cli');
+}
+
+function snapshotWorkingDirState(
+  records: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
+  opaquePaths: ReadonlySet<string>,
+): InitAuthoredWorkingDirState {
+  const hasConfig = records.get('opensip-cli.config.yml')?.exists === true;
+  const hasAuthoredDirectoryContent =
+    opaquePaths.size > 0 ||
+    [...records.values()].some(
+      (record) =>
+        record.exists &&
+        record.path.startsWith('opensip-cli/') &&
+        !isRuntimeAuthoredPath(record.path),
+    );
+  if (!hasConfig && !hasAuthoredDirectoryContent) return 'pristine';
+  if (hasConfig && hasAuthoredDirectoryContent) return 'fully-initialized';
+  return hasConfig ? 'partial-config-only' : 'partial-dir-only';
 }
 
 function observeTarget(
@@ -371,8 +455,9 @@ export function readInitAuthoredSnapshot(
 
   const records = new Map<string, InitAuthoredSnapshotRecord>();
   const folded = new Map<string, string>();
+  const opaquePaths = new Set<string>();
   const budget: SnapshotBudget = { entries: 0, bytes: 0 };
-  walkAuthoredTree(root, records, folded, budget, input.hooks);
+  walkAuthoredTree(root, records, folded, budget, opaquePaths, input.hooks);
   const targets = [...new Set(input.targetPaths.map(normalizeProjectRelativePath))].sort(
     compareUtf8,
   );
@@ -386,5 +471,7 @@ export function readInitAuthoredSnapshot(
     records: Object.freeze(
       [...records.values()].sort((left, right) => compareUtf8(left.path, right.path)),
     ),
+    opaquePaths: Object.freeze([...opaquePaths].sort(compareUtf8)),
+    workingDirState: snapshotWorkingDirState(records, opaquePaths),
   };
 }

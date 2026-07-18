@@ -7,12 +7,17 @@ import {
   runtimeManifestIdentityEqual,
 } from './runtime-manifest.js';
 import {
+  assertRuntimePromotionDestinationRootAuthority,
+  withRuntimePromotionDestinationRootAuthority,
+} from './runtime-promotion-destination-authority.js';
+import {
   consumeRuntimePromotionFilesystemAuthority,
   openCapabilityDirectory,
 } from './runtime-promotion-filesystem-authority.js';
 import { removeBoundedOwnedTree } from './runtime-promotion-filesystem-cleanup-io.js';
 import {
   assertPromotionRootIdentity,
+  assertStablePromotionDirectory,
   capturePromotionRootIdentity,
   classifyRuntimePromotionPath,
   closeStablePromotionDirectory,
@@ -118,6 +123,8 @@ function removeCreatedParentStage(
     slot: 'runtimeStage',
     expected,
     verifyBefore: () => verifyCompleteStage(state, expected),
+    revalidateBeforeMutation: () =>
+      assertStablePromotionDirectory(parent, 'the rollback stage cleanup parent'),
   });
 }
 
@@ -291,8 +298,11 @@ function restoreDestinationBackup(
     runtimePromotionFilesystemFailure('both rollback backup and destination are present');
   }
   if (backup === 'directory') {
+    assertRuntimePromotionDestinationRootAuthority(state.paths.destinationBackup, state.journal);
     const owner = verifyBackupOwner(state, parent, expected);
-    inspectExactRuntimeManifest(state.paths.destinationBackup, PROJECT_RUNTIME_POSTURE, expected);
+    withRuntimePromotionDestinationRootAuthority(state.paths.destinationBackup, state.journal, () =>
+      inspectExactRuntimeManifest(state.paths.destinationBackup, PROJECT_RUNTIME_POSTURE, expected),
+    );
     renamePromotionEntry(
       parent,
       state.paths.destinationBackup,
@@ -300,6 +310,10 @@ function restoreDestinationBackup(
       state.dependencies,
       'destination-backup-restore',
       () => {
+        assertRuntimePromotionDestinationRootAuthority(
+          state.paths.destinationBackup,
+          state.journal,
+        );
         assertPromotionRootIdentity(state.paths.destinationBackup, owner.rootIdentity);
         inspectExactRuntimeManifest(
           state.paths.destinationBackup,
@@ -308,6 +322,7 @@ function restoreDestinationBackup(
         );
       },
     );
+    assertRuntimePromotionDestinationRootAuthority(state.paths.destinationRuntime, state.journal);
     const restored = inspectExactRuntimeManifest(
       state.paths.destinationRuntime,
       PROJECT_RUNTIME_POSTURE,
@@ -333,10 +348,15 @@ function restoreDestinationBackup(
     return { restored, changed: true };
   }
   if (destination === 'directory') {
-    const restored = inspectExactRuntimeManifest(
+    const restored = withRuntimePromotionDestinationRootAuthority(
       state.paths.destinationRuntime,
-      PROJECT_RUNTIME_POSTURE,
-      expected,
+      state.journal,
+      () =>
+        inspectExactRuntimeManifest(
+          state.paths.destinationRuntime,
+          PROJECT_RUNTIME_POSTURE,
+          expected,
+        ),
     );
     const owner = inspectBoundOwnedMarker(
       state.paths.destinationBackupMarker,

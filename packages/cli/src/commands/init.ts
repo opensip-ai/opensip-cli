@@ -83,88 +83,113 @@
  */
 
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { resolveProjectPaths, type ProjectContext, type ProjectPaths } from '@opensip-cli/core';
+import {
+  inspectRuntimePromotionRecoveryHeader,
+  resolveProjectPaths,
+  type ProjectContext,
+} from '@opensip-cli/core';
 
 import { classifyFiles } from './init/file-classifier.js';
-import { resolveLanguages } from './init/language-detection.js';
-import { runRefresh, runScaffold } from './init/scaffold-writer.js';
+import { createInitAuthoredPlan } from './init/init-authored-plan.js';
+import {
+  ALL_LANGUAGES,
+  resolveLanguages,
+  type SupportedLanguage,
+} from './init/language-detection.js';
+import { recoverRuntimePromotion } from './init/runtime-promotion-recovery.js';
+import { runFreshRuntimePromotion } from './init/runtime-promotion.js';
 import { buildPartialStateMessage, classifyWorkingDir } from './init/state-machine.js';
 
+import type { InitAuthoredMode, InitAuthoredPlan } from './init/init-authored-plan.js';
+import type { RuntimePromotionRecoveryDependencies } from './init/runtime-promotion-recovery.js';
+import type { RuntimePromotionDependencies } from './init/runtime-promotion.js';
 import type { ToolScaffold } from './shared.js';
-import type { InitOptions, InitResult } from '@opensip-cli/contracts';
+import type {
+  AgentGuidanceResult,
+  InitOptions,
+  InitResult,
+  RuntimeAdoptionResult,
+} from '@opensip-cli/contracts';
+import type { DataStoreLockContext } from '@opensip-cli/datastore';
 
-type ExecuteInitArgs = InitOptions & {
+interface ExecuteInitBaseArgs extends InitOptions {
   projectContext?: ProjectContext;
   cwdExplicit?: boolean;
+  datastoreLockContext: DataStoreLockContext;
+}
+
+type ExecuteInitArgs = ExecuteInitBaseArgs & {
   toolScaffolds: readonly ToolScaffold[];
 };
 
 type BaseInitResult = Pick<InitResult, 'type' | 'path' | 'cwd' | 'configFilename'>;
 
-function maybeRunConfigRefresh(
-  args: ExecuteInitArgs,
-  inputs: {
-    readonly paths: ProjectPaths;
-    readonly baseResult: BaseInitResult;
-    readonly state: ReturnType<typeof classifyWorkingDir>;
-    readonly keep: boolean;
-    readonly remove: boolean;
-  },
-): InitResult | undefined {
-  const { paths, baseResult, state, keep, remove } = inputs;
-  if (keep || remove) return undefined;
-  if (state !== 'fully-initialized' && state !== 'partial-config-only') return undefined;
-
-  const languageExplicit = args.language !== undefined && args.language.length > 0;
-  const resolution = resolveLanguages(args.cwd, args.language);
-  if (!resolution.ok && languageExplicit) {
-    return {
-      ...baseResult,
-      created: false,
-      ambiguousLanguageError: resolution.error,
+type FreshInitAttempt =
+  | {
+      readonly ok: true;
+      readonly state: ReturnType<typeof classifyWorkingDir>;
+      readonly languages: readonly SupportedLanguage[];
+      readonly mode: InitAuthoredMode;
+    }
+  | {
+      readonly ok: false;
+      readonly result: InitResult;
     };
-  }
 
-  const languages = resolution.ok ? resolution.languages : undefined;
-  const preExistingFiles =
-    languages === undefined ? [] : classifyFiles(paths, languages, args.toolScaffolds);
-  return runRefresh(
-    {
-      cwd: args.cwd,
-      state,
-      ...(languages === undefined ? {} : { languages }),
-      preExistingFiles,
-      toolScaffolds: args.toolScaffolds,
-    },
-    baseResult,
-  );
+const APPLIED_ADOPTION_STATUSES = new Set<RuntimeAdoptionResult['status']>([
+  'not-found',
+  'promoted',
+  'already-project',
+  'deduplicated',
+  'kept-project',
+  'cleanup-pending',
+]);
+
+class InitAttemptResolutionError extends Error {
+  constructor(readonly result: InitResult) {
+    super('Init attempt inputs changed while waiting for exclusive authority');
+    this.name = 'InitAttemptResolutionError';
+  }
 }
 
-/**
- * Run init for the given args. Returns an InitResult — the caller
- * (CLI render layer) prints it.
- */
-export function executeInit(args: ExecuteInitArgs): InitResult {
-  const requestedCwd = args.cwd;
-  const project = args.projectContext;
-  // cwd is a discovery start, not an exact scaffold destination. Bootstrap's
-  // canonical project root remains authoritative for initialized and
-  // uninitialized projects alike, including explicit nested --cwd calls.
-  const cwd = project?.projectRoot ?? requestedCwd;
-  const targetArgs = cwd === args.cwd ? args : { ...args, cwd };
-  const keep = args.keep === true;
-  const remove = args.remove === true;
+function canonicalLanguages(languages: readonly SupportedLanguage[]): SupportedLanguage[] {
+  const selected = new Set<SupportedLanguage>(languages);
+  return ALL_LANGUAGES.filter((language) => selected.has(language));
+}
+
+function explicitLanguageResolution(
+  cwd: string,
+  language: readonly string[] | undefined,
+):
+  | { readonly ok: true; readonly languages?: readonly SupportedLanguage[] }
+  | {
+      readonly ok: false;
+      readonly error: NonNullable<InitResult['ambiguousLanguageError']>;
+    } {
+  if (language === undefined || language.length === 0) return { ok: true };
+  const resolution = resolveLanguages(cwd, language);
+  return resolution.ok
+    ? { ok: true, languages: canonicalLanguages(resolution.languages) }
+    : { ok: false, error: resolution.error };
+}
+
+function baseInitResult(cwd: string): BaseInitResult {
   const paths = resolveProjectPaths(cwd);
-  const baseResult = {
-    type: 'init' as const,
+  return {
+    type: 'init',
     path: paths.configFile,
     cwd,
     configFilename: 'opensip-cli.config.yml',
   };
+}
 
-  // Mutex: --keep and --remove are mutually exclusive.
-  if (keep && remove) {
+function invalidInitInput(
+  args: ExecuteInitBaseArgs,
+  baseResult: BaseInitResult,
+): InitResult | undefined {
+  if (args.keep === true && args.remove === true) {
     return {
       ...baseResult,
       created: false,
@@ -175,114 +200,371 @@ export function executeInit(args: ExecuteInitArgs): InitResult {
       },
     };
   }
-
-  if (!existsSync(requestedCwd)) {
-    // A non-existent target directory is a user error, not a "pristine
-    // success". Surface it through `ambiguousLanguageError` (which the
-    // register-init layer already maps to CONFIGURATION_ERROR / exit 2)
-    // so `opensip init --cwd /nonexistent` returns a nonzero exit
-    // code with a clear message instead of silently exiting 0.
+  if (!existsSync(args.cwd)) {
     return {
       ...baseResult,
       created: false,
       ambiguousLanguageError: {
         detected: [],
-        message: `Target directory does not exist: ${requestedCwd}`,
+        message: `Target directory does not exist: ${args.cwd}`,
       },
     };
   }
+  return undefined;
+}
 
-  const state = classifyWorkingDir(paths);
-
-  // Config-present projects are already configured. A plain repeat init
-  // refreshes managed guidance and runtime ignores without rewriting config or
-  // scaffold examples. If the user explicitly supplied --language, still
-  // validate it so bad flags fail loud.
-  const refreshResult = maybeRunConfigRefresh(targetArgs, {
-    paths,
-    baseResult,
-    state,
-    keep,
-    remove,
-  });
-  if (refreshResult !== undefined) return refreshResult;
-
-  const resolution = resolveLanguages(cwd, targetArgs.language);
+function resolveFreshInitAttempt(input: {
+  readonly args: ExecuteInitArgs;
+  readonly baseResult: BaseInitResult;
+  readonly cwd: string;
+  readonly paths: ReturnType<typeof resolveProjectPaths>;
+}): FreshInitAttempt {
+  const state = classifyWorkingDir(input.paths);
+  const languageExplicit = input.args.language !== undefined && input.args.language.length > 0;
+  const mode = authoredModeFor(state, input.args);
+  const resolution =
+    mode === 'refresh' && !languageExplicit
+      ? ({ ok: true, languages: [] } as const)
+      : resolveLanguages(input.cwd, input.args.language);
   if (!resolution.ok) {
     return {
-      ...baseResult,
-      created: false,
-      ambiguousLanguageError: resolution.error,
+      ok: false,
+      result: {
+        ...input.baseResult,
+        created: false,
+        ambiguousLanguageError: resolution.error,
+      },
     };
   }
-  const { languages } = resolution;
-
-  const preExistingFiles =
-    state === 'pristine' ? [] : classifyFiles(paths, languages, args.toolScaffolds);
-
-  // Pristine: scaffold and exit. No flag interaction needed.
-  if (state === 'pristine') {
-    return runScaffold(
-      {
-        paths,
-        languages,
-        cwd,
+  const languages = canonicalLanguages(resolution.languages);
+  if (state === 'partial-dir-only' && explicitAuthoredMode(input.args) === undefined) {
+    const preExistingFiles = classifyFiles(input.paths, languages, input.args.toolScaffolds);
+    return {
+      ok: false,
+      result: {
+        ...input.baseResult,
+        created: false,
         state,
-        preExistingFiles: [],
-        removeFirst: false,
-        keepCustom: false,
-        toolScaffolds: args.toolScaffolds,
+        languages,
+        preExistingFiles,
+        partialStateError: {
+          state,
+          preExistingFiles,
+          message: buildPartialStateMessage(state, preExistingFiles, input.cwd),
+        },
       },
-      baseResult,
-    );
+    };
   }
+  return { ok: true, state, languages, mode };
+}
 
-  // Non-pristine without an explicit flag: only dir-without-config remains an
-  // unsafe partial state. Config-present states refresh above.
-  if (!keep && !remove) {
+function explicitAuthoredMode(
+  args: Pick<ExecuteInitBaseArgs, 'keep' | 'remove'>,
+): 'keep' | 'remove' | undefined {
+  if (args.keep === true) return 'keep';
+  if (args.remove === true) return 'remove';
+  return undefined;
+}
+
+function authoredModeFor(
+  state: ReturnType<typeof classifyWorkingDir>,
+  args: Pick<ExecuteInitBaseArgs, 'keep' | 'remove'>,
+): InitAuthoredMode {
+  return (
+    explicitAuthoredMode(args) ??
+    (state === 'fully-initialized' || state === 'partial-config-only' ? 'refresh' : 'fresh')
+  );
+}
+
+function createdFilesFromPlan(projectRoot: string, plan: InitAuthoredPlan): readonly string[] {
+  return plan.mutations
+    .filter(
+      (mutation) =>
+        mutation.targetType === 'file' &&
+        (mutation.action === 'create' || mutation.action === 'replace') &&
+        (mutation.path === 'opensip-cli.config.yml' ||
+          (mutation.path.startsWith('opensip-cli/') &&
+            !mutation.path.startsWith('opensip-cli/.runtime/'))),
+    )
+    .map((mutation) => join(projectRoot, mutation.path));
+}
+
+function guidanceFromPlan(plan: InitAuthoredPlan): AgentGuidanceResult | undefined {
+  return plan.presentation?.agentGuidance;
+}
+
+function authoredStateChangedResult(input: {
+  readonly baseResult: BaseInitResult;
+  readonly plan: InitAuthoredPlan;
+  readonly languages: readonly SupportedLanguage[];
+}): InitResult {
+  const state = input.plan.presentation?.workingDirState ?? 'partial-dir-only';
+  const preExistingFiles = input.plan.presentation?.preExistingFiles ?? [];
+  return {
+    ...input.baseResult,
+    created: false,
+    state,
+    ...(input.languages.length === 0 ? {} : { languages: input.languages }),
+    preExistingFiles,
+    authoredStateChangedError: {
+      observedState: state,
+      message:
+        'Init-authored files changed while OpenSIP was planning this operation. No files were changed; retry opensip init.',
+    },
+  };
+}
+
+function adoptionApplied(adoption: RuntimeAdoptionResult): boolean {
+  return APPLIED_ADOPTION_STATUSES.has(adoption.status);
+}
+
+function recoveredPreAttemptState(
+  mode: InitAuthoredMode,
+): NonNullable<InitResult['state']> | undefined {
+  // `fresh` is selected only for a pristine project. The other authored modes
+  // can begin from more than one state, and the v1 durable journal intentionally
+  // does not serialize that presentation-only value. Do not misreport the
+  // post-commit filesystem classification as the state at Init time.
+  return mode === 'fresh' ? 'pristine' : undefined;
+}
+
+function explicitRecoveryRequest(
+  args: ExecuteInitBaseArgs,
+  languages: readonly SupportedLanguage[] | undefined,
+):
+  | Record<string, never>
+  | {
+      readonly explicit: {
+        readonly languages?: readonly SupportedLanguage[];
+        readonly authoredMode?: ReturnType<typeof explicitAuthoredMode>;
+        readonly conflict?: NonNullable<InitOptions['runtimeConflict']>;
+      };
+    } {
+  const authoredMode = explicitAuthoredMode(args);
+  if (languages === undefined && authoredMode === undefined && args.runtimeConflict === undefined) {
+    return {};
+  }
+  return {
+    explicit: {
+      ...(languages === undefined ? {} : { languages }),
+      ...(authoredMode === undefined ? {} : { authoredMode }),
+      ...(args.runtimeConflict === undefined ? {} : { conflict: args.runtimeConflict }),
+    },
+  };
+}
+
+function recoveryResultLanguages(
+  recorded: { readonly languages: readonly SupportedLanguage[] } | undefined,
+  explicit: readonly SupportedLanguage[] | undefined,
+): readonly SupportedLanguage[] | undefined {
+  if (recorded !== undefined) {
+    return recorded.languages.length === 0 ? undefined : recorded.languages;
+  }
+  return explicit;
+}
+
+function resultFromFreshAdoption(input: {
+  readonly baseResult: BaseInitResult;
+  readonly state: ReturnType<typeof classifyWorkingDir>;
+  readonly languages: readonly SupportedLanguage[];
+  readonly mode: InitAuthoredMode;
+  readonly adoption: RuntimeAdoptionResult;
+  readonly plan?: InitAuthoredPlan;
+}): InitResult {
+  const applied = adoptionApplied(input.adoption);
+  const presentation = input.plan?.presentation;
+  const agentGuidance = input.plan === undefined ? undefined : guidanceFromPlan(input.plan);
+  const createdFiles =
+    applied && input.plan !== undefined
+      ? createdFilesFromPlan(input.baseResult.cwd, input.plan)
+      : [];
+  const gitignoreUpdated =
+    applied &&
+    input.plan?.mutations.some(
+      (mutation) =>
+        mutation.path === '.gitignore' &&
+        (mutation.action === 'create' || mutation.action === 'replace'),
+    );
+  const agentsMdCreated =
+    applied &&
+    input.plan?.mutations.some(
+      (mutation) => mutation.path === 'AGENTS.md' && mutation.action === 'create',
+    );
+  return {
+    ...input.baseResult,
+    created: applied && input.mode !== 'refresh',
+    ...(applied && input.mode === 'refresh' ? { refreshed: true } : {}),
+    state: input.state,
+    ...(input.languages.length === 0 ? {} : { languages: input.languages }),
+    createdFiles,
+    gitignoreUpdated,
+    ...(applied && agentGuidance !== undefined ? { agentGuidance } : {}),
+    ...(applied && agentsMdCreated !== undefined ? { agentsMdCreated } : {}),
+    preExistingFiles: presentation?.preExistingFiles ?? [],
+    runtimeAdoption: input.adoption,
+  };
+}
+
+async function recoveryResult(
+  args: ExecuteInitBaseArgs,
+  baseResult: BaseInitResult,
+  dependencyOverrides: Partial<RuntimePromotionRecoveryDependencies> = {},
+): Promise<InitResult> {
+  const header = inspectRuntimePromotionRecoveryHeader(baseResult.cwd);
+  const explicit =
+    header.status === 'valid'
+      ? explicitLanguageResolution(baseResult.cwd, args.language)
+      : ({ ok: true } as const);
+  if (!explicit.ok) {
     return {
       ...baseResult,
       created: false,
-      state,
-      languages,
-      preExistingFiles,
-      partialStateError: {
-        state,
-        preExistingFiles,
-        message: buildPartialStateMessage(state, preExistingFiles, cwd),
-      },
+      ambiguousLanguageError: explicit.error,
     };
   }
-
-  // --remove: blow away the dir, then scaffold from zero.
-  if (remove) {
-    return runScaffold(
-      {
-        paths,
-        languages,
-        cwd,
-        state,
-        preExistingFiles,
-        removeFirst: true,
-        keepCustom: false,
-        toolScaffolds: args.toolScaffolds,
+  let recorded:
+    | {
+        readonly languages: readonly SupportedLanguage[];
+        readonly mode: InitAuthoredMode;
+      }
+    | undefined;
+  const runtimeAdoption = await recoverRuntimePromotion(
+    {
+      projectRoot: baseResult.cwd,
+      datastoreLockContext: args.datastoreLockContext,
+      ...explicitRecoveryRequest(args, explicit.languages),
+    },
+    {
+      ...dependencyOverrides,
+      onJournal: (journal) => {
+        dependencyOverrides.onJournal?.(journal);
+        recorded = {
+          languages: journal.inputs.languages,
+          mode: journal.inputs.authoredMode,
+        };
       },
-      baseResult,
-    );
+    },
+  );
+  const successfulRecorded = adoptionApplied(runtimeAdoption) ? recorded : undefined;
+  const state =
+    successfulRecorded === undefined
+      ? undefined
+      : recoveredPreAttemptState(successfulRecorded.mode);
+  const languages = recoveryResultLanguages(successfulRecorded, explicit.languages);
+  return {
+    ...baseResult,
+    created: successfulRecorded !== undefined && successfulRecorded.mode !== 'refresh',
+    ...(successfulRecorded?.mode === 'refresh' ? { refreshed: true } : {}),
+    ...(state === undefined ? {} : { state }),
+    ...(languages === undefined ? {} : { languages }),
+    runtimeAdoption,
+  };
+}
+
+/**
+ * Run init for the given args. Returns an InitResult — the caller
+ * (CLI render layer) prints it.
+ */
+export async function executeInit(
+  args: ExecuteInitArgs,
+  dependencyOverrides: Partial<RuntimePromotionDependencies> = {},
+): Promise<InitResult> {
+  const requestedCwd = args.cwd;
+  const project = args.projectContext;
+  // cwd is a discovery start, not an exact scaffold destination. Bootstrap's
+  // canonical project root remains authoritative for initialized and
+  // uninitialized projects alike, including explicit nested --cwd calls.
+  const cwd = project?.projectRoot ?? requestedCwd;
+  const targetArgs = cwd === args.cwd ? args : { ...args, cwd };
+  const paths = resolveProjectPaths(cwd);
+  const baseResult = baseInitResult(cwd);
+  const invalid = invalidInitInput({ ...targetArgs, cwd: requestedCwd }, baseResult);
+  if (invalid !== undefined) return invalid;
+
+  const header = inspectRuntimePromotionRecoveryHeader(cwd);
+  if (header.status !== 'absent') {
+    return recoveryResult(targetArgs, baseResult);
   }
 
-  // --keep: re-scaffold examples; preserve existing config plus custom/stale files.
-  return runScaffold(
-    {
-      paths,
-      languages,
-      cwd,
-      state,
-      preExistingFiles,
-      removeFirst: false,
-      keepCustom: true,
-      toolScaffolds: args.toolScaffolds,
-    },
+  const languageExplicit = targetArgs.language !== undefined && targetArgs.language.length > 0;
+  let attempt = resolveFreshInitAttempt({
+    args: targetArgs,
     baseResult,
-  );
+    cwd,
+    paths,
+  });
+  if (!attempt.ok) return attempt.result;
+  let plan: InitAuthoredPlan | undefined;
+  let adoption: RuntimeAdoptionResult;
+  const createPlan = dependencyOverrides.createPlan ?? createInitAuthoredPlan;
+  try {
+    adoption = await runFreshRuntimePromotion(
+      {
+        projectRoot: cwd,
+        languages: attempt.languages,
+        languageExplicit,
+        authoredMode: attempt.mode,
+        toolScaffolds: args.toolScaffolds,
+        datastoreLockContext: args.datastoreLockContext,
+        ...(args.runtimeConflict === undefined ? {} : { conflict: args.runtimeConflict }),
+      },
+      {
+        ...dependencyOverrides,
+        createPlan: () => {
+          const current = resolveFreshInitAttempt({
+            args: targetArgs,
+            baseResult,
+            cwd,
+            paths,
+          });
+          if (!current.ok) throw new InitAttemptResolutionError(current.result);
+          attempt = current;
+          plan = createPlan({
+            projectRoot: cwd,
+            languages: current.languages,
+            mode: current.mode,
+            toolScaffolds: args.toolScaffolds,
+          });
+          const snapshotState = plan.presentation?.workingDirState;
+          if (snapshotState !== undefined && snapshotState !== current.state) {
+            throw new InitAttemptResolutionError(
+              authoredStateChangedResult({
+                baseResult,
+                plan,
+                languages: current.languages,
+              }),
+            );
+          }
+          return plan;
+        },
+      },
+    );
+  } catch (error) {
+    if (error instanceof InitAttemptResolutionError) return error.result;
+    throw error;
+  }
+  return resultFromFreshAdoption({
+    baseResult,
+    state: attempt.state,
+    languages: attempt.languages,
+    mode: attempt.mode,
+    adoption,
+    ...(plan === undefined ? {} : { plan }),
+  });
+}
+
+/**
+ * Recovery-only Init entry used before Tool discovery. It can never fall back
+ * to a fresh operation if the fixed journal disappears between probe and
+ * action.
+ */
+export async function executeInitRecovery(
+  args: ExecuteInitBaseArgs,
+  dependencyOverrides: Partial<RuntimePromotionRecoveryDependencies> = {},
+): Promise<InitResult> {
+  const cwd = args.projectContext?.projectRoot ?? args.cwd;
+  const baseResult = baseInitResult(cwd);
+  const invalid = invalidInitInput(args, baseResult);
+  if (invalid !== undefined) return invalid;
+  return recoveryResult({ ...args, cwd }, baseResult, dependencyOverrides);
 }

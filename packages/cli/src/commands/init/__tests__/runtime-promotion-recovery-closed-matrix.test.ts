@@ -26,6 +26,7 @@ import {
   recordOpenIntent,
   recordOpenPostcondition,
 } from '../authored-state-transaction-journal.js';
+import { capturePromotionRootIdentity } from '../runtime-promotion-filesystem-io.js';
 import {
   createInitialRuntimePromotionJournal,
   createRuntimePromotionOwnedSlots,
@@ -207,11 +208,15 @@ function controllerFor(
 }
 
 function source() {
+  const runtime = currentCacheRuntime();
   return {
     classification: 'generation-bound' as const,
     cacheKey: SOURCE_CACHE_KEY,
     generationDigest: SOURCE_GENERATION,
     markerSha256: HISTORICAL_MARKER_SHA,
+    rootIdentity: existsSync(runtime)
+      ? capturePromotionRootIdentity(runtime)
+      : { device: '1', inode: '2' },
   };
 }
 
@@ -228,6 +233,7 @@ function allocateJournal(
       route,
       destinationParentPreexisting: destinationPreexisting,
       destinationRuntimePreexisting: destinationPreexisting,
+      destinationRootIdentity: destinationPreexisting ? { device: '1', inode: '2' } : null,
       source:
         route === 'promote-cache'
           ? source()
@@ -236,6 +242,7 @@ function allocateJournal(
               cacheKey: null,
               generationDigest: null,
               markerSha256: null,
+              rootIdentity: null,
             },
       inputs: {
         conflict: route === 'promote-cache' ? 'use-cache' : 'abort',
@@ -649,8 +656,8 @@ describe('closed runtime promotion recovery matrix', () => {
   it.each(['project', 'cache', 'none'] as const)(
     'accepts the current %s authority by canonical location and directory type',
     async (authority) => {
-      const fixture = await createAuthorityFixture(authority);
       materializeCurrentAuthority(authority);
+      const fixture = await createAuthorityFixture(authority);
       const harness = createRecoveryHarness(fixture);
 
       await expect(harness.run()).resolves.toMatchObject({
@@ -663,8 +670,8 @@ describe('closed runtime promotion recovery matrix', () => {
   );
 
   it('accepts changed cache bytes and marker bytes after the closed receipt became history', async () => {
-    const fixture = await createAuthorityFixture('cache');
     materializeCurrentAuthority('cache');
+    const fixture = await createAuthorityFixture('cache');
     const markerPath = join(currentCacheRuntime(), EPHEMERAL_MARKER_FILE);
     expect(readFileSync(markerPath, 'utf8')).not.toContain(HISTORICAL_MARKER_SHA);
     const harness = createRecoveryHarness(fixture);
@@ -681,24 +688,36 @@ describe('closed runtime promotion recovery matrix', () => {
   it.each(['project', 'cache'] as const)(
     'preserves a closed receipt when the current %s authority is not a directory',
     async (authority) => {
+      if (authority === 'cache') ensureDirectory(currentCacheRuntime());
       const fixture = await createAuthorityFixture(authority);
       const runtime = authority === 'project' ? currentProjectRuntime() : currentCacheRuntime();
+      if (existsSync(runtime)) rmSync(runtime, { recursive: true });
       writePrivateFile(runtime, 'not-a-directory');
       const harness = createRecoveryHarness(fixture);
 
       await expect(harness.run()).resolves.toMatchObject({
-        status: 'cleanup-pending',
+        status: 'rolled-back',
         cleanupPending: true,
+        reasonCode: 'operation-failed',
       });
       expect(storedJournal(fixture.store).state).toBe('closed');
       expect(readFileSync(runtime, 'utf8')).toBe('not-a-directory');
 
       rmSync(runtime);
       ensureDirectory(runtime);
-      await expect(harness.run()).resolves.toMatchObject({
-        status: 'rolled-back',
-      });
-      expect(fixture.store.content).toBeUndefined();
+      if (authority === 'cache') {
+        await expect(harness.run()).resolves.toMatchObject({
+          status: 'rolled-back',
+          cleanupPending: true,
+          reasonCode: 'operation-failed',
+        });
+        expect(storedJournal(fixture.store).state).toBe('closed');
+      } else {
+        await expect(harness.run()).resolves.toMatchObject({
+          status: 'rolled-back',
+        });
+        expect(fixture.store.content).toBeUndefined();
+      }
     },
   );
 
@@ -810,8 +829,9 @@ describe('closed runtime promotion recovery matrix', () => {
       const first = await interrupted.run();
       if (faultAt === 'before-journal-unlink') {
         expect(first).toMatchObject({
-          status: 'cleanup-pending',
+          status: 'rolled-back',
           cleanupPending: true,
+          reasonCode: 'operation-failed',
         });
         expect(storedJournal(fixture.store).state).toBe('closed');
         const resumed = createRecoveryHarness(fixture);
@@ -851,7 +871,8 @@ describe('closed runtime promotion recovery matrix', () => {
         await expect(interrupted.run()).rejects.toThrow(`fault at ${faultAt}`);
       } else {
         await expect(interrupted.run()).resolves.toMatchObject({
-          status: faultAt === 'after-lease-acquired' ? 'recovery-required' : 'cleanup-pending',
+          status: faultAt === 'after-lease-acquired' ? 'recovery-required' : 'rolled-back',
+          ...(faultAt === 'after-lease-acquired' ? {} : { cleanupPending: true }),
         });
       }
       expect(storedJournal(fixture.store)).toMatchObject({

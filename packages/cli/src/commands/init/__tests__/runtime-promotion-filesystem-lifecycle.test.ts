@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -200,7 +201,7 @@ describe('forward filesystem lifecycle', () => {
       );
 
       await expect(backupRuntimePromotionDestination(retry, expected.identity)).rejects.toThrow(
-        /owner is absent or foreign/u,
+        /replaced after journal creation/u,
       );
       expect(existsSync(paths.backup)).toBe(true);
       expect(readFileSync(join(paths.backup, 'evidence.txt'), 'utf8')).toBe('project-before');
@@ -265,6 +266,7 @@ describe('forward filesystem lifecycle', () => {
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(source),
       },
       sourceManifest: expected.identity,
       stageManifest: expected.identity,
@@ -294,6 +296,116 @@ describe('forward filesystem lifecycle', () => {
     });
   });
 
+  it('preserves a byte-identical source replacement instead of binding and retiring it', async () => {
+    const cacheKey = '4'.repeat(24);
+    const cacheParent = makePrivateDirectory(resolveUserPaths().ephemeralProjectsDir);
+    const source = makePrivateDirectory(join(cacheParent, cacheKey));
+    writePrivateFile(join(source, 'evidence.txt'), 'same-bytes');
+    const sourceRootIdentity = capturePromotionRootIdentity(source);
+    const expected = verifiedRuntime(source, 'cache-source');
+    const replacement = makePrivateDirectory(join(cacheParent, 'source-replacement'));
+    writePrivateFile(join(replacement, 'evidence.txt'), 'same-bytes');
+    expect(capturePromotionRootIdentity(replacement)).not.toEqual(sourceRootIdentity);
+    expect(verifiedRuntime(replacement, 'cache-source').identity).toEqual(expected.identity);
+    const destination = makePrivateDirectory(join(project, 'opensip-cli', '.runtime'));
+    writePrivateFile(join(destination, 'evidence.txt'), 'same-bytes');
+    const journal = makeFilesystemJournal({
+      action: 'source-retire',
+      projectRoot: project,
+      route: 'promote-cache',
+      source: {
+        classification: 'legacy',
+        cacheKey,
+        generationDigest: null,
+        markerSha256: null,
+        rootIdentity: sourceRootIdentity,
+      },
+      sourceManifest: expected.identity,
+      stageManifest: expected.identity,
+    });
+    const authority = await authorizeFilesystem(
+      project,
+      'source-retire',
+      makeAuthorityHarness(journal),
+      { sourceRuntime: realpathSync(source) },
+    );
+    rmSync(source, { recursive: true });
+    renameSync(replacement, source);
+
+    await expect(retireRuntimePromotionSource(authority, expected.identity)).rejects.toThrow(
+      /replaced/u,
+    );
+    expect(readFileSync(join(source, 'evidence.txt'), 'utf8')).toBe('same-bytes');
+    expect(existsSync(join(cacheParent, journal.owned.sourceTombstone.basename))).toBe(false);
+    expect(
+      existsSync(
+        join(
+          cacheParent,
+          runtimePromotionOwnerMarkerBasename(journal.owned.sourceTombstone.basename),
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('preserves a byte-identical replayed tombstone replacement', async () => {
+    const cacheKey = '5'.repeat(24);
+    const cacheParent = makePrivateDirectory(resolveUserPaths().ephemeralProjectsDir);
+    const source = makePrivateDirectory(join(cacheParent, cacheKey));
+    writePrivateFile(join(source, 'evidence.txt'), 'same-bytes');
+    const sourceRootIdentity = capturePromotionRootIdentity(source);
+    const expected = verifiedRuntime(source, 'cache-source');
+    const destination = makePrivateDirectory(join(project, 'opensip-cli', '.runtime'));
+    writePrivateFile(join(destination, 'evidence.txt'), 'same-bytes');
+    const journal = makeFilesystemJournal({
+      action: 'source-retire',
+      projectRoot: project,
+      route: 'promote-cache',
+      source: {
+        classification: 'legacy',
+        cacheKey,
+        generationDigest: null,
+        markerSha256: null,
+        rootIdentity: sourceRootIdentity,
+      },
+      sourceManifest: expected.identity,
+      stageManifest: expected.identity,
+    });
+    const tombstone = join(cacheParent, journal.owned.sourceTombstone.basename);
+    const first = await authorizeFilesystem(
+      project,
+      'source-retire',
+      makeAuthorityHarness(journal),
+      { sourceRuntime: realpathSync(source) },
+    );
+    await retireRuntimePromotionSource(first, expected.identity);
+
+    const replacement = makePrivateDirectory(join(cacheParent, 'tombstone-replacement'));
+    writePrivateFile(join(replacement, 'evidence.txt'), 'same-bytes');
+    expect(capturePromotionRootIdentity(replacement)).not.toEqual(sourceRootIdentity);
+    expect(verifiedRuntime(replacement, 'cache-source').identity).toEqual(expected.identity);
+    rmSync(tombstone, { recursive: true });
+    renameSync(replacement, tombstone);
+    const retry = await authorizeFilesystem(
+      project,
+      'source-retire',
+      makeAuthorityHarness(journal),
+      { sourceRuntime: join(realpathSync(cacheParent), cacheKey) },
+    );
+
+    await expect(retireRuntimePromotionSource(retry, expected.identity)).rejects.toThrow(
+      /replaced/u,
+    );
+    expect(readFileSync(join(tombstone, 'evidence.txt'), 'utf8')).toBe('same-bytes');
+    expect(
+      existsSync(
+        join(
+          cacheParent,
+          runtimePromotionOwnerMarkerBasename(journal.owned.sourceTombstone.basename),
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it('accepts a cache parent whose lexical path resolves to the anchored cache root', async () => {
     if (process.platform === 'win32') return;
     const homeAlias = join(sandbox, 'home-alias');
@@ -315,6 +427,7 @@ describe('forward filesystem lifecycle', () => {
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(lexicalSource),
       },
       sourceManifest: expected.identity,
       stageManifest: expected.identity,
@@ -354,6 +467,7 @@ describe('forward filesystem lifecycle', () => {
         cacheKey: cache.cacheKey,
         generationDigest: cache.generationDigest,
         markerSha256,
+        rootIdentity: capturePromotionRootIdentity(cache.runtimeDir),
       },
       sourceManifest: expected.identity,
       stageManifest: expected.identity,
@@ -385,6 +499,7 @@ describe('forward filesystem lifecycle', () => {
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(foreign),
       },
       sourceManifest: expected.identity,
       stageManifest: expected.identity,
@@ -573,7 +688,7 @@ describe('rollback filesystem lifecycle', () => {
         backup: previous.identity,
         installedWasAuthoritative: true,
       }),
-    ).rejects.toThrow(/backup owner is absent or foreign/u);
+    ).rejects.toThrow(/replaced after journal creation/u);
     expect(existsSync(backup)).toBe(true);
     expect(readFileSync(join(backup, 'evidence.txt'), 'utf8')).toBe('restored-old');
   });
@@ -934,6 +1049,7 @@ describe('terminal cleanup lifecycle', () => {
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(current),
       },
       sourceManifest: terminalManifest,
       stageManifest: staged.identity,
@@ -1067,6 +1183,7 @@ describe('terminal cleanup lifecycle', () => {
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: { device: '1', inode: '2' },
       },
       cleanupSlot: 'sourceTombstone',
     });
@@ -1084,6 +1201,7 @@ describe('terminal cleanup lifecycle', () => {
         cacheKey,
         generationDigest: null,
         markerSha256: null,
+        rootIdentity: capturePromotionRootIdentity(tombstone),
       },
       cleanupSlot: 'sourceTombstone',
       sourceManifest: tombstoneIdentity,

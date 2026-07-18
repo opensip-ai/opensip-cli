@@ -7,6 +7,10 @@ import {
   RUNTIME_STAGE_OWNERSHIP_FILE,
 } from './runtime-manifest.js';
 import {
+  assertRuntimePromotionDestinationRootAuthority,
+  withRuntimePromotionDestinationRootAuthority,
+} from './runtime-promotion-destination-authority.js';
+import {
   consumeRuntimePromotionFilesystemAuthority,
   openCapabilityDirectory,
 } from './runtime-promotion-filesystem-authority.js';
@@ -380,6 +384,8 @@ export async function reconcileRuntimePromotionStage(
           runtimePromotionFilesystemFailure('the incomplete stage changed before cleanup');
         }
       },
+      revalidateBeforeMutation: () =>
+        assertStablePromotionDirectory(parent, 'the runtime-stage cleanup parent'),
     });
     return { status: 'discarded-incomplete' };
   } finally {
@@ -408,10 +414,15 @@ export async function backupRuntimePromotionDestination(
       runtimePromotionFilesystemFailure('both destination and backup are present');
     }
     if (destination === 'directory') {
-      const verified = inspectExactRuntimeManifest(
+      const verified = withRuntimePromotionDestinationRootAuthority(
         state.paths.destinationRuntime,
-        PROJECT_RUNTIME_POSTURE,
-        expected,
+        state.journal,
+        () =>
+          inspectExactRuntimeManifest(
+            state.paths.destinationRuntime,
+            PROJECT_RUNTIME_POSTURE,
+            expected,
+          ),
       );
       const owner = ensureBoundOwnerMarker({
         state,
@@ -429,6 +440,10 @@ export async function backupRuntimePromotionDestination(
         state.dependencies,
         'destination-backup-rename',
         () => {
+          assertRuntimePromotionDestinationRootAuthority(
+            state.paths.destinationRuntime,
+            state.journal,
+          );
           assertPromotionRootIdentity(state.paths.destinationRuntime, owner.rootIdentity);
           inspectExactRuntimeManifest(
             state.paths.destinationRuntime,
@@ -437,6 +452,7 @@ export async function backupRuntimePromotionDestination(
           );
         },
       );
+      assertRuntimePromotionDestinationRootAuthority(state.paths.destinationBackup, state.journal);
       inspectExactRuntimeManifest(state.paths.destinationBackup, PROJECT_RUNTIME_POSTURE, expected);
       if (
         inspectBoundOwnedMarker(
@@ -453,6 +469,7 @@ export async function backupRuntimePromotionDestination(
       return { status: 'applied', manifest: verified };
     }
     if (backup === 'directory') {
+      assertRuntimePromotionDestinationRootAuthority(state.paths.destinationBackup, state.journal);
       const owner = inspectBoundOwnedMarker(
         state.paths.destinationBackupMarker,
         state.paths.destinationBackup,

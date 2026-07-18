@@ -9,6 +9,7 @@ import {
   recoveryBusyResult,
   recoveryInputConflictResult,
   recoveryRequiredFromJournal,
+  recoveredTerminalResult,
 } from '../runtime-promotion-recovery-result.js';
 
 const OPERATION_ID = 'recovery-result-source-disposition';
@@ -22,11 +23,13 @@ function initialJournal(): RuntimePromotionJournal {
     route: 'keep-project',
     destinationParentPreexisting: true,
     destinationRuntimePreexisting: true,
+    destinationRootIdentity: { device: '3', inode: '4' },
     source: {
       classification: 'legacy',
       cacheKey: 'b'.repeat(24),
       generationDigest: null,
       markerSha256: SOURCE_DIGEST,
+      rootIdentity: { device: '1', inode: '2' },
     },
     inputs: {
       conflict: 'keep-project',
@@ -120,5 +123,38 @@ describe('runtime promotion recovery result source disposition', () => {
     });
 
     expect(result.sourcePreserved).toBe(true);
+  });
+
+  it('retains rolled-back terminal truth while reporting pending cleanup', () => {
+    const journal: RuntimePromotionJournal = {
+      ...initialJournal(),
+      state: 'closed',
+      terminal: {
+        outcome: 'rolled-back',
+        authority: 'cache',
+        runtimeManifest: null,
+        authoredVerified: true,
+        sourcePreserved: true,
+        verifiedAt: 2,
+      },
+    };
+
+    const result = recoveredTerminalResult({
+      journal,
+      authored: null,
+      cleanupPending: true,
+      startedAt: 10,
+      now: () => 13,
+    });
+
+    expect(result).toMatchObject({
+      status: 'rolled-back',
+      cleanupPending: true,
+      sourcePreserved: true,
+      sourceRetired: false,
+      durationMs: 3,
+      reasonCode: 'operation-failed',
+      nextCommand: 'opensip init',
+    });
   });
 });
