@@ -96,7 +96,8 @@ export type RuntimeNextCommand =
   | RuntimeRecoveryCommand
   | 'opensip runs list --json'
   | 'opensip sessions list --json'
-  | 'opensip uninstall --project --dry-run';
+  | 'opensip uninstall --project --dry-run'
+  | 'opensip uninstall --user --dry-run';
 
 /** Terminal or actionable result of Init's runtime-adoption coordinator. */
 export type RuntimeAdoptionStatus =

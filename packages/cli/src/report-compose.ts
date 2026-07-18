@@ -24,6 +24,7 @@
 import { basename, join } from 'node:path';
 
 import {
+  ConfigurationError,
   currentScope,
   resolveToolHooks,
   SystemError,
@@ -38,7 +39,12 @@ import {
   type DashboardInput as HtmlReportInput,
   type ReportViewSelection,
 } from '@opensip-cli/dashboard';
-import { orderSessionsForSuiteGrouping, RunRepo, SessionRepo } from '@opensip-cli/session-store';
+import {
+  orderSessionsForSuiteGrouping,
+  resolveParentRunEvidence,
+  RunRepo,
+  SessionRepo,
+} from '@opensip-cli/session-store';
 
 import { writeArtifactAtomically } from './bootstrap/atomic-artifact-write.js';
 import { bindToolCliContext } from './bootstrap/bind-tool-context.js';
@@ -114,21 +120,50 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
   const sessions = repo ? orderSessionsForSuiteGrouping([...repo.list({ limit: 20 })]) : [];
   // ADR-0144 Strategy A: sessions stay raw; the dashboard client labels
   // duration/score via @opensip-cli/format — do not embed labels here.
-  const recentRuns = runRepo ? [...runRepo.listRuns({ limit: 20 })] : [];
-  const stepsByRun: ReadonlyMap<string, readonly StoredRunStep[]> = runRepo
+  let recentRuns = runRepo ? [...runRepo.listRuns({ limit: 20 })] : [];
+  let stepsByRun: ReadonlyMap<string, readonly StoredRunStep[]> = runRepo
     ? runRepo.listStepsForRuns(recentRuns.map((run) => run.id))
     : new Map<string, readonly StoredRunStep[]>();
+  let reportSessions = sessions;
 
   const normalizedSelection = normalizeReportViewSelection(selection);
   const requestedRunId = normalizedSelection?.runId;
-  const matchedStoredRun =
+  let matchedStoredRun =
     requestedRunId !== undefined && recentRuns.some((run) => run.id === requestedRunId);
+
+  // Exact retained Run selection (Task 5.1): not limited to the recent-20 window.
+  if (requestedRunId !== undefined && datastore !== undefined) {
+    const evidence = resolveParentRunEvidence(datastore, {
+      runId: requestedRunId,
+      stepLimit: 500,
+      sessionLimit: 500,
+    });
+    if (evidence.status === 'not-found') {
+      throw new ConfigurationError(
+        `No retained parent Run with id '${requestedRunId}'. Inspect with: opensip runs list --json`,
+        { code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' },
+      );
+    }
+    matchedStoredRun = true;
+    const exactRun = evidence.snapshot.run;
+    if (!recentRuns.some((run) => run.id === exactRun.id)) {
+      recentRuns = [exactRun, ...recentRuns];
+    }
+    const stepMap = new Map(stepsByRun);
+    stepMap.set(exactRun.id, evidence.snapshot.steps);
+    stepsByRun = stepMap;
+    // Union exact linked Sessions with recent presentation history.
+    const byId = new Map(reportSessions.map((s) => [s.id, s]));
+    for (const session of evidence.snapshot.sessions) byId.set(session.id, session);
+    reportSessions = orderSessionsForSuiteGrouping([...byId.values()]);
+  }
+
   const resolvedSelection =
     normalizedSelection === undefined
       ? undefined
       : ({
           view: normalizedSelection.view,
-          ...(matchedStoredRun ? { runId: requestedRunId } : {}),
+          ...(matchedStoredRun && requestedRunId !== undefined ? { runId: requestedRunId } : {}),
         } satisfies ReportViewSelection);
   log.info?.({
     evt: 'cli.report.compose.selection',
@@ -139,7 +174,7 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
   });
 
   const input: HtmlReportInput = {
-    sessions,
+    sessions: reportSessions,
     runs: recentRuns.map((run) => ({
       ...run,
       steps: stepsByRun.get(run.id) ?? [],

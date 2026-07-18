@@ -260,7 +260,7 @@ describe('composeAndWriteReport', () => {
     });
   });
 
-  it('drops an unknown run identity from both embedded data and the launch fragment', async () => {
+  it('fails closed when an exact retained Run id is not found', async () => {
     const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
     const info = vi.fn();
     const datastore = openMemoryDatastore();
@@ -272,20 +272,15 @@ describe('composeAndWriteReport', () => {
       error: vi.fn(),
     });
 
-    const result = await runWithScope(scope, () =>
-      composeAndWriteReport({
-        open: true,
-        selection: { view: 'change-impact', runId: 'run-missing' },
-      }),
-    );
-
-    expect(launch).toHaveBeenCalledWith(`file://${result.path}#change-impact`);
-    expect(readFileSync(result.path, 'utf8')).toContain(
-      'const REPORT_SELECTION = {"view":"change-impact"};',
-    );
-    expect(info).toHaveBeenCalledWith(
-      expect.objectContaining({ hasRunId: true, matchedStoredRun: false }),
-    );
+    await expect(
+      runWithScope(scope, () =>
+        composeAndWriteReport({
+          open: true,
+          selection: { view: 'change-impact', runId: 'run-missing' },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' });
+    expect(launch).not.toHaveBeenCalled();
   });
 
   it('omits malformed or oversized run identity text before embedding and launch', async () => {

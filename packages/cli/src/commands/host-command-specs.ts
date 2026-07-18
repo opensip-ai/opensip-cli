@@ -348,6 +348,12 @@ function buildReportSpec(): HostSpec {
         negatable: true,
       },
       {
+        flag: '--run',
+        value: '<run-id>',
+        description:
+          'Select an exact retained parent Run for the Change Impact view (works outside recent history)',
+      },
+      {
         flag: '--max-catalog-mb',
         value: '<mb>',
         description:
@@ -360,6 +366,7 @@ function buildReportSpec(): HostSpec {
       const opts = rawOpts as {
         open: boolean;
         json: boolean;
+        run?: string;
         maxCatalogMb?: string;
       };
       // Commander stores `--no-open` as `opts.open === false`; default true.
@@ -367,8 +374,13 @@ function buildReportSpec(): HostSpec {
       // ADR-0054 M4-F: composeAndWriteReport runs an EXTERNAL tool's
       // collectReportData in a forked hook worker (its runtime never runs in-host).
       const maxGraphCatalogBytes = parseMaxCatalogMb(opts.maxCatalogMb);
+      const selection =
+        opts.run === undefined
+          ? undefined
+          : ({ view: 'change-impact', runId: opts.run } as const);
       return composeAndWriteReport({
         open: opts.open === true && opts.json !== true,
+        ...(selection === undefined ? {} : { selection }),
         ...(maxGraphCatalogBytes === undefined ? {} : { maxGraphCatalogBytes }),
       });
     },
