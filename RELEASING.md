@@ -39,7 +39,7 @@ promotion (Plan 02 / ADR-0164; the normative sequence is Plan 02 §6):
    bytes, or another registry), installs the exact version through the canonical
    `scripts/install.sh`, runs the full macOS profile in published-version mode
    (upgrading from the prior exact version), and independently re-verifies the
-   sealed `opensip-cli-macos-qualification.v1.json` evidence. It uploads evidence
+   sealed `opensip-cli-macos-qualification.v2.json` evidence. It uploads evidence
    on every outcome (90-day retention) and exposes only a verified evidence
    digest/artifact name.
 4. **`promote-release`** (ubuntu, `needs: [stage-release, qualify-macos]`,
@@ -67,7 +67,7 @@ prior known-good release. Fix the defect and ship the corrective release under a
 reused. Do not hand-run `npm dist-tag add` to force a promotion the gate refused.
 
 **Evidence location.** The sealed
-`opensip-cli-macos-qualification.v1.json` (plus the host preflight and the
+`opensip-cli-macos-qualification.v2.json` (plus the host preflight and the
 independent verifier result) is uploaded as the `qualify-macos` job artifact and
 attached to the GitHub Release by `promote-release`. Its version, git SHA, and
 support-profile digest are rechecked to match the released tag before the release
@@ -372,7 +372,7 @@ a different question:
 2. **Reusable native acceptance** (`pnpm platform:acceptance` +
    `pnpm platform:acceptance:verify`). Installs a real candidate into a hermetic
    run root, runs the full closed journey catalog on the native host, and writes
-   one sealed `platform-acceptance.v1` evidence artifact that a **separate**
+   one sealed `platform-acceptance.v2` evidence artifact that a **separate**
    verifier re-validates. It is heavier and host-specific, so it is deliberately
    **not** wired into `release:preflight` or any developer build. See the
    "Platform acceptance" section of [`scripts/README.md`](scripts/README.md); a

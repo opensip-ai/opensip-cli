@@ -44,8 +44,13 @@ const MACOS_26_BASE_TUPLE = Object.freeze({
   installChannels: MACOS_INSTALL_CHANNELS,
 } as const);
 
-/** The stable id shared by the macOS preview row and its acceptance profile. */
+/**
+ * Stable support-row identity (historical binding for v1 verifier evidence).
+ * Distinct from the active executable profile id (schema-v2 chain).
+ */
 const MACOS_PREVIEW_ROW_ID = 'macos-26-arm64-node24-npm11-v1';
+/** Active schema-v2 acceptance profile for macOS qualification execution. */
+const MACOS_PREVIEW_PROFILE_ID = 'macos-26-arm64-node24-npm11-v2';
 /** The stable id of the explicit Intel/x64 macOS exclusion row. */
 const MACOS_INTEL_ROW_ID = 'macos-26-intel-unsupported';
 
@@ -53,16 +58,18 @@ export const MACOS_PREVIEW_ROW: PlatformSupportRow = Object.freeze({
   id: MACOS_PREVIEW_ROW_ID,
   status: 'preview',
   tuple: Object.freeze({ ...MACOS_26_BASE_TUPLE, arch: 'arm64' }),
-  profile: Object.freeze({ id: MACOS_PREVIEW_ROW_ID, version: 1 }),
+  profile: Object.freeze({ id: MACOS_PREVIEW_PROFILE_ID, version: 2 }),
   docsPath: MACOS_SUPPORT_DOCS_PATH,
   docsUrl: MACOS_SUPPORT_DOCS_URL,
   evidence: Object.freeze({
-    artifact: 'opensip-cli-macos-qualification.v1.json',
+    artifact: 'opensip-cli-macos-qualification.v2.json',
     url: null,
   }),
   notes:
-    'Apple Silicon macOS 26 on Node 24 (ABI 137) / npm 11 over APFS. Published as ' +
-    'preview until 14-day burn-in and a staged release pass promote it to supported.',
+    'Apple Silicon macOS 26 on Node 24 (ABI 137) / npm 11 over APFS. Active ' +
+    'qualification uses schema-v2 profiles (common-v2 + macos-v2); v1 artifacts ' +
+    'remain historical verifier inputs only. Preview until 14-day burn-in and a ' +
+    'staged release pass promote it to supported.',
 });
 
 export const MACOS_INTEL_ROW: PlatformSupportRow = Object.freeze({

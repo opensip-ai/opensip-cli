@@ -72,8 +72,8 @@ describe('platform-support registry', () => {
     const macos = PLATFORM_SUPPORT_ROWS.find((row) => row.status === 'preview');
     expect(macos?.id).toBe('macos-26-arm64-node24-npm11-v1');
     expect(macos?.profile).toEqual({
-      id: 'macos-26-arm64-node24-npm11-v1',
-      version: 1,
+      id: 'macos-26-arm64-node24-npm11-v2',
+      version: 2,
     });
     expect(macos?.docsPath).toBe('docs/public/70-reference/17-supported-platforms.md');
   });
@@ -518,8 +518,8 @@ describe('projectRuntimeHostSupport', () => {
     expect(projection.rowId).toBe('macos-26-arm64-node24-npm11-v1');
     expect(projection.rowStatus).toBe('preview');
     expect(projection.profile).toEqual({
-      id: 'macos-26-arm64-node24-npm11-v1',
-      version: 1,
+      id: 'macos-26-arm64-node24-npm11-v2',
+      version: 2,
     });
     expect(projection.unobserved).toEqual(
       expect.arrayContaining([

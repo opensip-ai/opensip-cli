@@ -87,7 +87,7 @@ jobs:
       # The pinned support profile + its public support-row identity. The
       # verifier RECOMPUTES the profile digest from this file; the workflow
       # never trusts a runner-printed value.
-      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v2.json
       SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
       SUPPORT_CONTRACT_VERSION: '1'
 
@@ -268,7 +268,7 @@ jobs:
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
             --runner-label macos-26 \
-            --out "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
+            --out "$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json" \
             --agent-report-out "$EVIDENCE_DIR/agent-eval-installed-smoke.json"
           rc=$?
           set -e
@@ -289,7 +289,7 @@ jobs:
           set -u
           set +e
           node scripts/verify-platform-acceptance.mjs \
-            --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
+            --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json" \
             --profile "$MACOS_PROFILE" \
             --expected-version "$VERSION" \
             --expected-candidate-kind packed-release \
@@ -356,7 +356,7 @@ jobs:
           fi
           echo "classification=$classification" >> "$GITHUB_OUTPUT"
 
-          digest="$(node -e 'try{const e=require(process.argv[1]);process.stdout.write(String(e.completion?.evidenceDigest||"none").slice(0,16))}catch{process.stdout.write("none")}' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" 2>/dev/null || echo none)"
+          digest="$(node -e 'try{const e=require(process.argv[1]);process.stdout.write(String(e.completion?.evidenceDigest||"none").slice(0,16))}catch{process.stdout.write("none")}' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json" 2>/dev/null || echo none)"
           counts="$(node -e 'try{const r=require(process.argv[1]);const s=r.summary||{};process.stdout.write(String(s.requiredPassed??"?")+" "+String(s.requiredTotal??"?"))}catch{process.stdout.write("? ?")}' "$EVIDENCE_DIR/verifier-result.json" 2>/dev/null || echo "? ?")"
           req_passed="${counts%% *}"
           req_total="${counts##* }"
@@ -389,7 +389,7 @@ jobs:
         with:
           name: ${{ steps.classify.outputs.artifact-name || format('macos-qualification-run{0}', github.run_attempt) }}
           path: |
-            ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v1.json
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v2.json
             ${{ env.EVIDENCE_DIR }}/agent-eval-installed-smoke.json
             ${{ env.EVIDENCE_DIR }}/host-preflight.json
             ${{ env.EVIDENCE_DIR }}/verifier-result.json

@@ -761,7 +761,7 @@ jobs:
       registry-integrity-digest: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
       candidate-digest: ${{ steps.registry-integrity.outputs.candidate-digest }}
     env:
-      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v2.json
       SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
       SUPPORT_CONTRACT_VERSION: '1'
     steps:
@@ -966,7 +966,7 @@ jobs:
           REGISTRY_INTEGRITY_DIGEST: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
         run: |
           set -u
-          out="$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json"
+          out="$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json"
           set +e
           # The bare `--` is the pnpm script-arg separator. pnpm 11 forwards it as
           # argv; run-platform-acceptance.mjs ignores end-of-options markers so this
@@ -1022,7 +1022,7 @@ jobs:
           fi
           set +e
           node scripts/verify-platform-acceptance.mjs \
-            --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json" \
+            --evidence "$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json" \
             --profile "$MACOS_PROFILE" \
             --expected-version "$VERSION" \
             --expected-candidate-kind published-version \
@@ -1066,8 +1066,8 @@ jobs:
         run: |
           set -eu
           short_sha="${GITHUB_SHA:0:7}"
-          digest="$(node -e 'const e=require(process.argv[1]);const d=e.completion?.evidenceDigest;if(typeof d!=="string"||!/^[a-f0-9]{64}$/.test(d))throw new Error("invalid evidence digest");process.stdout.write(d)' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json")"
-          evidence_attempt="$(node -e 'const e=require(process.argv[1]);const a=e.execution?.runAttempt;if(!Number.isSafeInteger(a)||a<=0)throw new Error("invalid evidence attempt");process.stdout.write(String(a))' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v1.json")"
+          digest="$(node -e 'const e=require(process.argv[1]);const d=e.completion?.evidenceDigest;if(typeof d!=="string"||!/^[a-f0-9]{64}$/.test(d))throw new Error("invalid evidence digest");process.stdout.write(d)' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json")"
+          evidence_attempt="$(node -e 'const e=require(process.argv[1]);const a=e.execution?.runAttempt;if(!Number.isSafeInteger(a)||a<=0)throw new Error("invalid evidence attempt");process.stdout.write(String(a))' "$EVIDENCE_DIR/opensip-cli-macos-qualification.v2.json")"
           echo "evidence-digest=$digest" >> "$GITHUB_OUTPUT"
           echo "evidence-run-attempt=$evidence_attempt" >> "$GITHUB_OUTPUT"
           echo "evidence-artifact=macos-release-qualification-c${SUPPORT_CONTRACT_VERSION}-v${VERSION}-${short_sha}-run${evidence_attempt}" >> "$GITHUB_OUTPUT"
@@ -1078,7 +1078,7 @@ jobs:
         with:
           name: ${{ steps.evidence.outputs.evidence-artifact || format('macos-release-qualification-run{0}', github.run_attempt) }}
           path: |
-            ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v1.json
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-macos-qualification.v2.json
             ${{ env.EVIDENCE_DIR }}/opensip-cli-registry-integrity.v1.json
             ${{ env.EVIDENCE_DIR }}/agent-eval-installed-smoke.json
             ${{ env.EVIDENCE_DIR }}/host-preflight.json
@@ -1130,7 +1130,7 @@ jobs:
       # publishes nor attests. The promotion secret below is scoped to this job
       # only and is never exposed to stage-release or qualify-macos.
     env:
-      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+      MACOS_PROFILE: .config/platform-acceptance/macos-26-arm64-node24-npm11-v2.json
       SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
       SUPPORT_CONTRACT_VERSION: '1'
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
@@ -1249,7 +1249,7 @@ jobs:
           # (d) independently RE-VERIFY the sealed evidence (recomputes the
           #     evidence digest from the artifact) with the same host/version/
           #     support-row constraints the Mac job used.
-          ev="$RUNNER_TEMP/macos-evidence/opensip-cli-macos-qualification.v1.json"
+          ev="$RUNNER_TEMP/macos-evidence/opensip-cli-macos-qualification.v2.json"
           case "$EVIDENCE_RUN_ATTEMPT" in
             ''|*[!0-9]*) echo "::error::qualified evidence run attempt is not a positive integer"; exit 1 ;;
             0) echo "::error::qualified evidence run attempt must be positive"; exit 1 ;;
@@ -1415,7 +1415,7 @@ jobs:
             ${{ runner.temp }}/release-metadata/opensip-cli-release-manifest.v1.json
             ${{ runner.temp }}/release-metadata/SHA256SUMS
             ${{ runner.temp }}/release-metadata/opensip-cli-sbom.cyclonedx.json
-            ${{ runner.temp }}/macos-evidence/opensip-cli-macos-qualification.v1.json
+            ${{ runner.temp }}/macos-evidence/opensip-cli-macos-qualification.v2.json
             ${{ runner.temp }}/macos-evidence/opensip-cli-registry-integrity.v1.json
             ${{ runner.temp }}/macos-evidence/agent-eval-installed-smoke.json
             ${{ runner.temp }}/macos-evidence/host-preflight.json
