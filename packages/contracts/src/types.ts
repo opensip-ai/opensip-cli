@@ -56,10 +56,11 @@ export interface InitOptions {
   /**
    * Language list. Repeatable and/or comma-separated: `--language ts
    * --language rust` and `--language ts,rust` both accumulate (the
-   * `--language` OptionSpec declares an array accumulator). When omitted,
-   * init detects the project's primary language(s) by inspecting filesystem
-   * markers (Cargo.toml, pyproject.toml, etc.) and exits 2 with a prompt if
-   * the result is ambiguous.
+   * `--language` OptionSpec declares an array accumulator) and are
+   * normalized into host-canonical order. When omitted, init detects
+   * every marker language (Cargo.toml, pyproject.toml, tsconfig, …) and
+   * accepts polyglot sets. Exits 2 only when no markers are found or the
+   * flag is empty/unknown — polyglot detection is not an error.
    */
   language?: string[];
   /**

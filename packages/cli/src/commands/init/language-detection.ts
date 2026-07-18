@@ -4,8 +4,11 @@
  * Inspects the cwd for well-known language markers (Cargo.toml,
  * pyproject.toml, go.mod, pom.xml/build.gradle, CMakeLists.txt,
  * tsconfig.json/package.json) and returns the unique set of detected
- * languages. Also parses the `--language <comma-separated>` flag that
- * overrides detection.
+ * languages in host-canonical `ALL_LANGUAGES` order. Also parses the
+ * `--language <comma-separated>` flag that overrides detection.
+ *
+ * Polyglot projects are not ambiguous: every detected marker language is
+ * accepted. Explicit `--language` remains the override for forced sets.
  */
 
 import { existsSync } from 'node:fs';
@@ -52,10 +55,22 @@ const MARKERS: readonly DetectionMarker[] = [
 ];
 
 /**
+ * Reorder + dedupe into host-canonical starter order (`ALL_LANGUAGES`).
+ */
+export function canonicalizeLanguages(
+  languages: readonly SupportedLanguage[],
+): SupportedLanguage[] {
+  const selected = new Set(languages);
+  return ALL_LANGUAGES.filter((language) => selected.has(language));
+}
+
+/**
  * Inspect the cwd for language markers. Returns the unique set of
- * detected languages. TypeScript is detected only when there's a
- * `tsconfig.json` (or a `package.json` with no other marker
- * present — fallback for plain JS/TS projects).
+ * detected languages in detection order (callers that need host-canonical
+ * order should pass through {@link canonicalizeLanguages} /
+ * {@link resolveLanguages}). TypeScript is detected only when there's a
+ * `tsconfig.json` (or a `package.json` with no other marker present —
+ * fallback for plain JS/TS projects).
  */
 export function detectLanguages(cwd: string): SupportedLanguage[] {
   const detected = new Set<SupportedLanguage>();
@@ -78,8 +93,8 @@ export function detectLanguages(cwd: string): SupportedLanguage[] {
 
 /**
  * Parse the `--language <comma-separated>` argv string into a list of
- * known languages. Throws on unknown entries — the CLI surfaces it as
- * an exit-2 configuration error.
+ * known languages in host-canonical order. Throws on unknown entries —
+ * the CLI surfaces it as an exit-2 configuration error.
  *
  * @throws {Error} When `raw` contains a token not present in `ALL_LANGUAGES`.
  */
@@ -101,7 +116,7 @@ export function parseLanguageFlag(raw: string): SupportedLanguage[] {
   if (out.length === 0) {
     throw new ValidationError('--language received an empty list');
   }
-  return out;
+  return canonicalizeLanguages(out);
 }
 
 export type LanguageResolution =
@@ -110,9 +125,10 @@ export type LanguageResolution =
 
 /**
  * Resolve the language set for an init run: either parse the explicit
- * --language flag, or fall back to filesystem detection. Returns an
- * error variant when no markers are found, or when multiple languages
- * are detected without --language to disambiguate.
+ * --language flag, or fall back to filesystem detection. Returns every
+ * detected marker language in canonical order (polyglot is not an error).
+ * Returns an error variant when no markers are found or when the flag is
+ * invalid/empty/unknown.
  */
 export function resolveLanguages(
   cwd: string,
@@ -123,14 +139,14 @@ export function resolveLanguages(
       // The flag is an accumulator (`--language ts --language rust`) whose
       // elements may also be comma-separated (`--language ts,rust`). Join into
       // one canonical comma-list and delegate to the established parser, which
-      // splits, trims, dedupes, and validates.
+      // splits, trims, dedupes, validates, and reorders.
       return { ok: true, languages: parseLanguageFlag(languageFlag.join(',')) };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       return { ok: false, error: { detected: [], message: msg } };
     }
   }
-  const detected = detectLanguages(cwd);
+  const detected = canonicalizeLanguages(detectLanguages(cwd));
   if (detected.length === 0) {
     return {
       ok: false,
@@ -139,19 +155,7 @@ export function resolveLanguages(
         message:
           'No language markers found. Specify with: ' +
           'opensip init --language <typescript|rust|python|go|java|cpp> ' +
-          '(comma-separated for polyglot projects).',
-      },
-    };
-  }
-  if (detected.length > 1) {
-    return {
-      ok: false,
-      error: {
-        detected,
-        message:
-          `Detected multiple languages: ${detected.join(', ')}. ` +
-          `Pass --language <comma-separated-list> to choose. ` +
-          `Example: opensip init --language ${detected.join(',')}`,
+          '(comma-separated or repeatable for polyglot projects).',
       },
     };
   }

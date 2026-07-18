@@ -863,16 +863,16 @@ describe('init view', () => {
     expect(out).toContain('line two');
   });
 
-  it('renders the ambiguous-language refusal', () => {
+  it('renders the language-resolution refusal', () => {
     const out = text({
       ...base,
       created: false,
-      ambiguousLanguageError: {
-        detected: ['ts', 'py'],
+      languageResolutionError: {
+        detected: [],
         message: 'pass --language',
       },
     });
-    expect(out).toContain('language ambiguous');
+    expect(out).toContain('language not resolved');
     expect(out).toContain('pass --language');
   });
 

@@ -176,16 +176,16 @@ describe('parseLanguageFlag', () => {
     expect(parseLanguageFlag('rust')).toEqual(['rust']);
   });
 
-  it('accepts comma-separated list', () => {
-    expect(parseLanguageFlag('rust,typescript')).toEqual(['rust', 'typescript']);
+  it('accepts comma-separated list in host-canonical order', () => {
+    expect(parseLanguageFlag('rust,typescript')).toEqual(['typescript', 'rust']);
   });
 
   it('trims whitespace and lowercases', () => {
-    expect(parseLanguageFlag(' Rust , TYPESCRIPT ')).toEqual(['rust', 'typescript']);
+    expect(parseLanguageFlag(' Rust , TYPESCRIPT ')).toEqual(['typescript', 'rust']);
   });
 
-  it('deduplicates', () => {
-    expect(parseLanguageFlag('rust,rust,typescript')).toEqual(['rust', 'typescript']);
+  it('deduplicates and canonicalizes order', () => {
+    expect(parseLanguageFlag('rust,rust,typescript')).toEqual(['typescript', 'rust']);
   });
 
   it('rejects unknown languages', () => {
@@ -422,51 +422,53 @@ describe('executeInit (polyglot)', () => {
 // executeInit — error paths
 // =============================================================================
 
-describe('executeInit (ambiguous language)', () => {
-  it('refuses to scaffold when multiple language markers present and no --language', async () => {
+describe('executeInit (language resolution)', () => {
+  it('accepts polyglot markers without --language (canonical order)', async () => {
     writeFileSync(join(testDir, 'Cargo.toml'), '[package]\nname = "x"');
     writeFileSync(join(testDir, 'tsconfig.json'), '{}');
 
     const result = await executeInit(makeArgs());
 
-    expect(result.created).toBe(false);
-    expect(result.ambiguousLanguageError).toBeDefined();
-    expect([...(result.ambiguousLanguageError?.detected ?? [])].sort()).toEqual([
-      'rust',
-      'typescript',
-    ]);
-    expect(result.ambiguousLanguageError?.message).toContain('--language');
-
-    // Nothing was written
-    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(false);
-    expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
+    expect(result.created).toBe(true);
+    expect(result.languages).toEqual(['typescript', 'rust']);
+    expect(result.languageResolutionError).toBeUndefined();
+    expect(result.ambiguousLanguageError).toBeUndefined();
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
+    const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
+    expect(config).toContain('typescript-source:');
+    expect(config).toContain('rust-source:');
   });
 
   it('refuses to scaffold when no language markers present and no --language', async () => {
     const result = await executeInit(makeArgs());
 
     expect(result.created).toBe(false);
-    expect(result.ambiguousLanguageError).toBeDefined();
-    expect(result.ambiguousLanguageError?.detected).toEqual([]);
+    expect(result.languageResolutionError).toBeDefined();
+    expect(result.languageResolutionError?.detected).toEqual([]);
+    // Dual-write for older --json consumers.
+    expect(result.ambiguousLanguageError).toEqual(result.languageResolutionError);
   });
 
   it('returns an error result when --language is unknown', async () => {
     const result = await executeInit(makeArgs({ language: ['cobol'] }));
     expect(result.created).toBe(false);
-    expect(result.ambiguousLanguageError?.message).toContain("Unknown language 'cobol'");
+    expect(result.languageResolutionError?.message).toContain("Unknown language 'cobol'");
+    expect(result.ambiguousLanguageError).toEqual(result.languageResolutionError);
   });
 
   // Regression for the 2026-05-25 audit fix: previously a non-existent
   // --cwd returned `{ created: false, state: 'pristine' }` with no error
   // discriminant, so register-init mapped it to exit 0. The fix surfaces
-  // it as ambiguousLanguageError so the existing exit-2 path fires.
+  // it as languageResolutionError (and dual-writes ambiguousLanguageError)
+  // so the existing exit-2 path fires.
   it('surfaces a structured error when --cwd does not exist on disk', async () => {
     const missing = join(testDir, 'definitely-does-not-exist');
     const result = await executeInit(makeArgs({ cwd: missing }));
     expect(result.created).toBe(false);
-    expect(result.ambiguousLanguageError).toBeDefined();
-    expect(result.ambiguousLanguageError?.detected).toEqual([]);
-    expect(result.ambiguousLanguageError?.message).toContain(missing);
+    expect(result.languageResolutionError).toBeDefined();
+    expect(result.languageResolutionError?.detected).toEqual([]);
+    expect(result.languageResolutionError?.message).toContain(missing);
+    expect(result.ambiguousLanguageError).toEqual(result.languageResolutionError);
   });
 });
 

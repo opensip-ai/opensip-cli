@@ -1006,14 +1006,15 @@ describe('init spec — action body', () => {
     expect(toolsList).not.toHaveBeenCalled();
   });
 
-  it('init: sets exit-code 2 when result.ambiguousLanguageError is set', async () => {
+  it('init: sets exit-code 2 when result.languageResolutionError is set', async () => {
     vi.mocked(executeInit).mockResolvedValueOnce({
       type: 'init',
       path: '',
       cwd: process.cwd(),
       configFilename: 'opensip-cli.config.yml',
       created: false,
-      ambiguousLanguageError: { detected: [], message: 'ambiguous' },
+      languageResolutionError: { detected: [], message: 'no markers' },
+      ambiguousLanguageError: { detected: [], message: 'no markers' },
     } as never);
 
     const { ctx, setExitCode } = makeCtx();
@@ -1024,6 +1025,24 @@ describe('init spec — action body', () => {
     expect(setExitCode).toHaveBeenCalledWith(2);
     expect(toolsList).not.toHaveBeenCalled();
     expect(harness.debug).not.toHaveBeenCalled();
+  });
+
+  it('init: sets exit-code 2 when only legacy ambiguousLanguageError is set', async () => {
+    vi.mocked(executeInit).mockResolvedValueOnce({
+      type: 'init',
+      path: '',
+      cwd: process.cwd(),
+      configFilename: 'opensip-cli.config.yml',
+      created: false,
+      ambiguousLanguageError: { detected: [], message: 'legacy only' },
+    } as never);
+
+    const { ctx, setExitCode } = makeCtx();
+    const program = mount(ctx);
+
+    const harness = makeInitScope();
+    await dispatchInit(program, ['init'], harness);
+    expect(setExitCode).toHaveBeenCalledWith(2);
   });
 
   it('init: sets exit-code 2 when result.partialStateError is set', async () => {

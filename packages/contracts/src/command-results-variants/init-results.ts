@@ -109,9 +109,20 @@ export interface InitResult {
     readonly message: string;
   };
   /**
-   * When detection is ambiguous and --language wasn't passed, init
-   * exits without writing anything and surfaces this error so the
-   * user can re-invoke with --language <list>.
+   * When language resolution fails (no markers, unknown/empty
+   * `--language`, missing cwd, …), init exits without writing and
+   * surfaces this structured error. Polyglot marker sets are NOT an
+   * error — every detected language is accepted in canonical order.
+   */
+  languageResolutionError?: {
+    detected: readonly string[];
+    message: string;
+  };
+  /**
+   * @deprecated Prefer {@link languageResolutionError}. Retained for
+   * older `--json` consumers. Current CLIs dual-write the same payload
+   * onto both fields for non-polyglot resolution failures; polyglot
+   * projects never produce this field.
    */
   ambiguousLanguageError?: {
     detected: readonly string[];

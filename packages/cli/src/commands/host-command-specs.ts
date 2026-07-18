@@ -106,6 +106,7 @@ function adoptionExitCode(adoption: RuntimeAdoptionResult): number | undefined {
 
 function applyInitExitCode(result: InitResult, ctx: CliCommandsContext): void {
   if (
+    result.languageResolutionError !== undefined ||
     result.ambiguousLanguageError !== undefined ||
     result.partialStateError !== undefined ||
     result.authoredStateChangedError !== undefined ||
@@ -147,7 +148,7 @@ function buildInitSpec(
         flag: '--language',
         value: '<list>',
         description:
-          'Language list (typescript|rust|python|go|java|cpp), repeatable or comma-separated. Default: detect from filesystem markers.',
+          'Language list (typescript|rust|python|go|java|cpp), repeatable or comma-separated. Default: accept every detected marker language (polyglot OK). Override to force a set.',
         arrayDefault: [],
         parse: (val, prev) => [...(prev as string[]), val],
       },

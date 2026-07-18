@@ -1881,7 +1881,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": [],
-          "description": "Language list (typescript|rust|python|go|java|cpp), repeatable or comma-separated. Default: detect from filesystem markers.",
+          "description": "Language list (typescript|rust|python|go|java|cpp), repeatable or comma-separated. Default: accept every detected marker language (polyglot OK). Override to force a set.",
           "flags": "--language <list>",
           "negate": false,
           "optional": false,

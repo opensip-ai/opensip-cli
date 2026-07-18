@@ -615,17 +615,23 @@ describe('CLI e2e', () => {
       expect(readFileSync(examplePath, 'utf8')).toBe(exampleBefore);
     });
 
-    it('exits 2 with a prompt when language is ambiguous and --language not passed', () => {
+    it('exits 2 when no language markers are found and --language is not passed', () => {
       tempDir = join(
         tmpdir(),
         `opensip-e2e-init3-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       );
       mkdirSync(tempDir, { recursive: true });
 
-      const { exitCode } = cli.run(['init', '--json'], { cwd: tempDir });
+      const { exitCode, stdout } = cli.run(['init', '--json'], { cwd: tempDir });
       expect(exitCode).toBe(2);
       // Nothing should have been written.
       expect(existsSync(join(tempDir, 'opensip-cli.config.yml'))).toBe(false);
+      const output = JSON.parse(stdout).data as {
+        languageResolutionError?: { message?: string };
+        ambiguousLanguageError?: { message?: string };
+      };
+      expect(output.languageResolutionError?.message ?? '').toMatch(/No language markers/);
+      expect(output.ambiguousLanguageError).toEqual(output.languageResolutionError);
     });
   });
 

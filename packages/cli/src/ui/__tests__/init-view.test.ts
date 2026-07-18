@@ -122,13 +122,23 @@ describe('viewInit — refusals', () => {
     expect(out).toContain('line two');
   });
 
-  it('renders the ambiguous-language refusal', () => {
+  it('renders the language-resolution refusal', () => {
     const out = text(
       result({
-        ambiguousLanguageError: { message: 'pass --language' },
+        languageResolutionError: { detected: [], message: 'pass --language' },
       } as Partial<InitResult>),
     );
-    expect(out).toContain('language ambiguous');
+    expect(out).toContain('language not resolved');
+    expect(out).toContain('pass --language');
+  });
+
+  it('renders legacy ambiguousLanguageError with the same refusal headline', () => {
+    const out = text(
+      result({
+        ambiguousLanguageError: { detected: [], message: 'pass --language' },
+      } as Partial<InitResult>),
+    );
+    expect(out).toContain('language not resolved');
     expect(out).toContain('pass --language');
   });
 });

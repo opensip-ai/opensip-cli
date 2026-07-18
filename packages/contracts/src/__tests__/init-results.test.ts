@@ -178,4 +178,26 @@ describe('Init result contracts', () => {
     } satisfies InitOptions;
     expect(invalidPolicy.runtimeConflict).toBe('merge');
   });
+
+  it('admits languageResolutionError and keeps ambiguousLanguageError for compatibility', () => {
+    const error = {
+      detected: [] as const,
+      message: 'No language markers found.',
+    };
+    const result: InitResult = {
+      ...baseInitResult(),
+      created: false,
+      languageResolutionError: error,
+      ambiguousLanguageError: error,
+    };
+
+    expect(result.languageResolutionError).toEqual(error);
+    expect(result.ambiguousLanguageError).toEqual(error);
+    expectTypeOf(result).toExtend<CommandResult>();
+    // Successful polyglot Init carries languages without either error field.
+    const polyglot = baseInitResult();
+    expect(polyglot.languages).toEqual(['typescript']);
+    expect(polyglot).not.toHaveProperty('languageResolutionError');
+    expect(polyglot).not.toHaveProperty('ambiguousLanguageError');
+  });
 });

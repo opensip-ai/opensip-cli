@@ -1,7 +1,8 @@
 /**
  * init view-model builder — expresses the InitResult's branches
- * (inside-existing-project refusal, ambiguous language, partial-state
- * refusal, re-scaffold/pristine success, creation failure) as a ViewNode.
+ * (inside-existing-project refusal, language-resolution failure,
+ * partial-state refusal, re-scaffold/pristine success, creation failure)
+ * as a ViewNode.
  */
 
 import { line, group, type Tone, type ViewNode } from '@opensip-cli/cli-ui';
@@ -113,13 +114,13 @@ function guidanceLines(
   );
 }
 
-function ambiguousView(message: string): ViewNode {
+function languageResolutionView(message: string): ViewNode {
   return group(
     [
       line([
         { text: '✗', tone: 'error' },
         { text: ' ' },
-        { text: 'Cannot scaffold — language ambiguous', bold: true },
+        { text: 'Cannot scaffold — language not resolved', bold: true },
       ]),
       { kind: 'spacer' },
       line([{ text: `  ${message}` }]),
@@ -499,8 +500,11 @@ function refreshView(result: InitResult): ViewNode {
 export function viewInit(result: InitResult): ViewNode {
   if (result.insideExistingProject !== undefined)
     return verbatim(result.insideExistingProject.message);
+  if (result.languageResolutionError !== undefined)
+    return languageResolutionView(result.languageResolutionError.message);
+  // Legacy dual-write / older CLI JSON still carries ambiguousLanguageError only.
   if (result.ambiguousLanguageError !== undefined)
-    return ambiguousView(result.ambiguousLanguageError.message);
+    return languageResolutionView(result.ambiguousLanguageError.message);
   if (result.authoredStateChangedError !== undefined)
     return authoredStateChangedView(result.authoredStateChangedError.message);
   if (result.partialStateError !== undefined)

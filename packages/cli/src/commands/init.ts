@@ -42,11 +42,13 @@
  *   - which `targets:` entry shape goes into the YAML config
  *   - the `scope.languages` field on the example check
  *
- * `--language <list>` (comma-separated) overrides detection.
+ * `--language <list>` (comma-separated or repeatable) overrides detection.
  * Detection inspects filesystem markers (Cargo.toml, pyproject.toml,
- * go.mod, pom.xml/build.gradle, CMakeLists.txt, package.json+tsconfig).
- * When detection is ambiguous AND --language is missing, init exits
- * 2 with a helpful prompt — no partial scaffolding.
+ * go.mod, pom.xml/build.gradle, CMakeLists.txt, package.json+tsconfig)
+ * and accepts every detected language in host-canonical order (polyglot
+ * is not an error). When no markers are found and --language is missing,
+ * or when --language is empty/unknown, init exits 2 with a helpful prompt
+ * — no partial scaffolding.
  *
  * Partial-state handling:
  *
@@ -94,7 +96,7 @@ import {
 import { classifyFiles } from './init/file-classifier.js';
 import { createInitAuthoredPlan } from './init/init-authored-plan.js';
 import {
-  ALL_LANGUAGES,
+  canonicalizeLanguages,
   resolveLanguages,
   type SupportedLanguage,
 } from './init/language-detection.js';
@@ -154,9 +156,15 @@ class InitAttemptResolutionError extends Error {
   }
 }
 
-function canonicalLanguages(languages: readonly SupportedLanguage[]): SupportedLanguage[] {
-  const selected = new Set<SupportedLanguage>(languages);
-  return ALL_LANGUAGES.filter((language) => selected.has(language));
+function languageResolutionFailure(
+  error: NonNullable<InitResult['languageResolutionError']>,
+): Pick<InitResult, 'languageResolutionError' | 'ambiguousLanguageError'> {
+  // Dual-write: languageResolutionError is the current field;
+  // ambiguousLanguageError remains for older --json consumers.
+  return {
+    languageResolutionError: error,
+    ambiguousLanguageError: error,
+  };
 }
 
 function explicitLanguageResolution(
@@ -166,12 +174,12 @@ function explicitLanguageResolution(
   | { readonly ok: true; readonly languages?: readonly SupportedLanguage[] }
   | {
       readonly ok: false;
-      readonly error: NonNullable<InitResult['ambiguousLanguageError']>;
+      readonly error: NonNullable<InitResult['languageResolutionError']>;
     } {
   if (language === undefined || language.length === 0) return { ok: true };
   const resolution = resolveLanguages(cwd, language);
   return resolution.ok
-    ? { ok: true, languages: canonicalLanguages(resolution.languages) }
+    ? { ok: true, languages: canonicalizeLanguages(resolution.languages) }
     : { ok: false, error: resolution.error };
 }
 
@@ -204,10 +212,10 @@ function invalidInitInput(
     return {
       ...baseResult,
       created: false,
-      ambiguousLanguageError: {
+      ...languageResolutionFailure({
         detected: [],
         message: `Target directory does not exist: ${args.cwd}`,
-      },
+      }),
     };
   }
   return undefined;
@@ -232,11 +240,11 @@ function resolveFreshInitAttempt(input: {
       result: {
         ...input.baseResult,
         created: false,
-        ambiguousLanguageError: resolution.error,
+        ...languageResolutionFailure(resolution.error),
       },
     };
   }
-  const languages = canonicalLanguages(resolution.languages);
+  const languages = canonicalizeLanguages(resolution.languages);
   if (state === 'partial-dir-only' && explicitAuthoredMode(input.args) === undefined) {
     const preExistingFiles = classifyFiles(input.paths, languages, input.args.toolScaffolds);
     return {
@@ -419,7 +427,7 @@ async function recoveryResult(
     return {
       ...baseResult,
       created: false,
-      ambiguousLanguageError: explicit.error,
+      ...languageResolutionFailure(explicit.error),
     };
   }
   let recorded:
