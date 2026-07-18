@@ -1,0 +1,36 @@
+{
+  "schema": "platform-acceptance-profile-digests.v1",
+  "note": "Immutable digest freezes for verifier history (v1) and active execution (v2). Do not regenerate unless intentionally changing sealed profiles.",
+  "profiles": {
+    "common-v1": {
+      "schemaVersion": 1,
+      "version": 1,
+      "journeyCount": 46,
+      "digest": "1dc14e214d7c359d65d1685744735eabe066afbbc5fac9068f651d2f8df10825"
+    },
+    "macos-26-arm64-node24-npm11-v1": {
+      "schemaVersion": 1,
+      "version": 1,
+      "journeyCount": 58,
+      "baseId": "common-v1",
+      "baseDigest": "1dc14e214d7c359d65d1685744735eabe066afbbc5fac9068f651d2f8df10825",
+      "digest": "0b3ae1116cfba59682df86fee0ecb1002e67ef7407bd6275914cb788337aea81"
+    },
+    "common-v2": {
+      "schemaVersion": 2,
+      "version": 2,
+      "journeyCount": 47,
+      "digest": "9091ec828d5e8dc68d348e201b69be3a4194f4446c4c8ded584d5fce3afd3141",
+      "hasCacheInitPromotion": true
+    },
+    "macos-26-arm64-node24-npm11-v2": {
+      "schemaVersion": 2,
+      "version": 2,
+      "journeyCount": 59,
+      "baseId": "common-v2",
+      "baseDigest": "9091ec828d5e8dc68d348e201b69be3a4194f4446c4c8ded584d5fce3afd3141",
+      "digest": "8ac17074d6237a2436bbe945d5bf7ad7ef2a28c8ac49a4288fd51513b9e31556",
+      "hasCacheInitPromotion": true
+    }
+  }
+}

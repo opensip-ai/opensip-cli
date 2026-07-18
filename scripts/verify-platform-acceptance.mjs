@@ -977,7 +977,13 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
     fail('impossible-host-capability-claim', 'process-tree-cleanup');
   }
 
-  // 2. Recompute the profile identity digest and cross-check it.
+  // 2. Schema and profile identity must agree (v1 history vs v2 execution).
+  if (profile.schemaVersion !== evidence.schemaVersion) {
+    fail(
+      'evidence-schema-mismatch',
+      `profile=${profile.schemaVersion} evidence=${evidence.schemaVersion}`,
+    );
+  }
   if (profileDigest(profile) !== evidence.profile.digest) fail('profile-digest-mismatch');
   if (profile.id !== evidence.profile.id) fail('profile-id-mismatch');
   if (profile.version !== evidence.profile.version) fail('profile-version-mismatch');
@@ -1015,6 +1021,26 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
       const applicable = isJourneyApplicable(journey, evidence.candidate.kind);
       const expectedRequired = applicable && isJourneyRequired(journey, evidence.previousCandidate);
       if (entry.required !== expectedRequired) fail('journey-required-mismatch', journey.id);
+
+      // Schema-v2: result requiredPorts must equal the profile selection exactly.
+      if (profile.schemaVersion === 2) {
+        const expectedPorts = journey.requiredPorts ?? [];
+        const actualPorts = entry.requiredPorts ?? [];
+        if (
+          expectedPorts.length !== actualPorts.length ||
+          expectedPorts.some((port, index) => port !== actualPorts[index])
+        ) {
+          fail('required-ports-mismatch', journey.id);
+        }
+        // Only persistence.cache-init-promotion may pass with a non-null continuityProof.
+        if (journey.id === 'persistence.cache-init-promotion') {
+          if (entry.status === 'pass' && entry.continuityProof === null) {
+            fail('continuity-proof-required', journey.id);
+          }
+        } else if (entry.continuityProof != null) {
+          fail('continuity-proof-forbidden', journey.id);
+        }
+      }
 
       let expectedSkipReason = null;
       if (applicable) {
