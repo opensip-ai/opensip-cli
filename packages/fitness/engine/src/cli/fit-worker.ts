@@ -74,9 +74,17 @@ export const fitRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   visibility: 'internal',
   description:
     '[internal] Run fit headless and stream progress + result over IPC (forked by the live view)',
-  commonFlags: [],
+  commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [{ name: 'specPath', description: 'Path to a JSON FitOptions spec file' }],
   scope: 'project',
+  noInit: true,
   output: 'raw-stream',
   rawStreamReason: 'worker-ipc',
   handler: async (rawOpts): Promise<void> => {

@@ -15,7 +15,7 @@ export {
 
 export { renderResult } from './render.js';
 export { executeReportOpen, maybeOpenReport } from './report.js';
-export { installPreActionHook } from './pre-action-hook.js';
+export { disposeCurrentScope, installPreActionHook } from './pre-action-hook.js';
 export { buildCommandRegistrationInput } from './build-command-registration-input.js';
 export { buildHostPlanes } from './host-planes.js';
 export { isRootVersionRequest } from './root-version.js';

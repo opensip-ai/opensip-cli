@@ -116,6 +116,13 @@ export const capabilityWorkerCommandSpec: CommandSpec<unknown, CliCommandsContex
   description:
     '[internal] Run one capability-pack operation in a resource-bounded worker (forked by the capability isolation supervisor)',
   commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [
     {
       name: 'specPath',
@@ -123,6 +130,7 @@ export const capabilityWorkerCommandSpec: CommandSpec<unknown, CliCommandsContex
     },
   ],
   scope: 'project',
+  noInit: true,
   output: 'raw-stream',
   rawStreamReason: 'worker-ipc',
   handler: async (rawOpts): Promise<void> => {

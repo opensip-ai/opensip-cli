@@ -27,6 +27,7 @@
 import { mountHostCommands } from './host-command-specs.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { CommandActionScopeRunner } from '../bootstrap/command-action-scope-runner.js';
 import type { Command } from 'commander';
 
 export type { CliCommandsContext } from './shared.js';
@@ -38,6 +39,10 @@ export { runCommandSpecAction } from './run-command-spec-action.js';
  * tests can register commands against a fresh `Command` instance and inspect
  * the resulting subcommand tree.
  */
-export function registerCliCommands(program: Command, ctx: CliCommandsContext): void {
-  mountHostCommands(program, ctx);
+export function registerCliCommands(
+  program: Command,
+  ctx: CliCommandsContext,
+  actionScopeRunner?: CommandActionScopeRunner,
+): void {
+  mountHostCommands(program, ctx, actionScopeRunner);
 }

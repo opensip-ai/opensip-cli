@@ -141,9 +141,17 @@ export const graphRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   visibility: 'internal',
   description:
     '[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)',
-  commonFlags: [],
+  commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [{ name: 'specPath', description: 'Path to a JSON graph build-spec file' }],
   scope: 'project',
+  noInit: true,
   output: 'raw-stream',
   rawStreamReason: 'worker-ipc',
   handler: async (rawOpts, cli): Promise<void> => {

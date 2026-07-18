@@ -72,7 +72,14 @@ export const simRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = def
   visibility: 'internal',
   description:
     '[internal] Run sim headless and stream progress + result over IPC (forked by the live view)',
-  commonFlags: [],
+  commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [{ name: 'specPath', description: 'Path to a JSON sim-args spec file' }],
   scope: 'project',
   output: 'raw-stream',

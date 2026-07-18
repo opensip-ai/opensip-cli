@@ -136,8 +136,35 @@ function hostId(value: string, instanceIdentity?: string): string {
   return createHash('sha256').update(material).digest('hex').slice(0, 32);
 }
 
+function syntheticCoordinator(input: {
+  readonly pid: number;
+  readonly parentPid: number;
+  readonly processIdentities: ReadonlyMap<number, string>;
+  readonly tokenPrefix: string;
+}) {
+  let tokenSequence = 0;
+  return createRuntimeLeaseCoordinator({
+    pid: input.pid,
+    parentPid: input.parentPid,
+    hostname: () => 'delegated-reader-host',
+    hostInstanceIdentity: () => 'delegated-reader-host-instance',
+    inspectProcessIncarnation: (pid) => {
+      const identity = input.processIdentities.get(pid);
+      return identity === undefined
+        ? ({ status: 'absent' } as const)
+        : ({ status: 'present', identity } as const);
+    },
+    isProcessAlive: (pid) => input.processIdentities.has(pid),
+    generateToken: () => `${input.tokenPrefix}-${(++tokenSequence).toString().padStart(8, '0')}`,
+  });
+}
+
 function coreEntryPath(): string {
   return fileURLToPath(new URL('../../../dist/index.js', import.meta.url));
+}
+
+function runtimeLeaseEntryPath(): string {
+  return fileURLToPath(new URL('../../../dist/lib/runtime-lease.js', import.meta.url));
 }
 
 async function runBarrierWorkers(
@@ -504,6 +531,519 @@ describe('runtime lease coordination', () => {
     release(projectLease);
     track(await globalPromise);
   });
+
+  it('lets a direct child inherit a composite reader sequence ahead of a later writer', async () => {
+    const parentPid = 410_001;
+    const childPid = 410_002;
+    const writerPid = 410_003;
+    const identities = new Map([
+      [parentPid, 'parent-incarnation'],
+      [childPid, 'child-incarnation'],
+      [writerPid, 'writer-incarnation'],
+    ]);
+    const parentCoordinator = syntheticCoordinator({
+      pid: parentPid,
+      parentPid: 1,
+      processIdentities: identities,
+      tokenPrefix: 'parent-delegation',
+    });
+    const childCoordinator = syntheticCoordinator({
+      pid: childPid,
+      parentPid,
+      processIdentities: identities,
+      tokenPrefix: 'child-delegation',
+    });
+    const writerCoordinator = syntheticCoordinator({
+      pid: writerPid,
+      parentPid: 1,
+      processIdentities: identities,
+      tokenPrefix: 'writer-delegation',
+    });
+    const parent = track(
+      await parentCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        policy: POLICY,
+      }),
+    );
+    const writerEvents: string[] = [];
+    const writerPromise = writerCoordinator.acquireGlobalRuntimeMaintenanceLease({
+      policy: { ...POLICY, waitMs: 15_000 },
+      onEvent: (event) => writerEvents.push(event.kind),
+    });
+    void writerPromise.catch(() => undefined);
+    await waitUntil(() => writerEvents.includes('lease.acquire.wait'));
+
+    const child = track(
+      await childCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    );
+    const paths = resolveCoordinationPaths();
+    const projectReadersDir = paths.forProject(parent.coordinationKey!).readersDir;
+    const parentRecord = JSON.parse(
+      readFileSync(join(projectReadersDir, `reader-${parent.ownerToken}.json`), 'utf8'),
+    ) as { sequence: number };
+    const childProjectPath = join(projectReadersDir, `reader-${child.ownerToken}.json`);
+    const childUserPath = join(paths.userReadersDir, `reader-${child.ownerToken}.json`);
+    const childRecord = JSON.parse(readFileSync(childProjectPath, 'utf8')) as {
+      sequence: number;
+      pid: number;
+    };
+    expect(child.ownerToken).not.toBe(parent.ownerToken);
+    expect(childRecord).toMatchObject({
+      sequence: parentRecord.sequence,
+      pid: childPid,
+    });
+    expect(existsSync(childUserPath)).toBe(true);
+
+    release(parent);
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    expect(writerEvents).not.toContain('lease.acquire.complete');
+    expect(existsSync(childProjectPath)).toBe(true);
+    expect(existsSync(childUserPath)).toBe(true);
+
+    release(child);
+    expect(existsSync(childProjectPath)).toBe(false);
+    expect(existsSync(childUserPath)).toBe(false);
+    const writer = track(await writerPromise);
+    expect(writerEvents).toContain('lease.acquire.complete');
+    release(writer);
+  }, 30_000);
+
+  it('refuses parent inheritance across a writer that precedes the parent sequence', async () => {
+    const parentPid = 420_001;
+    const childPid = 420_002;
+    const writerPid = 420_003;
+    const identities = new Map([
+      [parentPid, 'parent-earlier-writer-incarnation'],
+      [childPid, 'child-earlier-writer-incarnation'],
+      [writerPid, 'writer-earlier-writer-incarnation'],
+    ]);
+    const parentCoordinator = syntheticCoordinator({
+      pid: parentPid,
+      parentPid: 1,
+      processIdentities: identities,
+      tokenPrefix: 'parent-earlier',
+    });
+    const childCoordinator = syntheticCoordinator({
+      pid: childPid,
+      parentPid,
+      processIdentities: identities,
+      tokenPrefix: 'child-earlier',
+    });
+    const writerCoordinator = syntheticCoordinator({
+      pid: writerPid,
+      parentPid: 1,
+      processIdentities: identities,
+      tokenPrefix: 'writer-earlier',
+    });
+    const parent = track(
+      await parentCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        policy: POLICY,
+      }),
+    );
+    const writerEvents: string[] = [];
+    const writerPromise = writerCoordinator.acquireGlobalRuntimeMaintenanceLease({
+      policy: { ...POLICY, waitMs: 15_000 },
+      onEvent: (event) => writerEvents.push(event.kind),
+    });
+    void writerPromise.catch(() => undefined);
+    await waitUntil(() => writerEvents.includes('lease.acquire.wait'));
+
+    const paths = resolveCoordinationPaths();
+    const projectReaderPath = join(
+      paths.forProject(parent.coordinationKey!).readersDir,
+      `reader-${parent.ownerToken}.json`,
+    );
+    const userReaderPath = join(paths.userReadersDir, `reader-${parent.ownerToken}.json`);
+    for (const path of [projectReaderPath, userReaderPath]) {
+      const record = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+      privateWrite(path, { ...record, sequence: 3 });
+    }
+
+    const childOwnerToken = 'delegated-child-earlier-0001';
+    await expect(
+      childCoordinator.acquireRuntimeAccessLease({
+        ownerToken: childOwnerToken,
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+    });
+    expect(
+      existsSync(
+        join(
+          paths.forProject(parent.coordinationKey!).readersDir,
+          `reader-${childOwnerToken}.json`,
+        ),
+      ),
+    ).toBe(false);
+    expect(existsSync(join(paths.userReadersDir, `reader-${childOwnerToken}.json`))).toBe(false);
+
+    release(parent);
+    const writer = track(await writerPromise);
+    release(writer);
+  }, 30_000);
+
+  it('requires host proof and uses a live-parent fallback when incarnation inspection is unavailable', async () => {
+    const runCase = async (
+      caseProject: string,
+      identityPosture: 'unproven-host' | 'missing-incarnation',
+      pidBase: number,
+    ): Promise<void> => {
+      const parentPid = pidBase + 1;
+      const childPid = pidBase + 2;
+      const writerPid = pidBase + 3;
+      const identities = new Map([
+        [parentPid, `${identityPosture}-parent-incarnation`],
+        [childPid, `${identityPosture}-child-incarnation`],
+        [writerPid, `${identityPosture}-writer-incarnation`],
+      ]);
+      let parentToken = 0;
+      const parentCoordinator = createRuntimeLeaseCoordinator({
+        pid: parentPid,
+        parentPid: 1,
+        hostname: () => `${identityPosture}-host`,
+        hostInstanceIdentity:
+          identityPosture === 'unproven-host'
+            ? () => undefined
+            : () => `${identityPosture}-host-instance`,
+        inspectProcessIncarnation: (pid) => {
+          if (identityPosture === 'missing-incarnation' && pid === parentPid) {
+            return { status: 'unknown' } as const;
+          }
+          const identity = identities.get(pid);
+          return identity === undefined
+            ? ({ status: 'absent' } as const)
+            : ({ status: 'present', identity } as const);
+        },
+        isProcessAlive: (pid) => identities.has(pid),
+        generateToken: () =>
+          `${identityPosture}-parent-${(++parentToken).toString().padStart(8, '0')}`,
+      });
+      let childToken = 0;
+      const childCoordinator = createRuntimeLeaseCoordinator({
+        pid: childPid,
+        parentPid,
+        hostname: () => `${identityPosture}-host`,
+        hostInstanceIdentity:
+          identityPosture === 'unproven-host'
+            ? () => undefined
+            : () => `${identityPosture}-host-instance`,
+        inspectProcessIncarnation: (pid) => {
+          if (identityPosture === 'missing-incarnation' && pid === parentPid) {
+            return { status: 'unknown' } as const;
+          }
+          const identity = identities.get(pid);
+          return identity === undefined
+            ? ({ status: 'absent' } as const)
+            : ({ status: 'present', identity } as const);
+        },
+        isProcessAlive: (pid) => identities.has(pid),
+        generateToken: () =>
+          `${identityPosture}-child-${(++childToken).toString().padStart(8, '0')}`,
+      });
+      const writerCoordinator = syntheticCoordinator({
+        pid: writerPid,
+        parentPid: 1,
+        processIdentities: identities,
+        tokenPrefix: `${identityPosture}-writer`,
+      });
+      const parent = track(
+        await parentCoordinator.acquireRuntimeAccessLease({
+          projectRead: { projectDir: caseProject },
+          userStateRead: true,
+          policy: POLICY,
+        }),
+      );
+      const writerEvents: string[] = [];
+      const writerPromise = writerCoordinator.acquireGlobalRuntimeMaintenanceLease({
+        policy: { ...POLICY, waitMs: 15_000 },
+        onEvent: (event) => writerEvents.push(event.kind),
+      });
+      void writerPromise.catch(() => undefined);
+      await waitUntil(() => writerEvents.includes('lease.acquire.wait'));
+
+      const acquireChild = () =>
+        childCoordinator.acquireRuntimeAccessLease({
+          projectRead: { projectDir: caseProject },
+          userStateRead: true,
+          inheritFromParent: true,
+          policy: POLICY,
+        });
+      if (identityPosture === 'unproven-host') {
+        await expect(acquireChild()).rejects.toMatchObject({
+          code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+        });
+      } else {
+        const child = track(await acquireChild());
+        expect(child.ownerToken).not.toBe(parent.ownerToken);
+        release(child);
+      }
+
+      release(parent);
+      const writer = track(await writerPromise);
+      release(writer);
+    };
+
+    await runCase(project, 'unproven-host', 440_000);
+    await runCase(otherProject, 'missing-incarnation', 450_000);
+  }, 30_000);
+
+  it('requires one unambiguous live same-host direct-parent composite reader', async () => {
+    const parentPid = 430_001;
+    const childPid = 430_002;
+    const identities = new Map([
+      [parentPid, 'parent-proof-incarnation'],
+      [childPid, 'child-proof-incarnation'],
+    ]);
+    const parentCoordinator = syntheticCoordinator({
+      pid: parentPid,
+      parentPid: 1,
+      processIdentities: identities,
+      tokenPrefix: 'parent-proof',
+    });
+    const childCoordinator = syntheticCoordinator({
+      pid: childPid,
+      parentPid,
+      processIdentities: identities,
+      tokenPrefix: 'child-proof',
+    });
+    const parent = track(
+      await parentCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        policy: POLICY,
+      }),
+    );
+
+    const ambiguousParent = track(
+      await parentCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        policy: POLICY,
+      }),
+    );
+    await expect(
+      childCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+    });
+    release(ambiguousParent);
+
+    const additionalUserParent = track(
+      await parentCoordinator.acquireUserStateReadLease({ policy: POLICY }),
+    );
+    await expect(
+      childCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+    });
+    release(additionalUserParent);
+
+    const projectOnlyParent = track(
+      await parentCoordinator.acquireRuntimeReadLease({
+        projectDir: otherProject,
+        policy: POLICY,
+      }),
+    );
+    await expect(
+      childCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: otherProject },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+    });
+    release(projectOnlyParent);
+
+    const userOnlyParentPid = parentPid + 200;
+    const userOnlyChildPid = childPid + 200;
+    const userOnlyIdentities = new Map([
+      [userOnlyParentPid, 'user-only-parent-incarnation'],
+      [userOnlyChildPid, 'user-only-child-incarnation'],
+      ...identities,
+    ]);
+    const userOnlyParentCoordinator = syntheticCoordinator({
+      pid: userOnlyParentPid,
+      parentPid: 1,
+      processIdentities: userOnlyIdentities,
+      tokenPrefix: 'user-only-parent',
+    });
+    const userOnlyChildCoordinator = syntheticCoordinator({
+      pid: userOnlyChildPid,
+      parentPid: userOnlyParentPid,
+      processIdentities: userOnlyIdentities,
+      tokenPrefix: 'user-only-child',
+    });
+    const userOnlyParent = track(
+      await userOnlyParentCoordinator.acquireUserStateReadLease({ policy: POLICY }),
+    );
+    await expect(
+      userOnlyChildCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: otherProject },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+    });
+    release(userOnlyParent);
+
+    const missingParentPid = parentPid + 99;
+    const missingParentView = syntheticCoordinator({
+      pid: childPid,
+      parentPid: missingParentPid,
+      processIdentities: new Map([
+        ...identities,
+        [missingParentPid, 'unregistered-parent-incarnation'],
+      ]),
+      tokenPrefix: 'child-missing-parent',
+    });
+    const topLevel = track(
+      await missingParentView.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    );
+    const proofPaths = resolveCoordinationPaths();
+    const readSequence = (ownerToken: string) =>
+      (
+        JSON.parse(
+          readFileSync(
+            join(
+              proofPaths.forProject(parent.coordinationKey!).readersDir,
+              `reader-${ownerToken}.json`,
+            ),
+            'utf8',
+          ),
+        ) as { sequence: number }
+      ).sequence;
+    expect(readSequence(topLevel.ownerToken)).toBeGreaterThan(readSequence(parent.ownerToken));
+    release(topLevel);
+
+    await expect(
+      childCoordinator.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+    });
+
+    const staleView = syntheticCoordinator({
+      pid: childPid,
+      parentPid,
+      processIdentities: new Map([
+        [parentPid, 'reused-parent-incarnation'],
+        [childPid, 'child-proof-incarnation'],
+      ]),
+      tokenPrefix: 'child-stale-parent',
+    });
+    const reparented = track(
+      await staleView.acquireRuntimeAccessLease({
+        projectRead: { projectDir: project },
+        userStateRead: true,
+        inheritFromParent: true,
+        policy: POLICY,
+      }),
+    );
+    release(reparented);
+
+    release(parent);
+  });
+
+  it.runIf(process.platform === 'linux' || process.platform === 'darwin')(
+    'inherits through the default OS parent identity and keeps a later writer blocked',
+    async () => {
+      const parent = track(
+        await acquireRuntimeAccessLease({
+          projectRead: { projectDir: project },
+          userStateRead: true,
+          policy: { ...POLICY, waitMs: 15_000 },
+        }),
+      );
+      const writerEvents: string[] = [];
+      const writerPromise = acquireGlobalRuntimeMaintenanceLease({
+        policy: { ...POLICY, waitMs: 30_000 },
+        onEvent: (event) => writerEvents.push(event.kind),
+      });
+      void writerPromise.catch(() => undefined);
+      await waitUntil(() => writerEvents.includes('lease.acquire.wait'));
+
+      const worker = String.raw`
+        import { pathToFileURL } from "node:url";
+        const core = await import(pathToFileURL(process.argv[1]).href);
+        try {
+          const lease = await core.acquireRuntimeAccessLease({
+            projectRead: { projectDir: process.argv[2] },
+            userStateRead: true,
+            inheritFromParent: true,
+            policy: { waitMs: 15000, staleMs: 5000, heartbeatMs: 100, pollMs: 2 },
+          });
+          process.stdout.write("READY\n");
+          process.stdin.setEncoding("utf8");
+          process.stdin.once("data", (command) => {
+            if (command.trim() !== "RELEASE") process.exit(2);
+            lease.release();
+            process.stdout.write("DONE\n");
+            process.exit(0);
+          });
+        } catch (error) {
+          console.error(error);
+          process.exit(3);
+        }
+      `;
+      const child = spawn(process.execPath, [
+        '--input-type=module',
+        '--eval',
+        worker,
+        coreEntryPath(),
+        project,
+      ]);
+      try {
+        await waitForChildOutput(child, 'READY\n', 30_000);
+        release(parent);
+        await new Promise<void>((resolve) => setTimeout(resolve, 25));
+        expect(writerEvents).not.toContain('lease.acquire.complete');
+
+        const completed = waitForChildOutput(child, 'DONE\n', 30_000);
+        child.stdin.write('RELEASE\n');
+        await completed;
+        const writer = track(await writerPromise);
+        expect(writerEvents).toContain('lease.acquire.complete');
+        release(writer);
+      } finally {
+        await stopChild(child);
+      }
+    },
+    45_000,
+  );
 
   it('lets a held project writer add reentrant user-state refs ahead of a later global writer', async () => {
     const projectWriter = track(
@@ -2339,6 +2879,62 @@ describe('runtime lease coordination', () => {
       projectReaders: 0,
     });
   });
+
+  it('waits without spinning when synchronous release meets healthy mutex contention', async () => {
+    const lease = track(
+      await acquireRuntimeReadLease({
+        projectDir: project,
+        policy: { waitMs: 7000, staleMs: 20_000, heartbeatMs: 1000, pollMs: 25 },
+      }),
+    );
+    const runtimeLeaseEntry = runtimeLeaseEntryPath();
+    const worker = String.raw`
+      import { pathToFileURL } from "node:url";
+      const core = await import(pathToFileURL(process.argv[1]).href);
+      let paused = false;
+      const coordinator = core.createRuntimeLeaseCoordinator({
+        coordinationCheckpoint: (name) => {
+          if (name !== "mutex-entered" || paused) return;
+          paused = true;
+          process.stdout.write("READY\n");
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5500);
+        },
+      });
+      try {
+        const reader = await coordinator.acquireUserStateReadLease({
+          policy: { waitMs: 10000, staleMs: 20000, heartbeatMs: 1000, pollMs: 25 },
+        });
+        reader.release();
+        process.stdout.write("DONE\n");
+        process.exit(0);
+      } catch (error) {
+        console.error(error);
+        process.exit(3);
+      }
+    `;
+    const child = spawn(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      worker,
+      runtimeLeaseEntry,
+    ]);
+    try {
+      await waitForChildOutput(child, 'READY\n');
+      const completed = waitForChildOutput(child, 'DONE\n', 20_000);
+      void completed.catch(() => undefined);
+      const cpuBefore = process.cpuUsage();
+      release(lease);
+      const cpu = process.cpuUsage(cpuBefore);
+      expect((cpu.user + cpu.system) / 1000).toBeLessThan(2500);
+      await completed;
+      expect(await inspectRuntimeLeaseState(project)).toMatchObject({
+        status: 'stable',
+        projectReaders: 0,
+      });
+    } finally {
+      await stopChild(child);
+    }
+  }, 30_000);
 
   it.runIf(process.platform !== 'win32')(
     'forces private coordination modes under a restrictive umask',

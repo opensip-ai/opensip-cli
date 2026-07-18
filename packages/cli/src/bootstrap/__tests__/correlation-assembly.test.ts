@@ -218,7 +218,12 @@ describe('parentCommand is the FIRST segment of the command path (GAP e)', () =>
   const COMMAND_SCOPES = buildCommandScopeIndex({
     hostSpecs: [],
     hostGroups: [],
-    toolSpecs: [],
+    toolSpecs: [
+      {
+        name: 'graph',
+        scope: 'project',
+      },
+    ],
   });
 
   it('derives parentCommand=graph from a `graph` invocation (never graph-shard-worker)', async () => {

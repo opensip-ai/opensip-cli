@@ -88,10 +88,11 @@ export function buildDeniedWorkerDatastoreThunk(logger: Logger): DatastoreThunk 
   // Cast via unknown: the callable always throws (never returns DataStore), so
   // TS would otherwise reject the DatastoreThunk shape.
   const thunk = denyDatastoreAccess as unknown as DatastoreThunk;
+  thunk.current = () => void 0;
   // Dispose is a no-op: nothing was opened.
-  thunk.dispose = (): void => {
-    // Intentionally empty — denied thunk never materialises a connection.
-  };
+  thunk.dispose = () =>
+    // Denied thunk never materialises a connection.
+    ({ checkpointed: true, closed: true });
   return thunk;
 }
 

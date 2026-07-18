@@ -25,10 +25,19 @@ import type { ProgressEvent, ProgressSurface } from '@opensip-cli/cli-ui';
 
 const SIM_TOOL_TITLE = 'Simulation Scenarios';
 const SIM_TOOL_DESCRIPTION = 'Running simulation scenarios against your codebase.';
-const SIM_LOADING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Loading scenarios...' };
-const SIM_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running scenarios...' };
+const SIM_LOADING_SURFACE: ProgressSurface = {
+  shape: 'pool',
+  label: 'Loading scenarios...',
+};
+const SIM_RUNNING_SURFACE: ProgressSurface = {
+  shape: 'pool',
+  label: 'Running scenarios...',
+};
 
-type SimLiveArgs = ToolOptions & { readonly quiet?: boolean; readonly verbose?: boolean };
+type SimLiveArgs = ToolOptions & {
+  readonly quiet?: boolean;
+  readonly verbose?: boolean;
+};
 
 interface SimDoneShape {
   readonly envelope: SignalEnvelope;
@@ -39,7 +48,11 @@ function executeSimWithProgress(
   args: SimLiveArgs,
   emit: (event: ProgressEvent) => void,
 ): ReturnType<typeof executeSim> {
-  emit({ type: 'stage-start', stage: 'scenarios', label: 'Running scenarios...' });
+  emit({
+    type: 'stage-start',
+    stage: 'scenarios',
+    label: 'Running scenarios...',
+  });
   return executeSim(args, {
     onProgress: (completed, total) =>
       emit({ type: 'stage-progress', stage: 'scenarios', completed, total }),
@@ -48,6 +61,11 @@ function executeSimWithProgress(
 
 export interface RenderSimLiveOptions {
   readonly setExitCode?: (code: number) => void;
+}
+
+function workerProjectSelectionArgs(cwd: string): string[] {
+  const configPath = currentScope()?.projectContext?.configPath;
+  return ['--cwd', cwd, ...(configPath === undefined ? [] : ['--config', configPath])];
 }
 
 export async function renderSimLive(
@@ -74,7 +92,7 @@ export async function renderSimLive(
         const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>({
           descriptor: {
             command: process.argv[1] ?? '',
-            argv: ['sim-run-worker', specPath],
+            argv: ['sim-run-worker', specPath, ...workerProjectSelectionArgs(args.cwd)],
             ...(correlation ? { correlation } : {}),
           },
           inProcess: (workerEmit) => executeSimWithProgress(args, workerEmit),

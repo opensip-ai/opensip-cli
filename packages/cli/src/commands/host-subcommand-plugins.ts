@@ -20,6 +20,7 @@ import { mountCommandSpec } from './mount-command-spec.js';
 import { pluginAdd, pluginList, pluginRemove, pluginSync } from './plugin.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { CommandActionScopeRunner } from '../bootstrap/command-action-scope-runner.js';
 import type { CliProgram } from '@opensip-cli/contracts';
 
 function pluginCwdOption() {
@@ -183,13 +184,14 @@ export function mountToolPluginGroups(
   program: CliProgram,
   ctx: CliCommandsContext,
   registry?: ToolRegistry,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): void {
   for (const group of buildToolPluginGroups(ctx, registry)) {
     const primary = program.commands.find((c) => c.name() === group.parentVerb);
     if (primary === undefined) continue;
     const parent = primary.command('plugin').description(group.description);
     for (const leaf of group.leaves) {
-      mountCommandSpec(parent, leaf, ctx);
+      mountCommandSpec(parent, leaf, ctx, {}, actionScopeRunner);
     }
   }
 }

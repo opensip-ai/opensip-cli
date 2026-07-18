@@ -140,8 +140,19 @@ export class RunScope {
   }
 
   dispose(): void {
-    this.parseCache.dispose();
-    this.recipeUnitConfig.clear();
+    // Teardown is a safety boundary, not a convenience callback. A corrupted
+    // or Tool-mutated cache/config object must not prevent persistence close
+    // proof and runtime-lease release in the registered disposer tail.
+    try {
+      this.parseCache.dispose();
+    } catch {
+      /* @swallow-ok continue draining safety-critical disposers */
+    }
+    try {
+      this.recipeUnitConfig.clear();
+    } catch {
+      /* @swallow-ok continue draining safety-critical disposers */
+    }
     for (const fn of this.disposers.splice(0)) {
       try {
         fn();

@@ -27,7 +27,7 @@ const unit = {
   configPath: '/repo/packages/a/tsconfig.json',
 };
 
-function mockCli(): {
+function mockCli(configPath?: string): {
   readonly cli: ToolCliContext;
   readonly emitJson: ReturnType<typeof vi.fn>;
   readonly render: ReturnType<typeof vi.fn>;
@@ -44,7 +44,10 @@ function mockCli(): {
       render,
       deliverSignals,
       setExitCode,
-      scope: { languages: { getAll: vi.fn(() => []) } },
+      scope: {
+        languages: { getAll: vi.fn(() => []) },
+        ...(configPath === undefined ? {} : { projectContext: { configPath } }),
+      },
     } as unknown as ToolCliContext,
     emitJson,
     render,
@@ -93,6 +96,46 @@ beforeEach(() => {
 });
 
 describe('executeWorkspaceGraph evidence', () => {
+  it('forwards the parent OpenSIP config selection to workspace children', async () => {
+    const configPath = '/repo/custom opensip.yml';
+    const { cli } = mockCli(configPath);
+    const { scope } = completionLogger();
+
+    await runWithScope(scope, () =>
+      executeWorkspaceGraph({ cwd: '/repo', cliScript: '/repo/opensip.cjs' }, cli),
+    );
+
+    expect(h.runWorkspaceUnitsInParallel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: '/repo',
+        configPath,
+      }),
+    );
+  });
+
+  it('forwards bootstrap’s canonical cwd when the explicit option was relative', async () => {
+    const { cli } = mockCli('/repo/project/custom opensip.yml');
+    (
+      cli.scope as unknown as { projectContext: { cwd: string; configPath: string } }
+    ).projectContext = {
+      cwd: '/repo/project',
+      configPath: '/repo/project/custom opensip.yml',
+    };
+    const { scope } = completionLogger();
+
+    await runWithScope(scope, () =>
+      executeWorkspaceGraph({ cwd: 'project', cliScript: '/repo/opensip.cjs' }, cli),
+    );
+
+    expect(h.discoverPolyglotUnits).toHaveBeenCalledWith('/repo/project', expect.any(Array));
+    expect(h.runWorkspaceUnitsInParallel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: '/repo/project',
+        configPath: '/repo/project/custom opensip.yml',
+      }),
+    );
+  });
+
   it('returns one aggregate parent session in human mode without aggregate egress', async () => {
     const { cli, emitJson, render, deliverSignals } = mockCli();
     const { info, scope } = completionLogger();
@@ -129,10 +172,7 @@ describe('executeWorkspaceGraph evidence', () => {
     const { info, scope } = completionLogger();
 
     const outcome = await runWithScope(scope, () =>
-      executeWorkspaceGraph(
-        { cwd: '/repo', cliScript: '/repo/opensip.cjs', json: true },
-        cli,
-      ),
+      executeWorkspaceGraph({ cwd: '/repo', cliScript: '/repo/opensip.cjs', json: true }, cli),
     );
 
     expect(outcome).toEqual(

@@ -115,6 +115,7 @@ describe('runWorkspaceUnitsInParallel', () => {
       mkdirSync(unitRoot, { recursive: true });
       const argvPath = join(root, 'argv.jsonl');
       const cliScript = join(root, 'fake-cli.cjs');
+      const configPath = join(root, 'custom opensip.yml');
       writeFileSync(
         cliScript,
         `
@@ -127,6 +128,7 @@ process.stdout.write(JSON.stringify({ signals: [] }));
 
       const out = await runWorkspaceUnitsInParallel({
         cwd: root,
+        configPath,
         units: [{ id: 'api', rootDir: unitRoot }],
         cliScript,
         concurrency: 1,
@@ -142,6 +144,10 @@ process.stdout.write(JSON.stringify({ signals: [] }));
         'graph',
         unitRoot,
         '--json',
+        '--cwd',
+        root,
+        '--config',
+        configPath,
         '--no-cache',
         '--resolution',
         'fast',

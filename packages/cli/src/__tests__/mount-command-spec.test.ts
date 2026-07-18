@@ -17,17 +17,19 @@
  */
 
 import { mapToolErrorToExitCode } from '@opensip-cli/contracts';
-import { ConfigurationError, defineCommand } from '@opensip-cli/core';
+import { ConfigurationError, currentScope, defineCommand, RunScope } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { Command } from 'commander';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createCommandActionScopeRunner } from '../bootstrap/pre-action-hook.js';
 import {
   createRunActionHooks,
   createRunPlaneFactory,
   createRunSessionSeam,
 } from '../bootstrap/run-plane.js';
+import { createRuntimeLeaseLifecycle } from '../commands/host-runtime-access.js';
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 
 import type { CommandMountContext, HostCommandSpec } from '../commands/mount-command-spec.js';
@@ -859,6 +861,251 @@ describe('mountCommandSpec — host run-lifecycle hooks', () => {
     expect(beginRun).toHaveBeenCalledOnce();
     expect(completeRun).not.toHaveBeenCalled(); // handler threw before the completeRun line
     expect(exitCodes.length).toBeGreaterThan(0); // ToolError → mapped non-zero exit
+  });
+});
+
+describe('mountCommandSpec — staged RunScope lifecycle through Commander', () => {
+  interface StagedScopeHarness {
+    scope: RunScope;
+    runner: ReturnType<typeof createCommandActionScopeRunner>;
+    disposed: ReturnType<typeof vi.fn>;
+    leaseRelease: ReturnType<typeof vi.fn>;
+    leaseLifecycle: ReturnType<typeof createRuntimeLeaseLifecycle>;
+  }
+
+  function stageScope(): StagedScopeHarness {
+    const scope = new RunScope({ runId: 'run-mounted-scope-lifecycle' });
+    const runner = createCommandActionScopeRunner();
+    const disposed = vi.fn();
+    const leaseRelease = vi.fn();
+    const leaseLifecycle = createRuntimeLeaseLifecycle({
+      ownerToken: 'owner-mounted-scope-lifecycle',
+      acquiredAt: 1,
+      release: leaseRelease,
+    });
+    scope.onDispose(() => disposed(currentScope() === scope));
+    scope.onDispose(() =>
+      leaseLifecycle.finishAfterDatastoreClose({ checkpointed: true, closed: true }),
+    );
+    leaseLifecycle.transferToScope();
+    expect(leaseLifecycle.state()).toBe('scope');
+    runner.stage(scope);
+    return { scope, runner, disposed, leaseRelease, leaseLifecycle };
+  }
+
+  function expectDisposedExactlyOnce(harness: StagedScopeHarness): void {
+    const { runner, disposed, leaseRelease, leaseLifecycle } = harness;
+    // The composition root owns this idempotent fallback after parse failures.
+    // Calling it here proves the mounted action already consumed and disposed
+    // the staged scope, rather than leaving a second teardown for the fallback.
+    runner.disposeStaged();
+    expect(disposed).toHaveBeenCalledOnce();
+    expect(disposed).toHaveBeenCalledWith(true);
+    expect(leaseLifecycle.state()).toBe('released');
+    expect(leaseRelease).toHaveBeenCalledOnce();
+    expect(currentScope()).toBeUndefined();
+  }
+
+  it('keeps the staged scope current through a successful handler and output render', async () => {
+    const { ctx: baseCtx } = makeCtx();
+    const staged = stageScope();
+    const { scope, runner } = staged;
+    const render = vi.fn(async () => {
+      expect(currentScope()).toBe(scope);
+      await Promise.resolve();
+      expect(currentScope()).toBe(scope);
+    });
+    const ctx = { ...baseCtx, render };
+    const handler = vi.fn(async () => {
+      expect(currentScope()).toBe(scope);
+      await Promise.resolve();
+      expect(currentScope()).toBe(scope);
+      return { type: 'help' as const };
+    });
+    const program = new Command();
+    const spec: HostCommandSpec<unknown> = defineCommand({
+      name: 'scoped-success',
+      description: 'successful scoped command',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx, {}, runner);
+
+    await program.parseAsync(['scoped-success'], { from: 'user' });
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(render).toHaveBeenCalledOnce();
+    expectDisposedExactlyOnce(staged);
+  });
+
+  it('disposes exactly once when an unexpected handler rejection escapes Commander', async () => {
+    const { ctx } = makeCtx();
+    const staged = stageScope();
+    const { scope, runner } = staged;
+    const failure = new Error('unexpected handler rejection');
+    const handler = vi.fn(async () => {
+      expect(currentScope()).toBe(scope);
+      await Promise.resolve();
+      throw failure;
+    });
+    const program = new Command();
+    const spec: HostCommandSpec<unknown> = defineCommand({
+      name: 'scoped-rejection',
+      description: 'unexpected rejection',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx, {}, runner);
+
+    await expect(program.parseAsync(['scoped-rejection'], { from: 'user' })).rejects.toBe(failure);
+
+    expectDisposedExactlyOnce(staged);
+  });
+
+  it('keeps the scope current while a typed ToolError is handled and rendered', async () => {
+    const { ctx: baseCtx } = makeCtx();
+    const staged = stageScope();
+    const { scope, runner } = staged;
+    const render = vi.fn(async () => {
+      expect(currentScope()).toBe(scope);
+      await Promise.resolve();
+      expect(currentScope()).toBe(scope);
+    });
+    const ctx: CommandMountContext = {
+      render,
+      setExitCode: baseCtx.setExitCode,
+    };
+    const failure = new ConfigurationError('invalid mounted command configuration', {
+      code: 'CONFIGURATION_ERROR',
+    });
+    const handler = vi.fn(() => {
+      expect(currentScope()).toBe(scope);
+      throw failure;
+    });
+    const program = new Command();
+    const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
+      name: 'scoped-tool-error',
+      description: 'typed ToolError',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx as ToolCliContext, {}, runner);
+
+    await program.parseAsync(['scoped-tool-error'], { from: 'user' });
+
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        message: 'invalid mounted command configuration',
+      }),
+    );
+    expectDisposedExactlyOnce(staged);
+  });
+
+  it('disposes exactly once when command-result rendering rejects', async () => {
+    const { ctx: baseCtx } = makeCtx();
+    const staged = stageScope();
+    const { scope, runner } = staged;
+    const failure = new Error('output rendering failed');
+    const render = vi.fn(async () => {
+      expect(currentScope()).toBe(scope);
+      await Promise.resolve();
+      throw failure;
+    });
+    const ctx = { ...baseCtx, render };
+    const handler = vi.fn(() => {
+      expect(currentScope()).toBe(scope);
+      return { type: 'help' as const };
+    });
+    const program = new Command();
+    const spec: HostCommandSpec<unknown> = defineCommand({
+      name: 'scoped-output-rejection',
+      description: 'output rejection',
+      commonFlags: [],
+      scope: 'none',
+      output: 'command-result',
+      handler,
+    });
+    mountCommandSpec(program, spec, ctx, {}, runner);
+
+    await expect(program.parseAsync(['scoped-output-rejection'], { from: 'user' })).rejects.toBe(
+      failure,
+    );
+
+    expectDisposedExactlyOnce(staged);
+  });
+
+  it('holds the scope through a real deferred report-effect rejection and disposes once', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    const staged = stageScope();
+    const { scope, runner } = staged;
+    const reportFailure = new TypeError('report path is unavailable');
+    const reportFailureScopeObservations: boolean[] = [];
+    const executeReportEffect = vi.fn(async () => {
+      expect(currentScope()).toBe(scope);
+      await Promise.resolve();
+      expect(currentScope()).toBe(scope);
+      throw reportFailure;
+    });
+    const onReportEffectFailure = vi.fn(async () => {
+      reportFailureScopeObservations.push(currentScope() === scope);
+      await Promise.resolve();
+      reportFailureScopeObservations.push(currentScope() === scope);
+    });
+    try {
+      const factory = createRunPlaneFactory({
+        getDatastore: () => datastore,
+        executeReportEffect,
+        onReportEffectFailure,
+        logger: SILENT_LOG,
+      });
+      const { ctx: baseCtx } = makeCtx();
+      const ctx: ToolCliContext = {
+        ...baseCtx,
+        runSession: createRunSessionSeam(factory),
+      };
+      const handler = vi.fn(() => {
+        expect(currentScope()).toBe(scope);
+        return {
+          session: {
+            tool: 'fit',
+            cwd: '/project',
+            score: 100,
+            passed: true,
+          },
+        };
+      });
+      const program = new Command();
+      const spec: HostCommandSpec<unknown> = defineCommand({
+        name: 'scoped-report-rejection',
+        description: 'deferred report rejection',
+        commonFlags: [],
+        scope: 'none',
+        output: 'command-result',
+        handler,
+      });
+      factory.queueReportEffect({ kind: 'compose-and-open' });
+      mountCommandSpec(program, spec, ctx, createRunActionHooks(factory), runner);
+
+      await program.parseAsync(['scoped-report-rejection'], { from: 'user' });
+
+      expect(executeReportEffect).toHaveBeenCalledOnce();
+      expect(onReportEffectFailure).toHaveBeenCalledWith({
+        effect: { kind: 'compose-and-open' },
+        errorName: 'TypeError',
+      });
+      expect(reportFailureScopeObservations).toEqual([true, true]);
+      expect(new SessionRepo(datastore).list()).toHaveLength(1);
+      expectDisposedExactlyOnce(staged);
+    } finally {
+      datastore.close();
+    }
   });
 });
 

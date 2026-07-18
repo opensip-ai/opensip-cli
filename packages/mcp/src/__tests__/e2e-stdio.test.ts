@@ -100,6 +100,7 @@ const CONFIG_YML = [
 ].join('\n');
 const SOURCE = BASE_PROJECT_SOURCE;
 const OVERSIZED_SESSION_ID = 'graph-e2e-oversized';
+const TEST_HOME = mkdtempSync(join(tmpdir(), 'mcp-e2e-home-'));
 
 // A config with NON-EMPTY target conventions, so both transports emit an equal
 // bounded `projectContext.targetConventions` for the same fixture (Plan 03,
@@ -139,6 +140,9 @@ const CATALOG_CONFIG_YML = [
 const SAFE_ENV: Record<string, string> = Object.fromEntries(
   Object.entries(process.env).filter(([, v]) => v !== undefined) as [string, string][],
 );
+SAFE_ENV.HOME = TEST_HOME;
+SAFE_ENV.XDG_CACHE_HOME = join(TEST_HOME, 'xdg-cache');
+SAFE_ENV.XDG_CONFIG_HOME = join(TEST_HOME, 'xdg-config');
 
 async function runBuiltCli(root: string, args: readonly string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -738,6 +742,7 @@ afterAll(() => {
   if (lifecycleFixture) rmSync(lifecycleFixture, { recursive: true, force: true });
   if (contextFixture) rmSync(contextFixture, { recursive: true, force: true });
   if (catalogFixture) rmSync(catalogFixture, { recursive: true, force: true });
+  rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
 describe('MCP e2e over real stdio', () => {

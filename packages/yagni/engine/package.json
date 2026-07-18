@@ -143,7 +143,16 @@
         "name": "yagni-run-worker",
         "description": "[internal] Run YAGNI headless and stream progress + result over IPC (forked by the live view)",
         "visibility": "internal",
-        "commonFlags": [],
+        "commonFlags": [
+          "cwd"
+        ],
+        "options": [
+          {
+            "flag": "--config",
+            "value": "<path>",
+            "description": "Resolved project config inherited from the parent run"
+          }
+        ],
         "args": [
           {
             "name": "specPath",

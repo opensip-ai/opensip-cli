@@ -222,6 +222,7 @@ describe('CLI e2e', () => {
         writeFileSync(join(tempDir, 'src', 'a.ts'), 'export const x = 1;\nconsole.log(x);\n');
 
         const fakeHome = join(tempDir, '.home');
+        mkdirSync(fakeHome, { recursive: true });
         const { stdout, stderr, exitCode } = cli.run(
           ['fit', '--json', '--check', 'no-console-log'],
           {
@@ -231,7 +232,7 @@ describe('CLI e2e', () => {
         );
         expect([0, 1]).toContain(exitCode);
         const outcome = JSON.parse(stdout);
-        expect(outcome.kind).toBe('fit.run');
+        expect(outcome.kind, JSON.stringify({ outcome, stderr }, undefined, 2)).toBe('fit.run');
         expect(outcome.status).toBe('ok');
         expect(outcome.envelope.verdict.summary.total).toBe(1);
         expect(stderr).not.toContain('opensip init');
@@ -359,7 +360,10 @@ describe('CLI e2e', () => {
         const graph = cli.run(['graph', '--json'], { cwd: project, env });
         expect(graph.exitCode).toBe(0);
 
-        const listed = cli.run(['runs', 'list', '--json'], { cwd: project, env });
+        const listed = cli.run(['runs', 'list', '--json'], {
+          cwd: project,
+          env,
+        });
         expect(listed.exitCode).toBe(0);
         const history = (
           JSON.parse(listed.stdout) as {
@@ -373,9 +377,7 @@ describe('CLI e2e', () => {
         expect(history?.runs).toHaveLength(1);
         const runId = history?.runs?.[0]?.run?.id;
         expect(runId).toMatch(/^[A-Za-z0-9_-]{1,128}$/u);
-        expect(history?.runs?.[0]?.showCommand).toBe(
-          `opensip runs show ${String(runId)} --json`,
-        );
+        expect(history?.runs?.[0]?.showCommand).toBe(`opensip runs show ${String(runId)} --json`);
 
         const shown = cli.run(['runs', 'show', String(runId), '--json'], {
           cwd: project,
@@ -418,7 +420,10 @@ describe('CLI e2e', () => {
         ).data;
         expect(replay?.session).toMatchObject({ id: sessionId, tool: 'graph' });
 
-        const listedAgain = cli.run(['runs', 'list', '--json'], { cwd: project, env });
+        const listedAgain = cli.run(['runs', 'list', '--json'], {
+          cwd: project,
+          env,
+        });
         expect(
           (
             JSON.parse(listedAgain.stdout) as {

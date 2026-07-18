@@ -27,6 +27,7 @@ import { buildOption, formatArgUsage } from './mount-command-spec-wiring.js';
 import { runCommandSpecAction } from './run-command-spec-action.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { CommandActionScopeRunner } from '../bootstrap/command-action-scope-runner.js';
 
 /**
  * A {@link CommandSpec} whose handler receives the concrete host
@@ -65,6 +66,8 @@ export type HostCommandSpec<TOpts = Record<string, unknown>> = CommandSpec<TOpts
  *                `ToolCliContext`; this is the mount plane's structural subset.
  * @param hooks   Host-only run-lifecycle hooks (`beginRun`, `completeRun`, …).
  *                Omitted for lean host-command contexts that carry no run plane.
+ * @param actionScopeRunner Invocation-local bridge that binds the RunScope
+ *                across Commander's async pre-action/action continuation.
  * @returns       The mounted Commander command, so a caller nesting children
  *                (e.g. `mountOneTool`) can mount sub-subcommands onto it.
  */
@@ -73,18 +76,21 @@ export function mountCommandSpec(
   spec: CommandSpec<unknown, CliCommandsContext>,
   ctx: CliCommandsContext,
   hooks?: RunActionHooks,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): CliProgram;
 export function mountCommandSpec(
   program: CliProgram,
   spec: CommandSpec<unknown, ToolCliContext>,
   ctx: ToolCliContext,
   hooks?: RunActionHooks,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): CliProgram;
 export function mountCommandSpec<TCtx extends CommandMountContext>(
   program: CliProgram,
   spec: CommandSpec<unknown, TCtx>,
   ctx: TCtx,
   hooks: RunActionHooks = {},
+  actionScopeRunner?: CommandActionScopeRunner,
 ): CliProgram {
   const cmd = program.command(spec.name).description(spec.description);
   if (spec.aliases !== undefined && spec.aliases.length > 0) {
@@ -136,7 +142,12 @@ export function mountCommandSpec<TCtx extends CommandMountContext>(
   cmd.action(async (...actionArgs: unknown[]) => {
     const { opts, positionals } = splitActionArgs(actionArgs);
     const optsWithArgs = { ...opts, _args: positionals };
-    await runCommandSpecAction(spec, optsWithArgs, positionals, ctx, hooks);
+    const runAction = () => runCommandSpecAction(spec, optsWithArgs, positionals, ctx, hooks);
+    if (actionScopeRunner === undefined) {
+      await runAction();
+      return;
+    }
+    await actionScopeRunner.run(runAction);
   });
   return cmd;
 }

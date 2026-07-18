@@ -221,9 +221,11 @@ function buildRepairApplySpec(ctx: CliCommandsContext): HostSpec {
         return replayed.result;
       }
       if (opts.verify === true) {
+        const configPath = currentScope()?.projectContext?.configPath;
         const result = await applyAndVerifyRepair({
           ...replayed.input,
           force: opts.force === true,
+          ...(configPath === undefined ? {} : { configPath }),
         });
         if (!result.ok) return commandError(ctx, result.error);
         if (result.value.status === 'refused' || result.value.verification.status !== 'verified') {

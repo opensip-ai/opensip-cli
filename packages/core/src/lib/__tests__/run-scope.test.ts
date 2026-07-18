@@ -91,6 +91,23 @@ describe('RunScope — dispose', () => {
     scope.dispose();
     expect(() => scope.dispose()).not.toThrow();
   });
+
+  it('drains registered disposers when built-in cleanup throws', () => {
+    const scope = new RunScope();
+    const disposer = vi.fn();
+    const clear = vi.spyOn(scope.recipeUnitConfig, 'clear').mockImplementation(() => {
+      throw new Error('config cleanup failed');
+    });
+    vi.spyOn(scope.parseCache, 'dispose').mockImplementation(() => {
+      throw new Error('cache cleanup failed');
+    });
+    scope.onDispose(disposer);
+
+    expect(() => scope.dispose()).not.toThrow();
+
+    expect(clear).toHaveBeenCalledOnce();
+    expect(disposer).toHaveBeenCalledOnce();
+  });
 });
 
 describe('runWithScope / currentScope', () => {

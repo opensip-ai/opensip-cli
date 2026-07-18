@@ -30,8 +30,14 @@ const FIT_TOOL_TITLE = 'Fitness Checks';
 const FIT_TOOL_DESCRIPTION =
   'Scanning your codebase for quality, security, and architecture issues.';
 
-const FIT_LOADING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Loading checks...' };
-const FIT_RUNNING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Running checks...' };
+const FIT_LOADING_SURFACE: ProgressSurface = {
+  shape: 'pool',
+  label: 'Loading checks...',
+};
+const FIT_RUNNING_SURFACE: ProgressSurface = {
+  shape: 'pool',
+  label: 'Running checks...',
+};
 
 function executeFitWithProgress(
   args: FitOptions,
@@ -59,6 +65,11 @@ function fitRowsToLiveRunTable(rows: readonly FitTableRow[]): LiveRunTableRow[] 
 
 export interface RenderFitLiveOptions {
   readonly setExitCode?: (code: number) => void;
+}
+
+function workerProjectSelectionArgs(cwd: string): string[] {
+  const configPath = currentScope()?.projectContext?.configPath;
+  return ['--cwd', cwd, ...(configPath === undefined ? [] : ['--config', configPath])];
 }
 
 export async function renderFitLive(
@@ -97,7 +108,7 @@ export async function renderFitLive(
         const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeFit>>>({
           descriptor: {
             command: process.argv[1] ?? '',
-            argv: ['fit-run-worker', specPath],
+            argv: ['fit-run-worker', specPath, ...workerProjectSelectionArgs(args.cwd)],
             ...(correlation ? { correlation } : {}),
           },
           inProcess: (workerEmit) => executeFitWithProgress(args, workerEmit),
@@ -139,7 +150,9 @@ export async function renderFitLive(
 
         const { result } = fitResult as { result: RunPresentation };
         const envelope = result.envelope;
-        const verboseDetail = buildFitVerboseDetail(envelope, { verbose: args.verbose === true });
+        const verboseDetail = buildFitVerboseDetail(envelope, {
+          verbose: args.verbose === true,
+        });
         const findingsGroups =
           verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0
             ? verboseDetail.groups

@@ -24,16 +24,18 @@ import {
   BootstrapDiagnosticsCollector,
   createCapabilityRegistry,
   type CliDiagnostic,
-  type LanguageRegistry,
+  LanguageRegistry,
   type Logger,
+  LoggerImpl,
   type ProjectContext,
   resolveUserPaths,
   RunScope,
+  runWithScopeSync,
   resolveToolHooks,
   type RuntimeCommandInventory,
   type ToolPluginManifest,
   type ToolProvenance,
-  type ToolRegistry,
+  ToolRegistry,
 } from '@opensip-cli/core';
 import { resolveSignalSink } from '@opensip-cli/output';
 
@@ -51,6 +53,38 @@ import { buildDeniedWorkerDatastoreThunk } from './worker-datastore.js';
 import type { loadCliDefaults } from './cli-defaults.js';
 import type { PolicyAuditCollector } from './policy-audit.js';
 import type { StartupTimingEvent } from './startup-timing.js';
+import type { RuntimeLeaseLifecycle } from '../commands/host-runtime-access.js';
+
+export interface BuildInspectionOnlyScopeInput {
+  readonly project: ProjectContext;
+  readonly runId: string;
+}
+
+export interface BuildInspectionOnlyScopeResult {
+  readonly scope: RunScope;
+  readonly logger: Logger;
+}
+
+/**
+ * Minimal non-persistent scope for `status`. No config composition, cloud
+ * sink, datastore factory, report state, Tool hook, or file logger is touched.
+ */
+export function buildInspectionOnlyScope(
+  input: BuildInspectionOnlyScopeInput,
+): BuildInspectionOnlyScopeResult {
+  const inspectionLogger = new LoggerImpl({ silent: true, runId: input.runId });
+  const scope = new RunScope({
+    logger: inspectionLogger,
+    projectContext: input.project,
+    languages: new LanguageRegistry(),
+    tools: new ToolRegistry(),
+    runId: input.runId,
+    datastore: () => {
+      // Inspection-only scope has no persistence capability.
+    },
+  });
+  return { scope, logger: inspectionLogger };
+}
 
 /** Inputs required to build a fully wired per-run scope. */
 export interface BuildPerRunScopeInput {
@@ -112,13 +146,24 @@ export interface BuildPerRunScopeInput {
     readonly update: string | undefined;
   };
   /**
-   * Ambient datastore capability for this scope. `'local'` opens the project
-   * SQLite store lazily; `'host-rpc-only'` installs a denied thunk so isolated
-   * workers cannot recover a local handle via `cli.scope` or `currentScope()`.
-   * Resolved by bootstrap from the internal command path + host marker —
+   * Ambient datastore capability for this scope:
+   *
+   * - `'local'` opens project SQLite lazily, including for teardown audit flush.
+   * - `'local-explicit-only'` permits an action to open project SQLite, but
+   *   teardown never materializes it solely to flush policy audit events.
+   * - `'host-rpc-only'` installs a denied thunk so isolated workers cannot
+   *   recover a local handle via `cli.scope` or `currentScope()`.
+   * - `'none'` denies local persistence for non-runtime host commands.
+   *
+   * Bootstrap resolves this from the internal command path + host marker —
    * never from config, manifest, CLI option, or RPC.
    */
-  readonly datastoreAccess: 'local' | 'host-rpc-only';
+  readonly datastoreAccess: 'local' | 'local-explicit-only' | 'host-rpc-only' | 'none';
+  /**
+   * CLI-only runtime lease ownership. It is consumed by the combined
+   * persistence teardown and is never installed on RunScope.
+   */
+  readonly runtimeLeaseLifecycle?: RuntimeLeaseLifecycle;
 }
 
 /**
@@ -215,10 +260,12 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
   // External workers get a denied thunk (ADR-0145): ambient access fails loud;
   // privileged effects cross host RPC only.
   const datastoreAccess = input.datastoreAccess;
+  const datastoreProject =
+    datastoreAccess === 'none' ? { ...project, scope: 'none' as const } : project;
   const datastoreThunk =
     datastoreAccess === 'host-rpc-only'
       ? buildDeniedWorkerDatastoreThunk(logger)
-      : buildDatastoreThunk(project, logger, input.parentCommand);
+      : buildDatastoreThunk(datastoreProject, logger, input.parentCommand);
   const scope = new RunScope({
     logger,
     projectContext: project,
@@ -263,96 +310,140 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     capabilityAdmission: admitCapabilityPackage,
   });
 
-  // Flush policy audit events before the datastore close disposer. Both are
-  // best-effort; flush opens the project store only when policy decisions exist.
-  scope.onDispose(() => {
-    flushPolicyAuditEvents();
-  });
-  // Close the datastore on scope teardown — the "consumer responsibility"
-  // RunScope.dispose() documents. No-op when no command opened it.
-  scope.onDispose(datastoreThunk.dispose);
+  let persistenceAndLeaseDisposed = false;
+  const disposePersistenceAndLease = (): void => {
+    if (persistenceAndLeaseDisposed) return;
+    persistenceAndLeaseDisposed = true;
+    try {
+      // Flush first: it may lazily open the datastore to persist policy
+      // decisions, so close proof must be gathered after this step. Composite
+      // scope-none host commands are coordination-only: they may explicitly
+      // open SQLite (tools uninstall --purge-data), but teardown must never
+      // materialize it merely to persist policy audit events.
+      if (datastoreAccess === 'local-explicit-only') {
+        const opened = datastoreThunk.current();
+        if (opened !== undefined) flushPolicyAuditEvents(opened);
+      } else {
+        flushPolicyAuditEvents();
+      }
+    } catch {
+      // @swallow-ok policy audit flush is best-effort during teardown.
+    }
+    let closeResult;
+    try {
+      closeResult = datastoreThunk.dispose();
+    } catch {
+      closeResult = {
+        checkpointed: false,
+        closed: false,
+        reason: 'checkpoint-and-close-failed',
+      } as const;
+    }
+    input.runtimeLeaseLifecycle?.finishAfterDatastoreClose(closeResult);
+  };
 
-  for (const timing of startupTimings ?? []) {
-    scope.diagnostics.event('load', 'debug', `startup phase '${timing.name}' completed`, {
-      source: 'startup',
-      phase: timing.name,
-      durationMs: timing.durationMs,
-      sinceStartMs: timing.sinceStartMs,
-      ...(timing.skipped === true ? { skipped: true } : {}),
+  try {
+    for (const timing of startupTimings ?? []) {
+      scope.diagnostics.event('load', 'debug', `startup phase '${timing.name}' completed`, {
+        source: 'startup',
+        phase: timing.name,
+        durationMs: timing.durationMs,
+        sinceStartMs: timing.sinceStartMs,
+        ...(timing.skipped === true ? { skipped: true } : {}),
+      });
+    }
+
+    // Observability of the assembly step (consistent with the contributeScope /
+    // capabilities diagnostics below). Do NOT log the `repo` VALUE at debug — it
+    // can be a filesystem path; log the boolean `hasRepo` instead.
+    scope.diagnostics.event('load', 'debug', 'run correlation assembled', {
+      tool: correlation.tool,
+      parentCommand: correlation.parentCommand,
+      cloudActive,
+      hasTraceId: traceId !== undefined,
+      hasRepo: correlation.repo !== undefined,
     });
+
+    // Lifecycle diagnostics: record wiring steps (contributeScope + capabilities)
+    // on the bus *before* enterScope. These ride the eventual CommandOutcome so
+    // --json consumers and the uniform diagnostics snapshot see the full
+    // per-run construction (addresses architecture review findings on observability
+    // of steps 6/7 and blast-radius files).
+    // ADR-0054 M4-F: the HOST process never executes an EXTERNAL tool's
+    // `contributeScope` (running its runtime closure is the load-time hole the ADR
+    // rejects). External subscopes are contributed worker-side — the dispatch
+    // worker re-runs this SAME builder with the host-skip INACTIVE, so the
+    // dispatched external tool's subscope is installed there (the isolation
+    // boundary). Bundled tools contribute in-host exactly as before. The
+    // diagnostics count only the tools whose hook actually runs in-host.
+    const contributing = tools
+      .list()
+      .filter((t) => !!resolveToolHooks(t).contributeScope && shouldRunHookInHost(t, provenance));
+    scope.diagnostics.event(
+      'load',
+      'debug',
+      `${contributing.length} tool(s) contributed subscope`,
+      {
+        tools: contributing.map((t) => t.metadata.id ?? t.metadata.name),
+      },
+    );
+    scope.diagnostics.counter('tools.subscope_contributions', contributing.length);
+
+    // D7: each selected tool contributes its tool-specific subscope BEFORE the
+    // scope is entered. Host-vs-worker selection (provenance / shouldRunHookInHost)
+    // is CLI-owned; validation + install + disposer registration is the single
+    // core helper `applyToolContributeScope` (no parallel installer path).
+    for (const tool of contributing) {
+      applyToolContributeScope(scope, tool);
+    }
+
+    // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
+    // M4-F: pass provenance so the registry installs an external tool's REAL
+    // registrar in-host only when the host-skip is inactive (i.e. in the worker).
+    const capabilities = wireCapabilityRegistry({
+      tools,
+      manifests,
+      registry: createCapabilityRegistry(logger),
+      provenance,
+    });
+
+    const wired = capabilities.listDomains().map((d) => d.id);
+    scope.diagnostics.event('load', 'debug', `wired ${wired.length} capability domain(s)`, {
+      domains: wired,
+    });
+    scope.diagnostics.counter('capabilities.wired', wired.length);
+
+    Object.assign(scope, {
+      capabilities,
+      toolConfig,
+      targets,
+      ...configDocumentSlot(project, configDocument),
+    });
+
+    // Also surface the config validation result for the uniform lifecycle view.
+    const toolConfigNamespaces = tools.list().filter((t) => !!resolveToolHooks(t).config).length;
+    scope.diagnostics.event(
+      'validate',
+      'debug',
+      `config composed for ${toolConfigNamespaces} tool namespace(s)`,
+    );
+
+    // Register the combined persistence/lease teardown LAST. RunScope executes
+    // disposers FIFO, so every Tool-contributed disposer runs before SQLite is
+    // closed and the runtime reader is released.
+    scope.onDispose(disposePersistenceAndLease);
+    input.runtimeLeaseLifecycle?.transferToScope();
+    return scope;
+  } catch (error) {
+    // Dispose any Tool contributions already installed, then close persistence
+    // and release only when native-close proof permits it. The outer bootstrap
+    // sees the lifecycle as released/retained and cannot undo that decision.
+    runWithScopeSync(scope, () => {
+      scope.dispose();
+      disposePersistenceAndLease();
+    });
+    throw error;
   }
-
-  // Observability of the assembly step (consistent with the contributeScope /
-  // capabilities diagnostics below). Do NOT log the `repo` VALUE at debug — it
-  // can be a filesystem path; log the boolean `hasRepo` instead.
-  scope.diagnostics.event('load', 'debug', 'run correlation assembled', {
-    tool: correlation.tool,
-    parentCommand: correlation.parentCommand,
-    cloudActive,
-    hasTraceId: traceId !== undefined,
-    hasRepo: correlation.repo !== undefined,
-  });
-
-  // Lifecycle diagnostics: record wiring steps (contributeScope + capabilities)
-  // on the bus *before* enterScope. These ride the eventual CommandOutcome so
-  // --json consumers and the uniform diagnostics snapshot see the full
-  // per-run construction (addresses architecture review findings on observability
-  // of steps 6/7 and blast-radius files).
-  // ADR-0054 M4-F: the HOST process never executes an EXTERNAL tool's
-  // `contributeScope` (running its runtime closure is the load-time hole the ADR
-  // rejects). External subscopes are contributed worker-side — the dispatch
-  // worker re-runs this SAME builder with the host-skip INACTIVE, so the
-  // dispatched external tool's subscope is installed there (the isolation
-  // boundary). Bundled tools contribute in-host exactly as before. The
-  // diagnostics count only the tools whose hook actually runs in-host.
-  const contributing = tools
-    .list()
-    .filter((t) => !!resolveToolHooks(t).contributeScope && shouldRunHookInHost(t, provenance));
-  scope.diagnostics.event('load', 'debug', `${contributing.length} tool(s) contributed subscope`, {
-    tools: contributing.map((t) => t.metadata.id ?? t.metadata.name),
-  });
-  scope.diagnostics.counter('tools.subscope_contributions', contributing.length);
-
-  // D7: each selected tool contributes its tool-specific subscope BEFORE the
-  // scope is entered. Host-vs-worker selection (provenance / shouldRunHookInHost)
-  // is CLI-owned; validation + install + disposer registration is the single
-  // core helper `applyToolContributeScope` (no parallel installer path).
-  for (const tool of contributing) {
-    applyToolContributeScope(scope, tool);
-  }
-
-  // §5.3 Phase 4: per-run capability registry (manifest domains → real registrars).
-  // M4-F: pass provenance so the registry installs an external tool's REAL
-  // registrar in-host only when the host-skip is inactive (i.e. in the worker).
-  const capabilities = wireCapabilityRegistry({
-    tools,
-    manifests,
-    registry: createCapabilityRegistry(logger),
-    provenance,
-  });
-
-  const wired = capabilities.listDomains().map((d) => d.id);
-  scope.diagnostics.event('load', 'debug', `wired ${wired.length} capability domain(s)`, {
-    domains: wired,
-  });
-  scope.diagnostics.counter('capabilities.wired', wired.length);
-
-  Object.assign(scope, {
-    capabilities,
-    toolConfig,
-    targets,
-    ...configDocumentSlot(project, configDocument),
-  });
-
-  // Also surface the config validation result for the uniform lifecycle view.
-  const toolConfigNamespaces = tools.list().filter((t) => !!resolveToolHooks(t).config).length;
-  scope.diagnostics.event(
-    'validate',
-    'debug',
-    `config composed for ${toolConfigNamespaces} tool namespace(s)`,
-  );
-
-  return scope;
 }
 
 function configDocumentSlot(

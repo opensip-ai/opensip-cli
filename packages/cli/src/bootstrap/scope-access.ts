@@ -24,7 +24,11 @@ import {
   logger as defaultLogger,
   resolveRuntimePathsForScope,
 } from '@opensip-cli/core';
-import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
+import {
+  DataStoreFactory,
+  type DataStore,
+  type DatastoreCloseResult,
+} from '@opensip-cli/datastore';
 
 import { buildDatastoreLockContext } from './state-lock-policy.js';
 
@@ -97,12 +101,14 @@ export function getCurrentRuntimePaths(): RuntimePaths {
  */
 export interface DatastoreThunk {
   (): DataStore;
+  /** Return the cached store without materializing SQLite. */
+  current: () => DataStore | undefined;
   /**
    * Close the cached connection (no-op if it was never opened). An arrow-type
    * property, not a method, so it can be passed straight to `scope.onDispose`
    * (no unbound-method footgun) while still being assignable on construction.
    */
-  dispose: () => void;
+  dispose: () => DatastoreCloseResult;
 }
 
 /**
@@ -122,6 +128,7 @@ export function buildDatastoreThunk(
   commandName?: string,
 ): DatastoreThunk {
   let cached: DataStore | undefined;
+  let failedMaterialization = false;
   const thunk = (() => {
     if (cached) return cached;
     if (project.scope !== 'project' && project.scope !== 'ephemeral') {
@@ -133,14 +140,23 @@ export function buildDatastoreThunk(
     }
     const runtime = resolveRuntimePathsForScope(project);
     const path = `${runtime.runtimeDir}/datastore.sqlite`;
-    cached = DataStoreFactory.open({
-      backend: 'sqlite',
-      path,
-      lock: buildDatastoreLockContext(log, {
-        cwd: project.projectRoot,
-        commandName,
-      }),
-    });
+    try {
+      cached = DataStoreFactory.open({
+        backend: 'sqlite',
+        path,
+        lock: buildDatastoreLockContext(log, {
+          cwd: project.projectRoot,
+          commandName,
+        }),
+      });
+      failedMaterialization = false;
+    } catch (error) {
+      // The factory may have opened SQLite and then failed migration/version
+      // cleanup without proving the native handle closed. Preserve that
+      // uncertainty for lifecycle teardown; never classify it as "never opened".
+      failedMaterialization = true;
+      throw error;
+    }
     log.info({
       evt: 'cli.datastore.opened',
       module: 'cli:context',
@@ -148,14 +164,55 @@ export function buildDatastoreThunk(
     });
     return cached;
   }) as DatastoreThunk;
+  thunk.current = () => cached;
   // Close the cached connection on scope teardown (registered via
   // `scope.onDispose`). Closing checkpoints + truncates the WAL; without this the
   // connection (and its growing -wal sidecar) leaked for the process lifetime.
-  thunk.dispose = (): void => {
-    if (!cached) return;
-    cached.close();
-    cached = undefined;
-    log.info({ evt: 'cli.datastore.closed', module: 'cli:context' });
+  thunk.dispose = (): DatastoreCloseResult => {
+    if (!cached) {
+      return failedMaterialization
+        ? {
+            checkpointed: false,
+            closed: false,
+            reason: 'checkpoint-and-close-failed',
+          }
+        : { checkpointed: true, closed: true };
+    }
+    let result: DatastoreCloseResult;
+    try {
+      if (cached.closeForLifecycle === undefined) {
+        cached.close();
+        result = { checkpointed: true, closed: true };
+      } else {
+        result = cached.closeForLifecycle();
+      }
+    } catch {
+      result = {
+        checkpointed: false,
+        closed: false,
+        reason: 'checkpoint-and-close-failed',
+      };
+    }
+    if (result.closed) {
+      cached = undefined;
+      failedMaterialization = false;
+      try {
+        log.info({ evt: 'cli.datastore.closed', module: 'cli:context' });
+      } catch {
+        // @swallow-ok lifecycle proof must not be invalidated by diagnostic observers.
+      }
+    } else {
+      try {
+        log.error({
+          evt: 'cli.datastore.close_unproven',
+          module: 'cli:context',
+          reason: result.reason,
+        });
+      } catch {
+        // @swallow-ok keep the unclosed handle/lease protected even if logging fails.
+      }
+    }
+    return result;
   };
   return thunk;
 }

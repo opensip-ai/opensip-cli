@@ -5,12 +5,7 @@ export type RuntimeStoragePlane = 'cache' | 'project' | 'none';
 
 /** Current relationship between the cache candidate and project runtime. */
 export type RuntimeAdoptionState =
-  | 'ready'
-  | 'not-needed'
-  | 'legacy-unverified'
-  | 'conflict'
-  | 'busy'
-  | 'recovery-required';
+  'ready' | 'not-needed' | 'legacy-unverified' | 'conflict' | 'busy' | 'recovery-required';
 
 /** Strength of the evidence tying a runtime to this repository generation. */
 export type RuntimeIdentityStrength = 'generation-bound' | 'path-only' | 'legacy-unverified';

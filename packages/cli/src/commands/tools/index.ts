@@ -10,14 +10,13 @@
  */
 
 import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
-import {
-  currentScope,
-  defineCommand,
-  type CommandSpec,
-  type ProjectContext,
-} from '@opensip-cli/core';
+import { currentScope, type ProjectContext } from '@opensip-cli/core';
 
 import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
+import {
+  defineHostCommand as defineCommand,
+  type HostRuntimeCommandSpec,
+} from '../host-runtime-access.js';
 
 import { toolsListAvailable } from './available.js';
 import { toolsCreate } from './create.js';
@@ -31,7 +30,7 @@ import { runToolValidation } from './validate.js';
 import type { CliCommandsContext } from '../shared.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
-type HostSpec = CommandSpec<unknown, CliCommandsContext>;
+type HostSpec = HostRuntimeCommandSpec<unknown, CliCommandsContext>;
 const COMMAND_RESULT_OUTPUT = 'command-result';
 
 /** Static-handler provenance shared by every tools-group command spec. */
@@ -193,134 +192,140 @@ function buildToolsValidateSpec(ctx: CliCommandsContext): HostSpec {
 }
 
 function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
-    staticHandler: {
-      package: TOOLS_COMMAND_PACKAGE,
-      path: TOOLS_COMMAND_SPECS_PATH,
-      declaration: 'buildToolsInstallSpec',
+  return defineCommand<unknown, CliCommandsContext>(
+    {
+      staticHandler: {
+        package: TOOLS_COMMAND_PACKAGE,
+        path: TOOLS_COMMAND_SPECS_PATH,
+        declaration: 'buildToolsInstallSpec',
+      },
+      name: 'install',
+      description: 'Validate, then install a tool package (global by default; see tools validate)',
+      commonFlags: ['json'],
+      args: [
+        {
+          name: 'spec',
+          description: 'npm spec, tarball, or local directory path',
+        },
+      ],
+      options: [
+        {
+          flag: '--global',
+          description: 'Install user-global (the default)',
+          default: false,
+        },
+        {
+          flag: '--project',
+          description: 'Install into this project’s runtime tool host instead',
+          default: false,
+        },
+      ],
+      scope: 'none',
+      output: COMMAND_RESULT_OUTPUT,
+      handler: async (rawOpts) => {
+        const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
+        if (opts.global === true && opts.project === true) {
+          ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+          return {
+            type: 'tools-uninstall',
+            target: opts._args[0] ?? '',
+            success: false,
+            error: '--global and --project are mutually exclusive',
+          } satisfies CommandResult;
+        }
+        const result = await toolsInstall({
+          spec: opts._args[0] ?? '',
+          cwd: effectiveCwd(opts),
+          project: opts.project,
+        });
+        if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+        return result;
+      },
     },
-    name: 'install',
-    description: 'Validate, then install a tool package (global by default; see tools validate)',
-    commonFlags: ['json'],
-    args: [
-      {
-        name: 'spec',
-        description: 'npm spec, tarball, or local directory path',
-      },
-    ],
-    options: [
-      {
-        flag: '--global',
-        description: 'Install user-global (the default)',
-        default: false,
-      },
-      {
-        flag: '--project',
-        description: 'Install into this project’s runtime tool host instead',
-        default: false,
-      },
-    ],
-    scope: 'none',
-    output: COMMAND_RESULT_OUTPUT,
-    handler: async (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
-      if (opts.global === true && opts.project === true) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'tools-uninstall',
-          target: opts._args[0] ?? '',
-          success: false,
-          error: '--global and --project are mutually exclusive',
-        } satisfies CommandResult;
-      }
-      const result = await toolsInstall({
-        spec: opts._args[0] ?? '',
-        cwd: effectiveCwd(opts),
-        project: opts.project,
-      });
-      if (!result.success) ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-      return result;
-    },
-  });
+    { runtimeAccess: 'project-and-user-state' },
+  );
 }
 
 function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
-    staticHandler: {
-      package: TOOLS_COMMAND_PACKAGE,
-      path: TOOLS_COMMAND_SPECS_PATH,
-      declaration: 'buildToolsUninstallSpec',
-    },
-    name: 'uninstall',
-    description: 'Uninstall a tool by id or package name (never deletes project SQLite data)',
-    commonFlags: ['json'],
-    args: [{ name: 'name-or-id', description: 'Tool id or npm package name' }],
-    options: [
-      {
-        flag: '--global',
-        description: 'Target the user-global install',
-        default: false,
+  return defineCommand<unknown, CliCommandsContext>(
+    {
+      staticHandler: {
+        package: TOOLS_COMMAND_PACKAGE,
+        path: TOOLS_COMMAND_SPECS_PATH,
+        declaration: 'buildToolsUninstallSpec',
       },
-      {
-        flag: '--project',
-        description: 'Target the project-local install',
-        default: false,
-      },
-      {
-        flag: '--purge-data',
-        description: 'Also purge the tool’s project SQLite rows (project scope only)',
-        default: false,
-      },
-    ],
-    scope: 'none',
-    output: COMMAND_RESULT_OUTPUT,
-    // eslint-disable-next-line @typescript-eslint/require-await -- async keeps the CommandSpec handler signature; the bodies are synchronous SQLite + fs
-    handler: async (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & {
-        _args: string[];
-        purgeData?: boolean;
-      };
-      // --purge-data is project-local only: runtime data lives per project
-      // (the spec's explicit rejection for --global).
-      if (opts.purgeData === true && opts.global === true) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return {
-          type: 'tools-uninstall',
-          target: opts._args[0] ?? '',
-          success: false,
-          error:
-            '--purge-data is project-local only (runtime data lives per project); it cannot combine with --global',
-        } satisfies CommandResult;
-      }
-      const result = toolsUninstall({
-        target: opts._args[0] ?? '',
-        cwd: effectiveCwd(opts),
-        global: opts.global,
-        project: opts.project,
-        // Per-run admitted-tool provenance (bundled-id guard) from the scope.
-        provenance: currentScope()?.toolProvenance ?? [],
-      });
-      if (!result.success) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return result;
-      }
-      if (opts.purgeData === true && result.removed?.scope === 'project') {
-        const datastore = ctx.datastore() as DataStore | undefined;
-        if (datastore !== undefined) {
-          // Purge AFTER a successful project uninstall; counts ride stderr so
-          // the uninstall result stays the command's one payload.
-          const scope = currentScope();
-          const purgeForms = deriveToolDataPurgeIdForms(result.removed.id, scope?.tools);
-          const purge = toolsDataPurge(result.removed.id, datastore, purgeForms, scope?.logger);
-          process.stderr.write(
-            `opensip: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
-              `${purge.stateRows} state row(s) for '${purge.toolId}'\n`,
-          );
+      name: 'uninstall',
+      description: 'Uninstall a tool by id or package name (never deletes project SQLite data)',
+      commonFlags: ['json'],
+      args: [{ name: 'name-or-id', description: 'Tool id or npm package name' }],
+      options: [
+        {
+          flag: '--global',
+          description: 'Target the user-global install',
+          default: false,
+        },
+        {
+          flag: '--project',
+          description: 'Target the project-local install',
+          default: false,
+        },
+        {
+          flag: '--purge-data',
+          description: 'Also purge the tool’s project SQLite rows (project scope only)',
+          default: false,
+        },
+      ],
+      scope: 'none',
+      output: COMMAND_RESULT_OUTPUT,
+      // eslint-disable-next-line @typescript-eslint/require-await -- async keeps the CommandSpec handler signature; the bodies are synchronous SQLite + fs
+      handler: async (rawOpts) => {
+        const opts = rawOpts as ScopeFilterOpts & {
+          _args: string[];
+          purgeData?: boolean;
+        };
+        // --purge-data is project-local only: runtime data lives per project
+        // (the spec's explicit rejection for --global).
+        if (opts.purgeData === true && opts.global === true) {
+          ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+          return {
+            type: 'tools-uninstall',
+            target: opts._args[0] ?? '',
+            success: false,
+            error:
+              '--purge-data is project-local only (runtime data lives per project); it cannot combine with --global',
+          } satisfies CommandResult;
         }
-      }
-      return result;
+        const result = toolsUninstall({
+          target: opts._args[0] ?? '',
+          cwd: effectiveCwd(opts),
+          global: opts.global,
+          project: opts.project,
+          // Per-run admitted-tool provenance (bundled-id guard) from the scope.
+          provenance: currentScope()?.toolProvenance ?? [],
+        });
+        if (!result.success) {
+          ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
+          return result;
+        }
+        if (opts.purgeData === true && result.removed?.scope === 'project') {
+          const datastore = ctx.datastore() as DataStore | undefined;
+          if (datastore !== undefined) {
+            // Purge AFTER a successful project uninstall; counts ride stderr so
+            // the uninstall result stays the command's one payload.
+            const scope = currentScope();
+            const purgeForms = deriveToolDataPurgeIdForms(result.removed.id, scope?.tools);
+            const purge = toolsDataPurge(result.removed.id, datastore, purgeForms, scope?.logger);
+            process.stderr.write(
+              `opensip: purged ${purge.sessions} session(s), ${purge.baselineEntries} baseline entr(ies), ` +
+                `${purge.stateRows} state row(s) for '${purge.toolId}'\n`,
+            );
+          }
+        }
+        return result;
+      },
     },
-  });
+    { runtimeAccess: 'project-and-user-state' },
+  );
 }
 
 function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {

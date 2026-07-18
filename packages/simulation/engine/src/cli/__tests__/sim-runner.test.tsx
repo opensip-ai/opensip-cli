@@ -14,6 +14,7 @@ import type * as CoreModule from '@opensip-cli/core';
 
 const runToolLiveView = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() => vi.fn());
+const currentScope = vi.hoisted(() => vi.fn());
 
 vi.mock('@opensip-cli/cli-live', () => ({
   runToolLiveView,
@@ -28,7 +29,7 @@ vi.mock('@opensip-cli/core', async (importOriginal) => {
   return {
     ...actual,
     runOffThreadOrInProcess,
-    currentScope: vi.fn(() => undefined),
+    currentScope,
   };
 });
 
@@ -53,6 +54,8 @@ beforeEach(() => {
   capturedSpec = undefined;
   runToolLiveView.mockReset();
   runOffThreadOrInProcess.mockReset();
+  currentScope.mockReset();
+  currentScope.mockReturnValue(undefined);
   executeSimMock.mockReset();
   executeSimMock.mockResolvedValue({
     result: {
@@ -76,6 +79,38 @@ describe('renderSimLive', () => {
     await renderSimLive({ cwd: '/proj', recipe: 'example', json: false, debug: false });
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
     expect(capturedSpec?.tool).toBe('simulation');
+  });
+
+  it('passes the resolved cwd and custom config to the child bootstrap', async () => {
+    currentScope.mockReturnValue({
+      projectContext: { configPath: '/repo with spaces/custom config.yml' },
+    });
+    await renderSimLive({
+      cwd: '/repo with spaces',
+      recipe: 'example',
+      json: false,
+      debug: false,
+    });
+    await capturedSpec!.produce(vi.fn(), {
+      setRunning: vi.fn(),
+      setHeaderMetadata: vi.fn(),
+      setShowRunHeader: vi.fn(),
+    });
+
+    expect(runOffThreadOrInProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: expect.objectContaining({
+          argv: [
+            'sim-run-worker',
+            expect.any(String),
+            '--cwd',
+            '/repo with spaces',
+            '--config',
+            '/repo with spaces/custom config.yml',
+          ],
+        }),
+      }),
+    );
   });
 
   it('maps executeSim results into a done LiveRunOutcome with session', async () => {

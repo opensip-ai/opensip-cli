@@ -9,12 +9,7 @@
  */
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import {
-  ConfigurationError,
-  currentScope,
-  defineCommand,
-  type ProjectContext,
-} from '@opensip-cli/core';
+import { ConfigurationError, currentScope, type ProjectContext } from '@opensip-cli/core';
 
 import { capabilityWorkerCommandSpec } from '../bootstrap/capability-worker/entry.js';
 import { toolCommandWorkerCommandSpec } from '../bootstrap/tool-command-worker-entry.js';
@@ -32,6 +27,7 @@ import {
   type ToolPluginGroupLike,
 } from './completion.js';
 import { executeConfigure } from './configure.js';
+import { defineHostCommand as defineCommand } from './host-runtime-access.js';
 import {
   buildHostSubcommandGroups,
   buildToolPluginGroups,
@@ -50,6 +46,7 @@ import { toolsList } from './tools/list.js';
 import { executeUninstall } from './uninstall.js';
 
 import type { CliCommandsContext } from './shared.js';
+import type { CommandActionScopeRunner } from '../bootstrap/command-action-scope-runner.js';
 import type { CliProgram, InitOptions } from '@opensip-cli/contracts';
 
 /** Shared `output` mode for the host commands that return a renderable result. */
@@ -182,27 +179,39 @@ interface StatusOpts {
 }
 
 function buildStatusSpec(): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
-    staticHandler: {
-      package: HOST_COMMAND_PACKAGE,
-      path: HOST_COMMAND_SPECS_PATH,
-      declaration: 'buildStatusSpec',
+  return defineCommand<unknown, CliCommandsContext>(
+    {
+      staticHandler: {
+        package: HOST_COMMAND_PACKAGE,
+        path: HOST_COMMAND_SPECS_PATH,
+        declaration: 'buildStatusSpec',
+      },
+      name: 'status',
+      description: "Show where this project's OpenSIP evidence is stored",
+      commonFlags: ['cwd', 'json', 'debug'],
+      scope: 'none',
+      noInit: true,
+      output: COMMAND_RESULT,
+      handler: (rawOpts) => {
+        const opts = rawOpts as StatusOpts;
+        return executeRuntimeStatus({
+          cwd: opts.cwd ?? process.cwd(),
+          cwdExplicit: opts.cwdExplicit === true,
+          projectContext: opts.projectContext,
+        });
+      },
     },
-    name: 'status',
-    description: "Show where this project's OpenSIP evidence is stored",
-    commonFlags: ['cwd', 'json', 'debug'],
-    scope: 'none',
-    noInit: true,
-    output: COMMAND_RESULT,
-    handler: (rawOpts) => {
-      const opts = rawOpts as StatusOpts;
-      return executeRuntimeStatus({
-        cwd: opts.cwd ?? process.cwd(),
-        cwdExplicit: opts.cwdExplicit === true,
-        projectContext: opts.projectContext,
-      });
-    },
-  });
+    { bootstrapMode: 'inspection-only' },
+  );
+}
+
+/**
+ * Host specs whose policy must be known before startup Tool discovery. Kept as
+ * a live spec projection so the pre-scan cannot drift into a second command
+ * allowlist.
+ */
+export function buildPreBootstrapInspectionHostSpecs(): readonly HostSpec[] {
+  return [buildStatusSpec()];
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +269,11 @@ function buildReportSpec(): HostSpec {
     scope: 'project',
     output: COMMAND_RESULT,
     handler: (rawOpts) => {
-      const opts = rawOpts as { open: boolean; json: boolean; maxCatalogMb?: string };
+      const opts = rawOpts as {
+        open: boolean;
+        json: boolean;
+        maxCatalogMb?: string;
+      };
       // Commander stores `--no-open` as `opts.open === false`; default true.
       // In `--json` mode we never launch a browser (machine-output contract).
       // ADR-0054 M4-F: composeAndWriteReport runs an EXTERNAL tool's
@@ -540,15 +553,19 @@ export function buildTopLevelHostSpecs(ctx: CliCommandsContext): readonly HostSp
  * which runs AFTER the tools were mounted (the composition root mounts tools
  * before `registerCliCommands`), so the tool primaries already exist.
  */
-export function mountHostCommands(program: CliProgram, ctx: CliCommandsContext): void {
+export function mountHostCommands(
+  program: CliProgram,
+  ctx: CliCommandsContext,
+  actionScopeRunner?: CommandActionScopeRunner,
+): void {
   for (const spec of buildTopLevelHostSpecs(ctx)) {
-    mountCommandSpec(program, spec, ctx);
+    mountCommandSpec(program, spec, ctx, {}, actionScopeRunner);
   }
   for (const group of buildHostSubcommandGroups(ctx)) {
     const parent = program.command(group.name).description(group.description);
     for (const leaf of group.leaves) {
-      mountCommandSpec(parent, leaf, ctx);
+      mountCommandSpec(parent, leaf, ctx, {}, actionScopeRunner);
     }
   }
-  mountToolPluginGroups(program, ctx, ctx.tools);
+  mountToolPluginGroups(program, ctx, ctx.tools, actionScopeRunner);
 }

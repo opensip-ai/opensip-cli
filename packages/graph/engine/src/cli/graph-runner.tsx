@@ -90,6 +90,11 @@ export interface GraphRunnerArgs {
   readonly shards?: readonly Shard[];
 }
 
+function workerProjectSelectionArgs(cwd: string): string[] {
+  const configPath = currentScope()?.projectContext?.configPath;
+  return ['--cwd', cwd, ...(configPath === undefined ? [] : ['--config', configPath])];
+}
+
 async function runGraphWithProgress(
   args: GraphRunnerArgs,
   datastore: DataStore | undefined,
@@ -150,7 +155,7 @@ export async function renderGraphLive(
           preferWorker: true,
           descriptor: {
             command: process.argv[1] ?? '',
-            argv: ['graph-run-worker', specPath],
+            argv: ['graph-run-worker', specPath, ...workerProjectSelectionArgs(args.cwd)],
             ...(correlation ? { correlation } : {}),
           },
           inProcess: (workerEmit) =>
@@ -197,7 +202,9 @@ export async function renderGraphLive(
           });
           const { verdict } = envelope;
           const banner = resolutionBannerText(result.resolutionMode);
-          const table = shouldRenderRunUnitTable({ verbose: args.verbose === true })
+          const table = shouldRenderRunUnitTable({
+            verbose: args.verbose === true,
+          })
             ? envelopeToLiveRunTableRows(envelope)
             : undefined;
 

@@ -59,6 +59,7 @@ export type ProcessRunner = (request: ProcessRunRequest) => Promise<ProcessRunRe
 
 export interface VerifyRepairInput {
   readonly projectRoot: string;
+  readonly configPath?: string;
   readonly applyResult: RepairApplyResult;
   readonly runner?: ProcessRunner;
   readonly cliEntrypoint?: string;
@@ -134,6 +135,9 @@ function canonicalTool(tool: string): string {
 function buildFitCommand(input: VerifyRepairInput): RepairVerificationCommand {
   const args = [
     'fit',
+    '--cwd',
+    input.projectRoot,
+    ...(input.configPath === undefined ? [] : ['--config', input.configPath]),
     '--check',
     input.applyResult.signal.ruleId,
     '--changed',

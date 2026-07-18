@@ -55,14 +55,21 @@ export async function executeWorkspaceGraph(
   cli: ToolCliContext,
   profile?: GraphProfileBuilder,
 ): Promise<GraphRunOutcome | undefined> {
+  // Commander preserves the literal explicit `--cwd` value, which may be
+  // relative. Bootstrap's ProjectContext is the one canonical absolute
+  // selection shared with the parent runtime lease; children must receive that
+  // exact value both as process cwd and `--cwd` or `project/project` drift can
+  // select a different coordination key.
+  const effectiveCwd = cli.scope.projectContext?.cwd ?? opts.cwd;
+  const effectiveOpts = effectiveCwd === opts.cwd ? opts : { ...opts, cwd: effectiveCwd };
   const cliScript = opts.cliScript ?? process.argv[1];
   if (typeof cliScript !== 'string' || cliScript.length === 0) {
     throw new ConfigurationError(
       '--workspace: could not determine the CLI entry script (process.argv[1] is empty).',
     );
   }
-  const adapters = resolveAdaptersForRun(opts, cli);
-  const units = await discoverPolyglotUnits(opts.cwd, adapters);
+  const adapters = resolveAdaptersForRun(effectiveOpts, cli);
+  const units = await discoverPolyglotUnits(effectiveCwd, adapters);
   if (units.length === 0) {
     const adapterLabel = adapters.map((a) => a.id).join(', ') || '(no language adapters available)';
     throw new ConfigurationError(
@@ -72,14 +79,17 @@ export async function executeWorkspaceGraph(
 
   const profileRun = profile?.startRun({
     label: 'workspace',
-    cwd: opts.cwd,
+    cwd: effectiveCwd,
     mode: 'workspace',
   });
   // Internal per-run timer for the workspace report artifact. The generic
   // session row's timing remains host-owned.
   const startedAt = Date.now();
   const result = await runWorkspaceUnitsInParallel({
-    cwd: opts.cwd,
+    cwd: effectiveCwd,
+    ...(cli.scope.projectContext?.configPath === undefined
+      ? {}
+      : { configPath: cli.scope.projectContext.configPath }),
     units,
     cliScript,
     concurrency: opts.concurrency,
@@ -107,7 +117,7 @@ export async function executeWorkspaceGraph(
     await writeWorkspaceReport(result.perUnit, durationMs, cli);
   }
   const session: ToolSessionContribution = buildWorkspaceSessionContribution(
-    opts,
+    effectiveOpts,
     allSignals,
     result.anyChildFailed,
   );

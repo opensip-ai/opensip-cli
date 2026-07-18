@@ -52,6 +52,8 @@ export interface RepairWritePort {
 
 export interface CliRepairWritePortOptions {
   readonly projectRoot: string;
+  /** Exact config selected by the parent invocation; absent for no-init runs. */
+  readonly configPath?: string;
   readonly cliEntrypoint?: string;
   readonly timeoutMs?: number;
 }
@@ -93,11 +95,13 @@ function parseApplyVerifyResult(stdout: string): Result<RepairApplyVerifyResult,
 
 export class CliRepairWritePort implements RepairWritePort {
   private readonly projectRoot: string;
+  private readonly configPath: string | undefined;
   private readonly entrypoint: string | undefined;
   private readonly timeoutMs: number;
 
   constructor(options: CliRepairWritePortOptions) {
     this.projectRoot = options.projectRoot;
+    this.configPath = options.configPath;
     this.entrypoint = options.cliEntrypoint ?? cliEntrypoint();
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
@@ -120,6 +124,9 @@ export class CliRepairWritePort implements RepairWritePort {
       'repair',
       'apply',
       input.ref,
+      '--cwd',
+      this.projectRoot,
+      ...(this.configPath === undefined ? [] : ['--config', this.configPath]),
       '--tool',
       input.tool,
       '--signal',

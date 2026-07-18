@@ -56,7 +56,10 @@ export async function executeYagniWorker(specPath: string, _cli: ToolCliContext)
         send({ kind: 'progress', event: detectorDoneEvent(slug, durationMs) }),
       onDetectorsSkipped: (slugs) => {
         for (const slug of slugs) {
-          send({ kind: 'progress', event: detectorDoneEvent(slug, 0, 'skipped') });
+          send({
+            kind: 'progress',
+            event: detectorDoneEvent(slug, 0, 'skipped'),
+          });
         }
       },
     });
@@ -88,7 +91,14 @@ export const yagniRunWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> = d
   visibility: 'internal',
   description:
     '[internal] Run YAGNI headless and stream progress + result over IPC (forked by the live view)',
-  commonFlags: [],
+  commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [{ name: 'specPath', description: 'Path to a JSON YAGNI run spec file' }],
   scope: 'project',
   output: 'raw-stream',

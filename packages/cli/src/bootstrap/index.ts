@@ -12,6 +12,7 @@
  * See tool-lifecycle.ts for the ordered steps and phase split.
  */
 
+import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import {
   logger,
   resolveProjectContext,
@@ -36,6 +37,7 @@ import {
 } from './bootstrap-diagnostics-buffer.js';
 import { resolveBootstrapPolicyState, type BootstrapPolicyState } from './bootstrap-policy.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
+import { PolicyAuditCollector } from './policy-audit.js';
 import { registerLanguageAdapters } from './register-language-adapters.js';
 import {
   BUNDLED_TOOL_PACKAGES,
@@ -71,6 +73,13 @@ export interface BootstrapOptions {
    * project's `.runtime/plugins/tool`, and `~/.opensip-cli/plugins/tool`).
    */
   readonly cwd: string;
+  /** Whether `cwd` came from the command's explicit `--cwd` option. */
+  readonly cwdExplicit?: boolean;
+  /**
+   * Early `--config` selection, parsed before dynamic Tool discovery so startup
+   * trust/discovery and the later authoritative planner resolve one project.
+   */
+  readonly explicitConfigPath?: string;
   /**
    * `import.meta.url` of the CLI entry. Used to init telemetry as early as
    * possible (reads the CLI package version for the `service.version` resource
@@ -80,6 +89,17 @@ export interface BootstrapOptions {
   readonly cliEntryUrl: string;
   /** Exact startup posture, validated before any external runtime discovery. */
   readonly runtimeMode: ToolRuntimeExecutionMode;
+  /**
+   * Composition-root proof that project/user discovery is covered by its
+   * startup reader. Optional only for direct library tests and embedders.
+   */
+  readonly assertExternalDiscoveryProtected?: (projectRoot: string) => void;
+  /**
+   * Register only trusted bundled language/Tool surfaces. This mode exists for
+   * the pre-lease Commander bailout probe and must not inspect project/user
+   * policy, installed packages, authored Tools, telemetry, or runtime state.
+   */
+  readonly discoveryMode?: 'standard' | 'bundled-surface-only';
 }
 
 /**
@@ -102,7 +122,11 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   // once per process ahead of the first stage span. Hard no-op unless the OTLP
   // endpoint env var is set (see telemetry/sdk-init.ts), so standalone startup
   // is byte-for-byte unaffected.
-  startupTimer.measure('telemetry-init', () => initTelemetry(opts.cliEntryUrl));
+  if (opts.discoveryMode === 'bundled-surface-only') {
+    startupTimer.mark('telemetry-init', { skipped: true });
+  } else {
+    startupTimer.measure('telemetry-init', () => initTelemetry(opts.cliEntryUrl));
+  }
   startupTimer.measure('bootstrap-diagnostics-reset', () => resetBootstrapDiagnosticsBuffer());
   startupTimer.measure('language-adapters', () => registerLanguageAdapters(opts.langRegistry));
 
@@ -132,11 +156,22 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
   await startupTimer.measureAsync('first-party-tools', () =>
     registerFirstPartyTools(opts.toolRegistry, provenance, manifests, bundledPackages),
   );
+  if (opts.discoveryMode === 'bundled-surface-only') {
+    return {
+      provenance,
+      manifests,
+      bootstrapDiagnostics: takeBootstrapDiagnostics(),
+      startupTimings: startupTimer.events(),
+      trustPolicy: BUILTIN_TRUST_POLICY,
+      policyAudit: new PolicyAuditCollector(),
+    };
+  }
   // The bundled-tool ids discovery must skip on a name collision, derived from
   // the manifests just loaded (not from an imported tool runtime — the host
   // holds none in the launch contract).
   const builtInIds = new Set(manifests.map((m) => m.id));
   let projectRoot: string | undefined;
+  let resolvedProjectRoot = opts.cwd;
   let projectAuthoredDir: string | undefined;
   let projectConfigPath: string | undefined;
   let projectTrustedTools: ReadonlySet<string> = new Set();
@@ -144,8 +179,12 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
     try {
       const project = resolveProjectContext({
         cwd: opts.cwd,
-        cwdExplicit: false,
+        cwdExplicit: opts.cwdExplicit === true,
+        ...(opts.explicitConfigPath === undefined
+          ? {}
+          : { explicitConfigPath: opts.explicitConfigPath }),
       });
+      resolvedProjectRoot = project.projectRoot;
       if (project.scope === 'project') {
         projectRoot = project.projectRoot;
         projectConfigPath = project.configPath;
@@ -158,6 +197,7 @@ export async function bootstrapCli(opts: BootstrapOptions): Promise<BootstrapRes
       // later in per-run bootstrap for commands that enter a project scope.
     }
   });
+  opts.assertExternalDiscoveryProtected?.(resolvedProjectRoot);
   const bootstrapPolicy = startupTimer.measure('policy-source-resolution', () =>
     resolveBootstrapPolicyState({
       cwd: opts.cwd,

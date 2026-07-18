@@ -9,6 +9,10 @@
  *  - mountAllToolCommands fail-closes bundled mount failures (exit 5 path).
  */
 
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
   LanguageRegistry,
   PluginIncompatibleError,
@@ -20,6 +24,7 @@ import { Command } from 'commander';
 import { describe, expect, it, vi } from 'vitest';
 
 import { resetBootstrapDiagnosticsBuffer } from '../bootstrap/bootstrap-diagnostics-buffer.js';
+import { bootstrapCli } from '../bootstrap/index.js';
 import { registerLanguageAdapters } from '../bootstrap/register-language-adapters.js';
 import { mountAllToolCommands, registerFirstPartyTools } from '../bootstrap/register-tools.js';
 
@@ -87,6 +92,62 @@ describe('registerLanguageAdapters', () => {
       const adapter = registry.get(id);
       expect(adapter, `expected ${id} to be registered`).toBeDefined();
       expect(adapter?.id).toBe(id);
+    }
+  });
+});
+
+describe('bootstrap discovery protection', () => {
+  it('checks the stabilized project reader before either external discovery leg', async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-bootstrap-protection-')));
+    const project = join(root, 'project');
+    const home = join(root, 'home');
+    const trapDir = join(home, '.opensip-cli', 'tools', 'discovery-trap');
+    mkdirSync(project, { recursive: true });
+    mkdirSync(trapDir, { recursive: true });
+    writeFileSync(
+      join(project, 'opensip-cli.config.yml'),
+      'schemaVersion: 1\ntargets: {}\n',
+      'utf8',
+    );
+    writeFileSync(
+      join(trapDir, 'opensip-tool.manifest.json'),
+      JSON.stringify({
+        kind: 'tool',
+        id: 'discovery-protection-trap',
+        identity: { name: 'discovery-protection-trap' },
+        name: 'Discovery protection trap',
+        version: '1.0.0',
+        apiVersion: 999,
+        main: './index.js',
+        commands: [{ name: 'discovery-protection-trap', description: 'trap' }],
+      }),
+      'utf8',
+    );
+    const failure = new Error('startup reader missing');
+    const assertExternalDiscoveryProtected = vi.fn(() => {
+      throw failure;
+    });
+    const previousHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      await expect(
+        bootstrapCli({
+          langRegistry: new LanguageRegistry(),
+          toolRegistry: new ToolRegistry(),
+          projectDir: root,
+          cwd: project,
+          cwdExplicit: true,
+          cliEntryUrl: import.meta.url,
+          argv: ['agent-catalog'],
+          runtimeMode: 'host',
+          assertExternalDiscoveryProtected,
+        }),
+      ).rejects.toBe(failure);
+      expect(assertExternalDiscoveryProtected).toHaveBeenCalledWith(realpathSync(project));
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

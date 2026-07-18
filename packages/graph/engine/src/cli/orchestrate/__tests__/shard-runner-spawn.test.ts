@@ -14,6 +14,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { RunScope, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { runShardsInParallel } from '../shard-runner.js';
@@ -36,7 +37,8 @@ const result = {
   shardId: id,
   fragment: {
     version: '3.0', tool: 'graph', language: spec.language ?? 'typescript',
-    builtAt: 'x', cacheKey: 'k-' + id, resolutionMode: 'exact', functions: {},
+    builtAt: 'x', cacheKey: JSON.stringify(process.argv.slice(4)),
+    resolutionMode: 'exact', functions: {},
   },
   fingerprint: 'fp-' + id,
   boundaryCalls: [],
@@ -88,6 +90,36 @@ describe('runShardsInParallel', () => {
 
     expect(out.failures).toHaveLength(0);
     expect(out.fragments[0]?.fragment.language).toBe('python');
+  });
+
+  it('passes the resolved cwd and custom config to each shard bootstrap', async () => {
+    const configPath = join(dir, 'custom config.yml');
+    const scope = new RunScope({
+      projectContext: {
+        cwd: dir,
+        cwdExplicit: true,
+        projectRoot: dir,
+        configPath,
+        walkedUp: 0,
+        scope: 'project',
+      },
+    });
+    const out = await runWithScope(scope, () =>
+      runShardsInParallel({
+        shards: [shard('pkg:a')],
+        projectRoot: dir,
+        cliScript,
+        resolutionMode: 'exact',
+      }),
+    );
+
+    expect(out.failures).toHaveLength(0);
+    expect(JSON.parse(out.fragments[0].fragment.cacheKey)).toEqual([
+      '--cwd',
+      dir,
+      '--config',
+      configPath,
+    ]);
   });
 
   it('attributes a non-zero worker exit to its shard as a failure, not a throw', async () => {

@@ -44,7 +44,10 @@ const YAGNI_RUNNING_SURFACE: ProgressSurface = {
     runningDetail: 'Analyzing project...',
   })),
 };
-const YAGNI_LOADING_SURFACE: ProgressSurface = { shape: 'pool', label: 'Loading detectors...' };
+const YAGNI_LOADING_SURFACE: ProgressSurface = {
+  shape: 'pool',
+  label: 'Loading detectors...',
+};
 
 export { YAGNI_LIVE_VIEW_KEY } from '../identity.js';
 
@@ -57,6 +60,11 @@ export interface YagniLiveArgs {
   readonly categories?: readonly string[];
   readonly includeTests?: boolean;
   readonly pathRoots?: readonly string[];
+}
+
+function workerProjectSelectionArgs(cwd: string): string[] {
+  const configPath = currentScope()?.projectContext?.configPath;
+  return ['--cwd', cwd, ...(configPath === undefined ? [] : ['--config', configPath])];
 }
 
 function rowStatus(unit: UnitResult): LiveRunTableRow['status'] {
@@ -138,7 +146,7 @@ export async function renderYagniLive(
           preferWorker: true,
           descriptor: {
             command: process.argv[1] ?? '',
-            argv: ['yagni-run-worker', specPath],
+            argv: ['yagni-run-worker', specPath, ...workerProjectSelectionArgs(args.cwd)],
             ...(correlation ? { correlation } : {}),
           },
           inProcess: (workerEmit) => executeYagni(buildExecuteOptions(args, config, workerEmit)),

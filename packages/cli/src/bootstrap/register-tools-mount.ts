@@ -19,6 +19,8 @@ import { decorateToolPrimary } from './decorate-tool-primary.js';
 import { type RunActionHooks } from './run-plane.js';
 import { provenanceSourceFor } from './tool-provenance.js';
 
+import type { CommandActionScopeRunner } from './command-action-scope-runner.js';
+
 /**
  * Walk the registry and mount each tool's commands onto `program`. This is
  * **step 8** of the tool lifecycle (launch, §5.4) — see
@@ -49,10 +51,11 @@ export function mountAllToolCommands(
   ctx: ToolCliContext,
   provenance: readonly ToolProvenance[],
   runActionHooks: RunActionHooks,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): void {
   for (const tool of registry.list()) {
     try {
-      mountOneTool(program, tool, ctx, runActionHooks);
+      mountOneTool(program, tool, ctx, runActionHooks, actionScopeRunner);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const human = tool.metadata.name ?? tool.metadata.id;
@@ -125,6 +128,7 @@ export function mountOneTool(
   tool: Tool,
   ctx: ToolCliContext,
   runActionHooks: RunActionHooks,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): void {
   if (tool.commandSpecs === undefined || tool.commandSpecs.length === 0) {
     // No declarative command surface — a mis-declared tool contributes no
@@ -151,7 +155,7 @@ export function mountOneTool(
     ...runActionHooks,
     maybeDispatchExternal: buildMaybeDispatchExternal(tool, boundCtx, runActionHooks),
   };
-  const mountedByName = mountFlatSpecs(program, tool, boundCtx, toolHooks);
+  const mountedByName = mountFlatSpecs(program, tool, boundCtx, toolHooks, actionScopeRunner);
 
   // Host-owned uniform decoration of the tool PRIMARY (the flat run command
   // whose name === metadata.name): per-tool `--version`, guaranteed
@@ -163,7 +167,7 @@ export function mountOneTool(
   const primaryCmd = mountedByName.get(tool.metadata.name);
   if (primaryCmd !== undefined) decorateToolPrimary(primaryCmd, tool);
 
-  mountNestedSpecs(program, tool, boundCtx, toolHooks, mountedByName);
+  mountNestedSpecs(program, tool, boundCtx, toolHooks, mountedByName, actionScopeRunner);
 }
 
 /**
@@ -177,11 +181,15 @@ function mountFlatSpecs(
   tool: Tool,
   toolCtx: ToolCliContext,
   hooks: RunActionHooks,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): Map<string, CliProgram> {
   const mountedByName = new Map<string, CliProgram>();
   for (const spec of tool.commandSpecs ?? []) {
     if (spec.parent !== undefined) continue;
-    mountedByName.set(spec.name, mountCommandSpec(program, spec, toolCtx, hooks));
+    mountedByName.set(
+      spec.name,
+      mountCommandSpec(program, spec, toolCtx, hooks, actionScopeRunner),
+    );
   }
   return mountedByName;
 }
@@ -198,6 +206,7 @@ function mountNestedSpecs(
   toolCtx: ToolCliContext,
   hooks: RunActionHooks,
   mountedByName: ReadonlyMap<string, CliProgram>,
+  actionScopeRunner?: CommandActionScopeRunner,
 ): void {
   for (const spec of tool.commandSpecs ?? []) {
     if (spec.parent === undefined) continue;
@@ -210,10 +219,10 @@ function mountNestedSpecs(
         toolName: tool.metadata.name ?? tool.metadata.id,
         detail: `command '${spec.name}' declares parent '${spec.parent}', which is not a flat command on this tool; mounting flat at root instead`,
       });
-      mountCommandSpec(program, spec, toolCtx, hooks);
+      mountCommandSpec(program, spec, toolCtx, hooks, actionScopeRunner);
       continue;
     }
-    mountCommandSpec(parentCmd, spec, toolCtx, hooks);
+    mountCommandSpec(parentCmd, spec, toolCtx, hooks, actionScopeRunner);
   }
 }
 

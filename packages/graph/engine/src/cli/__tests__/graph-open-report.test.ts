@@ -127,10 +127,7 @@ describe('graph --open report delivery', () => {
       ctx,
     );
 
-    expect(h.executeGraph).toHaveBeenCalledWith(
-      expect.objectContaining({ json: true }),
-      ctx,
-    );
+    expect(h.executeGraph).toHaveBeenCalledWith(expect.objectContaining({ json: true }), ctx);
     expect(writeSarif).toHaveBeenCalledTimes(1);
     expect(writeSarif).toHaveBeenCalledWith(envelope, '/repo/graph.sarif');
     // executeGraph's JSON renderer owns signal delivery; the root must not

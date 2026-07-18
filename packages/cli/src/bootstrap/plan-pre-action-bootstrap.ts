@@ -11,8 +11,10 @@ import { existsSync } from 'node:fs';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
+  ConfigurationError,
   resolveProjectContext,
   resolveRuntimePathsForScope,
+  type CommandScopeRequirement,
   type LoggerOptions,
   type ProjectContext,
 } from '@opensip-cli/core';
@@ -30,6 +32,9 @@ import {
 
 import type { loadCliDefaults as loadCliDefaultsFn } from './cli-defaults.js';
 import type { CommandScopeIndex } from '../commands/command-scope-index.js';
+import type { HostCommandRuntimePolicy } from '../commands/host-runtime-access.js';
+
+export type BootstrapPlanningMode = 'tentative' | 'authoritative';
 
 export interface PlanPreActionBootstrapInput {
   readonly opts: Record<string, unknown>;
@@ -40,6 +45,11 @@ export interface PlanPreActionBootstrapInput {
   readonly commandPath: string;
   readonly commandScopes: CommandScopeIndex;
   readonly explicitConfigPath?: string;
+  /**
+   * Tentative planning performs side-effect-free discovery only. It never
+   * emits warnings, runs bailout guards, or mutates the caller's options.
+   */
+  readonly planningMode?: BootstrapPlanningMode;
 }
 
 export interface PreActionBootstrapPlan {
@@ -51,15 +61,28 @@ export interface PreActionBootstrapPlan {
   readonly project: ProjectContext;
   readonly commandName: string;
   readonly commandPath: string;
+  readonly commandScope: CommandScopeRequirement;
   readonly jsonOutput: boolean;
+  readonly runtimePolicy: HostCommandRuntimePolicy;
   /** Per-run logger options computed after bailouts (ADR-0053). */
   readonly runLoggerOptions: LoggerOptions;
-  readonly completedThrough: typeof PRE_ACTION_PHASES.bailoutWindow;
+  readonly completedThrough:
+    typeof PRE_ACTION_PHASES.resolveProject | typeof PRE_ACTION_PHASES.bailoutWindow;
 }
 
-function logDirForProject(project: ProjectContext): { readonly logDir?: string } {
+function logDirForProject(project: ProjectContext): {
+  readonly logDir?: string;
+} {
   if (project.scope === 'none' || !existsSync(project.projectRoot)) return {};
   return { logDir: resolveRuntimePathsForScope(project).logsDir };
+}
+
+function shouldLoadDefaults(
+  planningMode: BootstrapPlanningMode,
+  runtimePolicy: HostCommandRuntimePolicy,
+): boolean {
+  if (planningMode !== 'authoritative') return false;
+  return runtimePolicy.bootstrapMode !== 'inspection-only';
 }
 
 /**
@@ -70,19 +93,39 @@ function logDirForProject(project: ProjectContext): { readonly logDir?: string }
  *   guard bails out before project side effects are allowed.
  */
 export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreActionBootstrapPlan {
-  const {
-    opts,
-    cwd,
-    cwdExplicit,
-    runId,
-    commandName,
-    commandPath,
-    commandScopes,
-    explicitConfigPath,
-  } = input;
+  const { cwd, cwdExplicit, runId, commandName, commandPath, commandScopes, explicitConfigPath } =
+    input;
+  const planningMode = input.planningMode ?? 'authoritative';
+  const commandEntry = commandScopes.get(commandPath);
+  if (commandEntry === undefined) {
+    throw new ConfigurationError(
+      `No declared runtime scope exists for mounted command '${commandPath}'.`,
+      { code: 'CONFIGURATION.COMMAND_SCOPE_UNDECLARED' },
+    );
+  }
+  const runtimePolicy = commandEntry.runtimePolicy;
+  const commandScope = commandEntry.scope;
+  const inspectionOnly = runtimePolicy.bootstrapMode === 'inspection-only';
+  const shouldLoadCliDefaults = shouldLoadDefaults(planningMode, runtimePolicy);
+  // Planning may run more than once around lease acquisition. Clone arrays as
+  // well as the containing record so mergeConfigDefaults cannot append into
+  // Commander's live option values before the authoritative plan is stable.
+  const opts = Object.fromEntries(
+    Object.entries(input.opts).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value.map((item: unknown) => item) : value,
+    ]),
+  );
 
-  const cliDefaults = loadCliDefaults(cwd, explicitConfigPath);
-  mergeConfigDefaults(opts, cliDefaults);
+  // Tentative discovery and inspection-only status must not read user
+  // defaults/API-key state. Ordinary authoritative commands retain the
+  // established CLI-default behavior.
+  const cliDefaults = shouldLoadCliDefaults
+    ? loadCliDefaults(cwd, explicitConfigPath)
+    : ({} as ReturnType<typeof loadCliDefaultsFn>);
+  if (shouldLoadCliDefaults) {
+    mergeConfigDefaults(opts, cliDefaults);
+  }
 
   let project: ProjectContext;
   try {
@@ -102,6 +145,8 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   }
 
   if (
+    planningMode === 'authoritative' &&
+    !inspectionOnly &&
     project.scope === 'none' &&
     explicitConfigPath === undefined &&
     isNoInitEligibleCommand(commandPath, commandScopes) &&
@@ -120,15 +165,19 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   opts.projectContext = project;
   opts.cwdExplicit = cwdExplicit;
 
-  checkSchemaVersionAndBailout(project, runId);
-  checkNoProjectAndBailout(project, cwd, commandPath, runId, commandScopes);
-  warnAboutPhantomRuntimes(project, opts.json === true);
+  if (planningMode === 'authoritative' && !inspectionOnly) {
+    checkSchemaVersionAndBailout(project, runId);
+    checkNoProjectAndBailout(project, cwd, commandPath, runId, commandScopes);
+    warnAboutPhantomRuntimes(project, opts.json === true);
+  }
 
   const runLoggerOptions: LoggerOptions = {
     silent: true,
     debugMode: Boolean(opts.debug),
     runId,
-    ...logDirForProject(project),
+    ...(planningMode === 'authoritative' && !inspectionOnly && commandScope === 'project'
+      ? logDirForProject(project)
+      : {}),
   };
 
   return {
@@ -140,8 +189,13 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
     project,
     commandName,
     commandPath,
+    commandScope,
     jsonOutput: opts.json === true,
+    runtimePolicy,
     runLoggerOptions,
-    completedThrough: PRE_ACTION_PHASES.bailoutWindow,
+    completedThrough:
+      planningMode === 'tentative'
+        ? PRE_ACTION_PHASES.resolveProject
+        : PRE_ACTION_PHASES.bailoutWindow,
   };
 }

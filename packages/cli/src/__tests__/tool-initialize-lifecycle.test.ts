@@ -14,19 +14,15 @@
  * a fixture Tool handed to the hook via its `PreActionRuntime` closure.
  */
 
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
-import {
-  exitScope,
-  LanguageRegistry,
-  ToolRegistry,
-  type Tool,
-  type ToolCliContext,
-} from '@opensip-cli/core';
+import { LanguageRegistry, ToolRegistry, type Tool, type ToolCliContext } from '@opensip-cli/core';
 import { Command } from 'commander';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { PolicyAuditCollector } from '../bootstrap/policy-audit.js';
 import { installPreActionHook, resolveOwningTool } from '../bootstrap/pre-action-hook.js';
@@ -35,6 +31,20 @@ import { mountAllToolCommands } from '../bootstrap/register-tools.js';
 import { buildCommandScopeIndex } from '../commands/command-scope-index.js';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/sample-project');
+let priorHome: string | undefined;
+let testHome: string;
+
+beforeAll(() => {
+  priorHome = process.env.HOME;
+  testHome = mkdtempSync(join(tmpdir(), 'opensip-tool-initialize-home-'));
+  process.env.HOME = testHome;
+});
+
+afterAll(() => {
+  if (priorHome === undefined) delete process.env.HOME;
+  else process.env.HOME = priorHome;
+  rmSync(testHome, { recursive: true, force: true });
+});
 
 /** Minimal handler-facing ToolCliContext (no Commander program — 3.0.0). */
 function stubCtx(): ToolCliContext {
@@ -145,7 +155,7 @@ function buildProgram(tool: Tool): Command {
   // The hook captures the registries + admitted-tool facts in its closure
   // (the production shape after eliminating the module-global handoff bag);
   // this fixture run admits a single tool and no manifests/provenance.
-  installPreActionHook(
+  const actionScopeRunner = installPreActionHook(
     program,
     'test',
     {
@@ -163,7 +173,7 @@ function buildProgram(tool: Tool): Command {
       hostGroups: [],
     }),
   );
-  mountAllToolCommands(tools, program, stubCtx(), [], {});
+  mountAllToolCommands(tools, program, stubCtx(), [], {}, actionScopeRunner);
   return program;
 }
 
@@ -240,13 +250,8 @@ describe('Tool.initialize() wiring (preAction)', () => {
     await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], {
       from: 'node',
     });
-    // Production runs one command per process, so each invocation's pre-action
-    // hook enters a fresh ALS slot from a clean state. This test drives Commander
-    // twice in ONE process to exercise the once-per-process initialize() guard, so
-    // clear the ambient slot between invocations — mirroring the fresh-process
-    // boundary — otherwise the second enterScope would (correctly) trip the
-    // always-on SYSTEM.SCOPE.REENTRANT guard against the first run's leaked scope.
-    exitScope();
+    // The action-scope runner disposes and clears the first invocation before
+    // Commander starts the second one in this same process.
     await program.parseAsync(['node', 'cli', 'memo-cmd', '--cwd', FIXTURE], {
       from: 'node',
     });

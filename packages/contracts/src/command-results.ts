@@ -171,15 +171,15 @@ import type {
   RepairPreviewResult,
 } from './command-results-variants/repair-results.js';
 import type {
-  SessionReplayResult,
-  HelpResult,
-  ErrorResult,
-} from './command-results-variants/session-results.js';
-import type {
   RunDetailResult,
   RunHistoryResult,
   RuntimeStatusResult,
 } from './command-results-variants/runtime-results.js';
+import type {
+  SessionReplayResult,
+  HelpResult,
+  ErrorResult,
+} from './command-results-variants/session-results.js';
 import type {
   SuiteAddResult,
   SuiteListResult,

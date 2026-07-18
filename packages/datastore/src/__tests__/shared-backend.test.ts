@@ -107,15 +107,17 @@ describe('checkpointAndCloseSqlite', () => {
   });
 
   it.each([
-    [],
-    [{ busy: 0 }],
-    [
-      { busy: 0, log: 1, checkpointed: 1 },
-      { busy: 0, log: 1, checkpointed: 1 },
-    ],
-    [{ busy: Number.NaN, log: 1, checkpointed: 1 }],
-    [{ busy: 0, log: -2, checkpointed: 1 }],
-  ])('does not accept a malformed checkpoint result as proof', (result) => {
+    { result: [] },
+    { result: [{ busy: 0 }] },
+    {
+      result: [
+        { busy: 0, log: 1, checkpointed: 1 },
+        { busy: 0, log: 1, checkpointed: 1 },
+      ],
+    },
+    { result: [{ busy: Number.NaN, log: 1, checkpointed: 1 }] },
+    { result: [{ busy: 0, log: -2, checkpointed: 1 }] },
+  ])('does not accept a malformed checkpoint result as proof', ({ result }) => {
     const sqlite: SqliteLifecycleConnection = {
       open: true,
       pragma: () => result,

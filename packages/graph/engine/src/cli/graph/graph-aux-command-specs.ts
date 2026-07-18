@@ -312,9 +312,17 @@ export const graphShardWorkerCommandSpec: CommandSpec<unknown, ToolCliContext> =
   visibility: 'internal',
   description:
     '[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)',
-  commonFlags: [],
+  commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [{ name: 'specPath', description: 'Path to a JSON ShardWorkerSpec file' }],
   scope: 'project',
+  noInit: true,
   output: RAW_STREAM,
   rawStreamReason: 'worker-ipc',
   handler: async (rawOpts, cli): Promise<void> => {

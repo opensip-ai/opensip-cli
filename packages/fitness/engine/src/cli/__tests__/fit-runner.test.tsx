@@ -27,6 +27,7 @@ function fitArgs(over: Partial<FitOptions> & Pick<FitOptions, 'cwd'>): FitOption
 
 const runToolLiveView = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() => vi.fn());
+const currentScope = vi.hoisted(() => vi.fn());
 
 vi.mock('@opensip-cli/cli-live', () => ({
   runToolLiveView,
@@ -59,7 +60,7 @@ vi.mock('@opensip-cli/core', async (importOriginal) => {
   return {
     ...actual,
     runOffThreadOrInProcess,
-    currentScope: vi.fn(() => undefined),
+    currentScope,
   };
 });
 
@@ -104,6 +105,8 @@ beforeEach(() => {
   capturedSpec = undefined;
   runToolLiveView.mockReset();
   runOffThreadOrInProcess.mockReset();
+  currentScope.mockReset();
+  currentScope.mockReturnValue(undefined);
   ensureChecksLoadedMock.mockClear();
   executeFitMock.mockReset();
   getEnabledCheckCountMock.mockReturnValue(3);
@@ -128,6 +131,29 @@ describe('renderFitLive produce mapping', () => {
     await renderFitLive(fitArgs({ cwd: '/proj' }));
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
     expect(capturedSpec?.tool).toBe('fitness');
+  });
+
+  it('passes the resolved cwd and custom config to the child bootstrap', async () => {
+    currentScope.mockReturnValue({
+      projectContext: { configPath: '/repo with spaces/custom config.yml' },
+    });
+    await renderFitLive(fitArgs({ cwd: '/repo with spaces' }));
+    await invokeProduce();
+
+    expect(runOffThreadOrInProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: expect.objectContaining({
+          argv: [
+            'fit-run-worker',
+            expect.any(String),
+            '--cwd',
+            '/repo with spaces',
+            '--config',
+            '/repo with spaces/custom config.yml',
+          ],
+        }),
+      }),
+    );
   });
 
   it('omits the per-check table unless --verbose', async () => {

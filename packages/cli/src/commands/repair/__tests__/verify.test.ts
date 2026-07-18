@@ -29,6 +29,8 @@ const COMMAND = {
   tool: 'fit',
   args: [
     'fit',
+    '--cwd',
+    '/repo',
     '--check',
     'typescript-directive-hygiene',
     '--changed',
@@ -275,6 +277,7 @@ describe('repair verification classifier', () => {
 
     const result = await verifyRepair({
       projectRoot: '/repo',
+      configPath: '/repo/custom opensip.yml',
       applyResult,
       cliEntrypoint: '/repo/packages/cli/dist/index.js',
       runner: (request) => {
@@ -296,6 +299,10 @@ describe('repair verification classifier', () => {
         args: [
           '/repo/packages/cli/dist/index.js',
           'fit',
+          '--cwd',
+          '/repo',
+          '--config',
+          '/repo/custom opensip.yml',
           '--check',
           'typescript-directive-hygiene',
           '--changed',

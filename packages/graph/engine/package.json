@@ -179,7 +179,16 @@
         "name": "graph-shard-worker",
         "description": "[internal] Build one shard from a spec file and emit a ShardBuildResult JSON (spawned by the sharded build)",
         "visibility": "internal",
-        "commonFlags": [],
+        "commonFlags": [
+          "cwd"
+        ],
+        "options": [
+          {
+            "flag": "--config",
+            "value": "<path>",
+            "description": "Resolved project config inherited from the parent run"
+          }
+        ],
         "args": [
           {
             "name": "specPath",
@@ -194,7 +203,16 @@
         "name": "graph-run-worker",
         "description": "[internal] Run the graph build headless and stream progress + result over IPC (forked by the live view)",
         "visibility": "internal",
-        "commonFlags": [],
+        "commonFlags": [
+          "cwd"
+        ],
+        "options": [
+          {
+            "flag": "--config",
+            "value": "<path>",
+            "description": "Resolved project config inherited from the parent run"
+          }
+        ],
         "args": [
           {
             "name": "specPath",

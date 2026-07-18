@@ -164,6 +164,8 @@ export interface RuntimeLeaseEnvironment {
   /** Proven process-start identity when the platform can distinguish PID reuse. */
   readonly inspectProcessIncarnation: (pid: number) => ProcessIncarnationInspection;
   readonly pid: number;
+  /** Direct OS parent PID, captured for bounded child-reader inheritance. */
+  readonly parentPid: number;
   readonly isProcessAlive: (pid: number) => boolean;
   readonly generateToken: () => string;
   readonly poll: (ms: number, signal?: AbortSignal) => Promise<void>;
@@ -226,6 +228,13 @@ export interface AcquireGlobalRuntimeMaintenanceLeaseInput extends RuntimeLeaseC
 export interface AcquireRuntimeAccessLeaseInput extends RuntimeLeaseCommonInput {
   readonly projectRead?: { readonly projectDir: string } | false;
   readonly userStateRead?: boolean;
+  /**
+   * Admit a fresh child-owned composite reader at a live direct parent's
+   * earlier sequence. Both parent dimensions, host/process identity, and the OS
+   * direct-parent relationship are discovered and revalidated under the
+   * coordination mutex; no persistent or transported grant is accepted.
+   */
+  readonly inheritFromParent?: boolean;
 }
 
 /** Idempotent synchronous lease handle suitable for `RunScope.onDispose`. */
@@ -2581,8 +2590,13 @@ function acquireRuntimeMutexSync(
 ): RuntimeMutexGuard {
   const ownerToken = environment.generateToken();
   validateOwnerToken(ownerToken);
-  const maxWaitMs = Math.min(policy.waitMs, 5000);
-  let waitedMs = 0;
+  // Release is synchronous so RunScope teardown cannot outlive the process,
+  // but it must honor the same bounded coordination horizon as acquisition.
+  // A shorter release-only cap can strand a live reader during otherwise
+  // healthy contention and turn one slow mutex holder into a stale-record
+  // cascade for every following process.
+  const maxWaitMs = policy.waitMs;
+  const deadline = environment.monotonicNow() + maxWaitMs;
   const remoteStaleTracker: RemoteStaleTracker = new Map();
   const processInspector = createRuntimeMutexProcessInspector(environment);
   const processIncarnation = currentProcessIncarnation(environment);
@@ -2598,14 +2612,14 @@ function acquireRuntimeMutexSync(
       processIncarnation,
     );
     if (acquired !== undefined) return acquired;
-    if (waitedMs >= maxWaitMs) {
+    const remainingMs = deadline - environment.monotonicNow();
+    if (remainingMs <= 0) {
       throw new TimeoutError('Timed out releasing runtime coordination state', {
         code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX',
       });
     }
-    const delay = Math.min(policy.pollMs, Math.max(1, maxWaitMs - waitedMs));
+    const delay = Math.min(policy.pollMs, Math.max(1, remainingMs));
     environment.pollSync(delay);
-    waitedMs += delay;
   }
 }
 
@@ -2687,12 +2701,14 @@ async function defaultPoll(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+const SYNCHRONOUS_POLL_CELL = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
+
 function defaultPollSync(ms: number): void {
-  const monotonicNow = (): number => Number(process.hrtime.bigint() / 1_000_000n);
-  const deadline = monotonicNow() + ms;
-  while (monotonicNow() < deadline) {
-    // Synchronous release handles are required by RunScope.onDispose.
-  }
+  if (ms <= 0) return;
+  // Atomics.wait is Node's blocking sleep primitive. It preserves the
+  // synchronous release contract without burning a CPU core and starving
+  // other OpenSIP processes that need the same coordination mutex.
+  Atomics.wait(SYNCHRONOUS_POLL_CELL, 0, 0, ms);
 }
 
 const DEFAULT_RUNTIME_LEASE_ENVIRONMENT: RuntimeLeaseEnvironment = Object.freeze({
@@ -2702,6 +2718,7 @@ const DEFAULT_RUNTIME_LEASE_ENVIRONMENT: RuntimeLeaseEnvironment = Object.freeze
   hostInstanceIdentity: defaultHostInstanceIdentity,
   inspectProcessIncarnation,
   pid: process.pid,
+  parentPid: process.ppid,
   isProcessAlive: processIsAlive,
   generateToken: generateUUID,
   poll: defaultPoll,
@@ -3503,6 +3520,104 @@ function assertOwnerRecordsCompatible(
   }
 }
 
+function parentInheritanceDenied(message: string): SystemError {
+  return new SystemError(message, {
+    code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+  });
+}
+
+function ownedByDirectParentProcess(
+  record: ReaderRecord,
+  environment: RuntimeLeaseEnvironment,
+): boolean {
+  const parentPid = environment.parentPid;
+  if (
+    !Number.isInteger(parentPid) ||
+    parentPid <= 0 ||
+    parentPid === environment.pid ||
+    record.pid !== parentPid ||
+    !sameProvenRuntimeHost(record, environment)
+  ) {
+    return false;
+  }
+  const inspection = environment.inspectProcessIncarnation(parentPid);
+  if (record.processIncarnation !== undefined) {
+    return inspection.status === 'present' && inspection.identity === record.processIncarnation;
+  }
+  // Windows and other platforms without a portable process-start identity
+  // still expose the kernel-reported direct parent PID. Admit the narrower
+  // same-host fallback only when incarnation inspection is unavailable and
+  // that exact parent PID is currently live. Both composite dimensions must
+  // still agree on owner/sequence below, so this does not become a transported
+  // or arbitrary-PID delegation credential.
+  return inspection.status === 'unknown' && environment.isProcessAlive(parentPid);
+}
+
+interface DirectParentCompositeReader {
+  readonly ownerToken: string;
+  readonly sequence: number;
+  readonly acquiredAt: number;
+}
+
+/**
+ * Discover exactly one requested-project reader owned by this process's live
+ * direct parent, then bind it to the corresponding live user reader. No parent
+ * dimensions means an ordinary top-level acquisition; partial or ambiguous
+ * parent evidence is rejected rather than guessed.
+ */
+function resolveDirectParentCompositeReader(
+  projectReaders: readonly ReaderRecord[],
+  userReaders: readonly ReaderRecord[],
+  environment: RuntimeLeaseEnvironment,
+): DirectParentCompositeReader | undefined {
+  const parentPid = environment.parentPid;
+  const projectPidMatches = projectReaders.filter((record) => record.pid === parentPid);
+  const userPidMatches = userReaders.filter((record) => record.pid === parentPid);
+  if (projectPidMatches.length === 0 && userPidMatches.length === 0) {
+    return undefined;
+  }
+  const projectCandidates = projectReaders.filter((record) =>
+    ownedByDirectParentProcess(record, environment),
+  );
+  const userCandidates = userReaders.filter((record) =>
+    ownedByDirectParentProcess(record, environment),
+  );
+  if (
+    projectCandidates.length !== projectPidMatches.length ||
+    userCandidates.length !== userPidMatches.length
+  ) {
+    throw parentInheritanceDenied(
+      'Runtime reader inheritance could not prove direct-parent host and process identity',
+    );
+  }
+  if (projectCandidates.length !== 1) {
+    throw parentInheritanceDenied(
+      projectCandidates.length === 0
+        ? 'Runtime reader inheritance found direct-parent user state without the requested project'
+        : 'Runtime reader inheritance found multiple direct-parent project readers',
+    );
+  }
+  const project = projectCandidates[0];
+  if (userCandidates.length !== 1) {
+    throw parentInheritanceDenied(
+      userCandidates.length === 0
+        ? 'Runtime reader inheritance requires matching direct-parent user state'
+        : 'Runtime reader inheritance found multiple direct-parent user-state readers',
+    );
+  }
+  const user = userCandidates[0];
+  if (user.ownerToken !== project.ownerToken || user.sequence !== project.sequence) {
+    throw parentInheritanceDenied(
+      'Runtime reader inheritance could not prove a live direct-parent composite owner',
+    );
+  }
+  return {
+    ownerToken: project.ownerToken,
+    sequence: project.sequence,
+    acquiredAt: Math.min(project.acquiredAt, user.acquiredAt),
+  };
+}
+
 function writerBlocksSharedRegistration(
   writer: WriterRecord,
   projectKey: string | undefined,
@@ -3768,6 +3883,153 @@ function registerSharedDimensions(
   };
 }
 
+/**
+ * Register a fresh child-owned composite reader at its live direct parent's
+ * sequence. This is the only cross-process fairness inheritance path: it
+ * cannot re-use the parent's record, span another project, omit the user
+ * dimension, or pass a writer that precedes the parent.
+ */
+function registerParentInheritedSharedDimensions(
+  paths: CoordinationPaths,
+  ownerToken: string,
+  projectKey: string,
+  referenceToken: string,
+  input: RuntimeLeaseCommonInput,
+  policy: RuntimeLeasePolicy,
+  guard?: RuntimeMutexGuard,
+  remoteStaleTracker?: RemoteStaleTracker,
+): SharedRegistrationResult | undefined {
+  const environment = runtimeEnvironment(input);
+  ensureProjectScaffold(paths, projectKey, guard);
+  assertNormalSharedAccess(paths, projectKey, input, 'runtime-access-composite', guard);
+  const state = cleanStaleWriters(
+    paths,
+    readLeaseState(paths),
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  const projectReaders = cleanAndListReaders(
+    paths.forProject(projectKey).readersDir,
+    'project',
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    undefined,
+    remoteStaleTracker,
+  );
+  const userReaders = cleanAndListReaders(
+    paths.userReadersDir,
+    'user',
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    undefined,
+    remoteStaleTracker,
+  );
+  const parent = resolveDirectParentCompositeReader(projectReaders, userReaders, environment);
+  if (parent === undefined) {
+    return registerSharedDimensions(
+      paths,
+      ownerToken,
+      projectKey,
+      true,
+      true,
+      referenceToken,
+      input,
+      policy,
+      guard,
+      remoteStaleTracker,
+    );
+  }
+
+  if (state.writers.some((writer) => writer.ownerToken === ownerToken)) {
+    throw parentInheritanceDenied('A child runtime reader owner is already in use');
+  }
+  const existing = findExistingOwnerReaders(
+    paths,
+    ownerToken,
+    policy,
+    input.onEvent,
+    environment,
+    guard,
+    remoteStaleTracker,
+  );
+  if (existing.projects.length > 0 || existing.user !== undefined) {
+    throw parentInheritanceDenied('A child runtime reader owner is already registered');
+  }
+  if (ownerToken === parent.ownerToken) {
+    throw parentInheritanceDenied('A child runtime reader requires a fresh owner token');
+  }
+
+  const earlierWriter = state.writers.find(
+    (writer) =>
+      (writer.kind === 'global' ||
+        (writer.kind === 'project' && writer.coordinationKey === projectKey)) &&
+      writer.sequence <= parent.sequence,
+  );
+  if (earlierWriter !== undefined) {
+    throw parentInheritanceDenied(
+      'Runtime reader inheritance cannot bypass a writer that precedes its parent',
+    );
+  }
+
+  if (
+    projectReaders.length >= MAX_READERS_PER_DIMENSION ||
+    userReaders.length >= MAX_READERS_PER_DIMENSION
+  ) {
+    return undefined;
+  }
+
+  // Parent processes can exit without acquiring this mutex. Re-prove the exact
+  // composite immediately before publishing the inherited child records.
+  const confirmedParent = resolveDirectParentCompositeReader(
+    projectReaders,
+    userReaders,
+    environment,
+  );
+  if (
+    confirmedParent?.ownerToken !== parent.ownerToken ||
+    confirmedParent.sequence !== parent.sequence
+  ) {
+    throw parentInheritanceDenied('The direct-parent runtime reader changed during inheritance');
+  }
+
+  const metadata = buildMetadata(ownerToken, confirmedParent.sequence, input, policy);
+  const created: { path: string; dimension: ReaderRecord['dimension'] }[] = [];
+  try {
+    const projectReadersDir = paths.forProject(projectKey).readersDir;
+    writeReaderRecord(projectReadersDir, metadata, 'project', referenceToken, guard);
+    created.push({
+      path: readerFile(projectReadersDir, ownerToken),
+      dimension: 'project',
+    });
+    writeReaderRecord(paths.userReadersDir, metadata, 'user', referenceToken, guard);
+    created.push({
+      path: readerFile(paths.userReadersDir, ownerToken),
+      dimension: 'user',
+    });
+  } catch (error) {
+    for (let index = created.length - 1; index >= 0; index -= 1) {
+      const entry = created[index];
+      try {
+        removeRecordIfOwned(entry.path, ownerToken, entry.dimension, guard);
+      } catch {
+        // Fail closed: a partial child record remains owned by this live process.
+      }
+    }
+    throw error;
+  }
+  return {
+    acquiredAt: metadata.acquiredAt,
+    sequence: confirmedParent.sequence,
+  };
+}
+
 function abortedError(): SystemError {
   return new SystemError('Runtime lease acquisition was cancelled', {
     code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
@@ -3966,6 +4228,7 @@ async function acquireSharedDimensions(
   projectDir: string | undefined,
   wantsProject: boolean,
   wantsUser: boolean,
+  inheritFromParent?: boolean,
 ): Promise<{
   readonly ownerToken: string;
   readonly coordinationKey?: string;
@@ -4006,18 +4269,29 @@ async function acquireSharedDimensions(
         remaining,
         (paths, guard) => {
           registrationAttempted = true;
-          return registerSharedDimensions(
-            paths,
-            ownerToken,
-            coordinationKey,
-            wantsProject,
-            wantsUser,
-            referenceToken,
-            input,
-            policy,
-            guard,
-            remoteStaleTracker,
-          );
+          return inheritFromParent === true
+            ? registerParentInheritedSharedDimensions(
+                paths,
+                ownerToken,
+                coordinationKey!,
+                referenceToken,
+                input,
+                policy,
+                guard,
+                remoteStaleTracker,
+              )
+            : registerSharedDimensions(
+                paths,
+                ownerToken,
+                coordinationKey,
+                wantsProject,
+                wantsUser,
+                referenceToken,
+                input,
+                policy,
+                guard,
+                remoteStaleTracker,
+              );
         },
         environment,
         input.signal,
@@ -4326,8 +4600,19 @@ export async function acquireRuntimeAccessLease(
   const stableInput = captureRuntimeIdentity(input);
   const wantsProject = stableInput.projectRead !== false && stableInput.projectRead !== undefined;
   const wantsUser = stableInput.userStateRead === true;
+  if (stableInput.inheritFromParent === true && (!wantsProject || !wantsUser)) {
+    throw parentInheritanceDenied(
+      'Direct-parent runtime inheritance requires project and user-state dimensions',
+    );
+  }
   const projectDir = wantsProject ? stableInput.projectRead.projectDir : undefined;
-  const acquired = await acquireSharedDimensions(stableInput, projectDir, wantsProject, wantsUser);
+  const acquired = await acquireSharedDimensions(
+    stableInput,
+    projectDir,
+    wantsProject,
+    wantsUser,
+    stableInput.inheritFromParent,
+  );
   return {
     kind: 'runtime-access-composite',
     ownerToken: acquired.ownerToken,

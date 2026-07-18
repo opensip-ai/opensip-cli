@@ -11,10 +11,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { SystemError, resolveProjectPaths, type ProjectContext } from '@opensip-cli/core';
-import { ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
+import { DataStoreFactory, ToolStateRepo, type DataStore } from '@opensip-cli/datastore';
 import { makeTestScope, withScope } from '@opensip-cli/test-support';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createRuntimeLeaseLifecycle } from '../../commands/host-runtime-access.js';
 import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
 
 /** A scope whose datastore thunk throws the given error. */
@@ -77,7 +78,7 @@ describe('buildDatastoreThunk lifecycle', () => {
     const first = thunk();
     expect(thunk()).toBe(first); // cached on subsequent access
 
-    thunk.dispose();
+    expect(thunk.dispose()).toEqual({ checkpointed: true, closed: true });
     // Public repository operation on the closed handle must fail (no raw
     // transaction escape on DataStore — ADR-0145 / opaque handle).
     const closedRepo = new ToolStateRepo(first);
@@ -89,6 +90,35 @@ describe('buildDatastoreThunk lifecycle', () => {
   });
 
   it('dispose() is a no-op when the store was never opened', () => {
-    expect(() => buildDatastoreThunk(project()).dispose()).not.toThrow();
+    expect(buildDatastoreThunk(project()).dispose()).toEqual({
+      checkpointed: true,
+      closed: true,
+    });
+  });
+
+  it('retains the runtime lease after an unproven failed materialization', () => {
+    const open = vi.spyOn(DataStoreFactory, 'open').mockImplementationOnce(() => {
+      throw new Error('migration failed after native close failed');
+    });
+    const thunk = buildDatastoreThunk(project());
+    expect(() => thunk()).toThrow(/migration failed/);
+    const closeResult = thunk.dispose();
+    expect(closeResult).toEqual({
+      checkpointed: false,
+      closed: false,
+      reason: 'checkpoint-and-close-failed',
+    });
+
+    const release = vi.fn();
+    const lifecycle = createRuntimeLeaseLifecycle({
+      ownerToken: 'owner-token-failed-open',
+      acquiredAt: 1,
+      release,
+    });
+    lifecycle.transferToScope();
+    lifecycle.finishAfterDatastoreClose(closeResult);
+    expect(lifecycle.state()).toBe('retained');
+    expect(release).not.toHaveBeenCalled();
+    open.mockRestore();
   });
 });

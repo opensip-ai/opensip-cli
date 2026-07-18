@@ -95,6 +95,11 @@ export const BOOTSTRAP_PHASE_MAP: readonly PhaseMapEntry[] = [
     symbol: 'pre-action guards',
   },
   {
+    preActionPhase: PRE_ACTION_PHASES.runtimeLease,
+    module: 'commands/host-runtime-access.ts',
+    symbol: 'acquireHostRuntimeLease',
+  },
+  {
     preActionPhase: PRE_ACTION_PHASES.projectSideEffects,
     module: 'bootstrap/execute-post-bailout-bootstrap.ts',
     symbol: 'executePostBailoutBootstrap → projectSideEffects',

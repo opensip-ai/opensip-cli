@@ -97,6 +97,8 @@ const EXPECTED: Record<string, string[]> = {
     '--changed-file',
     '--changed',
     '--concurrency',
+    // Internal worker re-entry inherits the parent's exact config selection.
+    '--config',
     '--cwd',
     '--debug',
     '--exact',
@@ -135,6 +137,8 @@ const EXPECTED: Record<string, string[]> = {
   // ADR-0021: sim gained -v/--verbose (cross-tool flag parity).
   simulation: [
     '--api-key',
+    // Internal worker re-entry inherits the parent's exact config selection.
+    '--config',
     '--cwd',
     '--debug',
     '--json',
@@ -151,6 +155,8 @@ const EXPECTED: Record<string, string[]> = {
   yagni: [
     '--api-key',
     '--category',
+    // Internal worker re-entry inherits the parent's exact config selection.
+    '--config',
     '--cwd',
     '--debug',
     '--detector',

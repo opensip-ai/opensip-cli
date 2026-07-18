@@ -8,6 +8,13 @@
  * of a parallel allowlist.
  */
 
+import {
+  DEFAULT_HOST_RUNTIME_POLICY,
+  resolveHostRuntimePolicyForScope,
+  type HostCommandRuntimePolicy,
+  type HostRuntimeCommandSpec,
+} from './host-runtime-access.js';
+
 import type { HostSubcommandGroup, ToolPluginGroup } from './host-subcommand-groups.js';
 import type { CommandScopeRequirement } from '@opensip-cli/core';
 import type { Command } from 'commander';
@@ -24,6 +31,8 @@ export interface CommandScopeEntry {
   readonly scope: CommandScopeRequirement;
   /** True when this command may run outside an initialized project (ephemeral). */
   readonly noInit: boolean;
+  /** CLI-private host bootstrap/resource declaration; Tools always receive the default. */
+  readonly runtimePolicy: HostCommandRuntimePolicy;
 }
 
 export type CommandScopeIndex = ReadonlyMap<string, CommandScopeEntry>;
@@ -60,9 +69,14 @@ function addSpec(
   index: Map<string, CommandScopeEntry>,
   pathPrefix: string | undefined,
   spec: CommandScopeSpec,
+  runtimePolicy: HostCommandRuntimePolicy,
 ): void {
   const names = [spec.name, ...(spec.aliases ?? [])];
-  const entry: CommandScopeEntry = { scope: spec.scope, noInit: spec.noInit === true };
+  const entry: CommandScopeEntry = Object.freeze({
+    scope: spec.scope,
+    noInit: spec.noInit === true,
+    runtimePolicy,
+  });
   names.forEach((name) => {
     index.set(pathPrefix === undefined ? name : `${pathPrefix} ${name}`, entry);
   });
@@ -74,16 +88,40 @@ export function buildCommandScopeIndex(input: CommandScopeIndexInput): CommandSc
   // Tool specs key flat by `name`, EXCEPT `parent`-nested specs (the
   // `<tool> <verb>` grammar, taxonomy Task 0.4), which key under
   // `${parent} ${name}` so `commandPath` resolves `graph export` / `fit list`.
-  input.toolSpecs.forEach((spec) => addSpec(index, spec.parent, spec));
-  input.hostSpecs.forEach((spec) => addSpec(index, undefined, spec));
+  input.toolSpecs.forEach((spec) => addSpec(index, spec.parent, spec, DEFAULT_HOST_RUNTIME_POLICY));
+  input.hostSpecs.forEach((spec) =>
+    addSpec(
+      index,
+      undefined,
+      spec,
+      resolveHostRuntimePolicyForScope(
+        spec.scope,
+        (spec as HostRuntimeCommandSpec).hostRuntimePolicy,
+      ),
+    ),
+  );
   input.hostGroups.forEach((group) => {
-    group.leaves.forEach((leaf) => addSpec(index, group.name, leaf));
+    group.leaves.forEach((leaf) =>
+      addSpec(
+        index,
+        group.name,
+        leaf,
+        resolveHostRuntimePolicyForScope(leaf.scope, leaf.hostRuntimePolicy),
+      ),
+    );
   });
   // Per-tool `plugin` group leaves key under the doubly-nested
   // `${parentVerb} plugin ${leaf}` path (e.g. `fit plugin list`), matching what
   // `commandPath` resolves for the mounted `opensip fit plugin list`.
   (input.toolPluginGroups ?? []).forEach((group) => {
-    group.leaves.forEach((leaf) => addSpec(index, `${group.parentVerb} plugin`, leaf));
+    group.leaves.forEach((leaf) =>
+      addSpec(
+        index,
+        `${group.parentVerb} plugin`,
+        leaf,
+        resolveHostRuntimePolicyForScope(leaf.scope, leaf.hostRuntimePolicy),
+      ),
+    );
   });
 
   return index;

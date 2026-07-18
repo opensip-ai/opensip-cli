@@ -8,6 +8,7 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import { defineHostCommand } from '../../commands/host-runtime-access.js';
 import { buildRuntimeCommandInventory } from '../build-runtime-command-inventory.js';
 
 function handler(): undefined {
@@ -176,5 +177,34 @@ describe('buildRuntimeCommandInventory', () => {
     });
     expect(Object.isFrozen(inv)).toBe(true);
     expect(Object.isFrozen(inv.leaves[0])).toBe(true);
+  });
+
+  it('omits CLI-private host runtime policy from the public inventory', () => {
+    const registry = new ToolRegistry();
+    const status = defineHostCommand(
+      {
+        name: 'status',
+        description: 'status',
+        commonFlags: [],
+        scope: 'none',
+        output: 'command-result',
+        handler,
+      },
+      { bootstrapMode: 'inspection-only' },
+    );
+    const inv = buildRuntimeCommandInventory({
+      toolRegistry: registry,
+      toolCommandSpecs: [],
+      hostSpecs: [status],
+      hostGroups: [],
+      toolPluginGroups: [],
+    });
+    const serialized = JSON.stringify(inv);
+    expect(serialized).not.toContain('hostRuntimePolicy');
+    expect(serialized).not.toContain('inspection-only');
+    expect(inv.leaves.find((leaf) => leaf.path === 'status')).toMatchObject({
+      owner: 'host',
+      scope: 'none',
+    });
   });
 });

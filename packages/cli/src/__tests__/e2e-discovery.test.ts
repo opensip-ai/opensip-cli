@@ -301,9 +301,12 @@ describe('full Tool-plugin install path (audit P1b)', () => {
         'tool-demo',
       );
 
-      // Discovered + mounted: top-level help lists the new subcommand …
-      expect(runCli(['--help'], testDir, env).stdout).toContain('audit-demo');
-      // … and it actually runs.
+      // Root help is the stable host+bundled surface and deliberately performs
+      // no ambient Tool discovery. The leased inventory command remains the
+      // canonical way to enumerate installed Tools.
+      expect(runCli(['--help'], testDir, env).stdout).not.toContain('audit-demo');
+      expect(runCli(['tools', 'list', '--json'], testDir, env).stdout).toContain('tool-demo');
+      // Dynamic discovery still mounts the external command for real dispatch.
       const ran = runCli(['audit-demo'], testDir, env);
       expect(ran.exitCode).toBe(0);
       expect(ran.stdout).toContain('audit-demo ran');

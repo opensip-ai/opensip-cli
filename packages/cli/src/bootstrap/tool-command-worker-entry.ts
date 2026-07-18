@@ -370,8 +370,15 @@ export const toolCommandWorkerCommandSpec: CommandSpec<unknown, CliCommandsConte
   visibility: 'internal',
   description:
     '[internal] Run one external tool command headless in a forked worker and stream the result over IPC (forked by the ADR-0054 dispatch supervisor)',
-  // The supervisor passes `--cwd`; bootstrap uses it to resolve the project.
+  // The supervisor passes the resolved project selection back through bootstrap.
   commonFlags: ['cwd'],
+  options: [
+    {
+      flag: '--config',
+      value: '<path>',
+      description: 'Resolved project config inherited from the parent run',
+    },
+  ],
   args: [
     {
       name: 'specPath',
@@ -379,6 +386,7 @@ export const toolCommandWorkerCommandSpec: CommandSpec<unknown, CliCommandsConte
     },
   ],
   scope: 'project',
+  noInit: true,
   output: 'raw-stream',
   rawStreamReason: 'worker-ipc',
   handler: async (rawOpts): Promise<void> => {

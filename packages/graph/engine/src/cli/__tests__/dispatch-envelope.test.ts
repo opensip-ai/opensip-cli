@@ -196,9 +196,7 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
         ...modeOptions,
       } as unknown as Parameters<typeof dispatchGraphResult>[0];
 
-      await runWithScope(scope, () =>
-        dispatchGraphResult(opts, result, cli, STARTED, '/x'),
-      );
+      await runWithScope(scope, () => dispatchGraphResult(opts, result, cli, STARTED, '/x'));
 
       const events = completionEvents(info);
       expect(events).toHaveLength(1);

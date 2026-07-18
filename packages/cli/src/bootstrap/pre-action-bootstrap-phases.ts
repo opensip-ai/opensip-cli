@@ -8,6 +8,7 @@ export const PRE_ACTION_PHASES = {
   mergeCliDefaults: 'merge-cli-defaults',
   resolveProject: 'resolve-project',
   bailoutWindow: 'bailout-window',
+  runtimeLease: 'runtime-lease',
   projectSideEffects: 'project-side-effects',
   buildScope: 'build-scope',
   enterScope: 'enter-scope',
@@ -20,6 +21,7 @@ export type PreActionPhase = (typeof PRE_ACTION_PHASES)[keyof typeof PRE_ACTION_
 
 /** Post-bailout phases in load-bearing order (phases 5–9 of ADR-0052). */
 export const POST_BAILOUT_PHASE_ORDER: readonly PreActionPhase[] = [
+  PRE_ACTION_PHASES.runtimeLease,
   PRE_ACTION_PHASES.projectSideEffects,
   PRE_ACTION_PHASES.buildScope,
   PRE_ACTION_PHASES.enterScope,

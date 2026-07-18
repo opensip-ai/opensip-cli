@@ -10,9 +10,11 @@ import {
   createRunLogger,
   currentScope,
   enterScope,
+  exitScope,
   getMeter,
   pruneEphemeralRuntimes,
   resolveEphemeralProjectPaths,
+  runWithScopeSync,
   shouldPruneEphemeralRuntimes,
   SystemError,
   touchEphemeralRuntime,
@@ -24,7 +26,7 @@ import {
 import { startProfiling } from '../telemetry/profiling.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
 
-import { buildPerRunScope } from './build-per-run-scope.js';
+import { buildInspectionOnlyScope, buildPerRunScope } from './build-per-run-scope.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { shouldRenderNoInitAdoptionHint } from './no-init-eligibility.js';
 import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
@@ -38,6 +40,11 @@ import { resolveDatastoreAccess } from './worker-datastore.js';
 
 import type { PreActionBootstrapPlan } from './plan-pre-action-bootstrap.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';
+import type {
+  RuntimeLeaseLifecycle,
+  SafeRuntimeLeaseEvent,
+  SafeRuntimeLeaseEventBuffer,
+} from '../commands/host-runtime-access.js';
 
 const MODULE_TAG = 'cli:bootstrap';
 const CLI_PACKAGE_NAME = 'opensip-cli';
@@ -86,12 +93,15 @@ export interface PostBailoutBootstrapInput {
   readonly version: string;
   readonly noCloud: boolean;
   readonly apiKey?: string;
+  readonly runtimeLeaseLifecycle?: RuntimeLeaseLifecycle;
+  readonly leaseEvents?: SafeRuntimeLeaseEventBuffer;
 }
 
 export interface PostBailoutBootstrapDeps {
   readonly recordPhase?: PhaseRecorder;
   readonly createRunLogger?: typeof createRunLogger;
   readonly buildPerRunScope?: typeof buildPerRunScope;
+  readonly buildInspectionOnlyScope?: typeof buildInspectionOnlyScope;
   readonly enterScope?: typeof enterScope;
   readonly isScopeEntered?: () => boolean;
   readonly checkForUpdate?: typeof checkForUpdate;
@@ -111,6 +121,7 @@ const defaultDeps: Required<
     PostBailoutBootstrapDeps,
     | 'createRunLogger'
     | 'buildPerRunScope'
+    | 'buildInspectionOnlyScope'
     | 'enterScope'
     | 'isScopeEntered'
     | 'checkForUpdate'
@@ -122,6 +133,7 @@ const defaultDeps: Required<
 > = {
   createRunLogger,
   buildPerRunScope,
+  buildInspectionOnlyScope,
   enterScope,
   isScopeEntered: () => currentScope() !== undefined,
   checkForUpdate,
@@ -130,6 +142,32 @@ const defaultDeps: Required<
   loadOwningToolCapabilities,
   resolveOwningTool,
 };
+
+function emitRuntimeLeaseEvent(runLogger: Logger, event: SafeRuntimeLeaseEvent): void {
+  runLogger.debug({
+    evt: 'cli.runtime.lease',
+    module: MODULE_TAG,
+    kind: event.kind,
+    resource: event.resource,
+    ...(event.operation === undefined ? {} : { operation: event.operation }),
+    ...(event.waitMs === undefined ? {} : { waitMs: event.waitMs }),
+  });
+}
+
+function attachRuntimeLeaseEventLogger(
+  buffer: SafeRuntimeLeaseEventBuffer | undefined,
+  runLogger: Logger,
+): void {
+  buffer?.attach({
+    onEvent: (event) => emitRuntimeLeaseEvent(runLogger, event),
+    onDropped: (count) =>
+      runLogger.debug({
+        evt: 'cli.runtime.lease_events_dropped',
+        module: MODULE_TAG,
+        count,
+      }),
+  });
+}
 
 /**
  * Run post-bailout bootstrap phases. Returns the entered scope and its
@@ -150,167 +188,221 @@ export async function executePostBailoutBootstrap(
     emitPreActionTimingEvents(scope, events.slice(emittedTimingCount));
     emittedTimingCount = events.length;
   };
+  let constructedScope: RunScope | undefined;
 
-  record(PRE_ACTION_PHASES.projectSideEffects);
+  try {
+    record(PRE_ACTION_PHASES.runtimeLease);
 
-  const { runLogger, update } = preActionTimer.measure(PRE_ACTION_PHASES.projectSideEffects, () => {
-    const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
-    const checkedUpdate = preActionTimer.measure('update-check', () =>
-      d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
-    );
-    if (checkedUpdate && plan.jsonOutput) {
-      process.stderr.write(formatUpdateNag(version, checkedUpdate));
-    }
-    preActionTimer.measure('ephemeral-cache-maintenance', () =>
-      maintainEphemeralCache(plan.project, createdRunLogger),
-    );
-    return { runLogger: createdRunLogger, update: checkedUpdate };
-  });
-
-  record(PRE_ACTION_PHASES.buildScope);
-
-  // B2 / GAP e: parentCommand is the FIRST segment of the invoked command path
-  // (e.g. `graph`, `fit`) — NOT a child's own `graph-shard-worker`. toolName is
-  // the owning tool id of the dispatched command (resolved by the same
-  // owning-tool resolution the preflight uses); fall back to parentCommand when
-  // the command belongs to no tool (CLI-only commands have a 1:1 name).
-  const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
-  // An exact internal worker command + host-injected marker must agree (ADR-0145).
-  // Resolved before scope construction so a mismatch never reaches a handler
-  // or opens SQLite.
-  const datastoreAccess = resolveDatastoreAccess(plan.commandPath, process.env);
-  const { owningTool, scope } = preActionTimer.measure(PRE_ACTION_PHASES.buildScope, () => {
-    const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandPath);
-    const toolName = resolvedOwningTool?.metadata.id ?? parentCommand;
-    return {
-      owningTool: resolvedOwningTool,
-      scope: d.buildPerRunScope({
+    if (plan.runtimePolicy.bootstrapMode === 'inspection-only') {
+      record(PRE_ACTION_PHASES.buildScope);
+      const inspection = d.buildInspectionOnlyScope({
         project: plan.project,
         runId: plan.runId,
-        cwd: plan.cwd,
-        parentCommand,
-        toolName,
-        cliDefaults: plan.cliDefaults,
-        registries: { languages, tools },
-        manifests,
-        provenance,
-        bootstrapDiagnostics,
-        startupTimings: runtime.startupTimings,
-        bootstrapPolicyAudit: runtime.policyAudit,
-        apiKey,
-        noCloud,
-        logger: runLogger,
-        ui: { version, update },
-        datastoreAccess,
-        ...(runtime.runtimeCommands === undefined
-          ? {}
-          : { runtimeCommands: runtime.runtimeCommands }),
-      }),
-    };
-  });
-  const toolName = owningTool?.metadata.id ?? parentCommand;
-
-  record(PRE_ACTION_PHASES.enterScope);
-  preActionTimer.measure(PRE_ACTION_PHASES.enterScope, () => {
-    if (shouldRenderNoInitAdoptionHint({ project: plan.project, opts: plan.opts })) {
-      scope.bootstrapDiagnostics.record({
-        severity: 'warning',
-        code: 'OPENSIP_NO_INIT_EPHEMERAL_PROJECT',
-        category: 'configuration',
-        message: 'Running with auto-detected no-init configuration.',
-        impact:
-          'Project-local plugins, custom recipes, and committed baselines are unavailable until the project is initialized.',
-        action: "Run 'opensip init' to save this configuration and track baselines across runs.",
-        provenance: { toolId: toolName },
       });
+      constructedScope = inspection.scope;
+      record(PRE_ACTION_PHASES.enterScope);
+      d.enterScope(inspection.scope);
+      if (!d.isScopeEntered()) {
+        throw new SystemError('Inspection scope was not entered before command dispatch', {
+          code: 'SYSTEM.SCOPE.NOT_ENTERED',
+        });
+      }
+      return { scope: inspection.scope, runLogger: inspection.logger };
     }
 
-    d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
+    record(PRE_ACTION_PHASES.projectSideEffects);
 
-    if (
-      !isDedicatedBootstrapDiagnosticCommand(plan.commandPath) &&
-      plan.jsonOutput !== true &&
-      plan.opts.help !== true
-    ) {
-      renderRelevantBootstrapDiagnostics(scope.bootstrapDiagnostics, toolName);
-    }
-
-    if (!d.isScopeEntered()) {
-      throw new SystemError('Scope was not entered before command dispatch', {
-        code: 'SYSTEM.SCOPE.NOT_ENTERED',
-      });
-    }
-  });
-  emitNewTimings(scope);
-
-  record(PRE_ACTION_PHASES.hostStartEffects);
-
-  await preActionTimer.measureAsync(PRE_ACTION_PHASES.hostStartEffects, async () => {
-    scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
-    scope.diagnostics.counter('tools.loaded', tools.list().length);
-
-    getMeter('opensip-cli').createCounter('opensip_cli.commands.started').add(1, {
-      command: plan.commandName,
-    });
-    scope.diagnostics.event(
-      'validate',
-      'debug',
-      `project config resolved (scope: ${plan.project.scope})`,
+    const { runLogger, update } = preActionTimer.measure(
+      PRE_ACTION_PHASES.projectSideEffects,
+      () => {
+        const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
+        const checkedUpdate = preActionTimer.measure('update-check', () =>
+          d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
+        );
+        if (checkedUpdate && plan.jsonOutput) {
+          process.stderr.write(formatUpdateNag(version, checkedUpdate));
+        }
+        preActionTimer.measure('ephemeral-cache-maintenance', () =>
+          maintainEphemeralCache(plan.project, createdRunLogger),
+        );
+        return { runLogger: createdRunLogger, update: checkedUpdate };
+      },
     );
 
-    runLogger.info({
-      evt: 'cli.run.start',
-      module: MODULE_TAG,
-      runId: plan.runId,
-      command: plan.commandName,
-      cwd: plan.cwd,
-      projectRoot: plan.project.projectRoot,
-      scope: plan.project.scope,
-    });
+    attachRuntimeLeaseEventLogger(input.leaseEvents, runLogger);
 
-    if (plan.project.walkedUp > 0) {
+    record(PRE_ACTION_PHASES.buildScope);
+
+    // B2 / GAP e: parentCommand is the FIRST segment of the invoked command path
+    // (e.g. `graph`, `fit`) — NOT a child's own `graph-shard-worker`. toolName is
+    // the owning tool id of the dispatched command (resolved by the same
+    // owning-tool resolution the preflight uses); fall back to parentCommand when
+    // the command belongs to no tool (CLI-only commands have a 1:1 name).
+    const parentCommand = plan.commandPath.split(' ')[0] ?? plan.commandName;
+    // An exact internal worker command + host-injected marker must agree (ADR-0145).
+    // Resolved before scope construction so a mismatch never reaches a handler
+    // or opens SQLite.
+    const workerDatastoreAccess = resolveDatastoreAccess(plan.commandPath, process.env);
+    // Composite scope-none host commands coordinate both install hosts without
+    // eagerly opening project state. Their local datastore thunk remains lazy
+    // so the documented tools-uninstall --purge-data branch can explicitly
+    // materialize the already reader-protected project store.
+    let datastoreAccess: 'local' | 'local-explicit-only' | 'host-rpc-only' | 'none' = 'none';
+    if (plan.commandScope === 'project') {
+      datastoreAccess = workerDatastoreAccess;
+    } else if (plan.runtimePolicy.runtimeAccess === 'project-and-user-state') {
+      datastoreAccess = 'local-explicit-only';
+    }
+    const { owningTool, scope } = preActionTimer.measure(PRE_ACTION_PHASES.buildScope, () => {
+      const resolvedOwningTool = d.resolveOwningTool(tools, plan.commandPath);
+      const toolName = resolvedOwningTool?.metadata.id ?? parentCommand;
+      return {
+        owningTool: resolvedOwningTool,
+        scope: d.buildPerRunScope({
+          project: plan.project,
+          runId: plan.runId,
+          cwd: plan.cwd,
+          parentCommand,
+          toolName,
+          cliDefaults: plan.cliDefaults,
+          registries: { languages, tools },
+          manifests,
+          provenance,
+          bootstrapDiagnostics,
+          startupTimings: runtime.startupTimings,
+          bootstrapPolicyAudit: runtime.policyAudit,
+          apiKey,
+          noCloud,
+          logger: runLogger,
+          ui: { version, update },
+          datastoreAccess,
+          ...(input.runtimeLeaseLifecycle === undefined
+            ? {}
+            : { runtimeLeaseLifecycle: input.runtimeLeaseLifecycle }),
+          ...(runtime.runtimeCommands === undefined
+            ? {}
+            : { runtimeCommands: runtime.runtimeCommands }),
+        }),
+      };
+    });
+    constructedScope = scope;
+    const toolName = owningTool?.metadata.id ?? parentCommand;
+
+    record(PRE_ACTION_PHASES.enterScope);
+    preActionTimer.measure(PRE_ACTION_PHASES.enterScope, () => {
+      if (
+        shouldRenderNoInitAdoptionHint({
+          project: plan.project,
+          opts: plan.opts,
+        })
+      ) {
+        scope.bootstrapDiagnostics.record({
+          severity: 'warning',
+          code: 'OPENSIP_NO_INIT_EPHEMERAL_PROJECT',
+          category: 'configuration',
+          message: 'Running with auto-detected no-init configuration.',
+          impact:
+            'Project-local plugins, custom recipes, and committed baselines are unavailable until the project is initialized.',
+          action: "Run 'opensip init' to save this configuration and track baselines across runs.",
+          provenance: { toolId: toolName },
+        });
+      }
+
+      d.enterScope(scope); // resilience-ok: Commander postAction in pre-action-hook.ts disposes the entered RunScope after the action completes.
+
+      if (
+        !isDedicatedBootstrapDiagnosticCommand(plan.commandPath) &&
+        plan.jsonOutput !== true &&
+        plan.opts.help !== true
+      ) {
+        renderRelevantBootstrapDiagnostics(scope.bootstrapDiagnostics, toolName);
+      }
+
+      if (!d.isScopeEntered()) {
+        throw new SystemError('Scope was not entered before command dispatch', {
+          code: 'SYSTEM.SCOPE.NOT_ENTERED',
+        });
+      }
+    });
+    emitNewTimings(scope);
+
+    record(PRE_ACTION_PHASES.hostStartEffects);
+
+    await preActionTimer.measureAsync(PRE_ACTION_PHASES.hostStartEffects, async () => {
+      scope.diagnostics.event('load', 'debug', `${tools.list().length} tool(s) loaded`);
+      scope.diagnostics.counter('tools.loaded', tools.list().length);
+
+      getMeter('opensip-cli').createCounter('opensip_cli.commands.started').add(1, {
+        command: plan.commandName,
+      });
+      scope.diagnostics.event(
+        'validate',
+        'debug',
+        `project config resolved (scope: ${plan.project.scope})`,
+      );
+
       runLogger.info({
-        evt: 'cli.project.discovered',
+        evt: 'cli.run.start',
         module: MODULE_TAG,
         runId: plan.runId,
+        command: plan.commandName,
         cwd: plan.cwd,
         projectRoot: plan.project.projectRoot,
-        walkedUp: plan.project.walkedUp,
+        scope: plan.project.scope,
       });
-    }
 
-    await d.startProfiling(scope, plan.commandName);
-  });
-  emitNewTimings(scope);
+      if (plan.project.walkedUp > 0) {
+        runLogger.info({
+          evt: 'cli.project.discovered',
+          module: MODULE_TAG,
+          runId: plan.runId,
+          cwd: plan.cwd,
+          projectRoot: plan.project.projectRoot,
+          walkedUp: plan.project.walkedUp,
+        });
+      }
 
-  record(PRE_ACTION_PHASES.toolPreflight);
+      await d.startProfiling(scope, plan.commandName);
+    });
+    emitNewTimings(scope);
 
-  await preActionTimer.measureAsync(PRE_ACTION_PHASES.toolPreflight, async () => {
-    // ADR-0054 M4-F: pass provenance so an EXTERNAL owning tool's initialize is
-    // skipped in-host (it runs worker-side under dispatch); bundled runs in-host.
-    await preActionTimer.measureAsync('owning-tool-initialize', () =>
-      d.maybeInitializeOwningTool(tools, plan.commandPath, plan.runId, provenance),
-    );
+    record(PRE_ACTION_PHASES.toolPreflight);
 
-    const driven = await preActionTimer.measureAsync('owning-capability-load', () =>
-      d.loadOwningToolCapabilities({
-        owningTool,
-        projectDir: plan.project.projectRoot,
-        pluginsConfig: scope.configDocument?.plugins ?? {},
-      }),
-    );
-    if (driven > 0) {
-      scope.diagnostics.event(
-        'load',
-        'debug',
-        `drove ${String(driven)} owning-tool capability domain(s) (see per-domain 'capability ... loaded' events for contribution counts + errors)`,
+    await preActionTimer.measureAsync(PRE_ACTION_PHASES.toolPreflight, async () => {
+      // ADR-0054 M4-F: pass provenance so an EXTERNAL owning tool's initialize is
+      // skipped in-host (it runs worker-side under dispatch); bundled runs in-host.
+      await preActionTimer.measureAsync('owning-tool-initialize', () =>
+        d.maybeInitializeOwningTool(tools, plan.commandPath, plan.runId, provenance),
       );
-      scope.diagnostics.counter('capabilities.driven', driven);
-    }
-  });
-  emitNewTimings(scope);
 
-  return { scope, runLogger };
+      const driven = await preActionTimer.measureAsync('owning-capability-load', () =>
+        d.loadOwningToolCapabilities({
+          owningTool,
+          projectDir: plan.project.projectRoot,
+          pluginsConfig: scope.configDocument?.plugins ?? {},
+        }),
+      );
+      if (driven > 0) {
+        scope.diagnostics.event(
+          'load',
+          'debug',
+          `drove ${String(driven)} owning-tool capability domain(s) (see per-domain 'capability ... loaded' events for contribution counts + errors)`,
+        );
+        scope.diagnostics.counter('capabilities.driven', driven);
+      }
+    });
+    emitNewTimings(scope);
+
+    return { scope, runLogger };
+  } catch (error) {
+    if (constructedScope !== undefined) {
+      const failedScope = constructedScope;
+      runWithScopeSync(failedScope, () => failedScope.dispose());
+      if (currentScope() === failedScope) exitScope();
+    }
+    input.runtimeLeaseLifecycle?.releaseBootstrapOwned();
+    throw error;
+  }
 }
 
 function emitPreActionTimingEvents(scope: RunScope, timings: readonly StartupTimingEvent[]): void {

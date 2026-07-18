@@ -26,6 +26,7 @@ function writeChild(source: string): string {
 function port(entrypoint: string | undefined, timeoutMs = 5000): CliRepairWritePort {
   return new CliRepairWritePort({
     projectRoot: root,
+    configPath: join(root, 'custom opensip.yml'),
     cliEntrypoint: entrypoint,
     timeoutMs,
   });
@@ -99,6 +100,10 @@ describe('CliRepairWritePort', () => {
         'repair',
         'apply',
         'session:0',
+        '--cwd',
+        root,
+        '--config',
+        join(root, 'custom opensip.yml'),
         '--tool',
         'fit',
         '--signal',

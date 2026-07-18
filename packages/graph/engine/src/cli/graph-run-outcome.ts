@@ -29,12 +29,7 @@ export type GraphRunOutcome =
 
 /** Closed vocabulary for the graph completion event's delivery projection. */
 export type GraphDeliveryMode =
-  | 'gate'
-  | 'catalog'
-  | 'json'
-  | 'human'
-  | 'report-to'
-  | 'workspace-parent';
+  'gate' | 'catalog' | 'json' | 'human' | 'report-to' | 'workspace-parent';
 
 type GraphCompletionLogInput =
   | {
@@ -58,9 +53,7 @@ export interface GraphCompletionLogFields {
   readonly workspaceChild: boolean;
 }
 
-export function graphCompletionLogFields(
-  input: GraphCompletionLogInput,
-): GraphCompletionLogFields {
+export function graphCompletionLogFields(input: GraphCompletionLogInput): GraphCompletionLogFields {
   switch (input.kind) {
     case 'direct': {
       return {

@@ -446,14 +446,24 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
     // the child inherits the parent run, B1) is spread LAST; the `{ ...process.env }`
     // base already preserves PATH/HOME/OTEL_*, and `correlationToEnv` only adds
     // `OPENSIP_*` keys (and NEVER the API key, M1), so it can never clobber them (M2).
-    const child = spawn(process.execPath, [cliScript, 'graph-shard-worker', specPath], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        ...(traceparent ? { TRACEPARENT: traceparent } : {}),
-        ...(correlation ? correlationToEnv(correlation) : {}),
+    const configPath = currentScope()?.projectContext?.configPath;
+    const projectSelectionArgs = [
+      '--cwd',
+      projectRoot,
+      ...(configPath === undefined ? [] : ['--config', configPath]),
+    ];
+    const child = spawn(
+      process.execPath,
+      [cliScript, 'graph-shard-worker', specPath, ...projectSelectionArgs],
+      {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          ...(traceparent ? { TRACEPARENT: traceparent } : {}),
+          ...(correlation ? correlationToEnv(correlation) : {}),
+        },
       },
-    });
+    );
 
     // Arm the hard kill-timeout (M3): a hung child is SIGKILLed after a fixed
     // wall-clock floor so `runWorkerPool` settles (with failureClass 'timeout')

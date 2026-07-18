@@ -108,14 +108,14 @@ interface CapturedCli {
   readonly render: MockInstance;
 }
 
-function makeCli(): CapturedCli {
+function makeCli(projectRoot: string): CapturedCli {
   const exitCodes: number[] = [];
   const render = vi.fn((_result?: unknown) => Promise.resolve());
   const datastore = DataStoreFactory.open({ backend: 'memory' });
   const project = {
-    cwd: '/test',
+    cwd: projectRoot,
     cwdExplicit: false,
-    projectRoot: '/test',
+    projectRoot,
     configPath: undefined,
     walkedUp: 0,
     scope: 'none' as const,
@@ -296,7 +296,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir }, cli);
     // executeGraph hands a structured result to the render seam; the
     // Ink-vs-plain-text rendering is the CLI's concern (covered there).
@@ -317,7 +317,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, verbose: true }, cli);
     const done = render.mock.calls[0]?.[0] as RunPresentationLike;
     expect(done.type).toBe('run-presentation');
@@ -334,7 +334,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
     });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, json: true }, cli);
     const parsed = JSON.parse(stdout) as {
       tool: string;
@@ -353,7 +353,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, gateSave: true }, cli);
     expect(renderedLines(render)).toContain(`Graph baseline saved`);
     expect(exitCodes).toContain(0);
@@ -363,7 +363,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const shared = makeCli();
+    const shared = makeCli(dir);
     await runExecuteGraph({ cwd: dir, gateSave: true }, shared.cli);
     shared.render.mockClear();
     await runExecuteGraph({ cwd: dir, gateCompare: true }, shared.cli);
@@ -375,7 +375,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function main(): void {}\n`,
     });
-    const shared = makeCli();
+    const shared = makeCli(dir);
     await runExecuteGraph({ cwd: dir, gateSave: true }, shared.cli);
     // Mutate fixture to add an orphan
     writeFileSync(
@@ -393,7 +393,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, gateSave: true, gateCompare: true }, cli);
     expect(renderedErrorText(render)).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
@@ -402,7 +402,7 @@ describe('executeGraph', () => {
   it('maps a missing tsconfig.json to a configuration-error exit code', async () => {
     // No tsconfig.json -> ConfigurationError surfaces
     mkdirSync(dir, { recursive: true });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir }, cli);
     expect(renderedErrorText(render)).toContain('graph:');
     expect(exitCodes).toContain(2);
@@ -418,7 +418,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `function unused(): number { return 1; }\nexport function main(): void {}\n`,
     });
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes } = makeCli(dir);
     // host-owned-run-timing Phase 3: executeGraph now returns a GraphRunOutcome
     // ({ envelope?, session? }); the deliverable envelope is on `.envelope`.
     const outcome = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
@@ -431,7 +431,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, paths: ['foo'], workspace: true }, cli);
     expect(renderedErrorText(render)).toContain('mutually exclusive');
     expect(exitCodes).toContain(2);
@@ -441,7 +441,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: '' }, cli);
     expect(renderedErrorText(render)).toContain('CLI entry script');
     expect(exitCodes).toContain(2);
@@ -451,7 +451,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     // No packages/** dir exists — discoverWorkspaceUnits returns [].
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: '/usr/bin/node' }, cli);
     expect(renderedErrorText(render)).toContain('no workspace units');
@@ -471,7 +471,7 @@ describe('executeGraph', () => {
       `export function fromInner(): number { return 1; }\n`,
       'utf8',
     );
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, paths: [join(dir, 'packages', 'inner')], json: true }, cli);
     const parsed = JSON.parse(stdout) as { tool: string };
     expect(parsed.tool).toBe('graph');
@@ -485,7 +485,7 @@ describe('executeGraph', () => {
     setupFixture(dir, {
       'index.ts': `export function x(): number { return 1; }\n`,
     });
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     const outcome = await runExecuteGraph({ cwd: dir, reportTo: 'http://127.0.0.1:1' }, cli);
     const done = render.mock.calls[0]?.[0] as RunPresentationLike;
     expect(done.type).toBe('run-presentation');
@@ -532,7 +532,7 @@ describe('executeGraph', () => {
         `process.exit(0);\n`,
       'utf8',
     );
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes } = makeCli(dir);
     await runExecuteGraph(
       {
         cwd: dir,
@@ -580,7 +580,7 @@ describe('executeGraph', () => {
         `process.exit(0);\n`,
       'utf8',
     );
-    const { cli, exitCodes, render } = makeCli();
+    const { cli, exitCodes, render } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     const out = renderedLines(render);
     expect(out).toContain('opensip graph --workspace');
@@ -610,7 +610,7 @@ describe('executeGraph', () => {
     // Failing helper: writes some stderr + exits 1.
     const helper = join(dir, 'failing-cli.cjs');
     writeFileSync(helper, `process.stderr.write('boom\\n');\nprocess.exit(1);\n`, 'utf8');
-    const { cli, exitCodes } = makeCli();
+    const { cli, exitCodes } = makeCli(dir);
     await runExecuteGraph({ cwd: dir, workspace: true, cliScript: helper, concurrency: 1 }, cli);
     expect(exitCodes).toContain(1);
     expect(stderr).toContain('at least one unit run failed');

@@ -227,7 +227,10 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   const mutationEnabled = mutationsEnabled(rawOpts as McpCommandOptions);
   const repairWrite = mutationEnabled
     ? new CliRepairWritePort({
-        projectRoot,
+        projectRoot: canonicalProjectRoot,
+        ...(scope.projectContext?.configPath === undefined
+          ? {}
+          : { configPath: canonicalConfigPath }),
       })
     : undefined;
 

@@ -23,6 +23,7 @@ export interface ApplyRepairInput extends RepairBuildInput {
 export type RepairVerifier = (input: VerifyRepairInput) => Promise<RepairVerificationResult>;
 
 export interface ApplyAndVerifyRepairInput extends ApplyRepairInput {
+  readonly configPath?: string;
   readonly verifier?: RepairVerifier;
   readonly verificationRunner?: ProcessRunner;
   readonly cliEntrypoint?: string;
@@ -134,6 +135,7 @@ export async function applyAndVerifyRepair(
   const verifier = input.verifier ?? verifyRepair;
   const verification = await verifier({
     projectRoot: input.projectRoot,
+    ...(input.configPath === undefined ? {} : { configPath: input.configPath }),
     applyResult: applied.value,
     ...(input.verificationRunner === undefined ? {} : { runner: input.verificationRunner }),
     ...(input.cliEntrypoint === undefined ? {} : { cliEntrypoint: input.cliEntrypoint }),

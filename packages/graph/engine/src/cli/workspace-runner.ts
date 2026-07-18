@@ -65,6 +65,8 @@ export interface WorkspaceUnitRunResult {
  */
 export interface RunWorkspaceUnitsInput {
   readonly cwd: string;
+  /** Exact OpenSIP config selected by the parent invocation, when present. */
+  readonly configPath?: string;
   readonly units: readonly WorkspaceUnit[];
   /**
    * Path to the CLI entry script — typically `process.argv[1]` from
@@ -160,6 +162,7 @@ export async function runWorkspaceUnitsInParallel(
       cliScript: input.cliScript,
       unit,
       cwd: input.cwd,
+      ...(input.configPath === undefined ? {} : { configPath: input.configPath }),
       noCache: input.noCache === true,
       resolution: input.resolution,
       recipe: input.recipe,
@@ -195,6 +198,7 @@ interface SpawnInput {
   readonly cliScript: string;
   readonly unit: WorkspaceUnit;
   readonly cwd: string;
+  readonly configPath?: string;
   readonly noCache: boolean;
   readonly resolution?: ResolutionMode;
   readonly language?: string;
@@ -205,7 +209,15 @@ interface SpawnInput {
 
 function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
   return new Promise((resolvePromise) => {
-    const args: string[] = [input.cliScript, 'graph', input.unit.rootDir, '--json'];
+    const args: string[] = [
+      input.cliScript,
+      'graph',
+      input.unit.rootDir,
+      '--json',
+      '--cwd',
+      input.cwd,
+    ];
+    if (input.configPath !== undefined) args.push('--config', input.configPath);
     if (input.noCache) args.push('--no-cache');
     if (input.resolution !== undefined) args.push('--resolution', input.resolution);
     if (input.language !== undefined && input.language.length > 0)

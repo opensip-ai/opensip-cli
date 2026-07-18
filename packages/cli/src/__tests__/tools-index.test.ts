@@ -18,6 +18,7 @@ import { EXIT_CODES } from '@opensip-cli/contracts';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { HostRuntimeCommandSpec } from '../commands/host-runtime-access.js';
 import type { CliCommandsContext } from '../commands/shared.js';
 import type { CommandSpec } from '@opensip-cli/core';
 
@@ -66,12 +67,18 @@ function makeCtx(): CliCommandsContext {
 }
 
 /** Resolve one leaf's handler by subcommand name. */
-function handlerFor(name: string): Handler {
+function leafFor(name: string): HostRuntimeCommandSpec<unknown, CliCommandsContext> {
   const leaf = buildToolsGroupLeaves(makeCtx()).find(
     (s: CommandSpec<unknown, CliCommandsContext>) => s.name === name,
   );
-  if (!leaf?.handler) throw new Error(`no handler for ${name}`);
-  return leaf.handler as Handler;
+  if (leaf === undefined) throw new Error(`no leaf for ${name}`);
+  return leaf;
+}
+
+function handlerFor(name: string): Handler {
+  const handler = leafFor(name).handler;
+  if (handler === undefined) throw new Error(`no handler for ${name}`);
+  return handler as Handler;
 }
 
 beforeEach(() => {
@@ -175,6 +182,14 @@ describe('tools install handler', () => {
 });
 
 describe('tools uninstall handler', () => {
+  it('declares its complete project-and-user runtime footprint before dispatch', () => {
+    expect(leafFor('uninstall').hostRuntimePolicy).toEqual({
+      runtimeAccess: 'project-and-user-state',
+      bootstrapMode: 'standard',
+    });
+    expect(Object.isFrozen(leafFor('uninstall').hostRuntimePolicy)).toBe(true);
+  });
+
   it('rejects --purge-data combined with --global', async () => {
     const result = (await handlerFor('uninstall')({
       cwd: tmp,
@@ -234,6 +249,15 @@ describe('tools uninstall handler', () => {
     });
     await handlerFor('uninstall')({ cwd: tmp, _args: ['t'], project: true });
     expect(toolsDataPurge).not.toHaveBeenCalled();
+  });
+});
+
+describe('tools install handler', () => {
+  it('declares its complete project-and-user runtime footprint before dispatch', () => {
+    expect(leafFor('install').hostRuntimePolicy).toEqual({
+      runtimeAccess: 'project-and-user-state',
+      bootstrapMode: 'standard',
+    });
   });
 });
 

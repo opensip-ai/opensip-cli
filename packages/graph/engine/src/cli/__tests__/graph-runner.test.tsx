@@ -13,6 +13,7 @@ import type { Signal } from '@opensip-cli/core';
 
 const runToolLiveView = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() => vi.fn());
+const currentScope = vi.hoisted(() => vi.fn());
 
 vi.mock('@opensip-cli/cli-live', () => ({
   runToolLiveView,
@@ -23,7 +24,7 @@ vi.mock('@opensip-cli/core', async (importOriginal) => {
   return {
     ...actual,
     runOffThreadOrInProcess,
-    currentScope: vi.fn(() => ({ runId: 'RUN_graph_test' })),
+    currentScope,
   };
 });
 
@@ -57,6 +58,8 @@ beforeEach(() => {
   capturedSpec = undefined;
   runToolLiveView.mockReset();
   runOffThreadOrInProcess.mockReset();
+  currentScope.mockReset();
+  currentScope.mockReturnValue({ runId: 'RUN_graph_test' });
   runOffThreadOrInProcess.mockImplementation(({ inProcess }) => ({
     onProgress: vi.fn(),
     result: Promise.resolve(inProcess(vi.fn())),
@@ -72,6 +75,38 @@ describe('renderGraphLive produce mapping', () => {
     await renderGraphLive({ cwd: '/proj' });
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
     expect(capturedSpec?.tool).toBe('graph');
+  });
+
+  it('passes the resolved cwd and custom config to the child bootstrap', async () => {
+    currentScope.mockReturnValue({
+      runId: 'RUN_graph_test',
+      projectContext: { configPath: '/repo with spaces/custom config.yml' },
+    });
+    runOffThreadOrInProcess.mockImplementation(() => ({
+      onProgress: vi.fn(),
+      result: Promise.resolve(liveGraphOutput()),
+    }));
+    await renderGraphLive({ cwd: '/repo with spaces' });
+    await capturedSpec!.produce(vi.fn(), {
+      setRunning: vi.fn(),
+      setHeaderMetadata: vi.fn(),
+      setShowRunHeader: vi.fn(),
+    });
+
+    expect(runOffThreadOrInProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: expect.objectContaining({
+          argv: [
+            'graph-run-worker',
+            expect.any(String),
+            '--cwd',
+            '/repo with spaces',
+            '--config',
+            '/repo with spaces/custom config.yml',
+          ],
+        }),
+      }),
+    );
   });
 
   it('omits verbose lines and table on compact runs', async () => {

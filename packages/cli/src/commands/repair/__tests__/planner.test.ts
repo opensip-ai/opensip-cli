@@ -155,10 +155,12 @@ describe('repair planner', () => {
       force: true,
       verificationRunner: runner,
       cliEntrypoint: '/repo/packages/cli/dist/index.js',
+      configPath: '/repo/custom opensip.yml',
       timeoutMs: 5,
-      verifier: ({ applyResult, runner: receivedRunner, cliEntrypoint, timeoutMs }) => {
+      verifier: ({ applyResult, runner: receivedRunner, cliEntrypoint, configPath, timeoutMs }) => {
         expect(receivedRunner).toBe(runner);
         expect(cliEntrypoint).toBe('/repo/packages/cli/dist/index.js');
+        expect(configPath).toBe('/repo/custom opensip.yml');
         expect(timeoutMs).toBe(5);
         return Promise.resolve({
           ...verification,

@@ -25,7 +25,7 @@
 import { type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import {
   ConfigurationError,
@@ -106,9 +106,25 @@ export async function runWorkerSpec(args: {
   readonly timeoutMs?: number;
   readonly onAdapterProgress?: (event: ExternalAdapterProgressEvent) => void;
 }): Promise<ToolCommandResult> {
+  // Commander preserves a literal relative `--cwd`, but the internal child is
+  // spawned with that directory as its process cwd and also receives `--cwd`.
+  // Reusing the literal value would resolve `project` as `project/project`.
+  // Prefer bootstrap's canonical selection, falling back to an absolute
+  // resolution for direct/test callers without an entered scope.
+  const workerCwd = currentScope()?.projectContext?.cwd ?? resolve(args.cwd);
+  const workerSpec: ToolCommandWorkerSpec =
+    typeof args.spec.opts.cwd === 'string'
+      ? {
+          ...args.spec,
+          opts: {
+            ...args.spec.opts,
+            cwd: workerCwd,
+          },
+        }
+      : args.spec;
   const dir = mkdtempSync(join(tmpdir(), 'opensip-tool-dispatch-'));
   const specPath = join(dir, 'spec.json');
-  writeFileSync(specPath, JSON.stringify(args.spec), 'utf8');
+  writeFileSync(specPath, JSON.stringify(workerSpec), 'utf8');
 
   const cliScript = args.cliScript ?? process.argv[1] ?? '';
   const timeoutMs = args.timeoutMs ?? DEFAULT_DISPATCH_TIMEOUT_MS;
@@ -117,8 +133,8 @@ export async function runWorkerSpec(args: {
     return await forkAndAwait({
       cliScript,
       specPath,
-      cwd: args.cwd,
-      spec: args.spec,
+      cwd: workerCwd,
+      spec: workerSpec,
       timeoutMs,
       ctx: args.ctx,
       onAdapterProgress: args.onAdapterProgress,
@@ -159,7 +175,9 @@ function forkAndAwait({
   onAdapterProgress,
 }: ForkAndAwaitInput): Promise<ToolCommandResult> {
   return new Promise<ToolCommandResult>((resolve, reject) => {
-    const runId = currentScope()?.runId;
+    const scope = currentScope();
+    const runId = scope?.runId;
+    const configPath = scope?.projectContext?.configPath;
     const traceparent = currentTraceparent();
     let inFlightRpc = 0;
     let totalRpc = 0;
@@ -167,7 +185,13 @@ function forkAndAwait({
     const handle = forkAndSettle(
       {
         command: cliScript,
-        argv: [WORKER_SUBCOMMAND, specPath, '--cwd', cwd],
+        argv: [
+          WORKER_SUBCOMMAND,
+          specPath,
+          '--cwd',
+          cwd,
+          ...(configPath === undefined ? [] : ['--config', configPath]),
+        ],
         cwd,
         timeoutMs,
         enableHeartbeat: true,

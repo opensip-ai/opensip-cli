@@ -51,7 +51,9 @@ function forkAndAwait(args: {
   readonly timeoutMs: number;
 }): Promise<unknown> {
   return new Promise<unknown>((resolve, reject) => {
-    const runId = currentScope()?.runId;
+    const scope = currentScope();
+    const runId = scope?.runId;
+    const configPath = scope?.projectContext?.configPath;
     const traceparent = currentTraceparent();
     const started = Date.now();
     logger.info({
@@ -63,7 +65,13 @@ function forkAndAwait(args: {
     const handle = forkAndSettle(
       {
         command: args.cliScript,
-        argv: [CAPABILITY_WORKER_SUBCOMMAND, args.specPath, '--cwd', args.cwd],
+        argv: [
+          CAPABILITY_WORKER_SUBCOMMAND,
+          args.specPath,
+          '--cwd',
+          args.cwd,
+          ...(configPath === undefined ? [] : ['--config', configPath]),
+        ],
         cwd: args.cwd,
         timeoutMs: args.timeoutMs,
         enableHeartbeat: true,

@@ -8,10 +8,11 @@ import {
   type ProjectContext,
 } from '@opensip-cli/core';
 
+import type { HostRuntimeCommandSpec } from './host-runtime-access.js';
 import type { CliCommandsContext } from './shared.js';
 
 /** A host command spec — handler receives the {@link CliCommandsContext}. */
-export type HostSpec = CommandSpec<unknown, CliCommandsContext>;
+export type HostSpec = HostRuntimeCommandSpec<unknown, CliCommandsContext>;
 
 /** Every grouped leaf needs the entered project scope (datastore / project context). */
 export const PROJECT_SCOPE: CommandScopeRequirement = 'project';
@@ -26,6 +27,7 @@ export function effectiveCwd(opts: { cwd?: string; projectContext?: ProjectConte
   return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd();
 }
 
-/** Re-export defineCommand for sibling modules building HostSpecs. */
+/** Re-export the host-only decorator under the established local helper name. */
 
-export { defineCommand } from '@opensip-cli/core';
+export { defineHostCommand as defineCommand } from './host-runtime-access.js';
+export type { HostCommandRuntimePolicy } from './host-runtime-access.js';

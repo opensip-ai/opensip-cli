@@ -13,6 +13,7 @@ import type { LiveRunSpec } from '@opensip-cli/cli-live';
 import type * as CoreModule from '@opensip-cli/core';
 
 const runToolLiveView = vi.hoisted(() => vi.fn());
+const currentScope = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() =>
   vi.fn((opts: { inProcess: (emit: (event: unknown) => void) => Promise<unknown> }) => ({
     onProgress: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('@opensip-cli/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
   return {
     ...actual,
+    currentScope,
     liveEngineCorrelation: vi.fn(() => undefined),
     runOffThreadOrInProcess,
   };
@@ -131,6 +133,8 @@ beforeEach(() => {
   capturedSpec = undefined;
   capturedGlue = undefined;
   runToolLiveView.mockReset();
+  currentScope.mockReset();
+  currentScope.mockReturnValue(undefined);
   runOffThreadOrInProcess.mockClear();
   executeYagniMock.mockReset();
   executeYagniMock.mockResolvedValue(stubExecuteOutcome());
@@ -146,6 +150,33 @@ describe('renderYagniLive produce mapping', () => {
     await renderYagniLive({ cwd: '/proj' }, stubCli());
     expect(runToolLiveView).toHaveBeenCalledTimes(1);
     expect(capturedSpec?.tool).toBe('yagni');
+  });
+
+  it('passes the resolved cwd and custom config to the child bootstrap', async () => {
+    currentScope.mockReturnValue({
+      projectContext: { configPath: '/repo with spaces/custom config.yml' },
+    });
+    await renderYagniLive({ cwd: '/repo with spaces' }, stubCli());
+    await capturedSpec!.produce(vi.fn(), {
+      setRunning: vi.fn(),
+      setHeaderMetadata: vi.fn(),
+      setShowRunHeader: vi.fn(),
+    });
+
+    expect(runOffThreadOrInProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        descriptor: expect.objectContaining({
+          argv: [
+            'yagni-run-worker',
+            expect.any(String),
+            '--cwd',
+            '/repo with spaces',
+            '--config',
+            '/repo with spaces/custom config.yml',
+          ],
+        }),
+      }),
+    );
   });
 
   it('passes the host exit-code hook to runToolLiveView', async () => {
