@@ -11,6 +11,10 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  enterHostOwnershipForTests,
+  resetEnteredHostOwnershipForTests,
+} from '../commands/host-runtime-access.js';
+import {
   clearKnownLatest,
   defaultUpdateStateFile,
   readKnownLatest,
@@ -23,9 +27,12 @@ let stateFile: string;
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'osip-upd-state-'));
   stateFile = join(tmpDir, 'update-state.json');
+  resetEnteredHostOwnershipForTests();
+  enterHostOwnershipForTests({ userState: true });
 });
 
 afterEach(() => {
+  resetEnteredHostOwnershipForTests();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -81,5 +88,11 @@ describe('update-state store', () => {
   it('resolves the default path under ~/.opensip-cli/', () => {
     const path = defaultUpdateStateFile();
     expect(path.endsWith(join('.opensip-cli', 'update-state.json'))).toBe(true);
+  });
+
+  it('refuses production writes without entered user-state ownership', () => {
+    resetEnteredHostOwnershipForTests();
+    expect(() => writeKnownLatest('1.0.0', stateFile)).toThrow(/user-state runtime lease/);
+    expect(() => clearKnownLatest(stateFile)).toThrow(/user-state runtime lease/);
   });
 });

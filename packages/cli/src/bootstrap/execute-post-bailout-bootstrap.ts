@@ -24,8 +24,8 @@ import {
 } from '@opensip-cli/core';
 
 import { startProfiling } from '../telemetry/profiling.js';
+import { runWithUserStateOwnership } from '../commands/host-runtime-access.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
-
 import { buildInspectionOnlyScope, buildPerRunScope } from './build-per-run-scope.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { shouldRenderNoInitAdoptionHint } from './no-init-eligibility.js';
@@ -256,31 +256,46 @@ export async function executePostBailoutBootstrap(
 
     record(PRE_ACTION_PHASES.projectSideEffects);
 
-    const createProjectSideEffects = () => {
+    const createProjectSideEffects = async () => {
       const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
-      const checkedUpdate = preActionTimer.measure('update-check', () =>
-        d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
-      );
+      // Update-state writes require user-state ownership. Reuse the command's
+      // entered user-state owner when present; otherwise reenter briefly with
+      // the same token as the project/command lease (or a short user-only owner).
+      let checkedUpdate: string | undefined;
+      await preActionTimer.measureAsync('update-check', async () => {
+        await runWithUserStateOwnership(
+          {
+            command: 'update-check',
+            cwdBasename: 'opensip',
+            ownerToken: input.runtimeLeaseLifecycle?.lease?.ownerToken,
+          },
+          () => {
+            checkedUpdate = d.checkForUpdate({ name: CLI_PACKAGE_NAME, version });
+          },
+        );
+      });
       if (checkedUpdate && plan.jsonOutput) {
         process.stderr.write(formatUpdateNag(version, checkedUpdate));
       }
       return { runLogger: createdRunLogger, update: checkedUpdate };
     };
-    const { runLogger, update } =
-      plan.project.scope === 'ephemeral'
-        ? await preActionTimer.measureAsync(PRE_ACTION_PHASES.projectSideEffects, async () => {
-            const created = createProjectSideEffects();
-            await preActionTimer.measureAsync('ephemeral-cache-maintenance', () =>
-              d.maintainEphemeralCache(
-                plan.project,
-                created.runLogger,
-                input.runtimeLeaseLifecycle,
-                input.leaseEvents,
-              ),
-            );
-            return created;
-          })
-        : preActionTimer.measure(PRE_ACTION_PHASES.projectSideEffects, createProjectSideEffects);
+    const { runLogger, update } = await preActionTimer.measureAsync(
+      PRE_ACTION_PHASES.projectSideEffects,
+      async () => {
+        const created = await createProjectSideEffects();
+        if (plan.project.scope === 'ephemeral') {
+          await preActionTimer.measureAsync('ephemeral-cache-maintenance', () =>
+            d.maintainEphemeralCache(
+              plan.project,
+              created.runLogger,
+              input.runtimeLeaseLifecycle,
+              input.leaseEvents,
+            ),
+          );
+        }
+        return created;
+      },
+    );
 
     attachRuntimeLeaseEventLogger(input.leaseEvents, runLogger);
 

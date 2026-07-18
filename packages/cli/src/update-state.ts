@@ -15,14 +15,17 @@
  *
  * The store is a tiny JSON file at `~/.opensip-cli/update-state.json`
  * (see {@link resolveUserPaths}), kept separate from the user-authored
- * `config.yml`. Reads and writes are best-effort: any failure degrades to
- * "nothing known" rather than breaking the command.
+ * `config.yml`. Writes require entered user-state ownership (Task 4.6) so a
+ * detached callback cannot mutate user-root state after global uninstall
+ * starts. Reads remain best-effort.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { resolveUserPaths } from '@opensip-cli/core';
+
+import { assertEnteredUserStateOwner } from './commands/host-runtime-access.js';
 
 /** On-disk shape of `~/.opensip-cli/update-state.json`. */
 interface UpdateState {
@@ -37,7 +40,8 @@ export function defaultUpdateStateFile(): string {
 
 /**
  * Read the last-known newer published version, or `undefined` when nothing is
- * cached / the file is absent or unreadable. Never throws.
+ * cached / the file is absent or unreadable. Never throws. Reads do not
+ * require ownership (display-only).
  */
 export function readKnownLatest(file: string = defaultUpdateStateFile()): string | undefined {
   if (!existsSync(file)) return undefined;
@@ -53,10 +57,11 @@ export function readKnownLatest(file: string = defaultUpdateStateFile()): string
 
 /**
  * Persist the newest known published version so the notice survives across
- * runs. No-ops on any I/O failure. Skips the write when the value is unchanged
- * to avoid needless disk churn on every invocation.
+ * runs. Requires entered user-state ownership. No-ops on I/O failure after
+ * authorization succeeds. Skips the write when the value is unchanged.
  */
 export function writeKnownLatest(latest: string, file: string = defaultUpdateStateFile()): void {
+  assertEnteredUserStateOwner('writeKnownLatest');
   if (readKnownLatest(file) === latest) return;
   try {
     mkdirSync(dirname(file), { recursive: true });
@@ -68,11 +73,11 @@ export function writeKnownLatest(latest: string, file: string = defaultUpdateSta
 }
 
 /**
- * Clear the cached version — called once the running version catches up, so
- * the notice stops on its own after an upgrade. No-ops when already absent or
- * on any I/O failure.
+ * Clear the cached version — called once the running version catches up.
+ * Requires entered user-state ownership. No-ops when already absent or on I/O failure.
  */
 export function clearKnownLatest(file: string = defaultUpdateStateFile()): void {
+  assertEnteredUserStateOwner('clearKnownLatest');
   if (!existsSync(file)) return;
   try {
     // Overwrite rather than unlink: keeps the file (and its dir perms) stable,

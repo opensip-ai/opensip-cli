@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import { logger, PluginIncompatibleError, resolveProjectPaths } from '@opensip-cli/core';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
 import {
@@ -26,6 +26,10 @@ import {
   resolveInstalledToolTrust,
   trustedToolIdsFromConfigDocument,
 } from '../bootstrap/tool-trust.js';
+import {
+  enterHostOwnershipForTests,
+  resetEnteredHostOwnershipForTests,
+} from '../commands/host-runtime-access.js';
 
 const SIDECAR = 'opensip-tool.manifest.json';
 
@@ -178,7 +182,12 @@ describe('tools.trusted config parsing', () => {
 
 describe('managed installed-tool trust records', () => {
   const staged: string[] = [];
+  beforeEach(() => {
+    resetEnteredHostOwnershipForTests();
+    enterHostOwnershipForTests({ userState: true, project: true });
+  });
   afterEach(() => {
+    resetEnteredHostOwnershipForTests();
     for (const d of staged.splice(0)) rmSync(d, { recursive: true, force: true });
   });
 

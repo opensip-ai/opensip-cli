@@ -15,6 +15,10 @@ import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { recordInstalledToolTrust } from '../bootstrap/tool-trust.js';
+import {
+  enterHostOwnershipForTests,
+  resetEnteredHostOwnershipForTests,
+} from '../commands/host-runtime-access.js';
 import { TOOL_DOMAIN } from '../commands/plugin/domain-resolution.js';
 import { toolsList } from '../commands/tools/list.js';
 
@@ -54,9 +58,12 @@ beforeEach(() => {
   homeBackup = process.env.HOME;
   // resolveUserPaths reads HOME; redirect it so the user-global host is hermetic.
   process.env.HOME = fakeHome;
+  resetEnteredHostOwnershipForTests();
+  enterHostOwnershipForTests({ userState: true, project: true });
 });
 
 afterEach(() => {
+  resetEnteredHostOwnershipForTests();
   if (homeBackup === undefined) delete process.env.HOME;
   else process.env.HOME = homeBackup;
   rmSync(projectDir, { recursive: true, force: true });

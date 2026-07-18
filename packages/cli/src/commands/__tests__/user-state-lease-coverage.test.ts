@@ -133,6 +133,38 @@ describe('user-state lease coverage inventory', () => {
     );
   });
 
+  it('classifies trust and update-state writers as user-state requiring ownership', async () => {
+    resetEnteredHostOwnershipForTests();
+    const { writeKnownLatest, clearKnownLatest } = await import('../../update-state.js');
+    const { recordInstalledToolTrust } = await import('../../bootstrap/tool-trust.js');
+    expect(() => writeKnownLatest('1.0.0', '/tmp/no-write-update-state.json')).toThrow(
+      /user-state runtime lease/,
+    );
+    expect(() => clearKnownLatest('/tmp/no-write-update-state.json')).toThrow(
+      /user-state runtime lease/,
+    );
+    expect(() =>
+      recordInstalledToolTrust({
+        scope: 'global',
+        cwd: '/tmp',
+        toolId: 'x',
+        packageName: 'x',
+        manifestHash: 'h',
+        installSourcePath: '/tmp/x',
+      }),
+    ).toThrow(/user-state runtime lease/);
+    expect(() =>
+      recordInstalledToolTrust({
+        scope: 'project',
+        cwd: '/tmp',
+        toolId: 'x',
+        packageName: 'x',
+        manifestHash: 'h',
+        installSourcePath: '/tmp/x',
+      }),
+    ).toThrow(/project runtime lease/);
+  });
+
   it('freezes decorated host policy so inventory copies cannot be mutated', () => {
     const decorated = defineHostCommand(
       {

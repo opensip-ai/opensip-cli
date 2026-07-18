@@ -441,6 +441,43 @@ export function enterHostOwnershipForTests(args: {
   });
 }
 
+/** True when the current process already holds user-state write authority. */
+export function hasEnteredUserStateOwner(): boolean {
+  return enteredHostOwnership?.userState === true;
+}
+
+/**
+ * Run `fn` under entered user-state ownership. Reuses an existing user-state
+ * owner when present; otherwise acquires a short user-state lease (optionally
+ * reentering with the same owner token as an existing project lease) and
+ * releases it before returning. Used by bootstrap update-state writes.
+ */
+export async function runWithUserStateOwnership(
+  opts: {
+    readonly command: string;
+    readonly cwdBasename?: string;
+    readonly ownerToken?: string;
+  },
+  fn: () => void | Promise<void>,
+): Promise<void> {
+  if (enteredHostOwnership?.userState === true) {
+    await fn();
+    return;
+  }
+  const lease = await acquireUserStateReadLease({
+    command: opts.command,
+    cwdBasename: opts.cwdBasename ?? 'opensip',
+    ...(opts.ownerToken === undefined ? {} : { ownerToken: opts.ownerToken }),
+  });
+  recordEnteredOwnership(lease);
+  try {
+    await fn();
+  } finally {
+    clearEnteredOwnership(lease.ownerToken);
+    lease.release();
+  }
+}
+
 export async function acquireHostRuntimeLease(
   input: AcquireHostRuntimeLeaseInput,
   deps: HostRuntimeLeaseAcquisitionDeps = {},

@@ -10,6 +10,11 @@ import {
   resolveUserPaths,
 } from '@opensip-cli/core';
 
+import {
+  assertEnteredProjectOwner,
+  assertEnteredUserStateOwner,
+} from '../commands/host-runtime-access.js';
+
 /**
  * tool-trust — executable-tool trust policies for project-local and installed
  * npm tools (release launch, Phase 3 Task 3.2; audit remediation).
@@ -183,6 +188,8 @@ export function recordInstalledToolTrust(args: {
   readonly installSourcePath: string;
   readonly installedAt?: Date;
 }): void {
+  if (args.scope === 'project') assertEnteredProjectOwner('recordInstalledToolTrust');
+  else assertEnteredUserStateOwner('recordInstalledToolTrust');
   const path = installedTrustFileForScope(args.scope, args.cwd);
   const existing = readInstalledTrustFile(path).installedTools.filter(
     (record) => !(record.toolId === args.toolId && record.packageName === args.packageName),
@@ -207,6 +214,8 @@ export function removeInstalledToolTrust(args: {
   readonly toolId: string;
   readonly packageName: string;
 }): void {
+  if (args.scope === 'project') assertEnteredProjectOwner('removeInstalledToolTrust');
+  else assertEnteredUserStateOwner('removeInstalledToolTrust');
   const path = installedTrustFileForScope(args.scope, args.cwd);
   const existing = readInstalledTrustFile(path).installedTools;
   const retained = existing.filter(
