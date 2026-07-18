@@ -374,7 +374,7 @@ test('the web-generated mirror carries the same support facts and the public mat
   assert.match(web, /`macos-26-arm64-node24-npm11-v1` \| `preview`/u);
   assert.match(web, /`macos-26-intel-unsupported` \| `unsupported`/u);
   assert.doesNotMatch(web, /`macos-26-arm64-node24-npm11-v1` \| `supported`/u);
-  assert.match(web, /opensip-cli-macos-qualification\.v1\.json/u);
+  assert.match(web, /opensip-cli-macos-qualification\.v2\.json/u);
   assert.match(committed, /\.\/15-compatibility-policy\.md/u, 'links the compatibility policy');
   assert.match(committed, /\.\.\/00-start\/00-quick-start\.md/u, 'links Quick start');
   assert.match(committed, /\.\.\/00-start\/04-faq\.md/u, 'links the FAQ');
