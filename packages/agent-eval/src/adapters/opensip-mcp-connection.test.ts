@@ -305,7 +305,7 @@ describe('BoundedStdioClientTransport', () => {
       // Root may exit 0 on its own timer or via close escalation.
       expect(transport.terminalStatus()?.exitCode).toBe(0);
       // close() arms TERM→KILL cleanup; reaping is asynchronous on loaded Linux CI.
-      await waitUntilDead(descendantPid, 10000);
+      await waitUntilDead(descendantPid, 10_000);
     },
   );
 
@@ -343,7 +343,7 @@ describe('BoundedStdioClientTransport', () => {
       await expect(transport.close()).resolves.toBeUndefined();
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
-      await waitUntilDead(descendantPid, 10000);
+      await waitUntilDead(descendantPid, 10_000);
     },
   );
 
