@@ -253,8 +253,21 @@ test('rejects unknown keys at every level', () => {
 
 test('rejects a wrong schema version', () => {
   const raw = clone(COMMON_V1_RAW);
-  raw.schemaVersion = 2;
-  assert.throws(() => parseAcceptanceProfile(raw), /schemaVersion/);
+  raw.schemaVersion = 99;
+  assert.throws(() => parseAcceptanceProfile(raw), /schemaVersion|schema-version/);
+});
+
+test('parses schema-v2 common-v2 with requiredPorts', () => {
+  const raw = JSON.parse(
+    readFileSync(join(REPO_ROOT, '.config', 'platform-acceptance', 'common-v2.json'), 'utf8'),
+  );
+  const profile = parseAcceptanceProfile(raw);
+  assert.equal(profile.schemaVersion, 2);
+  assert.equal(profile.version, 2);
+  assert.equal(profile.id, 'common-v2');
+  const continuity = profile.journeys.find((j) => j.id === 'persistence.cache-init-promotion');
+  assert.deepEqual(continuity?.requiredPorts, ['mcp']);
+  assert.ok(profile.journeys.every((j) => Array.isArray(j.requiredPorts)));
 });
 
 test('rejects a duplicate journey id', () => {

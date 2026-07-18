@@ -8,7 +8,7 @@ purpose: "The generated, authoritative host-support matrix: the exact qualified 
 source-files:
   - packages/core/src/lib/platform-support.ts
   - scripts/build-supported-platforms-doc.mjs
-  - .config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json
+  - .config/platform-acceptance/macos-26-arm64-node24-npm11-v2.json
 related-docs:
   - ./15-compatibility-policy.md
   - ./13-verifiable-releases.md
@@ -67,9 +67,9 @@ Row id: `macos-26-arm64-node24-npm11-v1`
 | Filesystem | apfs (case-insensitive) |
 | Install channels | `npm-exact-version`, `install-sh` |
 
-Apple Silicon macOS 26 on Node 24 (ABI 137) / npm 11 over APFS. Published as preview until 14-day burn-in and a staged release pass promote it to supported.
+Apple Silicon macOS 26 on Node 24 (ABI 137) / npm 11 over APFS. Active qualification uses schema-v2 profiles (common-v2 + macos-v2); v1 artifacts remain historical verifier inputs only. Preview until 14-day burn-in and a staged release pass promote it to supported.
 
-Acceptance profile `macos-26-arm64-node24-npm11-v1` (version 1), stored at `.config/platform-acceptance/macos-26-arm64-node24-npm11-v1.json`. Release evidence artifact: `opensip-cli-macos-qualification.v1.json`. Published evidence link: not yet available — the row is in burn-in and the link is attached on promotion to `supported`.
+Acceptance profile `macos-26-arm64-node24-npm11-v2` (version 2), stored at `.config/platform-acceptance/macos-26-arm64-node24-npm11-v2.json`. Release evidence artifact: `opensip-cli-macos-qualification.v2.json`. Published evidence link: not yet available — the row is in burn-in and the link is attached on promotion to `supported`.
 
 ### macOS 26.x on x64 — `unsupported`
 
