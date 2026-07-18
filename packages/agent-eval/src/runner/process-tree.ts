@@ -264,10 +264,15 @@ class DescendantTracker {
     if (!this.rootIdentityInitialized) {
       this.rootIdentityInitialized = true;
       if (currentRoot === undefined) {
-        // A short-lived utility may exit before the first bounded process-table
-        // sample. Its closed stdio/root handle still settle normally, but no
-        // descendant-containment claim is made for that unobserved interval.
-        return false;
+        // The root exited before the first successful process-table sample —
+        // a slow `ps` on a loaded host, not an error. Its process GROUP id is
+        // still known statically (the root pid), so treat this exactly like an
+        // observed exit and sweep same-group survivors from THIS snapshot.
+        // Returning false here instead silently waived the containment claim:
+        // a TERM-ignoring descendant spawned by a fast-exiting root was never
+        // tracked, never killed, and never reported — the run closed clean
+        // while leaking the process.
+        return true;
       }
       this.rootIdentity = currentRoot;
     }
