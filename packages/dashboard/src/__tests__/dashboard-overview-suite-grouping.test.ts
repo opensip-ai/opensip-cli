@@ -496,7 +496,7 @@ describe('Overview suite rows', () => {
     expect(faultedRow.textContent).not.toContain('projectContext');
   });
 
-  it('renders a Pass Rate score, not the raw outcome word, for a sessionless suite child step', () => {
+  it('shows a dash Pass Rate (not the raw outcome word) for a sessionless suite child step', () => {
     const run = makeRun({
       id: 'run-suite-faulted-child',
       name: 'audit',
@@ -523,8 +523,10 @@ describe('Overview suite rows', () => {
     bootReport([], [run]);
 
     const [child] = childRows();
+    // Unlinked steps have no session score — Pass Rate is an em dash (parity
+    // with overview-ledger); outcome lives in Status, never in Pass Rate.
     const passRateCell = cells(child)[4];
-    expect(passRateCell.textContent).toBe('0%');
+    expect(passRateCell.textContent).toBe('—');
     expect(passRateCell.textContent).not.toBe('faulted');
   });
 
