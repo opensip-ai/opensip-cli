@@ -227,6 +227,61 @@ export const COMMON_V1_JOURNEY_IDS = Object.freeze([
 ]);
 
 /**
+ * The explicit `common-v2` selection — every common-v1 id plus the dedicated
+ * cache→Init continuity journey, in profile order. Frozen independently so
+ * executor registration cannot silently alter either profile selection.
+ */
+export const COMMON_V2_JOURNEY_IDS = Object.freeze([
+  'lifecycle.install',
+  'lifecycle.upgrade',
+  'lifecycle.version',
+  'lifecycle.help',
+  'analysis.audit-preinit',
+  'analysis.init',
+  'analysis.fit',
+  'analysis.graph',
+  'analysis.graph-impact',
+  'analysis.sim',
+  'analysis.yagni',
+  'analysis.report',
+  'analysis.sessions-list',
+  'analysis.sessions-show',
+  'analysis.replay',
+  'output.human-non-tty',
+  'output.no-color',
+  'output.json',
+  'output.filters-raw',
+  'output.sarif',
+  'output.report-html',
+  'output.pty',
+  'persistence.sqlite-load',
+  'persistence.first-open-migration',
+  'persistence.cross-process-replay',
+  'persistence.contention-retry',
+  'persistence.interrupted-recovery',
+  'persistence.state-bounds',
+  'persistence.cache-init-promotion',
+  'mcp.initialize',
+  'mcp.catalog-parity',
+  'mcp.context',
+  'mcp.graph-reads',
+  'mcp.result-replay',
+  'mcp.stale-evidence',
+  'agent.installed-smoke',
+  'extensions.whole-tool',
+  'extensions.fit-pack',
+  'extensions.sim-pack',
+  'resilience.spaces-unicode',
+  'resilience.symlink-root',
+  'resilience.permissions',
+  'resilience.isolated-home',
+  'resilience.signals',
+  'resilience.timeout-cleanup',
+  'lifecycle.cli-state-uninstall',
+  'lifecycle.package-uninstall',
+]);
+
+/**
  * The macOS-specific journeys the macOS profile adds on top of `common-v1`
  * (Plan 02, spec §8). The registry holds `COMMON_V1_JOURNEY_IDS ∪
  * MACOS_JOURNEY_IDS`; a load-time assertion binds this union so drift fails fast.
@@ -272,23 +327,38 @@ function buildRegistry(journeys) {
     registry.set(journey.id, journey);
   }
   // Bijection with the closed selection: the registry MUST equal
-  // COMMON_V1_JOURNEY_IDS ∪ MACOS_JOURNEY_IDS — every id in each list is
-  // registered, neither list overlaps the other, and no id is registered that
-  // neither list selects. (macOS journeys extend, never replace, the common set.)
+  // COMMON_V2_JOURNEY_IDS ∪ MACOS_JOURNEY_IDS (v2 contains every v1 id plus the
+  // deliberate cache→Init row). Immutable COMMON_V1 remains a strict subset.
   if (new Set(COMMON_V1_JOURNEY_IDS).size !== COMMON_V1_JOURNEY_IDS.length) {
     throw new Error('journey-catalog: COMMON_V1_JOURNEY_IDS contains a duplicate id');
+  }
+  if (new Set(COMMON_V2_JOURNEY_IDS).size !== COMMON_V2_JOURNEY_IDS.length) {
+    throw new Error('journey-catalog: COMMON_V2_JOURNEY_IDS contains a duplicate id');
   }
   if (new Set(MACOS_JOURNEY_IDS).size !== MACOS_JOURNEY_IDS.length) {
     throw new Error('journey-catalog: MACOS_JOURNEY_IDS contains a duplicate id');
   }
-  const selected = new Set([...COMMON_V1_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
-  if (selected.size !== COMMON_V1_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length) {
-    throw new Error('journey-catalog: COMMON_V1_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap');
-  }
   for (const id of COMMON_V1_JOURNEY_IDS) {
+    if (!COMMON_V2_JOURNEY_IDS.includes(id)) {
+      throw new Error(
+        `journey-catalog: common-v2 drops common-v1 journey ${JSON.stringify(id)}`,
+      );
+    }
+  }
+  const v2Only = COMMON_V2_JOURNEY_IDS.filter((id) => !COMMON_V1_JOURNEY_IDS.includes(id));
+  if (v2Only.length !== 1 || v2Only[0] !== 'persistence.cache-init-promotion') {
+    throw new Error(
+      `journey-catalog: common-v2 may only add persistence.cache-init-promotion; got ${JSON.stringify(v2Only)}`,
+    );
+  }
+  const selected = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
+  if (selected.size !== COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length) {
+    throw new Error('journey-catalog: COMMON_V2_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap');
+  }
+  for (const id of COMMON_V2_JOURNEY_IDS) {
     if (!registry.has(id))
       throw new Error(
-        `journey-catalog: common-v1 selects unregistered journey ${JSON.stringify(id)}`,
+        `journey-catalog: common-v2 selects unregistered journey ${JSON.stringify(id)}`,
       );
   }
   for (const id of MACOS_JOURNEY_IDS) {

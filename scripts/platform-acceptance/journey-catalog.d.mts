@@ -273,11 +273,43 @@ export interface JourneyExecutorContext {
   readonly toolchain?: JourneyToolchain;
   /** Present only for a published candidate whose canonical inventory passed preflight. */
   readonly registryInventory?: JourneyRegistryInventory;
-  /** Present only for journeys in the `mcp` category. */
+  /**
+   * Present only when the journey declares `requiredPorts: ['mcp']`.
+   * Category alone never injects this port.
+   */
   readonly mcp?: McpClientPort;
   /** Present only for `agent.installed-smoke` when an auxiliary output was requested. */
   readonly artifacts?: JourneyAgentArtifacts;
   readonly assert: JourneyAssertHelpers;
+}
+
+/** Closed harness-owned injected ports (distinct from native host capabilities). */
+export type JourneyInjectedPort = "mcp";
+
+/**
+ * Sealed machine-readable proof for `persistence.cache-init-promotion` only.
+ * Other journeys must leave this null/absent.
+ */
+export interface CacheInitContinuityProof {
+  readonly kind: "cache-init-continuity";
+  readonly proofSchemaVersion: 1;
+  readonly parentRunId: string;
+  readonly steps: ReadonlyArray<{
+    readonly runStepId: string;
+    readonly sessionId: string | null;
+  }>;
+  readonly identityDigest: string;
+  readonly preReportRunId: string;
+  readonly postReportRunId: string;
+  readonly prePlane: "cache" | "project";
+  readonly postPlane: "cache" | "project";
+  readonly cliMcpEqualPre: boolean;
+  readonly cliMcpEqualPost: boolean;
+  readonly prePostEqual: boolean;
+  readonly busyInitObserved: boolean;
+  readonly mcpCleanRetry: boolean;
+  readonly cacheSourceRetired: boolean;
+  readonly cleanupStatus: "clean" | "incomplete";
 }
 
 /** The bounded outcome an executor returns; the runner adds id/category/required/duration/rss. */
@@ -287,6 +319,8 @@ export interface JourneyOutcome {
   readonly reasonCode?: string | null;
   /** Bounded diagnostic tails; never secrets, credentials, or absolute host paths. */
   readonly diagnostics: readonly string[];
+  /** Schema-v2 only; non-null solely for persistence.cache-init-promotion on pass. */
+  readonly continuityProof?: CacheInitContinuityProof | null;
 }
 
 /** A short, bounded human/agent value statement for a journey. */
@@ -332,6 +366,11 @@ export interface AcceptanceJourney {
   readonly category: string;
   readonly value: JourneyValue;
   readonly capabilities: readonly JourneyCapability[];
+  /**
+   * Always present. Declares harness-injected ports (e.g. `mcp`).
+   * Category alone never grants a port.
+   */
+  readonly requiredPorts: readonly JourneyInjectedPort[];
   readonly steps: readonly JourneyStepPlanEntry[];
   /** True when the runner may parallelize this journey (it owns all its state). */
   readonly isolated: boolean;
@@ -359,6 +398,11 @@ export const KNOWN_CAPABILITIES: ReadonlySet<JourneyCapability>;
 
 /** The explicit common-v1 selection (all 46 ids, in profile order). */
 export const COMMON_V1_JOURNEY_IDS: readonly string[];
+/**
+ * The explicit common-v2 selection (every common-v1 id plus
+ * `persistence.cache-init-promotion`, in profile order).
+ */
+export const COMMON_V2_JOURNEY_IDS: readonly string[];
 /** The macOS-specific ids the macOS profile adds on top of common-v1 (spec §8). */
 export const MACOS_JOURNEY_IDS: readonly string[];
 /** The explicit release-smoke selection (command-only subset, in projection order). */

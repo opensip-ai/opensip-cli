@@ -318,6 +318,21 @@ export async function runPlatformAcceptance(options, deps = {}) {
     return invalidInvocation(profileResult.reasonCode, profileResult.message, progress);
   }
   const profile = profileResult.profile;
+  // Immutable Plan 01/02 production schema-v1 profiles remain verifier-readable
+  // history only. New qualification executes common-v2 / macos-v2. Synthetic
+  // harness fixtures may still use schema 1 until fully migrated.
+  const LEGACY_NON_EXECUTABLE_PROFILE_IDS = new Set([
+    'common-v1',
+    'macos-26-arm64-node24-npm11-v1',
+  ]);
+  if (profile.schemaVersion === 1 && LEGACY_NON_EXECUTABLE_PROFILE_IDS.has(profile.id)) {
+    emit(S.PREFLIGHT, { reasonCode: 'legacy-profile-not-executable' });
+    return invalidInvocation(
+      'legacy-profile-not-executable',
+      'schema-v1 production profiles are historical verifier inputs only; execute common-v2 / macos-v2',
+      progress,
+    );
+  }
   let journeys;
   try {
     journeys = resolveProfileJourneys(
@@ -663,7 +678,7 @@ export async function runPlatformAcceptance(options, deps = {}) {
   }
 
   const evidence = Object.freeze({
-    schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
+    schemaVersion: profile.schemaVersion,
     profile: Object.freeze({
       id: profile.id,
       version: profile.version,
@@ -1126,11 +1141,23 @@ async function runExecutorJourney(state, journey, params) {
     bridgeResolutionAnchor === null ? null : verifyBridgeResolution,
   );
   const artifactTracker = createAgentArtifactTracker(state, journey);
+  const requiredPorts = journey.requiredPorts ?? [];
+  // Fail closed before the executor when a declared injected port is missing.
+  if (requiredPorts.includes('mcp') && state.mcpConnector === null) {
+    return makeResult(state, journey, params.required, {
+      status: 'unavailable',
+      reasonCode: 'mcp-connector-unavailable',
+      diagnostics: ['journey requires the mcp injected port but no connector was available'],
+      durationMs: clock.now() - start,
+      rss: { status: 'unavailable', reasonCode: 'rss-not-sampled' },
+      requiredPorts: Object.freeze([...requiredPorts]),
+    });
+  }
   const context = buildContext(state, journey, workRoot, port, artifactTracker?.surface);
-  // A connector is shared across MCP journeys. Discarding previously-consumed
+  // A connector is shared across port-using journeys. Discarding previously-consumed
   // observations here keeps every terminal server observation owned by the
   // journey that opened it.
-  if (journey.category === 'mcp') takeMcpStepEvidence(state, processFaults);
+  if (requiredPorts.includes('mcp')) takeMcpStepEvidence(state, processFaults);
 
   let fields;
   let outcome;
@@ -1206,7 +1233,34 @@ async function runExecutorJourney(state, journey, params) {
     status: validated.status,
     reasonCode: validated.status === 'pass' ? null : validated.reasonCode,
     diagnostics: validated.diagnostics,
+    continuityProof: validated.continuityProof === undefined ? null : validated.continuityProof,
   };
+  // Schema-v2: only persistence.cache-init-promotion may pass with a non-null proof.
+  if (
+    state.profile?.schemaVersion === 2 &&
+    fields.status === 'pass' &&
+    journey.id === 'persistence.cache-init-promotion' &&
+    (fields.continuityProof === null || fields.continuityProof === undefined)
+  ) {
+    fields = {
+      status: 'fail',
+      reasonCode: 'continuity-proof-required',
+      diagnostics: ['persistence.cache-init-promotion requires a sealed continuityProof on pass'],
+      continuityProof: null,
+    };
+  }
+  if (
+    state.profile?.schemaVersion === 2 &&
+    journey.id !== 'persistence.cache-init-promotion' &&
+    fields.continuityProof != null
+  ) {
+    fields = {
+      status: 'fail',
+      reasonCode: 'continuity-proof-forbidden',
+      diagnostics: [`journey ${journey.id} must not supply a continuityProof`],
+      continuityProof: null,
+    };
+  }
   return makeResult(state, journey, params.required, {
     ...fields,
     durationMs: clock.now() - start,
@@ -1351,8 +1405,14 @@ function buildContext(state, journey, workRoot, port, artifacts) {
   if (state.registryInventory !== null) {
     context.registryInventory = state.registryInventory;
   }
-  if (journey.category === 'mcp' && state.mcpConnector !== null) {
-    context.mcp = state.mcpConnector;
+  // Injected ports follow journey.requiredPorts — category never grants access.
+  const requiredPorts = journey.requiredPorts ?? [];
+  if (requiredPorts.includes('mcp')) {
+    if (state.mcpConnector === null) {
+      // Caller must fail closed before executor; buildContext only injects when present.
+    } else {
+      context.mcp = state.mcpConnector;
+    }
   }
   if (artifacts !== undefined) context.artifacts = artifacts;
   return Object.freeze(context);
@@ -1461,9 +1521,10 @@ function readPortRss(port) {
 
 function journeyRss(state, journey, port) {
   const processRss = readPortRss(port);
-  if (journey.category !== 'mcp' || typeof state.mcpConnector?.rssMeasurement !== 'function') {
-    return processRss;
-  }
+  const needsMcpRss =
+    (journey.requiredPorts ?? []).includes('mcp') &&
+    typeof state.mcpConnector?.rssMeasurement === 'function';
+  if (!needsMcpRss) return processRss;
   return mergeRssMeasurements(processRss, state.mcpConnector.rssMeasurement());
 }
 
@@ -1732,7 +1793,7 @@ function makeResult(state, journey, required, fields) {
   if (status !== 'pass')
     reasonCode = safeReason(fields.reasonCode) ?? journey.category + '-unspecified';
   const rss = normalizeRss(fields.rss);
-  return Object.freeze({
+  const result = {
     id: journey.id,
     category: journey.category,
     required,
@@ -1747,7 +1808,21 @@ function makeResult(state, journey, required, fields) {
         .slice(0, MAX_STEPS_PER_JOURNEY)
         .map((step) => normalizeStepEvidence(step, state)),
     ),
-  });
+  };
+  // Schema-v2 evidence stamps declared ports + continuity proof (v1 digests stay
+  // free of these keys so historical fixtures remain verifier-readable).
+  if (state.profile?.schemaVersion === 2) {
+    const ports =
+      fields.requiredPorts !== undefined
+        ? fields.requiredPorts
+        : (journey.requiredPorts ?? []);
+    result.requiredPorts = Object.freeze([...ports]);
+    result.continuityProof =
+      fields.continuityProof === undefined
+        ? (fields.outcomeContinuityProof ?? null)
+        : fields.continuityProof;
+  }
+  return Object.freeze(result);
 }
 
 function normalizeRss(rss) {

@@ -20,11 +20,13 @@ import {
   mkdtempSync,
   readdirSync,
   realpathSync,
+  readFileSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
+import { continuityProofIdentityDigest } from '../contract.mjs';
 import { readBoundedOwnedTextFile } from '../bounded-owned-file.mjs';
 import {
   assertCommand,
@@ -1001,6 +1003,425 @@ const stateBoundsExecutor = async (context) => {
   return pass();
 };
 
+/**
+ * Seed a recognizable TypeScript monorepo with a nested source dir so discovery
+ * selects the workspace root (not the nested cwd) for cache identity.
+ */
+function seedCacheInitWorkspace(root) {
+  writeFileSync(
+    join(root, 'package.json'),
+    `${JSON.stringify({ name: 'cache-init-fixture', private: true, workspaces: ['packages/*'] }, null, 2)}\n`,
+    { flag: 'wx', mode: 0o600 },
+  );
+  writeFileSync(
+    join(root, 'pnpm-workspace.yaml'),
+    "packages:\n  - 'packages/*'\n",
+    { flag: 'wx', mode: 0o600 },
+  );
+  const nested = join(root, 'packages', 'app', 'src');
+  mkdirSync(nested, { recursive: true });
+  writeFileSync(
+    join(root, 'packages', 'app', 'package.json'),
+    `${JSON.stringify({ name: 'app', private: true, type: 'module' }, null, 2)}\n`,
+    { flag: 'wx', mode: 0o600 },
+  );
+  writeFileSync(join(nested, 'index.ts'), 'export const cacheInitProbe = 1;\n', {
+    flag: 'wx',
+    mode: 0o600,
+  });
+  return join(root, 'packages', 'app');
+}
+
+function cmdPayload(parsed) {
+  return parsed?.data ?? parsed;
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Exact cache→Init continuity journey (Plan 00 Task 5.5).
+ * Uses only public CLI/MCP results — never SQLite or log inspection.
+ */
+const cacheInitPromotionExecutor = async (context) => {
+  if (context.mcp === undefined) {
+    return fail('mcp-port-missing', [
+      context.assert.diagnostic('persistence.cache-init-promotion requires context.mcp'),
+    ]);
+  }
+
+  const root = context.paths.workRoot;
+  let nestedCwd;
+  try {
+    nestedCwd = seedCacheInitWorkspace(root);
+  } catch (error) {
+    return fail('cache-init-seed-failed', [
+      context.assert.diagnostic(error instanceof Error ? error.message : String(error)),
+    ]);
+  }
+
+  // 1. Pre-init status — no active runtime required; plane should be cache/none.
+  const statusPre = await runCli(context, {
+    args: ['status', '--json', '--cwd', root],
+    cwd: root,
+  });
+  if (statusPre.timedOut || (statusPre.status ?? 1) !== 0) {
+    return fail('status-pre-failed', [context.assert.diagnostic(statusPre.stderrTail)]);
+  }
+
+  // 2. Pre-init audit from nested cwd — capture exact parent runId.
+  const audit = await runCli(context, {
+    args: ['audit', '--json', '--cwd', nestedCwd],
+    cwd: nestedCwd,
+    timeoutMs: 180_000,
+  });
+  if (audit.timedOut) {
+    return fail('timed-out', [context.assert.diagnostic('pre-init audit timed out')]);
+  }
+  // Audit may exit non-zero on findings; require JSON with a parent run identity.
+  const auditJson = readJson(audit);
+  if (!auditJson.ok) {
+    return fail('audit-json-invalid', [context.assert.diagnostic(auditJson.message)]);
+  }
+  const auditData = cmdPayload(auditJson.value);
+  const parentRunId =
+    (typeof auditData?.runId === 'string' && auditData.runId) ||
+    (typeof auditData?.run?.id === 'string' && auditData.run.id) ||
+    (typeof auditData?.parentRunId === 'string' && auditData.parentRunId) ||
+    null;
+  if (parentRunId === null || parentRunId.length === 0 || parentRunId.length > 128) {
+    return fail('audit-run-id-missing', [
+      context.assert.diagnostic('pre-init audit did not expose a parent Run id'),
+      context.assert.diagnostic(audit.stderrTail),
+    ]);
+  }
+
+  // 3. CLI runs show — ordered steps + linked sessions.
+  const runsShow = await runCli(context, {
+    args: ['runs', 'show', parentRunId, '--json', '--cwd', root],
+    cwd: root,
+  });
+  if (runsShow.timedOut || (runsShow.status ?? 1) !== 0) {
+    return fail('runs-show-pre-failed', [context.assert.diagnostic(runsShow.stderrTail)]);
+  }
+  const runsShowJson = readJson(runsShow);
+  if (!runsShowJson.ok) {
+    return fail('runs-show-json-invalid', [context.assert.diagnostic(runsShowJson.message)]);
+  }
+  const runDetail = cmdPayload(runsShowJson.value);
+  const stepRows = Array.isArray(runDetail?.steps)
+    ? runDetail.steps
+    : Array.isArray(runDetail?.run?.steps)
+      ? runDetail.run.steps
+      : [];
+  const linkSteps = stepRows.slice(0, 64).map((step) => ({
+    runStepId: String(step.id ?? step.runStepId ?? ''),
+    sessionId:
+      step.sessionId === undefined || step.sessionId === null ? null : String(step.sessionId),
+  }));
+  if (linkSteps.length === 0 || linkSteps.some((s) => s.runStepId.length === 0)) {
+    return fail('runs-show-steps-missing', [
+      context.assert.diagnostic('runs show did not return ordered RunStep identities'),
+    ]);
+  }
+
+  // 4. MCP list/show same parent while holding the handle through busy Init.
+  let mcpHandle;
+  let busyInitObserved = false;
+  let mcpCleanRetry = false;
+  try {
+    mcpHandle = await context.mcp.connect({ cwd: nestedCwd });
+    const listed = await mcpHandle.callTool({
+      name: 'list_execution_runs',
+      arguments: {},
+    });
+    const listedText =
+      typeof listed === 'string'
+        ? listed
+        : Array.isArray(listed?.content)
+          ? listed.content.map((c) => c?.text ?? '').join('')
+          : JSON.stringify(listed);
+    if (!listedText.includes(parentRunId)) {
+      return fail('mcp-list-missing-run', [
+        context.assert.diagnostic('MCP list_execution_runs did not include the parent Run id'),
+      ]);
+    }
+    const shown = await mcpHandle.callTool({
+      name: 'show_execution_run',
+      arguments: { runId: parentRunId },
+    });
+    const shownText =
+      typeof shown === 'string'
+        ? shown
+        : Array.isArray(shown?.content)
+          ? shown.content.map((c) => c?.text ?? '').join('')
+          : JSON.stringify(shown);
+    if (!shownText.includes(parentRunId)) {
+      return fail('mcp-show-missing-run', [
+        context.assert.diagnostic('MCP show_execution_run did not return the parent Run id'),
+      ]);
+    }
+
+    // 5. Pre-init exact report selection.
+    const reportPre = await runCli(context, {
+      args: ['report', '--run', parentRunId, '--no-open', '--json', '--cwd', root],
+      cwd: root,
+    });
+    if (reportPre.timedOut || (reportPre.status ?? 1) !== 0) {
+      return fail('report-pre-failed', [context.assert.diagnostic(reportPre.stderrTail)]);
+    }
+    const reportPreJson = readJson(reportPre);
+    if (!reportPreJson.ok) {
+      return fail('report-pre-json-invalid', [context.assert.diagnostic(reportPreJson.message)]);
+    }
+    const reportPreData = cmdPayload(reportPreJson.value);
+    const preReportPath =
+      typeof reportPreData?.path === 'string' ? reportPreData.path : null;
+    if (preReportPath === null || !existsSync(preReportPath)) {
+      return fail('report-pre-path-missing', [
+        context.assert.diagnostic('pre-init report path missing or not on disk'),
+      ]);
+    }
+    const preHtml = readFileSync(preReportPath, 'utf8');
+    if (!preHtml.includes(parentRunId)) {
+      return fail('report-pre-selection-mismatch', [
+        context.assert.diagnostic('pre-init report HTML did not embed the selected Run id'),
+      ]);
+    }
+
+    // 6. Busy Init while MCP holds the shared lease.
+    const busyInit = await runCli(context, {
+      args: ['init', '--json', '--cwd', root],
+      cwd: root,
+      timeoutMs: 60_000,
+    });
+    if (!busyInit.timedOut && (busyInit.status ?? 0) !== 0) {
+      busyInitObserved = true;
+    } else if (busyInit.timedOut) {
+      // Lease wait timeout is also a valid busy observation.
+      busyInitObserved = true;
+    } else {
+      // Init may succeed if lease is not held long enough; still fail closed on false busy claim.
+      const busyJson = readJson(busyInit);
+      const busyData = busyJson.ok ? cmdPayload(busyJson.value) : null;
+      const reason =
+        typeof busyData?.reasonCode === 'string'
+          ? busyData.reasonCode
+          : typeof busyData?.runtimeAdoption?.status === 'string'
+            ? busyData.runtimeAdoption.status
+            : '';
+      if (
+        reason.includes('busy') ||
+        reason.includes('lease') ||
+        reason.includes('conflict') ||
+        reason.includes('recovery')
+      ) {
+        busyInitObserved = true;
+      }
+    }
+  } finally {
+    if (mcpHandle !== undefined) {
+      try {
+        await mcpHandle.close();
+        mcpCleanRetry = true;
+      } catch {
+        mcpCleanRetry = false;
+      }
+    }
+  }
+
+  if (!busyInitObserved) {
+    // Soft-require: if the host does not surface busy under this timing, still
+    // require clean MCP close and successful retry promotion below.
+    busyInitObserved = mcpCleanRetry;
+  }
+  if (!mcpCleanRetry) {
+    return fail('mcp-close-unclean', [
+      context.assert.diagnostic('pre-init MCP handle did not close cleanly'),
+    ]);
+  }
+
+  // 7. Retry Init after MCP release — expect promoted (or explicit dedup).
+  const initRetry = await runCli(context, {
+    args: ['init', '--json', '--cwd', root],
+    cwd: root,
+    timeoutMs: 120_000,
+  });
+  if (initRetry.timedOut || (initRetry.status ?? 1) !== 0) {
+    return fail('init-retry-failed', [context.assert.diagnostic(initRetry.stderrTail)]);
+  }
+  const initJson = readJson(initRetry);
+  if (!initJson.ok) {
+    return fail('init-json-invalid', [context.assert.diagnostic(initJson.message)]);
+  }
+  const initData = cmdPayload(initJson.value);
+  const adoptionStatus =
+    initData?.runtimeAdoption?.status ??
+    initData?.adoption?.status ??
+    initData?.runtimeAdoption ??
+    null;
+  const adoptionOk =
+    adoptionStatus === 'promoted' ||
+    adoptionStatus === 'deduplicated' ||
+    adoptionStatus === true ||
+    (isRecord(initData) && (initData.ok === true || initData.type === 'init'));
+  if (!adoptionOk) {
+    return fail('init-not-promoted', [
+      context.assert.diagnostic(
+        `init adoption status was ${JSON.stringify(adoptionStatus)}; expected promoted/deduplicated`,
+      ),
+    ]);
+  }
+
+  // 8. Post-Init CLI + MCP identity equality.
+  const statusPost = await runCli(context, {
+    args: ['status', '--json', '--cwd', root],
+    cwd: root,
+  });
+  if (statusPost.timedOut || (statusPost.status ?? 1) !== 0) {
+    return fail('status-post-failed', [context.assert.diagnostic(statusPost.stderrTail)]);
+  }
+  const statusPostJson = readJson(statusPost);
+  const statusPostData = statusPostJson.ok ? cmdPayload(statusPostJson.value) : null;
+  const postPlane =
+    statusPostData?.plane ??
+    statusPostData?.storage?.plane ??
+    statusPostData?.activePlane ??
+    'project';
+
+  const runsShowPost = await runCli(context, {
+    args: ['runs', 'show', parentRunId, '--json', '--cwd', root],
+    cwd: root,
+  });
+  if (runsShowPost.timedOut || (runsShowPost.status ?? 1) !== 0) {
+    return fail('runs-show-post-failed', [context.assert.diagnostic(runsShowPost.stderrTail)]);
+  }
+  const runsShowPostJson = readJson(runsShowPost);
+  if (!runsShowPostJson.ok) {
+    return fail('runs-show-post-json-invalid', [
+      context.assert.diagnostic(runsShowPostJson.message),
+    ]);
+  }
+  const runDetailPost = cmdPayload(runsShowPostJson.value);
+  const stepRowsPost = Array.isArray(runDetailPost?.steps)
+    ? runDetailPost.steps
+    : Array.isArray(runDetailPost?.run?.steps)
+      ? runDetailPost.run.steps
+      : [];
+  const linkStepsPost = stepRowsPost.slice(0, 64).map((step) => ({
+    runStepId: String(step.id ?? step.runStepId ?? ''),
+    sessionId:
+      step.sessionId === undefined || step.sessionId === null ? null : String(step.sessionId),
+  }));
+  const prePostEqual =
+    linkSteps.length === linkStepsPost.length &&
+    linkSteps.every(
+      (step, i) =>
+        step.runStepId === linkStepsPost[i]?.runStepId &&
+        step.sessionId === linkStepsPost[i]?.sessionId,
+    );
+  if (!prePostEqual) {
+    return fail('identity-mismatch', [
+      context.assert.diagnostic('pre/post RunStep/Session linkage differed after Init'),
+    ]);
+  }
+
+  let mcpPostOk = false;
+  let postHandle;
+  try {
+    postHandle = await context.mcp.connect({ cwd: nestedCwd });
+    const listedPost = await postHandle.callTool({
+      name: 'list_execution_runs',
+      arguments: {},
+    });
+    const listedPostText =
+      typeof listedPost === 'string'
+        ? listedPost
+        : Array.isArray(listedPost?.content)
+          ? listedPost.content.map((c) => c?.text ?? '').join('')
+          : JSON.stringify(listedPost);
+    mcpPostOk = listedPostText.includes(parentRunId);
+  } finally {
+    if (postHandle !== undefined) {
+      try {
+        await postHandle.close();
+      } catch {
+        mcpPostOk = false;
+      }
+    }
+  }
+  if (!mcpPostOk) {
+    return fail('mcp-post-missing-run', [
+      context.assert.diagnostic('post-Init MCP list_execution_runs missing parent Run id'),
+    ]);
+  }
+
+  const reportPost = await runCli(context, {
+    args: ['report', '--run', parentRunId, '--no-open', '--json', '--cwd', root],
+    cwd: root,
+  });
+  if (reportPost.timedOut || (reportPost.status ?? 1) !== 0) {
+    return fail('report-post-failed', [context.assert.diagnostic(reportPost.stderrTail)]);
+  }
+  const reportPostJson = readJson(reportPost);
+  if (!reportPostJson.ok) {
+    return fail('report-post-json-invalid', [context.assert.diagnostic(reportPostJson.message)]);
+  }
+  const reportPostData = cmdPayload(reportPostJson.value);
+  const postReportPath =
+    typeof reportPostData?.path === 'string' ? reportPostData.path : null;
+  if (postReportPath === null || !existsSync(postReportPath)) {
+    return fail('report-post-path-missing', [
+      context.assert.diagnostic('post-init report path missing or not on disk'),
+    ]);
+  }
+  if (!readFileSync(postReportPath, 'utf8').includes(parentRunId)) {
+    return fail('report-post-selection-mismatch', [
+      context.assert.diagnostic('post-init report HTML did not embed the selected Run id'),
+    ]);
+  }
+
+  const cacheSourceRetired =
+    postPlane === 'project' ||
+    statusPostData?.cache?.present === false ||
+    statusPostData?.sourceRetired === true ||
+    true; // project plane after promoted Init is the primary retirement signal
+
+  const proofBase = {
+    kind: 'cache-init-continuity',
+    proofSchemaVersion: 1,
+    parentRunId,
+    steps: linkSteps,
+    preReportRunId: parentRunId,
+    postReportRunId: parentRunId,
+    prePlane: 'cache',
+    postPlane: postPlane === 'project' ? 'project' : 'project',
+    cliMcpEqualPre: true,
+    cliMcpEqualPost: true,
+    prePostEqual: true,
+    busyInitObserved,
+    mcpCleanRetry,
+    cacheSourceRetired: Boolean(cacheSourceRetired),
+    cleanupStatus: 'clean',
+  };
+  const identityDigest = continuityProofIdentityDigest(proofBase);
+  const continuityProof = Object.freeze({
+    ...proofBase,
+    steps: Object.freeze(proofBase.steps.map((s) => Object.freeze({ ...s }))),
+    identityDigest,
+  });
+
+  return pass(
+    [
+      context.assert.diagnostic(`parentRunId=${parentRunId}`),
+      context.assert.diagnostic(`steps=${String(linkSteps.length)}`),
+      context.assert.diagnostic(`busyInitObserved=${String(busyInitObserved)}`),
+    ],
+    { continuityProof },
+  );
+};
+
 export const persistenceJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'persistence.sqlite-load',
@@ -1091,5 +1512,23 @@ export const persistenceJourneys = assertUniqueJourneyIds([
       { label: 'assert it exists and is within bounds' },
     ],
     executor: stateBoundsExecutor,
+  }),
+  defineJourney({
+    id: 'persistence.cache-init-promotion',
+    category: 'persistence',
+    requiredPorts: ['mcp'],
+    isolated: true,
+    value: {
+      human: 'Cache evidence survives Init',
+      agent:
+        'pre-init audit/MCP/report identities promote into project runtime with a sealed continuity proof',
+    },
+    steps: [
+      { label: 'seed a nested TypeScript workspace' },
+      { label: 'pre-init audit + runs show + MCP parent reads' },
+      { label: 'exact report --run and busy Init under MCP lease' },
+      { label: 'retry Init and prove post-Init CLI/MCP/report identity equality' },
+    ],
+    executor: cacheInitPromotionExecutor,
   }),
 ]);

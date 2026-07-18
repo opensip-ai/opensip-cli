@@ -13,9 +13,13 @@
  */
 
 export const PLATFORM_ACCEPTANCE_SCHEMA_VERSION: 1;
+export const PLATFORM_ACCEPTANCE_SCHEMA_VERSION_V2: 2;
+export const PLATFORM_ACCEPTANCE_SUPPORTED_SCHEMA_VERSIONS: readonly [1, 2];
 export type PlatformAcceptanceCapability =
   'pty' | 'symlink' | 'permissions' | 'process-tree-rss' | 'process-tree-cleanup';
 export const PLATFORM_ACCEPTANCE_CAPABILITIES: readonly PlatformAcceptanceCapability[];
+export type PlatformAcceptanceInjectedPort = 'mcp';
+export const PLATFORM_ACCEPTANCE_INJECTED_PORTS: readonly PlatformAcceptanceInjectedPort[];
 
 /**
  * Every journey lands in exactly one of these states. `required` journeys pass
@@ -57,6 +61,11 @@ export interface ProfileJourneySelection {
    * non-required `skipped` result rather than being removed from the profile.
    */
   readonly candidateKinds?: readonly CandidateKind[];
+  /**
+   * Schema-v2 only. Always present on v2 selections (`[]` or `['mcp']`).
+   * Inherited unchanged by derived OS profiles.
+   */
+  readonly requiredPorts?: readonly PlatformAcceptanceInjectedPort[];
 }
 
 /** All numeric bounds a run enforces. Every value must be a positive integer. */
@@ -93,7 +102,7 @@ export interface ProfileSupportRowBinding {
 
 /** The data-only acceptance profile loaded from `.config/platform-acceptance/*.json`. */
 export interface AcceptanceProfile {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly id: string;
   readonly version: number;
   readonly base?: ProfileBaseRef;
@@ -224,6 +233,29 @@ export interface JourneyStepEvidence {
   readonly diagnostics: readonly string[];
 }
 
+/** Sealed cache→Init continuity proof stamped on schema-v2 results. */
+export interface CacheInitContinuityProof {
+  readonly kind: 'cache-init-continuity';
+  readonly proofSchemaVersion: 1;
+  readonly parentRunId: string;
+  readonly steps: ReadonlyArray<{
+    readonly runStepId: string;
+    readonly sessionId: string | null;
+  }>;
+  readonly identityDigest: string;
+  readonly preReportRunId: string;
+  readonly postReportRunId: string;
+  readonly prePlane: 'cache' | 'project';
+  readonly postPlane: 'cache' | 'project';
+  readonly cliMcpEqualPre: boolean;
+  readonly cliMcpEqualPost: boolean;
+  readonly prePostEqual: boolean;
+  readonly busyInitObserved: boolean;
+  readonly mcpCleanRetry: boolean;
+  readonly cacheSourceRetired: boolean;
+  readonly cleanupStatus: 'clean' | 'incomplete';
+}
+
 /** One journey outcome inside the ordered results array. */
 export interface JourneyResult {
   readonly id: string;
@@ -241,6 +273,10 @@ export interface JourneyResult {
    * rejects a required passing result that omits or empties this array.
    */
   readonly steps?: readonly JourneyStepEvidence[];
+  /** Schema-v2 only: declared injected ports mirrored from the profile selection. */
+  readonly requiredPorts?: readonly PlatformAcceptanceInjectedPort[];
+  /** Schema-v2 only: non-null solely for persistence.cache-init-promotion on pass. */
+  readonly continuityProof?: CacheInitContinuityProof | null;
 }
 
 /** Result of the run-owned cleanup step. */
@@ -276,7 +312,7 @@ export interface EvidenceProfileRef {
 
 /** The one authoritative, versioned evidence artifact. */
 export interface AcceptanceEvidence {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly profile: EvidenceProfileRef;
   readonly candidate: CandidateIdentity;
   /** Exact upgrade source, or null for a bootstrap/self-reinstall run. */
@@ -303,6 +339,10 @@ export interface ContractError extends Error {
 
 export function parseAcceptanceProfile(input: unknown): AcceptanceProfile;
 export function parseAcceptanceEvidence(input: unknown): AcceptanceEvidence;
+/** Domain-separated digest over parent Run ID + ordered step/session linkage. */
+export function continuityProofIdentityDigest(
+  proof: Pick<CacheInitContinuityProof, 'proofSchemaVersion' | 'parentRunId' | 'steps'>,
+): string;
 
 /**
  * Compose an OS-specific derived profile over a validated base. Additive only:

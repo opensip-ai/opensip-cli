@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { buildPackedSmokeScenarios } from '../smoke-pack-scenarios.mjs';
 import {
   COMMON_V1_JOURNEY_IDS,
+  COMMON_V2_JOURNEY_IDS,
   JOURNEY_REGISTRY,
   MACOS_JOURNEY_IDS,
   RELEASE_SMOKE_JOURNEY_IDS,
@@ -23,6 +24,7 @@ import { KNOWN_CAPABILITIES } from '../platform-acceptance/journey-kit.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const COMMON_V1_PATH = join(HERE, '..', '..', '.config', 'platform-acceptance', 'common-v1.json');
+const COMMON_V2_PATH = join(HERE, '..', '..', '.config', 'platform-acceptance', 'common-v2.json');
 const MACOS_V1_PATH = join(
   HERE,
   '..',
@@ -31,8 +33,18 @@ const MACOS_V1_PATH = join(
   'platform-acceptance',
   'macos-26-arm64-node24-npm11-v1.json',
 );
+const MACOS_V2_PATH = join(
+  HERE,
+  '..',
+  '..',
+  '.config',
+  'platform-acceptance',
+  'macos-26-arm64-node24-npm11-v2.json',
+);
 const commonV1 = JSON.parse(readFileSync(COMMON_V1_PATH, 'utf8'));
+const commonV2 = JSON.parse(readFileSync(COMMON_V2_PATH, 'utf8'));
 const macosV1 = JSON.parse(readFileSync(MACOS_V1_PATH, 'utf8'));
+const macosV2 = JSON.parse(readFileSync(MACOS_V2_PATH, 'utf8'));
 
 // Placeholder absolute paths only — this test projects scenarios (no filesystem
 // writes), so the exact location is irrelevant and never touched.
@@ -43,21 +55,27 @@ const SMOKE_PARAMS = Object.freeze({
   fitPackTarball: '/acceptance-run/fit.tgz',
 });
 
-test('registry holds exactly COMMON_V1 ∪ MACOS ids, once each', () => {
-  // The registry is the closed union of the common-v1 selection (46) and the
-  // macOS profile's additive journeys (spec §8). It never replaces a common id.
+test('registry holds exactly COMMON_V2 ∪ MACOS ids, once each', () => {
+  // The registry is the closed union of common-v2 (every v1 id + cache→Init) and
+  // the macOS additive journeys. Immutable COMMON_V1 remains a strict subset.
   assert.equal(COMMON_V1_JOURNEY_IDS.length, 46);
+  assert.equal(COMMON_V2_JOURNEY_IDS.length, 47);
   assert.equal(new Set(COMMON_V1_JOURNEY_IDS).size, 46, 'COMMON_V1_JOURNEY_IDS has a duplicate');
+  assert.equal(new Set(COMMON_V2_JOURNEY_IDS).size, 47, 'COMMON_V2_JOURNEY_IDS has a duplicate');
   assert.equal(
     new Set(MACOS_JOURNEY_IDS).size,
     MACOS_JOURNEY_IDS.length,
     'MACOS_JOURNEY_IDS has a duplicate',
   );
-  const union = new Set([...COMMON_V1_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
+  for (const id of COMMON_V1_JOURNEY_IDS) {
+    assert.ok(COMMON_V2_JOURNEY_IDS.includes(id), `common-v2 drops ${id}`);
+  }
+  assert.ok(COMMON_V2_JOURNEY_IDS.includes('persistence.cache-init-promotion'));
+  const union = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
   assert.equal(
     union.size,
-    COMMON_V1_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length,
-    'COMMON_V1_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap',
+    COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length,
+    'COMMON_V2_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap',
   );
   assert.equal(JOURNEY_REGISTRY.size, union.size);
   for (const id of union) {
@@ -66,6 +84,10 @@ test('registry holds exactly COMMON_V1 ∪ MACOS ids, once each', () => {
   for (const id of JOURNEY_REGISTRY.keys()) {
     assert.ok(union.has(id), `registry holds unselected journey ${id}`);
   }
+  const cacheInit = JOURNEY_REGISTRY.get('persistence.cache-init-promotion');
+  assert.deepEqual(cacheInit?.requiredPorts, ['mcp']);
+  assert.deepEqual(JOURNEY_REGISTRY.get('mcp.initialize')?.requiredPorts, ['mcp']);
+  assert.deepEqual(JOURNEY_REGISTRY.get('analysis.fit')?.requiredPorts, []);
 });
 
 test('the committed common-v1.json selects exactly the catalog ids in order', () => {
@@ -75,6 +97,24 @@ test('the committed common-v1.json selects exactly the catalog ids in order', ()
     [...COMMON_V1_JOURNEY_IDS],
     'common-v1.json drifted from the catalog selection',
   );
+});
+
+test('the committed common-v2.json selects exactly the catalog ids with requiredPorts', () => {
+  assert.equal(commonV2.schemaVersion, 2);
+  assert.equal(commonV2.version, 2);
+  const profileIds = commonV2.journeys.map((entry) => entry.id);
+  assert.deepEqual(
+    profileIds,
+    [...COMMON_V2_JOURNEY_IDS],
+    'common-v2.json drifted from the catalog selection',
+  );
+  for (const journey of commonV2.journeys) {
+    assert.ok(Array.isArray(journey.requiredPorts), `${journey.id} missing requiredPorts`);
+  }
+  const continuity = commonV2.journeys.find((j) => j.id === 'persistence.cache-init-promotion');
+  assert.deepEqual(continuity?.requiredPorts, ['mcp']);
+  assert.equal(macosV2.schemaVersion, 2);
+  assert.equal(macosV2.base?.id, 'common-v2');
 });
 
 test('lifecycle order qualifies the installed target before uninstalling state or package', () => {

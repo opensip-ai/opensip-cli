@@ -530,6 +530,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'mcp.initialize',
     category: 'mcp',
+    requiredPorts: ['mcp'],
     value: {
       human: 'Agents can connect',
       agent: 'the MCP stdio server completes initialize and reports a version',
@@ -540,6 +541,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'mcp.catalog-parity',
     category: 'mcp',
+    requiredPorts: ['mcp'],
     value: {
       human: 'The tool surface is consistent',
       agent: 'get_agent_catalog toolNames match listTools exactly',
@@ -550,6 +552,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'mcp.context',
     category: 'mcp',
+    requiredPorts: ['mcp'],
     value: {
       human: 'Agents get task context',
       agent: 'captured task context replays as ready/matched and the seeded file is found',
@@ -565,6 +568,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'mcp.graph-reads',
     category: 'mcp',
+    requiredPorts: ['mcp'],
     value: {
       human: 'Agents can read the graph',
       agent: 'get_architecture returns a decodable payload',
@@ -575,6 +579,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'mcp.result-replay',
     category: 'mcp',
+    requiredPorts: ['mcp'],
     value: {
       human: 'Agents replay stored results',
       agent: 'list_runs → show_run replays a persisted run',
@@ -585,6 +590,7 @@ export const mcpJourneys = assertUniqueJourneyIds([
   defineJourney({
     id: 'mcp.stale-evidence',
     category: 'mcp',
+    requiredPorts: ['mcp'],
     value: {
       human: 'Missing evidence is honest',
       agent: 'an evidence-less read returns a reason/fallback, never a false ready',

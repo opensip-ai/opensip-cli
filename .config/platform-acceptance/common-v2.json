@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 2,
+  "id": "common-v2",
+  "version": 2,
+  "requiredCapabilities": [
+    "process-tree-cleanup"
+  ],
+  "rssRequired": false,
+  "bounds": {
+    "journeyTimeoutMs": 180000,
+    "maxStdoutBytes": 1048576,
+    "maxStderrBytes": 262144,
+    "maxDiagnosticTailBytes": 4096,
+    "rssSampleIntervalMs": 250,
+    "maxEvidenceBytes": 4194304,
+    "maxJourneyResults": 128
+  },
+  "journeys": [
+    {
+      "id": "lifecycle.install",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "lifecycle.upgrade",
+      "required": false,
+      "requiredPorts": []
+    },
+    {
+      "id": "lifecycle.version",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "lifecycle.help",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.audit-preinit",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.init",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.fit",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.graph",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.graph-impact",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.sim",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.yagni",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.report",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.sessions-list",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.sessions-show",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "analysis.replay",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.human-non-tty",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.no-color",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.json",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.filters-raw",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.sarif",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.report-html",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "output.pty",
+      "required": false,
+      "capabilities": [
+        "pty"
+      ],
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.sqlite-load",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.first-open-migration",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.cross-process-replay",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.contention-retry",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.interrupted-recovery",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.state-bounds",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "persistence.cache-init-promotion",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp.initialize",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp.catalog-parity",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp.context",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp.graph-reads",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp.result-replay",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "mcp.stale-evidence",
+      "required": true,
+      "requiredPorts": [
+        "mcp"
+      ]
+    },
+    {
+      "id": "agent.installed-smoke",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "extensions.whole-tool",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "extensions.fit-pack",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "extensions.sim-pack",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.spaces-unicode",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.symlink-root",
+      "required": false,
+      "capabilities": [
+        "symlink"
+      ],
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.permissions",
+      "required": false,
+      "capabilities": [
+        "permissions"
+      ],
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.isolated-home",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.signals",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.timeout-cleanup",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "lifecycle.cli-state-uninstall",
+      "required": true,
+      "requiredPorts": []
+    },
+    {
+      "id": "lifecycle.package-uninstall",
+      "required": true,
+      "requiredPorts": []
+    }
+  ]
+}

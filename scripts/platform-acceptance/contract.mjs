@@ -22,7 +22,12 @@
 
 import { createHash } from 'node:crypto';
 
+/** Schema version used by legacy immutable common-v1 / macOS-v1 artifacts. */
 export const PLATFORM_ACCEPTANCE_SCHEMA_VERSION = 1;
+/** Schema version for cache→Init continuity profiles (requiredPorts + continuityProof). */
+export const PLATFORM_ACCEPTANCE_SCHEMA_VERSION_V2 = 2;
+/** Supported schema versions for independent verification. */
+export const PLATFORM_ACCEPTANCE_SUPPORTED_SCHEMA_VERSIONS = Object.freeze([1, 2]);
 export const PLATFORM_ACCEPTANCE_CAPABILITIES = Object.freeze([
   'pty',
   'symlink',
@@ -31,6 +36,10 @@ export const PLATFORM_ACCEPTANCE_CAPABILITIES = Object.freeze([
   'process-tree-cleanup',
 ]);
 const PLATFORM_ACCEPTANCE_CAPABILITY_SET = new Set(PLATFORM_ACCEPTANCE_CAPABILITIES);
+
+/** Closed injected-port vocabulary (mirrors journey-kit; kept free of cycle). */
+export const PLATFORM_ACCEPTANCE_INJECTED_PORTS = Object.freeze(['mcp']);
+const PLATFORM_ACCEPTANCE_INJECTED_PORT_SET = new Set(PLATFORM_ACCEPTANCE_INJECTED_PORTS);
 
 // Bounds on the contract's own strings/arrays (independent of a profile's
 // runtime output bounds). Keep them generous but finite so a hand-edited or
@@ -73,7 +82,7 @@ const INSTALL_CHANNELS = new Set(['canonical-installer', 'npm-direct', 'packed-c
 const CLEANUP_STATUSES = new Set(['clean', 'incomplete']);
 const COMPLETION_STATES = new Set(['completed', 'infrastructure-fault']);
 const STEP_STAGES = new Set(['process', 'lifecycle', 'mcp']);
-const KNOWN_BASE_IDS_DEFAULT = ['common-v1'];
+const KNOWN_BASE_IDS_DEFAULT = ['common-v1', 'common-v2'];
 
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 const REASON_CODE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -267,7 +276,14 @@ const PROFILE_KEY_SET = new Set([
   'journeys',
   'supportRow',
 ]);
-const JOURNEY_SELECTION_KEY_SET = new Set(['id', 'required', 'capabilities', 'candidateKinds']);
+const JOURNEY_SELECTION_KEY_SET_V1 = new Set(['id', 'required', 'capabilities', 'candidateKinds']);
+const JOURNEY_SELECTION_KEY_SET_V2 = new Set([
+  'id',
+  'required',
+  'capabilities',
+  'candidateKinds',
+  'requiredPorts',
+]);
 const BASE_REF_KEY_SET = new Set(['id', 'digest']);
 const SUPPORT_ROW_KEY_SET = new Set(['contractVersion', 'rowId']);
 
@@ -342,9 +358,44 @@ function parseCandidateKinds(raw, label) {
   return Object.freeze(out);
 }
 
-function parseJourneySelection(raw, index) {
+function parseRequiredPorts(raw, label) {
+  if (!Array.isArray(raw)) {
+    throw contractError('invalid-array', `${label} must be an array`);
+  }
+  if (raw.length > PLATFORM_ACCEPTANCE_INJECTED_PORTS.length) {
+    throw contractError(
+      'array-too-long',
+      `${label} exceeds ${PLATFORM_ACCEPTANCE_INJECTED_PORTS.length} entries`,
+    );
+  }
+  const seen = new Set();
+  const out = [];
+  for (const entry of raw) {
+    const port = requireId(entry, `${label} entry`);
+    if (!PLATFORM_ACCEPTANCE_INJECTED_PORT_SET.has(port)) {
+      throw contractError(
+        'unknown-required-port',
+        `${label} has unknown port ${JSON.stringify(port)}`,
+      );
+    }
+    if (seen.has(port)) {
+      throw contractError('duplicate-required-port', `${label} has duplicate ${JSON.stringify(port)}`);
+    }
+    seen.add(port);
+    out.push(port);
+  }
+  // Canonical order matches PLATFORM_ACCEPTANCE_INJECTED_PORTS.
+  out.sort(
+    (a, b) =>
+      PLATFORM_ACCEPTANCE_INJECTED_PORTS.indexOf(a) - PLATFORM_ACCEPTANCE_INJECTED_PORTS.indexOf(b),
+  );
+  return Object.freeze(out);
+}
+
+function parseJourneySelection(raw, index, schemaVersion) {
   const record = requireObject(raw, `profile.journeys[${index}]`);
-  rejectUnknownKeys(record, JOURNEY_SELECTION_KEY_SET, `profile.journeys[${index}]`);
+  const keySet = schemaVersion === 2 ? JOURNEY_SELECTION_KEY_SET_V2 : JOURNEY_SELECTION_KEY_SET_V1;
+  rejectUnknownKeys(record, keySet, `profile.journeys[${index}]`);
   const selection = {
     id: requireId(record.id, `profile.journeys[${index}].id`),
     required: requireBoolean(record.required, `profile.journeys[${index}].required`),
@@ -359,6 +410,18 @@ function parseJourneySelection(raw, index) {
     `profile.journeys[${index}].candidateKinds`,
   );
   if (candidateKinds) selection.candidateKinds = candidateKinds;
+  if (schemaVersion === 2) {
+    if (!Object.hasOwn(record, 'requiredPorts')) {
+      throw contractError(
+        'missing-required-ports',
+        `profile.journeys[${index}].requiredPorts is required for schema version 2`,
+      );
+    }
+    selection.requiredPorts = parseRequiredPorts(
+      record.requiredPorts,
+      `profile.journeys[${index}].requiredPorts`,
+    );
+  }
   return Object.freeze(selection);
 }
 
@@ -393,16 +456,22 @@ function parseSupportRow(raw) {
   });
 }
 
-/** Validate and freeze a data-only acceptance profile. */
+/** Validate and freeze a data-only acceptance profile (schema v1 or v2). */
 export function parseAcceptanceProfile(input) {
   const record = requireObject(input, 'profile');
   rejectUnknownKeys(record, PROFILE_KEY_SET, 'profile');
-  if (record.schemaVersion !== PLATFORM_ACCEPTANCE_SCHEMA_VERSION) {
+  const schemaVersion = record.schemaVersion;
+  if (
+    schemaVersion !== PLATFORM_ACCEPTANCE_SCHEMA_VERSION &&
+    schemaVersion !== PLATFORM_ACCEPTANCE_SCHEMA_VERSION_V2
+  ) {
     throw contractError(
       'schema-version',
-      `profile.schemaVersion must be ${PLATFORM_ACCEPTANCE_SCHEMA_VERSION}`,
+      `profile.schemaVersion must be one of ${PLATFORM_ACCEPTANCE_SUPPORTED_SCHEMA_VERSIONS.join(', ')}`,
     );
   }
+  // Schema/version alignment: v1 profiles use version 1; v2 profiles use version 2.
+  const expectedProfileVersion = schemaVersion;
   const journeysRaw = record.journeys;
   if (!Array.isArray(journeysRaw) || journeysRaw.length === 0) {
     throw contractError('empty-journeys', 'profile.journeys must be a non-empty array');
@@ -419,7 +488,7 @@ export function parseAcceptanceProfile(input) {
   }
   const seen = new Set();
   const journeys = journeysRaw.map((entry, index) => {
-    const selection = parseJourneySelection(entry, index);
+    const selection = parseJourneySelection(entry, index, schemaVersion);
     if (seen.has(selection.id)) {
       throw contractError(
         'duplicate-journey',
@@ -430,10 +499,18 @@ export function parseAcceptanceProfile(input) {
     return selection;
   });
 
+  const profileVersion = requirePositiveInt(record.version, 'profile.version');
+  if (profileVersion !== expectedProfileVersion) {
+    throw contractError(
+      'profile-version-schema-mismatch',
+      `profile.version ${profileVersion} does not match schemaVersion ${schemaVersion}`,
+    );
+  }
+
   const profile = {
-    schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
+    schemaVersion,
     id: requireId(record.id, 'profile.id'),
-    version: requirePositiveInt(record.version, 'profile.version'),
+    version: profileVersion,
     requiredCapabilities:
       parseCapabilities(record.requiredCapabilities, 'profile.requiredCapabilities') ??
       Object.freeze([]),
@@ -473,6 +550,12 @@ export function composeProfile(base, derived, options = {}) {
     throw contractError(
       'base-not-root',
       'composition is one level only; base must be a root profile',
+    );
+  }
+  if (base.schemaVersion !== parsedDerived.schemaVersion) {
+    throw contractError(
+      'cross-schema-composition',
+      `base schemaVersion ${base.schemaVersion} cannot compose with derived schemaVersion ${parsedDerived.schemaVersion}`,
     );
   }
   if (profileDigest(base) !== parsedDerived.base.digest) {
@@ -537,6 +620,20 @@ export function composeProfile(base, derived, options = {}) {
         );
       }
     }
+    // Schema v2: inherited requiredPorts must be identical (no add/remove/reorder).
+    if (base.schemaVersion === 2) {
+      const basePorts = journey.requiredPorts ?? [];
+      const overridePorts = override.requiredPorts ?? [];
+      if (
+        basePorts.length !== overridePorts.length ||
+        basePorts.some((port, i) => port !== overridePorts[i])
+      ) {
+        throw contractError(
+          'mutated-required-ports',
+          `derived profile mutates requiredPorts for ${JSON.stringify(journey.id)}`,
+        );
+      }
+    }
   }
 
   // The derived document owns executable order so OS-specific probes can run
@@ -555,7 +652,7 @@ export function composeProfile(base, derived, options = {}) {
   ];
 
   const composed = {
-    schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
+    schemaVersion: base.schemaVersion,
     id: parsedDerived.id,
     version: parsedDerived.version,
     base: parsedDerived.base,
@@ -810,7 +907,7 @@ function parseRss(raw, label) {
   throw contractError('invalid-rss', `${label}.status must be 'available' or 'unavailable'`);
 }
 
-const JOURNEY_RESULT_KEY_SET = new Set([
+const JOURNEY_RESULT_KEY_SET_V1 = new Set([
   'id',
   'category',
   'required',
@@ -821,6 +918,36 @@ const JOURNEY_RESULT_KEY_SET = new Set([
   'diagnostics',
   'steps',
 ]);
+const JOURNEY_RESULT_KEY_SET_V2 = new Set([
+  ...JOURNEY_RESULT_KEY_SET_V1,
+  'requiredPorts',
+  'continuityProof',
+]);
+
+const CONTINUITY_PROOF_KEY_SET = new Set([
+  'kind',
+  'proofSchemaVersion',
+  'parentRunId',
+  'steps',
+  'identityDigest',
+  'preReportRunId',
+  'postReportRunId',
+  'prePlane',
+  'postPlane',
+  'cliMcpEqualPre',
+  'cliMcpEqualPost',
+  'prePostEqual',
+  'busyInitObserved',
+  'mcpCleanRetry',
+  'cacheSourceRetired',
+  'cleanupStatus',
+]);
+const CONTINUITY_PROOF_STEP_KEY_SET = new Set(['runStepId', 'sessionId']);
+const CONTINUITY_PLANES = new Set(['cache', 'project']);
+const CONTINUITY_CLEANUP = new Set(['clean', 'incomplete']);
+const CONTINUITY_PROOF_DOMAIN = 'opensip-cli/cache-init-continuity-proof/v1\0';
+const MAX_CONTINUITY_PROOF_STEPS = 64;
+const MAX_CONTINUITY_ID_LENGTH = 128;
 
 const STEP_EVIDENCE_KEY_SET = new Set([
   'label',
@@ -955,9 +1082,109 @@ function parseJourneySteps(raw, resultIndex) {
   return Object.freeze(steps);
 }
 
-function parseJourneyResult(raw, index) {
+/**
+ * Domain-separated digest over parent Run ID + ordered step/session linkage.
+ * Used by journey executors and the independent verifier.
+ */
+export function continuityProofIdentityDigest(proof) {
+  const payload = {
+    proofSchemaVersion: proof.proofSchemaVersion,
+    parentRunId: proof.parentRunId,
+    steps: proof.steps.map((step) => ({
+      runStepId: step.runStepId,
+      sessionId: step.sessionId,
+    })),
+  };
+  return createHash('sha256')
+    .update(CONTINUITY_PROOF_DOMAIN)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+}
+
+function parseContinuityProof(raw, label) {
+  if (raw === null) return null;
+  const record = requireObject(raw, label);
+  rejectUnknownKeys(record, CONTINUITY_PROOF_KEY_SET, label);
+  if (record.kind !== 'cache-init-continuity') {
+    throw contractError('invalid-continuity-proof-kind', `${label}.kind must be cache-init-continuity`);
+  }
+  const proofSchemaVersion = requirePositiveInt(
+    record.proofSchemaVersion,
+    `${label}.proofSchemaVersion`,
+  );
+  if (proofSchemaVersion !== 1) {
+    throw contractError(
+      'invalid-continuity-proof-schema',
+      `${label}.proofSchemaVersion must be 1`,
+    );
+  }
+  const parentRunId = requireString(record.parentRunId, `${label}.parentRunId`, {
+    max: MAX_CONTINUITY_ID_LENGTH,
+  });
+  if (!Array.isArray(record.steps) || record.steps.length === 0) {
+    throw contractError('invalid-continuity-steps', `${label}.steps must be a non-empty array`);
+  }
+  if (record.steps.length > MAX_CONTINUITY_PROOF_STEPS) {
+    throw contractError(
+      'too-many-continuity-steps',
+      `${label}.steps exceeds ${MAX_CONTINUITY_PROOF_STEPS}`,
+    );
+  }
+  const steps = record.steps.map((entry, stepIndex) => {
+    const stepLabel = `${label}.steps[${stepIndex}]`;
+    const step = requireObject(entry, stepLabel);
+    rejectUnknownKeys(step, CONTINUITY_PROOF_STEP_KEY_SET, stepLabel);
+    return Object.freeze({
+      runStepId: requireString(step.runStepId, `${stepLabel}.runStepId`, {
+        max: MAX_CONTINUITY_ID_LENGTH,
+      }),
+      sessionId:
+        step.sessionId === null
+          ? null
+          : requireString(step.sessionId, `${stepLabel}.sessionId`, {
+              max: MAX_CONTINUITY_ID_LENGTH,
+            }),
+    });
+  });
+  const proof = {
+    kind: 'cache-init-continuity',
+    proofSchemaVersion,
+    parentRunId,
+    steps: Object.freeze(steps),
+    identityDigest: requireString(record.identityDigest, `${label}.identityDigest`, {
+      max: MAX_DIGEST_LENGTH,
+      pattern: HEX_DIGEST_PATTERN,
+    }),
+    preReportRunId: requireString(record.preReportRunId, `${label}.preReportRunId`, {
+      max: MAX_CONTINUITY_ID_LENGTH,
+    }),
+    postReportRunId: requireString(record.postReportRunId, `${label}.postReportRunId`, {
+      max: MAX_CONTINUITY_ID_LENGTH,
+    }),
+    prePlane: requireEnum(record.prePlane, CONTINUITY_PLANES, `${label}.prePlane`),
+    postPlane: requireEnum(record.postPlane, CONTINUITY_PLANES, `${label}.postPlane`),
+    cliMcpEqualPre: requireBoolean(record.cliMcpEqualPre, `${label}.cliMcpEqualPre`),
+    cliMcpEqualPost: requireBoolean(record.cliMcpEqualPost, `${label}.cliMcpEqualPost`),
+    prePostEqual: requireBoolean(record.prePostEqual, `${label}.prePostEqual`),
+    busyInitObserved: requireBoolean(record.busyInitObserved, `${label}.busyInitObserved`),
+    mcpCleanRetry: requireBoolean(record.mcpCleanRetry, `${label}.mcpCleanRetry`),
+    cacheSourceRetired: requireBoolean(record.cacheSourceRetired, `${label}.cacheSourceRetired`),
+    cleanupStatus: requireEnum(record.cleanupStatus, CONTINUITY_CLEANUP, `${label}.cleanupStatus`),
+  };
+  const recomputed = continuityProofIdentityDigest(proof);
+  if (recomputed !== proof.identityDigest) {
+    throw contractError(
+      'continuity-proof-digest-mismatch',
+      `${label}.identityDigest does not match recomputed identity digest`,
+    );
+  }
+  return Object.freeze(proof);
+}
+
+function parseJourneyResult(raw, index, schemaVersion = 1) {
   const record = requireObject(raw, `results[${index}]`);
-  rejectUnknownKeys(record, JOURNEY_RESULT_KEY_SET, `results[${index}]`);
+  const keySet = schemaVersion === 2 ? JOURNEY_RESULT_KEY_SET_V2 : JOURNEY_RESULT_KEY_SET_V1;
+  rejectUnknownKeys(record, keySet, `results[${index}]`);
   const result = {
     id: requireId(record.id, `results[${index}].id`),
     category: requireId(record.category, `results[${index}].category`),
@@ -976,6 +1203,28 @@ function parseJourneyResult(raw, index) {
   // their sealed digest remains reproducible; the independent verifier still
   // rejects any required passing result without new step evidence.
   if (record.steps !== undefined) result.steps = parseJourneySteps(record.steps, index);
+  if (schemaVersion === 2) {
+    if (!Object.hasOwn(record, 'requiredPorts')) {
+      throw contractError(
+        'missing-required-ports',
+        `results[${index}].requiredPorts is required for schema version 2`,
+      );
+    }
+    result.requiredPorts = parseRequiredPorts(
+      record.requiredPorts,
+      `results[${index}].requiredPorts`,
+    );
+    if (!Object.hasOwn(record, 'continuityProof')) {
+      throw contractError(
+        'missing-continuity-proof',
+        `results[${index}].continuityProof is required for schema version 2 (may be null)`,
+      );
+    }
+    result.continuityProof = parseContinuityProof(
+      record.continuityProof,
+      `results[${index}].continuityProof`,
+    );
+  }
   return Object.freeze(result);
 }
 
@@ -1349,10 +1598,14 @@ export function evidenceDigest(evidence) {
 export function parseAcceptanceEvidence(input) {
   const record = requireObject(input, 'evidence');
   rejectUnknownKeys(record, EVIDENCE_KEY_SET, 'evidence');
-  if (record.schemaVersion !== PLATFORM_ACCEPTANCE_SCHEMA_VERSION) {
+  const schemaVersion = record.schemaVersion;
+  if (
+    schemaVersion !== PLATFORM_ACCEPTANCE_SCHEMA_VERSION &&
+    schemaVersion !== PLATFORM_ACCEPTANCE_SCHEMA_VERSION_V2
+  ) {
     throw contractError(
       'schema-version',
-      `evidence.schemaVersion must be ${PLATFORM_ACCEPTANCE_SCHEMA_VERSION}`,
+      `evidence.schemaVersion must be one of ${PLATFORM_ACCEPTANCE_SUPPORTED_SCHEMA_VERSIONS.join(', ')}`,
     );
   }
   const resultsRaw = record.results;
@@ -1364,7 +1617,7 @@ export function parseAcceptanceEvidence(input) {
   }
   const seenIds = new Set();
   const results = resultsRaw.map((entry, index) => {
-    const result = parseJourneyResult(entry, index);
+    const result = parseJourneyResult(entry, index, schemaVersion);
     if (seenIds.has(result.id)) {
       throw contractError(
         'duplicate-result',
@@ -1383,7 +1636,7 @@ export function parseAcceptanceEvidence(input) {
   });
   const registryBindings = parseRegistryBindings(record.registryBindings, candidate);
   const evidence = {
-    schemaVersion: PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
+    schemaVersion,
     profile: parseEvidenceProfileRef(record.profile),
     candidate,
     previousCandidate:

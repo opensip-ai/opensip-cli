@@ -35,6 +35,13 @@ import { PLATFORM_ACCEPTANCE_CAPABILITIES } from './contract.mjs';
 /** The closed native-capability vocabulary. A journey may declare only these. */
 export const KNOWN_CAPABILITIES = Object.freeze(new Set(PLATFORM_ACCEPTANCE_CAPABILITIES));
 
+/**
+ * Closed harness-owned injected ports (distinct from native host capabilities).
+ * Category never grants a port; each journey declares `requiredPorts` explicitly.
+ */
+export const JOURNEY_INJECTED_PORTS = Object.freeze(['mcp']);
+export const JOURNEY_INJECTED_PORT_SET = Object.freeze(new Set(JOURNEY_INJECTED_PORTS));
+
 const KEBAB_REASON = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/;
 
@@ -102,6 +109,32 @@ export function defineJourney(row) {
     seenCapabilities.add(capability);
   }
 
+  // Injected ports are always present and frozen; omitted ⇒ empty (least authority).
+  const portsRaw = row.requiredPorts ?? [];
+  if (!Array.isArray(portsRaw)) {
+    throw new JourneyDefinitionError(`journey.requiredPorts (${id}) must be an array`);
+  }
+  const seenPorts = new Set();
+  const requiredPorts = [];
+  for (const port of portsRaw) {
+    if (!JOURNEY_INJECTED_PORT_SET.has(port)) {
+      throw new JourneyDefinitionError(
+        `journey ${JSON.stringify(id)} declares unknown requiredPort ${JSON.stringify(port)}`,
+      );
+    }
+    if (seenPorts.has(port)) {
+      throw new JourneyDefinitionError(
+        `journey ${JSON.stringify(id)} declares duplicate requiredPort ${JSON.stringify(port)}`,
+      );
+    }
+    seenPorts.add(port);
+    requiredPorts.push(port);
+  }
+  // Canonical order matches JOURNEY_INJECTED_PORTS.
+  requiredPorts.sort(
+    (a, b) => JOURNEY_INJECTED_PORTS.indexOf(a) - JOURNEY_INJECTED_PORTS.indexOf(b),
+  );
+
   const stepsRaw = row.steps ?? [];
   if (!Array.isArray(stepsRaw) || stepsRaw.length === 0) {
     throw new JourneyDefinitionError(`journey.steps (${id}) must be a non-empty array`);
@@ -124,6 +157,7 @@ export function defineJourney(row) {
     category,
     value: Object.freeze({ human: row.value.human, agent: row.value.agent }),
     capabilities: Object.freeze([...seenCapabilities]),
+    requiredPorts: Object.freeze(requiredPorts),
     steps: Object.freeze(steps),
     isolated: row.isolated === true,
     // Lifecycle-driven journeys (install/upgrade/cli-state/package removal) are
@@ -182,30 +216,48 @@ function requireReason(reasonCode, status) {
   return reasonCode;
 }
 
-/** @returns {JourneyOutcome} */
-export function pass(diagnostics = []) {
-  return Object.freeze({
+/**
+ * @param {readonly string[]} [diagnostics]
+ * @param {{ continuityProof?: unknown }} [extra]
+ * @returns {JourneyOutcome}
+ */
+export function pass(diagnostics = [], extra = {}) {
+  const outcome = {
     status: 'pass',
     reasonCode: null,
     diagnostics: boundedDiagnostics(diagnostics),
-  });
+    continuityProof: extra.continuityProof === undefined ? null : extra.continuityProof,
+  };
+  return Object.freeze(outcome);
 }
 
-/** @returns {JourneyOutcome} */
-export function fail(reasonCode, diagnostics = []) {
+/**
+ * @param {string} reasonCode
+ * @param {readonly string[]} [diagnostics]
+ * @param {{ continuityProof?: unknown }} [extra]
+ * @returns {JourneyOutcome}
+ */
+export function fail(reasonCode, diagnostics = [], extra = {}) {
   return Object.freeze({
     status: 'fail',
     reasonCode: requireReason(reasonCode, 'fail'),
     diagnostics: boundedDiagnostics(diagnostics),
+    continuityProof: extra.continuityProof === undefined ? null : extra.continuityProof,
   });
 }
 
-/** @returns {JourneyOutcome} */
-export function unavailable(reasonCode, diagnostics = []) {
+/**
+ * @param {string} reasonCode
+ * @param {readonly string[]} [diagnostics]
+ * @param {{ continuityProof?: unknown }} [extra]
+ * @returns {JourneyOutcome}
+ */
+export function unavailable(reasonCode, diagnostics = [], extra = {}) {
   return Object.freeze({
     status: 'unavailable',
     reasonCode: requireReason(reasonCode, 'unavailable'),
     diagnostics: boundedDiagnostics(diagnostics),
+    continuityProof: extra.continuityProof === undefined ? null : extra.continuityProof,
   });
 }
 
