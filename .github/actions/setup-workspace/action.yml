@@ -1,0 +1,55 @@
+# Shared install + two-pass build for parallel CI lanes.
+# Each lane still pays this cost on its own runner (avoids fragile dist
+# artifact handoff with injectWorkspacePackages). Wall-clock improves
+# because lanes run concurrently; total runner-minutes increase.
+name: Setup workspace
+description: Install frozen lockfile, clean dist, build via scripts/build-ci.mjs, optional Turbo local cache
+
+inputs:
+  turbo-cache-key-suffix:
+    description: >
+      Extra key segment for the Turbo local cache (usually github.job) so lanes
+      do not clobber each other's incomplete cache entries mid-run.
+    required: false
+    default: shared
+  restore-turbo-cache:
+    description: Whether to restore/save .turbo for this lane
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        # Single source of truth: .nvmrc (kept in lockstep with engines.node).
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Turbo local cache
+      if: inputs.restore-turbo-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: .turbo
+        key: ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-${{ inputs.turbo-cache-key-suffix }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-${{ inputs.turbo-cache-key-suffix }}-
+          ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # Clean every package's dist/ before build so dogfood gates never execute a
+    # stale or Turbo-cache-restored binary that lags the source.
+    - name: Clean dist
+      shell: bash
+      run: pnpm -r run clean
+
+    # Two-pass build that re-syncs pnpm's injected workspace copies between
+    # passes (see scripts/build-ci.mjs).
+    - name: Build
+      shell: bash
+      run: node scripts/build-ci.mjs
