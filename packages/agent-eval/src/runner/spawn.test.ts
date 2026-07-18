@@ -174,7 +174,9 @@ describe('spawnProcess', () => {
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
       expect(result.exitCode).toBe(0);
-      expect(result.error).toMatch(
+      // The containment summary makes an intermittent CI-only miss a complete
+      // bug report (sampler inputs) instead of an unexplained undefined.
+      expect(result.error, `containment: ${JSON.stringify(result.containment)}`).toMatch(
         /surviving descendant|descendant observation became unavailable|did not terminate after bounded/u,
       );
       // Reaping after SIGKILL is asynchronous on loaded CI runners.

@@ -147,8 +147,18 @@ function sameProcessIdentity(
   );
 }
 
+/** Bounded decision-evidence summary for post-run containment diagnostics. */
+export interface ProcessTreeSummary {
+  readonly reliable: boolean;
+  readonly rootObserved: boolean;
+  readonly samples: number;
+  readonly tracked: number;
+}
+
 class DescendantTracker {
   private failed = false;
+  private successfulSamples = 0;
+  private everObservedRoot = false;
   private rootIdentityInitialized = false;
   private rootObservedAlive = false;
   private rootIdentity: PosixProcessIdentity | undefined;
@@ -176,6 +186,20 @@ class DescendantTracker {
 
   public reliable(): boolean {
     return !this.failed;
+  }
+
+  /**
+   * The inputs behind a containment verdict, so a "clean" result that later
+   * proves wrong (e.g. an intermittent CI-only leak) arrives as a complete
+   * bug report instead of an unexplained `error: undefined`.
+   */
+  public summary(): ProcessTreeSummary {
+    return {
+      reliable: !this.failed,
+      rootObserved: this.everObservedRoot,
+      samples: this.successfulSamples,
+      tracked: this.tracked.size,
+    };
   }
 
   public sample(): void {
@@ -257,6 +281,7 @@ class DescendantTracker {
     if (this.rootObservedAlive) currentTracked.add(this.rootPid);
     if (rootExitedThisSample) this.retainOriginalGroupMembers(snapshot, currentTracked);
     this.expandDescendants(snapshot, currentTracked);
+    this.successfulSamples += 1;
   }
 
   private updateRootObservation(currentRoot: PosixProcessIdentity | undefined): boolean {
@@ -264,18 +289,40 @@ class DescendantTracker {
     if (!this.rootIdentityInitialized) {
       this.rootIdentityInitialized = true;
       if (currentRoot === undefined) {
-        // A short-lived utility may exit before the first bounded process-table
-        // sample. Its closed stdio/root handle still settle normally, but no
-        // descendant-containment claim is made for that unobserved interval.
-        return false;
+        // The root exited before the first successful process-table sample —
+        // a slow `ps` on a loaded host, not an error. Its process GROUP id is
+        // still known statically (the root pid), so treat this exactly like an
+        // observed exit and sweep same-group survivors from THIS snapshot.
+        // Returning false here instead silently waived the containment claim:
+        // a TERM-ignoring descendant spawned by a fast-exiting root was never
+        // tracked, never killed, and never reported — the run closed clean
+        // while leaking the process.
+        return true;
       }
       this.rootIdentity = currentRoot;
     }
+    // A Linux root can linger as a zombie whose COMMAND mutates (e.g.
+    // "[MainThread] <defunct>") before its parent reaps it: same pid, group,
+    // session, and start time — different fingerprint. That row is the root's
+    // corpse, not a new process, and it must count as the exit transition; a
+    // sample that sees the zombie and a later sample that sees the reaped
+    // absence would otherwise EACH miss the transition, permanently skipping
+    // the same-group survivor sweep (the silent orphan leak observed on the
+    // Linux CI lanes). True PID reuse (different start time or session) stays
+    // a non-sweeping disappearance — signalling a recycled group could kill
+    // an unrelated process.
+    const zombieOfRoot =
+      currentRoot !== undefined &&
+      currentRoot.startedAt === this.rootIdentity?.startedAt &&
+      currentRoot.processGroupId === this.rootIdentity.processGroupId &&
+      currentRoot.posixSession === this.rootIdentity.posixSession &&
+      currentRoot.commandFingerprint !== this.rootIdentity.commandFingerprint;
     this.rootObservedAlive =
       currentRoot !== undefined &&
       this.rootIdentity !== undefined &&
       sameProcessIdentity(currentRoot, this.rootIdentity);
-    return currentRoot === undefined && rootWasObservedAlive;
+    if (this.rootObservedAlive) this.everObservedRoot = true;
+    return rootWasObservedAlive && (currentRoot === undefined || zombieOfRoot);
   }
 
   private validatedTrackedPids(byPid: ReadonlyMap<number, PosixProcessIdentity>): Set<number> {
@@ -398,6 +445,10 @@ export function stopProcessTreeTracking(tree: PosixProcessTree): void {
 
 export function processTreeTrackingReliable(tree: PosixProcessTree): boolean {
   return tree.tracker.reliable();
+}
+
+export function processTreeSummary(tree: PosixProcessTree): ProcessTreeSummary {
+  return tree.tracker.summary();
 }
 
 /** Return whether the root group or any retained descendant identity is alive. */

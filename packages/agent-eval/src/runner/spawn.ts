@@ -28,6 +28,7 @@ import { hasControlCharacter } from '../control-text.js';
 import { buildDeterministicEnv } from './env.js';
 import {
   processTreeIsAlive,
+  processTreeSummary,
   processTreeTrackingReliable,
   retainPosixProcessTree,
   sampleProcessTree,
@@ -35,7 +36,7 @@ import {
   stopProcessTreeTracking,
 } from './process-tree.js';
 
-import type { ProcessSnapshot } from './process-tree.js';
+import type { ProcessSnapshot, ProcessTreeSummary } from './process-tree.js';
 import type { BigIntStats } from 'node:fs';
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -151,6 +152,14 @@ export type CliTarget = InstalledCliTarget | WorkspaceCliTarget;
 
 /** Captured, bounded outcome of one child-process invocation. */
 export interface SpawnResult {
+  /**
+   * Decision evidence behind the descendant-containment verdict (absent on
+   * Windows-rejected/pre-tracking failures). A clean result that later proves
+   * wrong — e.g. an intermittent CI-only orphan leak — carries the sampler
+   * inputs (`samples`, `rootObserved`, `tracked`, `reliable`) instead of an
+   * unexplained missing `error`.
+   */
+  readonly containment?: ProcessTreeSummary;
   readonly durationMs: number;
   readonly error?: string;
   readonly exitCode: number | null;
@@ -272,6 +281,7 @@ export function spawnProcess(
       if (forceSettlementTimer !== undefined) clearTimeout(forceSettlementTimer);
       if (processTree !== undefined) stopProcessTreeTracking(processTree);
       resolveResult({
+        ...(processTree === undefined ? {} : { containment: processTreeSummary(processTree) }),
         durationMs: Math.max(0, performance.now() - startedAt),
         ...(error === undefined ? {} : { error }),
         exitCode,

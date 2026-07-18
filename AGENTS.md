@@ -408,6 +408,16 @@ fitness.
 Vitest. Test files: `*.test.ts` next to the source. Run with `pnpm test`
 or `pnpm --filter=@opensip-cli/<pkg> test`.
 
+**No flaky tests (ADR-0169).** An intermittent test failure is a bug report,
+triaged once to a terminal outcome: permanent fix (of the product defect or of
+the test's synchronization — event-based proofs, never "wait N ms and
+assume"), a deterministic alternative proving the same invariant (then delete
+the timing-dependent form), or outright deletion when covered elsewhere.
+Widening a timeout is NOT an outcome and must not be proposed as one; repeat
+nursing of the same test is prohibited. Harness failures caused by
+infrastructure timing carry distinct reason codes so they can never read as
+product defects. Do not add `.skip`/quarantine/auto-retry for a flake.
+
 ### Imports
 
 - **Workspace packages** — `import { x } from '@opensip-cli/<pkg>'`
