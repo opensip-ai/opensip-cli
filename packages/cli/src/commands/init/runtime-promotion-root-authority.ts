@@ -3,17 +3,24 @@ import { join } from 'node:path';
 
 import { projectCoordinationKey } from '@opensip-cli/core';
 
-import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 import {
   runtimePromotionPathSnapshot,
   sameRuntimePromotionPathSnapshot,
-} from './runtime-promotion-preflight-fs.js';
+  type RuntimePromotionPathSnapshot,
+} from './runtime-promotion-path-snapshot.js';
+import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 
-import type { RuntimePromotionPathSnapshot } from './runtime-promotion-preflight-fs.js';
-import type { RuntimePromotionPreflightRevalidationToken } from './runtime-promotion-preflight-types.js';
 import type { RuntimeExclusiveLease, RuntimeExclusivePosture } from '@opensip-cli/core';
 
 const CHANGED_AFTER_PREFLIGHT = 'changed-after-preflight' as const;
+
+interface RuntimePromotionFreshProjectRootToken {
+  readonly projectRoot: string;
+  readonly coordinationKey: string;
+  readonly projectRootSnapshot: RuntimePromotionPathSnapshot;
+  readonly destinationParentDir: string;
+  readonly destinationParent: RuntimePromotionPathSnapshot;
+}
 
 /**
  * Attempt-local project-root identity. It deliberately stays out of the
@@ -186,7 +193,7 @@ export function captureRuntimePromotionRecoveryProjectRootAuthority(input: {
  */
 export function bindRuntimePromotionFreshProjectRootAuthority(input: {
   readonly lease: RuntimeExclusiveLease;
-  readonly token: RuntimePromotionPreflightRevalidationToken;
+  readonly token: RuntimePromotionFreshProjectRootToken;
 }): RuntimePromotionProjectRootAuthority {
   assertLease(input.lease, input.token.coordinationKey, 'normal');
   const identity = projectRootAuthorityIdentity(input.token.projectRootSnapshot);

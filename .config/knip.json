@@ -29,6 +29,7 @@
       "entry": [
         "src/__tests__/fixtures/**/*.{ts,js,mjs}",
         "src/bootstrap/__tests__/fixtures/**/*.{ts,js,mjs}",
+        "src/commands/init/agents-md.ts",
         "src/commands/tools/runtime-probe-entry.ts"
       ],
       "ignoreDependencies": [

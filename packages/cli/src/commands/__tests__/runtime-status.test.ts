@@ -1,7 +1,10 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
   symlinkSync,
@@ -26,6 +29,13 @@ import {
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  canonicalRuntimePromotionJournal,
+  createInitialRuntimePromotionJournal,
+  createRuntimePromotionOwnedSlots,
+  encodeRuntimePromotionJournal,
+  type RuntimePromotionJournal,
+} from '../init/runtime-promotion-journal-schema.js';
 import { executeRuntimeStatus } from '../runtime-status.js';
 
 let sandbox: string;
@@ -53,25 +63,99 @@ async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 3000): P
   }
 }
 
-async function stagePromotionJournal(project: string, state: 'open' | 'closed'): Promise<void> {
+function initialPromotionJournal(
+  coordinationKey: string,
+  state: 'open' | 'closed',
+): RuntimePromotionJournal {
+  const operationId = `status-${state}-journal`;
+  const initial = createInitialRuntimePromotionJournal({
+    coordinationKey,
+    operationId,
+    recoveryOwnerToken: `status-${state}-owner-000000001`,
+    route: 'authored-only',
+    destinationParentPreexisting: false,
+    destinationRuntimePreexisting: false,
+    destinationRootIdentity: null,
+    source: {
+      classification: 'none',
+      cacheKey: null,
+      generationDigest: null,
+      markerSha256: null,
+      rootIdentity: null,
+    },
+    inputs: {
+      conflict: 'abort',
+      authoredMode: 'fresh',
+      languages: ['typescript'],
+      languageExplicit: false,
+    },
+    plan: {
+      authoredDigest: 'a'.repeat(64),
+      replayDigest: 'b'.repeat(64),
+      mutationCount: 0,
+    },
+    owned: createRuntimePromotionOwnedSlots(operationId),
+    createdAt: 100,
+  });
+  if (state === 'open') return initial;
+
+  const rollbackStarted = canonicalRuntimePromotionJournal({
+    ...initial,
+    revision: 1,
+    progress: {
+      ...initial.progress,
+      phase: 'rollback-started',
+      direction: 'rollback',
+    },
+    timestamps: { ...initial.timestamps, updatedAt: 101 },
+  });
+  const authoredRolledBack = canonicalRuntimePromotionJournal({
+    ...rollbackStarted,
+    revision: 2,
+    progress: { ...rollbackStarted.progress, phase: 'authored-rolled-back' },
+    timestamps: { ...rollbackStarted.timestamps, updatedAt: 102 },
+  });
+  const sealed = canonicalRuntimePromotionJournal({
+    ...authoredRolledBack,
+    revision: 3,
+    progress: { ...authoredRolledBack.progress, phase: 'rolled-back' },
+    terminal: {
+      outcome: 'rolled-back',
+      authority: 'none',
+      runtimeManifest: null,
+      authoredVerified: true,
+      sourcePreserved: false,
+      verifiedAt: 103,
+    },
+    timestamps: { ...authoredRolledBack.timestamps, updatedAt: 103 },
+  });
+  return canonicalRuntimePromotionJournal({
+    ...sealed,
+    state: 'closed',
+    revision: 4,
+    progress: { ...sealed.progress, phase: 'closed', direction: 'cleanup' },
+    timestamps: { ...sealed.timestamps, updatedAt: 104, closedAt: 104 },
+  });
+}
+
+async function stagePromotionJournal(
+  project: string,
+  state: 'open' | 'closed',
+): Promise<RuntimePromotionJournal> {
   const writer = await acquireRuntimeExclusiveLease({
     projectDir: project,
     policy: { waitMs: 3000, pollMs: 5 },
   });
+  const journal = initialPromotionJournal(writer.coordinationKey, state);
   try {
     await mutateRuntimePromotionJournal(writer, {
       operation: 'create',
-      content: JSON.stringify({
-        kind: 'init-promotion',
-        version: 1,
-        coordinationKey: writer.coordinationKey,
-        operationId: `status-${state}-journal`,
-        state,
-      }),
+      content: encodeRuntimePromotionJournal(journal),
     });
   } finally {
     writer.release();
   }
+  return journal;
 }
 
 beforeEach(() => {
@@ -172,15 +256,24 @@ describe('executeRuntimeStatus', () => {
       project: { exists: true },
       cache: { exists: true, identityStrength: 'generation-bound' },
       adoptionState: 'conflict',
-      nextCommands: expect.arrayContaining(['opensip init']),
+      nextCommands: expect.arrayContaining([
+        'opensip init --runtime-conflict keep-project',
+        'opensip init --runtime-conflict use-cache',
+      ]),
     });
 
     writeFileSync(join(cachePaths.runtimeDir, EPHEMERAL_MARKER_FILE), '{');
-    expect(await execute(conflict)).toMatchObject({
+    const malformedConflict = await execute(conflict);
+    expect(malformedConflict).toMatchObject({
       projectInitialized: true,
-      adoptionState: 'legacy-unverified',
-      nextCommands: expect.arrayContaining(['opensip init']),
+      adoptionState: 'conflict',
     });
+    expect(malformedConflict.nextCommands).not.toContain(
+      'opensip init --runtime-conflict keep-project',
+    );
+    expect(malformedConflict.nextCommands).not.toContain(
+      'opensip init --runtime-conflict use-cache',
+    );
   });
 
   it('converges root, nested, explicit-cwd, and symlink aliases', async () => {
@@ -208,7 +301,7 @@ describe('executeRuntimeStatus', () => {
     }
   });
 
-  it('classifies legacy, malformed, and oversize markers as unverified', async () => {
+  it('reports a marker-bound legacy-only candidate without selecting it as active evidence', async () => {
     const legacyProject = makeProject('legacy');
     const legacyDir = join(
       resolveUserPaths().ephemeralProjectsDir,
@@ -218,29 +311,155 @@ describe('executeRuntimeStatus', () => {
     writeFileSync(
       join(legacyDir, EPHEMERAL_MARKER_FILE),
       JSON.stringify({
-        projectDir: legacyProject,
+        projectDir: realpathSync(legacyProject),
         lastUsedAt: '2026-07-15T00:00:00.000Z',
       }),
     );
+    writeFileSync(join(legacyDir, 'datastore.sqlite'), 'legacy-evidence');
     expect(await execute(legacyProject)).toMatchObject({
-      activePlane: 'cache',
+      activePlane: 'none',
       cache: { exists: true, identityStrength: 'legacy-unverified' },
+      evidenceDatabase: { exists: false },
       adoptionState: 'legacy-unverified',
+      nextCommands: ['opensip init --runtime-conflict use-cache'],
     });
+  });
 
+  it('blocks active candidates with missing, malformed, or oversize markers', async () => {
     for (const [name, marker] of [
+      ['missing', undefined],
       ['malformed', '{'],
       ['oversize', 'x'.repeat(EPHEMERAL_MARKER_MAX_BYTES + 1)],
     ] as const) {
       const project = makeProject(name);
       const paths = resolveEphemeralProjectPaths(project);
       mkdirSync(paths.runtimeDir, { recursive: true });
-      writeFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), marker);
-      expect(await execute(project)).toMatchObject({
+      if (marker !== undefined) {
+        writeFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), marker);
+      }
+      writeFileSync(join(paths.runtimeDir, 'datastore.sqlite'), 'active-evidence');
+      const result = await execute(project);
+      expect(result).toMatchObject({
+        activePlane: 'cache',
         cache: { exists: true, identityStrength: 'legacy-unverified' },
-        adoptionState: 'legacy-unverified',
+        evidenceDatabase: { exists: true, sizeBytes: 15 },
+        adoptionState: 'conflict',
       });
+      expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+      expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
     }
+  });
+
+  it('uses Init exact-schema marker validation before recommending adoption', async () => {
+    const project = makeProject('extra-marker-key');
+    const paths = resolveEphemeralProjectPaths(project);
+    touchEphemeralRuntime(paths);
+    const markerPath = join(paths.runtimeDir, EPHEMERAL_MARKER_FILE);
+    const marker = JSON.parse(readFileSync(markerPath, 'utf8')) as Record<string, unknown>;
+    writeFileSync(markerPath, JSON.stringify({ ...marker, extraAuthorityClaim: true }));
+
+    const result = await execute(project);
+
+    expect(result).toMatchObject({
+      activePlane: 'cache',
+      cache: { exists: true, identityStrength: 'legacy-unverified' },
+      adoptionState: 'conflict',
+    });
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
+  });
+
+  it('uses Init owner-controlled marker posture before recommending adoption', async () => {
+    if (platform() === 'win32') return;
+    const project = makeProject('permission-unsafe-marker');
+    const paths = resolveEphemeralProjectPaths(project);
+    touchEphemeralRuntime(paths);
+    chmodSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), 0o666);
+
+    const result = await execute(project);
+
+    expect(result).toMatchObject({
+      activePlane: 'cache',
+      adoptionState: 'conflict',
+    });
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
+  });
+
+  it('blocks ambiguous active and legacy cache candidates without hiding active evidence', async () => {
+    const project = makeProject('active-and-legacy');
+    const active = resolveEphemeralProjectPaths(project);
+    touchEphemeralRuntime(active);
+    writeFileSync(join(active.runtimeDir, 'datastore.sqlite'), 'active-evidence');
+    const legacyDir = join(
+      resolveUserPaths().ephemeralProjectsDir,
+      legacyEphemeralProjectCacheKey(project),
+    );
+    mkdirSync(legacyDir, { recursive: true });
+    writeFileSync(
+      join(legacyDir, EPHEMERAL_MARKER_FILE),
+      JSON.stringify({
+        projectDir: realpathSync(project),
+        lastUsedAt: '2026-07-15T00:00:00.000Z',
+      }),
+    );
+
+    const result = await execute(project);
+
+    expect(result).toMatchObject({
+      activePlane: 'cache',
+      cache: { exists: true, identityStrength: 'legacy-unverified' },
+      evidenceDatabase: { exists: true, sizeBytes: 15 },
+      adoptionState: 'conflict',
+    });
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
+  });
+
+  it('keeps an initialized empty project ready for its eligible generation-bound cache', async () => {
+    const project = makeProject('initialized-cache-only', true);
+    const cache = resolveEphemeralProjectPaths(project);
+    touchEphemeralRuntime(cache);
+    writeFileSync(join(cache.runtimeDir, 'datastore.sqlite'), 'cached');
+
+    const result = await execute(project);
+
+    expect(result).toMatchObject({
+      projectInitialized: true,
+      activePlane: 'project',
+      project: { exists: false },
+      cache: { exists: true, identityStrength: 'generation-bound' },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'ready',
+      nextCommands: ['opensip init', 'opensip uninstall --project --dry-run'],
+    });
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
+  });
+
+  it('blocks a cache marker that belongs to another canonical project root', async () => {
+    const project = makeProject('marker-mismatch');
+    const otherProject = makeProject('marker-owner');
+    const cache = resolveEphemeralProjectPaths(project);
+    mkdirSync(cache.runtimeDir, { recursive: true });
+    writeFileSync(
+      join(cache.runtimeDir, EPHEMERAL_MARKER_FILE),
+      JSON.stringify({
+        projectDir: realpathSync(otherProject),
+        lastUsedAt: '2026-07-15T00:00:00.000Z',
+      }),
+    );
+
+    const result = await execute(project);
+
+    expect(result).toMatchObject({
+      activePlane: 'cache',
+      cache: { exists: true, identityStrength: 'legacy-unverified' },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'conflict',
+    });
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
   });
 
   it('bounds runtime traversal and reports truncation', async () => {
@@ -269,6 +488,8 @@ describe('executeRuntimeStatus', () => {
     if (platform() === 'win32') return;
 
     const project = makeProject('project-symlink', true);
+    const eligibleCache = resolveEphemeralProjectPaths(project);
+    touchEphemeralRuntime(eligibleCache);
     const externalProjectState = join(sandbox, 'external-project-state');
     mkdirSync(join(externalProjectState, '.runtime'), { recursive: true });
     writeFileSync(join(externalProjectState, '.runtime', 'datastore.sqlite'), 'private-evidence');
@@ -280,6 +501,11 @@ describe('executeRuntimeStatus', () => {
       sizeTruncated: true,
     });
     expect(projectResult.evidenceDatabase).toEqual({ exists: false });
+    expect(projectResult.adoptionState).toBe('conflict');
+    expect(projectResult.nextCommands).not.toContain(
+      'opensip init --runtime-conflict keep-project',
+    );
+    expect(projectResult.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
 
     const cacheProject = makeProject('cache-symlink');
     const cachePaths = resolveEphemeralProjectPaths(cacheProject);
@@ -296,6 +522,9 @@ describe('executeRuntimeStatus', () => {
       sizeTruncated: true,
     });
     expect(cacheResult.evidenceDatabase).toEqual({ exists: false });
+    expect(cacheResult.adoptionState).toBe('conflict');
+    expect(cacheResult.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(cacheResult.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
   });
 
   it('discloses path-only identity without claiming generation proof', async () => {
@@ -309,6 +538,7 @@ describe('executeRuntimeStatus', () => {
       activePlane: 'cache',
       cache: { exists: true, identityStrength: 'path-only' },
       adoptionState: 'legacy-unverified',
+      nextCommands: expect.arrayContaining(['opensip init --runtime-conflict use-cache']),
     });
     expect(JSON.stringify(result)).not.toContain(missingProject);
   });
@@ -383,19 +613,22 @@ describe('executeRuntimeStatus', () => {
     const openCache = resolveEphemeralProjectPaths(openProject);
     touchEphemeralRuntime(openCache);
     writeFileSync(join(openCache.runtimeDir, 'datastore.sqlite'), 'must-not-project');
-    await stagePromotionJournal(openProject, 'open');
+    const openJournal = await stagePromotionJournal(openProject, 'open');
 
     const open = await execute(openProject);
     expect(open).toMatchObject({
       inspectionUnavailable: true,
       adoptionState: 'recovery-required',
-      recoveryPhase: 'unknown',
+      recoveryPhase: 'prepared',
       recoveryReasonCode: 'operation-interrupted',
       recoveryCommand: 'opensip init',
       nextCommands: ['opensip init'],
     });
     expect(open).not.toHaveProperty('sourcePreserved');
     expect(open.evidenceDatabase).toEqual({ exists: false });
+    expect(JSON.stringify(open)).not.toContain(openJournal.operationId);
+    expect(JSON.stringify(open)).not.toContain(openJournal.recoveryOwnerToken);
+    expect(JSON.stringify(open)).not.toContain(openJournal.plan.authoredDigest);
 
     const malformedProject = makeProject('malformed-journal');
     const writer = await acquireRuntimeExclusiveLease({
@@ -420,12 +653,37 @@ describe('executeRuntimeStatus', () => {
     });
   });
 
+  it('reports a live recovery writer as busy instead of projecting its open journal', async () => {
+    const project = makeProject('live-open-journal');
+    const journal = await stagePromotionJournal(project, 'open');
+    const writer = await acquireRuntimeExclusiveLease({
+      projectDir: project,
+      posture: 'init-recovery',
+      recoveryOperationId: journal.operationId,
+      policy: { waitMs: 3000, pollMs: 5 },
+    });
+    try {
+      expect(await execute(project)).toMatchObject({
+        inspectionUnavailable: true,
+        adoptionState: 'busy',
+        leaseActivity: {
+          activeReaders: 0,
+          writerPending: true,
+          busy: true,
+        },
+        nextCommands: [],
+      });
+    } finally {
+      writer.release();
+    }
+  });
+
   it('reads safely through a closed journal and reports terminal cleanup pending', async () => {
     const project = makeProject('closed-journal');
     const cache = resolveEphemeralProjectPaths(project);
     touchEphemeralRuntime(cache);
-    writeFileSync(join(cache.runtimeDir, 'datastore.sqlite'), 'evidence');
     await stagePromotionJournal(project, 'closed');
+    writeFileSync(join(cache.runtimeDir, 'datastore.sqlite'), 'evidence');
 
     const result = await execute(project);
 
@@ -443,6 +701,41 @@ describe('executeRuntimeStatus', () => {
         writerPending: false,
         busy: false,
       },
+    });
+    expect(result).not.toHaveProperty('sourcePreserved');
+    expect(result).not.toHaveProperty('inspectionUnavailable');
+  });
+
+  it('keeps ordinary evidence readable when only a valid closed header can be projected', async () => {
+    const project = makeProject('closed-header-only');
+    const cache = resolveEphemeralProjectPaths(project);
+    touchEphemeralRuntime(cache);
+    const staged = await stagePromotionJournal(project, 'closed');
+    writeFileSync(join(cache.runtimeDir, 'datastore.sqlite'), 'later-evidence');
+    const journalPath = resolveCoordinationPaths().forProject(
+      cache.coordinationKey,
+    ).promotionJournalFile;
+    writeFileSync(
+      journalPath,
+      JSON.stringify({
+        kind: 'init-promotion',
+        version: 1,
+        coordinationKey: cache.coordinationKey,
+        operationId: staged.operationId,
+        state: 'closed',
+      }),
+    );
+
+    const result = await execute(project);
+
+    expect(result).toMatchObject({
+      activePlane: 'cache',
+      evidenceDatabase: { exists: true, sizeBytes: 14 },
+      adoptionState: 'ready',
+      recoveryPhase: 'cleanup',
+      recoveryReasonCode: 'cleanup-pending',
+      cleanupPending: true,
+      recoveryCommand: 'opensip init',
     });
     expect(result).not.toHaveProperty('sourcePreserved');
     expect(result).not.toHaveProperty('inspectionUnavailable');
@@ -560,6 +853,101 @@ describe('executeRuntimeStatus', () => {
     });
     expect(JSON.stringify(result)).not.toContain('private snapshot detail');
     expect(JSON.stringify(result)).not.toContain('must-not-project');
+    expect(acquisitionCalls).toBe(0);
+  });
+
+  it('maps a recovery phase change after projection to busy without acquiring', async () => {
+    const project = makeProject('recovery-phase-changed');
+    let promotionInspections = 0;
+    let acquisitionCalls = 0;
+    const stableInspection = {
+      status: 'stable',
+      projectReaders: 0,
+      userStateReaders: 0,
+      writer: 'none',
+      globalWriter: 'none',
+      promotion: { status: 'valid', state: 'open' },
+      userUninstall: { status: 'absent' },
+    } as const;
+
+    const result = await executeRuntimeStatus({
+      cwd: project,
+      cwdExplicit: true,
+      coordination: {
+        rootPresence: () => 'present',
+        inspect: () => Promise.resolve(stableInspection),
+        inspectPromotion: () => {
+          promotionInspections++;
+          return promotionInspections === 1
+            ? {
+                status: 'recovery-required',
+                recoveryPhase: 'prepared',
+                recoveryReasonCode: 'operation-interrupted',
+                recoveryCommand: 'opensip init',
+              }
+            : {
+                status: 'recovery-required',
+                recoveryPhase: 'rollback',
+                recoveryReasonCode: 'operation-failed',
+                recoveryCommand: 'opensip init',
+              };
+        },
+        acquireRead: () => {
+          acquisitionCalls++;
+          return Promise.reject(new Error('must not acquire'));
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      inspectionUnavailable: true,
+      adoptionState: 'busy',
+      nextCommands: [],
+    });
+    expect(promotionInspections).toBe(2);
+    expect(acquisitionCalls).toBe(0);
+  });
+
+  it('keeps a valid-open unsafe-body projection actionable instead of degrading to busy', async () => {
+    const project = makeProject('recovery-unsafe-body');
+    let acquisitionCalls = 0;
+    const stableInspection = {
+      status: 'stable',
+      projectReaders: 0,
+      userStateReaders: 0,
+      writer: 'none',
+      globalWriter: 'none',
+      promotion: { status: 'valid', state: 'open' },
+      userUninstall: { status: 'absent' },
+    } as const;
+
+    const result = await executeRuntimeStatus({
+      cwd: project,
+      cwdExplicit: true,
+      coordination: {
+        rootPresence: () => 'present',
+        inspect: () => Promise.resolve(stableInspection),
+        inspectPromotion: () => ({
+          status: 'recovery-required',
+          recoveryPhase: 'unknown',
+          recoveryReasonCode: 'state-ambiguous',
+          recoveryCommand: 'opensip init',
+        }),
+        acquireRead: () => {
+          acquisitionCalls++;
+          return Promise.reject(new Error('must not acquire'));
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      inspectionUnavailable: true,
+      adoptionState: 'recovery-required',
+      recoveryPhase: 'unknown',
+      recoveryReasonCode: 'state-ambiguous',
+      recoveryCommand: 'opensip init',
+      nextCommands: ['opensip init'],
+    });
     expect(acquisitionCalls).toBe(0);
   });
 

@@ -297,23 +297,33 @@ describe('runtime status view', () => {
       sourcePreserved: true,
       recoveryCommand: 'opensip init',
       nextCommands: ['opensip init'],
-    });
+      // Internal promotion material must never reach the human view, even if
+      // an internal caller accidentally carries it beside the public result.
+      cachePath: '/Users/private/.cache/opensip/runtime',
+      stagePath: '/Users/private/.cache/opensip/stage-secret',
+      manifestDigest: 'manifest-secret',
+      ownerToken: 'owner-secret',
+    } as never);
 
     expect(out).toContain('bounded scan; actual size may be larger');
-    expect(out).toContain('Runtime recovery is required');
+    expect(out).toContain('Runtime recovery is required before analysis can continue');
     expect(out).toContain('destination-install · operation-interrupted');
     expect(out).toContain('Source evidence: preserved');
     expect(out).toContain('Run: opensip init');
+    expect(out).not.toContain('/Users/private');
+    expect(out).not.toContain('manifest-secret');
+    expect(out).not.toContain('owner-secret');
   });
 
-  it('does not claim a retired source is preserved during terminal cleanup', () => {
+  it('keeps evolved evidence usable while closed-journal cleanup removes only owned leftovers', () => {
     const out = text({
       type: 'runtime-status',
       projectInitialized: true,
       activePlane: 'project',
       cache: { exists: false, identityStrength: 'generation-bound' },
-      project: { exists: true },
-      evidenceDatabase: { exists: true },
+      project: { exists: true, sizeBytes: 8192 },
+      // The evidence database may have grown after the journal closed.
+      evidenceDatabase: { exists: true, sizeBytes: 6144 },
       adoptionState: 'not-needed',
       retention: {
         cache: { keep: 50, maxAgeDays: 30 },
@@ -327,9 +337,15 @@ describe('runtime status view', () => {
       nextCommands: ['opensip init'],
     });
 
-    expect(out).toContain('current project evidence remains authoritative');
+    expect(out).toContain('Adoption: not-needed');
+    expect(out).toContain('No storage conflict needs attention');
+    expect(out).toContain('Normal evidence reads and writes may continue');
+    expect(out).toContain('runtime state can evolve');
+    expect(out).toContain('only operation-owned cleanup is pending');
     expect(out).toContain('Source evidence: not preserved');
-    expect(out).not.toContain('source evidence remains preserved');
+    expect(out).toContain('Run: opensip init');
+    expect(out).not.toContain('matches its terminal manifest');
+    expect(out).not.toContain('current project evidence remains authoritative');
   });
 
   it('does not render blocked storage placeholders as absent', () => {
@@ -387,15 +403,15 @@ describe('runtime status view', () => {
     expect(out).not.toContain('Source evidence: not preserved');
   });
 
-  it('does not infer project authority from a bounded closed journal header', () => {
+  it('does not infer evidence authority from a bounded closed journal header', () => {
     const out = text({
       type: 'runtime-status',
       projectInitialized: false,
-      activePlane: 'cache',
-      cache: { exists: true, identityStrength: 'generation-bound' },
+      activePlane: 'none',
+      cache: { exists: false, identityStrength: 'generation-bound' },
       project: { exists: false },
-      evidenceDatabase: { exists: true },
-      adoptionState: 'ready',
+      evidenceDatabase: { exists: false },
+      adoptionState: 'not-needed',
       retention: {
         cache: { keep: 50, maxAgeDays: 30 },
         evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
@@ -407,9 +423,266 @@ describe('runtime status view', () => {
       nextCommands: ['opensip init'],
     });
 
-    expect(out).toContain('source disposition is unknown until opensip init');
+    expect(out).toContain('Active: none');
+    expect(out).toContain('Adoption: not-needed');
+    expect(out).toContain('No storage conflict needs attention');
+    expect(out).toContain('Normal evidence reads and writes may continue');
+    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toContain('Source evidence: unknown from bounded status inspection');
+    expect(out).not.toContain('Current evidence');
+    expect(out).not.toContain('authoritative');
     expect(out).not.toContain('current project evidence remains authoritative');
     expect(out).not.toContain('source evidence remains preserved');
+  });
+
+  it.each([
+    {
+      label: 'ready',
+      adoptionState: 'ready',
+      identityStrength: 'generation-bound',
+      guidance: 'Cached evidence is ready to move into this project',
+    },
+    {
+      label: 'path-only',
+      adoptionState: 'legacy-unverified',
+      identityStrength: 'path-only',
+      guidance: 'cannot distinguish a repository recreated at the same path',
+    },
+  ] as const)(
+    'keeps $label guidance visible while closed-journal cleanup is pending',
+    ({ adoptionState, identityStrength, guidance }) => {
+      const out = text({
+        type: 'runtime-status',
+        projectInitialized: false,
+        activePlane: 'cache',
+        cache: { exists: true, identityStrength },
+        project: { exists: false },
+        evidenceDatabase: { exists: true },
+        adoptionState,
+        retention: {
+          cache: { keep: 50, maxAgeDays: 30 },
+          evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+        },
+        recoveryPhase: 'cleanup',
+        recoveryReasonCode: 'cleanup-pending',
+        cleanupPending: true,
+        recoveryCommand: 'opensip init',
+        nextCommands: ['opensip init'],
+      });
+
+      expect(out).toContain(`Adoption: ${adoptionState}`);
+      expect(out).toContain(guidance);
+      expect(out).toContain('Cleanup: cleanup-pending');
+      expect(out).toContain('only operation-owned cleanup is pending');
+    },
+  );
+
+  it('keeps both-present conflict visible while closed-journal cleanup is pending', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: { exists: true, identityStrength: 'generation-bound' },
+      project: { exists: true },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'conflict',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      recoveryPhase: 'cleanup',
+      recoveryReasonCode: 'cleanup-pending',
+      sourcePreserved: true,
+      cleanupPending: true,
+      recoveryCommand: 'opensip init',
+      nextCommands: [
+        'opensip init',
+        'opensip init --runtime-conflict keep-project',
+        'opensip init --runtime-conflict use-cache',
+      ],
+    });
+
+    expect(out).toContain('Adoption: conflict');
+    expect(out).toContain('Cache and project evidence both exist');
+    expect(out).toContain('OpenSIP will not merge them');
+    expect(out).toContain('Cleanup: cleanup-pending');
+    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toContain('Run: opensip init');
+  });
+
+  it('keeps legacy guidance visible while closed-journal cleanup is pending', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: { exists: true, identityStrength: 'legacy-unverified' },
+      project: { exists: true },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'legacy-unverified',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      recoveryPhase: 'cleanup',
+      recoveryReasonCode: 'cleanup-pending',
+      cleanupPending: true,
+      recoveryCommand: 'opensip init',
+      nextCommands: ['opensip init', 'opensip init --runtime-conflict use-cache'],
+    });
+
+    expect(out).toContain('Adoption: legacy-unverified');
+    expect(out).toContain('Legacy cache identity is unverified');
+    expect(out).toContain('will not be attributed to the project');
+    expect(out).toContain('Cleanup: cleanup-pending');
+    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toContain('Source evidence: unknown from bounded status inspection');
+  });
+
+  it('explains both-present conflict and renders only the exact returned choices', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: { exists: true, identityStrength: 'generation-bound' },
+      project: { exists: true },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'conflict',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: [
+        'opensip init --runtime-conflict keep-project',
+        'opensip init --runtime-conflict use-cache',
+      ],
+    });
+
+    expect(out).toContain('Cache and project evidence both exist');
+    expect(out).toContain('Choose one explicitly with opensip init');
+    expect(out).toContain('OpenSIP will not merge them');
+    expect(out).toContain('opensip init --runtime-conflict keep-project');
+    expect(out).toContain('opensip init --runtime-conflict use-cache');
+  });
+
+  it('discloses the path-only recreation limitation without attributing weak evidence', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: false,
+      activePlane: 'cache',
+      cache: { exists: true, identityStrength: 'path-only' },
+      project: { exists: false },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'legacy-unverified',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: ['opensip init --runtime-conflict use-cache'],
+    });
+
+    expect(out).toContain('Cache identity is path-only');
+    expect(out).toContain('cannot distinguish a repository recreated at the same path');
+    expect(out).toContain('will not be adopted automatically');
+    expect(out).toContain('opensip init --runtime-conflict use-cache');
+    expect(out).not.toContain('belongs to this project');
+  });
+
+  it('shows a legacy-only candidate without calling it the active no-init runtime', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: false,
+      activePlane: 'none',
+      cache: { exists: true, identityStrength: 'legacy-unverified' },
+      project: { exists: false },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'legacy-unverified',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: ['opensip init --runtime-conflict use-cache'],
+    });
+
+    expect(out).toContain('Active: none · project not initialized');
+    expect(out).toContain('A legacy cache candidate matches this project');
+    expect(out).toContain('it is not the active no-init runtime');
+    expect(out).toContain('opensip init --runtime-conflict use-cache');
+    expect(out).not.toContain('Evidence database: present');
+  });
+
+  it('does not suggest conflict commands for ambiguous or unsafe storage', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: false,
+      activePlane: 'cache',
+      cache: {
+        exists: true,
+        identityStrength: 'legacy-unverified',
+        sizeTruncated: true,
+      },
+      project: { exists: false },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'conflict',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: [],
+    });
+
+    expect(out).toContain('ambiguous, unverified, or unsafe storage state');
+    expect(out).toContain('No runtime-conflict command is safe to recommend');
+    expect(out).not.toContain('Cache and project evidence both exist');
+    expect(out).not.toContain('opensip init --runtime-conflict keep-project');
+    expect(out).not.toContain('opensip init --runtime-conflict use-cache');
+  });
+
+  it('directs an initialized empty project with eligible cache evidence through init', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: { exists: true, identityStrength: 'generation-bound' },
+      project: { exists: false },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'ready',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: ['opensip init', 'opensip uninstall --project --dry-run'],
+    });
+
+    expect(out).toContain('Active: project · project initialized');
+    expect(out).toContain('Cached evidence is ready to move into this project');
+    expect(out).toContain('opensip init');
+    expect(out).not.toContain('opensip init --runtime-conflict keep-project');
+  });
+
+  it('quarantines a legacy candidate until the customer chooses a source', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: true,
+      activePlane: 'project',
+      cache: { exists: true, identityStrength: 'legacy-unverified' },
+      project: { exists: true },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'legacy-unverified',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      nextCommands: [
+        'opensip init --runtime-conflict keep-project',
+        'opensip init --runtime-conflict use-cache',
+      ],
+    });
+
+    expect(out).toContain('Legacy cache identity is unverified');
+    expect(out).toContain('will not be attributed to the project');
+    expect(out).toContain('will not be adopted automatically');
+    expect(out).toContain('opensip init --runtime-conflict keep-project');
+    expect(out).toContain('opensip init --runtime-conflict use-cache');
   });
 });
 

@@ -11,7 +11,11 @@ import { describe, expect, it } from 'vitest';
 
 import { viewInit } from '../views/init-view.js';
 
-import type { InitResult } from '@opensip-cli/contracts';
+import type {
+  InitResult,
+  RuntimeAdoptionResult,
+  RuntimeAdoptionStatus,
+} from '@opensip-cli/contracts';
 
 function result(over: Partial<InitResult>): InitResult {
   return {
@@ -26,6 +30,80 @@ function result(over: Partial<InitResult>): InitResult {
 }
 
 const text = (r: InitResult): string => renderToText(viewInit(r));
+
+const ADOPTION_BY_STATUS = {
+  'not-found': {
+    status: 'not-found',
+    sourcePreserved: false,
+    durationMs: 1,
+    reasonCode: 'source-absent',
+  },
+  promoted: {
+    status: 'promoted',
+    proofStrength: 'generation-bound',
+    sourcePreserved: false,
+    sourceRetired: true,
+    durationMs: 2,
+    reasonCode: 'destination-absent',
+  },
+  'already-project': {
+    status: 'already-project',
+    sourcePreserved: false,
+    durationMs: 3,
+    reasonCode: 'source-absent',
+  },
+  deduplicated: {
+    status: 'deduplicated',
+    proofStrength: 'generation-bound',
+    sourcePreserved: false,
+    sourceRetired: true,
+    durationMs: 4,
+    reasonCode: 'equivalent',
+  },
+  'kept-project': {
+    status: 'kept-project',
+    proofStrength: 'path-only',
+    sourcePreserved: false,
+    sourceRetired: true,
+    durationMs: 5,
+  },
+  conflict: {
+    status: 'conflict',
+    proofStrength: 'legacy-unverified',
+    sourcePreserved: true,
+    durationMs: 6,
+    reasonCode: 'divergent',
+    nextCommand: 'opensip init --runtime-conflict keep-project',
+  },
+  busy: {
+    status: 'busy',
+    durationMs: 7,
+    reasonCode: 'lease-busy',
+    nextCommand: 'opensip init',
+  },
+  'recovery-required': {
+    status: 'recovery-required',
+    durationMs: 8,
+    reasonCode: 'operation-interrupted',
+    nextCommand: 'opensip init',
+  },
+  'rolled-back': {
+    status: 'rolled-back',
+    sourcePreserved: true,
+    sourceRetired: false,
+    durationMs: 9,
+    reasonCode: 'operation-failed',
+    nextCommand: 'opensip init',
+  },
+  'cleanup-pending': {
+    status: 'cleanup-pending',
+    sourcePreserved: false,
+    cleanupPending: true,
+    durationMs: 10,
+    reasonCode: 'cleanup-pending',
+    nextCommand: 'opensip init',
+  },
+} as const satisfies Record<RuntimeAdoptionStatus, RuntimeAdoptionResult>;
 
 function spans(node: ViewNode): readonly Span[] {
   if (node.kind === 'line') return node.spans;
@@ -251,6 +329,256 @@ describe('viewInit — refresh success', () => {
     expect(out).toContain('CLAUDE.md');
     expect(out).toContain('missing');
     expect(out).toContain('opensip init --keep');
+  });
+});
+
+describe('viewInit — runtime evidence adoption', () => {
+  it.each([
+    ['not-found', 'Evidence adoption: no cache evidence found'],
+    ['promoted', 'Evidence adoption: cache evidence promoted'],
+    ['already-project', 'Evidence adoption: project evidence already active'],
+    ['deduplicated', 'Evidence adoption: equivalent cache evidence retired'],
+    ['kept-project', 'Evidence adoption: project evidence kept'],
+    ['conflict', 'Evidence adoption blocked by a conflict'],
+    ['busy', 'Evidence adoption is busy'],
+    ['recovery-required', 'Evidence adoption requires recovery'],
+    ['rolled-back', 'Evidence adoption rolled back'],
+    ['cleanup-pending', 'Evidence adoption committed; cleanup pending'],
+  ] as const)('renders the %s state without the generic scaffold failure', (status, headline) => {
+    const adoption: RuntimeAdoptionResult = ADOPTION_BY_STATUS[status];
+    const out = text(
+      result({
+        created: false,
+        runtimeAdoption: adoption,
+      }),
+    );
+
+    expect(out).toContain(headline);
+    expect(out).not.toContain('Failed to scaffold');
+    if (adoption.nextCommand !== undefined) {
+      expect(out).toContain(`Next command: ${adoption.nextCommand}`);
+    }
+  });
+
+  it.each([
+    ['not-found', 'Evidence adoption: no cache evidence found'],
+    ['promoted', 'Evidence adoption: cache evidence promoted'],
+    ['already-project', 'Evidence adoption: project evidence already active'],
+    ['deduplicated', 'Evidence adoption: equivalent cache evidence retired'],
+    ['kept-project', 'Evidence adoption: project evidence kept'],
+  ] as const)('appends %s evidence details to an authored success', (status, headline) => {
+    const out = text(
+      result({
+        created: true,
+        languages: ['typescript'],
+        runtimeAdoption: ADOPTION_BY_STATUS[status],
+      }),
+    );
+
+    expect(out).toContain('Scaffolded for typescript');
+    expect(out).toContain(headline);
+    expect(out).toContain(`Duration: ${ADOPTION_BY_STATUS[status].durationMs} ms`);
+  });
+
+  it('renders unknown source disposition without guessing', () => {
+    const out = text(
+      result({
+        runtimeAdoption: ADOPTION_BY_STATUS['recovery-required'],
+      }),
+    );
+
+    expect(out).toContain('Source disposition: unknown');
+    expect(out).not.toContain('Source disposition: preserved');
+    expect(out).not.toContain('Source disposition: not preserved');
+  });
+
+  it('renders a source-absent result as having no applicable source disposition', () => {
+    const out = text(
+      result({
+        created: true,
+        runtimeAdoption: ADOPTION_BY_STATUS['not-found'],
+      }),
+    );
+
+    expect(out).toContain('Source disposition: not applicable (no source)');
+    expect(out).not.toContain('Source disposition: not preserved');
+  });
+
+  it('renders bounded authored counts and source proof details', () => {
+    const out = text(
+      result({
+        created: true,
+        runtimeAdoption: {
+          ...ADOPTION_BY_STATUS.promoted,
+          authored: {
+            created: 3,
+            replaced: 2,
+            deleted: 1,
+            preserved: 4,
+          },
+        },
+      }),
+    );
+
+    expect(out).toContain('Proof strength: generation-bound');
+    expect(out).toContain('Source disposition: not preserved');
+    expect(out).toContain('Source retired: yes');
+    expect(out).toContain('Authored state: 3 created · 2 replaced · 1 deleted · 4 preserved');
+    expect(out).toContain('Reason: destination-absent');
+  });
+
+  it('reports committed cleanup as usable authority with operation-owned cleanup only', () => {
+    const out = text(
+      result({
+        created: true,
+        runtimeAdoption: ADOPTION_BY_STATUS['cleanup-pending'],
+      }),
+    );
+
+    expect(out).toContain('Evidence adoption committed; cleanup pending');
+    expect(out).toContain(
+      'Normal evidence writes are allowed. Only operation-owned cleanup remains.',
+    );
+    expect(out).toContain('Source disposition: not applicable (no source)');
+    expect(out).not.toContain('Source disposition: not preserved');
+    expect(out).toContain('Scaffolded for');
+    expect(out).not.toContain('Failed to scaffold');
+    expect(out).not.toContain('rolled back');
+  });
+
+  it('composes refresh output with committed cleanup guidance', () => {
+    const out = text(
+      result({
+        created: false,
+        refreshed: true,
+        state: 'fully-initialized',
+        runtimeAdoption: ADOPTION_BY_STATUS['cleanup-pending'],
+      }),
+    );
+
+    expect(out).toContain('Already initialized; refreshed OpenSIP agent guidance');
+    expect(out).toContain('Evidence adoption committed; cleanup pending');
+    expect(out).toContain(
+      'Normal evidence writes are allowed. Only operation-owned cleanup remains.',
+    );
+    expect(out).not.toContain('Failed to scaffold');
+  });
+
+  it('retains rolled-back truth while accurately separating pending cleanup', () => {
+    const out = text(
+      result({
+        runtimeAdoption: {
+          ...ADOPTION_BY_STATUS['rolled-back'],
+          cleanupPending: true,
+        },
+      }),
+    );
+
+    expect(out).toContain('Evidence adoption rolled back; cleanup pending');
+    expect(out).toContain(
+      'Normal evidence writes are allowed. Only operation-owned cleanup remains.',
+    );
+    expect(out).not.toContain('The attempted evidence adoption did not commit.');
+    expect(out).not.toContain('Failed to scaffold');
+  });
+
+  it('does not imply an authored-only rollback deleted cache evidence', () => {
+    const out = text(
+      result({
+        runtimeAdoption: {
+          ...ADOPTION_BY_STATUS['rolled-back'],
+          sourcePreserved: false,
+          sourceRetired: false,
+        },
+      }),
+    );
+
+    expect(out).toContain('Evidence adoption rolled back');
+    expect(out).toContain('Source disposition: not applicable (no source)');
+    expect(out).not.toContain('Source disposition: not preserved');
+    expect(out).not.toContain('Source retired:');
+  });
+
+  it('keeps real source-route dispositions distinct from authored-only outcomes', () => {
+    const promoted = text(
+      result({
+        created: true,
+        runtimeAdoption: ADOPTION_BY_STATUS.promoted,
+      }),
+    );
+    const rolledBack = text(
+      result({
+        runtimeAdoption: ADOPTION_BY_STATUS['rolled-back'],
+      }),
+    );
+
+    expect(promoted).toContain('Source disposition: not preserved');
+    expect(promoted).toContain('Source retired: yes');
+    expect(rolledBack).toContain('Source disposition: preserved');
+    expect(rolledBack).toContain('Source retired: no');
+  });
+
+  it('does not disclose non-contract runtime internals or arbitrary exception text', () => {
+    const adoption = {
+      ...ADOPTION_BY_STATUS['recovery-required'],
+      runtimePath: '/Users/customer/private/project/opensip-cli/.runtime',
+      manifestDigest: 'secret-manifest-digest',
+      ownerToken: 'secret-owner-token',
+      journalPath: '/private/runtime-promotion.json',
+      message: 'arbitrary internal exception text',
+    } as RuntimeAdoptionResult;
+    const out = text(result({ runtimeAdoption: adoption }));
+
+    expect(out).not.toMatch(
+      /(?:Users\/customer|secret-manifest|secret-owner|runtime-promotion\.json|arbitrary internal)/u,
+    );
+    expect(out).toContain('Reason: operation-interrupted');
+    expect(out).toContain('Next command: opensip init');
+  });
+
+  it('uses candidate-neutral conflict guidance for a quarantined weak source', () => {
+    const out = text(
+      result({
+        runtimeAdoption: {
+          ...ADOPTION_BY_STATUS.conflict,
+          reasonCode: 'weak-source-requires-selection',
+          nextCommand: 'opensip init --runtime-conflict use-cache',
+        },
+      }),
+    );
+
+    expect(out).toContain('The cache candidate requires an explicit evidence selection.');
+    expect(out).toContain('Next command: opensip init --runtime-conflict use-cache');
+    expect(out).not.toContain('between the available evidence authorities');
+  });
+
+  it('does not describe non-interruption recovery reasons as interrupted operations', () => {
+    const out = text(
+      result({
+        runtimeAdoption: {
+          ...ADOPTION_BY_STATUS['recovery-required'],
+          reasonCode: 'artifact-mismatch',
+        },
+      }),
+    );
+
+    expect(out).toContain('Retry Init to reconcile the evidence operation safely.');
+    expect(out).not.toContain('interrupted evidence operation');
+  });
+
+  it('preserves refusal precedence over an attached adoption result', () => {
+    const out = text(
+      result({
+        insideExistingProject: {
+          discoveredRoot: '/proj',
+          message: 'refuse before adoption presentation',
+        },
+        runtimeAdoption: ADOPTION_BY_STATUS.promoted,
+      }),
+    );
+
+    expect(out).toContain('refuse before adoption presentation');
+    expect(out).not.toContain('Evidence adoption');
   });
 });
 

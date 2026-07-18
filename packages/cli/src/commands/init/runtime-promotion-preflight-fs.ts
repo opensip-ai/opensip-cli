@@ -1,11 +1,10 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, realpathSync, type BigIntStats } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
 import {
   EPHEMERAL_MARKER_FILE,
   EPHEMERAL_MARKER_MAX_BYTES,
-  EPHEMERAL_MARKER_VERSION,
   legacyEphemeralProjectCacheKey,
   projectCoordinationKey,
   readAnchoredRecord,
@@ -14,7 +13,6 @@ import {
   resolveUserPaths,
   type EphemeralMarker,
   type EphemeralProjectPaths,
-  type LegacyEphemeralMarker,
   type RuntimeExclusiveLease,
 } from '@opensip-cli/core';
 
@@ -29,24 +27,27 @@ import {
   RUNTIME_PROMOTION_DIGEST_PATTERN,
   type RuntimePromotionSource,
 } from './runtime-promotion-journal-schema.js';
+import {
+  currentRuntimePromotionMarkerMatches,
+  parseRuntimePromotionMarker,
+  readRuntimePromotionMarkerRecord,
+} from './runtime-promotion-marker.js';
+import {
+  runtimePromotionPathSnapshot,
+  sameRuntimePromotionPathSnapshot,
+  type RuntimePromotionPathSnapshot,
+} from './runtime-promotion-path-snapshot.js';
 import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 
-export type RuntimePromotionPathPresence = 'absent' | 'directory' | 'unsafe';
-
-export interface RuntimePromotionPathIdentity {
-  readonly dev: string;
-  readonly ino: string;
-  readonly uid: string;
-  readonly mode: string;
-  readonly nlink: string;
-  readonly mtimeNs: string;
-  readonly ctimeNs: string;
-}
-
-export interface RuntimePromotionPathSnapshot {
-  readonly presence: RuntimePromotionPathPresence;
-  readonly identity?: RuntimePromotionPathIdentity;
-}
+export {
+  runtimePromotionPathSnapshot,
+  sameRuntimePromotionPathSnapshot,
+} from './runtime-promotion-path-snapshot.js';
+export type {
+  RuntimePromotionPathIdentity,
+  RuntimePromotionPathPresence,
+  RuntimePromotionPathSnapshot,
+} from './runtime-promotion-path-snapshot.js';
 
 export interface RuntimePromotionSourceRevalidation {
   readonly kind: 'active' | 'legacy';
@@ -91,10 +92,6 @@ export type RuntimePromotionFilesystemInspectionResult =
       readonly reason: RuntimePromotionFilesystemConflictReason;
       readonly sourcePreserved: boolean;
     };
-
-type ParsedMarker =
-  | { readonly kind: 'current'; readonly marker: EphemeralMarker }
-  | { readonly kind: 'legacy'; readonly marker: LegacyEphemeralMarker };
 
 const PROJECT_PATH_UNSAFE = 'project-path-unsafe' as const;
 const GENERATION_BOUND = 'generation-bound' as const;
@@ -178,147 +175,6 @@ export class RuntimePromotionFilesystemLeaseMismatchError extends Error {
     super('Runtime promotion filesystem inspection requires the matching exclusive lease');
     this.name = 'RuntimePromotionFilesystemLeaseMismatchError';
   }
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}
-
-function identity(stat: BigIntStats): RuntimePromotionPathIdentity {
-  return {
-    dev: stat.dev.toString(),
-    ino: stat.ino.toString(),
-    uid: stat.uid.toString(),
-    mode: stat.mode.toString(),
-    nlink: stat.nlink.toString(),
-    mtimeNs: stat.mtimeNs.toString(),
-    ctimeNs: stat.ctimeNs.toString(),
-  };
-}
-
-function sameIdentity(
-  left: RuntimePromotionPathIdentity | undefined,
-  right: RuntimePromotionPathIdentity | undefined,
-): boolean {
-  if (left === undefined || right === undefined) return false;
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.uid === right.uid &&
-    left.mode === right.mode &&
-    left.nlink === right.nlink &&
-    left.mtimeNs === right.mtimeNs &&
-    left.ctimeNs === right.ctimeNs
-  );
-}
-
-export function runtimePromotionPathSnapshot(path: string): RuntimePromotionPathSnapshot {
-  try {
-    const stat = lstatSync(path, { bigint: true });
-    if (!stat.isDirectory() || stat.isSymbolicLink() || stat.nlink < 1n) {
-      return { presence: 'unsafe' };
-    }
-    return { presence: 'directory', identity: identity(stat) };
-  } catch (error) {
-    return hasCode(error, 'ENOENT') ? { presence: 'absent' } : { presence: 'unsafe' };
-  }
-}
-
-export function sameRuntimePromotionPathSnapshot(
-  left: RuntimePromotionPathSnapshot,
-  right: RuntimePromotionPathSnapshot,
-): boolean {
-  if (left.presence !== right.presence) return false;
-  if (left.presence !== 'directory') return true;
-  return sameIdentity(left.identity, right.identity);
-}
-
-function isCanonicalTimestamp(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const parsed = Date.parse(value);
-  return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value;
-}
-
-function isDigest(value: unknown): value is string {
-  return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
-}
-
-function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  const canonical = [...expected].sort();
-  return (
-    actual.length === canonical.length && actual.every((key, index) => key === canonical[index])
-  );
-}
-
-function parseMarker(raw: string): ParsedMarker | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return;
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return;
-  const record = parsed as Record<string, unknown>;
-  if (record.version === EPHEMERAL_MARKER_VERSION) {
-    const identityStrength = record.identityStrength;
-    const generationBound = identityStrength === GENERATION_BOUND;
-    const expectedKeys = generationBound
-      ? [
-          'version',
-          'projectDir',
-          'canonicalRootDigest',
-          'identityStrength',
-          'generationDigest',
-          'lastUsedAt',
-        ]
-      : ['version', 'projectDir', 'canonicalRootDigest', 'identityStrength', 'lastUsedAt'];
-    if (
-      !exactKeys(record, expectedKeys) ||
-      typeof record.projectDir !== 'string' ||
-      !isDigest(record.canonicalRootDigest) ||
-      (identityStrength !== GENERATION_BOUND && identityStrength !== 'path-only') ||
-      (generationBound
-        ? !isDigest(record.generationDigest)
-        : record.generationDigest !== undefined) ||
-      !isCanonicalTimestamp(record.lastUsedAt)
-    ) {
-      return;
-    }
-    return {
-      kind: 'current',
-      marker: {
-        version: EPHEMERAL_MARKER_VERSION,
-        projectDir: record.projectDir,
-        canonicalRootDigest: record.canonicalRootDigest,
-        identityStrength,
-        ...(generationBound ? { generationDigest: record.generationDigest as string } : {}),
-        lastUsedAt: record.lastUsedAt,
-      },
-    };
-  }
-  if (
-    exactKeys(record, ['projectDir', 'lastUsedAt']) &&
-    typeof record.projectDir === 'string' &&
-    isCanonicalTimestamp(record.lastUsedAt)
-  ) {
-    return {
-      kind: 'legacy',
-      marker: {
-        projectDir: record.projectDir,
-        lastUsedAt: record.lastUsedAt,
-      },
-    };
-  }
-}
-
-function currentMarkerMatches(marker: EphemeralMarker, paths: EphemeralProjectPaths): boolean {
-  return (
-    marker.projectDir === paths.projectDir &&
-    marker.canonicalRootDigest === paths.canonicalRootDigest &&
-    marker.identityStrength === paths.identityStrength &&
-    marker.generationDigest === paths.generationDigest
-  );
 }
 
 function recoverySourceChanged(): never {
@@ -554,7 +410,7 @@ export function assertRuntimePromotionRecoverySourceAuthority(
   ) {
     recoverySourceChanged();
   }
-  const marker = parseMarker(confirmedMarker.content);
+  const marker = parseRuntimePromotionMarker(confirmedMarker.content);
   if (marker?.marker.projectDir !== input.projectRoot) recoverySourceChanged();
   if (
     source.classification !== 'legacy' &&
@@ -641,32 +497,16 @@ function inspectSource(input: {
     };
   }
 
-  let observed;
-  try {
-    observed = readAnchoredRecord({
-      trustedAnchorDir: resolveUserPaths().ephemeralProjectsDir,
-      parentDir: selected.runtimeDir,
-      basename: EPHEMERAL_MARKER_FILE,
-      maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
-      permissionPosture: OWNER_CONTROLLED,
-      recordPosture: OWNER_CONTROLLED,
-    });
-  } catch {
-    return {
-      status: 'conflict',
-      reason: 'cache-marker-invalid',
-      sourcePreserved: true,
-    };
-  }
+  const observed = readRuntimePromotionMarkerRecord(selected.runtimeDir);
   input.dependencies.afterMarkerRead?.();
-  if (observed.status !== 'present') {
+  if (observed === undefined) {
     return {
       status: 'conflict',
       reason: 'cache-marker-invalid',
       sourcePreserved: true,
     };
   }
-  const marker = parseMarker(observed.content);
+  const marker = observed.marker;
   if (marker?.marker.projectDir !== input.projectRoot) {
     return {
       status: 'conflict',
@@ -686,7 +526,7 @@ function inspectSource(input: {
   const exactCurrent =
     selected.kind === 'active' &&
     marker.kind === 'current' &&
-    currentMarkerMatches(marker.marker, input.paths);
+    currentRuntimePromotionMarkerMatches(marker.marker, input.paths);
   const classification = exactCurrent ? input.paths.identityStrength : 'legacy';
   return {
     status: 'ready',

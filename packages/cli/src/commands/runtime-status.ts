@@ -31,6 +31,15 @@ import {
   type SessionRetentionPolicy,
 } from '../bootstrap/session-retention.js';
 
+import {
+  currentRuntimePromotionMarkerMatches,
+  readRuntimePromotionMarkerRecord,
+} from './init/runtime-promotion-marker.js';
+import {
+  inspectRuntimePromotionStatus,
+  type RuntimePromotionStatusInspection,
+} from './init/runtime-promotion-status.js';
+
 import type {
   RuntimeAdoptionState,
   RuntimeCacheLocationProjection,
@@ -61,6 +70,10 @@ export type RuntimeStatusCoordinationRootPresence = 'absent' | 'present' | 'unsa
 export interface RuntimeStatusCoordination {
   readonly rootPresence: () => RuntimeStatusCoordinationRootPresence;
   readonly inspect: (projectDir: string) => Promise<RuntimeLeaseStateInspection>;
+  readonly inspectPromotion: (
+    projectRoot: string,
+    coordinationKey: string,
+  ) => RuntimePromotionStatusInspection;
   readonly acquireRead: (projectDir: string) => Promise<RuntimeReadLease>;
 }
 
@@ -97,6 +110,22 @@ interface RuntimeStatusContext {
   readonly projectInitialized: boolean;
   readonly cacheIdentityStrength: RuntimeCacheLocationProjection['identityStrength'];
   readonly retention: SessionRetentionPolicy;
+}
+
+type RuntimeCacheSource =
+  | { readonly status: 'none' }
+  | { readonly status: 'blocked' }
+  | {
+      readonly status: 'eligible';
+      readonly identityStrength: RuntimeCacheLocationProjection['identityStrength'];
+    };
+
+interface InspectedCacheCandidates {
+  readonly display: EphemeralRuntimeCandidate;
+  readonly displayInspection: RuntimePathInspection;
+  readonly activeInspection: RuntimePathInspection;
+  readonly multiple: boolean;
+  readonly source: RuntimeCacheSource;
 }
 
 function safePathExists(path: string): boolean {
@@ -228,17 +257,67 @@ function markerLastUsedAt(candidate: EphemeralRuntimeCandidate): string | undefi
     : undefined;
 }
 
-function selectedCacheCandidate(
+function inspectCacheCandidates(
   active: EphemeralRuntimeCandidate,
   legacy: EphemeralRuntimeCandidate | undefined,
-): EphemeralRuntimeCandidate {
-  return active.exists || legacy === undefined ? active : legacy;
+  projectRoot: string,
+): InspectedCacheCandidates {
+  const cacheAnchor = resolveUserPaths().userHomeDir;
+  const activeInspection = inspectRuntimePath(cacheAnchor, active.runtimeDir);
+  const legacyInspection =
+    legacy === undefined ? undefined : inspectRuntimePath(cacheAnchor, legacy.runtimeDir);
+  const present = [
+    ...(active.exists ? [{ candidate: active, inspection: activeInspection }] : []),
+    ...(legacy?.exists === true && legacyInspection !== undefined
+      ? [{ candidate: legacy, inspection: legacyInspection }]
+      : []),
+  ];
+  const display =
+    active.exists || legacy === undefined
+      ? { candidate: active, inspection: activeInspection }
+      : { candidate: legacy, inspection: legacyInspection ?? 'missing' };
+  const selected = present.length === 1 ? present[0] : undefined;
+  const authoritativeMarker =
+    selected?.inspection === 'trusted'
+      ? readRuntimePromotionMarkerRecord(selected.candidate.runtimeDir)
+      : undefined;
+  let source: RuntimeCacheSource;
+  if (present.length === 0) {
+    source = { status: 'none' };
+  } else if (
+    selected?.inspection !== 'trusted' ||
+    authoritativeMarker?.marker.marker.projectDir !== projectRoot
+  ) {
+    source = { status: 'blocked' };
+  } else {
+    const exactCurrent =
+      selected.candidate.kind === 'active' &&
+      authoritativeMarker.marker.kind === 'current' &&
+      currentRuntimePromotionMarkerMatches(
+        authoritativeMarker.marker.marker,
+        resolveEphemeralProjectPaths(projectRoot),
+      );
+    source = {
+      status: 'eligible',
+      identityStrength: exactCurrent
+        ? authoritativeMarker.marker.marker.identityStrength
+        : 'legacy-unverified',
+    };
+  }
+  return {
+    display: display.candidate,
+    displayInspection: display.inspection,
+    activeInspection,
+    multiple: present.length > 1,
+    source,
+  };
 }
 
 function cacheProjection(
   candidate: EphemeralRuntimeCandidate,
-  hasAdditionalLegacy: boolean,
+  multiple: boolean,
   inspection: RuntimePathInspection,
+  markerBoundToProject: boolean,
   limits: RuntimeSizeLimits,
 ): RuntimeCacheLocationProjection {
   const location = locationProjection(candidate.runtimeDir, inspection, limits);
@@ -246,33 +325,40 @@ function cacheProjection(
   return {
     ...location,
     identityStrength:
-      hasAdditionalLegacy || unsafe ? 'legacy-unverified' : candidate.identityStrength,
-    ...(unsafe || markerLastUsedAt(candidate) === undefined
+      multiple || unsafe || (location.exists && !markerBoundToProject)
+        ? 'legacy-unverified'
+        : candidate.identityStrength,
+    ...(unsafe || !markerBoundToProject || markerLastUsedAt(candidate) === undefined
       ? {}
       : { lastUsedAt: markerLastUsedAt(candidate) }),
   };
 }
 
 function adoptionState(input: {
-  readonly cache: RuntimeCacheLocationProjection;
-  readonly projectInitialized: boolean;
-  readonly projectRuntimeExists: boolean;
-  readonly hasAdditionalLegacy: boolean;
+  readonly source: RuntimeCacheSource;
+  readonly projectDestination: 'absent' | 'trusted' | 'unsafe';
 }): Exclude<RuntimeAdoptionState, 'busy' | 'recovery-required'> {
-  const weakCache =
-    input.cache.exists &&
-    (input.cache.identityStrength !== 'generation-bound' || input.hasAdditionalLegacy);
-  if (weakCache) return 'legacy-unverified';
-
-  const authoritativeProject = input.projectInitialized || input.projectRuntimeExists;
-  if (authoritativeProject && input.cache.exists) return 'conflict';
-  if (input.cache.exists) return 'ready';
-  return 'not-needed';
+  if (input.source.status === 'blocked' || input.projectDestination === 'unsafe') {
+    return 'conflict';
+  }
+  if (input.source.status !== 'eligible') return 'not-needed';
+  const weak = input.source.identityStrength !== 'generation-bound';
+  if (input.projectDestination === 'trusted') return weak ? 'legacy-unverified' : 'conflict';
+  return weak ? 'legacy-unverified' : 'ready';
 }
 
-function activePlane(projectInitialized: boolean, cacheExists: boolean): RuntimeStoragePlane {
+function projectDestination(
+  inspection: RuntimePathInspection,
+  locationExists: boolean,
+): 'absent' | 'trusted' | 'unsafe' {
+  if (inspection === 'unsafe') return 'unsafe';
+  if (locationExists) return 'trusted';
+  return 'absent';
+}
+
+function activePlane(projectInitialized: boolean, activeCacheExists: boolean): RuntimeStoragePlane {
   if (projectInitialized) return 'project';
-  return cacheExists ? 'cache' : 'none';
+  return activeCacheExists ? 'cache' : 'none';
 }
 
 function selectedRuntimeDir(input: {
@@ -297,18 +383,33 @@ function selectedRuntimeInspection(input: {
 
 function nextCommands(input: {
   readonly initialized: boolean;
-  readonly projectRuntimeExists: boolean;
+  readonly adoptionBlocked: boolean;
+  readonly projectLocationExists: boolean;
+  readonly projectDestinationTrusted: boolean;
   readonly evidenceExists: boolean;
-  readonly adoptionState: Exclude<RuntimeAdoptionState, 'busy' | 'recovery-required'>;
+  readonly source: RuntimeCacheSource;
 }): readonly RuntimeNextCommand[] {
   const commands: RuntimeNextCommand[] = [];
-  if (!input.initialized || input.adoptionState !== 'not-needed') {
-    commands.push('opensip init');
+  if (!input.adoptionBlocked) {
+    if (input.source.status === 'eligible') {
+      if (input.projectDestinationTrusted) {
+        commands.push(
+          'opensip init --runtime-conflict keep-project',
+          'opensip init --runtime-conflict use-cache',
+        );
+      } else if (input.source.identityStrength === 'generation-bound') {
+        commands.push('opensip init');
+      } else {
+        commands.push('opensip init --runtime-conflict use-cache');
+      }
+    } else if (!input.initialized) {
+      commands.push('opensip init');
+    }
   }
   if (input.evidenceExists) {
     commands.push('opensip runs list --json', 'opensip sessions list --json');
   }
-  if (input.initialized || input.projectRuntimeExists) {
+  if (input.initialized || input.projectLocationExists) {
     commands.push('opensip uninstall --project --dry-run');
   }
   return commands;
@@ -332,6 +433,8 @@ function defaultCoordination(): RuntimeStatusCoordination {
   return {
     rootPresence: runtimeCoordinationRootPresence,
     inspect: inspectRuntimeLeaseState,
+    inspectPromotion: (projectRoot, coordinationKey) =>
+      inspectRuntimePromotionStatus({ projectRoot, coordinationKey }),
     acquireRead: (projectDir) =>
       acquireRuntimeReadLease({
         projectDir,
@@ -352,6 +455,7 @@ function resolveStatusCoordination(
   return {
     rootPresence: override?.rootPresence ?? defaults.rootPresence,
     inspect: override?.inspect ?? defaults.inspect,
+    inspectPromotion: override?.inspectPromotion ?? defaults.inspectPromotion,
     acquireRead: override?.acquireRead ?? defaults.acquireRead,
   };
 }
@@ -423,17 +527,17 @@ function busyStatus(
 
 function recoveryStatus(
   context: RuntimeStatusContext,
-  reason: 'operation-interrupted' | 'journal-malformed',
+  projection: Extract<RuntimePromotionStatusInspection, { readonly status: 'recovery-required' }>,
   leaseActivity: RuntimeLeaseActivity,
 ): RuntimeStatusResult {
   return {
     ...unavailableBase(context),
     adoptionState: 'recovery-required',
     leaseActivity,
-    recoveryPhase: 'unknown',
-    recoveryReasonCode: reason,
-    recoveryCommand: 'opensip init',
-    nextCommands: ['opensip init'],
+    recoveryPhase: projection.recoveryPhase,
+    recoveryReasonCode: projection.recoveryReasonCode,
+    recoveryCommand: projection.recoveryCommand,
+    nextCommands: [projection.recoveryCommand],
   };
 }
 
@@ -452,25 +556,77 @@ function leaseActivity(
   };
 }
 
-function blockingStatus(
+function leaseBlockingStatus(
   context: RuntimeStatusContext,
   inspection: RuntimeLeaseStateInspection,
   includesStatusReader: boolean,
 ): RuntimeStatusResult | undefined {
   if (inspection.status === 'busy') return busyStatus(context);
   const activity = leaseActivity(inspection, includesStatusReader, true);
-  if (inspection.promotion.status === 'malformed') {
-    return recoveryStatus(context, 'journal-malformed', activity);
-  }
-  if (inspection.promotion.status === 'valid' && inspection.promotion.state === 'open') {
-    return recoveryStatus(context, 'operation-interrupted', activity);
-  }
   if (
     inspection.userUninstall.status === 'malformed' ||
     (inspection.userUninstall.status === 'valid' && inspection.userUninstall.state === 'open') ||
     activity.writerPending
   ) {
     return busyStatus(context, activity);
+  }
+}
+
+function promotionMatchesLeaseInspection(
+  promotion: RuntimePromotionStatusInspection,
+  inspection: StableLeaseInspection,
+): boolean {
+  if (promotion.status === 'absent') return inspection.promotion.status === 'absent';
+  if (promotion.status === 'cleanup-pending') {
+    return inspection.promotion.status === 'valid' && inspection.promotion.state === 'closed';
+  }
+  if (promotion.status === 'busy') return false;
+  if (inspection.promotion.status === 'valid') return inspection.promotion.state === 'open';
+  return inspection.promotion.status === 'malformed';
+}
+
+function samePromotionProjection(
+  left: RuntimePromotionStatusInspection,
+  right: RuntimePromotionStatusInspection,
+): boolean {
+  if (left.status !== right.status) return false;
+  if (left.status === 'absent' || left.status === 'busy') return true;
+  if (right.status === 'absent' || right.status === 'busy') return false;
+  return (
+    left.recoveryPhase === right.recoveryPhase &&
+    left.recoveryReasonCode === right.recoveryReasonCode &&
+    left.recoveryCommand === right.recoveryCommand &&
+    (left.status !== 'cleanup-pending' ||
+      (right.status === 'cleanup-pending' && left.sourcePreserved === right.sourcePreserved))
+  );
+}
+
+function inspectPromotion(
+  context: RuntimeStatusContext,
+  coordination: RuntimeStatusCoordination,
+): RuntimePromotionStatusInspection | undefined {
+  try {
+    return coordination.inspectPromotion(context.project.projectRoot, context.coordinationKey);
+  } catch (error) {
+    if (isBoundedCoordinationFailure(error)) return;
+    throw error;
+  }
+}
+
+function promotionBlockingStatus(
+  context: RuntimeStatusContext,
+  inspection: StableLeaseInspection,
+  projection: RuntimePromotionStatusInspection,
+  includesStatusReader: boolean,
+): RuntimeStatusResult | undefined {
+  if (!promotionMatchesLeaseInspection(projection, inspection)) return busyStatus(context);
+  if (projection.status === 'busy') return busyStatus(context);
+  if (projection.status === 'recovery-required') {
+    return recoveryStatus(
+      context,
+      projection,
+      leaseActivity(inspection, includesStatusReader, true),
+    );
   }
 }
 
@@ -510,37 +666,41 @@ function inspectRuntimeStorage(context: RuntimeStatusContext) {
   const { project, limits, projectInitialized } = context;
   const projectPaths = resolveProjectPaths(project.projectRoot);
   const candidates = inspectEphemeralRuntimeCandidates(project.projectRoot);
-  const chosenCache = selectedCacheCandidate(candidates.active, candidates.legacy);
-  const hasAdditionalLegacy = candidates.legacy !== undefined && candidates.active.exists;
-  const cacheInspection = inspectRuntimePath(
-    resolveUserPaths().userHomeDir,
-    chosenCache.runtimeDir,
+  const inspectedCache = inspectCacheCandidates(
+    candidates.active,
+    candidates.legacy,
+    project.projectRoot,
   );
   const projectInspection = inspectRuntimePath(project.projectRoot, projectPaths.runtimeDir);
-  const cache = cacheProjection(chosenCache, hasAdditionalLegacy, cacheInspection, limits);
+  const cache = cacheProjection(
+    inspectedCache.display,
+    inspectedCache.multiple,
+    inspectedCache.displayInspection,
+    inspectedCache.source.status === 'eligible',
+    limits,
+  );
   const projectLocation = locationProjection(projectPaths.runtimeDir, projectInspection, limits);
-  const plane = activePlane(projectInitialized, cache.exists);
+  const destination = projectDestination(projectInspection, projectLocation.exists);
+  const plane = activePlane(projectInitialized, candidates.active.exists);
   const selectedRuntime = selectedRuntimeDir({
     plane,
     projectRuntimeDir: projectPaths.runtimeDir,
-    cacheRuntimeDir: chosenCache.runtimeDir,
+    cacheRuntimeDir: candidates.active.runtimeDir,
   });
   const evidencePath =
     selectedRuntime === undefined ? undefined : join(selectedRuntime, DATASTORE_FILE);
   const selectedInspection = selectedRuntimeInspection({
     plane,
     project: projectInspection,
-    cache: cacheInspection,
+    cache: inspectedCache.activeInspection,
   });
   const evidenceDatabase =
     selectedInspection === 'trusted'
       ? evidenceDatabaseProjection(evidencePath)
       : ({ exists: false } as const);
   const state = adoptionState({
-    cache,
-    projectInitialized,
-    projectRuntimeExists: projectLocation.exists,
-    hasAdditionalLegacy,
+    source: inspectedCache.source,
+    projectDestination: destination,
   });
 
   return {
@@ -560,9 +720,11 @@ function inspectRuntimeStorage(context: RuntimeStatusContext) {
     },
     nextCommands: nextCommands({
       initialized: projectInitialized,
-      projectRuntimeExists: projectLocation.exists,
+      adoptionBlocked: inspectedCache.source.status === 'blocked' || destination === 'unsafe',
+      projectLocationExists: projectLocation.exists,
+      projectDestinationTrusted: destination === 'trusted',
       evidenceExists: evidenceDatabase.exists,
-      adoptionState: state,
+      source: inspectedCache.source,
     }),
   };
 }
@@ -572,23 +734,29 @@ type InspectedRuntimeStatus = ReturnType<typeof inspectRuntimeStorage>;
 function completedStatus(
   inspected: InspectedRuntimeStatus,
   activity: RuntimeLeaseActivity,
-  cleanupPending: boolean,
+  promotion: Extract<
+    RuntimePromotionStatusInspection,
+    { readonly status: 'absent' | 'cleanup-pending' }
+  >,
 ): RuntimeStatusResult {
-  if (cleanupPending) {
+  if (promotion.status === 'cleanup-pending') {
     return {
       ...inspected,
       leaseActivity: activity,
-      recoveryPhase: 'cleanup',
-      recoveryReasonCode: 'cleanup-pending',
+      recoveryPhase: promotion.recoveryPhase,
+      recoveryReasonCode: promotion.recoveryReasonCode,
+      ...(promotion.sourcePreserved === undefined
+        ? {}
+        : { sourcePreserved: promotion.sourcePreserved }),
       cleanupPending: true,
-      recoveryCommand: 'opensip init',
+      recoveryCommand: promotion.recoveryCommand,
+      nextCommands: [
+        promotion.recoveryCommand,
+        ...inspected.nextCommands.filter((command) => command !== promotion.recoveryCommand),
+      ],
     };
   }
   return { ...inspected, leaseActivity: activity };
-}
-
-function closedPromotion(inspection: StableLeaseInspection): boolean {
-  return inspection.promotion.status === 'valid' && inspection.promotion.state === 'closed';
 }
 
 async function inspectRuntimeStorageUnderLease(
@@ -597,26 +765,38 @@ async function inspectRuntimeStorageUnderLease(
 ): Promise<RuntimeStatusResult> {
   const underLease = await inspectCoordination(coordination, context.project.projectRoot);
   if (underLease === undefined) return busyStatus(context);
-  const blockedUnderLease = blockingStatus(context, underLease, true);
+  const blockedUnderLease = leaseBlockingStatus(context, underLease, true);
   if (blockedUnderLease !== undefined) return blockedUnderLease;
   if (underLease.status !== 'stable' || underLease.projectReaders < 1) {
     return busyStatus(context);
   }
+  const initialPromotion = inspectPromotion(context, coordination);
+  if (initialPromotion === undefined) return busyStatus(context);
+  const promotionBlocked = promotionBlockingStatus(context, underLease, initialPromotion, true);
+  if (promotionBlocked !== undefined) return promotionBlocked;
 
   const inspected = inspectRuntimeStorage(context);
   const finalInspection = await inspectCoordination(coordination, context.project.projectRoot);
   if (finalInspection === undefined) return busyStatus(context);
-  const blockedAfterRead = blockingStatus(context, finalInspection, true);
+  const blockedAfterRead = leaseBlockingStatus(context, finalInspection, true);
   if (blockedAfterRead !== undefined) return blockedAfterRead;
   if (finalInspection.status !== 'stable' || finalInspection.projectReaders < 1) {
     return busyStatus(context);
   }
-
-  return completedStatus(
-    inspected,
-    leaseActivity(finalInspection, true, false),
-    closedPromotion(finalInspection),
+  const finalPromotion = inspectPromotion(context, coordination);
+  if (finalPromotion === undefined) return busyStatus(context);
+  const finalPromotionBlocked = promotionBlockingStatus(
+    context,
+    finalInspection,
+    finalPromotion,
+    true,
   );
+  if (finalPromotionBlocked !== undefined) return finalPromotionBlocked;
+  if (finalPromotion.status === 'busy' || finalPromotion.status === 'recovery-required') {
+    return busyStatus(context);
+  }
+
+  return completedStatus(inspected, leaseActivity(finalInspection, true, false), finalPromotion);
 }
 
 function releaseStatusLease(lease: RuntimeReadLease): boolean {
@@ -641,12 +821,29 @@ function statusWithoutCoordination(
       writerPending: false,
       busy: false,
     },
-    false,
+    { status: 'absent' },
   );
 }
 
 type StatusLeaseAcquisition =
   { readonly status: RuntimeStatusResult } | { readonly lease: RuntimeReadLease };
+
+async function promotionProjectionRemainedStable(
+  context: RuntimeStatusContext,
+  coordination: RuntimeStatusCoordination,
+  promotion: RuntimePromotionStatusInspection,
+): Promise<boolean> {
+  const afterProjection = await inspectCoordination(coordination, context.project.projectRoot);
+  if (
+    afterProjection?.status !== 'stable' ||
+    leaseBlockingStatus(context, afterProjection, false) !== undefined ||
+    !promotionMatchesLeaseInspection(promotion, afterProjection)
+  ) {
+    return false;
+  }
+  const afterPromotion = inspectPromotion(context, coordination);
+  return afterPromotion !== undefined && samePromotionProjection(promotion, afterPromotion);
+}
 
 async function acquireInspectedStatusLease(
   context: RuntimeStatusContext,
@@ -654,8 +851,19 @@ async function acquireInspectedStatusLease(
 ): Promise<StatusLeaseAcquisition> {
   const before = await inspectCoordination(coordination, context.project.projectRoot);
   if (before === undefined) return { status: busyStatus(context) };
-  const blockedBefore = blockingStatus(context, before, false);
+  const blockedBefore = leaseBlockingStatus(context, before, false);
   if (blockedBefore !== undefined) return { status: blockedBefore };
+  if (before.status !== 'stable') return { status: busyStatus(context) };
+
+  const promotion = inspectPromotion(context, coordination);
+  if (promotion === undefined) return { status: busyStatus(context) };
+  const promotionBlocked = promotionBlockingStatus(context, before, promotion, false);
+  if (promotionBlocked !== undefined) {
+    if (!(await promotionProjectionRemainedStable(context, coordination, promotion))) {
+      return { status: busyStatus(context) };
+    }
+    return { status: promotionBlocked };
+  }
 
   try {
     return {
@@ -665,7 +873,7 @@ async function acquireInspectedStatusLease(
     if (!isBoundedCoordinationFailure(error)) throw error;
     const raced = await inspectCoordination(coordination, context.project.projectRoot);
     if (raced === undefined) return { status: busyStatus(context) };
-    const blocked = blockingStatus(context, raced, false);
+    const blocked = leaseBlockingStatus(context, raced, false);
     return {
       status:
         blocked ??

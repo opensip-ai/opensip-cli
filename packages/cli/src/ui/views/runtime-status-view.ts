@@ -7,6 +7,8 @@ import { formatBytes } from '../../format-bytes.js';
 import type { RuntimeStatusResult } from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
+const CLEANUP_PENDING_TEXT =
+  'Normal evidence reads and writes may continue, so runtime state can evolve; only operation-owned cleanup is pending.';
 
 function runtimeLocationText(
   location: RuntimeStatusResult['cache'] | RuntimeStatusResult['project'],
@@ -24,20 +26,6 @@ function adoptionGuidance(result: RuntimeStatusResult): {
   readonly text: string;
   readonly tone: Tone;
 } {
-  if (result.cleanupPending === true) {
-    if (result.sourcePreserved === undefined) {
-      return {
-        text: 'Terminal cleanup is pending; source disposition is unknown until opensip init inspects recovery state.',
-        tone: 'warning',
-      };
-    }
-    return {
-      text: result.sourcePreserved
-        ? 'Terminal cleanup is pending; the source evidence remains preserved.'
-        : 'Terminal cleanup is pending; the current project evidence remains authoritative.',
-      tone: 'warning',
-    };
-  }
   switch (result.adoptionState) {
     case 'ready': {
       return {
@@ -49,14 +37,37 @@ function adoptionGuidance(result: RuntimeStatusResult): {
       return { text: 'No storage conflict needs attention.', tone: 'success' };
     }
     case 'legacy-unverified': {
+      if (
+        result.activePlane === 'none' &&
+        result.nextCommands.includes('opensip init --runtime-conflict use-cache')
+      ) {
+        return {
+          text: 'A legacy cache candidate matches this project, but it is not the active no-init runtime. Adopt it only with the explicit use-cache command shown below.',
+          tone: 'warning',
+        };
+      }
+      if (result.cache.identityStrength === 'path-only') {
+        return {
+          text: 'Cache identity is path-only: OpenSIP cannot distinguish a repository recreated at the same path, so this evidence will not be adopted automatically.',
+          tone: 'warning',
+        };
+      }
       return {
-        text: 'Cache identity is unverified; choose the source explicitly with opensip init.',
+        text: 'Legacy cache identity is unverified, so this evidence will not be attributed to the project. It will not be adopted automatically.',
         tone: 'warning',
       };
     }
     case 'conflict': {
+      const canKeep = result.nextCommands.includes('opensip init --runtime-conflict keep-project');
+      const canUseCache = result.nextCommands.includes('opensip init --runtime-conflict use-cache');
+      if (!canKeep || !canUseCache) {
+        return {
+          text: 'OpenSIP found ambiguous, unverified, or unsafe storage state and cannot select an adoption source. No runtime-conflict command is safe to recommend.',
+          tone: 'warning',
+        };
+      }
       return {
-        text: 'Cache and project evidence both exist; resolve the conflict explicitly with opensip init.',
+        text: 'Cache and project evidence both exist. Choose one explicitly with opensip init; OpenSIP will not merge them.',
         tone: 'warning',
       };
     }
@@ -152,7 +163,20 @@ export function viewRuntimeStatus(result: RuntimeStatusResult): ViewNode {
     line([{ text: adoption.text, tone: adoption.tone }]),
   ];
 
-  if (result.adoptionState === 'recovery-required' || result.cleanupPending === true) {
+  if (result.cleanupPending === true) {
+    children.push(
+      line([
+        { text: 'Cleanup: ', dim: true },
+        { text: result.recoveryReasonCode, tone: 'warning' },
+      ]),
+      line([{ text: CLEANUP_PENDING_TEXT, tone: 'warning' }]),
+      line([
+        { text: 'Source evidence: ', dim: true },
+        { text: sourceDispositionText(result.sourcePreserved) },
+      ]),
+      line([{ text: `Run: ${result.recoveryCommand}`, tone: 'brand' }]),
+    );
+  } else if (result.adoptionState === 'recovery-required') {
     children.push(
       line([
         { text: 'Recovery: ', dim: true },
