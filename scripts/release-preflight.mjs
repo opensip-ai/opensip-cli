@@ -37,6 +37,13 @@ function parseArgs(argv) {
     } else if (arg === '--tarball-dir') {
       const value = argv[++i];
       if (!value) throw new Error('--tarball-dir requires a value');
+      // Fail closed on the classic JS stringification of a missing path —
+      // otherwise `pnpm pack --pack-destination undefined` pollutes the repo.
+      if (value === 'undefined' || value === 'null') {
+        throw new Error(
+          `--tarball-dir must be a real path (got ${JSON.stringify(value)}); check the calling env/arg`,
+        );
+      }
       out.tarballDir = value;
     } else {
       throw new Error(`unknown argument: ${arg}`);

@@ -69,6 +69,12 @@ compatibility-matrix-report*.json
 # Packed tarballs (from `pnpm pack` / `npm pack`)
 *.tgz
 
+# Accidental pack destination when a path env/arg is missing and becomes the
+# JS string "undefined" (e.g. `pnpm pack --pack-destination $UNSET`). Contents
+# are already covered by `*.tgz`; ignore the directory itself so it never
+# appears as untracked noise at the repo root.
+/undefined/
+
 # v3 per-project runtime state — sessions, logs, dashboard reports,
 # baselines, AST cache, plugin installs. Test fixtures, the
 # opensip-cli repo itself, and any consumer all generate this.
