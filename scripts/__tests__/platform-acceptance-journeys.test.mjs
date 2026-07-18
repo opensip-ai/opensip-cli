@@ -1052,6 +1052,7 @@ function persistenceBarrierContext({
   interruptLockOutcome = 'stale',
   ownerLockDelayMs = 0,
   queuedWriterSettlesEarly = false,
+  waiterOmitsWaitEvents = false,
   writerSettlesEarly = false,
 } = {}) {
   const root = tmpRoot('pa-persistence-barrier-');
@@ -1062,9 +1063,12 @@ function persistenceBarrierContext({
   writeFileSync(dbPath, 'initialized');
 
   const { context } = queuedContext([], { workRoot: root });
+  // Fast synthetic-lock hold for unit runs; production default is generous.
+  context.timing = { syntheticQueueHoldMs: 50 };
   const calls = [];
   const sessions = [];
   let exhaustionCalls = 0;
+  let waiterCalls = 0;
   let graphCalls = 0;
   let sessionGraphCalls = 0;
   let activeReleaseMarker = null;
@@ -1100,10 +1104,32 @@ function persistenceBarrierContext({
     });
   }
 
+  function waiterSuccessJson({ withWaitEvent }) {
+    return jsonResult({
+      kind: 'graph.run',
+      status: 'ok',
+      exitCode: 0,
+      diagnostics: {
+        events: withWaitEvent
+          ? [
+              {
+                phase: 'persist',
+                message: 'state.lock.acquire.wait',
+                data: { resource: 'datastore', waitMs: 51, ownerPid: process.pid },
+              },
+            ]
+          : [],
+      },
+    });
+  }
+
   function runGraph(spec) {
     graphCalls += 1;
     const lockWaitMs = spec.env?.OPENSIP_STATE_LOCK_WAIT_MS;
-    if (lockWaitMs !== undefined) {
+    // The short-wait exhaustion probe runs with the journey's 250ms budget;
+    // the queued waiter runs with its generous explicit budget. Classify by
+    // value — both are env-overridden writers.
+    if (lockWaitMs === '250') {
       exhaustionCalls += 1;
       if (!existsSync(writeLock)) competitorStartedBeforeOwnerLock = true;
       if (exhaustionSucceeds) return Promise.resolve(measured());
@@ -1143,13 +1169,35 @@ function persistenceBarrierContext({
         );
       });
     }
+    if (lockWaitMs !== undefined) {
+      // Queued waiter: settles only after the synthetic lock is removed —
+      // unless a knob simulates misbehavior.
+      waiterCalls += 1;
+      if (!existsSync(writeLock)) competitorStartedBeforeOwnerLock = true;
+      if (queuedWriterSettlesEarly) {
+        return Promise.resolve(waiterSuccessJson({ withWaitEvent: false }));
+      }
+      return new Promise((resolve) => {
+        const timer = setInterval(() => {
+          if (existsSync(writeLock)) return;
+          clearInterval(timer);
+          sessions.push({ id: 'graph-session-waiter', tool: 'graph' });
+          resolve(waiterSuccessJson({ withWaitEvent: !waiterOmitsWaitEvents }));
+        }, 5);
+        spec.signal?.addEventListener(
+          'abort',
+          () => {
+            clearInterval(timer);
+            resolve(measured({ status: null, cancelled: true }));
+          },
+          { once: true },
+        );
+      });
+    }
 
     sessionGraphCalls += 1;
     const writerNumber = sessionGraphCalls;
     if (writerSettlesEarly && writerNumber === 1) return Promise.resolve(measured());
-    if (!interrupt && writerNumber === 2 && !existsSync(writeLock)) {
-      competitorStartedBeforeOwnerLock = true;
-    }
     // A real interrupted CLI can either remove its outer lock during graceful
     // shutdown or leave the exact lock for the next writer to reclaim.
     if (interrupt && writerNumber > 1) {
@@ -1196,28 +1244,6 @@ function persistenceBarrierContext({
                 break;
               }
             }
-            resolve(measured({ status: null, cancelled: true }));
-          },
-          { once: true },
-        );
-      });
-    }
-
-    if (!interrupt && writerNumber === 2) {
-      if (queuedWriterSettlesEarly) return Promise.resolve(measured());
-      return new Promise((resolve) => {
-        const timer = setInterval(() => {
-          if (releaseMarker() === null || existsSync(writeLock)) return;
-          clearInterval(timer);
-          writeFileSync(writeLock, lockContents, { flag: 'wx' });
-          rmSync(writeLock, { force: true });
-          sessions.push({ id: `graph-session-${writerNumber}`, tool: 'graph' });
-          resolve(measured());
-        }, 5);
-        spec.signal?.addEventListener(
-          'abort',
-          () => {
-            clearInterval(timer);
             resolve(measured({ status: null, cancelled: true }));
           },
           { once: true },
@@ -1305,6 +1331,9 @@ function persistenceBarrierContext({
     get exhaustionCalls() {
       return exhaustionCalls;
     },
+    get waiterCalls() {
+      return waiterCalls;
+    },
     get sessionGraphCalls() {
       return sessionGraphCalls;
     },
@@ -1320,40 +1349,47 @@ test('persistence.contention-retry proves bounded exhaustion, a queued writer, a
   assert.equal(outcome.status, 'pass');
   assert.equal(harness.graphCalls, 3);
   assert.equal(harness.exhaustionCalls, 1);
-  assert.equal(harness.sessionGraphCalls, 2);
+  assert.equal(harness.waiterCalls, 1);
+  assert.equal(harness.sessionGraphCalls, 1);
   assert.equal(harness.calls.filter(({ argv }) => argv.includes('show')).length, 2);
+  // Every competitor contended against an already-held lock.
+  assert.equal(harness.competitorStartedBeforeOwnerLock, false);
   assert.ok(
     harness.calls.some(
       ({ argv, env }) => argv.includes('graph') && env?.OPENSIP_STATE_LOCK_WAIT_MS === '250',
     ),
   );
+  assert.ok(
+    harness.calls.some(
+      ({ argv, env }) => argv.includes('graph') && env?.OPENSIP_STATE_LOCK_WAIT_MS === '15000',
+    ),
+  );
 });
 
-test('persistence contention cannot pass when the CLI writer settles before the barrier', async () => {
+test('persistence contention cannot pass when the phase-B writer settles without locking', async () => {
   const harness = persistenceBarrierContext({ writerSettlesEarly: true });
   const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
   assert.equal(outcome.status, 'fail');
   assert.equal(outcome.reasonCode, 'contention-not-observed');
 });
 
-test('persistence contention launches competitors only after the head-start owner lock is stable', async () => {
+test('persistence contention tolerates a slow phase-B owner lock inside the probe window', async () => {
   const harness = persistenceBarrierContext({ ownerLockDelayMs: 650 });
   const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
   assert.equal(outcome.status, 'pass');
   assert.equal(harness.competitorStartedBeforeOwnerLock, false);
 });
 
-test('persistence contention fails with a timing reason when the short-wait writer never engages', async () => {
-  // The regression that kept the macOS qualification lane red: on a slow
-  // 3-core VM the short-wait writer was still in Node startup when the old
-  // fixed barrier expired, arrived after release, succeeded against a free
-  // lock, and the journey misreported the CLI's bounded timeout as broken.
-  // The engagement gate must instead fail with an infrastructure-timing
-  // reason and release the native holder.
-  const harness = persistenceBarrierContext({ exhaustionSettleDelayMs: 4200 });
+test('persistence contention passes deterministically however slow the short-wait writer starts', async () => {
+  // The regression that kept the macOS qualification lane red: the old fixed
+  // release barrier expired while the short-wait writer was still in Node
+  // startup on a slow 3-core VM; it arrived after release, succeeded against
+  // a free lock, and the journey misreported the CLI's bounded timeout as
+  // broken. Under the synthetic-lock design the lock is held until the
+  // writer settles, so a slow start changes nothing.
+  const harness = persistenceBarrierContext({ exhaustionSettleDelayMs: 2000 });
   const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
-  assert.equal(outcome.status, 'fail');
-  assert.equal(outcome.reasonCode, 'contention-competitor-not-engaged');
+  assert.equal(outcome.status, 'pass');
 });
 
 test('persistence contention cannot pass when bounded retry unexpectedly succeeds', async () => {
@@ -1361,6 +1397,8 @@ test('persistence contention cannot pass when bounded retry unexpectedly succeed
   const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
   assert.equal(outcome.status, 'fail');
   assert.equal(outcome.reasonCode, 'contention-retry-not-exhausted');
+  // Phase A fails fast: no phase-B writer ever launches.
+  assert.equal(harness.sessionGraphCalls, 0);
 });
 
 test('persistence contention cannot pass when the queued writer settles before release', async () => {
@@ -1368,6 +1406,13 @@ test('persistence contention cannot pass when the queued writer settles before r
   const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
   assert.equal(outcome.status, 'fail');
   assert.equal(outcome.reasonCode, 'contention-waiter-not-observed');
+});
+
+test('persistence contention requires the queued writer to record its wait on the owner', async () => {
+  const harness = persistenceBarrierContext({ waiterOmitsWaitEvents: true });
+  const outcome = await getJourney('persistence.contention-retry').executor(harness.context);
+  assert.equal(outcome.status, 'fail');
+  assert.equal(outcome.reasonCode, 'contention-queue-not-observed');
 });
 
 test('persistence.interrupted-recovery cancels only after persistence and proves a fresh write', async () => {
