@@ -21,11 +21,10 @@ import { bindToolCliContext } from './bind-tool-context.js';
 import { dispatchExternalToolHook } from './dispatch-external-tool-hook.js';
 import { EXPECTED_SCAFFOLDING_TOOL_IDS } from './register-tools.js';
 
+import type { ToolScaffold } from '../commands/shared.js';
 import type {
   CommandSpec,
   PluginLayout,
-  ScaffoldContext,
-  ScaffoldFile,
   ToolCliContext,
   ToolProvenance,
   ToolRegistry,
@@ -35,12 +34,7 @@ import type {
 /** The structured input consumed by `registerCliCommands`. */
 export interface CommandRegistrationInput {
   readonly pluginLayouts: readonly NonNullable<PluginLayout>[];
-  readonly toolScaffolds: readonly {
-    readonly layout: PluginLayout;
-    readonly scaffoldExamples: ((ctx: ScaffoldContext) => readonly ScaffoldFile[]) | undefined;
-    readonly stableExampleIds: (() => readonly string[]) | undefined;
-    readonly scaffoldConfigBlock: (() => string) | undefined;
-  }[];
+  readonly toolScaffolds: readonly ToolScaffold[];
   readonly sessionReplayRegistry: SessionReplayRegistry;
   readonly toolCommandSpecs: readonly CommandSpec<unknown, ToolCliContext>[];
   /**
@@ -90,6 +84,11 @@ export function buildCommandRegistrationInput(
     const hooks = resolveToolHooks(t);
     return [
       {
+        identity: {
+          stableId: t.metadata.id,
+          name: t.metadata.name,
+          version: t.metadata.version,
+        },
         layout,
         scaffoldExamples: hooks.scaffoldExamples,
         stableExampleIds: hooks.stableExampleIds,

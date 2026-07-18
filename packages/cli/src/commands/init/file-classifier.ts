@@ -13,7 +13,7 @@ import { basename as pathBasename, join } from 'node:path';
 import { ALL_LANGUAGES } from './language-detection.js';
 
 import type { SupportedLanguage } from './language-detection.js';
-import type { ToolScaffold } from '../shared.js';
+import type { RenderedToolScaffold, ToolScaffold } from '../shared.js';
 import type { PreExistingFile } from '@opensip-cli/contracts';
 import type { ProjectPaths } from '@opensip-cli/core';
 
@@ -27,15 +27,13 @@ const GENERATED_DIR_NAMES = new Set(['node_modules', 'dist', 'coverage', '.turbo
  */
 function buildScaffoldTemplates(
   paths: ProjectPaths,
-  languages: readonly SupportedLanguage[],
-  toolScaffolds: readonly ToolScaffold[],
+  toolScaffolds: readonly RenderedToolScaffold[],
 ): Map<string, string> {
   const templates = new Map<string, string>();
-  for (const ts of toolScaffolds) {
-    if (!ts.scaffoldExamples) continue;
-    for (const file of ts.scaffoldExamples({ languages })) {
+  for (const toolScaffold of toolScaffolds) {
+    for (const file of toolScaffold.examples) {
       templates.set(
-        join(paths.userPluginDir(ts.layout.domain, file.kind), file.filename),
+        join(paths.userPluginDir(toolScaffold.layout.domain, file.kind), file.filename),
         file.content,
       );
     }
@@ -82,7 +80,31 @@ export function classifyFiles(
 ): PreExistingFile[] {
   if (!existsSync(paths.userSourceDir)) return [];
 
-  const templates = buildScaffoldTemplates(paths, currentLanguages, toolScaffolds);
+  const rendered = toolScaffolds.map((toolScaffold) => {
+    const examples = toolScaffold.scaffoldExamples?.({ languages: currentLanguages }) ?? [];
+    return {
+      identity: toolScaffold.identity,
+      layout: toolScaffold.layout,
+      examples,
+      stableExampleIds: toolScaffold.stableExampleIds?.() ?? [],
+    } satisfies RenderedToolScaffold;
+  });
+  return classifyFilesFromRenderedScaffolds(paths, currentLanguages, rendered);
+}
+
+/**
+ * Classify authored files from a callback-free scaffold snapshot. The durable
+ * Init planner can evaluate Tool hooks once and reuse the exact rendered files
+ * for config generation, planning, and stale-file classification.
+ */
+export function classifyFilesFromRenderedScaffolds(
+  paths: ProjectPaths,
+  currentLanguages: readonly SupportedLanguage[],
+  toolScaffolds: readonly RenderedToolScaffold[],
+): PreExistingFile[] {
+  if (!existsSync(paths.userSourceDir)) return [];
+
+  const templates = buildScaffoldTemplates(paths, toolScaffolds);
   const templateHashes = new Map<string, string>();
   for (const [absPath, body] of templates) {
     templateHashes.set(absPath, sha256(body));
@@ -94,11 +116,11 @@ export function classifyFiles(
   // carrying a complete-but-not-current id is a stale scaffold for a config the
   // project no longer uses; current-config ids are excluded so an edited
   // current-language example (no content-hash match) stays `custom`.
-  const completeIds = new Set<string>(toolScaffolds.flatMap((ts) => ts.stableExampleIds?.() ?? []));
+  const completeIds = new Set<string>(
+    toolScaffolds.flatMap((toolScaffold) => toolScaffold.stableExampleIds),
+  );
   const currentIds = new Set<string>(
-    toolScaffolds.flatMap((ts) =>
-      (ts.scaffoldExamples?.({ languages: currentLanguages }) ?? []).map((f) => f.stableId),
-    ),
+    toolScaffolds.flatMap((toolScaffold) => toolScaffold.examples.map((file) => file.stableId)),
   );
   const staleIds = [...completeIds].filter((id) => !currentIds.has(id));
 

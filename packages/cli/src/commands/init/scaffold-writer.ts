@@ -31,21 +31,30 @@ import type { ProjectPaths, ScaffoldContext } from '@opensip-cli/core';
 
 const GITIGNORE_LINE = 'opensip-cli/.runtime/';
 
+/** Pure byte renderer for Init's managed `.gitignore` entry. */
+export function renderGitignore(existing: string | undefined): {
+  readonly content: string;
+  readonly changed: boolean;
+} {
+  if (existing === undefined) {
+    return { content: `${GITIGNORE_LINE}\n`, changed: true };
+  }
+  if (existing.split('\n').some((line) => line.trim() === GITIGNORE_LINE)) {
+    return { content: existing, changed: false };
+  }
+
+  const separator = existing.endsWith('\n') ? '' : '\n';
+  return {
+    content: `${existing}${separator}\n# opensip-cli runtime state\n${GITIGNORE_LINE}\n`,
+    changed: true,
+  };
+}
+
 export function ensureGitignore(cwd: string): boolean {
   const path = join(cwd, '.gitignore');
-  if (!existsSync(path)) {
-    writeFileSync(path, `${GITIGNORE_LINE}\n`, 'utf8');
-    return true;
-  }
-
-  const content = readFileSync(path, 'utf8');
-  if (content.split('\n').some((line) => line.trim() === GITIGNORE_LINE)) {
-    return false; // already present, idempotent
-  }
-
-  const sep = content.endsWith('\n') ? '' : '\n';
-  writeFileSync(path, `${content}${sep}\n# opensip-cli runtime state\n${GITIGNORE_LINE}\n`, 'utf8');
-  return true;
+  const rendered = renderGitignore(existsSync(path) ? readFileSync(path, 'utf8') : undefined);
+  if (rendered.changed) writeFileSync(path, rendered.content, 'utf8');
+  return rendered.changed;
 }
 
 /**

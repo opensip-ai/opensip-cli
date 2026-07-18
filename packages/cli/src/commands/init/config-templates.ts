@@ -15,7 +15,7 @@ import { renderDocumentHeader, type TargetTemplateInput } from '@opensip-cli/con
 import { CLI_SUPPORTED_SCHEMA_VERSION } from '@opensip-cli/core';
 
 import type { SupportedLanguage } from './language-detection.js';
-import type { ToolScaffold } from '../shared.js';
+import type { RenderedToolScaffold, ToolScaffold } from '../shared.js';
 
 type TargetTemplate = TargetTemplateInput;
 
@@ -106,6 +106,35 @@ export function generateConfig(
   languages: readonly SupportedLanguage[],
   toolScaffolds: readonly ToolScaffold[],
 ): string {
+  const toolBlocks = toolScaffolds
+    .map((toolScaffold) => toolScaffold.scaffoldConfigBlock?.())
+    .filter((block): block is string => block !== undefined);
+  return generateConfigFromBlocks(languages, toolBlocks);
+}
+
+/**
+ * Render config bytes from a callback-free Tool scaffold snapshot.
+ *
+ * The future authored-plan builder evaluates every Tool hook once up front and
+ * feeds the resulting snapshot here. The existing `generateConfig` wrapper
+ * remains available while Init still accepts live contributions.
+ */
+export function generateConfigFromRenderedScaffolds(
+  languages: readonly SupportedLanguage[],
+  toolScaffolds: readonly RenderedToolScaffold[],
+): string {
+  return generateConfigFromBlocks(
+    languages,
+    toolScaffolds
+      .map((toolScaffold) => toolScaffold.configBlock)
+      .filter((block): block is string => block !== undefined),
+  );
+}
+
+function generateConfigFromBlocks(
+  languages: readonly SupportedLanguage[],
+  toolBlocks: readonly string[],
+): string {
   // The document-level skeleton (header, schemaVersion, globalExcludes, targets)
   // is rendered by @opensip-cli/config — the package that also OWNS + validates
   // those blocks (ADR-0023), so the scaffold cannot drift from what the
@@ -117,10 +146,5 @@ export function generateConfig(
     targets: targetTemplatesForLanguages(languages),
   });
 
-  const toolBlocks = toolScaffolds
-    .map((ts) => ts.scaffoldConfigBlock?.())
-    .filter((block): block is string => block !== undefined)
-    .join('');
-
-  return `${header}\n${toolBlocks}`;
+  return `${header}\n${toolBlocks.join('')}`;
 }

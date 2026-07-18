@@ -18,7 +18,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BUNDLED_TOOLS } from '../../../__tests__/test-utils/bundled-tools.js';
 import { composeAndValidateToolConfig } from '../../../bootstrap/config-and-capabilities.js';
-import { generateConfig } from '../config-templates.js';
+import { enumerateToolScaffolds } from '../../shared.js';
+import { generateConfig, generateConfigFromRenderedScaffolds } from '../config-templates.js';
 
 import type { ToolScaffold } from '../../shared.js';
 import type { SupportedLanguage } from '../language-detection.js';
@@ -43,6 +44,11 @@ function scaffolds(): ToolScaffold[] {
   return BUNDLED_TOOLS.filter((t) => t.pluginLayout !== undefined).map((t) => {
     const hooks = resolveToolHooks(t);
     return {
+      identity: {
+        stableId: t.metadata.id,
+        name: t.metadata.name,
+        version: t.metadata.version,
+      },
       layout: t.pluginLayout!,
       scaffoldExamples: hooks.scaffoldExamples,
       stableExampleIds: hooks.stableExampleIds,
@@ -84,5 +90,13 @@ describe('init config template round-trips through the composed schema', () => {
         env: {},
       }),
     ).not.toThrow();
+  });
+
+  it('renders identical config bytes from the callback-free Tool snapshot', () => {
+    const liveScaffolds = scaffolds();
+    const rendered = enumerateToolScaffolds(liveScaffolds, { languages: LANGUAGES });
+    expect(generateConfigFromRenderedScaffolds(LANGUAGES, rendered)).toBe(
+      generateConfig(LANGUAGES, liveScaffolds),
+    );
   });
 });

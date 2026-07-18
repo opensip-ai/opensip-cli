@@ -9,12 +9,19 @@ import {
   AGENT_GUIDANCE_START,
   buildManagedAgentGuidance,
   ensureOpenSipAgentGuidance,
+  listAgentGuidanceTargetSpecs,
+  renderAgentGuidanceTargets,
   upsertManagedBlock,
 } from './agent-guidance.js';
 
 import type { ToolScaffold } from '../shared.js';
 
 const FIT_SCAFFOLD: ToolScaffold = {
+  identity: {
+    stableId: '00000000-0000-4000-8000-0000000000f1',
+    name: 'fit',
+    version: '0.0.0',
+  },
   layout: { domain: 'fit', userSubdirs: [] },
 };
 
@@ -158,6 +165,58 @@ describe('buildManagedAgentGuidance', () => {
       const block = content.slice(start, end + AGENT_GUIDANCE_END.length);
       expect(block, name).toBe(expected);
     }
+  });
+});
+
+describe('renderAgentGuidanceTargets', () => {
+  it('renders path-neutral decisions from pre-read state without touching disk', () => {
+    const snapshots = listAgentGuidanceTargetSpecs().map((target) => ({
+      relativePath: target.relativePath,
+      status: 'missing' as const,
+      parentExists: false,
+    }));
+
+    const rendered = renderAgentGuidanceTargets(snapshots, {
+      toolScaffolds: [FIT_SCAFFOLD],
+    });
+
+    expect(rendered.changed).toBe(true);
+    expect(rendered.targets.find((target) => target.relativePath === 'AGENTS.md')).toMatchObject({
+      action: 'created',
+      relativePath: 'AGENTS.md',
+    });
+    expect(
+      rendered.targets.find((target) => target.relativePath === 'AGENTS.md')?.content,
+    ).toContain('opensip fit --recipe agent-fast');
+    expect(rendered.targets.find((target) => target.relativePath === 'CLAUDE.md')).toEqual({
+      action: 'skipped',
+      reason: 'missing',
+      relativePath: 'CLAUDE.md',
+    });
+    expect(existsSync(join(testDir, 'AGENTS.md'))).toBe(false);
+  });
+
+  it('rejects incomplete, duplicate, and unknown target snapshots', () => {
+    expect(() => renderAgentGuidanceTargets([], { toolScaffolds: [] })).toThrow(
+      /Missing agent-guidance snapshot/,
+    );
+    const snapshots = listAgentGuidanceTargetSpecs().map((target) => ({
+      relativePath: target.relativePath,
+      status: 'missing' as const,
+      parentExists: false,
+    }));
+    expect(() =>
+      renderAgentGuidanceTargets([...snapshots, snapshots[0]], { toolScaffolds: [] }),
+    ).toThrow(/Duplicate agent-guidance snapshot/);
+    expect(() =>
+      renderAgentGuidanceTargets(
+        [
+          ...snapshots,
+          { relativePath: '../escape', status: 'missing' as const, parentExists: true },
+        ],
+        { toolScaffolds: [] },
+      ),
+    ).toThrow(/Unknown agent-guidance target/);
   });
 });
 

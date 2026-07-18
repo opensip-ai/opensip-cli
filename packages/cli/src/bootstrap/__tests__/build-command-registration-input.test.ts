@@ -1,6 +1,7 @@
 import { logger, ToolRegistry } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
+import { enumerateToolScaffolds } from '../../commands/shared.js';
 import { buildCommandRegistrationInput } from '../build-command-registration-input.js';
 import * as dispatchHookMod from '../dispatch-external-tool-hook.js';
 
@@ -84,6 +85,11 @@ describe('buildCommandRegistrationInput', () => {
     expect(input.pluginLayouts).toEqual([{ domain: 'fit', userSubdirs: ['checks', 'recipes'] }]);
     expect(input.toolScaffolds).toEqual([
       {
+        identity: {
+          stableId: '00000000-0000-4000-8000-0000000000f1',
+          name: 'fit',
+          version: '0.0.0',
+        },
         layout: { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
         scaffoldExamples,
         stableExampleIds,
@@ -105,6 +111,57 @@ describe('buildCommandRegistrationInput', () => {
       'fit-run-worker',
     ]);
     expect(warn).not.toHaveBeenCalled();
+
+    const rendered = enumerateToolScaffolds(input.toolScaffolds, {
+      languages: ['typescript'],
+    });
+    expect(rendered).toEqual([
+      {
+        identity: {
+          stableId: '00000000-0000-4000-8000-0000000000f1',
+          name: 'fit',
+          version: '0.0.0',
+        },
+        layout: { domain: 'fit', userSubdirs: ['checks', 'recipes'] },
+        examples: [],
+        stableExampleIds: ['fit:example'],
+        configBlock: 'fit: {}',
+      },
+    ]);
+    expect(scaffoldExamples).toHaveBeenCalledOnce();
+    expect(stableExampleIds).toHaveBeenCalledOnce();
+    expect(scaffoldConfigBlock).toHaveBeenCalledOnce();
+  });
+
+  it('rejects duplicate durable identities before evaluating Tool hooks', () => {
+    const hook = vi.fn(() => []);
+    const shared = {
+      identity: { stableId: 'same', name: 'fit', version: '1.0.0' },
+      layout: { domain: 'fit', userSubdirs: [] },
+      scaffoldExamples: hook,
+    } as const;
+
+    expect(() =>
+      enumerateToolScaffolds(
+        [shared, { ...shared, identity: { ...shared.identity, name: 'sim' } }],
+        { languages: [] },
+      ),
+    ).toThrow(/Duplicate Tool scaffold stable id/);
+    expect(hook).not.toHaveBeenCalled();
+
+    expect(() =>
+      enumerateToolScaffolds(
+        [
+          shared,
+          {
+            ...shared,
+            identity: { ...shared.identity, stableId: 'different' },
+          },
+        ],
+        { languages: [] },
+      ),
+    ).toThrow(/Duplicate Tool scaffold name/);
+    expect(hook).not.toHaveBeenCalled();
   });
 
   it('warns when expected bundled scaffolding tools are absent', () => {

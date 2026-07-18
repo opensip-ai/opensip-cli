@@ -22,6 +22,7 @@ import {
   parseLanguageFlag,
   type SupportedLanguage,
 } from '../commands/init/language-detection.js';
+import { renderGitignore } from '../commands/init/scaffold-writer.js';
 import { executeInit } from '../commands/init.js';
 
 import type { ToolScaffold } from '../commands/shared.js';
@@ -34,6 +35,11 @@ function firstPartyScaffolds(): ToolScaffold[] {
     .map((t) => {
       const hooks = resolveToolHooks(t);
       return {
+        identity: {
+          stableId: t.metadata.id,
+          name: t.metadata.name,
+          version: t.metadata.version,
+        },
         layout: t.pluginLayout!,
         scaffoldExamples: hooks.scaffoldExamples,
         stableExampleIds: hooks.stableExampleIds,
@@ -592,6 +598,21 @@ describe('executeInit (.gitignore)', () => {
     const result = executeInit(makeArgs());
     expect(result.gitignoreUpdated).toBe(true);
     expect(readFileSync(join(testDir, '.gitignore'), 'utf8')).toContain('opensip-cli/.runtime/');
+  });
+
+  it('purely renders the same create, append, and idempotent bytes', () => {
+    const created = renderGitignore(undefined);
+    expect(created).toEqual({ content: 'opensip-cli/.runtime/\n', changed: true });
+
+    const appended = renderGitignore('node_modules/\n');
+    expect(appended).toEqual({
+      content: 'node_modules/\n\n# opensip-cli runtime state\nopensip-cli/.runtime/\n',
+      changed: true,
+    });
+    expect(renderGitignore(appended.content)).toEqual({
+      content: appended.content,
+      changed: false,
+    });
   });
 
   it('appends to an existing .gitignore', () => {

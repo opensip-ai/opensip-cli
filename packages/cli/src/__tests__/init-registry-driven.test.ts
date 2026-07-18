@@ -25,8 +25,12 @@ import { graphTool } from '@opensip-cli/graph';
 import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { classifyFiles } from '../commands/init/file-classifier.js';
+import {
+  classifyFiles,
+  classifyFilesFromRenderedScaffolds,
+} from '../commands/init/file-classifier.js';
 import { executeInit } from '../commands/init.js';
+import { enumerateToolScaffolds } from '../commands/shared.js';
 
 import type { ToolScaffold } from '../commands/shared.js';
 import type { Tool } from '@opensip-cli/core';
@@ -38,6 +42,11 @@ function scaffoldsFor(tools: readonly Tool[]): ToolScaffold[] {
     .map((t) => {
       const hooks = resolveToolHooks(t);
       return {
+        identity: {
+          stableId: t.metadata.id,
+          name: t.metadata.name,
+          version: t.metadata.version,
+        },
         layout: t.pluginLayout!,
         scaffoldExamples: hooks.scaffoldExamples,
         stableExampleIds: hooks.stableExampleIds,
@@ -83,6 +92,11 @@ describe('init — fixture tool scaffolds with no CLI change (ADR-0038)', () => 
     // A fake tool the CLI has never heard of. Nothing in packages/cli references
     // 'toy' / 'rules' — the directory + bytes come entirely from this contribution.
     const toyScaffold: ToolScaffold = {
+      identity: {
+        stableId: '00000000-0000-4000-8000-0000000000b1',
+        name: 'toy',
+        version: '1.0.0',
+      },
       layout: { domain: 'toy', userSubdirs: ['rules'] },
       scaffoldExamples: () => [
         {
@@ -180,6 +194,19 @@ describe('init — stale-detection over the aggregated full-language id universe
       scaffoldsFor([fitnessTool, simulationTool]),
     );
     expect(classified.find((f) => f.path === custom)?.classification).toBe('custom');
+  });
+
+  it('classifies from one callback-free Tool render with identical results', () => {
+    initTsOnly();
+    const paths = resolveProjectPaths(testDir);
+    const toolScaffolds = scaffoldsFor([fitnessTool, simulationTool]);
+    const rendered = enumerateToolScaffolds(toolScaffolds, {
+      languages: ['typescript'],
+    });
+
+    expect(classifyFilesFromRenderedScaffolds(paths, ['typescript'], rendered)).toEqual(
+      classifyFiles(paths, ['typescript'], toolScaffolds),
+    );
   });
 
   it('skips generated dependency and build output dirs while classifying', () => {

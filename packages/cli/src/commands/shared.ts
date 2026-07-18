@@ -31,10 +31,89 @@ import type {
  * init command iterates these instead of hardcoding fit/sim.
  */
 export interface ToolScaffold {
+  /**
+   * Durable identity captured from the admitted Tool descriptor. Init plans
+   * record this triple so replay can prove which renderer set produced the
+   * authored bytes without loading a newer Tool implementation.
+   */
+  readonly identity: ToolScaffoldIdentity;
   readonly layout: PluginLayout;
   readonly scaffoldExamples?: (ctx: ScaffoldContext) => readonly ScaffoldFile[];
   readonly stableExampleIds?: () => readonly string[];
   readonly scaffoldConfigBlock?: () => string;
+}
+
+/** Stable Tool identity recorded in an Init authored plan. */
+export interface ToolScaffoldIdentity {
+  readonly stableId: string;
+  readonly name: string;
+  readonly version: string;
+}
+
+/**
+ * Immutable snapshot of one Tool's scaffold hooks for a single context.
+ *
+ * This is deliberately callback-free: callers may render a plan, classify
+ * files, and serialize replay metadata from the same values without invoking a
+ * Tool hook more than once.
+ */
+export interface RenderedToolScaffold {
+  readonly identity: ToolScaffoldIdentity;
+  readonly layout: PluginLayout;
+  readonly examples: readonly ScaffoldFile[];
+  readonly stableExampleIds: readonly string[];
+  readonly configBlock?: string;
+}
+
+/**
+ * Evaluate each Tool scaffold hook exactly once, retaining the supplied
+ * registry order. Tool order is plan input: changing it intentionally changes
+ * a fresh authored plan, so this function does not sort contributions.
+ *
+ * Duplicate stable ids or current names would make durable replay attribution
+ * ambiguous. Reject them before invoking any Tool-owned callback.
+ */
+export function enumerateToolScaffolds(
+  toolScaffolds: readonly ToolScaffold[],
+  ctx: ScaffoldContext,
+): readonly RenderedToolScaffold[] {
+  assertUniqueToolScaffoldIdentities(toolScaffolds);
+
+  return toolScaffolds.map((toolScaffold) => {
+    const hookContext: ScaffoldContext = {
+      languages: [...ctx.languages],
+      ...(ctx.slugs === undefined ? {} : { slugs: [...ctx.slugs] }),
+    };
+    const examples = toolScaffold.scaffoldExamples?.(hookContext) ?? [];
+    const stableExampleIds = toolScaffold.stableExampleIds?.() ?? [];
+    const configBlock = toolScaffold.scaffoldConfigBlock?.();
+
+    return {
+      identity: { ...toolScaffold.identity },
+      layout: {
+        domain: toolScaffold.layout.domain,
+        userSubdirs: [...toolScaffold.layout.userSubdirs],
+      },
+      examples: examples.map((example) => ({ ...example })),
+      stableExampleIds: [...stableExampleIds],
+      ...(configBlock === undefined ? {} : { configBlock }),
+    };
+  });
+}
+
+function assertUniqueToolScaffoldIdentities(toolScaffolds: readonly ToolScaffold[]): void {
+  const stableIds = new Set<string>();
+  const names = new Set<string>();
+  for (const { identity } of toolScaffolds) {
+    if (stableIds.has(identity.stableId)) {
+      throw new Error(`Duplicate Tool scaffold stable id: ${identity.stableId}`);
+    }
+    if (names.has(identity.name)) {
+      throw new Error(`Duplicate Tool scaffold name: ${identity.name}`);
+    }
+    stableIds.add(identity.stableId);
+    names.add(identity.name);
+  }
 }
 
 /**

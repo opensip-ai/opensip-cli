@@ -30,6 +30,11 @@ function firstPartyScaffolds(): ToolScaffold[] {
     .map((t) => {
       const hooks = resolveToolHooks(t);
       return {
+        identity: {
+          stableId: t.metadata.id,
+          name: t.metadata.name,
+          version: t.metadata.version,
+        },
         layout: t.pluginLayout!,
         scaffoldExamples: hooks.scaffoldExamples,
         stableExampleIds: hooks.stableExampleIds,
