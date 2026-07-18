@@ -338,10 +338,9 @@ describe('runtime status view', () => {
     });
 
     expect(out).toContain('Adoption: not-needed');
-    expect(out).toContain('No storage conflict needs attention');
-    expect(out).toContain('Normal evidence reads and writes may continue');
-    expect(out).toContain('runtime state can evolve');
-    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toMatch(/no adoption conflict needs attention|No storage conflict needs attention/i);
+    expect(out).toContain('normal evidence reads and writes may continue');
+        expect(out).toContain('only operation-owned cleanup remains');
     expect(out).toContain('Source evidence: not preserved');
     expect(out).toContain('Run: opensip init');
     expect(out).not.toContain('matches its terminal manifest');
@@ -425,9 +424,9 @@ describe('runtime status view', () => {
 
     expect(out).toContain('Active: none');
     expect(out).toContain('Adoption: not-needed');
-    expect(out).toContain('No storage conflict needs attention');
-    expect(out).toContain('Normal evidence reads and writes may continue');
-    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toMatch(/no adoption conflict needs attention|No storage conflict needs attention/i);
+    expect(out).toContain('normal evidence reads and writes may continue');
+    expect(out).toContain('only operation-owned cleanup remains');
     expect(out).toContain('Source evidence: unknown from bounded status inspection');
     expect(out).not.toContain('Current evidence');
     expect(out).not.toContain('authoritative');
@@ -440,7 +439,7 @@ describe('runtime status view', () => {
       label: 'ready',
       adoptionState: 'ready',
       identityStrength: 'generation-bound',
-      guidance: 'Cached evidence is ready to move into this project',
+      guidance: 'User-cache evidence is ready to adopt into the project runtime',
     },
     {
       label: 'path-only',
@@ -473,7 +472,7 @@ describe('runtime status view', () => {
       expect(out).toContain(`Adoption: ${adoptionState}`);
       expect(out).toContain(guidance);
       expect(out).toContain('Cleanup: cleanup-pending');
-      expect(out).toContain('only operation-owned cleanup is pending');
+      expect(out).toContain('only operation-owned cleanup remains');
     },
   );
 
@@ -506,7 +505,7 @@ describe('runtime status view', () => {
     expect(out).toContain('Cache and project evidence both exist');
     expect(out).toContain('OpenSIP will not merge them');
     expect(out).toContain('Cleanup: cleanup-pending');
-    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toContain('only operation-owned cleanup remains');
     expect(out).toContain('Run: opensip init');
   });
 
@@ -534,7 +533,7 @@ describe('runtime status view', () => {
     expect(out).toContain('Legacy cache identity is unverified');
     expect(out).toContain('will not be attributed to the project');
     expect(out).toContain('Cleanup: cleanup-pending');
-    expect(out).toContain('only operation-owned cleanup is pending');
+    expect(out).toContain('only operation-owned cleanup remains');
     expect(out).toContain('Source evidence: unknown from bounded status inspection');
   });
 
@@ -653,8 +652,8 @@ describe('runtime status view', () => {
       nextCommands: ['opensip init', 'opensip uninstall --project --dry-run'],
     });
 
-    expect(out).toContain('Active: project · project initialized');
-    expect(out).toContain('Cached evidence is ready to move into this project');
+    expect(out).toContain('Active: project runtime · project initialized');
+    expect(out).toContain('User-cache evidence is ready to adopt into the project runtime');
     expect(out).toContain('opensip init');
     expect(out).not.toContain('opensip init --runtime-conflict keep-project');
   });

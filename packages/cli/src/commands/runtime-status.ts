@@ -412,6 +412,10 @@ function nextCommands(input: {
   if (input.initialized || input.projectLocationExists) {
     commands.push('opensip uninstall --project --dry-run');
   }
+  // Lifecycle escape when adoption is not blocked by recovery; never path-revealing.
+  if (!input.adoptionBlocked) {
+    commands.push('opensip uninstall --user --dry-run');
+  }
   return commands;
 }
 

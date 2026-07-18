@@ -8,7 +8,7 @@ import type { RuntimeStatusResult } from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
 const CLEANUP_PENDING_TEXT =
-  'Normal evidence reads and writes may continue, so runtime state can evolve; only operation-owned cleanup is pending.';
+  'Cleanup pending: normal evidence reads and writes may continue; only operation-owned cleanup remains. Retry the recovery command shown below.';
 
 function runtimeLocationText(
   location: RuntimeStatusResult['cache'] | RuntimeStatusResult['project'],
@@ -29,12 +29,17 @@ function adoptionGuidance(result: RuntimeStatusResult): {
   switch (result.adoptionState) {
     case 'ready': {
       return {
-        text: 'Cached evidence is ready to move into this project with opensip init.',
+        text: 'User-cache evidence is ready to adopt into the project runtime with opensip init (versioned config, examples, agent guidance, and project-local reports).',
         tone: 'success',
       };
     }
     case 'not-needed': {
-      return { text: 'No storage conflict needs attention.', tone: 'success' };
+      return {
+        text: result.projectInitialized
+          ? 'Project is initialized; no adoption conflict needs attention.'
+          : 'No storage conflict needs attention.',
+        tone: 'success',
+      };
     }
     case 'legacy-unverified': {
       if (
@@ -89,6 +94,7 @@ function adoptionGuidance(result: RuntimeStatusResult): {
 function activePlaneLabel(result: RuntimeStatusResult): string {
   if (result.inspectionUnavailable === true) return 'inspection unavailable';
   if (result.activePlane === 'cache') return 'user cache';
+  if (result.activePlane === 'project') return 'project runtime';
   return result.activePlane;
 }
 

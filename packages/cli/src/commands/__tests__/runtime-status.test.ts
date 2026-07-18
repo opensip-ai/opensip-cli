@@ -187,7 +187,7 @@ describe('executeRuntimeStatus', () => {
       project: { exists: false },
       evidenceDatabase: { exists: false },
       adoptionState: 'not-needed',
-      nextCommands: ['opensip init'],
+      nextCommands: ['opensip init', 'opensip uninstall --user --dry-run'],
     });
     expect(readdirSync(project)).toEqual(before);
     expect(existsSync(resolveUserPaths().userHomeDir)).toBe(false);
@@ -215,7 +215,12 @@ describe('executeRuntimeStatus', () => {
       project: { exists: false },
       evidenceDatabase: { exists: true, sizeBytes: 8 },
       adoptionState: 'ready',
-      nextCommands: ['opensip init', 'opensip runs list --json', 'opensip sessions list --json'],
+      nextCommands: [
+        'opensip init',
+        'opensip runs list --json',
+        'opensip sessions list --json',
+        'opensip uninstall --user --dry-run',
+      ],
     });
   });
 
@@ -230,7 +235,7 @@ describe('executeRuntimeStatus', () => {
       project: { exists: false },
       evidenceDatabase: { exists: false },
       adoptionState: 'not-needed',
-      nextCommands: ['opensip uninstall --project --dry-run'],
+      nextCommands: ['opensip uninstall --project --dry-run', 'opensip uninstall --user --dry-run'],
     });
   });
 
@@ -321,7 +326,10 @@ describe('executeRuntimeStatus', () => {
       cache: { exists: true, identityStrength: 'legacy-unverified' },
       evidenceDatabase: { exists: false },
       adoptionState: 'legacy-unverified',
-      nextCommands: ['opensip init --runtime-conflict use-cache'],
+      nextCommands: [
+        'opensip init --runtime-conflict use-cache',
+        'opensip uninstall --user --dry-run',
+      ],
     });
   });
 
@@ -431,7 +439,11 @@ describe('executeRuntimeStatus', () => {
       cache: { exists: true, identityStrength: 'generation-bound' },
       evidenceDatabase: { exists: false },
       adoptionState: 'ready',
-      nextCommands: ['opensip init', 'opensip uninstall --project --dry-run'],
+      nextCommands: [
+        'opensip init',
+        'opensip uninstall --project --dry-run',
+        'opensip uninstall --user --dry-run',
+      ],
     });
     expect(result.nextCommands).not.toContain('opensip init --runtime-conflict keep-project');
     expect(result.nextCommands).not.toContain('opensip init --runtime-conflict use-cache');
