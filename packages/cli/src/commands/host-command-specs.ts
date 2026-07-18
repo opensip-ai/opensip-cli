@@ -175,6 +175,7 @@ function buildConfigureSpec(): HostSpec {
 interface StatusOpts {
   cwd?: string;
   cwdExplicit?: boolean;
+  config?: string;
   projectContext?: ProjectContext;
 }
 
@@ -197,6 +198,7 @@ function buildStatusSpec(): HostSpec {
         return executeRuntimeStatus({
           cwd: opts.cwd ?? process.cwd(),
           cwdExplicit: opts.cwdExplicit === true,
+          ...(opts.config === undefined ? {} : { explicitConfigPath: opts.config }),
           projectContext: opts.projectContext,
         });
       },

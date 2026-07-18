@@ -10,7 +10,9 @@ const SPACER: ViewNode = { kind: 'spacer' };
 
 function runtimeLocationText(
   location: RuntimeStatusResult['cache'] | RuntimeStatusResult['project'],
+  inspectionUnavailable: boolean,
 ): string {
+  if (inspectionUnavailable) return 'inspection unavailable';
   if (!location.exists) return 'not present';
   if (location.sizeBytes === undefined) return 'present · size unavailable';
   const suffix =
@@ -23,11 +25,16 @@ function adoptionGuidance(result: RuntimeStatusResult): {
   readonly tone: Tone;
 } {
   if (result.cleanupPending === true) {
+    if (result.sourcePreserved === undefined) {
+      return {
+        text: 'Terminal cleanup is pending; source disposition is unknown until opensip init inspects recovery state.',
+        tone: 'warning',
+      };
+    }
     return {
-      text:
-        result.sourcePreserved === true
-          ? 'Terminal cleanup is pending; the source evidence remains preserved.'
-          : 'Terminal cleanup is pending; the current project evidence remains authoritative.',
+      text: result.sourcePreserved
+        ? 'Terminal cleanup is pending; the source evidence remains preserved.'
+        : 'Terminal cleanup is pending; the current project evidence remains authoritative.',
       tone: 'warning',
     };
   }
@@ -69,14 +76,22 @@ function adoptionGuidance(result: RuntimeStatusResult): {
 }
 
 function activePlaneLabel(result: RuntimeStatusResult): string {
+  if (result.inspectionUnavailable === true) return 'inspection unavailable';
   if (result.activePlane === 'cache') return 'user cache';
   return result.activePlane;
 }
 
 function evidenceDatabaseText(result: RuntimeStatusResult): string {
+  if (result.inspectionUnavailable === true) return 'inspection unavailable';
   if (!result.evidenceDatabase.exists) return 'not present';
   if (result.evidenceDatabase.sizeBytes === undefined) return 'present · size unavailable';
   return `present · ${formatBytes(result.evidenceDatabase.sizeBytes)}`;
+}
+
+function sourceDispositionText(sourcePreserved: boolean | undefined): string {
+  if (sourcePreserved === true) return 'preserved';
+  if (sourcePreserved === false) return 'not preserved';
+  return 'unknown from bounded status inspection';
 }
 
 /** Render the customer-visible status projection without revealing filesystem locations. */
@@ -87,19 +102,48 @@ export function viewRuntimeStatus(result: RuntimeStatusResult): ViewNode {
     line([{ text: 'OpenSIP evidence storage', bold: true }]),
     line([
       { text: 'Active: ', dim: true },
-      { text: activePlane, tone: result.activePlane === 'none' ? 'muted' : 'brand' },
       {
-        text: ` · project ${result.projectInitialized ? 'initialized' : 'not initialized'}`,
-        dim: true,
+        text: activePlane,
+        tone: result.activePlane === 'none' ? 'muted' : 'brand',
       },
+      ...(result.inspectionUnavailable === true
+        ? []
+        : [
+            {
+              text: ` · project ${result.projectInitialized ? 'initialized' : 'not initialized'}`,
+              dim: true,
+            } as const,
+          ]),
     ]),
     SPACER,
-    line([{ text: 'Cache: ', dim: true }, { text: runtimeLocationText(result.cache) }]),
-    ...(result.cache.exists
+    line([
+      { text: 'Cache: ', dim: true },
+      {
+        text: runtimeLocationText(result.cache, result.inspectionUnavailable === true),
+      },
+    ]),
+    ...(result.cache.exists && result.inspectionUnavailable !== true
       ? [line([{ text: 'Cache identity: ', dim: true }, { text: result.cache.identityStrength }])]
       : []),
-    line([{ text: 'Project: ', dim: true }, { text: runtimeLocationText(result.project) }]),
+    line([
+      { text: 'Project: ', dim: true },
+      {
+        text: runtimeLocationText(result.project, result.inspectionUnavailable === true),
+      },
+    ]),
     line([{ text: 'Evidence database: ', dim: true }, { text: evidenceDatabaseText(result) }]),
+    ...(result.leaseActivity === undefined
+      ? []
+      : [
+          line([
+            { text: 'Runtime activity: ', dim: true },
+            {
+              text:
+                `${String(result.leaseActivity.activeReaders)} other reader(s)` +
+                (result.leaseActivity.writerPending ? ' · writer pending' : ''),
+            },
+          ]),
+        ]),
     SPACER,
     line([
       { text: 'Adoption: ', dim: true },
@@ -116,7 +160,7 @@ export function viewRuntimeStatus(result: RuntimeStatusResult): ViewNode {
       ]),
       line([
         { text: 'Source evidence: ', dim: true },
-        { text: result.sourcePreserved === true ? 'preserved' : 'not preserved' },
+        { text: sourceDispositionText(result.sourcePreserved) },
       ]),
       line([{ text: `Run: ${result.recoveryCommand}`, tone: 'brand' }]),
     );

@@ -2,7 +2,7 @@
  * Table-driven bootstrap planner + post-bailout phase-order tests (ADR-0052).
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,9 +10,14 @@ import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import {
   defineCommand,
   LanguageRegistry,
+  projectCoordinationKey,
+  resolveEphemeralProjectPaths,
+  resolveUserPaths,
+  touchEphemeralRuntime,
   ToolRegistry,
   type CommandScopeRequirement,
   type CommandSpec,
+  type RuntimeReadLease,
   type ScopeContribution,
   type Tool,
   type ToolCliContext,
@@ -22,6 +27,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
+import { type RuntimeLeaseLifecycle } from '../../commands/host-runtime-access.js';
 import { type HostSpec } from '../../commands/host-subcommand-shared.js';
 import { type CliCommandsContext } from '../../commands/shared.js';
 import { BootstrapError } from '../bootstrap-error.js';
@@ -311,6 +317,242 @@ describe('executePostBailoutBootstrap phase ordering', () => {
 
     expect(phases).toEqual([...POST_BAILOUT_PHASE_ORDER]);
   });
+
+  it('runs ephemeral cache maintenance under the current project lease before scope build', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'opensip-maintenance-order-'));
+    writeFileSync(join(tmp, 'package.json'), '{"type":"module"}\n', 'utf8');
+    writeFileSync(join(tmp, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+    const plan = planPreActionBootstrap({
+      opts: {},
+      cwd: tmp,
+      cwdExplicit: true,
+      runId: 'RUN_cache_lease',
+      commandName: 'fit',
+      commandPath: 'fit',
+      commandScopes: COMMAND_SCOPES,
+    });
+    const order: string[] = [];
+    let leaseLive = true;
+    const lease = {
+      kind: 'runtime-read' as const,
+      ownerToken: 'a'.repeat(32),
+      acquiredAt: Date.now(),
+      coordinationKey: projectCoordinationKey(tmp),
+      release: () => {
+        leaseLive = false;
+      },
+    };
+    const lifecycle: RuntimeLeaseLifecycle = {
+      lease,
+      state: () => (leaseLive ? 'bootstrap' : 'released'),
+      transferToScope: vi.fn(),
+      releaseBootstrapOwned: vi.fn(),
+      finishAfterDatastoreClose: vi.fn(),
+    };
+    const maintainEphemeralCache = vi.fn(
+      (
+        _project: typeof plan.project,
+        _logger: unknown,
+        observedLifecycle: RuntimeLeaseLifecycle | undefined,
+      ) => {
+        expect(leaseLive).toBe(true);
+        expect(observedLifecycle).toBe(lifecycle);
+        order.push('cache-maintenance');
+        return Promise.resolve();
+      },
+    );
+
+    const result = await executePostBailoutBootstrap(
+      {
+        plan,
+        runtime: runtimeWith([]),
+        version: '0.0.0-test',
+        noCloud: true,
+        runtimeLeaseLifecycle: lifecycle,
+      },
+      {
+        recordPhase: (phase) => order.push(phase),
+        createRunLogger: () => ({
+          debug: vi.fn(),
+          info: vi.fn(),
+          warn: vi.fn(),
+          error: vi.fn(),
+        }),
+        enterScope: () => undefined,
+        isScopeEntered: () => true,
+        checkForUpdate: () => undefined,
+        startProfiling: () => Promise.resolve(undefined),
+        maybeInitializeOwningTool: () => Promise.resolve(),
+        loadOwningToolCapabilities: () => Promise.resolve(0),
+        maintainEphemeralCache,
+      },
+    );
+
+    expect(maintainEphemeralCache).toHaveBeenCalledOnce();
+    expect(order.indexOf(PRE_ACTION_PHASES.runtimeLease)).toBeLessThan(
+      order.indexOf('cache-maintenance'),
+    );
+    expect(order.indexOf('cache-maintenance')).toBeLessThan(
+      order.indexOf(PRE_ACTION_PHASES.buildScope),
+    );
+    result.scope.dispose();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('protects the current cache while actual lease-authorized maintenance prunes an orphan', async () => {
+    const sandbox = mkdtempSync(join(tmpdir(), 'opensip-maintenance-real-'));
+    const home = join(sandbox, 'home');
+    const project = join(sandbox, 'project');
+    const previousHome = process.env.HOME;
+    mkdirSync(home);
+    mkdirSync(project);
+    process.env.HOME = home;
+    try {
+      writeFileSync(join(project, 'package.json'), '{"type":"module"}\n', 'utf8');
+      writeFileSync(join(project, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+      const plan = planPreActionBootstrap({
+        opts: {},
+        cwd: project,
+        cwdExplicit: true,
+        runId: 'RUN_cache_real_lease',
+        commandName: 'fit',
+        commandPath: 'fit',
+        commandScopes: COMMAND_SCOPES,
+      });
+      const current = resolveEphemeralProjectPaths(project);
+      const orphan = resolveEphemeralProjectPaths(join(sandbox, 'deleted-project'));
+      const now = Date.now();
+      touchEphemeralRuntime(current, now - 60 * 24 * 60 * 60 * 1000);
+      touchEphemeralRuntime(orphan, now - 60 * 24 * 60 * 60 * 1000);
+      const lease: RuntimeReadLease = {
+        kind: 'runtime-read',
+        ownerToken: 'b'.repeat(32),
+        acquiredAt: now,
+        coordinationKey: current.coordinationKey,
+        release: vi.fn(),
+      };
+      const lifecycle: RuntimeLeaseLifecycle = {
+        lease,
+        state: () => 'bootstrap',
+        transferToScope: vi.fn(),
+        releaseBootstrapOwned: vi.fn(),
+        finishAfterDatastoreClose: vi.fn(),
+      };
+
+      const result = await executePostBailoutBootstrap(
+        {
+          plan,
+          runtime: runtimeWith([]),
+          version: '0.0.0-test',
+          noCloud: true,
+          runtimeLeaseLifecycle: lifecycle,
+        },
+        {
+          createRunLogger: () => ({
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+          }),
+          enterScope: () => undefined,
+          isScopeEntered: () => true,
+          checkForUpdate: () => undefined,
+          startProfiling: () => Promise.resolve(undefined),
+          maybeInitializeOwningTool: () => Promise.resolve(),
+          loadOwningToolCapabilities: () => Promise.resolve(0),
+        },
+      );
+
+      expect(existsSync(current.runtimeDir)).toBe(true);
+      expect(existsSync(orphan.runtimeDir)).toBe(false);
+      result.scope.dispose();
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['missing', 'mismatched'] as const)(
+    'skips actual cache maintenance when the project lease is %s',
+    async (leaseState) => {
+      const sandbox = mkdtempSync(join(tmpdir(), `opensip-maintenance-${leaseState}-`));
+      const home = join(sandbox, 'home');
+      const project = join(sandbox, 'project');
+      const previousHome = process.env.HOME;
+      mkdirSync(home);
+      mkdirSync(project);
+      process.env.HOME = home;
+      try {
+        writeFileSync(join(project, 'package.json'), '{"type":"module"}\n', 'utf8');
+        writeFileSync(join(project, 'tsconfig.json'), '{"compilerOptions":{}}\n', 'utf8');
+        const plan = planPreActionBootstrap({
+          opts: {},
+          cwd: project,
+          cwdExplicit: true,
+          runId: `RUN_cache_${leaseState}`,
+          commandName: 'fit',
+          commandPath: 'fit',
+          commandScopes: COMMAND_SCOPES,
+        });
+        const current = resolveEphemeralProjectPaths(project);
+        const orphan = resolveEphemeralProjectPaths(join(sandbox, 'deleted-project'));
+        touchEphemeralRuntime(orphan, Date.now() - 60 * 24 * 60 * 60 * 1000);
+        const mismatchedLease: RuntimeReadLease = {
+          kind: 'runtime-read',
+          ownerToken: 'c'.repeat(32),
+          acquiredAt: Date.now(),
+          coordinationKey: '0'.repeat(24),
+          release: vi.fn(),
+        };
+        const lifecycle: RuntimeLeaseLifecycle | undefined =
+          leaseState === 'missing'
+            ? undefined
+            : {
+                lease: mismatchedLease,
+                state: () => 'bootstrap',
+                transferToScope: vi.fn(),
+                releaseBootstrapOwned: vi.fn(),
+                finishAfterDatastoreClose: vi.fn(),
+              };
+
+        const result = await executePostBailoutBootstrap(
+          {
+            plan,
+            runtime: runtimeWith([]),
+            version: '0.0.0-test',
+            noCloud: true,
+            runtimeLeaseLifecycle: lifecycle,
+          },
+          {
+            createRunLogger: () => ({
+              debug: vi.fn(),
+              info: vi.fn(),
+              warn: vi.fn(),
+              error: vi.fn(),
+            }),
+            enterScope: () => undefined,
+            isScopeEntered: () => true,
+            checkForUpdate: () => undefined,
+            startProfiling: () => Promise.resolve(undefined),
+            maybeInitializeOwningTool: () => Promise.resolve(),
+            loadOwningToolCapabilities: () => Promise.resolve(0),
+          },
+        );
+
+        expect(existsSync(current.runtimeDir)).toBe(false);
+        expect(existsSync(orphan.runtimeDir)).toBe(true);
+        expect(existsSync(join(resolveUserPaths().ephemeralProjectsDir, '.last-prune'))).toBe(
+          false,
+        );
+        result.scope.dispose();
+      } finally {
+        if (previousHome === undefined) delete process.env.HOME;
+        else process.env.HOME = previousHome;
+        rmSync(sandbox, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('awaits profiler startup before running tool preflight', async () => {
     const plan = planPreActionBootstrap({

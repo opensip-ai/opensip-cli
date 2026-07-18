@@ -360,6 +360,35 @@ describe('lease lifecycle and event safety', () => {
     expect(buffer.drain()).toEqual({ events: [], dropped: 0 });
   });
 
+  it('preserves only the closed cache-metadata operation vocabulary', () => {
+    const buffer = createSafeRuntimeLeaseEventBuffer();
+    buffer.onEvent({
+      kind: 'acquire.complete',
+      lockPath: '/private/cache/.project-marker.lock',
+      resource: 'runtime',
+      operation: 'ephemeral-marker',
+    });
+    buffer.onEvent({
+      kind: 'acquire.complete',
+      lockPath: '/private/cache/.last-prune.lock',
+      resource: 'runtime',
+      operation: 'ephemeral-prune-stamp',
+    });
+
+    expect(buffer.drain().events).toEqual([
+      {
+        kind: 'acquire.complete',
+        resource: 'runtime',
+        operation: 'ephemeral-marker',
+      },
+      {
+        kind: 'acquire.complete',
+        resource: 'runtime',
+        operation: 'ephemeral-prune-stamp',
+      },
+    ]);
+  });
+
   it('forwards safe release events after the run logger attaches', () => {
     const buffer = createSafeRuntimeLeaseEventBuffer();
     const events: unknown[] = [];

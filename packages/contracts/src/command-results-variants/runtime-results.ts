@@ -148,6 +148,15 @@ export interface RuntimeAdoptionResult {
 
 interface RuntimeStatusBase {
   readonly type: 'runtime-status';
+  /**
+   * True when runtime coordination prevented a safe storage-tree read.
+   *
+   * While present, `projectInitialized`, `activePlane`, and the required
+   * location/evidence fields are placeholders and must not be interpreted as
+   * storage facts. Keeping this flag on the result lets status fail closed
+   * without widening every projection field into a three-state value.
+   */
+  readonly inspectionUnavailable?: true;
   readonly projectInitialized: boolean;
   readonly activePlane: RuntimeStoragePlane;
   readonly cache: RuntimeCacheLocationProjection;
@@ -174,7 +183,8 @@ interface RuntimeStatusRecoveryRequired {
   readonly adoptionState: 'recovery-required';
   readonly recoveryPhase: RuntimeRecoveryPhase;
   readonly recoveryReasonCode: RuntimeRecoveryReasonCode;
-  readonly sourcePreserved: boolean;
+  /** Omitted when the bounded header alone cannot prove source disposition. */
+  readonly sourcePreserved?: boolean;
   readonly cleanupPending?: never;
   readonly recoveryCommand: RuntimeRecoveryCommand;
 }
@@ -183,7 +193,8 @@ interface RuntimeStatusCleanupPending {
   readonly adoptionState: Exclude<RuntimeAdoptionState, 'recovery-required'>;
   readonly recoveryPhase: 'cleanup';
   readonly recoveryReasonCode: 'cleanup-pending';
-  readonly sourcePreserved: boolean;
+  /** Omitted when the bounded header alone cannot prove source disposition. */
+  readonly sourcePreserved?: boolean;
   readonly cleanupPending: true;
   readonly recoveryCommand: 'opensip init';
 }

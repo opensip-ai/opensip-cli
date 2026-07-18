@@ -195,6 +195,7 @@ export type {
   EmptyRuntimeLeaseKeyCleanup,
   GlobalRuntimeMaintenanceLease,
   GlobalRuntimeMaintenancePosture,
+  ListActiveRuntimeLeaseKeysInput,
   RecoveryHeaderInspection,
   RuntimeAccessLease,
   RuntimeExclusiveLease,
@@ -278,11 +279,11 @@ export {
   EPHEMERAL_MARKER_MAX_BYTES,
   EPHEMERAL_MARKER_VERSION,
   inspectEphemeralRuntimeCandidates,
-  pruneEphemeralRuntimes,
   readEphemeralMarker,
   shouldPruneEphemeralRuntimes,
   touchEphemeralRuntime,
 } from './lib/ephemeral-runtime.js';
+export { pruneEphemeralRuntimes } from './lib/ephemeral-runtime-prune.js';
 export type {
   EphemeralMarker,
   EphemeralMarkerInvalidReason,

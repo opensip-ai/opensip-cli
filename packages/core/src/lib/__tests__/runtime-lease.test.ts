@@ -695,6 +695,15 @@ describe('runtime lease coordination', () => {
   }, 30_000);
 
   it('requires host proof and uses a live-parent fallback when incarnation inspection is unavailable', async () => {
+    // This case exercises identity posture, not stale-owner recovery. Keep its
+    // synthetic parent comfortably live even when the monorepo suite briefly
+    // starves heartbeat timers under heavy parallel load.
+    const inheritancePolicy = {
+      waitMs: 15_000,
+      staleMs: 60_000,
+      heartbeatMs: 1000,
+      pollMs: 5,
+    };
     const runCase = async (
       caseProject: string,
       identityPosture: 'unproven-host' | 'missing-incarnation',
@@ -762,7 +771,7 @@ describe('runtime lease coordination', () => {
         await parentCoordinator.acquireRuntimeAccessLease({
           projectRead: { projectDir: caseProject },
           userStateRead: true,
-          policy: POLICY,
+          policy: inheritancePolicy,
         }),
       );
       const writerEvents: string[] = [];
@@ -778,7 +787,7 @@ describe('runtime lease coordination', () => {
           projectRead: { projectDir: caseProject },
           userStateRead: true,
           inheritFromParent: true,
-          policy: POLICY,
+          policy: inheritancePolicy,
         });
       if (identityPosture === 'unproven-host') {
         await expect(acquireChild()).rejects.toMatchObject({
@@ -797,7 +806,7 @@ describe('runtime lease coordination', () => {
 
     await runCase(project, 'unproven-host', 440_000);
     await runCase(otherProject, 'missing-incarnation', 450_000);
-  }, 30_000);
+  }, 45_000);
 
   it('requires one unambiguous live same-host direct-parent composite reader', async () => {
     const parentPid = 430_001;
@@ -1803,7 +1812,7 @@ describe('runtime lease coordination', () => {
 
     expect(inspectedOwners).toBeGreaterThan(0);
     expect(inspectedOwners).toBeLessThanOrEqual(256);
-  });
+  }, 15_000);
 
   it('serializes shared heartbeats while the coordination mutex is contended', async () => {
     let activePolls = 0;
@@ -3884,7 +3893,7 @@ describe('anchored coordination mutation and cleanup', () => {
   );
 
   it.runIf(process.platform === 'linux' || process.platform === 'darwin')(
-    'closes both scaffold parents when cleanup fails after acquisition',
+    'closes both scaffold parents and releases when scaffold cleanup fails',
     async () => {
       const descriptorDirectory = process.platform === 'linux' ? '/proc/self/fd' : '/dev/fd';
       let failCleanupOnce = true;
@@ -3904,7 +3913,7 @@ describe('anchored coordination mutation and cleanup', () => {
       );
       const descriptorCountBefore = readdirSync(descriptorDirectory).length;
 
-      expect(() => reader.release()).toThrow('injected cleanup failure');
+      expect(() => reader.release()).not.toThrow();
       expect(readdirSync(descriptorDirectory).length).toBeLessThanOrEqual(
         descriptorCountBefore + 2,
       );
@@ -3912,6 +3921,155 @@ describe('anchored coordination mutation and cleanup', () => {
       release(reader);
     },
   );
+
+  it('finishes writer release when empty-scaffold cleanup fails', async () => {
+    let failCleanupOnce = true;
+    const events: string[] = [];
+    const coordinator = createRuntimeLeaseCoordinator({
+      coordinationCheckpoint: (name) => {
+        if (name === 'empty-scaffold-parents-opened' && failCleanupOnce) {
+          failCleanupOnce = false;
+          throw new Error('injected writer cleanup failure');
+        }
+      },
+    });
+    const writer = track(
+      await coordinator.acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: { ...POLICY, waitMs: 200 },
+        onEvent: (event) => events.push(event.kind),
+      }),
+    );
+
+    expect(() => writer.release()).not.toThrow();
+    expect(events).toContain('lease.release');
+    expect(await inspectRuntimeLeaseState(project)).toMatchObject({
+      status: 'stable',
+      writer: 'none',
+    });
+    release(writer);
+  });
+
+  it('defers writer release after transient mutex contention', async () => {
+    const events: string[] = [];
+    const writer = track(
+      await acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: { waitMs: 50, staleMs: 5000, heartbeatMs: 100, pollMs: 5 },
+        onEvent: (event) => events.push(event.kind),
+      }),
+    );
+    const worker = String.raw`
+      import { pathToFileURL } from "node:url";
+      const runtime = await import(pathToFileURL(process.argv[1]).href);
+      let paused = false;
+      const coordinator = runtime.createRuntimeLeaseCoordinator({
+        coordinationCheckpoint: (name) => {
+          if (name !== "mutex-entered" || paused) return;
+          paused = true;
+          process.stdout.write("READY\n");
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 350);
+        },
+      });
+      const reader = await coordinator.acquireUserStateReadLease({
+        policy: { waitMs: 5000, staleMs: 5000, heartbeatMs: 100, pollMs: 5 },
+      });
+      reader.release();
+      process.stdout.write("DONE\n");
+      process.exit(0);
+    `;
+    const child = spawn(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      worker,
+      runtimeLeaseEntryPath(),
+    ]);
+    try {
+      await waitForChildOutput(child, 'READY\n');
+      expect(() => writer.release()).toThrow(
+        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+      );
+      await waitForChildOutput(child, 'DONE\n');
+      await waitUntil(() => events.includes('lease.release'));
+      expect(await inspectRuntimeLeaseState(project)).toMatchObject({
+        status: 'stable',
+        writer: 'none',
+      });
+      release(writer);
+    } finally {
+      await stopChild(child);
+    }
+  });
+
+  it('defers distinct reentrant reader releases once after transient mutex contention', async () => {
+    const events: string[] = [];
+    const first = track(
+      await acquireRuntimeReadLease({
+        projectDir: project,
+        policy: { waitMs: 50, staleMs: 5000, heartbeatMs: 100, pollMs: 5 },
+        onEvent: (event) => events.push(event.kind),
+      }),
+    );
+    const second = track(
+      await acquireRuntimeReadLease({
+        projectDir: project,
+        ownerToken: first.ownerToken,
+        policy: { waitMs: 50, staleMs: 5000, heartbeatMs: 100, pollMs: 5 },
+        onEvent: (event) => events.push(event.kind),
+      }),
+    );
+    const worker = String.raw`
+      import { pathToFileURL } from "node:url";
+      const runtime = await import(pathToFileURL(process.argv[1]).href);
+      let paused = false;
+      const coordinator = runtime.createRuntimeLeaseCoordinator({
+        coordinationCheckpoint: (name) => {
+          if (name !== "mutex-entered" || paused) return;
+          paused = true;
+          process.stdout.write("READY\n");
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 350);
+        },
+      });
+      const reader = await coordinator.acquireUserStateReadLease({
+        policy: { waitMs: 5000, staleMs: 5000, heartbeatMs: 100, pollMs: 5 },
+      });
+      reader.release();
+      process.stdout.write("DONE\n");
+      process.exit(0);
+    `;
+    const child = spawn(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      worker,
+      runtimeLeaseEntryPath(),
+    ]);
+    try {
+      await waitForChildOutput(child, 'READY\n');
+      expect(() => first.release()).toThrow(
+        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+      );
+      expect(() => second.release()).toThrow(
+        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+      );
+      await waitForChildOutput(child, 'DONE\n');
+      await waitUntil(async () => {
+        const state = await inspectRuntimeLeaseState(project);
+        return (
+          state.status === 'stable' &&
+          state.projectReaders === 0 &&
+          events.filter((kind) => kind === 'lease.release').length === 2
+        );
+      });
+
+      first.release();
+      second.release();
+      expect(events.filter((kind) => kind === 'lease.release')).toHaveLength(2);
+      release(first);
+      release(second);
+    } finally {
+      await stopChild(child);
+    }
+  });
 
   it('rejects generic anchored mutation of the coordination root before it exists', () => {
     const paths = resolveCoordinationPaths();

@@ -319,6 +319,12 @@ export interface BusyRuntimeLeaseStateInspection {
 export type RuntimeLeaseStateInspection =
   StableRuntimeLeaseStateInspection | BusyRuntimeLeaseStateInspection;
 
+/** Optional bounded coordination policy for active-key cache-prune inspection. */
+export interface ListActiveRuntimeLeaseKeysInput {
+  readonly policy?: Partial<RuntimeLeasePolicy>;
+  readonly onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void;
+}
+
 /** Portable Node currently exposes no proven descriptor-relative renameat/unlinkat seam. */
 export const COORDINATION_MUTATION_STRATEGY = 'portable-anchored' as const;
 
@@ -4180,6 +4186,22 @@ function reserveDeferredPublicationCleanup(key: string): DeferredPublicationClea
   });
 }
 
+function deferRuntimeLeaseRelease(
+  cleanupKey: string,
+  release: () => Promise<void>,
+  baseDelayMs: number,
+): boolean {
+  try {
+    const reservation = reserveDeferredPublicationCleanup(`lease-release:${cleanupKey}`);
+    reservation.defer(release, baseDelayMs);
+    return true;
+  } catch {
+    // A prior retry for this exact lease is already registered, or the bounded
+    // registry is saturated. The live heartbeat remains the safety fallback.
+    return false;
+  }
+}
+
 async function cleanupFailedSharedRegistration(
   ownerToken: string,
   coordinationKey: string | undefined,
@@ -4492,7 +4514,12 @@ function removeSharedRegistrationWhileOwned(
   // Cleanup follows both exact decrements. If either dimension faults, a retry
   // can still reach the other record before the project scaffold disappears.
   if (wantsProject && coordinationKey !== undefined) {
-    cleanupEmptyRuntimeLeaseKeyWhileOwned(paths, coordinationKey, policy, environment, guard);
+    try {
+      cleanupEmptyRuntimeLeaseKeyWhileOwned(paths, coordinationKey, policy, environment, guard);
+    } catch {
+      // Exact reference authority is already removed from every requested
+      // dimension. Empty-scaffold cleanup is best-effort hygiene.
+    }
   }
 }
 
@@ -4525,6 +4552,62 @@ function releaseSharedDimensions(
   );
 }
 
+function deferredReleasePolicy(policy: RuntimeLeasePolicy): RuntimeLeasePolicy {
+  return {
+    ...policy,
+    waitMs: Math.min(250, Math.max(50, policy.waitMs)),
+    pollMs: Math.min(10, policy.pollMs),
+  };
+}
+
+async function releaseSharedDimensionsAsync(
+  ownerToken: string,
+  coordinationKey: string | undefined,
+  wantsProject: boolean,
+  wantsUser: boolean,
+  referenceToken: string,
+  input: RuntimeLeaseCommonInput,
+  originalPolicy: RuntimeLeasePolicy,
+): Promise<void> {
+  const environment = runtimeEnvironment(input);
+  const policy = deferredReleasePolicy(originalPolicy);
+  await withCoordinationMutex(
+    policy,
+    input.onEvent,
+    policy.waitMs,
+    (paths, guard) =>
+      removeSharedRegistrationWhileOwned(
+        paths,
+        ownerToken,
+        coordinationKey,
+        wantsProject,
+        wantsUser,
+        referenceToken,
+        policy,
+        environment,
+        guard,
+      ),
+    environment,
+  );
+}
+
+function createLeaseReleaseFinalizer(
+  timer: ReturnType<typeof setInterval>,
+  input: RuntimeLeaseCommonInput,
+  operation: RuntimeLeaseWaitKind,
+): { readonly isReleased: () => boolean; readonly finish: () => void } {
+  let released = false;
+  return {
+    isReleased: () => released,
+    finish: () => {
+      if (released) return;
+      clearInterval(timer);
+      released = true;
+      emitLeaseEvent(input, { kind: 'lease.release', operation });
+    },
+  };
+}
+
 function sharedReleaseHandle(
   acquired: Awaited<ReturnType<typeof acquireSharedDimensions>>,
   wantsProject: boolean,
@@ -4532,22 +4615,44 @@ function sharedReleaseHandle(
   input: RuntimeLeaseCommonInput,
   operation: RuntimeLeaseWaitKind,
 ): () => void {
-  let released = false;
-  return () => {
-    if (released) return;
-    releaseSharedDimensions(
-      acquired.ownerToken,
-      acquired.coordinationKey,
-      wantsProject,
-      wantsUser,
-      acquired.referenceToken,
-      input,
-      acquired.policy,
-    );
-    clearInterval(acquired.timer);
-    released = true;
-    emitLeaseEvent(input, { kind: 'lease.release', operation });
+  let deferredScheduled = false;
+  const finalizer = createLeaseReleaseFinalizer(acquired.timer, input, operation);
+  const release = (): void => {
+    if (finalizer.isReleased()) return;
+    try {
+      releaseSharedDimensions(
+        acquired.ownerToken,
+        acquired.coordinationKey,
+        wantsProject,
+        wantsUser,
+        acquired.referenceToken,
+        input,
+        acquired.policy,
+      );
+      finalizer.finish();
+    } catch (error) {
+      if (!deferredScheduled) {
+        deferredScheduled = deferRuntimeLeaseRelease(
+          `${operation}:${acquired.ownerToken}:${acquired.referenceToken}`,
+          async () => {
+            await releaseSharedDimensionsAsync(
+              acquired.ownerToken,
+              acquired.coordinationKey,
+              wantsProject,
+              wantsUser,
+              acquired.referenceToken,
+              input,
+              acquired.policy,
+            );
+            finalizer.finish();
+          },
+          acquired.policy.pollMs,
+        );
+      }
+      throw error;
+    }
   };
+  return release;
 }
 
 function captureRuntimeIdentity<T extends RuntimeLeaseCommonInput>(input: T): T {
@@ -5165,44 +5270,96 @@ async function acquireWriter(
   }
 }
 
+function removeWriterRegistrationWhileOwned(
+  paths: CoordinationPaths,
+  acquired: Awaited<ReturnType<typeof acquireWriter>>,
+  input: RuntimeLeaseCommonInput,
+  environment: RuntimeLeaseEnvironment,
+  guard: RuntimeMutexGuard,
+  coordinationKey?: string,
+): void {
+  removeWriterRequest(paths, acquired.writer, acquired.policy, input.onEvent, environment, guard);
+  if (coordinationKey === undefined) return;
+  try {
+    cleanupEmptyRuntimeLeaseKeyWhileOwned(
+      paths,
+      coordinationKey,
+      acquired.policy,
+      environment,
+      guard,
+    );
+  } catch {
+    // Exact writer authority is already removed. Empty-scaffold cleanup is
+    // hygiene and must not retain the live heartbeat.
+  }
+}
+
+async function releaseWriterAsync(
+  acquired: Awaited<ReturnType<typeof acquireWriter>>,
+  input: RuntimeLeaseCommonInput,
+  coordinationKey?: string,
+): Promise<void> {
+  const environment = runtimeEnvironment(input);
+  const policy = deferredReleasePolicy(acquired.policy);
+  await withCoordinationMutex(
+    policy,
+    input.onEvent,
+    policy.waitMs,
+    (paths, guard) =>
+      removeWriterRegistrationWhileOwned(
+        paths,
+        acquired,
+        input,
+        environment,
+        guard,
+        coordinationKey,
+      ),
+    environment,
+  );
+}
+
 function writerReleaseHandle(
   acquired: Awaited<ReturnType<typeof acquireWriter>>,
   input: RuntimeLeaseCommonInput,
   operation: WriterAcquisitionOptions['waitKind'],
   coordinationKey?: string,
 ): () => void {
-  let released = false;
-  return () => {
-    if (released) return;
+  let deferredScheduled = false;
+  const finalizer = createLeaseReleaseFinalizer(acquired.timer, input, operation);
+  const release = (): void => {
+    if (finalizer.isReleased()) return;
     const environment = runtimeEnvironment(input);
-    withCoordinationMutexSync(
-      acquired.policy,
-      input.onEvent,
-      (paths, guard) => {
-        removeWriterRequest(
-          paths,
-          acquired.writer,
-          acquired.policy,
-          input.onEvent,
-          environment,
-          guard,
-        );
-        if (coordinationKey !== undefined) {
-          cleanupEmptyRuntimeLeaseKeyWhileOwned(
+    try {
+      withCoordinationMutexSync(
+        acquired.policy,
+        input.onEvent,
+        (paths, guard) =>
+          removeWriterRegistrationWhileOwned(
             paths,
-            coordinationKey,
-            acquired.policy,
+            acquired,
+            input,
             environment,
             guard,
-          );
-        }
-      },
-      environment,
-    );
-    clearInterval(acquired.timer);
-    released = true;
-    emitLeaseEvent(input, { kind: 'lease.release', operation });
+            coordinationKey,
+          ),
+        environment,
+      );
+      finalizer.finish();
+    } catch (error) {
+      if (!deferredScheduled) {
+        deferredScheduled = deferRuntimeLeaseRelease(
+          `${operation}:${acquired.ownerToken}:${String(acquired.writer.sequence)}`,
+          async () => {
+            await releaseWriterAsync(acquired, input, coordinationKey);
+            finalizer.finish();
+          },
+          acquired.policy.pollMs,
+        );
+      }
+      throw error;
+    }
   };
+  return release;
 }
 
 function attachWriterAuthority<T extends RuntimeExclusiveLease | GlobalRuntimeMaintenanceLease>(
@@ -5740,17 +5897,19 @@ export async function inspectRuntimeLeaseState(
  * Unsafe, malformed, or over-cap state throws rather than returning a false
  * empty set; pruning must treat that uncertainty as "skip deletion".
  */
-export async function listActiveRuntimeLeaseKeys(): Promise<readonly string[]> {
+export async function listActiveRuntimeLeaseKeys(
+  input: ListActiveRuntimeLeaseKeysInput = {},
+): Promise<readonly string[]> {
   const paths = resolveCoordinationPaths();
   if (coordinationRootPresence(paths) === 'absent') return [];
   assertExistingScaffold(paths);
-  const policy = normalizePolicy();
-  return withCoordinationMutex(policy, undefined, policy.waitMs, (lockedPaths, guard) => {
+  const policy = normalizePolicy(input.policy);
+  return withCoordinationMutex(policy, input.onEvent, policy.waitMs, (lockedPaths, guard) => {
     let state = cleanStaleWriters(
       lockedPaths,
       readLeaseState(lockedPaths),
       policy,
-      undefined,
+      input.onEvent,
       DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
       guard,
     );
@@ -5776,22 +5935,28 @@ export async function listActiveRuntimeLeaseKeys(): Promise<readonly string[]> {
       );
       // Open, closed, and malformed journals all preserve the source cache key
       // until Init recovery or explicit discard has completed.
-      if (promotion.status !== 'absent') active.add(coordinationKey);
-      if (
-        cleanAndListReaders(
-          projectPaths.readersDir,
-          'project',
-          policy,
-          undefined,
-          DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
-          guard,
-          undefined,
-          undefined,
-          processInspectionCache,
-        ).length > 0
-      ) {
+      const readers = cleanAndListReaders(
+        projectPaths.readersDir,
+        'project',
+        policy,
+        input.onEvent,
+        DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+        guard,
+        undefined,
+        undefined,
+        processInspectionCache,
+      );
+      if (promotion.status !== 'absent' || readers.length > 0) {
         active.add(coordinationKey);
+        continue;
       }
+      cleanupEmptyRuntimeLeaseKeyWhileOwned(
+        lockedPaths,
+        coordinationKey,
+        policy,
+        DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+        guard,
+      );
     }
     state = readLeaseState(lockedPaths);
     if (state.writers.length > MAX_WRITER_QUEUE) {

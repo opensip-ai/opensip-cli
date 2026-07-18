@@ -21,7 +21,14 @@ const RUN: StoredRun = {
   completedAt: '2026-07-16T00:00:01.000Z',
   durationMs: 1000,
   exitCode: 0,
-  aggregate: { steps: 1, passed: 1, failed: 0, faulted: 0, errors: 0, warnings: 0 },
+  aggregate: {
+    steps: 1,
+    passed: 1,
+    failed: 0,
+    faulted: 0,
+    errors: 0,
+    warnings: 0,
+  },
 };
 
 const STEP: StoredRunStep = {
@@ -68,10 +75,10 @@ describe('runtime and parent Run result contracts', () => {
   it('admits open recovery and closed cleanup projections', () => {
     const open: RuntimeStatusResult = {
       ...baseStatus(),
+      inspectionUnavailable: true,
       adoptionState: 'recovery-required',
       recoveryPhase: 'destination-install',
       recoveryReasonCode: 'operation-interrupted',
-      sourcePreserved: true,
       recoveryCommand: 'opensip init',
     };
     const closed: RuntimeStatusResult = {
@@ -87,7 +94,25 @@ describe('runtime and parent Run result contracts', () => {
       recoveryCommand: 'opensip init',
     };
     expect(open.recoveryReasonCode).toBe('operation-interrupted');
+    expect(open).not.toHaveProperty('sourcePreserved');
     expect(closed.cleanupPending).toBe(true);
+  });
+
+  it('marks blocked location fields as unavailable instead of claiming absence', () => {
+    const busy = {
+      ...baseStatus(),
+      inspectionUnavailable: true,
+      adoptionState: 'busy',
+      leaseActivity: {
+        activeReaders: 1,
+        writerPending: true,
+        busy: true,
+      },
+      nextCommands: [],
+    } as const satisfies RuntimeStatusResult;
+
+    expect(busy.inspectionUnavailable).toBe(true);
+    expectTypeOf(busy).toExtend<CommandResult>();
   });
 
   it('keeps the recovery reason and command vocabularies closed', () => {

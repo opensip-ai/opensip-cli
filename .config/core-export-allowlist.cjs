@@ -638,6 +638,7 @@ const EXPORT_ALLOWLIST = {
   FileLockResource: 'run-kernel',
   GlobalRuntimeMaintenanceLease: 'run-kernel',
   GlobalRuntimeMaintenancePosture: 'run-kernel',
+  ListActiveRuntimeLeaseKeysInput: 'run-kernel',
   RecoveryHeaderInspection: 'run-kernel',
   RuntimeAccessLease: 'run-kernel',
   RuntimeExclusiveLease: 'run-kernel',

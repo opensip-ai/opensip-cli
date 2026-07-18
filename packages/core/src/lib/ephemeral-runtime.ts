@@ -21,22 +21,14 @@
  * operation is tolerant, and a failure to prune must never fail a user's run.
  */
 
-import {
-  closeSync,
-  existsSync,
-  fstatSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  readSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { closeSync, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
+import {
+  ensureEphemeralRuntimeDirectory,
+  ensureEphemeralRuntimeRoot,
+} from './ephemeral-runtime-directory.js';
+import { withFileLock, type FileLockEvent } from './file-lock.js';
 import {
   legacyEphemeralProjectCacheKey,
   resolveEphemeralProjectPaths,
@@ -44,6 +36,11 @@ import {
   type EphemeralProjectIdentityStrength,
   type EphemeralProjectPaths,
 } from './paths.js';
+import {
+  mutateAnchoredRecord,
+  readAnchoredRecord,
+  type RuntimeLeaseEvent,
+} from './runtime-lease.js';
 
 /** Marker file recording which project an ephemeral cache entry belongs to. */
 export const EPHEMERAL_MARKER_FILE = 'project.json';
@@ -55,6 +52,14 @@ export const EPHEMERAL_MARKER_MAX_BYTES = 4096;
 /** Throttle marker: pruning runs at most once per {@link PRUNE_INTERVAL_MS}. */
 const PRUNE_STAMP_FILE = '.last-prune';
 const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const MARKER_METADATA_LOCK_FILE = '.project-marker.lock';
+const PRUNE_METADATA_LOCK_FILE = '.last-prune.lock';
+const CACHE_PERMISSION_POSTURE = 'owner-controlled' as const;
+const METADATA_LOCK_POLICY = Object.freeze({
+  waitMs: 250,
+  staleMs: 30_000,
+  heartbeatMs: 5000,
+});
 
 /**
  * Retention defaults. A user-global cache cannot be governed by any single
@@ -91,7 +96,10 @@ export type EphemeralMarkerReadResult =
   | { readonly status: 'current'; readonly marker: EphemeralMarker }
   | { readonly status: 'legacy'; readonly marker: LegacyEphemeralMarker }
   | { readonly status: 'missing' }
-  | { readonly status: 'invalid'; readonly reason: EphemeralMarkerInvalidReason };
+  | {
+      readonly status: 'invalid';
+      readonly reason: EphemeralMarkerInvalidReason;
+    };
 
 export type EphemeralRuntimeCandidateIdentityStrength =
   EphemeralProjectIdentityStrength | 'legacy-unverified';
@@ -113,8 +121,12 @@ export interface EphemeralRuntimeCandidates {
 }
 
 export interface PruneEphemeralInput {
-  /** Never prune this entry — it backs the run in progress. */
-  readonly keepCacheKey?: string;
+  /**
+   * Path-stable coordination keys already known to be protected by the
+   * caller. The active runtime-lease snapshot is unioned with this set.
+   */
+  readonly protectedCoordinationKeys?: readonly string[];
+  readonly onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void;
   readonly maxAgeDays?: number;
   readonly keep?: number;
   /** Injected for determinism in tests. */
@@ -129,25 +141,115 @@ export interface PruneEphemeralResult {
   readonly removedStale: number;
   /** Removed because the cache exceeded `keep` after the other passes. */
   readonly removedOverflow: number;
+  /** Preserved because a live/protected lease or maintenance intent won. */
+  readonly skippedActive: number;
+  /** Preserved because identity, metadata, or eligibility could not be re-proven. */
+  readonly skippedChanged: number;
+}
+
+/** Direct-module-only deterministic race checkpoints; not part of the package barrel. */
+export const EPHEMERAL_RUNTIME_TEST_HOOKS = Symbol('ephemeral-runtime-test-hooks');
+
+export interface EphemeralRuntimeTestHooks {
+  readonly beforeMarkerPublish?: () => void;
+  readonly beforePruneStampPublish?: () => void;
+  readonly afterActiveSnapshot?: () => void | Promise<void>;
+  readonly beforeCandidateRevalidation?: (cacheKey: string) => void | Promise<void>;
+  readonly pruneMonotonicNow?: () => number;
+}
+
+type EphemeralPathsWithTestHooks = EphemeralProjectPaths & {
+  readonly [EPHEMERAL_RUNTIME_TEST_HOOKS]?: EphemeralRuntimeTestHooks;
+};
+
+type EphemeralFileLockEventHandler = ((event: FileLockEvent) => void) & {
+  readonly [EPHEMERAL_RUNTIME_TEST_HOOKS]?: EphemeralRuntimeTestHooks;
+};
+
+function markerForPaths(paths: EphemeralProjectPaths, lastUsedAt: string): EphemeralMarker {
+  return {
+    version: EPHEMERAL_MARKER_VERSION,
+    projectDir: paths.projectDir,
+    canonicalRootDigest: paths.canonicalRootDigest,
+    identityStrength: paths.identityStrength,
+    ...(paths.generationDigest === undefined ? {} : { generationDigest: paths.generationDigest }),
+    lastUsedAt,
+  };
+}
+
+function updateMarkerWhileLocked(
+  paths: EphemeralProjectPaths,
+  root: string,
+  now: number,
+  hooks?: EphemeralRuntimeTestHooks,
+): void {
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: root,
+    parentDir: paths.runtimeDir,
+    basename: EPHEMERAL_MARKER_FILE,
+    maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
+    permissionPosture: CACHE_PERMISSION_POSTURE,
+  });
+  const requestedAt = new Date(now).toISOString();
+  hooks?.beforeMarkerPublish?.();
+  if (observed.status === 'absent') {
+    mutateAnchoredRecord({
+      trustedAnchorDir: root,
+      parentDir: paths.runtimeDir,
+      basename: EPHEMERAL_MARKER_FILE,
+      operation: 'create',
+      content: JSON.stringify(markerForPaths(paths, requestedAt)),
+      maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
+      permissionPosture: CACHE_PERMISSION_POSTURE,
+    });
+    return;
+  }
+
+  const parsed = parseEphemeralMarker(observed.content);
+  if (parsed.status !== 'current' || !markerMatchesActiveIdentity(parsed, paths)) return;
+  const current = parsed.marker;
+  const monotonicAt = Date.parse(current.lastUsedAt) >= now ? current.lastUsedAt : requestedAt;
+  if (monotonicAt === current.lastUsedAt) return;
+  mutateAnchoredRecord({
+    trustedAnchorDir: root,
+    parentDir: paths.runtimeDir,
+    basename: EPHEMERAL_MARKER_FILE,
+    operation: 'replace',
+    content: JSON.stringify({ ...current, lastUsedAt: monotonicAt }),
+    expectedContentSha256: observed.sha256,
+    maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
+    permissionPosture: CACHE_PERMISSION_POSTURE,
+  });
 }
 
 /**
  * Record that `paths` was used now, creating the runtime directory if needed.
- * Best-effort: a failure to write the marker degrades pruning for that entry
- * (it falls back to directory mtime), never the run.
+ * Best-effort: a failure to prove and update the marker preserves that entry
+ * from pruning and never fails the primary run.
  */
-export function touchEphemeralRuntime(paths: EphemeralProjectPaths, now = Date.now()): void {
+export function touchEphemeralRuntime(
+  paths: EphemeralProjectPaths,
+  now = Date.now(),
+  onEvent?: (event: FileLockEvent) => void,
+): void {
   try {
-    mkdirSync(paths.runtimeDir, { recursive: true });
-    const marker: EphemeralMarker = {
-      version: EPHEMERAL_MARKER_VERSION,
-      projectDir: paths.projectDir,
-      canonicalRootDigest: paths.canonicalRootDigest,
-      identityStrength: paths.identityStrength,
-      ...(paths.generationDigest === undefined ? {} : { generationDigest: paths.generationDigest }),
-      lastUsedAt: new Date(now).toISOString(),
-    };
-    writeFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), JSON.stringify(marker), 'utf8');
+    const root = ensureEphemeralRuntimeDirectory(paths).ephemeralProjectsDir;
+    withFileLock(
+      join(paths.runtimeDir, MARKER_METADATA_LOCK_FILE),
+      {
+        policy: METADATA_LOCK_POLICY,
+        resource: 'runtime',
+        operation: 'ephemeral-marker',
+        onEvent,
+      },
+      () =>
+        updateMarkerWhileLocked(
+          paths,
+          root,
+          now,
+          (paths as EphemeralPathsWithTestHooks)[EPHEMERAL_RUNTIME_TEST_HOOKS],
+        ),
+    );
   } catch {
     // intentionally best-effort hygiene; never fail the user run
   }
@@ -167,7 +269,8 @@ function validIdentityStrength(value: unknown): value is EphemeralProjectIdentit
   return value === 'generation-bound' || value === 'path-only';
 }
 
-function parseMarker(raw: string): EphemeralMarkerReadResult {
+/** Direct-module parser shared with the bounded prune implementation. */
+export function parseEphemeralMarker(raw: string): EphemeralMarkerReadResult {
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (parsed.version === EPHEMERAL_MARKER_VERSION) {
@@ -212,7 +315,10 @@ function parseMarker(raw: string): EphemeralMarkerReadResult {
     ) {
       return {
         status: 'legacy',
-        marker: { projectDir: parsed.projectDir, lastUsedAt: parsed.lastUsedAt },
+        marker: {
+          projectDir: parsed.projectDir,
+          lastUsedAt: parsed.lastUsedAt,
+        },
       };
     }
     return { status: 'invalid', reason: 'malformed' };
@@ -276,7 +382,7 @@ export function readEphemeralMarker(entryDir: string): EphemeralMarkerReadResult
     if (bytesRead > EPHEMERAL_MARKER_MAX_BYTES) {
       return { status: 'invalid', reason: 'oversize' };
     }
-    return parseMarker(buffer.toString('utf8', 0, bytesRead));
+    return parseEphemeralMarker(buffer.toString('utf8', 0, bytesRead));
   } catch {
     return { status: 'invalid', reason: 'unreadable' };
   } finally {
@@ -357,28 +463,35 @@ export function inspectEphemeralRuntimeCandidates(projectDir: string): Ephemeral
   };
 }
 
-/** Last-used time for an entry: marker first, directory mtime for legacy entries. */
-function lastUsedAt(entryDir: string, marker: EphemeralMarkerReadResult): number {
-  if (marker.status === 'current' || marker.status === 'legacy') {
-    const parsed = Date.parse(marker.marker.lastUsedAt);
-    if (!Number.isNaN(parsed)) return parsed;
+function writePruneStampWhileLocked(
+  root: string,
+  now: number,
+  hooks?: EphemeralRuntimeTestHooks,
+): boolean {
+  const observed = readAnchoredRecord({
+    trustedAnchorDir: root,
+    parentDir: root,
+    basename: PRUNE_STAMP_FILE,
+    maxBytes: 64,
+    permissionPosture: CACHE_PERMISSION_POSTURE,
+  });
+  if (observed.status === 'present') {
+    if (!validTimestamp(observed.content)) return false;
+    const last = Date.parse(observed.content);
+    if (now - last < PRUNE_INTERVAL_MS) return false;
   }
-  try {
-    return statSync(entryDir).mtimeMs;
-  } catch {
-    // intentionally best-effort hygiene; never fail the user run
-    return 0;
-  }
-}
-
-function removeEntry(entryDir: string): boolean {
-  try {
-    rmSync(entryDir, { recursive: true, force: true });
-    return true;
-  } catch {
-    // intentionally best-effort hygiene; never fail the user run
-    return false;
-  }
+  hooks?.beforePruneStampPublish?.();
+  mutateAnchoredRecord({
+    trustedAnchorDir: root,
+    parentDir: root,
+    basename: PRUNE_STAMP_FILE,
+    operation: observed.status === 'absent' ? 'create' : 'replace',
+    content: new Date(now).toISOString(),
+    ...(observed.status === 'present' ? { expectedContentSha256: observed.sha256 } : {}),
+    maxBytes: 64,
+    permissionPosture: CACHE_PERMISSION_POSTURE,
+  });
+  return true;
 }
 
 /**
@@ -386,121 +499,25 @@ function removeEntry(entryDir: string): boolean {
  * cache so the next call inside the window is a cheap no-op — pruning is
  * hygiene, and paying a full cache scan on every CLI invocation is not.
  */
-export function shouldPruneEphemeralRuntimes(now = Date.now()): boolean {
-  const stampPath = join(resolveUserPaths().ephemeralProjectsDir, PRUNE_STAMP_FILE);
+export function shouldPruneEphemeralRuntimes(
+  now = Date.now(),
+  onEvent?: EphemeralFileLockEventHandler,
+): boolean {
   try {
-    const last = Date.parse(readFileSync(stampPath, 'utf8'));
-    if (!Number.isNaN(last) && now - last < PRUNE_INTERVAL_MS) return false;
+    const root = ensureEphemeralRuntimeRoot().ephemeralProjectsDir;
+    const hooks = onEvent?.[EPHEMERAL_RUNTIME_TEST_HOOKS];
+    return withFileLock(
+      join(root, PRUNE_METADATA_LOCK_FILE),
+      {
+        policy: METADATA_LOCK_POLICY,
+        resource: 'runtime',
+        operation: 'ephemeral-prune-stamp',
+        onEvent,
+      },
+      () => writePruneStampWhileLocked(root, now, hooks),
+    );
   } catch {
-    // intentionally best-effort hygiene; never fail the user run
+    // A stamp publication failure cannot grant deletion authority.
+    return false;
   }
-  try {
-    mkdirSync(resolveUserPaths().ephemeralProjectsDir, { recursive: true });
-    writeFileSync(stampPath, new Date(now).toISOString(), 'utf8');
-  } catch {
-    // intentionally best-effort hygiene; never fail the user run
-  }
-  return true;
-}
-
-/** Cache-entry directory names, or `[]` when the cache does not exist yet. */
-function listEntries(root: string): string[] {
-  try {
-    return readdirSync(root, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch {
-    // intentionally best-effort hygiene; never fail the user run
-    return [];
-  }
-}
-
-type Verdict = 'orphaned' | 'stale' | 'keep';
-
-/**
- * Why (if at all) an entry should go. An entry with no marker predates this
- * plane and cannot be orphan-checked — it is judged on age alone rather than
- * deleted on suspicion.
- */
-function classifyEntry(
-  marker: EphemeralMarkerReadResult,
-  usedAt: number,
-  now: number,
-  maxAgeMs: number,
-): Verdict {
-  if (
-    (marker.status === 'current' || marker.status === 'legacy') &&
-    !existsSync(marker.marker.projectDir)
-  ) {
-    return 'orphaned';
-  }
-  if (now - usedAt > maxAgeMs) return 'stale';
-  return 'keep';
-}
-
-/** Drop the oldest survivors until at most `keep` remain. */
-function pruneOverflow(
-  root: string,
-  survivors: readonly { readonly key: string; readonly usedAt: number }[],
-  keep: number,
-): number {
-  if (keep <= 0 || survivors.length <= keep) return 0;
-  const oldestFirst = [...survivors].sort((a, b) => a.usedAt - b.usedAt);
-  let removed = 0;
-  for (const entry of oldestFirst.slice(0, survivors.length - keep)) {
-    if (removeEntry(join(root, entry.key))) removed++;
-  }
-  return removed;
-}
-
-/**
- * Drop ephemeral cache entries that can no longer be useful:
- *   1. ORPHANED — the project directory they belong to no longer exists (it was
- *      deleted, moved, or renamed; the path hash can never match again).
- *   2. STALE — untouched for longer than `maxAgeDays`.
- *   3. OVERFLOW — beyond `keep`, oldest first.
- *
- * The entry backing the current run (`keepCacheKey`) is never removed. Entries
- * with no marker (written before this plane existed) cannot be orphan-checked
- * and are judged on age/overflow alone.
- */
-export function pruneEphemeralRuntimes(input: PruneEphemeralInput = {}): PruneEphemeralResult {
-  const now = input.now ?? Date.now();
-  const maxAgeDays = input.maxAgeDays ?? DEFAULT_EPHEMERAL_MAX_AGE_DAYS;
-  const keep = input.keep ?? DEFAULT_EPHEMERAL_KEEP;
-  const root = resolveUserPaths().ephemeralProjectsDir;
-  const entries = listEntries(root);
-  const maxAgeMs = maxAgeDays <= 0 ? Number.POSITIVE_INFINITY : maxAgeDays * 24 * 60 * 60 * 1000;
-
-  const survivors: { readonly key: string; readonly usedAt: number }[] = [];
-  let removedOrphaned = 0;
-  let removedStale = 0;
-
-  for (const key of entries) {
-    if (key === input.keepCacheKey) continue;
-    const entryDir = join(root, key);
-    const marker = readEphemeralMarker(entryDir);
-    const usedAt = lastUsedAt(entryDir, marker);
-
-    switch (classifyEntry(marker, usedAt, now, maxAgeMs)) {
-      case 'orphaned': {
-        if (removeEntry(entryDir)) removedOrphaned++;
-        break;
-      }
-      case 'stale': {
-        if (removeEntry(entryDir)) removedStale++;
-        break;
-      }
-      default: {
-        survivors.push({ key, usedAt });
-      }
-    }
-  }
-
-  return {
-    scanned: entries.length,
-    removedOrphaned,
-    removedStale,
-    removedOverflow: pruneOverflow(root, survivors, keep),
-  };
 }

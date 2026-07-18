@@ -193,6 +193,8 @@ const SAFE_RUNTIME_OPERATIONS = new Set([
   'user-state-read',
   'runtime-global-maintenance',
   'coordination-transition',
+  'ephemeral-marker',
+  'ephemeral-prune-stamp',
   'create',
   'replace',
   'unlink',

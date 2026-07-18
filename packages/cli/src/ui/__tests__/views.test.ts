@@ -331,6 +331,86 @@ describe('runtime status view', () => {
     expect(out).toContain('Source evidence: not preserved');
     expect(out).not.toContain('source evidence remains preserved');
   });
+
+  it('does not render blocked storage placeholders as absent', () => {
+    const out = text({
+      type: 'runtime-status',
+      inspectionUnavailable: true,
+      projectInitialized: false,
+      activePlane: 'none',
+      cache: { exists: false, identityStrength: 'generation-bound' },
+      project: { exists: false },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'busy',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      leaseActivity: {
+        activeReaders: 2,
+        writerPending: true,
+        busy: true,
+      },
+      nextCommands: [],
+    });
+
+    expect(out).toContain('Active: inspection unavailable');
+    expect(out).toContain('Cache: inspection unavailable');
+    expect(out).toContain('Project: inspection unavailable');
+    expect(out).toContain('Evidence database: inspection unavailable');
+    expect(out).toContain('Runtime activity: 2 other reader(s) · writer pending');
+    expect(out).not.toContain('Cache: not present');
+    expect(out).not.toContain('project not initialized');
+  });
+
+  it('renders source disposition as unknown when only a bounded recovery header was read', () => {
+    const out = text({
+      type: 'runtime-status',
+      inspectionUnavailable: true,
+      projectInitialized: false,
+      activePlane: 'none',
+      cache: { exists: false, identityStrength: 'generation-bound' },
+      project: { exists: false },
+      evidenceDatabase: { exists: false },
+      adoptionState: 'recovery-required',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      recoveryPhase: 'unknown',
+      recoveryReasonCode: 'operation-interrupted',
+      recoveryCommand: 'opensip init',
+      nextCommands: ['opensip init'],
+    });
+
+    expect(out).toContain('Source evidence: unknown from bounded status inspection');
+    expect(out).not.toContain('Source evidence: not preserved');
+  });
+
+  it('does not infer project authority from a bounded closed journal header', () => {
+    const out = text({
+      type: 'runtime-status',
+      projectInitialized: false,
+      activePlane: 'cache',
+      cache: { exists: true, identityStrength: 'generation-bound' },
+      project: { exists: false },
+      evidenceDatabase: { exists: true },
+      adoptionState: 'ready',
+      retention: {
+        cache: { keep: 50, maxAgeDays: 30 },
+        evidence: { keep: 200, maxAgeDays: 60, maxSizeMb: 150 },
+      },
+      recoveryPhase: 'cleanup',
+      recoveryReasonCode: 'cleanup-pending',
+      cleanupPending: true,
+      recoveryCommand: 'opensip init',
+      nextCommands: ['opensip init'],
+    });
+
+    expect(out).toContain('source disposition is unknown until opensip init');
+    expect(out).not.toContain('current project evidence remains authoritative');
+    expect(out).not.toContain('source evidence remains preserved');
+  });
 });
 
 describe('policy views', () => {

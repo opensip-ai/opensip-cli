@@ -57,15 +57,51 @@ const CLI_PACKAGE_NAME = 'opensip-cli';
  *
  * Best-effort by construction: cache hygiene must never fail a user's run.
  */
-function maintainEphemeralCache(project: ProjectContext, logger: Logger): void {
+function heldProjectCoordinationKey(
+  lifecycle: RuntimeLeaseLifecycle | undefined,
+): string | undefined {
+  if (lifecycle?.state() !== 'bootstrap') return;
+  const lease = lifecycle?.lease;
+  if (lease === undefined || !('coordinationKey' in lease)) return;
+  if (!('kind' in lease)) return;
+  if (
+    lease.kind !== 'runtime-read' &&
+    !(
+      lease.kind === 'runtime-access-composite' &&
+      'projectRead' in lease &&
+      lease.projectRead === true
+    )
+  ) {
+    return;
+  }
+  return typeof lease.coordinationKey === 'string' ? lease.coordinationKey : undefined;
+}
+
+async function maintainEphemeralCache(
+  project: ProjectContext,
+  logger: Logger,
+  lifecycle: RuntimeLeaseLifecycle | undefined,
+  leaseEvents: SafeRuntimeLeaseEventBuffer | undefined,
+): Promise<void> {
   if (project.scope !== 'ephemeral') return;
   try {
     const paths = resolveEphemeralProjectPaths(project.projectRoot);
-    touchEphemeralRuntime(paths);
-    if (!shouldPruneEphemeralRuntimes()) return;
-    const pruned = pruneEphemeralRuntimes({ keepCacheKey: paths.cacheKey });
+    const coordinationKey = heldProjectCoordinationKey(lifecycle);
+    // Cache mutation and pruning are authorized only while this invocation's
+    // current-project reader is live. A missing or mismatched handoff is
+    // uncertainty, never permission for best-effort hygiene to mutate state.
+    if (coordinationKey === undefined || coordinationKey !== paths.coordinationKey) return;
+    touchEphemeralRuntime(paths, Date.now(), leaseEvents?.onEvent);
+    if (!shouldPruneEphemeralRuntimes(Date.now(), leaseEvents?.onEvent)) return;
+    const pruned = await pruneEphemeralRuntimes({
+      protectedCoordinationKeys: [coordinationKey],
+      onEvent: leaseEvents?.onEvent,
+    });
     const removed = pruned.removedOrphaned + pruned.removedStale + pruned.removedOverflow;
-    if (removed === 0) return;
+    const skipped = pruned.skippedActive + pruned.skippedChanged;
+    if (removed === 0 && skipped === 0) return;
+    const removedEntryLabel = removed === 1 ? 'entry' : 'entries';
+    const skippedEntryLabel = skipped === 1 ? 'entry' : 'entries';
     logger.debug?.({
       evt: 'cli.cache.ephemeral_pruned',
       module: MODULE_TAG,
@@ -73,7 +109,12 @@ function maintainEphemeralCache(project: ProjectContext, logger: Logger): void {
       removedOrphaned: pruned.removedOrphaned,
       removedStale: pruned.removedStale,
       removedOverflow: pruned.removedOverflow,
-      msg: `Pruned ${removed} unused no-init cache entr${removed === 1 ? 'y' : 'ies'}.`,
+      skippedActive: pruned.skippedActive,
+      skippedChanged: pruned.skippedChanged,
+      msg:
+        removed > 0
+          ? `Pruned ${removed} unused no-init cache ${removedEntryLabel}.`
+          : `Preserved ${skipped} no-init cache ${skippedEntryLabel} because activity or identity changed.`,
     });
   } catch {
     // Hygiene only — never fail the run.
@@ -109,6 +150,7 @@ export interface PostBailoutBootstrapDeps {
   readonly maybeInitializeOwningTool?: typeof maybeInitializeOwningTool;
   readonly loadOwningToolCapabilities?: typeof loadOwningToolCapabilities;
   readonly resolveOwningTool?: typeof resolveOwningTool;
+  readonly maintainEphemeralCache?: typeof maintainEphemeralCache;
 }
 
 export interface PostBailoutBootstrapResult {
@@ -129,6 +171,7 @@ const defaultDeps: Required<
     | 'maybeInitializeOwningTool'
     | 'loadOwningToolCapabilities'
     | 'resolveOwningTool'
+    | 'maintainEphemeralCache'
   >
 > = {
   createRunLogger,
@@ -141,6 +184,7 @@ const defaultDeps: Required<
   maybeInitializeOwningTool,
   loadOwningToolCapabilities,
   resolveOwningTool,
+  maintainEphemeralCache,
 };
 
 function emitRuntimeLeaseEvent(runLogger: Logger, event: SafeRuntimeLeaseEvent): void {
@@ -212,22 +256,31 @@ export async function executePostBailoutBootstrap(
 
     record(PRE_ACTION_PHASES.projectSideEffects);
 
-    const { runLogger, update } = preActionTimer.measure(
-      PRE_ACTION_PHASES.projectSideEffects,
-      () => {
-        const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
-        const checkedUpdate = preActionTimer.measure('update-check', () =>
-          d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
-        );
-        if (checkedUpdate && plan.jsonOutput) {
-          process.stderr.write(formatUpdateNag(version, checkedUpdate));
-        }
-        preActionTimer.measure('ephemeral-cache-maintenance', () =>
-          maintainEphemeralCache(plan.project, createdRunLogger),
-        );
-        return { runLogger: createdRunLogger, update: checkedUpdate };
-      },
-    );
+    const createProjectSideEffects = () => {
+      const createdRunLogger = d.createRunLogger(plan.runLoggerOptions);
+      const checkedUpdate = preActionTimer.measure('update-check', () =>
+        d.checkForUpdate({ name: CLI_PACKAGE_NAME, version }),
+      );
+      if (checkedUpdate && plan.jsonOutput) {
+        process.stderr.write(formatUpdateNag(version, checkedUpdate));
+      }
+      return { runLogger: createdRunLogger, update: checkedUpdate };
+    };
+    const { runLogger, update } =
+      plan.project.scope === 'ephemeral'
+        ? await preActionTimer.measureAsync(PRE_ACTION_PHASES.projectSideEffects, async () => {
+            const created = createProjectSideEffects();
+            await preActionTimer.measureAsync('ephemeral-cache-maintenance', () =>
+              d.maintainEphemeralCache(
+                plan.project,
+                created.runLogger,
+                input.runtimeLeaseLifecycle,
+                input.leaseEvents,
+              ),
+            );
+            return created;
+          })
+        : preActionTimer.measure(PRE_ACTION_PHASES.projectSideEffects, createProjectSideEffects);
 
     attachRuntimeLeaseEventLogger(input.leaseEvents, runLogger);
 
