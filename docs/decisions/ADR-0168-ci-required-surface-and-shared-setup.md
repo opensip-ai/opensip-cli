@@ -16,13 +16,15 @@ superseded_by: null
 related: [ADR-0012, ADR-0017, ADR-0020, ADR-0032]
 tags: [ci, github-actions, supply-chain, dogfood, cold-gate]
 enforcement: mechanizable
-enforced-by: [script:ci-workflow-structure]
+enforced-by: [script:ci-workflow-structure.test.mjs]
 enforcement-reason: >
-  scripts/__tests__/ci-workflow-structure.test.mjs (invoked via pnpm test:scripts
-  / pnpm lint) asserts aggregator membership (including cold-gate), per-job
-  timeouts, third-party action SHA shape, workflow default-deny permissions,
-  persist-credentials: false, fork-PR SARIF guards, and post-restore
-  verify-pnpm-injection on warm lanes.
+  scripts/__tests__/ci-workflow-structure.test.mjs (invoked via pnpm
+  test:scripts — part of pnpm test and the CI lint lane) asserts aggregator
+  membership (including cold-gate), job-level timeouts, third-party action SHA
+  shape, workflow default-deny permission exclusivity, persist-credentials:
+  false, fork-PR SARIF guards, post-restore verify-pnpm-injection ordering on
+  warm lanes, the .turbo-bearing workspace tar, re-run-safe artifact overwrite,
+  and cross-run Turbo caches on the turbo-task lanes.
 ```
 
 ## Context
@@ -55,11 +57,18 @@ sibling jobs. Scorecard gaps remained:
    `persist-credentials: false`.
 
 4. **Shared warm setup** — One `setup` job runs frozen install + `build-ci`,
-   packs `node_modules` and package `dist/` trees with **`tar -cpf`** (symlink-
-   preserving; raw `upload-artifact` of `node_modules` is forbidden because it
-   follows links and breaks pnpm injection). Warm lanes download, `tar -xpf`,
-   and run **`node scripts/verify-pnpm-injection.mjs`** before work. Cold-gate
-   never consumes that artifact.
+   packs `node_modules`, **`.turbo`**, and package `dist/` trees with
+   **`tar -cpf`** (symlink-preserving; raw `upload-artifact` of `node_modules`
+   is forbidden because it follows links and breaks pnpm injection; `.turbo`
+   rides along so `turbo run test`/`typecheck` in consumer lanes do not re-run
+   the build DAG). The upload sets **`overwrite: true`** — v4 artifacts persist
+   across run attempts, so "Re-run all jobs" would otherwise 409 and red every
+   warm lane. Warm lanes download, `tar -xpf`, and run
+   **`node scripts/verify-pnpm-injection.mjs`** before work; the turbo-task
+   lanes (`lint`, `test`) additionally keep per-lane cross-run `.turbo`
+   `actions/cache` restores (content-addressed entries union safely with the
+   tar's). Cold-gate never consumes the artifact, the Turbo caches, or the
+   `CI_WORKSPACE_ARTIFACT` env indirection.
 
 5. **Fork PRs degrade reporting only** — SARIF uploads run only when
    `github.event_name != 'pull_request' || head.repo.full_name == github.repository`.
@@ -77,6 +86,7 @@ sibling jobs. Scorecard gaps remained:
 | Keep N× rebuild per lane | Simple but fails caching score and burns minutes |
 | Floating action tags on PR CI | Supply-chain drift vs release/macOS |
 | Raw `upload-artifact` of `node_modules` | Follows symlinks; breaks injectWorkspacePackages |
+| Keep `upload-artifact@v7` (pre-#30 float) on PR CI | Deliberately pinned to v4.4.3 instead: release/macOS pin parity and same-major pairing with `download-artifact` v4 for the workspace handoff — a recorded major change, not an oversight |
 | Make macOS qualification required on every PR | Product policy keeps it non-blocking evidence / release gate |
 | Skip correctness gates on fork PRs | Would greenwash external contributions |
 

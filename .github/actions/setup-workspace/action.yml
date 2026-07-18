@@ -21,13 +21,6 @@ inputs:
     description: Whether to restore/save .turbo for this lane
     required: false
     default: 'true'
-  run-build:
-    description: >
-      When 'true' (default), clean dist and run scripts/build-ci.mjs.
-      Set 'false' only after a verified workspace restore that already includes dist.
-    required: false
-    default: 'true'
-
 runs:
   using: composite
   steps:
@@ -56,13 +49,11 @@ runs:
     # Clean every package's dist/ before build so dogfood gates never execute a
     # stale or Turbo-cache-restored binary that lags the source.
     - name: Clean dist
-      if: inputs.run-build == 'true'
       shell: bash
       run: pnpm -r run clean
 
     # Two-pass build that re-syncs pnpm's injected workspace copies between
     # passes (see scripts/build-ci.mjs).
     - name: Build
-      if: inputs.run-build == 'true'
       shell: bash
       run: node scripts/build-ci.mjs

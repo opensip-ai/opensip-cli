@@ -13,7 +13,6 @@ import { test } from 'node:test';
 
 import {
   FULL_SHA,
-  SHA_PIN,
   assertThirdPartyActionsPinned,
   collectActionRefs,
   readWorkflow,
@@ -38,13 +37,19 @@ const REQUIRED_LANES = [
   'cold-gate',
 ];
 
-test('ci.yml declares workflow-level default-deny permissions', () => {
+test('ci.yml declares workflow-level default-deny permissions (exactly contents: read)', () => {
   const raw = readWorkflow('ci.yml');
   // Top-level permissions before jobs: (not only nested under a job).
-  assert.match(
-    raw,
-    /^permissions:\s*\n\s*contents:\s*read\s*$/m,
-    'workflow-level permissions: contents: read is required',
+  const preJobs = raw.slice(0, raw.search(/^jobs:\s*$/m));
+  const block = preJobs.match(/^permissions:\n((?: {2}\S[^\n]*\n)+)/m);
+  assert.ok(block, 'workflow-level permissions block is required');
+  // Exclusivity: a widened default (e.g. an added `actions: write`) must fail —
+  // the block is default-deny only if contents: read is its ONLY scope.
+  const scopes = block[1].trim().split('\n').map((l) => l.trim());
+  assert.deepEqual(
+    scopes,
+    ['contents: read'],
+    'workflow-level permissions must be exactly contents: read',
   );
 });
 
@@ -84,16 +89,16 @@ function sliceCiJobs(raw) {
   return jobs;
 }
 
-test('ci.yml bounds every job with timeout-minutes', () => {
+test('ci.yml bounds every job with a JOB-level timeout-minutes', () => {
   const jobs = sliceCiJobs(readWorkflow('ci.yml'));
   assert.ok(jobs.has('setup'), 'setup job expected');
+  // Anchor to 4-space indentation: a step-level timeout (8-space) must not
+  // satisfy this — the job itself would stay unbounded.
+  const jobLevel = /^ {4}timeout-minutes:\s*(\d+)/m;
   for (const [job, segment] of jobs) {
-    assert.match(
-      segment,
-      /timeout-minutes:\s*(\d+)/,
-      `${job} must declare timeout-minutes`,
-    );
-    const n = Number(/timeout-minutes:\s*(\d+)/.exec(segment)[1]);
+    const m = jobLevel.exec(segment);
+    assert.ok(m, `${job} must declare a job-level timeout-minutes`);
+    const n = Number(m[1]);
     assert.ok(n >= 5 && n <= 60, `${job} timeout-minutes ${n} out of 5–60 band`);
   }
 });
@@ -109,7 +114,6 @@ test('ci.yml and setup-workspace pin third-party actions to full SHAs', () => {
   for (const ref of refs) {
     assert.match(ref, FULL_SHA);
   }
-  void SHA_PIN; // exported for reuse; collectActionRefs already uses it
 });
 
 test('ci.yml checkouts set persist-credentials: false', () => {
@@ -132,14 +136,26 @@ test('ci.yml checkouts set persist-credentials: false', () => {
 
 test('ci.yml keeps ADR-0017 gate command counterparts as run: lines', () => {
   const raw = readWorkflow('ci.yml');
-  assert.ok(raw.includes('run: pnpm lint'), 'run: pnpm lint');
-  assert.ok(raw.includes('run: pnpm test:coverage'), 'run: pnpm test:coverage');
-  assert.ok(raw.includes('run: pnpm fit:ci'), 'run: pnpm fit:ci');
-  assert.ok(
-    raw.includes('run: node packages/cli/dist/index.js graph --gate-save') ||
-      raw.includes('run: pnpm graph:ci'),
-    'graph gate counterpart',
+  const jobs = sliceCiJobs(raw);
+  // End-of-line anchors so a prefix cannot satisfy a shorter literal
+  // (e.g. `test:coverage:fresh` must NOT satisfy the `test:coverage` assert),
+  // and per-job anchoring so cold-gate's fit:ci cannot mask a dogfood removal.
+  assert.match(raw, /^\s*run: pnpm lint$/m, 'run: pnpm lint');
+  assert.match(
+    jobs.get('test'),
+    /^\s*run: pnpm test:coverage$/m,
+    'PR coverage line in the test lane',
   );
+  assert.match(
+    jobs.get('test'),
+    /^\s*run: pnpm test:coverage:fresh$/m,
+    'fresh coverage line (main) in the test lane',
+  );
+  assert.match(jobs.get('dogfood'), /^\s*run: pnpm fit:ci$/m, 'dogfood fit:ci');
+  assert.match(jobs.get('cold-gate'), /^\s*run: pnpm fit:ci$/m, 'cold-gate fit:ci');
+  const graphGate =
+    /^\s*run: (?:node packages\/cli\/dist\/index\.js graph --gate-save|pnpm graph:ci)/m;
+  assert.match(jobs.get('dogfood'), graphGate, 'dogfood graph gate counterpart');
 });
 
 test('ci.yml concurrency cancels in-progress PR runs', () => {
@@ -172,18 +188,30 @@ test('ci.yml SARIF uploads are guarded for fork PRs', () => {
 test('warm lanes restore shared workspace and verify injection; cold-gate does not', () => {
   const raw = readWorkflow('ci.yml');
   const jobs = sliceCiJobs(raw);
-  assert.ok(jobs.has('setup'), 'setup job');
-  assert.match(jobs.get('setup'), /Pack workspace for warm lanes/);
-  assert.match(raw, /tar -cpf/);
+  const setup = jobs.get('setup');
+  assert.ok(setup, 'setup job');
+  assert.match(setup, /Pack workspace for warm lanes/);
+  // .turbo must ride in the tar — without it, `turbo run test`/`typecheck`
+  // re-run the build DAG in consumer lanes despite the restored dist.
+  assert.match(
+    setup,
+    /tar -cpf "\$CI_WORKSPACE_ARTIFACT" node_modules \.turbo/,
+    'workspace tar must include node_modules and .turbo',
+  );
+  // upload-artifact v4 artifacts persist across run attempts: without
+  // overwrite, "Re-run all jobs" 409s and reds setup + every warm lane.
+  assert.match(setup, /overwrite:\s*true/, 'setup upload must set overwrite: true');
   assert.match(raw, /tar -xpf/);
   assert.match(raw, /verify-pnpm-injection\.mjs/);
 
   const cold = jobs.get('cold-gate');
   assert.ok(cold, 'cold-gate job');
+  // Include the env-var indirection (CI_WORKSPACE_ARTIFACT / tar -xpf) so
+  // cold-gate cannot consume the warm tar via the workflow-level env either.
   assert.doesNotMatch(
     cold,
-    /download-artifact|workspace-\$\{\{\s*github\.sha\s*\}\}/,
-    'cold-gate must not consume the warm workspace artifact',
+    /download-artifact|workspace-\$\{\{\s*github\.sha\s*\}\}|CI_WORKSPACE_ARTIFACT|tar -xpf/,
+    'cold-gate must not consume the warm workspace artifact (directly or via env)',
   );
   assert.match(cold, /Install dependencies without package-manager cache/);
   assert.match(cold, /Build from cold install/);
@@ -193,5 +221,20 @@ test('warm lanes restore shared workspace and verify injection; cold-gate does n
     assert.ok(segment, job);
     assert.match(segment, /needs:\s*setup/, `${job} needs setup`);
     assert.match(segment, /verify-pnpm-injection\.mjs/, `${job} verifies injection post-restore`);
+    // Integrity gate must run AFTER the restore, not before it.
+    const restoreIdx = segment.indexOf('Restore workspace');
+    const verifyIdx = segment.indexOf('verify-pnpm-injection.mjs');
+    assert.ok(restoreIdx >= 0, `${job} restores the workspace`);
+    assert.ok(verifyIdx > restoreIdx, `${job} verifies injection after restore`);
+  }
+
+  // Cross-run Turbo task caches for the turbo-task lanes (test re-use is the
+  // PR-push cost win; content-addressed entries union safely with the tar's).
+  for (const job of ['lint', 'test']) {
+    assert.match(
+      jobs.get(job),
+      /path:\s*\.turbo/,
+      `${job} must restore a cross-run .turbo cache`,
+    );
   }
 });

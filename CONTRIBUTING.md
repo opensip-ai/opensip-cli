@@ -278,8 +278,18 @@ gates passed.
 **macOS qualification** is a separate workflow and is **not** required for PR
 merge; it feeds release/support evidence.
 
-Third-party Actions are pinned to full commit SHAs. Dependabot’s `github-actions`
-ecosystem (or a deliberate pin bump) keeps them current.
+**No path filters (never-skip policy):** CI deliberately runs the full suite on
+every PR — docs paths are code-adjacent here (generated docs, freshness gates),
+so lint / test / dogfood / cold-gate are never skipped for any change touching
+`packages/`, `scripts/`, the lockfile, `turbo.json`, or `.github/workflows/`.
+Any future path filter must not make `build-and-test` green while a skipped
+correctness lane would have run (see ADR-0168).
+
+Third-party Actions are pinned to full commit SHAs in both
+`.github/workflows/*` and `.github/actions/setup-workspace/action.yml`;
+Dependabot's `github-actions` ecosystem covers **both directories** (two
+entries in `.github/dependabot.yml` — `directory: /` only scans workflows), or
+bump pins deliberately with the tag noted in the comment table.
 
 ## Code Style
 
