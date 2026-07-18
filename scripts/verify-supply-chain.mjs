@@ -523,7 +523,11 @@ function checkReleaseArtifactAttestations(workflows) {
         'promote-release must validate identity, then pin Node, before repository scripts',
       );
     }
-    if (!/PROMOTION_ORDER:\s*\$\{\{ runner\.temp \}\}\/promotion-order\.txt/u.test(promote)) {
+    // Job-level env cannot read the runner context (GitHub rejects the whole
+    // workflow file), so the runner-temp path must resolve in a step.
+    if (
+      !/echo "PROMOTION_ORDER=\$RUNNER_TEMP\/promotion-order\.txt" >> "\$GITHUB_ENV"/u.test(promote)
+    ) {
       problems.push('promote-release must use one bounded inert promotion-order handoff');
     }
     const promotionOrderDigest = createHash('sha256')
