@@ -29,7 +29,7 @@ function committedSlotHistoryAllowed(journal: RuntimePromotionJournal): boolean 
     !journal.destinationRuntimePreexisting ||
     journal.cleanup.destinationBackup !== 'unmaterialized';
   const parentResolved =
-    journal.destinationParentPreexisting || journal.cleanup.destinationParent === 'removed';
+    journal.destinationParentPreexisting || journal.cleanup.destinationParent !== 'unmaterialized';
   return (
     journal.progress.runtimeInstallState === 'installed' &&
     journal.cleanup.runtimeStage === 'removed' &&
@@ -56,18 +56,22 @@ function operationConsumedRemovedSlots(
 ): readonly RuntimePromotionOwnedSlotName[] {
   if (journal.progress.runtimeInstallState === 'not-installed') return [];
   const consumed: RuntimePromotionOwnedSlotName[] = [];
-  if (journal.progress.runtimeInstallState !== 'backup-restored') {
+  if (journal.manifests.runtimeStage !== null && journal.cleanup.runtimeStage === 'removed') {
     consumed.push('runtimeStage');
   }
   if (
-    journal.progress.runtimeInstallState !== 'backup-restored' &&
-    !journal.destinationParentPreexisting
+    journal.terminal?.outcome === 'rolled-back' &&
+    journal.progress.runtimeInstallState === 'rolled-back' &&
+    !journal.destinationParentPreexisting &&
+    journal.progress.authoredCursor === 0 &&
+    journal.cleanup.destinationParent === 'removed'
   ) {
     consumed.push('destinationParent');
   }
   if (
     ['rolled-back', 'backup-restored'].includes(journal.progress.runtimeInstallState) &&
-    journal.destinationRuntimePreexisting
+    journal.destinationRuntimePreexisting &&
+    journal.cleanup.destinationBackup === 'removed'
   ) {
     consumed.push('destinationBackup');
   }

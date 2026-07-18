@@ -106,6 +106,22 @@ describe('checkpointAndCloseSqlite', () => {
     expect(sqlite.closeCalls).toBe(1);
   });
 
+  it('does not claim closure when the native state probe itself fails', () => {
+    const sqlite: SqliteLifecycleConnection = {
+      get open(): boolean {
+        throw new Error('private native state detail');
+      },
+      pragma: () => [{ busy: 0, log: 0, checkpointed: 0 }],
+      close: () => undefined,
+    };
+
+    expect(checkpointAndCloseSqlite(sqlite)).toEqual({
+      checkpointed: true,
+      closed: false,
+      reason: 'native-close-failed',
+    });
+  });
+
   it.each([
     { result: [] },
     { result: [{ busy: 0 }] },

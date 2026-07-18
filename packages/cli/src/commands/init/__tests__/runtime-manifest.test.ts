@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -16,7 +17,12 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { EPHEMERAL_MARKER_FILE } from '@opensip-cli/core';
+import {
+  EPHEMERAL_MARKER_FILE,
+  projectCoordinationKey,
+  resolveUserPaths,
+  type RuntimeExclusiveLease,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type SqliteIntegrityResult } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,6 +45,7 @@ import {
   runtimeManifestIdentityEqual,
 } from '../runtime-manifest.js';
 import { createRuntimePromotionOwnedSlots } from '../runtime-promotion-journal-schema.js';
+import { captureRuntimePromotionProjectRootAuthority } from '../runtime-promotion-root-authority.js';
 import { materializeRuntimeStage, type RuntimeStageIoCheckpoint } from '../runtime-stage-io.js';
 import { createRuntimeStageOwnershipMarker } from '../runtime-stage-ownership.js';
 
@@ -50,6 +57,7 @@ import type {
   RuntimeManifestIdentity,
   VerifiedRuntimeManifest,
 } from '../runtime-manifest.js';
+import type { RuntimePromotionJournal } from '../runtime-promotion-journal-schema.js';
 import type {
   DurableOpenPromotionJournal,
   RuntimePromotionJournalController,
@@ -58,7 +66,9 @@ import type {
 } from '../runtime-promotion-journal.js';
 
 let temporaryDirectory: string;
+let originalHome: string | undefined;
 const ABSENT_SQLITE_IDENTITY = { status: 'absent' } as const;
+const SOURCE_CACHE_KEY = 'a'.repeat(24);
 const STAGE_OPERATION_ID = 'runtime-manifest-stage-operation-0001';
 const STAGE_SLOT = createRuntimePromotionOwnedSlots(STAGE_OPERATION_ID).runtimeStage;
 const STAGE_BASENAME = STAGE_SLOT.basename;
@@ -80,9 +90,13 @@ const FOREIGN_STAGE_OWNERSHIP: RuntimeStageMaterializationIdentity = Object.free
 beforeEach(() => {
   temporaryDirectory = mkdtempSync(join(tmpdir(), 'runtime-manifest-'));
   chmodSync(temporaryDirectory, 0o700);
+  originalHome = process.env.HOME;
+  process.env.HOME = realpathSync(temporaryDirectory);
 });
 
 afterEach(() => {
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
   rmSync(temporaryDirectory, { recursive: true, force: true });
 });
 
@@ -104,6 +118,16 @@ function makeRuntime(name: string): string {
   return makeDirectory(join(temporaryDirectory, name));
 }
 
+function makeCopyDestinationParent(name: string): string {
+  return makeDirectory(join(makeRuntime(`${name}-project`), 'opensip-cli'));
+}
+
+function makeCopySource(): string {
+  return realpathSync(
+    makeDirectory(join(resolveUserPaths().ephemeralProjectsDir, SOURCE_CACHE_KEY)),
+  );
+}
+
 function createValidDatastore(runtime: string): string {
   const path = join(runtime, 'datastore.sqlite');
   const datastore = DataStoreFactory.open({ backend: 'sqlite', path });
@@ -119,6 +143,17 @@ function absentSqliteResult(): SqliteIntegrityResult {
   return {
     status: 'absent',
     reason: 'file-absent',
+    sidecars: {
+      before: { wal: 'absent', shm: 'absent' },
+      after: { wal: 'absent', shm: 'absent' },
+    },
+  };
+}
+
+function nativeCloseFailedSqliteResult(): SqliteIntegrityResult {
+  return {
+    status: 'unreadable',
+    reason: 'native-close-failed',
     sidecars: {
       before: { wal: 'absent', shm: 'absent' },
       after: { wal: 'absent', shm: 'absent' },
@@ -196,19 +231,62 @@ function expectManifestFailure(
   }
 }
 
+function expectReleaseUnsafeManifestFailure(
+  action: () => unknown,
+  reason: RuntimeManifestError['reason'],
+): RuntimeManifestError {
+  try {
+    action();
+    throw new Error('expected release-unsafe runtime manifest inspection to fail');
+  } catch (error) {
+    expect(error).toBeInstanceOf(RuntimeManifestError);
+    expect((error as RuntimeManifestError).reason).toBe(reason);
+    expect((error as RuntimeManifestError).releaseSafe).toBe(false);
+    return error as RuntimeManifestError;
+  }
+}
+
 interface AuthorityHarness {
   readonly controller: RuntimePromotionJournalController;
   readonly receipt: DurableOpenPromotionJournal;
   readonly events: string[];
+  readonly verifyOpen: ReturnType<typeof vi.fn>;
+  readonly assertBoundLease: ReturnType<typeof vi.fn>;
   readonly authorize: ReturnType<typeof vi.fn>;
   readonly assertAuthority: ReturnType<typeof vi.fn>;
 }
 
 function authorityHarness(
-  options: { readonly rejectAuthorization?: Error } = {},
+  options: {
+    readonly rejectAuthorization?: Error;
+    readonly rejectLease?: Error;
+    readonly sourceManifest?: RuntimeManifestIdentity;
+  } = {},
 ): AuthorityHarness {
   const events: string[] = [];
   const issued = new WeakSet<object>();
+  const verifyOpen = vi.fn((): Promise<RuntimePromotionJournal> => {
+    const sourceDir = realpathSync(join(resolveUserPaths().ephemeralProjectsDir, SOURCE_CACHE_KEY));
+    return Promise.resolve({
+      route: 'promote-cache',
+      source: {
+        classification: 'path-only',
+        cacheKey: SOURCE_CACHE_KEY,
+        generationDigest: null,
+        markerSha256: 'b'.repeat(64),
+      },
+      manifests: {
+        source:
+          options.sourceManifest ??
+          inspectVerifiedRuntimeManifest(sourceDir, 'cache-source').identity,
+        destination: null,
+        runtimeStage: null,
+      },
+    } as RuntimePromotionJournal);
+  });
+  const assertBoundLease = vi.fn(() => {
+    if (options.rejectLease !== undefined) throw options.rejectLease;
+  });
   const authorize = vi.fn(
     (
       _receipt: DurableOpenPromotionJournal,
@@ -245,13 +323,23 @@ function authorityHarness(
     },
   );
   const controller = {
+    assertBoundLease,
+    verifyOpen,
     authorizeRuntimeStage: authorize,
     assertRuntimeStageAuthority: assertAuthority,
   } as unknown as RuntimePromotionJournalController;
   const receipt = Object.freeze({
     state: 'open',
   }) as DurableOpenPromotionJournal;
-  return { controller, receipt, events, authorize, assertAuthority };
+  return {
+    controller,
+    receipt,
+    events,
+    verifyOpen,
+    assertBoundLease,
+    authorize,
+    assertAuthority,
+  };
 }
 
 function copyInput(
@@ -260,13 +348,38 @@ function copyInput(
   harness: AuthorityHarness,
   stageBasename = STAGE_BASENAME,
 ): CopyRuntimeToStageInput {
+  const canonicalDestinationParent = realpathSync(destinationParent);
+  const projectRoot = dirname(canonicalDestinationParent);
+  const authority = copyRootAuthority(projectRoot);
   return {
     controller: harness.controller,
     receipt: harness.receipt,
     sourceDir,
     sourcePosture: 'cache-source',
-    destinationParent,
+    destinationParent: canonicalDestinationParent,
     stageBasename,
+    ...authority,
+  };
+}
+
+function copyRootAuthority(
+  projectRoot: string,
+): Pick<CopyRuntimeToStageInput, 'lease' | 'projectRootAuthority'> {
+  const lease = {
+    kind: 'runtime-exclusive',
+    coordinationKey: projectCoordinationKey(projectRoot),
+    posture: 'normal',
+    ownerToken: 'runtime-manifest-root-owner-0001',
+    acquiredAt: 1,
+    release: () => undefined,
+  } satisfies RuntimeExclusiveLease;
+  return {
+    projectRootAuthority: captureRuntimePromotionProjectRootAuthority({
+      lease,
+      projectRoot,
+      expectedPosture: 'normal',
+    }),
+    lease,
   };
 }
 
@@ -559,6 +672,42 @@ describe('SQLite promotion policy', () => {
     );
   });
 
+  it('preserves an explicit native-close failure as release-unsafe evidence', () => {
+    const tree = treeManifest([manifestEntry('datastore.sqlite')]);
+
+    expectReleaseUnsafeManifestFailure(
+      () =>
+        inspectVerifiedRuntimeManifest('/not-read-by-test', 'project-runtime', {
+          inspectTree: () => tree,
+          inspectSqlite: nativeCloseFailedSqliteResult,
+        }),
+      'sqlite-native-close-failed',
+    );
+  });
+
+  it('treats an unexpected SQLite inspector throw as unproven close safety', () => {
+    const tree = treeManifest([manifestEntry('datastore.sqlite')]);
+    const inspectorFailure = new Error('injected inspector failure');
+
+    const error = expectReleaseUnsafeManifestFailure(
+      () =>
+        inspectVerifiedRuntimeManifest('/not-read-by-test', 'project-runtime', {
+          inspectTree: () => tree,
+          inspectSqlite: () => {
+            throw inspectorFailure;
+          },
+        }),
+      'sqlite-close-unproven',
+    );
+    expect(error.cause).toBe(inspectorFailure);
+  });
+
+  it('keeps ordinary manifest policy failures release-safe', () => {
+    const error = new RuntimeManifestError('sqlite-invalid');
+
+    expect(error.releaseSafe).toBe(true);
+  });
+
   it('rejects a valid database written by a newer schema version', () => {
     const tree = treeManifest([manifestEntry('datastore.sqlite')]);
 
@@ -742,6 +891,9 @@ describe('journal-authorized runtime stage copy', () => {
       'after-marker-stage-fsync',
       'after-marker-parent-fsync',
       'before-first-source-entry',
+      'before-source-entry',
+      'after-source-file-chunk',
+      'after-source-entry',
     ]);
     expect(readFileSync(join(stage, 'evidence.txt'), 'utf8')).toBe('preserved');
   });
@@ -792,6 +944,169 @@ describe('journal-authorized runtime stage copy', () => {
         expect(() => assertRuntimeStageOwnershipMarker(stage, STAGE_OWNERSHIP)).not.toThrow();
       }
     }
+  });
+
+  it('does not create a marker in a stage-root replacement after mkdir', () => {
+    const source = makeRuntime('stage-root-swap-source');
+    writeRuntimeFile(source, 'evidence.txt', 'source');
+    const sourceManifest = inspectRuntimeTree(source, 'project-runtime');
+    const destinationParent = makeRuntime('stage-root-swap-parent');
+    const stage = join(realpathSync(destinationParent), STAGE_BASENAME);
+    const held = `${stage}.held`;
+
+    expect(() =>
+      materializeRuntimeStage(
+        source,
+        destinationParent,
+        STAGE_BASENAME,
+        sourceManifest,
+        STAGE_OWNERSHIP,
+        {
+          checkpoint: (checkpoint) => {
+            if (checkpoint !== 'after-stage-mkdir') return;
+            renameSync(stage, held);
+            makeDirectory(stage, 0o700);
+            writeRuntimeFile(stage, 'customer.txt', 'preserve me');
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed' }));
+
+    expect(readFileSync(join(stage, 'customer.txt'), 'utf8')).toBe('preserve me');
+    expect(existsSync(join(stage, RUNTIME_STAGE_OWNERSHIP_FILE))).toBe(false);
+    if (process.platform !== 'win32') {
+      expect(statSync(stage).mode & 0o777).toBe(0o700);
+    }
+  });
+
+  it('holds every created directory while traversing nested entries', () => {
+    const source = makeRuntime('nested-directory-swap-source');
+    writeRuntimeFile(source, 'nested/evidence.txt', 'source');
+    const sourceManifest = inspectRuntimeTree(source, 'project-runtime');
+    const destinationParent = makeRuntime('nested-directory-swap-parent');
+    const stage = join(realpathSync(destinationParent), STAGE_BASENAME);
+    const nested = join(stage, 'nested');
+    let swapped = false;
+
+    expect(() =>
+      materializeRuntimeStage(
+        source,
+        destinationParent,
+        STAGE_BASENAME,
+        sourceManifest,
+        STAGE_OWNERSHIP,
+        {
+          checkpoint: (checkpoint, entryIndex) => {
+            if (swapped || checkpoint !== 'before-source-entry' || entryIndex !== 1) {
+              return;
+            }
+            swapped = true;
+            renameSync(nested, `${nested}.held`);
+            makeDirectory(nested, 0o700);
+            writeRuntimeFile(nested, 'customer.txt', 'preserve me');
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed' }));
+
+    expect(swapped).toBe(true);
+    expect(readFileSync(join(nested, 'customer.txt'), 'utf8')).toBe('preserve me');
+    expect(existsSync(join(nested, 'evidence.txt'))).toBe(false);
+  });
+
+  it('does not chmod or fsync a stage-root replacement after an entry', () => {
+    const source = makeRuntime('stage-finalize-swap-source');
+    writeRuntimeFile(source, 'evidence.txt', 'source');
+    const sourceManifest = inspectRuntimeTree(source, 'project-runtime');
+    const destinationParent = makeRuntime('stage-finalize-swap-parent');
+    const stage = join(realpathSync(destinationParent), STAGE_BASENAME);
+    let swapped = false;
+
+    expect(() =>
+      materializeRuntimeStage(
+        source,
+        destinationParent,
+        STAGE_BASENAME,
+        sourceManifest,
+        STAGE_OWNERSHIP,
+        {
+          checkpoint: (checkpoint) => {
+            if (swapped || checkpoint !== 'after-source-entry') return;
+            swapped = true;
+            renameSync(stage, `${stage}.held`);
+            makeDirectory(stage, 0o700);
+            writeRuntimeFile(stage, 'customer.txt', 'preserve me');
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed' }));
+
+    expect(readFileSync(join(stage, 'customer.txt'), 'utf8')).toBe('preserve me');
+    if (process.platform !== 'win32') {
+      expect(statSync(stage).mode & 0o777).toBe(0o700);
+    }
+  });
+
+  it('leaves only an owned recoverable stage when a later source entry changes', () => {
+    const source = makeRuntime('per-entry-source-change');
+    writeRuntimeFile(source, 'a.txt', 'stable-a');
+    writeRuntimeFile(source, 'b.txt', 'stable-b');
+    const sourceManifest = inspectRuntimeTree(source, 'project-runtime');
+    const destinationParent = makeRuntime('per-entry-source-change-parent');
+    const stage = join(realpathSync(destinationParent), STAGE_BASENAME);
+    let changed = false;
+
+    expect(() =>
+      materializeRuntimeStage(
+        source,
+        destinationParent,
+        STAGE_BASENAME,
+        sourceManifest,
+        STAGE_OWNERSHIP,
+        {
+          checkpoint: (checkpoint, entryIndex) => {
+            if (changed || checkpoint !== 'before-source-entry' || entryIndex !== 1) return;
+            changed = true;
+            writeRuntimeFile(source, 'b.txt', 'changed!');
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed' }));
+    expect(changed).toBe(true);
+    expect(readFileSync(join(stage, RUNTIME_STAGE_OWNERSHIP_FILE), 'utf8')).toBe(
+      encodeRuntimeStageOwnershipMarker(STAGE_OWNERSHIP),
+    );
+  });
+
+  it('detects a same-inode source mutation during streaming copy', () => {
+    const source = makeRuntime('streaming-source-change');
+    const sourcePath = join(source, 'large.bin');
+    writeRuntimeFile(source, 'large.bin', 'a'.repeat(256 * 1024));
+    const sourceManifest = inspectRuntimeTree(source, 'project-runtime');
+    const destinationParent = makeRuntime('streaming-source-change-parent');
+    const stage = join(realpathSync(destinationParent), STAGE_BASENAME);
+    let changed = false;
+
+    expect(() =>
+      materializeRuntimeStage(
+        source,
+        destinationParent,
+        STAGE_BASENAME,
+        sourceManifest,
+        STAGE_OWNERSHIP,
+        {
+          checkpoint: (checkpoint) => {
+            if (changed || checkpoint !== 'after-source-file-chunk') return;
+            changed = true;
+            writeFileSync(sourcePath, 'z'.repeat(256 * 1024), { mode: 0o600 });
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed' }));
+    expect(changed).toBe(true);
+    expect(readFileSync(join(stage, RUNTIME_STAGE_OWNERSHIP_FILE), 'utf8')).toBe(
+      encodeRuntimeStageOwnershipMarker(STAGE_OWNERSHIP),
+    );
   });
 
   it('rejects a foreign ownership identity before creating a stage', () => {
@@ -877,8 +1192,8 @@ describe('journal-authorized runtime stage copy', () => {
   });
 
   it('streams and verifies a nested runtime, its SQLite database, modes, and safe links', async () => {
-    const source = makeRuntime('copy-source');
-    const destinationParent = makeRuntime('copy-destination-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('copy-destination-parent');
     createValidDatastore(source);
     writeRuntimeFile(source, EPHEMERAL_MARKER_FILE, '{"kind":"ephemeral-project"}');
     const executable = writeRuntimeFile(source, 'plugins/tool/bin.js', '#!/usr/bin/env node');
@@ -912,34 +1227,137 @@ describe('journal-authorized runtime stage copy', () => {
     expect(harness.assertAuthority).toHaveBeenCalledTimes(1);
   });
 
-  it('returns the canonical stage after an intermediate parent alias changes', async () => {
-    if (process.platform === 'win32') return;
-    const source = makeRuntime('alias-source');
-    writeRuntimeFile(source, 'evidence.txt', 'preserved');
-    const actualRoot = makeRuntime('alias-actual');
-    const actualParent = makeDirectory(join(actualRoot, 'parent'));
-    const replacementRoot = makeRuntime('alias-replacement');
-    makeDirectory(join(replacementRoot, 'parent'));
-    const alias = join(temporaryDirectory, 'destination-alias');
-    symlinkSync(actualRoot, alias);
+  it('rejects project-root replacement at the stage materialization boundary', async () => {
+    const source = makeCopySource();
+    const projectRoot = makeRuntime('copy-root-swap-project');
+    const destinationParent = makeDirectory(join(projectRoot, 'opensip-cli'));
+    const displaced = `${projectRoot}-displaced`;
+    writeRuntimeFile(source, 'evidence.txt', 'source');
     const harness = authorityHarness();
+    const input = {
+      ...copyInput(source, destinationParent, harness),
+      ...copyRootAuthority(realpathSync(projectRoot)),
+    };
+    let swapped = false;
 
-    const result = await copyRuntimeToStage(copyInput(source, join(alias, 'parent'), harness), {
-      checkpoint: (checkpoint) => {
-        if (checkpoint !== 'after-stage-materialization') return;
-        rmSync(alias);
-        symlinkSync(replacementRoot, alias);
-      },
-    });
+    await expect(
+      copyRuntimeToStage(input, {
+        checkpoint: (checkpoint) => {
+          if (swapped || checkpoint !== 'before-stage-materialization') return;
+          swapped = true;
+          renameSync(projectRoot, displaced);
+          makeDirectory(destinationParent);
+        },
+      }),
+    ).rejects.toThrow(/changed-after-preflight/iu);
+    expect(swapped).toBe(true);
+    expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
+  });
 
-    expect(result.stageDir).toBe(join(realpathSync(actualParent), STAGE_BASENAME));
-    expect(readFileSync(join(result.stageDir, 'evidence.txt'), 'utf8')).toBe('preserved');
-    expect(existsSync(join(replacementRoot, 'parent', STAGE_BASENAME))).toBe(false);
+  it('rejects an unrelated destination parent without mutating it', async () => {
+    const source = makeCopySource();
+    writeRuntimeFile(source, 'evidence.txt', 'preserved');
+    const projectRoot = makeRuntime('unrelated-parent-project');
+    makeDirectory(join(projectRoot, 'opensip-cli'));
+    const unrelatedParent = makeRuntime('unrelated-parent');
+    const sentinel = writeRuntimeFile(unrelatedParent, 'sentinel.txt', 'unrelated');
+    const harness = authorityHarness();
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>();
+    const authority = copyRootAuthority(realpathSync(projectRoot));
+
+    await expect(
+      copyRuntimeToStage(
+        {
+          controller: harness.controller,
+          receipt: harness.receipt,
+          sourceDir: source,
+          sourcePosture: 'cache-source',
+          destinationParent: realpathSync(unrelatedParent),
+          stageBasename: STAGE_BASENAME,
+          ...authority,
+        },
+        { materialize },
+      ),
+    ).rejects.toMatchObject({ reason: 'invalid-path' });
+
+    expect(materialize).not.toHaveBeenCalled();
+    expect(harness.authorize).not.toHaveBeenCalled();
+    expect(readFileSync(sentinel, 'utf8')).toBe('unrelated');
+    expect(existsSync(join(unrelatedParent, STAGE_BASENAME))).toBe(false);
+  });
+
+  it('rejects a cache source that does not match the journal-selected cache key', async () => {
+    makeCopySource();
+    const foreignSource = realpathSync(
+      makeDirectory(join(resolveUserPaths().ephemeralProjectsDir, 'c'.repeat(24))),
+    );
+    const sentinel = writeRuntimeFile(foreignSource, 'sentinel.txt', 'foreign');
+    const destinationParent = makeCopyDestinationParent('foreign-source-destination');
+    const harness = authorityHarness();
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>();
+
+    await expect(
+      copyRuntimeToStage(copyInput(foreignSource, destinationParent, harness), {
+        materialize,
+      }),
+    ).rejects.toMatchObject({ reason: 'invalid-path' });
+
+    expect(materialize).not.toHaveBeenCalled();
+    expect(harness.authorize).not.toHaveBeenCalled();
+    expect(readFileSync(sentinel, 'utf8')).toBe('foreign');
+    expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
+  });
+
+  it('rejects selected-cache bytes that no longer match the journal source manifest', async () => {
+    const source = makeCopySource();
+    const sourceFile = writeRuntimeFile(source, 'evidence.txt', 'before');
+    const expected = inspectVerifiedRuntimeManifest(source, 'cache-source').identity;
+    writeFileSync(sourceFile, 'after');
+    const destinationParent = makeCopyDestinationParent('changed-source-destination');
+    const harness = authorityHarness({ sourceManifest: expected });
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>();
+
+    await expect(
+      copyRuntimeToStage(copyInput(source, destinationParent, harness), {
+        materialize,
+      }),
+    ).rejects.toMatchObject({ reason: 'changed' });
+
+    expect(materialize).not.toHaveBeenCalled();
+    expect(harness.authorize).not.toHaveBeenCalled();
+    expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
+  });
+
+  it('rejects a destination-parent alias without following it', async () => {
+    if (process.platform === 'win32') return;
+    const source = makeCopySource();
+    writeRuntimeFile(source, 'evidence.txt', 'preserved');
+    const projectRoot = makeRuntime('alias-project');
+    const destinationParent = makeDirectory(join(projectRoot, 'opensip-cli'));
+    const aliasRoot = join(temporaryDirectory, 'alias-root');
+    symlinkSync(projectRoot, aliasRoot);
+    const harness = authorityHarness();
+    const authority = copyRootAuthority(realpathSync(projectRoot));
+
+    await expect(
+      copyRuntimeToStage({
+        controller: harness.controller,
+        receipt: harness.receipt,
+        sourceDir: source,
+        sourcePosture: 'cache-source',
+        destinationParent: join(aliasRoot, 'opensip-cli'),
+        stageBasename: STAGE_BASENAME,
+        ...authority,
+      }),
+    ).rejects.toMatchObject({ reason: 'invalid-path' });
+
+    expect(existsSync(join(destinationParent, STAGE_BASENAME))).toBe(false);
+    expect(harness.authorize).not.toHaveBeenCalled();
   });
 
   it('refuses materialization when durable journal authorization is unavailable', async () => {
-    const source = makeRuntime('unauthorized-source');
-    const destinationParent = makeRuntime('unauthorized-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('unauthorized-parent');
     writeRuntimeFile(source, 'evidence.txt', 'preserved');
     const harness = authorityHarness({
       rejectAuthorization: new Error('journal intent is not durable'),
@@ -957,9 +1375,27 @@ describe('journal-authorized runtime stage copy', () => {
     expect(harness.assertAuthority).not.toHaveBeenCalled();
   });
 
+  it('rejects a lease not bound to the journal controller before inspection or mutation', async () => {
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('foreign-lease-parent');
+    writeRuntimeFile(source, 'evidence.txt', 'preserved');
+    const harness = authorityHarness({
+      rejectLease: new Error('foreign lease'),
+    });
+    const materialize = vi.fn<RuntimeManifestDependencies['materialize']>();
+
+    await expect(
+      copyRuntimeToStage(copyInput(source, destinationParent, harness), {
+        materialize,
+      }),
+    ).rejects.toThrow('foreign lease');
+    expect(harness.verifyOpen).not.toHaveBeenCalled();
+    expect(materialize).not.toHaveBeenCalled();
+  });
+
   it('consumes the path-neutral authority before the first stage mutation', async () => {
-    const source = makeRuntime('authority-order-source');
-    const destinationParent = makeRuntime('authority-order-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('authority-order-parent');
     writeRuntimeFile(source, 'evidence.txt', 'preserved');
     const harness = authorityHarness();
     const materialize = vi.fn<RuntimeManifestDependencies['materialize']>(
@@ -977,8 +1413,8 @@ describe('journal-authorized runtime stage copy', () => {
   });
 
   it('fails closed without replacing a preexisting destination stage', async () => {
-    const source = makeRuntime('preexisting-source');
-    const destinationParent = makeRuntime('preexisting-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('preexisting-parent');
     writeRuntimeFile(source, 'evidence.txt', 'new');
     const stage = makeDirectory(join(destinationParent, STAGE_BASENAME));
     writeRuntimeFile(stage, 'sentinel.txt', 'owned by another operation');
@@ -993,8 +1429,8 @@ describe('journal-authorized runtime stage copy', () => {
   });
 
   it('preserves a preexisting stage with a foreign marker', async () => {
-    const source = makeRuntime('foreign-marker-source');
-    const destinationParent = makeRuntime('foreign-marker-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('foreign-marker-parent');
     writeRuntimeFile(source, 'evidence.txt', 'new');
     const stage = makeDirectory(join(destinationParent, STAGE_BASENAME));
     writeRuntimeFile(
@@ -1014,8 +1450,8 @@ describe('journal-authorized runtime stage copy', () => {
   });
 
   it('rejects a source collision with the reserved ownership marker', async () => {
-    const source = makeRuntime('reserved-marker-source');
-    const destinationParent = makeRuntime('reserved-marker-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('reserved-marker-parent');
     writeRuntimeFile(source, RUNTIME_STAGE_OWNERSHIP_FILE, 'customer bytes');
     writeRuntimeFile(source, 'evidence.txt', 'preserved');
     const harness = authorityHarness();
@@ -1030,8 +1466,8 @@ describe('journal-authorized runtime stage copy', () => {
   });
 
   it('leaves a partial journal-owned stage in place when materialization fails', async () => {
-    const source = makeRuntime('partial-source');
-    const destinationParent = makeRuntime('partial-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('partial-parent');
     writeRuntimeFile(source, 'evidence.txt', 'preserved');
     const harness = authorityHarness();
     const materialize = vi.fn<RuntimeManifestDependencies['materialize']>(
@@ -1057,8 +1493,8 @@ describe('journal-authorized runtime stage copy', () => {
   });
 
   it('detects source mutation after stage materialization and preserves both candidates', async () => {
-    const source = makeRuntime('mutating-source');
-    const destinationParent = makeRuntime('mutating-parent');
+    const source = makeCopySource();
+    const destinationParent = makeCopyDestinationParent('mutating-parent');
     const sourceFile = writeRuntimeFile(source, 'evidence.txt', 'before');
     const harness = authorityHarness();
     const checkpoints: RuntimeManifestCheckpoint[] = [];

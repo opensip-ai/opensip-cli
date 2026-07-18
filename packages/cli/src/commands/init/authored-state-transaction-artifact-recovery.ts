@@ -1,5 +1,5 @@
 import { lstatSync, rmdirSync, unlinkSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 import {
   encodeOwner,
@@ -8,11 +8,15 @@ import {
   pathPresent,
 } from './authored-state-transaction-artifacts.js';
 import {
+  assertStableAuthoredEntry,
   assertStableAuthoredRoot,
   authoredTransactionFailure,
-  fsyncDirectory,
+  bindStableAuthoredEntry,
+  fsyncStableAuthoredDirectory,
+  fsyncStableAuthoredRoot,
   readBoundedAuthoredDirectory,
   readStableArtifactFile,
+  type StableAuthoredEntry,
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import { AUTHORED_ARTIFACT_OWNER_FILE } from './authored-state-transaction-types.js';
@@ -28,37 +32,58 @@ import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema
 
 type MarkerState = 'absent' | 'partial' | 'exact';
 
-interface RecoverableBlobRoot {
-  readonly marker: MarkerState;
-  readonly hasBlobDirectory: boolean;
-  readonly blobNames: readonly string[];
+const INCOMPLETE_ROOT_DESCRIPTION = 'an incomplete authored root';
+const INCOMPLETE_MARKER_DESCRIPTION = 'an incomplete authored owner marker';
+const INCOMPLETE_BLOB_DIRECTORY_DESCRIPTION = 'an incomplete authored blob directory';
+const INCOMPLETE_BLOB_DESCRIPTION = 'an incomplete authored blob';
+const INCOMPLETE_REPLAY_DESCRIPTION = 'the incomplete authored replay manifest';
+
+interface RecoverableFileAuthority {
+  readonly entry: StableAuthoredEntry;
+  readonly digest: string;
+  readonly mode: number;
 }
 
-function assertRecoverableRoot(rootPath: string): void {
-  const root = lstatSync(rootPath, { bigint: true });
-  const uid = typeof process.getuid === 'function' ? BigInt(process.getuid()) : undefined;
-  if (
-    !root.isDirectory() ||
-    root.isSymbolicLink() ||
-    Number(root.mode & 0o777n) !== 0o700 ||
-    (uid !== undefined && root.uid !== uid)
-  ) {
+interface RecoverableBlobRoot {
+  readonly root: StableAuthoredEntry;
+  readonly marker: MarkerState;
+  readonly markerEntry: RecoverableFileAuthority | null;
+  readonly blobDirectory: StableAuthoredEntry | null;
+  readonly blobs: readonly RecoverableFileAuthority[];
+}
+
+export interface IncompleteAuthoredArtifactAuthority {
+  readonly replay: RecoverableFileAuthority | null;
+  readonly stage: RecoverableBlobRoot | null;
+  readonly backup: RecoverableBlobRoot | null;
+}
+
+function bindRecoverableRoot(rootPath: string): StableAuthoredEntry {
+  const root = bindStableAuthoredEntry(rootPath, 'directory', INCOMPLETE_ROOT_DESCRIPTION);
+  if (Number(root.identity.mode & 0o777n) !== 0o700) {
     authoredTransactionFailure('an incomplete authored root is unsafe');
   }
+  return root;
 }
 
 function inspectRecoverableMarker(
   rootPath: string,
   expected: AuthoredArtifactOwner,
   rootNames: Set<string>,
-): MarkerState {
+): {
+  readonly state: MarkerState;
+  readonly entry: RecoverableFileAuthority | null;
+} {
   if (!rootNames.delete(AUTHORED_ARTIFACT_OWNER_FILE)) {
     if (rootNames.size > 0) {
       authoredTransactionFailure('an ownerless authored root has unexpected entries');
     }
-    return 'absent';
+    return { state: 'absent', entry: null };
   }
-  const marker = readStableArtifactFile(join(rootPath, AUTHORED_ARTIFACT_OWNER_FILE));
+  const markerPath = join(rootPath, AUTHORED_ARTIFACT_OWNER_FILE);
+  const entry = bindStableAuthoredEntry(markerPath, 'file', INCOMPLETE_MARKER_DESCRIPTION);
+  const marker = readStableArtifactFile(markerPath);
+  assertStableAuthoredEntry(entry, INCOMPLETE_MARKER_DESCRIPTION);
   const expectedBytes = encodeOwner(expected);
   const observedBytes = marker.bytes.toString('utf8');
   if (
@@ -71,25 +96,32 @@ function inspectRecoverableMarker(
     if (rootNames.size > 0) {
       authoredTransactionFailure('a partial authored owner marker has unexpected siblings');
     }
-    return 'partial';
+    return {
+      state: 'partial',
+      entry: { entry, digest: marker.digest, mode: marker.mode },
+    };
   }
-  return 'exact';
+  return {
+    state: 'exact',
+    entry: { entry, digest: marker.digest, mode: marker.mode },
+  };
 }
 
 function inspectRecoverableBlobDirectory(
   rootPath: string,
   kind: 'desired' | 'preimage',
   manifest: AuthoredReplayManifest,
-): readonly string[] {
+): {
+  readonly directory: StableAuthoredEntry;
+  readonly blobs: readonly RecoverableFileAuthority[];
+} {
   const directoryPath = join(rootPath, kind);
-  const directory = lstatSync(directoryPath, { bigint: true });
-  const uid = typeof process.getuid === 'function' ? BigInt(process.getuid()) : undefined;
-  if (
-    !directory.isDirectory() ||
-    directory.isSymbolicLink() ||
-    Number(directory.mode & 0o777n) !== 0o700 ||
-    (uid !== undefined && directory.uid !== uid)
-  ) {
+  const directory = bindStableAuthoredEntry(
+    directoryPath,
+    'directory',
+    INCOMPLETE_BLOB_DIRECTORY_DESCRIPTION,
+  );
+  if (Number(directory.identity.mode & 0o777n) !== 0o700) {
     authoredTransactionFailure('an incomplete authored blob directory is unsafe');
   }
   const expected = expectedBlobNames(manifest, kind);
@@ -103,17 +135,28 @@ function inspectRecoverableBlobDirectory(
     'incomplete authored blob directory',
   );
   let totalBytes = 0;
+  const blobs: RecoverableFileAuthority[] = [];
   for (const basename of blobNames) {
-    if (!expected.has(basename)) {
+    const mutation = expected.get(basename);
+    if (mutation === undefined) {
       authoredTransactionFailure('an incomplete authored artifact has an unowned blob');
     }
-    const file = readStableArtifactFile(join(directoryPath, basename));
+    const blobPath = join(directoryPath, basename);
+    const blob = bindStableAuthoredEntry(blobPath, 'file', INCOMPLETE_BLOB_DESCRIPTION);
+    const file = readStableArtifactFile(blobPath);
+    const state = kind === 'desired' ? mutation.desired : mutation.preimage;
+    if (file.mode !== state.mode) {
+      authoredTransactionFailure('an incomplete authored blob has a changed mode');
+    }
+    assertStableAuthoredEntry(blob, INCOMPLETE_BLOB_DESCRIPTION);
+    blobs.push({ entry: blob, digest: file.digest, mode: file.mode });
     totalBytes += file.bytes.length;
     if (totalBytes > INIT_AUTHORED_PLAN_CAPS.maxAggregateBlobBytes) {
       authoredTransactionFailure('incomplete authored blobs exceed their recovery cap');
     }
   }
-  return blobNames;
+  assertStableAuthoredEntry(directory, INCOMPLETE_BLOB_DIRECTORY_DESCRIPTION);
+  return { directory, blobs };
 }
 
 function inspectRecoverableBlobRoot(
@@ -122,7 +165,7 @@ function inspectRecoverableBlobRoot(
   manifest: AuthoredReplayManifest | null,
   role: AuthoredArtifactRole,
 ): RecoverableBlobRoot {
-  assertRecoverableRoot(rootPath);
+  const root = bindRecoverableRoot(rootPath);
   const kind = role === 'stage' ? 'desired' : 'preimage';
   const rootNames = new Set(
     readBoundedAuthoredDirectory(
@@ -133,48 +176,101 @@ function inspectRecoverableBlobRoot(
     ),
   );
   const marker = inspectRecoverableMarker(rootPath, ownerFor(journal, role), rootNames);
-  if (marker !== 'exact') {
-    return { marker, hasBlobDirectory: false, blobNames: [] };
+  if (marker.state !== 'exact') {
+    assertStableAuthoredEntry(root, INCOMPLETE_ROOT_DESCRIPTION);
+    return {
+      root,
+      marker: marker.state,
+      markerEntry: marker.entry,
+      blobDirectory: null,
+      blobs: [],
+    };
   }
   const hasBlobDirectory = rootNames.delete(kind);
   if (rootNames.size > 0) {
     authoredTransactionFailure('an incomplete authored artifact has unowned entries');
   }
   if (!hasBlobDirectory) {
-    return { marker, hasBlobDirectory: false, blobNames: [] };
+    assertStableAuthoredEntry(root, INCOMPLETE_ROOT_DESCRIPTION);
+    return {
+      root,
+      marker: marker.state,
+      markerEntry: marker.entry,
+      blobDirectory: null,
+      blobs: [],
+    };
   }
   if (manifest === null) {
     authoredTransactionFailure('an incomplete authored blob directory has no replay manifest');
   }
+  const inspected = inspectRecoverableBlobDirectory(rootPath, kind, manifest);
+  assertStableAuthoredEntry(root, INCOMPLETE_ROOT_DESCRIPTION);
   return {
-    marker,
-    hasBlobDirectory: true,
-    blobNames: inspectRecoverableBlobDirectory(rootPath, kind, manifest),
+    root,
+    marker: marker.state,
+    markerEntry: marker.entry,
+    blobDirectory: inspected.directory,
+    blobs: inspected.blobs,
   };
 }
 
-function removeRecoverableBlobRoot(
-  rootPath: string,
-  journal: RuntimePromotionJournal,
-  manifest: AuthoredReplayManifest | null,
-  role: AuthoredArtifactRole,
+function hasCode(error: unknown, code: string): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
+}
+
+function assertPathAbsent(path: string, description: string): void {
+  try {
+    lstatSync(path);
+  } catch (error) {
+    if (hasCode(error, 'ENOENT')) return;
+    throw error;
+  }
+  authoredTransactionFailure(`${description} was replaced during incomplete cleanup`);
+}
+
+function unlinkRecoverableFile(
+  file: RecoverableFileAuthority,
+  parent: StableAuthoredEntry,
+  description: string,
 ): void {
-  const kind = role === 'stage' ? 'desired' : 'preimage';
-  const inspected = inspectRecoverableBlobRoot(rootPath, journal, manifest, role);
-  if (inspected.hasBlobDirectory) {
-    const directoryPath = join(rootPath, kind);
-    for (const basename of inspected.blobNames) {
-      unlinkSync(join(directoryPath, basename));
+  assertStableAuthoredEntry(parent, `${description} parent`);
+  assertStableAuthoredEntry(file.entry, description);
+  const observed = readStableArtifactFile(file.entry.path);
+  assertStableAuthoredEntry(file.entry, description);
+  if (observed.mode !== file.mode || observed.digest !== file.digest) {
+    authoredTransactionFailure(`${description} changed after its cleanup authority was captured`);
+  }
+  unlinkSync(file.entry.path);
+  assertStableAuthoredEntry(parent, `${description} parent`);
+  assertPathAbsent(file.entry.path, description);
+  fsyncStableAuthoredDirectory(parent, `${description} parent`);
+}
+
+function removeRecoverableBlobRoot(
+  projectRoot: StableAuthoredRoot,
+  inspected: RecoverableBlobRoot,
+): void {
+  assertStableAuthoredRoot(projectRoot);
+  assertStableAuthoredEntry(inspected.root, INCOMPLETE_ROOT_DESCRIPTION);
+  if (inspected.blobDirectory !== null) {
+    assertStableAuthoredEntry(inspected.blobDirectory, INCOMPLETE_BLOB_DIRECTORY_DESCRIPTION);
+    for (const blob of inspected.blobs) {
+      unlinkRecoverableFile(blob, inspected.blobDirectory, INCOMPLETE_BLOB_DESCRIPTION);
     }
-    fsyncDirectory(directoryPath);
-    rmdirSync(directoryPath);
+    assertStableAuthoredEntry(inspected.root, INCOMPLETE_ROOT_DESCRIPTION);
+    assertStableAuthoredEntry(inspected.blobDirectory, INCOMPLETE_BLOB_DIRECTORY_DESCRIPTION);
+    rmdirSync(inspected.blobDirectory.path);
+    assertPathAbsent(inspected.blobDirectory.path, INCOMPLETE_BLOB_DIRECTORY_DESCRIPTION);
+    fsyncStableAuthoredDirectory(inspected.root, INCOMPLETE_ROOT_DESCRIPTION);
   }
-  if (inspected.marker !== 'absent') {
-    unlinkSync(join(rootPath, AUTHORED_ARTIFACT_OWNER_FILE));
+  if (inspected.markerEntry !== null) {
+    unlinkRecoverableFile(inspected.markerEntry, inspected.root, INCOMPLETE_MARKER_DESCRIPTION);
   }
-  fsyncDirectory(rootPath);
-  rmdirSync(rootPath);
-  fsyncDirectory(dirname(rootPath));
+  assertStableAuthoredRoot(projectRoot);
+  assertStableAuthoredEntry(inspected.root, INCOMPLETE_ROOT_DESCRIPTION);
+  rmdirSync(inspected.root.path);
+  assertPathAbsent(inspected.root.path, INCOMPLETE_ROOT_DESCRIPTION);
+  fsyncStableAuthoredRoot(projectRoot);
 }
 
 function assertPendingPreparation(journal: RuntimePromotionJournal): void {
@@ -187,7 +283,8 @@ function validateReplay(
   journal: RuntimePromotionJournal,
   manifestBytes: string,
   path: string,
-): void {
+): RecoverableFileAuthority {
+  const stable = bindStableAuthoredEntry(path, 'file', INCOMPLETE_REPLAY_DESCRIPTION);
   const replay = readStableArtifactFile(path);
   if (
     replay.mode !== 0o600 ||
@@ -196,6 +293,8 @@ function validateReplay(
   ) {
     authoredTransactionFailure('an incomplete replay manifest is changed');
   }
+  assertStableAuthoredEntry(stable, INCOMPLETE_REPLAY_DESCRIPTION);
+  return { entry: stable, digest: replay.digest, mode: replay.mode };
 }
 
 export function validateIncompleteAuthoredArtifacts(
@@ -204,7 +303,7 @@ export function validateIncompleteAuthoredArtifacts(
   manifest: AuthoredReplayManifest | null,
   manifestBytes: string | null,
   paths: AuthoredArtifactPaths,
-): void {
+): IncompleteAuthoredArtifactAuthority {
   assertPendingPreparation(journal);
   const replayPresent = pathPresent(paths.replayManifest);
   const stagePresent = pathPresent(paths.stageRoot);
@@ -212,17 +311,42 @@ export function validateIncompleteAuthoredArtifacts(
   if ((stagePresent || backupPresent) && !replayPresent) {
     authoredTransactionFailure('authored artifacts exist without their durable replay manifest');
   }
+  let replay: RecoverableFileAuthority | null = null;
   if (replayPresent) {
     if (manifest === null || manifestBytes === null) {
       authoredTransactionFailure('the durable replay manifest could not be loaded');
     }
-    validateReplay(journal, manifestBytes, paths.replayManifest);
+    replay = validateReplay(journal, manifestBytes, paths.replayManifest);
   }
-  if (stagePresent) {
-    inspectRecoverableBlobRoot(paths.stageRoot, journal, manifest, 'stage');
-  }
-  if (backupPresent) {
-    inspectRecoverableBlobRoot(paths.backupRoot, journal, manifest, 'backup');
+  const stage = stagePresent
+    ? inspectRecoverableBlobRoot(paths.stageRoot, journal, manifest, 'stage')
+    : null;
+  const backup = backupPresent
+    ? inspectRecoverableBlobRoot(paths.backupRoot, journal, manifest, 'backup')
+    : null;
+  assertStableAuthoredRoot(root);
+  return { replay, stage, backup };
+}
+
+function discardIncompleteAuthority(
+  root: StableAuthoredRoot,
+  authority: IncompleteAuthoredArtifactAuthority,
+): void {
+  if (authority.stage !== null) removeRecoverableBlobRoot(root, authority.stage);
+  if (authority.backup !== null) removeRecoverableBlobRoot(root, authority.backup);
+  if (authority.replay !== null) {
+    assertStableAuthoredRoot(root);
+    assertStableAuthoredEntry(authority.replay.entry, INCOMPLETE_REPLAY_DESCRIPTION);
+    const replay = readStableArtifactFile(authority.replay.entry.path);
+    assertStableAuthoredEntry(authority.replay.entry, INCOMPLETE_REPLAY_DESCRIPTION);
+    if (replay.mode !== authority.replay.mode || replay.digest !== authority.replay.digest) {
+      authoredTransactionFailure(
+        'the incomplete authored replay manifest changed after cleanup authority was captured',
+      );
+    }
+    unlinkSync(authority.replay.entry.path);
+    assertPathAbsent(authority.replay.entry.path, INCOMPLETE_REPLAY_DESCRIPTION);
+    fsyncStableAuthoredRoot(root);
   }
   assertStableAuthoredRoot(root);
 }
@@ -234,19 +358,14 @@ export function resetIncompleteAuthoredArtifacts(
   manifestBytes: string,
   paths: AuthoredArtifactPaths,
 ): void {
-  validateIncompleteAuthoredArtifacts(root, journal, manifest, manifestBytes, paths);
-  if (pathPresent(paths.stageRoot)) {
-    removeRecoverableBlobRoot(paths.stageRoot, journal, manifest, 'stage');
-  }
-  if (pathPresent(paths.backupRoot)) {
-    removeRecoverableBlobRoot(paths.backupRoot, journal, manifest, 'backup');
-  }
-  if (pathPresent(paths.replayManifest)) {
-    validateReplay(journal, manifestBytes, paths.replayManifest);
-    unlinkSync(paths.replayManifest);
-    fsyncDirectory(root.path);
-  }
-  assertStableAuthoredRoot(root);
+  const authority = validateIncompleteAuthoredArtifacts(
+    root,
+    journal,
+    manifest,
+    manifestBytes,
+    paths,
+  );
+  discardIncompleteAuthority(root, authority);
 }
 
 export function discardIncompleteAuthoredArtifacts(
@@ -255,21 +374,22 @@ export function discardIncompleteAuthoredArtifacts(
   manifest: AuthoredReplayManifest | null,
   manifestBytes: string | null,
   paths: AuthoredArtifactPaths,
+  authority?: IncompleteAuthoredArtifactAuthority,
 ): void {
-  validateIncompleteAuthoredArtifacts(root, journal, manifest, manifestBytes, paths);
-  if (pathPresent(paths.stageRoot)) {
-    removeRecoverableBlobRoot(paths.stageRoot, journal, manifest, 'stage');
-  }
-  if (pathPresent(paths.backupRoot)) {
-    removeRecoverableBlobRoot(paths.backupRoot, journal, manifest, 'backup');
-  }
-  if (pathPresent(paths.replayManifest)) {
-    if (manifestBytes === null) {
-      authoredTransactionFailure('partial replay cleanup requires its exact manifest bytes');
+  const bound =
+    authority ?? validateIncompleteAuthoredArtifacts(root, journal, manifest, manifestBytes, paths);
+  discardIncompleteAuthority(root, bound);
+}
+
+export function assertIncompleteAuthoredArtifactsAbsent(
+  root: StableAuthoredRoot,
+  paths: AuthoredArtifactPaths,
+): void {
+  assertStableAuthoredRoot(root);
+  for (const path of [paths.stageRoot, paths.backupRoot, paths.replayManifest]) {
+    if (pathPresent(path)) {
+      authoredTransactionFailure('an aborted authored preparation left an owned artifact path');
     }
-    validateReplay(journal, manifestBytes, paths.replayManifest);
-    unlinkSync(paths.replayManifest);
-    fsyncDirectory(root.path);
   }
   assertStableAuthoredRoot(root);
 }

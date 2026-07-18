@@ -58,16 +58,25 @@ export function runtimePromotionDestinationParentReady(journal: RuntimePromotion
   if (journal.destinationParentPreexisting) {
     return journal.cleanup.destinationParent === 'unmaterialized';
   }
-  if (forwardPhaseAtLeast(journal.progress.phase, 'runtime-installed')) {
-    return journal.cleanup.destinationParent === 'removed';
-  }
   return journal.cleanup.destinationParent === 'pending';
 }
 
-function rollbackPhaseEvidenceAllowed(journal: RuntimePromotionJournal): boolean {
+function authoredOwnsPendingDestinationParent(journal: RuntimePromotionJournal): boolean {
   return (
-    !rollbackPhaseAtLeast(journal.progress.phase, 'authored-rolled-back') ||
-    journal.progress.rollbackCursor === journal.progress.authoredCursor
+    !journal.destinationParentPreexisting &&
+    journal.cleanup.destinationParent === 'pending' &&
+    journal.progress.runtimeInstallState === 'rolled-back' &&
+    journal.progress.authoredCursor > 0
+  );
+}
+
+function rollbackPhaseEvidenceAllowed(journal: RuntimePromotionJournal): boolean {
+  if (!rollbackPhaseAtLeast(journal.progress.phase, 'authored-rolled-back')) return true;
+  return (
+    journal.progress.rollbackCursor === journal.progress.authoredCursor &&
+    (journal.destinationParentPreexisting ||
+      journal.cleanup.destinationParent !== 'pending' ||
+      authoredOwnsPendingDestinationParent(journal))
   );
 }
 
@@ -260,7 +269,7 @@ function rollbackIntentAllowed(
   const openRollback = journal.state === 'open' && journal.progress.direction === 'rollback';
   switch (intent.kind) {
     case 'runtime-rollback': {
-      const restoringBeforeInstall =
+      const restoringDestinationBeforeInstall =
         journal.progress.runtimeInstallState === 'not-installed' &&
         journal.destinationRuntimePreexisting &&
         journal.manifests.destination !== null &&
@@ -268,10 +277,27 @@ function rollbackIntentAllowed(
         journal.cleanup.destinationBackup === 'pending' &&
         journal.cleanup.runtimeStage === 'pending' &&
         journal.progress.lastPostcondition?.kind === 'destination-backup-create';
+      const removingCreatedParentBeforeInstall =
+        journal.progress.runtimeInstallState === 'not-installed' &&
+        !journal.destinationParentPreexisting &&
+        !journal.destinationRuntimePreexisting &&
+        journal.cleanup.destinationParent === 'pending' &&
+        journal.cleanup.destinationBackup === 'unmaterialized' &&
+        ((journal.manifests.runtimeStage === null &&
+          journal.cleanup.runtimeStage === 'unmaterialized') ||
+          (journal.manifests.runtimeStage !== null && journal.cleanup.runtimeStage === 'pending'));
+      const removingPreinstallStage =
+        journal.progress.runtimeInstallState === 'not-installed' &&
+        journal.manifests.runtimeStage !== null &&
+        journal.cleanup.runtimeStage === 'pending' &&
+        journal.cleanup.destinationBackup !== 'pending';
       return (
         openRollback &&
         journal.progress.phase === 'rollback-started' &&
-        (journal.progress.runtimeInstallState === 'installed' || restoringBeforeInstall)
+        (journal.progress.runtimeInstallState === 'installed' ||
+          restoringDestinationBeforeInstall ||
+          removingCreatedParentBeforeInstall ||
+          removingPreinstallStage)
       );
     }
     case 'authored-target-rollback': {
@@ -280,6 +306,9 @@ function rollbackIntentAllowed(
         ['rollback-started', 'runtime-rolled-back'].includes(journal.progress.phase) &&
         journal.progress.runtimeInstallState !== 'installed' &&
         journal.cleanup.destinationBackup !== 'pending' &&
+        (journal.destinationParentPreexisting ||
+          journal.cleanup.destinationParent !== 'pending' ||
+          authoredOwnsPendingDestinationParent(journal)) &&
         intent.cursor === journal.progress.authoredCursor - journal.progress.rollbackCursor - 1
       );
     }

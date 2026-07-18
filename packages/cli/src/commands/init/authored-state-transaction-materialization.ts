@@ -3,11 +3,14 @@ import { join } from 'node:path';
 import { encodeOwner, ownerFor } from './authored-state-transaction-artifacts.js';
 import {
   assertStableAuthoredRoot,
+  assertStableAuthoredEntry,
   authoredTransactionFailure,
+  bindStableAuthoredEntry,
   createDurableDirectory,
-  fsyncDirectory,
+  fsyncStableAuthoredDirectory,
   writeExclusiveDurableFile,
   type DurableFileWriteCheckpoint,
+  type StableAuthoredEntry,
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import {
@@ -27,6 +30,19 @@ interface ArtifactCheckpoints {
   readonly blobDirectoryMkdir: AuthoredStateCheckpoint;
   readonly blob: Readonly<Record<DurableFileWriteCheckpoint, AuthoredStateCheckpoint>>;
 }
+
+interface AuthoredArtifactRootAuthority {
+  readonly root: StableAuthoredEntry;
+  readonly blobDirectory: StableAuthoredEntry | null;
+}
+
+export interface AuthoredMaterializationAuthority {
+  readonly stage: AuthoredArtifactRootAuthority;
+  readonly backup: AuthoredArtifactRootAuthority;
+}
+
+const ARTIFACT_ROOT_DESCRIPTION = 'the authored artifact root';
+const BLOB_DIRECTORY_DESCRIPTION = 'the authored blob directory';
 
 const CHECKPOINTS: Readonly<Record<AuthoredArtifactRole, ArtifactCheckpoints>> = {
   stage: {
@@ -82,6 +98,8 @@ function blobMutations(
 
 function writeBlob(
   rootPath: string,
+  artifactRoot: StableAuthoredEntry,
+  blobDirectory: StableAuthoredEntry,
   mutation: InitAuthoredMutation,
   kind: 'desired' | 'preimage',
   plan: InitAuthoredPlan,
@@ -104,9 +122,17 @@ function writeBlob(
   if (sha256Bytes(bytes) !== state.digest) {
     authoredTransactionFailure('an authored blob disagrees with its manifest digest');
   }
-  writeExclusiveDurableFile(join(rootPath, kind, basename), bytes, state.mode, (value) =>
-    checkpoint(checkpoints.blob[value]),
-  );
+  assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+  assertStableAuthoredEntry(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
+  writeExclusiveDurableFile(join(rootPath, kind, basename), bytes, state.mode, (value) => {
+    assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+    assertStableAuthoredEntry(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
+    checkpoint(checkpoints.blob[value]);
+    assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+    assertStableAuthoredEntry(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
+  });
+  assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+  assertStableAuthoredEntry(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
 }
 
 function writeArtifactRoot(
@@ -116,27 +142,80 @@ function writeArtifactRoot(
   kind: 'desired' | 'preimage',
   plan: InitAuthoredPlan,
   checkpoint: (value: AuthoredStateCheckpoint) => void,
-): void {
+): AuthoredArtifactRootAuthority {
   const checkpoints = CHECKPOINTS[role];
-  createDurableDirectory(rootPath);
-  checkpoint(checkpoints.rootMkdir);
+  const artifactRoot = createDurableDirectory(rootPath, () => checkpoint(checkpoints.rootMkdir));
+  const rootCheckpoint = (value: AuthoredStateCheckpoint): void => {
+    assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+    checkpoint(value);
+    assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+  };
   writeExclusiveDurableFile(
     join(rootPath, AUTHORED_ARTIFACT_OWNER_FILE),
     Buffer.from(encodeOwner(ownerFor(journal, role)), 'utf8'),
     0o600,
-    (value) => checkpoint(checkpoints.marker[value]),
+    (value) => rootCheckpoint(checkpoints.marker[value]),
   );
-  fsyncDirectory(rootPath);
+  fsyncStableAuthoredDirectory(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
   const mutations = blobMutations(plan.mutations, kind);
+  let blobDirectory: StableAuthoredEntry | null = null;
   if (mutations.length > 0) {
-    createDurableDirectory(join(rootPath, kind));
-    checkpoint(checkpoints.blobDirectoryMkdir);
+    assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+    blobDirectory = createDurableDirectory(join(rootPath, kind), () =>
+      rootCheckpoint(checkpoints.blobDirectoryMkdir),
+    );
+    assertStableAuthoredEntry(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+    assertStableAuthoredEntry(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
   }
   for (const mutation of mutations) {
-    writeBlob(rootPath, mutation, kind, plan, checkpoints, checkpoint);
+    if (blobDirectory === null) {
+      authoredTransactionFailure('an authored blob directory was not materialized');
+    }
+    writeBlob(rootPath, artifactRoot, blobDirectory, mutation, kind, plan, checkpoints, checkpoint);
   }
-  if (mutations.length > 0) fsyncDirectory(join(rootPath, kind));
-  fsyncDirectory(rootPath);
+  if (blobDirectory !== null) {
+    fsyncStableAuthoredDirectory(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
+  }
+  fsyncStableAuthoredDirectory(artifactRoot, ARTIFACT_ROOT_DESCRIPTION);
+  return { root: artifactRoot, blobDirectory };
+}
+
+function bindArtifactRootAuthority(
+  rootPath: string,
+  kind: 'desired' | 'preimage',
+  plan: InitAuthoredPlan,
+): AuthoredArtifactRootAuthority {
+  const root = bindStableAuthoredEntry(rootPath, 'directory', ARTIFACT_ROOT_DESCRIPTION);
+  const blobDirectory =
+    blobMutations(plan.mutations, kind).length === 0
+      ? null
+      : bindStableAuthoredEntry(join(rootPath, kind), 'directory', BLOB_DIRECTORY_DESCRIPTION);
+  assertStableAuthoredEntry(root, ARTIFACT_ROOT_DESCRIPTION);
+  return { root, blobDirectory };
+}
+
+export function bindAuthoredMaterializationAuthority(
+  plan: InitAuthoredPlan,
+  paths: AuthoredArtifactPaths,
+): AuthoredMaterializationAuthority {
+  const stage = bindArtifactRootAuthority(paths.stageRoot, 'desired', plan);
+  const backup = bindArtifactRootAuthority(paths.backupRoot, 'preimage', plan);
+  assertAuthoredMaterializationAuthority({ stage, backup });
+  return { stage, backup };
+}
+
+function assertArtifactRootAuthority(authority: AuthoredArtifactRootAuthority): void {
+  assertStableAuthoredEntry(authority.root, ARTIFACT_ROOT_DESCRIPTION);
+  if (authority.blobDirectory !== null) {
+    assertStableAuthoredEntry(authority.blobDirectory, BLOB_DIRECTORY_DESCRIPTION);
+  }
+}
+
+export function assertAuthoredMaterializationAuthority(
+  authority: AuthoredMaterializationAuthority,
+): void {
+  assertArtifactRootAuthority(authority.stage);
+  assertArtifactRootAuthority(authority.backup);
 }
 
 export function materializeAuthoredBlobRoots(
@@ -145,11 +224,23 @@ export function materializeAuthoredBlobRoots(
   plan: InitAuthoredPlan,
   paths: AuthoredArtifactPaths,
   checkpoint: (value: AuthoredStateCheckpoint) => void,
-): void {
+): AuthoredMaterializationAuthority {
   assertStableAuthoredRoot(root);
-  writeArtifactRoot(paths.stageRoot, journal, 'stage', 'desired', plan, checkpoint);
+  const stage = writeArtifactRoot(paths.stageRoot, journal, 'stage', 'desired', plan, checkpoint);
+  assertStableAuthoredEntry(stage.root, 'the authored stage root');
   checkpoint('after-stage-materialization');
-  writeArtifactRoot(paths.backupRoot, journal, 'backup', 'preimage', plan, checkpoint);
+  assertStableAuthoredEntry(stage.root, 'the authored stage root');
+  const backup = writeArtifactRoot(
+    paths.backupRoot,
+    journal,
+    'backup',
+    'preimage',
+    plan,
+    checkpoint,
+  );
+  assertStableAuthoredEntry(backup.root, 'the authored backup root');
   checkpoint('after-backup-materialization');
+  assertAuthoredMaterializationAuthority({ stage, backup });
   assertStableAuthoredRoot(root);
+  return { stage, backup };
 }

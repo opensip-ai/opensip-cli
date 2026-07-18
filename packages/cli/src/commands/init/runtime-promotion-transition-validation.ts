@@ -332,7 +332,7 @@ function allowedCleanupSlots(
       return ['sourceTombstone'];
     }
     case 'runtime-rollback': {
-      return ['destinationBackup'];
+      return ['destinationParent', 'runtimeStage', 'destinationBackup'];
     }
     default: {
       return [];
@@ -349,7 +349,10 @@ function assertRuntimeInstallStatePostcondition(
   if (intent.kind === 'destination-install') expected = 'installed';
   if (intent.kind === 'runtime-rollback') {
     expected =
-      previous.progress.runtimeInstallState === 'installed' ? 'rolled-back' : 'backup-restored';
+      previous.progress.runtimeInstallState === 'installed' ||
+      !previous.destinationRuntimePreexisting
+        ? 'rolled-back'
+        : 'backup-restored';
   }
   if (next.progress.runtimeInstallState !== expected) {
     transitionFailure('runtime install state changed outside its exact postcondition');
@@ -364,7 +367,7 @@ function assertDestinationInstallOwnership(
     transitionFailure('destination install must consume its owned runtime stage');
   }
   const expectedParentBefore = previous.destinationParentPreexisting ? 'unmaterialized' : 'pending';
-  const expectedParentAfter = previous.destinationParentPreexisting ? 'unmaterialized' : 'removed';
+  const expectedParentAfter = previous.destinationParentPreexisting ? 'unmaterialized' : 'pending';
   if (
     previous.cleanup.destinationParent !== expectedParentBefore ||
     next.cleanup.destinationParent !== expectedParentAfter
@@ -378,13 +381,33 @@ function assertRuntimeRollbackOwnership(
   next: RuntimePromotionJournal,
 ): void {
   const destinationExisted = previous.destinationRuntimePreexisting;
-  const expectedBackupBefore = destinationExisted ? 'pending' : 'unmaterialized';
-  const expectedBackupAfter = destinationExisted ? 'removed' : 'unmaterialized';
+  const expectedBackupBefore = previous.cleanup.destinationBackup;
+  const expectedBackupAfter = expectedBackupBefore === 'pending' ? 'removed' : expectedBackupBefore;
   if (
-    previous.cleanup.destinationBackup !== expectedBackupBefore ||
+    (destinationExisted
+      ? !['unmaterialized', 'pending'].includes(expectedBackupBefore)
+      : expectedBackupBefore !== 'unmaterialized') ||
     next.cleanup.destinationBackup !== expectedBackupAfter
   ) {
     transitionFailure('runtime rollback must consume its exact destination backup');
+  }
+  const removesCreatedParent =
+    !previous.destinationParentPreexisting &&
+    (previous.progress.runtimeInstallState === 'not-installed' ||
+      previous.progress.authoredCursor === 0);
+  const expectedStageAfter =
+    (removesCreatedParent || previous.progress.runtimeInstallState === 'not-installed') &&
+    previous.cleanup.runtimeStage === 'pending'
+      ? 'removed'
+      : previous.cleanup.runtimeStage;
+  const expectedParentAfter = removesCreatedParent ? 'removed' : previous.cleanup.destinationParent;
+  if (
+    next.cleanup.runtimeStage !== expectedStageAfter ||
+    next.cleanup.destinationParent !== expectedParentAfter
+  ) {
+    transitionFailure(
+      'runtime rollback must resolve only its operation-created stage and destination parent',
+    );
   }
 }
 

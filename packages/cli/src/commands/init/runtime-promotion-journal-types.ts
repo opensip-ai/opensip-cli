@@ -135,12 +135,6 @@ export type RuntimePromotionTerminalOutcome = (typeof RUNTIME_PROMOTION_TERMINAL
 export const RUNTIME_PROMOTION_AUTHORITIES = ['project', 'cache', 'none'] as const;
 export type RuntimePromotionAuthority = (typeof RUNTIME_PROMOTION_AUTHORITIES)[number];
 
-/**
- * Only relative, non-escaping, non-dangling in-tree links are supported.
- * The journal stores their count, never entry names or link targets.
- */
-export const RUNTIME_MANIFEST_RELATIVE_SYMLINK_POLICY = 'relative-in-tree-only' as const;
-
 export interface RuntimePromotionSource {
   readonly classification: RuntimePromotionSourceClassification;
   readonly cacheKey: string | null;

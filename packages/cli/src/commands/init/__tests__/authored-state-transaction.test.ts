@@ -8,7 +8,10 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
+  renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,6 +19,7 @@ import { join } from 'node:path';
 
 import {
   anchoredRecordTemporaryBasename,
+  projectCoordinationKey,
   RUNTIME_RECOVERY_RECORD_MAX_BYTES,
   type AnchoredRecordReadResult,
   type RuntimeExclusiveLease,
@@ -23,6 +27,8 @@ import {
 } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { createDurableDirectory } from '../authored-state-transaction-fs.js';
+import { AUTHORED_ARTIFACT_OWNER_FILE } from '../authored-state-transaction-types.js';
 import {
   abortPendingAuthoredPreparation,
   bindAuthoredStateReceipt,
@@ -57,12 +63,47 @@ import {
   type PromotionJournalIdentity,
   type RuntimePromotionJournalController,
 } from '../runtime-promotion-journal.js';
+import { captureRuntimePromotionProjectRootAuthority } from '../runtime-promotion-root-authority.js';
+import { createRuntimePromotionTransitionWriter } from '../runtime-promotion-transitions.js';
 
 const PROJECT_KEY = 'a'.repeat(24);
 const OPERATION_ID = 'authored-transaction-operation-0001';
 const OWNER_TOKEN = 'authored-transaction-owner-000001';
+const CLEANUP_ROOT_CHECKPOINTS = [
+  'before-cleanup-intent',
+  'after-cleanup-intent',
+  'before-cleanup-mutation',
+  'after-cleanup-artifact-observation',
+  'after-cleanup-evidence-published',
+  'after-cleanup-artifact-read',
+  'before-cleanup-entry-unlink',
+  'after-cleanup-entry-unlink',
+  'before-cleanup-directory-removal',
+  'after-cleanup-directory-removal',
+  'before-cleanup-evidence-unlink',
+  'after-cleanup-evidence-unlink',
+  'after-cleanup-mutation',
+  'before-cleanup-postcondition',
+  'after-cleanup-postcondition',
+] as const satisfies readonly AuthoredStateCheckpoint[];
+const CLEANUP_ARTIFACT_CHECKPOINTS = [
+  'after-cleanup-artifact-observation',
+  'after-cleanup-evidence-published',
+  'after-cleanup-artifact-read',
+  'before-cleanup-entry-unlink',
+  'after-cleanup-entry-unlink',
+  'before-cleanup-directory-removal',
+  'after-cleanup-directory-removal',
+  'before-cleanup-evidence-unlink',
+  'after-cleanup-evidence-unlink',
+  'after-cleanup-mutation',
+  'before-cleanup-postcondition',
+  'after-cleanup-postcondition',
+] as const satisfies readonly AuthoredStateCheckpoint[];
 
 const temporaryRoots: string[] = [];
+let latestProjectRoot: string | undefined;
+const controllerCoordinationKeys = new WeakMap<RuntimePromotionJournalController, string>();
 
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) {
@@ -71,9 +112,11 @@ afterEach(() => {
 });
 
 function projectRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'opensip-authored-transaction-'));
-  chmodSync(root, 0o700);
+  const created = mkdtempSync(join(tmpdir(), 'opensip-authored-transaction-'));
+  chmodSync(created, 0o700);
+  const root = realpathSync(created);
   temporaryRoots.push(root);
+  latestProjectRoot = root;
   return root;
 }
 
@@ -81,7 +124,10 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function fakeLease(key = PROJECT_KEY): RuntimeExclusiveLease {
+function fakeLease(
+  root = latestProjectRoot,
+  key = root === undefined ? PROJECT_KEY : projectCoordinationKey(root),
+): RuntimeExclusiveLease {
   return {
     kind: 'runtime-exclusive',
     coordinationKey: key,
@@ -92,6 +138,17 @@ function fakeLease(key = PROJECT_KEY): RuntimeExclusiveLease {
   };
 }
 
+function projectRootAuthority(
+  root: string,
+  lease: RuntimeExclusiveLease,
+): ReturnType<typeof captureRuntimePromotionProjectRootAuthority> {
+  return captureRuntimePromotionProjectRootAuthority({
+    lease,
+    projectRoot: root,
+    expectedPosture: 'normal',
+  });
+}
+
 interface JournalStore {
   content: string | undefined;
 }
@@ -99,10 +156,11 @@ interface JournalStore {
 function controllerFor(
   lease: RuntimeExclusiveLease,
   store: JournalStore,
+  afterMutation?: (mutation: RuntimeRecoveryRecordMutation) => void,
 ): RuntimePromotionJournalController {
   let clock = 99;
   let recoveryOwnerSequence = 0;
-  return createRuntimePromotionJournalController(lease, {
+  const controller = createRuntimePromotionJournalController(lease, {
     now: () => ++clock,
     generateOperationId: () => OPERATION_ID,
     generateRecoveryOwnerToken: () =>
@@ -124,6 +182,7 @@ function controllerFor(
       if (mutation.operation === 'create') {
         if (store.content !== undefined) throw new Error('exists');
         store.content = mutation.content;
+        afterMutation?.(mutation);
         return Promise.resolve();
       }
       if (mutation.operation === 'replace') {
@@ -134,15 +193,19 @@ function controllerFor(
           throw new Error('changed');
         }
         store.content = mutation.content;
+        afterMutation?.(mutation);
         return Promise.resolve();
       }
       if (store.content === undefined || sha256(store.content) !== mutation.expectedContentSha256) {
         throw new Error('changed');
       }
       store.content = undefined;
+      afterMutation?.(mutation);
       return Promise.resolve();
     },
   });
+  controllerCoordinationKeys.set(controller, lease.coordinationKey);
+  return controller;
 }
 
 function absent(): InitAuthoredPathState {
@@ -263,9 +326,10 @@ function authoredPlan(specifications: readonly MutationSpec[]): InitAuthoredPlan
 function initialJournal(
   identity: PromotionJournalIdentity,
   plan: InitAuthoredPlan,
+  coordinationKey: string,
 ): RuntimePromotionJournal {
   return createInitialRuntimePromotionJournal({
-    coordinationKey: PROJECT_KEY,
+    coordinationKey,
     operationId: identity.operationId,
     recoveryOwnerToken: identity.recoveryOwnerToken,
     route: 'authored-only',
@@ -296,8 +360,11 @@ function initialJournal(
 async function createJournal(
   controller: RuntimePromotionJournalController,
   plan: InitAuthoredPlan,
+  coordinationKey = controllerCoordinationKeys.get(controller) ?? PROJECT_KEY,
 ): Promise<DurableOpenPromotionJournal> {
-  const allocation = controller.allocate((identity) => initialJournal(identity, plan));
+  const allocation = controller.allocate((identity) =>
+    initialJournal(identity, plan, coordinationKey),
+  );
   return controller.create(allocation);
 }
 
@@ -314,14 +381,16 @@ async function prepareHarness(
   plan: InitAuthoredPlan,
   root = projectRoot(),
   checkpoint?: (checkpoint: AuthoredStateCheckpoint, cursor?: number) => void,
+  afterJournalMutation?: (mutation: RuntimeRecoveryRecordMutation) => void,
 ): Promise<PreparedHarness> {
-  const lease = fakeLease();
+  const lease = fakeLease(root);
   const store: JournalStore = { content: undefined };
-  const controller = controllerFor(lease, store);
-  const receipt = await createJournal(controller, plan);
+  const controller = controllerFor(lease, store, afterJournalMutation);
+  const receipt = await createJournal(controller, plan, lease.coordinationKey);
   let now = 101;
   const prepared = await prepareAuthoredState({
     projectRoot: root,
+    projectRootAuthority: projectRootAuthority(root, lease),
     lease,
     controller,
     receipt,
@@ -381,6 +450,461 @@ async function closeCommitted(
 }
 
 describe('authored state transaction', () => {
+  it('rejects a project root outside the controller-bound coordination key before writing', async () => {
+    const authorizedRoot = projectRoot();
+    const foreignRoot = projectRoot();
+    const plan = authoredPlan([]);
+    const lease = fakeLease(authorizedRoot);
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const receipt = await createJournal(controller, plan);
+
+    await expect(
+      prepareAuthoredState({
+        projectRoot: foreignRoot,
+        projectRootAuthority: projectRootAuthority(authorizedRoot, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+      }),
+    ).rejects.toThrow(/coordination key/iu);
+    expect(readdirCustomerEntries(foreignRoot)).toEqual([]);
+    await expect(controller.verifyOpen(receipt)).resolves.toMatchObject({
+      revision: 0,
+      progress: { pendingIntent: null },
+    });
+  });
+
+  it('binds a transaction handle to its original project-root inode', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([]);
+    const harness = await prepareHarness(plan, root);
+    const displaced = `${root}-displaced`;
+    renameSync(root, displaced);
+    temporaryRoots.push(displaced);
+    mkdirSync(root, { mode: 0o700 });
+
+    await expect(commitAuthoredState(harness.prepared.transaction)).rejects.toThrow(
+      /project root changed/iu,
+    );
+    await expect(verifyAuthoredState(harness.prepared.transaction)).rejects.toThrow(
+      /project root changed/iu,
+    );
+    expect(readdirSync(root)).toEqual([]);
+  });
+
+  it('rejects an authored target changed at the after-verify checkpoint', async () => {
+    const root = projectRoot();
+    const target = join(root, 'new.txt');
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    let armed = false;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (armed && checkpoint === 'after-verify') {
+        writeFileSync(target, 'changed', { mode: 0o600 });
+      }
+    });
+    await commitAuthoredState(harness.prepared.transaction);
+    armed = true;
+
+    await expect(verifyAuthoredState(harness.prepared.transaction)).rejects.toThrow(
+      /authored target verification failed/iu,
+    );
+    expect(readFileSync(target, 'utf8')).toBe('changed');
+  });
+
+  it('rejects an authored artifact changed at the after-verify checkpoint', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const replayManifest = join(
+      root,
+      createRuntimePromotionOwnedSlots(OPERATION_ID).replayManifest.basename,
+    );
+    let armed = false;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (armed && checkpoint === 'after-verify') {
+        writeFileSync(replayManifest, '{}', { mode: 0o600 });
+      }
+    });
+    await commitAuthoredState(harness.prepared.transaction);
+    armed = true;
+
+    await expect(verifyAuthoredState(harness.prepared.transaction)).rejects.toThrow(
+      /stored replay manifest does not match/iu,
+    );
+  });
+
+  it('rejects a project-root replacement at the after-verify checkpoint', async () => {
+    const root = projectRoot();
+    const displaced = `${root}-after-verify-displaced`;
+    temporaryRoots.push(displaced);
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    let armed = false;
+    let swapped = false;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (!armed || swapped || checkpoint !== 'after-verify') return;
+      swapped = true;
+      renameSync(root, displaced);
+      mkdirSync(root, { mode: 0o700 });
+    });
+    await commitAuthoredState(harness.prepared.transaction);
+    armed = true;
+
+    await expect(verifyAuthoredState(harness.prepared.transaction)).rejects.toThrow(
+      /project root changed/iu,
+    );
+    expect(swapped).toBe(true);
+    expect(readdirSync(root)).toEqual([]);
+  });
+
+  it('rechecks a closed-loaded authored target after the after-verify checkpoint', async () => {
+    const root = projectRoot();
+    const target = join(root, 'new.txt');
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const harness = await prepareHarness(plan, root);
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+    const recoveryLease = fakeLease(root);
+    const recoveryController = controllerFor(recoveryLease, harness.store);
+    const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableClosedPromotionJournal;
+    const transaction = await loadClosedAuthoredState({
+      projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, recoveryLease),
+      lease: recoveryLease,
+      controller: recoveryController,
+      receipt: claimed,
+      dependencies: {
+        checkpoint: (checkpoint) => {
+          if (checkpoint === 'after-verify') {
+            writeFileSync(target, 'changed', { mode: 0o600 });
+          }
+        },
+      },
+    });
+
+    await expect(verifyAuthoredState(transaction)).rejects.toThrow(
+      /authored target verification failed/iu,
+    );
+    expect(closed.state).toBe('closed');
+  });
+
+  it('uses an identity-only Windows fallback when directory descriptors are unavailable', () => {
+    const root = projectRoot();
+    const path = join(root, 'windows-fallback');
+    const unsupported = Object.assign(new Error('directory open unsupported'), {
+      code: 'EINVAL',
+    });
+    let descriptorChmodCalled = false;
+
+    const created = createDurableDirectory(path, undefined, {
+      platform: 'win32',
+      openDirectory: () => {
+        throw unsupported;
+      },
+      fchmodDirectory: () => {
+        descriptorChmodCalled = true;
+      },
+    });
+
+    expect(created.path).toBe(path);
+    expect(created.type).toBe('directory');
+    expect(lstatSync(path).isDirectory()).toBe(true);
+    expect(lstatSync(path).isSymbolicLink()).toBe(false);
+    expect(descriptorChmodCalled).toBe(false);
+  });
+
+  it('does not path-chmod a replacement symlink in the Windows directory fallback', () => {
+    const root = projectRoot();
+    const path = join(root, 'windows-fallback');
+    const displaced = join(root, 'windows-fallback-displaced');
+    const externalCreated = mkdtempSync(join(tmpdir(), 'opensip-authored-windows-fallback-'));
+    chmodSync(externalCreated, 0o755);
+    const external = realpathSync(externalCreated);
+    temporaryRoots.push(external);
+    const sentinel = join(external, 'sentinel.txt');
+    writeFileSync(sentinel, 'customer', { mode: 0o600 });
+    const unsupported = Object.assign(new Error('directory open unsupported'), {
+      code: 'EINVAL',
+    });
+
+    expect(() =>
+      createDurableDirectory(
+        path,
+        () => {
+          renameSync(path, displaced);
+          symlinkSync(external, path);
+        },
+        {
+          platform: 'win32',
+          openDirectory: () => {
+            throw unsupported;
+          },
+        },
+      ),
+    ).toThrow(/could not be finalized safely/iu);
+
+    expect(lstatSync(path).isSymbolicLink()).toBe(true);
+    expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+    if (process.platform !== 'win32') {
+      expect(lstatSync(external).mode & 0o777).toBe(0o755);
+    }
+  });
+
+  it('does not materialize authored artifacts into a root replaced at a checkpoint', async () => {
+    const root = projectRoot();
+    const displaced = `${root}-displaced`;
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+    let swapped = false;
+
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (swapped || checkpoint !== 'after-stage-root-mkdir') return;
+            swapped = true;
+            renameSync(root, displaced);
+            temporaryRoots.push(displaced);
+            mkdirSync(root, { mode: 0o700 });
+          },
+        },
+      }),
+    ).rejects.toThrow(/project root changed/iu);
+
+    expect(swapped).toBe(true);
+    expect(readdirCustomerEntries(root)).toEqual([]);
+    const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+    await expect(controller.verifyOpen(claimed)).resolves.toMatchObject({
+      progress: {
+        phase: 'prepared',
+        pendingIntent: { kind: 'authored-prepare' },
+      },
+    });
+  });
+
+  it.each([
+    {
+      boundary: 'after-stage-root-mkdir',
+      ownedDirectory: (root: string, stageBasename: string) => join(root, stageBasename),
+    },
+    {
+      boundary: 'after-stage-blob-directory-mkdir',
+      ownedDirectory: (root: string, stageBasename: string) => join(root, stageBasename, 'desired'),
+    },
+    {
+      boundary: 'after-manifest-materialization',
+      ownedDirectory: (root: string, stageBasename: string) => join(root, stageBasename),
+    },
+    {
+      boundary: 'before-prepare-postcondition',
+      ownedDirectory: (root: string, stageBasename: string) => join(root, stageBasename, 'desired'),
+    },
+    {
+      boundary: 'after-prepare-postcondition',
+      ownedDirectory: (root: string, stageBasename: string) => join(root, stageBasename),
+    },
+  ] as const)(
+    'does not write through an authored artifact parent replaced at $boundary',
+    async ({ boundary, ownedDirectory }) => {
+      const root = projectRoot();
+      const externalCreated = mkdtempSync(join(tmpdir(), 'opensip-authored-external-'));
+      chmodSync(externalCreated, 0o755);
+      const external = realpathSync(externalCreated);
+      temporaryRoots.push(external);
+      const externalSentinel = join(external, 'sentinel.txt');
+      writeFileSync(externalSentinel, 'customer', { mode: 0o600 });
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      const lease = fakeLease(root);
+      const store: JournalStore = { content: undefined };
+      const controller = controllerFor(lease, store);
+      const receipt = await createJournal(controller, plan, lease.coordinationKey);
+      const stageBasename = createRuntimePromotionOwnedSlots(OPERATION_ID).authoredStage.basename;
+      const ownedPath = ownedDirectory(root, stageBasename);
+      const displaced = `${ownedPath}.opensip-displaced`;
+      let swapped = false;
+
+      await expect(
+        prepareAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt,
+          plan,
+          dependencies: {
+            checkpoint: (checkpoint) => {
+              if (swapped || checkpoint !== boundary) return;
+              swapped = true;
+              renameSync(ownedPath, displaced);
+              symlinkSync(external, ownedPath);
+            },
+          },
+        }),
+      ).rejects.toThrow(
+        /could not be finalized safely|artifact root changed|blob directory changed/iu,
+      );
+
+      expect(swapped).toBe(true);
+      expect(readdirSync(external)).toEqual(['sentinel.txt']);
+      expect(readFileSync(externalSentinel, 'utf8')).toBe('customer');
+      if (process.platform !== 'win32') {
+        expect(lstatSync(external).mode & 0o777).toBe(0o755);
+      }
+      expect(lstatSync(ownedPath).isSymbolicLink()).toBe(true);
+    },
+  );
+
+  it('accepts only journal-proven runtime installation and rollback of the authored root', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'opensip-cli',
+        preimage: absent(),
+        desired: directoryState(0o755),
+      },
+    ]);
+    const lease = fakeLease();
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const allocation = controller.allocate((identity) =>
+      createInitialRuntimePromotionJournal({
+        coordinationKey: lease.coordinationKey,
+        operationId: identity.operationId,
+        recoveryOwnerToken: identity.recoveryOwnerToken,
+        route: 'promote-cache',
+        destinationParentPreexisting: false,
+        destinationRuntimePreexisting: false,
+        source: {
+          classification: 'generation-bound',
+          cacheKey: 'b'.repeat(24),
+          generationDigest: 'c'.repeat(64),
+          markerSha256: 'd'.repeat(64),
+        },
+        inputs: {
+          conflict: 'use-cache',
+          authoredMode: 'fresh',
+          languages: ['typescript'],
+          languageExplicit: false,
+        },
+        plan: {
+          authoredDigest: plan.digest,
+          replayDigest: plan.replayManifestDigest,
+          mutationCount: plan.mutations.length,
+        },
+        owned: createRuntimePromotionOwnedSlots(identity.operationId),
+        createdAt: identity.createdAt,
+      }),
+    );
+    let receipt = await controller.create(allocation);
+    const writer = createRuntimePromotionTransitionWriter(controller, {
+      now: () => 101,
+    });
+    const runtimeManifest = {
+      digest: 'e'.repeat(64),
+      fileCount: 0,
+      directoryCount: 1,
+      symlinkCount: 0,
+      rootMode: 0o700,
+      totalBytes: 0,
+      sqlite: { status: 'absent' as const },
+    };
+    receipt = await writer.verifySource(receipt, runtimeManifest);
+    receipt = await writer.verifyDestination(receipt, null);
+    const prepared = await prepareAuthoredState({
+      projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, lease),
+      lease,
+      controller,
+      receipt,
+      plan,
+      dependencies: { now: () => 101 },
+    });
+    receipt = await writer.bindAuthoredPrepared(prepared.receipt);
+    receipt = await writer.recordDestinationParentCreateIntent(receipt);
+    mkdirSync(join(root, 'opensip-cli'), { mode: 0o755 });
+    receipt = await writer.recordDestinationReady(receipt, 'applied');
+    receipt = await writer.recordRuntimeStageCreateIntent(receipt);
+    receipt = await writer.recordRuntimeStaged(receipt, 'applied', runtimeManifest);
+    receipt = await writer.recordDestinationInstallIntent(receipt);
+    mkdirSync(join(root, 'opensip-cli', '.runtime'), { mode: 0o700 });
+    receipt = await writer.recordRuntimeInstalled(receipt, 'applied');
+
+    await bindAuthoredStateReceipt(prepared.transaction, receipt);
+    const committed = await commitAuthoredState(prepared.transaction);
+    expect(committed.summary).toMatchObject({
+      completed: 1,
+      created: 1,
+      verified: true,
+    });
+    expect(existsSync(join(root, 'opensip-cli', '.runtime'))).toBe(true);
+
+    receipt = await writer.beginRollback(committed.receipt);
+    receipt = await writer.recordRuntimeRollbackIntent(receipt);
+    rmSync(join(root, 'opensip-cli', '.runtime'), { recursive: true });
+    receipt = await writer.recordRuntimeRolledBack(receipt, 'applied');
+    await bindAuthoredStateReceipt(prepared.transaction, receipt);
+    const rolledBack = await rollbackAuthoredState(prepared.transaction);
+
+    expect(rolledBack.summary).toMatchObject({ rolledBack: 1, verified: true });
+    expect(existsSync(join(root, 'opensip-cli'))).toBe(false);
+    await expect(verifyAuthoredState(prepared.transaction, 'preimage')).resolves.toMatchObject({
+      completed: 1,
+      rolledBack: 1,
+      verified: true,
+    });
+  });
+
   it('durably records preparation before creating any artifact', async () => {
     const root = projectRoot();
     const plan = authoredPlan([
@@ -438,6 +962,7 @@ describe('authored state transaction', () => {
     const receipt = await createJournal(controller, plan);
     const prepared = await prepareAuthoredState({
       projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, lease),
       lease,
       controller,
       receipt,
@@ -470,6 +995,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease: fakeLease(),
         controller,
         receipt,
@@ -581,6 +1107,7 @@ describe('authored state transaction', () => {
     const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
     const loaded = await loadAuthoredState({
       projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, recoveryLease),
       lease: recoveryLease,
       controller: recoveryController,
       receipt: claimed,
@@ -614,6 +1141,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -636,6 +1164,7 @@ describe('authored state transaction', () => {
     const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
     const resumed = await prepareAuthoredState({
       projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, lease),
       lease,
       controller,
       receipt: claimed,
@@ -684,6 +1213,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -702,6 +1232,7 @@ describe('authored state transaction', () => {
     const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
     const resumed = await prepareAuthoredState({
       projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, lease),
       lease,
       controller,
       receipt: claimed,
@@ -715,6 +1246,121 @@ describe('authored state transaction', () => {
       verified: true,
     });
     expect(readFileSync(join(root, 'target.txt'), 'utf8')).toBe('new');
+  });
+
+  it.each([
+    {
+      artifact: 'replay manifest',
+      boundary: 'after-manifest-materialization',
+      path: (root: string, owned: ReturnType<typeof createRuntimePromotionOwnedSlots>) =>
+        join(root, owned.replayManifest.basename),
+    },
+    {
+      artifact: 'stage marker',
+      boundary: 'before-prepare-postcondition',
+      path: (root: string, owned: ReturnType<typeof createRuntimePromotionOwnedSlots>) =>
+        join(root, owned.authoredStage.basename, AUTHORED_ARTIFACT_OWNER_FILE),
+    },
+    {
+      artifact: 'stage blob',
+      boundary: 'after-prepare-postcondition',
+      path: (root: string, owned: ReturnType<typeof createRuntimePromotionOwnedSlots>) =>
+        join(root, owned.authoredStage.basename, 'desired', '0000.blob'),
+    },
+  ] as const)(
+    'rejects a changed $artifact at $boundary',
+    async ({ boundary, path: artifactPath }) => {
+      const root = projectRoot();
+      writeFileSync(join(root, 'target.txt'), 'old', { mode: 0o600 });
+      const plan = authoredPlan([
+        {
+          path: 'target.txt',
+          preimage: fileState('old'),
+          desired: fileState('new'),
+          preimageContent: 'old',
+          desiredContent: 'new',
+        },
+      ]);
+      const lease = fakeLease(root);
+      const store: JournalStore = { content: undefined };
+      const controller = controllerFor(lease, store);
+      const receipt = await createJournal(controller, plan, lease.coordinationKey);
+      const path = artifactPath(root, createRuntimePromotionOwnedSlots(OPERATION_ID));
+      let changed = false;
+
+      await expect(
+        prepareAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt,
+          plan,
+          dependencies: {
+            checkpoint: (checkpoint) => {
+              if (changed || checkpoint !== boundary) return;
+              changed = true;
+              writeFileSync(path, 'customer-artifact', { mode: 0o600 });
+            },
+          },
+        }),
+      ).rejects.toThrow(/artifact|blob|manifest|owner|identity|changed/iu);
+
+      expect(changed).toBe(true);
+      expect(readFileSync(path, 'utf8')).toBe('customer-artifact');
+    },
+  );
+
+  it('rejects a changed backup blob immediately after its prepare journal postcondition', async () => {
+    const root = projectRoot();
+    writeFileSync(join(root, 'target.txt'), 'old', { mode: 0o600 });
+    const plan = authoredPlan([
+      {
+        path: 'target.txt',
+        preimage: fileState('old'),
+        desired: fileState('new'),
+        preimageContent: 'old',
+        desiredContent: 'new',
+      },
+    ]);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const backupBlob = join(root, owned.authoredBackup.basename, 'preimage', '0000.blob');
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    let changed = false;
+    const controller = controllerFor(lease, store, (mutation) => {
+      if (changed || mutation.operation !== 'replace' || mutation.content === undefined) {
+        return;
+      }
+      const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+      if (
+        next.progress.pendingIntent !== null ||
+        next.progress.lastPostcondition?.kind !== 'authored-prepare' ||
+        next.progress.phase !== 'authored-prepared'
+      ) {
+        return;
+      }
+      changed = true;
+      writeFileSync(backupBlob, 'customer-backup', { mode: 0o600 });
+    });
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+      }),
+    ).rejects.toThrow(/backup blob|blob was changed|artifact/iu);
+
+    expect(changed).toBe(true);
+    expect(readFileSync(backupBlob, 'utf8')).toBe('customer-backup');
+    expect((JSON.parse(store.content ?? '{}') as RuntimePromotionJournal).progress.phase).toBe(
+      'authored-prepared',
+    );
   });
 
   it('preserves and rejects unexpected entries in an ownerless interrupted root', async () => {
@@ -734,6 +1380,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -756,6 +1403,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt: claimed,
@@ -783,6 +1431,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -807,6 +1456,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt: claimed,
@@ -834,6 +1484,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -856,6 +1507,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt: claimed,
@@ -883,6 +1535,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -905,6 +1558,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt: claimed,
@@ -939,6 +1593,7 @@ describe('authored state transaction', () => {
       await expect(
         prepareAuthoredState({
           projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
           lease,
           controller,
           receipt,
@@ -977,6 +1632,7 @@ describe('authored state transaction', () => {
       if (recovery === 'prepare') {
         await prepareAuthoredState({
           projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
           lease,
           controller,
           receipt: claimed,
@@ -988,6 +1644,7 @@ describe('authored state transaction', () => {
       } else {
         await abortPendingAuthoredPreparation({
           projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
           lease,
           controller,
           receipt: claimed,
@@ -1016,6 +1673,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt,
@@ -1042,6 +1700,7 @@ describe('authored state transaction', () => {
     await expect(
       prepareAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt: claimed,
@@ -1094,6 +1753,7 @@ describe('authored state transaction', () => {
       await expect(
         prepareAuthoredState({
           projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
           lease,
           controller,
           receipt,
@@ -1112,6 +1772,7 @@ describe('authored state transaction', () => {
       const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
       const aborted = await abortPendingAuthoredPreparation({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, recoveryLease),
         lease: recoveryLease,
         controller: recoveryController,
         receipt: claimed,
@@ -1168,6 +1829,7 @@ describe('authored state transaction', () => {
       await expect(
         prepareAuthoredState({
           projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
           lease,
           controller,
           receipt,
@@ -1186,6 +1848,7 @@ describe('authored state transaction', () => {
       await expect(
         abortPendingAuthoredPreparation({
           projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
           lease,
           controller,
           receipt: claimed,
@@ -1201,6 +1864,7 @@ describe('authored state transaction', () => {
       claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
       const resumed = await abortPendingAuthoredPreparation({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
         lease,
         controller,
         receipt: claimed,
@@ -1210,6 +1874,463 @@ describe('authored state transaction', () => {
         progress: { direction: 'rollback', phase: 'authored-rolled-back' },
       });
     }
+  });
+
+  it.each(['abort-postcondition', 'begin-rollback', 'advance-authored-rollback'] as const)(
+    'converges an exact replay temporary introduced during %s',
+    async (transition) => {
+      const root = projectRoot();
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+      const temporary = join(
+        root,
+        anchoredRecordTemporaryBasename(
+          owned.replayManifest.basename,
+          owned.replayManifest.ownershipId,
+        ),
+      );
+      const lease = fakeLease(root);
+      const store: JournalStore = { content: undefined };
+      let armed = false;
+      let inserted = false;
+      const controller = controllerFor(lease, store, (mutation) => {
+        if (
+          !armed ||
+          inserted ||
+          mutation.operation !== 'replace' ||
+          mutation.content === undefined
+        ) {
+          return;
+        }
+        const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+        let matches: boolean;
+        if (transition === 'abort-postcondition') {
+          matches =
+            next.progress.direction === 'forward' &&
+            next.progress.pendingIntent === null &&
+            next.progress.lastPostcondition?.kind === 'authored-prepare' &&
+            next.progress.lastPostcondition.outcome === 'aborted';
+        } else if (transition === 'begin-rollback') {
+          matches =
+            next.progress.direction === 'rollback' && next.progress.phase === 'rollback-started';
+        } else {
+          matches =
+            next.progress.direction === 'rollback' &&
+            next.progress.phase === 'authored-rolled-back';
+        }
+        if (!matches) return;
+        inserted = true;
+        writeFileSync(temporary, 'partial-replay', { mode: 0o600 });
+      });
+      const receipt = await createJournal(controller, plan, lease.coordinationKey);
+      await expect(
+        prepareAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt,
+          plan,
+          dependencies: {
+            checkpoint: (checkpoint) => {
+              if (checkpoint === 'after-stage-materialization') {
+                throw new Error('prepare crash');
+              }
+            },
+          },
+        }),
+      ).rejects.toThrow(/prepare crash/iu);
+      const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+      armed = true;
+
+      const aborted = await abortPendingAuthoredPreparation({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt: claimed,
+      });
+
+      expect(inserted).toBe(true);
+      expect(existsSync(temporary)).toBe(false);
+      await expect(controller.verifyOpen(aborted.receipt)).resolves.toMatchObject({
+        progress: {
+          direction: 'rollback',
+          phase: 'authored-rolled-back',
+        },
+      });
+    },
+  );
+
+  it.each(['begin-rollback', 'advance-authored-rollback'] as const)(
+    'preserves and rejects a replacement artifact introduced during %s',
+    async (transition) => {
+      const root = projectRoot();
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+      const stage = join(root, owned.authoredStage.basename);
+      const sentinel = join(stage, 'customer.txt');
+      const lease = fakeLease(root);
+      const store: JournalStore = { content: undefined };
+      let armed = false;
+      let inserted = false;
+      const controller = controllerFor(lease, store, (mutation) => {
+        if (
+          !armed ||
+          inserted ||
+          mutation.operation !== 'replace' ||
+          mutation.content === undefined
+        ) {
+          return;
+        }
+        const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+        const matches =
+          transition === 'begin-rollback'
+            ? next.progress.direction === 'rollback' && next.progress.phase === 'rollback-started'
+            : next.progress.direction === 'rollback' &&
+              next.progress.phase === 'authored-rolled-back';
+        if (!matches) return;
+        inserted = true;
+        mkdirSync(stage, { mode: 0o700 });
+        writeFileSync(sentinel, 'customer', { mode: 0o600 });
+      });
+      const receipt = await createJournal(controller, plan, lease.coordinationKey);
+      await expect(
+        prepareAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt,
+          plan,
+          dependencies: {
+            checkpoint: (checkpoint) => {
+              if (checkpoint === 'after-stage-materialization') {
+                throw new Error('prepare crash');
+              }
+            },
+          },
+        }),
+      ).rejects.toThrow(/prepare crash/iu);
+      const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+      armed = true;
+
+      await expect(
+        abortPendingAuthoredPreparation({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt: claimed,
+        }),
+      ).rejects.toThrow(/left an owned artifact path/iu);
+
+      expect(inserted).toBe(true);
+      expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+    },
+  );
+
+  it('rejects a customer target edit introduced while advancing an aborted rollback', async () => {
+    const root = projectRoot();
+    const target = join(root, 'target.txt');
+    writeFileSync(target, 'old', { mode: 0o600 });
+    const plan = authoredPlan([
+      {
+        path: 'target.txt',
+        preimage: fileState('old'),
+        desired: fileState('new'),
+        preimageContent: 'old',
+        desiredContent: 'new',
+      },
+    ]);
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    let armed = false;
+    let changed = false;
+    const controller = controllerFor(lease, store, (mutation) => {
+      if (!armed || changed || mutation.operation !== 'replace' || mutation.content === undefined) {
+        return;
+      }
+      const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+      if (
+        next.progress.direction !== 'rollback' ||
+        next.progress.phase !== 'authored-rolled-back'
+      ) {
+        return;
+      }
+      changed = true;
+      writeFileSync(target, 'customer', { mode: 0o600 });
+    });
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (checkpoint === 'after-stage-materialization') {
+              throw new Error('prepare crash');
+            }
+          },
+        },
+      }),
+    ).rejects.toThrow(/prepare crash/iu);
+    const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+    armed = true;
+
+    await expect(
+      abortPendingAuthoredPreparation({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt: claimed,
+      }),
+    ).rejects.toThrow(
+      /authored target changed|authored target verification failed|does not match/iu,
+    );
+
+    expect(changed).toBe(true);
+    expect(readFileSync(target, 'utf8')).toBe('customer');
+  });
+
+  it('preserves a blob replaced after abort cleanup authority was captured', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (checkpoint === 'after-stage-materialization') {
+              throw new Error('prepare crash');
+            }
+          },
+        },
+      }),
+    ).rejects.toThrow(/prepare crash/iu);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const blob = join(root, owned.authoredStage.basename, 'desired', '0000.blob');
+    const displaced = `${blob}.opensip-original`;
+    const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+    let replaced = false;
+
+    await expect(
+      abortPendingAuthoredPreparation({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt: claimed,
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (replaced || checkpoint !== 'before-abort-cleanup') return;
+            replaced = true;
+            renameSync(blob, displaced);
+            writeFileSync(blob, 'customer', { mode: 0o600 });
+          },
+        },
+      }),
+    ).rejects.toThrow(/blob changed while it was being removed|blob changed/iu);
+
+    expect(replaced).toBe(true);
+    expect(readFileSync(blob, 'utf8')).toBe('customer');
+    expect(readFileSync(displaced, 'utf8')).toBe('new');
+    await expect(controller.verifyOpen(claimed)).resolves.toMatchObject({
+      progress: {
+        direction: 'forward',
+        pendingIntent: { kind: 'authored-prepare' },
+      },
+    });
+  });
+
+  it.each([
+    'after-abort-cleanup',
+    'before-abort-postcondition',
+    'after-abort-postcondition',
+  ] as const)(
+    'does not record a false unmaterialized postcondition when an artifact appears at %s',
+    async (boundary) => {
+      const root = projectRoot();
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      const lease = fakeLease(root);
+      const store: JournalStore = { content: undefined };
+      const controller = controllerFor(lease, store);
+      const receipt = await createJournal(controller, plan, lease.coordinationKey);
+      await expect(
+        prepareAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt,
+          plan,
+          dependencies: {
+            checkpoint: (checkpoint) => {
+              if (checkpoint === 'after-stage-materialization') {
+                throw new Error('prepare crash');
+              }
+            },
+          },
+        }),
+      ).rejects.toThrow(/prepare crash/iu);
+      const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+      const stage = join(root, owned.authoredStage.basename);
+      const sentinel = join(stage, 'customer.txt');
+      const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+      let inserted = false;
+
+      await expect(
+        abortPendingAuthoredPreparation({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt: claimed,
+          dependencies: {
+            checkpoint: (checkpoint) => {
+              if (inserted || checkpoint !== boundary) return;
+              inserted = true;
+              mkdirSync(stage, { mode: 0o700 });
+              writeFileSync(sentinel, 'customer', { mode: 0o600 });
+            },
+          },
+        }),
+      ).rejects.toThrow(/left an owned artifact path/iu);
+
+      expect(inserted).toBe(true);
+      expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+      const journal = JSON.parse(store.content ?? '{}') as RuntimePromotionJournal;
+      expect(journal.progress.pendingIntent === null).toBe(
+        boundary === 'after-abort-postcondition',
+      );
+
+      const retry = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+      await expect(
+        abortPendingAuthoredPreparation({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, lease),
+          lease,
+          controller,
+          receipt: retry,
+        }),
+      ).rejects.toThrow(
+        /left an owned artifact path|ownership marker|without their durable replay manifest/iu,
+      );
+      expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+    },
+  );
+
+  it('stops an abort when its project root is replaced after owned cleanup', async () => {
+    const root = projectRoot();
+    const displaced = `${root}-displaced`;
+    const replacementFile = join(root, 'customer.txt');
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+        dependencies: {
+          now: () => 101,
+          checkpoint: (checkpoint) => {
+            if (checkpoint === 'after-stage-materialization') {
+              throw new Error('prepare crash');
+            }
+          },
+        },
+      }),
+    ).rejects.toThrow(/prepare crash/iu);
+    const claimed = (await controller.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+    const authority = projectRootAuthority(root, lease);
+    let swapped = false;
+
+    await expect(
+      abortPendingAuthoredPreparation({
+        projectRoot: root,
+        projectRootAuthority: authority,
+        lease,
+        controller,
+        receipt: claimed,
+        dependencies: {
+          now: () => 102,
+          checkpoint: (checkpoint) => {
+            if (swapped || checkpoint !== 'after-abort-cleanup') return;
+            swapped = true;
+            renameSync(root, displaced);
+            temporaryRoots.push(displaced);
+            mkdirSync(root, { mode: 0o700 });
+            writeFileSync(replacementFile, 'customer', { mode: 0o600 });
+          },
+        },
+      }),
+    ).rejects.toThrow(/project root changed/iu);
+
+    expect(swapped).toBe(true);
+    expect(readdirCustomerEntries(root)).toEqual(['customer.txt']);
+    expect(readFileSync(replacementFile, 'utf8')).toBe('customer');
+    await expect(controller.verifyOpen(claimed)).resolves.toMatchObject({
+      progress: {
+        direction: 'forward',
+        phase: 'prepared',
+        pendingIntent: { kind: 'authored-prepare' },
+      },
+    });
   });
 
   it('commits directory-to-file changes children-first and rolls back exactly', async () => {
@@ -1281,6 +2402,107 @@ describe('authored state transaction', () => {
     expect(readFileSync(join(root, 'target.txt'), 'utf8')).toBe('customer-change');
   });
 
+  it.each([
+    { direction: 'commit', boundary: 'after-target-mutation' },
+    { direction: 'commit', boundary: 'before-target-postcondition' },
+    { direction: 'rollback', boundary: 'after-target-mutation' },
+    { direction: 'rollback', boundary: 'before-target-postcondition' },
+  ] as const)(
+    'rejects a $direction target replacement at $boundary before recording success',
+    async ({ direction, boundary }) => {
+      const root = projectRoot();
+      const target = join(root, 'target.txt');
+      writeFileSync(target, 'old', { mode: 0o600 });
+      const plan = authoredPlan([
+        {
+          path: 'target.txt',
+          preimage: fileState('old'),
+          desired: fileState('new'),
+          preimageContent: 'old',
+          desiredContent: 'new',
+        },
+      ]);
+      let armed = false;
+      let replaced = false;
+      const harness = await prepareHarness(plan, root, (checkpoint, cursor) => {
+        if (!armed || replaced || cursor !== 0 || checkpoint !== boundary) {
+          return;
+        }
+        replaced = true;
+        writeFileSync(target, 'customer', { mode: 0o600 });
+      });
+      if (direction === 'rollback') {
+        await commitAuthoredState(harness.prepared.transaction);
+      }
+      armed = true;
+
+      const operation =
+        direction === 'commit'
+          ? commitAuthoredState(harness.prepared.transaction)
+          : rollbackAuthoredState(harness.prepared.transaction);
+      await expect(operation).rejects.toThrow(/target changed before its durable postcondition/iu);
+
+      expect(replaced).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('customer');
+    },
+  );
+
+  it.each(['commit', 'rollback'] as const)(
+    'detects a $direction target replacement immediately after its journal postcondition',
+    async (direction) => {
+      const root = projectRoot();
+      const target = join(root, 'target.txt');
+      writeFileSync(target, 'old', { mode: 0o600 });
+      const plan = authoredPlan([
+        {
+          path: 'target.txt',
+          preimage: fileState('old'),
+          desired: fileState('new'),
+          preimageContent: 'old',
+          desiredContent: 'new',
+        },
+      ]);
+      let armed = false;
+      let replaced = false;
+      const harness = await prepareHarness(plan, root, undefined, (mutation) => {
+        if (
+          !armed ||
+          replaced ||
+          mutation.operation !== 'replace' ||
+          mutation.content === undefined
+        ) {
+          return;
+        }
+        const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+        if (
+          next.progress.pendingIntent !== null ||
+          next.progress.lastPostcondition?.kind !== `authored-target-${direction}`
+        ) {
+          return;
+        }
+        replaced = true;
+        writeFileSync(target, 'customer', { mode: 0o600 });
+      });
+      if (direction === 'rollback') {
+        await commitAuthoredState(harness.prepared.transaction);
+      }
+      armed = true;
+
+      const operation =
+        direction === 'commit'
+          ? commitAuthoredState(harness.prepared.transaction)
+          : rollbackAuthoredState(harness.prepared.transaction);
+      await expect(operation).rejects.toThrow(/target changed before its durable postcondition/iu);
+
+      expect(replaced).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('customer');
+      const journal = JSON.parse(harness.store.content ?? '{}') as RuntimePromotionJournal;
+      expect(
+        direction === 'commit' ? journal.progress.authoredCursor : journal.progress.rollbackCursor,
+      ).toBe(1);
+    },
+  );
+
   it('fails closed on a tampered blob or replay manifest', async () => {
     const root = projectRoot();
     const plan = authoredPlan([
@@ -1305,11 +2527,293 @@ describe('authored state transaction', () => {
     await expect(
       loadAuthoredState({
         projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, recoveryLease),
         lease: recoveryLease,
         controller: recoveryController,
         receipt: claimed,
       }),
     ).rejects.toThrow(/expected identity|replay manifest identity/iu);
+  });
+
+  it.each(CLEANUP_ROOT_CHECKPOINTS)(
+    'refuses a project-root replacement at cleanup checkpoint %s',
+    async (boundary) => {
+      const root = projectRoot();
+      const displaced = `${root}-displaced-${boundary}`;
+      const replacementFile = join(root, 'customer.txt');
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      let swapped = false;
+      const harness = await prepareHarness(plan, root, (checkpoint) => {
+        if (swapped || checkpoint !== boundary) return;
+        swapped = true;
+        renameSync(root, displaced);
+        temporaryRoots.push(displaced);
+        mkdirSync(root, { mode: 0o700 });
+        writeFileSync(replacementFile, 'customer', { mode: 0o600 });
+      });
+      const committed = await commitAuthoredState(harness.prepared.transaction);
+      const closed = await closeCommitted(harness.controller, committed.receipt);
+
+      await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+        /project root changed/iu,
+      );
+
+      expect(swapped).toBe(true);
+      expect(readFileSync(replacementFile, 'utf8')).toBe('customer');
+      expect(readdirCustomerEntries(root)).toEqual(['customer.txt']);
+    },
+  );
+
+  it.each(CLEANUP_ARTIFACT_CHECKPOINTS)(
+    'preserves a replacement artifact tree introduced at cleanup checkpoint %s',
+    async (boundary) => {
+      const root = projectRoot();
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+      const stage = join(root, owned.authoredStage.basename);
+      const displaced = `${stage}-displaced-${boundary}`;
+      const sentinel = join(stage, 'customer-tree', 'sentinel.txt');
+      let swapped = false;
+      const harness = await prepareHarness(plan, root, (checkpoint) => {
+        if (swapped || checkpoint !== boundary) return;
+        swapped = true;
+        if (existsSync(stage)) renameSync(stage, displaced);
+        mkdirSync(join(stage, 'customer-tree'), {
+          recursive: true,
+          mode: 0o700,
+        });
+        writeFileSync(sentinel, 'customer', { mode: 0o600 });
+      });
+      const committed = await commitAuthoredState(harness.prepared.transaction);
+      const closed = await closeCommitted(harness.controller, committed.receipt);
+
+      await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+        /changed|replaced|no longer absent|ownership marker|unexpected entries/iu,
+      );
+
+      expect(swapped).toBe(true);
+      expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+      if (boundary === 'after-cleanup-evidence-unlink') {
+        const recoveryLease = fakeLease(root);
+        const recoveryController = controllerFor(recoveryLease, harness.store);
+        const claimed = (await recoveryController.claim(
+          OPERATION_ID,
+        )) as DurableClosedPromotionJournal;
+        const transaction = await loadClosedAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, recoveryLease),
+          lease: recoveryLease,
+          controller: recoveryController,
+          receipt: claimed,
+        });
+        await expect(cleanupAuthoredState(transaction, claimed)).rejects.toThrow(
+          /no longer absent/iu,
+        );
+        expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+      }
+    },
+  );
+
+  it('does not authorize a replacement root after its owner marker was removed', async () => {
+    const root = projectRoot();
+    writeFileSync(join(root, 'kept.txt'), 'same', { mode: 0o600 });
+    const plan = authoredPlan([
+      {
+        path: 'kept.txt',
+        preimage: fileState('same'),
+        desired: fileState('same'),
+        preimageContent: 'same',
+        desiredContent: 'same',
+      },
+    ]);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const stage = join(root, owned.authoredStage.basename);
+    const displaced = `${stage}.opensip-ownerless-original`;
+    const sentinel = join(stage, 'customer.txt');
+    let unlinks = 0;
+    let swapped = false;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (checkpoint !== 'after-cleanup-entry-unlink') return;
+      unlinks += 1;
+      if (unlinks !== 2) return;
+      swapped = true;
+      renameSync(stage, displaced);
+      mkdirSync(stage, { mode: 0o700 });
+      writeFileSync(sentinel, 'customer', { mode: 0o600 });
+    });
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /root changed|root was replaced|marker parent changed/iu,
+    );
+
+    expect(swapped).toBe(true);
+    expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+    expect(readdirSync(displaced)).toEqual([]);
+  });
+
+  it('reasserts the project root after cleanup journal writes', async () => {
+    for (const transition of ['intent', 'postcondition'] as const) {
+      const root = projectRoot();
+      const displaced = `${root}-displaced-${transition}`;
+      const replacementFile = join(root, 'customer.txt');
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      let swapped = false;
+      const harness = await prepareHarness(plan, root, undefined, (mutation) => {
+        if (swapped || mutation.operation !== 'replace') return;
+        const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+        const isTargetTransition =
+          transition === 'intent'
+            ? next.progress.pendingIntent?.kind === 'owned-slot-cleanup'
+            : next.cleanup.authoredStage === 'removed';
+        if (!isTargetTransition) return;
+        swapped = true;
+        renameSync(root, displaced);
+        temporaryRoots.push(displaced);
+        mkdirSync(root, { mode: 0o700 });
+        writeFileSync(replacementFile, 'customer', { mode: 0o600 });
+      });
+      const committed = await commitAuthoredState(harness.prepared.transaction);
+      const closed = await closeCommitted(harness.controller, committed.receipt);
+
+      await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+        /project root changed/iu,
+      );
+
+      expect(swapped).toBe(true);
+      expect(readFileSync(replacementFile, 'utf8')).toBe('customer');
+    }
+  });
+
+  it('reasserts the project root on an absent cleanup branch', async () => {
+    const root = projectRoot();
+    const displaced = `${root}-displaced-absent-cleanup`;
+    const replacementFile = join(root, 'customer.txt');
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    let swapped = false;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (swapped || checkpoint !== 'after-cleanup-artifact-observation') return;
+      swapped = true;
+      renameSync(root, displaced);
+      temporaryRoots.push(displaced);
+      mkdirSync(root, { mode: 0o700 });
+      writeFileSync(replacementFile, 'customer', { mode: 0o600 });
+    });
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    rmSync(join(root, owned.authoredStage.basename), { recursive: true });
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /project root changed/iu,
+    );
+
+    expect(swapped).toBe(true);
+    expect(readFileSync(replacementFile, 'utf8')).toBe('customer');
+  });
+
+  it('refuses a symlink swapped in between artifact inspection and unlink', async () => {
+    const root = projectRoot();
+    writeFileSync(join(root, 'new.txt'), 'new', { mode: 0o600 });
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: fileState('new'),
+        desired: fileState('new'),
+        preimageContent: 'new',
+        desiredContent: 'new',
+      },
+    ]);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const blob = join(root, owned.authoredStage.basename, 'desired', '0000.blob');
+    const displacedBlob = `${blob}.displaced`;
+    const sentinel = join(root, 'customer-sentinel.txt');
+    writeFileSync(sentinel, 'customer', { mode: 0o600 });
+    let swapped = false;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (swapped || checkpoint !== 'before-cleanup-entry-unlink') return;
+      swapped = true;
+      renameSync(blob, displacedBlob);
+      symlinkSync(sentinel, blob);
+    });
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /changed while it was being removed/iu,
+    );
+
+    expect(swapped).toBe(true);
+    expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+    expect(lstatSync(blob).isSymbolicLink()).toBe(true);
+  });
+
+  it('does not record an already-satisfied cleanup after an absent artifact path is replaced', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const stage = join(root, owned.authoredStage.basename);
+    const sentinel = join(stage, 'customer-tree', 'sentinel.txt');
+    let inserted = false;
+    const harness = await prepareHarness(plan, root, undefined, (mutation) => {
+      if (inserted || mutation.operation !== 'replace') return;
+      const next = JSON.parse(mutation.content) as RuntimePromotionJournal;
+      if (next.cleanup.authoredStage !== 'removed') return;
+      inserted = true;
+      mkdirSync(join(stage, 'customer-tree'), { recursive: true, mode: 0o700 });
+      writeFileSync(sentinel, 'customer', { mode: 0o600 });
+    });
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+    rmSync(stage, { recursive: true });
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /no longer absent/iu,
+    );
+
+    expect(inserted).toBe(true);
+    expect(readFileSync(sentinel, 'utf8')).toBe('customer');
+    const claimed = (await harness.controller.claim(OPERATION_ID)) as DurableClosedPromotionJournal;
+    await expect(cleanupAuthoredState(harness.prepared.transaction, claimed)).rejects.toThrow(
+      /no longer absent/iu,
+    );
+    expect(readFileSync(sentinel, 'utf8')).toBe('customer');
   });
 
   it('cleans only exact journal-owned artifacts and preserves a changed owner marker', async () => {
@@ -1412,6 +2916,145 @@ describe('authored state transaction', () => {
     expect(readFileSync(join(root, 'new.txt'), 'utf8')).toBe('new');
   });
 
+  it.each([
+    {
+      boundary: 'after-cleanup-evidence-published',
+      occurrence: 1,
+      window: 'durable evidence publication',
+    },
+    {
+      boundary: 'after-cleanup-entry-unlink',
+      occurrence: 1,
+      window: 'blob unlink',
+    },
+    {
+      boundary: 'after-cleanup-directory-removal',
+      occurrence: 1,
+      window: 'blob-directory removal',
+    },
+    {
+      boundary: 'after-cleanup-entry-unlink',
+      occurrence: 2,
+      window: 'owner-marker unlink',
+    },
+    {
+      boundary: 'after-cleanup-directory-removal',
+      occurrence: 2,
+      window: 'artifact-root removal',
+    },
+    {
+      boundary: 'before-cleanup-evidence-unlink',
+      occurrence: 1,
+      window: 'pre-evidence unlink',
+    },
+    {
+      boundary: 'after-cleanup-evidence-unlink',
+      occurrence: 1,
+      window: 'post-evidence unlink',
+    },
+  ] as const)(
+    'resumes exact closed cleanup after a crash at $window',
+    async ({ boundary, occurrence }) => {
+      const root = projectRoot();
+      writeFileSync(join(root, 'kept.txt'), 'same', { mode: 0o600 });
+      const plan = authoredPlan([
+        {
+          path: 'kept.txt',
+          preimage: fileState('same'),
+          desired: fileState('same'),
+          preimageContent: 'same',
+          desiredContent: 'same',
+        },
+      ]);
+      let observations = 0;
+      const harness = await prepareHarness(plan, root, (checkpoint) => {
+        if (checkpoint !== boundary) return;
+        observations += 1;
+        if (observations === occurrence) throw new Error('inner cleanup crash');
+      });
+      const committed = await commitAuthoredState(harness.prepared.transaction);
+      const closed = await closeCommitted(harness.controller, committed.receipt);
+
+      await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+        /inner cleanup crash/iu,
+      );
+
+      const recoveryLease = fakeLease(root);
+      const recoveryController = controllerFor(recoveryLease, harness.store);
+      const claimed = (await recoveryController.claim(
+        OPERATION_ID,
+      )) as DurableClosedPromotionJournal;
+      const transaction = await loadClosedAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, recoveryLease),
+        lease: recoveryLease,
+        controller: recoveryController,
+        receipt: claimed,
+      });
+      const result = await cleanupAuthoredState(transaction, claimed);
+      const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+
+      expect(result.summary).toMatchObject({
+        verified: true,
+        actionsKnown: true,
+      });
+      expect(existsSync(join(root, owned.authoredStage.basename))).toBe(false);
+      expect(existsSync(join(root, owned.authoredBackup.basename))).toBe(false);
+      expect(existsSync(join(root, owned.replayManifest.basename))).toBe(false);
+      expect(
+        readdirSync(root).filter((name) => name.startsWith('.opensip-init-authored-cleanup-')),
+      ).toEqual([]);
+      expect(readFileSync(join(root, 'kept.txt'), 'utf8')).toBe('same');
+    },
+  );
+
+  it('preserves an exact-byte replacement swapped in for cleanup evidence', async () => {
+    const root = projectRoot();
+    writeFileSync(join(root, 'kept.txt'), 'same', { mode: 0o600 });
+    const plan = authoredPlan([
+      {
+        path: 'kept.txt',
+        preimage: fileState('same'),
+        desired: fileState('same'),
+        preimageContent: 'same',
+        desiredContent: 'same',
+      },
+    ]);
+    let replacement: string | undefined;
+    let displaced: string | undefined;
+    let canonicalBytes: string | undefined;
+    const harness = await prepareHarness(plan, root, (checkpoint) => {
+      if (replacement !== undefined || checkpoint !== 'before-cleanup-evidence-unlink') {
+        return;
+      }
+      const basename = readdirSync(root).find((name) =>
+        name.startsWith('.opensip-init-authored-cleanup-'),
+      );
+      if (basename === undefined) throw new Error('missing cleanup evidence');
+      replacement = join(root, basename);
+      displaced = `${replacement}.opensip-original`;
+      canonicalBytes = readFileSync(replacement, 'utf8');
+      renameSync(replacement, displaced);
+      writeFileSync(replacement, canonicalBytes, { mode: 0o600 });
+    });
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /cleanup evidence changed/iu,
+    );
+
+    expect(replacement).toBeDefined();
+    expect(displaced).toBeDefined();
+    if (replacement === undefined || displaced === undefined) {
+      throw new Error('cleanup evidence replacement was not installed');
+    }
+    expect(canonicalBytes).toBeDefined();
+    expect(readFileSync(replacement, 'utf8')).toBe(canonicalBytes);
+    expect(readFileSync(displaced, 'utf8')).toContain('opensip-init-authored-cleanup-evidence');
+    expect(lstatSync(replacement).ino).not.toBe(lstatSync(displaced).ino);
+  });
+
   it('resumes cleanup after an authored stage was removed before its postcondition', async () => {
     const root = projectRoot();
     const plan = authoredPlan([
@@ -1439,6 +3082,7 @@ describe('authored state transaction', () => {
     const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableClosedPromotionJournal;
     const transaction = await loadClosedAuthoredState({
       projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, recoveryLease),
       lease: recoveryLease,
       controller: recoveryController,
       receipt: claimed,
@@ -1478,6 +3122,7 @@ describe('authored state transaction', () => {
     const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableClosedPromotionJournal;
     const transaction = await loadClosedAuthoredState({
       projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, recoveryLease),
       lease: recoveryLease,
       controller: recoveryController,
       receipt: claimed,

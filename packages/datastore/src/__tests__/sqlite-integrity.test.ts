@@ -20,8 +20,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LOGICAL_SCHEMA_VERSION } from '../schema-version.js';
 import {
   checkpointSqliteFile,
+  checkpointSqliteFileWithDependencies,
   inspectSqliteFile,
   inspectSqliteFileWithDependencies,
+  sqliteCheckpointFailureResult,
   SQLITE_FOREIGN_KEY_MAX_SAMPLES,
 } from '../sqlite-integrity.js';
 
@@ -51,6 +53,22 @@ function createDatabase(path: string, userVersion = LOGICAL_SCHEMA_VERSION): voi
   sqlite.prepare('INSERT INTO probe (value) VALUES (?)').run('kept');
   sqlite.pragma(`user_version = ${userVersion}`);
   sqlite.close();
+}
+
+function unclosedInspectionDatabase(): Database.Database {
+  return {
+    open: true,
+    pragma: (pragma: string, options?: { readonly simple?: boolean }): unknown => {
+      if (pragma === 'user_version' && options?.simple === true) {
+        return LOGICAL_SCHEMA_VERSION;
+      }
+      return [{ quick_check: 'ok' }];
+    },
+    prepare: () => ({ all: () => [] }),
+    close: () => {
+      throw new Error('private native close detail');
+    },
+  } as unknown as Database.Database;
 }
 
 describe('inspectSqliteFile', () => {
@@ -117,6 +135,35 @@ describe('inspectSqliteFile', () => {
     });
   });
 
+  it('runs the caller authority guard after hashing and before native open', () => {
+    const path = join(temporaryDirectory, 'guarded-open.sqlite');
+    createDatabase(path);
+    const events: string[] = [];
+    let opened = false;
+
+    const result = inspectSqliteFileWithDependencies(path, {
+      afterHash: () => events.push('hashed'),
+      beforeOpen: () => {
+        events.push('guarded');
+        throw new Error('authority changed');
+      },
+      openDatabase: (databasePath) => {
+        opened = true;
+        return new Database(databasePath, {
+          readonly: true,
+          fileMustExist: true,
+        });
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: 'unreadable',
+      reason: 'inspection-failed',
+    });
+    expect(events).toEqual(['hashed', 'guarded']);
+    expect(opened).toBe(false);
+  });
+
   it('does not report absent when the path appears before absence is confirmed', () => {
     const path = join(temporaryDirectory, 'appeared.sqlite');
 
@@ -172,6 +219,74 @@ describe('inspectSqliteFile', () => {
     });
 
     expect(result).toMatchObject({ status: 'valid' });
+  });
+
+  it('reports an unclosed native inspection handle without exposing native detail', () => {
+    const path = join(temporaryDirectory, 'unclosed-inspection.sqlite');
+    createDatabase(path);
+
+    const result = inspectSqliteFileWithDependencies(path, {
+      openDatabase: unclosedInspectionDatabase,
+    });
+
+    expect(result).toMatchObject({
+      status: 'unreadable',
+      reason: 'native-close-failed',
+    });
+  });
+
+  it('preserves an unclosed proof over a simultaneous main-file identity change', () => {
+    const path = join(temporaryDirectory, 'unclosed-and-replaced.sqlite');
+    createDatabase(path);
+
+    const result = inspectSqliteFileWithDependencies(path, {
+      openDatabase: unclosedInspectionDatabase,
+      afterFailure: () => writeFileSync(path, 'replacement'),
+    });
+
+    expect(result).toMatchObject({
+      status: 'unreadable',
+      reason: 'native-close-failed',
+    });
+  });
+
+  it('preserves an unclosed proof when failure diagnostics also throw', () => {
+    const path = join(temporaryDirectory, 'unclosed-diagnostic-failure.sqlite');
+    createDatabase(path);
+
+    const result = inspectSqliteFileWithDependencies(path, {
+      openDatabase: unclosedInspectionDatabase,
+      afterFailure: () => {
+        throw new Error('private diagnostic detail');
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: 'unreadable',
+      reason: 'native-close-failed',
+    });
+  });
+
+  it('preserves an unclosed proof when sidecar and identity diagnostics are unavailable', () => {
+    if (process.platform === 'win32') return;
+    const parent = join(temporaryDirectory, 'unclosed-unreadable-parent');
+    const path = join(parent, 'database.sqlite');
+    mkdirSync(parent);
+    createDatabase(path);
+
+    try {
+      const result = inspectSqliteFileWithDependencies(path, {
+        openDatabase: unclosedInspectionDatabase,
+        afterFailure: () => chmodSync(parent, 0o000),
+      });
+
+      expect(result).toMatchObject({
+        status: 'unreadable',
+        reason: 'native-close-failed',
+      });
+    } finally {
+      chmodSync(parent, 0o700);
+    }
   });
 
   it('reports a newer user_version as unsupported after integrity checks', () => {
@@ -305,6 +420,127 @@ describe('checkpointSqliteFile', () => {
     });
     expect(reopened.prepare('SELECT value FROM probe').pluck().get()).toBe('from-wal');
     reopened.close();
+  });
+
+  it('uses an explicit maintenance lock and runs guards inside that lock', () => {
+    const path = join(temporaryDirectory, 'guarded.sqlite');
+    const lockPath = join(temporaryDirectory, 'coordination', 'maintenance.lock');
+    mkdirSync(join(temporaryDirectory, 'coordination'));
+    createDatabase(path);
+    const events: string[] = [];
+
+    expect(
+      checkpointSqliteFile(path, lockContext, {
+        lockPath,
+        beforeOpen: () => {
+          expect(existsSync(lockPath)).toBe(true);
+          events.push('before-open');
+        },
+        afterOpen: () => {
+          expect(existsSync(lockPath)).toBe(true);
+          events.push('after-open');
+        },
+        beforeCheckpoint: () => {
+          expect(existsSync(lockPath)).toBe(true);
+          events.push('before-checkpoint');
+        },
+        afterClose: () => {
+          expect(existsSync(lockPath)).toBe(true);
+          events.push('after-close');
+        },
+      }),
+    ).toEqual({ checkpointed: true, closed: true });
+
+    expect(events).toEqual(['before-open', 'after-open', 'before-checkpoint', 'after-close']);
+    expect(existsSync(lockPath)).toBe(false);
+    expect(existsSync(`${path}.write.lock`)).toBe(false);
+  });
+
+  it('closes the native handle and removes the explicit lock when an in-lock guard fails', () => {
+    const path = join(temporaryDirectory, 'guard-failure.sqlite');
+    const lockPath = join(temporaryDirectory, 'maintenance.lock');
+    createDatabase(path);
+
+    expect(() =>
+      checkpointSqliteFile(path, lockContext, {
+        lockPath,
+        afterOpen: () => {
+          throw new Error('authority changed');
+        },
+      }),
+    ).toThrow('Unable to open the existing SQLite file for checkpointing');
+    expect(existsSync(lockPath)).toBe(false);
+    expect(existsSync(`${path}.write.lock`)).toBe(false);
+
+    const reopened = new Database(path, {
+      readonly: true,
+      fileMustExist: true,
+    });
+    expect(reopened.pragma('quick_check', { simple: true })).toBe('ok');
+    reopened.close();
+  });
+
+  it('preserves an unclosed native-handle proof when an in-lock guard fails', () => {
+    const path = join(temporaryDirectory, 'guard-close-failure.sqlite');
+    let failure: unknown;
+    const sqlite = {
+      open: true,
+      pragma: () => [{ busy: 0, log: 0, checkpointed: 0 }],
+      close: () => {
+        throw new Error('native close failed');
+      },
+    };
+
+    try {
+      checkpointSqliteFileWithDependencies(
+        path,
+        lockContext,
+        {
+          afterOpen: () => {
+            throw new Error('authority changed');
+          },
+        },
+        { openDatabase: () => sqlite },
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(sqliteCheckpointFailureResult(failure)).toEqual({
+      checkpointed: false,
+      closed: false,
+      reason: 'checkpoint-and-close-failed',
+    });
+    expect(existsSync(`${path}.write.lock`)).toBe(false);
+  });
+
+  it('marks pre-open failures as release-safe without exposing native error detail', () => {
+    const path = join(temporaryDirectory, 'open-failure.sqlite');
+    let failure: unknown;
+
+    try {
+      checkpointSqliteFileWithDependencies(
+        path,
+        lockContext,
+        {},
+        {
+          openDatabase: () => {
+            throw new Error('private native detail');
+          },
+        },
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toMatchObject({
+      message: 'Unable to open the existing SQLite file for checkpointing',
+    });
+    expect(sqliteCheckpointFailureResult(failure)).toEqual({
+      checkpointed: false,
+      closed: true,
+      reason: 'checkpoint-failed',
+    });
   });
 
   it('produces a stable main-file digest after checkpoint and copy', () => {

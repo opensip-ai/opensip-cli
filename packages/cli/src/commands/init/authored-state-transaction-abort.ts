@@ -1,5 +1,9 @@
-import { settleAuthoredReplayPublication } from './authored-state-replay-publication.js';
 import {
+  assertAuthoredReplayPublicationAbsent,
+  settleAuthoredReplayPublication,
+} from './authored-state-replay-publication.js';
+import {
+  assertIncompleteAuthoredArtifactsAbsent,
   discardIncompleteAuthoredArtifacts,
   validateIncompleteAuthoredArtifacts,
 } from './authored-state-transaction-artifact-recovery.js';
@@ -13,8 +17,10 @@ import {
   verifyEveryAuthoredTarget,
 } from './authored-state-transaction-execution.js';
 import {
+  assertAuthoredRootMatchesPromotionAuthority,
   authoredTransactionFailure,
-  openStableAuthoredRoot,
+  bindStableAuthoredRoot,
+  transactionAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import {
   advanceAuthoredPhase,
@@ -26,6 +32,7 @@ import {
   issueTransaction,
   summaryFor,
 } from './authored-state-transaction-registry.js';
+import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 
 import type {
   AbortPendingAuthoredPreparationInput,
@@ -49,15 +56,14 @@ function assertZeroAuthoredProgress(journal: RuntimePromotionJournal): void {
 }
 
 function storedReplay(
-  projectRoot: string,
+  root: ReturnType<typeof bindStableAuthoredRoot>,
   journal: RuntimePromotionJournal,
 ): {
-  readonly root: ReturnType<typeof openStableAuthoredRoot>;
+  readonly root: ReturnType<typeof bindStableAuthoredRoot>;
   readonly paths: ReturnType<typeof authoredArtifactPaths>;
   readonly manifest: AuthoredReplayManifest | null;
   readonly bytes: string | null;
 } {
-  const root = openStableAuthoredRoot(projectRoot);
   const paths = authoredArtifactPaths(root, journal);
   const replayState = settleAuthoredReplayPublication(root, journal, paths);
   if (replayState.status === 'absent') {
@@ -76,6 +82,7 @@ function abortState(
   const order = replay.manifest === null ? [] : authoredExecutionOrder(replay.manifest);
   return {
     projectRoot: replay.root.path,
+    root: replay.root,
     lease: input.lease,
     controller: input.controller,
     manifest: replay.manifest,
@@ -87,6 +94,17 @@ function abortState(
     dependencies: authoredDependencies(input.dependencies),
     receipt,
   };
+}
+
+function assertAbortProjectRoot(
+  input: AbortPendingAuthoredPreparationInput,
+  root: ReturnType<typeof bindStableAuthoredRoot>,
+): void {
+  transactionAuthoredRoot(root);
+  assertRuntimePromotionProjectRootAuthority({
+    lease: input.lease,
+    authority: input.projectRootAuthority,
+  });
 }
 
 function isAbortedPreparation(journal: RuntimePromotionJournal): boolean {
@@ -101,30 +119,52 @@ export async function abortPendingAuthoredPreparation(
   input: AbortPendingAuthoredPreparationInput,
 ): Promise<PreparedAuthoredState> {
   input.controller.assertBoundLease(input.lease);
+  assertRuntimePromotionProjectRootAuthority({
+    lease: input.lease,
+    authority: input.projectRootAuthority,
+  });
+  const root = bindStableAuthoredRoot(input.projectRoot, input.lease.coordinationKey);
+  assertAuthoredRootMatchesPromotionAuthority(root, input.projectRootAuthority);
   let receipt = input.receipt;
   let journal = await input.controller.verifyOpen(receipt);
   assertZeroAuthoredProgress(journal);
-  const replay = storedReplay(input.projectRoot, journal);
+  const replay = storedReplay(root, journal);
   const state = abortState(input, receipt, journal, replay);
+  const checkpoint = (name: Parameters<typeof state.dependencies.checkpoint>[0]): void => {
+    state.dependencies.checkpoint(name);
+    assertAbortProjectRoot(input, root);
+  };
+  const assertArtifactsAbsent = (): void => {
+    assertAbortProjectRoot(input, root);
+    assertIncompleteAuthoredArtifactsAbsent(root, replay.paths);
+    if (settleAuthoredReplayPublication(root, journal, replay.paths).status !== 'absent') {
+      authoredTransactionFailure('an aborted authored preparation retained its replay manifest');
+    }
+    assertAuthoredReplayPublicationAbsent(root, journal, replay.paths);
+  };
   const pendingPrepare = journal.progress.pendingIntent?.kind === 'authored-prepare';
   if (pendingPrepare) {
-    validateIncompleteAuthoredArtifacts(
+    const cleanupAuthority = validateIncompleteAuthoredArtifacts(
       replay.root,
       journal,
       replay.manifest,
       replay.bytes,
       replay.paths,
     );
-    state.dependencies.checkpoint('before-abort-cleanup');
+    checkpoint('before-abort-cleanup');
     discardIncompleteAuthoredArtifacts(
       replay.root,
       journal,
       replay.manifest,
       replay.bytes,
       replay.paths,
+      cleanupAuthority,
     );
-    state.dependencies.checkpoint('after-abort-cleanup');
-    state.dependencies.checkpoint('before-abort-postcondition');
+    assertArtifactsAbsent();
+    checkpoint('after-abort-cleanup');
+    assertArtifactsAbsent();
+    checkpoint('before-abort-postcondition');
+    assertArtifactsAbsent();
     receipt = await recordOpenPostcondition(
       input.controller,
       receipt,
@@ -135,15 +175,21 @@ export async function abortPendingAuthoredPreparation(
       state.dependencies.now,
     );
     state.receipt = receipt;
-    state.dependencies.checkpoint('after-abort-postcondition');
+    assertArtifactsAbsent();
+    checkpoint('after-abort-postcondition');
+    assertArtifactsAbsent();
     journal = await input.controller.verifyOpen(receipt);
+    assertArtifactsAbsent();
   } else if (!isAbortedPreparation(journal) && journal.progress.direction === 'forward') {
     authoredTransactionFailure('the journal has no abortable authored preparation');
   }
+  if (isAbortedPreparation(journal)) assertArtifactsAbsent();
   if (journal.progress.direction === 'forward') {
     receipt = await beginAuthoredRollback(input.controller, receipt, state.dependencies.now);
     state.receipt = receipt;
+    assertArtifactsAbsent();
     journal = await input.controller.verifyOpen(receipt);
+    assertArtifactsAbsent();
   }
   if (
     journal.progress.direction !== 'rollback' ||
@@ -162,8 +208,14 @@ export async function abortPendingAuthoredPreparation(
       state.dependencies.now,
     );
     state.receipt = receipt;
+    assertArtifactsAbsent();
     journal = await input.controller.verifyOpen(receipt);
+    assertArtifactsAbsent();
   }
+  if (replay.manifest !== null) {
+    verifyEveryAuthoredTarget(replay.root, replay.manifest, 'preimage');
+  }
+  assertArtifactsAbsent();
   return {
     transaction: issueTransaction(state),
     receipt,

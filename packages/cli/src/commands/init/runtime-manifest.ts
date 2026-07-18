@@ -2,8 +2,10 @@
  * Verified whole-runtime manifests and journal-authorized stage copies.
  */
 
+import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { resolveUserPaths } from '@opensip-cli/core';
 import { inspectSqliteFile, type SqliteIntegrityResult } from '@opensip-cli/datastore';
 
 import { inspectRuntimeTree } from './runtime-manifest-io.js';
@@ -11,6 +13,7 @@ import {
   RUNTIME_MANIFEST_DIFF_SAMPLE_LIMIT,
   RuntimeManifestError,
 } from './runtime-manifest-model.js';
+import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 import { materializeRuntimeStage } from './runtime-stage-io.js';
 import { RUNTIME_STAGE_OWNERSHIP_FILE } from './runtime-stage-ownership.js';
 
@@ -25,7 +28,9 @@ import type {
   RuntimePromotionJournalController,
   RuntimeStageMaterializationIdentity,
 } from './runtime-promotion-journal.js';
+import type { RuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 import type { RuntimeStageOwnershipIdentity } from './runtime-stage-ownership.js';
+import type { RuntimeExclusiveLease } from '@opensip-cli/core';
 
 export {
   RUNTIME_MANIFEST_DIFF_SAMPLE_LIMIT,
@@ -36,6 +41,7 @@ export {
   RUNTIME_MANIFEST_MAX_PATH_BYTES,
   RUNTIME_MANIFEST_MAX_SQLITE_SHM_BYTES,
   RUNTIME_MANIFEST_MAX_TOTAL_BYTES,
+  isRuntimeManifestReleaseUnsafe,
   RuntimeManifestError,
 } from './runtime-manifest-model.js';
 export {
@@ -98,9 +104,11 @@ export interface CopyRuntimeToStageInput {
   readonly controller: RuntimePromotionJournalController;
   readonly receipt: DurableOpenPromotionJournal;
   readonly sourceDir: string;
-  readonly sourcePosture: Extract<RuntimeTreePosture, 'cache-source' | 'project-runtime'>;
+  readonly sourcePosture: 'cache-source';
   readonly destinationParent: string;
   readonly stageBasename: string;
+  readonly projectRootAuthority: RuntimePromotionProjectRootAuthority;
+  readonly lease: RuntimeExclusiveLease;
 }
 
 export interface VerifiedRuntimeStage {
@@ -121,6 +129,57 @@ const DEFAULT_DEPENDENCIES: RuntimeManifestDependencies = Object.freeze({
 
 function fail(reason: ConstructorParameters<typeof RuntimeManifestError>[0]): never {
   throw new RuntimeManifestError(reason);
+}
+
+function assertCopyProjectRoot(input: CopyRuntimeToStageInput): void {
+  assertRuntimePromotionProjectRootAuthority({
+    lease: input.lease,
+    authority: input.projectRootAuthority,
+  });
+}
+
+function copyDestinationParent(input: CopyRuntimeToStageInput): string {
+  const expected = join(input.projectRootAuthority.projectRoot, 'opensip-cli');
+  if (input.destinationParent !== expected) fail('invalid-path');
+  return expected;
+}
+
+async function copySourceAuthority(input: CopyRuntimeToStageInput): Promise<{
+  readonly sourceDir: string;
+  readonly manifest: RuntimeManifestIdentity;
+}> {
+  const journal = await input.controller.verifyOpen(input.receipt);
+  if (
+    journal.route !== 'promote-cache' ||
+    journal.source.cacheKey === null ||
+    journal.source.classification === 'none'
+  ) {
+    fail('invalid-path');
+  }
+  const expected = join(resolveUserPaths().ephemeralProjectsDir, journal.source.cacheKey);
+  let canonicalExpected: string;
+  try {
+    canonicalExpected = realpathSync(expected);
+  } catch {
+    fail('invalid-path');
+  }
+  if (input.sourceDir !== canonicalExpected) fail('invalid-path');
+  if (journal.manifests.source === null) fail('changed');
+  return { sourceDir: canonicalExpected, manifest: journal.manifests.source };
+}
+
+function verifiedRuntimeTree(manifest: VerifiedRuntimeManifest): RuntimeTreeManifest {
+  return {
+    version: 1,
+    rootMode: manifest.identity.rootMode,
+    sha256: manifest.identity.digest,
+    entryCount: manifest.entries.length,
+    fileCount: manifest.identity.fileCount,
+    directoryCount: manifest.identity.directoryCount,
+    symlinkCount: manifest.identity.symlinkCount,
+    totalBytes: manifest.identity.totalBytes,
+    entries: manifest.entries,
+  };
 }
 
 function assertNoReservedStageMarker(manifest: VerifiedRuntimeManifest): void {
@@ -144,13 +203,29 @@ function sqliteIdentity(
   tree: RuntimeTreeManifest,
   inspect: RuntimeManifestDependencies['inspectSqlite'],
 ): RuntimeManifestIdentity['sqlite'] {
-  const result = inspect(join(runtimeDir, DATASTORE_FILE));
+  let result: SqliteIntegrityResult;
+  try {
+    result = inspect(join(runtimeDir, DATASTORE_FILE));
+  } catch (error) {
+    // A foreign/future inspector can throw after acquiring its native handle.
+    // Without an explicit close result, retaining the lifecycle lease is the
+    // only conservative disposition.
+    throw new RuntimeManifestError('sqlite-close-unproven', {
+      cause: error,
+      releaseSafe: false,
+    });
+  }
   const entry = tree.entries.find((candidate) => candidate.path === DATASTORE_FILE);
   if (result.status === 'absent') {
     if (entry !== undefined || !allSidecarsAbsent(result)) fail('sqlite-absent-with-sidecar');
     return { status: 'absent' };
   }
   if (result.status === 'unsupported') fail('sqlite-unsupported');
+  if (result.status === 'unreadable' && result.reason === 'native-close-failed') {
+    throw new RuntimeManifestError('sqlite-native-close-failed', {
+      releaseSafe: false,
+    });
+  }
   if (result.status !== 'valid') fail('sqlite-invalid');
   if (
     entry?.kind !== 'file' ||
@@ -309,30 +384,40 @@ export async function copyRuntimeToStage(
   dependencyOverrides: Partial<RuntimeManifestDependencies> = {},
 ): Promise<VerifiedRuntimeStage> {
   const dependencies = { ...DEFAULT_DEPENDENCIES, ...dependencyOverrides };
-  const source = inspectVerifiedRuntimeManifest(input.sourceDir, input.sourcePosture, dependencies);
+  input.controller.assertBoundLease(input.lease);
+  assertCopyProjectRoot(input);
+  const destinationParent = copyDestinationParent(input);
+  const sourceAuthority = await copySourceAuthority(input);
+  const { sourceDir } = sourceAuthority;
+  assertCopyProjectRoot(input);
+  const source = inspectVerifiedRuntimeManifest(sourceDir, input.sourcePosture, dependencies);
+  if (!runtimeManifestIdentityEqual(sourceAuthority.manifest, source.identity)) {
+    fail('changed');
+  }
   assertNoReservedStageMarker(source);
   dependencies.checkpoint?.('after-source-inspection');
+  assertCopyProjectRoot(input);
   const authority = await input.controller.authorizeRuntimeStage(
     input.receipt,
     input.stageBasename,
   );
   const ownership = input.controller.assertRuntimeStageAuthority(authority, input.stageBasename);
   dependencies.checkpoint?.('before-stage-materialization');
-  const sourceTree = dependencies.inspectTree(input.sourceDir, input.sourcePosture);
+  assertCopyProjectRoot(input);
+  const sourceTree = verifiedRuntimeTree(source);
   const stageDir = dependencies.materialize(
-    input.sourceDir,
-    input.destinationParent,
+    sourceDir,
+    destinationParent,
     input.stageBasename,
     sourceTree,
     ownership,
   );
+  assertCopyProjectRoot(input);
   dependencies.checkpoint?.('after-stage-materialization');
-  const sourceAfter = inspectVerifiedRuntimeManifest(
-    input.sourceDir,
-    input.sourcePosture,
-    dependencies,
-  );
+  assertCopyProjectRoot(input);
+  const sourceAfter = inspectVerifiedRuntimeManifest(sourceDir, input.sourcePosture, dependencies);
   dependencies.checkpoint?.('after-source-reinspection');
+  assertCopyProjectRoot(input);
   if (!runtimeManifestIdentityEqual(source.identity, sourceAfter.identity)) fail('changed');
   const stage = inspectVerifiedRuntimeManifest(
     stageDir,
@@ -341,5 +426,6 @@ export async function copyRuntimeToStage(
     ownership,
   );
   if (!compareRuntimeManifests(sourceAfter, stage).equal) fail('changed');
+  assertCopyProjectRoot(input);
   return { stageDir, source: sourceAfter, stage };
 }

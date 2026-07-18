@@ -259,7 +259,7 @@ export function validateAuthoredArtifacts(
   let aggregateBytes = 0;
   if (
     (preparing || journal.cleanup.replayManifest === 'pending') &&
-    !(cleanupSlot === 'replayManifest' && !pathPresent(paths.replayManifest))
+    cleanupSlot !== 'replayManifest'
   ) {
     const replay = readStableArtifactFile(paths.replayManifest);
     if (
@@ -272,7 +272,7 @@ export function validateAuthoredArtifacts(
   }
   if (
     (preparing || journal.cleanup.authoredStage === 'pending') &&
-    !(cleanupSlot === 'authoredStage' && !pathPresent(paths.stageRoot))
+    cleanupSlot !== 'authoredStage'
   ) {
     aggregateBytes += validateBlobRoot(
       paths.stageRoot,
@@ -284,7 +284,7 @@ export function validateAuthoredArtifacts(
   }
   if (
     (preparing || journal.cleanup.authoredBackup === 'pending') &&
-    !(cleanupSlot === 'authoredBackup' && !pathPresent(paths.backupRoot))
+    cleanupSlot !== 'authoredBackup'
   ) {
     aggregateBytes += validateBlobRoot(
       paths.backupRoot,

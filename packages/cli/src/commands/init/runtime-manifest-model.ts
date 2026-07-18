@@ -56,8 +56,10 @@ export type RuntimeManifestFailureReason =
   | 'size-cap'
   | 'special-entry'
   | 'sqlite-absent-with-sidecar'
+  | 'sqlite-close-unproven'
   | 'sqlite-invalid'
   | 'sqlite-mismatch'
+  | 'sqlite-native-close-failed'
   | 'sqlite-sidecar-nonempty'
   | 'sqlite-unsupported'
   | 'stage-ownership'
@@ -66,10 +68,25 @@ export type RuntimeManifestFailureReason =
   | 'unsafe-owner';
 
 export class RuntimeManifestError extends ConfigurationError {
-  constructor(readonly reason: RuntimeManifestFailureReason) {
+  readonly releaseSafe: boolean;
+
+  constructor(
+    readonly reason: RuntimeManifestFailureReason,
+    options: {
+      readonly cause?: unknown;
+      readonly releaseSafe?: boolean;
+    } = {},
+  ) {
     super(`Runtime evidence cannot be promoted safely (${reason}).`, {
       code: 'CONFIGURATION.RUNTIME_PROMOTION.MANIFEST_UNSAFE',
+      ...(options.cause === undefined ? {} : { cause: options.cause }),
     });
     this.name = 'RuntimeManifestError';
+    this.releaseSafe = options.releaseSafe ?? true;
   }
+}
+
+/** True only for a typed manifest failure that cannot prove native SQLite closure. */
+export function isRuntimeManifestReleaseUnsafe(error: unknown): error is RuntimeManifestError {
+  return error instanceof RuntimeManifestError && !error.releaseSafe;
 }

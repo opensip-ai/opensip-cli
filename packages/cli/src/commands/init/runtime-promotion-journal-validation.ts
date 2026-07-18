@@ -37,10 +37,6 @@ import {
   validateSource,
 } from './runtime-promotion-journal-validation-helpers.js';
 
-export function isRuntimePromotionCoordinationKey(value: string): boolean {
-  return RUNTIME_PROMOTION_COORDINATION_KEY_PATTERN.test(value);
-}
-
 const TOP_LEVEL_KEYS = [
   'kind',
   'version',
@@ -300,20 +296,8 @@ export function assertRuntimePromotionJournalShape(
   validateRuntimePromotionCrossFields(journal as unknown as RuntimePromotionJournal);
 }
 
-export function isRuntimePromotionJournalShape(value: unknown): value is RuntimePromotionJournal {
-  try {
-    assertRuntimePromotionJournalShape(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export {
   canonicalSqliteIdentity,
   assertRuntimeManifestIdentity,
 } from './runtime-promotion-journal-identity-validation.js';
-export {
-  isRuntimePromotionDigest,
-  isSafeRuntimePromotionBasename,
-} from './runtime-promotion-journal-validation-helpers.js';
+export { isSafeRuntimePromotionBasename } from './runtime-promotion-journal-validation-helpers.js';

@@ -2,6 +2,7 @@
  * Create and durably populate one journal-owned destination-sibling stage.
  */
 
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
@@ -20,6 +21,7 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
+import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fallback.js';
 import { RuntimeManifestError } from './runtime-manifest-model.js';
 import {
   assertRuntimeStageOwnershipMarker,
@@ -41,10 +43,13 @@ export type RuntimeStageIoCheckpoint =
   | 'after-stage-mkdir'
   | 'after-marker-stage-fsync'
   | 'after-marker-parent-fsync'
-  | 'before-first-source-entry';
+  | 'before-first-source-entry'
+  | 'before-source-entry'
+  | 'after-source-file-chunk'
+  | 'after-source-entry';
 
 export interface RuntimeStageIoDependencies {
-  readonly checkpoint?: (checkpoint: RuntimeStageIoCheckpoint) => void;
+  readonly checkpoint?: (checkpoint: RuntimeStageIoCheckpoint, entryIndex?: number) => void;
 }
 
 interface EntryIdentity {
@@ -103,10 +108,6 @@ function sameDirectoryAuthority(left: EntryIdentity, right: EntryIdentity): bool
   );
 }
 
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}
-
 function isContained(root: string, path: string): boolean {
   const fromRoot = relative(root, path);
   return (
@@ -142,10 +143,7 @@ function openStableParent(path: string): StableDirectory {
     assertSafeDirectoryStat(opened);
     if (!sameIdentity(identityOf(stat), identityOf(opened))) fail('changed');
   } catch (error) {
-    if (
-      process.platform !== 'win32' ||
-      (!hasCode(error, 'EINVAL') && !hasCode(error, 'ENOTSUP') && !hasCode(error, 'EPERM'))
-    ) {
+    if (!isWindowsDirectoryHandleFallback(error)) {
       if (descriptor !== undefined) closeSync(descriptor);
       throw error;
     }
@@ -165,9 +163,7 @@ function assertStableDirectory(directory: StableDirectory): void {
 }
 
 function observeCreatedDirectory(path: string): StableDirectory {
-  const stat = lstatSync(path, { bigint: true });
-  assertSafeDirectoryStat(stat);
-  return { path, identity: identityOf(stat) };
+  return openStableParent(path);
 }
 
 function requireStableDestinationParent(
@@ -221,7 +217,22 @@ function assertSafeSourceSymlink(root: string, path: string, expectedTarget: str
   }
 }
 
-function writeFileFromSource(source: string, destination: string, mode: number): void {
+function writeChunk(descriptor: number, chunk: Buffer, bytes: number): void {
+  let offset = 0;
+  while (offset < bytes) {
+    const written = writeSync(descriptor, chunk, offset, bytes - offset);
+    if (written < 1) fail('changed');
+    offset += written;
+  }
+}
+
+function writeFileFromSource(
+  source: string,
+  destination: string,
+  expected: Extract<RuntimeTreeManifest['entries'][number], { readonly kind: 'file' }>,
+  dependencies: RuntimeStageIoDependencies,
+  entryIndex: number,
+): void {
   const sourceBefore = lstatSync(source, { bigint: true });
   if (!sourceBefore.isFile() || sourceBefore.isSymbolicLink() || sourceBefore.nlink !== 1n) {
     fail('changed');
@@ -236,19 +247,23 @@ function writeFileFromSource(source: string, destination: string, mode: number):
       0o600,
     );
     const chunk = Buffer.allocUnsafe(READ_CHUNK_BYTES);
+    const digest = createHash('sha256');
+    let totalBytes = 0;
     for (;;) {
       const bytesRead = readSync(sourceFd, chunk, 0, chunk.length, null);
       if (bytesRead === 0) break;
-      let offset = 0;
-      while (offset < bytesRead) {
-        const written = writeSync(destinationFd, chunk, offset, bytesRead - offset);
-        if (written < 1) fail('changed');
-        offset += written;
-      }
+      if (totalBytes + bytesRead > expected.sizeBytes) fail('changed');
+      writeChunk(destinationFd, chunk, bytesRead);
+      digest.update(chunk.subarray(0, bytesRead));
+      totalBytes += bytesRead;
+      dependencies.checkpoint?.('after-source-file-chunk', entryIndex);
+    }
+    if (totalBytes !== expected.sizeBytes || digest.digest('hex') !== expected.sha256) {
+      fail('changed');
     }
     const sourceAfter = fstatSync(sourceFd, { bigint: true });
     if (!sameIdentity(identityOf(sourceBefore), identityOf(sourceAfter))) fail('changed');
-    fchmodSync(destinationFd, mode);
+    fchmodSync(destinationFd, expected.mode);
     fsyncSync(destinationFd);
   } finally {
     if (destinationFd !== undefined) closeSync(destinationFd);
@@ -266,10 +281,7 @@ function fsyncDirectory(path: string): void {
     if (!stat.isDirectory()) fail('special-entry');
     fsyncSync(descriptor);
   } catch (error) {
-    if (
-      process.platform === 'win32' &&
-      (hasCode(error, 'EINVAL') || hasCode(error, 'ENOTSUP') || hasCode(error, 'EPERM'))
-    ) {
+    if (isWindowsDirectoryHandleFallback(error)) {
       return;
     }
     throw error;
@@ -285,6 +297,58 @@ function fsyncStableParent(parent: StableDirectory): void {
   assertStableDirectory(parent);
 }
 
+function finalizeStableDirectoryMode(directory: StableDirectory, mode: number): StableDirectory {
+  assertStableDirectory(directory);
+  if (directory.descriptor === undefined) {
+    // This is the guarded Windows fallback reached only when directory
+    // O_DIRECTORY/O_NOFOLLOW handles are unsupported. Reassert the exact path
+    // identity immediately around the unavoidable path-based operations.
+    assertStableDirectory(directory);
+    chmodSync(directory.path, mode);
+    const changedMode = lstatSync(directory.path, { bigint: true });
+    if (
+      directory.identity.dev !== changedMode.dev ||
+      directory.identity.ino !== changedMode.ino ||
+      directory.identity.uid !== changedMode.uid
+    ) {
+      fail('changed');
+    }
+    fsyncDirectory(directory.path);
+  } else {
+    fchmodSync(directory.descriptor, mode);
+    fsyncSync(directory.descriptor);
+  }
+  const observed =
+    directory.descriptor === undefined
+      ? lstatSync(directory.path, { bigint: true })
+      : fstatSync(directory.descriptor, { bigint: true });
+  assertSafeDirectoryStat(observed);
+  const observedIdentity = identityOf(observed);
+  if (
+    directory.identity.dev !== observedIdentity.dev ||
+    directory.identity.ino !== observedIdentity.ino ||
+    directory.identity.uid !== observedIdentity.uid ||
+    Number(observed.mode & 0o777n) !== mode
+  ) {
+    fail('changed');
+  }
+  const finalized: StableDirectory = {
+    path: directory.path,
+    identity: observedIdentity,
+    ...(directory.descriptor === undefined ? {} : { descriptor: directory.descriptor }),
+  };
+  assertStableDirectory(finalized);
+  return finalized;
+}
+
+function closeStableDirectories(directories: ReadonlyMap<string, StableDirectory>): void {
+  const descriptors = new Set<number>();
+  for (const directory of directories.values()) {
+    if (directory.descriptor !== undefined) descriptors.add(directory.descriptor);
+  }
+  for (const descriptor of descriptors) closeSync(descriptor);
+}
+
 function assertStageOwnershipBinding(
   stageBasename: string,
   ownership: RuntimeStageOwnershipIdentity,
@@ -298,19 +362,123 @@ function createDurableOwnedStage(
   stageDir: string,
   ownership: RuntimeStageOwnershipIdentity,
   dependencies: RuntimeStageIoDependencies,
-): void {
+): StableDirectory {
   assertStableDirectory(parent);
   mkdirSync(stageDir, { recursive: false, mode: 0o700 });
-  assertStableDirectory(parent);
-  dependencies.checkpoint?.('after-stage-mkdir');
-  createRuntimeStageOwnershipMarker(stageDir, ownership, {
-    checkpoint: dependencies.checkpoint,
+  const stage = observeCreatedDirectory(stageDir);
+  try {
+    assertStableDirectory(parent);
+    dependencies.checkpoint?.('after-stage-mkdir');
+    assertStableDirectory(parent);
+    assertStableDirectory(stage);
+    createRuntimeStageOwnershipMarker(stageDir, ownership, {
+      checkpoint: dependencies.checkpoint,
+      assertRootStable: () => {
+        assertStableDirectory(parent);
+        assertStableDirectory(stage);
+      },
+    });
+    fsyncStableParent(stage);
+    dependencies.checkpoint?.('after-marker-stage-fsync');
+    assertStableDirectory(stage);
+    fsyncStableParent(parent);
+    dependencies.checkpoint?.('after-marker-parent-fsync');
+    assertStableDirectory(parent);
+    assertStableDirectory(stage);
+    assertRuntimeStageOwnershipMarker(stageDir, ownership);
+    assertStableDirectory(stage);
+    return stage;
+  } catch (error) {
+    if (stage.descriptor !== undefined) closeSync(stage.descriptor);
+    throw error;
+  }
+}
+
+interface MaterializeStageEntryInput {
+  readonly canonicalSource: string;
+  readonly entry: RuntimeTreeManifest['entries'][number];
+  readonly entryIndex: number;
+  readonly sourcePath: string;
+  readonly destinationPath: string;
+  readonly destinationEntryParent: StableDirectory;
+  readonly stableDirectories: Map<string, StableDirectory>;
+  readonly directories: { readonly path: string; readonly mode: number }[];
+  readonly dependencies: RuntimeStageIoDependencies;
+}
+
+function materializeDirectoryEntry(input: MaterializeStageEntryInput): void {
+  if (input.entry.kind !== 'directory') fail('changed');
+  mkdirSync(input.destinationPath, { recursive: false, mode: 0o700 });
+  const created = observeCreatedDirectory(input.destinationPath);
+  try {
+    assertStableDirectory(input.destinationEntryParent);
+  } catch (error) {
+    if (created.descriptor !== undefined) closeSync(created.descriptor);
+    throw error;
+  }
+  input.stableDirectories.set(input.destinationPath, created);
+  input.directories.push({
+    path: input.destinationPath,
+    mode: input.entry.mode,
   });
-  fsyncDirectory(stageDir);
-  dependencies.checkpoint?.('after-marker-stage-fsync');
-  fsyncStableParent(parent);
-  dependencies.checkpoint?.('after-marker-parent-fsync');
-  assertRuntimeStageOwnershipMarker(stageDir, ownership);
+  input.dependencies.checkpoint?.('after-source-entry', input.entryIndex);
+  assertStableDirectory(input.destinationEntryParent);
+  assertStableDirectory(created);
+}
+
+function materializeFileEntry(input: MaterializeStageEntryInput): void {
+  if (input.entry.kind !== 'file') fail('changed');
+  writeFileFromSource(
+    input.sourcePath,
+    input.destinationPath,
+    input.entry,
+    input.dependencies,
+    input.entryIndex,
+  );
+  assertStableDirectory(input.destinationEntryParent);
+  input.dependencies.checkpoint?.('after-source-entry', input.entryIndex);
+  assertStableDirectory(input.destinationEntryParent);
+}
+
+function materializeSymlinkEntry(input: MaterializeStageEntryInput): void {
+  if (input.entry.kind !== 'symlink') fail('changed');
+  assertSafeSourceSymlink(input.canonicalSource, input.sourcePath, input.entry.target);
+  symlinkSync(input.entry.target, input.destinationPath);
+  assertStableDirectory(input.destinationEntryParent);
+  const installedLink = lstatSync(input.destinationPath, { bigint: true });
+  if (
+    !installedLink.isSymbolicLink() ||
+    readlinkSync(input.destinationPath) !== input.entry.target
+  ) {
+    fail('changed');
+  }
+  input.dependencies.checkpoint?.('after-source-entry', input.entryIndex);
+  assertStableDirectory(input.destinationEntryParent);
+}
+
+function materializeStageEntry(input: MaterializeStageEntryInput): void {
+  if (input.entry.kind === 'directory') {
+    materializeDirectoryEntry(input);
+    return;
+  }
+  if (input.entry.kind === 'file') {
+    materializeFileEntry(input);
+    return;
+  }
+  materializeSymlinkEntry(input);
+}
+
+function finalizeStageDirectoryModes(
+  directories: readonly { readonly path: string; readonly mode: number }[],
+  stableDirectories: Map<string, StableDirectory>,
+): void {
+  for (let index = directories.length - 1; index >= 0; index -= 1) {
+    const directory = directories[index];
+    if (directory === undefined) continue;
+    const stable = stableDirectories.get(directory.path);
+    if (stable === undefined) fail('changed');
+    stableDirectories.set(directory.path, finalizeStableDirectoryMode(stable, directory.mode));
+  }
 }
 
 /**
@@ -330,17 +498,18 @@ export function materializeRuntimeStage(
   const canonicalSource = realpathSync(sourceDir);
   const parent = openStableParent(destinationParent);
   const stageDir = join(parent.path, stageBasename);
+  const stableDirectories = new Map<string, StableDirectory>();
   try {
-    createDurableOwnedStage(parent, stageDir, ownership, dependencies);
-
-    const stableDirectories = new Map<string, StableDirectory>([
-      [stageDir, observeCreatedDirectory(stageDir)],
-    ]);
+    stableDirectories.set(
+      stageDir,
+      createDurableOwnedStage(parent, stageDir, ownership, dependencies),
+    );
     const directories: { readonly path: string; readonly mode: number }[] = [
       { path: stageDir, mode: source.rootMode },
     ];
     dependencies.checkpoint?.('before-first-source-entry');
-    for (const entry of source.entries) {
+    for (const [entryIndex, entry] of source.entries.entries()) {
+      dependencies.checkpoint?.('before-source-entry', entryIndex);
       const sourcePath = join(canonicalSource, ...entry.path.split('/'));
       const destinationPath = join(stageDir, ...entry.path.split('/'));
       if (!isContained(canonicalSource, sourcePath) || !isContained(stageDir, destinationPath)) {
@@ -351,37 +520,29 @@ export function materializeRuntimeStage(
         destinationPath,
         stableDirectories,
       );
-      if (entry.kind === 'directory') {
-        mkdirSync(destinationPath, { recursive: false, mode: 0o700 });
-        assertStableDirectory(destinationEntryParent);
-        stableDirectories.set(destinationPath, observeCreatedDirectory(destinationPath));
-        directories.push({ path: destinationPath, mode: entry.mode });
-        continue;
-      }
-      if (entry.kind === 'file') {
-        writeFileFromSource(sourcePath, destinationPath, entry.mode);
-        assertStableDirectory(destinationEntryParent);
-        continue;
-      }
-      assertSafeSourceSymlink(canonicalSource, sourcePath, entry.target);
-      symlinkSync(entry.target, destinationPath);
-      assertStableDirectory(destinationEntryParent);
-      const installedLink = lstatSync(destinationPath, { bigint: true });
-      if (!installedLink.isSymbolicLink() || readlinkSync(destinationPath) !== entry.target) {
-        fail('changed');
-      }
+      materializeStageEntry({
+        canonicalSource,
+        entry,
+        entryIndex,
+        sourcePath,
+        destinationPath,
+        destinationEntryParent,
+        stableDirectories,
+        directories,
+        dependencies,
+      });
     }
 
-    for (let index = directories.length - 1; index >= 0; index -= 1) {
-      const directory = directories[index];
-      if (directory === undefined) continue;
-      chmodSync(directory.path, directory.mode);
-      fsyncDirectory(directory.path);
-    }
+    finalizeStageDirectoryModes(directories, stableDirectories);
     fsyncStableParent(parent);
+    const stableStage = stableDirectories.get(stageDir);
+    if (stableStage === undefined) fail('changed');
+    assertStableDirectory(stableStage);
     assertRuntimeStageOwnershipMarker(stageDir, ownership);
+    assertStableDirectory(stableStage);
     return stageDir;
   } finally {
+    closeStableDirectories(stableDirectories);
     if (parent.descriptor !== undefined) closeSync(parent.descriptor);
   }
 }

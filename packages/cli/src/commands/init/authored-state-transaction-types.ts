@@ -1,3 +1,4 @@
+import type { StableAuthoredRoot } from './authored-state-transaction-fs.js';
 import type {
   AuthoredReplayManifest,
   InitAuthoredMutation,
@@ -9,6 +10,7 @@ import type {
   DurablePromotionJournal,
   RuntimePromotionJournalController,
 } from './runtime-promotion-journal.js';
+import type { RuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 import type { RuntimeExclusiveLease } from '@opensip-cli/core';
 
 declare const AUTHORED_TRANSACTION_BRAND: unique symbol;
@@ -101,6 +103,15 @@ export type AuthoredStateCheckpoint =
   | 'before-cleanup-intent'
   | 'after-cleanup-intent'
   | 'before-cleanup-mutation'
+  | 'after-cleanup-artifact-observation'
+  | 'after-cleanup-artifact-read'
+  | 'after-cleanup-evidence-published'
+  | 'before-cleanup-entry-unlink'
+  | 'after-cleanup-entry-unlink'
+  | 'before-cleanup-directory-removal'
+  | 'after-cleanup-directory-removal'
+  | 'before-cleanup-evidence-unlink'
+  | 'after-cleanup-evidence-unlink'
   | 'after-cleanup-mutation'
   | 'before-cleanup-postcondition'
   | 'after-cleanup-postcondition';
@@ -112,6 +123,7 @@ export interface AuthoredStateTransactionDependencies {
 
 interface AuthoredStateAuthorityInput {
   readonly projectRoot: string;
+  readonly projectRootAuthority: RuntimePromotionProjectRootAuthority;
   readonly lease: RuntimeExclusiveLease;
   readonly controller: RuntimePromotionJournalController;
   readonly receipt: DurableOpenPromotionJournal;
@@ -127,6 +139,7 @@ export type AbortPendingAuthoredPreparationInput = AuthoredStateAuthorityInput;
 
 export interface LoadClosedAuthoredStateInput {
   readonly projectRoot: string;
+  readonly projectRootAuthority: RuntimePromotionProjectRootAuthority;
   readonly lease: RuntimeExclusiveLease;
   readonly controller: RuntimePromotionJournalController;
   readonly receipt: DurableClosedPromotionJournal;
@@ -150,6 +163,8 @@ export interface AuthoredArtifactPaths {
 
 export interface AuthoredTransactionState {
   readonly projectRoot: string;
+  /** Exact canonical directory authority captured when this handle was issued. */
+  readonly root: StableAuthoredRoot;
   readonly lease: RuntimeExclusiveLease;
   readonly controller: RuntimePromotionJournalController;
   readonly manifest: AuthoredReplayManifest | null;

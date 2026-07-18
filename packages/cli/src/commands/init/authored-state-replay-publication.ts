@@ -1,4 +1,4 @@
-import { opendirSync } from 'node:fs';
+import { lstatSync, opendirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -80,6 +80,33 @@ function assertReplayPath(
   ) {
     authoredTransactionFailure('the replay manifest path does not match its durable identity');
   }
+}
+
+function replayPathPresent(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export function assertAuthoredReplayPublicationAbsent(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  paths: AuthoredArtifactPaths,
+): void {
+  assertReplayPath(root, journal, paths);
+  assertStableAuthoredRoot(root);
+  assertNoForeignReplayTemporaries(root, journal);
+  const exactTemporary = join(root.path, exactReplayTemporaryBasename(journal));
+  if (replayPathPresent(paths.replayManifest) || replayPathPresent(exactTemporary)) {
+    authoredTransactionFailure('an aborted authored preparation left a replay publication path');
+  }
+  assertStableAuthoredRoot(root);
 }
 
 export function settleAuthoredReplayPublication(

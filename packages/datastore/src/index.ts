@@ -11,6 +11,7 @@ export { DataStoreFactory } from './factory.js';
 export {
   checkpointSqliteFile,
   inspectSqliteFile,
+  sqliteCheckpointFailureResult,
   SQLITE_FOREIGN_KEY_MAX_SAMPLES,
   SQLITE_QUICK_CHECK_MAX_ISSUES,
 } from './sqlite-integrity.js';

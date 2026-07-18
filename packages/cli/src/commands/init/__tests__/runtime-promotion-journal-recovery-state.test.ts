@@ -573,13 +573,14 @@ describe('runtime promotion rollback and closed evidence', () => {
       },
       cleanup: {
         ...rollbackIntent.cleanup,
+        runtimeStage: 'removed',
         destinationBackup: 'removed',
       },
       counts: { ...rollbackIntent.counts, postconditionCount: 4 },
       timestamps: { ...rollbackIntent.timestamps, updatedAt: 109 },
     });
     expect(() => assertRuntimePromotionTransition(rollbackIntent, restored)).not.toThrow();
-    expect(restored.cleanup.runtimeStage).toBe('pending');
+    expect(restored.cleanup.runtimeStage).toBe('removed');
 
     const forgedSeal = canonicalRuntimePromotionJournal({
       ...restored,
@@ -665,7 +666,7 @@ describe('runtime promotion rollback and closed evidence', () => {
       },
       progress: {
         ...journal.progress,
-        phase: 'rollback-started',
+        phase: 'rollback-started' as const,
         direction: 'rollback' as const,
       },
       cleanup: { ...journal.cleanup, runtimeStage: 'pending' as const },

@@ -1,10 +1,7 @@
 /** Pure legal-transition reducer for the fixed promotion journal. */
 
 import { runtimePromotionDestinationParentReady } from './runtime-promotion-intent-policy.js';
-import {
-  assertRuntimePromotionJournal,
-  canonicalRuntimePromotionJournal,
-} from './runtime-promotion-journal-schema.js';
+import { assertRuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
 import {
   assertIntentLifecycle,
   assertRecoveryOwner,
@@ -19,11 +16,6 @@ import type {
   RuntimePromotionJournal,
   RuntimePromotionOwnedSlotName,
 } from './runtime-promotion-journal-schema.js';
-
-export interface RuntimePromotionJournalTransition {
-  readonly type: 'advance';
-  readonly next: RuntimePromotionJournal;
-}
 
 const FORWARD_PHASES = [
   'prepared',
@@ -191,15 +183,6 @@ export function assertRuntimePromotionTransition(
   assertPhase(previous, proposed);
   assertTerminal(previous, proposed);
   assertCleanup(previous, proposed);
-}
-
-export function reduceRuntimePromotionJournal(
-  previous: RuntimePromotionJournal,
-  transition: RuntimePromotionJournalTransition,
-): RuntimePromotionJournal {
-  if (transition.type !== 'advance') transitionFailure('transition type is unsupported');
-  assertRuntimePromotionTransition(previous, transition.next);
-  return canonicalRuntimePromotionJournal(transition.next);
 }
 
 /** Revision zero is always the journal-first prepared record. */

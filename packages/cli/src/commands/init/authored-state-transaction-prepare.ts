@@ -16,17 +16,25 @@ import {
   executionIndex,
 } from './authored-state-transaction-execution.js';
 import {
+  assertAuthoredRootMatchesPromotionAuthority,
   authoredTransactionFailure,
-  openStableAuthoredRoot,
+  bindStableAuthoredRoot,
+  transactionAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import { recordOpenIntent, recordOpenPostcondition } from './authored-state-transaction-journal.js';
-import { materializeAuthoredBlobRoots } from './authored-state-transaction-materialization.js';
+import {
+  assertAuthoredMaterializationAuthority,
+  bindAuthoredMaterializationAuthority,
+  materializeAuthoredBlobRoots,
+  type AuthoredMaterializationAuthority,
+} from './authored-state-transaction-materialization.js';
 import {
   authoredDependencies,
   issueTransaction,
   stateFor,
   summaryFor,
 } from './authored-state-transaction-registry.js';
+import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 
 import type {
   AuthoredTransactionState,
@@ -70,8 +78,14 @@ function buildState(
   input: LoadAuthoredStateInput | LoadClosedAuthoredStateInput,
   receipt: DurableOpenPromotionJournal | DurableClosedPromotionJournal,
   journal: RuntimePromotionJournal,
+  boundRoot?: ReturnType<typeof bindStableAuthoredRoot>,
 ): AuthoredTransactionState {
-  const root = openStableAuthoredRoot(input.projectRoot);
+  const root = boundRoot ?? bindStableAuthoredRoot(input.projectRoot, input.lease.coordinationKey);
+  assertRuntimePromotionProjectRootAuthority({
+    lease: input.lease,
+    authority: input.projectRootAuthority,
+  });
+  assertAuthoredRootMatchesPromotionAuthority(root, input.projectRootAuthority);
   const paths = authoredArtifactPaths(root, journal);
   settleAuthoredReplayPublication(root, journal, paths);
   const presence = artifactPresence(paths);
@@ -88,6 +102,7 @@ function buildState(
   if (cleanupOnlyWithoutReplay) {
     return {
       projectRoot: root.path,
+      root,
       lease: input.lease,
       controller: input.controller,
       manifest: null,
@@ -112,6 +127,7 @@ function buildState(
   );
   return {
     projectRoot: root.path,
+    root,
     lease: input.lease,
     controller: input.controller,
     manifest: replay.manifest,
@@ -129,12 +145,13 @@ function freshState(
   input: PrepareAuthoredStateInput,
   receipt: DurableOpenPromotionJournal,
   journal: RuntimePromotionJournal,
+  root: ReturnType<typeof bindStableAuthoredRoot>,
 ): AuthoredTransactionState {
-  const root = openStableAuthoredRoot(input.projectRoot);
   const paths = authoredArtifactPaths(root, journal);
   const order = authoredExecutionOrder(input.plan.replayManifest);
   return {
     projectRoot: root.path,
+    root,
     lease: input.lease,
     controller: input.controller,
     manifest: input.plan.replayManifest,
@@ -154,14 +171,18 @@ async function finishPrepare(
 ): Promise<DurableOpenPromotionJournal> {
   const receipt = state.receipt as DurableOpenPromotionJournal;
   const current = await state.controller.verifyOpen(receipt);
-  const root = openStableAuthoredRoot(state.projectRoot);
+  const root = transactionAuthoredRoot(state.root);
   const authority = await state.controller.authorizeAuthoredState(receipt, state.lease);
   state.controller.assertAuthoredStateAuthority(authority, {
     authoredStage: current.owned.authoredStage.basename,
     authoredBackup: current.owned.authoredBackup.basename,
     replayManifest: current.owned.replayManifest.basename,
   });
-  state.dependencies.checkpoint('before-manifest-materialization');
+  const checkpoint = (name: Parameters<typeof state.dependencies.checkpoint>[0]): void => {
+    state.dependencies.checkpoint(name);
+    transactionAuthoredRoot(state.root);
+  };
+  checkpoint('before-manifest-materialization');
   const manifest = state.manifest;
   const manifestBytes = state.manifestBytes;
   if (manifest === null || manifestBytes === null) {
@@ -173,33 +194,55 @@ async function finishPrepare(
     state.paths,
     plan.replayManifestBytes,
   );
-  state.dependencies.checkpoint('after-replay-materialization');
+  checkpoint('after-replay-materialization');
   let outcome: 'applied' | 'already-satisfied';
+  let materializationAuthority: AuthoredMaterializationAuthority;
   const [stagePresent, backupPresent] = artifactPresence(state.paths);
   if (stagePresent || backupPresent) {
     try {
+      materializationAuthority = bindAuthoredMaterializationAuthority(plan, state.paths);
       validateAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths, {
         desiredConsumed: new Set(),
         preimageConsumed: new Set(),
       });
+      assertAuthoredMaterializationAuthority(materializationAuthority);
       outcome = replayOutcome;
     } catch {
       resetIncompleteAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths);
       publishAuthoredReplayManifest(root, current, state.paths, plan.replayManifestBytes);
-      state.dependencies.checkpoint('after-replay-materialization');
-      materializeAuthoredBlobRoots(root, current, plan, state.paths, state.dependencies.checkpoint);
+      checkpoint('after-replay-materialization');
+      materializationAuthority = materializeAuthoredBlobRoots(
+        root,
+        current,
+        plan,
+        state.paths,
+        checkpoint,
+      );
       outcome = 'applied';
     }
   } else {
-    materializeAuthoredBlobRoots(root, current, plan, state.paths, state.dependencies.checkpoint);
+    materializationAuthority = materializeAuthoredBlobRoots(
+      root,
+      current,
+      plan,
+      state.paths,
+      checkpoint,
+    );
     outcome = 'applied';
   }
-  validateAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths, {
-    desiredConsumed: new Set(),
-    preimageConsumed: new Set(),
-  });
-  state.dependencies.checkpoint('after-manifest-materialization');
-  state.dependencies.checkpoint('before-prepare-postcondition');
+  const validateMaterializedArtifacts = (): void => {
+    assertAuthoredMaterializationAuthority(materializationAuthority);
+    validateAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths, {
+      desiredConsumed: new Set(),
+      preimageConsumed: new Set(),
+    });
+    assertAuthoredMaterializationAuthority(materializationAuthority);
+  };
+  validateMaterializedArtifacts();
+  checkpoint('after-manifest-materialization');
+  validateMaterializedArtifacts();
+  checkpoint('before-prepare-postcondition');
+  validateMaterializedArtifacts();
   const next = await recordOpenPostcondition(
     state.controller,
     receipt,
@@ -207,7 +250,9 @@ async function finishPrepare(
     state.dependencies.now,
   );
   state.receipt = next;
-  state.dependencies.checkpoint('after-prepare-postcondition');
+  validateMaterializedArtifacts();
+  checkpoint('after-prepare-postcondition');
+  validateMaterializedArtifacts();
   return next;
 }
 
@@ -215,10 +260,16 @@ export async function prepareAuthoredState(
   input: PrepareAuthoredStateInput,
 ): Promise<PreparedAuthoredState> {
   input.controller.assertBoundLease(input.lease);
+  assertRuntimePromotionProjectRootAuthority({
+    lease: input.lease,
+    authority: input.projectRootAuthority,
+  });
+  const root = bindStableAuthoredRoot(input.projectRoot, input.lease.coordinationKey);
+  assertAuthoredRootMatchesPromotionAuthority(root, input.projectRootAuthority);
   let journal = await input.controller.verifyOpen(input.receipt);
   assertPlanMatchesJournal(input.plan, journal);
   if (journal.progress.pendingIntent === null && journal.progress.phase === 'authored-prepared') {
-    const state = buildState(input, input.receipt, journal);
+    const state = buildState(input, input.receipt, journal, root);
     return {
       transaction: issueTransaction(state),
       receipt: input.receipt,
@@ -248,7 +299,7 @@ export async function prepareAuthoredState(
   } else if (journal.progress.pendingIntent.kind !== 'authored-prepare') {
     authoredTransactionFailure('another promotion intent is unresolved');
   }
-  const state = freshState(input, receipt, journal);
+  const state = freshState(input, receipt, journal, root);
   receipt = await finishPrepare(state, input.plan);
   journal = await input.controller.verifyOpen(receipt);
   return {
@@ -293,6 +344,7 @@ export async function bindAuthoredStateReceipt(
 ): Promise<void> {
   const state = stateFor(transaction);
   state.controller.assertBoundLease(state.lease);
+  transactionAuthoredRoot(state.root);
   const journal = await state.controller.verifyOpen(receipt);
   if (journal.operationId !== transaction.operationId) {
     authoredTransactionFailure('the replacement receipt belongs to another operation');

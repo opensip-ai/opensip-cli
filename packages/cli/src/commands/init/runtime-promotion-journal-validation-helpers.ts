@@ -90,10 +90,6 @@ export function isSafeRuntimePromotionBasename(value: string): boolean {
   );
 }
 
-export function isRuntimePromotionDigest(value: string): boolean {
-  return RUNTIME_PROMOTION_DIGEST_PATTERN.test(value);
-}
-
 export function validateSource(value: unknown): void {
   const source = journalObject(value, 'source');
   journalKeys(source, ['classification', 'cacheKey', 'generationDigest', 'markerSha256'], 'source');

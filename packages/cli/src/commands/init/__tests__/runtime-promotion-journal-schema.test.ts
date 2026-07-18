@@ -311,7 +311,7 @@ describe('runtime promotion journal canonical schema', () => {
         },
         cleanup: {
           ...journal.cleanup,
-          destinationParent: 'removed',
+          destinationParent: 'pending',
           runtimeStage: 'removed',
           sourceTombstone: 'pending',
           authoredStage: 'pending',

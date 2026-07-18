@@ -9,11 +9,9 @@ import {
   RUNTIME_PROMOTION_JOURNAL_VERSION,
   type CreateRuntimePromotionJournalInput,
   type RuntimeManifestIdentity,
-  type RuntimePromotionIntentKind,
   type RuntimePromotionJournal,
   type RuntimePromotionJournalBinding,
   type RuntimePromotionOwnedSlot,
-  type RuntimePromotionOwnedSlotName,
   type RuntimePromotionPendingIntent,
   type RuntimePromotionPostcondition,
   type RuntimePromotionTerminal,
@@ -21,14 +19,11 @@ import {
 import {
   assertRuntimePromotionJournalShape,
   canonicalSqliteIdentity,
-  isRuntimePromotionJournalShape,
 } from './runtime-promotion-journal-validation.js';
 
 export * from './runtime-promotion-journal-types.js';
 export {
   assertRuntimeManifestIdentity,
-  isRuntimePromotionCoordinationKey,
-  isRuntimePromotionDigest,
   isSafeRuntimePromotionBasename,
 } from './runtime-promotion-journal-validation.js';
 export {
@@ -98,10 +93,6 @@ export function assertRuntimePromotionJournal(
   value: unknown,
 ): asserts value is RuntimePromotionJournal {
   assertRuntimePromotionJournalShape(value);
-}
-
-export function isRuntimePromotionJournal(value: unknown): value is RuntimePromotionJournal {
-  return isRuntimePromotionJournalShape(value);
 }
 
 /** Return a deep copy with the one accepted v1 key order. */
@@ -291,18 +282,4 @@ export function createInitialRuntimePromotionJournal(
     },
     ...(input.reason === undefined ? {} : { reason: input.reason }),
   });
-}
-
-/** Exact predicate used by materializers before consuming durable authority. */
-export function hasRuntimePromotionIntent(
-  journal: RuntimePromotionJournal,
-  kind: RuntimePromotionIntentKind,
-  slot?: RuntimePromotionOwnedSlotName,
-): boolean {
-  const pending = journal.progress.pendingIntent;
-  return (
-    pending?.kind === kind &&
-    (slot === undefined || pending.slot === slot) &&
-    pending.sequence === journal.counts.intentCount
-  );
 }

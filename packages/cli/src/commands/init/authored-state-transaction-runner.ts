@@ -1,15 +1,21 @@
 import { validateAuthoredArtifacts } from './authored-state-transaction-artifacts.js';
-import { removeAuthoredArtifact } from './authored-state-transaction-cleanup.js';
+import {
+  assertAuthoredArtifactAbsent,
+  assertAuthoredArtifactPathAbsent,
+  finalizeAuthoredCleanupEvidence,
+  removeAuthoredArtifact,
+} from './authored-state-transaction-cleanup.js';
 import {
   authoredBlobAvailability,
   reconcileAuthoredMutation,
   verifyEveryAuthoredTarget,
 } from './authored-state-transaction-execution.js';
 import {
+  assertStableAuthoredRoot,
   authoredTransactionFailure,
   observeAuthoredPath,
-  openStableAuthoredRoot,
   sameAuthoredPathState,
+  transactionAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import {
   advanceAuthoredPhase,
@@ -28,6 +34,7 @@ import {
 
 import type {
   AuthoredStateCleanupResult,
+  AuthoredStateCheckpoint,
   AuthoredStateSummary,
   AuthoredStateTransitionResult,
   AuthoredTransactionState,
@@ -99,15 +106,40 @@ function assertPreMutationState(
   state: AuthoredTransactionState,
   mutation: InitAuthoredMutation,
   direction: AuthoredDirection,
+  journal: RuntimePromotionJournal,
 ): void {
   const expected = direction === 'commit' ? mutation.preimage : mutation.desired;
-  if (
-    !sameAuthoredPathState(
-      observeAuthoredPath(openStableAuthoredRoot(state.projectRoot), mutation.path),
-      expected,
-    )
-  ) {
+  const observed = observeAuthoredPath(transactionAuthoredRoot(state.root), mutation.path);
+  if (sameAuthoredPathState(observed, expected)) return;
+  const journalInstalledAuthoredParent =
+    direction === 'commit' &&
+    mutation.path === 'opensip-cli' &&
+    mutation.action === 'create' &&
+    mutation.targetType === 'directory' &&
+    !mutation.preimage.exists &&
+    mutation.desired.exists &&
+    mutation.desired.type === 'directory' &&
+    journal.route === 'promote-cache' &&
+    !journal.destinationParentPreexisting &&
+    journal.progress.phase === 'runtime-installed' &&
+    journal.progress.runtimeInstallState === 'installed' &&
+    journal.cleanup.destinationParent === 'pending' &&
+    journal.manifests.runtimeStage !== null &&
+    sameAuthoredPathState(observed, mutation.desired);
+  if (!journalInstalledAuthoredParent) {
     authoredTransactionFailure('a target changed before its write-ahead intent');
+  }
+}
+
+function assertMutationPostcondition(
+  state: AuthoredTransactionState,
+  mutation: InitAuthoredMutation,
+  direction: AuthoredDirection,
+): void {
+  const expected = direction === 'commit' ? mutation.desired : mutation.preimage;
+  const observed = observeAuthoredPath(transactionAuthoredRoot(state.root), mutation.path);
+  if (!sameAuthoredPathState(observed, expected)) {
+    authoredTransactionFailure('a target changed before its durable postcondition');
   }
 }
 
@@ -119,7 +151,7 @@ async function executeAuthoredDirection(
   state.controller.assertBoundLease(state.lease);
   let receipt = state.receipt as DurableOpenPromotionJournal;
   let journal = await state.controller.verifyOpen(receipt);
-  const root = openStableAuthoredRoot(state.projectRoot);
+  const root = transactionAuthoredRoot(state.root);
   const manifest = manifestFor(state);
   validateAuthoredArtifacts(
     root,
@@ -136,7 +168,7 @@ async function executeAuthoredDirection(
     const expectedKind = directionIntentKind(direction);
     let pending = journal.progress.pendingIntent;
     if (pending === null) {
-      assertPreMutationState(state, mutation, direction);
+      assertPreMutationState(state, mutation, direction, journal);
       state.dependencies.checkpoint('before-target-intent', cursor);
       receipt = await recordOpenIntent(
         state.controller,
@@ -156,8 +188,11 @@ async function executeAuthoredDirection(
     }
     state.dependencies.checkpoint('before-target-mutation', cursor);
     const outcome = reconcileAuthoredMutation(root, mutation, state.paths, direction, true);
+    assertMutationPostcondition(state, mutation, direction);
     state.dependencies.checkpoint('after-target-mutation', cursor);
+    assertMutationPostcondition(state, mutation, direction);
     state.dependencies.checkpoint('before-target-postcondition', cursor);
+    assertMutationPostcondition(state, mutation, direction);
     receipt = await recordOpenPostcondition(
       state.controller,
       receipt,
@@ -170,8 +205,11 @@ async function executeAuthoredDirection(
       state.dependencies.now,
     );
     state.receipt = receipt;
+    assertMutationPostcondition(state, mutation, direction);
     state.dependencies.checkpoint('after-target-postcondition', cursor);
+    assertMutationPostcondition(state, mutation, direction);
     journal = await state.controller.verifyOpen(receipt);
+    assertMutationPostcondition(state, mutation, direction);
   }
   const completedPhase = directionCompletedPhase(direction);
   if (journal.progress.phase !== completedPhase) {
@@ -224,7 +262,7 @@ export async function verifyAuthoredState(
   const state = stateFor(transaction);
   state.dependencies.checkpoint('before-verify');
   const journal = await state.controller.verifyReceipt(state.receipt);
-  const root = openStableAuthoredRoot(state.projectRoot);
+  const root = transactionAuthoredRoot(state.root);
   const manifest = manifestFor(state);
   validateAuthoredArtifacts(
     root,
@@ -236,7 +274,19 @@ export async function verifyAuthoredState(
   );
   verifyEveryAuthoredTarget(root, manifest, expected);
   state.dependencies.checkpoint('after-verify');
-  return summaryFor(state, journal, true);
+  assertStableAuthoredRoot(root);
+  const finalJournal = await state.controller.verifyReceipt(state.receipt);
+  validateAuthoredArtifacts(
+    root,
+    finalJournal,
+    manifest,
+    manifestBytesFor(state),
+    state.paths,
+    authoredBlobAvailability(finalJournal, state.executionOrder),
+  );
+  verifyEveryAuthoredTarget(root, manifest, expected);
+  assertStableAuthoredRoot(root);
+  return summaryFor(state, finalJournal, true);
 }
 
 export async function cleanupAuthoredState(
@@ -245,43 +295,84 @@ export async function cleanupAuthoredState(
 ): Promise<AuthoredStateCleanupResult> {
   const state = stateFor(transaction);
   state.controller.assertBoundLease(state.lease);
+  const root = transactionAuthoredRoot(state.root);
+  const checkpoint = (value: AuthoredStateCheckpoint): void => {
+    assertStableAuthoredRoot(root);
+    try {
+      state.dependencies.checkpoint(value);
+    } finally {
+      assertStableAuthoredRoot(root);
+    }
+  };
+  const withStableRoot = async <T>(action: () => Promise<T>): Promise<T> => {
+    assertStableAuthoredRoot(root);
+    try {
+      return await action();
+    } finally {
+      assertStableAuthoredRoot(root);
+    }
+  };
   let receipt = closedReceipt;
-  let journal = await state.controller.verifyReceipt(receipt, {
-    state: 'closed',
-  });
+  let journal = await withStableRoot(() =>
+    state.controller.verifyReceipt(receipt, {
+      state: 'closed',
+    }),
+  );
   if (journal.operationId !== transaction.operationId) {
     authoredTransactionFailure('the cleanup receipt belongs to another operation');
   }
-  const root = openStableAuthoredRoot(state.projectRoot);
   for (const slot of ['authoredStage', 'authoredBackup', 'replayManifest'] as const) {
-    if (journal.cleanup[slot] === 'removed' || journal.cleanup[slot] === 'unmaterialized') continue;
+    assertStableAuthoredRoot(root);
+    if (journal.cleanup[slot] === 'removed' || journal.cleanup[slot] === 'unmaterialized') {
+      assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+      finalizeAuthoredCleanupEvidence(root, journal, state.paths, slot, checkpoint);
+      assertAuthoredArtifactAbsent(root, journal, state.paths, slot);
+      continue;
+    }
     const pending = journal.progress.pendingIntent;
     if (pending === null) {
-      state.dependencies.checkpoint('before-cleanup-intent');
-      receipt = await recordCleanupIntent(state.controller, receipt, slot, state.dependencies.now);
-      state.dependencies.checkpoint('after-cleanup-intent');
-      journal = await state.controller.verifyReceipt(receipt, {
-        state: 'closed',
-      });
+      checkpoint('before-cleanup-intent');
+      receipt = await withStableRoot(() =>
+        recordCleanupIntent(state.controller, receipt, slot, state.dependencies.now),
+      );
+      checkpoint('after-cleanup-intent');
+      journal = await withStableRoot(() =>
+        state.controller.verifyReceipt(receipt, {
+          state: 'closed',
+        }),
+      );
     } else if (pending.kind !== 'owned-slot-cleanup' || pending.slot !== slot) {
       authoredTransactionFailure('another cleanup intent is unresolved');
     }
-    state.dependencies.checkpoint('before-cleanup-mutation');
+    checkpoint('before-cleanup-mutation');
     const manifest =
       slot === 'replayManifest' && state.manifest === null ? null : manifestFor(state);
-    const outcome = removeAuthoredArtifact(root, journal, manifest, state.paths, slot);
-    state.dependencies.checkpoint('after-cleanup-mutation');
-    state.dependencies.checkpoint('before-cleanup-postcondition');
-    receipt = await recordCleanupPostcondition(
-      state.controller,
-      receipt,
-      outcome === 'absent' ? 'already-satisfied' : 'applied',
-      state.dependencies.now,
+    const outcome = removeAuthoredArtifact(root, journal, manifest, state.paths, slot, checkpoint);
+    assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+    checkpoint('after-cleanup-mutation');
+    assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+    checkpoint('before-cleanup-postcondition');
+    assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+    receipt = await withStableRoot(() =>
+      recordCleanupPostcondition(
+        state.controller,
+        receipt,
+        outcome === 'absent' ? 'already-satisfied' : 'applied',
+        state.dependencies.now,
+      ),
     );
-    state.dependencies.checkpoint('after-cleanup-postcondition');
-    journal = await state.controller.verifyReceipt(receipt, {
-      state: 'closed',
-    });
+    assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+    checkpoint('after-cleanup-postcondition');
+    assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+    journal = await withStableRoot(() =>
+      state.controller.verifyReceipt(receipt, {
+        state: 'closed',
+      }),
+    );
+    assertAuthoredArtifactPathAbsent(root, state.paths, slot);
+    finalizeAuthoredCleanupEvidence(root, journal, state.paths, slot, checkpoint);
+    assertAuthoredArtifactAbsent(root, journal, state.paths, slot);
   }
+  assertStableAuthoredRoot(root);
   return { receipt, summary: summaryFor(state, journal, true) };
 }

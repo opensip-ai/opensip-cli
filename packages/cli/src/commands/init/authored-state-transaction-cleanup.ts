@@ -1,25 +1,96 @@
 import { lstatSync, unlinkSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import {
+  assertAuthoredCleanupEvidenceAbsent,
+  readAuthoredCleanupEvidence,
+  removeAuthoredCleanupEvidence,
+} from './authored-state-transaction-cleanup-evidence.js';
+import {
+  assertStableAuthoredEntry,
   assertStableAuthoredRoot,
   authoredTransactionFailure,
-  fsyncDirectory,
+  bindStableAuthoredEntry,
+  fsyncStableAuthoredRoot,
   readStableArtifactFile,
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import { removeOwnedAuthoredBlobRoot } from './authored-state-transaction-owned-artifact-cleanup.js';
 
-import type { AuthoredArtifactPaths } from './authored-state-transaction-types.js';
+import type {
+  AuthoredArtifactPaths,
+  AuthoredStateCheckpoint,
+} from './authored-state-transaction-types.js';
 import type { AuthoredReplayManifest } from './init-authored-plan.js';
 import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
 
-function artifactPath(
-  paths: AuthoredArtifactPaths,
-  slot: 'authoredStage' | 'authoredBackup' | 'replayManifest',
-): string {
+type AuthoredArtifactSlot = 'authoredStage' | 'authoredBackup' | 'replayManifest';
+
+function artifactPath(paths: AuthoredArtifactPaths, slot: AuthoredArtifactSlot): string {
   if (slot === 'authoredStage') return paths.stageRoot;
   if (slot === 'authoredBackup') return paths.backupRoot;
   return paths.replayManifest;
+}
+
+function hasCode(error: unknown, code: string): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
+}
+
+function assertDirectAuthoredArtifact(root: StableAuthoredRoot, path: string): void {
+  if (dirname(path) !== root.path) {
+    authoredTransactionFailure('an authored artifact escaped its bound project root');
+  }
+}
+
+export function assertAuthoredArtifactAbsent(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  paths: AuthoredArtifactPaths,
+  slot: AuthoredArtifactSlot,
+): void {
+  assertAuthoredArtifactPathAbsent(root, paths, slot);
+  if (slot === 'authoredStage' || slot === 'authoredBackup') {
+    assertAuthoredCleanupEvidenceAbsent(root, journal, slot);
+  }
+}
+
+export function assertAuthoredArtifactPathAbsent(
+  root: StableAuthoredRoot,
+  paths: AuthoredArtifactPaths,
+  slot: AuthoredArtifactSlot,
+): void {
+  const path = artifactPath(paths, slot);
+  assertStableAuthoredRoot(root);
+  assertDirectAuthoredArtifact(root, path);
+  try {
+    lstatSync(path);
+  } catch (error) {
+    if (hasCode(error, 'ENOENT')) {
+      assertStableAuthoredRoot(root);
+      return;
+    }
+    throw error;
+  }
+  authoredTransactionFailure('a cleaned authored artifact path is no longer absent');
+}
+
+export function finalizeAuthoredCleanupEvidence(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  paths: AuthoredArtifactPaths,
+  slot: AuthoredArtifactSlot,
+  checkpoint: (checkpoint: AuthoredStateCheckpoint) => void,
+): void {
+  if (slot !== 'authoredStage' && slot !== 'authoredBackup') return;
+  assertAuthoredArtifactPathAbsent(root, paths, slot);
+  const evidence = readAuthoredCleanupEvidence(root, journal, slot);
+  if (evidence === null) return;
+  checkpoint('before-cleanup-evidence-unlink');
+  assertAuthoredArtifactPathAbsent(root, paths, slot);
+  removeAuthoredCleanupEvidence(root, journal, slot, evidence);
+  checkpoint('after-cleanup-evidence-unlink');
+  assertAuthoredArtifactPathAbsent(root, paths, slot);
+  assertAuthoredCleanupEvidenceAbsent(root, journal, slot);
 }
 
 export function removeAuthoredArtifact(
@@ -27,28 +98,48 @@ export function removeAuthoredArtifact(
   journal: RuntimePromotionJournal,
   manifest: AuthoredReplayManifest | null,
   paths: AuthoredArtifactPaths,
-  slot: 'authoredStage' | 'authoredBackup' | 'replayManifest',
+  slot: AuthoredArtifactSlot,
+  checkpoint: (checkpoint: AuthoredStateCheckpoint) => void,
 ): 'removed' | 'absent' {
   const path = artifactPath(paths, slot);
+  assertStableAuthoredRoot(root);
+  assertDirectAuthoredArtifact(root, path);
+  if (slot === 'authoredStage' || slot === 'authoredBackup') {
+    if (manifest === null) {
+      authoredTransactionFailure('cleanup requires the replay manifest for artifact directories');
+    }
+    return removeOwnedAuthoredBlobRoot(root, journal, manifest, paths, slot, checkpoint);
+  }
   try {
     lstatSync(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'absent';
+    if (hasCode(error, 'ENOENT')) {
+      checkpoint('after-cleanup-artifact-observation');
+      assertAuthoredArtifactPathAbsent(root, paths, slot);
+      return 'absent';
+    }
     throw error;
   }
   if (slot === 'replayManifest') {
+    const replayIdentity = bindStableAuthoredEntry(path, 'file', 'the authored replay manifest');
+    checkpoint('after-cleanup-artifact-observation');
+    assertStableAuthoredRoot(root);
+    assertStableAuthoredEntry(replayIdentity, 'the authored replay manifest');
     const replay = readStableArtifactFile(path);
     if (replay.mode !== 0o600 || replay.digest !== journal.plan.replayDigest) {
       authoredTransactionFailure('cleanup refused a changed replay manifest');
     }
+    checkpoint('after-cleanup-artifact-read');
+    assertStableAuthoredRoot(root);
+    assertStableAuthoredEntry(replayIdentity, 'the authored replay manifest');
+    checkpoint('before-cleanup-entry-unlink');
+    assertStableAuthoredRoot(root);
+    assertStableAuthoredEntry(replayIdentity, 'the authored replay manifest');
     unlinkSync(path);
-    fsyncDirectory(root.path);
+    checkpoint('after-cleanup-entry-unlink');
+    assertAuthoredArtifactPathAbsent(root, paths, slot);
+    fsyncStableAuthoredRoot(root);
     return 'removed';
   }
-  if (manifest === null) {
-    authoredTransactionFailure('cleanup requires the replay manifest for artifact directories');
-  }
-  removeOwnedAuthoredBlobRoot(journal, manifest, paths, slot);
-  assertStableAuthoredRoot(root);
-  return 'removed';
+  authoredTransactionFailure('the authored cleanup slot is unsupported');
 }

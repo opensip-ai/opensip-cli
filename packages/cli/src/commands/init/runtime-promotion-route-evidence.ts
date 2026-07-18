@@ -139,7 +139,7 @@ function exactForwardOwnedWindowsAllowed(journal: RuntimePromotionJournal): bool
     journal.route !== 'promote-cache' || journal.cleanup.runtimeStage === runtimeExpected;
 
   const parentReady = forwardPhaseAtLeast(journal.progress.phase, 'destination-ready');
-  const parentExpected = materializationState(parentReady, runtimeInstalled);
+  const parentExpected = parentReady ? 'pending' : 'unmaterialized';
   const parentAllowed =
     journal.route !== 'promote-cache' ||
     journal.destinationParentPreexisting ||
@@ -170,22 +170,30 @@ function runtimeInstallStateAllowed(journal: RuntimePromotionJournal): boolean {
   }
   if (journal.progress.runtimeInstallState === 'not-installed') return true;
   if (journal.progress.runtimeInstallState === 'backup-restored') {
-    return (
-      journal.destinationRuntimePreexisting &&
+    const runtimeStageResolved =
       journal.manifests.runtimeStage !== null &&
-      journal.cleanup.runtimeStage === 'pending' &&
-      journal.cleanup.destinationBackup === 'removed'
+      ['pending', 'removed'].includes(journal.cleanup.runtimeStage);
+    const backupResolved = ['unmaterialized', 'removed'].includes(
+      journal.cleanup.destinationBackup,
     );
+    return journal.destinationRuntimePreexisting && runtimeStageResolved && backupResolved;
   }
-  const runtimeOwned =
-    journal.manifests.runtimeStage !== null && journal.cleanup.runtimeStage === 'removed';
+  const runtimeResolved =
+    journal.manifests.runtimeStage === null
+      ? journal.cleanup.runtimeStage === 'unmaterialized'
+      : journal.cleanup.runtimeStage === 'removed';
   const parentResolved =
-    journal.destinationParentPreexisting || journal.cleanup.destinationParent === 'removed';
+    journal.destinationParentPreexisting ||
+    (journal.progress.runtimeInstallState === 'installed'
+      ? journal.cleanup.destinationParent !== 'unmaterialized'
+      : journal.cleanup.destinationParent === 'removed' ||
+        (journal.progress.authoredCursor > 0 &&
+          journal.cleanup.destinationParent !== 'unmaterialized'));
   const backupResolved =
     journal.progress.runtimeInstallState !== 'rolled-back' ||
     !journal.destinationRuntimePreexisting ||
     journal.cleanup.destinationBackup === 'removed';
-  return runtimeOwned && parentResolved && backupResolved;
+  return runtimeResolved && parentResolved && backupResolved;
 }
 
 function forwardRuntimeInstallStateAllowed(journal: RuntimePromotionJournal): boolean {
@@ -240,7 +248,15 @@ function rollbackParentWindowAllowed(
   if (journal.destinationParentPreexisting) {
     return journal.cleanup.destinationParent === 'unmaterialized';
   }
-  if (journal.progress.runtimeInstallState !== 'not-installed') {
+  if (journal.progress.runtimeInstallState === 'installed') {
+    return journal.cleanup.destinationParent === 'pending';
+  }
+  if (journal.progress.runtimeInstallState === 'rolled-back') {
+    return journal.progress.authoredCursor === 0
+      ? journal.cleanup.destinationParent === 'removed'
+      : journal.cleanup.destinationParent === 'pending';
+  }
+  if (journal.progress.runtimeInstallState === 'backup-restored') {
     return journal.cleanup.destinationParent === 'removed';
   }
   return (
@@ -257,7 +273,7 @@ function rollbackBackupWindowAllowed(journal: RuntimePromotionJournal): boolean 
     return journal.cleanup.destinationBackup === 'pending';
   }
   if (['rolled-back', 'backup-restored'].includes(journal.progress.runtimeInstallState)) {
-    return journal.cleanup.destinationBackup === 'removed';
+    return ['unmaterialized', 'removed'].includes(journal.cleanup.destinationBackup);
   }
   return (
     ['unmaterialized', 'pending'].includes(journal.cleanup.destinationBackup) &&
@@ -274,7 +290,7 @@ function openRollbackRuntimeWindowsAllowed(journal: RuntimePromotionJournal): bo
   ) {
     return true;
   }
-  const runtimeRemoved = ['installed', 'rolled-back'].includes(
+  const runtimeRemoved = ['installed', 'rolled-back', 'backup-restored'].includes(
     journal.progress.runtimeInstallState,
   );
   const stageExpected = materializationState(

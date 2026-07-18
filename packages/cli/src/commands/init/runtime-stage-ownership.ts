@@ -33,6 +33,8 @@ export type RuntimeStageOwnershipCheckpoint =
 
 export interface RuntimeStageOwnershipDependencies {
   readonly checkpoint?: (checkpoint: RuntimeStageOwnershipCheckpoint) => void;
+  /** Reassert the held stage-root inode after every injected boundary. */
+  readonly assertRootStable?: () => void;
 }
 
 interface MarkerIdentity {
@@ -140,21 +142,27 @@ export function createRuntimeStageOwnershipMarker(
   const markerPath = join(stageDir, RUNTIME_STAGE_OWNERSHIP_FILE);
   let descriptor: number | undefined;
   try {
+    dependencies.assertRootStable?.();
     descriptor = openSync(
       markerPath,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
       RUNTIME_STAGE_OWNERSHIP_MODE,
     );
     dependencies.checkpoint?.('after-marker-open');
+    dependencies.assertRootStable?.();
     writeAll(descriptor, content);
     fchmodSync(descriptor, RUNTIME_STAGE_OWNERSHIP_MODE);
     dependencies.checkpoint?.('after-marker-write');
+    dependencies.assertRootStable?.();
     fsyncSync(descriptor);
     dependencies.checkpoint?.('after-marker-fsync');
+    dependencies.assertRootStable?.();
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
+  dependencies.assertRootStable?.();
   assertRuntimeStageOwnershipMarker(stageDir, identity);
+  dependencies.assertRootStable?.();
 }
 
 /** Verify exact marker bytes and stable single-link file identity without following links. */

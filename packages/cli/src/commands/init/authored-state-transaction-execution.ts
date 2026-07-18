@@ -9,7 +9,12 @@ import {
 import {
   applyAuthoredDirectory,
   applyAuthoredFile,
+  observeBoundAuthoredTarget,
   removeAuthoredTarget,
+  settleSatisfiedAuthoredTarget,
+  withBoundAuthoredTarget,
+  type AuthoredTargetMutationHooks,
+  type BoundAuthoredTarget,
 } from './authored-state-transaction-target-fs.js';
 
 import type {
@@ -45,6 +50,15 @@ function removesDirectory(mutation: InitAuthoredMutation): boolean {
 }
 
 function mutationRank(mutation: InitAuthoredMutation): number {
+  if (
+    mutation.path === 'opensip-cli' &&
+    mutation.action === 'create' &&
+    mutation.targetType === 'directory' &&
+    !mutation.preimage.exists &&
+    mutation.desired.exists
+  ) {
+    return -1;
+  }
   if (createsDirectory(mutation)) return 0;
   if (removesDirectory(mutation)) return 2;
   return 1;
@@ -191,55 +205,58 @@ function blobPath(
 }
 
 function applyTargetState(
-  root: StableAuthoredRoot,
+  authority: BoundAuthoredTarget,
   mutation: InitAuthoredMutation,
   current: InitAuthoredPathState,
   target: InitAuthoredPathState,
   paths: AuthoredArtifactPaths,
   direction: 'commit' | 'rollback',
+  hooks: AuthoredTargetMutationHooks,
 ): void {
   if (!target.exists) {
     if (!current.exists || current.type === null) return;
-    removeAuthoredTarget(root, mutation.path, current.type);
+    removeAuthoredTarget(authority, current.type, hooks);
     return;
   }
   if (target.type === 'file') {
-    applyFileTarget(root, mutation, current, target, paths, direction);
+    applyFileTarget(authority, mutation, current, target, paths, direction, hooks);
     return;
   }
-  applyDirectoryTarget(root, mutation, current, target);
+  applyDirectoryTarget(authority, mutation, current, target, hooks);
 }
 
 function applyFileTarget(
-  root: StableAuthoredRoot,
+  authority: BoundAuthoredTarget,
   mutation: InitAuthoredMutation,
   current: InitAuthoredPathState,
   target: InitAuthoredPathState,
   paths: AuthoredArtifactPaths,
   direction: 'commit' | 'rollback',
+  hooks: AuthoredTargetMutationHooks,
 ): void {
   if (current.exists && current.type === 'directory') {
-    removeAuthoredTarget(root, mutation.path, 'directory');
+    removeAuthoredTarget(authority, 'directory', hooks);
   }
   if (target.mode === null) {
     authoredTransactionFailure('a file target has no mode');
   }
-  applyAuthoredFile(root, mutation.path, blobPath(paths, mutation, direction));
+  applyAuthoredFile(authority, blobPath(paths, mutation, direction), target, hooks);
 }
 
 function applyDirectoryTarget(
-  root: StableAuthoredRoot,
+  authority: BoundAuthoredTarget,
   mutation: InitAuthoredMutation,
   current: InitAuthoredPathState,
   target: InitAuthoredPathState,
+  hooks: AuthoredTargetMutationHooks,
 ): void {
   if (current.exists && current.type === 'file') {
-    removeAuthoredTarget(root, mutation.path, 'file');
+    removeAuthoredTarget(authority, 'file', hooks);
   }
   if (target.mode === null) {
     authoredTransactionFailure('a directory target has no mode');
   }
-  applyAuthoredDirectory(root, mutation.path, target.mode);
+  applyAuthoredDirectory(authority, target.mode, hooks);
 }
 
 function assertReconcilableCurrent(
@@ -262,20 +279,32 @@ export function reconcileAuthoredMutation(
   paths: AuthoredArtifactPaths,
   direction: 'commit' | 'rollback',
   pending: boolean,
+  hooks: AuthoredTargetMutationHooks = {},
 ): 'applied' | 'already-satisfied' {
-  const source = direction === 'commit' ? mutation.preimage : mutation.desired;
-  const target = direction === 'commit' ? mutation.desired : mutation.preimage;
-  const current = observeAuthoredPath(root, mutation.path);
-  if (sameAuthoredPathState(current, target)) return 'already-satisfied';
-  assertReconcilableCurrent(source, target, current, pending);
-  if (mutation.action !== 'preserve') {
-    applyTargetState(root, mutation, current, target, paths, direction);
-  }
-  const verified = observeAuthoredPath(root, mutation.path);
-  if (!sameAuthoredPathState(verified, target)) {
-    authoredTransactionFailure('an authored target did not reach its exact postcondition');
-  }
-  return 'applied';
+  return withBoundAuthoredTarget(root, mutation.path, (authority, current) => {
+    const source = direction === 'commit' ? mutation.preimage : mutation.desired;
+    const target = direction === 'commit' ? mutation.desired : mutation.preimage;
+    if (sameAuthoredPathState(current, target)) {
+      if (pending) {
+        settleSatisfiedAuthoredTarget(
+          authority,
+          target.exists && target.type === 'file' ? blobPath(paths, mutation, direction) : null,
+          target,
+          hooks,
+        );
+      }
+      return 'already-satisfied';
+    }
+    assertReconcilableCurrent(source, target, current, pending);
+    if (mutation.action !== 'preserve') {
+      applyTargetState(authority, mutation, current, target, paths, direction, hooks);
+    }
+    const verified = observeBoundAuthoredTarget(authority);
+    if (!sameAuthoredPathState(verified, target)) {
+      authoredTransactionFailure('an authored target did not reach its exact postcondition');
+    }
+    return 'applied';
+  });
 }
 
 export function verifyEveryAuthoredTarget(

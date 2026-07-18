@@ -21,6 +21,15 @@ interface CheckpointOutcome {
   readonly busy: boolean;
 }
 
+/** A failed or unreadable native state probe is not closure evidence. */
+export function sqliteConnectionProvenClosed(sqlite: SqliteLifecycleConnection): boolean {
+  try {
+    return sqlite.open === false;
+  } catch {
+    return false;
+  }
+}
+
 function checkpointSqlite(sqlite: SqliteLifecycleConnection): CheckpointOutcome {
   try {
     const result: unknown = sqlite.pragma('wal_checkpoint(TRUNCATE)');
@@ -68,7 +77,7 @@ export function checkpointAndCloseSqlite(sqlite: SqliteLifecycleConnection): Dat
     // The native `open` property below is the proof; an exception alone is not.
   }
 
-  const closed = sqlite.open === false;
+  const closed = sqliteConnectionProvenClosed(sqlite);
   if (checkpoint.checkpointed && closed) {
     return { checkpointed: true, closed: true };
   }
