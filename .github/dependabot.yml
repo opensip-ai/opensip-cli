@@ -45,3 +45,17 @@ updates:
       - github-actions
     commit-message:
       prefix: chore(ci)
+
+  # directory:/ scans .github/workflows only — the composite action's pins
+  # (including the sole copy of the actions/cache pin) need their own entry.
+  - package-ecosystem: github-actions
+    directory: /.github/actions/setup-workspace
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: chore(ci)

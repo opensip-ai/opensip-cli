@@ -1,5 +1,23 @@
 name: CI
 
+# Pinned action SHAs (bump via Dependabot github-actions or deliberate review):
+#   actions/checkout@v7.0.0              → 9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+#   pnpm/action-setup@v6                 → 0ebf47130e4866e96fce0953f49152a61190b271
+#   actions/setup-node@v6                → 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+#   actions/cache@v4.3.0                 → 0057852bfaa89a56745cba8c7296529d2fc39830
+#   actions/upload-artifact@v4.4.3       → b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+#   actions/download-artifact@v4.1.8     → fa0a91b85d4f404e444e00e005971372dc801d16
+#   github/codeql-action/upload-sarif@v4 → 7188fc363630916deb702c7fdcf4e481b751f97a (v4.37.1)
+#
+#   NOTE: upload-artifact is deliberately pinned at v4.4.3 (the pre-#30 ci.yml
+#   floated @v7) — release/macos pin parity + same-major pairing with
+#   download-artifact v4 for the workspace handoff (ADR-0168).
+#
+# Parallel PR wall-clock lanes (PR #30) + Plan 10 hardening (ADR-0168):
+#   setup builds once; warm lanes restore a symlink-preserving tar; cold-gate
+#   stays uncached. Timeouts from post-#30 measurements + margin. Fork PRs skip
+#   SARIF uploads with notice (no security-events on fork tokens).
+
 on:
   push:
     branches: [main]
@@ -11,28 +29,102 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Default-deny: jobs must opt in. Prevents a future job without a permissions
+# block from silently inheriting repo-default token scopes.
+permissions:
+  contents: read
+
 env:
   TURBO_TELEMETRY_DISABLED: '1'
+  # Symlink-preserving workspace handoff (setup → warm lanes). Exact SHA key —
+  # never restore a foreign commit's tree.
+  CI_WORKSPACE_ARTIFACT: workspace-ci-${{ github.sha }}.tar
 
 jobs:
-  # ── Parallel PR wall-clock lanes ──────────────────────────────────────────
-  # Previously one ~45m serial job. Now independent jobs after each does its
-  # own install+build (~2–3m). Wall-clock ≈ max(lane) ≈ test coverage (~20–25m)
-  # instead of sum. The `build-and-test` job is a pure aggregator so existing
-  # required-check names keep working.
-  #
-  # cold-gate stays independent (uncached install; cold dogfood).
-
-  lint:
+  # ── Shared warm setup (one build-ci per run) ──────────────────────────────
+  setup:
     runs-on: ubuntu-latest
+    # Observed ~2–4 min build-ci + pack; margin for cold pnpm store.
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-workspace
         with:
-          turbo-cache-key-suffix: lint
+          turbo-cache-key-suffix: setup
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
+
+      # Tar preserves pnpm's symlink/hardlink forest; raw upload-artifact would
+      # follow links and break injectWorkspacePackages layout. `.turbo` rides
+      # along so warm lanes inherit setup's Turbo task cache — without it,
+      # `turbo run test`/`typecheck` re-run the build DAG despite restored dist.
+      - name: Pack workspace for warm lanes
+        run: |
+          set -euo pipefail
+          mkdir -p .turbo
+          mapfile -t dists < <(find packages -type d -name dist -print | sort)
+          tar -cpf "$CI_WORKSPACE_ARTIFACT" node_modules .turbo "${dists[@]}"
+          ls -lh "$CI_WORKSPACE_ARTIFACT"
+
+      - name: Upload workspace artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: workspace-${{ github.sha }}
+          path: ${{ env.CI_WORKSPACE_ARTIFACT }}
+          retention-days: 1
+          if-no-files-found: error
+          # v4 artifacts are immutable within a run and survive across attempts:
+          # without overwrite, "Re-run all jobs" 409s on the existing name and
+          # reds setup + every warm lane. Content is deterministic per sha.
+          overwrite: true
+
+  # ── Warm correctness lanes (restore setup artifact) ───────────────────────
+  lint:
+    needs: setup
+    runs-on: ubuntu-latest
+    # Observed ~9–12 min; margin for loaded runners.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      # Cross-run Turbo task cache (typecheck etc.). Restored before the
+      # workspace untar; the tar layers setup's build-task entries on top —
+      # entries are content-addressed, so the union is safe.
+      - name: Turbo local cache (cross-run)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-lint-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-lint-
+            ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Download workspace artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: workspace-${{ github.sha }}
+
+      - name: Restore workspace
+        run: tar -xpf "$CI_WORKSPACE_ARTIFACT"
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
 
       - name: Typecheck
         run: pnpm typecheck
@@ -48,15 +140,44 @@ jobs:
         run: shellcheck scripts/*.sh
 
   test:
+    needs: setup
     runs-on: ubuntu-latest
+    # Observed ~17–25 min coverage suite.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/setup-workspace
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          turbo-cache-key-suffix: test
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      # Cross-run Turbo task cache — this is what lets unchanged packages skip
+      # re-test on PR pushes (see the coverage comment below).
+      - name: Turbo local cache (cross-run)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-test-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-test-
+            ${{ runner.os }}-turbo-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Download workspace artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: workspace-${{ github.sha }}
+
+      - name: Restore workspace
+        run: tar -xpf "$CI_WORKSPACE_ARTIFACT"
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
 
       # PR lane: allow Turbo cache hits so unchanged packages skip re-test.
       # Main / merge-to-main: force recompute so coverage thresholds cannot
@@ -74,16 +195,34 @@ jobs:
         run: pnpm test:coverage:fresh
 
   dogfood:
+    needs: setup
     runs-on: ubuntu-latest
+    # Observed ~6–8 min sequential fit/graph/yagni.
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/setup-workspace
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          turbo-cache-key-suffix: dogfood
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download workspace artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: workspace-${{ github.sha }}
+
+      - name: Restore workspace
+        run: tar -xpf "$CI_WORKSPACE_ARTIFACT"
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
 
       # Fit/graph/yagni share opensip-cli/.runtime/datastore.sqlite — run
       # sequentially in one job (not as parallel background processes).
@@ -95,9 +234,22 @@ jobs:
         if: always() && steps.fit.outcome != 'skipped'
         run: node packages/cli/dist/index.js fit export --format baseline --out fit.sarif
 
+      # Fork PRs: GitHub strips security-events: write — skip upload with notice.
+      # always() so the explanation also appears on red fork runs, where the
+      # guarded uploads below still evaluate-and-skip (visible, never silent).
+      # NB: the run value is YAML-double-quoted — a bare plain scalar containing
+      # "security-events: write" (colon+space) is invalid YAML and would make
+      # GitHub reject the whole workflow file.
+      - name: Notice SARIF skip on fork PR
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: "echo '::notice::SARIF upload skipped on fork PR — token lacks security-events: write'"
+
       - name: Upload fit SARIF
-        if: always() && hashFiles('fit.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+        if: >-
+          always() &&
+          hashFiles('fit.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           sarif_file: fit.sarif
           category: opensip-cli-fit
@@ -107,8 +259,11 @@ jobs:
         run: node packages/cli/dist/index.js graph --gate-save --sarif graph.sarif
 
       - name: Upload graph SARIF
-        if: always() && hashFiles('graph.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+        if: >-
+          always() &&
+          hashFiles('graph.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           sarif_file: graph.sarif
           category: opensip-cli-graph
@@ -118,22 +273,43 @@ jobs:
         run: pnpm yagni:ci
 
       - name: Upload yagni SARIF
-        if: always() && hashFiles('yagni.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
+        if: >-
+          always() &&
+          hashFiles('yagni.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           sarif_file: yagni.sarif
           category: opensip-cli-yagni
 
   graph-equivalence:
+    needs: setup
     runs-on: ubuntu-latest
+    # Observed ~5–8 min exact≡sharded.
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/setup-workspace
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          turbo-cache-key-suffix: graph-equivalence
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download workspace artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: workspace-${{ github.sha }}
+
+      - name: Restore workspace
+        run: tar -xpf "$CI_WORKSPACE_ARTIFACT"
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
 
       # REAL-REPO equivalence guardrail (ADR-0032): sharded ≡ exact on this
       # monorepo. Exact build over ~1500 files needs a larger heap.
@@ -143,15 +319,33 @@ jobs:
         run: pnpm graph:equivalence:ci
 
   policy-and-docs:
+    needs: setup
     runs-on: ubuntu-latest
+    # Observed ~2–4 min.
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/setup-workspace
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          turbo-cache-key-suffix: policy-and-docs
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download workspace artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: workspace-${{ github.sha }}
+
+      - name: Restore workspace
+        run: tar -xpf "$CI_WORKSPACE_ARTIFACT"
+
+      - name: Verify pnpm injected packages are fresh
+        run: node scripts/verify-pnpm-injection.mjs
 
       # Inspect emitted + packed bytes right after the clean build (ADR-0150).
       - name: Verify published artifact boundary
@@ -162,30 +356,33 @@ jobs:
 
       - name: Upload Performance SLO report
         if: always() && hashFiles('slo-report.json') != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: performance-slo-report
           path: slo-report.json
+          overwrite: true # re-run safety (v4 artifacts persist across attempts)
 
       - name: Detection quality measurement
         run: pnpm quality:measure:ci -- --check --out detection-quality-report.json
 
       - name: Upload Detection Quality report
         if: always() && hashFiles('detection-quality-report.json') != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: detection-quality-report
           path: detection-quality-report.json
+          overwrite: true # re-run safety (v4 artifacts persist across attempts)
 
       - name: Compatibility matrix
         run: pnpm compat:matrix:ci -- --out compatibility-matrix-report.json
 
       - name: Upload Compatibility Matrix report
         if: always() && hashFiles('compatibility-matrix-report.json') != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: compatibility-matrix-report
           path: compatibility-matrix-report.json
+          overwrite: true # re-run safety (v4 artifacts persist across attempts)
 
       - name: Check version surfaces in sync
         run: node scripts/bump-version.mjs --check
@@ -211,60 +408,21 @@ jobs:
       - name: Check per-package LICENSE/NOTICE in sync
         run: pnpm licenses:check
 
-  # Required-check stable name: fails unless every parallel lane succeeded.
-  build-and-test:
-    needs:
-      - lint
-      - test
-      - dogfood
-      - graph-equivalence
-      - policy-and-docs
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Require all parallel lanes green
-        env:
-          LINT: ${{ needs.lint.result }}
-          TEST: ${{ needs.test.result }}
-          DOGFOOD: ${{ needs.dogfood.result }}
-          GRAPH_EQ: ${{ needs.graph-equivalence.result }}
-          POLICY: ${{ needs.policy-and-docs.result }}
-        run: |
-          set -euo pipefail
-          failed=0
-          for name_result in \
-            "lint:${LINT}" \
-            "test:${TEST}" \
-            "dogfood:${DOGFOOD}" \
-            "graph-equivalence:${GRAPH_EQ}" \
-            "policy-and-docs:${POLICY}"; do
-            name="${name_result%%:*}"
-            result="${name_result#*:}"
-            echo "${name}=${result}"
-            if [ "${result}" != "success" ]; then
-              failed=1
-            fi
-          done
-          if [ "${failed}" -ne 0 ]; then
-            echo "::error::One or more CI lanes failed (see needs.* above)."
-            exit 1
-          fi
-          echo "All parallel CI lanes passed."
-
+  # ── Cold install proof (never reuses warm workspace artifact) ─────────────
   cold-gate:
     runs-on: ubuntu-latest
-
+    # Observed ~6–8 min.
+    timeout-minutes: 30
     permissions:
       contents: read
-
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version-file: .nvmrc
           # Intentionally no pnpm cache — this lane proves cold install.
@@ -295,3 +453,50 @@ jobs:
         run: |
           rm -rf opensip-cli/.runtime
           node "$GITHUB_WORKSPACE/packages/cli/dist/index.js" fit --gate-save
+
+  # Required-check stable name: fails unless every correctness lane succeeded
+  # (including cold-gate). setup is an implicit dependency of warm lanes.
+  build-and-test:
+    needs:
+      - lint
+      - test
+      - dogfood
+      - graph-equivalence
+      - policy-and-docs
+      - cold-gate
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require all parallel lanes green
+        env:
+          LINT: ${{ needs.lint.result }}
+          TEST: ${{ needs.test.result }}
+          DOGFOOD: ${{ needs.dogfood.result }}
+          GRAPH_EQ: ${{ needs.graph-equivalence.result }}
+          POLICY: ${{ needs.policy-and-docs.result }}
+          COLD: ${{ needs.cold-gate.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for name_result in \
+            "lint:${LINT}" \
+            "test:${TEST}" \
+            "dogfood:${DOGFOOD}" \
+            "graph-equivalence:${GRAPH_EQ}" \
+            "policy-and-docs:${POLICY}" \
+            "cold-gate:${COLD}"; do
+            name="${name_result%%:*}"
+            result="${name_result#*:}"
+            echo "${name}=${result}"
+            if [ "${result}" != "success" ]; then
+              failed=1
+            fi
+          done
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::One or more CI lanes failed (see needs.* above)."
+            exit 1
+          fi
+          echo "All parallel CI lanes passed."
