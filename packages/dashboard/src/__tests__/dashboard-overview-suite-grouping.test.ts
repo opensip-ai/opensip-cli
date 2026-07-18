@@ -496,6 +496,40 @@ describe('Overview suite rows', () => {
     expect(faultedRow.textContent).not.toContain('projectContext');
   });
 
+  it('shows a dash Pass Rate (not the raw outcome word) for a sessionless suite child step', () => {
+    const run = makeRun({
+      id: 'run-suite-faulted-child',
+      name: 'audit',
+      source: 'built-in-suite',
+      legacySuiteRunId: 'suite-faulted-child',
+      aggregate: { steps: 1, passed: 0, failed: 0, faulted: 1, errors: 0, warnings: 0 },
+      steps: [
+        makeStep({
+          id: 'step-faulted-child',
+          runId: 'run-suite-faulted-child',
+          logicalStepKey: '1:graph:graph',
+          ordinal: 1,
+          tool: 'graph',
+          command: 'graph',
+          stableId: 'graph',
+          exitCode: 2,
+          outcome: 'faulted',
+          verdictSummary: undefined,
+          sessionId: undefined,
+        }),
+      ],
+    });
+
+    bootReport([], [run]);
+
+    const [child] = childRows();
+    // Unlinked steps have no session score — Pass Rate is an em dash (parity
+    // with overview-ledger); outcome lives in Status, never in Pass Rate.
+    const passRateCell = cells(child)[4];
+    expect(passRateCell.textContent).toBe('—');
+    expect(passRateCell.textContent).not.toBe('faulted');
+  });
+
   it('does not reconstruct overview rows from sessions without ledger runs', () => {
     const { sessions } = auditSuite();
     bootReport(sessions);

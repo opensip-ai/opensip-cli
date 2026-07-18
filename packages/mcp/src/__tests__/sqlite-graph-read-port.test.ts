@@ -1179,6 +1179,28 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(secondKeys.every((key) => !seen.has(key))).toBe(true);
   });
 
+  it('groups package dependencies by file even at the default sampleLimit:0 (no <unlocated> collapse)', async () => {
+    new CatalogRepo(store).replaceAll(packageCatalog());
+    const port = makePort(store);
+    const result = await port.packageDependencies({
+      edgeKind: 'call',
+      direction: 'out',
+      // The `package_dependencies` MCP tool coerces an omitted sampleLimit to
+      // 0 before it ever reaches this read port (packages/mcp/src/tools/
+      // package-dependencies.ts: `args.sampleLimit ?? 0`) — reproduce that
+      // exact value here rather than leaving it undefined, which would fall
+      // through to the graph engine's own DEFAULT_SAMPLE_LIMIT of 5 instead.
+      sampleLimit: 0,
+      groupBy: 'file',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.groups?.length ?? 0).toBeGreaterThan(0);
+    for (const group of result.value.groups ?? []) {
+      expect(group.key).not.toBe('<unlocated>');
+    }
+  });
+
   it('applies both-direction package selection before the package-edge cap', async () => {
     const functions: Record<string, FunctionOccurrence[]> = {};
     for (let index = 0; index < 10_001; index++) {
@@ -1625,5 +1647,74 @@ describe('SqliteGraphReadPort (async cutover)', () => {
       },
     ]);
     expect(again.ok && again.value.outcomes[0]?.status).toBe('resolved');
+  });
+
+  it('referencesTo flags coverage.inventory as capped when totalMatches exceeds the 500-row inventory window', async () => {
+    const declarationId =
+      'd1|pkg|src/types.ts|interface|AuditShape|0000000000000001|0000000000000000';
+    const references = Array.from({ length: 600 }, (_, i) => ({
+      referenceId: `r1|src/use${String(i)}.ts|type|${String(i).padStart(16, '0')}|0000000000000000|d1`,
+      kind: 'type' as const,
+      filePath: `src/use${String(i)}.ts`,
+      line: 1,
+      column: 0,
+      endLine: 1,
+      endColumn: 10,
+      package: 'pkg',
+      targetDeclarationId: declarationId,
+      targetPackage: 'pkg',
+      targetName: 'AuditShape',
+      targetKind: 'interface' as const,
+      basis: 'compiler-declaration' as const,
+      confidence: 'high' as const,
+      inTestFile: false,
+      definedInGenerated: false,
+    }));
+    const semanticCatalog: Catalog = {
+      ...seededCatalog('2026-07-12T00:00:00.000Z'),
+      engineMode: 'exact',
+      resolutionMode: 'exact',
+      semanticFacts: {
+        referenceScope: 'cross-file',
+        declarations: [
+          {
+            declarationId,
+            name: 'AuditShape',
+            qualifiedName: 'src/types.AuditShape',
+            kind: 'interface',
+            package: 'pkg',
+            filePath: 'src/types.ts',
+            line: 1,
+            column: 0,
+            endLine: 5,
+            endColumn: 1,
+            visibility: 'exported',
+            exportRole: 'named-export',
+            inTestFile: false,
+            definedInGenerated: false,
+          },
+        ],
+        references,
+        coverage: {
+          status: 'complete',
+          inspectedDeclarations: 1,
+          emittedDeclarations: 1,
+          omittedDeclarations: 0,
+          inspectedReferences: 600,
+          emittedReferences: 600,
+          omittedReferences: 0,
+          reasons: [],
+        },
+      },
+    };
+    new CatalogRepo(store).replaceAll(semanticCatalog);
+    const port = makePort(store);
+
+    const refs = await port.referencesTo(declarationId, { detail: 'summary' });
+    expect(refs.ok).toBe(true);
+    if (!refs.ok) return;
+    expect(refs.value.data.totalMatches).toBe(600);
+    expect(refs.value.coverage.inventory.complete).toBe(false);
+    expect(refs.value.coverage.inventory.reasons).toContain('inventory-cap');
   });
 });

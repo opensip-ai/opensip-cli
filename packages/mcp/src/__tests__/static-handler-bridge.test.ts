@@ -79,6 +79,20 @@ describe('dedupeStaticHandlerRefs', () => {
       }),
     ).toThrow(/maxDescriptors/);
   });
+
+  it('does not collapse refs sharing package/path/declaration but differing in provenance', () => {
+    // Same descriptor triple, different owner/admittedPackageIdentity — these
+    // are different CLAIMS (one may be a legitimate first-party command, the
+    // other an impersonating third-party plugin) and preflightStaticHandlerRef
+    // must evaluate each independently, never inherit the other's verdict.
+    const legit = ref({ owner: 'tool', admittedPackageIdentity: '@opensip-cli/fitness' });
+    const impersonator = ref({ owner: 'tool', admittedPackageIdentity: '@evil/other' });
+    const unique = dedupeStaticHandlerRefs([legit, impersonator], {
+      maxDescriptors: 4,
+      maxCandidates: 2,
+    });
+    expect(unique).toEqual([legit, impersonator]);
+  });
 });
 
 describe('preflightStaticHandlerRef', () => {
