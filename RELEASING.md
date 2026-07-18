@@ -91,6 +91,23 @@ current, generated support-matrix STATUS is never restated in prose here — rea
 from [`docs/public/70-reference/17-supported-platforms.md`](docs/public/70-reference/17-supported-platforms.md),
 which is generated from the one core support registry.
 
+### Relationship to PR / `main` CI
+
+Day-to-day merge gates live in `.github/workflows/ci.yml` (parallel lanes + a
+`build-and-test` aggregator that requires lint, test, dogfood, graph-equivalence,
+policy-and-docs, **and cold-gate**). That workflow is **not** the release pipeline:
+it does not pack, stage, or promote packages. Warm PR lanes share one post-`build-ci`
+workspace artifact; cold-gate stays uncached. See
+[ADR-0168](docs/decisions/ADR-0168-ci-required-surface-and-shared-setup.md) and
+[CONTRIBUTING.md § Continuous Integration](CONTRIBUTING.md#continuous-integration).
+
+Before tagging, treat **green `build-and-test` on `main`** as the merge bar — not a
+single green “test” lane. Locally, release prep still re-runs the correctness gates
+via `pnpm release:preflight` (including **`pnpm test:coverage:fresh`**, not the
+cacheable PR-lane `pnpm test:coverage`). Tag-driven `release.yml` also re-runs
+lint / fresh coverage / dogfood before pack (ADR-0017). Do not treat shared PR CI
+workspace handoff as part of release; release builds its own clean tree.
+
 ### Producer provenance
 
 Ordinary tag releases publish every package with **OIDC trusted publishing** and
