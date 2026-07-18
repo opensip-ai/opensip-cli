@@ -34,4 +34,20 @@ describe('capabilityDiscoveryToCliDiagnostic', () => {
     );
     expect(diag.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_DOMAIN_LOAD_FAILED);
   });
+
+  it('maps an untrusted package denial to the pack-untrusted code with allowlist action', () => {
+    const diag = capabilityDiscoveryToCliDiagnostic(
+      {
+        evt: 'capability.discovery.package_denied',
+        packageName: '@acme/untrusted-fit',
+        message: 'package @acme/untrusted-fit is not allowlisted',
+      },
+      'fit-pack',
+    );
+    expect(diag.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_PACK_UNTRUSTED);
+    expect(diag.category).toBe('discovery');
+    expect(diag.action).toMatch(/allowlist/i);
+    expect(diag.provenance?.packageName).toBe('@acme/untrusted-fit');
+    expect(diag.provenance?.capabilityDomain).toBe('fit-pack');
+  });
 });
