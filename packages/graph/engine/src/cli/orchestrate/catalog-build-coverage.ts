@@ -3,9 +3,42 @@ import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { compareCodePoint } from '@opensip-cli/contracts';
-import { tryCatch } from '@opensip-cli/core';
+import { currentLogger, tryCatch } from '@opensip-cli/core';
 
 import type { CatalogBuildCoverage, ParseError } from '../../types.js';
+
+const MODULE_NAME = 'graph:catalog-build-coverage';
+
+// Local-log bounds: a repo full of unparseable files must not unbound the log
+// line, and a parse diagnostic that echoes source must not land verbatim.
+const PARSE_DROP_FILE_CAP = 20;
+const PARSE_DROP_MESSAGE_CAP = 200;
+
+/** Single-line, length-bounded parse diagnostic — safe for a local log body. */
+function boundedParseMessage(message: string): string {
+  const singleLine = message.replaceAll(/\s+/gu, ' ').trim();
+  return singleLine.length > PARSE_DROP_MESSAGE_CAP
+    ? `${singleLine.slice(0, PARSE_DROP_MESSAGE_CAP)}…`
+    : singleLine;
+}
+
+/**
+ * Name every file the parser dropped, in the run log only. The persisted
+ * coverage payload stays count-only (privacy-safe); this local diagnostic is
+ * the sole place the dropped paths + parser messages appear.
+ */
+function logDroppedParseFiles(parseErrors: readonly ParseError[]): void {
+  if (parseErrors.length === 0) return;
+  currentLogger().warn({
+    evt: 'graph.catalog.parse.dropped',
+    module: MODULE_NAME,
+    count: parseErrors.length,
+    files: parseErrors
+      .slice(0, PARSE_DROP_FILE_CAP)
+      .map((error) => `${error.filePath}: ${boundedParseMessage(error.message)}`),
+    overflow: Math.max(0, parseErrors.length - PARSE_DROP_FILE_CAP),
+  });
+}
 
 /** @throws {Error} When a build input cannot be represented as a safe project-relative path. */
 function safeRelativePath(value: string): string {
@@ -28,7 +61,11 @@ export function graphInputFilesIdentity(files: readonly string[]): string {
   return `sha256:${createHash('sha256').update(JSON.stringify(normalized), 'utf8').digest('hex')}`;
 }
 
-/** Build bounded coverage metadata without retaining parse messages or file paths. */
+/**
+ * Build bounded coverage metadata without retaining parse messages or file
+ * paths. Dropped parse files are named in the local run log (fail-loud) but
+ * never enter the returned, persistable payload.
+ */
 export function catalogBuildCoverage(input: {
   readonly projectRoot: string;
   readonly files: readonly string[];
@@ -63,6 +100,7 @@ export function catalogBuildCoverage(input: {
     .map(projectRelative)
     .filter((file): file is string => file !== undefined);
   const fileSet = new Set(relativeFiles);
+  logDroppedParseFiles(input.parseErrors);
   const parseErrorFiles = new Set(
     input.parseErrors
       .map((error) => projectRelative(error.filePath))
