@@ -464,7 +464,7 @@ function buildUninstallSpec(): HostSpec {
     },
     name: 'uninstall',
     description:
-      'Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.',
+      'Remove user-level OpenSIP state at ~/.opensip-cli/ (config, cache, plugins). Use --project for project-local state.',
     commonFlags: [],
     options: [
       {
@@ -479,7 +479,7 @@ function buildUninstallSpec(): HostSpec {
       },
       {
         flag: '--user',
-        description: 'Remove user-level config at ~/.opensip-cli/ (default mode)',
+        description: 'Remove user-level state at ~/.opensip-cli/ (default mode; crash-recoverable)',
         default: false,
       },
       {
@@ -497,7 +497,7 @@ function buildUninstallSpec(): HostSpec {
       {
         flag: '--discard-recovery',
         description:
-          'With --project --purge: high-risk break-glass that also discards a stuck promotion journal after deleting canonical roots',
+          'Break-glass: with --project --purge discard a stuck promotion journal; with --user unlink only a malformed fixed user-uninstall receipt',
         default: false,
       },
       { flag: '--json', description: 'Output structured JSON', default: false },

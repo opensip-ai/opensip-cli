@@ -3517,7 +3517,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "With --project --purge: high-risk break-glass that also discards a stuck promotion journal after deleting canonical roots",
+          "description": "Break-glass: with --project --purge discard a stuck promotion journal; with --user unlink only a malformed fixed user-uninstall receipt",
           "flags": "--discard-recovery",
           "negate": false,
           "optional": false,
@@ -3567,7 +3567,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
-          "description": "Remove user-level config at ~/.opensip-cli/ (default mode)",
+          "description": "Remove user-level state at ~/.opensip-cli/ (default mode; crash-recoverable)",
           "flags": "--user",
           "negate": false,
           "optional": false,
@@ -3586,7 +3586,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         },
       ],
       "subcommands": [],
-      "synopsis": "Remove user-level config at ~/.opensip-cli/ (cloud API key, defaults). Use --project to remove project-local state instead.",
+      "synopsis": "Remove user-level OpenSIP state at ~/.opensip-cli/ (config, cache, plugins). Use --project for project-local state.",
       "usage": "[options]",
     },
     {

@@ -11,6 +11,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// ensure mkdirSync is available for user-mode HOME layout
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { executeUninstall } from '../commands/uninstall.js';
@@ -39,15 +41,25 @@ function noop(_s: string): void {
 
 describe('executeUninstall — user mode', () => {
   let rootDir: string;
+  let homeDir: string;
+  let priorHome: string | undefined;
 
   beforeEach(() => {
-    rootDir = makeTempDir();
+    priorHome = process.env.HOME;
+    homeDir = makeTempDir();
+    process.env.HOME = homeDir;
+    // User uninstall targets ~/.opensip-cli by default; tests override rootDir
+    // but coordination still keys off HOME.
+    rootDir = join(homeDir, '.opensip-cli');
+    mkdirSync(rootDir, { recursive: true });
     writeFileSync(join(rootDir, 'config.yml'), 'apiKey: secret\n', 'utf8');
   });
 
   afterEach(() => {
+    if (priorHome === undefined) delete process.env.HOME;
+    else process.env.HOME = priorHome;
     try {
-      rmSync(rootDir, { recursive: true, force: true });
+      rmSync(homeDir, { recursive: true, force: true });
     } catch {
       /* ignore */
     }
