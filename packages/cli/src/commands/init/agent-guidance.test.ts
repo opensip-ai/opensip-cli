@@ -232,6 +232,8 @@ describe('ensureOpenSipAgentGuidance', () => {
     );
     expect(agents).toContain('OpenSIP MCP First');
     expect(agents).toContain('list_runs');
+    expect(agents).toContain('list_execution_runs');
+    expect(agents).toContain('no-init capable');
     expect(agents).toContain('opensip audit --json');
     expect(agents).toContain('opensip suite run agent-context');
     expect(agents).toContain('agent-fast');

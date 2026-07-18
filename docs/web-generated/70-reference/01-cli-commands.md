@@ -434,10 +434,19 @@ opensip mcp --allow-mutations    # opt in to repair_apply_verify
 per-query argument (a `symbolId`, a `depth`, a `tool` filter) is an **MCP
 JSON-RPC tool parameter**, not a command-line flag. The equivalent mutation
 environment opt-in is `OPENSIP_MCP_ALLOW_MUTATIONS=1`; read-only remains the
-default. The server reads the project's persisted catalog and sessions from
-`<project>/opensip-cli/.runtime/datastore.sqlite`, so it must be run from inside
-an initialized project (run `opensip init` and at least one `opensip graph`
-first); without a datastore it exits 2 (`MCP.DATASTORE_UNAVAILABLE`).
+default.
+
+`mcp` is **project-scoped and no-init capable** ([ADR-0169](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0169-cache-first-runtime-evidence-continuity.md)):
+before Init it serves the host-selected managed user-cache datastore for the
+discovered project root; after Init it serves project
+`opensip-cli/.runtime/`. It never opens a second datastore, never upgrades a
+weak cache identity, and does not create config. The stdio process holds a
+shared runtime lease for its lifetime, so `opensip init` / uninstall may report
+busy until the client disconnects. Parent execution history is exposed via the
+additive tools `list_execution_runs` / `show_execution_run` (distinct from
+legacy Session-replay `list_runs` / `show_run`). A broken host scope still exits
+with typed `MCP.DATASTORE_UNAVAILABLE` and points at `opensip status --json` —
+it does **not** claim that Init is required.
 
 **Trust model.** stdio binds **no network port and opens no socket**, so there is no auth layer — the server inherits the caller's filesystem trust (the agent runs as you). `refresh_graph` is parse-only (tree-sitter parse + static analysis); it never executes project code or runs build scripts.
 
@@ -697,12 +706,13 @@ opensip graph list --json
 
 ## `report` — open the HTML report
 
-CLI-owned. The cross-tool `report` command lives at the CLI layer (not inside any one tool) because composition walks every tool's `collectReportData` contribution via the tool registry. Renders the most recent run as HTML and opens it in the user's default browser.
+CLI-owned. The cross-tool `report` command lives at the CLI layer (not inside any one tool) because composition walks every tool's `collectReportData` contribution via the tool registry. No-init capable: writes under the managed user cache before Init and project `.runtime` afterward.
 
 ```
 opensip report
 opensip report --no-open
 opensip report --json
+opensip report --run <run-id>
 opensip report --max-catalog-mb 64
 ```
 
@@ -710,6 +720,7 @@ opensip report --max-catalog-mb 64
 |---|---|---|---|
 | `--no-open` | bool | `false` | Write the report but do not launch a browser. |
 | `--json` | bool | `false` | Emit a `{ type: 'report', path, opened }` JSON envelope on stdout instead of the table renderer. In `--json` mode the browser is never launched (machine-output contract). |
+| `--run <run-id>` | string | — | Select an exact retained parent Run for the Change Impact view (works outside recent history). Missing/pruned IDs exit 2 (`CONFIGURATION.REPORT.RUN_NOT_FOUND`); non-audit retained Runs exit 2 (`CONFIGURATION.REPORT.CHANGE_IMPACT_UNAVAILABLE`). Matched selections write a run-addressed artifact under `reports/runs/<sha256>.html` and return/launch that path (not mutable `latest.html`). |
 | `--max-catalog-mb` | number | `8` | Byte budget for the inlined graph catalog, in megabytes. |
 
 ### Report size and the bounded graph catalog
@@ -730,11 +741,12 @@ send someone — a bigger report is slower to open and may be too large to share
 The exhaustive evidence always remains available through `opensip graph` and the
 MCP graph tools, which is the better path for an agent or a deep query.
 
-The report is a single self-contained HTML file at
-`<runtime-root>/reports/latest.html`: managed user cache before initialization,
-project `.runtime` afterward. Each generation overwrites the previous file. The
-command launches the browser and exits; the file works without opensip-cli
-installed, so you can email it directly to a teammate.
+Unselected reports rewrite `<runtime-root>/reports/latest.html` as a convenience
+alias (managed user cache before initialization, project `.runtime` afterward).
+Exact `report --run` / `audit --open` selections write run-addressed files under
+`reports/runs/` and bind browser launch to that path so concurrent selections
+cannot substitute through `latest.html`. The command launches the browser (unless
+`--no-open`/`--json`) and exits; the file works without opensip-cli installed.
 
 **See also:** [`70-reference/06-dashboard.md`](/docs/opensip-cli/70-reference/06-dashboard/), [`80-implementation/03-session-and-persistence.md`](/docs/opensip-cli/80-implementation/03-session-and-persistence/).
 

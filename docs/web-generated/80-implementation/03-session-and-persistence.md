@@ -99,7 +99,8 @@ local runtime or imply that every local file is uploaded.
 ├── datastore.sqlite-shm                        ← shared-memory page (companion to WAL)
 ├── cache/                                      ← AST, graph, and other rebuildable caches
 ├── artifacts/<tool>/                           ← retained raw external-tool artifacts
-├── reports/latest.html                         ← rewritten by every dashboard generation
+├── reports/latest.html                         ← convenience alias for the latest unselected report
+├── reports/runs/<sha256>.html                  ← run-addressed exact `report --run` / audit --open artifact
 ├── logs/<YYYY-MM-DD>.jsonl                     ← one log file per local day, shared across runs
 ├── profiles/                                   ← optional CPU profiles
 └── plugins/                                    ← initialized-project npm plugin hosts
@@ -454,12 +455,16 @@ deletes session rows but leaves logs alone, by design.
 
 ## Reports
 
-The HTML report writes a single self-contained file at
-`<runtime-root>/reports/latest.html`. `opensip report` and `--open` resolve the
-same active runtime as the analysis command, so managed-cache reports work before
-initialization without writing project files. Each generation overwrites the
-previous file—the report is “always show the most recent state,” not a per-run
-archive.
+The HTML report writes self-contained files under `<runtime-root>/reports/`.
+Unselected composition rewrites `latest.html` as a convenience alias. Exact
+`report --run` / `audit --open` selections write run-addressed artifacts under
+`reports/runs/<sha256>.html` (domain-separated hash of the opaque Run ID), return
+and launch that path, and may refresh `latest.html` without sharing the browser
+target. Missing/pruned IDs fail closed; non-audit retained Runs fail as
+change-impact-unavailable. Orphan run-addressed files are pruned best-effort when
+their Run is no longer retained. `opensip report` and `--open` resolve the same
+active runtime as the analysis command, so managed-cache reports work before
+initialization without writing project files.
 
 Composition is owned by the **CLI** ([`packages/cli/src/report-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/report-compose.ts)), the cross-tool composition root. It reads sessions via `SessionRepo.list({ limit: 20 })`, then walks every registered tool's optional `collectReportData(scope)` seam and merges the keyed contributions into one `DashboardInput` — graph returns its `graphCatalog` (via `CatalogRepo.loadCatalogContract()`), fitness returns its catalogs, neither reaching into the other (this is what the `fitness-no-graph` / `graph-no-fitness` layer rules enforce). The merged input is handed to `generateDashboardHtml` ([`@opensip-cli/dashboard`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/generator.ts)), which assembles the inlined HTML (JS via `<script type="module">`, CSS via `<style>`, session/catalog data via `<script type="application/json">`). The output is one self-contained file you can email — no CDN, no asset bundle, no server.
 

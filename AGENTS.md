@@ -9,10 +9,12 @@ This is the **START HERE** document for AI agents working on the OpenSIP CLI cod
 
 When answering questions about existing OpenSIP results, prior `fit` / `graph` / `yagni` / `sim` runs, findings, warnings, errors, scores, sessions, or graph relationships, use the OpenSIP MCP server first.
 
+`opensip mcp` is project-scoped and no-init capable: before Init it serves the managed user-cache evidence for the discovered project root; after Init it serves project `.runtime`. Prefer exact parent **Run** identity via `list_execution_runs` / `show_execution_run` (or CLI `runs`); legacy `list_runs` / `show_run` replay **Tool Session** evidence. Use `report --run <id>` (never “latest”) when an exact parent ID exists.
+
 Source precedence:
 
-1. OpenSIP MCP tools: `get_agent_catalog`, `list_runs`, `show_run`, `get_latest_findings`, `get_architecture`, `search_symbols`, `search_declarations`, `references_to`, `who_calls`, `callees_of`, `blast_radius`, `package_dependencies`, `why_depends`, `package_cycles`, `get_runtime_wiring`.
-2. `opensip sessions ...` replay commands when MCP is unavailable.
+1. OpenSIP MCP tools: `get_agent_catalog`, `list_execution_runs`, `show_execution_run`, `list_runs`, `show_run`, `get_latest_findings`, `get_architecture`, `search_symbols`, `search_declarations`, `references_to`, `who_calls`, `callees_of`, `blast_radius`, `package_dependencies`, `why_depends`, `package_cycles`, `get_runtime_wiring`.
+2. `opensip sessions ...` / `opensip runs ...` replay commands when MCP is unavailable.
 3. Re-run `opensip fit`, `opensip graph`, `opensip yagni`, or `opensip sim` only when fresh execution is explicitly needed.
 4. Raw logs or direct datastore inspection only as a last-resort debugging path.
 
