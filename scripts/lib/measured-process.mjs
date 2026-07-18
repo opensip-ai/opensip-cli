@@ -973,8 +973,6 @@ export async function runMeasuredCommand(input) {
           ),
         input.forceKillSettlementMs ?? FORCE_KILL_SETTLEMENT_MS,
       );
-      child.stdout?.destroy();
-      child.stderr?.destroy();
       const finalObservation = rootClosed ? sampleInFlight : undefined;
       forceSignalPromise = Promise.resolve()
         .then(() => finalObservation)
@@ -982,7 +980,18 @@ export async function runMeasuredCommand(input) {
         .then(() =>
           rootClosed ? terminator.signalAfterRootClose('SIGKILL') : terminator.signal('SIGKILL'),
         )
-        .catch(() => false);
+        .catch(() => false)
+        .finally(() => {
+          // Destroy stdio only AFTER the SIGKILL dispatch. A TERM-ignoring
+          // child that writes from its own signal handler must die of the
+          // uncatchable kill, not of EPIPE against a pre-destroyed pipe: an
+          // EPIPE death closes with a normal exit code and erases the
+          // `signal: 'SIGKILL'` evidence the measured result reports. The
+          // settlement timer above already bounds a child whose stdio never
+          // drains, so late destruction sacrifices nothing.
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+        });
       return forceSignalPromise;
     };
     const beginTermination = (reason, initialSignal = 'SIGTERM') => {
