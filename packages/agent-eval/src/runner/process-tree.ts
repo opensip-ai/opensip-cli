@@ -301,12 +301,28 @@ class DescendantTracker {
       }
       this.rootIdentity = currentRoot;
     }
+    // A Linux root can linger as a zombie whose COMMAND mutates (e.g.
+    // "[MainThread] <defunct>") before its parent reaps it: same pid, group,
+    // session, and start time — different fingerprint. That row is the root's
+    // corpse, not a new process, and it must count as the exit transition; a
+    // sample that sees the zombie and a later sample that sees the reaped
+    // absence would otherwise EACH miss the transition, permanently skipping
+    // the same-group survivor sweep (the silent orphan leak observed on the
+    // Linux CI lanes). True PID reuse (different start time or session) stays
+    // a non-sweeping disappearance — signalling a recycled group could kill
+    // an unrelated process.
+    const zombieOfRoot =
+      currentRoot !== undefined &&
+      currentRoot.startedAt === this.rootIdentity?.startedAt &&
+      currentRoot.processGroupId === this.rootIdentity.processGroupId &&
+      currentRoot.posixSession === this.rootIdentity.posixSession &&
+      currentRoot.commandFingerprint !== this.rootIdentity.commandFingerprint;
     this.rootObservedAlive =
       currentRoot !== undefined &&
       this.rootIdentity !== undefined &&
       sameProcessIdentity(currentRoot, this.rootIdentity);
     if (this.rootObservedAlive) this.everObservedRoot = true;
-    return currentRoot === undefined && rootWasObservedAlive;
+    return rootWasObservedAlive && (currentRoot === undefined || zombieOfRoot);
   }
 
   private validatedTrackedPids(byPid: ReadonlyMap<number, PosixProcessIdentity>): Set<number> {
