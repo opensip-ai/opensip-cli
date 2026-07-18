@@ -111,6 +111,21 @@ function committedTerminal(
   };
 }
 
+function rolledBackTerminal(
+  authority: 'project' | 'cache' | 'none',
+  manifest: RuntimeManifestIdentity | null,
+  sourcePreserved: boolean,
+): NonNullable<RuntimePromotionJournal['terminal']> {
+  return {
+    outcome: 'rolled-back',
+    authority,
+    runtimeManifest: manifest,
+    authoredVerified: true,
+    sourcePreserved,
+    verifiedAt: Date.parse('2026-07-17T12:01:00.000Z'),
+  };
+}
+
 describe('forward filesystem lifecycle', () => {
   it('backs up a verified destination and replays idempotently', async () => {
     const parent = makePrivateDirectory(join(project, 'opensip-cli'));
@@ -707,13 +722,21 @@ function backupCleanupSetup(): CleanupSetup {
 }
 
 describe('terminal cleanup lifecycle', () => {
-  it('cleans a complete leftover runtime stage and replays', async () => {
+  it('cleans a leftover stage after later project-runtime and datastore changes', async () => {
     const source = makePrivateDirectory(join(sandbox, 'cleanup-stage-source'));
     writePrivateFile(join(source, 'evidence.txt'), 'staged-leftover');
     const expected = verifiedRuntime(source);
     const current = makePrivateDirectory(join(project, 'opensip-cli', '.runtime'));
     writePrivateFile(join(current, 'evidence.txt'), 'current-authority');
     const currentManifest = verifiedRuntime(current);
+    const historicalTerminalManifest: RuntimeManifestIdentity = {
+      ...currentManifest.identity,
+      sqlite: {
+        status: 'verified',
+        sha256: 'f'.repeat(64),
+        userVersion: 1,
+      },
+    };
     const journal = makeFilesystemJournal({
       action: 'owned-slot-cleanup',
       projectRoot: project,
@@ -722,8 +745,10 @@ describe('terminal cleanup lifecycle', () => {
       destinationRuntimePreexisting: true,
       cleanupSlot: 'runtimeStage',
       stageManifest: expected.identity,
-      terminal: committedTerminal(currentManifest.identity),
+      terminal: committedTerminal(historicalTerminalManifest),
     });
+    writePrivateFile(join(current, 'later-run.txt'), 'post-close-evidence');
+    expect(verifiedRuntime(current).identity.digest).not.toBe(currentManifest.identity.digest);
     const paths = filesystemPaths(project, journal);
     materializeRuntimeStage(
       source,
@@ -763,6 +788,7 @@ describe('terminal cleanup lifecycle', () => {
       projectRoot: project,
       cleanupSlot: 'destinationParent',
       destinationParentPreexisting: false,
+      terminal: rolledBackTerminal('none', null, false),
     });
     const paths = createOwnedParent(journal);
     const authority = await authorizeFilesystem(
@@ -780,7 +806,7 @@ describe('terminal cleanup lifecycle', () => {
     expect(existsSync(paths.parentMarker)).toBe(false);
   });
 
-  it('resumes an exact cleanup marker without following a replacement link', async () => {
+  it('resumes an exact cleanup marker after revalidating current project authority', async () => {
     const setup = backupCleanupSetup();
     const external = join(sandbox, 'external-evidence.txt');
     writePrivateFile(external, 'must-survive');
@@ -801,7 +827,6 @@ describe('terminal cleanup lifecycle', () => {
     );
     unlinkSync(join(setup.paths.backup, 'old.txt'));
     symlinkSync(external, join(setup.paths.backup, 'old.txt'));
-    rmSync(setup.paths.runtime, { recursive: true, force: true });
     const authority = await authorizeFilesystem(
       project,
       'owned-slot-cleanup',
@@ -815,6 +840,188 @@ describe('terminal cleanup lifecycle', () => {
     });
     expect(existsSync(external)).toBe(true);
     expect(existsSync(setup.paths.backup)).toBe(false);
+    expect(existsSync(cleanupMarker)).toBe(false);
+  });
+
+  it('preserves an exact cleanup marker when project authority is no longer current', async () => {
+    const setup = backupCleanupSetup();
+    const cleanupMarker = join(
+      setup.paths.parent,
+      runtimePromotionCleanupMarkerBasename(setup.journal.owned.destinationBackup.basename),
+    );
+    writeMarker(
+      cleanupMarker,
+      markerForOwnedSlot(
+        setup.journal.operationId,
+        'destinationBackup',
+        'cleanup',
+        setup.backupIdentity,
+        capturePromotionRootIdentity(setup.paths.backup),
+      ),
+    );
+    rmSync(setup.paths.runtime, { recursive: true, force: true });
+    const authority = await authorizeFilesystem(
+      project,
+      'owned-slot-cleanup',
+      makeAuthorityHarness(setup.journal),
+      { cleanupSlot: 'destinationBackup' },
+    );
+
+    await expect(cleanupRuntimePromotionOwnedSlot(authority)).rejects.toThrow();
+    expect(existsSync(setup.paths.backup)).toBe(true);
+    expect(existsSync(cleanupMarker)).toBe(true);
+  });
+
+  it('cleans an owned stage under rolled-back project authority without old-byte equality', async () => {
+    const source = makePrivateDirectory(join(sandbox, 'rolled-back-project-stage'));
+    writePrivateFile(join(source, 'staged.txt'), 'owned-stage');
+    const staged = verifiedRuntime(source);
+    const current = makePrivateDirectory(join(project, 'opensip-cli', '.runtime'));
+    writePrivateFile(join(current, 'current.txt'), 'restored-project-authority');
+    const terminalManifest = verifiedRuntime(current).identity;
+    const journal = makeFilesystemJournal({
+      action: 'owned-slot-cleanup',
+      projectRoot: project,
+      route: 'promote-cache',
+      destinationParentPreexisting: true,
+      destinationRuntimePreexisting: true,
+      cleanupSlot: 'runtimeStage',
+      destinationManifest: terminalManifest,
+      stageManifest: staged.identity,
+      terminal: rolledBackTerminal('project', terminalManifest, true),
+    });
+    const paths = filesystemPaths(project, journal);
+    materializeRuntimeStage(
+      source,
+      paths.parent,
+      journal.owned.runtimeStage.basename,
+      inspectRuntimeTree(source, 'project-runtime'),
+      stageOwnership(journal),
+    );
+    writePrivateFile(join(current, 'later-run.txt'), 'new-project-evidence');
+    expect(verifiedRuntime(current).identity.digest).not.toBe(terminalManifest.digest);
+    const authority = await authorizeFilesystem(
+      project,
+      'owned-slot-cleanup',
+      makeAuthorityHarness(journal),
+      { cleanupSlot: 'runtimeStage' },
+    );
+
+    await expect(cleanupRuntimePromotionOwnedSlot(authority)).resolves.toEqual({
+      slot: 'runtimeStage',
+      status: 'removed',
+    });
+    expect(existsSync(paths.runtime)).toBe(true);
+    expect(existsSync(paths.stage)).toBe(false);
+  });
+
+  it('cleans an owned stage under rolled-back cache authority', async () => {
+    const cacheKey = '3'.repeat(24);
+    const cacheParent = makePrivateDirectory(resolveUserPaths().ephemeralProjectsDir);
+    const current = makePrivateDirectory(join(cacheParent, cacheKey));
+    writePrivateFile(join(current, 'current.txt'), 'restored-cache-authority');
+    const terminalManifest = verifiedRuntime(current, 'cache-source').identity;
+    const source = makePrivateDirectory(join(sandbox, 'rolled-back-cache-stage'));
+    writePrivateFile(join(source, 'staged.txt'), 'owned-stage');
+    const staged = verifiedRuntime(source);
+    makePrivateDirectory(join(project, 'opensip-cli'));
+    const journal = makeFilesystemJournal({
+      action: 'owned-slot-cleanup',
+      projectRoot: project,
+      route: 'promote-cache',
+      source: {
+        classification: 'legacy',
+        cacheKey,
+        generationDigest: null,
+        markerSha256: null,
+      },
+      sourceManifest: terminalManifest,
+      stageManifest: staged.identity,
+      cleanupSlot: 'runtimeStage',
+      terminal: rolledBackTerminal('cache', terminalManifest, true),
+    });
+    const paths = filesystemPaths(project, journal);
+    materializeRuntimeStage(
+      source,
+      paths.parent,
+      journal.owned.runtimeStage.basename,
+      inspectRuntimeTree(source, 'project-runtime'),
+      stageOwnership(journal),
+    );
+    const authority = await authorizeFilesystem(
+      project,
+      'owned-slot-cleanup',
+      makeAuthorityHarness(journal),
+      {
+        cleanupSlot: 'runtimeStage',
+        sourceRuntime: realpathSync(current),
+      },
+    );
+
+    await expect(cleanupRuntimePromotionOwnedSlot(authority)).resolves.toEqual({
+      slot: 'runtimeStage',
+      status: 'removed',
+    });
+    expect(existsSync(current)).toBe(true);
+    expect(existsSync(paths.stage)).toBe(false);
+  });
+
+  it('does not discard a runtime tree when closed authority is runtime-free', async () => {
+    const source = makePrivateDirectory(join(sandbox, 'runtime-free-stage'));
+    writePrivateFile(join(source, 'staged.txt'), 'must-survive');
+    const staged = verifiedRuntime(source);
+    makePrivateDirectory(join(project, 'opensip-cli'));
+    const journal = makeFilesystemJournal({
+      action: 'owned-slot-cleanup',
+      projectRoot: project,
+      route: 'authored-only',
+      cleanupSlot: 'runtimeStage',
+      stageManifest: staged.identity,
+      terminal: rolledBackTerminal('none', null, false),
+    });
+    const paths = filesystemPaths(project, journal);
+    materializeRuntimeStage(
+      source,
+      paths.parent,
+      journal.owned.runtimeStage.basename,
+      inspectRuntimeTree(source, 'project-runtime'),
+      stageOwnership(journal),
+    );
+    const authority = await authorizeFilesystem(
+      project,
+      'owned-slot-cleanup',
+      makeAuthorityHarness(journal),
+      { cleanupSlot: 'runtimeStage' },
+    );
+
+    await expect(cleanupRuntimePromotionOwnedSlot(authority)).rejects.toThrow(/runtime-free/u);
+    expect(existsSync(paths.stage)).toBe(true);
+
+    const cleanupMarker = join(
+      paths.parent,
+      runtimePromotionCleanupMarkerBasename(journal.owned.runtimeStage.basename),
+    );
+    writeMarker(
+      cleanupMarker,
+      markerForOwnedSlot(
+        journal.operationId,
+        'runtimeStage',
+        'cleanup',
+        staged.identity,
+        capturePromotionRootIdentity(paths.stage),
+      ),
+    );
+    rmSync(paths.stage, { recursive: true, force: true });
+    const markerOnly = await authorizeFilesystem(
+      project,
+      'owned-slot-cleanup',
+      makeAuthorityHarness(journal),
+      { cleanupSlot: 'runtimeStage' },
+    );
+    await expect(cleanupRuntimePromotionOwnedSlot(markerOnly)).resolves.toEqual({
+      slot: 'runtimeStage',
+      status: 'already-absent',
+    });
     expect(existsSync(cleanupMarker)).toBe(false);
   });
 

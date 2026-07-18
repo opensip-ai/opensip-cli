@@ -11,13 +11,20 @@ import {
   validateAuthoredArtifacts,
 } from './authored-state-transaction-artifacts.js';
 import {
+  assertAuthoredCleanupEvidenceArtifact,
+  ensureAuthoredCleanupEvidence,
+  readAuthoredCleanupEvidence,
+} from './authored-state-transaction-cleanup-evidence.js';
+import {
   authoredBlobAvailability,
   authoredExecutionOrder,
   executionIndex,
 } from './authored-state-transaction-execution.js';
 import {
   assertAuthoredRootMatchesPromotionAuthority,
+  assertStableAuthoredEntry,
   authoredTransactionFailure,
+  bindStableAuthoredEntry,
   bindStableAuthoredRoot,
   transactionAuthoredRoot,
 } from './authored-state-transaction-fs.js';
@@ -230,12 +237,37 @@ async function finishPrepare(
     );
     outcome = 'applied';
   }
+  const replayAuthority = bindStableAuthoredEntry(
+    state.paths.replayManifest,
+    'file',
+    'the authored replay manifest',
+  );
+  const identityArtifacts = [
+    ['authoredStage', materializationAuthority.stage.root],
+    ['authoredBackup', materializationAuthority.backup.root],
+    ['replayManifest', replayAuthority],
+  ] as const;
+  for (const [slot, artifact] of identityArtifacts) {
+    ensureAuthoredCleanupEvidence(root, current, slot, artifact);
+  }
+  const assertIdentityEvidence = (): void => {
+    for (const [slot, artifact] of identityArtifacts) {
+      assertStableAuthoredEntry(artifact, 'the authored cleanup artifact');
+      const evidence = readAuthoredCleanupEvidence(root, current, slot);
+      if (evidence === null) {
+        authoredTransactionFailure('prepared authored identity evidence is absent');
+      }
+      assertAuthoredCleanupEvidenceArtifact(evidence, artifact);
+    }
+  };
   const validateMaterializedArtifacts = (): void => {
     assertAuthoredMaterializationAuthority(materializationAuthority);
+    assertIdentityEvidence();
     validateAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths, {
       desiredConsumed: new Set(),
       preimageConsumed: new Set(),
     });
+    assertIdentityEvidence();
     assertAuthoredMaterializationAuthority(materializationAuthority);
   };
   validateMaterializedArtifacts();

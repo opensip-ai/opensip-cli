@@ -122,8 +122,9 @@ function cleanupRuntimeStage(
   const parent = openExactDestinationParent(state);
   try {
     const cleanupPath = cleanupMarkerPath(parent, state.journal.owned.runtimeStage.basename);
+    const stagePresence = artifactPresence(state.paths.runtimeStage);
     if (
-      artifactPresence(state.paths.runtimeStage) === 'absent' &&
+      stagePresence === 'absent' &&
       inspectBoundOwnedMarker(
         cleanupPath,
         state.paths.runtimeStage,
@@ -135,6 +136,7 @@ function cleanupRuntimeStage(
     ) {
       return CLEANUP_ALREADY_ABSENT;
     }
+    if (stagePresence === 'directory') verifyCurrentTerminalAuthority(state);
     return cleanupOwnedRuntimeTree({
       state,
       parent,
@@ -142,7 +144,7 @@ function cleanupRuntimeStage(
       slot: 'runtimeStage',
       expected,
       verifyBefore: () => {
-        verifyCurrentProjectSuccessor(state);
+        verifyCurrentTerminalAuthority(state);
         verifyCompleteOwnedStage(state, expected);
       },
     })
@@ -164,26 +166,41 @@ interface ExternalTreeCleanupInput {
 }
 
 /**
- * Generic recovery cleanup deliberately proves a valid current successor, not
- * historical byte equality: ordinary runs may have changed the project runtime
- * after the promotion journal closed.
+ * Closed cleanup checks only that the final authority still occupies its
+ * canonical directory. Its contents are no longer historical journal
+ * authority and may have changed after the journal closed.
  */
-function verifyCurrentProjectSuccessor(state: RuntimePromotionFilesystemCapabilityState): void {
+function verifyCurrentTerminalAuthority(state: RuntimePromotionFilesystemCapabilityState): void {
   const terminal = state.journal.terminal;
-  if (
-    terminal?.outcome !== 'committed' ||
-    terminal.authority !== 'project' ||
-    terminal.runtimeManifest === null
-  ) {
-    runtimePromotionFilesystemFailure('owned cleanup lacks committed project successor authority');
+  if (state.journal.state !== 'closed' || terminal === null) {
+    runtimePromotionFilesystemFailure('owned cleanup lacks closed terminal authority');
   }
-  const current = inspectVerifiedRuntimeManifest(state.paths.destinationRuntime, 'project-runtime');
-  if (
-    terminal.runtimeManifest.sqlite.status === 'verified' &&
-    current.identity.sqlite.status !== 'verified'
-  ) {
+
+  if (terminal.authority === 'none') {
+    if (terminal.runtimeManifest !== null) {
+      runtimePromotionFilesystemFailure('runtime-free terminal authority retained a manifest');
+    }
     runtimePromotionFilesystemFailure(
-      'owned cleanup cannot discard the last database-bearing authority',
+      'runtime-free terminal authority cannot discard an owned runtime tree',
+    );
+  }
+
+  if (terminal.runtimeManifest === null) {
+    runtimePromotionFilesystemFailure('terminal runtime authority lacks its manifest');
+  }
+
+  if (terminal.authority === 'cache') {
+    if (state.sourceParent === undefined || state.paths.sourceRuntime === undefined) {
+      runtimePromotionFilesystemFailure('owned cleanup lacks canonical cache runtime authority');
+    }
+    if (classifyRuntimePromotionPath(state.paths.sourceRuntime).status !== 'directory') {
+      runtimePromotionFilesystemFailure(
+        'the canonical cache runtime authority is no longer a directory',
+      );
+    }
+  } else if (classifyRuntimePromotionPath(state.paths.destinationRuntime).status !== 'directory') {
+    runtimePromotionFilesystemFailure(
+      'the canonical project runtime authority is no longer a directory',
     );
   }
 }
@@ -231,6 +248,7 @@ function cleanupExternalOwnedTree(
   if (cleanupState.status !== 'exact' && ownerState.status !== 'exact') {
     runtimePromotionFilesystemFailure('an owned cleanup root has no durable owner');
   }
+  if (root === 'directory') verifyCurrentTerminalAuthority(input.state);
   if (ownerState.status === 'exact') {
     ensureDurableExactPromotionMarker(
       input.parent,
@@ -254,7 +272,7 @@ function cleanupExternalOwnedTree(
         }
       : {}),
     verifyBefore: () => {
-      verifyCurrentProjectSuccessor(input.state);
+      verifyCurrentTerminalAuthority(input.state);
       if (
         inspectBoundOwnedMarker(
           input.ownerPath,

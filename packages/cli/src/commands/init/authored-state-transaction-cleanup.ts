@@ -2,6 +2,7 @@ import { lstatSync, unlinkSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import {
+  assertAuthoredCleanupEvidenceArtifact,
   assertAuthoredCleanupEvidenceAbsent,
   readAuthoredCleanupEvidence,
   removeAuthoredCleanupEvidence,
@@ -49,9 +50,7 @@ export function assertAuthoredArtifactAbsent(
   slot: AuthoredArtifactSlot,
 ): void {
   assertAuthoredArtifactPathAbsent(root, paths, slot);
-  if (slot === 'authoredStage' || slot === 'authoredBackup') {
-    assertAuthoredCleanupEvidenceAbsent(root, journal, slot);
-  }
+  assertAuthoredCleanupEvidenceAbsent(root, journal, slot);
 }
 
 export function assertAuthoredArtifactPathAbsent(
@@ -81,7 +80,6 @@ export function finalizeAuthoredCleanupEvidence(
   slot: AuthoredArtifactSlot,
   checkpoint: (checkpoint: AuthoredStateCheckpoint) => void,
 ): void {
-  if (slot !== 'authoredStage' && slot !== 'authoredBackup') return;
   assertAuthoredArtifactPathAbsent(root, paths, slot);
   const evidence = readAuthoredCleanupEvidence(root, journal, slot);
   if (evidence === null) return;
@@ -116,15 +114,25 @@ export function removeAuthoredArtifact(
     if (hasCode(error, 'ENOENT')) {
       checkpoint('after-cleanup-artifact-observation');
       assertAuthoredArtifactPathAbsent(root, paths, slot);
+      const evidence = readAuthoredCleanupEvidence(root, journal, slot);
+      if (evidence === null) {
+        authoredTransactionFailure('an absent authored artifact has no durable identity evidence');
+      }
       return 'absent';
     }
     throw error;
   }
   if (slot === 'replayManifest') {
     const replayIdentity = bindStableAuthoredEntry(path, 'file', 'the authored replay manifest');
+    const evidence = readAuthoredCleanupEvidence(root, journal, slot);
+    if (evidence === null) {
+      authoredTransactionFailure('the authored replay manifest has no durable identity evidence');
+    }
+    assertAuthoredCleanupEvidenceArtifact(evidence, replayIdentity);
     checkpoint('after-cleanup-artifact-observation');
     assertStableAuthoredRoot(root);
     assertStableAuthoredEntry(replayIdentity, 'the authored replay manifest');
+    assertAuthoredCleanupEvidenceArtifact(evidence, replayIdentity);
     const replay = readStableArtifactFile(path);
     if (replay.mode !== 0o600 || replay.digest !== journal.plan.replayDigest) {
       authoredTransactionFailure('cleanup refused a changed replay manifest');
@@ -132,6 +140,7 @@ export function removeAuthoredArtifact(
     checkpoint('after-cleanup-artifact-read');
     assertStableAuthoredRoot(root);
     assertStableAuthoredEntry(replayIdentity, 'the authored replay manifest');
+    assertAuthoredCleanupEvidenceArtifact(evidence, replayIdentity);
     checkpoint('before-cleanup-entry-unlink');
     assertStableAuthoredRoot(root);
     assertStableAuthoredEntry(replayIdentity, 'the authored replay manifest');

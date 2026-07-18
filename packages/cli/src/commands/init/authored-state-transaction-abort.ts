@@ -136,7 +136,7 @@ export async function abortPendingAuthoredPreparation(
   };
   const assertArtifactsAbsent = (): void => {
     assertAbortProjectRoot(input, root);
-    assertIncompleteAuthoredArtifactsAbsent(root, replay.paths);
+    assertIncompleteAuthoredArtifactsAbsent(root, journal, replay.paths);
     if (settleAuthoredReplayPublication(root, journal, replay.paths).status !== 'absent') {
       authoredTransactionFailure('an aborted authored preparation retained its replay manifest');
     }

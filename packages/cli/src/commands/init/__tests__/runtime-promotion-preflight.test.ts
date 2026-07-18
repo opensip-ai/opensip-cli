@@ -22,6 +22,7 @@ import {
   EPHEMERAL_MARKER_FILE,
   EPHEMERAL_MARKER_VERSION,
   legacyEphemeralProjectCacheKey,
+  projectCoordinationKey,
   resolveCoordinationPaths,
   resolveEphemeralProjectPaths,
   resolveProjectPaths,
@@ -47,9 +48,14 @@ import {
   createInitialRuntimePromotionJournal,
   createRuntimePromotionOwnedSlots,
   type RuntimeManifestIdentity,
+  type RuntimePromotionSource,
 } from '../runtime-promotion-journal-schema.js';
 import { bindRuntimePromotionDatastoreSet } from '../runtime-promotion-preflight-datastore-authority.js';
-import { inspectRuntimePromotionFilesystem } from '../runtime-promotion-preflight-fs.js';
+import {
+  assertRuntimePromotionRecoverySourceAuthority,
+  assertRuntimePromotionRecoverySourceLocation,
+  inspectRuntimePromotionFilesystem,
+} from '../runtime-promotion-preflight-fs.js';
 import {
   assertRuntimePromotionPreflightUnchanged,
   assertRuntimePromotionSourceRetirementUnchanged,
@@ -63,6 +69,7 @@ import {
 import {
   assertRuntimePromotionProjectRootAuthority,
   captureRuntimePromotionProjectRootAuthority,
+  captureRuntimePromotionRecoveryProjectRootAuthority,
 } from '../runtime-promotion-root-authority.js';
 
 import type { DurableOpenPromotionJournal } from '../runtime-promotion-journal.js';
@@ -102,6 +109,33 @@ function matchingLease(projectRoot = project): RuntimeExclusiveLease {
     ownerToken: 'preflight-test-owner-0001',
     acquiredAt: NOW,
     release: () => undefined,
+  };
+}
+
+function matchingRecoveryLease(projectRoot = project): RuntimeExclusiveLease {
+  return {
+    kind: 'runtime-exclusive',
+    coordinationKey: projectCoordinationKey(projectRoot),
+    posture: 'init-recovery',
+    ownerToken: 'preflight-recovery-owner-0001',
+    acquiredAt: NOW,
+    release: () => undefined,
+  };
+}
+
+function recordedSource(
+  paths: ReturnType<typeof resolveEphemeralProjectPaths>,
+  classification: RuntimePromotionSource['classification'] = paths.identityStrength,
+): RuntimePromotionSource {
+  const markerSha256 = createHash('sha256')
+    .update(readFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE)))
+    .digest('hex');
+  return {
+    classification,
+    cacheKey: paths.cacheKey,
+    generationDigest:
+      classification === 'generation-bound' ? (paths.generationDigest ?? null) : null,
+    markerSha256,
   };
 }
 
@@ -533,6 +567,38 @@ describe('attempt-local project-root authority', () => {
       expect.objectContaining({ reason: 'changed-after-preflight' }),
     );
   });
+
+  it('does not bind an operation-created destination parent during recovery', () => {
+    makeDirectory(join(project, 'opensip-cli'));
+    const lease = matchingRecoveryLease(project);
+    const ownedParentAuthority = captureRuntimePromotionRecoveryProjectRootAuthority({
+      lease,
+      projectRoot: project,
+      destinationParentPreexisting: false,
+    });
+    const preexistingParentAuthority = captureRuntimePromotionRecoveryProjectRootAuthority({
+      lease,
+      projectRoot: project,
+      destinationParentPreexisting: true,
+    });
+
+    expect(ownedParentAuthority.destinationParent).toBeNull();
+    expect(preexistingParentAuthority.destinationParent).not.toBeNull();
+  });
+
+  it('rejects a now-absent destination parent recorded as preexisting', () => {
+    const destinationParent = makeDirectory(join(project, 'opensip-cli'));
+    const lease = matchingRecoveryLease(project);
+    rmSync(destinationParent, { recursive: true, force: true });
+
+    expect(() =>
+      captureRuntimePromotionRecoveryProjectRootAuthority({
+        lease,
+        projectRoot: project,
+        destinationParentPreexisting: true,
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+  });
 });
 
 describe('read-only runtime authority preflight', () => {
@@ -836,6 +902,280 @@ describe('read-only runtime authority preflight', () => {
         proof,
       }),
     ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+  });
+});
+
+describe('recovery source-marker authority', () => {
+  it('lets closed cleanup prove only the recorded canonical source location and type', () => {
+    const paths = activeRuntime('closed-location');
+    const source = recordedSource(paths);
+    const markerPath = join(paths.runtimeDir, EPHEMERAL_MARKER_FILE);
+    writeFileSync(markerPath, `${readFileSync(markerPath, 'utf8')} `);
+
+    expect(() =>
+      assertRuntimePromotionRecoverySourceLocation({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingRecoveryLease(),
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+  });
+
+  it('accepts exact generation-bound and path-only sources without resolving new defaults', () => {
+    const generationBound = activeRuntime('strong');
+    expect(generationBound.identityStrength).toBe('generation-bound');
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: generationBound.runtimeDir,
+        source: recordedSource(generationBound),
+        lease: matchingRecoveryLease(),
+      }),
+    ).not.toThrow();
+
+    rmSync(generationBound.runtimeDir, { recursive: true, force: true });
+    symlinkSync('missing-gitdir', join(project, '.git'));
+    const pathOnly = activeRuntime('weak');
+    expect(pathOnly.identityStrength).toBe('path-only');
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: pathOnly.runtimeDir,
+        source: recordedSource(pathOnly),
+        lease: matchingRecoveryLease(),
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts the exact recorded weak form of a legacy-classified current marker', () => {
+    const paths = activeRuntime('legacy-current');
+    const markerPath = join(paths.runtimeDir, EPHEMERAL_MARKER_FILE);
+    const marker = JSON.parse(readFileSync(markerPath, 'utf8')) as Record<string, unknown>;
+    marker.generationDigest = 'f'.repeat(64);
+    writeFileSync(markerPath, JSON.stringify(marker), { mode: 0o644 });
+    if (process.platform !== 'win32') chmodSync(markerPath, 0o644);
+
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source: recordedSource(paths, 'legacy'),
+        lease: matchingRecoveryLease(),
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects aliases, non-recovery leases, and source paths not derived from the cache key', () => {
+    const paths = activeRuntime('authority');
+    const source = recordedSource(paths);
+    const alias = join(home, 'project-alias');
+    symlinkSync(project, alias, 'dir');
+
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: alias,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingRecoveryLease(alias),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'lease-mismatch' }));
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: join(resolveUserPaths().ephemeralProjectsDir, 'f'.repeat(24)),
+        source,
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source: { ...source, cacheKey: '../untrusted-cache-key' },
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+  });
+
+  it('requires the exact marker digest, project root, and current identity generation', () => {
+    const paths = activeRuntime('marker');
+    const source = recordedSource(paths);
+    const markerPath = join(paths.runtimeDir, EPHEMERAL_MARKER_FILE);
+    writeFileSync(markerPath, `${readFileSync(markerPath, 'utf8')} `);
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+
+    rmSync(paths.runtimeDir, { recursive: true, force: true });
+    const wrongProject = activeRuntime('wrong-project');
+    const wrongProjectMarkerPath = join(wrongProject.runtimeDir, EPHEMERAL_MARKER_FILE);
+    const wrongProjectMarker = JSON.parse(readFileSync(wrongProjectMarkerPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    wrongProjectMarker.projectDir = home;
+    writeFileSync(wrongProjectMarkerPath, JSON.stringify(wrongProjectMarker), {
+      mode: 0o644,
+    });
+    if (process.platform !== 'win32') chmodSync(wrongProjectMarkerPath, 0o644);
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: wrongProject.runtimeDir,
+        source: recordedSource(wrongProject),
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+
+    rmSync(wrongProject.runtimeDir, { recursive: true, force: true });
+    const wrongGeneration = activeRuntime('wrong-generation');
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: wrongGeneration.runtimeDir,
+        source: {
+          ...recordedSource(wrongGeneration),
+          generationDigest: '0'.repeat(64),
+        },
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+  });
+
+  it('re-reads the marker and rejects marker or source-directory replacement races', () => {
+    const markerChanged = activeRuntime('marker-race');
+    const markerPath = join(markerChanged.runtimeDir, EPHEMERAL_MARKER_FILE);
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority(
+        {
+          projectRoot: project,
+          sourceRuntime: markerChanged.runtimeDir,
+          source: recordedSource(markerChanged),
+          lease: matchingRecoveryLease(),
+        },
+        {
+          afterMarkerRead: () => {
+            writeFileSync(markerPath, `${readFileSync(markerPath, 'utf8')} `);
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+
+    rmSync(markerChanged.runtimeDir, { recursive: true, force: true });
+    const directoryChanged = activeRuntime('directory-race');
+    const originalMarker = readFileSync(
+      join(directoryChanged.runtimeDir, EPHEMERAL_MARKER_FILE),
+      'utf8',
+    );
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority(
+        {
+          projectRoot: project,
+          sourceRuntime: directoryChanged.runtimeDir,
+          source: recordedSource(directoryChanged),
+          lease: matchingRecoveryLease(),
+        },
+        {
+          afterMarkerRead: () => {
+            renameSync(directoryChanged.runtimeDir, `${directoryChanged.runtimeDir}-replaced`);
+            makeDirectory(directoryChanged.runtimeDir);
+            writeFileSync(
+              join(directoryChanged.runtimeDir, EPHEMERAL_MARKER_FILE),
+              originalMarker,
+              { mode: 0o644 },
+            );
+          },
+        },
+      ),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+  });
+
+  it('keeps both marker reads anchored to the cache root selected at entry', () => {
+    const paths = activeRuntime('fixed-root');
+    const alternateHome = makeDirectory(join(home, 'alternate-home'));
+    try {
+      expect(() =>
+        assertRuntimePromotionRecoverySourceAuthority(
+          {
+            projectRoot: project,
+            sourceRuntime: paths.runtimeDir,
+            source: recordedSource(paths),
+            lease: matchingRecoveryLease(),
+          },
+          {
+            afterMarkerRead: () => {
+              process.env.HOME = alternateHome;
+            },
+          },
+        ),
+      ).not.toThrow();
+    } finally {
+      process.env.HOME = home;
+    }
+  });
+
+  it('rejects an absent, symlinked, or permission-unsafe source root', () => {
+    const paths = activeRuntime('unsafe-root');
+    const source = recordedSource(paths);
+    const markerBytes = readFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), 'utf8');
+    rmSync(paths.runtimeDir, { recursive: true, force: true });
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+
+    const foreign = makeDirectory(join(home, 'foreign-runtime'));
+    symlinkSync(foreign, paths.runtimeDir, 'dir');
+    expect(() =>
+      assertRuntimePromotionRecoverySourceAuthority({
+        projectRoot: project,
+        sourceRuntime: paths.runtimeDir,
+        source,
+        lease: matchingRecoveryLease(),
+      }),
+    ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+
+    rmSync(paths.runtimeDir);
+    makeDirectory(paths.runtimeDir, 0o777);
+    writeFileSync(join(paths.runtimeDir, EPHEMERAL_MARKER_FILE), markerBytes, {
+      mode: 0o644,
+    });
+    if (process.platform !== 'win32') {
+      expect(() =>
+        assertRuntimePromotionRecoverySourceAuthority({
+          projectRoot: project,
+          sourceRuntime: paths.runtimeDir,
+          source,
+          lease: matchingRecoveryLease(),
+        }),
+      ).toThrow(expect.objectContaining({ reason: 'changed-after-preflight' }));
+    }
   });
 });
 

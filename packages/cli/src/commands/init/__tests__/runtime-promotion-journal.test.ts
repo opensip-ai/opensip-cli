@@ -22,6 +22,7 @@ import {
 } from '../runtime-promotion-journal-schema.js';
 import {
   createRuntimePromotionJournalController,
+  handoffRuntimePromotionRecoveryOwner,
   RUNTIME_PROMOTION_JOURNAL_FILE,
   type PromotionJournalIdentity,
   type RuntimePromotionJournalCheckpoint,
@@ -578,29 +579,55 @@ describe('runtime promotion journal controller', () => {
     });
   });
 
-  it('durably hands recovery ownership to one new attempt', async () => {
+  it('canonically hands an open journal to one new recovery owner', async () => {
     const harness = createHarness();
     const receipt = await createOpen(harness);
-    const next = await harness.controller.handoffRecoveryOwner(receipt, (record, identity) => ({
-      ...record,
-      revision: record.revision + 1,
-      recoveryOwnerToken: identity.recoveryOwnerToken,
-      recoveryAttempt: record.recoveryAttempt + 1,
-      timestamps: {
-        ...record.timestamps,
-        updatedAt: identity.claimedAt,
-      },
-    }));
+    const current = await harness.controller.verifyOpen(receipt);
+    const next = await handoffRuntimePromotionRecoveryOwner(harness.controller, receipt);
 
-    expect(next).toMatchObject({
+    await expect(harness.controller.verifyReceipt(next)).resolves.toStrictEqual({
+      ...current,
+      revision: current.revision + 1,
       recoveryOwnerToken: 'recovery-owner-000000000002',
-      revision: 1,
+      recoveryAttempt: current.recoveryAttempt + 1,
+      timestamps: {
+        ...current.timestamps,
+        updatedAt: 101,
+      },
     });
     await expect(harness.controller.verifyOpen(receipt)).rejects.toMatchObject({
       code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
     });
-    await expect(harness.controller.verifyReceipt(next)).resolves.toMatchObject({
-      recoveryAttempt: 2,
+  });
+
+  it('canonically hands a closed journal to one new recovery owner', async () => {
+    const closed = closedJournal(
+      committedJournal(
+        authorityVerifiedJournal({
+          operationId: 'closed-handoff-operation-0001',
+          recoveryOwnerToken: 'closed-handoff-owner-0000001',
+          createdAt: 1,
+        }),
+      ),
+    );
+    const harness = createHarness(encodeRuntimePromotionJournal(closed));
+    const receipt = await harness.controller.claim(closed.operationId);
+    if (receipt.state !== 'closed') throw new Error('expected closed test receipt');
+    const next = await handoffRuntimePromotionRecoveryOwner(harness.controller, receipt);
+
+    expect(next.state).toBe('closed');
+    await expect(harness.controller.verifyReceipt(next)).resolves.toStrictEqual({
+      ...closed,
+      revision: closed.revision + 1,
+      recoveryOwnerToken: 'recovery-owner-000000000001',
+      recoveryAttempt: closed.recoveryAttempt + 1,
+      timestamps: {
+        ...closed.timestamps,
+        updatedAt: 100,
+      },
+    });
+    await expect(harness.controller.verifyReceipt(receipt)).rejects.toMatchObject({
+      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
     });
   });
 

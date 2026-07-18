@@ -134,10 +134,8 @@ export interface RuntimeAuthoredMutationSummary {
  * Public Init adoption result. It deliberately carries no runtime path,
  * manifest digest, journal token, or arbitrary exception text.
  */
-export interface RuntimeAdoptionResult {
-  readonly status: RuntimeAdoptionStatus;
+interface RuntimeAdoptionResultBase {
   readonly proofStrength?: RuntimeIdentityStrength;
-  readonly sourcePreserved: boolean;
   readonly sourceRetired?: boolean;
   readonly cleanupPending?: boolean;
   readonly authored?: RuntimeAuthoredMutationSummary;
@@ -145,6 +143,20 @@ export interface RuntimeAdoptionResult {
   readonly reasonCode?: RuntimeAdoptionReasonCode;
   readonly nextCommand?: RuntimeRecoveryCommand;
 }
+
+/** Public Init adoption result, with source disposition required whenever known. */
+export type RuntimeAdoptionResult = RuntimeAdoptionResultBase &
+  (
+    | {
+        readonly status: Extract<RuntimeAdoptionStatus, 'busy' | 'conflict' | 'recovery-required'>;
+        /** Omitted when recovery cannot prove the source's current disposition. */
+        readonly sourcePreserved?: boolean;
+      }
+    | {
+        readonly status: Exclude<RuntimeAdoptionStatus, 'busy' | 'conflict' | 'recovery-required'>;
+        readonly sourcePreserved: boolean;
+      }
+  );
 
 interface RuntimeStatusBase {
   readonly type: 'runtime-status';

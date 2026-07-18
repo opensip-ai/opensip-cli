@@ -36,14 +36,14 @@ const EVIDENCE_KEYS = [
 const IDENTITY_KEYS = ['dev', 'ino', 'uid', 'mode'] as const;
 const CANONICAL_NONNEGATIVE_INTEGER = /^(?:0|[1-9]\d*)$/u;
 
-type AuthoredBlobSlot = 'authoredStage' | 'authoredBackup';
+export type AuthoredCleanupEvidenceSlot = 'authoredStage' | 'authoredBackup' | 'replayManifest';
 
 interface AuthoredCleanupEvidenceRecord {
   readonly kind: typeof CLEANUP_EVIDENCE_KIND;
   readonly version: typeof CLEANUP_EVIDENCE_VERSION;
   readonly operationId: string;
   readonly ownershipId: string;
-  readonly slot: AuthoredBlobSlot;
+  readonly slot: AuthoredCleanupEvidenceSlot;
   readonly artifactBasename: string;
   readonly artifactIdentity: {
     readonly dev: string;
@@ -64,14 +64,16 @@ export interface AuthoredCleanupEvidence {
 
 function slotIdentity(
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
 ): RuntimePromotionJournal['owned']['authoredStage'] {
-  return slot === 'authoredStage' ? journal.owned.authoredStage : journal.owned.authoredBackup;
+  if (slot === 'authoredStage') return journal.owned.authoredStage;
+  if (slot === 'authoredBackup') return journal.owned.authoredBackup;
+  return journal.owned.replayManifest;
 }
 
 function evidenceDigest(
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
   domain: string,
 ): string {
   const owned = slotIdentity(journal, slot);
@@ -88,7 +90,7 @@ function evidenceDigest(
 
 export function authoredCleanupEvidenceBasename(
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
 ): string {
   return `.opensip-init-authored-cleanup-${evidenceDigest(
     journal,
@@ -99,7 +101,7 @@ export function authoredCleanupEvidenceBasename(
 
 function cleanupEvidenceCreateIdentity(
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
 ): string {
   return `authored-cleanup-${evidenceDigest(
     journal,
@@ -121,11 +123,12 @@ function rootIdentity(
 
 function recordFor(
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
-  artifactRoot: StableAuthoredEntry,
+  slot: AuthoredCleanupEvidenceSlot,
+  artifact: StableAuthoredEntry,
 ): AuthoredCleanupEvidenceRecord {
-  if (artifactRoot.type !== 'directory') {
-    authoredTransactionFailure('authored cleanup evidence requires a directory authority');
+  const expectedType = slot === 'replayManifest' ? 'file' : 'directory';
+  if (artifact.type !== expectedType) {
+    authoredTransactionFailure('authored cleanup evidence has the wrong artifact type');
   }
   const owned = slotIdentity(journal, slot);
   return {
@@ -135,7 +138,7 @@ function recordFor(
     ownershipId: owned.ownershipId,
     slot,
     artifactBasename: owned.basename,
-    artifactIdentity: rootIdentity(artifactRoot.identity),
+    artifactIdentity: rootIdentity(artifact.identity),
   };
 }
 
@@ -146,7 +149,7 @@ function encodeCleanupEvidence(record: AuthoredCleanupEvidenceRecord): string {
 function parseCleanupEvidence(
   raw: string,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
 ): AuthoredCleanupEvidenceRecord {
   let value: unknown;
   try {
@@ -196,7 +199,7 @@ function parseCleanupEvidence(
 function evidenceFromBytes(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
   bytes: string,
   digest: string,
 ): AuthoredCleanupEvidence {
@@ -225,7 +228,7 @@ function evidenceFromBytes(
 function readEvidenceRecord(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
   expected?: { readonly bytes: string; readonly digest: string },
 ): AuthoredCleanupEvidence | null {
   assertStableAuthoredRoot(root);
@@ -263,20 +266,50 @@ function isAnchoredCreateConflict(error: unknown): boolean {
   return error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.EXISTS';
 }
 
+function expectedCleanupEvidence(
+  journal: RuntimePromotionJournal,
+  slot: AuthoredCleanupEvidenceSlot,
+  artifact: StableAuthoredEntry,
+): { readonly bytes: string; readonly digest: string } {
+  const bytes = encodeCleanupEvidence(recordFor(journal, slot, artifact));
+  return {
+    bytes,
+    digest: createHash('sha256').update(bytes).digest('hex'),
+  };
+}
+
+export function settleAuthoredCleanupEvidence(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  slot: AuthoredCleanupEvidenceSlot,
+  artifact: StableAuthoredEntry,
+): AuthoredCleanupEvidence | null {
+  assertStableAuthoredRoot(root);
+  assertStableAuthoredEntry(artifact, 'the authored cleanup artifact');
+  const settled = readEvidenceRecord(
+    root,
+    journal,
+    slot,
+    expectedCleanupEvidence(journal, slot, artifact),
+  );
+  assertStableAuthoredEntry(artifact, 'the authored cleanup artifact');
+  if (settled !== null) {
+    assertAuthoredCleanupEvidenceArtifact(settled, artifact);
+  }
+  return settled;
+}
+
 export function ensureAuthoredCleanupEvidence(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
-  artifactRoot: StableAuthoredEntry,
+  slot: AuthoredCleanupEvidenceSlot,
+  artifact: StableAuthoredEntry,
 ): AuthoredCleanupEvidence {
   assertStableAuthoredRoot(root);
-  assertStableAuthoredEntry(artifactRoot, 'the authored cleanup artifact root');
-  const bytes = encodeCleanupEvidence(recordFor(journal, slot, artifactRoot));
-  const digest = createHash('sha256').update(bytes).digest('hex');
-  const expected = { bytes, digest };
-  const existing = readEvidenceRecord(root, journal, slot, expected);
+  assertStableAuthoredEntry(artifact, 'the authored cleanup artifact');
+  const expected = expectedCleanupEvidence(journal, slot, artifact);
+  const existing = settleAuthoredCleanupEvidence(root, journal, slot, artifact);
   if (existing !== null) {
-    assertAuthoredCleanupEvidenceRoot(existing, artifactRoot);
     return existing;
   }
   try {
@@ -285,7 +318,7 @@ export function ensureAuthoredCleanupEvidence(
       parentDir: root.path,
       basename: authoredCleanupEvidenceBasename(journal, slot),
       operation: 'create',
-      content: bytes,
+      content: expected.bytes,
       maxBytes: CLEANUP_EVIDENCE_MAX_BYTES,
       permissionPosture: 'owner-controlled',
       recordPosture: 'private',
@@ -294,19 +327,19 @@ export function ensureAuthoredCleanupEvidence(
   } catch (error) {
     if (!isAnchoredCreateConflict(error)) throw error;
   }
-  assertStableAuthoredEntry(artifactRoot, 'the authored cleanup artifact root');
-  const created = readEvidenceRecord(root, journal, slot, expected);
+  assertStableAuthoredEntry(artifact, 'the authored cleanup artifact');
+  const created = settleAuthoredCleanupEvidence(root, journal, slot, artifact);
   if (created === null) {
     authoredTransactionFailure('authored cleanup evidence was not durably published');
   }
-  assertAuthoredCleanupEvidenceRoot(created, artifactRoot);
+  assertAuthoredCleanupEvidenceArtifact(created, artifact);
   return created;
 }
 
 export function readAuthoredCleanupEvidence(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
 ): AuthoredCleanupEvidence | null {
   return readEvidenceRecord(root, journal, slot);
 }
@@ -314,34 +347,35 @@ export function readAuthoredCleanupEvidence(
 export function assertAuthoredCleanupEvidenceAbsent(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
 ): void {
   if (readEvidenceRecord(root, journal, slot) !== null) {
     authoredTransactionFailure('authored cleanup evidence remained after cleanup');
   }
 }
 
-export function assertAuthoredCleanupEvidenceRoot(
+export function assertAuthoredCleanupEvidenceArtifact(
   evidence: AuthoredCleanupEvidence,
-  artifactRoot: StableAuthoredEntry,
+  artifact: StableAuthoredEntry,
 ): void {
   const expected = evidence.record.artifactIdentity;
-  const observed = rootIdentity(artifactRoot.identity);
+  const observed = rootIdentity(artifact.identity);
+  const expectedType = evidence.record.slot === 'replayManifest' ? 'file' : 'directory';
   if (
-    artifactRoot.type !== 'directory' ||
+    artifact.type !== expectedType ||
     expected.dev !== observed.dev ||
     expected.ino !== observed.ino ||
     expected.uid !== observed.uid ||
     expected.mode !== observed.mode
   ) {
-    authoredTransactionFailure('the authored cleanup artifact root was replaced');
+    authoredTransactionFailure('the authored cleanup artifact was replaced');
   }
 }
 
 export function removeAuthoredCleanupEvidence(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
-  slot: AuthoredBlobSlot,
+  slot: AuthoredCleanupEvidenceSlot,
   evidence: AuthoredCleanupEvidence,
 ): void {
   assertStableAuthoredRoot(root);

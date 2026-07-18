@@ -177,6 +177,11 @@ export {
   assertRuntimePromotionSourceRetirementUnchanged,
   refreshRuntimePromotionSourceRetirementProof,
 } from './runtime-promotion-preflight-revalidation.js';
+export {
+  assertRuntimePromotionRecoverySourceAuthority,
+  assertRuntimePromotionRecoverySourceLocation,
+} from './runtime-promotion-preflight-fs.js';
+export type { RuntimePromotionRecoverySourceAuthorityInput } from './runtime-promotion-preflight-fs.js';
 export type {
   RuntimePromotionPreflightCheckpoint,
   RuntimePromotionPreflightConflict,

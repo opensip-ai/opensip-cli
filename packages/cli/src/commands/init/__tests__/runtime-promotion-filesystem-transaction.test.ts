@@ -561,7 +561,7 @@ describe('closed cleanup write-ahead proof', () => {
     expect(existsSync(fixture.paths.backupMarker)).toBe(false);
   });
 
-  it('preserves leftovers when a database-bearing authority lost its current database', async () => {
+  it('does not reinterpret old database evidence after terminal authority closed', async () => {
     const fixture = destinationBackupCleanupFixture();
     const terminal = fixture.journal.terminal;
     if (terminal === null) {
@@ -584,10 +584,6 @@ describe('closed cleanup write-ahead proof', () => {
         },
       },
     };
-    const cleanupMarker = join(
-      fixture.paths.parent,
-      runtimePromotionCleanupMarkerBasename(journal.owned.destinationBackup.basename),
-    );
     const authority = await authorizeFilesystem(
       project,
       'owned-slot-cleanup',
@@ -595,10 +591,13 @@ describe('closed cleanup write-ahead proof', () => {
       { cleanupSlot: 'destinationBackup' },
     );
 
-    await expect(cleanupRuntimePromotionOwnedSlot(authority)).rejects.toThrow(/database-bearing/u);
-    expect(existsSync(cleanupMarker)).toBe(false);
-    expect(existsSync(fixture.paths.backup)).toBe(true);
-    expect(existsSync(fixture.paths.backupMarker)).toBe(true);
+    await expect(cleanupRuntimePromotionOwnedSlot(authority)).resolves.toEqual({
+      slot: 'destinationBackup',
+      status: 'removed',
+    });
+    expect(existsSync(fixture.paths.runtime)).toBe(true);
+    expect(existsSync(fixture.paths.backup)).toBe(false);
+    expect(existsSync(fixture.paths.backupMarker)).toBe(false);
   });
 
   it('fails closed when the cleanup root is replaced at its final delete boundary', async () => {

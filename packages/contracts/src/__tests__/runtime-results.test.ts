@@ -4,6 +4,7 @@ import type {
   CommandResult,
   RunDetailResult,
   RunHistoryResult,
+  RuntimeAdoptionResult,
   RuntimeNextCommand,
   RuntimeRecoveryCommand,
   RuntimeRecoveryReasonCode,
@@ -64,6 +65,17 @@ function baseStatus() {
 }
 
 describe('runtime and parent Run result contracts', () => {
+  it('omits adoption source disposition when recovery cannot prove it', () => {
+    const result = {
+      status: 'busy',
+      durationMs: 4,
+      reasonCode: 'lease-busy',
+      nextCommand: 'opensip init',
+    } satisfies RuntimeAdoptionResult;
+
+    expect(result).not.toHaveProperty('sourcePreserved');
+  });
+
   it('admits a status result with absent optional recovery fields', () => {
     const status = baseStatus();
     expect(status).not.toHaveProperty('recoveryPhase');

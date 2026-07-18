@@ -103,7 +103,6 @@ export function conflictResult(
 export function busyResult(startedAt: number, now: () => number): RuntimeAdoptionResult {
   return {
     status: 'busy',
-    sourcePreserved: true,
     durationMs: promotionDuration(startedAt, now),
     reasonCode: 'lease-busy',
     nextCommand: 'opensip init',
@@ -218,7 +217,7 @@ export function recoveryRequiredResult(input: {
   return {
     status: 'recovery-required',
     ...(strength === undefined ? {} : { proofStrength: strength }),
-    sourcePreserved: input.sourcePreserved ?? input.preflight.source.classification !== 'none',
+    ...(input.sourcePreserved === undefined ? {} : { sourcePreserved: input.sourcePreserved }),
     ...(authored === undefined ? {} : { authored }),
     durationMs: promotionDuration(input.startedAt, input.now),
     reasonCode: 'operation-failed',

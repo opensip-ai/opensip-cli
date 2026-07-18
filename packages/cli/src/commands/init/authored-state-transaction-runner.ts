@@ -1,4 +1,5 @@
 import { validateAuthoredArtifacts } from './authored-state-transaction-artifacts.js';
+import { readAuthoredCleanupEvidence } from './authored-state-transaction-cleanup-evidence.js';
 import {
   assertAuthoredArtifactAbsent,
   assertAuthoredArtifactPathAbsent,
@@ -11,6 +12,7 @@ import {
   verifyEveryAuthoredTarget,
 } from './authored-state-transaction-execution.js';
 import {
+  assertStableAuthoredEntry,
   assertStableAuthoredRoot,
   authoredTransactionFailure,
   observeAuthoredPath,
@@ -296,12 +298,15 @@ export async function cleanupAuthoredState(
   const state = stateFor(transaction);
   state.controller.assertBoundLease(state.lease);
   const root = transactionAuthoredRoot(state.root);
+  let assertEvidenceContinuity = (): void => undefined;
   const checkpoint = (value: AuthoredStateCheckpoint): void => {
     assertStableAuthoredRoot(root);
+    assertEvidenceContinuity();
     try {
       state.dependencies.checkpoint(value);
     } finally {
       assertStableAuthoredRoot(root);
+      assertEvidenceContinuity();
     }
   };
   const withStableRoot = async <T>(action: () => Promise<T>): Promise<T> => {
@@ -321,7 +326,26 @@ export async function cleanupAuthoredState(
   if (journal.operationId !== transaction.operationId) {
     authoredTransactionFailure('the cleanup receipt belongs to another operation');
   }
-  for (const slot of ['authoredStage', 'authoredBackup', 'replayManifest'] as const) {
+  const authoredSlots = ['authoredStage', 'authoredBackup', 'replayManifest'] as const;
+  const boundEvidence = new Map(
+    authoredSlots.map((slot) => [slot, readAuthoredCleanupEvidence(root, journal, slot)] as const),
+  );
+  for (const slot of authoredSlots) {
+    if (journal.cleanup[slot] === 'pending' && boundEvidence.get(slot) === null) {
+      authoredTransactionFailure('closed authored cleanup requires durable identity evidence');
+    }
+  }
+  assertEvidenceContinuity = (): void => {
+    for (const slot of authoredSlots) {
+      if (journal.cleanup[slot] !== 'pending') continue;
+      const evidence = boundEvidence.get(slot);
+      if (evidence !== null && evidence !== undefined) {
+        assertStableAuthoredEntry(evidence.entry, 'the authored cleanup evidence');
+      }
+    }
+  };
+  assertEvidenceContinuity();
+  for (const slot of authoredSlots) {
     assertStableAuthoredRoot(root);
     if (journal.cleanup[slot] === 'removed' || journal.cleanup[slot] === 'unmaterialized') {
       assertAuthoredArtifactPathAbsent(root, state.paths, slot);

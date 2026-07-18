@@ -3,10 +3,17 @@ import { join } from 'node:path';
 
 import { settleAuthoredReplayPublication } from './authored-state-replay-publication.js';
 import {
+  assertAuthoredCleanupEvidenceArtifact,
+  readAuthoredCleanupEvidence,
+  type AuthoredCleanupEvidenceSlot,
+} from './authored-state-transaction-cleanup-evidence.js';
+import {
   assertStableAuthoredRoot,
   authoredTransactionFailure,
+  bindStableAuthoredEntry,
   readBoundedAuthoredDirectory,
   readStableArtifactFile,
+  type StableAuthoredEntry,
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import {
@@ -109,6 +116,50 @@ export function authoredArtifactPaths(
     backupRoot: join(root.path, basenames[1]),
     replayManifest: join(root.path, basenames[2]),
   };
+}
+
+function requireAuthoredIdentityEvidence(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  paths: AuthoredArtifactPaths,
+  slot: AuthoredCleanupEvidenceSlot,
+): void {
+  let artifact: StableAuthoredEntry;
+  if (slot === 'authoredStage') {
+    artifact = bindStableAuthoredEntry(paths.stageRoot, 'directory', 'the authored stage root');
+  } else if (slot === 'authoredBackup') {
+    artifact = bindStableAuthoredEntry(paths.backupRoot, 'directory', 'the authored backup root');
+  } else {
+    artifact = bindStableAuthoredEntry(
+      paths.replayManifest,
+      'file',
+      'the authored replay manifest',
+    );
+  }
+  const evidence = readAuthoredCleanupEvidence(root, journal, slot);
+  if (evidence === null) {
+    authoredTransactionFailure('a prepared authored artifact has no durable identity evidence');
+  }
+  assertAuthoredCleanupEvidenceArtifact(evidence, artifact);
+  assertStableAuthoredRoot(root);
+}
+
+function requirePendingAuthoredIdentityEvidence(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  paths: AuthoredArtifactPaths,
+  cleanupSlot: string | null,
+): void {
+  const slots = [
+    'authoredStage',
+    'authoredBackup',
+    'replayManifest',
+  ] as const satisfies readonly AuthoredCleanupEvidenceSlot[];
+  for (const slot of slots) {
+    if (journal.cleanup[slot] === 'pending' && cleanupSlot !== slot) {
+      requireAuthoredIdentityEvidence(root, journal, paths, slot);
+    }
+  }
 }
 
 export function expectedOwner(rootPath: string, expected: AuthoredArtifactOwner): void {
@@ -297,6 +348,9 @@ export function validateAuthoredArtifacts(
   if (aggregateBytes > INIT_AUTHORED_PLAN_CAPS.maxAggregateBlobBytes) {
     authoredTransactionFailure('authored artifacts exceed their aggregate blob cap');
   }
+  if (!preparing) {
+    requirePendingAuthoredIdentityEvidence(root, journal, paths, cleanupSlot);
+  }
   assertStableAuthoredRoot(root);
 }
 
@@ -327,10 +381,17 @@ export function loadAuthoredReplayManifest(
   }
   const bytes = replay.bytes.toString('utf8');
   const manifest = parseAuthoredReplayManifest(bytes);
+  const inputsMatch =
+    manifest.inputs.mode === journal.inputs.authoredMode &&
+    manifest.inputs.languages.length === journal.inputs.languages.length &&
+    manifest.inputs.languages.every(
+      (language, index) => language === journal.inputs.languages[index],
+    );
   if (
     encodeAuthoredReplayManifest(manifest) !== bytes ||
     manifest.mutations.length !== journal.plan.mutationCount ||
-    authoredPlanDigest(bytes, manifest) !== journal.plan.authoredDigest
+    authoredPlanDigest(bytes, manifest) !== journal.plan.authoredDigest ||
+    !inputsMatch
   ) {
     authoredTransactionFailure('the replay manifest does not match the durable plan identity');
   }

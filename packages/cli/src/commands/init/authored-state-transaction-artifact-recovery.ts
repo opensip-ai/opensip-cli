@@ -8,6 +8,15 @@ import {
   pathPresent,
 } from './authored-state-transaction-artifacts.js';
 import {
+  assertAuthoredCleanupEvidenceAbsent,
+  assertAuthoredCleanupEvidenceArtifact,
+  readAuthoredCleanupEvidence,
+  removeAuthoredCleanupEvidence,
+  settleAuthoredCleanupEvidence,
+  type AuthoredCleanupEvidence,
+  type AuthoredCleanupEvidenceSlot,
+} from './authored-state-transaction-cleanup-evidence.js';
+import {
   assertStableAuthoredEntry,
   assertStableAuthoredRoot,
   authoredTransactionFailure,
@@ -56,6 +65,7 @@ export interface IncompleteAuthoredArtifactAuthority {
   readonly replay: RecoverableFileAuthority | null;
   readonly stage: RecoverableBlobRoot | null;
   readonly backup: RecoverableBlobRoot | null;
+  readonly evidence: Readonly<Record<AuthoredCleanupEvidenceSlot, AuthoredCleanupEvidence | null>>;
 }
 
 function bindRecoverableRoot(rootPath: string): StableAuthoredEntry {
@@ -297,6 +307,18 @@ function validateReplay(
   return { entry: stable, digest: replay.digest, mode: replay.mode };
 }
 
+function settleIncompleteCleanupEvidence(
+  root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
+  slot: AuthoredCleanupEvidenceSlot,
+  artifact: StableAuthoredEntry | null,
+): AuthoredCleanupEvidence | null {
+  if (artifact === null) {
+    return readAuthoredCleanupEvidence(root, journal, slot);
+  }
+  return settleAuthoredCleanupEvidence(root, journal, slot, artifact);
+}
+
 export function validateIncompleteAuthoredArtifacts(
   root: StableAuthoredRoot,
   journal: RuntimePromotionJournal,
@@ -324,12 +346,42 @@ export function validateIncompleteAuthoredArtifacts(
   const backup = backupPresent
     ? inspectRecoverableBlobRoot(paths.backupRoot, journal, manifest, 'backup')
     : null;
+  const evidence = {
+    authoredStage: settleIncompleteCleanupEvidence(
+      root,
+      journal,
+      'authoredStage',
+      stage?.root ?? null,
+    ),
+    authoredBackup: settleIncompleteCleanupEvidence(
+      root,
+      journal,
+      'authoredBackup',
+      backup?.root ?? null,
+    ),
+    replayManifest: settleIncompleteCleanupEvidence(
+      root,
+      journal,
+      'replayManifest',
+      replay?.entry ?? null,
+    ),
+  } as const;
+  if (stage !== null && evidence.authoredStage !== null) {
+    assertAuthoredCleanupEvidenceArtifact(evidence.authoredStage, stage.root);
+  }
+  if (backup !== null && evidence.authoredBackup !== null) {
+    assertAuthoredCleanupEvidenceArtifact(evidence.authoredBackup, backup.root);
+  }
+  if (replay !== null && evidence.replayManifest !== null) {
+    assertAuthoredCleanupEvidenceArtifact(evidence.replayManifest, replay.entry);
+  }
   assertStableAuthoredRoot(root);
-  return { replay, stage, backup };
+  return { replay, stage, backup, evidence };
 }
 
 function discardIncompleteAuthority(
   root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
   authority: IncompleteAuthoredArtifactAuthority,
 ): void {
   if (authority.stage !== null) removeRecoverableBlobRoot(root, authority.stage);
@@ -348,6 +400,17 @@ function discardIncompleteAuthority(
     assertPathAbsent(authority.replay.entry.path, INCOMPLETE_REPLAY_DESCRIPTION);
     fsyncStableAuthoredRoot(root);
   }
+  for (const slot of [
+    'authoredStage',
+    'authoredBackup',
+    'replayManifest',
+  ] as const satisfies readonly AuthoredCleanupEvidenceSlot[]) {
+    const evidence = authority.evidence[slot];
+    if (evidence !== null) {
+      removeAuthoredCleanupEvidence(root, journal, slot, evidence);
+    }
+    assertAuthoredCleanupEvidenceAbsent(root, journal, slot);
+  }
   assertStableAuthoredRoot(root);
 }
 
@@ -365,7 +428,7 @@ export function resetIncompleteAuthoredArtifacts(
     manifestBytes,
     paths,
   );
-  discardIncompleteAuthority(root, authority);
+  discardIncompleteAuthority(root, journal, authority);
 }
 
 export function discardIncompleteAuthoredArtifacts(
@@ -378,11 +441,12 @@ export function discardIncompleteAuthoredArtifacts(
 ): void {
   const bound =
     authority ?? validateIncompleteAuthoredArtifacts(root, journal, manifest, manifestBytes, paths);
-  discardIncompleteAuthority(root, bound);
+  discardIncompleteAuthority(root, journal, bound);
 }
 
 export function assertIncompleteAuthoredArtifactsAbsent(
   root: StableAuthoredRoot,
+  journal: RuntimePromotionJournal,
   paths: AuthoredArtifactPaths,
 ): void {
   assertStableAuthoredRoot(root);
@@ -390,6 +454,13 @@ export function assertIncompleteAuthoredArtifactsAbsent(
     if (pathPresent(path)) {
       authoredTransactionFailure('an aborted authored preparation left an owned artifact path');
     }
+  }
+  for (const slot of [
+    'authoredStage',
+    'authoredBackup',
+    'replayManifest',
+  ] as const satisfies readonly AuthoredCleanupEvidenceSlot[]) {
+    assertAuthoredCleanupEvidenceAbsent(root, journal, slot);
   }
   assertStableAuthoredRoot(root);
 }

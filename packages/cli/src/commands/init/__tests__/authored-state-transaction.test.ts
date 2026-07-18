@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
+  cpSync,
   existsSync,
   linkSync,
   lstatSync,
@@ -1123,6 +1124,47 @@ describe('authored state transaction', () => {
     expect(readFileSync(join(root, 'b.txt'), 'utf8')).toBe('new-b');
   });
 
+  it.each(['languages', 'mode'] as const)(
+    'rejects a replay manifest whose inputs.%s disagree with the durable journal',
+    async (mismatch) => {
+      const root = projectRoot();
+      const plan = authoredPlan([
+        {
+          path: 'new.txt',
+          preimage: absent(),
+          desired: fileState('new'),
+          desiredContent: 'new',
+        },
+      ]);
+      const harness = await prepareHarness(plan, root);
+      const journal = await harness.controller.verifyOpen(harness.prepared.receipt);
+      const mismatchedInputs =
+        mismatch === 'languages'
+          ? { ...journal.inputs, languages: ['rust'] as const }
+          : { ...journal.inputs, authoredMode: 'refresh' as const };
+      harness.store.content = JSON.stringify(
+        canonicalRuntimePromotionJournal({
+          ...journal,
+          inputs: mismatchedInputs,
+        }),
+      );
+
+      const recoveryLease = fakeLease(root);
+      const recoveryController = controllerFor(recoveryLease, harness.store);
+      const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+
+      await expect(
+        loadAuthoredState({
+          projectRoot: root,
+          projectRootAuthority: projectRootAuthority(root, recoveryLease),
+          lease: recoveryLease,
+          controller: recoveryController,
+          receipt: claimed,
+        }),
+      ).rejects.toThrow(/replay manifest does not match the durable plan identity/iu);
+    },
+  );
+
   it('removes an exact marker-owned partial preparation and rematerializes idempotently', async () => {
     const root = projectRoot();
     const plan = authoredPlan([
@@ -1810,6 +1852,152 @@ describe('authored state transaction', () => {
       });
     },
   );
+
+  it('removes durable identity evidence when aborting after manifest materialization', async () => {
+    const root = projectRoot();
+    const target = join(root, 'target.txt');
+    writeFileSync(target, 'old', { mode: 0o600 });
+    const plan = authoredPlan([
+      {
+        path: 'target.txt',
+        preimage: fileState('old'),
+        desired: fileState('new'),
+        preimageContent: 'old',
+        desiredContent: 'new',
+      },
+    ]);
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (checkpoint === 'after-manifest-materialization') {
+              throw new Error('prepare crash after identity evidence');
+            }
+          },
+        },
+      }),
+    ).rejects.toThrow(/prepare crash after identity evidence/iu);
+    expect(
+      readdirSync(root).filter((name) => name.startsWith('.opensip-init-authored-cleanup-')),
+    ).toHaveLength(3);
+
+    const recoveryLease = fakeLease(root);
+    const recoveryController = controllerFor(recoveryLease, store);
+    const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+    const aborted = await abortPendingAuthoredPreparation({
+      projectRoot: root,
+      projectRootAuthority: projectRootAuthority(root, recoveryLease),
+      lease: recoveryLease,
+      controller: recoveryController,
+      receipt: claimed,
+    });
+    const journal = await recoveryController.verifyOpen(aborted.receipt);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+
+    expect(journal).toMatchObject({
+      progress: {
+        direction: 'rollback',
+        phase: 'authored-rolled-back',
+        lastPostcondition: {
+          kind: 'authored-prepare',
+          outcome: 'aborted',
+        },
+      },
+      cleanup: {
+        authoredStage: 'unmaterialized',
+        authoredBackup: 'unmaterialized',
+        replayManifest: 'unmaterialized',
+      },
+    });
+    expect(readFileSync(target, 'utf8')).toBe('old');
+    expect(existsSync(join(root, owned.authoredStage.basename))).toBe(false);
+    expect(existsSync(join(root, owned.authoredBackup.basename))).toBe(false);
+    expect(existsSync(join(root, owned.replayManifest.basename))).toBe(false);
+    expect(
+      readdirSync(root).filter((name) => name.startsWith('.opensip-init-authored-cleanup-')),
+    ).toEqual([]);
+  });
+
+  it('preserves an exact-content stage replacement during incomplete-preparation abort', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const lease = fakeLease(root);
+    const store: JournalStore = { content: undefined };
+    const controller = controllerFor(lease, store);
+    const receipt = await createJournal(controller, plan, lease.coordinationKey);
+
+    await expect(
+      prepareAuthoredState({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, lease),
+        lease,
+        controller,
+        receipt,
+        plan,
+        dependencies: {
+          checkpoint: (checkpoint) => {
+            if (checkpoint === 'after-manifest-materialization') {
+              throw new Error('prepare crash after identity evidence');
+            }
+          },
+        },
+      }),
+    ).rejects.toThrow(/prepare crash after identity evidence/iu);
+
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const stage = join(root, owned.authoredStage.basename);
+    const displaced = `${stage}.opensip-original`;
+    renameSync(stage, displaced);
+    cpSync(displaced, stage, { recursive: true });
+    chmodSync(stage, 0o700);
+    chmodSync(join(stage, 'desired'), 0o700);
+    chmodSync(join(stage, AUTHORED_ARTIFACT_OWNER_FILE), 0o600);
+    chmodSync(join(stage, 'desired', '0000.blob'), 0o600);
+    const replacementInode = lstatSync(stage).ino;
+    const originalInode = lstatSync(displaced).ino;
+    expect(replacementInode).not.toBe(originalInode);
+    const recoveryLease = fakeLease(root);
+    const recoveryController = controllerFor(recoveryLease, store);
+    const claimed = (await recoveryController.claim(OPERATION_ID)) as DurableOpenPromotionJournal;
+
+    await expect(
+      abortPendingAuthoredPreparation({
+        projectRoot: root,
+        projectRootAuthority: projectRootAuthority(root, recoveryLease),
+        lease: recoveryLease,
+        controller: recoveryController,
+        receipt: claimed,
+      }),
+    ).rejects.toThrow(
+      /authored cleanup artifact was replaced|complete target does not match expected identity/iu,
+    );
+
+    expect(lstatSync(stage).ino).toBe(replacementInode);
+    expect(lstatSync(displaced).ino).toBe(originalInode);
+    expect(existsSync(join(stage, AUTHORED_ARTIFACT_OWNER_FILE))).toBe(true);
+    expect(existsSync(join(displaced, AUTHORED_ARTIFACT_OWNER_FILE))).toBe(true);
+    expect(
+      readdirSync(root).filter((name) => name.startsWith('.opensip-init-authored-cleanup-')),
+    ).toHaveLength(3);
+  });
 
   it('resumes an abort after owned cleanup and aborted-postcondition crash windows', async () => {
     for (const abortBoundary of ['after-abort-cleanup', 'after-abort-postcondition'] as const) {
@@ -3053,6 +3241,71 @@ describe('authored state transaction', () => {
     expect(readFileSync(replacement, 'utf8')).toBe(canonicalBytes);
     expect(readFileSync(displaced, 'utf8')).toContain('opensip-init-authored-cleanup-evidence');
     expect(lstatSync(replacement).ino).not.toBe(lstatSync(displaced).ino);
+  });
+
+  it('preserves an exact-content stage replacement installed before closed cleanup', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const harness = await prepareHarness(plan, root);
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const stage = join(root, owned.authoredStage.basename);
+    const displaced = `${stage}.opensip-original`;
+    renameSync(stage, displaced);
+    cpSync(displaced, stage, { recursive: true });
+    const replacementInode = lstatSync(stage).ino;
+    const originalInode = lstatSync(displaced).ino;
+    expect(replacementInode).not.toBe(originalInode);
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /authored cleanup artifact was replaced/iu,
+    );
+
+    expect(lstatSync(stage).ino).toBe(replacementInode);
+    expect(lstatSync(displaced).ino).toBe(originalInode);
+    expect(existsSync(join(stage, AUTHORED_ARTIFACT_OWNER_FILE))).toBe(true);
+    expect(existsSync(join(displaced, AUTHORED_ARTIFACT_OWNER_FILE))).toBe(true);
+  });
+
+  it('preserves an exact-byte replay replacement installed before closed cleanup', async () => {
+    const root = projectRoot();
+    const plan = authoredPlan([
+      {
+        path: 'new.txt',
+        preimage: absent(),
+        desired: fileState('new'),
+        desiredContent: 'new',
+      },
+    ]);
+    const harness = await prepareHarness(plan, root);
+    const committed = await commitAuthoredState(harness.prepared.transaction);
+    const closed = await closeCommitted(harness.controller, committed.receipt);
+    const owned = createRuntimePromotionOwnedSlots(OPERATION_ID);
+    const replay = join(root, owned.replayManifest.basename);
+    const displaced = `${replay}.opensip-original`;
+    const canonicalBytes = readFileSync(replay);
+    renameSync(replay, displaced);
+    writeFileSync(replay, canonicalBytes, { mode: 0o600 });
+    const replacementInode = lstatSync(replay).ino;
+    const originalInode = lstatSync(displaced).ino;
+    expect(replacementInode).not.toBe(originalInode);
+
+    await expect(cleanupAuthoredState(harness.prepared.transaction, closed)).rejects.toThrow(
+      /authored cleanup artifact was replaced/iu,
+    );
+
+    expect(lstatSync(replay).ino).toBe(replacementInode);
+    expect(lstatSync(displaced).ino).toBe(originalInode);
+    expect(readFileSync(replay)).toEqual(canonicalBytes);
+    expect(readFileSync(displaced)).toEqual(canonicalBytes);
   });
 
   it('resumes cleanup after an authored stage was removed before its postcondition', async () => {

@@ -246,6 +246,7 @@ async function runWithLease(
     return recoveryRequiredResult({
       preflight,
       authored: null,
+      sourcePreserved: preflight.source.classification !== 'none',
       startedAt,
       now: dependencies.now,
     });

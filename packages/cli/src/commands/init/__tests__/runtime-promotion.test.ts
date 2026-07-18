@@ -1483,6 +1483,7 @@ describe('fresh runtime promotion coordinator', () => {
       reasonCode: 'lease-busy',
       nextCommand: 'opensip init',
     });
+    expect(result).not.toHaveProperty('sourcePreserved');
     expect(harness.state.events).not.toContain('journal:create');
     expect(harness.state.released).toBe(0);
   });

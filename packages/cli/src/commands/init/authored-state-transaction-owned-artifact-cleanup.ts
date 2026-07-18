@@ -7,8 +7,7 @@ import {
   ownerFor,
 } from './authored-state-transaction-artifacts.js';
 import {
-  assertAuthoredCleanupEvidenceRoot,
-  ensureAuthoredCleanupEvidence,
+  assertAuthoredCleanupEvidenceArtifact,
   readAuthoredCleanupEvidence,
   type AuthoredCleanupEvidence,
 } from './authored-state-transaction-cleanup-evidence.js';
@@ -93,7 +92,7 @@ function inspectExactBlobRoot(
 ): ExactBlobRoot {
   const kind = role === 'stage' ? 'desired' : 'preimage';
   const root = bindStableAuthoredEntry(rootPath, 'directory', OWNED_ROOT_DESCRIPTION);
-  if (evidence !== null) assertAuthoredCleanupEvidenceRoot(evidence, root);
+  if (evidence !== null) assertAuthoredCleanupEvidenceArtifact(evidence, root);
   checkpoint('after-cleanup-artifact-observation');
   assertStableAuthoredEntry(root, OWNED_ROOT_DESCRIPTION);
   const markerPath = join(rootPath, AUTHORED_ARTIFACT_OWNER_FILE);
@@ -206,25 +205,9 @@ interface CleanupEvidenceInput {
 }
 
 function evidenceForCleanupRoot(input: CleanupEvidenceInput): AuthoredCleanupEvidence {
-  if (pathPresent(join(input.rootPath, AUTHORED_ARTIFACT_OWNER_FILE))) {
-    const initiallyInspected = inspectExactBlobRoot(
-      input.rootPath,
-      input.journal,
-      input.manifest,
-      input.role,
-      input.checkpoint,
-      null,
-    );
-    return ensureAuthoredCleanupEvidence(
-      input.authoredRoot,
-      input.journal,
-      input.slot,
-      initiallyInspected.root,
-    );
-  }
   const existing = readAuthoredCleanupEvidence(input.authoredRoot, input.journal, input.slot);
   if (existing === null) {
-    authoredTransactionFailure('an ownerless authored cleanup root has no durable evidence');
+    authoredTransactionFailure('an authored cleanup root has no durable identity evidence');
   }
   return existing;
 }
@@ -278,7 +261,12 @@ export function removeOwnedAuthoredBlobRoot(
   if (!pathPresent(rootPath)) {
     checkpoint('after-cleanup-artifact-observation');
     const evidence = readAuthoredCleanupEvidence(authoredRoot, journal, slot);
-    return evidence === null ? 'absent' : 'removed';
+    if (evidence === null) {
+      authoredTransactionFailure(
+        'an absent authored cleanup root has no durable identity evidence',
+      );
+    }
+    return 'removed';
   }
   const evidence = evidenceForCleanupRoot({
     authoredRoot,

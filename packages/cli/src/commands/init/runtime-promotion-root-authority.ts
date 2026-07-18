@@ -155,6 +155,32 @@ export function captureRuntimePromotionProjectRootAuthority(input: {
 }
 
 /**
+ * Bind a recovery attempt without accidentally promoting an operation-created
+ * destination parent into attempt-local preexisting authority.
+ */
+export function captureRuntimePromotionRecoveryProjectRootAuthority(input: {
+  readonly lease: RuntimeExclusiveLease;
+  readonly projectRoot: string;
+  readonly destinationParentPreexisting: boolean;
+}): RuntimePromotionProjectRootAuthority {
+  const authority = captureRuntimePromotionProjectRootAuthority({
+    lease: input.lease,
+    projectRoot: input.projectRoot,
+    expectedPosture: 'init-recovery',
+  });
+  if (input.destinationParentPreexisting && authority.destinationParent === null) {
+    throw new RuntimePromotionPreflightError(CHANGED_AFTER_PREFLIGHT);
+  }
+  if (input.destinationParentPreexisting || authority.destinationParent === null) {
+    return authority;
+  }
+  return Object.freeze({
+    ...authority,
+    destinationParent: null,
+  });
+}
+
+/**
  * Capture the exact root selected by fresh preflight for this in-memory
  * attempt. Recovery must bind a new authority after validating its journal.
  */

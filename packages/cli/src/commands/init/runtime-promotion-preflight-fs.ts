@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstatSync, realpathSync, type BigIntStats } from 'node:fs';
 import { join } from 'node:path';
 
@@ -6,6 +7,7 @@ import {
   EPHEMERAL_MARKER_MAX_BYTES,
   EPHEMERAL_MARKER_VERSION,
   legacyEphemeralProjectCacheKey,
+  projectCoordinationKey,
   readAnchoredRecord,
   resolveEphemeralProjectPaths,
   resolveProjectPaths,
@@ -16,7 +18,12 @@ import {
   type RuntimeExclusiveLease,
 } from '@opensip-cli/core';
 
-import type { RuntimePromotionSource } from './runtime-promotion-journal-schema.js';
+import {
+  RUNTIME_PROMOTION_CACHE_KEY_PATTERN,
+  RUNTIME_PROMOTION_DIGEST_PATTERN,
+  type RuntimePromotionSource,
+} from './runtime-promotion-journal-schema.js';
+import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 
 export type RuntimePromotionPathPresence = 'absent' | 'directory' | 'unsafe';
 
@@ -84,10 +91,75 @@ type ParsedMarker =
   | { readonly kind: 'legacy'; readonly marker: LegacyEphemeralMarker };
 
 const PROJECT_PATH_UNSAFE = 'project-path-unsafe' as const;
+const GENERATION_BOUND = 'generation-bound' as const;
+const OWNER_CONTROLLED = 'owner-controlled' as const;
 
 export interface RuntimePromotionPreflightFsDependencies {
   readonly afterCandidateResolution?: () => void;
   readonly afterMarkerRead?: () => void;
+}
+
+export interface RuntimePromotionRecoverySourceAuthorityInput {
+  /** Already-selected canonical project root; aliases and replacements fail closed. */
+  readonly projectRoot: string;
+  /** Exact canonical cache path derived from the validated journal cache key. */
+  readonly sourceRuntime: string;
+  readonly source: RuntimePromotionSource;
+  readonly lease: RuntimeExclusiveLease;
+}
+
+/**
+ * Validate only the canonical location/type needed by monotonic closed
+ * cleanup. Historical marker bytes are deliberately outside this proof.
+ */
+export function assertRuntimePromotionRecoverySourceLocation(
+  input: RuntimePromotionRecoverySourceAuthorityInput,
+): void {
+  let canonicalProjectRoot: string;
+  try {
+    canonicalProjectRoot = realpathSync(input.projectRoot);
+  } catch {
+    recoverySourceChanged();
+  }
+  if (
+    canonicalProjectRoot !== input.projectRoot ||
+    runtimePromotionPathSnapshot(input.projectRoot).presence !== 'directory'
+  ) {
+    recoverySourceChanged();
+  }
+  if (
+    input.lease.kind !== 'runtime-exclusive' ||
+    input.lease.posture !== 'init-recovery' ||
+    input.lease.coordinationKey !== projectCoordinationKey(input.projectRoot)
+  ) {
+    throw new RuntimePromotionPreflightError('lease-mismatch');
+  }
+  const source: RuntimePromotionSource = {
+    classification: input.source.classification,
+    cacheKey: input.source.cacheKey,
+    generationDigest: input.source.generationDigest,
+    markerSha256: input.source.markerSha256,
+  };
+  if (!recoverySourceShapeValid(source) || source.cacheKey === null) {
+    recoverySourceChanged();
+  }
+  const cacheRoot = resolveUserPaths().ephemeralProjectsDir;
+  const expectedSourceRuntime = join(cacheRoot, source.cacheKey);
+  if (input.sourceRuntime !== expectedSourceRuntime) {
+    recoverySourceChanged();
+  }
+  const rootBefore = runtimePromotionPathSnapshot(cacheRoot);
+  const sourceBefore = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  const sourceAfter = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  const rootAfter = runtimePromotionPathSnapshot(cacheRoot);
+  if (
+    rootBefore.presence !== 'directory' ||
+    sourceBefore.presence !== 'directory' ||
+    !sameRuntimePromotionPathSnapshot(rootBefore, rootAfter) ||
+    !sameRuntimePromotionPathSnapshot(sourceBefore, sourceAfter)
+  ) {
+    recoverySourceChanged();
+  }
 }
 
 export class RuntimePromotionFilesystemLeaseMismatchError extends Error {
@@ -179,7 +251,7 @@ function parseMarker(raw: string): ParsedMarker | undefined {
   const record = parsed as Record<string, unknown>;
   if (record.version === EPHEMERAL_MARKER_VERSION) {
     const identityStrength = record.identityStrength;
-    const generationBound = identityStrength === 'generation-bound';
+    const generationBound = identityStrength === GENERATION_BOUND;
     const expectedKeys = generationBound
       ? [
           'version',
@@ -194,7 +266,7 @@ function parseMarker(raw: string): ParsedMarker | undefined {
       !exactKeys(record, expectedKeys) ||
       typeof record.projectDir !== 'string' ||
       !isDigest(record.canonicalRootDigest) ||
-      (identityStrength !== 'generation-bound' && identityStrength !== 'path-only') ||
+      (identityStrength !== GENERATION_BOUND && identityStrength !== 'path-only') ||
       (generationBound
         ? !isDigest(record.generationDigest)
         : record.generationDigest !== undefined) ||
@@ -236,6 +308,162 @@ function currentMarkerMatches(marker: EphemeralMarker, paths: EphemeralProjectPa
     marker.identityStrength === paths.identityStrength &&
     marker.generationDigest === paths.generationDigest
   );
+}
+
+function recoverySourceChanged(): never {
+  throw new RuntimePromotionPreflightError('changed-after-preflight');
+}
+
+function recoverySourceShapeValid(source: RuntimePromotionSource): boolean {
+  if (
+    source.classification === 'none' ||
+    source.cacheKey === null ||
+    source.markerSha256 === null ||
+    !RUNTIME_PROMOTION_CACHE_KEY_PATTERN.test(source.cacheKey) ||
+    !RUNTIME_PROMOTION_DIGEST_PATTERN.test(source.markerSha256)
+  ) {
+    return false;
+  }
+  return source.classification === GENERATION_BOUND
+    ? source.generationDigest !== null &&
+        RUNTIME_PROMOTION_DIGEST_PATTERN.test(source.generationDigest)
+    : source.generationDigest === null;
+}
+
+function recoveryMarkerRead(
+  cacheRoot: string,
+  sourceRuntime: string,
+): {
+  readonly content: string;
+  readonly sha256: string;
+} {
+  let observed;
+  try {
+    observed = readAnchoredRecord({
+      trustedAnchorDir: cacheRoot,
+      parentDir: sourceRuntime,
+      basename: EPHEMERAL_MARKER_FILE,
+      maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
+      permissionPosture: OWNER_CONTROLLED,
+      recordPosture: OWNER_CONTROLLED,
+    });
+  } catch {
+    recoverySourceChanged();
+  }
+  if (observed.status !== 'present') recoverySourceChanged();
+  return observed;
+}
+
+function expectedGenerationCacheKey(canonicalRootDigest: string, generationDigest: string): string {
+  return createHash('sha256')
+    .update(`opensip-ephemeral-cache-v2\0${canonicalRootDigest}\0${generationDigest}`)
+    .digest('hex')
+    .slice(0, 24);
+}
+
+function currentRecoveryMarkerMatches(input: {
+  readonly projectRoot: string;
+  readonly cacheKey: string;
+  readonly source: RuntimePromotionSource;
+  readonly marker: EphemeralMarker;
+}): boolean {
+  const canonicalRootDigest = createHash('sha256').update(input.projectRoot).digest('hex');
+  if (
+    input.marker.projectDir !== input.projectRoot ||
+    input.marker.canonicalRootDigest !== canonicalRootDigest ||
+    input.marker.identityStrength !== input.source.classification
+  ) {
+    return false;
+  }
+  if (input.source.classification === 'path-only') {
+    return (
+      input.marker.generationDigest === undefined &&
+      input.source.generationDigest === null &&
+      input.cacheKey === canonicalRootDigest.slice(0, 24)
+    );
+  }
+  if (input.source.classification !== GENERATION_BOUND || input.source.generationDigest === null) {
+    return false;
+  }
+  return (
+    input.marker.generationDigest === input.source.generationDigest &&
+    input.cacheKey ===
+      expectedGenerationCacheKey(canonicalRootDigest, input.source.generationDigest)
+  );
+}
+
+/**
+ * Revalidate only the cache-source authority recorded by an existing promotion
+ * journal. This seam never resolves current cache defaults or reclassifies the
+ * recorded source.
+ */
+export function assertRuntimePromotionRecoverySourceAuthority(
+  input: RuntimePromotionRecoverySourceAuthorityInput,
+  dependencies: Pick<RuntimePromotionPreflightFsDependencies, 'afterMarkerRead'> = {},
+): void {
+  let canonicalProjectRoot: string;
+  try {
+    canonicalProjectRoot = realpathSync(input.projectRoot);
+  } catch {
+    recoverySourceChanged();
+  }
+  if (
+    canonicalProjectRoot !== input.projectRoot ||
+    runtimePromotionPathSnapshot(input.projectRoot).presence !== 'directory'
+  ) {
+    recoverySourceChanged();
+  }
+  if (
+    input.lease.kind !== 'runtime-exclusive' ||
+    input.lease.posture !== 'init-recovery' ||
+    input.lease.coordinationKey !== projectCoordinationKey(input.projectRoot)
+  ) {
+    throw new RuntimePromotionPreflightError('lease-mismatch');
+  }
+  const source: RuntimePromotionSource = {
+    classification: input.source.classification,
+    cacheKey: input.source.cacheKey,
+    generationDigest: input.source.generationDigest,
+    markerSha256: input.source.markerSha256,
+  };
+  if (!recoverySourceShapeValid(source)) recoverySourceChanged();
+  const cacheKey = source.cacheKey;
+  const markerSha256 = source.markerSha256;
+  if (cacheKey === null || markerSha256 === null) recoverySourceChanged();
+  const cacheRoot = resolveUserPaths().ephemeralProjectsDir;
+  const expectedSourceRuntime = join(cacheRoot, cacheKey);
+  if (input.sourceRuntime !== expectedSourceRuntime) recoverySourceChanged();
+
+  const before = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  if (before.presence !== 'directory') recoverySourceChanged();
+  const firstMarker = recoveryMarkerRead(cacheRoot, expectedSourceRuntime);
+  dependencies.afterMarkerRead?.();
+  const afterFirstRead = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  if (!sameRuntimePromotionPathSnapshot(before, afterFirstRead)) recoverySourceChanged();
+  const confirmedMarker = recoveryMarkerRead(cacheRoot, expectedSourceRuntime);
+  const afterConfirmation = runtimePromotionPathSnapshot(expectedSourceRuntime);
+  if (!sameRuntimePromotionPathSnapshot(before, afterConfirmation)) recoverySourceChanged();
+  if (
+    firstMarker.sha256 !== markerSha256 ||
+    confirmedMarker.sha256 !== markerSha256 ||
+    firstMarker.content !== confirmedMarker.content
+  ) {
+    recoverySourceChanged();
+  }
+  const marker = parseMarker(confirmedMarker.content);
+  if (marker?.marker.projectDir !== input.projectRoot) recoverySourceChanged();
+  if (
+    source.classification !== 'legacy' &&
+    (marker.kind !== 'current' ||
+      !currentRecoveryMarkerMatches({
+        projectRoot: input.projectRoot,
+        cacheKey,
+        source,
+        marker: marker.marker,
+      }))
+  ) {
+    recoverySourceChanged();
+  }
 }
 
 function inspectSource(input: {
@@ -303,8 +531,8 @@ function inspectSource(input: {
       parentDir: selected.runtimeDir,
       basename: EPHEMERAL_MARKER_FILE,
       maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
-      permissionPosture: 'owner-controlled',
-      recordPosture: 'owner-controlled',
+      permissionPosture: OWNER_CONTROLLED,
+      recordPosture: OWNER_CONTROLLED,
     });
   } catch {
     return { status: 'conflict', reason: 'cache-marker-invalid', sourcePreserved: true };
@@ -333,7 +561,7 @@ function inspectSource(input: {
       classification,
       cacheKey: selected.cacheKey,
       generationDigest:
-        classification === 'generation-bound' ? (input.paths.generationDigest ?? null) : null,
+        classification === GENERATION_BOUND ? (input.paths.generationDigest ?? null) : null,
       markerSha256: observed.sha256,
     },
     revalidation: {
@@ -460,8 +688,8 @@ export function readRuntimePromotionMarkerSha256(
       parentDir: source.runtimeDir,
       basename: EPHEMERAL_MARKER_FILE,
       maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
-      permissionPosture: 'owner-controlled',
-      recordPosture: 'owner-controlled',
+      permissionPosture: OWNER_CONTROLLED,
+      recordPosture: OWNER_CONTROLLED,
     });
     return observed.status === 'present' ? observed.sha256 : undefined;
   } catch {
