@@ -27,7 +27,11 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildCommandScopeIndex } from '../../commands/command-scope-index.js';
-import { type RuntimeLeaseLifecycle } from '../../commands/host-runtime-access.js';
+import {
+  enterHostOwnershipForTests,
+  resetEnteredHostOwnershipForTests,
+  type RuntimeLeaseLifecycle,
+} from '../../commands/host-runtime-access.js';
 import { type HostSpec } from '../../commands/host-subcommand-shared.js';
 import { type CliCommandsContext } from '../../commands/shared.js';
 import { BootstrapError } from '../bootstrap-error.js';
@@ -555,46 +559,63 @@ describe('executePostBailoutBootstrap phase ordering', () => {
   );
 
   it('awaits profiler startup before running tool preflight', async () => {
-    const plan = planPreActionBootstrap({
-      opts: {},
-      cwd: process.cwd(),
-      cwdExplicit: false,
-      runId: 'RUN_profile_order',
-      commandName: 'init',
-      commandPath: 'init',
-      commandScopes: COMMAND_SCOPES,
-    });
-    let releaseProfile: (() => void) | undefined;
-    const startProfiling = vi.fn(
-      () =>
-        new Promise<undefined>((resolve) => {
-          releaseProfile = () => resolve(undefined);
-        }),
-    );
-    const maybeInitializeOwningTool = vi.fn(() => Promise.resolve());
+    // Isolate HOME and seed entered user-state ownership so the update-check
+    // ownership wrapper does not acquire a real coordination lease (that would
+    // race the microtask assertion for startProfiling ordering).
+    const sandbox = mkdtempSync(join(tmpdir(), 'opensip-profile-order-'));
+    const previousHome = process.env.HOME;
+    process.env.HOME = join(sandbox, 'home');
+    mkdirSync(process.env.HOME, { recursive: true });
+    enterHostOwnershipForTests({ userState: true });
+    try {
+      const plan = planPreActionBootstrap({
+        opts: {},
+        cwd: process.cwd(),
+        cwdExplicit: false,
+        runId: 'RUN_profile_order',
+        commandName: 'init',
+        commandPath: 'init',
+        commandScopes: COMMAND_SCOPES,
+      });
+      let releaseProfile: (() => void) | undefined;
+      const startProfiling = vi.fn(
+        () =>
+          new Promise<undefined>((resolve) => {
+            releaseProfile = () => resolve(undefined);
+          }),
+      );
+      const maybeInitializeOwningTool = vi.fn(() => Promise.resolve());
 
-    const execution = executePostBailoutBootstrap(
-      {
-        plan,
-        runtime: runtimeWith([]),
-        version: '0.0.0-test',
-        noCloud: true,
-      },
-      {
-        enterScope: () => undefined,
-        isScopeEntered: () => true,
-        checkForUpdate: () => undefined,
-        startProfiling,
-        maybeInitializeOwningTool,
-        loadOwningToolCapabilities: () => Promise.resolve(0),
-      },
-    );
+      const execution = executePostBailoutBootstrap(
+        {
+          plan,
+          runtime: runtimeWith([]),
+          version: '0.0.0-test',
+          noCloud: true,
+        },
+        {
+          enterScope: () => undefined,
+          isScopeEntered: () => true,
+          checkForUpdate: () => undefined,
+          startProfiling,
+          maybeInitializeOwningTool,
+          loadOwningToolCapabilities: () => Promise.resolve(0),
+        },
+      );
 
-    expect(startProfiling).toHaveBeenCalledOnce();
-    expect(maybeInitializeOwningTool).not.toHaveBeenCalled();
-    releaseProfile?.();
-    await execution;
-    expect(maybeInitializeOwningTool).toHaveBeenCalledOnce();
+      await vi.waitFor(() => {
+        expect(startProfiling).toHaveBeenCalledOnce();
+      });
+      expect(maybeInitializeOwningTool).not.toHaveBeenCalled();
+      releaseProfile?.();
+      await execution;
+      expect(maybeInitializeOwningTool).toHaveBeenCalledOnce();
+    } finally {
+      resetEnteredHostOwnershipForTests();
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 
   it('builds a real project RunScope before tool preflight', async () => {
