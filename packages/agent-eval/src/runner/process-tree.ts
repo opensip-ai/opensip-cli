@@ -147,8 +147,18 @@ function sameProcessIdentity(
   );
 }
 
+/** Bounded decision-evidence summary for post-run containment diagnostics. */
+export interface ProcessTreeSummary {
+  readonly reliable: boolean;
+  readonly rootObserved: boolean;
+  readonly samples: number;
+  readonly tracked: number;
+}
+
 class DescendantTracker {
   private failed = false;
+  private successfulSamples = 0;
+  private everObservedRoot = false;
   private rootIdentityInitialized = false;
   private rootObservedAlive = false;
   private rootIdentity: PosixProcessIdentity | undefined;
@@ -176,6 +186,20 @@ class DescendantTracker {
 
   public reliable(): boolean {
     return !this.failed;
+  }
+
+  /**
+   * The inputs behind a containment verdict, so a "clean" result that later
+   * proves wrong (e.g. an intermittent CI-only leak) arrives as a complete
+   * bug report instead of an unexplained `error: undefined`.
+   */
+  public summary(): ProcessTreeSummary {
+    return {
+      reliable: !this.failed,
+      rootObserved: this.everObservedRoot,
+      samples: this.successfulSamples,
+      tracked: this.tracked.size,
+    };
   }
 
   public sample(): void {
@@ -257,6 +281,7 @@ class DescendantTracker {
     if (this.rootObservedAlive) currentTracked.add(this.rootPid);
     if (rootExitedThisSample) this.retainOriginalGroupMembers(snapshot, currentTracked);
     this.expandDescendants(snapshot, currentTracked);
+    this.successfulSamples += 1;
   }
 
   private updateRootObservation(currentRoot: PosixProcessIdentity | undefined): boolean {
@@ -280,6 +305,7 @@ class DescendantTracker {
       currentRoot !== undefined &&
       this.rootIdentity !== undefined &&
       sameProcessIdentity(currentRoot, this.rootIdentity);
+    if (this.rootObservedAlive) this.everObservedRoot = true;
     return currentRoot === undefined && rootWasObservedAlive;
   }
 
@@ -403,6 +429,10 @@ export function stopProcessTreeTracking(tree: PosixProcessTree): void {
 
 export function processTreeTrackingReliable(tree: PosixProcessTree): boolean {
   return tree.tracker.reliable();
+}
+
+export function processTreeSummary(tree: PosixProcessTree): ProcessTreeSummary {
+  return tree.tracker.summary();
 }
 
 /** Return whether the root group or any retained descendant identity is alive. */
