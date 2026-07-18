@@ -48,15 +48,18 @@ const MUST_RUN_WITHOUT_INIT = [
   'runs show',
   'sessions list',
   'sessions show',
+  // Purge targets the active local evidence store (cache or project runtime),
+  // same store list/show read — first-run capable so pre-init history can be cleared.
+  'sessions purge',
   'report',
 ] as const;
 
 /**
  * Commands that MUST NOT be promoted into an ephemeral project. `sim` and
- * `yagni` need authored scenarios/config to say anything useful; `sessions
- * purge` and the tool-management commands mutate durable project state.
+ * `yagni` need authored scenarios/config to say anything useful; tool-management
+ * commands mutate durable install state that expects an initialized layout.
  */
-const MUST_REQUIRE_INIT = ['sim', 'simulation', 'yagni', 'sessions purge', 'tools list'] as const;
+const MUST_REQUIRE_INIT = ['sim', 'simulation', 'yagni', 'tools list'] as const;
 
 function makeCtx(tools: ToolRegistry): CliCommandsContext {
   return {

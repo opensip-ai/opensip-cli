@@ -207,7 +207,10 @@ function buildSessionsPurgeSpec(ctx: CliCommandsContext): HostSpec {
     },
     name: 'purge',
     description:
-      'Delete session rows from the project-local SQLite store (opensip-cli/.runtime/datastore.sqlite)',
+      'Delete Tool Sessions from the active local evidence store (project runtime or user cache). Preserves Runs, reports, catalogs, and other runtime state. Full removal: opensip uninstall --project',
+    // First-run capable — pre-init evidence lives in the user-cache store and
+    // must be purgeable without forcing Init. Same active store as list/show.
+    noInit: true,
     commonFlags: ['json'],
     options: [
       {

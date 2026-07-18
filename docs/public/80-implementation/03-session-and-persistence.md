@@ -492,7 +492,7 @@ A reference for "I want to free disk / I'm debugging."
 | Command | Touches |
 |---|---|
 | `opensip sessions list` | `SELECT FROM sessions` |
-| `opensip sessions purge --older-than N` | In an initialized project, `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to the tool-payload row) |
+| `opensip sessions purge --older-than N` | Against the active local evidence store (user cache before Init, project runtime after), `DELETE FROM sessions WHERE timestamp < cutoff` (FK cascades to the tool-payload row). Parent Runs and other runtime state remain. |
 | `opensip fit --no-cache` / `graph --no-cache` | Forces cache miss; rebuilds full catalog/results, ignores any cached row |
 | `opensip uninstall --project [path]` | Removes generated project runtime state and the matching zero-config user-cache runtime while preserving project config/authored content unless `--purge` is passed. Session/log history, baselines, tool state, and other retained evidence in those runtimes are lost. On Windows, ensure no opensip-cli process is active; open handles can block WAL/SHM removal. |
 | `opensip uninstall` (no flag) | Removes `~/.opensip-cli/`, including user config, user-global tools/plugins, and every managed user-cache runtime/database. |

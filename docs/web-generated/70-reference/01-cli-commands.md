@@ -1127,10 +1127,12 @@ packs run through the capability worker bridge with undeclared resources denied.
 
 CLI-owned. Reads and replays session rows in the active local SQLite datastore
 via `SessionRepo`: the managed user cache before initialization, or
-`<project>/opensip-cli/.runtime/datastore.sqlite` afterward. `list` and `show`
-support zero-config first runs. `purge` requires an initialized project and
-is a row-level `DELETE` (the FK cascade drops each session's tool-payload row),
-not file removal.
+`<project>/opensip-cli/.runtime/datastore.sqlite` afterward. `list`, `show`,
+and `purge` all support zero-config first runs against that active local
+evidence store. `purge` deletes Tool Session rows only (the FK cascade drops
+each session's tool-payload row); parent Runs, reports, graph catalogs,
+baselines, and other runtime state are preserved. Full project runtime removal
+is `opensip uninstall --project`, not file-path deletion.
 
 Primary surface for inspecting prior runs (especially from agents). See `agent-catalog` above for the recommended discovery entry point.
 

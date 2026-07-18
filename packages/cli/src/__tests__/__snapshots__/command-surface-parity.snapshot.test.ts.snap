@@ -2490,7 +2490,7 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
             },
           ],
           "subcommands": [],
-          "synopsis": "Delete session rows from the project-local SQLite store (opensip-cli/.runtime/datastore.sqlite)",
+          "synopsis": "Delete Tool Sessions from the active local evidence store (project runtime or user cache). Preserves Runs, reports, catalogs, and other runtime state. Full removal: opensip uninstall --project",
           "usage": "[options]",
         },
         {
