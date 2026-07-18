@@ -248,6 +248,39 @@ pnpm test        # Must pass
 pnpm lint        # ESLint + dependency-cruiser; both must be 0-error
 ```
 
+## Continuous Integration
+
+PR and `main` CI (`.github/workflows/ci.yml`) runs **parallel lanes**. The
+required check **`build-and-test`** is an aggregator: it is green only when
+**lint**, **test**, **dogfood**, **graph-equivalence**, **policy-and-docs**, and
+**cold-gate** all succeed (see [ADR-0168](docs/decisions/ADR-0168-ci-required-surface-and-shared-setup.md)).
+
+| Lane | Role |
+|------|------|
+| `setup` | One frozen install + `build-ci`; packs workspace for warm lanes |
+| `lint` | Typecheck, ESLint, depcruise, script tests, shellcheck |
+| `test` | Coverage suite (`pnpm test:coverage` on PRs; `pnpm test:coverage:fresh` on `main`) |
+| `dogfood` | fit / graph / yagni gates (+ SARIF on same-repo runs) |
+| `graph-equivalence` | Exact ≡ sharded graph proof on this monorepo |
+| `policy-and-docs` | Artifact boundary, SLOs, supply-chain, generated docs |
+| `cold-gate` | Uncached install + build + dogfood (never reuses the warm workspace) |
+
+**Failure model:** lanes are independent — a red lint job does not cancel test.
+Within a job, steps stop on first failure. Coverage uses turbo `--continue` so
+multiple packages can fail in one run. Pushing to a PR cancels the previous run
+and starts a full suite again; you can also use Actions “Re-run failed jobs”.
+
+**Fork PRs:** correctness gates run the same as same-repo PRs. SARIF/Code Scanning
+uploads are skipped with a notice (GitHub does not grant `security-events: write`
+to fork tokens). A green `build-and-test` on a fork still means the product
+gates passed.
+
+**macOS qualification** is a separate workflow and is **not** required for PR
+merge; it feeds release/support evidence.
+
+Third-party Actions are pinned to full commit SHAs. Dependabot’s `github-actions`
+ecosystem (or a deliberate pin bump) keeps them current.
+
 ## Code Style
 
 - TypeScript strict mode
