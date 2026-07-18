@@ -22,6 +22,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { readdirSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 import {
@@ -154,8 +155,16 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
         { code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' },
       );
     }
-    matchedStoredRun = true;
     const exactRun = evidence.snapshot.run;
+    // Change Impact exact selection is only meaningful for audit parent Runs.
+    // Non-impact retained Runs fail closed rather than rendering an empty/wrong tab.
+    if (exactRun.name !== 'audit' || exactRun.source !== 'built-in-suite') {
+      throw new ConfigurationError(
+        `Retained parent Run '${requestedRunId}' has no Change Impact model (name=${exactRun.name}, source=${exactRun.source}). Inspect with: opensip runs show ${requestedRunId} --json`,
+        { code: 'CONFIGURATION.REPORT.CHANGE_IMPACT_UNAVAILABLE' },
+      );
+    }
+    matchedStoredRun = true;
     if (!recentRuns.some((run) => run.id === exactRun.id)) {
       recentRuns = [exactRun, ...recentRuns];
     }
@@ -344,6 +353,41 @@ export function runAddressedReportFilename(runId: string): string {
   return `${digest}.html`;
 }
 
+/**
+ * Delete run-addressed report HTML whose Run is no longer retained.
+ * Uncertainty preserves the file; only exact orphan digests are removed.
+ */
+export function pruneOrphanRunAddressedReports(
+  reportsDir: string,
+  retainedRunIds: readonly string[],
+): number {
+  const runsDir = join(reportsDir, 'runs');
+  let entries: string[];
+  try {
+    entries = readdirSync(runsDir);
+  } catch {
+    // @swallow-ok missing runs dir is not an error; nothing to prune.
+    return 0;
+  }
+  const kept = new Set(
+    retainedRunIds
+      .filter((id) => typeof id === 'string' && id.length > 0)
+      .map((id) => runAddressedReportFilename(id)),
+  );
+  let removed = 0;
+  for (const name of entries) {
+    if (!/^[a-f0-9]{64}\.html$/.test(name)) continue;
+    if (kept.has(name)) continue;
+    try {
+      unlinkSync(join(runsDir, name));
+      removed += 1;
+    } catch {
+      // @swallow-ok concurrent delete / permission uncertainty preserves the file.
+    }
+  }
+  return removed;
+}
+
 function writeReportHtml(
   reportPath: string,
   html: string,
@@ -399,6 +443,18 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
   writeReportHtml(reportPath, html, scope, logger);
   if (matchedRunId !== undefined && reportPath !== latestPath) {
     writeReportHtml(latestPath, html, scope, logger);
+  }
+
+  // Bound accumulation of run-addressed artifacts: delete only orphans whose
+  // Run is no longer retained. Uncertainty preserves the file.
+  const retainedRunIds = (input.runs ?? []).map((run) => run.id);
+  const pruned = pruneOrphanRunAddressedReports(paths.reportsDir, retainedRunIds);
+  if (pruned > 0) {
+    logger.info?.({
+      evt: 'cli.report.compose.orphan_pruned',
+      module: REPORT_MODULE,
+      pruned,
+    });
   }
 
   const fragment =

@@ -14,7 +14,7 @@
  * tools without `collectReportData` are skipped gracefully.
  */
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,7 +31,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as dispatchHookMod from '../bootstrap/dispatch-external-tool-hook.js';
 import * as openReportMod from '../open-report.js';
-import { composeAndWriteReport } from '../report-compose.js';
+import {
+  composeAndWriteReport,
+  pruneOrphanRunAddressedReports,
+  runAddressedReportFilename,
+} from '../report-compose.js';
 
 import type { StoredRun } from '@opensip-cli/contracts';
 import type { ProjectContext, Tool, ToolProvenance, ToolScope } from '@opensip-cli/core';
@@ -287,6 +291,45 @@ describe('composeAndWriteReport', () => {
       ),
     ).rejects.toMatchObject({ code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' });
     expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a retained Run has no Change Impact model', async () => {
+    const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const datastore = openMemoryDatastore();
+    new RunRepo(datastore).saveRun({
+      ...storedRun('run-fit-only'),
+      name: 'fit',
+      // Valid source vocabulary, but not an audit parent — no Change Impact model.
+      source: 'built-in-suite',
+    });
+    const scope = makeScope([], datastore);
+
+    await expect(
+      runWithScope(scope, () =>
+        composeAndWriteReport({
+          open: true,
+          selection: { view: 'change-impact', runId: 'run-fit-only' },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'CONFIGURATION.REPORT.CHANGE_IMPACT_UNAVAILABLE' });
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('prunes only orphaned run-addressed report artifacts', () => {
+    const reportsDir = join(projectRoot, 'reports');
+    const runsDir = join(reportsDir, 'runs');
+    mkdirSync(runsDir, { recursive: true });
+    const kept = runAddressedReportFilename('run-kept');
+    const orphan = runAddressedReportFilename('run-orphan');
+    writeFileSync(join(runsDir, kept), '<html>kept</html>', 'utf8');
+    writeFileSync(join(runsDir, orphan), '<html>orphan</html>', 'utf8');
+    writeFileSync(join(runsDir, 'not-a-digest.html'), '<html>ignore</html>', 'utf8');
+
+    const removed = pruneOrphanRunAddressedReports(reportsDir, ['run-kept']);
+    expect(removed).toBe(1);
+    expect(readFileSync(join(runsDir, kept), 'utf8')).toContain('kept');
+    expect(() => readFileSync(join(runsDir, orphan), 'utf8')).toThrow();
+    expect(readFileSync(join(runsDir, 'not-a-digest.html'), 'utf8')).toContain('ignore');
   });
 
   it('omits malformed or oversized run identity text before embedding and launch', async () => {
