@@ -46,6 +46,7 @@ import {
   isJourneyRequired,
   parseAcceptanceProfile,
 } from '../platform-acceptance/contract.mjs';
+import { FULL_SHA, SHA_PIN } from '../lib/github-workflow-asserts.mjs';
 
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const PROFILE_ROOT = join(REPO_ROOT, '.config', 'platform-acceptance');
@@ -177,9 +178,6 @@ function runStageValidator(dir, manifestDigest, environment = {}) {
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
-
-const SHA_PIN = /uses:\s*[^@\s]+@([^\s#]+)/g;
-const FULL_SHA = /^[a-f0-9]{40}$/;
 
 // ===========================================================================
 // Scheduled packed-candidate lane — .github/workflows/macos-qualification.yml
