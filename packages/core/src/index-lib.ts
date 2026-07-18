@@ -169,6 +169,9 @@ export {
   acquireRuntimeExclusiveLease,
   acquireRuntimeReadLease,
   acquireUserStateReadLease,
+  anchoredRecordTemporaryBasename,
+  ANCHORED_CREATE_RECOVERY_MAX_ENTRIES,
+  ANCHORED_RECORD_MAX_BYTES,
   cleanupEmptyRuntimeLeaseKey,
   COORDINATION_MUTATION_STRATEGY,
   DEFAULT_RUNTIME_LEASE_POLICY,
@@ -182,6 +185,9 @@ export {
   mutateRuntimePromotionJournal,
   mutateUserUninstallReceipt,
   readAnchoredRecord,
+  readRuntimePromotionJournal,
+  RUNTIME_RECOVERY_HEADER_VERSION,
+  RUNTIME_RECOVERY_RECORD_MAX_BYTES,
 } from './lib/runtime-lease.js';
 export type {
   AcquireGlobalRuntimeMaintenanceLeaseInput,
@@ -189,6 +195,7 @@ export type {
   AcquireRuntimeExclusiveLeaseInput,
   AcquireRuntimeReadLeaseInput,
   AcquireUserStateReadLeaseInput,
+  AnchoredLinkedCreateRecovery,
   AnchoredRecordMutation,
   AnchoredRecordRead,
   AnchoredRecordReadResult,

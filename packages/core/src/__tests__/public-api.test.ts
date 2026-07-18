@@ -332,6 +332,9 @@ const EXPECTED_VALUE_EXPORTS = [
   'acquireRuntimeExclusiveLease',
   'acquireRuntimeReadLease',
   'acquireUserStateReadLease',
+  'anchoredRecordTemporaryBasename',
+  'ANCHORED_CREATE_RECOVERY_MAX_ENTRIES',
+  'ANCHORED_RECORD_MAX_BYTES',
   'cleanupEmptyRuntimeLeaseKey',
   'COORDINATION_MUTATION_STRATEGY',
   'DEFAULT_RUNTIME_LEASE_POLICY',
@@ -345,8 +348,11 @@ const EXPECTED_VALUE_EXPORTS = [
   'mutateRuntimePromotionJournal',
   'mutateUserUninstallReceipt',
   'readAnchoredRecord',
+  'readRuntimePromotionJournal',
   'resolveCoordinationPaths',
   'RUNTIME_PROMOTION_JOURNAL_FILE',
+  'RUNTIME_RECOVERY_HEADER_VERSION',
+  'RUNTIME_RECOVERY_RECORD_MAX_BYTES',
   'USER_UNINSTALL_RECEIPT_FILE',
 ].sort();
 

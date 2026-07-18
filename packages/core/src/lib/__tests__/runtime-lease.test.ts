@@ -45,6 +45,9 @@ import {
   mutateRuntimePromotionJournal,
   mutateUserUninstallReceipt,
   readAnchoredRecord,
+  readRuntimePromotionJournal,
+  RUNTIME_RECOVERY_HEADER_VERSION,
+  RUNTIME_RECOVERY_RECORD_MAX_BYTES,
   type RuntimeLease,
 } from '../runtime-lease.js';
 
@@ -329,7 +332,10 @@ describe('runtime lease coordination', () => {
     });
     expect(await listActiveRuntimeLeaseKeys()).toContain(key);
 
-    writeFileSync(promotionPath(), '{malformed', { encoding: 'utf8', mode: 0o600 });
+    writeFileSync(promotionPath(), '{malformed', {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
     if (process.platform !== 'win32') chmodSync(promotionPath(), 0o600);
     expect(await listActiveRuntimeLeaseKeys()).toContain(key);
   });
@@ -907,7 +913,9 @@ describe('runtime lease coordination', () => {
       tokenPrefix: 'user-only-child',
     });
     const userOnlyParent = track(
-      await userOnlyParentCoordinator.acquireUserStateReadLease({ policy: POLICY }),
+      await userOnlyParentCoordinator.acquireUserStateReadLease({
+        policy: POLICY,
+      }),
     );
     await expect(
       userOnlyChildCoordinator.acquireRuntimeAccessLease({
@@ -1321,7 +1329,9 @@ describe('runtime lease coordination', () => {
           `reader-${existing.ownerToken}.json`,
         );
         if (!existsSync(readerPath)) return;
-        const record = JSON.parse(readFileSync(readerPath, 'utf8')) as { refs?: number };
+        const record = JSON.parse(readFileSync(readerPath, 'utf8')) as {
+          refs?: number;
+        };
         if (record.refs !== 2) return;
         injected = true;
         throw new Error('injected refcount publication postcondition failure');
@@ -1341,7 +1351,9 @@ describe('runtime lease coordination', () => {
       `reader-${existing.ownerToken}.json`,
     );
     await waitUntil(() => {
-      const record = JSON.parse(readFileSync(readerPath, 'utf8')) as { refs?: number };
+      const record = JSON.parse(readFileSync(readerPath, 'utf8')) as {
+        refs?: number;
+      };
       return record.refs === 1;
     });
     release(existing);
@@ -1568,7 +1580,9 @@ describe('runtime lease coordination', () => {
         if (name !== 'before-mutex-postcondition' || injected) return;
         const statePath = resolveCoordinationPaths().stateFile;
         if (!existsSync(statePath)) return;
-        const state = JSON.parse(readFileSync(statePath, 'utf8')) as { writers?: unknown[] };
+        const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
+          writers?: unknown[];
+        };
         if (state.writers?.length !== 1) return;
         injected = true;
         throw new Error('injected writer publication postcondition failure');
@@ -1775,7 +1789,10 @@ describe('runtime lease coordination', () => {
     let sequence = 1;
     for (const key of keys) {
       const projectPaths = paths.forProject(key);
-      mkdirSync(projectPaths.projectCoordinationDir, { recursive: true, mode: 0o700 });
+      mkdirSync(projectPaths.projectCoordinationDir, {
+        recursive: true,
+        mode: 0o700,
+      });
       mkdirSync(projectPaths.readersDir, { mode: 0o700 });
       if (process.platform !== 'win32') {
         chmodSync(projectPaths.projectCoordinationDir, 0o700);
@@ -2027,11 +2044,13 @@ describe('runtime lease coordination', () => {
     await createScaffold();
     const paths = resolveCoordinationPaths();
     const readersDir = paths.forProject(projectCoordinationKey(project)).readersDir;
+    const target = join(readersDir, 'reader-orphaned-prelink-owner-0001.json');
     const temporary = join(
       readersDir,
-      '.reader-orphaned-prelink-owner-0001.json.tmp-12345678-1234-1234-1234-123456789012',
+      '.reader-orphaned-prelink-owner-0001.json.tmp-12345678-1234-4234-8234-123456789012',
     );
     privateWrite(temporary, { incomplete: true });
+    expect(existsSync(target)).toBe(false);
 
     const writer = track(
       await acquireRuntimeExclusiveLease({
@@ -2040,6 +2059,7 @@ describe('runtime lease coordination', () => {
       }),
     );
     expect(existsSync(temporary)).toBe(false);
+    expect(existsSync(target)).toBe(false);
     release(writer);
   });
 
@@ -2049,15 +2069,15 @@ describe('runtime lease coordination', () => {
     const projectPaths = paths.forProject(projectCoordinationKey(project));
     const stateTemp = join(
       paths.coordinationDir,
-      '.state.json.tmp-12345678-1234-1234-1234-123456789012',
+      '.state.json.tmp-12345678-1234-4234-8234-123456789012',
     );
     const promotionTemp = join(
       projectPaths.projectCoordinationDir,
-      '.runtime-promotion.json.tmp-12345678-1234-1234-1234-123456789013',
+      '.runtime-promotion.json.tmp-12345678-1234-4234-8234-123456789013',
     );
     const mutexTemp = join(
       paths.coordinationDir,
-      '.coordination.lock.tmp-12345678-1234-1234-1234-123456789014',
+      '.coordination.lock.tmp-12345678-1234-4234-8234-123456789014',
     );
     privateWrite(stateTemp, { version: 1, abandoned: true });
     privateWrite(promotionTemp, { version: 1, abandoned: true });
@@ -2893,7 +2913,12 @@ describe('runtime lease coordination', () => {
     const lease = track(
       await acquireRuntimeReadLease({
         projectDir: project,
-        policy: { waitMs: 7000, staleMs: 20_000, heartbeatMs: 1000, pollMs: 25 },
+        policy: {
+          waitMs: 7000,
+          staleMs: 20_000,
+          heartbeatMs: 1000,
+          pollMs: 25,
+        },
       }),
     );
     const runtimeLeaseEntry = runtimeLeaseEntryPath();
@@ -3158,7 +3183,9 @@ describe('recovery barriers', () => {
         content: '{}',
       }),
     ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
-    expect(inspectRuntimePromotionRecoveryHeader(project)).toEqual({ status: 'absent' });
+    expect(inspectRuntimePromotionRecoveryHeader(project)).toEqual({
+      status: 'absent',
+    });
     await mutateRuntimePromotionJournal(writer, {
       operation: 'create',
       content: open,
@@ -3220,6 +3247,204 @@ describe('recovery barriers', () => {
       }),
     ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST' });
     release(successor);
+  });
+
+  it('reads the fixed promotion journal only with exact live writer authority', async () => {
+    const key = projectCoordinationKey(project);
+    const writer = track(
+      await acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: POLICY,
+      }),
+    );
+
+    await expect(readRuntimePromotionJournal(writer)).resolves.toEqual({
+      status: 'absent',
+    });
+    const content = JSON.stringify({
+      kind: 'init-promotion',
+      version: RUNTIME_RECOVERY_HEADER_VERSION,
+      coordinationKey: key,
+      operationId: 'authority-read',
+      state: 'open',
+      body: { cursor: 1 },
+    });
+    await mutateRuntimePromotionJournal(writer, {
+      operation: 'create',
+      content,
+    });
+    await expect(readRuntimePromotionJournal(writer)).resolves.toEqual({
+      status: 'present',
+      content,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    });
+
+    const forged = Object.freeze({ ...writer });
+    await expect(readRuntimePromotionJournal(forged)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+    });
+    const wrongKey = Object.freeze({
+      ...writer,
+      coordinationKey: projectCoordinationKey(otherProject),
+    });
+    await expect(readRuntimePromotionJournal(wrongKey)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+    });
+
+    release(writer);
+    await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+    });
+  });
+
+  it('rejects oversize and unsafe fixed promotion journal reads', async () => {
+    const writer = track(
+      await acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: POLICY,
+      }),
+    );
+    writeFileSync(promotionPath(), 'x'.repeat(RUNTIME_RECOVERY_RECORD_MAX_BYTES + 1), {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+    if (process.platform !== 'win32') chmodSync(promotionPath(), 0o600);
+    await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+    });
+    rmSync(promotionPath());
+
+    if (process.platform !== 'win32') {
+      const outside = join(project, 'outside-promotion.json');
+      privateWrite(outside, { secret: true });
+      symlinkSync(outside, promotionPath());
+      await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
+        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      });
+      rmSync(promotionPath());
+    }
+
+    release(writer);
+  });
+
+  it('keeps fixed promotion mutations at 24 KiB while general anchored records allow more', async () => {
+    const writer = track(
+      await acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: POLICY,
+      }),
+    );
+    const oversize = JSON.stringify({
+      kind: 'init-promotion',
+      version: 1,
+      coordinationKey: projectCoordinationKey(project),
+      operationId: 'fixed-promotion-oversize',
+      state: 'open',
+      padding: 'x'.repeat(RUNTIME_RECOVERY_RECORD_MAX_BYTES),
+    });
+    expect(Buffer.byteLength(oversize, 'utf8')).toBeGreaterThan(RUNTIME_RECOVERY_RECORD_MAX_BYTES);
+    await expect(
+      mutateRuntimePromotionJournal(writer, {
+        operation: 'create',
+        content: oversize,
+      }),
+    ).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+    });
+    expect(existsSync(promotionPath())).toBe(false);
+    release(writer);
+  });
+
+  it('detects fixed promotion parent replacement before returning journal data', async () => {
+    const movedParent = join(home, 'moved-project-coordination');
+    let replaceParent = false;
+    const coordinator = createRuntimeLeaseCoordinator({
+      coordinationCheckpoint: (name) => {
+        if (name !== 'before-fixed-recovery-read-parent-revalidation' || replaceParent) return;
+        replaceParent = true;
+        const projectPaths = resolveCoordinationPaths().forProject(projectCoordinationKey(project));
+        renameSync(projectPaths.projectCoordinationDir, movedParent);
+        mkdirSync(projectPaths.projectCoordinationDir, { mode: 0o700 });
+        mkdirSync(projectPaths.readersDir, { mode: 0o700 });
+        if (process.platform !== 'win32') {
+          chmodSync(projectPaths.projectCoordinationDir, 0o700);
+          chmodSync(projectPaths.readersDir, 0o700);
+        }
+      },
+    });
+    const writer = track(
+      await coordinator.acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: POLICY,
+      }),
+    );
+    const content = JSON.stringify({
+      kind: 'init-promotion',
+      version: RUNTIME_RECOVERY_HEADER_VERSION,
+      coordinationKey: projectCoordinationKey(project),
+      operationId: 'parent-replacement',
+      state: 'open',
+    });
+    await mutateRuntimePromotionJournal(writer, {
+      operation: 'create',
+      content,
+    });
+
+    await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+    });
+    expect(readFileSync(join(movedParent, RUNTIME_PROMOTION_JOURNAL_FILE), 'utf8')).toBe(content);
+    expect(existsSync(promotionPath())).toBe(false);
+
+    release(writer);
+    rmSync(movedParent, { recursive: true, force: true });
+  });
+
+  it('durably retries a fixed journal unlink after the target vanished before parent fsync', async () => {
+    let failParentFsync = true;
+    const coordinator = createRuntimeLeaseCoordinator({
+      coordinationCheckpoint: (name) => {
+        if (name !== 'before-fixed-recovery-parent-fsync' || !failParentFsync) return;
+        failParentFsync = false;
+        throw new Error('injected parent fsync failure');
+      },
+    });
+    const writer = track(
+      await coordinator.acquireRuntimeExclusiveLease({
+        projectDir: project,
+        policy: POLICY,
+      }),
+    );
+    const content = JSON.stringify({
+      kind: 'init-promotion',
+      version: RUNTIME_RECOVERY_HEADER_VERSION,
+      coordinationKey: projectCoordinationKey(project),
+      operationId: 'durable-unlink-retry',
+      state: 'closed',
+    });
+    await mutateRuntimePromotionJournal(writer, {
+      operation: 'create',
+      content,
+    });
+    const observed = await readRuntimePromotionJournal(writer);
+    expect(observed.status).toBe('present');
+    const unlink = {
+      operation: 'unlink' as const,
+      expectedContentSha256: observed.status === 'present' ? observed.sha256 : '',
+    };
+
+    await expect(mutateRuntimePromotionJournal(writer, unlink)).rejects.toThrow(
+      'injected parent fsync failure',
+    );
+    expect(existsSync(promotionPath())).toBe(false);
+    await expect(mutateRuntimePromotionJournal(writer, unlink)).resolves.toEqual({
+      strategy: 'portable-anchored',
+    });
+    await expect(readRuntimePromotionJournal(writer)).resolves.toEqual({
+      status: 'absent',
+    });
+
+    release(writer);
   });
 
   it('mutates the fixed uninstall receipt only under live global authority', async () => {
@@ -3314,6 +3539,9 @@ describe('recovery barriers', () => {
         content: '{}',
       }),
     ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE' });
+    await expect(readRuntimePromotionJournal(discard)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
     await expect(discardRuntimePromotionJournal(new Proxy(discard, {}))).rejects.toMatchObject({
       code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
     });
@@ -3435,6 +3663,10 @@ describe('recovery barriers', () => {
         policy: POLICY,
       }),
     );
+    await expect(readRuntimePromotionJournal(recovery)).resolves.toMatchObject({
+      status: 'present',
+      content: expect.stringContaining('"operationId":"promotion-2"'),
+    });
     release(recovery);
 
     const discard = track(
@@ -3640,7 +3872,7 @@ describe('recovery barriers', () => {
       const projectPaths = resolveCoordinationPaths().forProject(projectCoordinationKey(project));
       const allowedTemp = join(
         projectPaths.projectCoordinationDir,
-        '.runtime-promotion.json.tmp-12345678-1234-1234-1234-123456789012',
+        '.runtime-promotion.json.tmp-12345678-1234-4234-8234-123456789012',
       );
       symlinkSync(join(project, 'missing-recovery'), allowedTemp);
 
@@ -3681,7 +3913,7 @@ describe('recovery barriers', () => {
     const projectPaths = paths.forProject(projectCoordinationKey(project));
     const headerTemp = join(
       projectPaths.projectCoordinationDir,
-      '.runtime-promotion.json.tmp-12345678-1234-1234-1234-123456789012',
+      '.runtime-promotion.json.tmp-12345678-1234-4234-8234-123456789012',
     );
     privateWrite(headerTemp, {
       kind: 'init-promotion',
@@ -3717,7 +3949,7 @@ describe('recovery barriers', () => {
     rmSync(projectPaths.promotionJournalFile);
     const stateTemp = join(
       paths.coordinationDir,
-      '.state.json.tmp-12345678-1234-1234-1234-123456789012',
+      '.state.json.tmp-12345678-1234-4234-8234-123456789012',
     );
     linkSync(paths.stateFile, stateTemp);
     const stateBefore = {
@@ -4087,31 +4319,80 @@ describe('anchored coordination mutation and cleanup', () => {
     expect(existsSync(paths.coordinationDir)).toBe(false);
   });
 
+  it('allows a plain coordination-root read but rejects effectful generic recovery', async () => {
+    await createScaffold();
+    const paths = resolveCoordinationPaths();
+    const projectPaths = paths.forProject(projectCoordinationKey(project));
+    const content = '{"fixed":true}';
+    privateWrite(projectPaths.promotionJournalFile, JSON.parse(content));
+    const plain = readAnchoredRecord({
+      trustedAnchorDir: paths.coordinationDir,
+      parentDir: projectPaths.projectCoordinationDir,
+      basename: RUNTIME_PROMOTION_JOURNAL_FILE,
+      maxBytes: RUNTIME_RECOVERY_RECORD_MAX_BYTES,
+      permissionPosture: 'private',
+    });
+    expect(plain).toMatchObject({ status: 'present', content });
+
+    expect(() =>
+      readAnchoredRecord({
+        trustedAnchorDir: paths.coordinationDir,
+        parentDir: projectPaths.projectCoordinationDir,
+        basename: RUNTIME_PROMOTION_JOURNAL_FILE,
+        maxBytes: RUNTIME_RECOVERY_RECORD_MAX_BYTES,
+        permissionPosture: 'private',
+        linkedCreateRecovery: {
+          effect: 'settle-linked-create',
+          expectedContentSha256: createHash('sha256').update(content).digest('hex'),
+        },
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      }),
+    );
+    expect(readFileSync(projectPaths.promotionJournalFile, 'utf8')).toBe(content);
+  });
+
   it('detects replacement of an anchored parent before publication', () => {
     const anchor = mkdtempSync(join(tmpdir(), 'opensip-parent-replacement-'));
     const parent = join(anchor, 'parent');
+    const dryParent = join(anchor, 'parent-dry-run');
     const replacedParent = join(anchor, 'parent-replaced');
     mkdirSync(parent, { mode: 0o700 });
+    mkdirSync(dryParent, { mode: 0o700 });
     if (process.platform !== 'win32') {
       chmodSync(anchor, 0o700);
       chmodSync(parent, 0o700);
+      chmodSync(dryParent, 0o700);
     }
-    let operationReads = 0;
     try {
+      let dryParentReads = 0;
+      mutateAnchoredRecord({
+        trustedAnchorDir: anchor,
+        get parentDir() {
+          dryParentReads += 1;
+          return dryParent;
+        },
+        basename: 'record.json',
+        operation: 'create',
+        content: '{}',
+      });
+      let parentReads = 0;
       expect(() =>
         mutateAnchoredRecord({
           trustedAnchorDir: anchor,
-          parentDir: parent,
-          basename: 'record.json',
-          get operation() {
-            operationReads += 1;
-            if (operationReads === 2) {
+          get parentDir() {
+            parentReads += 1;
+            if (parentReads === dryParentReads - 2) {
               renameSync(parent, replacedParent);
               mkdirSync(parent, { mode: 0o700 });
               if (process.platform !== 'win32') chmodSync(parent, 0o700);
             }
-            return 'create' as const;
+            return parent;
           },
+          basename: 'record.json',
+          operation: 'create',
           content: '{}',
         }),
       ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
@@ -4194,7 +4475,9 @@ describe('anchored coordination mutation and cleanup', () => {
                 renameSync(parent, movedParent);
                 mkdirSync(parent, { mode: 0o700 });
                 if (process.platform !== 'win32') chmodSync(parent, 0o700);
-                privateWrite(join(parent, 'record.json'), { value: 'replacement-parent' });
+                privateWrite(join(parent, 'record.json'), {
+                  value: 'replacement-parent',
+                });
               }
               return parent;
             },
@@ -4203,7 +4486,11 @@ describe('anchored coordination mutation and cleanup', () => {
             ...(operation === 'replace' ? { content: '{"value":"published"}' } : {}),
             expectedContentSha256: before.status === 'present' ? before.sha256 : '',
           }),
-        ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+        ).toThrow(
+          expect.objectContaining({
+            code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+          }),
+        );
         expect(readFileSync(join(parent, 'record.json'), 'utf8')).toBe(
           JSON.stringify({ value: 'replacement-parent' }),
         );
@@ -4227,10 +4514,11 @@ describe('anchored coordination mutation and cleanup', () => {
     const anchor = mkdtempSync(join(tmpdir(), 'opensip-linked-recovery-'));
     if (process.platform !== 'win32') chmodSync(anchor, 0o700);
     const target = join(anchor, 'linked-crash.json');
-    const temp = join(anchor, '.linked-crash.json.tmp-12345678-1234-1234-1234-123456789012');
+    const temp = join(anchor, '.linked-crash.json.tmp-12345678-1234-4234-8234-123456789012');
     privateWrite(temp, { owner: 'test' });
     linkSync(temp, target);
     expect(lstatSync(target).nlink).toBe(2);
+    const content = JSON.stringify({ owner: 'test' });
 
     expect(() =>
       mutateAnchoredRecord({
@@ -4238,7 +4526,7 @@ describe('anchored coordination mutation and cleanup', () => {
         parentDir: anchor,
         basename: 'linked-crash.json',
         operation: 'create',
-        content: '{}',
+        content,
         maxBytes: 4096,
         permissionPosture: 'private',
       }),
@@ -4364,6 +4652,8 @@ describe('anchored coordination mutation and cleanup', () => {
 
   it('uses only fixed recovery basenames', () => {
     expect(RUNTIME_PROMOTION_JOURNAL_FILE).toBe('runtime-promotion.json');
+    expect(RUNTIME_RECOVERY_HEADER_VERSION).toBe(1);
+    expect(RUNTIME_RECOVERY_RECORD_MAX_BYTES).toBe(24 * 1024);
     expect(USER_UNINSTALL_RECEIPT_FILE).toBe('user-uninstall.json');
   });
 });

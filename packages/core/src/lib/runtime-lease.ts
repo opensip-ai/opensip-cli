@@ -56,12 +56,19 @@ import {
   USER_UNINSTALL_RECEIPT_FILE,
 } from './paths.js';
 
-import type { BigIntStats, Stats } from 'node:fs';
+import type { BigIntStats } from 'node:fs';
 
 const STATE_VERSION = 1;
-const RECOVERY_HEADER_VERSION = 1;
 const MAX_RECORD_BYTES = 4096;
-const MAX_RECOVERY_BYTES = 24 * 1024;
+/** Maximum UTF-8 body size accepted by the general anchored-record seam. */
+export const ANCHORED_RECORD_MAX_BYTES = 4 * 1024 * 1024;
+/** Maximum entries inspected lazily while proving a linked-create peer. */
+export const ANCHORED_CREATE_RECOVERY_MAX_ENTRIES = 100_000;
+/** Version of the bounded header shared by fixed runtime recovery records. */
+export const RUNTIME_RECOVERY_HEADER_VERSION = 1;
+/** Maximum UTF-8 body size for a fixed runtime recovery record. */
+export const RUNTIME_RECOVERY_RECORD_MAX_BYTES = 24 * 1024;
+const ANCHORED_TEMP_BASENAME_MAX_BYTES = 255;
 const MAX_WRITER_QUEUE = 8;
 const MAX_PROJECT_KEYS = 256;
 const MAX_READERS_PER_DIMENSION = 128;
@@ -88,6 +95,8 @@ const PROJECT_KEY_PATTERN = /^[a-f0-9]{24}$/u;
 const REFERENCE_TOKEN_PATTERN = /^[a-f0-9]{24}$/u;
 const OWNER_TOKEN_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]{15,127}$/u;
 const OPERATION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
+const ANCHORED_CREATE_IDENTITY_PATTERN = /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]{14,126}[a-zA-Z0-9])$/u;
+const UUID_V4_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
 const PROCESS_INCARNATION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_:-]{0,95}$/u;
 const READER_FILE_PATTERN = /^reader-([a-zA-Z0-9][a-zA-Z0-9-]{15,127})\.json$/u;
 const READER_TEMP_FILE_PATTERN =
@@ -177,7 +186,9 @@ export interface RuntimeLeaseEnvironment {
       | 'mutex-entered'
       | 'before-mutex-postcondition'
       | 'before-stale-reader-unlink'
-      | 'empty-scaffold-parents-opened',
+      | 'empty-scaffold-parents-opened'
+      | 'before-fixed-recovery-read-parent-revalidation'
+      | 'before-fixed-recovery-parent-fsync',
   ) => void;
 }
 
@@ -194,6 +205,7 @@ interface RuntimeWriterAuthority {
   readonly coordinationKey?: string;
   readonly mutationCapability:
     'project-record' | 'project-discard-only' | 'user-record' | 'receipt-discard-only';
+  readonly environment: RuntimeLeaseEnvironment;
 }
 
 type WriterLeaseWithAuthority = RuntimeExclusiveLease | GlobalRuntimeMaintenanceLease;
@@ -367,7 +379,31 @@ export interface AnchoredRecordMutation extends CoordinationRecordMutation {
    * parents while still rejecting group/world-writable directories.
    */
   readonly permissionPosture?: 'private' | 'owner-controlled';
+  /** Record permissions; defaults to the parent posture for compatibility. */
+  readonly recordPosture?: 'private' | 'owner-controlled';
+  /**
+   * Operation-bound identity for one deterministic create temporary. When
+   * supplied, retry/recovery may reconcile only that exact derived basename.
+   */
+  readonly createIdentity?: string;
 }
+
+export type AnchoredLinkedCreateRecovery =
+  | {
+      /** Explicit authority to settle a linked random-UUID create only. */
+      readonly effect: 'settle-linked-create';
+      readonly expectedContentSha256: string;
+      /** Optional stricter inspection limit; never exceeds the exported cap. */
+      readonly maxEntries?: number;
+    }
+  | {
+      /** Also authorizes discard of this operation's exact unlinked temporary. */
+      readonly effect: 'settle-or-discard-owned-temporary';
+      readonly expectedContentSha256: string;
+      readonly createIdentity: string;
+      /** Optional stricter inspection limit; never exceeds the exported cap. */
+      readonly maxEntries?: number;
+    };
 
 export interface AnchoredRecordRead {
   readonly trustedAnchorDir: string;
@@ -375,6 +411,10 @@ export interface AnchoredRecordRead {
   readonly basename: string;
   readonly maxBytes?: number;
   readonly permissionPosture?: 'private' | 'owner-controlled';
+  /** Record permissions; defaults to the parent posture for compatibility. */
+  readonly recordPosture?: 'private' | 'owner-controlled';
+  /** Explicit mutation authority for crash-safe linked-create reconciliation. */
+  readonly linkedCreateRecovery?: AnchoredLinkedCreateRecovery;
 }
 
 export type AnchoredRecordReadResult =
@@ -473,10 +513,34 @@ function boundedPolicyDuration(
 
 function boundedRecordSize(value: number | undefined): number {
   const candidate = value ?? MAX_RECORD_BYTES;
-  if (!Number.isSafeInteger(candidate) || candidate < 1) {
+  if (!Number.isSafeInteger(candidate) || candidate < 1 || candidate > ANCHORED_RECORD_MAX_BYTES) {
     throw unsafeCoordination('Anchored record size bound is invalid');
   }
-  return Math.min(MAX_RECOVERY_BYTES, candidate);
+  return candidate;
+}
+
+function boundedAnchoredRecoveryEntries(value: number | undefined): number {
+  const candidate = value ?? ANCHORED_CREATE_RECOVERY_MAX_ENTRIES;
+  if (
+    !Number.isSafeInteger(candidate) ||
+    candidate < 1 ||
+    candidate > ANCHORED_CREATE_RECOVERY_MAX_ENTRIES
+  ) {
+    throw unsafeCoordination('Anchored create recovery entry bound is invalid');
+  }
+  return candidate;
+}
+
+function anchoredPermissionPosture(
+  value: 'private' | 'owner-controlled' | undefined,
+  fallback: 'private' | 'owner-controlled',
+  field: string,
+): 'private' | 'owner-controlled' {
+  const candidate = value ?? fallback;
+  if (candidate !== 'private' && candidate !== 'owner-controlled') {
+    throw unsafeCoordination(`Anchored record ${field} is invalid`);
+  }
+  return candidate;
 }
 
 function normalizePolicy(policy?: Partial<RuntimeLeasePolicy>): RuntimeLeasePolicy {
@@ -745,13 +809,13 @@ function sameRecordIdentity(left: RecordIdentity, right: RecordIdentity): boolea
   );
 }
 
-function assertRegularRecordStat(
+function assertRecordStatMetadata(
   stat: BigIntStats,
   maxBytes: number | undefined,
   permissionPosture: 'private' | 'owner-controlled' = 'private',
 ): void {
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1n) {
-    throw unsafeCoordination('Runtime coordination record has an unsafe type or link count');
+  if (!stat.isFile() || stat.isSymbolicLink()) {
+    throw unsafeCoordination('Runtime coordination record has an unsafe type');
   }
   const uid = currentUid();
   if (uid !== undefined && stat.uid !== BigInt(uid)) {
@@ -770,6 +834,17 @@ function assertRegularRecordStat(
   }
   if (maxBytes !== undefined && stat.size > BigInt(maxBytes)) {
     throw unsafeCoordination('Runtime coordination record exceeds its size bound');
+  }
+}
+
+function assertRegularRecordStat(
+  stat: BigIntStats,
+  maxBytes: number | undefined,
+  permissionPosture: 'private' | 'owner-controlled' = 'private',
+): void {
+  assertRecordStatMetadata(stat, maxBytes, permissionPosture);
+  if (stat.nlink !== 1n) {
+    throw unsafeCoordination('Runtime coordination record has an unsafe link count');
   }
 }
 
@@ -908,7 +983,7 @@ function validateProjectCoordinationEntries(
     } else if (PROJECT_ENTRY_PATTERN.test(entry)) {
       assertPrivateRecordEntry(
         join(projectPaths.projectCoordinationDir, entry),
-        MAX_RECOVERY_BYTES,
+        RUNTIME_RECOVERY_RECORD_MAX_BYTES,
         [1n, 2n],
       );
       if (guard !== undefined) {
@@ -918,7 +993,7 @@ function validateProjectCoordinationEntries(
             projectPaths.projectCoordinationDir,
             entry,
             targetBasename,
-            MAX_RECOVERY_BYTES,
+            RUNTIME_RECOVERY_RECORD_MAX_BYTES,
             guard,
           );
         }
@@ -963,7 +1038,9 @@ function validateCoordinationRootEntries(
     } else if (ROOT_ENTRY_PATTERN.test(entry)) {
       assertPrivateRecordEntry(
         path,
-        entry.includes(USER_UNINSTALL_RECEIPT_FILE) ? MAX_RECOVERY_BYTES : MAX_RECORD_BYTES,
+        entry.includes(USER_UNINSTALL_RECEIPT_FILE)
+          ? RUNTIME_RECOVERY_RECORD_MAX_BYTES
+          : MAX_RECORD_BYTES,
         [1n, 2n],
         entry.startsWith('.coordination.lock.tmp-'),
       );
@@ -978,7 +1055,7 @@ function validateCoordinationRootEntries(
               entry,
               targetBasename,
               targetBasename === USER_UNINSTALL_RECEIPT_FILE
-                ? MAX_RECOVERY_BYTES
+                ? RUNTIME_RECOVERY_RECORD_MAX_BYTES
                 : MAX_RECORD_BYTES,
               guard,
             );
@@ -1217,6 +1294,25 @@ function assertSafeBasename(value: string): void {
   }
 }
 
+/**
+ * Derive the one deterministic temporary basename owned by an anchored create.
+ * Callers persist `createIdentity`; Core owns and validates the path grammar.
+ */
+export function anchoredRecordTemporaryBasename(
+  basenameValue: string,
+  createIdentity: string,
+): string {
+  assertSafeBasename(basenameValue);
+  if (!ANCHORED_CREATE_IDENTITY_PATTERN.test(createIdentity)) {
+    throw unsafeCoordination('Anchored create identity is invalid');
+  }
+  const temporary = `.${basenameValue}.tmp-${createIdentity}`;
+  if (Buffer.byteLength(temporary, 'utf8') > ANCHORED_TEMP_BASENAME_MAX_BYTES) {
+    throw unsafeCoordination('Anchored create temporary basename is too long');
+  }
+  return temporary;
+}
+
 function targetIdentity(
   path: string,
   maxBytes: number,
@@ -1310,115 +1406,329 @@ function createExclusiveRecord(
   return identity;
 }
 
-function assertLinkedCreateStat(
-  stat: Stats,
+interface LinkedRecordProof {
+  readonly identity: RecordIdentity;
+  readonly sha256: string;
+}
+
+interface LinkedCreateReconciliation {
+  readonly trustedAnchorDir: string;
+  readonly parentDir: string;
+  readonly basename: string;
+  readonly target: string;
+  readonly maxBytes: number;
+  readonly parentPosture: 'private' | 'owner-controlled';
+  readonly recordPosture: 'private' | 'owner-controlled';
+  readonly expectedContentSha256: string;
+  readonly exactTemporaryBasename?: string;
+  readonly discardExactUnlinkedTemporary: boolean;
+  readonly proveCompleteTarget: boolean;
+  readonly maxEntries: number;
+}
+
+function readLinkedRecordProof(
+  path: string,
   maxBytes: number,
-  permissionPosture: 'private' | 'owner-controlled',
-): void {
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 2) {
-    throw unsafeCoordination('Anchored create has an unproven link state');
+  recordPosture: 'private' | 'owner-controlled',
+  expectedLinks: bigint,
+): LinkedRecordProof {
+  const before = lstatIfPresent(path, 'Anchored create');
+  if (before === undefined) {
+    throw new RuntimeSnapshotChangedError('Anchored create disappeared before proof read');
   }
-  const uid = currentUid();
-  if (uid !== undefined && stat.uid !== uid) {
-    throw unsafeCoordination('Anchored create has an unexpected owner');
+  assertRecordStatMetadata(before, maxBytes, recordPosture);
+  if (before.nlink !== expectedLinks) {
+    throw new RuntimeSnapshotChangedError('Anchored create link state changed before proof read');
   }
-  const mode = stat.mode & 0o777;
-  if (
-    process.platform !== 'win32' &&
-    (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)
-  ) {
-    throw unsafeCoordination('Anchored create has unsafe permissions');
-  }
-  if (stat.size > maxBytes) {
-    throw unsafeCoordination('Anchored create exceeds its size bound');
+  const beforeIdentity = recordIdentity(before);
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const opened = fstatSync(fd, { bigint: true });
+    if (!sameRecordIdentity(beforeIdentity, recordIdentity(opened))) {
+      throw new RuntimeSnapshotChangedError('Anchored create changed before proof read');
+    }
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const count = readSync(fd, buffer, offset, buffer.length - offset, offset);
+      if (count === 0) break;
+      offset += count;
+    }
+    if (offset > maxBytes) {
+      throw unsafeCoordination('Anchored create exceeds its size bound');
+    }
+    const openedAfter = recordIdentity(fstatSync(fd, { bigint: true }));
+    const pathAfterStat = lstatIfPresent(path, 'Anchored create');
+    if (pathAfterStat === undefined) {
+      throw new RuntimeSnapshotChangedError('Anchored create disappeared during proof read');
+    }
+    const pathAfter = recordIdentity(pathAfterStat);
+    if (
+      !sameRecordIdentity(beforeIdentity, openedAfter) ||
+      !sameRecordIdentity(beforeIdentity, pathAfter)
+    ) {
+      throw new RuntimeSnapshotChangedError('Anchored create changed during proof read');
+    }
+    return {
+      identity: beforeIdentity,
+      sha256: createHash('sha256').update(buffer.subarray(0, offset)).digest('hex'),
+    };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
   }
 }
 
-function recoverCompletedLinkedCreate(
-  input: AnchoredRecordMutation,
-  parent: { readonly fd: number; readonly identity: DirectoryIdentity },
-  target: string,
-  maxBytes: number,
-  permissionPosture: 'private' | 'owner-controlled',
-): void {
-  const prefix = `.${input.basename}.tmp-`;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    let targetStat: Stats;
-    try {
-      targetStat = lstatSync(target);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-      throw unsafeCoordination('Anchored create target cannot be inspected');
-    }
-    if (targetStat.nlink <= 1) {
-      return;
-    }
-    assertLinkedCreateStat(targetStat, maxBytes, permissionPosture);
-    const entries = readDirectoryBounded(input.parentDir, 512, 'Anchored parent recovery scan');
-    const matching: string[] = [];
-    for (const entry of entries) {
-      if (!entry.startsWith(prefix) || entry.length > prefix.length + 128) continue;
-      try {
-        const stat = lstatSync(join(input.parentDir, entry));
-        if (stat.dev === targetStat.dev && stat.ino === targetStat.ino) {
-          matching.push(entry);
-        }
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+function scanLinkedCreatePeer(
+  parentDir: string,
+  prefix: string,
+  targetIdentityValue: RecordIdentity,
+  maxEntries: number,
+): string {
+  const directory = opendirSync(parentDir);
+  let inspected = 0;
+  let matching: string | undefined;
+  try {
+    for (;;) {
+      const entry = directory.readSync();
+      if (entry === null) break;
+      inspected += 1;
+      if (inspected > maxEntries) {
+        throw unsafeCoordination('Anchored parent recovery scan exceeds its entry bound');
       }
-    }
-    if (matching.length > 1) {
-      throw unsafeCoordination('Anchored create link recovery is ambiguous');
-    }
-    if (matching.length === 0) {
-      let current: Stats;
-      try {
-        current = lstatSync(target);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-        throw error;
+      if (
+        Buffer.byteLength(entry.name, 'utf8') > ANCHORED_TEMP_BASENAME_MAX_BYTES ||
+        !entry.name.startsWith(prefix) ||
+        !UUID_V4_PATTERN.test(entry.name.slice(prefix.length))
+      ) {
+        continue;
       }
-      if (current.dev === targetStat.dev && current.ino === targetStat.ino && current.nlink > 1) {
+      const stat = lstatIfPresent(join(parentDir, entry.name), 'Anchored create candidate');
+      if (stat?.dev !== targetIdentityValue.dev || stat.ino !== targetIdentityValue.ino) {
+        continue;
+      }
+      if (matching !== undefined) {
         throw unsafeCoordination('Anchored create link recovery is ambiguous');
       }
-      continue;
+      matching = entry.name;
     }
-    const tempPath = join(input.parentDir, matching[0]);
-    let tempStat: Stats;
-    try {
-      tempStat = lstatSync(tempPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw error;
-    }
-    if (tempStat.nlink <= 1) continue;
-    assertLinkedCreateStat(tempStat, maxBytes, permissionPosture);
-    const currentTarget = lstatSync(target);
+  } finally {
+    directory.closeSync();
+  }
+  if (matching === undefined) {
+    throw unsafeCoordination('Anchored create link recovery has no proven temporary peer');
+  }
+  return matching;
+}
+
+function samePublishedRecord(left: RecordIdentity, right: RecordIdentity): boolean {
+  return (
+    sameIdentity(left, right) &&
+    left.uid === right.uid &&
+    left.mode === right.mode &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs
+  );
+}
+
+function discardExactUnlinkedTemporary(
+  input: LinkedCreateReconciliation,
+  parent: { readonly fd: number; readonly identity: DirectoryIdentity },
+): void {
+  const temporaryBasename = input.exactTemporaryBasename;
+  if (temporaryBasename === undefined) return;
+  const temporaryPath = join(input.parentDir, temporaryBasename);
+  const temporary = lstatIfPresent(temporaryPath, 'Anchored owned temporary');
+  if (temporary === undefined) {
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      input.parentDir,
+      input.trustedAnchorDir,
+      input.parentPosture,
+    );
+    fsyncParent(parent.fd);
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      input.parentDir,
+      input.trustedAnchorDir,
+      input.parentPosture,
+    );
     if (
-      currentTarget.dev !== targetStat.dev ||
-      currentTarget.ino !== targetStat.ino ||
-      tempStat.dev !== targetStat.dev ||
-      tempStat.ino !== targetStat.ino
+      lstatIfPresent(temporaryPath, 'Anchored owned temporary') !== undefined ||
+      lstatIfPresent(input.target, 'Anchored create target') !== undefined
     ) {
-      continue;
+      throw unsafeCoordination('Anchored owned temporary absence did not converge');
+    }
+    return;
+  }
+  assertRegularRecordStat(temporary, input.maxBytes, input.recordPosture);
+  const identity = recordIdentity(temporary);
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  const immediatelyBefore = lstatSync(temporaryPath, { bigint: true });
+  assertRegularRecordStat(immediatelyBefore, input.maxBytes, input.recordPosture);
+  if (
+    !sameRecordIdentity(identity, recordIdentity(immediatelyBefore)) ||
+    lstatIfPresent(input.target, 'Anchored create target') !== undefined
+  ) {
+    throw new RuntimeSnapshotChangedError('Anchored owned temporary changed before discard');
+  }
+  unlinkSync(temporaryPath);
+  fsyncParent(parent.fd);
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  if (
+    lstatIfPresent(temporaryPath, 'Anchored owned temporary') !== undefined ||
+    lstatIfPresent(input.target, 'Anchored create target') !== undefined
+  ) {
+    throw unsafeCoordination('Anchored owned temporary discard did not converge');
+  }
+}
+
+function settleLinkedCreate(
+  input: LinkedCreateReconciliation,
+  parent: { readonly fd: number; readonly identity: DirectoryIdentity },
+  targetProof: LinkedRecordProof,
+): void {
+  if (targetProof.sha256 !== input.expectedContentSha256) {
+    throw unsafeCoordination('Anchored create content does not match expected identity');
+  }
+  const temporaryBasename =
+    input.exactTemporaryBasename ??
+    scanLinkedCreatePeer(
+      input.parentDir,
+      `.${input.basename}.tmp-`,
+      targetProof.identity,
+      input.maxEntries,
+    );
+  const temporaryPath = join(input.parentDir, temporaryBasename);
+  const temporaryProof = readLinkedRecordProof(
+    temporaryPath,
+    input.maxBytes,
+    input.recordPosture,
+    2n,
+  );
+  if (
+    temporaryProof.sha256 !== input.expectedContentSha256 ||
+    !sameRecordIdentity(targetProof.identity, temporaryProof.identity)
+  ) {
+    throw unsafeCoordination('Anchored create temporary peer is not content-bound');
+  }
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  const finalTarget = lstatSync(input.target, { bigint: true });
+  const finalTemporary = lstatSync(temporaryPath, { bigint: true });
+  assertRecordStatMetadata(finalTarget, input.maxBytes, input.recordPosture);
+  assertRecordStatMetadata(finalTemporary, input.maxBytes, input.recordPosture);
+  if (
+    finalTarget.nlink !== 2n ||
+    finalTemporary.nlink !== 2n ||
+    !sameRecordIdentity(targetProof.identity, recordIdentity(finalTarget)) ||
+    !sameRecordIdentity(temporaryProof.identity, recordIdentity(finalTemporary))
+  ) {
+    throw new RuntimeSnapshotChangedError('Anchored create changed immediately before settlement');
+  }
+  unlinkSync(temporaryPath);
+  fsyncParent(parent.fd);
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  if (lstatIfPresent(temporaryPath, 'Anchored create temporary') !== undefined) {
+    throw unsafeCoordination('Anchored create temporary remained after settlement');
+  }
+  const settled = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 1n);
+  if (
+    settled.sha256 !== input.expectedContentSha256 ||
+    !samePublishedRecord(targetProof.identity, settled.identity)
+  ) {
+    throw unsafeCoordination('Anchored create settlement lost its content identity');
+  }
+}
+
+function reconcileAnchoredCreate(
+  input: LinkedCreateReconciliation,
+  parent: { readonly fd: number; readonly identity: DirectoryIdentity },
+): 'absent' | 'present' {
+  const targetStat = lstatIfPresent(input.target, 'Anchored create target');
+  if (targetStat === undefined) {
+    if (input.discardExactUnlinkedTemporary) {
+      discardExactUnlinkedTemporary(input, parent);
+    }
+    return 'absent';
+  }
+  assertRecordStatMetadata(targetStat, input.maxBytes, input.recordPosture);
+  if (targetStat.nlink === 0n) {
+    throw new RuntimeSnapshotChangedError('Anchored create target was unlinked during recovery');
+  }
+  if (targetStat.nlink === 1n) {
+    if (
+      input.exactTemporaryBasename !== undefined &&
+      lstatIfPresent(
+        join(input.parentDir, input.exactTemporaryBasename),
+        'Anchored owned temporary',
+      ) !== undefined
+    ) {
+      throw unsafeCoordination('Anchored complete target collides with its owned temporary');
+    }
+    const before = input.proveCompleteTarget
+      ? readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 1n)
+      : undefined;
+    if (before !== undefined && before.sha256 !== input.expectedContentSha256) {
+      throw unsafeCoordination('Anchored complete target does not match expected identity');
     }
     assertAnchoredParentUnchanged(
       parent.fd,
       parent.identity,
       input.parentDir,
       input.trustedAnchorDir,
-      permissionPosture,
+      input.parentPosture,
     );
-    try {
-      unlinkSync(tempPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw error;
-    }
     fsyncParent(parent.fd);
-    return;
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      input.parentDir,
+      input.trustedAnchorDir,
+      input.parentPosture,
+    );
+    if (before !== undefined) {
+      const durable = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 1n);
+      if (
+        durable.sha256 !== input.expectedContentSha256 ||
+        !sameRecordIdentity(before.identity, durable.identity)
+      ) {
+        throw unsafeCoordination('Anchored complete target changed during durability proof');
+      }
+    }
+    return 'present';
   }
-  throw new RuntimeSnapshotChangedError('Anchored create publication changed during recovery');
+  if (targetStat.nlink !== 2n) {
+    throw unsafeCoordination('Anchored create link recovery is ambiguous');
+  }
+  const targetProof = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 2n);
+  settleLinkedCreate(input, parent, targetProof);
+  return 'present';
 }
 
 function settleCoordinationLinkedCreate(path: string, maxBytes: number): void {
@@ -1427,18 +1737,32 @@ function settleCoordinationLinkedCreate(path: string, maxBytes: number): void {
   const parentDir = dirname(path);
   const parent = openAnchoredParentIdentity(parentDir, paths.coordinationDir, 'private');
   try {
-    recoverCompletedLinkedCreate(
+    const stat = lstatIfPresent(path, 'Runtime coordination linked create');
+    if (stat === undefined || stat.nlink === 1n) return;
+    if (stat.nlink === 0n) {
+      throw new RuntimeSnapshotChangedError(
+        'Runtime coordination linked create was unlinked during recovery',
+      );
+    }
+    if (stat.nlink !== 2n) {
+      throw unsafeCoordination('Runtime coordination linked create is ambiguous');
+    }
+    const proof = readLinkedRecordProof(path, maxBytes, 'private', 2n);
+    reconcileAnchoredCreate(
       {
         trustedAnchorDir: paths.coordinationDir,
         parentDir,
         basename: basename(path),
-        operation: 'create',
-        permissionPosture: 'private',
+        target: path,
+        maxBytes,
+        parentPosture: 'private',
+        recordPosture: 'private',
+        expectedContentSha256: proof.sha256,
+        discardExactUnlinkedTemporary: false,
+        proveCompleteTarget: false,
+        maxEntries: 512,
       },
       parent,
-      path,
-      maxBytes,
-      'private',
     );
   } finally {
     closeSync(parent.fd);
@@ -1451,8 +1775,17 @@ function performAnchoredRecordMutation(
 ): {
   readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
 } {
-  const permissionPosture = input.permissionPosture ?? 'owner-controlled';
-  assertDirectory(input.trustedAnchorDir, undefined, permissionPosture);
+  const parentPosture = anchoredPermissionPosture(
+    input.permissionPosture,
+    'owner-controlled',
+    'parent posture',
+  );
+  const recordPosture = anchoredPermissionPosture(
+    input.recordPosture,
+    parentPosture,
+    'record posture',
+  );
+  assertDirectory(input.trustedAnchorDir, undefined, parentPosture);
   assertSafeBasename(input.basename);
   if (join(input.parentDir, input.basename) !== join(input.parentDir, basename(input.basename))) {
     throw unsafeCoordination('Runtime coordination mutation target is invalid');
@@ -1468,23 +1801,42 @@ function performAnchoredRecordMutation(
   if (input.operation === 'create' && input.expectedContentSha256 !== undefined) {
     throw unsafeCoordination('Anchored create cannot carry an expected-content digest');
   }
+  if (input.operation !== 'create' && input.createIdentity !== undefined) {
+    throw unsafeCoordination('Anchored create identity requires a create operation');
+  }
+  const exactTemporaryBasename =
+    input.createIdentity === undefined
+      ? undefined
+      : anchoredRecordTemporaryBasename(input.basename, input.createIdentity);
   if (Buffer.byteLength(content, 'utf8') > maxBytes) {
     throw unsafeCoordination('Runtime coordination mutation exceeds its size bound');
   }
   const target = join(input.parentDir, input.basename);
-  const parent = openAnchoredParentIdentity(
-    input.parentDir,
-    input.trustedAnchorDir,
-    permissionPosture,
-  );
+  const parent = openAnchoredParentIdentity(input.parentDir, input.trustedAnchorDir, parentPosture);
   try {
     if (input.operation === 'create') {
-      recoverCompletedLinkedCreate(input, parent, target, maxBytes, permissionPosture);
+      reconcileAnchoredCreate(
+        {
+          trustedAnchorDir: input.trustedAnchorDir,
+          parentDir: input.parentDir,
+          basename: input.basename,
+          target,
+          maxBytes,
+          parentPosture,
+          recordPosture,
+          expectedContentSha256: createHash('sha256').update(content).digest('hex'),
+          exactTemporaryBasename,
+          discardExactUnlinkedTemporary: exactTemporaryBasename !== undefined,
+          proveCompleteTarget: false,
+          maxEntries: ANCHORED_CREATE_RECOVERY_MAX_ENTRIES,
+        },
+        parent,
+      );
     }
     const beforeTarget = targetIdentity(
       target,
       maxBytes,
-      permissionPosture,
+      recordPosture,
       input.operation === 'create',
     );
     const assertExpectedDigest = (): void => {
@@ -1494,7 +1846,8 @@ function performAnchoredRecordMutation(
         parentDir: input.parentDir,
         basename: input.basename,
         maxBytes,
-        permissionPosture,
+        permissionPosture: parentPosture,
+        recordPosture,
       });
       if (observed.status !== 'present' || observed.sha256 !== input.expectedContentSha256) {
         throw new SystemError('Anchored record changed since the caller observed it', {
@@ -1512,15 +1865,15 @@ function performAnchoredRecordMutation(
             code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS',
           });
         }
-        const tempBasename = `.${input.basename}.tmp-${generateUUID()}`;
+        const tempBasename = exactTemporaryBasename ?? `.${input.basename}.tmp-${generateUUID()}`;
         tempPath = join(input.parentDir, tempBasename);
-        tempIdentity = createExclusiveRecord(tempPath, content, permissionPosture);
+        tempIdentity = createExclusiveRecord(tempPath, content, recordPosture);
         assertAnchoredParentUnchanged(
           parent.fd,
           parent.identity,
           input.parentDir,
           input.trustedAnchorDir,
-          permissionPosture,
+          parentPosture,
         );
         try {
           assertPublicationAllowed?.();
@@ -1543,13 +1896,13 @@ function performAnchoredRecordMutation(
         }
         tempPath = undefined;
         tempIdentity = undefined;
-        assertRegularRecord(target, maxBytes, permissionPosture);
+        assertRegularRecord(target, maxBytes, recordPosture);
         fsyncParent(parent.fd);
       } else if (input.operation === 'replace') {
         if (beforeTarget === undefined) {
           throw unsafeCoordination('Runtime coordination record disappeared before replacement');
         }
-        const current = targetIdentity(target, maxBytes, permissionPosture);
+        const current = targetIdentity(target, maxBytes, recordPosture);
         if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed before replacement',
@@ -1557,15 +1910,15 @@ function performAnchoredRecordMutation(
         }
         const tempBasename = `.${input.basename}.tmp-${generateUUID()}`;
         tempPath = join(input.parentDir, tempBasename);
-        tempIdentity = createExclusiveRecord(tempPath, content, permissionPosture);
+        tempIdentity = createExclusiveRecord(tempPath, content, recordPosture);
         assertAnchoredParentUnchanged(
           parent.fd,
           parent.identity,
           input.parentDir,
           input.trustedAnchorDir,
-          permissionPosture,
+          parentPosture,
         );
-        const immediatelyBefore = targetIdentity(target, maxBytes, permissionPosture);
+        const immediatelyBefore = targetIdentity(target, maxBytes, recordPosture);
         if (
           immediatelyBefore === undefined ||
           !sameRecordIdentity(beforeTarget, immediatelyBefore)
@@ -1575,7 +1928,7 @@ function performAnchoredRecordMutation(
           );
         }
         assertExpectedDigest();
-        const afterDigest = targetIdentity(target, maxBytes, permissionPosture);
+        const afterDigest = targetIdentity(target, maxBytes, recordPosture);
         if (afterDigest === undefined || !sameRecordIdentity(immediatelyBefore, afterDigest)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed after CAS verification',
@@ -1586,13 +1939,13 @@ function performAnchoredRecordMutation(
         assertPublicationAllowed?.();
         tempPath = undefined;
         tempIdentity = undefined;
-        assertRegularRecord(target, maxBytes, permissionPosture);
+        assertRegularRecord(target, maxBytes, recordPosture);
         fsyncParent(parent.fd);
       } else {
         if (beforeTarget === undefined) {
           return { strategy: COORDINATION_MUTATION_STRATEGY };
         }
-        const current = targetIdentity(target, maxBytes, permissionPosture);
+        const current = targetIdentity(target, maxBytes, recordPosture);
         if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed before unlink',
@@ -1603,10 +1956,10 @@ function performAnchoredRecordMutation(
           parent.identity,
           input.parentDir,
           input.trustedAnchorDir,
-          permissionPosture,
+          parentPosture,
         );
         assertExpectedDigest();
-        const afterDigest = targetIdentity(target, maxBytes, permissionPosture);
+        const afterDigest = targetIdentity(target, maxBytes, recordPosture);
         if (afterDigest === undefined || !sameRecordIdentity(current, afterDigest)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed after CAS verification',
@@ -1625,7 +1978,7 @@ function performAnchoredRecordMutation(
         parent.identity,
         input.parentDir,
         input.trustedAnchorDir,
-        permissionPosture,
+        parentPosture,
       );
       return { strategy: COORDINATION_MUTATION_STRATEGY };
     } catch (error) {
@@ -1636,9 +1989,9 @@ function performAnchoredRecordMutation(
             parent.identity,
             input.parentDir,
             input.trustedAnchorDir,
-            permissionPosture,
+            parentPosture,
           );
-          const observedTemp = targetIdentity(tempPath, maxBytes, permissionPosture);
+          const observedTemp = targetIdentity(tempPath, maxBytes, recordPosture);
           if (
             tempIdentity === undefined ||
             observedTemp === undefined ||
@@ -1714,20 +2067,12 @@ function unlinkFixedAnchoredRecordWithoutSize(
   }
 }
 
-/**
- * General audited portable mutation under an explicit trusted containment
- * anchor. Task-specific wrappers remain responsible for fixed basenames.
- * Replace/unlink callers that need atomic multi-writer CAS must hold an
- * external lock across their read and mutation.
- */
-export function mutateAnchoredRecord(input: AnchoredRecordMutation): {
-  readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
-} {
+function assertOutsideRuntimeCoordination(parentDir: string, basenameValue: string): void {
   const coordinationRoot = resolveCoordinationPaths().coordinationDir;
   let canonicalTarget: string;
   let canonicalCoordinationRoot: string;
   try {
-    canonicalTarget = join(realpathSync(input.parentDir), input.basename);
+    canonicalTarget = join(realpathSync(parentDir), basenameValue);
     canonicalCoordinationRoot = join(
       realpathSync(dirname(coordinationRoot)),
       basename(coordinationRoot),
@@ -1740,6 +2085,18 @@ export function mutateAnchoredRecord(input: AnchoredRecordMutation): {
       code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
+}
+
+/**
+ * General audited portable mutation under an explicit trusted containment
+ * anchor. Task-specific wrappers remain responsible for fixed basenames.
+ * Replace/unlink callers that need atomic multi-writer CAS must hold an
+ * external lock across their read and mutation.
+ */
+export function mutateAnchoredRecord(input: AnchoredRecordMutation): {
+  readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
+} {
+  assertOutsideRuntimeCoordination(input.parentDir, input.basename);
   return performAnchoredRecordMutation(input);
 }
 
@@ -1764,8 +2121,9 @@ function readAnchoredBoundedRecord(
   path: string,
   maxBytes: number,
   trustedAnchorDir: string,
-  permissionPosture: 'private' | 'owner-controlled',
+  parentPosture: 'private' | 'owner-controlled',
   linkedCreateCanBeBusy = false,
+  recordPosture: 'private' | 'owner-controlled' = parentPosture,
 ): string | undefined {
   let before;
   try {
@@ -1783,7 +2141,7 @@ function readAnchoredBoundedRecord(
       before.isSymbolicLink() ||
       (uid !== undefined && before.uid !== BigInt(uid)) ||
       (process.platform !== 'win32' &&
-        (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)) ||
+        (recordPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)) ||
       before.size > BigInt(maxBytes)
     ) {
       throw unsafeCoordination('Runtime coordination linked create is unsafe');
@@ -1793,7 +2151,7 @@ function readAnchoredBoundedRecord(
     );
   }
   try {
-    assertRegularRecord(path, maxBytes, permissionPosture);
+    assertRegularRecord(path, maxBytes, recordPosture);
   } catch (error) {
     const current = lstatIfPresent(path, 'Runtime coordination record');
     if (current === undefined || !sameRecordIdentity(beforeIdentity, recordIdentity(current))) {
@@ -1801,7 +2159,7 @@ function readAnchoredBoundedRecord(
     }
     throw error;
   }
-  const parent = openAnchoredParentIdentity(dirname(path), trustedAnchorDir, permissionPosture);
+  const parent = openAnchoredParentIdentity(dirname(path), trustedAnchorDir, parentPosture);
   let fd: number | undefined;
   try {
     fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
@@ -1843,7 +2201,7 @@ function readAnchoredBoundedRecord(
       parent.identity,
       dirname(path),
       trustedAnchorDir,
-      permissionPosture,
+      parentPosture,
     );
     return buffer.toString('utf8', 0, offset);
   } catch (error) {
@@ -1858,40 +2216,100 @@ function readAnchoredBoundedRecord(
 }
 
 /**
- * Read one bounded record without repair and return a conflict-detection
- * digest. A later replace/unlink still requires external writer serialization
- * when linearizable compare-and-swap semantics are needed.
+ * Read one bounded record without repair by default and return a
+ * conflict-detection digest. `linkedCreateRecovery` is explicit mutation
+ * authority and is rejected for runtime coordination paths. A later
+ * replace/unlink still requires external writer serialization when
+ * linearizable compare-and-swap semantics are needed.
  */
 export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordReadResult {
   assertSafeBasename(input.basename);
-  const permissionPosture = input.permissionPosture ?? 'owner-controlled';
+  const parentPosture = anchoredPermissionPosture(
+    input.permissionPosture,
+    'owner-controlled',
+    'parent posture',
+  );
+  const recordPosture = anchoredPermissionPosture(
+    input.recordPosture,
+    parentPosture,
+    'record posture',
+  );
   const maxBytes = boundedRecordSize(input.maxBytes);
   const target = join(input.parentDir, input.basename);
-  const parent = openAnchoredParentIdentity(
-    input.parentDir,
-    input.trustedAnchorDir,
-    permissionPosture,
-  );
+  const recovery = input.linkedCreateRecovery;
+  if (recovery !== undefined && !/^[a-f0-9]{64}$/u.test(recovery.expectedContentSha256)) {
+    throw unsafeCoordination('Anchored create recovery digest is invalid');
+  }
+  const exactTemporaryBasename =
+    recovery?.effect === 'settle-or-discard-owned-temporary'
+      ? anchoredRecordTemporaryBasename(input.basename, recovery.createIdentity)
+      : undefined;
+  if (
+    recovery !== undefined &&
+    recovery.effect !== 'settle-linked-create' &&
+    recovery.effect !== 'settle-or-discard-owned-temporary'
+  ) {
+    throw unsafeCoordination('Anchored create recovery effect is invalid');
+  }
+  if (recovery !== undefined) {
+    assertOutsideRuntimeCoordination(input.parentDir, input.basename);
+  }
+  const parent = openAnchoredParentIdentity(input.parentDir, input.trustedAnchorDir, parentPosture);
   try {
+    if (recovery !== undefined) {
+      const reconciliation = reconcileAnchoredCreate(
+        {
+          trustedAnchorDir: input.trustedAnchorDir,
+          parentDir: input.parentDir,
+          basename: input.basename,
+          target,
+          maxBytes,
+          parentPosture,
+          recordPosture,
+          expectedContentSha256: recovery.expectedContentSha256,
+          exactTemporaryBasename,
+          discardExactUnlinkedTemporary: recovery.effect === 'settle-or-discard-owned-temporary',
+          proveCompleteTarget: true,
+          maxEntries: boundedAnchoredRecoveryEntries(recovery.maxEntries),
+        },
+        parent,
+      );
+      if (reconciliation === 'absent') {
+        assertAnchoredParentUnchanged(
+          parent.fd,
+          parent.identity,
+          input.parentDir,
+          input.trustedAnchorDir,
+          parentPosture,
+        );
+        return { status: 'absent' };
+      }
+    }
     const content = readAnchoredBoundedRecord(
       target,
       maxBytes,
       input.trustedAnchorDir,
-      permissionPosture,
+      parentPosture,
+      false,
+      recordPosture,
     );
     assertAnchoredParentUnchanged(
       parent.fd,
       parent.identity,
       input.parentDir,
       input.trustedAnchorDir,
-      permissionPosture,
+      parentPosture,
     );
     if (content === undefined) return { status: 'absent' };
-    return {
+    const result = {
       status: 'present',
       content,
       sha256: createHash('sha256').update(content).digest('hex'),
-    };
+    } as const;
+    if (recovery !== undefined && result.sha256 !== recovery.expectedContentSha256) {
+      throw unsafeCoordination('Anchored record does not match expected recovery identity');
+    }
+    return result;
   } finally {
     closeSync(parent.fd);
   }
@@ -3199,7 +3617,7 @@ function inspectRecoveryHeader(
 ): RecoveryHeaderInspection {
   if (repairLinkedCreate) {
     try {
-      settleCoordinationLinkedCreate(path, MAX_RECOVERY_BYTES);
+      settleCoordinationLinkedCreate(path, RUNTIME_RECOVERY_RECORD_MAX_BYTES);
     } catch {
       return { status: 'malformed', reason: 'unsafe-file' };
     }
@@ -3233,12 +3651,12 @@ function inspectRecoveryHeader(
   ) {
     return { status: 'malformed', reason: 'unsafe-file' };
   }
-  if (stat.size > BigInt(MAX_RECOVERY_BYTES)) {
+  if (stat.size > BigInt(RUNTIME_RECOVERY_RECORD_MAX_BYTES)) {
     return { status: 'malformed', reason: 'oversize' };
   }
   let raw: string;
   try {
-    const read = readBoundedRecord(path, MAX_RECOVERY_BYTES, repairLinkedCreate);
+    const read = readBoundedRecord(path, RUNTIME_RECOVERY_RECORD_MAX_BYTES, repairLinkedCreate);
     if (read === undefined) return { status: 'absent' };
     raw = read;
   } catch {
@@ -3253,7 +3671,7 @@ function inspectRecoveryHeader(
   if (
     !isPlainRecord(parsed) ||
     parsed.kind !== expectedKind ||
-    parsed.version !== RECOVERY_HEADER_VERSION ||
+    parsed.version !== RUNTIME_RECOVERY_HEADER_VERSION ||
     (parsed.state !== 'open' && parsed.state !== 'closed') ||
     typeof parsed.operationId !== 'string' ||
     !validateOperationId(parsed.operationId)
@@ -5365,6 +5783,7 @@ function writerReleaseHandle(
 function attachWriterAuthority<T extends RuntimeExclusiveLease | GlobalRuntimeMaintenanceLease>(
   lease: T,
   writer: WriterRecord,
+  environment: RuntimeLeaseEnvironment,
 ): T {
   let mutationCapability: RuntimeWriterAuthority['mutationCapability'];
   if (lease.kind === 'runtime-exclusive') {
@@ -5383,6 +5802,7 @@ function attachWriterAuthority<T extends RuntimeExclusiveLease | GlobalRuntimeMa
       kind: writer.kind,
       ...(writer.coordinationKey === undefined ? {} : { coordinationKey: writer.coordinationKey }),
       mutationCapability,
+      environment,
     } satisfies RuntimeWriterAuthority),
   );
   return frozenLease;
@@ -5412,6 +5832,7 @@ export async function acquireRuntimeExclusiveLease(
       release: writerReleaseHandle(acquired, stableInput, 'runtime-exclusive', coordinationKey),
     },
     acquired.writer,
+    runtimeEnvironment(stableInput),
   );
 }
 
@@ -5437,6 +5858,7 @@ export async function acquireGlobalRuntimeMaintenanceLease(
       release: writerReleaseHandle(acquired, stableInput, 'runtime-global-maintenance'),
     },
     acquired.writer,
+    runtimeEnvironment(stableInput),
   );
 }
 
@@ -5469,21 +5891,163 @@ function assertRecoveryMutationAuthority(
   }
 }
 
+function writerAuthorityEnvironment(lease: WriterLeaseWithAuthority): RuntimeLeaseEnvironment {
+  return RUNTIME_WRITER_AUTHORITIES.get(lease)?.environment ?? DEFAULT_RUNTIME_LEASE_ENVIRONMENT;
+}
+
+function readFixedRecoveryRecordWhileOwned(
+  paths: CoordinationPaths,
+  parentDir: string,
+  basenameValue: string,
+  guard: RuntimeMutexGuard,
+  environment: RuntimeLeaseEnvironment,
+): AnchoredRecordReadResult {
+  assertSafeBasename(basenameValue);
+  const target = join(parentDir, basenameValue);
+  const parent = openAnchoredParentIdentity(parentDir, paths.coordinationDir, 'private');
+  try {
+    guard.assertOwned();
+    const content = readAnchoredBoundedRecord(
+      target,
+      RUNTIME_RECOVERY_RECORD_MAX_BYTES,
+      paths.coordinationDir,
+      'private',
+    );
+    environment.coordinationCheckpoint?.('before-fixed-recovery-read-parent-revalidation');
+    guard.assertOwned();
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      parentDir,
+      paths.coordinationDir,
+      'private',
+    );
+    if (content === undefined) return { status: 'absent' };
+    return {
+      status: 'present',
+      content,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
+  } finally {
+    closeSync(parent.fd);
+  }
+}
+
+function durableIdempotentFixedRecoveryUnlink(
+  paths: CoordinationPaths,
+  parentDir: string,
+  basenameValue: string,
+  expectedContentSha256: string,
+  guard: RuntimeMutexGuard,
+  environment: RuntimeLeaseEnvironment,
+): { readonly strategy: typeof COORDINATION_MUTATION_STRATEGY } {
+  assertSafeBasename(basenameValue);
+  if (!/^[a-f0-9]{64}$/u.test(expectedContentSha256)) {
+    throw unsafeCoordination('Anchored mutation expected digest is invalid');
+  }
+  const target = join(parentDir, basenameValue);
+  const parent = openAnchoredParentIdentity(parentDir, paths.coordinationDir, 'private');
+  const assertParentAndAuthority = (): void => {
+    guard.assertOwned();
+    assertAnchoredParentUnchanged(
+      parent.fd,
+      parent.identity,
+      parentDir,
+      paths.coordinationDir,
+      'private',
+    );
+    guard.assertOwned();
+  };
+  const assertTargetAbsent = (): void => {
+    if (targetIdentity(target, RUNTIME_RECOVERY_RECORD_MAX_BYTES, 'private') !== undefined) {
+      throw new RuntimeSnapshotChangedError(
+        'Fixed recovery record reappeared during durable unlink',
+      );
+    }
+  };
+  try {
+    const before = targetIdentity(target, RUNTIME_RECOVERY_RECORD_MAX_BYTES, 'private');
+    if (before === undefined) {
+      // A prior attempt can have completed the unlink but failed before the
+      // parent-directory fsync returned. Re-establish durability instead of
+      // turning that safe retry into a CAS mismatch.
+      assertParentAndAuthority();
+      assertTargetAbsent();
+      fsyncParent(parent.fd);
+      assertParentAndAuthority();
+      assertTargetAbsent();
+      return { strategy: COORDINATION_MUTATION_STRATEGY };
+    }
+
+    const assertExpectedDigest = (): RecordIdentity => {
+      const observed = readAnchoredRecord({
+        trustedAnchorDir: paths.coordinationDir,
+        parentDir,
+        basename: basenameValue,
+        maxBytes: RUNTIME_RECOVERY_RECORD_MAX_BYTES,
+        permissionPosture: 'private',
+      });
+      if (observed.status !== 'present' || observed.sha256 !== expectedContentSha256) {
+        throw new SystemError('Anchored record changed since the caller observed it', {
+          code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+        });
+      }
+      const identity = targetIdentity(target, RUNTIME_RECOVERY_RECORD_MAX_BYTES, 'private');
+      if (identity === undefined || !sameRecordIdentity(before, identity)) {
+        throw new RuntimeSnapshotChangedError(
+          'Fixed recovery record changed during CAS verification',
+        );
+      }
+      return identity;
+    };
+
+    assertExpectedDigest();
+    assertParentAndAuthority();
+    const immediatelyBefore = assertExpectedDigest();
+    assertParentAndAuthority();
+    const finalIdentity = targetIdentity(target, RUNTIME_RECOVERY_RECORD_MAX_BYTES, 'private');
+    if (finalIdentity === undefined || !sameRecordIdentity(immediatelyBefore, finalIdentity)) {
+      throw new RuntimeSnapshotChangedError('Fixed recovery record changed before durable unlink');
+    }
+    unlinkSync(target);
+    environment.coordinationCheckpoint?.('before-fixed-recovery-parent-fsync');
+    guard.assertOwned();
+    assertTargetAbsent();
+    fsyncParent(parent.fd);
+    assertParentAndAuthority();
+    assertTargetAbsent();
+    return { strategy: COORDINATION_MUTATION_STRATEGY };
+  } finally {
+    closeSync(parent.fd);
+  }
+}
+
 function fixedRecoveryMutation(
   paths: CoordinationPaths,
   parentDir: string,
   basenameValue: string,
   mutation: RuntimeRecoveryRecordMutation,
   guard: RuntimeMutexGuard,
+  environment: RuntimeLeaseEnvironment,
 ): { readonly strategy: typeof COORDINATION_MUTATION_STRATEGY } {
+  if (mutation.operation === 'unlink') {
+    return durableIdempotentFixedRecoveryUnlink(
+      paths,
+      parentDir,
+      basenameValue,
+      mutation.expectedContentSha256,
+      guard,
+      environment,
+    );
+  }
   return performAnchoredRecordMutation(
     {
       trustedAnchorDir: paths.coordinationDir,
       parentDir,
       basename: basenameValue,
       operation: mutation.operation,
-      ...(mutation.operation === 'unlink' ? {} : { content: mutation.content }),
-      maxBytes: MAX_RECOVERY_BYTES,
+      content: mutation.content,
+      maxBytes: RUNTIME_RECOVERY_RECORD_MAX_BYTES,
       ...(mutation.operation === 'create'
         ? {}
         : { expectedContentSha256: mutation.expectedContentSha256 }),
@@ -5508,7 +6072,7 @@ function assertValidRecoveryMutationContent(
   if (
     !isPlainRecord(parsed) ||
     parsed.kind !== expectedKind ||
-    parsed.version !== RECOVERY_HEADER_VERSION ||
+    parsed.version !== RUNTIME_RECOVERY_HEADER_VERSION ||
     (parsed.state !== 'open' && parsed.state !== 'closed') ||
     typeof parsed.operationId !== 'string' ||
     !validateOperationId(parsed.operationId) ||
@@ -5523,6 +6087,46 @@ function assertValidRecoveryMutationContent(
   }
 }
 
+/**
+ * Read only the fixed project promotion journal while the exact project
+ * writer remains live. The returned digest may be used with the fixed mutation
+ * seam; no caller-controlled path participates in the read.
+ */
+export async function readRuntimePromotionJournal(
+  lease: RuntimeExclusiveLease,
+): Promise<AnchoredRecordReadResult> {
+  if (lease.posture === 'destructive-discard') {
+    throw new SystemError('Destructive journal authority cannot read the recovery body', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  const policy = normalizePolicy();
+  const environment = writerAuthorityEnvironment(lease);
+  return withCoordinationMutex(
+    policy,
+    undefined,
+    policy.waitMs,
+    (paths, guard) => {
+      assertRecoveryMutationAuthority(
+        paths,
+        lease,
+        'project',
+        'project-record',
+        lease.coordinationKey,
+      );
+      const projectPaths = paths.forProject(lease.coordinationKey);
+      return readFixedRecoveryRecordWhileOwned(
+        paths,
+        projectPaths.projectCoordinationDir,
+        RUNTIME_PROMOTION_JOURNAL_FILE,
+        guard,
+        environment,
+      );
+    },
+    environment,
+  );
+}
+
 /** Mutate only the fixed project promotion journal while its writer is live. */
 export async function mutateRuntimePromotionJournal(
   lease: RuntimeExclusiveLease,
@@ -5534,24 +6138,32 @@ export async function mutateRuntimePromotionJournal(
     });
   }
   const policy = normalizePolicy();
-  return withCoordinationMutex(policy, undefined, policy.waitMs, (paths, guard) => {
-    assertRecoveryMutationAuthority(
-      paths,
-      lease,
-      'project',
-      'project-record',
-      lease.coordinationKey,
-    );
-    assertValidRecoveryMutationContent(mutation, 'init-promotion', lease.coordinationKey);
-    const projectPaths = paths.forProject(lease.coordinationKey);
-    return fixedRecoveryMutation(
-      paths,
-      projectPaths.projectCoordinationDir,
-      RUNTIME_PROMOTION_JOURNAL_FILE,
-      mutation,
-      guard,
-    );
-  });
+  const environment = writerAuthorityEnvironment(lease);
+  return withCoordinationMutex(
+    policy,
+    undefined,
+    policy.waitMs,
+    (paths, guard) => {
+      assertRecoveryMutationAuthority(
+        paths,
+        lease,
+        'project',
+        'project-record',
+        lease.coordinationKey,
+      );
+      assertValidRecoveryMutationContent(mutation, 'init-promotion', lease.coordinationKey);
+      const projectPaths = paths.forProject(lease.coordinationKey);
+      return fixedRecoveryMutation(
+        paths,
+        projectPaths.projectCoordinationDir,
+        RUNTIME_PROMOTION_JOURNAL_FILE,
+        mutation,
+        guard,
+        environment,
+      );
+    },
+    environment,
+  );
 }
 
 /** Mutate only the fixed user-uninstall receipt while its global writer is live. */
@@ -5565,17 +6177,25 @@ export async function mutateUserUninstallReceipt(
     });
   }
   const policy = normalizePolicy();
-  return withCoordinationMutex(policy, undefined, policy.waitMs, (paths, guard) => {
-    assertRecoveryMutationAuthority(paths, lease, 'global', 'user-record');
-    assertValidRecoveryMutationContent(mutation, 'user-uninstall');
-    return fixedRecoveryMutation(
-      paths,
-      paths.coordinationDir,
-      USER_UNINSTALL_RECEIPT_FILE,
-      mutation,
-      guard,
-    );
-  });
+  const environment = writerAuthorityEnvironment(lease);
+  return withCoordinationMutex(
+    policy,
+    undefined,
+    policy.waitMs,
+    (paths, guard) => {
+      assertRecoveryMutationAuthority(paths, lease, 'global', 'user-record');
+      assertValidRecoveryMutationContent(mutation, 'user-uninstall');
+      return fixedRecoveryMutation(
+        paths,
+        paths.coordinationDir,
+        USER_UNINSTALL_RECEIPT_FILE,
+        mutation,
+        guard,
+        environment,
+      );
+    },
+    environment,
+  );
 }
 
 /** Discard only the fixed promotion journal under explicit destructive posture. */
