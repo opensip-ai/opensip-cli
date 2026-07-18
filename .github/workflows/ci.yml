@@ -61,13 +61,17 @@ jobs:
       # PR lane: allow Turbo cache hits so unchanged packages skip re-test.
       # Main / merge-to-main: force recompute so coverage thresholds cannot
       # pass on a stale cached local pass (same command as release preflight).
+      #
+      # Keep a literal `run: pnpm test:coverage` line in this file — the local
+      # dogfood-release-gate-parity check (ADR-0017) scans for that exact
+      # substring to keep PR/release gates aligned. Do not fold into a shell if.
       - name: Test (with coverage thresholds)
-        run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            pnpm test:coverage:fresh
-          else
-            pnpm test:coverage
-          fi
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        run: pnpm test:coverage
+
+      - name: Test (fresh coverage thresholds on main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: pnpm test:coverage:fresh
 
   dogfood:
     runs-on: ubuntu-latest
