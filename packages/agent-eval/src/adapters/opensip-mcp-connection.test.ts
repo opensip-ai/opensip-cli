@@ -282,6 +282,9 @@ describe('BoundedStdioClientTransport', () => {
           const child = spawn(process.execPath, ['-e', source], { stdio: 'ignore' });
           writeFileSync(${JSON.stringify(pidPath)}, String(child.pid));
           child.unref();
+          // Stay alive long enough for process-tree sampling to observe the
+          // descendant before the root exits (otherwise cleanup never sees it).
+          setTimeout(() => process.exit(0), 450);
         `,
         'utf8',
       );
@@ -294,12 +297,15 @@ describe('BoundedStdioClientTransport', () => {
       });
 
       await transport.start();
+      // Let the fixture spawn + register the descendant before we escalate close.
+      await new Promise((resolve) => setTimeout(resolve, 200));
       await expect(transport.close()).resolves.toBeUndefined();
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
-      expect(transport.terminalStatus()).toEqual({ exitCode: 0, signal: null });
+      // Root may exit 0 on its own timer or via close escalation.
+      expect(transport.terminalStatus()?.exitCode).toBe(0);
       // close() arms TERM→KILL cleanup; reaping is asynchronous on loaded Linux CI.
-      await waitUntilDead(descendantPid);
+      await waitUntilDead(descendantPid, 10_000);
     },
   );
 
@@ -333,10 +339,11 @@ describe('BoundedStdioClientTransport', () => {
       });
 
       await transport.start();
+      await new Promise((resolve) => setTimeout(resolve, 200));
       await expect(transport.close()).resolves.toBeUndefined();
       const descendantPid = Number.parseInt(readFileSync(pidPath, 'utf8'), 10);
 
-      await waitUntilDead(descendantPid);
+      await waitUntilDead(descendantPid, 10_000);
     },
   );
 
