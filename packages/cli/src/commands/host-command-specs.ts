@@ -444,6 +444,7 @@ interface UninstallOpts {
   user?: boolean;
   project?: string | boolean;
   purge?: boolean;
+  discardRecovery?: boolean;
   json?: boolean;
   projectContext?: ProjectContext;
 }
@@ -487,6 +488,12 @@ function buildUninstallSpec(): HostSpec {
           'With --project, also remove user-authored content and opensip-cli.config.yml (DESTRUCTIVE)',
         default: false,
       },
+      {
+        flag: '--discard-recovery',
+        description:
+          'With --project --purge: high-risk break-glass that also discards a stuck promotion journal after deleting canonical roots',
+        default: false,
+      },
       { flag: '--json', description: 'Output structured JSON', default: false },
     ],
     scope: 'none',
@@ -506,6 +513,7 @@ function buildUninstallSpec(): HostSpec {
         dryRun: opts.dryRun,
         project,
         purge: opts.purge,
+        discardRecovery: opts.discardRecovery,
         projectContext: opts.projectContext,
       });
     },

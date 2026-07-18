@@ -3517,6 +3517,16 @@ exports[`behaviour-parity snapshot (command surface = 2.10.0 + the --resolution 
         {
           "choices": undefined,
           "defaultValue": false,
+          "description": "With --project --purge: high-risk break-glass that also discards a stuck promotion journal after deleting canonical roots",
+          "flags": "--discard-recovery",
+          "negate": false,
+          "optional": false,
+          "required": false,
+          "variadic": false,
+        },
+        {
+          "choices": undefined,
+          "defaultValue": false,
           "description": "Print what would be removed; take no action",
           "flags": "--dry-run",
           "negate": false,

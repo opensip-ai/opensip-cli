@@ -120,8 +120,13 @@ describe('executeUninstall — project mode', () => {
   let userSourceDir: string;
   let runtimeDir: string;
   let configFile: string;
+  let homeDir: string;
+  let priorHome: string | undefined;
 
   beforeEach(() => {
+    priorHome = process.env.HOME;
+    homeDir = makeTempDir();
+    process.env.HOME = homeDir;
     projectDir = makeTempDir();
     userSourceDir = join(projectDir, 'opensip-cli');
     runtimeDir = join(userSourceDir, '.runtime');
@@ -134,8 +139,15 @@ describe('executeUninstall — project mode', () => {
   });
 
   afterEach(() => {
+    if (priorHome === undefined) delete process.env.HOME;
+    else process.env.HOME = priorHome;
     try {
       rmSync(projectDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+    try {
+      rmSync(homeDir, { recursive: true, force: true });
     } catch {
       /* ignore */
     }

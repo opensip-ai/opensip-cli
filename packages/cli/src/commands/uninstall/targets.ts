@@ -14,19 +14,30 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import { resolveEphemeralProjectPaths, resolveProjectPaths } from '@opensip-cli/core';
+import {
+  inspectEphemeralRuntimeCandidates,
+  resolveProjectPaths,
+} from '@opensip-cli/core';
 
 import { formatBytes } from '../../format-bytes.js';
 
 /**
  * Bucket classification per target:
- *  - 'runtime'      — opensip-cli/.runtime/. Rebuildable. Removed by default.
- *  - 'user-content' — anything else under opensip-cli/. User-authored.
- *                     Preserved unless --purge.
- *  - 'config'       — opensip-cli.config.yml. Preserved unless --purge.
- *  - 'user-level'   — ~/.opensip-cli/ in user mode.
+ *  - 'runtime'       — opensip-cli/.runtime/. Rebuildable. Removed by default.
+ *  - 'active-cache'  — generation-bound user-cache entry. Removed by default.
+ *  - 'legacy-cache'  — pre-v2 / path-only cache entry. Removed by default.
+ *  - 'user-content'  — anything else under opensip-cli/. User-authored.
+ *                      Preserved unless --purge.
+ *  - 'config'        — opensip-cli.config.yml. Preserved unless --purge.
+ *  - 'user-level'    — ~/.opensip-cli/ in user mode.
  */
-type TargetBucket = 'runtime' | 'user-content' | 'config' | 'user-level';
+export type TargetBucket =
+  | 'runtime'
+  | 'active-cache'
+  | 'legacy-cache'
+  | 'user-content'
+  | 'config'
+  | 'user-level';
 
 /** Discrete target to remove (a file or a directory). */
 export interface Target {
@@ -85,14 +96,15 @@ function countFilesRecursive(dir: string): number {
  *
  * Project mode:
  *  - .runtime/                      → bucket 'runtime'
+ *  - active user-cache generation   → bucket 'active-cache'
+ *  - legacy user-cache (if present) → bucket 'legacy-cache'
  *  - everything else under opensip-cli/ (per top-level entry)
  *                                   → bucket 'user-content' (one entry each)
  *  - opensip-cli.config.yml       → bucket 'config'
  *
- * The user-content invariant is "everything under opensip-cli/ minus
- * .runtime/" — NOT an enumeration of known subdirs like fit/ + sim/.
- * Future tools and user-created folders (e.g. opensip-cli/notes/) are
- * preserved automatically.
+ * Cache candidates come from `inspectEphemeralRuntimeCandidates` — never from
+ * marker `projectDir` fields. The user-content invariant is "everything under
+ * opensip-cli/ minus .runtime/" — NOT an enumeration of known subdirs.
  */
 export function collectTargets(
   mode: UninstallMode,
@@ -115,7 +127,7 @@ export function collectTargets(
 
 function collectProjectTargets(projectDir: string): Target[] {
   const paths = resolveProjectPaths(projectDir);
-  const ephemeralPaths = resolveEphemeralProjectPaths(projectDir);
+  const candidates = inspectEphemeralRuntimeCandidates(projectDir);
   const targets: Target[] = [];
   if (existsSync(paths.runtimeDir)) {
     targets.push({
@@ -125,12 +137,26 @@ function collectProjectTargets(projectDir: string): Target[] {
       bucket: 'runtime',
     });
   }
-  if (existsSync(ephemeralPaths.runtimeDir)) {
+  if (candidates.active.exists) {
+    // Avoid double-counting when the active cache path equals project runtime
+    // (should not happen, but keep the projection stable).
+    if (candidates.active.runtimeDir !== paths.runtimeDir) {
+      targets.push({
+        path: candidates.active.runtimeDir,
+        kind: 'dir',
+        sizeBytes: dirSize(candidates.active.runtimeDir),
+        bucket: 'active-cache',
+        displayLabel: 'user-cache (active)',
+      });
+    }
+  }
+  if (candidates.legacy?.exists === true) {
     targets.push({
-      path: ephemeralPaths.runtimeDir,
+      path: candidates.legacy.runtimeDir,
       kind: 'dir',
-      sizeBytes: dirSize(ephemeralPaths.runtimeDir),
-      bucket: 'runtime',
+      sizeBytes: dirSize(candidates.legacy.runtimeDir),
+      bucket: 'legacy-cache',
+      displayLabel: 'user-cache (legacy)',
     });
   }
   if (existsSync(paths.userSourceDir)) {
@@ -216,10 +242,16 @@ export function printProjectDefault(
   } else {
     write('This will remove (rebuildable runtime state only):\n');
     for (const t of toDelete) {
+      const label =
+        t.bucket === 'active-cache'
+          ? 'active user cache'
+          : t.bucket === 'legacy-cache'
+            ? 'legacy user cache'
+            : t.bucket === 'runtime'
+              ? 'project runtime'
+              : t.path;
       write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatBytes(t.sizeBytes)})\n`);
-      if (t.bucket === 'runtime') {
-        write('    sessions database, cache, logs, baselines\n');
-      }
+      write(`    ${label}: sessions database, cache, logs, baselines\n`);
     }
     write('\n');
   }

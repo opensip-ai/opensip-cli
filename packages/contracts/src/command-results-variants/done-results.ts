@@ -1,3 +1,28 @@
+/**
+ * Path-neutral counts of removal buckets for agents/JSON consumers.
+ * Never includes HOME, coordination paths, journals, or tokens.
+ */
+export interface UninstallRemovalBuckets {
+  /** Generation-bound user-cache entry for this project. */
+  readonly activeCache?: number;
+  /** Pre-v2 / path-only cache entry when distinct from active. */
+  readonly legacyCache?: number;
+  /** Project-local `opensip-cli/.runtime/`. */
+  readonly projectRuntime?: number;
+  /** Authored Init content + config (only selected with `--purge`). */
+  readonly authored?: number;
+  /** User-level root entries (`--user` mode). */
+  readonly user?: number;
+}
+
+/** Bounded recovery status for project/user uninstall. */
+export type UninstallRecoveryStatus =
+  | { readonly status: 'absent' }
+  | { readonly status: 'present'; readonly state: 'open' | 'closed' }
+  | { readonly status: 'malformed'; readonly reason?: string }
+  | { readonly status: 'discarded' }
+  | { readonly status: 'refused'; readonly reason?: string };
+
 /** Outcome of an `opensip uninstall` run. */
 export interface UninstallDoneResult {
   type: 'uninstall-done';
@@ -11,6 +36,10 @@ export interface UninstallDoneResult {
   sizeBytes: number;
   /** Resolved root that was probed (user-level dir or project dir). */
   rootPath: string;
+  /** Path-neutral bucket counts for machine consumers. */
+  readonly buckets?: UninstallRemovalBuckets;
+  /** Promotion/user-uninstall recovery posture for this run, when relevant. */
+  readonly recovery?: UninstallRecoveryStatus;
 }
 
 export interface ClearDoneResult {

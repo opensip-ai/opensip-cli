@@ -12,6 +12,8 @@
 
 export type {
   UninstallDoneResult,
+  UninstallRemovalBuckets,
+  UninstallRecoveryStatus,
   ClearDoneResult,
   ConfigureDoneResult,
   GateDoneResult,
