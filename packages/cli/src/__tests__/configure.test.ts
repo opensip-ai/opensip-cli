@@ -40,6 +40,18 @@ async function loadModule() {
   return await import('../commands/configure.js');
 }
 
+async function withUserStateOwnership<T>(fn: () => Promise<T>): Promise<T> {
+  const { enterHostOwnershipForTests, resetEnteredHostOwnershipForTests } =
+    await import('../commands/host-runtime-access.js');
+  resetEnteredHostOwnershipForTests();
+  enterHostOwnershipForTests({ userState: true });
+  try {
+    return await fn();
+  } finally {
+    resetEnteredHostOwnershipForTests();
+  }
+}
+
 beforeEach(() => {
   checkEntitlementMock.mockReset();
   checkEntitlementMock.mockResolvedValue({ entitled: false });
@@ -65,47 +77,59 @@ afterEach(() => {
 describe('executeConfigure', () => {
   it('returns "cancelled" when the user provides an empty answer', async () => {
     nextAnswer = '';
-    const { executeConfigure } = await loadModule();
-    const result = await executeConfigure();
-    expect(result.action).toBe('cancelled');
-    expect(result.configPath).toContain('config.yml');
+    await withUserStateOwnership(async () => {
+      const { executeConfigure } = await loadModule();
+      const result = await executeConfigure();
+      expect(result.action).toBe('cancelled');
+      expect(result.configPath).toContain('config.yml');
+    });
   });
 
   it('saves the supplied API key and returns the masked value', async () => {
     nextAnswer = 'sk-supersecret-123456';
-    const { executeConfigure } = await loadModule();
-    const result = await executeConfigure();
-    expect(result.action).toBe('saved');
-    expect(result.maskedKey).toBe('sk-s...3456');
+    await withUserStateOwnership(async () => {
+      const { executeConfigure } = await loadModule();
+      const result = await executeConfigure();
+      expect(result.action).toBe('saved');
+      expect(result.maskedKey).toBe('sk-s...3456');
+    });
   });
 
   it('emits the "current key" hint when one is already stored', async () => {
     nextAnswer = 'first-key-with-mask-1234';
-    let mod = await loadModule();
-    await mod.executeConfigure();
+    await withUserStateOwnership(async () => {
+      let mod = await loadModule();
+      await mod.executeConfigure();
+    });
 
     writes.length = 0;
     nextAnswer = 'second-key-with-mask-9876';
     vi.resetModules();
-    mod = await loadModule();
-    await mod.executeConfigure();
+    await withUserStateOwnership(async () => {
+      const mod = await loadModule();
+      await mod.executeConfigure();
+    });
     const hint = writes.find((s) => s.includes('Current API key:'));
     expect(hint).toBeDefined();
   });
 
   it('does not mask short keys', async () => {
     nextAnswer = 'short';
-    const { executeConfigure } = await loadModule();
-    const result = await executeConfigure();
-    expect(result.action).toBe('saved');
-    // Keys <= 8 chars round-trip verbatim.
-    expect(result.maskedKey).toBe('short');
+    await withUserStateOwnership(async () => {
+      const { executeConfigure } = await loadModule();
+      const result = await executeConfigure();
+      expect(result.action).toBe('saved');
+      // Keys <= 8 chars round-trip verbatim.
+      expect(result.maskedKey).toBe('short');
+    });
   });
 
   it('tests the key against the cloud entitlement endpoint after saving (P2-2)', async () => {
     nextAnswer = 'sk-saved-and-tested-1234';
-    const { executeConfigure } = await loadModule();
-    await executeConfigure();
+    await withUserStateOwnership(async () => {
+      const { executeConfigure } = await loadModule();
+      await executeConfigure();
+    });
     expect(checkEntitlementMock).toHaveBeenCalledTimes(1);
     expect(checkEntitlementMock).toHaveBeenCalledWith(
       expect.objectContaining({ apiKey: 'sk-saved-and-tested-1234' }),

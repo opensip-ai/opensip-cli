@@ -233,19 +233,25 @@ export function buildInitRecoverySpec(ctx: CliCommandsContext): HostSpec {
 // ---------------------------------------------------------------------------
 
 function buildConfigureSpec(): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
-    staticHandler: {
-      package: HOST_COMMAND_PACKAGE,
-      path: HOST_COMMAND_SPECS_PATH,
-      declaration: 'buildConfigureSpec',
+  return defineCommand<unknown, CliCommandsContext>(
+    {
+      staticHandler: {
+        package: HOST_COMMAND_PACKAGE,
+        path: HOST_COMMAND_SPECS_PATH,
+        declaration: 'buildConfigureSpec',
+      },
+      name: 'configure',
+      description: 'Set up OpenSIP Cloud API key',
+      commonFlags: ['json', 'debug'],
+      scope: 'none',
+      output: COMMAND_RESULT,
+      handler: () => executeConfigure(),
     },
-    name: 'configure',
-    description: 'Set up OpenSIP Cloud API key',
-    commonFlags: ['json', 'debug'],
-    scope: 'none',
-    output: COMMAND_RESULT,
-    handler: () => executeConfigure(),
-  });
+    // Writes under the user root (~/.opensip-cli); acquire user-state for the
+    // full prompt/read/write/verification lifetime so global uninstall cannot
+    // interleave.
+    { runtimeAccess: 'user-state' },
+  );
 }
 
 // ---------------------------------------------------------------------------

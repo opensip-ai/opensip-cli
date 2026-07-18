@@ -19,6 +19,8 @@ import { GLOBAL_CONFIG_PATH, readGlobalConfig, writeGlobalConfig } from '@opensi
 import { resolveUserPaths } from '@opensip-cli/core';
 import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-cli/output';
 
+import { assertEnteredUserStateOwner } from './host-runtime-access.js';
+
 import type { ConfigureDoneResult } from '@opensip-cli/contracts';
 
 // Re-export `resolveApiKey` from the config layer so existing command-side
@@ -79,6 +81,7 @@ export async function verifyConfiguredKey(key: string): Promise<boolean> {
  * the user saw at the prompt.
  */
 export async function executeConfigure(): Promise<ConfigureDoneResult> {
+  assertEnteredUserStateOwner('executeConfigure');
   const existing = readGlobalConfig();
 
   if (existing.apiKey) {

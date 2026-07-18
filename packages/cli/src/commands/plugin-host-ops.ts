@@ -14,6 +14,10 @@ import { join } from 'node:path';
 
 import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 
+import {
+  assertEnteredProjectOwner,
+  assertEnteredUserStateOwner,
+} from './host-runtime-access.js';
 import { TOOL_DOMAIN } from './plugin/domain-resolution.js';
 import {
   ensurePluginHostDir,
@@ -85,6 +89,8 @@ export function npmInstallIntoHost(dir: string, packageName: string): InstallOut
  * Tool plugins auto-discover by their `kind: "tool"` marker.
  */
 export function addToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
+  if (project) assertEnteredProjectOwner('addToolPlugin');
+  else assertEnteredUserStateOwner('addToolPlugin');
   const dir = project
     ? ensurePluginHostDir(TOOL_DOMAIN, cwd)
     : ensureUserPluginHostDir(TOOL_DOMAIN);
@@ -119,6 +125,8 @@ export function npmUninstallFromHost(dir: string, packageName: string): boolean 
 
 /** Remove a Tool plugin from its host dir (user-global by default, --project otherwise). */
 export function removeToolPlugin(packageName: string, cwd: string, project: boolean): PluginResult {
+  if (project) assertEnteredProjectOwner('removeToolPlugin');
+  else assertEnteredUserStateOwner('removeToolPlugin');
   const dir = project
     ? resolveProjectPaths(cwd).pluginsDir(TOOL_DOMAIN)
     : resolveUserPaths().pluginsDir(TOOL_DOMAIN);

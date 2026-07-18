@@ -361,6 +361,86 @@ export function createRuntimeLeaseLifecycle(
  * already hold the project+user discovery reader). Inspection-only commands
  * bypass standard startup and acquire none at either phase.
  */
+/**
+ * Process-local ownership proof for host mutations under a declared runtime
+ * lease. Handler helpers (plugin install, configure writers) assert this before
+ * any user/project I/O so a nested path cannot mutate without the command's
+ * declared lease. Same-owner reentry preserves the token; release clears it.
+ */
+interface EnteredHostOwnership {
+  readonly ownerToken: string;
+  readonly userState: boolean;
+  readonly project: boolean;
+}
+
+let enteredHostOwnership: EnteredHostOwnership | undefined;
+
+function recordEnteredOwnership(lease: RuntimeLease): void {
+  const kind = 'kind' in lease ? String((lease as { readonly kind?: string }).kind) : '';
+  const composite =
+    kind === 'runtime-access-composite'
+      ? (lease as {
+          readonly userStateRead?: boolean;
+          readonly projectRead?: boolean;
+        })
+      : undefined;
+  const userState =
+    kind === 'user-state-read' || (composite !== undefined && composite.userStateRead === true);
+  const project =
+    kind === 'runtime-read' ||
+    kind === 'runtime-exclusive' ||
+    (composite !== undefined && composite.projectRead === true);
+  enteredHostOwnership = Object.freeze({
+    ownerToken: lease.ownerToken,
+    userState,
+    project,
+  });
+}
+
+function clearEnteredOwnership(ownerToken: string): void {
+  if (enteredHostOwnership?.ownerToken === ownerToken) {
+    enteredHostOwnership = undefined;
+  }
+}
+
+/** Assert the current command holds user-state authority before user-root I/O. */
+export function assertEnteredUserStateOwner(operation: string): void {
+  if (enteredHostOwnership?.userState !== true) {
+    throw new SystemError(
+      `Host user-state mutation '${operation}' requires an entered user-state runtime lease.`,
+      { code: 'SYSTEM.HOST_RUNTIME.USER_STATE_OWNER_REQUIRED' },
+    );
+  }
+}
+
+/** Assert the current command holds project authority before project-host I/O. */
+export function assertEnteredProjectOwner(operation: string): void {
+  if (enteredHostOwnership?.project !== true) {
+    throw new SystemError(
+      `Host project mutation '${operation}' requires an entered project runtime lease.`,
+      { code: 'SYSTEM.HOST_RUNTIME.PROJECT_OWNER_REQUIRED' },
+    );
+  }
+}
+
+/** Test-only: clear entered ownership between cases. */
+export function resetEnteredHostOwnershipForTests(): void {
+  enteredHostOwnership = undefined;
+}
+
+/** Test-only: seed entered ownership without a live coordination lease. */
+export function enterHostOwnershipForTests(args: {
+  readonly userState?: boolean;
+  readonly project?: boolean;
+  readonly ownerToken?: string;
+}): void {
+  enteredHostOwnership = Object.freeze({
+    ownerToken: args.ownerToken ?? 'test-owner-token',
+    userState: args.userState === true,
+    project: args.project === true,
+  });
+}
+
 export async function acquireHostRuntimeLease(
   input: AcquireHostRuntimeLeaseInput,
   deps: HostRuntimeLeaseAcquisitionDeps = {},
@@ -372,30 +452,42 @@ export async function acquireHostRuntimeLease(
     ...(input.ownerToken === undefined ? {} : { ownerToken: input.ownerToken }),
     ...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
   };
+  let lease: RuntimeLease | undefined;
   if (input.policy.runtimeAccess === 'project-and-user-state') {
-    return (deps.acquireRuntimeAccessLease ?? acquireRuntimeAccessLease)({
+    lease = await (deps.acquireRuntimeAccessLease ?? acquireRuntimeAccessLease)({
       ...common,
       projectRead: { projectDir: input.projectDir },
       userStateRead: true,
     });
-  }
-  if (input.policy.runtimeAccess === 'user-state') {
+  } else if (input.policy.runtimeAccess === 'user-state') {
     if (input.scope === 'project') {
-      return (deps.acquireRuntimeAccessLease ?? acquireRuntimeAccessLease)({
+      lease = await (deps.acquireRuntimeAccessLease ?? acquireRuntimeAccessLease)({
         ...common,
         projectRead: { projectDir: input.projectDir },
         userStateRead: true,
       });
+    } else {
+      lease = await (deps.acquireUserStateReadLease ?? acquireUserStateReadLease)(common);
     }
-    return (deps.acquireUserStateReadLease ?? acquireUserStateReadLease)(common);
-  }
-  if (input.scope === 'project') {
-    return (deps.acquireRuntimeReadLease ?? acquireRuntimeReadLease)({
+  } else if (input.scope === 'project') {
+    lease = await (deps.acquireRuntimeReadLease ?? acquireRuntimeReadLease)({
       ...common,
       projectDir: input.projectDir,
     });
+  } else {
+    return undefined;
   }
-  return undefined;
+  if (lease === undefined) return undefined;
+  recordEnteredOwnership(lease);
+  const originalRelease = lease.release.bind(lease);
+  const wrapped: RuntimeLease = Object.freeze({
+    ...lease,
+    release: (): void => {
+      clearEnteredOwnership(lease.ownerToken);
+      originalRelease();
+    },
+  });
+  return wrapped;
 }
 
 /** Whether stabilization must compare the path-stable project coordination key. */

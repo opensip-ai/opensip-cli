@@ -15,10 +15,13 @@ import {
 import {
   DEFAULT_HOST_RUNTIME_POLICY,
   acquireHostRuntimeLease,
+  assertEnteredProjectOwner,
+  assertEnteredUserStateOwner,
   createRuntimeLeaseLifecycle,
   createSafeRuntimeLeaseEventBuffer,
   defineHostCommand,
   isInspectionOnlyHostRequest,
+  resetEnteredHostOwnershipForTests,
   resolveHostRuntimePolicy,
 } from '../host-runtime-access.js';
 
@@ -142,6 +145,7 @@ describe('host command runtime policy', () => {
 
 describe('runtime lease acquisition', () => {
   it('maps declared project/default access to a project reader', async () => {
+    resetEnteredHostOwnershipForTests();
     const acquired = {
       ...lease(),
       kind: 'runtime-read',
@@ -158,7 +162,10 @@ describe('runtime lease acquisition', () => {
       },
       { acquireRuntimeReadLease: read },
     );
-    expect(result).toBe(acquired);
+    expect(result?.ownerToken).toBe(acquired.ownerToken);
+    expect(() => assertEnteredProjectOwner('test')).not.toThrow();
+    result?.release();
+    expect(() => assertEnteredProjectOwner('test')).toThrow(/project runtime lease/);
     expect(read).toHaveBeenCalledWith(
       expect.objectContaining({
         command: 'fit',
@@ -237,23 +244,26 @@ describe('runtime lease acquisition', () => {
   });
 
   it('uses the user reader for a scope-none user-state command', async () => {
+    resetEnteredHostOwnershipForTests();
     const acquired = {
       ...lease(),
       kind: 'user-state-read',
     } satisfies UserStateReadLease;
     const user = vi.fn(() => Promise.resolve(acquired));
-    await expect(
-      acquireHostRuntimeLease(
-        {
-          command: 'configure',
-          cwd: '/project',
-          projectDir: '/project',
-          scope: 'none',
-          policy: { runtimeAccess: 'user-state', bootstrapMode: 'standard' },
-        },
-        { acquireUserStateReadLease: user },
-      ),
-    ).resolves.toBe(acquired);
+    const held = await acquireHostRuntimeLease(
+      {
+        command: 'configure',
+        cwd: '/project',
+        projectDir: '/project',
+        scope: 'none',
+        policy: { runtimeAccess: 'user-state', bootstrapMode: 'standard' },
+      },
+      { acquireUserStateReadLease: user },
+    );
+    expect(held?.ownerToken).toBe(acquired.ownerToken);
+    expect(() => assertEnteredUserStateOwner('configure')).not.toThrow();
+    held?.release();
+    expect(() => assertEnteredUserStateOwner('configure')).toThrow(/user-state runtime lease/);
   });
 });
 
