@@ -436,7 +436,7 @@ JSON-RPC tool parameter**, not a command-line flag. The equivalent mutation
 environment opt-in is `OPENSIP_MCP_ALLOW_MUTATIONS=1`; read-only remains the
 default.
 
-`mcp` is **project-scoped and no-init capable** ([ADR-0169](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0169-cache-first-runtime-evidence-continuity.md)):
+`mcp` is **project-scoped and no-init capable** ([ADR-0170](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0170-cache-first-runtime-evidence-continuity.md)):
 before Init it serves the host-selected managed user-cache datastore for the
 discovered project root; after Init it serves project
 `opensip-cli/.runtime/`. It never opens a second datastore, never upgrades a

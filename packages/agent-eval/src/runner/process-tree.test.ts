@@ -4,6 +4,7 @@ import {
   processTreeIsAlive,
   processTreeTrackingReliable,
   retainPosixProcessTree,
+  sampleProcessTree,
   signalProcessTree,
   stopProcessTreeTracking,
   type KillableChild,
@@ -222,6 +223,78 @@ describe('retained POSIX process trees', () => {
 
     expect(killProcess).not.toHaveBeenCalledWith(-100, 'SIGKILL');
     expect(kill).not.toHaveBeenCalled();
+  });
+
+  it('sweeps same-group survivors when the first sample already misses the root', () => {
+    // The flake that redded main on a docs-only commit: a fast-exiting root
+    // spawned a TERM-ignoring descendant, the loaded runner's first `ps`
+    // returned only after the root died, and the tracker silently waived the
+    // containment claim — the run closed clean while the descendant leaked.
+    // The root's process-group id is known statically (the root pid), so the
+    // first successful sample must sweep group survivors instead.
+    const kill = vi.fn(() => true);
+    const child: KillableChild = { exitCode: 0, kill, pid: 100, signalCode: null };
+    const tree = retainPosixProcessTree(child, 'linux', {
+      snapshotProcesses: () => [
+        {
+          commandFingerprint: 'c'.repeat(64),
+          parentPid: 1, // reparented to init after the root died
+          pid: 150,
+          processGroupId: 100,
+          posixSession: 100,
+          startedAt: 'orphan-descendant-start',
+        },
+      ],
+    });
+    retainedTrees.push(tree);
+
+    expect(processTreeTrackingReliable(tree)).toBe(true);
+    const killProcess = vi.fn();
+    expect(processTreeIsAlive(tree, { killProcess })).toBe(true);
+    signalProcessTree(tree, 'SIGKILL', { killProcess });
+    expect(killProcess).toHaveBeenCalledWith(150, 'SIGKILL');
+  });
+
+  it('treats a command-mutated root zombie as the exit transition and sweeps its group', () => {
+    // The Linux CI silent-leak mode: the exited root lingers as a zombie whose
+    // command mutates ("[MainThread] <defunct>") — same pid/group/session/
+    // start time, different fingerprint. The zombie sample must fire the
+    // same-group survivor sweep; treating it as "root still present" skipped
+    // the transition on that sample AND on the post-reap sample, so a
+    // TERM-ignoring descendant was never tracked and the run closed clean.
+    const liveRoot = {
+      commandFingerprint: 'a'.repeat(64),
+      parentPid: 1,
+      pid: 100,
+      processGroupId: 100,
+      posixSession: 100,
+      startedAt: 'retained-root-start',
+    };
+    const zombieRoot = { ...liveRoot, commandFingerprint: 'f'.repeat(64) };
+    const descendant = {
+      commandFingerprint: 'b'.repeat(64),
+      parentPid: 1, // already reparented to init
+      pid: 150,
+      processGroupId: 100,
+      posixSession: 100,
+      startedAt: 'descendant-start',
+    };
+    const snapshots = [[liveRoot], [zombieRoot, descendant], [descendant]] as const;
+    let snapshotIndex = 0;
+    const kill = vi.fn(() => true);
+    const child: KillableChild = { exitCode: 0, kill, pid: 100, signalCode: null };
+    const tree = retainPosixProcessTree(child, 'linux', {
+      snapshotProcesses: () => snapshots[Math.min(snapshotIndex++, snapshots.length - 1)],
+    });
+    retainedTrees.push(tree);
+
+    sampleProcessTree(tree);
+
+    expect(processTreeTrackingReliable(tree)).toBe(true);
+    const killProcess = vi.fn();
+    expect(processTreeIsAlive(tree, { killProcess })).toBe(true);
+    signalProcessTree(tree, 'SIGKILL', { killProcess });
+    expect(killProcess).toHaveBeenCalledWith(150, 'SIGKILL');
   });
 
   it('retains original group members observed as the root exits', () => {

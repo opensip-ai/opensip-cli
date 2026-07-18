@@ -4,10 +4,10 @@ last_verified: 2026-07-18
 owner: opensip-cli
 ---
 
-# ADR-0169: Cache-first runtime evidence continuity
+# ADR-0170: Cache-first runtime evidence continuity
 
 ```yaml
-id: ADR-0169
+id: ADR-0170
 title: Cache-first runtime evidence continuity
 date: 2026-07-18
 status: active

@@ -571,6 +571,64 @@ test('expected version / host mismatches fail verification', () => {
   });
 });
 
+test('sw-vers major accepts real two-component macOS versions; mismatch and absence still fail', () => {
+  withTempDir((dir) => {
+    const evidence = writeValid(dir);
+    // Apple reports two-component product versions ("26.4") outside patch
+    // releases; a semver-strict major parse rejected them and failed every
+    // correctly-versioned macOS 26 runner (the red qualification lane).
+    for (const value of ['26.4', '26.4.1', '26']) {
+      const sealed = reseal(evidence, join(dir, `sw-vers-${value}.json`), (body) => {
+        body.host.swVers = value;
+      });
+      const ok = runVerifier([
+        '--evidence',
+        sealed,
+        '--profile',
+        PROFILE_PATH,
+        '--expected-sw-vers-major',
+        '26',
+        '--json',
+      ]);
+      assert.equal(ok.code, 0, `swVers ${value}: ${ok.stdout}`);
+      assert.equal(JSON.parse(ok.stdout).failures.length, 0);
+    }
+
+    const wrongMajor = reseal(evidence, join(dir, 'sw-vers-wrong-major.json'), (body) => {
+      body.host.swVers = '27.0';
+    });
+    const mismatch = runVerifier([
+      '--evidence',
+      wrongMajor,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-sw-vers-major',
+      '26',
+      '--json',
+    ]);
+    assert.equal(mismatch.code, 1);
+    assert.ok(
+      JSON.parse(mismatch.stdout).failures.some((f) => f.code === 'host-sw-vers-major-mismatch'),
+    );
+
+    // The fixture host reports the tagged unavailable fact — an absent or
+    // malformed sw_vers must still fail loudly, never pass by default.
+    const absent = runVerifier([
+      '--evidence',
+      evidence,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-sw-vers-major',
+      '26',
+      '--json',
+    ]);
+    assert.equal(absent.code, 1);
+    assert.ok(
+      JSON.parse(absent.stdout).failures.some((f) => f.code === 'host-sw-vers-major-mismatch'),
+    );
+  });
+});
+
 test('matching node/npm major constraints pass; mismatches fail with their reason', () => {
   withTempDir((dir) => {
     const evidence = writeValid(dir);

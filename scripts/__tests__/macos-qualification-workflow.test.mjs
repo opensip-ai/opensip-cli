@@ -733,7 +733,12 @@ test('promotion validates exact source identity before repo scripts and persists
     );
   }
   assert.match(promote, /NPM_CONFIG_REGISTRY:\s*https:\/\/registry\.npmjs\.org\//);
-  assert.match(promote, /PROMOTION_ORDER:\s*\$\{\{ runner\.temp \}\}\/promotion-order\.txt/);
+  // Job-level env cannot read the runner context (GitHub rejects the whole
+  // workflow file), so the runner-temp path resolves in a dedicated first step.
+  assert.match(
+    promote,
+    /echo "PROMOTION_ORDER=\$RUNNER_TEMP\/promotion-order\.txt" >> "\$GITHUB_ENV"/,
+  );
   const expectedOrderDigest = createHash('sha256')
     .update(`${RELEASE_PACKAGE_ORDER.map((entry) => entry.name).join('\n')}\n`)
     .digest('hex');

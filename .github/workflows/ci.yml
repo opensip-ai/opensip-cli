@@ -330,6 +330,23 @@ jobs:
         with:
           persist-credentials: false
 
+      # GitHub-parser validity for every workflow file (context availability,
+      # expression syntax). No local gate covers this class: release.yml once
+      # carried job-level `${{ runner.temp }}` env entries that GitHub rejected
+      # file-wide while PyYAML and the line-scan structure tests passed — and a
+      # tag-triggered workflow is never exercised until release day. Shellcheck
+      # integration stays off: shell style is out of this gate's scope. The
+      # binary is not a `uses:` action, so Dependabot cannot bump it — the
+      # version and checksum below are updated together, manually.
+      - name: Validate workflow files (actionlint)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" \
+            | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -no-color -shellcheck=
+
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6

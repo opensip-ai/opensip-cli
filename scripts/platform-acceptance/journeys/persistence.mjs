@@ -21,10 +21,12 @@ import {
   readdirSync,
   realpathSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+import { hostname } from 'node:os';
+import { basename, isAbsolute, join, relative } from 'node:path';
 
 import { continuityProofIdentityDigest } from '../contract.mjs';
 import { readBoundedOwnedTextFile } from '../bounded-owned-file.mjs';
@@ -45,6 +47,16 @@ const MAX_RUNTIME_STATE_BYTES = 128 * 1024 * 1024;
 /** Bounded directory walk so a pathological tree cannot exhaust the harness. */
 const MAX_WALK_ENTRIES = 4096;
 const SQLITE_PROBE_WAIT_MS = 10_000;
+// The queued writer proves queued-then-clean completion, never a timeout: an
+// explicit generous wait keeps its budget far above the synthetic hold window
+// so settling during the hold is itself evidence of misbehavior.
+const SQLITE_WAITER_LOCK_WAIT_MS = 15_000;
+// How long the synthetic advisory lock stays held after the queued writer
+// launches — its engagement window. ~3x the slowest observed installed-CLI
+// startup on the 3-core CI VMs; a miss classifies as infrastructure timing
+// (`contention-queue-not-observed`), never as candidate behavior. Overridable
+// per-run through `context.timing.syntheticQueueHoldMs` (test seam).
+const SYNTHETIC_QUEUE_HOLD_MS = 4000;
 const SQLITE_PROBE_PROCESS_TIMEOUT_MS = 15_000;
 const SQLITE_WRITE_LOCK_STABLE_MS = 150;
 const SQLITE_COMPETITOR_BARRIER_MS = 1250;
@@ -277,6 +289,51 @@ async function waitForUnchangedWriteLock(
     await delay(10);
   }
   return false;
+}
+
+/**
+ * Re-read the SYNTHETIC advisory lock (Phase A of the contention probe).
+ * `readWriteLockIdentity` deliberately accepts only CLI-owned locks
+ * (`command: 'graph'`); the synthetic lock carries an honest probe command,
+ * so its ownership check parses the token directly.
+ */
+function syntheticLockToken(path, root) {
+  try {
+    const result = readBoundedOwnedTextFile({
+      path,
+      root,
+      maxBytes: 4096,
+      reasonPrefix: 'sqlite-write-lock',
+      requireNonEmpty: true,
+    });
+    if (!result.ok) return null;
+    const value = JSON.parse(result.text);
+    return value !== null && typeof value === 'object' && typeof value.ownerToken === 'string'
+      ? value.ownerToken
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Post-hoc queue proof: the writer's own envelope must record at least one
+ * wait on the datastore lock naming this harness process as the owner.
+ */
+function waiterWaitedOnOwner(result, ownerPid) {
+  const parsed = readJson(result);
+  if (!parsed.ok) return false;
+  const events = parsed.value?.diagnostics?.events;
+  return (
+    Array.isArray(events) &&
+    events.some(
+      (event) =>
+        event?.phase === 'persist' &&
+        event?.message === 'state.lock.acquire.wait' &&
+        event?.data?.resource === 'datastore' &&
+        event?.data?.ownerPid === ownerPid,
+    )
+  );
 }
 
 function releaseSqliteHolder(path, lockIdentity) {
@@ -612,9 +669,28 @@ const crossProcessReplayExecutor = async (context) => {
 };
 
 /**
- * Deterministically force an installed CLI writer to wait on an active SQLite
- * transaction. The helper resolves better-sqlite3 from the installed candidate,
- * then holds BEGIN IMMEDIATE until it observes the CLI's own `.write.lock`.
+ * Prove the installed CLI's datastore contention contract in two
+ * deterministic phases:
+ *
+ * Phase A — advisory-lock contention against a SYNTHETIC lock owned by this
+ * (live) harness process. Same-host lock validity is pid-liveness-based
+ * (core file-lock `isStale`), so the lock stays held exactly until the
+ * journey removes it: no SQLite busy_timeout wall and no startup-speed
+ * window. The short-wait writer's bounded timeout is therefore a pure
+ * product claim, and the queued writer's wait is proven post-hoc from its
+ * own `state.lock.acquire.wait` events naming this process as the owner.
+ *
+ * Phase B — native SQLite survival: the helper resolves better-sqlite3 from
+ * the installed candidate and holds BEGIN IMMEDIATE until the journey writes
+ * the release marker (or its deadline expires). The normal-policy writer
+ * must hold the advisory lock through that native contention and complete
+ * cleanly after release, inside the shipped busy_timeout.
+ *
+ * (The previous single-phase design released the native holder on a fixed
+ * time barrier with no engagement proof; slow-VM startup let the short-wait
+ * writer arrive after release, succeed against a free lock, and misreport
+ * the CLI's bounded timeout as broken — the failure that kept the
+ * qualification lane permanently red.)
  */
 export async function runSqliteContentionProbe(context, cwd) {
   const readable = await ensureReadableStore(context, cwd);
@@ -631,30 +707,128 @@ export async function runSqliteContentionProbe(context, cwd) {
   const ownerController = new AbortController();
   const exhaustionController = new AbortController();
   const waiterController = new AbortController();
-  const holder = observeProcess(
-    context.process.run({
-      argv: [
-        ...probe.nodeArgv,
-        probe.script,
-        'hold-write-transaction',
-        probe.entrypoint,
-        probe.dbPath,
-        readyMarker,
-        releaseMarker,
-        String(SQLITE_PROBE_WAIT_MS),
-      ],
-      cwd,
-      signal: holderController.signal,
-      timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
-    }),
-  );
+  let holder = null;
   let owner = null;
   let exhaustion = null;
   let waiter = null;
   let lockIdentity = null;
-  let holderReleased = false;
+  let syntheticHeld = false;
+  let holderReleased = true; // becomes false once the native holder launches
   let completed = false;
   try {
+    // ── Phase A: bounded exhaustion + queued writer against a synthetic
+    // advisory lock owned by this live harness process.
+    const syntheticToken = `acceptance-contention-${process.pid}-${Date.now().toString(36)}`;
+    try {
+      writeFileSync(
+        writeLock,
+        JSON.stringify({
+          ownerToken: syntheticToken,
+          pid: process.pid,
+          hostname: hostname(),
+          command: 'platform-acceptance-contention-probe',
+          cwdBasename: basename(cwd),
+          acquiredAt: Date.now(),
+          lastHeartbeatAt: Date.now(),
+        }),
+        { flag: 'wx', mode: 0o600 },
+      );
+    } catch {
+      return fail('contention-probe-state-not-clean', []);
+    }
+    syntheticHeld = true;
+
+    exhaustion = observeProcess(
+      runCli(context, {
+        args: ['graph', '--json'],
+        cwd,
+        env: { OPENSIP_STATE_LOCK_WAIT_MS: String(STATE_LOCK_EXHAUST_WAIT_MS) },
+        signal: exhaustionController.signal,
+        timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
+      }),
+    );
+    // The lock is provably held for this writer's ENTIRE life (same-host
+    // validity is pid-liveness of this process), so its settlement needs no
+    // engagement window: however slow the host, the writer meets contention.
+    const exhaustionResult = await exhaustion.promise;
+    if (!isBoundedStateLockExhaustion(exhaustionResult)) {
+      return fail('contention-retry-not-exhausted', [
+        context.assert.diagnostic(
+          'a short-wait CLI writer did not report the bounded datastore lock timeout while a live same-host owner held the lock',
+        ),
+        context.assert.diagnostic(exhaustionResult?.stderrTail ?? ''),
+      ]);
+    }
+
+    waiter = observeProcess(
+      runCli(context, {
+        args: ['graph', '--json'],
+        cwd,
+        env: { OPENSIP_STATE_LOCK_WAIT_MS: String(SQLITE_WAITER_LOCK_WAIT_MS) },
+        signal: waiterController.signal,
+        timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
+      }),
+    );
+    // Hold through the queued writer's engagement window, then release. Its
+    // wait budget is far above the hold, so settling during the hold is
+    // itself misbehavior.
+    const queueHoldMs = context.timing?.syntheticQueueHoldMs ?? SYNTHETIC_QUEUE_HOLD_MS;
+    await delay(queueHoldMs);
+    if (waiter.settled) {
+      return fail('contention-waiter-not-observed', [
+        context.assert.diagnostic(
+          'the queued CLI writer settled while a live same-host owner still held the datastore lock',
+        ),
+      ]);
+    }
+    const heldToken = syntheticLockToken(writeLock, cwd);
+    if (heldToken !== syntheticToken) {
+      return fail('contention-probe-lock-stolen', [
+        context.assert.diagnostic(
+          'the synthetic datastore lock changed ownership while it should have been held',
+        ),
+      ]);
+    }
+    rmSync(writeLock, { force: true });
+    syntheticHeld = false;
+
+    const waiterResult = await waiter.promise;
+    if (!cleanProcess(waiterResult)) {
+      return fail('contention-not-retried', [
+        context.assert.diagnostic(
+          'the queued CLI writer did not complete cleanly after the lock release',
+        ),
+        context.assert.diagnostic(waiterResult?.stderrTail ?? ''),
+      ]);
+    }
+    if (!waiterWaitedOnOwner(waiterResult, process.pid)) {
+      return fail('contention-queue-not-observed', [
+        context.assert.diagnostic(
+          'the queued CLI writer completed without recording a wait on the held lock — infrastructure timing (startup outlasted the generous hold window), not candidate lock behavior',
+        ),
+      ]);
+    }
+
+    // ── Phase B: native SQLite survival — no competitor timing inside the
+    // owner's busy_timeout window.
+    holderReleased = false;
+    holder = observeProcess(
+      context.process.run({
+        argv: [
+          ...probe.nodeArgv,
+          probe.script,
+          'hold-write-transaction',
+          probe.entrypoint,
+          probe.dbPath,
+          readyMarker,
+          releaseMarker,
+          String(SQLITE_PROBE_WAIT_MS),
+        ],
+        cwd,
+        signal: holderController.signal,
+        timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
+      }),
+    );
     if (!(await waitForMarker(readyMarker, [holder]))) {
       return fail('contention-lock-not-acquired', [
         context.assert.diagnostic(
@@ -674,11 +848,6 @@ export async function runSqliteContentionProbe(context, cwd) {
         timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
       }),
     );
-
-    // The first normal-policy writer is the only CLI process in flight here,
-    // so observing one stable outer lock proves it owns the contention head
-    // start. Launching competitors only after that proof prevents scheduler
-    // timing from letting the short-wait process become the lock owner.
     lockIdentity = await waitForStableWriteLock(writeLock, cwd, holder, owner);
     if (lockIdentity === null) {
       return fail('contention-not-observed', [
@@ -687,43 +856,22 @@ export async function runSqliteContentionProbe(context, cwd) {
         ),
       ]);
     }
-
-    exhaustion = observeProcess(
-      runCli(context, {
-        args: ['graph', '--json'],
-        cwd,
-        env: { OPENSIP_STATE_LOCK_WAIT_MS: String(STATE_LOCK_EXHAUST_WAIT_MS) },
-        signal: exhaustionController.signal,
-        timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
-      }),
-    );
-    waiter = observeProcess(
-      runCli(context, {
-        args: ['graph'],
-        cwd,
-        signal: waiterController.signal,
-        timeoutMs: SQLITE_PROBE_PROCESS_TIMEOUT_MS,
-      }),
-    );
-
-    // Keep the native transaction active for longer than the short-wait policy
-    // while both normal-policy writers remain in flight and the exact OpenSIP
-    // lock owner stays unchanged. The short-wait process can remain in SQLite
-    // close/checkpoint cleanup after emitting its timeout, so classify its
-    // public result only after the native holder is released.
+    // Confirm the owner retains the lock while blocked in SQLite, then
+    // release promptly — the total native hold must stay well inside the
+    // shipped busy_timeout so the blocked statement still succeeds.
     if (
       !(await waitForUnchangedWriteLock(
         writeLock,
         cwd,
         lockIdentity,
-        [holder, owner, waiter],
-        SQLITE_PROBE_WAIT_MS,
+        [holder, owner],
         SQLITE_COMPETITOR_BARRIER_MS,
+        SQLITE_WRITE_LOCK_STABLE_MS,
       ))
     ) {
-      return fail('contention-waiter-not-observed', [
+      return fail('contention-not-observed', [
         context.assert.diagnostic(
-          'a queued CLI writer did not remain pending behind the unchanged datastore lock owner',
+          'the head-start CLI writer did not retain a stable datastore lock while SQLite was write-locked',
         ),
       ]);
     }
@@ -731,40 +879,32 @@ export async function runSqliteContentionProbe(context, cwd) {
     holderReleased = releaseSqliteHolder(releaseMarker, lockIdentity);
     if (!holderReleased) return fail('contention-release-failed', []);
 
-    const [holderResult, ownerResult, exhaustionResult, waiterResult] = await Promise.all([
-      holder.promise,
-      owner.promise,
-      exhaustion.promise,
-      waiter.promise,
-    ]);
-    if (!isBoundedStateLockExhaustion(exhaustionResult)) {
-      return fail('contention-retry-not-exhausted', [
-        context.assert.diagnostic(
-          'a short-wait CLI writer did not report the bounded datastore lock timeout',
-        ),
-        context.assert.diagnostic(exhaustionResult?.stderrTail ?? ''),
-      ]);
-    }
-    if (!cleanProcess(holderResult) || !cleanProcess(ownerResult) || !cleanProcess(waiterResult)) {
+    const [holderResult, ownerResult] = await Promise.all([holder.promise, owner.promise]);
+    if (!cleanProcess(holderResult) || !cleanProcess(ownerResult)) {
       return fail('contention-not-retried', [
         context.assert.diagnostic(
-          'the blocked and queued CLI writers did not resume cleanly after lock release',
+          'the blocked CLI writer did not resume cleanly after the native lock release',
         ),
-        context.assert.diagnostic(
-          waiterResult?.stderrTail ?? ownerResult?.stderrTail ?? holderResult?.stderrTail ?? '',
-        ),
+        context.assert.diagnostic(ownerResult?.stderrTail ?? holderResult?.stderrTail ?? ''),
       ]);
     }
     if (existsSync(writeLock)) {
       return fail('contention-write-lock-not-released', []);
     }
 
+    // Exactly ONE new session: the phase-B owner (a rendering run). The
+    // queued waiter runs `--json`, and graph's documented contract is that
+    // export/carrier modes carry no session contribution
+    // (graph-command-spec.ts: "the export/carrier modes (`--json`, gate,
+    // `--report-to`) carry no session"). Note fit's `--json` DOES record a
+    // session — the cross-tool inconsistency is tracked separately; this
+    // journey asserts the contract as specified, it does not editorialize it.
     const replay = await verifyNewGraphSessions(
       context,
       cwd,
       readable.sessionIds,
       'post-contention',
-      2,
+      1,
     );
     if (!replay.ok) return replay.outcome;
     completed = true;
@@ -774,20 +914,23 @@ export async function runSqliteContentionProbe(context, cwd) {
       ),
     ]);
   } finally {
+    if (syntheticHeld) rmSync(writeLock, { force: true });
     if (!completed && waiter !== null && !waiter.settled) waiterController.abort();
     if (!completed && exhaustion !== null && !exhaustion.settled) {
       exhaustionController.abort();
     }
     if (!completed && owner !== null && !owner.settled) ownerController.abort();
-    if (!holderReleased) {
-      holderReleased = releaseSqliteHolder(
-        releaseMarker,
-        lockIdentity ?? { ownerToken: 'harness-cleanup' },
-      );
+    if (holder !== null) {
+      if (!holderReleased) {
+        holderReleased = releaseSqliteHolder(
+          releaseMarker,
+          lockIdentity ?? { ownerToken: 'harness-cleanup' },
+        );
+      }
+      if (!holderReleased && !holder.settled) holderController.abort();
     }
-    if (!holderReleased && !holder.settled) holderController.abort();
     await Promise.all([
-      holder.promise,
+      ...(holder === null ? [] : [holder.promise]),
       ...(owner === null ? [] : [owner.promise]),
       ...(exhaustion === null ? [] : [exhaustion.promise]),
       ...(waiter === null ? [] : [waiter.promise]),
