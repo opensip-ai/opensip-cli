@@ -142,23 +142,40 @@ export class RunScope {
   dispose(): void {
     // Teardown is a safety boundary, not a convenience callback. A corrupted
     // or Tool-mutated cache/config object must not prevent persistence close
-    // proof and runtime-lease release in the registered disposer tail.
+    // proof and runtime-lease release in the registered disposer tail. A
+    // disposer failure must not abort teardown — but it is LOGGED, never
+    // silently dropped: a swallowed audit-flush/datastore-close failure would
+    // be exactly the silent evidence loss disposal exists to prevent.
     try {
       this.parseCache.dispose();
-    } catch {
-      /* @swallow-ok continue draining safety-critical disposers */
+    } catch (error) {
+      this.logDisposeFailure('parse-cache', error);
     }
     try {
       this.recipeUnitConfig.clear();
-    } catch {
-      /* @swallow-ok continue draining safety-critical disposers */
+    } catch (error) {
+      this.logDisposeFailure('recipe-unit-config', error);
     }
     for (const fn of this.disposers.splice(0)) {
       try {
         fn();
-      } catch {
-        /* @swallow-ok a disposer failure must not abort teardown */
+      } catch (error) {
+        this.logDisposeFailure('registered-disposer', error);
       }
+    }
+  }
+
+  /** Teardown must complete even when the log sink itself is gone. */
+  private logDisposeFailure(stage: string, error: unknown): void {
+    try {
+      this.logger.warn({
+        evt: 'core.scope.dispose.failed',
+        module: 'core:run-scope',
+        stage,
+        err: error instanceof Error ? error.message : String(error),
+      });
+    } catch {
+      /* @swallow-ok teardown outranks the diagnostic */
     }
   }
 }
