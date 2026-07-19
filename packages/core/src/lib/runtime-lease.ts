@@ -3238,13 +3238,14 @@ function reconcileOrphanedMutexTemp(
       // the same proven pair without touching unrelated state.
       return;
     }
+    // Concurrent cold-start creators rewrite or replace orphan temps between
+    // observation and unlink. Whether the path vanished or merely changed,
+    // leave it for the live owner / next mutex scan instead of failing
+    // acquisition or release.
     if (
-      ((error as NodeJS.ErrnoException).code === 'ENOENT' ||
-        error instanceof RuntimeSnapshotChangedError ||
-        (error instanceof SystemError &&
-          error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH')) &&
-      lstatIfPresent(join(paths.coordinationDir, entry), 'Runtime mutex temporary record') ===
-        undefined
+      (error as NodeJS.ErrnoException).code === 'ENOENT' ||
+      error instanceof RuntimeSnapshotChangedError ||
+      (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH')
     ) {
       return;
     }
