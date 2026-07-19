@@ -2,7 +2,7 @@ import { currentScope, RunScope } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { runCommandDispatchBoundary } from '../command-dispatch-boundary.js';
-import { createCommandActionScopeRunner } from '../pre-action-hook.js';
+import { createCommandActionScopeRunner, disposeCurrentScope } from '../pre-action-hook.js';
 
 describe('command dispatch boundary', () => {
   it('presents a rejected action inside its owned scope and disposes afterward', async () => {
@@ -35,6 +35,44 @@ describe('command dispatch boundary', () => {
     expect(presentError).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
     expect(disposeAmbientScope).toHaveBeenCalledTimes(1);
+    expect(currentScope()).toBeUndefined();
+  });
+
+  it('flushes audit + closes datastore on a raw Error and lets the next command enter scope', async () => {
+    // Plan 09 Task 2.2: the run you most want audited is the one that failed
+    // unexpectedly. A raw (non-ToolError) throw must still drain the
+    // registered disposers (policy-audit flush, datastore close) and clear
+    // the ambient ALS slot so an embedded host's NEXT command does not trip
+    // the re-entrancy guard.
+    const runner = createCommandActionScopeRunner();
+    const flushPolicyAudit = vi.fn();
+    const closeDatastore = vi.fn();
+    const scope = new RunScope();
+    scope.onDispose(flushPolicyAudit);
+    scope.onDispose(closeDatastore);
+    runner.stage(scope);
+
+    await runCommandDispatchBoundary({
+      dispatch: () =>
+        runner.run(() => {
+          throw new Error('raw unexpected failure');
+        }),
+      actionScope: runner,
+      presentError: () => Promise.resolve(),
+      disposeAmbientScope: disposeCurrentScope,
+    });
+
+    expect(flushPolicyAudit).toHaveBeenCalledTimes(1);
+    expect(closeDatastore).toHaveBeenCalledTimes(1);
+    expect(currentScope()).toBeUndefined();
+
+    // Embedded-mode second command in the same process: staging + entering a
+    // fresh scope succeeds without SYSTEM.SCOPE.REENTRANT.
+    const next = createCommandActionScopeRunner();
+    const nextScope = new RunScope();
+    next.stage(nextScope);
+    await expect(next.run(() => Promise.resolve(currentScope()))).resolves.toBe(nextScope);
+    next.disposeStaged();
     expect(currentScope()).toBeUndefined();
   });
 
