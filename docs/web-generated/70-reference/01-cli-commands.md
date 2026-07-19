@@ -1097,7 +1097,7 @@ The MCP response adds exactly one extra top-level object the CLI never emits —
 
 ---
 
-## `policy status`, `policy explain`, and `policy audit` — inspect local trust policy
+## `policy status`, `policy explain`, `policy audit`, and `policy trust`/`untrust` — local trust policy
 
 CLI-owned. Reads the effective local trust-policy plane used by bootstrap and
 host enforcement points. The policy decision point is offline and deterministic:
@@ -1111,13 +1111,17 @@ opensip policy explain installed-tool:audit-sec --action load --json
 opensip policy explain baseline:fit --action baseline-save --json
 opensip policy audit --json --limit 50
 opensip policy audit --out opensip-policy-audit.json
+opensip policy trust @acme/checks-internal
+opensip policy untrust @acme/checks-internal
 ```
 
 | Subcommand | Effect |
 |---|---|
-| `status` | Shows `mode`, `ci`, source tiers, org-cache state, and active exceptions. |
+| `status` | Shows `mode`, `ci`, source tiers, org-cache state, active exceptions, and current capability-pack grants. |
 | `explain <subject>` | Evaluates one subject/action pair against the current policy and returns reasons plus matched exception ids. |
 | `audit` | Lists local policy decisions persisted in `policy_audit_events`; `--out` writes the same JSON result to a file. |
+| `trust <package>` | Grants operator trust to a capability pack on the **user-level** global config. The grant records the exact package id bound to the pack's provenance (its `opensipTools` manifest hash) resolved at grant time — re-run after the pack legitimately changes ([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)). |
+| `untrust <package>` | Revokes a capability-pack grant from the user-level global config. |
 
 Subject strings are exact `kind:id` pairs. Supported kinds are
 `installed-tool`, `project-local-tool`, `user-global-tool`, `capability-pack`,
@@ -1129,9 +1133,14 @@ Strict mode denies unverified non-bundled executable loads/installs and
 gate-weakening actions (`fitness.disabledChecks`, baseline saves) unless an
 unexpired exact exception applies. Default mode preserves existing OSS behavior
 and records conditioned decisions where provenance is missing or failed.
-For `capability-pack:...` `load` decisions, allowed decisions also carry a
-resource decision: bundled first-party packs may run in-host, while non-bundled
-packs run through the capability worker bridge with undeclared resources denied.
+For `capability-pack:...` `load` decisions, external packs are admitted only by
+a matching user-level trust grant (`policy trust`); a denial cites the missing
+or provenance-mismatched grant and the exact `policy trust` command to run.
+Allowed decisions also carry a resource decision: bundled first-party packs may
+run in-host, while non-bundled packs run through the capability worker bridge,
+whose resource guard is advisory defense-in-depth — admission is the enforced
+boundary
+([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
 
 ---
 

@@ -53,7 +53,14 @@ Default-on for interactive TTY; hourly npm version fetch; update-state stores on
 | `OPENSIP_CLI_SKIP_BUNDLED` | Comma-separated bundled-tool ids (`fitness`/`simulation`/`graph`/`yagni`) to NOT load as bundled, so an installed or project-local package of the same id can take over instead. Unset loads all bundled tools. |
 | `OPENSIP_CLI_SKIP_INSTALLED` | Set to any non-empty value to skip discovery and loading of installed npm tool packages (`opensipTools.kind === tool` in ancestor `node_modules`). Bundled and authored tools are unaffected. Equivalent to passing `--no-plugins`. Use for incident response when ambient plugins must not execute in the host process. |
 | `OPENSIP_CLI_ALLOW_INSTALLED_TOOLS` | Override for comma/whitespace-separated exact installed npm Tool ids. `*` is ignored with one bounded warning and admits nothing. Normal `opensip tools install` writes managed trust state, so this is mainly for ambient `node_modules` packages, manual experiments, or incident response. Pair with `OPENSIP_CLI_SKIP_INSTALLED` for incident response (kill switch wins). |
-| `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` | Override for comma/whitespace-separated capability package names to admit for in-process fit-pack / graph-adapter loading. Bundled first-party packs and exact packages listed in `plugins.*` are trusted automatically; ambient marker-discovered non-bundled capability packs require this exact package-name override. `*` is ignored and warns because capability packs run in the host process. |
+
+There is no env override for **capability packs** (fit packs, scenario packs,
+graph adapters). The former `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` variable was
+removed: repo-committed workflow files and direnv can set env for a direct
+`opensip` invocation, so an env allowlist re-opened the analyzed-repo trust
+inversion. The single capability-pack trust surface is the user-level
+global-config trust list written by `opensip policy trust <pack>`
+([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
 
 ## Authored tools
 
