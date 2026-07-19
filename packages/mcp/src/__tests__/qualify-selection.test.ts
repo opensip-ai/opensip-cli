@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { qualifySelection } from '../sqlite-graph-read-port.js';
+import { qualifySelection } from '../sqlite-graph-test-selection-queries.js';
 
 import type { TestSelectionSnapshot } from '@opensip-cli/contracts';
 
