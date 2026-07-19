@@ -68,18 +68,18 @@ describe('executeUserRemoval', () => {
       userRoot,
       yes: true,
       write: out.write,
-      acquireGlobalLease: async () => fakeGlobalLease(),
+      acquireGlobalLease: () => Promise.resolve(fakeGlobalLease()),
     });
     expect(result.action).toBe('empty');
     expect(out.text()).toContain('Nothing to remove');
   });
 
   it('cancels without acquiring a lease when the prompt declines', async () => {
-    const acquire = vi.fn(async () => fakeGlobalLease());
+    const acquire = vi.fn(() => Promise.resolve(fakeGlobalLease()));
     const result = await executeUserRemoval({
       userRoot,
       write: captureWrite().write,
-      prompt: async () => 'n',
+      prompt: () => Promise.resolve('n'),
       acquireGlobalLease: acquire,
     });
     expect(result.action).toBe('cancelled');
@@ -88,7 +88,7 @@ describe('executeUserRemoval', () => {
   });
 
   it('dry-run lists targets without deletion', async () => {
-    const acquire = vi.fn(async () => fakeGlobalLease());
+    const acquire = vi.fn(() => Promise.resolve(fakeGlobalLease()));
     const result = await executeUserRemoval({
       userRoot,
       dryRun: true,
@@ -106,7 +106,7 @@ describe('executeUserRemoval', () => {
       discardRecovery: true,
       yes: true,
       write: captureWrite().write,
-      acquireGlobalLease: async () => fakeGlobalLease('receipt-only-discard'),
+      acquireGlobalLease: () => Promise.resolve(fakeGlobalLease('receipt-only-discard')),
     });
     expect(result.action).toBe('empty');
     expect(result.recovery?.status).toBe('absent');

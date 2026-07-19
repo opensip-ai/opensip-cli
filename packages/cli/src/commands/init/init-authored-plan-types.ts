@@ -177,12 +177,20 @@ export interface CreateInitAuthoredPlanInput {
   readonly hooks?: InitAuthoredSnapshotHooks;
 }
 
+/** @throws {Error} Always; the authored plan violates a required invariant. */
 export function authoredPlanFailure(message: string): never {
   throw new Error(`Invalid Init authored plan: ${message}`);
 }
 
 export function sha256Bytes(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+/** Hash bounded byte segments without allocating one aggregate Buffer. */
+export function sha256Parts(values: readonly (string | Uint8Array)[]): string {
+  const digest = createHash('sha256');
+  for (const value of values) digest.update(value);
+  return digest.digest('hex');
 }
 
 export function compareUtf8(left: string, right: string): number {
@@ -256,7 +264,7 @@ export function validateMode(value: string): asserts value is InitAuthoredMode {
   }
 }
 
-export function validateToolIdentity(identity: ToolScaffoldIdentity, field: string): void {
+export function validateAuthoredToolIdentity(identity: ToolScaffoldIdentity, field: string): void {
   const values = [
     ['stableId', identity.stableId],
     ['name', identity.name],
@@ -283,7 +291,7 @@ export function normalizeToolIdentities(
   const stableIds = new Set<string>();
   const names = new Set<string>();
   return scaffolds.map((scaffold, index) => {
-    validateToolIdentity(scaffold.identity, `tools[${String(index)}]`);
+    validateAuthoredToolIdentity(scaffold.identity, `tools[${String(index)}]`);
     if (stableIds.has(scaffold.identity.stableId) || names.has(scaffold.identity.name)) {
       authoredPlanFailure('Tool stable ids and names must be unique');
     }

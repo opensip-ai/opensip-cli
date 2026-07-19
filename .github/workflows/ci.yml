@@ -69,7 +69,14 @@ jobs:
           set -euo pipefail
           mkdir -p .turbo
           mapfile -t dists < <(find packages -type d -name dist -print | sort)
-          tar -cpf "$CI_WORKSPACE_ARTIFACT" node_modules .turbo "${dists[@]}"
+          mapfile -t package_node_modules < <(
+            find packages -type d -name node_modules -prune -print | sort
+          )
+          tar -cpf "$CI_WORKSPACE_ARTIFACT" \
+            node_modules \
+            .turbo \
+            "${package_node_modules[@]}" \
+            "${dists[@]}"
           ls -lh "$CI_WORKSPACE_ARTIFACT"
 
       - name: Upload workspace artifact

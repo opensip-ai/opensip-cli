@@ -3,6 +3,7 @@ import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { compareCodePoints } from '../model/value-helpers.js';
 import { listGitVisibleFixtureFiles } from '../runner/fixture-inventory.js';
 import { HarnessPrerequisiteError } from '../runner/spawn.js';
 
@@ -22,11 +23,6 @@ const MAX_MATERIALIZED_FIXTURE_INVENTORIES = 4;
 export interface ContractFingerprintOptions {
   readonly fixturesRoot?: string;
   readonly repositoryRoot?: string;
-}
-
-function compareCodePoints(left: string, right: string): number {
-  if (left === right) return 0;
-  return left < right ? -1 : 1;
 }
 
 /**

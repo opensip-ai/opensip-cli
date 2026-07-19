@@ -1,6 +1,7 @@
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { inArray } from 'drizzle-orm';
 
+import { canonicalParsedJson } from './canonical-json.js';
 import {
   prepareRunStepWrite,
   prepareRunWrite,
@@ -320,18 +321,9 @@ export function measureEvidenceBundleBytes(input: EvidenceBundleInput): number {
   return Buffer.byteLength(canonical, 'utf8');
 }
 
+/** @throws {TypeError} When the evidence bundle value is not JSON serializable. */
 function canonicalJson(value: unknown): string {
   const ordinary = JSON.stringify(value);
   if (ordinary === undefined) throw new TypeError('Evidence bundle is not JSON serializable.');
   return canonicalParsedJson(JSON.parse(ordinary) as unknown);
-}
-
-function canonicalParsedJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalParsedJson).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonicalParsedJson(record[key])}`)
-    .join(',')}}`;
 }

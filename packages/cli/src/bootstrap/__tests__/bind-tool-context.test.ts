@@ -190,12 +190,67 @@ describe('bindToolCliContext', () => {
     ]);
   });
 
+  it('forwards every remaining owned callback to the source context', async () => {
+    const { ctx, calls } = makeContext();
+    const bound = bindToolCliContext(makeTool(), ctx);
+
+    await bound.exportBaselineSarif('simulation', 'baseline.sarif');
+    await bound.toolState.get('simulation', 'cursor');
+    await bound.toolState.delete('sim', 'cursor');
+    await bound.hostPlanes?.governance?.getGovernanceState('simulation');
+    await bound.hostPlanes?.governance?.queryAudit('sim', { since: 1 });
+    await bound.hostPlanes?.governance?.recordInstallation('simulation', { source: 'test' });
+    await bound.hostPlanes?.governance?.recordApprovalDecision('sim', { approved: true });
+    await bound.hostPlanes?.governance?.setBlock('simulation', true, 'fixture');
+    await bound.hostPlanes?.governance?.checkAllowed('sim', 'run-simulation');
+    await bound.hostPlanes?.audit?.append('simulation', { event: 'fixture' });
+    await bound.hostPlanes?.audit?.query('sim', { since: 1 });
+    await bound.hostPlanes?.entitlements?.recordUsage('simulation', { units: 1 });
+    await bound.hostPlanes?.entitlements?.getLicenseState('sim');
+
+    expect(calls).toEqual([
+      'sarif:simulation',
+      'state-get:simulation',
+      'state-delete:sim',
+      'governance-get:simulation',
+      'governance-audit:sim',
+      'governance-install:simulation',
+      'governance-approval:sim',
+      'governance-block:simulation',
+      'governance-allowed:sim',
+      'audit-append:simulation',
+      'audit-query:sim',
+      'entitlements-usage:simulation',
+      'entitlements-license:sim',
+    ]);
+  });
+
+  it('preserves an absent host-plane bag and omits absent individual planes', () => {
+    const withoutBag = makeContext().ctx;
+    Object.defineProperty(withoutBag, 'hostPlanes', { value: undefined });
+    expect(bindToolCliContext(makeTool(), withoutBag).hostPlanes).toBeUndefined();
+
+    const withoutPlanes = makeContext().ctx;
+    Object.defineProperty(withoutPlanes, 'hostPlanes', { value: {} });
+    expect(bindToolCliContext(makeTool(), withoutPlanes).hostPlanes).toEqual({});
+  });
+
   it('rejects cross-tool baseline and state operations before persistence', () => {
     const { ctx } = makeContext();
     const bound = bindToolCliContext(makeTool(), ctx);
 
     expect(() => bound.saveBaseline('graph', {})).toThrow(PluginIncompatibleError);
     expect(() => bound.toolState.put('fitness', 'cursor', {})).toThrow(/namespace 'fitness'/);
+  });
+
+  it('uses the stable metadata id when the tool has no display name', () => {
+    const tool = makeTool();
+    (tool.metadata as { name: string }).name = '';
+    const bound = bindToolCliContext(tool, makeContext().ctx);
+
+    expect(() => bound.saveBaseline('graph', {})).toThrow(
+      /tool '00000000-0000-4000-8000-00000000abcd'/,
+    );
   });
 
   it('rejects cross-tool host-plane operations', () => {

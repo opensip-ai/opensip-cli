@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @fitness-ignore-file module-coupling-fan-out -- executable composition root intentionally wires independent bootstrap, host-command, telemetry, and rendering planes.
 
 /**
  * OpenSIP CLI — composition root (sequencer, not a god file).
@@ -170,6 +171,7 @@ async function main(): Promise<void> {
       render: renderResult,
       jsonRequested,
     });
+    // @swallow-ok handleParseError already presented the failure through the canonical output seam.
     return;
   }
   try {
@@ -212,6 +214,7 @@ async function main(): Promise<void> {
           cliEntryUrl: import.meta.url,
           argv: userArgv,
           runtimeMode,
+          /** @throws {Error} When standard discovery lacks its required runtime lease. */
           assertExternalDiscoveryProtected: (projectRoot) => {
             if (startupRuntimeLease === undefined) {
               throw new Error('Standard startup reached discovery without its runtime lease.');

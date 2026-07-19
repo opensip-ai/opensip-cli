@@ -263,7 +263,12 @@ function contextPlanesMatchLedgerIdentity(
   });
 }
 
-/** Build a validated parent Run + ordered RunSteps without datastore I/O. */
+/**
+ * Build a validated parent Run + ordered RunSteps without datastore I/O.
+ *
+ * @throws {TypeError} When task-context evidence does not match the host-owned
+ *   run and step identities being persisted.
+ */
 export function projectSuiteRun(input: ProjectSuiteRunInput): SuiteRunLedgerProjection {
   if (!contextManifestMatchesHostAuthority(input)) {
     throw new TypeError('The task-context manifest does not match host persistence authority.');

@@ -33,6 +33,7 @@ function ownedDigest(
 }
 
 /** Derive the only accepted basename for one operation-owned artifact slot. */
+/** @throws {Error} When the operation identity cannot produce a safe owned basename. */
 export function runtimePromotionOwnedBasename(
   operationId: string,
   slot: RuntimePromotionOwnedSlotName,
@@ -45,6 +46,7 @@ export function runtimePromotionOwnedBasename(
 }
 
 /** Derive the only accepted ownership marker identity for one artifact slot. */
+/** @throws {Error} When the operation identity cannot produce a safe ownership identifier. */
 export function runtimePromotionOwnershipId(
   operationId: string,
   slot: RuntimePromotionOwnedSlotName,

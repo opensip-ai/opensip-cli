@@ -21,6 +21,7 @@ const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT_PATH = join(REPO_ROOT, 'docs/public/80-implementation/architecture-map.md');
 const DEPCRUISE_CONFIG = join(REPO_ROOT, '.config/dependency-cruiser.cjs');
 const CLI_CONTEXT = join(REPO_ROOT, 'packages/core/src/tools/cli-context.ts');
+const CLI_CONTEXT_STATE = join(REPO_ROOT, 'packages/core/src/tools/cli-context-state.ts');
 const CHECK_ONLY = process.argv.slice(2).includes('--check');
 
 const GENERATED_BANNER =
@@ -48,13 +49,25 @@ function readLayerTable() {
  * @returns {readonly string[]}
  */
 export function extractToolCliContextSeams(sourceText, fileName = 'cli-context.ts') {
+  return extractExportedInterfaceSeams(sourceText, 'ToolCliContext', fileName).seams;
+}
+
+/**
+ * Extract a named exported interface and its direct top-level members.
+ *
+ * @param {string} sourceText
+ * @param {string} interfaceName
+ * @param {string} fileName
+ * @returns {{ declaration: ts.InterfaceDeclaration, seams: readonly string[] }}
+ */
+function extractExportedInterfaceSeams(sourceText, interfaceName, fileName) {
   const sf = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true);
   /** @type {ts.InterfaceDeclaration[]} */
   const matches = [];
   const visit = (node) => {
     if (
       ts.isInterfaceDeclaration(node) &&
-      node.name.text === 'ToolCliContext' &&
+      node.name.text === interfaceName &&
       node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
     ) {
       matches.push(node);
@@ -63,10 +76,10 @@ export function extractToolCliContextSeams(sourceText, fileName = 'cli-context.t
   };
   visit(sf);
   if (matches.length === 0) {
-    throw new Error('ToolCliContext interface not found in cli-context.ts');
+    throw new Error(`${interfaceName} interface not found in ${fileName}`);
   }
   if (matches.length > 1) {
-    throw new Error(`duplicate exported ToolCliContext interfaces: ${matches.length}`);
+    throw new Error(`duplicate exported ${interfaceName} interfaces: ${matches.length}`);
   }
   const iface = matches[0];
   /** @type {string[]} */
@@ -80,12 +93,54 @@ export function extractToolCliContextSeams(sourceText, fileName = 'cli-context.t
       seams.push(member.name.text);
     }
   }
-  return Object.freeze(seams);
+  return { declaration: iface, seams: Object.freeze(seams) };
+}
+
+/**
+ * Resolve the complete public ToolCliContext seam after its host-state split.
+ * The direct-only extractor remains useful for structural unit tests, while
+ * generated documentation must include locally inherited host seams.
+ *
+ * @param {string} contextSourceText
+ * @param {string} hostStateSourceText
+ * @param {string} [contextFileName]
+ * @param {string} [hostStateFileName]
+ * @returns {readonly string[]}
+ */
+export function extractComposedToolCliContextSeams(
+  contextSourceText,
+  hostStateSourceText,
+  contextFileName = 'cli-context.ts',
+  hostStateFileName = 'cli-context-state.ts',
+) {
+  const context = extractExportedInterfaceSeams(
+    contextSourceText,
+    'ToolCliContext',
+    contextFileName,
+  );
+  const inheritsHostState = context.declaration.heritageClauses?.some(
+    (clause) =>
+      clause.token === ts.SyntaxKind.ExtendsKeyword &&
+      clause.types.some(
+        (entry) =>
+          ts.isIdentifier(entry.expression) && entry.expression.text === 'ToolCliHostState',
+      ),
+  );
+  if (!inheritsHostState) {
+    throw new Error('ToolCliContext must extend ToolCliHostState for composed seam extraction');
+  }
+  const host = extractExportedInterfaceSeams(
+    hostStateSourceText,
+    'ToolCliHostState',
+    hostStateFileName,
+  );
+  return Object.freeze([...new Set([...context.seams, ...host.seams])]);
 }
 
 function readToolCliSeams() {
-  const text = readFileSync(CLI_CONTEXT, 'utf8');
-  return extractToolCliContextSeams(text, CLI_CONTEXT);
+  const context = readFileSync(CLI_CONTEXT, 'utf8');
+  const hostState = readFileSync(CLI_CONTEXT_STATE, 'utf8');
+  return extractComposedToolCliContextSeams(context, hostState, CLI_CONTEXT, CLI_CONTEXT_STATE);
 }
 
 function packageInventorySummary(repoRoot = REPO_ROOT) {

@@ -8,7 +8,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readlinkSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readlinkSync, readSync } from 'node:fs';
 import { platform } from 'node:os';
 
 const MAX_IDENTITY_FACT_BYTES = 4096;
@@ -36,6 +36,48 @@ function digestProcessIdentity(value: string): string {
   return `p${createHash('sha256').update(value).digest('base64url').slice(0, 16)}`;
 }
 
+interface BoundedIdentityFileOptions {
+  /**
+   * Preserve ENOENT for callers where a missing file is positive evidence.
+   * Other probe failures remain safety-biased and degrade to `undefined`.
+   */
+  readonly rethrowMissing?: boolean;
+}
+
+function readBoundedIdentityFile(
+  path: string,
+  options: BoundedIdentityFileOptions = {},
+): string | undefined {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, 'r');
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_IDENTITY_FACT_BYTES) return undefined;
+    const buffer = Buffer.alloc(MAX_IDENTITY_FACT_BYTES + 1);
+    let bytesRead = 0;
+    while (bytesRead < buffer.length) {
+      const count = readSync(fd, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
+      if (count === 0) break;
+      bytesRead += count;
+    }
+    return bytesRead > MAX_IDENTITY_FACT_BYTES ? undefined : buffer.toString('utf8', 0, bytesRead);
+  } catch (error) {
+    if (options.rethrowMissing === true && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw error;
+    }
+    // @swallow-ok Host identity probing is read-only and degrades to an explicitly unproven identity.
+    return undefined;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {
+        // @swallow-ok Identity discovery is read-only and degrades to unproven.
+      }
+    }
+  }
+}
+
 export interface DerivedHostIdentity {
   readonly id: string;
   readonly proven: boolean;
@@ -58,7 +100,9 @@ export function deriveHostIdentity(
 export function detectHostInstanceIdentity(): string | undefined {
   try {
     if (platform() === 'linux') {
-      const bootId = boundedIdentityFact(readFileSync('/proc/sys/kernel/random/boot_id', 'utf8'));
+      const bootId = boundedIdentityFact(
+        readBoundedIdentityFile('/proc/sys/kernel/random/boot_id'),
+      );
       const pidNamespace = boundedIdentityFact(readlinkSync('/proc/self/ns/pid'));
       if (bootId === undefined || pidNamespace === undefined) return undefined;
       return digestIdentity('linux-host', `${bootId}:${pidNamespace}`);
@@ -76,6 +120,7 @@ export function detectHostInstanceIdentity(): string | undefined {
         : digestIdentity('darwin-host', bootSessionUuid);
     }
   } catch {
+    // @swallow-ok Missing platform identity facts deliberately degrade to unproven.
     return undefined;
   }
   return undefined;
@@ -191,7 +236,10 @@ function processProbeAfterFailure(pid: number): ProcessIncarnationInspection {
 
 function linuxProcessIncarnation(pid: number): ProcessIncarnationInspection {
   try {
-    const raw = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const raw = readBoundedIdentityFile(`/proc/${pid}/stat`, {
+      rethrowMissing: true,
+    });
+    if (raw === undefined) return { status: 'unknown' };
     const commandEnd = raw.lastIndexOf(')');
     if (commandEnd < 0) return { status: 'unknown' };
     // Fields after the parenthesized command begin with field 3 (state).
@@ -219,7 +267,7 @@ function darwinProcessIncarnation(pid: number): ProcessIncarnationInspection {
     const started = boundedIdentityFact(
       execFileSync('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], {
         encoding: 'utf8',
-        env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' },
+        env: { LC_ALL: 'C', TZ: 'UTC' },
         maxBuffer: MAX_IDENTITY_FACT_BYTES,
         stdio: ['ignore', 'pipe', 'ignore'],
         timeout: 1000,

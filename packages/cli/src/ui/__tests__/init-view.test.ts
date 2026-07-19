@@ -1,6 +1,6 @@
 /**
  * init view-model builder. `viewInit` expresses every InitResult branch as a
- * ViewNode: the inside-existing-project refusal, ambiguous-language refusal, the
+ * ViewNode: the inside-existing-project refusal, language-resolution refusal, the
  * partial-state report (with a pre-existing-file count summary), the
  * created/re-scaffolded/recovered success headlines, and the scaffold-failure
  * fallback. Driven by input variety and asserted through `renderToText`.
@@ -126,17 +126,7 @@ describe('viewInit — refusals', () => {
     const out = text(
       result({
         languageResolutionError: { detected: [], message: 'pass --language' },
-      } as Partial<InitResult>),
-    );
-    expect(out).toContain('language not resolved');
-    expect(out).toContain('pass --language');
-  });
-
-  it('renders legacy ambiguousLanguageError with the same refusal headline', () => {
-    const out = text(
-      result({
-        ambiguousLanguageError: { detected: [], message: 'pass --language' },
-      } as Partial<InitResult>),
+      }),
     );
     expect(out).toContain('language not resolved');
     expect(out).toContain('pass --language');
@@ -387,7 +377,7 @@ describe('viewInit — runtime evidence adoption', () => {
 
     expect(out).toContain('Scaffolded for typescript');
     expect(out).toContain(headline);
-    expect(out).toContain(`Duration: ${ADOPTION_BY_STATUS[status].durationMs} ms`);
+    expect(out).toContain(`Duration: ${ADOPTION_BY_STATUS[status].durationMs}ms`);
   });
 
   it('renders unknown source disposition without guessing', () => {

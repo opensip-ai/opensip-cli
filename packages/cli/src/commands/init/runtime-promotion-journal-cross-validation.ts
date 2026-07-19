@@ -5,11 +5,11 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { runtimePromotionClosedEvidenceAllowed } from './runtime-promotion-closed-evidence.js';
 import {
-  runtimePromotionLastPostconditionCompatible,
   runtimePromotionPendingIntentAllowed,
   runtimePromotionPhaseEvidenceAllowed,
 } from './runtime-promotion-intent-policy.js';
 import { journalFailure } from './runtime-promotion-journal-validation-helpers.js';
+import { runtimePromotionLastPostconditionCompatible } from './runtime-promotion-postcondition-history-policy.js';
 import { runtimePromotionRouteEvidenceAllowed } from './runtime-promotion-route-evidence.js';
 
 import type {

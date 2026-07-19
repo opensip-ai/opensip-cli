@@ -13,7 +13,14 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { filterSameCorePackages, foreignCorePath, selfCore } from '../single-core-guard.js';
+import {
+  coreDescriptionAt,
+  filterSameCorePackages,
+  foreignCorePath,
+  selfCore,
+  selfCoreVersionString,
+  selfScopeAbiVersion,
+} from '../single-core-guard.js';
 
 let testDir: string;
 
@@ -102,6 +109,43 @@ describe('selfCore', () => {
     // installed) — in either case a concrete, absolute file path.
     expect(self).toMatch(/[/\\]core[/\\]/);
   });
+
+  it('describes the running scope ABI and core version for diagnostics', () => {
+    expect(selfScopeAbiVersion()).toBe(1);
+    expect(selfCoreVersionString()).toMatch(/^\d+\.\d+\.\d+/u);
+    expect(coreDescriptionAt(selfCore() ?? '')).toMatchObject({
+      path: selfCore(),
+      version: selfCoreVersionString(),
+      scopeAbi: selfScopeAbiVersion(),
+    });
+  });
+
+  it('returns an empty description for entries without a valid owning core manifest', () => {
+    const packageDir = join(testDir, 'not-core');
+    const entryDir = join(packageDir, 'dist');
+    const entry = join(entryDir, 'index.js');
+    mkdirSync(entryDir, { recursive: true });
+    writeFileSync(join(packageDir, 'package.json'), JSON.stringify({ name: 'not-core' }));
+    writeFileSync(entry, 'module.exports = {};');
+
+    expect(coreDescriptionAt(entry)).toEqual({
+      path: entry,
+      version: undefined,
+      scopeAbi: undefined,
+    });
+
+    writeFileSync(join(packageDir, 'package.json'), '{ malformed json');
+    expect(coreDescriptionAt(entry)).toEqual({
+      path: entry,
+      version: undefined,
+      scopeAbi: undefined,
+    });
+    expect(coreDescriptionAt('/opensip-core-entry-does-not-exist.js')).toEqual({
+      path: '/opensip-core-entry-does-not-exist.js',
+      version: undefined,
+      scopeAbi: undefined,
+    });
+  });
 });
 
 describe('foreignCorePath', () => {
@@ -185,6 +229,29 @@ describe('foreignCorePath', () => {
     plantForeignCore(simulationDir);
 
     expect(() => foreignCorePath(testDir)).not.toThrow();
+    expect(foreignCorePath(testDir)).toBeUndefined();
+  });
+
+  it('skips declared scoped runtime dependencies that are not installed', () => {
+    writePackManifest(testDir, { '@opensip-cli/not-installed': 'workspace:*' });
+
+    expect(foreignCorePath(testDir)).toBeUndefined();
+  });
+
+  it('skips a resolved scoped runtime dependency that has no resolvable core', () => {
+    writePackManifest(testDir, { '@opensip-cli/runtime-without-core': 'workspace:*' });
+    const packageDir = packageInstallDir(testDir, '@opensip-cli/runtime-without-core');
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(
+      join(packageDir, 'package.json'),
+      JSON.stringify({
+        name: '@opensip-cli/runtime-without-core',
+        version: '1.0.0',
+        main: 'index.js',
+      }),
+    );
+    writeFileSync(join(packageDir, 'index.js'), 'module.exports = {};');
+
     expect(foreignCorePath(testDir)).toBeUndefined();
   });
 });

@@ -1,15 +1,23 @@
-import {
-  currentScope,
-  formatUnknownErrorMessage,
-  logger as defaultLogger,
-  type Logger,
-} from '@opensip-cli/core';
+import { formatUnknownErrorMessage, logger as defaultLogger, type Logger } from '@opensip-cli/core';
 import { RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
-import { loadCliDefaults } from './cli-defaults.js';
+export {
+  DEFAULT_SESSION_RETENTION_KEEP,
+  DEFAULT_SESSION_RETENTION_MAX_AGE_DAYS,
+  DEFAULT_SESSION_RETENTION_MAX_SIZE_MB,
+  resolveCurrentSessionRetentionPolicy,
+  resolveSessionRetentionPolicy,
+} from './session-retention-policy.js';
 
+import type { SessionRetentionPolicy } from './session-retention-policy.js';
 import type { DataStore, DatastoreMaintenance } from '@opensip-cli/datastore';
 import type { RunRetentionBatchResult } from '@opensip-cli/session-store';
+
+export type {
+  ResolvedSessionRetentionPolicy,
+  SessionRetentionPolicy,
+  SessionRetentionPolicySource,
+} from './session-retention-policy.js';
 
 const DAY_MS = 86_400_000;
 const BYTES_PER_MB = 1024 * 1024;
@@ -19,23 +27,6 @@ const MODULE_TAG = 'cli:evidence-retention';
 export const EVIDENCE_RETENTION_BATCH_SIZE = 256;
 /** Maximum bounded Session→parent-Run passes in one command finalizer. */
 export const MAX_EVIDENCE_RETENTION_ITERATIONS = 32;
-
-/** MUST match cliConfigSchema.sessions defaults in @opensip-cli/config. */
-export const DEFAULT_SESSION_RETENTION_KEEP = 200;
-export const DEFAULT_SESSION_RETENTION_MAX_AGE_DAYS = 60;
-export const DEFAULT_SESSION_RETENTION_MAX_SIZE_MB = 150;
-
-export interface SessionRetentionPolicy {
-  readonly keep: number;
-  readonly maxAgeDays: number;
-  readonly maxSizeMb: number;
-}
-
-export type SessionRetentionPolicySource = 'scope' | 'cwd-fallback';
-
-export interface ResolvedSessionRetentionPolicy extends SessionRetentionPolicy {
-  readonly source: SessionRetentionPolicySource;
-}
 
 export interface EnforceSessionRetentionDeps {
   readonly now?: number;
@@ -81,37 +72,6 @@ interface EvidenceRepos {
 interface BatchPassResult {
   readonly deleted: number;
   readonly mayHaveMore: boolean;
-}
-
-export function resolveSessionRetentionPolicy(
-  configured?: Partial<SessionRetentionPolicy>,
-): SessionRetentionPolicy {
-  return {
-    keep: normalizedNonNegativeInt(configured?.keep, DEFAULT_SESSION_RETENTION_KEEP),
-    maxAgeDays: normalizedNonNegativeInt(
-      configured?.maxAgeDays,
-      DEFAULT_SESSION_RETENTION_MAX_AGE_DAYS,
-    ),
-    maxSizeMb: normalizedNonNegativeInt(
-      configured?.maxSizeMb,
-      DEFAULT_SESSION_RETENTION_MAX_SIZE_MB,
-    ),
-  };
-}
-
-export function resolveCurrentSessionRetentionPolicy(): ResolvedSessionRetentionPolicy {
-  const projectRoot = currentScope()?.projectContext?.projectRoot;
-  const source: SessionRetentionPolicySource = projectRoot === undefined ? 'cwd-fallback' : 'scope';
-  return {
-    source,
-    ...resolveSessionRetentionPolicy(loadCliDefaults(projectRoot ?? process.cwd()).sessions),
-  };
-}
-
-function normalizedNonNegativeInt(value: number | undefined, fallback: number): number {
-  if (value === undefined) return fallback;
-  if (!Number.isFinite(value) || value < 0) return fallback;
-  return Math.trunc(value);
 }
 
 function logFailure(log: Logger, operation: string, error: unknown): void {
@@ -321,16 +281,19 @@ function classifyUnresolvedOversize(
   summary.unresolvedNonEvidence = !evidenceRemains;
 }
 
-function runSizePressurePruning(
-  datastore: DataStore,
-  maintenance: DatastoreMaintenance,
-  repos: EvidenceRepos,
-  policy: SessionRetentionPolicy,
-  cutoff: Date | undefined,
-  limitBytes: number,
-  summary: MutableRetentionResult,
-  log: Logger,
-): number | undefined {
+interface SizePressurePruningInput {
+  readonly datastore: DataStore;
+  readonly maintenance: DatastoreMaintenance;
+  readonly repos: EvidenceRepos;
+  readonly policy: SessionRetentionPolicy;
+  readonly cutoff: Date | undefined;
+  readonly limitBytes: number;
+  readonly summary: MutableRetentionResult;
+  readonly log: Logger;
+}
+
+function runSizePressurePruning(input: SizePressurePruningInput): number | undefined {
+  const { datastore, maintenance, repos, policy, cutoff, limitBytes, summary, log } = input;
   const aggressiveKeep = policy.keep > 1 ? Math.max(1, Math.floor(policy.keep / 2)) : policy.keep;
   if (aggressiveKeep <= 0 || policy.keep <= 1) return summary.finalSizeBytes;
 
@@ -384,7 +347,7 @@ function enforceSizeGuard(
   summary.finalSizeBytes = sizeBytes;
   if (sizeBytes === undefined || sizeBytes <= limitBytes) return;
 
-  sizeBytes = runSizePressurePruning(
+  sizeBytes = runSizePressurePruning({
     datastore,
     maintenance,
     repos,
@@ -393,7 +356,7 @@ function enforceSizeGuard(
     limitBytes,
     summary,
     log,
-  );
+  });
   if (sizeBytes === undefined || sizeBytes <= limitBytes) return;
 
   // Fold free pages left by the final bounded batch before the final verdict.

@@ -1,7 +1,7 @@
 /**
  * Unit tests for the PURE equivalence-diagnostic builder. No fs / env / clock —
  * the host command owns those effects; here we assert the analysis maps a
- * decline/phantom divergence to a symmetric per-engine description.
+ * decline/phantom/conflict divergence to a symmetric per-engine description.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -11,20 +11,23 @@ import { buildEquivalenceDiagnostic } from '../equivalence-diagnostic.js';
 import type { Catalog, CallEdge, FunctionOccurrence } from '../../types.js';
 import type { EdgeDifference } from '../orchestrate/cross-shard-resolve.js';
 
+const DEFAULT_OCCURRENCE_POSITION = { line: 1, column: 0 } as const;
+
 function occ(
   simpleName: string,
   filePath: string,
   bodyHash: string,
   calls: readonly CallEdge[] = [],
+  position: { readonly line: number; readonly column: number } = DEFAULT_OCCURRENCE_POSITION,
 ): FunctionOccurrence {
   return {
     bodyHash,
     simpleName,
     qualifiedName: `${filePath}.${simpleName}`,
     filePath,
-    line: 1,
-    column: 0,
-    endLine: 1,
+    line: position.line,
+    column: position.column,
+    endLine: position.line,
     kind: 'function-declaration',
     params: [],
     returnType: null,
@@ -66,8 +69,11 @@ const edge = (over: Partial<CallEdge> & Pick<CallEdge, 'to'>): CallEdge => ({
 
 function diff(over: Partial<EdgeDifference>): EdgeDifference {
   return {
-    key: 'OWNER@caller',
+    key: 'packages/a/src/caller.ts:1:0@5:9',
+    ownerBodyHash: 'OWNER',
     ownerFilePath: 'packages/a/src/caller.ts',
+    ownerLine: 1,
+    ownerColumn: 0,
     line: 5,
     column: 9,
     toA: '',
@@ -104,13 +110,18 @@ describe('buildEquivalenceDiagnostic', () => {
       report: {
         productionDecline: [diff({ toA: 'TGT', toB: '' })],
         productionPhantom: [],
+        productionConflict: [],
       },
       exact,
       sharded,
       shards: SHARDS,
     });
 
-    expect(out.counts).toEqual({ productionDecline: 1, productionPhantom: 0 });
+    expect(out.counts).toEqual({
+      productionDecline: 1,
+      productionPhantom: 0,
+      productionConflict: 0,
+    });
     expect(out.shards).toEqual([{ id: 'pkg:a', rootDir: '/repo/packages/a', fileCount: 2 }]);
 
     const d = out.decline[0];
@@ -146,13 +157,18 @@ describe('buildEquivalenceDiagnostic', () => {
       report: {
         productionDecline: [],
         productionPhantom: [diff({ toA: '', toB: 'TGT' })],
+        productionConflict: [],
       },
       exact,
       sharded,
       shards: SHARDS,
     });
 
-    expect(out.counts).toEqual({ productionDecline: 0, productionPhantom: 1 });
+    expect(out.counts).toEqual({
+      productionDecline: 0,
+      productionPhantom: 1,
+      productionConflict: 0,
+    });
     const p = out.phantom[0];
     expect(p.shardedEdge?.to).toEqual(['TGT']);
     expect(p.shardedTo).toEqual([
@@ -177,6 +193,7 @@ describe('buildEquivalenceDiagnostic', () => {
       report: {
         productionDecline: [diff({ toA: 'TGT', toB: '' })],
         productionPhantom: [],
+        productionConflict: [],
       },
       exact,
       sharded,
@@ -189,5 +206,129 @@ describe('buildEquivalenceDiagnostic', () => {
     expect(d.shardedEdge).toBeNull();
     expect(d.shardedSameSite).toBeNull();
     expect(d.exactSameSite?.to).toEqual(['TGT']);
+  });
+
+  it('describes a conflict and histograms the exact/sharded resolution pair', () => {
+    const exact = fragment(
+      occ('caller', 'packages/a/src/caller.ts', 'OWNER', [
+        edge({ to: ['WRONG'], resolution: 'unknown', confidence: 'medium' }),
+      ]),
+      occ('wrong', 'packages/a/src/wrong.ts', 'WRONG'),
+      occ('right', 'packages/b/src/right.ts', 'RIGHT'),
+    );
+    const sharded = fragment(
+      occ('caller', 'packages/a/src/caller.ts', 'OWNER', [
+        edge({
+          to: ['RIGHT'],
+          resolution: 'semantic',
+          confidence: 'high',
+          crossShard: true,
+        }),
+      ]),
+      occ('wrong', 'packages/a/src/wrong.ts', 'WRONG'),
+      occ('right', 'packages/b/src/right.ts', 'RIGHT'),
+    );
+
+    const out = buildEquivalenceDiagnostic({
+      report: {
+        productionDecline: [],
+        productionPhantom: [],
+        productionConflict: [diff({ toA: 'WRONG', toB: 'RIGHT' })],
+      },
+      exact,
+      sharded,
+      shards: SHARDS,
+    });
+
+    expect(out.counts).toEqual({
+      productionDecline: 0,
+      productionPhantom: 0,
+      productionConflict: 1,
+    });
+    expect(out.conflict).toHaveLength(1);
+    expect(out.conflict[0]?.exactEdge).toEqual(
+      expect.objectContaining({
+        to: ['WRONG'],
+        resolution: 'unknown',
+        confidence: 'medium',
+      }),
+    );
+    expect(out.conflict[0]?.shardedEdge).toEqual(
+      expect.objectContaining({
+        to: ['RIGHT'],
+        resolution: 'semantic',
+        confidence: 'high',
+        crossShard: true,
+      }),
+    );
+    expect(out.conflictByResolutionPair).toEqual({
+      'unknown:false->semantic:true': 1,
+    });
+  });
+
+  it('selects a same-file body-twin owner by declaration line and column', () => {
+    const callerFile = 'packages/a/src/caller.ts';
+    const firstTwinExact = occ('caller', callerFile, 'OWNER', [edge({ to: ['FIRST'] })], {
+      line: 3,
+      column: 0,
+    });
+    const selectedTwinExact = occ('caller', callerFile, 'OWNER', [edge({ to: ['EXACT'] })], {
+      line: 3,
+      column: 24,
+    });
+    const firstTwinSharded = occ('caller', callerFile, 'OWNER', [edge({ to: ['FIRST'] })], {
+      line: 3,
+      column: 0,
+    });
+    const selectedTwinSharded = occ(
+      'caller',
+      callerFile,
+      'OWNER',
+      [edge({ to: ['SHARDED'], crossShard: true })],
+      { line: 3, column: 24 },
+    );
+
+    const out = buildEquivalenceDiagnostic({
+      report: {
+        productionDecline: [],
+        productionPhantom: [],
+        productionConflict: [
+          diff({
+            key: `${callerFile}:3:24@5:9`,
+            ownerLine: 3,
+            ownerColumn: 24,
+            toA: 'EXACT',
+            toB: 'SHARDED',
+          }),
+        ],
+      },
+      exact: fragment(
+        firstTwinExact,
+        selectedTwinExact,
+        occ('first', 'packages/a/src/first.ts', 'FIRST'),
+        occ('exact', 'packages/a/src/exact.ts', 'EXACT'),
+      ),
+      sharded: fragment(
+        firstTwinSharded,
+        selectedTwinSharded,
+        occ('first', 'packages/a/src/first.ts', 'FIRST'),
+        occ('sharded', 'packages/b/src/sharded.ts', 'SHARDED'),
+      ),
+      shards: SHARDS,
+    });
+
+    const conflict = out.conflict[0];
+    expect(conflict?.owner).toEqual(
+      expect.objectContaining({
+        hash: 'OWNER',
+        filePath: callerFile,
+        line: 3,
+        column: 24,
+      }),
+    );
+    expect(conflict?.owner.exact?.column).toBe(24);
+    expect(conflict?.owner.sharded?.column).toBe(24);
+    expect(conflict?.exactEdge?.to).toEqual(['EXACT']);
+    expect(conflict?.shardedEdge?.to).toEqual(['SHARDED']);
   });
 });

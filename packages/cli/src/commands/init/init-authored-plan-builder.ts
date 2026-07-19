@@ -21,6 +21,7 @@ import {
   normalizeProjectRelativePath,
   normalizeToolIdentities,
   sha256Bytes,
+  sha256Parts,
   stateFromSnapshot,
 } from './init-authored-plan-types.js';
 import { renderGitignore } from './scaffold-writer.js';
@@ -374,14 +375,12 @@ export function buildInitAuthoredPlan(input: BuildInitAuthoredPlanInput): InitAu
   });
   const replayManifestBytes = encodeAuthoredReplayManifest(replayManifest);
   const normalizedInputBytes = JSON.stringify(inputs);
-  const digest = sha256Bytes(
-    Buffer.concat([
-      Buffer.from('opensip-init-authored-plan\0v1\0', 'utf8'),
-      Buffer.from(normalizedInputBytes, 'utf8'),
-      Buffer.from('\0', 'utf8'),
-      Buffer.from(replayManifestBytes, 'utf8'),
-    ]),
-  );
+  const digest = sha256Parts([
+    'opensip-init-authored-plan\0v1\0',
+    normalizedInputBytes,
+    '\0',
+    replayManifestBytes,
+  ]);
   return Object.freeze({
     inputs,
     mutations: replayManifest.mutations,

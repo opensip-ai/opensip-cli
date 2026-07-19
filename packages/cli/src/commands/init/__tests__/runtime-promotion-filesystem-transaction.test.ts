@@ -577,10 +577,15 @@ describe('closed cleanup write-ahead proof', () => {
 
   it('preserves an identical backup replacement that lacks the recorded inode binding', async () => {
     const fixture = destinationBackupCleanupFixture();
+    const originalRootIdentity = capturePromotionRootIdentity(fixture.paths.backup);
+    const replacement = makePrivateDirectory(
+      join(fixture.paths.parent, 'cleanup-backup-replacement'),
+    );
+    writePrivateFile(join(replacement, 'backup.txt'), 'old-backup');
+    expect(capturePromotionRootIdentity(replacement)).not.toEqual(originalRootIdentity);
+    expect(verifiedRuntime(replacement).identity).toEqual(fixture.backupIdentity);
     rmSync(fixture.paths.backup, { recursive: true, force: true });
-    makePrivateDirectory(fixture.paths.backup);
-    writePrivateFile(join(fixture.paths.backup, 'backup.txt'), 'old-backup');
-    expect(verifiedRuntime(fixture.paths.backup).identity).toEqual(fixture.backupIdentity);
+    renameSync(replacement, fixture.paths.backup);
     const authority = await authorizeFilesystem(
       project,
       'owned-slot-cleanup',

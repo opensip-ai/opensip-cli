@@ -10,6 +10,7 @@ const MODULE_NAME = 'session-store:session-repo';
 /** Hard ceiling for one bounded Session-retention transaction. */
 export const MAX_SESSION_MAINTENANCE_BATCH_SIZE = 500;
 
+/** Transactional bounded pruning operations for persisted Tool Sessions. */
 export class SessionMaintenanceRepo {
   constructor(private readonly datastore: DrizzleDataStore) {}
 

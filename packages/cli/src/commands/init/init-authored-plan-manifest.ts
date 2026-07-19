@@ -9,7 +9,7 @@ import {
   normalizeLanguages,
   normalizeProjectRelativePath,
   validateMode,
-  validateToolIdentity,
+  validateAuthoredToolIdentity,
 } from './init-authored-plan-types.js';
 
 import type {
@@ -213,7 +213,7 @@ function parseIdentity(value: unknown, index: number): ToolScaffoldIdentity {
     name: object.name,
     version: object.version,
   };
-  validateToolIdentity(identity, field);
+  validateAuthoredToolIdentity(identity, field);
   return identity;
 }
 

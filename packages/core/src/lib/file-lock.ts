@@ -68,9 +68,10 @@ export interface FileLockMetadata {
 export type FileLockEventKind =
   'acquire.start' | 'acquire.wait' | 'acquire.complete' | 'acquire.timeout' | 'stale.recovered';
 
-/** Lock lifecycle event emitted through the injected callback. */
+/** Resource category protected by a file lock. */
 export type FileLockResource = 'datastore' | 'artifact' | 'runtime';
 
+/** Structured lock lifecycle event emitted through the injected callback. */
 export interface FileLockEvent {
   readonly kind: FileLockEventKind;
   readonly lockPath: string;
@@ -236,6 +237,7 @@ function pathHasIdentity(lockPath: string, expected: LockFileIdentity): boolean 
   try {
     return sameIdentity(expected, identityOf(lstatSync(lockPath, { bigint: true })));
   } catch {
+    // @swallow-ok Missing or unreadable paths cannot prove the expected identity.
     return false;
   }
 }
@@ -291,6 +293,7 @@ function unlinkExactPath(path: string, expected: LockFileIdentity): boolean {
     unlinkSync(path);
     return true;
   } catch {
+    // @swallow-ok Exact-path cleanup is best effort and never unlinks on uncertainty.
     return false;
   }
 }
@@ -461,6 +464,7 @@ function unlinkSnapshotIfCurrent(lockPath: string, expected: LockSnapshotBase): 
     unlinkSync(lockPath);
     return true;
   } catch {
+    // @swallow-ok Snapshot churn or unlink failure means the contender must retry.
     return false;
   }
 }
@@ -499,6 +503,10 @@ function writeAllAtStart(fd: number, bytes: Buffer): void {
   ftruncateSync(fd, bytes.length);
 }
 
+/**
+ * Create and durably populate a private one-link publication temporary.
+ * @throws {SystemError} When the temporary cannot be proven private and complete.
+ */
 function createCompletePrivateTemp(path: string, bytes: Buffer): LockFileIdentity {
   let fd: number | undefined;
   let identity: LockFileIdentity | undefined;
@@ -576,6 +584,7 @@ function writeLockMetadataIfOwner(
       published.raw === bytes.toString('utf8')
     );
   } catch {
+    // @swallow-ok Failed heartbeat publication leaves liveness probes authoritative.
     return false;
   } finally {
     if (tempIdentity !== undefined) unlinkExactPath(tempPath, tempIdentity);
@@ -679,6 +688,10 @@ function removeLockIfOwned(lockPath: string, ownerToken: string): void {
   }
 }
 
+/**
+ * Attempt one atomic hard-link publication of a complete lock record.
+ * @throws {SystemError} When publication identity or durability cannot be proven.
+ */
 function tryAcquireLock(lockPath: string, metadata: FileLockMetadata): boolean {
   const bytes = serializeLockMetadata(metadata);
   const tempPath = publicationTempPath(lockPath, metadata.ownerToken);

@@ -85,11 +85,7 @@ beforeEach(() => {
 
   writeFileSync(
     join(testDir, 'package.json'),
-    JSON.stringify(
-      { name: 'cache-init-e2e', private: true, workspaces: ['packages/*'] },
-      null,
-      2,
-    ),
+    JSON.stringify({ name: 'cache-init-e2e', private: true, workspaces: ['packages/*'] }, null, 2),
     'utf8',
   );
   writeFileSync(join(testDir, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n", 'utf8');
@@ -133,93 +129,82 @@ afterEach(() => {
 });
 
 describe('cache-init report continuity (built CLI)', () => {
-  it(
-    'preserves exact parent Run identity and report selection across Init',
-    () => {
-      const options = { cwd: testDir, timeout: 180_000, env: env() } as const;
+  it('preserves exact parent Run identity and report selection across Init', () => {
+    const options = { cwd: testDir, timeout: 180_000, env: env() } as const;
 
-      // Pre-init status should not create project opensip-cli/.
-      // Host commands inherit process cwd via the harness; they do not all accept --cwd.
-      const statusPre = cli.run(['--no-cloud', 'status', '--json'], options);
-      expect(statusPre.exitCode).toBe(0);
-      expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
+    // Pre-init status should not create project opensip-cli/.
+    // Host commands inherit process cwd via the harness; they do not all accept --cwd.
+    const statusPre = cli.run(['--no-cloud', 'status', '--json'], options);
+    expect(statusPre.exitCode).toBe(0);
+    expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
 
-      // Nested audit from packages/app — discovery should bind the workspace root.
-      const audit = cli.run(
-        ['--no-cloud', 'audit', '--files', 'src/index.ts', '--json'],
-        { ...options, cwd: nestedCwd },
-      );
-      // Audit may exit non-zero on findings; require a parseable parent identity.
-      const parentRunId = runIdFromAudit(audit.stdout);
-      expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
-      expect(existsSync(join(home, '.opensip-cli'))).toBe(true);
+    // Nested audit from packages/app — discovery should bind the workspace root.
+    const audit = cli.run(['--no-cloud', 'audit', '--files', 'src/index.ts', '--json'], {
+      ...options,
+      cwd: nestedCwd,
+    });
+    // Audit may exit non-zero on findings; require a parseable parent identity.
+    const parentRunId = runIdFromAudit(audit.stdout);
+    expect(existsSync(join(testDir, 'opensip-cli'))).toBe(false);
+    expect(existsSync(join(home, '.opensip-cli'))).toBe(true);
 
-      const runsShowPre = cli.run(['--no-cloud', 'runs', 'show', parentRunId, '--json'], options);
-      expect(runsShowPre.exitCode).toBe(0);
-      const preShow = payload(JSON.parse(runsShowPre.stdout));
-      const preRun =
-        (preShow.run as Record<string, unknown> | undefined) ??
-        (preShow as Record<string, unknown>);
-      expect(preRun.id ?? preShow.id).toBe(parentRunId);
+    const runsShowPre = cli.run(['--no-cloud', 'runs', 'show', parentRunId, '--json'], options);
+    expect(runsShowPre.exitCode).toBe(0);
+    const preShow = payload(JSON.parse(runsShowPre.stdout));
+    const preRun = (preShow.run as Record<string, unknown> | undefined) ?? preShow;
+    expect(preRun.id ?? preShow.id).toBe(parentRunId);
 
-      const reportPre = cli.run(
-        ['--no-cloud', 'report', '--run', parentRunId, '--no-open', '--json'],
-        options,
-      );
-      expect(reportPre.exitCode).toBe(0);
-      const reportPreData = payload(JSON.parse(reportPre.stdout));
-      const prePath = reportPreData.path;
-      expect(typeof prePath).toBe('string');
-      expect(prePath as string).toMatch(/[/\\]runs[/\\][a-f0-9]{64}\.html$/);
-      expect(existsSync(prePath as string)).toBe(true);
-      expect(readFileSync(prePath as string, 'utf8')).toContain(parentRunId);
-      // Report path must be under the user cache, not the project tree.
-      expect(prePath as string).toContain(home);
-      expect(prePath as string).not.toContain(join(testDir, 'opensip-cli'));
+    const reportPre = cli.run(
+      ['--no-cloud', 'report', '--run', parentRunId, '--no-open', '--json'],
+      options,
+    );
+    expect(reportPre.exitCode).toBe(0);
+    const reportPreData = payload(JSON.parse(reportPre.stdout));
+    const prePath = reportPreData.path;
+    expect(typeof prePath).toBe('string');
+    expect(prePath as string).toMatch(/[/\\]runs[/\\][a-f0-9]{64}\.html$/);
+    expect(existsSync(prePath as string)).toBe(true);
+    expect(readFileSync(prePath as string, 'utf8')).toContain(parentRunId);
+    // Report path must be under the user cache, not the project tree.
+    expect(prePath as string).toContain(home);
+    expect(prePath as string).not.toContain(join(testDir, 'opensip-cli'));
 
-      // Missing run fails closed (no latest fallback write/open).
-      const missing = cli.run(
-        ['--no-cloud', 'report', '--run', 'run-does-not-exist', '--no-open', '--json'],
-        options,
-      );
-      expect(missing.exitCode).not.toBe(0);
+    // Missing run fails closed (no latest fallback write/open).
+    const missing = cli.run(
+      ['--no-cloud', 'report', '--run', 'run-does-not-exist', '--no-open', '--json'],
+      options,
+    );
+    expect(missing.exitCode).not.toBe(0);
 
-      // Init adopts cache evidence into project runtime.
-      const init = cli.run(['--no-cloud', 'init', '--json'], {
-        ...options,
-        timeout: 180_000,
-      });
-      expect(init.exitCode).toBe(0);
-      expect(existsSync(join(testDir, 'opensip-cli', '.runtime'))).toBe(true);
+    // Init adopts cache evidence into project runtime.
+    const init = cli.run(['--no-cloud', 'init', '--json'], {
+      ...options,
+      timeout: 180_000,
+    });
+    expect(init.exitCode).toBe(0);
+    expect(existsSync(join(testDir, 'opensip-cli', '.runtime'))).toBe(true);
 
-      const runsShowPost = cli.run(
-        ['--no-cloud', 'runs', 'show', parentRunId, '--json'],
-        options,
-      );
-      expect(runsShowPost.exitCode).toBe(0);
-      const postShow = payload(JSON.parse(runsShowPost.stdout));
-      const postRun =
-        (postShow.run as Record<string, unknown> | undefined) ??
-        (postShow as Record<string, unknown>);
-      expect(postRun.id ?? postShow.id).toBe(parentRunId);
+    const runsShowPost = cli.run(['--no-cloud', 'runs', 'show', parentRunId, '--json'], options);
+    expect(runsShowPost.exitCode).toBe(0);
+    const postShow = payload(JSON.parse(runsShowPost.stdout));
+    const postRun = (postShow.run as Record<string, unknown> | undefined) ?? postShow;
+    expect(postRun.id ?? postShow.id).toBe(parentRunId);
 
-      const reportPost = cli.run(
-        ['--no-cloud', 'report', '--run', parentRunId, '--no-open', '--json'],
-        options,
-      );
-      expect(reportPost.exitCode).toBe(0);
-      const reportPostData = payload(JSON.parse(reportPost.stdout));
-      const postPath = reportPostData.path as string;
-      expect(postPath).toMatch(/[/\\]runs[/\\][a-f0-9]{64}\.html$/);
-      expect(existsSync(postPath)).toBe(true);
-      expect(readFileSync(postPath, 'utf8')).toContain(parentRunId);
-      expect(postPath).toContain(join(testDir, 'opensip-cli', '.runtime'));
+    const reportPost = cli.run(
+      ['--no-cloud', 'report', '--run', parentRunId, '--no-open', '--json'],
+      options,
+    );
+    expect(reportPost.exitCode).toBe(0);
+    const reportPostData = payload(JSON.parse(reportPost.stdout));
+    const postPath = reportPostData.path as string;
+    expect(postPath).toMatch(/[/\\]runs[/\\][a-f0-9]{64}\.html$/);
+    expect(existsSync(postPath)).toBe(true);
+    expect(readFileSync(postPath, 'utf8')).toContain(parentRunId);
+    expect(postPath).toContain(join(testDir, 'opensip-cli', '.runtime'));
 
-      // Status after Init should succeed on the project plane.
-      const statusPost = cli.run(['--no-cloud', 'status', '--json'], options);
-      expect(statusPost.exitCode).toBe(0);
-      expect(readdirSync(join(home, '.opensip-cli')).length).toBeGreaterThanOrEqual(0);
-    },
-    360_000,
-  );
+    // Status after Init should succeed on the project plane.
+    const statusPost = cli.run(['--no-cloud', 'status', '--json'], options);
+    expect(statusPost.exitCode).toBe(0);
+    expect(readdirSync(join(home, '.opensip-cli')).length).toBeGreaterThanOrEqual(0);
+  }, 360_000);
 });

@@ -30,7 +30,7 @@ const ACCEPT =
 
 export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) => {
   if (!ts.isIdentifier(node.expression)) return UNRESOLVED;
-  const name = node.expression.text;
+  const bindingName = node.expression.text;
   const symbol = ctx.typeChecker.getSymbolAtLocation(node.expression);
   if (!symbol) return UNRESOLVED;
 
@@ -40,10 +40,22 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
     const sf = d.getSourceFile();
     const declNode = functionLikeFromDeclaration(d, ACCEPT);
     if (!declNode) continue;
-    const hash = resolveDeclToHash(declNode, sf, [name], ctx);
+    const hash = resolveDeclToHash(declNode, sf, [semanticTargetName(real, d)], ctx, [bindingName]);
     if (hash) {
       return { to: [hash], resolution: 'static', confidence: 'high' };
     }
   }
   return UNRESOLVED;
 };
+
+/**
+ * The catalog target name belongs to the unaliased SOURCE declaration, while
+ * the caller-local spelling is only an import binding. TypeScript names a
+ * default-export symbol `default`; translate that one semantic sentinel to the
+ * inventory's source identity for function declarations.
+ */
+function semanticTargetName(symbol: ts.Symbol, declaration: ts.Declaration): string {
+  const name = symbol.getName();
+  if (name !== 'default' || !ts.isFunctionDeclaration(declaration)) return name;
+  return declaration.name?.text ?? '<default>';
+}

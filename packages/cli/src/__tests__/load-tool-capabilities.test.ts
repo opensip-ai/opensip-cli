@@ -6,11 +6,10 @@
  * CLI-only commands.
  */
 
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-import { createHash } from 'node:crypto';
 
 import { BUILTIN_TRUST_POLICY, type ResolvedTrustPolicy } from '@opensip-cli/config';
 import {

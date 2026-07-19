@@ -3,6 +3,10 @@
  * state must declare HostSpec runtimeAccess. Tool specs cannot forge policy.
  */
 
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
   LanguageRegistry,
   RunScope,
@@ -12,6 +16,7 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
+import { BUNDLED_TOOLS } from '../../__tests__/test-utils/bundled-tools.js';
 import { buildCommandScopeIndex } from '../command-scope-index.js';
 import { buildTopLevelHostSpecs } from '../host-command-specs.js';
 import {
@@ -22,8 +27,6 @@ import {
   resolveHostRuntimePolicy,
 } from '../host-runtime-access.js';
 import { buildHostSubcommandGroups } from '../host-subcommand-groups.js';
-
-import { BUNDLED_TOOLS } from '../../__tests__/test-utils/bundled-tools.js';
 
 import type { CliCommandsContext } from '../shared.js';
 
@@ -135,34 +138,37 @@ describe('user-state lease coverage inventory', () => {
 
   it('classifies trust and update-state writers as user-state requiring ownership', async () => {
     resetEnteredHostOwnershipForTests();
+    const privateTemp = mkdtempSync(join(tmpdir(), 'opensip-user-state-lease-'));
+    const updateStatePath = join(privateTemp, 'no-write-update-state.json');
+    const installSourcePath = join(privateTemp, 'install-source');
     const { writeKnownLatest, clearKnownLatest } = await import('../../update-state.js');
     const { recordInstalledToolTrust } = await import('../../bootstrap/tool-trust.js');
-    expect(() => writeKnownLatest('1.0.0', '/tmp/no-write-update-state.json')).toThrow(
-      /user-state runtime lease/,
-    );
-    expect(() => clearKnownLatest('/tmp/no-write-update-state.json')).toThrow(
-      /user-state runtime lease/,
-    );
-    expect(() =>
-      recordInstalledToolTrust({
-        scope: 'global',
-        cwd: '/tmp',
-        toolId: 'x',
-        packageName: 'x',
-        manifestHash: 'h',
-        installSourcePath: '/tmp/x',
-      }),
-    ).toThrow(/user-state runtime lease/);
-    expect(() =>
-      recordInstalledToolTrust({
-        scope: 'project',
-        cwd: '/tmp',
-        toolId: 'x',
-        packageName: 'x',
-        manifestHash: 'h',
-        installSourcePath: '/tmp/x',
-      }),
-    ).toThrow(/project runtime lease/);
+    try {
+      expect(() => writeKnownLatest('1.0.0', updateStatePath)).toThrow(/user-state runtime lease/);
+      expect(() => clearKnownLatest(updateStatePath)).toThrow(/user-state runtime lease/);
+      expect(() =>
+        recordInstalledToolTrust({
+          scope: 'global',
+          cwd: privateTemp,
+          toolId: 'x',
+          packageName: 'x',
+          manifestHash: 'h',
+          installSourcePath,
+        }),
+      ).toThrow(/user-state runtime lease/);
+      expect(() =>
+        recordInstalledToolTrust({
+          scope: 'project',
+          cwd: privateTemp,
+          toolId: 'x',
+          packageName: 'x',
+          manifestHash: 'h',
+          installSourcePath,
+        }),
+      ).toThrow(/project runtime lease/);
+    } finally {
+      rmSync(privateTemp, { recursive: true, force: true });
+    }
   });
 
   it('freezes decorated host policy so inventory copies cannot be mutated', () => {

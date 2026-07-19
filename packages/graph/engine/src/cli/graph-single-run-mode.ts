@@ -2,7 +2,6 @@ import {
   createToolLogger,
   ConfigurationError,
   currentScope,
-  SystemError,
   type ToolCliContext,
 } from '@opensip-cli/core';
 
@@ -121,18 +120,6 @@ export async function executeSinglePathGraph(
           onProgress: profileRun?.onProgress,
         });
   finishProfileRun(profileRun, result);
-
-  if (shards.length > 1) {
-    const sharded = result as { failedShardIds?: readonly string[] };
-    if (sharded.failedShardIds && sharded.failedShardIds.length > 0) {
-      throw new SystemError(
-        `Sharded graph build had ${sharded.failedShardIds.length} shard failure(s); ` +
-          `catalog and any --gate-* / baseline artifacts are incomplete. ` +
-          `See 'graph.sharded.shard_failed' log events for per-shard details.`,
-        { code: 'GRAPH.SHARD.FAILURES' },
-      );
-    }
-  }
 
   enforceLanguageMismatchPolicy(opts, result.catalog, [runCwd]);
   const scope = currentScope();

@@ -17,6 +17,7 @@ import {
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import { removeOwnedAuthoredBlobRoot } from './authored-state-transaction-owned-artifact-cleanup.js';
+import { hasErrorCode } from './error-code.js';
 
 import type {
   AuthoredArtifactPaths,
@@ -31,10 +32,6 @@ function artifactPath(paths: AuthoredArtifactPaths, slot: AuthoredArtifactSlot):
   if (slot === 'authoredStage') return paths.stageRoot;
   if (slot === 'authoredBackup') return paths.backupRoot;
   return paths.replayManifest;
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
 }
 
 function assertDirectAuthoredArtifact(root: StableAuthoredRoot, path: string): void {
@@ -64,7 +61,7 @@ export function assertAuthoredArtifactPathAbsent(
   try {
     lstatSync(path);
   } catch (error) {
-    if (hasCode(error, 'ENOENT')) {
+    if (hasErrorCode(error, 'ENOENT')) {
       assertStableAuthoredRoot(root);
       return;
     }
@@ -111,7 +108,7 @@ export function removeAuthoredArtifact(
   try {
     lstatSync(path);
   } catch (error) {
-    if (hasCode(error, 'ENOENT')) {
+    if (hasErrorCode(error, 'ENOENT')) {
       checkpoint('after-cleanup-artifact-observation');
       assertAuthoredArtifactPathAbsent(root, paths, slot);
       const evidence = readAuthoredCleanupEvidence(root, journal, slot);

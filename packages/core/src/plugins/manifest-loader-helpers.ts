@@ -67,8 +67,8 @@ function isIdentityObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Narrow an unknown value to a non-empty string (the manifest identity-field guard). */
-function isNonEmptyString(value: unknown): value is string {
+/** Narrow an unknown manifest identity field to a non-empty string. */
+function isManifestIdentityString(value: unknown): value is string {
   return typeof value === 'string' && value !== '';
 }
 
@@ -170,9 +170,9 @@ export function validateManifest(
   version: unknown,
 ): RawToolPluginManifest | undefined {
   if (block.kind !== 'tool') return undefined;
-  if (!isNonEmptyString(block.id)) return undefined;
-  if (!isNonEmptyString(name)) return undefined;
-  if (!isNonEmptyString(version)) return undefined;
+  if (!isManifestIdentityString(block.id)) return undefined;
+  if (!isManifestIdentityString(name)) return undefined;
+  if (!isManifestIdentityString(version)) return undefined;
 
   const commands = normalizeCommands(block.commands);
   if (commands === undefined) return undefined;
@@ -335,7 +335,7 @@ function normalizeConfig(value: unknown): ConfigParseResult {
   if (value === undefined) return { ok: true };
   if (!isRecord(value)) return { ok: false };
   const { namespace, schema } = value;
-  if (!isNonEmptyString(namespace)) return { ok: false };
+  if (!isManifestIdentityString(namespace)) return { ok: false };
   if (!isRecord(schema)) return { ok: false };
   return { ok: true, config: { namespace, schema } };
 }

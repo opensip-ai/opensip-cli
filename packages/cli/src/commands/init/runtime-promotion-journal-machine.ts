@@ -3,10 +3,12 @@
 import { runtimePromotionDestinationParentReady } from './runtime-promotion-intent-policy.js';
 import { assertRuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
 import {
-  assertIntentLifecycle,
   assertRecoveryOwner,
   assertTransitionIdentity,
   assertTransitionManifests,
+} from './runtime-promotion-transition-identity-validation.js';
+import {
+  assertIntentLifecycle,
   sameTransitionValue,
   transitionFailure,
 } from './runtime-promotion-transition-validation.js';

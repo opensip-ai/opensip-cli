@@ -15,7 +15,12 @@ import {
 } from './near-duplicate-signature.js';
 import { UnionFind } from './near-duplicate-union-find.js';
 
-import type { CloneCandidate, NearDupOpts, NearDuplicateCluster, NearDuplicateResult } from './types.js';
+import type {
+  CloneCandidate,
+  NearDupOpts,
+  NearDuplicateCluster,
+  NearDuplicateResult,
+} from './types.js';
 
 const DEFAULT_MIN_SIMILARITY = 0.85;
 const DEFAULT_MIN_BODY_SIZE = 200;
@@ -95,7 +100,8 @@ function buildNearEdges(
   let cappedBuckets = 0;
   for (const indices of buckets.values()) {
     // Deterministic sample (first N in eligible order) before the O(k^2) loop.
-    const bounded = indices.length > MAX_BUCKET_PAIRWISE ? indices.slice(0, MAX_BUCKET_PAIRWISE) : indices;
+    const bounded =
+      indices.length > MAX_BUCKET_PAIRWISE ? indices.slice(0, MAX_BUCKET_PAIRWISE) : indices;
     if (bounded !== indices) cappedBuckets += 1;
     collectBucketEdges(bounded, eligible, minSimilarity, seenPairs, edges);
   }

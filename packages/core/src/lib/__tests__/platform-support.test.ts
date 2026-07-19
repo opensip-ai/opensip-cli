@@ -102,10 +102,26 @@ describe('platform-support registry', () => {
         assertPlatformSupportRowsValid([supportedRow({ qualification: { qualifiedVersion } })]),
       ).toThrow(/invalid exact qualified version/u);
     }
-
-    for (const qualifiedAt of ['not-a-date', '2026-02-30T00:00:00.000Z', '2026-08-01T00:00:00Z']) {
+    for (const qualifiedVersion of [42, '1.2.3+build+extra', '1.2.3+bad!']) {
       expect(() =>
-        assertPlatformSupportRowsValid([supportedRow({ qualification: { qualifiedAt } })]),
+        assertPlatformSupportRowsValid([
+          supportedRow({
+            qualification: { qualifiedVersion: qualifiedVersion as string },
+          }),
+        ]),
+      ).toThrow(/invalid exact qualified version/u);
+    }
+
+    for (const qualifiedAt of [
+      42,
+      'not-a-date',
+      '2026-02-30T00:00:00.000Z',
+      '2026-08-01T00:00:00Z',
+    ]) {
+      expect(() =>
+        assertPlatformSupportRowsValid([
+          supportedRow({ qualification: { qualifiedAt: qualifiedAt as string } }),
+        ]),
       ).toThrow(/invalid qualification timestamp/u);
     }
 
@@ -150,6 +166,9 @@ describe('platform-support registry', () => {
     expect(() =>
       assertPlatformSupportRowsValid([{ ...MACOS_PREVIEW_ROW, evidence: undefined }]),
     ).toThrow(/lacks an evidence artifact policy/u);
+    expect(() =>
+      assertPlatformSupportRowsValid([{ ...MACOS_PREVIEW_ROW, profile: undefined }]),
+    ).toThrow(/lacks a qualification profile/u);
   });
 
   it('rejects empty, duplicate, and overlapping registries', () => {
@@ -173,6 +192,11 @@ describe('platform-support registry', () => {
   it('validates every customer-facing registry field before it can be projected', () => {
     const invalidRows: readonly [PlatformSupportRow, RegExp][] = [
       [{ ...MACOS_PREVIEW_ROW, id: '../macos' }, /invalid id/u],
+      [null as unknown as PlatformSupportRow, /must be an object/u],
+      [
+        { ...MACOS_PREVIEW_ROW, tuple: null as unknown as PlatformSupportRow['tuple'] },
+        /invalid tuple/u,
+      ],
       [
         {
           ...MACOS_PREVIEW_ROW,
@@ -215,6 +239,10 @@ describe('platform-support registry', () => {
       ],
       [{ ...MACOS_PREVIEW_ROW, profile: { id: 'Not Stable', version: 1 } }, /invalid profile id/u],
       [
+        { ...MACOS_PREVIEW_ROW, profile: null as unknown as PlatformSupportRow['profile'] },
+        /invalid qualification profile/u,
+      ],
+      [
         {
           ...MACOS_PREVIEW_ROW,
           profile: { id: MACOS_PREVIEW_ROW.id, version: 0 },
@@ -226,6 +254,7 @@ describe('platform-support registry', () => {
         { ...MACOS_PREVIEW_ROW, docsUrl: ['http:', '', 'opensip.ai', 'support'].join('/') },
         /invalid public docs URL/u,
       ],
+      [{ ...MACOS_PREVIEW_ROW, docsUrl: 'not a URL' }, /invalid public docs URL/u],
       // A control character in the URL is rejected by the bounded-input guard
       // (exercises containsControlCharacter's positive branch).
       [
@@ -247,6 +276,13 @@ describe('platform-support registry', () => {
       [
         {
           ...MACOS_PREVIEW_ROW,
+          evidence: null as unknown as PlatformSupportRow['evidence'],
+        },
+        /invalid evidence metadata/u,
+      ],
+      [
+        {
+          ...MACOS_PREVIEW_ROW,
           evidence: {
             artifact: EVIDENCE_ARTIFACT,
             url: 'https://user@example.test/evidence',
@@ -261,6 +297,20 @@ describe('platform-support registry', () => {
     for (const [row, message] of invalidRows) {
       expect(() => assertPlatformSupportRowsValid([row])).toThrow(message);
     }
+  });
+
+  it('rejects a supported row whose evidence policy has no immutable URL', () => {
+    expect(() =>
+      assertPlatformSupportRowsValid([
+        {
+          ...supportedRow(),
+          evidence: {
+            artifact: EVIDENCE_ARTIFACT,
+            url: null,
+          },
+        },
+      ]),
+    ).toThrow(/immutable HTTPS evidence URL/u);
   });
 });
 
@@ -412,12 +462,37 @@ describe('assessHostSupport', () => {
       { ...EXACT_MACOS, kernelRelease: 'Darwin 25.0.0' },
       { ...EXACT_MACOS, nodeVersion: 'node-24.16.0' },
       { ...EXACT_MACOS, npmVersion: 'npm 11.2.3' },
+      { ...EXACT_MACOS, nodeVersion: ' ' },
+      { ...EXACT_MACOS, nodeVersion: '24.16.0+build+extra' },
+      { ...EXACT_MACOS, nodeVersion: '24.16.0+bad!' },
+      { ...EXACT_MACOS, nodeVersion: '24.16.0-01' },
     ]) {
       const assessment = assessHostSupport(observed);
       expect(assessment.status).toBe('unqualified');
       expect(assessment.match).toBe('none');
       expect(assessment.reasonCodes.length).toBeGreaterThan(0);
     }
+  });
+
+  it('rejects incomplete or canonically misidentified injected registries', () => {
+    expect(() => assessHostSupport(EXACT_MACOS, [MACOS_INTEL_ROW])).toThrow(
+      /missing required row: macos-26-arm64-node24-npm11-v1/u,
+    );
+    expect(() => assessHostSupport(EXACT_MACOS, [MACOS_PREVIEW_ROW])).toThrow(
+      /missing required row: macos-26-intel-unsupported/u,
+    );
+    expect(() =>
+      assessHostSupport(EXACT_MACOS, [
+        { ...MACOS_PREVIEW_ROW, tuple: { ...MACOS_PREVIEW_ROW.tuple, arch: 'ia32' } },
+        MACOS_INTEL_ROW,
+      ]),
+    ).toThrow(/invalid macOS qualification row/u);
+    expect(() =>
+      assessHostSupport(EXACT_MACOS, [
+        MACOS_PREVIEW_ROW,
+        { ...MACOS_INTEL_ROW, tuple: { ...MACOS_INTEL_ROW.tuple, arch: 'ia32' } },
+      ]),
+    ).toThrow(/invalid macOS Intel exclusion row/u);
   });
 
   it('classifies Windows as unqualified (a later OS profile owns it), never "cannot run"', () => {

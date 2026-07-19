@@ -45,6 +45,14 @@ describe('scrubModuleNotFoundMessage', () => {
       "Cannot find module '@opensip-cli/core/dist/tools/identity.js' imported from <path-scrubbed>",
     );
   });
+
+  it('scrubs a quoted absolute importer path', () => {
+    expect(
+      scrubModuleNotFoundMessage(
+        `Cannot find module '@opensip-cli/missing' imported from "/Users/dev/proj/loader.js"`,
+      ),
+    ).toContain('imported from "<path-scrubbed>"');
+  });
 });
 
 describe('classifyModuleError', () => {
@@ -84,6 +92,16 @@ describe('classifyModuleError', () => {
     expect(diag.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_RUNTIME_MODULE_NOT_FOUND);
     expect(diag.message).toContain("Cannot find module '@opensip-cli/missing'");
   });
+
+  it('retains scrubbed detail for an absolute non-workspace module miss', () => {
+    const diag = classifyModuleError(
+      new Error("Cannot find module '/Users/dev/private/missing.js'"),
+    );
+
+    expect(diag.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_RUNTIME_MODULE_NOT_FOUND);
+    expect(diag.message).toContain('<path-scrubbed>');
+    expect(diag.detail).toContain('/Users/dev/private/missing.js');
+  });
 });
 
 describe('classifyIntegrityFailure', () => {
@@ -110,6 +128,21 @@ describe('classifyIntegrityFailure', () => {
     expect(diag?.code).toBe(CLI_DIAGNOSTIC_CODES.OPENSIP_INTEGRITY_MISSING_DIST_ENTRY);
     expect(diag?.category).toBe('integrity');
   });
+
+  it('supports omitted entry hints and rejects unknown integrity kinds', () => {
+    expect(
+      classifyIntegrityFailure({
+        kind: 'missing-dist-entry',
+        packageName: '@opensip-cli/fitness',
+      })?.message,
+    ).toBe('Package @opensip-cli/fitness is missing a required build artifact.');
+    expect(
+      classifyIntegrityFailure({
+        kind: 'future-integrity-kind',
+        packageName: '@opensip-cli/core',
+      } as never),
+    ).toBeUndefined();
+  });
 });
 
 describe('detectIntegrityFailure', () => {
@@ -124,5 +157,23 @@ describe('detectIntegrityFailure', () => {
     expect(detected?.kind).toBe('injected-copy-stale');
     expect(detected?.packageName).toBe('@opensip-cli/core');
     expect(detected?.expectedEntry).toBe('@opensip-cli/core/dist/tools/identity.js');
+  });
+
+  it('infers the package name and tolerates an absent missing-entry match', () => {
+    const detected = detectIntegrityFailure(
+      new Error(
+        'ERR_MODULE_NOT_FOUND while loading node_modules/@opensip-cli/core from an injected copy',
+      ),
+    );
+
+    expect(detected).toMatchObject({
+      kind: 'injected-copy-stale',
+      packageName: '@opensip-cli/core',
+      expectedEntry: undefined,
+    });
+  });
+
+  it('returns no integrity match for ordinary loader failures', () => {
+    expect(detectIntegrityFailure(new Error('ordinary loader failure'))).toBeUndefined();
   });
 });

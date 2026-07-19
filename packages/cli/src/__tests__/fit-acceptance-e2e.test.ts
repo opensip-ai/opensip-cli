@@ -205,9 +205,7 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
       timeout: 120_000,
     });
     expect(deniedRun.exitCode, deniedRun.stderr).toBe(0);
-    expect(JSON.stringify(JSON.parse(deniedRun.stdout))).not.toContain(
-      'capability-worker-fixture',
-    );
+    expect(JSON.stringify(JSON.parse(deniedRun.stdout))).not.toContain('capability-worker-fixture');
 
     // The real operator ceremony through the real binary, against an isolated
     // HOME so the developer's actual ~/.opensip-cli is never touched.

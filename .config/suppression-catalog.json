@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T02:07:54.757Z",
+  "generatedAt": "2026-07-19T12:14:35.092Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,22 +25,23 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 242,
+        "total": 246,
         "bySlug": {
           "missing-type-exports": 4,
-          "async-waterfall-detection": 14,
-          "file-length-limit": 10,
+          "async-waterfall-detection": 15,
+          "module-coupling-fan-out": 10,
           "no-markdown-references": 5,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 4,
           "one-outcome-shape": 1,
+          "only-documented-toolcli-seams": 3,
           "context-leakage": 1,
+          "file-length-limit": 8,
           "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
           "stream-buffer-size-limits": 1,
-          "module-coupling-fan-out": 8,
-          "shipped-checks-must-be-generic": 10,
+          "shipped-checks-must-be-generic": 12,
           "fitness-check-standards": 17,
           "null-safety": 7,
           "correlation-id-coverage": 6,
@@ -88,7 +89,6 @@
           "no-skipped-tests": 1,
           "no-stub-tests": 1,
           "no-direct-stdout-in-tool-engine": 2,
-          "only-documented-toolcli-seams": 2,
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
           "module-coupling-metrics": 2,
@@ -102,15 +102,15 @@
         },
         "byPackage": {
           "agent-eval": 9,
-          "cli": 8,
+          "cli": 9,
           "contracts": 2,
           "core": 7,
           "dashboard": 1,
-          "fitness/checks-dogfood": 10,
+          "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
           "fitness/checks-universal": 103,
           "fitness/engine": 12,
-          "graph/engine": 11,
+          "graph/engine": 12,
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 3,
           "mcp": 10,
@@ -128,24 +128,24 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 70,
+        "total": 72,
         "bySlug": {
           "missing-type-exports": 4,
-          "async-waterfall-detection": 14,
-          "file-length-limit": 10,
+          "async-waterfall-detection": 15,
+          "module-coupling-fan-out": 10,
           "no-markdown-references": 3,
           "dogfood-one-config-document-ratchet": 2,
           "throws-documentation": 1,
           "one-outcome-shape": 1,
+          "only-documented-toolcli-seams": 3,
           "context-leakage": 1,
+          "file-length-limit": 8,
           "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
           "stream-buffer-size-limits": 1,
-          "module-coupling-fan-out": 8,
           "duplicate-utility-functions": 1,
           "no-direct-stdout-in-tool-engine": 2,
-          "only-documented-toolcli-seams": 2,
           "semgrep-scan": 1,
           "error-handling-suite": 2,
           "zod-schema-strictness": 1,
@@ -160,12 +160,12 @@
         },
         "byPackage": {
           "agent-eval": 9,
-          "cli": 8,
+          "cli": 9,
           "contracts": 2,
           "core": 7,
           "dashboard": 1,
           "fitness/engine": 12,
-          "graph/engine": 11,
+          "graph/engine": 12,
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 3,
           "mcp": 10,
@@ -199,9 +199,9 @@
     },
     "check-package": {
       "fitness": {
-        "total": 170,
+        "total": 172,
         "bySlug": {
-          "shipped-checks-must-be-generic": 10,
+          "shipped-checks-must-be-generic": 12,
           "fitness-check-standards": 17,
           "null-safety": 7,
           "correlation-id-coverage": 6,
@@ -255,7 +255,7 @@
           "no-stub-tests": 1
         },
         "byPackage": {
-          "fitness/checks-dogfood": 10,
+          "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
           "fitness/checks-universal": 103
         }
@@ -337,15 +337,17 @@
         }
       },
       "graph": {
-        "total": 27,
+        "total": 32,
         "byRuleId": {
-          "graph:cycle": 17,
-          "graph:wide-function": 2,
+          "graph:cycle": 19,
+          "graph:wide-function": 3,
+          "graph:cycle\\ncode": 1,
+          "graph:": 1,
           "graph:large-function": 7,
           "graph:cycle\\nfunction": 1
         },
         "byPackage": {
-          "core": 8,
+          "core": 13,
           "fitness/checks-universal": 10,
           "graph/engine": 9
         }
@@ -382,11 +384,11 @@
     "cosmetic": {
       "file-length-limit": {
         "budget": 0,
-        "actual": 10
+        "actual": 8
       },
       "module-coupling-fan-out": {
         "budget": 4,
-        "actual": 8
+        "actual": 10
       },
       "project-readme-existence": {
         "budget": 0,
@@ -461,17 +463,17 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 242,
+    "budgetGateFitness": 246,
     "budgetGateFitnessSlugs": 72,
-    "productRuntimeFitness": 70,
+    "productRuntimeFitness": 72,
     "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 102,
-    "checkPackageFitness": 170,
+    "productRuntimeCombined": 104,
+    "checkPackageFitness": 172,
     "testSupportFitness": 2,
     "testsFitness": 62,
-    "testsGraph": 27,
+    "testsGraph": 32,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
     "unbudgetedProductRuntimeSlugs": 25
@@ -487,24 +489,24 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -235,
+      "productRuntimeFitness": -233,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -210,
-      "budgetGateFitness": -300,
-      "checkPackageFitness": -64,
+      "productRuntimeCombined": -208,
+      "budgetGateFitness": -296,
+      "checkPackageFitness": -62,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
     },
     "reopenCandidates": [
       {
         "slug": "async-waterfall-detection",
-        "count": 14,
+        "count": 15,
         "disposition": "c",
         "kind": "fitness"
       },
       {
         "slug": "file-length-limit",
-        "count": 10,
+        "count": 8,
         "disposition": "c",
         "kind": "fitness"
       }
@@ -512,7 +514,7 @@
     "acceptedHighCount": [
       {
         "slug": "module-coupling-fan-out",
-        "count": 8,
+        "count": 10,
         "disposition": "b",
         "kind": "fitness"
       },

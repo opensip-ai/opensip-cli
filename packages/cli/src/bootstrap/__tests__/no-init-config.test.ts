@@ -9,10 +9,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  NO_INIT_GLOBAL_EXCLUDES,
-  synthesizeNoInitConfigDocument,
-} from '../no-init-config.js';
+import { synthesizeNoInitConfigDocument } from '../no-init-config.js';
 import {
   STARTER_GLOBAL_EXCLUDES,
   buildStarterConfigDocument,
@@ -28,11 +25,6 @@ describe('synthesizeNoInitConfigDocument', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('aliases NO_INIT_GLOBAL_EXCLUDES to the shared starter list', () => {
-    expect(NO_INIT_GLOBAL_EXCLUDES).toBe(STARTER_GLOBAL_EXCLUDES);
-    expect(NO_INIT_GLOBAL_EXCLUDES).toHaveLength(11);
-  });
-
   it('returns undefined when no language markers are present', () => {
     expect(synthesizeNoInitConfigDocument(dir)).toBeUndefined();
   });
@@ -43,7 +35,7 @@ describe('synthesizeNoInitConfigDocument', () => {
     expect(synthesized).toBeDefined();
     expect(synthesized!.languages).toEqual(['typescript']);
     expect(synthesized!.document).toEqual(buildStarterConfigDocument(['typescript']));
-    expect(synthesized!.document['globalExcludes']).toEqual([...STARTER_GLOBAL_EXCLUDES]);
+    expect(synthesized!.document.globalExcludes).toEqual([...STARTER_GLOBAL_EXCLUDES]);
   });
 
   it('canonicalizes polyglot markers into ALL_LANGUAGES order', () => {

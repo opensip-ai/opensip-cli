@@ -35,6 +35,7 @@ import { envelopeToResultSummary } from '@opensip-cli/contracts';
 import { formatScore } from '@opensip-cli/format';
 import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
+import { suiteResultToView } from './suite-result-to-view.js';
 import { viewConfigMigrate, viewConfigSchema, viewConfigValidate } from './views/config-views.js';
 import { viewInit } from './views/init-view.js';
 import {
@@ -54,7 +55,6 @@ import { viewPolicyResult } from './views/policy-views.js';
 import { viewRepair } from './views/repair-views.js';
 import { viewRunDetail, viewRunHistory } from './views/run-views.js';
 import { viewRuntimeStatus } from './views/runtime-status-view.js';
-import { viewSuiteAdd, viewSuiteList, viewSuiteRun } from './views/suite-views.js';
 import { viewToolsResult } from './views/tools-views.js';
 
 import type {
@@ -144,28 +144,6 @@ function titledLinesView(title: string | undefined, lines: readonly string[]): V
 /** @throws {Error} When the closed command-result union and renderer drift. */
 function assertNever(result: never): never {
   throw new Error(`Unhandled command result '${JSON.stringify(result)}'`);
-}
-
-type SuiteCommandResult = Extract<
-  CommandResult,
-  { type: 'suite-run' | 'suite-list' | 'suite-add' }
->;
-
-function suiteResultToView(result: SuiteCommandResult): ViewNode {
-  switch (result.type) {
-    case 'suite-run': {
-      return viewSuiteRun(result);
-    }
-    case 'suite-list': {
-      return viewSuiteList(result);
-    }
-    case 'suite-add': {
-      return viewSuiteAdd(result);
-    }
-    default: {
-      return assertNever(result);
-    }
-  }
 }
 
 // --- Envelope-derived terminal table (ADR-0011) -----------------------------

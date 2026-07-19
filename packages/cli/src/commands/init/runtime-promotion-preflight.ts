@@ -61,6 +61,7 @@ function conflictFromPolicy(
   return selection;
 }
 
+/** @throws {RuntimePromotionPreflightError} When a selected source is not canonically located. */
 function canonicalSourceRuntimeDir(
   inspection: RuntimePromotionFilesystemInspection,
 ): string | undefined {
@@ -81,6 +82,7 @@ function canonicalSourceRuntimeDir(
   return canonical.runtimeDir;
 }
 
+/** @throws {RuntimePromotionPreflightError} When destination root identity is missing or unsafe. */
 function destinationRootIdentity(
   inspection: RuntimePromotionFilesystemInspection,
 ): RuntimePromotionRootIdentity | null {
@@ -138,6 +140,7 @@ function preliminaryEquality(input: {
  * Resolve fresh authority without creating a journal, opening SQLite, or
  * mutating cache/project state.
  */
+/** @throws {RuntimePromotionPreflightError} When runtime-promotion authority cannot be established. */
 export function preflightRuntimePromotionAuthority(
   input: RuntimePromotionPreflightInput,
   dependencyOverrides: Partial<RuntimePromotionPreflightDependencies> = {},

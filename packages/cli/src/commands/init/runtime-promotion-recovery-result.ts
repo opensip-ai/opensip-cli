@@ -192,6 +192,11 @@ function recoveredCommittedResult(input: RecoveredTerminalResultInput): RuntimeA
   };
 }
 
+/**
+ * Project a terminal recovery result from durable journal evidence.
+ *
+ * @throws {Error} When the supplied journal has no terminal evidence.
+ */
 export function recoveredTerminalResult(
   input: RecoveredTerminalResultInput,
 ): RuntimeAdoptionResult {

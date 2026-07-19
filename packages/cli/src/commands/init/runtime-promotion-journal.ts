@@ -3,23 +3,12 @@ import { randomUUID } from 'node:crypto';
 import {
   mutateRuntimePromotionJournal,
   readRuntimePromotionJournal,
-  RUNTIME_RECOVERY_RECORD_MAX_BYTES,
-  SystemError,
   type AnchoredRecordReadResult,
   type RuntimeExclusiveLease,
   type RuntimeRecoveryRecordMutation,
 } from '@opensip-cli/core';
 
 import {
-  asClosed,
-  asOpen,
-  assertExpectation,
-  hasCompleteOwnedCleanup,
-  hasRuntimeStageIntent,
-  isIntentTransition,
-  isPostconditionTransition,
-  isRecoveryOwnerHandoff,
-  isRollbackTransition,
   PromotionJournalCapabilityRegistry,
   type DurableClosedPromotionJournal,
   type DurableOpenPromotionJournal,
@@ -28,6 +17,13 @@ import {
   type ReceiptMetadata,
   type RuntimePromotionJournalController,
 } from './runtime-promotion-journal-controller-internal.js';
+import {
+  assertDesiredIdentity,
+  isTerminalSeal,
+  journalError,
+  parseCanonicalRecord,
+  recoveryRequired,
+} from './runtime-promotion-journal-controller-validation.js';
 import {
   assertInitialRuntimePromotionJournal,
   assertRuntimePromotionTransition,
@@ -40,9 +36,19 @@ import {
 import {
   canonicalRuntimePromotionJournal,
   encodeRuntimePromotionJournal,
-  parseRuntimePromotionJournal,
   type RuntimePromotionJournal,
 } from './runtime-promotion-journal-schema.js';
+import {
+  asClosed,
+  asOpen,
+  assertExpectation,
+  hasCompleteOwnedCleanup,
+  hasRuntimeStageIntent,
+  isIntentTransition,
+  isPostconditionTransition,
+  isRecoveryOwnerHandoff,
+  isRollbackTransition,
+} from './runtime-promotion-journal-transition-guards.js';
 
 export type {
   DurableClosedPromotionJournal,
@@ -59,10 +65,8 @@ export type {
   RuntimeStageMaterializationIdentity,
 } from './runtime-promotion-journal-controller-internal.js';
 
-const JOURNAL_ERROR_CODE = 'SYSTEM.INIT.PROMOTION_JOURNAL';
-const RECOVERY_REQUIRED_CODE = 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED';
-
 export { RUNTIME_PROMOTION_JOURNAL_FILE } from '@opensip-cli/core';
+export { handoffRuntimePromotionRecoveryOwner } from './runtime-promotion-journal-handoff.js';
 
 export type RuntimePromotionJournalCheckpoint =
   | 'after-create-mutation'
@@ -83,83 +87,12 @@ export interface RuntimePromotionJournalControllerDependencies {
   readonly checkpoint?: (checkpoint: RuntimePromotionJournalCheckpoint) => void;
 }
 
-function journalError(message: string, cause?: unknown): SystemError {
-  return new SystemError(message, {
-    code: JOURNAL_ERROR_CODE,
-    ...(cause === undefined ? {} : { cause }),
-  });
-}
-
-function recoveryRequired(message: string, cause?: unknown): SystemError {
-  return new SystemError(message, {
-    code: RECOVERY_REQUIRED_CODE,
-    ...(cause === undefined ? {} : { cause }),
-  });
-}
-
-export function handoffRuntimePromotionRecoveryOwner<Receipt extends DurablePromotionJournal>(
-  controller: RuntimePromotionJournalController,
-  receipt: Receipt,
-): Promise<Receipt>;
-export async function handoffRuntimePromotionRecoveryOwner(
-  controller: RuntimePromotionJournalController,
-  receipt: DurablePromotionJournal,
-): Promise<DurablePromotionJournal> {
-  const previousState = receipt.state;
-  const next = await controller.handoffRecoveryOwner(receipt, (current, identity) => ({
-    ...current,
-    revision: current.revision + 1,
-    recoveryOwnerToken: identity.recoveryOwnerToken,
-    recoveryAttempt: current.recoveryAttempt + 1,
-    timestamps: {
-      ...current.timestamps,
-      updatedAt: identity.claimedAt,
-    },
-  }));
-  return previousState === 'open'
-    ? asOpen(next, (message) => journalError(message))
-    : asClosed(next, (message) => journalError(message));
-}
-
-function parseCanonicalRecord(content: string): RuntimePromotionJournal {
-  if (Buffer.byteLength(content, 'utf8') > RUNTIME_RECOVERY_RECORD_MAX_BYTES) {
-    throw recoveryRequired('The promotion journal exceeds its bounded size.');
-  }
-  try {
-    const parsed = parseRuntimePromotionJournal(content);
-    if (encodeRuntimePromotionJournal(parsed) !== content) {
-      throw journalError('The promotion journal is not canonically encoded.');
-    }
-    return parsed;
-  } catch (error) {
-    if (error instanceof SystemError) throw error;
-    throw recoveryRequired('The promotion journal is malformed.', error);
-  }
-}
-
-function assertDesiredIdentity(
-  current: RuntimePromotionJournal,
-  desired: RuntimePromotionJournal,
-): void {
-  if (
-    desired.coordinationKey !== current.coordinationKey ||
-    desired.operationId !== current.operationId
-  ) {
-    throw journalError('A journal transition changed immutable receipt identity.');
-  }
-}
-
-function isTerminalSeal(
-  desired: RuntimePromotionJournal,
-  outcome: 'committed' | 'rolled-back',
-): boolean {
-  return desired.state === 'open' && desired.terminal?.outcome === outcome;
-}
-
 /**
  * Bind the fixed promotion journal to one exact live writer lease. All durable
  * capabilities issued by this controller are exact objects held only by this
  * controller's private WeakMap.
+ *
+ * @throws {SystemError} When a controller operation observes stale or foreign journal authority.
  */
 export function createRuntimePromotionJournalController(
   lease: RuntimeExclusiveLease,
@@ -175,11 +108,12 @@ export function createRuntimePromotionJournalController(
   };
   const capabilities = new PromotionJournalCapabilityRegistry((message) => journalError(message));
 
-  const readCurrent = async (): Promise<{
+  /** @throws {SystemError} When the durable journal is absent, foreign, or internally inconsistent. */
+  async function readCurrent(): Promise<{
     readonly record: RuntimePromotionJournal;
     readonly content: string;
     readonly sha256: string;
-  }> => {
+  }> {
     const observed = await dependencies.read(lease);
     if (observed.status === 'absent') {
       throw recoveryRequired('The promotion journal is absent.');
@@ -192,15 +126,16 @@ export function createRuntimePromotionJournalController(
       throw recoveryRequired('The promotion journal read digest is inconsistent.');
     }
     return { record, content: observed.content, sha256: observed.sha256 };
-  };
+  }
 
   const metadataForReceipt = (receipt: DurablePromotionJournal): ReceiptMetadata =>
     capabilities.receipt(receipt);
 
-  const verifyReceipt = async (
+  /** @throws {SystemError} When durable journal bytes no longer match the receipt. */
+  async function verifyReceipt(
     receipt: DurablePromotionJournal,
     expectation?: PromotionJournalReceiptExpectation,
-  ): Promise<RuntimePromotionJournal> => {
+  ): Promise<RuntimePromotionJournal> {
     const metadata = metadataForReceipt(receipt);
     const current = await readCurrent();
     if (
@@ -216,11 +151,12 @@ export function createRuntimePromotionJournalController(
     }
     assertExpectation(current.record, expectation, (message) => journalError(message));
     return current.record;
-  };
+  }
 
-  const verifyDesiredAfterMutation = async (
+  /** @throws {SystemError} When a journal mutation cannot be verified exactly. */
+  async function verifyDesiredAfterMutation(
     desiredContent: string,
-  ): Promise<DurablePromotionJournal> => {
+  ): Promise<DurablePromotionJournal> {
     let observed: AnchoredRecordReadResult;
     try {
       observed = await dependencies.read(lease);
@@ -235,7 +171,7 @@ export function createRuntimePromotionJournalController(
       throw recoveryRequired('The promotion journal changed project authority.');
     }
     return capabilities.issueReceipt(record, observed.content, observed.sha256);
-  };
+  }
 
   const mutationCoordinator = createJournalMutationCoordinator({
     read: () => dependencies.read(lease),
@@ -247,9 +183,16 @@ export function createRuntimePromotionJournalController(
   const replace = async (
     receipt: DurablePromotionJournal,
     desiredInput: RuntimePromotionJournal,
+    preverifiedCurrent?: RuntimePromotionJournal,
   ): Promise<DurablePromotionJournal> => {
     const metadata = metadataForReceipt(receipt);
     const current = await verifyReceipt(receipt);
+    if (
+      preverifiedCurrent !== undefined &&
+      encodeRuntimePromotionJournal(preverifiedCurrent) !== metadata.content
+    ) {
+      throw recoveryRequired('The preverified promotion journal no longer matches its receipt.');
+    }
     const desired = canonicalRuntimePromotionJournal(desiredInput);
     assertDesiredIdentity(current, desired);
     assertRuntimePromotionTransition(current, desired);
@@ -268,7 +211,8 @@ export function createRuntimePromotionJournalController(
     );
   };
 
-  const assertNamedTransition = (
+  /** @throws {SystemError} When a requested named transition has the wrong shape. */
+  function assertNamedTransition(
     current: RuntimePromotionJournal,
     desired: RuntimePromotionJournal,
     predicate: (
@@ -276,11 +220,11 @@ export function createRuntimePromotionJournalController(
       desiredRecord: RuntimePromotionJournal,
     ) => boolean,
     name: string,
-  ): void => {
+  ): void {
     if (!predicate(current, desired)) {
       throw journalError(`The requested ${name} transition has the wrong shape.`);
     }
-  };
+  }
 
   const namedOpenTransition = async (
     receipt: DurableOpenPromotionJournal,
@@ -293,7 +237,7 @@ export function createRuntimePromotionJournalController(
   ): Promise<DurableOpenPromotionJournal> => {
     const current = await verifyReceipt(receipt, { state: 'open' });
     assertNamedTransition(current, desired, predicate, name);
-    return asOpen(await replace(receipt, desired), (message) => journalError(message));
+    return asOpen(await replace(receipt, desired, current), (message) => journalError(message));
   };
 
   const namedClosedTransition = async (
@@ -307,10 +251,11 @@ export function createRuntimePromotionJournalController(
   ): Promise<DurableClosedPromotionJournal> => {
     const current = await verifyReceipt(receipt, { state: 'closed' });
     assertNamedTransition(current, desired, predicate, name);
-    return asClosed(await replace(receipt, desired), (message) => journalError(message));
+    return asClosed(await replace(receipt, desired, current), (message) => journalError(message));
   };
 
   const controller: RuntimePromotionJournalController = {
+    /** @throws {SystemError} When the allocated initial record has invalid identity. */
     allocate: (build) => {
       const identity = Object.freeze({
         operationId: dependencies.generateOperationId(),
@@ -346,6 +291,7 @@ export function createRuntimePromotionJournalController(
       );
       return asOpen(receipt, (message) => journalError(message));
     },
+    /** @throws {SystemError} When the durable journal cannot be claimed for the expected operation. */
     claim: async (expectedOperationId) => {
       const current = await readCurrent();
       if (expectedOperationId !== undefined && current.record.operationId !== expectedOperationId) {
@@ -356,6 +302,7 @@ export function createRuntimePromotionJournalController(
     verifyOpen: (receipt) => verifyReceipt(receipt, { state: 'open' }),
     verifyReceipt,
     replace,
+    /** @throws {SystemError} When recovery-owner handoff identity or transition is invalid. */
     handoffRecoveryOwner: async (receipt, build) => {
       const current = await verifyReceipt(receipt);
       const identity = Object.freeze({
@@ -406,6 +353,7 @@ export function createRuntimePromotionJournalController(
       namedClosedTransition(receipt, desired, isIntentTransition, 'cleanup intent'),
     recordCleanupPostcondition: (receipt, desired) =>
       namedClosedTransition(receipt, desired, isPostconditionTransition, 'cleanup postcondition'),
+    /** @throws {SystemError} When owned cleanup is incomplete or the closed journal cannot be unlinked. */
     unlinkClosed: async (receipt) => {
       const metadata = metadataForReceipt(receipt);
       const record = await verifyReceipt(receipt, { state: 'closed' });
@@ -419,6 +367,7 @@ export function createRuntimePromotionJournalController(
       } as const;
       await mutationCoordinator.unlinkClosed(mutation, metadata.content);
     },
+    /** @throws {SystemError} When no exact durable runtime-stage creation intent exists. */
     authorizeRuntimeStage: async (receipt, stageBasename) => {
       const record = await verifyReceipt(receipt, {
         state: 'open',
@@ -431,11 +380,13 @@ export function createRuntimePromotionJournalController(
     },
     assertRuntimeStageAuthority: (authority, stageBasename) =>
       capabilities.consumeRuntimeStageAuthority(authority, stageBasename),
+    /** @throws {SystemError} When the candidate is not the controller-bound writer lease. */
     assertBoundLease: (candidate) => {
       if (candidate !== lease) {
         throw journalError('The promotion-journal controller is bound to another writer lease.');
       }
     },
+    /** @throws {SystemError} When durable authored-state materialization authority is absent. */
     authorizeAuthoredState: async (receipt, candidate) => {
       if (candidate !== lease) {
         throw journalError('Authored-state materialization requires the controller-bound lease.');

@@ -13,6 +13,7 @@ import {
 import { INVENTORY_BATCH_SIZE, cancelled, yieldToEventLoop } from './inventory-helpers.js';
 import { discoverStructuralFiles } from './inventory-structural.js';
 import { resolveTargetFiles } from './inventory-targets.js';
+import { findOwningPackage } from './package-ownership.js';
 import { MAX_FILE_LANGUAGES, MAX_PROJECT_LANGUAGES } from './types.js';
 
 import type { InventoryLimits, PackageManifestFacts, ProjectInventoryInput } from './types.js';
@@ -31,20 +32,6 @@ const UNKNOWN_EVIDENCE_SUPPORT: FileEvidenceSupport = deepFreeze({
   declaration: 'unknown',
   reference: 'unknown',
 });
-
-function owningPackage(path: string, packages: readonly PackageFact[]): PackageFact | undefined {
-  let owner: PackageFact | undefined;
-  let ownerLength = -1;
-  for (const candidate of packages) {
-    const root = candidate.root;
-    const matches = root === '.' || path === root || path.startsWith(`${root}/`);
-    if (matches && root.length > ownerLength) {
-      owner = candidate;
-      ownerLength = root.length;
-    }
-  }
-  return owner;
-}
 
 function supportStatus(
   languages: readonly string[],
@@ -134,7 +121,7 @@ function materializeFile(
   const provenance = [...provenanceByIdentity.values()].sort((left, right) =>
     byCodePoint(`${left.source}:${left.detail}`, `${right.source}:${right.detail}`),
   );
-  const owner = owningPackage(candidate.relativePath, packages);
+  const owner = findOwningPackage(candidate.relativePath, packages);
   const languages = fileLanguages(targets, reasons);
   return deepFreeze({
     path: candidate.relativePath,

@@ -44,6 +44,7 @@ import {
   type EquivalenceReport,
   type EquivalenceVerdict,
 } from './orchestrate/equivalence-check.js';
+import { requireCompleteShardedCatalog } from './orchestrate/shard-completeness.js';
 import { runGraph, runShardedGraph } from './orchestrate.js';
 import { readGraphEnv } from './pressure-monitor.js';
 
@@ -155,7 +156,7 @@ async function buildShardedCatalog(input: {
     catalogRepo: null,
     rules: [],
   });
-  return result.catalog;
+  return requireCompleteShardedCatalog(result);
 }
 
 /**

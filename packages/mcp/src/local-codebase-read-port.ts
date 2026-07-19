@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 import {
   buildProjectInventory,
+  findOwningPackage,
   type LanguageEvidenceSupport,
   type ProjectInventory,
 } from '@opensip-cli/codebase';
@@ -18,7 +19,7 @@ import type {
   FileContextDto,
   InventoryStatusOptions,
 } from './codebase-read-port.js';
-import type { FileFact, PackageFact } from '@opensip-cli/contracts';
+import type { FileFact } from '@opensip-cli/contracts';
 
 export interface LocalCodebaseReadPortDeps {
   readonly projectRoot: string;
@@ -93,20 +94,6 @@ function freshnessFor(cache: InventoryCache): CodebaseFreshness {
 function inventoryNextActions(status: CodebaseFreshness): readonly string[] {
   if (status.verification === 'complete') return [];
   return ['Review configured targets and inventory coverage before relying on a negative answer.'];
-}
-
-function owningPackage(path: string, packages: readonly PackageFact[]): PackageFact | undefined {
-  let owner: PackageFact | undefined;
-  let ownerLength = -1;
-  for (const candidate of packages) {
-    const matches =
-      candidate.root === '.' || path === candidate.root || path.startsWith(`${candidate.root}/`);
-    if (matches && candidate.root.length > ownerLength) {
-      owner = candidate;
-      ownerLength = candidate.root.length;
-    }
-  }
-  return owner;
 }
 
 /**
@@ -307,7 +294,7 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
     fact: FileFact,
     status: CodebaseInventoryStatus,
   ): FileContextDto {
-    let packageFact = owningPackage(normalized, status.snapshot.packages);
+    let packageFact = findOwningPackage(normalized, status.snapshot.packages);
     if (fact.packageName !== undefined) {
       packageFact =
         status.snapshot.packages.find((item) => item.name === fact.packageName) ?? packageFact;
@@ -327,7 +314,7 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
 
   private missingFileContext(normalized: string, status: CodebaseInventoryStatus): FileContextDto {
     if (status.coverage.status === 'unavailable') {
-      const packageFact = owningPackage(normalized, status.snapshot.packages);
+      const packageFact = findOwningPackage(normalized, status.snapshot.packages);
       return {
         status: 'unavailable',
         ...(packageFact === undefined ? {} : { package: packageFact }),
@@ -339,7 +326,7 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
         nextActions: status.nextActions,
       };
     }
-    const packageFact = owningPackage(normalized, status.snapshot.packages);
+    const packageFact = findOwningPackage(normalized, status.snapshot.packages);
     const shared = {
       ...(packageFact === undefined ? {} : { package: packageFact }),
       inventoryIdentity: status.identity,

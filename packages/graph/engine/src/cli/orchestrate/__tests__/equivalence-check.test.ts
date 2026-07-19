@@ -167,8 +167,11 @@ type Diff = EquivalenceReport['productionResolvedDifferences'][number];
 /** A divergence in a given direction: phantom (sharded-only), decline (exact-only),
  *  conflict (both differ). `toA`=exact, `toB`=sharded. */
 const diffOf = (owner: string, toA: string, toB: string): Diff => ({
-  key: `${owner}@1:1`,
+  key: `${owner}:1:0@1:1`,
+  ownerBodyHash: 'OWNER',
   ownerFilePath: owner,
+  ownerLine: 1,
+  ownerColumn: 0,
   line: 1,
   column: 1,
   toA,

@@ -135,7 +135,11 @@ export function createInitAuthoredPlan(input: CreateInitAuthoredPlanInput): Init
   });
 }
 
-/** Decode an immutable in-memory blob for Task 3.4 materialization. */
+/**
+ * Decode an immutable in-memory blob for Task 3.4 materialization.
+ *
+ * @throws {Error} When the requested blob is not part of the durable plan.
+ */
 export function decodeInitAuthoredPlanBlob(
   plan: InitAuthoredPlan,
   kind: 'desired' | 'preimage',

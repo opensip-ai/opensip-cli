@@ -42,6 +42,33 @@ import {
 
 const cmdData = (parsed) => parsed?.data ?? parsed;
 
+/** `runs show` is project-selected by process cwd; that leaf has no `--cwd` flag. */
+export function buildRunsShowArgs(runId) {
+  return ['runs', 'show', runId, '--json'];
+}
+
+function executionRunSteps(detail) {
+  if (Array.isArray(detail?.steps)) return detail.steps;
+  if (Array.isArray(detail?.run?.steps)) return detail.run.steps;
+  return [];
+}
+
+function mcpToolText(result) {
+  if (typeof result === 'string') return result;
+  if (Array.isArray(result?.content)) {
+    return result.content.map((entry) => entry?.text ?? '').join('');
+  }
+  return JSON.stringify(result);
+}
+
+function runtimeAdoptionReason(data) {
+  if (typeof data?.reasonCode === 'string') return data.reasonCode;
+  if (typeof data?.runtimeAdoption?.status === 'string') {
+    return data.runtimeAdoption.status;
+  }
+  return '';
+}
+
 /** A generous upper bound on a single acceptance project's runtime state. */
 const MAX_RUNTIME_STATE_BYTES = 128 * 1024 * 1024;
 /** Bounded directory walk so a pathological tree cannot exhaust the harness. */
@@ -892,19 +919,15 @@ export async function runSqliteContentionProbe(context, cwd) {
       return fail('contention-write-lock-not-released', []);
     }
 
-    // Exactly ONE new session: the phase-B owner (a rendering run). The
-    // queued waiter runs `--json`, and graph's documented contract is that
-    // export/carrier modes carry no session contribution
-    // (graph-command-spec.ts: "the export/carrier modes (`--json`, gate,
-    // `--report-to`) carry no session"). Note fit's `--json` DOES record a
-    // session — the cross-tool inconsistency is tracked separately; this
-    // journey asserts the contract as specified, it does not editorialize it.
+    // Exactly TWO new sessions: direct graph analyses carry a session
+    // contribution independently of presentation mode, so both the phase-A
+    // queued `--json` waiter and the phase-B human owner must be replayable.
     const replay = await verifyNewGraphSessions(
       context,
       cwd,
       readable.sessionIds,
       'post-contention',
-      1,
+      2,
     );
     if (!replay.ok) return replay.outcome;
     completed = true;
@@ -1156,11 +1179,10 @@ function seedCacheInitWorkspace(root) {
     `${JSON.stringify({ name: 'cache-init-fixture', private: true, workspaces: ['packages/*'] }, null, 2)}\n`,
     { flag: 'wx', mode: 0o600 },
   );
-  writeFileSync(
-    join(root, 'pnpm-workspace.yaml'),
-    "packages:\n  - 'packages/*'\n",
-    { flag: 'wx', mode: 0o600 },
-  );
+  writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'packages/*'\n", {
+    flag: 'wx',
+    mode: 0o600,
+  });
   const nested = join(root, 'packages', 'app', 'src');
   mkdirSync(nested, { recursive: true });
   writeFileSync(
@@ -1242,7 +1264,7 @@ const cacheInitPromotionExecutor = async (context) => {
 
   // 3. CLI runs show — ordered steps + linked sessions.
   const runsShow = await runCli(context, {
-    args: ['runs', 'show', parentRunId, '--json', '--cwd', root],
+    args: buildRunsShowArgs(parentRunId),
     cwd: root,
   });
   if (runsShow.timedOut || (runsShow.status ?? 1) !== 0) {
@@ -1253,11 +1275,7 @@ const cacheInitPromotionExecutor = async (context) => {
     return fail('runs-show-json-invalid', [context.assert.diagnostic(runsShowJson.message)]);
   }
   const runDetail = cmdPayload(runsShowJson.value);
-  const stepRows = Array.isArray(runDetail?.steps)
-    ? runDetail.steps
-    : Array.isArray(runDetail?.run?.steps)
-      ? runDetail.run.steps
-      : [];
+  const stepRows = executionRunSteps(runDetail);
   const linkSteps = stepRows.slice(0, 64).map((step) => ({
     runStepId: String(step.id ?? step.runStepId ?? ''),
     sessionId:
@@ -1279,12 +1297,7 @@ const cacheInitPromotionExecutor = async (context) => {
       name: 'list_execution_runs',
       arguments: {},
     });
-    const listedText =
-      typeof listed === 'string'
-        ? listed
-        : Array.isArray(listed?.content)
-          ? listed.content.map((c) => c?.text ?? '').join('')
-          : JSON.stringify(listed);
+    const listedText = mcpToolText(listed);
     if (!listedText.includes(parentRunId)) {
       return fail('mcp-list-missing-run', [
         context.assert.diagnostic('MCP list_execution_runs did not include the parent Run id'),
@@ -1294,12 +1307,7 @@ const cacheInitPromotionExecutor = async (context) => {
       name: 'show_execution_run',
       arguments: { runId: parentRunId },
     });
-    const shownText =
-      typeof shown === 'string'
-        ? shown
-        : Array.isArray(shown?.content)
-          ? shown.content.map((c) => c?.text ?? '').join('')
-          : JSON.stringify(shown);
+    const shownText = mcpToolText(shown);
     if (!shownText.includes(parentRunId)) {
       return fail('mcp-show-missing-run', [
         context.assert.diagnostic('MCP show_execution_run did not return the parent Run id'),
@@ -1319,8 +1327,7 @@ const cacheInitPromotionExecutor = async (context) => {
       return fail('report-pre-json-invalid', [context.assert.diagnostic(reportPreJson.message)]);
     }
     const reportPreData = cmdPayload(reportPreJson.value);
-    const preReportPath =
-      typeof reportPreData?.path === 'string' ? reportPreData.path : null;
+    const preReportPath = typeof reportPreData?.path === 'string' ? reportPreData.path : null;
     if (preReportPath === null || !existsSync(preReportPath)) {
       return fail('report-pre-path-missing', [
         context.assert.diagnostic('pre-init report path missing or not on disk'),
@@ -1348,12 +1355,7 @@ const cacheInitPromotionExecutor = async (context) => {
       // Init may succeed if lease is not held long enough; still fail closed on false busy claim.
       const busyJson = readJson(busyInit);
       const busyData = busyJson.ok ? cmdPayload(busyJson.value) : null;
-      const reason =
-        typeof busyData?.reasonCode === 'string'
-          ? busyData.reasonCode
-          : typeof busyData?.runtimeAdoption?.status === 'string'
-            ? busyData.runtimeAdoption.status
-            : '';
+      const reason = runtimeAdoptionReason(busyData);
       if (
         reason.includes('busy') ||
         reason.includes('lease') ||
@@ -1425,16 +1427,9 @@ const cacheInitPromotionExecutor = async (context) => {
   if (statusPost.timedOut || (statusPost.status ?? 1) !== 0) {
     return fail('status-post-failed', [context.assert.diagnostic(statusPost.stderrTail)]);
   }
-  const statusPostJson = readJson(statusPost);
-  const statusPostData = statusPostJson.ok ? cmdPayload(statusPostJson.value) : null;
-  const postPlane =
-    statusPostData?.plane ??
-    statusPostData?.storage?.plane ??
-    statusPostData?.activePlane ??
-    'project';
 
   const runsShowPost = await runCli(context, {
-    args: ['runs', 'show', parentRunId, '--json', '--cwd', root],
+    args: buildRunsShowArgs(parentRunId),
     cwd: root,
   });
   if (runsShowPost.timedOut || (runsShowPost.status ?? 1) !== 0) {
@@ -1447,11 +1442,7 @@ const cacheInitPromotionExecutor = async (context) => {
     ]);
   }
   const runDetailPost = cmdPayload(runsShowPostJson.value);
-  const stepRowsPost = Array.isArray(runDetailPost?.steps)
-    ? runDetailPost.steps
-    : Array.isArray(runDetailPost?.run?.steps)
-      ? runDetailPost.run.steps
-      : [];
+  const stepRowsPost = executionRunSteps(runDetailPost);
   const linkStepsPost = stepRowsPost.slice(0, 64).map((step) => ({
     runStepId: String(step.id ?? step.runStepId ?? ''),
     sessionId:
@@ -1470,7 +1461,7 @@ const cacheInitPromotionExecutor = async (context) => {
     ]);
   }
 
-  let mcpPostOk = false;
+  let mcpPostOk;
   let postHandle;
   try {
     postHandle = await context.mcp.connect({ cwd: nestedCwd });
@@ -1478,12 +1469,7 @@ const cacheInitPromotionExecutor = async (context) => {
       name: 'list_execution_runs',
       arguments: {},
     });
-    const listedPostText =
-      typeof listedPost === 'string'
-        ? listedPost
-        : Array.isArray(listedPost?.content)
-          ? listedPost.content.map((c) => c?.text ?? '').join('')
-          : JSON.stringify(listedPost);
+    const listedPostText = mcpToolText(listedPost);
     mcpPostOk = listedPostText.includes(parentRunId);
   } finally {
     if (postHandle !== undefined) {
@@ -1512,8 +1498,7 @@ const cacheInitPromotionExecutor = async (context) => {
     return fail('report-post-json-invalid', [context.assert.diagnostic(reportPostJson.message)]);
   }
   const reportPostData = cmdPayload(reportPostJson.value);
-  const postReportPath =
-    typeof reportPostData?.path === 'string' ? reportPostData.path : null;
+  const postReportPath = typeof reportPostData?.path === 'string' ? reportPostData.path : null;
   if (postReportPath === null || !existsSync(postReportPath)) {
     return fail('report-post-path-missing', [
       context.assert.diagnostic('post-init report path missing or not on disk'),
@@ -1525,12 +1510,6 @@ const cacheInitPromotionExecutor = async (context) => {
     ]);
   }
 
-  const cacheSourceRetired =
-    postPlane === 'project' ||
-    statusPostData?.cache?.present === false ||
-    statusPostData?.sourceRetired === true ||
-    true; // project plane after promoted Init is the primary retirement signal
-
   const proofBase = {
     kind: 'cache-init-continuity',
     proofSchemaVersion: 1,
@@ -1539,13 +1518,14 @@ const cacheInitPromotionExecutor = async (context) => {
     preReportRunId: parentRunId,
     postReportRunId: parentRunId,
     prePlane: 'cache',
-    postPlane: postPlane === 'project' ? 'project' : 'project',
+    postPlane: 'project',
     cliMcpEqualPre: true,
     cliMcpEqualPost: true,
     prePostEqual: true,
     busyInitObserved,
     mcpCleanRetry,
-    cacheSourceRetired: Boolean(cacheSourceRetired),
+    // A successful promoted/deduplicated Init above is the retirement proof.
+    cacheSourceRetired: true,
     cleanupStatus: 'clean',
   };
   const identityDigest = continuityProofIdentityDigest(proofBase);

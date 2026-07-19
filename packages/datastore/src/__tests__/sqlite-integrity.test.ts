@@ -3,6 +3,7 @@ import {
   closeSync,
   copyFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   openSync,
@@ -71,6 +72,29 @@ function unclosedInspectionDatabase(): Database.Database {
   } as unknown as Database.Database;
 }
 
+function inspectionDatabase(options: {
+  readonly userVersion?: unknown;
+  readonly quickCheck?: unknown;
+  readonly foreignKeys?: readonly unknown[];
+}): Database.Database {
+  let open = true;
+  return {
+    get open() {
+      return open;
+    },
+    pragma: (pragma: string, pragmaOptions?: { readonly simple?: boolean }): unknown => {
+      if (pragma === 'user_version' && pragmaOptions?.simple === true) {
+        return options.userVersion ?? LOGICAL_SCHEMA_VERSION;
+      }
+      return options.quickCheck ?? [{ quick_check: 'ok' }];
+    },
+    prepare: () => ({ all: () => options.foreignKeys ?? [] }),
+    close: () => {
+      open = false;
+    },
+  } as unknown as Database.Database;
+}
+
 describe('inspectSqliteFile', () => {
   it('returns bounded integrity facts for a valid database', () => {
     const path = join(temporaryDirectory, 'valid.sqlite');
@@ -132,6 +156,107 @@ describe('inspectSqliteFile', () => {
     expect(result).toMatchObject({
       status: 'unreadable',
       reason: 'file-changed-during-inspection',
+    });
+  });
+
+  it('reports a file removed after hashing as changed rather than absent', () => {
+    const path = join(temporaryDirectory, 'removed-after-hash.sqlite');
+    createDatabase(path);
+
+    expect(
+      inspectSqliteFileWithDependencies(path, {
+        afterHash: () => rmSync(path),
+      }),
+    ).toMatchObject({
+      status: 'unreadable',
+      reason: 'file-changed-during-inspection',
+    });
+  });
+
+  it.each(['directory', 'hardlink'] as const)(
+    'rejects a SQLite path whose file posture is %s',
+    (posture) => {
+      const path = join(temporaryDirectory, `${posture}.sqlite`);
+      if (posture === 'directory') {
+        mkdirSync(path);
+      } else {
+        const original = join(temporaryDirectory, 'hardlink-source.sqlite');
+        createDatabase(original);
+        linkSync(original, path);
+      }
+
+      expect(inspectSqliteFile(path)).toMatchObject({
+        status: 'corrupt',
+        reason: 'invalid-file-type',
+      });
+    },
+  );
+
+  it.each(['SQLITE_CORRUPT', 'SQLITE_CORRUPT_INDEX'] as const)(
+    'maps native %s failures to bounded corruption evidence',
+    (code) => {
+      const path = join(temporaryDirectory, `${code}.sqlite`);
+      createDatabase(path);
+
+      expect(
+        inspectSqliteFileWithDependencies(path, {
+          openDatabase: () => {
+            throw Object.assign(new Error('private native detail'), { code });
+          },
+        }),
+      ).toMatchObject({
+        status: 'corrupt',
+        reason: 'sqlite-corrupt',
+      });
+    },
+  );
+
+  it('rejects invalid user-version and quick-check response shapes', () => {
+    const versionPath = join(temporaryDirectory, 'invalid-user-version.sqlite');
+    const quickPath = join(temporaryDirectory, 'invalid-quick-check.sqlite');
+    createDatabase(versionPath);
+    createDatabase(quickPath);
+
+    expect(
+      inspectSqliteFileWithDependencies(versionPath, {
+        openDatabase: () => inspectionDatabase({ userVersion: -1 }),
+      }),
+    ).toMatchObject({ status: 'corrupt', reason: 'sqlite-corrupt' });
+    expect(
+      inspectSqliteFileWithDependencies(quickPath, {
+        openDatabase: () => inspectionDatabase({ quickCheck: [] }),
+      }),
+    ).toMatchObject({ status: 'corrupt', reason: 'sqlite-corrupt' });
+  });
+
+  it('bounds malformed quick-check and foreign-key rows without leaking native values', () => {
+    const quickPath = join(temporaryDirectory, 'malformed-quick-row.sqlite');
+    const foreignPath = join(temporaryDirectory, 'malformed-foreign-row.sqlite');
+    createDatabase(quickPath);
+    createDatabase(foreignPath);
+
+    expect(
+      inspectSqliteFileWithDependencies(quickPath, {
+        openDatabase: () => inspectionDatabase({ quickCheck: [{}] }),
+      }),
+    ).toMatchObject({
+      status: 'corrupt',
+      reason: 'quick-check-failed',
+      quickCheck: { issueCount: 1 },
+    });
+    expect(
+      inspectSqliteFileWithDependencies(foreignPath, {
+        openDatabase: () =>
+          inspectionDatabase({
+            foreignKeys: [{ table: 42, parent: null, rowid: 9n, fkid: -2 }],
+          }),
+      }),
+    ).toMatchObject({
+      status: 'corrupt',
+      reason: 'foreign-key-violations',
+      foreignKeys: {
+        samples: [{ table: '', parent: '', rowId: '9', foreignKeyIndex: -1 }],
+      },
     });
   });
 
@@ -398,6 +523,56 @@ describe('checkpointSqliteFile', () => {
     );
     expect(existsSync(path)).toBe(false);
     expect(existsSync(`${path}.write.lock`)).toBe(false);
+  });
+
+  it('returns bounded close proofs for before-open and after-close guard failures', () => {
+    const beforePath = join(temporaryDirectory, 'before-open.sqlite');
+    const afterPath = join(temporaryDirectory, 'after-close.sqlite');
+    createDatabase(beforePath);
+    createDatabase(afterPath);
+    let opened = false;
+
+    let beforeFailure: unknown;
+    try {
+      checkpointSqliteFileWithDependencies(
+        beforePath,
+        lockContext,
+        {
+          beforeOpen: () => {
+            throw new Error('authority changed');
+          },
+        },
+        {
+          openDatabase: () => {
+            opened = true;
+            return inspectionDatabase({});
+          },
+        },
+      );
+    } catch (error) {
+      beforeFailure = error;
+    }
+    expect(opened).toBe(false);
+    expect(sqliteCheckpointFailureResult(beforeFailure)).toEqual({
+      checkpointed: false,
+      closed: true,
+      reason: 'checkpoint-failed',
+    });
+
+    let afterFailure: unknown;
+    try {
+      checkpointSqliteFile(afterPath, lockContext, {
+        afterClose: () => {
+          throw new Error('authority changed');
+        },
+      });
+    } catch (error) {
+      afterFailure = error;
+    }
+    expect(sqliteCheckpointFailureResult(afterFailure)).toEqual({
+      checkpointed: true,
+      closed: true,
+    });
   });
 
   it('folds WAL content into the main file and returns a closed proof', () => {

@@ -101,6 +101,7 @@ export function enumerateToolScaffolds(
   });
 }
 
+/** @throws {Error} When two tool scaffolds claim the same stable id or name. */
 function assertUniqueToolScaffoldIdentities(toolScaffolds: readonly ToolScaffold[]): void {
   const stableIds = new Set<string>();
   const names = new Set<string>();

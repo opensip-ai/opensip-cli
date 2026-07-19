@@ -193,10 +193,11 @@ function hasGeneratedDirectoryAncestor(
   records: ReadonlyMap<string, InitAuthoredSnapshotRecord>,
 ): boolean {
   const segments = relativePath.split('/');
-  let ancestor = segments[0] ?? '';
+  const ancestorSegments = [segments[0] ?? ''];
   for (let index = 1; index < segments.length - 1; index += 1) {
     const segment = segments[index];
-    ancestor += `/${segment}`;
+    ancestorSegments.push(segment);
+    const ancestor = ancestorSegments.join('/');
     const record = records.get(ancestor);
     if (
       GENERATED_DIR_NAMES.has(segment) &&

@@ -1,5 +1,7 @@
 import { lstatSync, type BigIntStats } from 'node:fs';
 
+import { hasErrorCode } from './error-code.js';
+
 export type RuntimePromotionPathPresence = 'absent' | 'directory' | 'unsafe';
 
 export interface RuntimePromotionPathIdentity {
@@ -15,10 +17,6 @@ export interface RuntimePromotionPathIdentity {
 export interface RuntimePromotionPathSnapshot {
   readonly presence: RuntimePromotionPathPresence;
   readonly identity?: RuntimePromotionPathIdentity;
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
 }
 
 function identity(stat: BigIntStats): RuntimePromotionPathIdentity {
@@ -57,7 +55,7 @@ export function runtimePromotionPathSnapshot(path: string): RuntimePromotionPath
     }
     return { presence: 'directory', identity: identity(stat) };
   } catch (error) {
-    return hasCode(error, 'ENOENT') ? { presence: 'absent' } : { presence: 'unsafe' };
+    return hasErrorCode(error, 'ENOENT') ? { presence: 'absent' } : { presence: 'unsafe' };
   }
 }
 

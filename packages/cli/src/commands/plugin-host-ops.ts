@@ -14,10 +14,7 @@ import { join } from 'node:path';
 
 import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 
-import {
-  assertEnteredProjectOwner,
-  assertEnteredUserStateOwner,
-} from './host-runtime-access.js';
+import { assertEnteredProjectOwner, assertEnteredUserStateOwner } from './host-runtime-access.js';
 import { TOOL_DOMAIN } from './plugin/domain-resolution.js';
 import {
   ensurePluginHostDir,

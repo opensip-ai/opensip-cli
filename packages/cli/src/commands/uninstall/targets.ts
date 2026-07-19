@@ -14,10 +14,7 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import {
-  inspectEphemeralRuntimeCandidates,
-  resolveProjectPaths,
-} from '@opensip-cli/core';
+import { inspectEphemeralRuntimeCandidates, resolveProjectPaths } from '@opensip-cli/core';
 
 import { formatBytes } from '../../format-bytes.js';
 
@@ -32,12 +29,7 @@ import { formatBytes } from '../../format-bytes.js';
  *  - 'user-level'    — ~/.opensip-cli/ in user mode.
  */
 export type TargetBucket =
-  | 'runtime'
-  | 'active-cache'
-  | 'legacy-cache'
-  | 'user-content'
-  | 'config'
-  | 'user-level';
+  'runtime' | 'active-cache' | 'legacy-cache' | 'user-content' | 'config' | 'user-level';
 
 /** Discrete target to remove (a file or a directory). */
 export interface Target {
@@ -137,18 +129,16 @@ function collectProjectTargets(projectDir: string): Target[] {
       bucket: 'runtime',
     });
   }
-  if (candidates.active.exists) {
-    // Avoid double-counting when the active cache path equals project runtime
-    // (should not happen, but keep the projection stable).
-    if (candidates.active.runtimeDir !== paths.runtimeDir) {
-      targets.push({
-        path: candidates.active.runtimeDir,
-        kind: 'dir',
-        sizeBytes: dirSize(candidates.active.runtimeDir),
-        bucket: 'active-cache',
-        displayLabel: 'user-cache (active)',
-      });
-    }
+  // Avoid double-counting when the active cache path equals project runtime
+  // (should not happen, but keep the projection stable).
+  if (candidates.active.exists && candidates.active.runtimeDir !== paths.runtimeDir) {
+    targets.push({
+      path: candidates.active.runtimeDir,
+      kind: 'dir',
+      sizeBytes: dirSize(candidates.active.runtimeDir),
+      bucket: 'active-cache',
+      displayLabel: 'user-cache (active)',
+    });
   }
   if (candidates.legacy?.exists === true) {
     targets.push({
@@ -229,6 +219,48 @@ export function printUserModeTargets(write: (s: string) => void, targets: readon
   write('\n');
 }
 
+function projectRuntimeLabel(target: Target): string {
+  switch (target.bucket) {
+    case 'active-cache': {
+      return 'active user cache';
+    }
+    case 'legacy-cache': {
+      return 'legacy user cache';
+    }
+    case 'runtime': {
+      return 'project runtime';
+    }
+    default: {
+      return target.path;
+    }
+  }
+}
+
+function printProjectRemovalTargets(write: (s: string) => void, targets: readonly Target[]): void {
+  if (targets.length === 0) {
+    write('Nothing to remove — runtime state is already absent.\n\n');
+    return;
+  }
+
+  write('This will remove (rebuildable runtime state only):\n');
+  for (const target of targets) {
+    const suffix = target.kind === 'dir' ? '/' : '';
+    write(`  - ${target.path}${suffix}  (${formatBytes(target.sizeBytes)})\n`);
+    write(`    ${projectRuntimeLabel(target)}: sessions database, cache, logs, baselines\n`);
+  }
+  write('\n');
+}
+
+function printProjectKeptTargets(write: (s: string) => void, targets: readonly Target[]): void {
+  if (targets.length === 0) return;
+
+  write('These will be KEPT (your authored content):\n');
+  for (const target of targets) {
+    write(`  ✓ ${formatKeepLine(target)}\n`);
+  }
+  write('\n  To also remove your authored content, re-run with --purge.\n\n');
+}
+
 export function printProjectDefault(
   write: (s: string) => void,
   toDelete: readonly Target[],
@@ -237,31 +269,8 @@ export function printProjectDefault(
 ): void {
   write('\n');
   write(`Project: ${projectRoot}\n\n`);
-  if (toDelete.length === 0) {
-    write('Nothing to remove — runtime state is already absent.\n\n');
-  } else {
-    write('This will remove (rebuildable runtime state only):\n');
-    for (const t of toDelete) {
-      const label =
-        t.bucket === 'active-cache'
-          ? 'active user cache'
-          : t.bucket === 'legacy-cache'
-            ? 'legacy user cache'
-            : t.bucket === 'runtime'
-              ? 'project runtime'
-              : t.path;
-      write(`  - ${t.path}${t.kind === 'dir' ? '/' : ''}  (${formatBytes(t.sizeBytes)})\n`);
-      write(`    ${label}: sessions database, cache, logs, baselines\n`);
-    }
-    write('\n');
-  }
-  if (toKeep.length > 0) {
-    write('These will be KEPT (your authored content):\n');
-    for (const t of toKeep) {
-      write(`  ✓ ${formatKeepLine(t)}\n`);
-    }
-    write('\n  To also remove your authored content, re-run with --purge.\n\n');
-  }
+  printProjectRemovalTargets(write, toDelete);
+  printProjectKeptTargets(write, toKeep);
 }
 
 export function printProjectPurge(

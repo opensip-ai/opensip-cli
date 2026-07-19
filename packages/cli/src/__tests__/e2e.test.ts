@@ -628,10 +628,8 @@ describe('CLI e2e', () => {
       expect(existsSync(join(tempDir, 'opensip-cli.config.yml'))).toBe(false);
       const output = JSON.parse(stdout).data as {
         languageResolutionError?: { message?: string };
-        ambiguousLanguageError?: { message?: string };
       };
       expect(output.languageResolutionError?.message ?? '').toMatch(/No language markers/);
-      expect(output.ambiguousLanguageError).toEqual(output.languageResolutionError);
     });
   });
 

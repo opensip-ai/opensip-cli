@@ -2,20 +2,24 @@ import { join } from 'node:path';
 
 import {
   authoredTransactionFailure,
-  observeAuthoredPath,
-  sameAuthoredPathState,
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import {
-  applyAuthoredDirectory,
-  applyAuthoredFile,
+  observeAuthoredPath,
+  sameAuthoredPathState,
+} from './authored-state-transaction-observation.js';
+import {
   observeBoundAuthoredTarget,
-  removeAuthoredTarget,
-  settleSatisfiedAuthoredTarget,
   withBoundAuthoredTarget,
   type AuthoredTargetMutationHooks,
   type BoundAuthoredTarget,
 } from './authored-state-transaction-target-fs.js';
+import {
+  applyAuthoredDirectory,
+  applyAuthoredFile,
+  removeAuthoredTarget,
+  settleSatisfiedAuthoredTarget,
+} from './authored-state-transaction-target-mutations.js';
 
 import type {
   AuthoredArtifactPaths,

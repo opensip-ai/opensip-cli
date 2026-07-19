@@ -48,8 +48,12 @@ export interface ToolCliContext { readonly b: 2 }
   });
 
   it('locks real ToolCliContext at exactly 24 members', () => {
-    const text = readFileSync(join(REPO, 'packages/core/src/tools/cli-context.ts'), 'utf8');
-    const seams = arch.extractToolCliContextSeams(text);
+    const context = readFileSync(join(REPO, 'packages/core/src/tools/cli-context.ts'), 'utf8');
+    const hostState = readFileSync(
+      join(REPO, 'packages/core/src/tools/cli-context-state.ts'),
+      'utf8',
+    );
+    const seams = arch.extractComposedToolCliContextSeams(context, hostState);
     assert.equal(seams.length, 24);
     assert.ok(seams.includes('scope'));
     assert.ok(seams.includes('getExitCode'));

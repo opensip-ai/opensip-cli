@@ -27,7 +27,7 @@ export interface RuntimePromotionMarkerRecord {
   readonly sha256: string;
 }
 
-function isCanonicalTimestamp(value: unknown): value is string {
+function isCanonicalMarkerTimestamp(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const parsed = Date.parse(value);
   return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value;
@@ -76,7 +76,7 @@ export function parseRuntimePromotionMarker(raw: string): RuntimePromotionParsed
       (generationBound
         ? !isDigest(record.generationDigest)
         : record.generationDigest !== undefined) ||
-      !isCanonicalTimestamp(record.lastUsedAt)
+      !isCanonicalMarkerTimestamp(record.lastUsedAt)
     ) {
       return;
     }
@@ -95,7 +95,7 @@ export function parseRuntimePromotionMarker(raw: string): RuntimePromotionParsed
   if (
     exactKeys(record, ['projectDir', 'lastUsedAt']) &&
     typeof record.projectDir === 'string' &&
-    isCanonicalTimestamp(record.lastUsedAt)
+    isCanonicalMarkerTimestamp(record.lastUsedAt)
   ) {
     return {
       kind: 'legacy',

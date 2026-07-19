@@ -51,4 +51,36 @@ describe('compatibility policy registry', () => {
       expect(policy.deprecationWindow.length).toBeGreaterThan(0);
     }
   });
+
+  it('fails closed for unknown, duplicate, incomplete, and missing policy entries', () => {
+    const mutable = COMPATIBILITY_POLICIES as (typeof COMPATIBILITY_POLICIES)[number][];
+    const original = [...mutable];
+    const expectFailure = (
+      policies: readonly (typeof COMPATIBILITY_POLICIES)[number][],
+      message: RegExp,
+    ): void => {
+      mutable.splice(0, mutable.length, ...policies);
+      try {
+        expect(() => assertCompatibilityPoliciesComplete()).toThrow(message);
+      } finally {
+        mutable.splice(0, mutable.length, ...original);
+      }
+    };
+
+    expectFailure(
+      [{ ...original[0], class: 'future-contract' as never }, ...original.slice(1)],
+      /Unknown compatibility contract class/u,
+    );
+    expectFailure(
+      [original[0], { ...original[1], class: original[0].class }, ...original.slice(2)],
+      /Duplicate compatibility policy/u,
+    );
+    expectFailure(
+      [{ ...original[0], breakingChangeRequires: [] }, ...original.slice(1)],
+      /has no breaking-change gate/u,
+    );
+    expectFailure([{ ...original[0], docsPath: '' }, ...original.slice(1)], /has no docs path/u);
+    expectFailure(original.slice(0, -1), /Missing compatibility policies/u);
+    expect(findCompatibilityPolicy('future-contract' as never)).toBeUndefined();
+  });
 });

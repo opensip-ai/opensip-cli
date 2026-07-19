@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runToolLiveView } from '@opensip-cli/cli-live';
+import { runToolLiveView, workerProjectSelectionArgs } from '@opensip-cli/cli-live';
 import { type FitOptions, type RunPresentation } from '@opensip-cli/contracts';
 import {
   runOffThreadOrInProcess,
@@ -65,11 +65,6 @@ function fitRowsToLiveRunTable(rows: readonly FitTableRow[]): LiveRunTableRow[] 
 
 export interface RenderFitLiveOptions {
   readonly setExitCode?: (code: number) => void;
-}
-
-function workerProjectSelectionArgs(cwd: string): string[] {
-  const configPath = currentScope()?.projectContext?.configPath;
-  return ['--cwd', cwd, ...(configPath === undefined ? [] : ['--config', configPath])];
 }
 
 export async function renderFitLive(

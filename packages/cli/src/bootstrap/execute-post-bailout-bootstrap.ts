@@ -12,21 +12,18 @@ import {
   enterScope,
   exitScope,
   getMeter,
-  pruneEphemeralRuntimes,
-  resolveEphemeralProjectPaths,
   runWithScopeSync,
-  shouldPruneEphemeralRuntimes,
   SystemError,
-  touchEphemeralRuntime,
   type Logger,
-  type ProjectContext,
   type RunScope,
 } from '@opensip-cli/core';
 
-import { startProfiling } from '../telemetry/profiling.js';
 import { runWithUserStateOwnership } from '../commands/host-runtime-access.js';
+import { startProfiling } from '../telemetry/profiling.js';
 import { checkForUpdate, formatUpdateNag } from '../update-notifier.js';
+
 import { buildInspectionOnlyScope, buildPerRunScope } from './build-per-run-scope.js';
+import { maintainEphemeralCache } from './ephemeral-cache-maintenance.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { shouldRenderNoInitAdoptionHint } from './no-init-eligibility.js';
 import { maybeInitializeOwningTool, resolveOwningTool } from './owning-tool-init.js';
@@ -48,78 +45,6 @@ import type {
 
 const MODULE_TAG = 'cli:bootstrap';
 const CLI_PACKAGE_NAME = 'opensip-cli';
-
-/**
- * Ephemeral (no-init) cache hygiene, on the side-effect phase of an ephemeral
- * run only. Stamps this project's entry as used, then — at most once a day —
- * drops orphaned/stale/overflow entries so the user cache cannot grow without
- * bound (one directory per project path ever audited, kept forever).
- *
- * Best-effort by construction: cache hygiene must never fail a user's run.
- */
-function heldProjectCoordinationKey(
-  lifecycle: RuntimeLeaseLifecycle | undefined,
-): string | undefined {
-  if (lifecycle?.state() !== 'bootstrap') return;
-  const lease = lifecycle?.lease;
-  if (lease === undefined || !('coordinationKey' in lease)) return;
-  if (!('kind' in lease)) return;
-  if (
-    lease.kind !== 'runtime-read' &&
-    !(
-      lease.kind === 'runtime-access-composite' &&
-      'projectRead' in lease &&
-      lease.projectRead === true
-    )
-  ) {
-    return;
-  }
-  return typeof lease.coordinationKey === 'string' ? lease.coordinationKey : undefined;
-}
-
-async function maintainEphemeralCache(
-  project: ProjectContext,
-  logger: Logger,
-  lifecycle: RuntimeLeaseLifecycle | undefined,
-  leaseEvents: SafeRuntimeLeaseEventBuffer | undefined,
-): Promise<void> {
-  if (project.scope !== 'ephemeral') return;
-  try {
-    const paths = resolveEphemeralProjectPaths(project.projectRoot);
-    const coordinationKey = heldProjectCoordinationKey(lifecycle);
-    // Cache mutation and pruning are authorized only while this invocation's
-    // current-project reader is live. A missing or mismatched handoff is
-    // uncertainty, never permission for best-effort hygiene to mutate state.
-    if (coordinationKey === undefined || coordinationKey !== paths.coordinationKey) return;
-    touchEphemeralRuntime(paths, Date.now(), leaseEvents?.onEvent);
-    if (!shouldPruneEphemeralRuntimes(Date.now(), leaseEvents?.onEvent)) return;
-    const pruned = await pruneEphemeralRuntimes({
-      protectedCoordinationKeys: [coordinationKey],
-      onEvent: leaseEvents?.onEvent,
-    });
-    const removed = pruned.removedOrphaned + pruned.removedStale + pruned.removedOverflow;
-    const skipped = pruned.skippedActive + pruned.skippedChanged;
-    if (removed === 0 && skipped === 0) return;
-    const removedEntryLabel = removed === 1 ? 'entry' : 'entries';
-    const skippedEntryLabel = skipped === 1 ? 'entry' : 'entries';
-    logger.debug?.({
-      evt: 'cli.cache.ephemeral_pruned',
-      module: MODULE_TAG,
-      scanned: pruned.scanned,
-      removedOrphaned: pruned.removedOrphaned,
-      removedStale: pruned.removedStale,
-      removedOverflow: pruned.removedOverflow,
-      skippedActive: pruned.skippedActive,
-      skippedChanged: pruned.skippedChanged,
-      msg:
-        removed > 0
-          ? `Pruned ${removed} unused no-init cache ${removedEntryLabel}.`
-          : `Preserved ${skipped} no-init cache ${skippedEntryLabel} because activity or identity changed.`,
-    });
-  } catch {
-    // Hygiene only — never fail the run.
-  }
-}
 
 function noopPhaseRecord(): void {
   // Default when callers omit recordPhase (production hook path).
@@ -216,6 +141,10 @@ function attachRuntimeLeaseEventLogger(
 /**
  * Run post-bailout bootstrap phases. Returns the entered scope and its
  * per-run logger (ADR-0053).
+ *
+ * @throws {Error} When runtime acquisition, scope construction, or a required
+ *   bootstrap invariant fails; the constructed scope is disposed before the
+ *   error propagates.
  */
 export async function executePostBailoutBootstrap(
   input: PostBailoutBootstrapInput,

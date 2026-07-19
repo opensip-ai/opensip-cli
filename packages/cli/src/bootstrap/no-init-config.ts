@@ -10,22 +10,12 @@
 
 import { detectLanguages, type SupportedLanguage } from '../commands/init/language-detection.js';
 
-import {
-  buildStarterConfigDocument,
-  canonicalStarterLanguages,
-  STARTER_GLOBAL_EXCLUDES,
-} from './starter-config.js';
+import { buildStarterConfigDocument, canonicalStarterLanguages } from './starter-config.js';
 
 export interface NoInitConfigSynthesis {
   readonly document: Record<string, unknown>;
   readonly languages: readonly SupportedLanguage[];
 }
-
-/**
- * @deprecated Prefer {@link STARTER_GLOBAL_EXCLUDES}. Kept as a stable alias so
- * existing call sites and tests that named the no-init list keep resolving.
- */
-export const NO_INIT_GLOBAL_EXCLUDES: readonly string[] = STARTER_GLOBAL_EXCLUDES;
 
 export function synthesizeNoInitConfigDocument(cwd: string): NoInitConfigSynthesis | undefined {
   const languages = canonicalStarterLanguages(detectLanguages(cwd));

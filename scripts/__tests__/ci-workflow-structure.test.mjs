@@ -191,12 +191,21 @@ test('warm lanes restore shared workspace and verify injection; cold-gate does n
   const setup = jobs.get('setup');
   assert.ok(setup, 'setup job');
   assert.match(setup, /Pack workspace for warm lanes/);
+  // Package-local node_modules holds pnpm's consumer-facing workspace links
+  // (for example packages/cli/node_modules/@opensip-cli/config). Root
+  // node_modules alone contains the virtual store but cannot resolve those
+  // imports from packages/cli/dist after a warm restore.
+  assert.match(
+    setup,
+    /mapfile -t package_node_modules < <\([\s\S]*?find packages -type d -name node_modules -prune -print \| sort[\s\S]*?\)/,
+    'workspace tar must discover package-local node_modules link forests',
+  );
   // .turbo must ride in the tar — without it, `turbo run test`/`typecheck`
   // re-run the build DAG in consumer lanes despite the restored dist.
   assert.match(
     setup,
-    /tar -cpf "\$CI_WORKSPACE_ARTIFACT" node_modules \.turbo/,
-    'workspace tar must include node_modules and .turbo',
+    /tar -cpf "\$CI_WORKSPACE_ARTIFACT"[\s\S]*?node_modules[\s\S]*?\.turbo[\s\S]*?"\$\{package_node_modules\[@\]\}"[\s\S]*?"\$\{dists\[@\]\}"/,
+    'workspace tar must include root dependencies, package links, .turbo, and dist',
   );
   // upload-artifact v4 artifacts persist across run attempts: without
   // overwrite, "Re-run all jobs" 409s and reds setup + every warm lane.

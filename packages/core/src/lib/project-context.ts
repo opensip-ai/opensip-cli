@@ -193,6 +193,7 @@ function hasFileSystemMarker(
       (kinds.includes('file') && stat.isFile()) || (kinds.includes('dir') && stat.isDirectory())
     );
   } catch {
+    // @swallow-ok Missing or unreadable optional markers do not establish a project root.
     return false;
   }
 }
@@ -207,6 +208,7 @@ function hasGitMarker(dir: string): boolean {
     const target = lstatSync(realpathSync(markerPath));
     return target.isFile() || target.isDirectory();
   } catch {
+    // @swallow-ok An unresolved Git marker cannot establish a project root.
     return false;
   }
 }
@@ -231,12 +233,14 @@ function readBoundedUtf8(path: string, limit = MAX_ROOT_MARKER_BYTES): string | 
     }
     return bytesRead > limit ? undefined : buffer.toString('utf8', 0, bytesRead);
   } catch {
+    // @swallow-ok Unreadable optional root metadata is treated as absent.
     return undefined;
   } finally {
     if (fd !== undefined) {
       try {
         closeSync(fd);
       } catch {
+        // @swallow-ok Read-only discovery preserves the already selected root.
         // Read-only discovery is best effort; a failed close cannot change the
         // selected root and must not turn discovery into a project mutation.
       }
@@ -254,6 +258,7 @@ function hasPackageWorkspaces(dir: string): boolean {
     if (typeof workspaces !== 'object' || workspaces === null) return false;
     return Array.isArray((workspaces as { readonly packages?: unknown }).packages);
   } catch {
+    // @swallow-ok Invalid optional package metadata is not a workspace marker.
     return false;
   }
 }
@@ -279,7 +284,10 @@ function isStrongProjectRoot(dir: string): boolean {
 /** True only for initialized projects backed by a real config file. */
 export function isInitializedProjectContext(
   project: ProjectContext | undefined,
-): project is ProjectContext & { readonly scope: 'project'; readonly configPath: string } {
+): project is ProjectContext & {
+  readonly scope: 'project';
+  readonly configPath: string;
+} {
   return project?.scope === 'project' && project.configPath !== undefined;
 }
 

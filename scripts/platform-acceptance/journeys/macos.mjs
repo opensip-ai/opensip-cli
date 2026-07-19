@@ -284,8 +284,10 @@ export function evaluatePermissionFailure(result, targetMarker) {
     .flatMap((error) => [error?.message, error?.suggestion])
     .filter((entry) => typeof entry === 'string')
     .join(' ');
+  const structuredErrorKind =
+    payload?.kind === 'command.error' || payload?.kind === 'bootstrap.error';
   if (
-    payload?.kind !== 'command.error' ||
+    !structuredErrorKind ||
     payload?.status !== 'error' ||
     payload?.exitCode !== result.status ||
     errors.length === 0

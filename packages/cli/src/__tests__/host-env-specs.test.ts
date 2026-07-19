@@ -111,7 +111,6 @@ describe('hostEnv reads (CLI infra)', () => {
       'OPENSIP_CLI_SKIP_BUNDLED',
       'OPENSIP_CLI_SKIP_INSTALLED',
       'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS',
-      'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
       'OPENSIP_CLI_ALLOW_PROJECT_TOOLS',
       'OPENSIP_STATE_LOCK_WAIT_MS',
       'OPENSIP_STATE_LOCK_STALE_MS',
@@ -223,15 +222,12 @@ describe('hostEnv reads (CLI infra)', () => {
     expect(project?.docs).not.toMatch(/admit all project-authored/i);
   });
 
-  it('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS coerces on whitespace AND comma and preserves wildcard as a plain token', () => {
-    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toEqual([]);
-    process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS = '@acme/fit-rules, @acme/graph-go';
-    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toEqual([
-      '@acme/fit-rules',
-      '@acme/graph-go',
-    ]);
-    process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS = '*';
-    expect(hostEnv.get<readonly string[]>('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toEqual(['*']);
+  it('does not declare the retired capability-pack env trust surface', () => {
+    expect(describeHostEnv().map((spec) => spec.canonical)).not.toContain(
+      'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
+    );
+    process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS = '@acme/fit-rules';
+    expect(() => hostEnv.get('OPENSIP_CLI_ALLOW_CAPABILITY_PACKS')).toThrow(/unknown variable/u);
     delete process.env.OPENSIP_CLI_ALLOW_CAPABILITY_PACKS;
   });
 

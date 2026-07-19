@@ -22,6 +22,10 @@ export interface RuntimePromotionTransitionContext {
   readonly now: () => number;
 }
 
+export function runtimePromotionMutationOutcome(status: string): RuntimeMutationOutcome {
+  return status.startsWith('already-') ? 'already-satisfied' : 'applied';
+}
+
 interface OpenIntentIdentity {
   readonly kind: RuntimePromotionIntentKind;
   readonly slot: RuntimePromotionOwnedSlotName;
@@ -31,6 +35,7 @@ interface OpenPostconditionIdentity extends OpenIntentIdentity {
   readonly outcome: RuntimeMutationOutcome;
 }
 
+/** @throws {Error} Always; the requested runtime promotion transition is invalid. */
 export function transitionFailure(message: string): never {
   throw new Error(`Invalid runtime promotion transition request: ${message}`);
 }

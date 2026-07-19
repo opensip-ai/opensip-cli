@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { runToolLiveView } from '@opensip-cli/cli-live';
+import { runToolLiveView, workerProjectSelectionArgs } from '@opensip-cli/cli-live';
 import {
   shouldRenderRunUnitTable,
   type ProgressEvent,
@@ -88,11 +88,6 @@ export interface GraphRunnerArgs {
   readonly explicitRecipe?: string;
   readonly exact?: boolean;
   readonly shards?: readonly Shard[];
-}
-
-function workerProjectSelectionArgs(cwd: string): string[] {
-  const configPath = currentScope()?.projectContext?.configPath;
-  return ['--cwd', cwd, ...(configPath === undefined ? [] : ['--config', configPath])];
 }
 
 async function runGraphWithProgress(

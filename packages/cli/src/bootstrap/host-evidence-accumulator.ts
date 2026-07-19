@@ -97,6 +97,9 @@ export interface HostEvidenceAccumulator {
  * Any rejected contribution poisons its complete owner and clears all buffered
  * rows. The buffer therefore has no prefix-commit mode and never spills
  * customer evidence to a temporary file.
+ *
+ * @throws {RangeError} When a configured session or byte bound is outside the
+ *   accumulator's closed safety limits.
  */
 export function createHostEvidenceAccumulator(
   limits: HostEvidenceAccumulatorLimits = {},
@@ -187,6 +190,7 @@ export function createHostEvidenceAccumulator(
         hostMetrics: immutableMetrics,
       });
       const sessions = [...state.sessions, entry];
+      // @silent-ok -- false is the documented staging outcome after measureCandidate poisons the owner.
       if (!measureCandidate(state, { sessions })) return false;
       state.sessions = sessions;
       return true;
@@ -196,6 +200,7 @@ export function createHostEvidenceAccumulator(
       const state = activeState(owner);
       if (state === undefined) return false;
       const index = state.sessions.findIndex((entry) => entry.session.id === sessionId);
+      // @silent-ok -- a missing session is a normal negative lookup for this boolean mutation API.
       if (index < 0) return false;
 
       let merged: StoredSessionHostMetrics;
@@ -209,6 +214,7 @@ export function createHostEvidenceAccumulator(
         session: sessions[index].session,
         hostMetrics: merged,
       });
+      // @silent-ok -- false is the documented merge outcome after measureCandidate poisons the owner.
       if (!measureCandidate(state, { sessions })) return false;
       state.sessions = sessions;
       return true;
@@ -227,6 +233,7 @@ export function createHostEvidenceAccumulator(
       const state = activeState(owner);
       if (state === undefined) return false;
       const next = state.sessions.filter((entry) => entry.session.id !== sessionId);
+      // @silent-ok -- no matching staged session is a normal idempotent negative outcome.
       if (next.length === state.sessions.length) return false;
       state.sessions = next;
       return true;
@@ -304,6 +311,7 @@ export function createHostEvidenceAccumulator(
   };
 }
 
+/** @throws {TypeError} When evidence cannot be represented as bounded JSON data. */
 function immutableJsonClone<T>(value: T): T {
   const serialized = JSON.stringify(value);
   if (serialized === undefined) {

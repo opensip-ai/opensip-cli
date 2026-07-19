@@ -1,5 +1,4 @@
 import { realpathSync } from 'node:fs';
-import { basename } from 'node:path';
 
 import {
   acquireRuntimeExclusiveLease,
@@ -21,7 +20,6 @@ import {
   copyRuntimeToStage,
   inspectVerifiedRuntimeManifest,
   isRuntimeManifestReleaseUnsafe,
-  RuntimeManifestError,
 } from './runtime-manifest.js';
 import { assertRuntimePromotionDestinationRootAuthority } from './runtime-promotion-destination-authority.js';
 import {
@@ -44,20 +42,25 @@ import {
   assertRuntimePromotionRecoverySourceLocation,
   checkpointRuntimePromotionDatastores,
   RuntimePromotionDatastoreError,
-  RuntimePromotionPreflightError,
 } from './runtime-promotion-preflight.js';
 import { cleanupRecoveredClosedRuntimePromotion } from './runtime-promotion-recovery-closed.js';
 import {
+  asRecoveryClosed,
   deriveRecoverySourceRuntime,
+  recoveryFailureReason,
   recoveryInputsCompatible,
 } from './runtime-promotion-recovery-common.js';
-import { recoverOpenRuntimePromotion } from './runtime-promotion-recovery-open.js';
+import { recoverOpenRuntimePromotion } from './runtime-promotion-recovery-open-coordinator.js';
 import {
   recoveredTerminalResult,
-  recoveryBusyResult,
   recoveryInputConflictResult,
   recoveryRequiredFromJournal,
 } from './runtime-promotion-recovery-result.js';
+import {
+  acquireRecoveryLeaseOrResult,
+  inspectRecoveryStart,
+  type RecoveryStart,
+} from './runtime-promotion-recovery-start.js';
 import {
   assertRuntimePromotionProjectRootAuthority,
   captureRuntimePromotionRecoveryProjectRootAuthority,
@@ -65,7 +68,10 @@ import {
 import { createRuntimePromotionTransitionWriter } from './runtime-promotion-transitions.js';
 
 import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
-import type { DurablePromotionJournal } from './runtime-promotion-journal.js';
+import type {
+  DurableClosedPromotionJournal,
+  DurablePromotionJournal,
+} from './runtime-promotion-journal.js';
 import type {
   RecoverRuntimePromotionInput,
   RuntimePromotionRecoveryDependencies,
@@ -80,8 +86,6 @@ export type {
   RuntimePromotionRecoveryDependencies,
   RuntimePromotionRecoveryExplicitInputs,
 } from './runtime-promotion-recovery-types.js';
-
-const STATE_AMBIGUOUS = 'state-ambiguous' as const;
 
 function defaultDependencies(
   overrides: Partial<RuntimePromotionRecoveryDependencies>,
@@ -125,41 +129,7 @@ function defaultDependencies(
   return { ...defaults, ...overrides, now };
 }
 
-function hasErrorCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}
-
-function isLeaseBusy(error: unknown): boolean {
-  return (
-    hasErrorCode(error, 'TIMEOUT.RUNTIME_EXCLUSIVE') ||
-    hasErrorCode(error, 'SYSTEM.RUNTIME_COORDINATION.BUSY')
-  );
-}
-
-function malformedHeaderReason(
-  reason:
-    'oversize' | 'unsafe-file' | 'invalid-json' | 'invalid-header' | 'coordination-key-mismatch',
-): 'journal-malformed' | 'journal-oversize' | 'journal-key-mismatch' | 'state-ambiguous' {
-  if (reason === 'oversize') return 'journal-oversize';
-  if (reason === 'coordination-key-mismatch') return 'journal-key-mismatch';
-  if (reason === 'unsafe-file') return STATE_AMBIGUOUS;
-  return 'journal-malformed';
-}
-
-async function acquireRecoveryLease(input: {
-  readonly projectRoot: string;
-  readonly operationId: string;
-  readonly dependencies: RuntimePromotionRecoveryDependencies;
-}): Promise<RuntimeExclusiveLease> {
-  return input.dependencies.acquireLease({
-    projectDir: input.projectRoot,
-    posture: 'init-recovery',
-    recoveryOperationId: input.operationId,
-    command: 'opensip init',
-    cwdBasename: basename(input.projectRoot),
-  });
-}
-
+/** @throws {Error} When the claimed durable journal is incompatible with recovery inputs. */
 async function claimValidatedJournal(input: {
   readonly controller: ReturnType<RuntimePromotionRecoveryDependencies['createController']>;
   readonly operationId: string;
@@ -193,130 +163,6 @@ function recoveryFailure(input: {
     startedAt: input.startedAt,
     now: input.dependencies.now,
   });
-}
-
-function recoveryFailureReason(
-  error: unknown,
-  journal: RuntimePromotionJournal | undefined,
-): Parameters<typeof recoveryRequiredFromJournal>[0]['reasonCode'] {
-  if (journal === undefined) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.includes('exceeds its bounded size')) return 'journal-oversize';
-    if (message.includes('another project key')) return 'journal-key-mismatch';
-    if (
-      message.includes('malformed') ||
-      message.includes('canonically encoded') ||
-      hasErrorCode(error, 'SYSTEM.INIT.PROMOTION_JOURNAL')
-    ) {
-      return 'journal-malformed';
-    }
-    return STATE_AMBIGUOUS;
-  }
-  if (hasErrorCode(error, 'SYSTEM.INIT.PROMOTION_JOURNAL')) {
-    return 'journal-phase-invalid';
-  }
-  if (
-    error instanceof RuntimeManifestError ||
-    error instanceof RuntimePromotionDatastoreError ||
-    error instanceof RuntimePromotionPreflightError ||
-    hasErrorCode(error, 'SYSTEM.INIT.AUTHORED_TRANSACTION') ||
-    hasErrorCode(error, 'SYSTEM.INIT.RUNTIME_PROMOTION_FILESYSTEM')
-  ) {
-    return 'artifact-mismatch';
-  }
-  return 'operation-failed';
-}
-
-type RecoveryStart =
-  | {
-      readonly status: 'ready';
-      readonly projectRoot: string;
-      readonly operationId: string;
-    }
-  | { readonly status: 'result'; readonly result: RuntimeAdoptionResult };
-
-function inspectRecoveryStart(input: {
-  readonly request: RecoverRuntimePromotionInput;
-  readonly dependencies: RuntimePromotionRecoveryDependencies;
-  readonly startedAt: number;
-}): RecoveryStart {
-  let projectRoot: string;
-  try {
-    projectRoot = input.dependencies.canonicalizeProjectRoot(input.request.projectRoot);
-  } catch {
-    return {
-      status: 'result',
-      result: recoveryRequiredFromJournal({
-        reasonCode: STATE_AMBIGUOUS,
-        startedAt: input.startedAt,
-        now: input.dependencies.now,
-      }),
-    };
-  }
-  if (projectRoot !== input.request.projectRoot) {
-    return {
-      status: 'result',
-      result: recoveryRequiredFromJournal({
-        reasonCode: STATE_AMBIGUOUS,
-        startedAt: input.startedAt,
-        now: input.dependencies.now,
-      }),
-    };
-  }
-  const header = input.dependencies.inspectHeader(projectRoot);
-  input.dependencies.checkpoint?.('after-header-inspection');
-  if (header.status === 'absent') {
-    return {
-      status: 'result',
-      result: recoveryRequiredFromJournal({
-        reasonCode: STATE_AMBIGUOUS,
-        startedAt: input.startedAt,
-        now: input.dependencies.now,
-      }),
-    };
-  }
-  if (header.status === 'malformed') {
-    return {
-      status: 'result',
-      result: recoveryRequiredFromJournal({
-        reasonCode: malformedHeaderReason(header.reason),
-        startedAt: input.startedAt,
-        now: input.dependencies.now,
-      }),
-    };
-  }
-  return { status: 'ready', projectRoot, operationId: header.operationId };
-}
-
-async function acquireRecoveryLeaseOrResult(input: {
-  readonly start: Extract<RecoveryStart, { readonly status: 'ready' }>;
-  readonly dependencies: RuntimePromotionRecoveryDependencies;
-  readonly startedAt: number;
-}): Promise<
-  | { readonly status: 'ready'; readonly lease: RuntimeExclusiveLease }
-  | { readonly status: 'result'; readonly result: RuntimeAdoptionResult }
-> {
-  try {
-    return {
-      status: 'ready',
-      lease: await acquireRecoveryLease({
-        projectRoot: input.start.projectRoot,
-        operationId: input.start.operationId,
-        dependencies: input.dependencies,
-      }),
-    };
-  } catch (error) {
-    return {
-      status: 'result',
-      result: isLeaseBusy(error)
-        ? recoveryBusyResult(input.startedAt, input.dependencies.now)
-        : recoveryRequiredFromJournal({
-            reasonCode: STATE_AMBIGUOUS,
-            startedAt: input.startedAt,
-            now: input.dependencies.now,
-          }),
-    };
-  }
 }
 
 async function executeRecoveryUnderLease(input: {
@@ -381,10 +227,13 @@ async function executeRecoveryUnderLease(input: {
     journalUnlinked: false,
   };
   input.state.operation = operation;
+  let closedReceipt: DurableClosedPromotionJournal;
   if (operation.receipt.state === 'open') {
-    await recoverOpenRuntimePromotion(operation);
+    closedReceipt = await recoverOpenRuntimePromotion(operation);
+  } else {
+    closedReceipt = asRecoveryClosed(operation);
   }
-  await cleanupRecoveredClosedRuntimePromotion(operation);
+  await cleanupRecoveredClosedRuntimePromotion(operation, closedReceipt);
   return recoveredTerminalResult({
     journal: operation.journal,
     authored: operation.authoredSummary,

@@ -15,6 +15,10 @@ import { join } from 'node:path';
 import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  enterHostOwnershipForTests,
+  resetEnteredHostOwnershipForTests,
+} from '../commands/host-runtime-access.js';
 import { TOOL_DOMAIN } from '../commands/plugin/domain-resolution.js';
 
 import type { ToolProvenance } from '@opensip-cli/core';
@@ -69,9 +73,12 @@ beforeEach(() => {
   homeBackup = process.env.HOME;
   process.env.HOME = fakeHome;
   removeToolPlugin.mockReset();
+  resetEnteredHostOwnershipForTests();
+  enterHostOwnershipForTests({ userState: true, project: true });
 });
 
 afterEach(() => {
+  resetEnteredHostOwnershipForTests();
   if (homeBackup === undefined) delete process.env.HOME;
   else process.env.HOME = homeBackup;
   rmSync(projectDir, { recursive: true, force: true });

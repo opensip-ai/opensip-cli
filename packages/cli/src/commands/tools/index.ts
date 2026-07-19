@@ -1,4 +1,3 @@
-// @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /**
  * tools — the customer-facing whole-tool management group (ADR-0041).
  *
@@ -20,7 +19,8 @@ import {
 
 import { toolsListAvailable } from './available.js';
 import { toolsCreate } from './create.js';
-import { assertToolDataPurgeId, deriveToolDataPurgeIdForms, toolsDataPurge } from './data-purge.js';
+import { createToolsDataPurgeSpec } from './data-purge-command-spec.js';
+import { deriveToolDataPurgeIdForms, toolsDataPurge } from './data-purge.js';
 import { toolsDoctor } from './doctor.js';
 import { toolsInstall } from './install.js';
 import { toolsList } from './list.js';
@@ -380,66 +380,7 @@ function buildToolsCreateSpec(ctx: CliCommandsContext): HostSpec {
 }
 
 function buildToolsDataPurgeSpec(ctx: CliCommandsContext): HostSpec {
-  return defineCommand<unknown, CliCommandsContext>({
-    staticHandler: {
-      package: TOOLS_COMMAND_PACKAGE,
-      path: TOOLS_COMMAND_SPECS_PATH,
-      declaration: 'buildToolsDataPurgeSpec',
-    },
-    name: 'data-purge',
-    description:
-      'Delete one tool’s project SQLite rows (sessions, baselines, state) — never tables',
-    commonFlags: ['json'],
-    args: [{ name: 'tool-id', description: 'The tool id whose rows to delete' }],
-    scope: 'project',
-    output: COMMAND_RESULT_OUTPUT,
-    handler: (rawOpts) => {
-      const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
-      const rawId = opts._args[0] ?? '';
-      let toolId: string;
-      try {
-        // Reject empty/whitespace/reserved-prefix before opening repositories.
-        toolId = assertToolDataPurgeId(rawId);
-      } catch (error) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return Promise.resolve({
-          type: 'tools-data-purge',
-          toolId: rawId,
-          sessions: 0,
-          baselineEntries: 0,
-          baselineMeta: false,
-          stateRows: 0,
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          target: rawId,
-        } as CommandResult);
-      }
-      const datastore = ctx.datastore() as DataStore | undefined;
-      if (datastore === undefined) {
-        ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-        return Promise.resolve({
-          type: 'tools-data-purge',
-          toolId,
-          sessions: 0,
-          baselineEntries: 0,
-          baselineMeta: false,
-          stateRows: 0,
-          success: false,
-          error: 'tools data-purge requires the project datastore (run inside a project)',
-          target: toolId,
-        } as CommandResult);
-      }
-      const scope = currentScope();
-      return Promise.resolve(
-        toolsDataPurge(
-          toolId,
-          datastore,
-          deriveToolDataPurgeIdForms(toolId, scope?.tools),
-          scope?.logger,
-        ),
-      );
-    },
-  });
+  return createToolsDataPurgeSpec(ctx);
 }
 
 /** Build the `tools` group's leaf specs (consumed by the group mounter). */

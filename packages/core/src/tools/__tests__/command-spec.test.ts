@@ -190,6 +190,53 @@ describe('defineCommand', () => {
     expect(() => defineCommand(baseSpec({ description: '' }))).toThrow(/non-empty description/);
   });
 
+  it('rejects non-object declarations and reports unusual scalar metadata safely', () => {
+    expect(validateCommandSpec(null)).toBe(false);
+    expect(validateCommandSpec([])).toBe(false);
+    expect(() => defineCommand(baseSpec({ visibility: null as never }))).toThrow(
+      /unknown visibility 'null'/,
+    );
+    expect(() => defineCommand(baseSpec({ visibility: {} as never }))).toThrow(
+      /unknown visibility 'object'/,
+    );
+  });
+
+  it('fails closed when command own-property inspection throws a non-Error value', () => {
+    const hostile = new Proxy(baseSpec(), {
+      ownKeys: () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- hostile runtime input may throw any JS value
+        throw 'hostile ownKeys';
+      },
+    });
+
+    expect(() => defineCommand(hostile)).toThrow(/own-property inspection failed/);
+  });
+
+  it('ignores a property that disappears between enumeration and descriptor capture', () => {
+    let descriptorReads = 0;
+    const unstable = new Proxy(
+      {},
+      {
+        ownKeys: () => ['name'],
+        getOwnPropertyDescriptor: () => {
+          descriptorReads++;
+          return descriptorReads === 1
+            ? { configurable: true, enumerable: true, value: 'graph', writable: true }
+            : undefined;
+        },
+      },
+    );
+
+    expect(validateCommandSpec(unstable)).toBe(false);
+    expect(descriptorReads).toBe(2);
+  });
+
+  it('rejects non-array commonFlags', () => {
+    expect(() => defineCommand(baseSpec({ commonFlags: 'cwd' as never }))).toThrow(
+      /commonFlags as an array/,
+    );
+  });
+
   it('rejects a non-function handler', () => {
     expect(() =>
       // @ts-expect-error — deliberately wrong handler type for the runtime guard
@@ -240,6 +287,61 @@ describe('defineCommand', () => {
   it('accepts documented raw-stream exceptions', () => {
     const spec = defineCommand(baseSpec({ output: 'raw-stream', rawStreamReason: 'file-export' }));
     expect(spec.rawStreamReason).toBe('file-export');
+  });
+
+  it('rejects unknown raw-stream reasons without coercing objects', () => {
+    expect(() =>
+      defineCommand(
+        baseSpec({
+          output: 'raw-stream',
+          rawStreamReason: { reason: 'unknown' } as never,
+        }),
+      ),
+    ).toThrow(/unknown rawStreamReason 'object'/);
+  });
+
+  it('accepts an explicitly absent staticHandler', () => {
+    expect(defineCommand(baseSpec({ staticHandler: undefined })).staticHandler).toBeUndefined();
+  });
+
+  it('rejects scalar and hostile staticHandler descriptors', () => {
+    expect(() => defineCommand(baseSpec({ staticHandler: 42 as never }))).toThrow(
+      /staticHandler must be a plain object/,
+    );
+
+    const hostile = new Proxy(
+      {},
+      {
+        ownKeys: () => {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error -- hostile runtime input may throw any JS value
+          throw 'hostile staticHandler ownKeys';
+        },
+      },
+    );
+    expect(() => defineCommand(baseSpec({ staticHandler: hostile as never }))).toThrow(
+      /staticHandler own-property inspection failed/,
+    );
+  });
+
+  it('rejects unsafe staticHandler declarations and path spellings', () => {
+    const descriptor = {
+      package: '@opensip-cli/graph',
+      path: 'packages/graph/src/index.ts',
+      declaration: 'run',
+    };
+
+    expect(() =>
+      defineCommand(baseSpec({ staticHandler: { ...descriptor, declaration: '' } })),
+    ).toThrow(/staticHandler\.declaration/);
+    expect(() => defineCommand(baseSpec({ staticHandler: { ...descriptor, path: '' } }))).toThrow(
+      /staticHandler\.path/,
+    );
+    expect(() =>
+      defineCommand(baseSpec({ staticHandler: { ...descriptor, path: 'packages\\graph.ts' } })),
+    ).toThrow(/staticHandler\.path/);
+    expect(() =>
+      defineCommand(baseSpec({ staticHandler: { ...descriptor, path: 'C:/graph.ts' } })),
+    ).toThrow(/staticHandler\.path/);
   });
 
   it('exposes a boolean validator for untrusted command specs', () => {

@@ -8,7 +8,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { CLI_SUPPORTED_SCHEMA_VERSION, ToolRegistry, resolveToolHooks } from '@opensip-cli/core';
+import {
+  CLI_SUPPORTED_SCHEMA_VERSION,
+  ToolRegistry,
+  isPlainRecord,
+  resolveToolHooks,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
@@ -52,8 +57,8 @@ function scaffolds(): ToolScaffold[] {
   });
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function reversedCopy<T>(values: readonly T[]): T[] {
+  return Array.from({ length: values.length }, (_, index) => values[values.length - index - 1]);
 }
 
 /** Host-owned projection used for semantic parity (not tool namespaces). */
@@ -66,9 +71,9 @@ function hostProjection(document: unknown): {
     throw new Error('expected plain config document');
   }
   return {
-    schemaVersion: document['schemaVersion'],
-    globalExcludes: document['globalExcludes'],
-    targets: document['targets'],
+    schemaVersion: document.schemaVersion,
+    globalExcludes: document.globalExcludes,
+    targets: document.targets,
   };
 }
 
@@ -86,7 +91,7 @@ const LANGUAGE_CASES: readonly {
   },
   {
     name: 'polyglot:all',
-    languages: [...ALL_LANGUAGES].reverse(),
+    languages: reversedCopy(ALL_LANGUAGES),
   },
 ];
 
@@ -113,7 +118,7 @@ describe('starter-config host model', () => {
       'typescript',
       'python',
     ]);
-    expect(canonicalStarterLanguages([...ALL_LANGUAGES].reverse())).toEqual([...ALL_LANGUAGES]);
+    expect(canonicalStarterLanguages(reversedCopy(ALL_LANGUAGES))).toEqual([...ALL_LANGUAGES]);
   });
 
   it('projects one target per language with backend concerns default', () => {
@@ -141,17 +146,19 @@ describe('starter-config host model', () => {
     const languages: readonly SupportedLanguage[] = ['rust', 'go'];
     const document = buildStarterConfigDocument(languages);
     const header = buildStarterDocumentHeaderInput(languages);
-    expect(document['schemaVersion']).toBe(header.schemaVersion);
-    expect(document['globalExcludes']).toEqual(header.globalExcludes);
-    const targets = document['targets'] as Record<string, Record<string, unknown>>;
+    expect(document.schemaVersion).toBe(header.schemaVersion);
+    expect(document.globalExcludes).toEqual(header.globalExcludes);
+    const targets = document.targets;
+    if (!isPlainRecord(targets)) throw new Error('expected starter targets record');
     expect(Object.keys(targets)).toEqual(header.targets.map((t) => t.name));
     for (const template of header.targets) {
-      const entry = targets[template.name]!;
-      expect(entry['description']).toBe(template.description);
-      expect(entry['languages']).toEqual([...template.languages]);
-      expect(entry['concerns']).toEqual(['backend']);
-      expect(entry['include']).toEqual([...template.include]);
-      expect(entry['exclude']).toEqual([...template.exclude]);
+      const entry = targets[template.name];
+      if (!isPlainRecord(entry)) throw new Error(`expected target record for ${template.name}`);
+      expect(entry.description).toBe(template.description);
+      expect(entry.languages).toEqual([...template.languages]);
+      expect(entry.concerns).toEqual(['backend']);
+      expect(entry.include).toEqual([...template.include]);
+      expect(entry.exclude).toEqual([...template.exclude]);
     }
     // Tool namespaces must not be copied into the host model.
     expect(document).not.toHaveProperty('fitness');

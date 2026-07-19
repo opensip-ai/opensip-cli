@@ -21,12 +21,9 @@
  * `ToolScope` view as the `collectReportData` parameter.
  */
 
-import { createHash } from 'node:crypto';
-import { readdirSync, unlinkSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 
 import {
-  ConfigurationError,
   currentScope,
   resolveToolHooks,
   SystemError,
@@ -39,22 +36,14 @@ import {
   generateDashboardHtml,
   normalizeReportViewSelection,
   type DashboardInput as HtmlReportInput,
-  type ReportSelectionEvidence,
   type ReportViewSelection,
 } from '@opensip-cli/dashboard';
-import {
-  orderSessionsForSuiteGrouping,
-  resolveParentRunEvidence,
-  RunRepo,
-  SessionRepo,
-} from '@opensip-cli/session-store';
+import { orderSessionsForSuiteGrouping, RunRepo, SessionRepo } from '@opensip-cli/session-store';
 
-import { writeArtifactAtomically } from './bootstrap/atomic-artifact-write.js';
 import { bindToolCliContext } from './bootstrap/bind-tool-context.js';
 import { collectDeclaredInputsForTool } from './bootstrap/declared-inputs.js';
 import { dispatchExternalToolHook } from './bootstrap/dispatch-external-tool-hook.js';
 import { type DispatchHostCtx } from './bootstrap/dispatch-replay-result.js';
-import { resolveStateLockPolicy } from './bootstrap/state-lock-policy.js';
 import {
   isExternalToolProvenance,
   provenanceRecordFor,
@@ -66,6 +55,17 @@ import {
   getCurrentRuntimePaths,
 } from './cli-context.js';
 import { buildReportLaunchTarget, launchReport } from './open-report.js';
+import {
+  pruneOrphanRunAddressedReports,
+  runAddressedReportFilename,
+  writeReportHtml,
+} from './report-artifact-store.js';
+import { resolveReportHistorySelection } from './report-history-selection.js';
+
+export {
+  pruneOrphanRunAddressedReports,
+  runAddressedReportFilename,
+} from './report-artifact-store.js';
 
 import type { ReportResult, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
@@ -75,16 +75,9 @@ import type { DataStore } from '@opensip-cli/datastore';
  * must never set. Sessions/runs are durable cross-tool history and selection is
  * host-owned navigation. A tool that returns one is ignored with a warning.
  */
-const RESERVED_DASHBOARD_KEYS = new Set([
-  'runs',
-  'selection',
-  'selectionEvidence',
-  'sessions',
-]);
+const RESERVED_DASHBOARD_KEYS = new Set(['runs', 'selection', 'selectionEvidence', 'sessions']);
 const UNSAFE_DASHBOARD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const REPORT_MODULE = 'cli:report';
-/** Domain-separated filename material for run-addressed report artifacts. */
-const RUN_REPORT_FILENAME_DOMAIN = 'opensip-cli/report-run-artifact/v1\0';
 
 interface ComposeReportOptions {
   readonly open: boolean;
@@ -96,6 +89,17 @@ interface ComposeReportOptions {
    * small enough to send someone.
    */
   readonly maxGraphCatalogBytes?: number;
+}
+
+function requireReportScope(): NonNullable<ReturnType<typeof currentScope>> {
+  const scope = currentScope();
+  if (scope !== undefined) return scope;
+  // Use a typed error with code so the top-level handler + --json paths
+  // produce a clean, consistent failure instead of a raw Error.
+  throw new SystemError(
+    'report composition requires an entered RunScope (run inside a CLI action body).',
+    { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
+  );
 }
 
 /**
@@ -113,16 +117,7 @@ interface ComposeReportOptions {
  *   require the scope.
  */
 async function composeReportInput(selection?: ReportViewSelection): Promise<HtmlReportInput> {
-  const scope = currentScope();
-  if (!scope) {
-    // Use a typed error with code so the top-level handler + --json paths
-    // produce a clean, consistent failure instead of a raw Error.
-    throw new SystemError(
-      'report composition requires an entered RunScope (run inside a CLI action body).',
-      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
-    );
-  }
-
+  const scope = requireReportScope();
   const log = scope.logger ?? defaultLogger;
   const datastore = scope.datastore() as DataStore | undefined;
   const repo = datastore ? new SessionRepo(datastore) : undefined;
@@ -130,85 +125,48 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
   const sessions = repo ? orderSessionsForSuiteGrouping([...repo.list({ limit: 20 })]) : [];
   // ADR-0144 Strategy A: sessions stay raw; the dashboard client labels
   // duration/score via @opensip-cli/format — do not embed labels here.
-  let recentRuns = runRepo ? [...runRepo.listRuns({ limit: 20 })] : [];
-  let stepsByRun: ReadonlyMap<string, readonly StoredRunStep[]> = runRepo
+  const recentRuns = runRepo ? [...runRepo.listRuns({ limit: 20 })] : [];
+  const stepsByRun: ReadonlyMap<string, readonly StoredRunStep[]> = runRepo
     ? runRepo.listStepsForRuns(recentRuns.map((run) => run.id))
     : new Map<string, readonly StoredRunStep[]>();
-  let reportSessions = sessions;
 
   const normalizedSelection = normalizeReportViewSelection(selection);
   const requestedRunId = normalizedSelection?.runId;
-  let matchedStoredRun =
-    requestedRunId !== undefined && recentRuns.some((run) => run.id === requestedRunId);
-  let selectionEvidence: ReportSelectionEvidence | undefined;
-
-  // Exact retained Run selection (Task 5.1): not limited to the recent-20 window.
-  if (requestedRunId !== undefined && datastore !== undefined) {
-    const evidence = resolveParentRunEvidence(datastore, {
-      runId: requestedRunId,
-      stepLimit: 500,
-      sessionLimit: 500,
-    });
-    if (evidence.status === 'not-found') {
-      throw new ConfigurationError(
-        `No retained parent Run with id '${requestedRunId}'. Inspect with: opensip runs list --json`,
-        { code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' },
-      );
-    }
-    const exactRun = evidence.snapshot.run;
-    // Change Impact exact selection is only meaningful for audit parent Runs.
-    // Non-impact retained Runs fail closed rather than rendering an empty/wrong tab.
-    if (exactRun.name !== 'audit' || exactRun.source !== 'built-in-suite') {
-      throw new ConfigurationError(
-        `Retained parent Run '${requestedRunId}' has no Change Impact model (name=${exactRun.name}, source=${exactRun.source}). Inspect with: opensip runs show ${requestedRunId} --json`,
-        { code: 'CONFIGURATION.REPORT.CHANGE_IMPACT_UNAVAILABLE' },
-      );
-    }
-    matchedStoredRun = true;
-    if (!recentRuns.some((run) => run.id === exactRun.id)) {
-      recentRuns = [exactRun, ...recentRuns];
-    }
-    const stepMap = new Map(stepsByRun);
-    stepMap.set(exactRun.id, evidence.snapshot.steps);
-    stepsByRun = stepMap;
-    // Union exact linked Sessions with recent presentation history.
-    const byId = new Map(reportSessions.map((s) => [s.id, s]));
-    for (const session of evidence.snapshot.sessions) byId.set(session.id, session);
-    reportSessions = orderSessionsForSuiteGrouping([...byId.values()]);
-    selectionEvidence = {
-      requestedRunId,
-      matched: true,
-      totalSteps: evidence.metadata.steps.total,
-      includedSteps: evidence.metadata.steps.included,
-      totalSessions: evidence.metadata.sessions.total,
-      includedSessions: evidence.metadata.sessions.included,
-      truncated: evidence.metadata.truncated,
-    };
-  }
+  const history = resolveReportHistorySelection(
+    datastore,
+    requestedRunId,
+    recentRuns,
+    stepsByRun,
+    sessions,
+  );
 
   const resolvedSelection =
     normalizedSelection === undefined
       ? undefined
       : ({
           view: normalizedSelection.view,
-          ...(matchedStoredRun && requestedRunId !== undefined ? { runId: requestedRunId } : {}),
+          ...(history.matchedStoredRun && requestedRunId !== undefined
+            ? { runId: requestedRunId }
+            : {}),
         } satisfies ReportViewSelection);
   log.info?.({
     evt: 'cli.report.compose.selection',
     module: REPORT_MODULE,
     view: resolvedSelection?.view ?? 'overview',
     hasRunId: requestedRunId !== undefined,
-    matchedStoredRun,
+    matchedStoredRun: history.matchedStoredRun,
   });
 
   const input: HtmlReportInput = {
-    sessions: reportSessions,
-    runs: recentRuns.map((run) => ({
+    sessions: history.reportSessions,
+    runs: history.recentRuns.map((run) => ({
       ...run,
-      steps: stepsByRun.get(run.id) ?? [],
+      steps: history.stepsByRun.get(run.id) ?? [],
     })),
     ...(resolvedSelection === undefined ? {} : { selection: resolvedSelection }),
-    ...(selectionEvidence === undefined ? {} : { selectionEvidence }),
+    ...(history.selectionEvidence === undefined
+      ? {}
+      : { selectionEvidence: history.selectionEvidence }),
     declaredInputs: collectDeclaredInputsForTool('report'),
   };
   const claimedKeys = new Map<string, string>();
@@ -342,71 +300,6 @@ function mergeContribution(
 }
 
 /**
- * Fixed safe filename for a run-addressed report artifact.
- * Domain-separated SHA-256 of the opaque Run ID — never path-interpolated.
- */
-export function runAddressedReportFilename(runId: string): string {
-  const digest = createHash('sha256')
-    .update(RUN_REPORT_FILENAME_DOMAIN)
-    .update(runId)
-    .digest('hex');
-  return `${digest}.html`;
-}
-
-/**
- * Delete run-addressed report HTML whose Run is no longer retained.
- * Uncertainty preserves the file; only exact orphan digests are removed.
- */
-export function pruneOrphanRunAddressedReports(
-  reportsDir: string,
-  retainedRunIds: readonly string[],
-): number {
-  const runsDir = join(reportsDir, 'runs');
-  let entries: string[];
-  try {
-    entries = readdirSync(runsDir);
-  } catch {
-    // @swallow-ok missing runs dir is not an error; nothing to prune.
-    return 0;
-  }
-  const kept = new Set(
-    retainedRunIds
-      .filter((id) => typeof id === 'string' && id.length > 0)
-      .map((id) => runAddressedReportFilename(id)),
-  );
-  let removed = 0;
-  for (const name of entries) {
-    if (!/^[a-f0-9]{64}\.html$/.test(name)) continue;
-    if (kept.has(name)) continue;
-    try {
-      unlinkSync(join(runsDir, name));
-      removed += 1;
-    } catch {
-      // @swallow-ok concurrent delete / permission uncertainty preserves the file.
-    }
-  }
-  return removed;
-}
-
-function writeReportHtml(
-  reportPath: string,
-  html: string,
-  scope: ReturnType<typeof currentScope>,
-  logger: typeof defaultLogger,
-): void {
-  void writeArtifactAtomically(reportPath, html, {
-    policy: resolveStateLockPolicy(),
-    logger,
-    runId: scope?.runId,
-    command: 'report',
-    cwdBasename:
-      scope?.projectContext?.projectRoot === undefined
-        ? basename(process.cwd())
-        : basename(scope.projectContext.projectRoot),
-  });
-}
-
-/**
  * Compose the cross-tool report and write it under the active runtime
  * reports directory. An explicit matched Run selection writes a
  * run-addressed artifact under `reports/runs/` (returned/launched path)
@@ -440,9 +333,18 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
       ? latestPath
       : join(paths.reportsDir, 'runs', runAddressedReportFilename(matchedRunId));
 
-  writeReportHtml(reportPath, html, scope, logger);
+  const artifactContext = {
+    logger,
+    ...(scope?.runId === undefined ? {} : { runId: scope.runId }),
+    ...(scope?.projectContext?.projectRoot === undefined
+      ? {}
+      : { projectRoot: scope.projectContext.projectRoot }),
+  };
+  // The artifact store is synchronous; `void` records that no promise is
+  // detached despite the write-oriented helper name.
+  void writeReportHtml(reportPath, html, artifactContext);
   if (matchedRunId !== undefined && reportPath !== latestPath) {
-    writeReportHtml(latestPath, html, scope, logger);
+    void writeReportHtml(latestPath, html, artifactContext);
   }
 
   // Bound accumulation of run-addressed artifacts: delete only orphans whose

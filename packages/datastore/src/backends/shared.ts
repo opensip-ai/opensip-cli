@@ -26,6 +26,7 @@ export function sqliteConnectionProvenClosed(sqlite: SqliteLifecycleConnection):
   try {
     return sqlite.open === false;
   } catch {
+    // @swallow-ok an unreadable native state fails closed: it is never closure evidence.
     return false;
   }
 }
@@ -74,7 +75,8 @@ export function checkpointAndCloseSqlite(sqlite: SqliteLifecycleConnection): Dat
   try {
     sqlite.close();
   } catch {
-    // The native `open` property below is the proof; an exception alone is not.
+    // @swallow-ok the native `open` state below is authoritative; the bounded
+    // result records an unclosed handle without exposing arbitrary native detail.
   }
 
   const closed = sqliteConnectionProvenClosed(sqlite);
@@ -102,6 +104,7 @@ export function checkpointAndCloseSqlite(sqlite: SqliteLifecycleConnection): Dat
   };
 }
 
+/** @throws {Error} When checkpointing or native connection closure was not proven. */
 function throwCloseFailure(
   result: Exclude<DatastoreCloseResult, { checkpointed: true; closed: true }>,
 ): never {

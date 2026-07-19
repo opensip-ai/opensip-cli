@@ -58,6 +58,7 @@ interface AuthoredPostconditionInput {
   readonly prepareArtifacts?: boolean;
 }
 
+/** @throws {Error} When no durable authored intent is pending. */
 export async function recordOpenPostcondition(
   controller: RuntimePromotionJournalController,
   receipt: DurableOpenPromotionJournal,
@@ -186,6 +187,7 @@ export async function recordCleanupIntent(
   return controller.recordCleanupIntent(receipt, desired);
 }
 
+/** @throws {Error} When the exact owned-slot cleanup intent is not pending. */
 export async function recordCleanupPostcondition(
   controller: RuntimePromotionJournalController,
   receipt: DurableClosedPromotionJournal,

@@ -172,19 +172,27 @@ function freshState(
   };
 }
 
-async function finishPrepare(
+async function authorizePreparedAuthoredState(
   state: AuthoredTransactionState,
-  plan: InitAuthoredPlan,
-): Promise<DurableOpenPromotionJournal> {
-  const receipt = state.receipt as DurableOpenPromotionJournal;
-  const current = await state.controller.verifyOpen(receipt);
-  const root = transactionAuthoredRoot(state.root);
+  receipt: DurableOpenPromotionJournal,
+  current: RuntimePromotionJournal,
+): Promise<void> {
   const authority = await state.controller.authorizeAuthoredState(receipt, state.lease);
   state.controller.assertAuthoredStateAuthority(authority, {
     authoredStage: current.owned.authoredStage.basename,
     authoredBackup: current.owned.authoredBackup.basename,
     replayManifest: current.owned.replayManifest.basename,
   });
+}
+
+async function finishPrepare(
+  state: AuthoredTransactionState,
+  plan: InitAuthoredPlan,
+): Promise<DurableOpenPromotionJournal> {
+  const receipt = state.receipt as DurableOpenPromotionJournal;
+  const current = await state.controller.verifyOpen(receipt);
+  await authorizePreparedAuthoredState(state, receipt, current);
+  const root = transactionAuthoredRoot(state.root);
   const checkpoint = (name: Parameters<typeof state.dependencies.checkpoint>[0]): void => {
     state.dependencies.checkpoint(name);
     transactionAuthoredRoot(state.root);

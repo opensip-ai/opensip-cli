@@ -48,6 +48,7 @@ interface MarkerIdentity {
   readonly ctimeNs: bigint;
 }
 
+/** @throws {RuntimeManifestError} Always; stage ownership proof failed. */
 function fail(): never {
   throw new RuntimeManifestError('stage-ownership');
 }

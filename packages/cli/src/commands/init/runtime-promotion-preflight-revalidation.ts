@@ -45,6 +45,7 @@ function dependencies(
   };
 }
 
+/** @throws {RuntimePromotionPreflightChangedError} When the lease no longer matches the project. */
 function assertLease(lease: RuntimeExclusiveLease, coordinationKey: string): void {
   if (
     lease.kind !== 'runtime-exclusive' ||
@@ -143,6 +144,7 @@ function preliminaryUnchanged(
  * Revalidate the complete preflight snapshot immediately before journal
  * creation. Do not reuse this token after SQLite checkpointing.
  */
+/** @throws {RuntimePromotionPreflightChangedError} When preflight authority has changed. */
 export function assertRuntimePromotionPreflightUnchanged(
   input: {
     readonly lease: RuntimeExclusiveLease;
@@ -225,6 +227,7 @@ function sameSourceAuthority(
  * Refresh rename authority after journal-first checkpoint and authoritative
  * source-manifest verification.
  */
+/** @throws {RuntimePromotionPreflightChangedError} When source retirement authority cannot be refreshed. */
 export function refreshRuntimePromotionSourceRetirementProof(
   input: {
     readonly lease: RuntimeExclusiveLease;
@@ -297,6 +300,7 @@ export function refreshRuntimePromotionSourceRetirementProof(
 }
 
 /** Re-prove the refreshed source identity immediately before tombstone rename. */
+/** @throws {RuntimePromotionPreflightChangedError} When source retirement authority has changed. */
 export function assertRuntimePromotionSourceRetirementUnchanged(
   input: {
     readonly lease: RuntimeExclusiveLease;

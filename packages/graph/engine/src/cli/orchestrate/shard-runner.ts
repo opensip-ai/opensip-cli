@@ -32,7 +32,12 @@ import { computeFilesFingerprint } from '../../cache/invalidate.js';
 
 import { runWorkerPool } from './worker-pool.js';
 
-import type { Shard, ShardBuildResult, ShardWorkerSpec } from './shard-model.js';
+import type {
+  Shard,
+  ShardBuildResult,
+  ShardFailureEvidence,
+  ShardWorkerSpec,
+} from './shard-model.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { ResolutionMode } from '../../types.js';
@@ -66,6 +71,7 @@ export type FailureClass = 'spawn' | 'exit_nonzero' | 'stdout_parse' | 'timeout'
  */
 const SHARD_HARD_KILL_TIMEOUT_MS = 10 * 60_000;
 const SHARD_PLAN_CONCURRENCY = 32;
+const STDERR_TAIL_CHARACTER_LIMIT = 1000;
 
 /**
  * Project a (possibly absent) parent {@link RunCorrelation} onto the flat set of
@@ -164,11 +170,45 @@ export interface ShardFailure {
   readonly stderr: string;
   /** Machine-filterable failure taxonomy ({@link FailureClass}); absent on a clean exit. */
   readonly failureClass?: FailureClass;
+  /** Process signal reported by Node when the worker did not exit normally. */
+  readonly signal?: string;
 }
 
 export interface RunShardsOutput {
   readonly fragments: readonly ShardBuildResult[];
   readonly failures: readonly ShardFailure[];
+}
+
+interface FailureClassification {
+  readonly failureClass?: FailureClass;
+  readonly signal?: string;
+}
+
+function failureClassificationFields(value: FailureClassification): FailureClassification {
+  return {
+    ...(value.failureClass ? { failureClass: value.failureClass } : {}),
+    ...(value.signal ? { signal: value.signal } : {}),
+  };
+}
+
+function shardFailureFromOutcome(outcome: ShardOutcome): ShardFailure {
+  return {
+    shardId: outcome.shardId,
+    exitCode: outcome.exitCode,
+    stderr: outcome.stderr,
+    ...failureClassificationFields(outcome),
+  };
+}
+
+/** Retain only a bounded stderr tail when projecting an internal worker failure. */
+export function boundedShardFailureEvidence(failure: ShardFailure): ShardFailureEvidence {
+  const stderrTail = failure.stderr.trim().slice(-STDERR_TAIL_CHARACTER_LIMIT);
+  return {
+    shardId: failure.shardId,
+    exitCode: failure.exitCode,
+    ...failureClassificationFields(failure),
+    ...(stderrTail.length === 0 ? {} : { stderrTail }),
+  };
 }
 
 /**
@@ -225,13 +265,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
   const failures: ShardFailure[] = [];
   for (const o of outcomes) {
     if (o.result) fragments.push(o.result);
-    else
-      failures.push({
-        shardId: o.shardId,
-        exitCode: o.exitCode,
-        stderr: o.stderr,
-        ...(o.failureClass ? { failureClass: o.failureClass } : {}),
-      });
+    else failures.push(shardFailureFromOutcome(o));
   }
   // Deterministic order regardless of completion order.
   fragments.sort((a, b) => Number(a.shardId > b.shardId) - Number(a.shardId < b.shardId));
@@ -247,7 +281,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
       ...correlationFields,
       shardId: failure.shardId,
       exitCode: failure.exitCode,
-      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
+      ...failureClassificationFields(failure),
       stderrPresent: failure.stderr.length > 0,
       stderrLength: failure.stderr.length,
     });
@@ -256,7 +290,7 @@ export async function runShardsInParallel(input: RunShardsInput): Promise<RunSha
     emitShardMilestone(diagnostics, diagnosticsCorrelation, 'warn', 'subprocess.failed', {
       shardId: failure.shardId,
       exitCode: failure.exitCode,
-      ...(failure.failureClass ? { failureClass: failure.failureClass } : {}),
+      ...failureClassificationFields(failure),
     });
   }
 
@@ -344,6 +378,7 @@ interface ShardOutcome {
   readonly exitCode: number;
   readonly stderr: string;
   readonly failureClass?: FailureClass;
+  readonly signal?: string;
 }
 
 /**
@@ -506,7 +541,7 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
       });
       /* v8 ignore stop */
     });
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       cleanup();
       if (timedOut) {
         resolvePromise({
@@ -516,6 +551,7 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
             stderr +
             `\ngraph shard worker killed after ${String(hardKillTimeoutMs)}ms hard kill-timeout`,
           failureClass: 'timeout',
+          ...(signal === null ? {} : { signal }),
         });
         return;
       }
@@ -525,6 +561,7 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
           exitCode: code ?? -1,
           stderr,
           failureClass: 'exit_nonzero',
+          ...(signal === null ? {} : { signal }),
         });
         return;
       }

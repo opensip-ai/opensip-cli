@@ -68,7 +68,6 @@ import {
   isJourneyApplicable,
   isJourneyRequired,
   parseAcceptanceProfile,
-  PLATFORM_ACCEPTANCE_SCHEMA_VERSION,
   profileDigest,
 } from './contract.mjs';
 import { collectHostProfile as realCollectHostProfile } from './host-profile.mjs';
@@ -1813,9 +1812,7 @@ function makeResult(state, journey, required, fields) {
   // free of these keys so historical fixtures remain verifier-readable).
   if (state.profile?.schemaVersion === 2) {
     const ports =
-      fields.requiredPorts !== undefined
-        ? fields.requiredPorts
-        : (journey.requiredPorts ?? []);
+      fields.requiredPorts === undefined ? (journey.requiredPorts ?? []) : fields.requiredPorts;
     result.requiredPorts = Object.freeze([...ports]);
     result.continuityProof =
       fields.continuityProof === undefined

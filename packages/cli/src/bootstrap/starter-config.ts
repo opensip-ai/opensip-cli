@@ -12,10 +12,7 @@
 
 import { CLI_SUPPORTED_SCHEMA_VERSION } from '@opensip-cli/core';
 
-import {
-  ALL_LANGUAGES,
-  type SupportedLanguage,
-} from '../commands/init/language-detection.js';
+import { ALL_LANGUAGES, type SupportedLanguage } from '../commands/init/language-detection.js';
 
 import type { DocumentHeaderInput, TargetTemplateInput } from '@opensip-cli/config';
 

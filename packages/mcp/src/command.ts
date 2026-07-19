@@ -89,6 +89,7 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   try {
     canonicalProjectRoot = realpathSync(projectRoot);
   } catch {
+    // @swallow-ok MCP preserves the host-attested project root when canonicalization fails.
     // Path absent or unreadable — keep the host-provided root string.
   }
   const configPath = scope.projectContext?.configPath ?? 'opensip-cli.config.yml';
@@ -97,6 +98,7 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
     try {
       canonicalConfigPath = realpathSync(scope.projectContext.configPath);
     } catch {
+      // @swallow-ok Missing no-init config paths remain bound to the host-provided path.
       canonicalConfigPath = scope.projectContext.configPath;
     }
   }

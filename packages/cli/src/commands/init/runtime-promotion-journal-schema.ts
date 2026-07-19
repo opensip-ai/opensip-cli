@@ -196,7 +196,11 @@ export function canonicalRuntimePromotionJournal(
   };
 }
 
-/** Compact canonical JSON with no trailing newline. */
+/**
+ * Compact canonical JSON with no trailing newline.
+ *
+ * @throws {Error} When the encoded journal exceeds its durable size cap.
+ */
 export function encodeRuntimePromotionJournal(journal: RuntimePromotionJournal): string {
   const encoded = JSON.stringify(canonicalRuntimePromotionJournal(journal));
   if (Buffer.byteLength(encoded, 'utf8') > RUNTIME_PROMOTION_JOURNAL_MAX_BYTES) {
@@ -210,6 +214,8 @@ export function encodeRuntimePromotionJournal(journal: RuntimePromotionJournal):
 /**
  * Parse only exact canonical bytes. Re-encoding catches duplicate keys,
  * reordered fields, alternate escapes, whitespace, and unknown additions.
+ *
+ * @throws {Error} When the bytes are oversized, invalid, noncanonical, or bound elsewhere.
  */
 export function parseRuntimePromotionJournal(
   raw: string,

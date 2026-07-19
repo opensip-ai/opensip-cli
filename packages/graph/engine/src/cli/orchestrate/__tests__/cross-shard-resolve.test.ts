@@ -116,7 +116,13 @@ describe('reattributeDeclarationDependencies (P2 Phase 0)', () => {
     line: number,
     classification: DependencyEdge['classification'],
   ): DependencyEdge {
-    return { to: [], line, column: 0, specifier, ...(classification && { classification }) };
+    return {
+      to: [],
+      line,
+      column: 0,
+      specifier,
+      ...(classification && { classification }),
+    };
   }
 
   it('fills a cross-shard workspace declaration import from the complete manifest index', () => {
@@ -268,6 +274,40 @@ describe('resolveCrossBoundaryCalls', () => {
     expect(edge?.to).toEqual(['B']);
     expect(edge?.resolution).toBe('semantic');
     expect(edge?.confidence).toBe('high');
+  });
+
+  it('resolves an aliased named import by its source name through a relative specifier', () => {
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
+      calleeName: 'localHelper',
+      importedName: 'helperB',
+      importSpecifier: '../pkg-b/index.js',
+      line: 2,
+      column: 9,
+      text: 'localHelper()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], EMPTY_MANIFESTS);
+    expect(crossEdge(catalog)?.to).toEqual(['B']);
+  });
+
+  it('resolves an aliased named import by its source name through a workspace specifier', () => {
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/index.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
+      calleeName: 'localHelper',
+      importedName: 'helperB',
+      importSpecifier: '@scope/pkgb',
+      line: 2,
+      column: 9,
+      text: 'localHelper()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
+    expect(crossEdge(catalog)?.to).toEqual(['B']);
   });
 
   it('declines a call whose specifier maps to no known workspace package', () => {
@@ -577,6 +617,16 @@ describe('diffCatalogsByEdge', () => {
     const diff = diffCatalogsByEdge(a, b);
     expect(diff.intraMismatches.length).toBe(1);
     expect(diff.crossDifferences).toEqual([]);
+    expect(diff.differences).toEqual([
+      expect.objectContaining({
+        ownerBodyHash: 'A',
+        ownerFilePath: 'packages/pkg-a/index.ts',
+        ownerLine: 1,
+        ownerColumn: 0,
+        line: 2,
+        column: 1,
+      }),
+    ]);
   });
 
   it('partitions a cross-package edge difference into crossDifferences (not intraMismatches)', () => {
@@ -862,13 +912,11 @@ describe('resolveCrossBoundaryCalls — re-export follow (relative import to a r
     const { catalog } = resolveCrossBoundaryCalls(merged, [bc], mIndex);
     const edge = catalog.functions.mainA?.[0]?.calls.find((e) => e.crossShard);
     expect(edge?.to).toEqual(['C']);
-    // `unknown` (NAME_GUESSED) so constrainCrossPackageEdges applies the SAME
-    // reachability gate the exact engine's catalog name fallback gets.
-    expect(edge?.resolution).toBe('unknown');
+    expect(edge?.resolution).toBe('semantic');
     expect(edge?.crossShard).toBe(true);
   });
 
-  it('declines a globally-ambiguous name (parity with the exact name fallback)', () => {
+  it('ignores an unrelated global same-name occurrence when the module path is unique', () => {
     const ambiguous: Catalog = {
       ...mergeShardFragments(
         [
@@ -892,6 +940,127 @@ describe('resolveCrossBoundaryCalls — re-export follow (relative import to a r
       text: 'defineThing()',
     };
     const { catalog } = resolveCrossBoundaryCalls(ambiguous, [bc], mIndex);
+    expect(crossEdge(catalog)?.to).toEqual(['C']);
+  });
+
+  it('declines when one barrel exposes the name from two distinct workspace targets', () => {
+    const ambiguous: Catalog = {
+      ...mergeShardFragments(
+        [
+          fragment('typescript', occ('mainA', 'packages/pkg-a/cmd.ts', 'A')),
+          fragment('typescript', occ('defineThing', 'packages/pkg-c/index.ts', 'C')),
+          fragment('typescript', occ('defineThing', 'packages/pkg-d/index.ts', 'D')),
+        ],
+        ['packages/pkg-a/cmd.ts', 'packages/pkg-c/index.ts', 'packages/pkg-d/index.ts'],
+      ),
+      reExports: [
+        ...(merged.reExports ?? []),
+        {
+          fromFile: 'packages/pkg-a/shared.ts',
+          exportedName: 'defineThing',
+          sourceName: 'defineThing',
+          specifier: '@scope/pkgd',
+        },
+      ],
+    };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/cmd.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
+      calleeName: 'defineThing',
+      importSpecifier: './shared.js',
+      line: 5,
+      column: 9,
+      text: 'defineThing()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(
+      ambiguous,
+      [bc],
+      manifests(
+        manifest('@scope/pkgc', 'packages/pkg-c'),
+        manifest('@scope/pkgd', 'packages/pkg-d'),
+      ),
+    );
+    expect(crossEdge(catalog)).toBeUndefined();
+  });
+
+  it('follows aliased names through a bounded relative re-export chain', () => {
+    const chainedBase = mergeShardFragments(
+      [
+        fragment('typescript', occ('mainA', 'packages/pkg-a/cmd.ts', 'A')),
+        fragment('typescript', occ('sourceThing', 'packages/pkg-a/impl.ts', 'IMPL')),
+      ],
+      ['packages/pkg-a/cmd.ts', 'packages/pkg-a/impl.ts'],
+    );
+    const chained: Catalog = {
+      ...chainedBase,
+      reExports: [
+        {
+          fromFile: 'packages/pkg-a/barrel.ts',
+          exportedName: 'publicThing',
+          sourceName: 'middleThing',
+          specifier: './middle.js',
+        },
+        {
+          fromFile: 'packages/pkg-a/middle.ts',
+          exportedName: 'middleThing',
+          sourceName: 'sourceThing',
+          specifier: './impl.js',
+        },
+      ],
+    };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/cmd.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
+      calleeName: 'localThing',
+      importedName: 'publicThing',
+      importSpecifier: './barrel.js',
+      line: 5,
+      column: 9,
+      text: 'localThing()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(chained, [bc], EMPTY_MANIFESTS);
+    expect(crossEdge(catalog)?.to).toEqual(['IMPL']);
+    expect(crossEdge(catalog)?.resolution).toBe('semantic');
+  });
+
+  it('declines a cyclic relative re-export chain', () => {
+    const cyclic: Catalog = {
+      ...mergeShardFragments(
+        [fragment('typescript', occ('mainA', 'packages/pkg-a/cmd.ts', 'A'))],
+        ['packages/pkg-a/cmd.ts'],
+      ),
+      reExports: [
+        {
+          fromFile: 'packages/pkg-a/barrel.ts',
+          exportedName: 'publicThing',
+          sourceName: 'middleThing',
+          specifier: './middle.js',
+        },
+        {
+          fromFile: 'packages/pkg-a/middle.ts',
+          exportedName: 'middleThing',
+          sourceName: 'publicThing',
+          specifier: './barrel.js',
+        },
+      ],
+    };
+    const bc: CrossBoundaryCall = {
+      ownerHash: 'A',
+      ownerFile: 'packages/pkg-a/cmd.ts',
+      ownerLine: 1,
+      ownerColumn: 0,
+      calleeName: 'localThing',
+      importedName: 'publicThing',
+      importSpecifier: './barrel.js',
+      line: 5,
+      column: 9,
+      text: 'localThing()',
+    };
+    const { catalog } = resolveCrossBoundaryCalls(cyclic, [bc], EMPTY_MANIFESTS);
     expect(crossEdge(catalog)).toBeUndefined();
   });
 

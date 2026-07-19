@@ -2,6 +2,7 @@ export { buildProjectInventory } from './inventory.js';
 export { readPackageManifestFacts } from './manifest-facts.js';
 export { classifyFileRoles } from './file-roles.js';
 export { projectConfigIdentity } from './identity.js';
+export { findOwningPackage } from './package-ownership.js';
 export {
   DEFAULT_INVENTORY_LIMITS,
   MAX_COMMAND_ARGV,

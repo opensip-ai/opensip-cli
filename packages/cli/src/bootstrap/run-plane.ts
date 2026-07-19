@@ -7,14 +7,7 @@
  * optional parent Run atomically; analysis never holds a datastore write lock.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-
-import {
-  isSignalEnvelope,
-  type SignalEnvelope,
-  type StoredSession,
-  type StoredSessionHostMetrics,
-} from '@opensip-cli/contracts';
+import { type StoredSession, type StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import {
   createRunLifecycle,
   currentScope,
@@ -22,186 +15,56 @@ import {
   generatePrefixedId,
   logger as defaultLogger,
   readPackageVersion,
-  type EvidenceSnapshotContribution,
-  type Logger,
-  type RunLifecycle,
   type ToolRunCompletion,
-  type ToolRunSessions,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
-import {
-  commitEvidenceBundle,
-  type EvidenceBundleCommitResult,
-  type EvidenceBundlePrecondition,
-  type EvidenceBundleRun,
-} from '@opensip-cli/session-store';
+import { commitEvidenceBundle, type EvidenceBundleCommitResult } from '@opensip-cli/session-store';
 
 import { manifestVersionFor } from './declared-inputs.js';
 import { authoritativeEvidenceCwd } from './evidence-cwd.js';
-import { captureEvidenceSnapshots } from './evidence-snapshot-capture.js';
 import {
   createHostEvidenceAccumulator,
-  type HostEvidenceAccumulatorLimits,
   type HostEvidenceDrainResult,
   type HostEvidenceOwnerToken,
 } from './host-evidence-accumulator.js';
-import { type DeferredReportEffect } from './report-open-policy.js';
+import {
+  captureEnvelopeEvidence,
+  completionWithoutSession,
+} from './run-plane-envelope-evidence.js';
 import {
   enforceSessionRetention,
   resolveCurrentSessionRetentionPolicy,
   type ResolvedSessionRetentionPolicy,
 } from './session-retention.js';
+import { currentSuiteRunContext, suiteSessionFields } from './suite-run-context.js';
 
+import type {
+  HostEvidenceFinalizeInput,
+  HostEvidenceFinalizeResult,
+  RunPlaneDeps,
+  RunPlaneFactory,
+  RunPlaneInvocation,
+  RunSessionStagingStatus,
+  StagedEnvelopeEvidence,
+} from './run-plane-contract.js';
 import type { DataStore } from '@opensip-cli/datastore';
+
+export type {
+  HostEvidenceFinalizeInput,
+  HostEvidenceFinalizeResult,
+  RunActionHooks,
+  RunPlaneDeps,
+  RunPlaneFactory,
+  RunPlaneInvocation,
+  RunSessionStagingStatus,
+  StagedEnvelopeEvidence,
+} from './run-plane-contract.js';
+export { currentSuiteRunContext, runWithSuiteRunContext } from './suite-run-context.js';
+export type { SuiteRunContext } from './suite-run-context.js';
+export { createRunActionHooks, createRunSessionSeam } from './run-plane-adapters.js';
 
 const CLI_VERSION = readPackageVersion(import.meta.url);
 const MODULE_TAG = 'cli:run-plane';
-
-export interface SuiteRunContext {
-  readonly suiteRunId: string;
-  readonly suiteName: string;
-  /**
-   * Task 1.4 supplies this explicit nested owner. Until then, a suite context
-   * without one retains the legacy per-step ordinary finalization behavior.
-   */
-  readonly evidenceOwner?: HostEvidenceOwnerToken;
-}
-
-const suiteContextStorage = new AsyncLocalStorage<SuiteRunContext>();
-
-export function currentSuiteRunContext(): SuiteRunContext | undefined {
-  return suiteContextStorage.getStore();
-}
-
-export function runWithSuiteRunContext<T>(ctx: SuiteRunContext, fn: () => T): T {
-  return suiteContextStorage.run(ctx, fn);
-}
-
-export interface RunPlaneDeps {
-  readonly getDatastore: () => DataStore | undefined;
-  readonly sessionRetentionPolicy?: () => ResolvedSessionRetentionPolicy;
-  readonly executeReportEffect?: (effect: DeferredReportEffect) => Promise<void>;
-  readonly onReportEffectFailure?: (detail: {
-    readonly effect: DeferredReportEffect;
-    readonly errorName: string;
-  }) => Promise<void>;
-  readonly evidenceLimits?: HostEvidenceAccumulatorLimits;
-  /** Test seam; production uses session-store's closed atomic API. */
-  readonly commitEvidence?: typeof commitEvidenceBundle;
-  readonly logger?: Logger;
-}
-
-export interface HostEvidenceFinalizeInput {
-  readonly run?: EvidenceBundleRun;
-  readonly precondition?: EvidenceBundlePrecondition;
-}
-
-export type HostEvidenceFinalizeResult =
-  | EvidenceBundleCommitResult
-  | {
-      readonly status: 'deferred';
-    }
-  | {
-      readonly status: 'poisoned';
-      readonly reason: 'session-limit' | 'byte-limit' | 'invalid-evidence';
-    }
-  | {
-      readonly status: 'datastore-unavailable' | 'discarded';
-    };
-
-export type RunSessionStagingStatus = 'none' | 'staged' | 'rejected' | 'discarded';
-
-/** Immutable bounded envelope facts retained before any output side effect. */
-export interface StagedEnvelopeEvidence {
-  readonly tool: string;
-  readonly createdAt: string;
-  readonly engineVersion?: string;
-  readonly passed: boolean;
-  readonly faulted: boolean;
-  readonly score: number;
-  readonly errors: number;
-  readonly warnings: number;
-  readonly findings: number;
-  readonly evidence: Readonly<Record<string, unknown>>;
-}
-
-export interface RunPlaneInvocation {
-  readonly lifecycle: RunLifecycle;
-  /** Freeze timing and stage one complete Session. Idempotent per invocation. */
-  completeAndStage(contribution: ToolSessionContribution): StoredSession | undefined;
-  /** Merge host-only metrics into the staged sibling row before drain. */
-  recordHostMetrics(metrics: StoredSessionHostMetrics): void;
-  /** Stage a live renderer's Session and strip only `.session` from its return. */
-  completeLiveRender(
-    render: () => Promise<ToolRunCompletion | void>,
-  ): Promise<ToolRunCompletion | void>;
-  /** Preallocated, still-linkable Session identity. */
-  sessionId(): string | undefined;
-  /** Immutable Session used by the pure standalone parent projection. */
-  stagedSession(): StoredSession | undefined;
-  /** Capture and expose bounded immutable envelope facts before output replay. */
-  captureEnvelope(result: unknown): void;
-  stagedEnvelope(): StagedEnvelopeEvidence | undefined;
-  /** Remove only this invocation's staged Session from its owner. */
-  discardEvidence(): void;
-  /** Closed observation used by suite capability validation. */
-  sessionStagingStatus(): RunSessionStagingStatus;
-  readonly owner: HostEvidenceOwnerToken;
-}
-
-export interface RunActionHooks {
-  readonly beginRun?: () => void;
-  readonly completeRun?: (result: unknown) => void;
-  readonly resetRun?: () => void;
-  readonly currentSessionId?: () => string | undefined;
-  readonly currentStagedSession?: () => StoredSession | undefined;
-  readonly currentStagedEnvelope?: () => StagedEnvelopeEvidence | undefined;
-  readonly currentSessionStagingStatus?: () => RunSessionStagingStatus;
-  readonly currentEvidenceSnapshots?: () => readonly EvidenceSnapshotContribution[];
-  /** Remove a capability-mismatched step's staged Session without poisoning siblings. */
-  readonly discardCurrentInvocationEvidence?: () => void;
-  /** Ordinary command-boundary finalizer; nested owners deliberately defer. */
-  readonly finalizeRun?: (input?: HostEvidenceFinalizeInput) => Promise<HostEvidenceFinalizeResult>;
-  /** Task 1.4 host-only nested owner capabilities. */
-  readonly createNestedEvidenceOwner?: () => HostEvidenceOwnerToken;
-  readonly finalizeEvidenceOwner?: (
-    owner: HostEvidenceOwnerToken,
-    input?: HostEvidenceFinalizeInput,
-  ) => Promise<HostEvidenceFinalizeResult>;
-  readonly discardEvidenceOwner?: (owner: HostEvidenceOwnerToken) => void;
-  /** Replace child requests with one suite-owned exact post-commit effect. */
-  readonly replaceEvidenceOwnerReportEffect?: (
-    owner: HostEvidenceOwnerToken,
-    effect?: DeferredReportEffect,
-  ) => boolean;
-  readonly maybeDispatchExternal?: (
-    commandName: string,
-    opts: Record<string, unknown>,
-    positionals: readonly unknown[],
-  ) => Promise<boolean>;
-}
-
-export interface RunPlaneFactory {
-  beginRun(): RunPlaneInvocation;
-  current(): RunPlaneInvocation;
-  /**
-   * Clear invocation-local timing and identity. Explicit nested-owner rows stay
-   * in the accumulator for their sole owner to drain later.
-   */
-  reset(): void;
-  queueReportEffect(effect: DeferredReportEffect): boolean;
-  finalizeCurrent(input?: HostEvidenceFinalizeInput): Promise<HostEvidenceFinalizeResult>;
-  createNestedEvidenceOwner(): HostEvidenceOwnerToken;
-  finalizeEvidenceOwner(
-    owner: HostEvidenceOwnerToken,
-    input?: HostEvidenceFinalizeInput,
-  ): Promise<HostEvidenceFinalizeResult>;
-  discardEvidenceOwner(owner: HostEvidenceOwnerToken): void;
-  replaceEvidenceOwnerReportEffect(
-    owner: HostEvidenceOwnerToken,
-    effect?: DeferredReportEffect,
-  ): boolean;
-}
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- factory and invocation closure intentionally share the per-command lifecycle slot.
 export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
@@ -519,161 +382,4 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     },
   };
   return factory;
-}
-
-function suiteSessionFields(): { suiteRunId?: string; suiteName?: string } {
-  const suite = currentSuiteRunContext();
-  return suite === undefined ? {} : { suiteRunId: suite.suiteRunId, suiteName: suite.suiteName };
-}
-
-export function createRunSessionSeam(factory: RunPlaneFactory): ToolRunSessions {
-  return {
-    get timing() {
-      return factory.current().lifecycle;
-    },
-  };
-}
-
-export function createRunActionHooks(factory: RunPlaneFactory): RunActionHooks {
-  let evidenceSnapshots: readonly EvidenceSnapshotContribution[] = Object.freeze([]);
-  return {
-    beginRun: () => {
-      evidenceSnapshots = Object.freeze([]);
-      factory.beginRun();
-    },
-    completeRun: (result) => {
-      const completion = result as ToolRunCompletion | undefined;
-      factory.current().captureEnvelope(result);
-      evidenceSnapshots =
-        completion?.evidenceSnapshots === undefined
-          ? Object.freeze([])
-          : captureEvidenceSnapshots(completion.evidenceSnapshots);
-      if (completion?.session !== undefined) {
-        factory.current().completeAndStage(completion.session);
-      }
-    },
-    resetRun: () => {
-      factory.reset();
-      evidenceSnapshots = Object.freeze([]);
-    },
-    currentSessionId: () => factory.current().sessionId(),
-    currentStagedSession: () => factory.current().stagedSession(),
-    currentStagedEnvelope: () => factory.current().stagedEnvelope(),
-    currentSessionStagingStatus: () => factory.current().sessionStagingStatus(),
-    currentEvidenceSnapshots: () => evidenceSnapshots,
-    discardCurrentInvocationEvidence: () => {
-      factory.current().discardEvidence();
-      evidenceSnapshots = Object.freeze([]);
-    },
-    finalizeRun: (input) => factory.finalizeCurrent(input),
-    createNestedEvidenceOwner: () => factory.createNestedEvidenceOwner(),
-    finalizeEvidenceOwner: (owner, input) => factory.finalizeEvidenceOwner(owner, input),
-    discardEvidenceOwner: (owner) => factory.discardEvidenceOwner(owner),
-    replaceEvidenceOwnerReportEffect: (owner, effect) =>
-      factory.replaceEvidenceOwnerReportEffect(owner, effect),
-  };
-}
-
-function completionWithoutSession(completion: ToolRunCompletion): ToolRunCompletion {
-  return {
-    ...(completion.result === undefined ? {} : { result: completion.result }),
-    ...(completion.envelope === undefined ? {} : { envelope: completion.envelope }),
-    ...(completion.evidenceSnapshots === undefined
-      ? {}
-      : { evidenceSnapshots: completion.evidenceSnapshots }),
-    ...(completion.execution === undefined ? {} : { execution: completion.execution }),
-  };
-}
-
-function captureEnvelopeEvidence(value: unknown): StagedEnvelopeEvidence | undefined {
-  try {
-    const envelope = extractEnvelope(value);
-    if (envelope === undefined) return undefined;
-    const { verdict } = envelope;
-    const summary = verdict?.summary;
-    if (
-      typeof envelope.tool !== 'string' ||
-      typeof envelope.runId !== 'string' ||
-      typeof envelope.createdAt !== 'string' ||
-      typeof verdict?.passed !== 'boolean' ||
-      !finiteNumber(verdict.score) ||
-      !finiteNumber(summary?.errors) ||
-      !finiteNumber(summary.warnings) ||
-      !finiteNumber(summary.total) ||
-      !Array.isArray(envelope.signals) ||
-      !Array.isArray(envelope.units)
-    ) {
-      return undefined;
-    }
-
-    const fingerprints: string[] = [];
-    const scanCount = Math.min(envelope.signals.length, 100);
-    for (let index = 0; index < scanCount && fingerprints.length < 20; index += 1) {
-      const signal = envelope.signals[index] as unknown;
-      if (signal === null || typeof signal !== 'object') continue;
-      const fingerprint = (signal as { readonly fingerprint?: unknown }).fingerprint;
-      if (typeof fingerprint === 'string') fingerprints.push(fingerprint);
-    }
-    const frozenFingerprints = Object.freeze(fingerprints);
-    const faulted = verdict.faulted === true;
-    const evidence = Object.freeze({
-      kind: 'signal-envelope',
-      schemaVersion: envelope.schemaVersion,
-      tool: envelope.tool,
-      runId: envelope.runId,
-      createdAt: envelope.createdAt,
-      verdict: Object.freeze({
-        passed: verdict.passed,
-        faulted,
-        score: verdict.score,
-        errors: summary.errors,
-        warnings: summary.warnings,
-        total: summary.total,
-      }),
-      signalCount: envelope.signals.length,
-      unitCount: envelope.units.length,
-      ...(frozenFingerprints.length === 0 ? {} : { fingerprints: frozenFingerprints }),
-      ...(typeof envelope.resolutionMode === 'string'
-        ? { resolutionMode: envelope.resolutionMode }
-        : {}),
-    });
-    const engineVersion =
-      typeof envelope.declaredInputs?.engineVersion === 'string'
-        ? envelope.declaredInputs.engineVersion
-        : undefined;
-    return Object.freeze({
-      tool: envelope.tool,
-      createdAt: envelope.createdAt,
-      ...(engineVersion === undefined ? {} : { engineVersion }),
-      passed: verdict.passed,
-      faulted,
-      score: verdict.score,
-      errors: summary.errors,
-      warnings: summary.warnings,
-      findings: envelope.signals.length,
-      evidence,
-    });
-  } catch {
-    return undefined;
-  }
-}
-
-function extractEnvelope(value: unknown): SignalEnvelope | undefined {
-  if (isSignalEnvelope(value)) return value;
-  if (value === null || typeof value !== 'object') return undefined;
-  const completion = value as ToolRunCompletion;
-  if (isSignalEnvelope(completion.envelope)) return completion.envelope;
-  if (
-    completion.result !== undefined &&
-    completion.result !== null &&
-    typeof completion.result === 'object'
-  ) {
-    const nested = completion.result as { readonly envelope?: unknown };
-    if (isSignalEnvelope(nested.envelope)) return nested.envelope;
-  }
-  return undefined;
-}
-
-function finiteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }

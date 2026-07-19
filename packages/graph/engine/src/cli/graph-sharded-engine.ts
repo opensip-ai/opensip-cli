@@ -11,6 +11,7 @@ import {
   resolveDefaultEngineShards,
   type EngineShardPolicyResolution,
 } from './orchestrate/engine-shard-policy.js';
+import { assertShardedBuildComplete } from './orchestrate/shard-completeness.js';
 import { loadGraphConfig, runShardedGraph } from './orchestrate.js';
 import { resolveAdaptersForRun } from './resolve-adapters.js';
 
@@ -132,6 +133,7 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     ...(ctx.onProgress === undefined ? {} : { onProgress: ctx.onProgress }),
     ...(opts.language === undefined ? {} : { language: opts.language }),
   });
+  assertShardedBuildComplete(sharded);
   return {
     catalog: sharded.catalog,
     indexes: sharded.indexes,
@@ -222,6 +224,7 @@ export async function runShardedLiveBuild(
     emitFeatures: DASHBOARD_FEATURE_COLUMNS,
     onProgress,
   });
+  assertShardedBuildComplete(result);
   return buildLiveGraphOutput(
     {
       catalog: result.catalog,

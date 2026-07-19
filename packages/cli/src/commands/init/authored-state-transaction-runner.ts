@@ -15,8 +15,6 @@ import {
   assertStableAuthoredEntry,
   assertStableAuthoredRoot,
   authoredTransactionFailure,
-  observeAuthoredPath,
-  sameAuthoredPathState,
   transactionAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import {
@@ -27,6 +25,10 @@ import {
   recordOpenIntent,
   recordOpenPostcondition,
 } from './authored-state-transaction-journal.js';
+import {
+  observeAuthoredPath,
+  sameAuthoredPathState,
+} from './authored-state-transaction-observation.js';
 import {
   manifestBytesFor,
   manifestFor,
@@ -345,13 +347,15 @@ export async function cleanupAuthoredState(
     }
   };
   assertEvidenceContinuity();
-  for (const slot of authoredSlots) {
+  async function cleanupAuthoredSlot(index: number): Promise<void> {
+    const slot = authoredSlots[index];
+    if (slot === undefined) return;
     assertStableAuthoredRoot(root);
     if (journal.cleanup[slot] === 'removed' || journal.cleanup[slot] === 'unmaterialized') {
       assertAuthoredArtifactPathAbsent(root, state.paths, slot);
       finalizeAuthoredCleanupEvidence(root, journal, state.paths, slot, checkpoint);
       assertAuthoredArtifactAbsent(root, journal, state.paths, slot);
-      continue;
+      return cleanupAuthoredSlot(index + 1);
     }
     const pending = journal.progress.pendingIntent;
     if (pending === null) {
@@ -396,7 +400,9 @@ export async function cleanupAuthoredState(
     assertAuthoredArtifactPathAbsent(root, state.paths, slot);
     finalizeAuthoredCleanupEvidence(root, journal, state.paths, slot, checkpoint);
     assertAuthoredArtifactAbsent(root, journal, state.paths, slot);
+    return cleanupAuthoredSlot(index + 1);
   }
+  await cleanupAuthoredSlot(0);
   assertStableAuthoredRoot(root);
   return { receipt, summary: summaryFor(state, journal, true) };
 }

@@ -175,6 +175,84 @@ describe('readGlobalTrustPolicy', () => {
   });
 });
 
+describe('capability trust grant persistence', () => {
+  const HASH_A = `sha256:${'a'.repeat(64)}`;
+  const HASH_B = `sha256:${'b'.repeat(64)}`;
+
+  it('grants, replaces, and revokes exact capability identities while preserving user config', async () => {
+    const {
+      grantCapabilityTrust,
+      readGlobalConfig,
+      readGlobalTrustPolicy,
+      revokeCapabilityTrust,
+      writeGlobalConfig,
+    } = await loadModule();
+    writeGlobalConfig({
+      apiKey: 'sk-preserved',
+      policy: {
+        mode: 'strict',
+        trustedCapabilityPacks: [
+          { id: '@acme/other', manifestHash: HASH_A },
+          { id: '@acme/rules', manifestHash: HASH_A },
+        ],
+      },
+    });
+
+    grantCapabilityTrust({
+      id: '@acme/rules',
+      manifestHash: HASH_B,
+      grantedAt: '2026-07-19T00:00:00.000Z',
+    });
+
+    expect(readGlobalConfig().apiKey).toBe('sk-preserved');
+    expect(readGlobalTrustPolicy().policy).toEqual({
+      mode: 'strict',
+      trustedCapabilityPacks: [
+        { id: '@acme/other', manifestHash: HASH_A },
+        {
+          id: '@acme/rules',
+          manifestHash: HASH_B,
+          grantedAt: '2026-07-19T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(revokeCapabilityTrust('@acme/rules')).toBe(true);
+    expect(readGlobalTrustPolicy().policy).toEqual({
+      mode: 'strict',
+      trustedCapabilityPacks: [{ id: '@acme/other', manifestHash: HASH_A }],
+    });
+  });
+
+  it('creates the first grant and treats absent or unmatched revocations as no-ops', async () => {
+    const { grantCapabilityTrust, readGlobalTrustPolicy, revokeCapabilityTrust } =
+      await loadModule();
+
+    expect(revokeCapabilityTrust('@acme/missing')).toBe(false);
+    grantCapabilityTrust({ id: '@acme/first', manifestHash: HASH_A });
+    expect(readGlobalTrustPolicy().policy?.trustedCapabilityPacks).toEqual([
+      { id: '@acme/first', manifestHash: HASH_A },
+    ]);
+    expect(revokeCapabilityTrust('@acme/missing')).toBe(false);
+  });
+
+  it('fails closed on an invalid policy without mutating it', async () => {
+    const { grantCapabilityTrust, readGlobalConfig, revokeCapabilityTrust, writeGlobalConfig } =
+      await loadModule();
+    const invalidPolicy = { mode: 'invalid-mode' };
+    writeGlobalConfig({ apiKey: 'sk-kept', policy: invalidPolicy });
+
+    expect(() => grantCapabilityTrust({ id: '@acme/rules', manifestHash: HASH_A })).toThrow(
+      /user-level policy block is invalid/u,
+    );
+    expect(revokeCapabilityTrust('@acme/rules')).toBe(false);
+    expect(readGlobalConfig()).toEqual({
+      apiKey: 'sk-kept',
+      policy: invalidPolicy,
+    });
+  });
+});
+
 describe('resolveApiKey', () => {
   const originalEnv = { ...process.env };
 

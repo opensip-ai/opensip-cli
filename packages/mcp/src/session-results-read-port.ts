@@ -19,15 +19,14 @@ import { BaselineRepo } from '@opensip-cli/datastore';
 import {
   bundledReplayResolver,
   isSessionCwdWithin,
-  listParentRuns,
   listSessionSummaries,
-  resolveParentRun,
   resolveSession,
   resolveAndReplaySession,
   resolveSessionLedgerReference,
   type SessionReplayFn,
 } from '@opensip-cli/session-store';
 
+import { listStoredExecutionRuns, showStoredExecutionRun } from './execution-run-read.js';
 import { readError, sanitizeMcpErrorMessage } from './mcp-error.js';
 import { buildPersistedReviewBrief, type PersistedReviewStep } from './persisted-review-brief.js';
 import {
@@ -36,6 +35,7 @@ import {
   recommendedNext,
   runSummaryFromReplay,
 } from './session-reply-builders.js';
+import { filterMeta, severityFilters, toRunSummary } from './session-results-read-helpers.js';
 import {
   latestCompleted,
   missingSuiteGroupMessage,
@@ -72,13 +72,6 @@ import type { DataStore } from '@opensip-cli/datastore';
 /** The no-op replay resolver used when no tool registry was supplied. */
 const noReplay = (): undefined => undefined;
 const REVIEW_REPLAY_CONCURRENCY = 8;
-const SAFE_STORED_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const EXECUTION_RUN_VALIDATION_CODES = new Set([
-  'VALIDATION.RUN_READ.LIST_LIMIT_INVALID',
-  'VALIDATION.RUN_READ.RUN_ID_INVALID',
-  'VALIDATION.RUN_READ.OFFSET_INVALID',
-  'VALIDATION.RUN_READ.STEP_LIMIT_INVALID',
-]);
 
 /** Construction deps — all captured once (no ambient scope reads). */
 export interface SessionResultsReadPortDeps {
@@ -124,72 +117,11 @@ export class SessionResultsReadPort implements ResultsReadPort {
   listExecutionRuns(
     opts: ListExecutionRunsOptions = {},
   ): Result<McpExecutionRunHistoryData, McpReadError> {
-    try {
-      const history = listParentRuns(this.store, {
-        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
-        ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
-      });
-      return ok({
-        type: 'run-history',
-        runs: history.runs.map((run) => ({
-          run,
-          showCommand: `opensip runs show ${run.id} --json`,
-        })),
-        requestedLimit: history.requestedLimit,
-        effectiveLimit: history.effectiveLimit,
-        truncated: history.truncated,
-      });
-    } catch (error) {
-      return err(executionRunReadError(error));
-    }
+    return listStoredExecutionRuns(this.store, this.projectRoot, opts);
   }
 
   showExecutionRun(opts: ShowExecutionRunOptions): Result<McpExecutionRunDetailData, McpReadError> {
-    try {
-      const resolved = resolveParentRun(this.store, {
-        runId: opts.runId,
-        ...(opts.offset === undefined ? {} : { offset: opts.offset }),
-        ...(opts.limit === undefined ? {} : { limit: opts.limit }),
-        ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
-      });
-      if (resolved.status === 'not-found') {
-        return err(readError('not-found', `Execution Run '${opts.runId}' was not found.`));
-      }
-      if (
-        resolved.steps.some(
-          (step) => step.sessionId !== undefined && !SAFE_STORED_ID.test(step.sessionId),
-        )
-      ) {
-        return err(
-          readError(
-            'execution-run-read-failed',
-            'Stored execution Run evidence could not be read.',
-          ),
-        );
-      }
-      return ok({
-        type: 'run-detail',
-        run: resolved.run,
-        steps: resolved.steps,
-        offset: resolved.offset,
-        limit: resolved.limit,
-        total: resolved.total,
-        ...(resolved.nextOffset === undefined ? {} : { nextOffset: resolved.nextOffset }),
-        sessionFollowUps: resolved.steps.flatMap((step) =>
-          step.sessionId === undefined
-            ? []
-            : [
-                {
-                  runStepId: step.id,
-                  sessionId: step.sessionId,
-                  showCommand: `opensip sessions show ${step.sessionId} --json`,
-                },
-              ],
-        ),
-      });
-    } catch (error) {
-      return err(executionRunReadError(error));
-    }
+    return showStoredExecutionRun(this.store, this.projectRoot, opts);
   }
 
   listRuns(opts: ListRunsOptions = {}): Result<readonly RunSummary[], McpReadError> {
@@ -400,57 +332,4 @@ export class SessionResultsReadPort implements ResultsReadPort {
     });
     return err(readError('not-found', `session ${ref} was not found`));
   }
-}
-
-/** Map a `sessions list` row to the lean {@link RunSummary} agent shape. */
-function toRunSummary(s: HistorySession): RunSummary {
-  return {
-    id: s.id,
-    tool: s.tool,
-    startedAt: s.startedAt,
-    completedAt: s.completedAt,
-    cwd: s.cwd,
-    durationMs: s.durationMs,
-    score: s.score,
-    passed: s.passed,
-    ...(s.cliVersion === undefined ? {} : { cliVersion: s.cliVersion }),
-    ...(s.engineVersion === undefined ? {} : { engineVersion: s.engineVersion }),
-    showCommand: s.showCommand,
-    ...(s.ledger === undefined ? {} : { ledger: s.ledger }),
-    ...(s.summary ? { summary: s.summary } : {}),
-  };
-}
-
-/** The `--filter` vocabulary for a {@link LatestFindingsOptions} request. */
-function severityFilters(opts: LatestFindingsOptions): string[] {
-  const filters: string[] = [];
-  if (opts.severity === 'errors') filters.push('errors-only');
-  else if (opts.severity === 'warnings') filters.push('warnings-only');
-  if (opts.limit !== undefined) filters.push(`top:${String(opts.limit)}`);
-  return filters;
-}
-
-/** Agent filter metadata, present only when a filter actually narrowed the set. */
-function filterMeta(
-  filters: readonly string[] | undefined,
-  originalSignalCount: number,
-  returnedSignalCount: number,
-): Pick<
-  McpResultReplay<unknown>,
-  'filtersApplied' | 'originalSignalCount' | 'returnedSignalCount'
-> {
-  if (!filters?.length) return {};
-  return { filtersApplied: filters, originalSignalCount, returnedSignalCount };
-}
-
-function executionRunReadError(error: unknown): McpReadError {
-  return isExecutionRunValidationError(error)
-    ? readError('invalid-argument', 'Execution Run identity or pagination bounds are invalid.')
-    : readError('execution-run-read-failed', 'Stored execution Run evidence could not be read.');
-}
-
-function isExecutionRunValidationError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return false;
-  const code = error.code;
-  return typeof code === 'string' && EXECUTION_RUN_VALIDATION_CODES.has(code);
 }

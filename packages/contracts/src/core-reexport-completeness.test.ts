@@ -11,10 +11,10 @@
  * The decision and its alternative are recorded in the shared-analysis ADR.
  */
 
+import * as core from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import * as contracts from './index.js';
-import * as core from '@opensip-cli/core';
 
 /**
  * The core export families contracts PROMISES to re-export completely.

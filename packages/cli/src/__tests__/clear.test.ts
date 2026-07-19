@@ -325,7 +325,12 @@ describe('executeClear', () => {
       expect(result.action).toBe('cancelled');
       expect(result.deletedCount).toBe(0);
       expect(repo.count()).toBe(2);
-      expect(repo.list().map((s) => s.id).sort()).toEqual(['keep-a', 'keep-b']);
+      expect(
+        repo
+          .list()
+          .map((s) => s.id)
+          .sort(),
+      ).toEqual(['keep-a', 'keep-b']);
     } finally {
       writeSpy.mockRestore();
     }

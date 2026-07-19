@@ -1,5 +1,10 @@
 /**
  * Filesystem adapter for Init's pure managed-agent-guidance renderer.
+ *
+ * The managed block must keep its operational precedence explicit: use
+ * OpenSIP MCP result tools first for existing results. Agents must not grep
+ * `.runtime/logs`, read `datastore.sqlite` directly, or re-run an analysis
+ * merely to answer a stored-result or history question.
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -81,6 +86,7 @@ function readTargetSnapshot(
       };
 }
 
+/** @throws {Error} When a changed guidance target has no rendered content. */
 function applyRenderedTarget(
   cwd: string,
   spec: AgentGuidanceTargetSpec,

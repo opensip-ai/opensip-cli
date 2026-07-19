@@ -1,6 +1,8 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
+import { compareCodePoints } from '../model/value-helpers.js';
+
 import { buildDeterministicEnv } from './env.js';
 import { HarnessPrerequisiteError, spawnProcess } from './spawn.js';
 
@@ -33,11 +35,6 @@ export interface FixtureInventoryOptions {
 
 function portablePath(path: string): string {
   return path.split(sep).join('/');
-}
-
-function compareCodePoints(left: string, right: string): number {
-  if (left === right) return 0;
-  return left < right ? -1 : 1;
 }
 
 function containedPath(root: string, path: string): boolean {

@@ -135,6 +135,7 @@ async function acquireNormalLease(
   });
 }
 
+/** @throws {Error} When planning, authority binding, or durable operation setup fails. */
 async function createOperation(input: {
   readonly request: FreshRuntimePromotionInput;
   readonly dependencies: RuntimePromotionDependencies;

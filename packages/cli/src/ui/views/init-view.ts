@@ -7,23 +7,14 @@
 
 import { line, group, type Tone, type ViewNode } from '@opensip-cli/cli-ui';
 
+import { isSuccessfulRuntimeAdoption, runtimeAdoptionView } from './runtime-adoption-view.js';
+
 import type {
   AgentGuidanceTargetAction,
   AgentGuidanceTargetResult,
   InitOptionalToolRecommendation,
   InitResult,
-  RuntimeAdoptionResult,
-  RuntimeAdoptionStatus,
 } from '@opensip-cli/contracts';
-
-const RUNTIME_ADOPTION_SUCCESSES = new Set<RuntimeAdoptionStatus>([
-  'not-found',
-  'promoted',
-  'already-project',
-  'deduplicated',
-  'kept-project',
-  'cleanup-pending',
-]);
 
 function relativize(p: string, cwd: string): string {
   return p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : p;
@@ -139,219 +130,6 @@ function authoredStateChangedView(message: string): ViewNode {
       ]),
       { kind: 'spacer' },
       line([{ text: `  ${message}` }]),
-    ],
-    2,
-  );
-}
-
-interface RuntimeAdoptionPresentation {
-  readonly headline: string;
-  readonly summary: string;
-  readonly symbol: '✓' | '⚠' | '✗';
-  readonly tone: Tone;
-}
-
-function runtimeAdoptionPresentation(adoption: RuntimeAdoptionResult): RuntimeAdoptionPresentation {
-  switch (adoption.status) {
-    case 'not-found': {
-      return {
-        headline: 'Evidence adoption: no cache evidence found',
-        summary: 'Project-authored setup completed without a cache evidence source.',
-        symbol: '✓',
-        tone: 'success',
-      };
-    }
-    case 'promoted': {
-      return {
-        headline: 'Evidence adoption: cache evidence promoted',
-        summary: 'The selected cache evidence is now project-local authority.',
-        symbol: '✓',
-        tone: 'success',
-      };
-    }
-    case 'already-project': {
-      return {
-        headline: 'Evidence adoption: project evidence already active',
-        summary: 'The existing project-local evidence remains authoritative.',
-        symbol: '✓',
-        tone: 'success',
-      };
-    }
-    case 'deduplicated': {
-      return {
-        headline: 'Evidence adoption: equivalent cache evidence retired',
-        summary: 'The equivalent project-local evidence remains authoritative.',
-        symbol: '✓',
-        tone: 'success',
-      };
-    }
-    case 'kept-project': {
-      return {
-        headline: 'Evidence adoption: project evidence kept',
-        summary: 'The selected project-local evidence remains authoritative.',
-        symbol: '✓',
-        tone: 'success',
-      };
-    }
-    case 'conflict': {
-      return {
-        headline: 'Evidence adoption blocked by a conflict',
-        summary: conflictSummary(adoption),
-        symbol: '⚠',
-        tone: 'warning',
-      };
-    }
-    case 'busy': {
-      return {
-        headline: 'Evidence adoption is busy',
-        summary: 'Another OpenSIP operation currently holds the evidence lease.',
-        symbol: '⚠',
-        tone: 'warning',
-      };
-    }
-    case 'recovery-required': {
-      return {
-        headline: 'Evidence adoption requires recovery',
-        summary: recoveryRequiredSummary(adoption),
-        symbol: '✗',
-        tone: 'error',
-      };
-    }
-    case 'rolled-back': {
-      if (adoption.cleanupPending === true) {
-        return {
-          headline: 'Evidence adoption rolled back; cleanup pending',
-          summary: 'Normal evidence writes are allowed. Only operation-owned cleanup remains.',
-          symbol: '⚠',
-          tone: 'warning',
-        };
-      }
-      return {
-        headline: 'Evidence adoption rolled back',
-        summary: 'The attempted evidence adoption did not commit.',
-        symbol: '✗',
-        tone: 'error',
-      };
-    }
-    case 'cleanup-pending': {
-      return {
-        headline: 'Evidence adoption committed; cleanup pending',
-        summary: 'Normal evidence writes are allowed. Only operation-owned cleanup remains.',
-        symbol: '⚠',
-        tone: 'warning',
-      };
-    }
-  }
-}
-
-function conflictSummary(adoption: RuntimeAdoptionResult): string {
-  switch (adoption.reasonCode) {
-    case 'weak-source-requires-selection': {
-      return 'The cache candidate requires an explicit evidence selection.';
-    }
-    case 'destination-absent': {
-      return 'The requested project evidence authority is not available.';
-    }
-    case 'divergent': {
-      return 'The available evidence candidates require an explicit selection.';
-    }
-    case 'destination-unverified': {
-      return 'OpenSIP could not verify an evidence candidate for automatic selection.';
-    }
-    case 'state-ambiguous': {
-      return 'OpenSIP could not safely select an evidence candidate from the current state.';
-    }
-    default: {
-      return 'OpenSIP could not safely complete evidence selection under the requested policy.';
-    }
-  }
-}
-
-function recoveryRequiredSummary(adoption: RuntimeAdoptionResult): string {
-  return adoption.reasonCode === 'operation-interrupted'
-    ? 'Retry Init to reconcile the interrupted evidence operation.'
-    : 'Retry Init to reconcile the evidence operation safely.';
-}
-
-function hasNoCacheSource(adoption: RuntimeAdoptionResult): boolean {
-  if (adoption.reasonCode === 'source-absent') return true;
-  if (adoption.proofStrength !== undefined || adoption.sourceRetired === true) return false;
-  if (adoption.sourcePreserved !== false) return false;
-  return (
-    (adoption.status === 'cleanup-pending' && adoption.sourceRetired === undefined) ||
-    (adoption.status === 'rolled-back' && adoption.sourceRetired === false)
-  );
-}
-
-function sourceDispositionLabel(adoption: RuntimeAdoptionResult): string {
-  if (hasNoCacheSource(adoption)) return 'not applicable (no source)';
-  if (adoption.sourcePreserved === undefined) return 'unknown';
-  return adoption.sourcePreserved ? 'preserved' : 'not preserved';
-}
-
-function runtimeAdoptionDetails(adoption: RuntimeAdoptionResult): ViewNode[] {
-  const noCacheSource = hasNoCacheSource(adoption);
-  const details: ViewNode[] = [
-    line([
-      { text: '  Proof strength: ', dim: true },
-      { text: adoption.proofStrength ?? 'not available' },
-    ]),
-    line([
-      { text: '  Source disposition: ', dim: true },
-      { text: sourceDispositionLabel(adoption) },
-    ]),
-  ];
-  if (!noCacheSource && adoption.sourceRetired !== undefined) {
-    details.push(
-      line([
-        { text: '  Source retired: ', dim: true },
-        { text: adoption.sourceRetired ? 'yes' : 'no' },
-      ]),
-    );
-  }
-  if (adoption.authored !== undefined) {
-    const { created, replaced, deleted, preserved } = adoption.authored;
-    details.push(
-      line([
-        { text: '  Authored state: ', dim: true },
-        {
-          text: `${created} created · ${replaced} replaced · ${deleted} deleted · ${preserved} preserved`,
-        },
-      ]),
-    );
-  }
-  details.push(
-    line([
-      { text: '  Duration: ', dim: true },
-      { text: `${Math.max(0, Math.round(adoption.durationMs))} ms` },
-    ]),
-  );
-  if (adoption.reasonCode !== undefined) {
-    details.push(line([{ text: '  Reason: ', dim: true }, { text: adoption.reasonCode }]));
-  }
-  if (adoption.nextCommand !== undefined) {
-    details.push(
-      line([
-        { text: '  Next command: ', dim: true },
-        { text: adoption.nextCommand, tone: 'brand' },
-      ]),
-    );
-  }
-  return details;
-}
-
-function runtimeAdoptionView(adoption: RuntimeAdoptionResult): ViewNode {
-  const presentation = runtimeAdoptionPresentation(adoption);
-  return group(
-    [
-      line([
-        { text: presentation.symbol, tone: presentation.tone },
-        { text: ' ' },
-        { text: presentation.headline, bold: true },
-      ]),
-      { kind: 'spacer' },
-      line([{ text: `  ${presentation.summary}` }]),
-      ...runtimeAdoptionDetails(adoption),
     ],
     2,
   );
@@ -502,15 +280,12 @@ export function viewInit(result: InitResult): ViewNode {
     return verbatim(result.insideExistingProject.message);
   if (result.languageResolutionError !== undefined)
     return languageResolutionView(result.languageResolutionError.message);
-  // Legacy dual-write / older CLI JSON still carries ambiguousLanguageError only.
-  if (result.ambiguousLanguageError !== undefined)
-    return languageResolutionView(result.ambiguousLanguageError.message);
   if (result.authoredStateChangedError !== undefined)
     return authoredStateChangedView(result.authoredStateChangedError.message);
   if (result.partialStateError !== undefined)
     return partialStateView(result.partialStateError, result.cwd, result.configFilename);
   if (result.runtimeAdoption !== undefined) {
-    if (RUNTIME_ADOPTION_SUCCESSES.has(result.runtimeAdoption.status))
+    if (isSuccessfulRuntimeAdoption(result.runtimeAdoption.status))
       return successfulAdoptionView(result);
     return runtimeAdoptionView(result.runtimeAdoption);
   }

@@ -1,5 +1,3 @@
-import { lstatSync, type BigIntStats } from 'node:fs';
-
 import {
   checkpointSqliteFile,
   inspectSqliteFile,
@@ -13,31 +11,30 @@ import {
   bindRuntimePromotionDatastoreSet,
   closeBoundRuntimePromotionDatastoreSet,
 } from './runtime-promotion-preflight-datastore-authority.js';
+import { RuntimePromotionDatastoreError } from './runtime-promotion-preflight-datastore-error.js';
+import {
+  assertExactDatabaseSet,
+  assertExactFileSnapshot,
+  assertPostCloseSnapshot,
+  assertSameSidecarObjects,
+  captureCurrentDatabaseAuthority,
+  databaseSetSnapshot,
+  runtimePromotionFileSnapshot,
+  type RuntimePromotionDatabaseSetSnapshot,
+} from './runtime-promotion-preflight-datastore-snapshot.js';
 import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 
 import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
 import type {
   RuntimePromotionDatastoreCheckpointInput,
   RuntimePromotionDatastoreDependencies,
-  RuntimePromotionDatastoreFailureReason,
   RuntimePromotionDatastoreIdentity,
   RuntimePromotionDatastoreKind,
 } from './runtime-promotion-preflight-datastore-types.js';
 
+export { RuntimePromotionDatastoreError } from './runtime-promotion-preflight-datastore-error.js';
+
 const DATABASE_INVALID_REASON = 'database-invalid';
-
-export class RuntimePromotionDatastoreError extends Error {
-  readonly releaseSafe: boolean;
-
-  constructor(
-    readonly reason: RuntimePromotionDatastoreFailureReason,
-    readonly closeResult?: DatastoreCloseResult,
-  ) {
-    super(`Runtime promotion datastore preparation failed (${reason}).`);
-    this.name = 'RuntimePromotionDatastoreError';
-    this.releaseSafe = closeResult?.closed !== false;
-  }
-}
 
 function mainFilePresence(path: string): 'absent' | 'file' | 'unsafe' {
   const snapshot = runtimePromotionFileSnapshot(path);
@@ -72,6 +69,7 @@ function candidateSetValid(
   );
 }
 
+/** @throws {RuntimePromotionDatastoreError} When the open journal lacks exact datastore authority. */
 function assertVerifiedOpenJournal(
   journal: RuntimePromotionJournal,
   input: RuntimePromotionDatastoreCheckpointInput,
@@ -88,171 +86,14 @@ function assertVerifiedOpenJournal(
   }
 }
 
-interface RuntimePromotionDatabaseAuthority {
-  readonly dev: bigint;
-  readonly ino: bigint;
-  readonly uid: bigint;
-  readonly mode: bigint;
-  readonly nlink: bigint;
-  readonly size: bigint;
-  readonly mtimeNs: bigint;
-  readonly ctimeNs: bigint;
-}
-
-type RuntimePromotionFileSnapshot =
-  | { readonly status: 'absent' }
-  | {
-      readonly status: 'file';
-      readonly identity: RuntimePromotionDatabaseAuthority;
-    }
-  | { readonly status: 'unsafe' };
-
-function databaseIdentity(stat: BigIntStats): RuntimePromotionDatabaseAuthority {
-  return {
-    dev: stat.dev,
-    ino: stat.ino,
-    uid: stat.uid,
-    mode: stat.mode,
-    nlink: stat.nlink,
-    size: stat.size,
-    mtimeNs: stat.mtimeNs,
-    ctimeNs: stat.ctimeNs,
-  };
-}
-
-function runtimePromotionFileSnapshot(path: string): RuntimePromotionFileSnapshot {
-  try {
-    const stat = lstatSync(path, { bigint: true });
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1n) {
-      return { status: 'unsafe' };
-    }
-    const uid = typeof process.getuid === 'function' ? BigInt(process.getuid()) : undefined;
-    if (uid !== undefined && stat.uid !== uid) return { status: 'unsafe' };
-    return { status: 'file', identity: databaseIdentity(stat) };
-  } catch (error) {
-    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
-      ? { status: 'absent' }
-      : { status: 'unsafe' };
-  }
-}
-
-function sameFileIdentity(
-  expected: RuntimePromotionDatabaseAuthority,
-  observed: RuntimePromotionDatabaseAuthority,
-): boolean {
-  return (
-    expected.dev === observed.dev &&
-    expected.ino === observed.ino &&
-    expected.uid === observed.uid &&
-    expected.mode === observed.mode &&
-    expected.nlink === observed.nlink &&
-    expected.size === observed.size &&
-    expected.mtimeNs === observed.mtimeNs &&
-    expected.ctimeNs === observed.ctimeNs
-  );
-}
-
-function sameFileObject(
-  expected: RuntimePromotionDatabaseAuthority,
-  observed: RuntimePromotionDatabaseAuthority,
-): boolean {
-  return (
-    expected.dev === observed.dev &&
-    expected.ino === observed.ino &&
-    expected.uid === observed.uid &&
-    expected.mode === observed.mode &&
-    expected.nlink === observed.nlink
-  );
-}
-
-interface RuntimePromotionDatabaseSetSnapshot {
-  readonly main: RuntimePromotionFileSnapshot;
-  readonly wal: RuntimePromotionFileSnapshot;
-  readonly shm: RuntimePromotionFileSnapshot;
-}
-
-function databaseSetSnapshot(path: string): RuntimePromotionDatabaseSetSnapshot {
-  return {
-    main: runtimePromotionFileSnapshot(path),
-    wal: runtimePromotionFileSnapshot(`${path}-wal`),
-    shm: runtimePromotionFileSnapshot(`${path}-shm`),
-  };
-}
-
-function assertExactFileSnapshot(path: string, expected: RuntimePromotionFileSnapshot): void {
-  const observed = runtimePromotionFileSnapshot(path);
-  if (
-    expected.status !== observed.status ||
-    (expected.status === 'file' &&
-      (observed.status !== 'file' || !sameFileIdentity(expected.identity, observed.identity)))
-  ) {
-    throw new RuntimePromotionDatastoreError(DATABASE_INVALID_REASON);
-  }
-}
-
-function assertExactDatabaseSet(path: string, expected: RuntimePromotionDatabaseSetSnapshot): void {
-  assertExactFileSnapshot(path, expected.main);
-  assertExactFileSnapshot(`${path}-wal`, expected.wal);
-  assertExactFileSnapshot(`${path}-shm`, expected.shm);
-}
-
-function assertMainDatabaseObject(path: string, expected: RuntimePromotionFileSnapshot): void {
-  const observed = runtimePromotionFileSnapshot(path);
-  if (
-    expected.status !== observed.status ||
-    (expected.status === 'file' &&
-      (observed.status !== 'file' || !sameFileObject(expected.identity, observed.identity)))
-  ) {
-    throw new RuntimePromotionDatastoreError(DATABASE_INVALID_REASON);
-  }
-}
-
-function captureCurrentDatabaseAuthority(
-  input: RuntimePromotionDatastoreCheckpointInput,
-  bound: Parameters<typeof assertBoundRuntimePromotionDatastoreSet>[1],
-  path: string,
-  expectedMain: RuntimePromotionFileSnapshot,
-): RuntimePromotionDatabaseSetSnapshot {
-  assertBoundRuntimePromotionDatastoreSet(input, bound);
-  assertMainDatabaseObject(path, expectedMain);
-  const observed = databaseSetSnapshot(path);
-  if (observed.wal.status === 'unsafe' || observed.shm.status === 'unsafe') {
-    throw new RuntimePromotionDatastoreError(DATABASE_INVALID_REASON);
-  }
-  return observed;
-}
-
-function assertSameSidecarObjects(
-  expected: RuntimePromotionDatabaseSetSnapshot,
-  observed: RuntimePromotionDatabaseSetSnapshot,
-): void {
-  for (const sidecar of ['wal', 'shm'] as const) {
-    const expectedSidecar = expected[sidecar];
-    const observedSidecar = observed[sidecar];
-    if (
-      expectedSidecar.status !== observedSidecar.status ||
-      (expectedSidecar.status === 'file' &&
-        (observedSidecar.status !== 'file' ||
-          !sameFileObject(expectedSidecar.identity, observedSidecar.identity)))
-    ) {
-      throw new RuntimePromotionDatastoreError(DATABASE_INVALID_REASON);
-    }
-  }
-}
-
-function assertPostCloseSnapshot(
-  path: string,
-  snapshot: RuntimePromotionDatabaseSetSnapshot | undefined,
-): void {
-  if (snapshot !== undefined) assertExactDatabaseSet(path, snapshot);
-}
-
+/** @throws {RuntimePromotionDatastoreError} When a datastore checkpoint or close is incomplete. */
 function assertCheckpointComplete(result: DatastoreCloseResult): void {
   if (!result.checkpointed || !result.closed) {
     throw new RuntimePromotionDatastoreError('checkpoint-incomplete', result);
   }
 }
 
+/** @throws {RuntimePromotionDatastoreError} When integrity inspection bypasses its authority guard. */
 function assertInspectionAuthorityAccepted(invoked: boolean, accepted: boolean): void {
   if (!invoked || !accepted) {
     throw new RuntimePromotionDatastoreError(DATABASE_INVALID_REASON);
@@ -265,6 +106,7 @@ const UNKNOWN_UNCLOSED_RESULT: DatastoreCloseResult = Object.freeze({
   reason: 'checkpoint-and-close-failed',
 });
 
+/** @throws {RuntimePromotionDatastoreError} When SQLite integrity inspection cannot be proven safe. */
 function inspectWithLifecycleProof(
   dependencies: RuntimePromotionDatastoreDependencies,
   path: string,
@@ -297,6 +139,7 @@ function sidecarsAbsent(result: SqliteIntegrityResult): boolean {
   );
 }
 
+/** @throws {RuntimePromotionDatastoreError} When SQLite integrity evidence is incomplete or unsafe. */
 function classifyIntegrity(
   kind: RuntimePromotionDatastoreKind,
   integrity: SqliteIntegrityResult,
@@ -342,6 +185,8 @@ function classifyIntegrity(
  * handles through checkpoint and inspection. Node/better-sqlite3 has no openat
  * API, so this closes deterministic process-level swap windows rather than
  * claiming an OS sandbox against a concurrently racing local process.
+ *
+ * @throws {RuntimePromotionDatastoreError} When checkpoint or integrity authority cannot be proven.
  */
 export async function checkpointRuntimePromotionDatastores(
   input: RuntimePromotionDatastoreCheckpointInput,
@@ -440,6 +285,7 @@ export async function checkpointRuntimePromotionDatastores(
               database.main,
             );
           },
+          /** @throws {RuntimePromotionDatastoreError} When open-database authority was not captured. */
           beforeCheckpoint: () => {
             if (postOpenDatabase === undefined) {
               throw new RuntimePromotionDatastoreError(DATABASE_INVALID_REASON);

@@ -181,10 +181,10 @@ describe('attachOptionalToolRecommendations', () => {
       }),
     ],
     [
-      'ambiguous language',
+      'language resolution refusal',
       init({
         created: false,
-        ambiguousLanguageError: { detected: ['python', 'go'], message: 'choose a language' },
+        languageResolutionError: { detected: ['python', 'go'], message: 'choose a language' },
       }),
     ],
     [

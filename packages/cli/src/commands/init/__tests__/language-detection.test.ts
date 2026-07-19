@@ -18,6 +18,10 @@ import {
   type SupportedLanguage,
 } from '../language-detection.js';
 
+function reversedCopy<T>(values: readonly T[]): T[] {
+  return Array.from({ length: values.length }, (_, index) => values[values.length - index - 1]);
+}
+
 describe('canonicalizeLanguages', () => {
   it('reorders into ALL_LANGUAGES order and dedupes', () => {
     expect(canonicalizeLanguages(['python', 'typescript', 'python', 'go'])).toEqual([
@@ -25,7 +29,7 @@ describe('canonicalizeLanguages', () => {
       'python',
       'go',
     ]);
-    expect(canonicalizeLanguages([...ALL_LANGUAGES].reverse())).toEqual([...ALL_LANGUAGES]);
+    expect(canonicalizeLanguages(reversedCopy(ALL_LANGUAGES))).toEqual([...ALL_LANGUAGES]);
   });
 });
 

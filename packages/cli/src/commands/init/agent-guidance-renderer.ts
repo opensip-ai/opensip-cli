@@ -265,6 +265,7 @@ export function renderAgentGuidanceTargets(
   };
 }
 
+/** @throws {Error} When a guidance snapshot is unknown or duplicated. */
 function indexTargetSnapshots(
   snapshots: readonly AgentGuidanceTargetSnapshot[],
 ): ReadonlyMap<string, AgentGuidanceTargetSnapshot> {

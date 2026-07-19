@@ -3,8 +3,8 @@
  *
  * The most powerful test in the suite: take real TypeScript files from
  * the workspace, enumerate every callable declaration using the
- * TypeScript Compiler API directly, run graph's stage 1 against the
- * same files, and assert the symmetric difference is empty (modulo a
+ * TypeScript Compiler API directly, run graph's checker-free stage 1 against
+ * the same files, and assert the symmetric difference is empty (modulo a
  * documented deny-list of intentional exclusions).
  *
  * If this test passes for the chosen sample files, function detection
@@ -19,10 +19,10 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { discoverFiles } from '../discover.js';
+import { parseProjectFast } from '../parse-fast.js';
+import { walkProgram } from '../walk.js';
 
-import { buildCatalog } from './_pipeline.js';
-
-import type { Catalog, FunctionOccurrence } from '@opensip-cli/graph';
+import type { FunctionOccurrence } from '@opensip-cli/graph';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../../..');
@@ -232,7 +232,11 @@ function enumerateCallablesFromTs(
 }
 
 /** Reduce a graph occurrence to a (line, column, kind) site for comparison. */
-function occToSite(occ: FunctionOccurrence): { line: number; column: number; kind: string } {
+function occToSite(occ: FunctionOccurrence): {
+  line: number;
+  column: number;
+  kind: string;
+} {
   // Map graph's FunctionKind → the coarser kinds enumerateCallablesFromTs uses.
   let kind: string = occ.kind;
   if (occ.kind === 'function-declaration') kind = 'function';
@@ -248,42 +252,64 @@ function siteKey(s: { line: number; column: number; kind: string }): string {
  * TS-Compiler-API enumeration, and return the symmetric difference of
  * (line, column, kind) sites.
  */
-function differentialFor(
-  filePathProjectRel: string,
-  projectDir: string,
-): {
+interface DifferentialResult {
   onlyInTs: CallableSite[];
   onlyInGraph: FunctionOccurrence[];
   graphCount: number;
   tsCount: number;
-} {
-  const discovery = discoverFiles({ projectDir });
-  const inv = buildCatalog({
-    projectDirAbs: discovery.projectDirAbs,
-    files: discovery.files,
-    compilerOptions: discovery.compilerOptions,
-    tsConfigPathAbs: discovery.tsConfigPathAbs,
-  });
-  const catalog: Catalog = inv.catalog;
+}
 
-  const targetSf = inv.program
-    .getSourceFiles()
-    .find(
-      (sf) =>
-        relative(discovery.projectDirAbs, sf.fileName).split(/[/\\]/).join('/') ===
-        filePathProjectRel,
-    );
-  if (!targetSf) {
+const DIFFERENTIAL_CACHE = new Map<string, DifferentialResult>();
+
+function differentialFor(filePathProjectRel: string, projectDir: string): DifferentialResult {
+  const cacheKey = `${resolve(projectDir)}\0${filePathProjectRel}`;
+  const cached = DIFFERENTIAL_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const discovery = discoverFiles({ projectDir });
+  const targetFile = discovery.files.find(
+    (file) =>
+      relative(discovery.projectDirAbs, file).split(/[/\\]/).join('/') === filePathProjectRel,
+  );
+  if (!targetFile) {
     throw new Error(
-      `Could not find ${filePathProjectRel} in program; tsconfig may not include it.`,
+      `Could not find ${filePathProjectRel} in discovery; tsconfig may not include it.`,
     );
   }
+
+  // Stage 1 is deliberately checker-free and mode-agnostic. Parse only the
+  // sampled file through the production fast parser, then exercise the same
+  // production walker used by a full graph build. Building an exact Program
+  // for every package here tested semantic setup that cannot affect inventory
+  // and made this structural differential sensitive to machine load.
+  const parsed = parseProjectFast({
+    projectDirAbs: discovery.projectDirAbs,
+    files: [targetFile],
+    compilerOptions: discovery.compilerOptions,
+    resolutionMode: 'fast',
+  });
+  if (parsed.parseErrors.length > 0) {
+    throw new Error(
+      `Could not parse ${filePathProjectRel}: ${parsed.parseErrors
+        .map((error) => error.message)
+        .join('; ')}`,
+    );
+  }
+  const targetSf = parsed.project.sourceFiles.get(targetFile);
+  if (!targetSf) {
+    throw new Error(`Fast parser omitted ${filePathProjectRel}.`);
+  }
+  const walked = walkProgram({
+    sourceFiles: parsed.project.sourceFiles.values(),
+    files: [targetFile],
+    projectDirAbs: discovery.projectDirAbs,
+  });
 
   const tsCallables = enumerateCallablesFromTs(targetSf, filePathProjectRel);
   const tsSites = new Set(tsCallables.map((c) => siteKey(c)));
 
   const graphOccs: FunctionOccurrence[] = [];
-  for (const occs of Object.values(catalog.functions)) {
+  for (const occs of Object.values(walked.functions)) {
     for (const o of occs) {
       // module-init is a graph-only synthesis; not a real callable from
       // the TS-API perspective. Exclude from the differential.
@@ -296,12 +322,14 @@ function differentialFor(
   const onlyInTs = tsCallables.filter((c) => !graphSites.has(siteKey(c)));
   const onlyInGraph = graphOccs.filter((o) => !tsSites.has(siteKey(occToSite(o))));
 
-  return {
+  const result = {
     onlyInTs,
     onlyInGraph,
     graphCount: graphOccs.length,
     tsCount: tsCallables.length,
   };
+  DIFFERENTIAL_CACHE.set(cacheKey, result);
+  return result;
 }
 
 interface SampleSpec {
@@ -311,13 +339,22 @@ interface SampleSpec {
 
 const SAMPLES: readonly SampleSpec[] = [
   { packageDir: 'packages/cli', relativePath: 'src/index.ts' },
-  { packageDir: 'packages/fitness/engine', relativePath: 'src/framework/define-check.ts' },
+  {
+    packageDir: 'packages/fitness/engine',
+    relativePath: 'src/framework/define-check.ts',
+  },
   { packageDir: 'packages/contracts', relativePath: 'src/types.ts' },
-  { packageDir: 'packages/languages/lang-typescript', relativePath: 'src/ast-utilities.ts' },
+  {
+    packageDir: 'packages/languages/lang-typescript',
+    relativePath: 'src/ast-utilities.ts',
+  },
   // Layer 5 Phase 3 (audit 2026-05-22 F3) moved the FitView controller
   // out of cli/ui into the fitness package as fit-runner.tsx; the new
   // file is the JSX-rich sample that this differential test exercises.
-  { packageDir: 'packages/fitness/engine', relativePath: 'src/cli/fit-runner.tsx' },
+  {
+    packageDir: 'packages/fitness/engine',
+    relativePath: 'src/cli/fit-runner.tsx',
+  },
 ];
 
 describe('Tier 2 — differential test against TS Compiler API on real workspace files', () => {
@@ -359,9 +396,6 @@ describe('Tier 2 — differential test against TS Compiler API on real workspace
     });
   }
 
-  // Builds real TS catalogs over several monorepo samples — can exceed the
-  // shared 120s base under release-job load (same class of flake as the
-  // inventory-differential suite that raised vitest.base to 120s).
   it('coverage sanity: the 5 sample files together expose a substantial number of callables', () => {
     // Make sure our chosen sample is non-trivial — i.e. we're actually
     // exercising graph's detection on real code, not just empty type files.
@@ -387,5 +421,5 @@ describe('Tier 2 — differential test against TS Compiler API on real workspace
     // Belt-and-braces: at least 4 of the 5 samples are non-empty.
     const nonEmpty = Object.values(perFile).filter((n) => n > 0).length;
     expect(nonEmpty, detail).toBeGreaterThanOrEqual(4);
-  }, 180_000);
+  });
 });

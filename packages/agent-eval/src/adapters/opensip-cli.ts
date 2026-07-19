@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { buildDeterministicEnv } from '../runner/env.js';
@@ -24,6 +25,7 @@ export type SetupSpawnCli = (
 /** Injectable environment and process effects for fixture setup. */
 export interface SetupFixtureProjectDependencies {
   readonly buildEnv: typeof buildDeterministicEnv;
+  readonly prepareHome: (path: string) => void;
   readonly spawnCli: SetupSpawnCli;
 }
 
@@ -31,6 +33,9 @@ export interface SetupFixtureProjectDependencies {
 export const DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES: SetupFixtureProjectDependencies =
   Object.freeze({
     buildEnv: buildDeterministicEnv,
+    prepareHome: (path: string) => {
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+    },
     spawnCli,
   });
 
@@ -107,7 +112,9 @@ export async function setupFixtureProject(
   language: string,
   dependencies: SetupFixtureProjectDependencies = DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES,
 ): Promise<SetupRecord> {
-  const env = dependencies.buildEnv({ HOME: fixtureHomePath(projectRoot) });
+  const home = fixtureHomePath(projectRoot);
+  dependencies.prepareHome(home);
+  const env = dependencies.buildEnv({ HOME: home });
   const options: SpawnOptions = { cwd: projectRoot, env };
 
   const init = requireSuccessfulStage(

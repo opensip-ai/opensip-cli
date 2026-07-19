@@ -338,9 +338,11 @@ describe('runtime status view', () => {
     });
 
     expect(out).toContain('Adoption: not-needed');
-    expect(out).toMatch(/no adoption conflict needs attention|No storage conflict needs attention/i);
+    expect(out).toMatch(
+      /no adoption conflict needs attention|No storage conflict needs attention/i,
+    );
     expect(out).toContain('normal evidence reads and writes may continue');
-        expect(out).toContain('only operation-owned cleanup remains');
+    expect(out).toContain('only operation-owned cleanup remains');
     expect(out).toContain('Source evidence: not preserved');
     expect(out).toContain('Run: opensip init');
     expect(out).not.toContain('matches its terminal manifest');
@@ -424,7 +426,9 @@ describe('runtime status view', () => {
 
     expect(out).toContain('Active: none');
     expect(out).toContain('Adoption: not-needed');
-    expect(out).toMatch(/no adoption conflict needs attention|No storage conflict needs attention/i);
+    expect(out).toMatch(
+      /no adoption conflict needs attention|No storage conflict needs attention/i,
+    );
     expect(out).toContain('normal evidence reads and writes may continue');
     expect(out).toContain('only operation-owned cleanup remains');
     expect(out).toContain('Source evidence: unknown from bounded status inspection');

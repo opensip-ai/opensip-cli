@@ -21,10 +21,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { reconcileAuthoredMutation } from '../authored-state-transaction-execution.js';
 import { openStableAuthoredRoot } from '../authored-state-transaction-fs.js';
-import {
-  applyAuthoredDirectory,
-  withBoundAuthoredTarget,
-} from '../authored-state-transaction-target-fs.js';
+import { withBoundAuthoredTarget } from '../authored-state-transaction-target-fs.js';
+import { applyAuthoredDirectory } from '../authored-state-transaction-target-mutations.js';
 import { directoryDigest, sha256Bytes } from '../init-authored-plan-types.js';
 
 import type {

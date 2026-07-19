@@ -187,10 +187,13 @@ describe('forward filesystem lifecycle', () => {
       await backupRuntimePromotionDestination(first, expected.identity);
       const owner = readFileSync(paths.backupMarker, 'utf8');
 
+      const originalRootIdentity = capturePromotionRootIdentity(paths.backup);
+      const replacement = makePrivateDirectory(join(paths.parent, 'backup-replacement'));
+      writePrivateFile(join(replacement, 'evidence.txt'), 'project-before');
+      expect(capturePromotionRootIdentity(replacement)).not.toEqual(originalRootIdentity);
+      expect(verifiedRuntime(replacement).identity).toEqual(expected.identity);
       rmSync(paths.backup, { recursive: true, force: true });
-      makePrivateDirectory(paths.backup);
-      writePrivateFile(join(paths.backup, 'evidence.txt'), 'project-before');
-      expect(verifiedRuntime(paths.backup).identity).toEqual(expected.identity);
+      renameSync(replacement, paths.backup);
       if (markerPosture === 'partial-before-inode') {
         writePrivateFile(paths.backupMarker, owner.slice(0, owner.indexOf('"rootIdentity"')));
       }
@@ -672,10 +675,13 @@ describe('rollback filesystem lifecycle', () => {
         capturePromotionRootIdentity(backup),
       ),
     );
+    const originalRootIdentity = capturePromotionRootIdentity(backup);
+    const replacement = makePrivateDirectory(join(parent, 'rollback-backup-replacement'));
+    writePrivateFile(join(replacement, 'evidence.txt'), 'restored-old');
+    expect(capturePromotionRootIdentity(replacement)).not.toEqual(originalRootIdentity);
+    expect(verifiedRuntime(replacement).identity).toEqual(previous.identity);
     rmSync(backup, { recursive: true, force: true });
-    makePrivateDirectory(backup);
-    writePrivateFile(join(backup, 'evidence.txt'), 'restored-old');
-    expect(verifiedRuntime(backup).identity).toEqual(previous.identity);
+    renameSync(replacement, backup);
     const authority = await authorizeFilesystem(
       project,
       'runtime-rollback',

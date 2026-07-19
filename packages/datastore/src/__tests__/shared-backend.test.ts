@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -28,6 +28,19 @@ describe('buildSqliteDataStore', () => {
     handle.close();
   });
 
+  it('serializes file-backed writes when a lock context is supplied', () => {
+    const path = join(tmp, 'locked.sqlite');
+    const handle = buildSqliteDataStore(path, {
+      policy: { waitMs: 1000, staleMs: 10_000, heartbeatMs: 100 },
+      command: 'shared-backend-test',
+      cwdBasename: 'fixture',
+    });
+
+    expect(handle.withWriteLock('probe', () => 42)).toBe(42);
+    expect(existsSync(`${path}.write.lock`)).toBe(false);
+    handle.close();
+  });
+
   it('returns one idempotent lifecycle close proof', () => {
     const path = join(tmp, 'lifecycle.sqlite');
     const handle = buildSqliteDataStore(path);
@@ -38,6 +51,17 @@ describe('buildSqliteDataStore', () => {
     expect(first).toEqual({ checkpointed: true, closed: true });
     expect(second).toBe(first);
     expect(() => handle.close()).not.toThrow();
+  });
+
+  it('throws a bounded close failure when the native handle was closed before checkpointing', () => {
+    const path = join(tmp, 'premature-native-close.sqlite');
+    const handle = buildSqliteDataStore(path);
+    const native = (handle.db as unknown as { readonly $client: { close(): void } }).$client;
+    native.close();
+
+    expect(() => handle.close()).toThrow(
+      'SQLite datastore close did not complete cleanly (checkpoint-failed)',
+    );
   });
 });
 

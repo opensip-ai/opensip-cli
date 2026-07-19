@@ -1,7 +1,7 @@
 import { closeSync, openSync, opendirSync, readSync, statSync } from 'node:fs';
 import { sep } from 'node:path';
 
-import { escapeRegularExpression } from '../model/value-helpers.js';
+import { compareCodePoints, escapeRegularExpression } from '../model/value-helpers.js';
 import { resolveInsideRoot } from '../runner/workspace-paths.js';
 
 import type { Dirent } from 'node:fs';
@@ -79,18 +79,6 @@ function shouldExclude(relativePath: string, name: string): boolean {
     normalized.startsWith('__fixtures__/') ||
     normalized.includes('/__fixtures__/')
   );
-}
-
-function compareCodePoints(left: string, right: string): number {
-  const leftPoints = [...left];
-  const rightPoints = [...right];
-  const length = Math.min(leftPoints.length, rightPoints.length);
-  for (let index = 0; index < length; index += 1) {
-    const leftPoint = leftPoints[index]?.codePointAt(0) ?? 0;
-    const rightPoint = rightPoints[index]?.codePointAt(0) ?? 0;
-    if (leftPoint !== rightPoint) return leftPoint - rightPoint;
-  }
-  return leftPoints.length - rightPoints.length;
 }
 
 function entrySortKey(entry: Dirent<string>): string {

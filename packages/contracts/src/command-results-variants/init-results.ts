@@ -118,16 +118,6 @@ export interface InitResult {
     detected: readonly string[];
     message: string;
   };
-  /**
-   * @deprecated Prefer {@link languageResolutionError}. Retained for
-   * older `--json` consumers. Current CLIs dual-write the same payload
-   * onto both fields for non-polyglot resolution failures; polyglot
-   * projects never produce this field.
-   */
-  ambiguousLanguageError?: {
-    detected: readonly string[];
-    message: string;
-  };
 }
 
 export interface SimNoticeResult {

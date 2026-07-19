@@ -129,7 +129,9 @@ export function buildDatastoreThunk(
 ): DatastoreThunk {
   let cached: DataStore | undefined;
   let failedMaterialization = false;
-  const thunk = (() => {
+
+  /** @throws {SystemError} When invoked without a runtime-backed project scope. */
+  function materializeDatastore(): DataStore {
     if (cached) return cached;
     if (project.scope !== 'project' && project.scope !== 'ephemeral') {
       throw new SystemError(
@@ -163,7 +165,9 @@ export function buildDatastoreThunk(
       path,
     });
     return cached;
-  }) as DatastoreThunk;
+  }
+
+  const thunk = materializeDatastore as DatastoreThunk;
   thunk.current = () => cached;
   // Close the cached connection on scope teardown (registered via
   // `scope.onDispose`). Closing checkpoints + truncates the WAL; without this the

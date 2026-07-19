@@ -340,9 +340,7 @@ function buildRegistry(journeys) {
   }
   for (const id of COMMON_V1_JOURNEY_IDS) {
     if (!COMMON_V2_JOURNEY_IDS.includes(id)) {
-      throw new Error(
-        `journey-catalog: common-v2 drops common-v1 journey ${JSON.stringify(id)}`,
-      );
+      throw new Error(`journey-catalog: common-v2 drops common-v1 journey ${JSON.stringify(id)}`);
     }
   }
   const v2Only = COMMON_V2_JOURNEY_IDS.filter((id) => !COMMON_V1_JOURNEY_IDS.includes(id));

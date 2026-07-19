@@ -300,7 +300,10 @@ export function admitCapabilityPackage(
 function admissionDenialReason(
   pkg: SelectedCapabilityPackage,
   grantPresent: boolean,
-  policyDecision: { readonly allowed: boolean; readonly decision: { readonly reasons: readonly string[] } },
+  policyDecision: {
+    readonly allowed: boolean;
+    readonly decision: { readonly reasons: readonly string[] };
+  },
 ): string {
   if (!policyDecision.allowed) return policyDecision.decision.reasons.join('; ');
   if (grantPresent) {

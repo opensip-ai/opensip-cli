@@ -12,7 +12,7 @@
  * import from this leaf, and nothing in this file imports back.
  */
 
-import type { Shard, ShardRunStats } from './shard-model.js';
+import type { Shard, ShardFailureEvidence, ShardRunStats } from './shard-model.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type {
@@ -91,6 +91,8 @@ export interface RunShardedResult {
   readonly cacheHit: boolean;
   /** Shard ids whose worker failed while the remaining build continued. */
   readonly failedShardIds: readonly string[];
+  /** Bounded reason evidence for each failed worker, in stable shard-id order. */
+  readonly shardFailures: readonly ShardFailureEvidence[];
   /** Feature table derived over the merged global catalog. */
   readonly features: FeatureTable;
   /** Per-run sharded build statistics mirrored into profile output. */

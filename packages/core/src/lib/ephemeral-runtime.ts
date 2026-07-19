@@ -21,13 +21,23 @@
  * operation is tolerant, and a failure to prune must never fail a user's run.
  */
 
-import { closeSync, fstatSync, lstatSync, openSync, readSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { lstatSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   ensureEphemeralRuntimeDirectory,
   ensureEphemeralRuntimeRoot,
 } from './ephemeral-runtime-directory.js';
+import {
+  EPHEMERAL_MARKER_FILE,
+  EPHEMERAL_MARKER_MAX_BYTES,
+  EPHEMERAL_MARKER_VERSION,
+  isValidEphemeralTimestamp,
+  parseEphemeralMarker,
+  readEphemeralMarker,
+  type EphemeralMarker,
+  type EphemeralMarkerReadResult,
+} from './ephemeral-runtime-marker.js';
 import { withFileLock, type FileLockEvent } from './file-lock.js';
 import {
   legacyEphemeralProjectCacheKey,
@@ -42,12 +52,17 @@ import {
   type RuntimeLeaseEvent,
 } from './runtime-lease.js';
 
-/** Marker file recording which project an ephemeral cache entry belongs to. */
-export const EPHEMERAL_MARKER_FILE = 'project.json';
-/** Current marker schema written beside an ephemeral runtime. */
-export const EPHEMERAL_MARKER_VERSION = 2;
-/** Hard read cap for the untrusted cache-owned marker. */
-export const EPHEMERAL_MARKER_MAX_BYTES = 4096;
+export {
+  EPHEMERAL_MARKER_FILE,
+  EPHEMERAL_MARKER_MAX_BYTES,
+  EPHEMERAL_MARKER_VERSION,
+  parseEphemeralMarker,
+  readEphemeralMarker,
+  type EphemeralMarker,
+  type EphemeralMarkerInvalidReason,
+  type EphemeralMarkerReadResult,
+  type LegacyEphemeralMarker,
+} from './ephemeral-runtime-marker.js';
 
 /** Throttle marker: pruning runs at most once per {@link PRUNE_INTERVAL_MS}. */
 const PRUNE_STAMP_FILE = '.last-prune';
@@ -68,38 +83,6 @@ const METADATA_LOCK_POLICY = Object.freeze({
  */
 export const DEFAULT_EPHEMERAL_MAX_AGE_DAYS = 30;
 export const DEFAULT_EPHEMERAL_KEEP = 50;
-
-export interface EphemeralMarker {
-  readonly version: typeof EPHEMERAL_MARKER_VERSION;
-  /** Absolute project directory this runtime backs. */
-  readonly projectDir: string;
-  /** Digest of the canonical project root. Internal only. */
-  readonly canonicalRootDigest: string;
-  /** Strength of the cache storage identity. */
-  readonly identityStrength: EphemeralProjectIdentityStrength;
-  /** Digest of reliable root/gitdir facts, present only when generation-bound. */
-  readonly generationDigest?: string;
-  /** ISO timestamp of the most recent run against it. */
-  readonly lastUsedAt: string;
-}
-
-/** Marker shape written before versioned generation-aware cache identities. */
-export interface LegacyEphemeralMarker {
-  readonly projectDir: string;
-  readonly lastUsedAt: string;
-}
-
-export type EphemeralMarkerInvalidReason = 'oversize' | 'malformed' | 'unreadable';
-
-/** Bounded, non-throwing result of inspecting one cache marker. */
-export type EphemeralMarkerReadResult =
-  | { readonly status: 'current'; readonly marker: EphemeralMarker }
-  | { readonly status: 'legacy'; readonly marker: LegacyEphemeralMarker }
-  | { readonly status: 'missing' }
-  | {
-      readonly status: 'invalid';
-      readonly reason: EphemeralMarkerInvalidReason;
-    };
 
 export type EphemeralRuntimeCandidateIdentityStrength =
   EphemeralProjectIdentityStrength | 'legacy-unverified';
@@ -255,159 +238,12 @@ export function touchEphemeralRuntime(
   }
 }
 
-function validTimestamp(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const parsed = Date.parse(value);
-  return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value;
-}
-
-function validDigest(value: unknown): value is string {
-  return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
-}
-
-function validIdentityStrength(value: unknown): value is EphemeralProjectIdentityStrength {
-  return value === 'generation-bound' || value === 'path-only';
-}
-
-/** Direct-module parser shared with the bounded prune implementation. */
-export function parseEphemeralMarker(raw: string): EphemeralMarkerReadResult {
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (parsed.version === EPHEMERAL_MARKER_VERSION) {
-      const identityStrength = parsed.identityStrength;
-      const generationDigest = parsed.generationDigest;
-      const validGeneration =
-        validIdentityStrength(identityStrength) &&
-        (identityStrength === 'generation-bound'
-          ? validDigest(generationDigest)
-          : generationDigest === undefined);
-      if (
-        typeof parsed.projectDir !== 'string' ||
-        parsed.projectDir.length === 0 ||
-        !isAbsolute(parsed.projectDir) ||
-        !validTimestamp(parsed.lastUsedAt) ||
-        !validDigest(parsed.canonicalRootDigest) ||
-        !validGeneration
-      ) {
-        return { status: 'invalid', reason: 'malformed' };
-      }
-      return {
-        status: 'current',
-        marker: {
-          version: EPHEMERAL_MARKER_VERSION,
-          projectDir: parsed.projectDir,
-          canonicalRootDigest: parsed.canonicalRootDigest,
-          identityStrength,
-          ...(identityStrength === 'generation-bound'
-            ? { generationDigest: generationDigest as string }
-            : {}),
-          lastUsedAt: parsed.lastUsedAt,
-        },
-      };
-    }
-
-    if (
-      parsed.version === undefined &&
-      typeof parsed.projectDir === 'string' &&
-      parsed.projectDir.length > 0 &&
-      isAbsolute(parsed.projectDir) &&
-      validTimestamp(parsed.lastUsedAt)
-    ) {
-      return {
-        status: 'legacy',
-        marker: {
-          projectDir: parsed.projectDir,
-          lastUsedAt: parsed.lastUsedAt,
-        },
-      };
-    }
-    return { status: 'invalid', reason: 'malformed' };
-  } catch {
-    return { status: 'invalid', reason: 'malformed' };
-  }
-}
-
-/**
- * Read one marker through an explicit 4 KiB cap. Missing, malformed, oversize,
- * unreadable, symlinked, and special-file markers are distinguished without
- * throwing or mutating the cache.
- */
-function markerReadPreflight(
-  entryDir: string,
-  markerPath: string,
-): EphemeralMarkerReadResult | undefined {
-  try {
-    const runtimeStat = lstatSync(entryDir);
-    if (!runtimeStat.isDirectory()) return { status: 'invalid', reason: 'unreadable' };
-  } catch (error) {
-    return isMissingFsError(error)
-      ? { status: 'missing' }
-      : { status: 'invalid', reason: 'unreadable' };
-  }
-
-  try {
-    const markerStat = lstatSync(markerPath);
-    if (!markerStat.isFile()) return { status: 'invalid', reason: 'unreadable' };
-    if (markerStat.size > EPHEMERAL_MARKER_MAX_BYTES) {
-      return { status: 'invalid', reason: 'oversize' };
-    }
-  } catch (error) {
-    return isMissingFsError(error)
-      ? { status: 'missing' }
-      : { status: 'invalid', reason: 'unreadable' };
-  }
-  return undefined;
-}
-
-/** Bounded, non-throwing public marker reader used by status and maintenance. */
-export function readEphemeralMarker(entryDir: string): EphemeralMarkerReadResult {
-  const markerPath = join(entryDir, EPHEMERAL_MARKER_FILE);
-  const preflight = markerReadPreflight(entryDir, markerPath);
-  if (preflight !== undefined) return preflight;
-  let fd: number | undefined;
-  try {
-    fd = openSync(markerPath, 'r');
-    const stat = fstatSync(fd);
-    if (!stat.isFile()) return { status: 'invalid', reason: 'unreadable' };
-    if (stat.size > EPHEMERAL_MARKER_MAX_BYTES) {
-      return { status: 'invalid', reason: 'oversize' };
-    }
-    const buffer = Buffer.alloc(EPHEMERAL_MARKER_MAX_BYTES + 1);
-    let bytesRead = 0;
-    while (bytesRead < buffer.length) {
-      const count = readSync(fd, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
-      if (count === 0) break;
-      bytesRead += count;
-    }
-    if (bytesRead > EPHEMERAL_MARKER_MAX_BYTES) {
-      return { status: 'invalid', reason: 'oversize' };
-    }
-    return parseEphemeralMarker(buffer.toString('utf8', 0, bytesRead));
-  } catch {
-    return { status: 'invalid', reason: 'unreadable' };
-  } finally {
-    if (fd !== undefined) {
-      try {
-        closeSync(fd);
-      } catch {
-        // Best-effort read helper: closing failure does not make a parsed
-        // marker trustworthy enough to mutate anything.
-      }
-    }
-  }
-}
-
-function isMissingFsError(error: unknown): boolean {
-  return (
-    error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT'
-  );
-}
-
 function entryExists(entryDir: string): boolean {
   try {
     lstatSync(entryDir);
     return true;
   } catch {
+    // @swallow-ok An inaccessible cache entry is treated as unavailable to callers.
     return false;
   }
 }
@@ -476,7 +312,7 @@ function writePruneStampWhileLocked(
     permissionPosture: CACHE_PERMISSION_POSTURE,
   });
   if (observed.status === 'present') {
-    if (!validTimestamp(observed.content)) return false;
+    if (!isValidEphemeralTimestamp(observed.content)) return false;
     const last = Date.parse(observed.content);
     if (now - last < PRUNE_INTERVAL_MS) return false;
   }
@@ -517,6 +353,7 @@ export function shouldPruneEphemeralRuntimes(
       () => writePruneStampWhileLocked(root, now, hooks),
     );
   } catch {
+    // @swallow-ok A stamp failure cannot grant prune authority and is reported as false.
     // A stamp publication failure cannot grant deletion authority.
     return false;
   }

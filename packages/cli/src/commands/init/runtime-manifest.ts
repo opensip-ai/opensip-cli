@@ -8,11 +8,13 @@ import { join } from 'node:path';
 import { resolveUserPaths } from '@opensip-cli/core';
 import { inspectSqliteFile, type SqliteIntegrityResult } from '@opensip-cli/datastore';
 
-import { inspectRuntimeTree } from './runtime-manifest-io.js';
 import {
-  RUNTIME_MANIFEST_DIFF_SAMPLE_LIMIT,
-  RuntimeManifestError,
-} from './runtime-manifest-model.js';
+  compareRuntimeManifests,
+  runtimeManifestIdentityEqual,
+  sameRuntimeManifestEntry,
+} from './runtime-manifest-comparison.js';
+import { inspectRuntimeTree } from './runtime-manifest-io.js';
+import { RuntimeManifestError } from './runtime-manifest-model.js';
 import { RUNTIME_PROMOTION_CACHE_KEY_PATTERN } from './runtime-promotion-journal-types.js';
 import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 import { materializeRuntimeStage } from './runtime-stage-io.js';
@@ -58,6 +60,11 @@ export type {
 } from './runtime-manifest-model.js';
 export type { RuntimeStageOwnershipIdentity } from './runtime-stage-ownership.js';
 export type { RuntimeManifestIdentity } from './runtime-promotion-journal-schema.js';
+export {
+  compareRuntimeManifests,
+  runtimeManifestIdentityEqual,
+} from './runtime-manifest-comparison.js';
+export type { RuntimeManifestDifference } from './runtime-manifest-comparison.js';
 
 const DATASTORE_FILE = 'datastore.sqlite';
 const INVALID_PATH = 'invalid-path';
@@ -66,18 +73,6 @@ export interface VerifiedRuntimeManifest {
   readonly identity: RuntimeManifestIdentity;
   /** Bounded by {@link RUNTIME_MANIFEST_MAX_ENTRIES}; never journaled or rendered. */
   readonly entries: readonly RuntimeManifestEntry[];
-}
-
-export interface RuntimeManifestDifference {
-  readonly equal: boolean;
-  readonly onlyLeft: number;
-  readonly onlyRight: number;
-  readonly changed: number;
-  readonly truncated: boolean;
-  readonly samples: readonly {
-    readonly path: string;
-    readonly difference: 'only-left' | 'only-right' | 'changed';
-  }[];
 }
 
 export type RuntimeManifestCheckpoint =
@@ -141,6 +136,7 @@ const DEFAULT_DEPENDENCIES: RuntimeManifestDependencies = Object.freeze({
     }),
 });
 
+/** @throws {RuntimeManifestError} Always; runtime-manifest authority cannot be established. */
 function fail(reason: ConstructorParameters<typeof RuntimeManifestError>[0]): never {
   throw new RuntimeManifestError(reason);
 }
@@ -248,6 +244,7 @@ function allSidecarsAbsent(result: SqliteIntegrityResult): boolean {
   );
 }
 
+/** @throws {RuntimeManifestError} When SQLite integrity or close authority cannot be proven. */
 function sqliteIdentity(
   runtimeDir: string,
   tree: RuntimeTreeManifest,
@@ -291,23 +288,6 @@ function sqliteIdentity(
   };
 }
 
-function sameEntry(left: RuntimeManifestEntry, right: RuntimeManifestEntry): boolean {
-  if (left.kind !== right.kind || left.path !== right.path || left.mode !== right.mode)
-    return false;
-  if (left.kind === 'directory' || right.kind === 'directory') {
-    return left.kind === 'directory' && right.kind === 'directory';
-  }
-  if (left.kind === 'file' || right.kind === 'file') {
-    return (
-      left.kind === 'file' &&
-      right.kind === 'file' &&
-      left.sizeBytes === right.sizeBytes &&
-      left.sha256 === right.sha256
-    );
-  }
-  return left.target === right.target && left.targetSha256 === right.targetSha256;
-}
-
 function sameTree(left: RuntimeTreeManifest, right: RuntimeTreeManifest): boolean {
   return (
     left.sha256 === right.sha256 &&
@@ -320,7 +300,7 @@ function sameTree(left: RuntimeTreeManifest, right: RuntimeTreeManifest): boolea
     left.entries.length === right.entries.length &&
     left.entries.every((entry, index) => {
       const other = right.entries[index];
-      return other !== undefined && sameEntry(entry, other);
+      return other !== undefined && sameRuntimeManifestEntry(entry, other);
     })
   );
 }
@@ -356,73 +336,6 @@ export function inspectVerifiedRuntimeManifest(
   const after = dependencies.inspectTree(runtimeDir, posture, stageOwnership);
   if (!sameTree(before, after)) fail('changed');
   return { identity: toIdentity(after, sqlite), entries: after.entries };
-}
-
-export function runtimeManifestIdentityEqual(
-  left: RuntimeManifestIdentity,
-  right: RuntimeManifestIdentity,
-): boolean {
-  return (
-    left.digest === right.digest &&
-    left.rootMode === right.rootMode &&
-    left.fileCount === right.fileCount &&
-    left.directoryCount === right.directoryCount &&
-    left.symlinkCount === right.symlinkCount &&
-    left.totalBytes === right.totalBytes &&
-    (left.sqlite.status === 'absent'
-      ? right.sqlite.status === 'absent'
-      : right.sqlite.status === 'verified' &&
-        left.sqlite.sha256 === right.sqlite.sha256 &&
-        left.sqlite.userVersion === right.sqlite.userVersion)
-  );
-}
-
-/** Return only bounded path samples even when the complete manifests are large. */
-export function compareRuntimeManifests(
-  left: VerifiedRuntimeManifest,
-  right: VerifiedRuntimeManifest,
-): RuntimeManifestDifference {
-  let onlyLeft = 0;
-  let onlyRight = 0;
-  let changed = 0;
-  const samples: RuntimeManifestDifference['samples'][number][] = [];
-  const sample = (
-    path: string,
-    difference: RuntimeManifestDifference['samples'][number]['difference'],
-  ): void => {
-    if (samples.length < RUNTIME_MANIFEST_DIFF_SAMPLE_LIMIT) samples.push({ path, difference });
-  };
-
-  const leftByPath = new Map(left.entries.map((entry) => [entry.path, entry]));
-  const rightByPath = new Map(right.entries.map((entry) => [entry.path, entry]));
-  for (const leftEntry of left.entries) {
-    const rightEntry = rightByPath.get(leftEntry.path);
-    if (rightEntry === undefined) {
-      onlyLeft += 1;
-      sample(leftEntry.path, 'only-left');
-      continue;
-    }
-    if (!sameEntry(leftEntry, rightEntry)) {
-      changed += 1;
-      sample(leftEntry.path, 'changed');
-    }
-  }
-  for (const rightEntry of right.entries) {
-    if (leftByPath.has(rightEntry.path)) continue;
-    onlyRight += 1;
-    sample(rightEntry.path, 'only-right');
-  }
-  const differenceCount = onlyLeft + onlyRight + changed;
-  const equal =
-    differenceCount === 0 && runtimeManifestIdentityEqual(left.identity, right.identity);
-  return {
-    equal,
-    onlyLeft,
-    onlyRight,
-    changed,
-    truncated: differenceCount > samples.length,
-    samples,
-  };
 }
 
 /**

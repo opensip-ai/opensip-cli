@@ -131,6 +131,7 @@ describe('runShardedGraph', () => {
     expect(out.indexes).not.toBeNull();
     expect(out.cacheHit).toBe(false);
     expect(out.failedShardIds).toEqual([]);
+    expect(out.shardFailures).toEqual([]);
     expect(out.signals).toHaveLength(1);
     expect(out.signals[0]?.message).toBe('saw 2 functions');
     expect(evaluatedAgainst).not.toBeNull();
@@ -236,6 +237,14 @@ describe('runShardedGraph', () => {
       rules: [],
     });
     expect(out.failedShardIds).toEqual(['fail:b']);
+    expect(out.shardFailures).toEqual([
+      {
+        shardId: 'fail:b',
+        exitCode: 2,
+        failureClass: 'exit_nonzero',
+        stderrTail: 'boom',
+      },
+    ]);
     expect(Object.keys(out.catalog.functions)).toEqual(['pkg_a']);
     expect(out.signals).toEqual([]);
   });

@@ -217,6 +217,27 @@ describe('withFileLock', () => {
     },
   );
 
+  it('rejects a heartbeat policy whose safety-normalized stale horizon overflows', () => {
+    dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+    const lockPath = join(dir, 'overflow-policy.lock');
+
+    expect(() =>
+      withFileLock(
+        lockPath,
+        {
+          policy: {
+            waitMs: 0,
+            staleMs: 0,
+            heartbeatMs: Math.floor(2_147_483_647 / 3) + 1,
+          },
+          resource: 'runtime',
+        },
+        () => 'never',
+      ),
+    ).toThrow(SystemError);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
   it.runIf(process.platform !== 'win32')(
     'does not unlink a replacement path while cleaning a failed partial create',
     () => {
@@ -414,6 +435,94 @@ describe('withFileLock', () => {
     },
   );
 
+  it.runIf(process.platform !== 'win32')(
+    'fails closed for an unproven two-link publication',
+    () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const sourcePath = join(dir, 'unproven-publication.source');
+      const lockPath = join(dir, 'unproven-publication.lock');
+      writeFileSync(
+        sourcePath,
+        JSON.stringify({
+          ownerToken: 'unproven-publisher',
+          pid: process.pid,
+          hostname: hostname(),
+          cwdBasename: 'tmp',
+          acquiredAt: Date.now(),
+          lastHeartbeatAt: Date.now(),
+        }),
+        { mode: 0o600 },
+      );
+      linkSync(sourcePath, lockPath);
+
+      expect(() =>
+        withFileLock(
+          lockPath,
+          {
+            policy: { waitMs: 0, staleMs: 10, heartbeatMs: 1 },
+            resource: 'runtime',
+          },
+          () => 'never',
+        ),
+      ).toThrow(SystemError);
+      expect(lstatSync(lockPath, { bigint: true }).nlink).toBe(2n);
+    },
+  );
+
+  it.runIf(process.platform !== 'win32')(
+    'fails closed for oversized or invalid linked publication records',
+    () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+
+      for (const [name, contents] of [
+        ['oversized', 'x'.repeat(5000)],
+        ['invalid', '{not-json'],
+      ] as const) {
+        const sourcePath = join(dir, `${name}.source`);
+        const lockPath = join(dir, `${name}.lock`);
+        writeFileSync(sourcePath, contents, { mode: 0o600 });
+        linkSync(sourcePath, lockPath);
+
+        expect(() =>
+          withFileLock(
+            lockPath,
+            {
+              policy: { waitMs: 0, staleMs: 10, heartbeatMs: 1 },
+              resource: 'runtime',
+            },
+            () => 'never',
+          ),
+        ).toThrow(SystemError);
+        expect(readFileSync(sourcePath, 'utf8')).toBe(contents);
+      }
+    },
+  );
+
+  it.runIf(process.platform !== 'win32')(
+    'fails closed for a lock inode with more than two links',
+    () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const sourcePath = join(dir, 'many-links.source');
+      const lockPath = join(dir, 'many-links.lock');
+      const thirdPath = join(dir, 'many-links.third');
+      writeFileSync(sourcePath, '{}', { mode: 0o600 });
+      linkSync(sourcePath, lockPath);
+      linkSync(sourcePath, thirdPath);
+
+      expect(() =>
+        withFileLock(
+          lockPath,
+          {
+            policy: { waitMs: 0, staleMs: 10, heartbeatMs: 1 },
+            resource: 'runtime',
+          },
+          () => 'never',
+        ),
+      ).toThrow(SystemError);
+      expect(lstatSync(lockPath, { bigint: true }).nlink).toBe(3n);
+    },
+  );
+
   it.runIf(process.platform === 'linux' || process.platform === 'darwin')(
     'honors the longer owner-selected stale horizon',
     () => {
@@ -558,6 +667,115 @@ describe('withFileLock', () => {
         ),
       ).toBe('recovered');
       expect(processProbe.calls.get(pid)).toBe(2);
+    },
+  );
+
+  it.runIf(process.platform === 'linux' || process.platform === 'darwin')(
+    'retries when the owner snapshot changes after the first dead-process proof',
+    () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const lockPath = join(dir, 'changed-after-proof.lock');
+      const pid = 800_000_103;
+      const owner = {
+        ...captureOwnedMetadata(lockPath),
+        ownerToken: 'initial-dead-owner',
+        pid,
+        processIncarnation: 'initial-process-incarnation',
+      };
+      writeFileSync(lockPath, JSON.stringify(owner), { mode: 0o600 });
+      processProbe.calls.clear();
+      processProbe.inspect = (inspectedPid) => {
+        if (inspectedPid === pid && (processProbe.calls.get(pid) ?? 0) === 1) {
+          replaceJsonAtomically(lockPath, {
+            ...owner,
+            ownerToken: 'successor-dead-owner',
+          });
+        }
+        return { status: 'absent' };
+      };
+
+      expect(
+        withFileLock(
+          lockPath,
+          {
+            policy: { waitMs: 100, staleMs: 10, heartbeatMs: 1 },
+            resource: 'datastore',
+          },
+          () => 'recovered',
+        ),
+      ).toBe('recovered');
+      expect(processProbe.calls.get(pid)).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  it.runIf(process.platform === 'linux' || process.platform === 'darwin')(
+    'preserves an owner that becomes live at the fresh pre-unlink probe',
+    () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const lockPath = join(dir, 'live-at-fresh-probe.lock');
+      const pid = 800_000_104;
+      const processIncarnation = 'returned-process-incarnation';
+      const owner = {
+        ...captureOwnedMetadata(lockPath),
+        ownerToken: 'returning-owner',
+        pid,
+        processIncarnation,
+      };
+      writeFileSync(lockPath, JSON.stringify(owner), { mode: 0o600 });
+      processProbe.calls.clear();
+      processProbe.inspect = () =>
+        (processProbe.calls.get(pid) ?? 0) === 1
+          ? { status: 'absent' }
+          : { status: 'present', identity: processIncarnation };
+
+      expect(() =>
+        withFileLock(
+          lockPath,
+          {
+            policy: { waitMs: 10, staleMs: 10, heartbeatMs: 1 },
+            resource: 'datastore',
+          },
+          () => 'never',
+        ),
+      ).toThrow(TimeoutError);
+      expect(readFileSync(lockPath, 'utf8')).toBe(JSON.stringify(owner));
+      expect(processProbe.calls.get(pid)).toBe(2);
+    },
+  );
+
+  it.runIf(process.platform === 'linux' || process.platform === 'darwin')(
+    'treats a fresh process-probe failure as retryable contention',
+    () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const lockPath = join(dir, 'fresh-probe-failure.lock');
+      const pid = 800_000_105;
+      const owner = {
+        ...captureOwnedMetadata(lockPath),
+        ownerToken: 'probe-failure-owner',
+        pid,
+        processIncarnation: 'probe-failure-incarnation',
+      };
+      writeFileSync(lockPath, JSON.stringify(owner), { mode: 0o600 });
+      processProbe.calls.clear();
+      processProbe.inspect = () => {
+        const calls = processProbe.calls.get(pid) ?? 0;
+        if (calls === 1) return { status: 'absent' };
+        if (calls === 2) throw new Error('injected process probe failure');
+        return { status: 'unknown' };
+      };
+
+      expect(() =>
+        withFileLock(
+          lockPath,
+          {
+            policy: { waitMs: 10, staleMs: 10, heartbeatMs: 1 },
+            resource: 'datastore',
+          },
+          () => 'never',
+        ),
+      ).toThrow(TimeoutError);
+      expect(existsSync(lockPath)).toBe(true);
+      expect(processProbe.calls.get(pid)).toBeGreaterThanOrEqual(2);
     },
   );
 
@@ -1025,4 +1243,27 @@ describe('withFileLockAsync', () => {
       ),
     ).resolves.toBe('recovered');
   });
+
+  it.runIf(process.platform !== 'win32')(
+    'fails closed for an unsafe lock path on the async acquisition path',
+    async () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const target = join(dir, 'async-target.json');
+      const lockPath = join(dir, 'async-symlink.lock');
+      writeFileSync(target, '{}');
+      symlinkSync(target, lockPath);
+
+      await expect(
+        withFileLockAsync(
+          lockPath,
+          {
+            policy: { waitMs: 0, staleMs: 10, heartbeatMs: 1 },
+            resource: 'artifact',
+          },
+          () => Promise.resolve('never'),
+        ),
+      ).rejects.toThrow(SystemError);
+      expect(lstatSync(lockPath).isSymbolicLink()).toBe(true);
+    },
+  );
 });

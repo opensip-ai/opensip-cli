@@ -14,11 +14,15 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
-import { loadOwningToolCapabilities } from '../../bootstrap/load-tool-capabilities.js';
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 
 import { type SuiteSource } from './built-in-suites.js';
 import { planSuiteReportEffect } from './open-suite-report.js';
+import {
+  deriveSuiteAggregate,
+  loadSuiteStepCapabilities,
+  resolveBuiltInAuditFullScopeFiles,
+} from './orchestration-helpers.js';
 import { buildReviewBrief } from './review-brief-builder.js';
 import {
   allocateSuiteLedgerIdentity,
@@ -38,6 +42,8 @@ import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
+
+export { deriveSuiteAggregate } from './orchestration-helpers.js';
 
 export interface RunSuiteInput {
   readonly name: string;
@@ -61,6 +67,7 @@ interface SuiteEvidenceSeam {
   readonly replaceReport: NonNullable<RunActionHooks['replaceEvidenceOwnerReportEffect']>;
 }
 
+/** @throws {TypeError} When the host provides only part of the atomic evidence seam. */
 function createSuiteEvidenceSeam(hooks: RunActionHooks): SuiteEvidenceSeam {
   const create = hooks.createNestedEvidenceOwner;
   const finalize = hooks.finalizeEvidenceOwner;
@@ -380,95 +387,4 @@ async function rejectSuiteEvidence(evidence: SuiteEvidenceSeam): Promise<void> {
   } catch {
     // The outer guaranteed cleanup discards the owner capability.
   }
-}
-
-export function deriveSuiteAggregate(
-  steps: readonly SuiteStepSummary[],
-): SuiteRunResult['aggregate'] {
-  let passed = 0;
-  let failed = 0;
-  let faulted = 0;
-  let errors = 0;
-  let warnings = 0;
-
-  for (const step of steps) {
-    // `step.outcome` is the single source of truth (deriveOutcome over the step's
-    // RunVerdict, unioned with host-caught runtime issues). A UNIT-level fault (a
-    // check that threw, surfaced as `verdict.faulted`) now counts `faulted`, not
-    // `failed` — the old `step.error`-only heuristic only saw run-LEVEL throws.
-    // Every step lands in exactly one bucket (the old shape silently dropped a
-    // success-exit step that emitted no envelope from all three counts).
-    switch (step.outcome) {
-      case 'faulted': {
-        faulted += 1;
-        break;
-      }
-      case 'failed': {
-        failed += 1;
-        break;
-      }
-      case 'passed': {
-        passed += 1;
-        break;
-      }
-    }
-    errors += step.verdict?.errors ?? 0;
-    warnings += step.verdict?.warnings ?? 0;
-  }
-
-  return {
-    steps: steps.length,
-    passed,
-    failed,
-    faulted,
-    errors,
-    warnings,
-  };
-}
-
-async function loadSuiteStepCapabilities(
-  suite: ValidatedSuite,
-  projectRoot?: string,
-): Promise<void> {
-  const loaded = new Set<string>();
-  const scope = currentScope();
-  if (scope?.capabilities === undefined) return;
-  const projectDir = projectRoot ?? scope?.projectContext?.projectRoot ?? process.cwd();
-  const pluginsConfig = scope?.configDocument?.plugins ?? {};
-  const log = currentLogger();
-
-  // @sequential-ok — capability loading registers into shared scope with
-  // ordering side effects; bounded by the configured suite steps (a handful) and
-  // deduped, so serial-by-design, not unbounded fanout.
-  for (const step of suite.steps) {
-    const toolId = step.tool.metadata.id;
-    if (loaded.has(toolId)) continue;
-    loaded.add(toolId);
-    const domains = await loadOwningToolCapabilities({
-      owningTool: step.tool,
-      projectDir,
-      pluginsConfig,
-    });
-    if (domains > 0) {
-      log.debug?.({
-        evt: 'cli.suite.step.capabilities.loaded',
-        suite: suite.name,
-        tool: toolId,
-        domains,
-      });
-    }
-  }
-}
-
-function resolveBuiltInAuditFullScopeFiles(
-  cwd: string,
-  opts: { readonly defaultChanged: boolean; readonly fullScope: boolean },
-): readonly string[] | undefined {
-  if (!opts.defaultChanged || !opts.fullScope) return undefined;
-  const targets = currentScope()?.targets;
-  if (targets === undefined) return undefined;
-  const names = targets.getAll().map((target) => target.config.name);
-  if (names.length === 0) return undefined;
-  const files = targets.resolveTargets(names, cwd);
-  return files.length === 0 ? undefined : files;
 }

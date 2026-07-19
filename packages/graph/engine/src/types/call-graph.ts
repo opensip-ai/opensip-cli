@@ -18,6 +18,7 @@ import type { DependencyEdge } from './dependency.js';
 import type { PersistedFeatures } from './features.js';
 import type { SemanticFactBundle } from './semantic-facts.js';
 
+/** Syntactic declaration form represented by one graph function occurrence. */
 export type FunctionKind =
   | 'function-declaration'
   | 'function-expression'
@@ -101,7 +102,11 @@ export interface CatalogShardCacheInput {
  * verification is partial.
  */
 export type AdapterSelectionEvidence =
-  | { readonly mode: 'forced'; readonly requestedId: string; readonly selectedId: string }
+  | {
+      readonly mode: 'forced';
+      readonly requestedId: string;
+      readonly selectedId: string;
+    }
   | { readonly mode: 'auto'; readonly selectedId: string };
 
 /** Function visibility tier: exported from module, module-local, or class-private. */
@@ -250,6 +255,14 @@ export interface CrossBoundaryCall {
   readonly ownerColumn: number;
   /** Syntactic callee simple name (`foo` in `foo()`, rightmost in `a.b.c()`). */
   readonly calleeName: string;
+  /**
+   * Name exported by the imported module when a named import aliases it
+   * (`sourceName` in `import { sourceName as calleeName } from '…'`). Absent
+   * for unaliased/default/namespace/import-equals bindings and method calls.
+   * The cross-shard linker resolves this source name while retaining
+   * `calleeName` as the call site's local spelling.
+   */
+  readonly importedName?: string;
   /** The raw import specifier the name came from, if imported (`'./x.js'`, `'@scope/pkg'`). */
   readonly importSpecifier?: string;
   /**

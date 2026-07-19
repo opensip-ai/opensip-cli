@@ -41,22 +41,23 @@
  * change to the layout is a single-file edit.
  */
 
-import { createHash } from 'node:crypto';
-import {
-  closeSync,
-  fstatSync,
-  lstatSync,
-  openSync,
-  readSync,
-  realpathSync,
-  statSync,
-} from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
-import { SystemError } from './errors.js';
+import { resolveGenerationDigest, sha256PathIdentity } from './ephemeral-project-generation.js';
+import { resolveUserPaths } from './user-paths.js';
 
 import type { BundledToolShortId } from '../tools/ids.js';
+
+export { isPathInside, toPosixRelative } from './path-containment.js';
+export {
+  RUNTIME_PROMOTION_JOURNAL_FILE,
+  USER_UNINSTALL_RECEIPT_FILE,
+  resolveCoordinationPaths,
+  resolveUserPaths,
+  type CoordinationPaths,
+  type UserPaths,
+} from './user-paths.js';
 
 // =============================================================================
 // PROJECT PATHS
@@ -187,123 +188,6 @@ export function resolveProjectPaths(projectDir: string): ProjectPaths {
   };
 }
 
-// =============================================================================
-// USER PATHS
-// =============================================================================
-
-/** User-level paths in `~/.opensip-cli/`. */
-export interface UserPaths {
-  /** ~/.opensip-cli — root for all user-level state. */
-  readonly userHomeDir: string;
-  /** ~/.opensip-cli/config.yml — cloud API key + per-user defaults. */
-  readonly configFile: string;
-  /** ~/.opensip-cli/cache — user-level tool-generated cache state. */
-  readonly cacheDir: string;
-  /** ~/.opensip-cli/cache/ephemeral — no-init per-project runtime roots. */
-  readonly ephemeralProjectsDir: string;
-  /**
-   * `~/.opensip-cli/plugins/<domain>` — user-global (cross-project)
-   * npm-installed plugins. Used today by the `tool` domain: a Tool plugin
-   * is a whole subcommand, so a user-global install makes it available in
-   * every project (like `npm i -g`), unlike fit/sim packs which are
-   * project-committed. Generic over domain for symmetry with
-   * `ProjectPaths.pluginsDir`.
-   */
-  readonly pluginsDir: (domain: string) => string;
-  /**
-   * `~/.opensip-cli/tools` — global authored Tool sidecars
-   * (trusted-by-default). Each child is a
-   * `<name>/opensip-tool.manifest.json` sidecar. The user placed it in
-   * their own home dir → admitted without an allowlist (the `npm i -g`
-   * analogue for authored code).
-   */
-  readonly authoredToolsDir: string;
-  /**
-   * ~/.opensip-cli/update-state.json — tool-generated cache of the
-   * last-known newer published version, so the "update available" notice can
-   * persist across runs instead of showing once. NOT user-authored: written
-   * by the update notifier, cleared automatically once the running version
-   * catches up. Distinct from `configFile`, which holds user-authored config.
-   */
-  readonly updateStateFile: string;
-}
-
-/** Fixed per-project Init promotion journal basename. */
-export const RUNTIME_PROMOTION_JOURNAL_FILE = 'runtime-promotion.json';
-
-/** Fixed user-uninstall recovery receipt basename. */
-export const USER_UNINSTALL_RECEIPT_FILE = 'user-uninstall.json';
-
-/** Stable paths used only for runtime coordination, never customer evidence. */
-export interface CoordinationPaths {
-  /** Sibling of `~/.opensip-cli`; user uninstall must never recursively remove it. */
-  readonly coordinationDir: string;
-  /** Short-lived global mutex used only while publishing coordination transitions. */
-  readonly globalMutexFile: string;
-  /** Bounded FIFO writer queue and monotonic sequence record. */
-  readonly stateFile: string;
-  /** Container for path-stable canonical project coordination keys. */
-  readonly projectsDir: string;
-  /** Shared user-state reader records. */
-  readonly userReadersDir: string;
-  /** Fixed external user-uninstall recovery receipt. */
-  readonly userUninstallReceiptFile: string;
-  /** Resolve the fixed, non-generation-bound layout for one coordination key. */
-  readonly forProject: (coordinationKey: string) => {
-    readonly projectCoordinationDir: string;
-    readonly readersDir: string;
-    readonly promotionJournalFile: string;
-  };
-}
-
-/** Resolve the user-level path layout. */
-export function resolveUserPaths(): UserPaths {
-  const userHomeDir = join(homedir(), '.opensip-cli');
-  const cacheDir = join(userHomeDir, 'cache');
-  return {
-    userHomeDir,
-    configFile: join(userHomeDir, 'config.yml'),
-    cacheDir,
-    ephemeralProjectsDir: join(cacheDir, 'ephemeral'),
-    updateStateFile: join(userHomeDir, 'update-state.json'),
-    authoredToolsDir: join(userHomeDir, 'tools'),
-    pluginsDir: (domain) => join(userHomeDir, 'plugins', domain),
-  };
-}
-
-/**
- * Resolve the small coordination-only sibling root.
- *
- * This root deliberately lives outside `~/.opensip-cli/`: global uninstall can
- * move or remove the user-data tree, but it must not remove and recreate the
- * mutex that prevents another process from entering that tree concurrently.
- */
-export function resolveCoordinationPaths(): CoordinationPaths {
-  const coordinationDir = join(homedir(), '.opensip-cli-coordination');
-  const projectsDir = join(coordinationDir, 'projects');
-  return {
-    coordinationDir,
-    globalMutexFile: join(coordinationDir, 'coordination.lock'),
-    stateFile: join(coordinationDir, 'state.json'),
-    projectsDir,
-    userReadersDir: join(coordinationDir, 'user-readers'),
-    userUninstallReceiptFile: join(coordinationDir, USER_UNINSTALL_RECEIPT_FILE),
-    forProject: (coordinationKey) => {
-      if (!/^[a-f0-9]{24}$/u.test(coordinationKey)) {
-        throw new SystemError('Runtime coordination key is invalid', {
-          code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
-        });
-      }
-      const projectCoordinationDir = join(projectsDir, coordinationKey);
-      return {
-        projectCoordinationDir,
-        readersDir: join(projectCoordinationDir, 'readers'),
-        promotionJournalFile: join(projectCoordinationDir, RUNTIME_PROMOTION_JOURNAL_FILE),
-      };
-    },
-  };
-}
-
 function canonicalProjectDir(projectDir: string): string {
   const absolute = resolve(projectDir);
   try {
@@ -313,13 +197,9 @@ function canonicalProjectDir(projectDir: string): string {
   }
 }
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
 /** Canonical-path-only key used to serialize all generations at one location. */
 export function projectCoordinationKey(projectDir: string): string {
-  return sha256(canonicalProjectDir(projectDir)).slice(0, 24);
+  return sha256PathIdentity(canonicalProjectDir(projectDir)).slice(0, 24);
 }
 
 /**
@@ -331,113 +211,6 @@ export function legacyEphemeralProjectCacheKey(projectDir: string): string {
   return projectCoordinationKey(projectDir);
 }
 
-interface StableDirectoryFact {
-  readonly role: 'root' | 'gitdir';
-  readonly device: string;
-  readonly inode: string;
-  readonly birthtimeNs?: string;
-}
-
-function stableDirectoryFact(
-  path: string,
-  role: StableDirectoryFact['role'],
-): StableDirectoryFact | undefined {
-  try {
-    const stat = statSync(path, { bigint: true });
-    if (!stat.isDirectory() || stat.dev <= 0n || stat.ino <= 0n) return undefined;
-    return {
-      role,
-      device: stat.dev.toString(),
-      inode: stat.ino.toString(),
-      ...(stat.birthtimeNs > 0n ? { birthtimeNs: stat.birthtimeNs.toString() } : {}),
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-/** Read a small gitfile without allowing an atomic replacement to grow the read. */
-function readBoundedGitFile(path: string): string | undefined {
-  const limit = 4096;
-  let fd: number | undefined;
-  try {
-    fd = openSync(path, 'r');
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size > limit) return undefined;
-    const buffer = Buffer.alloc(limit + 1);
-    let bytesRead = 0;
-    while (bytesRead < buffer.length) {
-      const count = readSync(fd, buffer, bytesRead, buffer.length - bytesRead, bytesRead);
-      if (count === 0) break;
-      bytesRead += count;
-    }
-    return bytesRead > limit ? undefined : buffer.toString('utf8', 0, bytesRead);
-  } catch {
-    return undefined;
-  } finally {
-    if (fd !== undefined) {
-      try {
-        closeSync(fd);
-      } catch {
-        // Identity discovery is read-only and degrades to the root fact.
-      }
-    }
-  }
-}
-
-type GitDirectoryResolution =
-  | { readonly status: 'absent' }
-  | { readonly status: 'resolved'; readonly path: string }
-  | { readonly status: 'unreliable' };
-
-function resolveGitDirectory(projectDir: string): GitDirectoryResolution {
-  const dotGit = join(projectDir, '.git');
-  try {
-    const stat = lstatSync(dotGit);
-    if (stat.isDirectory() || stat.isSymbolicLink()) {
-      try {
-        return { status: 'resolved', path: realpathSync(dotGit) };
-      } catch {
-        return { status: 'unreliable' };
-      }
-    }
-    if (!stat.isFile()) return { status: 'unreliable' };
-  } catch (error) {
-    return isMissingPathError(error) ? { status: 'absent' } : { status: 'unreliable' };
-  }
-
-  const raw = readBoundedGitFile(dotGit);
-  const match = raw?.match(/^\s*gitdir:\s*(.+?)\s*$/iu);
-  if (match?.[1] === undefined || match[1].includes('\0')) return { status: 'unreliable' };
-  const candidate = isAbsolute(match[1]) ? match[1] : resolve(dirname(dotGit), match[1]);
-  try {
-    return { status: 'resolved', path: realpathSync(candidate) };
-  } catch {
-    return { status: 'unreliable' };
-  }
-}
-
-function isMissingPathError(error: unknown): boolean {
-  return (
-    error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT'
-  );
-}
-
-function resolveGenerationDigest(projectDir: string): string | undefined {
-  const root = stableDirectoryFact(projectDir, 'root');
-  if (root === undefined) return undefined;
-
-  const gitDirectory = resolveGitDirectory(projectDir);
-  if (gitDirectory.status === 'unreliable') return undefined;
-  if (gitDirectory.status === 'absent') {
-    return sha256(`opensip-project-generation-v1\0${JSON.stringify([root])}`);
-  }
-  const gitdir = stableDirectoryFact(gitDirectory.path, 'gitdir');
-  if (gitdir === undefined) return undefined;
-  const facts = [root, gitdir];
-  return sha256(`opensip-project-generation-v1\0${JSON.stringify(facts)}`);
-}
-
 /**
  * Resolve the current no-init cache identity exclusively from pre-existing
  * canonical-root and stable filesystem facts. Mutable workspace manifests are
@@ -445,7 +218,7 @@ function resolveGenerationDigest(projectDir: string): string | undefined {
  */
 export function resolveEphemeralProjectIdentity(projectDir: string): EphemeralProjectIdentity {
   const canonical = canonicalProjectDir(projectDir);
-  const canonicalRootDigest = sha256(canonical);
+  const canonicalRootDigest = sha256PathIdentity(canonical);
   const coordinationKey = canonicalRootDigest.slice(0, 24);
   const generationDigest = resolveGenerationDigest(canonical);
   if (generationDigest === undefined) {
@@ -460,7 +233,7 @@ export function resolveEphemeralProjectIdentity(projectDir: string): EphemeralPr
   return {
     projectDir: canonical,
     coordinationKey,
-    cacheKey: sha256(
+    cacheKey: sha256PathIdentity(
       `opensip-ephemeral-cache-v2\0${canonicalRootDigest}\0${generationDigest}`,
     ).slice(0, 24),
     identityStrength: 'generation-bound',
@@ -503,46 +276,4 @@ export function resolveRuntimePathsForScope(project: {
   return project.scope === 'ephemeral'
     ? resolveEphemeralProjectPaths(project.projectRoot)
     : resolveProjectPaths(project.projectRoot);
-}
-
-// =============================================================================
-// SAFE PATH CONTAINMENT
-// =============================================================================
-
-/**
- * Returns true iff `child`, after resolving symlinks via realpath, is the same
- * path as `parent` or located inside it (native-separator prefix match after
- * realpath). Returns false on any error (missing, unresolvable, permission, etc).
- *
- * Canonical helper for preventing path escape / symlink traversal in glob
- * results, plugin discovery, targeting, etc. See also the cli-realpath-validation
- * fitness check that enforces use of realpath-based containment over naive
- * `.startsWith`.
- */
-export function isPathInside(child: string, parent: string): boolean {
-  let realChild: string;
-  let realParent: string;
-  try {
-    realChild = realpathSync(child);
-    realParent = realpathSync(parent);
-  } catch {
-    // @swallow-ok realpathSync throws when a path does not exist; fail closed (treat as "not inside")
-    return false;
-  }
-  if (realChild === realParent) return true;
-  return realChild.startsWith(realParent + sep);
-}
-
-/**
- * Normalize a path to project-relative POSIX form: absolute paths are made
- * relative to `cwd`, and OS separators are converted to `/`. Shared by the git
- * changed-file resolver and `graph impact` so both compare paths against
- * catalog occurrences in one canonical form (ADR-0085).
- */
-export function toPosixRelative(cwd: string, filePath: string): string {
-  const normalized = normalize(filePath);
-  if (isAbsolute(normalized)) {
-    return relative(cwd, normalized).split(sep).join('/');
-  }
-  return normalized.split(sep).join('/');
 }

@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolRegistry, logger, resolveToolHooks } from '@opensip-cli/core';
+import { ToolRegistry, isPlainRecord, logger, resolveToolHooks } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { composeAndValidateToolConfig } from '../bootstrap/config-and-capabilities.js';
@@ -54,10 +54,6 @@ function scaffolds(): ToolScaffold[] {
   });
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function hostProjection(document: unknown): {
   schemaVersion: unknown;
   globalExcludes: unknown;
@@ -65,10 +61,16 @@ function hostProjection(document: unknown): {
 } {
   if (!isPlainRecord(document)) throw new Error('expected plain config document');
   return {
-    schemaVersion: document['schemaVersion'],
-    globalExcludes: document['globalExcludes'],
-    targets: document['targets'],
+    schemaVersion: document.schemaVersion,
+    globalExcludes: document.globalExcludes,
+    targets: document.targets,
   };
+}
+
+function markerContent(marker: string): string {
+  if (marker === 'go.mod') return 'module example.com/x\n';
+  if (marker === 'Cargo.toml') return '[package]\nname = "x"\n';
+  return marker.endsWith('.json') ? '{}' : '';
 }
 
 const FIXTURES: readonly {
@@ -115,15 +117,7 @@ describe('no-init / Init config semantic parity (integration)', () => {
   for (const fixture of FIXTURES) {
     it(`${fixture.name}: detection, no-init document, and Init scaffold share semantics`, async () => {
       for (const marker of fixture.markers) {
-        const content =
-          marker === 'go.mod'
-            ? 'module example.com/x\n'
-            : marker === 'Cargo.toml'
-              ? '[package]\nname = "x"\n'
-              : marker.endsWith('.json')
-                ? '{}'
-                : '';
-        writeFileSync(join(dir, marker), content, 'utf8');
+        writeFileSync(join(dir, marker), markerContent(marker), 'utf8');
       }
 
       const resolution = resolveLanguages(dir, undefined);
@@ -134,9 +128,7 @@ describe('no-init / Init config semantic parity (integration)', () => {
       const synthesized = synthesizeNoInitConfigDocument(dir);
       expect(synthesized).toBeDefined();
       expect(synthesized!.languages).toEqual(fixture.expectedLanguages);
-      expect(synthesized!.document).toEqual(
-        buildStarterConfigDocument(fixture.expectedLanguages),
-      );
+      expect(synthesized!.document).toEqual(buildStarterConfigDocument(fixture.expectedLanguages));
 
       // YAML path uses the same starter model (no live disk Init required).
       const yaml = generateConfig(resolution.languages, scaffolds());
@@ -177,7 +169,6 @@ describe('no-init / Init config semantic parity (integration)', () => {
       expect(initResult.created).toBe(true);
       expect(initResult.languages).toEqual(fixture.expectedLanguages);
       expect(initResult.languageResolutionError).toBeUndefined();
-      expect(initResult.ambiguousLanguageError).toBeUndefined();
 
       const onDiskValidated = composeAndValidateToolConfig({
         tools: realRegistry(),
@@ -188,9 +179,7 @@ describe('no-init / Init config semantic parity (integration)', () => {
         hostProjection(noInitValidated.document),
       );
       expect(onDiskValidated.config).toEqual(noInitValidated.config);
-      expect(canonicalizeLanguages(initResult.languages ?? [])).toEqual(
-        fixture.expectedLanguages,
-      );
+      expect(canonicalizeLanguages(initResult.languages ?? [])).toEqual(fixture.expectedLanguages);
     });
   }
 });

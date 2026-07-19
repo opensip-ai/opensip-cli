@@ -37,6 +37,11 @@ function sameIdentity(left: DirectoryIdentity, right: DirectoryIdentity): boolea
   return left.dev === right.dev && left.ino === right.ino;
 }
 
+/**
+ * Inspect and prove a directory's ownership, type, permissions, and canonical identity.
+ *
+ * @throws {Error} When the directory has an unsafe identity or permission posture.
+ */
 function inspectDirectory(path: string): {
   readonly identity: DirectoryIdentity;
   readonly canonicalPath: string;
@@ -58,6 +63,11 @@ function inspectDirectory(path: string): {
   };
 }
 
+/**
+ * Open a proven directory without following a final-component symlink.
+ *
+ * @throws {Error} When the opened directory changes identity or escapes its expected parent.
+ */
 function openDirectory(path: string, expectedCanonicalParent?: string): OpenDirectory {
   const inspected = inspectDirectory(path);
   const fd = openSync(
@@ -75,13 +85,22 @@ function openDirectory(path: string, expectedCanonicalParent?: string): OpenDire
     ) {
       throw new Error('Ephemeral cache directory changed or escaped its expected parent');
     }
-    return { fd, identity: openedIdentity, canonicalPath: inspected.canonicalPath };
+    return {
+      fd,
+      identity: openedIdentity,
+      canonicalPath: inspected.canonicalPath,
+    };
   } catch (error) {
     closeSync(fd);
     throw error;
   }
 }
 
+/**
+ * Confirm that a directory still resolves to the identity held by an open descriptor.
+ *
+ * @throws {Error} When the directory or its open handle changes during preparation.
+ */
 function assertOpenDirectoryUnchanged(path: string, opened: OpenDirectory): void {
   const handle = fstatSync(opened.fd, { bigint: true });
   const current = inspectDirectory(path);
@@ -94,6 +113,11 @@ function assertOpenDirectoryUnchanged(path: string, opened: OpenDirectory): void
   }
 }
 
+/**
+ * Create or validate one direct child under a proven parent directory.
+ *
+ * @throws {Error} When the child is not direct or cannot be created and proven safely.
+ */
 function ensureDirectChild(parentDir: string, childDir: string): void {
   if (dirname(childDir) !== parentDir) {
     throw new Error('Ephemeral cache directory is not a direct child of its expected parent');
@@ -140,7 +164,11 @@ function prepareEphemeralRoot(create: boolean): UserPaths | undefined {
   return paths;
 }
 
-/** Create and prove the fixed user-cache hierarchy without recursive mkdir. */
+/**
+ * Create and prove the fixed user-cache hierarchy without recursive mkdir.
+ *
+ * @throws {Error} When the cache hierarchy cannot be created and proven safely.
+ */
 export function ensureEphemeralRuntimeRoot(): UserPaths {
   const paths = prepareEphemeralRoot(true);
   if (paths === undefined) throw new Error('Ephemeral cache root could not be prepared');
@@ -152,7 +180,11 @@ export function inspectEphemeralRuntimeRoot(): UserPaths | undefined {
   return prepareEphemeralRoot(false);
 }
 
-/** Create and prove one exact cache-key directory under the fixed hierarchy. */
+/**
+ * Create and prove one exact cache-key directory under the fixed hierarchy.
+ *
+ * @throws {Error} When the cache key/path pair is invalid or its directory cannot be proven.
+ */
 export function ensureEphemeralRuntimeDirectory(paths: EphemeralProjectPaths): UserPaths {
   const userPaths = ensureEphemeralRuntimeRoot();
   const expectedRuntimeDir = join(userPaths.ephemeralProjectsDir, paths.cacheKey);

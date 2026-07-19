@@ -6,46 +6,44 @@
  * pushing the metadata surface past the repository's file-length guardrail.
  */
 
-import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, opendirSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 import { inspectEphemeralRuntimeRoot } from './ephemeral-runtime-directory.js';
 import {
+  PRUNE_PASS_BUDGET_MS,
+  compareCandidatesByAge,
+  inspectPruneCandidate,
+  listPruneEntries,
+  revalidateOverflowCandidate,
+  remainingBudget,
+  removeRevalidatedCandidate,
+  sameCandidateSnapshot,
+  type PruneCandidate,
+  type PruneDeadline,
+  type PruneVerdict,
+} from './ephemeral-runtime-prune-candidates.js';
+import { resolveProtectedCoordinationKeys } from './ephemeral-runtime-prune-protection.js';
+import {
+  createPruneExecution,
+  emptyPruneResult,
+  type PruneExecution,
+} from './ephemeral-runtime-prune-state.js';
+import {
   DEFAULT_EPHEMERAL_KEEP,
   DEFAULT_EPHEMERAL_MAX_AGE_DAYS,
-  EPHEMERAL_MARKER_FILE,
-  EPHEMERAL_MARKER_MAX_BYTES,
   EPHEMERAL_RUNTIME_TEST_HOOKS,
-  parseEphemeralMarker,
-  type EphemeralMarker,
-  type EphemeralMarkerReadResult,
   type EphemeralRuntimeTestHooks,
   type PruneEphemeralInput,
   type PruneEphemeralResult,
 } from './ephemeral-runtime.js';
 import { withFileLockAsync, type FileLockEvent } from './file-lock.js';
-import { projectCoordinationKey } from './paths.js';
-import {
-  acquireRuntimeExclusiveLease,
-  listActiveRuntimeLeaseKeys,
-  readAnchoredRecord,
-  type RuntimeLeaseEvent,
-} from './runtime-lease.js';
+import { acquireRuntimeExclusiveLease, type RuntimeLeaseEvent } from './runtime-lease.js';
 
-import type { BigIntStats } from 'node:fs';
-
-const CACHE_KEY_PATTERN = /^[a-f0-9]{24}$/u;
-const MAX_PROTECTED_COORDINATION_KEYS = 256;
 const MAX_PRUNE_LOCK_ATTEMPTS = 128;
 const MAX_PRUNE_DELETIONS = 64;
-const PRUNE_ENUMERATION_WAIT_MS = 200;
 const PRUNE_CANDIDATE_WAIT_MS = 200;
-const PRUNE_PASS_BUDGET_MS = 1000;
-const MAX_PRUNE_SCAN_ENTRIES = 1024;
 const PRUNE_PASS_LOCK_FILE = '.prune-pass.lock';
-const CACHE_PERMISSION_POSTURE = 'owner-controlled' as const;
 const PRUNE_PASS_LOCK_POLICY = Object.freeze({
   waitMs: 250,
   staleMs: 30_000,
@@ -56,328 +54,34 @@ type PruneEphemeralInputWithTestHooks = PruneEphemeralInput & {
   readonly [EPHEMERAL_RUNTIME_TEST_HOOKS]?: EphemeralRuntimeTestHooks;
 };
 
-interface PruneDeadline {
-  readonly expiresAt: number;
-  readonly monotonicNow: () => number;
+interface CandidateDeletion {
+  readonly root: string;
+  readonly candidate: PruneCandidate;
+  readonly reason: Exclude<PruneVerdict, 'keep'> | 'overflow';
+  readonly protectedKeys: ReadonlySet<string>;
+  readonly now: number;
+  readonly maxAgeMs: number;
+  readonly state: PruneExecution;
+  readonly deadline: PruneDeadline;
+  readonly onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void;
+  readonly hooks?: EphemeralRuntimeTestHooks;
+  readonly overflowKeep?: number;
 }
 
-function remainingBudget(deadline: PruneDeadline, cap: number): number {
-  return Math.max(0, Math.min(cap, Math.floor(deadline.expiresAt - deadline.monotonicNow())));
-}
-
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
-function isMissingFsError(error: unknown): boolean {
-  return (
-    error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT'
-  );
-}
-
-/**
- * Bounded cache-entry enumeration. `undefined` means the scan could not prove a
- * complete view, so callers must grant no deletion authority.
- */
-function listEntries(root: string): string[] | undefined {
-  let directory;
-  try {
-    directory = opendirSync(root);
-  } catch (error) {
-    return isMissingFsError(error) ? [] : undefined;
-  }
-  const entries: string[] = [];
-  let inspected = 0;
-  let complete = true;
-  try {
-    for (;;) {
-      const entry = directory.readSync();
-      if (entry === null) break;
-      inspected += 1;
-      if (inspected > MAX_PRUNE_SCAN_ENTRIES) {
-        complete = false;
-        break;
-      }
-      if (entry.isDirectory()) entries.push(entry.name);
-    }
-  } catch {
-    complete = false;
-  }
-  try {
-    directory.closeSync();
-  } catch {
-    complete = false;
-  }
-  return complete ? entries : undefined;
-}
-
-type Verdict = 'orphaned' | 'stale' | 'keep';
-type ProjectPresence = 'present' | 'absent' | 'uncertain';
-
-function inspectProjectPresence(projectDir: string): ProjectPresence {
-  try {
-    const stat = lstatSync(projectDir);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) return 'uncertain';
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    return code === 'ENOENT' || code === 'ENOTDIR' ? 'absent' : 'uncertain';
-  }
-  try {
-    realpathSync(projectDir);
-    return 'present';
-  } catch {
-    // A path that changes or becomes inaccessible after lstat is not proof of
-    // orphanhood; preserve it for a later pass.
-    return 'uncertain';
-  }
-}
-
-function classifyEntry(
-  projectPresence: Exclude<ProjectPresence, 'uncertain'>,
-  usedAt: number,
-  now: number,
-  maxAgeMs: number,
-): Verdict {
-  if (projectPresence === 'absent') return 'orphaned';
-  if (now - usedAt > maxAgeMs) return 'stale';
-  return 'keep';
-}
-
-interface DirectoryIdentity {
-  readonly dev: bigint;
-  readonly ino: bigint;
-  readonly mtimeNs: bigint;
-  readonly ctimeNs: bigint;
-}
-
-interface PruneCandidate {
-  readonly key: string;
-  readonly entryDir: string;
-  readonly projectDir: string;
-  readonly coordinationKey: string;
-  readonly usedAt: number;
-  readonly markerSha256: string;
-  readonly directoryIdentity: DirectoryIdentity;
-  readonly verdict: Verdict;
-}
-
-function directoryIdentity(stat: BigIntStats): DirectoryIdentity {
-  return {
-    dev: stat.dev,
-    ino: stat.ino,
-    mtimeNs: stat.mtimeNs,
-    ctimeNs: stat.ctimeNs,
-  };
-}
-
-function sameDirectoryIdentity(left: DirectoryIdentity, right: DirectoryIdentity): boolean {
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.mtimeNs === right.mtimeNs &&
-    left.ctimeNs === right.ctimeNs
-  );
-}
-
-function expectedCurrentCacheKey(marker: EphemeralMarker): string {
-  if (marker.identityStrength === 'path-only') return marker.canonicalRootDigest.slice(0, 24);
-  return sha256(
-    `opensip-ephemeral-cache-v2\0${marker.canonicalRootDigest}\0${marker.generationDigest}`,
-  ).slice(0, 24);
-}
-
-function markerCoordinationProof(
-  key: string,
-  marker: EphemeralMarkerReadResult,
-): { readonly projectDir: string; readonly coordinationKey: string } | undefined {
-  if (marker.status === 'current') {
-    if (sha256(marker.marker.projectDir) !== marker.marker.canonicalRootDigest) return;
-    const coordinationKey = marker.marker.canonicalRootDigest.slice(0, 24);
-    if (
-      key !== expectedCurrentCacheKey(marker.marker) ||
-      projectCoordinationKey(marker.marker.projectDir) !== coordinationKey
-    ) {
-      return;
-    }
-    return { projectDir: marker.marker.projectDir, coordinationKey };
-  }
-  if (marker.status !== 'legacy') return;
-  const coordinationKey = projectCoordinationKey(marker.marker.projectDir);
-  if (key !== coordinationKey) return;
-  return { projectDir: marker.marker.projectDir, coordinationKey };
-}
-
-function inspectPruneCandidate(
-  root: string,
-  key: string,
-  now: number,
-  maxAgeMs: number,
-): PruneCandidate | undefined {
-  if (!CACHE_KEY_PATTERN.test(key)) return;
-  const entryDir = join(root, key);
-  try {
-    const before = lstatSync(entryDir, { bigint: true });
-    if (!before.isDirectory() || before.isSymbolicLink()) return;
-    const observed = readAnchoredRecord({
-      trustedAnchorDir: root,
-      parentDir: entryDir,
-      basename: EPHEMERAL_MARKER_FILE,
-      maxBytes: EPHEMERAL_MARKER_MAX_BYTES,
-      permissionPosture: CACHE_PERMISSION_POSTURE,
-    });
-    if (observed.status !== 'present') return;
-    const marker = parseEphemeralMarker(observed.content);
-    if (marker.status !== 'current' && marker.status !== 'legacy') return;
-    const proof = markerCoordinationProof(key, marker);
-    if (proof === undefined) return;
-    const projectPresence = inspectProjectPresence(proof.projectDir);
-    if (projectPresence === 'uncertain') return;
-    const after = lstatSync(entryDir, { bigint: true });
-    const beforeIdentity = directoryIdentity(before);
-    if (
-      !after.isDirectory() ||
-      after.isSymbolicLink() ||
-      !sameDirectoryIdentity(beforeIdentity, directoryIdentity(after))
-    ) {
-      return;
-    }
-    const usedAt = Date.parse(marker.marker.lastUsedAt);
-    return {
-      key,
-      entryDir,
-      ...proof,
-      usedAt,
-      markerSha256: observed.sha256,
-      directoryIdentity: beforeIdentity,
-      verdict: classifyEntry(projectPresence, usedAt, now, maxAgeMs),
-    };
-  } catch {
-    return;
-  }
-}
-
-function sameCandidateSnapshot(left: PruneCandidate, right: PruneCandidate): boolean {
-  return (
-    left.key === right.key &&
-    left.projectDir === right.projectDir &&
-    left.coordinationKey === right.coordinationKey &&
-    left.usedAt === right.usedAt &&
-    left.markerSha256 === right.markerSha256 &&
-    sameDirectoryIdentity(left.directoryIdentity, right.directoryIdentity)
-  );
-}
-
-function compareCandidatesByAge(left: PruneCandidate, right: PruneCandidate): number {
-  return left.usedAt - right.usedAt || left.key.localeCompare(right.key);
-}
-
-function revalidateOverflowCandidate(
-  root: string,
-  candidate: PruneCandidate,
-  keep: number,
-  now: number,
-  maxAgeMs: number,
-  deadline: PruneDeadline,
-): PruneCandidate | undefined {
-  const keys = listEntries(root);
-  if (keys === undefined || keys.length <= keep) return;
-  const currentCandidates: PruneCandidate[] = [];
-  for (const key of keys) {
-    if (remainingBudget(deadline, PRUNE_PASS_BUDGET_MS) <= 0) return;
-    const current = inspectPruneCandidate(root, key, now, maxAgeMs);
-    if (current === undefined) return;
-    currentCandidates.push(current);
-  }
-  currentCandidates.sort(compareCandidatesByAge);
-  const oldest = currentCandidates.slice(0, keys.length - keep);
-  const current = oldest.find((entry) => entry.key === candidate.key);
-  if (current === undefined || !sameCandidateSnapshot(candidate, current)) return;
-  return current;
-}
-
-function removeRevalidatedCandidate(candidate: PruneCandidate): boolean {
-  try {
-    const immediatelyBefore = lstatSync(candidate.entryDir, { bigint: true });
-    if (
-      !immediatelyBefore.isDirectory() ||
-      immediatelyBefore.isSymbolicLink() ||
-      !sameDirectoryIdentity(candidate.directoryIdentity, directoryIdentity(immediatelyBefore))
-    ) {
-      return false;
-    }
-    rmSync(candidate.entryDir, { recursive: true });
-    return !existsSync(candidate.entryDir);
-  } catch {
-    return false;
-  }
-}
-
-function emptyPruneResult(): PruneEphemeralResult {
-  return {
-    scanned: 0,
-    removedOrphaned: 0,
-    removedStale: 0,
-    removedOverflow: 0,
-    skippedActive: 0,
-    skippedChanged: 0,
-  };
-}
-
-async function resolveProtectedCoordinationKeys(
-  requested: readonly string[],
-  deadline: PruneDeadline,
-  onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void,
-  hooks?: EphemeralRuntimeTestHooks,
-): Promise<ReadonlySet<string> | undefined> {
-  if (
-    requested.length > MAX_PROTECTED_COORDINATION_KEYS ||
-    requested.some((key) => !CACHE_KEY_PATTERN.test(key))
-  ) {
-    return;
-  }
-  try {
-    const waitMs = remainingBudget(deadline, PRUNE_ENUMERATION_WAIT_MS);
-    if (waitMs <= 0) return;
-    const active = await listActiveRuntimeLeaseKeys({
-      policy: { waitMs, pollMs: 5 },
-      onEvent,
-    });
-    await hooks?.afterActiveSnapshot?.();
-    if (remainingBudget(deadline, PRUNE_PASS_BUDGET_MS) <= 0) return;
-    const protectedKeys = new Set([...requested, ...active]);
-    if (protectedKeys.size > MAX_PROTECTED_COORDINATION_KEYS) return;
-    return protectedKeys;
-  } catch {
-    return;
-  }
-}
-
-interface PruneExecution {
-  attempts: number;
-  deletions: number;
-  budgetExhausted: boolean;
-  removedOrphaned: number;
-  removedStale: number;
-  removedOverflow: number;
-  readonly removedKeys: Set<string>;
-  readonly attemptedKeys: Set<string>;
-  readonly skippedActive: Set<string>;
-  readonly skippedChanged: Set<string>;
-}
-
-async function deleteCandidate(
-  root: string,
-  candidate: PruneCandidate,
-  reason: Exclude<Verdict, 'keep'> | 'overflow',
-  protectedKeys: ReadonlySet<string>,
-  now: number,
-  maxAgeMs: number,
-  state: PruneExecution,
-  deadline: PruneDeadline,
-  onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void,
-  hooks?: EphemeralRuntimeTestHooks,
-  overflowKeep?: number,
-): Promise<boolean> {
+async function deleteCandidate(deletion: CandidateDeletion): Promise<boolean> {
+  const {
+    root,
+    candidate,
+    reason,
+    protectedKeys,
+    now,
+    maxAgeMs,
+    state,
+    deadline,
+    onEvent,
+    hooks,
+    overflowKeep,
+  } = deletion;
   if (protectedKeys.has(candidate.coordinationKey)) {
     state.skippedActive.add(candidate.key);
     return false;
@@ -403,6 +107,7 @@ async function deleteCandidate(
       onEvent,
     });
   } catch {
+    // @swallow-ok Contention or uncertain lease state classifies the cache as active.
     state.skippedActive.add(candidate.key);
     return false;
   }
@@ -442,23 +147,8 @@ async function deleteCandidate(
     else state.removedOverflow += 1;
     return true;
   } finally {
-    lease.release();
+    void lease.release();
   }
-}
-
-function createPruneExecution(): PruneExecution {
-  return {
-    attempts: 0,
-    deletions: 0,
-    budgetExhausted: false,
-    removedOrphaned: 0,
-    removedStale: 0,
-    removedOverflow: 0,
-    removedKeys: new Set(),
-    attemptedKeys: new Set(),
-    skippedActive: new Set(),
-    skippedChanged: new Set(),
-  };
 }
 
 async function pruneAgedCandidates(input: {
@@ -485,18 +175,18 @@ async function pruneAgedCandidates(input: {
     }
     candidates.push(candidate);
     if (candidate.verdict === 'keep') continue;
-    await deleteCandidate(
-      input.root,
+    await deleteCandidate({
+      root: input.root,
       candidate,
-      candidate.verdict,
-      input.protectedKeys,
-      input.now,
-      input.maxAgeMs,
-      input.state,
-      input.deadline,
-      input.onEvent,
-      input.hooks,
-    );
+      reason: candidate.verdict,
+      protectedKeys: input.protectedKeys,
+      now: input.now,
+      maxAgeMs: input.maxAgeMs,
+      state: input.state,
+      deadline: input.deadline,
+      onEvent: input.onEvent,
+      hooks: input.hooks,
+    });
   }
   return candidates;
 }
@@ -531,19 +221,19 @@ async function pruneOverflowCandidates(input: {
     ) {
       continue;
     }
-    await deleteCandidate(
-      input.root,
+    await deleteCandidate({
+      root: input.root,
       candidate,
-      'overflow',
-      input.protectedKeys,
-      input.now,
-      input.maxAgeMs,
-      input.state,
-      input.deadline,
-      input.onEvent,
-      input.hooks,
-      input.keep,
-    );
+      reason: 'overflow',
+      protectedKeys: input.protectedKeys,
+      now: input.now,
+      maxAgeMs: input.maxAgeMs,
+      state: input.state,
+      deadline: input.deadline,
+      onEvent: input.onEvent,
+      hooks: input.hooks,
+      overflowKeep: input.keep,
+    });
   }
 }
 
@@ -569,7 +259,7 @@ async function executePrunePass(input: {
   readonly onEvent?: (event: RuntimeLeaseEvent | FileLockEvent) => void;
   readonly hooks?: EphemeralRuntimeTestHooks;
 }): Promise<PruneEphemeralResult> {
-  const entries = listEntries(input.root);
+  const entries = listPruneEntries(input.root);
   if (entries === undefined) return emptyPruneResult();
   const maxAgeMs =
     input.maxAgeDays <= 0 ? Number.POSITIVE_INFINITY : input.maxAgeDays * 24 * 60 * 60 * 1000;
@@ -642,7 +332,7 @@ export async function pruneEphemeralRuntimes(
     hooks,
   );
   if (protectedKeys === undefined) return emptyPruneResult();
-  const initialEntries = listEntries(root);
+  const initialEntries = listPruneEntries(root);
   if (initialEntries === undefined || initialEntries.length === 0) return emptyPruneResult();
   const passLockWaitMs = remainingBudget(deadline, PRUNE_PASS_LOCK_POLICY.waitMs);
   if (passLockWaitMs <= 0) return emptyPruneResult();

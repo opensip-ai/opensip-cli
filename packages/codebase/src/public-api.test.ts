@@ -37,6 +37,7 @@ const RUNTIME_EXPORTS = [
   'MAX_WORKSPACE_PATTERNS',
   'buildProjectInventory',
   'classifyFileRoles',
+  'findOwningPackage',
   'projectConfigIdentity',
   'readPackageManifestFacts',
 ] as const;

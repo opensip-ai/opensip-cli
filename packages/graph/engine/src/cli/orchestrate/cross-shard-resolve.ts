@@ -11,15 +11,17 @@
  *      the recovered edges onto their owner occurrences as
  *      `resolution: 'semantic'`, `crossShard: true`, `confidence: 'high'`.
  *
- * The linker emits a cross-package edge ONLY when the import specifier + callee
- * name resolve to a UNIQUE exported occurrence in the imported package — exactly
- * what the TypeScript type checker would conclude. On ANY ambiguity (a name with
- * multiple matching exports the subpath can't disambiguate, a name the package
- * does not export, a specifier pointing at an external npm package) it DECLINES
- * and emits an unresolved (`to: []`) edge. A missing edge is safe; a phantom
- * cross-package edge would fail the gate. This replaces the old name-only
- * syntactic fallback, which fabricated impossible coupling edges by matching a
- * globally-unique simple name into a package the caller never imported.
+ * The linker emits a cross-package edge ONLY when the import specifier +
+ * imported source name resolve to a UNIQUE exported occurrence in the imported
+ * module — exactly what the TypeScript type checker would conclude. Relative
+ * module barrels are followed through a bounded, cycle-safe re-export walk. On
+ * ANY ambiguity (a name with multiple matching exports the subpath can't
+ * disambiguate, a name the module does not export, a specifier pointing at an
+ * external npm package) it DECLINES and emits an unresolved (`to: []`) edge. A
+ * missing edge is safe; a phantom cross-package edge would fail the gate. This
+ * replaces the old name-only syntactic fallback, which fabricated impossible
+ * coupling edges by matching a globally-unique simple name into a package the
+ * caller never imported.
  *
  * Intra-shard edges retain their original (semantic, in exact mode) fidelity;
  * relative imports are still path-pinned (already exact for same-package
@@ -371,31 +373,28 @@ export function resolveCrossBoundaryCalls(
 ): CrossShardOutput {
   const exportIndex = buildExportIndex(merged, manifestIndex);
   const nameIndex = buildNameIndex(merged);
-  const knownFiles = new Set<string>(
+  const knownFilesStripped = new Set<string>(
     Object.values(merged.functions)
       .flat()
-      .map((o) => o.filePath),
+      .map((o) => stripExt(o.filePath)),
   );
-  // Extension-stripped twin of knownFiles, built ONCE per resolve pass so the
-  // relative-import pin does two O(1) lookups per boundary call instead of
-  // spreading + regex-scanning the whole set per call (O(calls x files)).
-  const knownFilesStripped = new Set<string>([...knownFiles].map(stripExt));
-  // name → re-export records exposing it (for following a relative import that
-  // lands on a re-exporting module rather than the definition).
-  const reExportsByName = new Map<string, ReExportRecord[]>();
+  // Re-exporting module → its records. Keying by module first preserves the
+  // semantic path a relative import selected; same-named exports elsewhere in
+  // the catalog cannot influence this traversal.
+  const reExportsByFile = new Map<string, ReExportRecord[]>();
   for (const r of merged.reExports ?? []) {
-    const bucket = reExportsByName.get(r.exportedName);
+    const fromFile = stripExt(posix.normalize(r.fromFile));
+    const bucket = reExportsByFile.get(fromFile);
     if (bucket) bucket.push(r);
-    else reExportsByName.set(r.exportedName, [r]);
+    else reExportsByFile.set(fromFile, [r]);
   }
 
   const ctx: ResolveContext = {
     exportIndex,
     manifestIndex,
     nameIndex,
-    knownFiles,
     knownFilesStripped,
-    reExportsByName,
+    reExportsByFile,
   };
   const stats = createMutableStats();
 
@@ -447,26 +446,25 @@ interface ResolveContext {
   readonly manifestIndex: PackageManifestIndex;
   /** name → all occurrences with that name (the relative-import pin candidates). */
   readonly nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>;
-  readonly knownFiles: ReadonlySet<string>;
   /** Extension-stripped knownFiles for O(1) relative-import pin existence checks. */
   readonly knownFilesStripped: ReadonlySet<string>;
-  /** exportedName → re-export records, for following a relative import that lands
-   *  on a re-exporting module (`export { x } from '@scope/pkg'`) not the definition. */
-  readonly reExportsByName: ReadonlyMap<string, readonly ReExportRecord[]>;
+  /** Re-exporting module path (extension-stripped) → its re-export records. */
+  readonly reExportsByFile: ReadonlyMap<string, readonly ReExportRecord[]>;
 }
 
 /**
  * Resolve one cross-boundary call to a recovered edge — semantically, by
- * linking the import specifier + callee name to a UNIQUE target occurrence, or
- * DECLINING (`to: []`) when the link is absent or ambiguous. Three branches:
+ * linking the import specifier + imported source name to a UNIQUE target
+ * occurrence, or DECLINING (`to: []`) when the link is absent or ambiguous.
+ * Three branches:
  *
  *  (a) RELATIVE specifier (`./x`) → pin by path against the owner's directory
- *      (an intra-package import; already exact). Emit when ≥1 occurrence in the
- *      resolved file matches the callee name.
+ *      and follow bounded relative re-exports when the selected module is a
+ *      barrel. Emit only when one distinct occurrence survives.
  *  (b) BARE / workspace specifier that resolves to a known workspace package P →
- *      look the callee name up in P's export bucket: exactly 1 export → emit;
- *      >1 → narrow by a single subpath-pinned file if possible, else decline;
- *      0 → decline (not exported / re-export chain we don't follow).
+ *      look the imported source name up in P's export bucket: exactly 1 export
+ *      → emit; >1 → narrow by a single subpath-pinned file if possible, else
+ *      decline; 0 → decline.
  *  (c) Specifier maps to no known workspace package (external npm) → unresolved.
  *
  * A recovered edge is `'semantic'`, `crossShard: true`, `confidence: 'high'`.
@@ -482,6 +480,7 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
     confidence: 'high' as const,
   };
   const spec = bc.importSpecifier;
+  const importedName = bc.importedName ?? bc.calleeName;
 
   // (a0) Type-attested cross-package METHOD: the checker resolved `recv.m()`'s
   // method to a workspace `dist/*.d.ts` whose SOURCE lives in another shard, so
@@ -505,7 +504,7 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   // (`pinByFileAndName`), so the two engines converge (Phase 3, Option A;
   // decline-beats-guess). Previously emitted ALL matches as a multi-target edge.
   if (spec?.startsWith('.')) {
-    const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
+    const candidates = ctx.nameIndex.get(importedName) ?? [];
     const pinned = pinBySpecifier(bc, candidates, ctx.knownFilesStripped);
     const distinct = [...new Set(pinned.map((o) => o.bodyHash))];
     if (distinct.length === 1) {
@@ -514,20 +513,12 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
       return edge;
     }
     if (distinct.length === 0) {
-      // The relative import landed on a module that RE-EXPORTS the name
-      // (`export { defineCommand } from '@scope/pkg'`) rather than defining it.
-      // Follow the re-export to the SAME source occurrence the exact engine's
-      // whole-catalog name fallback recovers. Mark it `unknown` (NAME_GUESSED) so
-      // constrainCrossPackageEdges applies the SAME reachability gate exact's
-      // fallback gets: a relative re-export adds NO package to the caller's import
-      // set, so an unreachable target drops in BOTH engines (no sharded-only phantom).
-      const reTarget = followReExport(bc, ctx);
+      // The relative import landed on a module that RE-EXPORTS the imported
+      // source name rather than defining it. Follow bounded relative barrels,
+      // preserving every alias translation, and accept only one semantic target.
+      const reTarget = followReExport(bc, importedName, ctx);
       if (reTarget !== undefined) {
-        const edge: CallEdge = {
-          ...base,
-          resolution: 'unknown',
-          to: [reTarget],
-        };
+        const edge: CallEdge = { ...base, to: [reTarget] };
         traceResolveOne(bc, 'relative-pin', edge.to);
         return edge;
       }
@@ -541,7 +532,7 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   // through the SHARED cross-package resolver the exact adapter also uses.
   const linked = resolveCrossPackageCall({
     importSpecifier: spec,
-    calleeName: bc.calleeName,
+    calleeName: importedName,
     exportIndex: ctx.exportIndex,
     manifestIndex: ctx.manifestIndex,
   });
@@ -551,38 +542,118 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
 }
 
 /**
- * Follow a relative import that resolves to a module RE-EXPORTING the callee
- * (`export { x } from '@scope/pkg'`) instead of defining it. Returns the UNIQUE
- * source-occurrence bodyHash the re-export points at, or undefined (decline) on
- * no/ambiguous match — the same edge the exact engine's whole-catalog name
- * resolution recovers, so the two engines converge. Workspace re-export
- * specifiers link through the shared export index (the path bare imports use);
- * a relative re-export chain is left declined (rare; would need recursion).
+ * Follow a relative import that resolves to a module RE-EXPORTING the imported
+ * source name instead of defining it. Relative re-export chains retain their
+ * module path and alias at every hop; a workspace endpoint links through the
+ * shared export index. The traversal is bounded and cycle-safe. Any competing,
+ * cyclic, over-depth, or absent result declines.
  */
-function followReExport(bc: CrossBoundaryCall, ctx: ResolveContext): string | undefined {
+function followReExport(
+  bc: CrossBoundaryCall,
+  importedName: string,
+  ctx: ResolveContext,
+): string | undefined {
   const spec = bc.importSpecifier;
   if (!spec?.startsWith('.')) return undefined;
-  // Match the exact engine's whole-catalog name fallback (resolveByCatalogFallback):
-  // it only resolves a GLOBALLY-UNIQUE simple name. A name with >1 distinct body
-  // declines there, so following the re-export to a (locally-unique export) target
-  // would resolve sharded-only — a phantom. Gate on global uniqueness for parity.
-  const all = ctx.nameIndex.get(bc.calleeName) ?? [];
-  if (new Set(all.map((o) => o.bodyHash)).size > 1) return undefined;
-  const resolved = stripExt(posix.normalize(posix.join(posix.dirname(bc.ownerFile), spec)));
-  const hashes = new Set<string>();
-  for (const r of ctx.reExportsByName.get(bc.calleeName) ?? []) {
-    const rf = stripExt(r.fromFile);
-    if (rf !== resolved && rf !== `${resolved}/index`) continue;
-    if (r.specifier.startsWith('.')) continue; // relative re-export chain — out of scope
-    const linked = resolveCrossPackageCall({
-      importSpecifier: r.specifier,
-      calleeName: r.sourceName,
-      exportIndex: ctx.exportIndex,
-      manifestIndex: ctx.manifestIndex,
-    });
-    if (linked !== undefined) hashes.add(linked.bodyHash);
+  const target = resolveRelativeModule(bc.ownerFile, spec);
+  const resolution = resolveModuleExport(target, importedName, ctx, new Set(), 0);
+  return resolution.kind === 'unique' ? resolution.bodyHash : undefined;
+}
+
+const MAX_RELATIVE_REEXPORT_DEPTH = 16;
+
+type ModuleExportResolution =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'ambiguous' }
+  | { readonly kind: 'unique'; readonly bodyHash: string };
+
+const NO_MODULE_EXPORT: ModuleExportResolution = { kind: 'none' };
+const AMBIGUOUS_MODULE_EXPORT: ModuleExportResolution = { kind: 'ambiguous' };
+
+/**
+ * Resolve one exported name from a path-selected module. The direct definition
+ * and every matching named/star re-export contribute candidates; exactly one
+ * distinct body survives. A cycle or depth cap is uncertainty, so it declines
+ * the whole branch rather than hiding a potentially competing target.
+ */
+function resolveModuleExport(
+  target: string,
+  exportedName: string,
+  ctx: ResolveContext,
+  visited: ReadonlySet<string>,
+  depth: number,
+): ModuleExportResolution {
+  if (depth >= MAX_RELATIVE_REEXPORT_DEPTH) return AMBIGUOUS_MODULE_EXPORT;
+  const visitKey = `${target}|${exportedName}`;
+  if (visited.has(visitKey)) return AMBIGUOUS_MODULE_EXPORT;
+  const nextVisited = new Set(visited);
+  nextVisited.add(visitKey);
+
+  const hashes = directModuleHashes(target, exportedName, ctx.nameIndex);
+  if (hashes.size > 1) return AMBIGUOUS_MODULE_EXPORT;
+
+  for (const record of reExportsForModule(target, ctx.reExportsByFile)) {
+    if (record.exportedName !== exportedName && record.exportedName !== '*') continue;
+    const resolution = resolveReExportRecord(record, exportedName, ctx, nextVisited, depth + 1);
+    if (resolution.kind === 'ambiguous') return resolution;
+    if (resolution.kind === 'unique') hashes.add(resolution.bodyHash);
+    if (hashes.size > 1) return AMBIGUOUS_MODULE_EXPORT;
   }
-  return hashes.size === 1 ? [...hashes][0] : undefined; // unique-or-decline
+
+  const [bodyHash] = hashes;
+  return bodyHash === undefined ? NO_MODULE_EXPORT : { kind: 'unique', bodyHash };
+}
+
+function resolveReExportRecord(
+  record: ReExportRecord,
+  exposedName: string,
+  ctx: ResolveContext,
+  visited: ReadonlySet<string>,
+  depth: number,
+): ModuleExportResolution {
+  const sourceName = record.exportedName === '*' ? exposedName : record.sourceName;
+  if (record.specifier.startsWith('.')) {
+    const target = resolveRelativeModule(record.fromFile, record.specifier);
+    return resolveModuleExport(target, sourceName, ctx, visited, depth);
+  }
+  const linked = resolveCrossPackageCall({
+    importSpecifier: record.specifier,
+    calleeName: sourceName,
+    exportIndex: ctx.exportIndex,
+    manifestIndex: ctx.manifestIndex,
+  });
+  return linked === undefined ? NO_MODULE_EXPORT : { kind: 'unique', bodyHash: linked.bodyHash };
+}
+
+function directModuleHashes(
+  target: string,
+  exportedName: string,
+  nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>,
+): Set<string> {
+  return new Set(
+    (nameIndex.get(exportedName) ?? [])
+      .filter((occurrence) => matchesModuleTarget(occurrence.filePath, target))
+      .map((occurrence) => occurrence.bodyHash),
+  );
+}
+
+function reExportsForModule(
+  target: string,
+  reExportsByFile: ReadonlyMap<string, readonly ReExportRecord[]>,
+): readonly ReExportRecord[] {
+  return [
+    ...(reExportsByFile.get(target) ?? []),
+    ...(reExportsByFile.get(`${target}/index`) ?? []),
+  ];
+}
+
+function resolveRelativeModule(fromFile: string, specifier: string): string {
+  return stripExt(posix.normalize(posix.join(posix.dirname(fromFile), specifier)));
+}
+
+function matchesModuleTarget(filePath: string, target: string): boolean {
+  const stripped = stripExt(filePath);
+  return stripped === target || stripped === `${target}/index`;
 }
 
 /**
@@ -818,16 +889,20 @@ export interface CatalogEdgeDiff {
 /**
  * One owner-attributed edge difference. `key` is the same
  * `filePath:line:column@line:col` (owner OCCURRENCE identity + call-site
- * position) the partition arrays use. `ownerFilePath` is the project-relative
- * path of the owner occurrence (resolved from whichever catalog holds it — the
- * two catalogs share occurrence identities, so the owner file is the same on
- * both sides).
+ * position) the partition arrays use. The explicit `owner*` fields carry the
+ * complete owner occurrence identity alongside that display key so downstream
+ * diagnostics never need to parse the key or mistake it for a body hash.
+ * `ownerFilePath` is project-relative; `ownerLine` / `ownerColumn` are the
+ * declaration position, while `line` / `column` remain the call-site position.
  * `toA` / `toB` are the sorted-joined target sets on each side (one is `''` when
  * the edge is present only on one side). `cross` mirrors the partition split.
  */
 export interface EdgeDifference {
   readonly key: string;
+  readonly ownerBodyHash: string;
   readonly ownerFilePath: string;
+  readonly ownerLine: number;
+  readonly ownerColumn: number;
   readonly line: number;
   readonly column: number;
   readonly toA: string;
@@ -869,12 +944,16 @@ export function diffCatalogsByEdge(a: Catalog, b: Catalog): CatalogEdgeDiff {
     if (x?.to === y?.to) continue; // identical (or both absent) → no difference
     const isCross = (x?.crossShard ?? false) || (y?.crossShard ?? false);
     (isCross ? crossDifferences : intraMismatches).push(key);
-    // Owner file path + position is the same on both sides (shared occurrence
-    // identity); take whichever side carries the edge.
+    // Owner occurrence identity is the same on both sides; take whichever side
+    // carries the edge. Keeping it explicit prevents diagnostics from parsing
+    // the human-readable key (whose prefix is a source location, not a hash).
     const present = x ?? y;
     differences.push({
       key,
+      ownerBodyHash: present?.ownerBodyHash ?? '',
       ownerFilePath: present?.ownerFilePath ?? '',
+      ownerLine: present?.ownerLine ?? 0,
+      ownerColumn: present?.ownerColumn ?? 0,
       line: present?.line ?? 0,
       column: present?.column ?? 0,
       toA: x?.to ?? '',
@@ -888,7 +967,10 @@ export function diffCatalogsByEdge(a: Catalog, b: Catalog): CatalogEdgeDiff {
 interface IndexedEdge {
   readonly to: string;
   readonly crossShard: boolean;
+  readonly ownerBodyHash: string;
   readonly ownerFilePath: string;
+  readonly ownerLine: number;
+  readonly ownerColumn: number;
   readonly line: number;
   readonly column: number;
 }
@@ -907,7 +989,10 @@ function indexEdges(catalog: Catalog): ReadonlyMap<string, IndexedEdge> {
         map.set(key, {
           to: [...e.to].sort().join(','),
           crossShard: e.crossShard ?? false,
+          ownerBodyHash: o.bodyHash,
           ownerFilePath: o.filePath,
+          ownerLine: o.line,
+          ownerColumn: o.column,
           line: e.line,
           column: e.column,
         });

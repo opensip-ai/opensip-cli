@@ -85,7 +85,7 @@ function patchNetwork(): void {
   }
   // Global fetch is the modern outbound primitive — the old denylist omitted
   // it entirely, so a pack with network denied could still exfiltrate.
-  globalThis.fetch = (() => denied('network')) as typeof fetch;
+  globalThis.fetch = () => denied('network');
 }
 
 function patchFilesystem(cwd: string, packageDir: string): void {

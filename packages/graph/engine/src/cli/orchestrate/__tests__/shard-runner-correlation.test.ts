@@ -33,6 +33,7 @@ import type { Shard } from '../shard-model.js';
 //  - `fail:<id>`  → exit 3 with a LONG stderr (proves structured logs omit the
 //                   content while the full stderr survives on ShardFailure).
 //  - `sleep:<id>` → sleep well past the injected short kill-timeout (proves M3).
+//  - `signal:<id>` → terminate by signal so the parent retains signal evidence.
 //  - anything else → emit a ShardBuildResult whose `fragment.cacheKey` carries an
 //    env+spec snapshot: the OPENSIP_RUN_ID the child saw and whether the spec had
 //    a `correlation` (and, if so, its runId-stripped shape).
@@ -49,6 +50,9 @@ if (id.startsWith('sleep:')) {
   // Hang past the injected short kill-timeout; the parent SIGKILLs us.
   setTimeout(() => process.exit(0), 60_000);
   return;
+}
+if (id.startsWith('signal:')) {
+  process.kill(process.pid, 'SIGKILL');
 }
 const snapshot = {
   runIdEnv: process.env.OPENSIP_RUN_ID ?? null,
@@ -87,6 +91,7 @@ interface CapturedLog {
   readonly shardId?: string;
   readonly exitCode?: number;
   readonly failureClass?: string;
+  readonly signal?: string;
   readonly stderrPresent?: boolean;
   readonly stderrLength?: number;
   readonly runId?: string;
@@ -231,6 +236,20 @@ describe('runShardsInParallel — spawn-path correlation + failure taxonomy', ()
     expect(event?.failureClass).toBe('timeout');
     expect(event?.shardId).toBe('sleep:hang');
   }, 15_000);
+
+  it('retains the process signal when a worker is externally terminated', async () => {
+    const out = await runWithCorrelation([shard('signal:killed')]);
+
+    expect(out.fragments).toHaveLength(0);
+    expect(out.failures).toEqual([
+      expect.objectContaining({
+        shardId: 'signal:killed',
+        exitCode: -1,
+        failureClass: 'exit_nonzero',
+        signal: 'SIGKILL',
+      }),
+    ]);
+  });
 
   it('builds a spec WITHOUT a correlation field (wire-compat, GAP a) — no throw, valid result', async () => {
     // Run OUTSIDE any scope correlation: spawnShardWorker reads

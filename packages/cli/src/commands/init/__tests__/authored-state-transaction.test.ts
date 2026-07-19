@@ -28,7 +28,7 @@ import {
 } from '@opensip-cli/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createDurableDirectory } from '../authored-state-transaction-fs.js';
+import { createDurableDirectory } from '../authored-state-transaction-durable-fs.js';
 import { AUTHORED_ARTIFACT_OWNER_FILE } from '../authored-state-transaction-types.js';
 import {
   abortPendingAuthoredPreparation,
@@ -42,7 +42,7 @@ import {
   verifyAuthoredState,
   type AuthoredStateCheckpoint,
 } from '../authored-state-transaction.js';
-import { directoryDigest, sha256Bytes } from '../init-authored-plan-types.js';
+import { directoryDigest, sha256Bytes, sha256Parts } from '../init-authored-plan-types.js';
 import {
   encodeAuthoredReplayManifest,
   type AuthoredReplayManifest,
@@ -304,14 +304,12 @@ function authoredPlan(specifications: readonly MutationSpec[]): InitAuthoredPlan
     mutations,
   };
   const replayManifestBytes = encodeAuthoredReplayManifest(replayManifest);
-  const digest = sha256Bytes(
-    Buffer.concat([
-      Buffer.from('opensip-init-authored-plan\0v1\0', 'utf8'),
-      Buffer.from(JSON.stringify(inputs), 'utf8'),
-      Buffer.from('\0', 'utf8'),
-      Buffer.from(replayManifestBytes, 'utf8'),
-    ]),
-  );
+  const digest = sha256Parts([
+    'opensip-init-authored-plan\0v1\0',
+    JSON.stringify(inputs),
+    '\0',
+    replayManifestBytes,
+  ]);
   return {
     inputs,
     mutations,

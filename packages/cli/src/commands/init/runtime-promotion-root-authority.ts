@@ -55,6 +55,7 @@ export interface RuntimePromotionProjectRootAuthority {
   } | null;
 }
 
+/** @throws {RuntimePromotionPreflightError} When the lease does not match root authority. */
 function assertLease(
   lease: RuntimeExclusiveLease,
   coordinationKey: string,
@@ -101,6 +102,7 @@ function sameAuthorityIdentity(
   );
 }
 
+/** @throws {RuntimePromotionPreflightError} When an existing parent lacks safe identity. */
 function destinationParentAuthority(
   projectRoot: string,
   snapshot: RuntimePromotionPathSnapshot,
@@ -125,7 +127,11 @@ function canonicalProjectRootUnchanged(projectRoot: string, coordinationKey: str
   }
 }
 
-/** Bind a current exact root after the caller has validated its operation context. */
+/**
+ * Bind a current exact root after the caller validates its operation context.
+ *
+ * @throws {RuntimePromotionPreflightError} When root, parent, or lease authority changed.
+ */
 export function captureRuntimePromotionProjectRootAuthority(input: {
   readonly lease: RuntimeExclusiveLease;
   readonly projectRoot: string;
@@ -164,6 +170,8 @@ export function captureRuntimePromotionProjectRootAuthority(input: {
 /**
  * Bind a recovery attempt without accidentally promoting an operation-created
  * destination parent into attempt-local preexisting authority.
+ *
+ * @throws {RuntimePromotionPreflightError} When recovery root or parent authority changed.
  */
 export function captureRuntimePromotionRecoveryProjectRootAuthority(input: {
   readonly lease: RuntimeExclusiveLease;
@@ -190,6 +198,8 @@ export function captureRuntimePromotionRecoveryProjectRootAuthority(input: {
 /**
  * Capture the exact root selected by fresh preflight for this in-memory
  * attempt. Recovery must bind a new authority after validating its journal.
+ *
+ * @throws {RuntimePromotionPreflightError} When fresh preflight authority cannot be rebound.
  */
 export function bindRuntimePromotionFreshProjectRootAuthority(input: {
   readonly lease: RuntimeExclusiveLease;
@@ -233,6 +243,8 @@ export function bindRuntimePromotionFreshProjectRootAuthority(input: {
 /**
  * Reassert attempt-local root authority at every root-dependent boundary.
  * dev/ino/uid/mode are stable while owned descendants may change timestamps.
+ *
+ * @throws {RuntimePromotionPreflightError} When the lease, root, or parent authority changed.
  */
 export function assertRuntimePromotionProjectRootAuthority(input: {
   readonly lease: RuntimeExclusiveLease;

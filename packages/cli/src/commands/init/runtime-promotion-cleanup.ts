@@ -3,6 +3,7 @@ import {
   verifyClosedTerminalOperationAuthority,
 } from './runtime-promotion-authority-verification.js';
 import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
+import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
 import type { RuntimePromotionOwnedSlotName } from './runtime-promotion-journal-schema.js';
 import type {
@@ -16,17 +17,16 @@ import type {
 
 const RUNTIME_CLEANUP_ORDER = ['runtimeStage', 'destinationBackup', 'sourceTombstone'] as const;
 
-function mutationOutcome(status: string): 'applied' | 'already-satisfied' {
-  return status.startsWith('already-') ? 'already-satisfied' : 'applied';
-}
-
+/** @throws {Error} When an owned runtime slot cannot be safely cleaned. */
 async function cleanupRuntimeSlot(
   operation: RuntimePromotionOperation,
   initialReceipt: DurableClosedPromotionJournal,
   slot: (typeof RUNTIME_CLEANUP_ORDER)[number] | 'destinationParent',
 ): Promise<DurableClosedPromotionJournal> {
   let receipt = initialReceipt;
-  const current = await operation.controller.verifyReceipt(receipt, { state: 'closed' });
+  const current = await operation.controller.verifyReceipt(receipt, {
+    state: 'closed',
+  });
   if (current.cleanup[slot] !== 'pending') return receipt;
   assertFreshRuntimePromotionProjectRoot(operation);
   receipt = await operation.writer.recordCleanupIntent(receipt, slot);
@@ -47,7 +47,11 @@ async function cleanupRuntimeSlot(
   if (result.slot !== slot) {
     throw new Error('Runtime promotion cleanup returned a different owned slot');
   }
-  return operation.writer.recordCleanupPostcondition(receipt, slot, mutationOutcome(result.status));
+  return operation.writer.recordCleanupPostcondition(
+    receipt,
+    slot,
+    runtimePromotionMutationOutcome(result.status),
+  );
 }
 
 async function claimClosedAfterFailure(
@@ -62,11 +66,33 @@ async function claimClosedAfterFailure(
   }
 }
 
+async function verifyCleanupStart(
+  operation: RuntimePromotionOperation,
+  receipt: DurableClosedPromotionJournal,
+): Promise<DurableClosedPromotionJournal> {
+  await verifyClosedTerminalOperationAuthority(operation, receipt);
+  return receipt;
+}
+
+async function cleanupRuntimeSlots(
+  operation: RuntimePromotionOperation,
+  receipt: DurableClosedPromotionJournal,
+  index = 0,
+): Promise<DurableClosedPromotionJournal> {
+  const slot = RUNTIME_CLEANUP_ORDER[index];
+  if (slot === undefined) return receipt;
+  const cleaned = await cleanupRuntimeSlot(operation, receipt, slot);
+  return cleanupRuntimeSlots(operation, cleaned, index + 1);
+}
+
+/** @throws {Error} When closed-journal cleanup is incomplete or cannot be verified. */
 async function assertReadyToUnlink(
   operation: RuntimePromotionOperation,
   receipt: DurableClosedPromotionJournal,
 ): Promise<void> {
-  const current = await operation.controller.verifyReceipt(receipt, { state: 'closed' });
+  const current = await operation.controller.verifyReceipt(receipt, {
+    state: 'closed',
+  });
   const pendingSlots = (Object.keys(current.cleanup) as RuntimePromotionOwnedSlotName[]).filter(
     (slot) => current.cleanup[slot] === 'pending',
   );
@@ -88,10 +114,8 @@ export async function cleanupFreshClosedRuntimePromotion(
   let receipt = initialReceipt;
   try {
     assertFreshRuntimePromotionProjectRoot(operation);
-    await verifyClosedTerminalOperationAuthority(operation, receipt);
-    for (const slot of RUNTIME_CLEANUP_ORDER) {
-      receipt = await cleanupRuntimeSlot(operation, receipt, slot);
-    }
+    receipt = await verifyCleanupStart(operation, receipt);
+    receipt = await cleanupRuntimeSlots(operation, receipt);
     if (operation.transaction !== null) {
       assertFreshRuntimePromotionProjectRoot(operation);
       const cleaned = await operation.dependencies.cleanupAuthored(operation.transaction, receipt);

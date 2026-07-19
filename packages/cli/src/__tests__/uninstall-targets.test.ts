@@ -128,9 +128,7 @@ describe('collectTargets', () => {
       expect(targets.some((entry) => entry.path === ephemeralRuntime)).toBe(true);
       // No-init evidence lives in the generation-bound user-cache entry, not
       // project `.runtime` — default project uninstall still retires it.
-      expect(targets.find((entry) => entry.path === ephemeralRuntime)?.bucket).toBe(
-        'active-cache',
-      );
+      expect(targets.find((entry) => entry.path === ephemeralRuntime)?.bucket).toBe('active-cache');
       expect(existsSync(join(projectDir, 'opensip-cli'))).toBe(false);
     } finally {
       if (oldHome === undefined) delete process.env.HOME;

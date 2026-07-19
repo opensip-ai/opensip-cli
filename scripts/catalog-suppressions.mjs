@@ -16,6 +16,10 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { format as formatWithPrettier } from 'prettier';
+
+import prettierConfig from '../.config/prettier.config.mjs';
+
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BUDGET_PATH = join(REPO_ROOT, '.config/waiver-budget.json');
 const CATALOG_JSON_PATH = join(REPO_ROOT, '.config/suppression-catalog.json');
@@ -642,6 +646,14 @@ function renderTriageMarkdown(catalog) {
   return `${lines.join('\n')}\n`;
 }
 
+async function formatTriageMarkdown(catalog) {
+  return formatWithPrettier(renderTriageMarkdown(catalog), {
+    ...prettierConfig,
+    filepath: TRIAGE_MD_PATH,
+    parser: 'markdown',
+  });
+}
+
 function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
@@ -667,19 +679,19 @@ function markdownFingerprint(md) {
   return digest(normalized);
 }
 
-function writeOutputs(catalog) {
+async function writeOutputs(catalog) {
   mkdirSync(dirname(CATALOG_JSON_PATH), { recursive: true });
   const json = stableJson(catalog);
-  const md = renderTriageMarkdown(catalog);
+  const md = await formatTriageMarkdown(catalog);
   writeFileSync(CATALOG_JSON_PATH, json);
   writeFileSync(TRIAGE_MD_PATH, md);
   log(`wrote ${relative(REPO_ROOT, CATALOG_JSON_PATH)}`);
   log(`wrote ${relative(REPO_ROOT, TRIAGE_MD_PATH)}`);
 }
 
-function checkStale(catalog) {
+async function checkStale(catalog) {
   const expectedJsonFp = catalogFingerprint(catalog);
-  const expectedMdFp = markdownFingerprint(renderTriageMarkdown(catalog));
+  const expectedMdFp = markdownFingerprint(await formatTriageMarkdown(catalog));
   let stale = false;
 
   try {
@@ -715,7 +727,7 @@ function checkNoTbdDispositions(catalog) {
   process.exit(1);
 }
 
-function main() {
+async function main() {
   const args = new Set(process.argv.slice(2));
   const catalog = buildCatalog({ collectRecords: args.has('--include-records') });
 
@@ -726,11 +738,11 @@ function main() {
 
   if (args.has('--check')) {
     checkNoTbdDispositions(catalog);
-    checkStale(catalog);
+    await checkStale(catalog);
     return;
   }
 
-  writeOutputs(catalog);
+  await writeOutputs(catalog);
   log(
     `product-runtime: ${catalog.summary.productRuntimeFitness} fitness + ${catalog.summary.productRuntimeGraph} graph = ${catalog.summary.productRuntimeCombined}`,
   );
@@ -750,13 +762,14 @@ function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+  await main();
 }
 
 export {
   buildCatalog,
   buildQualityBySlug,
   buildPhase4Audit,
+  formatTriageMarkdown,
   renderTriageMarkdown,
   qualityPriority,
 };

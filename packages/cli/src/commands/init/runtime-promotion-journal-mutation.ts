@@ -62,12 +62,13 @@ export function isExactJournalContent(
 export function createJournalMutationCoordinator(
   dependencies: JournalMutationCoordinatorDependencies,
 ): JournalMutationCoordinator {
-  const retryContentMutation = async (
+  /** @throws {SystemError} When an ambiguous content mutation cannot be reconciled safely. */
+  async function retryContentMutation(
     mutation: Extract<JournalMutation, { operation: 'create' | 'replace' }>,
     previousContent: string | undefined,
     desiredContent: string,
     firstError: unknown,
-  ): Promise<void> => {
+  ): Promise<void> {
     dependencies.checkpoint?.('before-ambiguity-reconciliation');
     let observed: JournalObservedRecord;
     try {
@@ -105,7 +106,7 @@ export function createJournalMutationCoordinator(
         error,
       );
     }
-  };
+  }
 
   const coordinator: JournalMutationCoordinator = {
     mutateContent: async (mutation, previousContent, desiredContent, verifyDesired) => {
@@ -119,6 +120,7 @@ export function createJournalMutationCoordinator(
       }
       return verifyDesired(desiredContent);
     },
+    /** @throws {SystemError} When a closed-journal unlink cannot be reconciled or verified. */
     unlinkClosed: async (mutation, expectedContent) => {
       try {
         await dependencies.mutate(mutation);

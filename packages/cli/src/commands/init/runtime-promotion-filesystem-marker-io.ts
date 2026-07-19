@@ -213,8 +213,9 @@ export function publishPromotionMarker(
     const split = bytes.length === 0 ? 0 : Math.max(1, Math.floor(bytes.length / 2));
     writeAll(descriptor, bytes, 0, split, dependencies, operation);
     writeAll(descriptor, bytes, split, bytes.length, dependencies, operation);
+    const publishedDescriptor = descriptor;
     withPromotionMutation(dependencies, operation, () =>
-      fchmodSync(descriptor!, RUNTIME_PROMOTION_ARTIFACT_MARKER_MODE),
+      fchmodSync(publishedDescriptor, RUNTIME_PROMOTION_ARTIFACT_MARKER_MODE),
     );
     promotionFilesystemCheckpoint(dependencies, 'before', 'fsync', 'file');
     fsyncSync(descriptor);

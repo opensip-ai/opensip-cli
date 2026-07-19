@@ -1,8 +1,13 @@
 import { join } from 'node:path';
 
-import { runtimeManifestIdentityEqual } from './runtime-manifest.js';
+import { hasErrorCode } from './error-code.js';
+import { RuntimeManifestError, runtimeManifestIdentityEqual } from './runtime-manifest.js';
 import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
 import { canonicalRuntimePromotionCacheChild } from './runtime-promotion-preflight-fs.js';
+import {
+  RuntimePromotionDatastoreError,
+  RuntimePromotionPreflightError,
+} from './runtime-promotion-preflight.js';
 
 import type { VerifiedRuntimeManifest } from './runtime-manifest.js';
 import type {
@@ -12,15 +17,12 @@ import type {
 import type {
   DurableClosedPromotionJournal,
   DurableOpenPromotionJournal,
+  DurablePromotionJournal,
 } from './runtime-promotion-journal.js';
 import type {
   RuntimePromotionRecoveryExplicitInputs,
   RuntimePromotionRecoveryOperation,
 } from './runtime-promotion-recovery-types.js';
-
-export function runtimeRecoveryMutationOutcome(status: string): 'applied' | 'already-satisfied' {
-  return status.startsWith('already-') ? 'already-satisfied' : 'applied';
-}
 
 export function recoveryInputsCompatible(
   journal: RuntimePromotionJournal,
@@ -47,6 +49,45 @@ export function recoveryInputsCompatible(
   );
 }
 
+export function recoveryFailureReason(
+  error: unknown,
+  journal: RuntimePromotionJournal | undefined,
+):
+  | 'operation-failed'
+  | 'journal-malformed'
+  | 'journal-oversize'
+  | 'journal-key-mismatch'
+  | 'journal-phase-invalid'
+  | 'artifact-mismatch'
+  | 'state-ambiguous' {
+  if (journal === undefined) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('exceeds its bounded size')) return 'journal-oversize';
+    if (message.includes('another project key')) return 'journal-key-mismatch';
+    if (
+      message.includes('malformed') ||
+      message.includes('canonically encoded') ||
+      hasErrorCode(error, 'SYSTEM.INIT.PROMOTION_JOURNAL')
+    ) {
+      return 'journal-malformed';
+    }
+    return 'state-ambiguous';
+  }
+  if (hasErrorCode(error, 'SYSTEM.INIT.PROMOTION_JOURNAL')) {
+    return 'journal-phase-invalid';
+  }
+  if (
+    error instanceof RuntimeManifestError ||
+    error instanceof RuntimePromotionDatastoreError ||
+    error instanceof RuntimePromotionPreflightError ||
+    hasErrorCode(error, 'SYSTEM.INIT.AUTHORED_TRANSACTION') ||
+    hasErrorCode(error, 'SYSTEM.INIT.RUNTIME_PROMOTION_FILESYSTEM')
+  ) {
+    return 'artifact-mismatch';
+  }
+  return 'operation-failed';
+}
+
 export function deriveRecoverySourceRuntime(
   journal: RuntimePromotionJournal,
   ephemeralProjectsDir: string,
@@ -70,6 +111,7 @@ export function assertRecoveryProjectRoot(operation: RuntimePromotionRecoveryOpe
   });
 }
 
+/** @throws {Error} When the selected recovery source no longer has exact authority. */
 export function assertRecoverySourceAuthority(
   operation: RuntimePromotionRecoveryOperation,
 ): string {
@@ -87,6 +129,7 @@ export function assertRecoverySourceAuthority(
   return operation.sourceRuntime;
 }
 
+/** @throws {Error} When the recovery source is absent or no longer canonically located. */
 export function assertRecoverySourceLocation(operation: RuntimePromotionRecoveryOperation): string {
   if (operation.sourceRuntime === undefined) {
     throw new Error('Source-backed recovery lacks its canonical cache location');
@@ -104,14 +147,16 @@ export function assertRecoverySourceLocation(operation: RuntimePromotionRecovery
 
 export async function refreshRecoveryJournal(
   operation: RuntimePromotionRecoveryOperation,
+  expectedReceipt: DurablePromotionJournal = operation.receipt,
 ): Promise<RuntimePromotionJournal> {
   assertRecoveryProjectRoot(operation);
-  operation.journal = await operation.controller.verifyReceipt(operation.receipt, {
-    state: operation.receipt.state,
+  operation.journal = await operation.controller.verifyReceipt(expectedReceipt, {
+    state: expectedReceipt.state,
   });
   return operation.journal;
 }
 
+/** @throws {Error} When a durable recovery receipt is not open. */
 export function asRecoveryOpen(
   operation: RuntimePromotionRecoveryOperation,
 ): DurableOpenPromotionJournal {
@@ -121,6 +166,7 @@ export function asRecoveryOpen(
   return operation.receipt;
 }
 
+/** @throws {Error} When a durable recovery receipt is not closed. */
 export function asRecoveryClosed(
   operation: RuntimePromotionRecoveryOperation,
 ): DurableClosedPromotionJournal {
@@ -130,6 +176,7 @@ export function asRecoveryClosed(
   return operation.receipt;
 }
 
+/** @throws {Error} When required durable recovery manifest evidence is absent. */
 export function requireManifest(
   manifest: RuntimeManifestIdentity | null,
   description: string,
@@ -140,6 +187,7 @@ export function requireManifest(
   return manifest;
 }
 
+/** @throws {Error} When observed recovery manifest identity differs from the journal. */
 export function inspectExactRecoveryManifest(
   operation: RuntimePromotionRecoveryOperation,
   runtimeDir: string,
@@ -155,14 +203,15 @@ export function inspectExactRecoveryManifest(
   return observed;
 }
 
+type RecoveryAuthoredTransaction = NonNullable<RuntimePromotionRecoveryOperation['transaction']>;
+
 export async function bindRecoveryAuthoredReceipt(
   operation: RuntimePromotionRecoveryOperation,
-): Promise<void> {
-  if (operation.transaction === null) return;
-  await operation.dependencies.bindAuthoredReceipt(
-    operation.transaction,
-    asRecoveryOpen(operation),
-  );
+): Promise<RecoveryAuthoredTransaction | null> {
+  if (operation.transaction === null) return null;
+  const transaction = operation.transaction;
+  await operation.dependencies.bindAuthoredReceipt(transaction, asRecoveryOpen(operation));
+  return transaction;
 }
 
 export async function loadRecoveryAuthored(
@@ -226,6 +275,7 @@ export function recoveryRuntimeAuthority(input: {
   return { location: 'none', manifest: null };
 }
 
+/** @throws {Error} When open recovery runtime authority cannot be proven exactly. */
 export function inspectOpenRecoveryRuntimeAuthority(
   operation: RuntimePromotionRecoveryOperation,
   outcome: 'committed' | 'rolled-back',

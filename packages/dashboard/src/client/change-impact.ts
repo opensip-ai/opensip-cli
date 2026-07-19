@@ -7,6 +7,7 @@ import { el } from './el.js';
 import { activateReportTab } from './tab-bar.js';
 
 const CHANGE_IMPACT_HASH = /^#change-impact(?:\/([A-Za-z0-9_-]{1,128}))?$/u;
+const CHANGE_IMPACT_VIEW = 'change-impact';
 let hashListenerRegistered = false;
 
 function hashRunId(): string | undefined {
@@ -15,14 +16,14 @@ function hashRunId(): string | undefined {
 
 function requestedRunId(): string | undefined {
   const selection = typeof REPORT_SELECTION === 'undefined' ? null : REPORT_SELECTION;
-  return hashRunId() ?? (selection?.view === 'change-impact' ? selection.runId : undefined);
+  return hashRunId() ?? (selection?.view === CHANGE_IMPACT_VIEW ? selection.runId : undefined);
 }
 
 function shouldActivate(): boolean {
   const hash = globalThis.location.hash || '';
   if (hash.length > 0) return CHANGE_IMPACT_HASH.test(hash);
   const selection = typeof REPORT_SELECTION === 'undefined' ? null : REPORT_SELECTION;
-  return selection?.view === 'change-impact';
+  return selection?.view === CHANGE_IMPACT_VIEW;
 }
 
 function updateHash(runId: string): void {
@@ -91,7 +92,7 @@ export function renderChangeImpact(): void {
   panel.replaceChildren();
   if (changeImpactRuns.length === 0) {
     renderNoAuditState(panel, changeImpactOmittedRuns);
-    if (shouldActivate()) activateReportTab('change-impact');
+    if (shouldActivate()) activateReportTab(CHANGE_IMPACT_VIEW);
     return;
   }
 
@@ -104,7 +105,7 @@ export function renderChangeImpact(): void {
   // Unselected reports (no runId) keep the previous "first available" default.
   const hostSelection = typeof REPORT_SELECTION === 'undefined' ? null : REPORT_SELECTION;
   const exactHostSelection =
-    hostSelection?.view === 'change-impact' && typeof hostSelection.runId === 'string';
+    hostSelection?.view === CHANGE_IMPACT_VIEW && typeof hostSelection.runId === 'string';
   if (exactHostSelection && requested && exactMatch === undefined) {
     panel.append(
       el('div', {
@@ -112,7 +113,7 @@ export function renderChangeImpact(): void {
         text: `Requested run ${requested} is not available in this report's Change Impact projection. Inspect with: opensip runs show ${requested} --json`,
       }),
     );
-    if (shouldActivate()) activateReportTab('change-impact');
+    if (shouldActivate()) activateReportTab(CHANGE_IMPACT_VIEW);
     return;
   }
   const selected = exactMatch ?? changeImpactRuns[0];
@@ -154,7 +155,7 @@ export function renderChangeImpact(): void {
     updateHash(next.runId);
   });
   if (shouldActivate()) {
-    activateReportTab('change-impact');
+    activateReportTab(CHANGE_IMPACT_VIEW);
     updateHash(selected.runId);
   }
 }

@@ -1,6 +1,6 @@
 /**
  * @fileoverview init command — language detection, scaffolding,
- * gitignore append, ambiguous-language prompt.
+ * gitignore append, and language-resolution failures.
  */
 
 import {
@@ -31,6 +31,10 @@ import { simulationTool } from '@opensip-cli/simulation';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildDatastoreLockContext } from '../bootstrap/state-lock-policy.js';
+import {
+  enterHostOwnershipForTests,
+  resetEnteredHostOwnershipForTests,
+} from '../commands/host-runtime-access.js';
 import { createInitAuthoredPlan } from '../commands/init/init-authored-plan.js';
 import {
   detectLanguages,
@@ -67,9 +71,12 @@ let testDir: string;
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-init-test-'));
+  resetEnteredHostOwnershipForTests();
+  enterHostOwnershipForTests({ userState: true, project: true });
 });
 
 afterEach(() => {
+  resetEnteredHostOwnershipForTests();
   rmSync(testDir, { recursive: true, force: true });
 });
 
@@ -432,7 +439,6 @@ describe('executeInit (language resolution)', () => {
     expect(result.created).toBe(true);
     expect(result.languages).toEqual(['typescript', 'rust']);
     expect(result.languageResolutionError).toBeUndefined();
-    expect(result.ambiguousLanguageError).toBeUndefined();
     expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
     const config = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(config).toContain('typescript-source:');
@@ -445,22 +451,18 @@ describe('executeInit (language resolution)', () => {
     expect(result.created).toBe(false);
     expect(result.languageResolutionError).toBeDefined();
     expect(result.languageResolutionError?.detected).toEqual([]);
-    // Dual-write for older --json consumers.
-    expect(result.ambiguousLanguageError).toEqual(result.languageResolutionError);
   });
 
   it('returns an error result when --language is unknown', async () => {
     const result = await executeInit(makeArgs({ language: ['cobol'] }));
     expect(result.created).toBe(false);
     expect(result.languageResolutionError?.message).toContain("Unknown language 'cobol'");
-    expect(result.ambiguousLanguageError).toEqual(result.languageResolutionError);
   });
 
   // Regression for the 2026-05-25 audit fix: previously a non-existent
   // --cwd returned `{ created: false, state: 'pristine' }` with no error
   // discriminant, so register-init mapped it to exit 0. The fix surfaces
-  // it as languageResolutionError (and dual-writes ambiguousLanguageError)
-  // so the existing exit-2 path fires.
+  // it as languageResolutionError so the existing exit-2 path fires.
   it('surfaces a structured error when --cwd does not exist on disk', async () => {
     const missing = join(testDir, 'definitely-does-not-exist');
     const result = await executeInit(makeArgs({ cwd: missing }));
@@ -468,7 +470,6 @@ describe('executeInit (language resolution)', () => {
     expect(result.languageResolutionError).toBeDefined();
     expect(result.languageResolutionError?.detected).toEqual([]);
     expect(result.languageResolutionError?.message).toContain(missing);
-    expect(result.ambiguousLanguageError).toEqual(result.languageResolutionError);
   });
 });
 

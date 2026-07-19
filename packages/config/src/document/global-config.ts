@@ -32,7 +32,10 @@ import { join } from 'node:path';
 import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
-import { userTrustPolicySchema, type UserTrustPolicyDocument } from '../policy/trust-policy-schema.js';
+import {
+  userTrustPolicySchema,
+  type UserTrustPolicyDocument,
+} from '../policy/trust-policy-schema.js';
 
 /**
  * Config-layer environment variables (§5.12). Declared as an

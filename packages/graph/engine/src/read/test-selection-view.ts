@@ -491,13 +491,23 @@ async function scanReverseEvidence(
   seen: Map<string, Set<string>>,
   state: ReverseBuildState,
   signal: AbortSignal | undefined,
-): Promise<{ readonly reverse: Map<string, ReverseEvidence[]>; readonly complete: boolean }> {
+): Promise<{
+  readonly reverse: Map<string, ReverseEvidence[]>;
+  readonly complete: boolean;
+}> {
   for (const name in catalog.functions) {
     if (!Object.hasOwn(catalog.functions, name)) continue;
     const occurrences = catalog.functions[name] ?? [];
     for (const occurrence of occurrences) {
       throwIfAborted(signal);
-      const scan: OccurrenceEvidenceScanInput = { reverse, seen, occurrence, state, signal };
+      const scan: OccurrenceEvidenceScanInput = {
+        reverse,
+        seen,
+        occurrence,
+        state,
+        signal,
+      };
+      // @fitness-ignore-next-line async-waterfall-detection -- Call edges must consume the shared deterministic edge cap before dependency edges for this occurrence.
       const callsComplete = await addOccurrenceCallEvidence(scan);
       if (!callsComplete) return { reverse, complete: false };
       const dependenciesComplete = await addOccurrenceDependencyEvidence(scan);
@@ -578,7 +588,7 @@ interface AddCandidateInput {
 }
 
 function addCandidate(input: AddCandidateInput): void {
-  const { candidates, occurrence, entry, maxCandidates, reasons, maxProofNodes } = input;
+  const { occurrence, entry, maxCandidates, reasons, maxProofNodes } = input;
   const path = safeProjectPath(occurrence.filePath);
   const identity = occurrenceId(occurrence);
   if (path === undefined || identity === undefined) {
@@ -592,22 +602,22 @@ function addCandidate(input: AddCandidateInput): void {
     proof: boundedProof([...entry.proof, identity], maxProofNodes, reasons),
     observed: false,
   };
-  const existing = candidates.get(selected.path);
+  const existing = input.candidates.get(selected.path);
   if (existing !== undefined) {
     existing.sourceFiles.add(entry.sourceFile);
     if (compareSelected(selected, existing.selected) < 0) {
-      candidates.set(selected.path, {
+      input.candidates.set(selected.path, {
         selected,
         sourceFiles: existing.sourceFiles,
       });
     }
     return;
   }
-  if (candidates.size >= maxCandidates) {
+  if (input.candidates.size >= maxCandidates) {
     reasons.add('test-selection-candidate-cap');
     return;
   }
-  candidates.set(selected.path, {
+  input.candidates.set(selected.path, {
     selected,
     sourceFiles: new Set([entry.sourceFile]),
   });
@@ -659,7 +669,7 @@ interface ConventionCandidateInput {
 }
 
 function addConventionCandidate(input: ConventionCandidateInput): boolean {
-  const { changedFile, changed, test, candidates, maxCandidates, reasons, maxProofNodes } = input;
+  const { changedFile, changed, test, maxCandidates, reasons, maxProofNodes } = input;
   const basis = conventionBasis(changedFile, changed, test);
   if (basis === undefined) return true;
   const safeTestPath = safeProjectPath(test.path);
@@ -667,16 +677,16 @@ function addConventionCandidate(input: ConventionCandidateInput): boolean {
     reasons.add(MALFORMED_EVIDENCE_REASON);
     return true;
   }
-  const existing = candidates.get(safeTestPath);
+  const existing = input.candidates.get(safeTestPath);
   if (existing !== undefined) {
     existing.sourceFiles.add(changedFile);
     return true;
   }
-  if (candidates.size >= maxCandidates) {
+  if (input.candidates.size >= maxCandidates) {
     reasons.add('test-selection-candidate-cap');
     return false;
   }
-  candidates.set(safeTestPath, {
+  input.candidates.set(safeTestPath, {
     selected: {
       path: safeTestPath,
       basis,

@@ -97,6 +97,7 @@ export async function retireRuntimePromotionSource(
   ) {
     runtimePromotionFilesystemFailure('source retirement lacks an anchored cache path');
   }
+  const sourceRuntime = state.paths.sourceRuntime;
   const parent = openCapabilityDirectory(state.sourceParent, 'the selected cache parent');
   try {
     assertProjectSuccessor(state);
@@ -126,17 +127,17 @@ export async function retireRuntimePromotionSource(
       });
       renamePromotionEntry(
         parent,
-        state.paths.sourceRuntime,
+        sourceRuntime,
         state.paths.sourceTombstone,
         state.dependencies,
         'source-retire-rename',
         () => {
-          assertPromotionRootIdentity(state.paths.sourceRuntime!, sourceRootIdentity);
-          assertPromotionRootIdentity(state.paths.sourceRuntime!, owner.rootIdentity);
-          assertSelectedSourceMarker(state.paths.sourceRuntime!, state.journal.source.markerSha256);
-          inspectExactRuntimeManifest(state.paths.sourceRuntime!, 'cache-source', expected);
+          assertPromotionRootIdentity(sourceRuntime, sourceRootIdentity);
+          assertPromotionRootIdentity(sourceRuntime, owner.rootIdentity);
+          assertSelectedSourceMarker(sourceRuntime, state.journal.source.markerSha256);
+          inspectExactRuntimeManifest(sourceRuntime, 'cache-source', expected);
           assertProjectSuccessor(state);
-          assertPromotionRootIdentity(state.paths.sourceRuntime!, sourceRootIdentity);
+          assertPromotionRootIdentity(sourceRuntime, sourceRootIdentity);
         },
       );
       assertSelectedSourceMarker(state.paths.sourceTombstone, state.journal.source.markerSha256);

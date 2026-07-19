@@ -242,12 +242,16 @@ async function runInitRecoveryProbe(
   input: LightweightCommandProbeInput,
   capture: ReturnType<typeof createBoundedOutputCapture>,
 ): Promise<boolean | undefined> {
+  // observability-ok -- this pre-scope recovery probe captures output for the
+  // normal host dispatcher, which owns and emits the canonical command lifecycle.
   if (findRootOperand(input.argv)?.value !== 'init') return undefined;
 
   const handle = createProbeToolContext();
   const commandContext = createInitRecoveryCommandContext(handle);
   const actionScope = createCommandActionScopeRunner();
-  input.program.hook('preAction', (_thisCommand, actionCommand) => {
+
+  /** @throws {ContinueToLeasedBootstrap} When no fixed recovery journal exists. */
+  function stageRecoveryScope(_thisCommand: Command, actionCommand: Command): void {
     const selection = resolveStartupProjectSelection(input.argv, input.cwd);
     const opts = actionCommand.opts();
     Object.assign(opts, {
@@ -257,7 +261,9 @@ async function runInitRecoveryProbe(
     const header = inspectRuntimePromotionRecoveryHeader(selection.project.projectRoot);
     if (header.status === 'absent') throw new ContinueToLeasedBootstrap();
     actionScope.stage(createInitRecoveryScope(selection.project, opts.debug === true));
-  });
+  }
+
+  input.program.hook('preAction', stageRecoveryScope); // observability-ok -- pre-scope staging; host dispatch owns lifecycle.
   mountCommandSpec(
     input.program,
     buildInitRecoverySpec(commandContext),

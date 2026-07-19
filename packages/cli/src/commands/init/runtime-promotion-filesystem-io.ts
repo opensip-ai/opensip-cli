@@ -15,155 +15,36 @@ import {
 } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { SystemError } from '@opensip-cli/core';
-
 import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fallback.js';
-import { isRuntimeManifestReleaseUnsafe } from './runtime-manifest-model.js';
+import {
+  assertPromotionPathIdentity,
+  assertPromotionRootIdentity,
+  assertSafePromotionDirectory,
+  capturePromotionPathIdentity,
+  classifyRuntimePromotionPath,
+  promotionIdentityOf,
+  runtimePromotionFilesystemFailure,
+  samePromotionDirectoryAuthority,
+  samePromotionDirectoryObject,
+  samePromotionEntryIdentity,
+  type PromotionEntryIdentity,
+} from './runtime-promotion-filesystem-identity.js';
 
 import type {
   RuntimePromotionArtifactMarker,
   RuntimePromotionFilesystemDependencies,
   RuntimePromotionFilesystemMutation,
-  RuntimePromotionPathClassification,
 } from './runtime-promotion-filesystem-types.js';
 import type { BigIntStats } from 'node:fs';
 
-const FILESYSTEM_ERROR_CODE = 'SYSTEM.INIT.RUNTIME_PROMOTION_FILESYSTEM';
-const OPERATION_CREATED_DIRECTORY = 'an operation-created directory';
+export * from './runtime-promotion-filesystem-identity.js';
 
-export interface PromotionEntryIdentity {
-  readonly dev: bigint;
-  readonly ino: bigint;
-  readonly uid: bigint;
-  readonly mode: bigint;
-  readonly nlink: bigint;
-  readonly size: bigint;
-  readonly mtimeNs: bigint;
-  readonly ctimeNs: bigint;
-}
+const OPERATION_CREATED_DIRECTORY = 'an operation-created directory';
 
 export interface StablePromotionDirectory {
   readonly path: string;
   readonly identity: PromotionEntryIdentity;
   readonly descriptor?: number;
-}
-
-export function runtimePromotionFilesystemFailure(message: string, cause?: unknown): never {
-  // Do not erase the native-handle release disposition behind a generic
-  // filesystem wrapper. The orchestration boundary must see this exact typed
-  // failure and retain its process-owned lease.
-  if (isRuntimeManifestReleaseUnsafe(cause)) throw cause;
-  throw new SystemError(`Init runtime promotion filesystem failed: ${message}`, {
-    code: FILESYSTEM_ERROR_CODE,
-    ...(cause === undefined ? {} : { cause }),
-  });
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}
-
-export function promotionCurrentUid(): bigint | undefined {
-  return typeof process.getuid === 'function' ? BigInt(process.getuid()) : undefined;
-}
-
-export function promotionIdentityOf(stat: BigIntStats): PromotionEntryIdentity {
-  return {
-    dev: stat.dev,
-    ino: stat.ino,
-    uid: stat.uid,
-    mode: stat.mode,
-    nlink: stat.nlink,
-    size: stat.size,
-    mtimeNs: stat.mtimeNs,
-    ctimeNs: stat.ctimeNs,
-  };
-}
-
-export function samePromotionEntryIdentity(
-  left: PromotionEntryIdentity,
-  right: PromotionEntryIdentity,
-): boolean {
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.uid === right.uid &&
-    left.mode === right.mode &&
-    left.nlink === right.nlink &&
-    left.size === right.size &&
-    left.mtimeNs === right.mtimeNs &&
-    left.ctimeNs === right.ctimeNs
-  );
-}
-
-function sameDirectoryAuthority(
-  left: PromotionEntryIdentity,
-  right: PromotionEntryIdentity,
-): boolean {
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.uid === right.uid &&
-    left.mode === right.mode
-  );
-}
-
-function sameDirectoryObject(left: PromotionEntryIdentity, right: PromotionEntryIdentity): boolean {
-  return left.dev === right.dev && left.ino === right.ino && left.uid === right.uid;
-}
-
-export function capturePromotionPathIdentity(
-  path: string,
-  description: string,
-): PromotionEntryIdentity {
-  try {
-    return promotionIdentityOf(lstatSync(path, { bigint: true }));
-  } catch (error) {
-    runtimePromotionFilesystemFailure(`${description} could not be observed`, error);
-  }
-}
-
-export function assertPromotionPathIdentity(
-  path: string,
-  expected: PromotionEntryIdentity,
-  description: string,
-): void {
-  const observed = capturePromotionPathIdentity(path, description);
-  if (!samePromotionEntryIdentity(expected, observed)) {
-    runtimePromotionFilesystemFailure(`${description} was replaced or changed`);
-  }
-}
-
-export function assertPromotionDirectoryObjectIdentity(
-  path: string,
-  expected: PromotionEntryIdentity,
-  description: string,
-): void {
-  const observed = capturePromotionPathIdentity(path, description);
-  if (!sameDirectoryObject(expected, observed)) {
-    runtimePromotionFilesystemFailure(`${description} was replaced`);
-  }
-}
-
-export function assertPromotionCurrentOwner(stat: BigIntStats, description: string): void {
-  const uid = promotionCurrentUid();
-  if (uid !== undefined && stat.uid !== uid) {
-    runtimePromotionFilesystemFailure(`${description} is not owned by the current user`);
-  }
-}
-
-function assertSafeDirectory(stat: BigIntStats, description: string): void {
-  if (!stat.isDirectory() || stat.isSymbolicLink()) {
-    runtimePromotionFilesystemFailure(`${description} is not a real directory`);
-  }
-  assertPromotionCurrentOwner(stat, description);
-  const mode = Number(stat.mode & 0o7777n);
-  if (
-    process.platform !== 'win32' &&
-    ((mode & 0o7000) !== 0 || (mode & 0o022) !== 0 || (mode & 0o700) !== 0o700)
-  ) {
-    runtimePromotionFilesystemFailure(`${description} has an unsafe mode`);
-  }
 }
 
 export function promotionFilesystemCheckpoint(
@@ -186,41 +67,6 @@ export function withPromotionMutation<T>(
   return result;
 }
 
-export function classifyRuntimePromotionPath(path: string): RuntimePromotionPathClassification {
-  let stat: BigIntStats;
-  try {
-    stat = lstatSync(path, { bigint: true });
-  } catch (error) {
-    if (hasCode(error, 'ENOENT')) return { status: 'absent' };
-    runtimePromotionFilesystemFailure('a filesystem path could not be classified', error);
-  }
-  if (stat.isSymbolicLink()) return { status: 'symlink' };
-  const uid = promotionCurrentUid();
-  const owner = uid === undefined || stat.uid === uid ? ('current' as const) : ('unknown' as const);
-  const mode = Number(stat.mode & 0o777n);
-  if (stat.isDirectory()) return { status: 'directory', mode, owner };
-  if (stat.isFile()) return { status: 'file', mode, links: Number(stat.nlink), owner };
-  return { status: 'special' };
-}
-
-export function capturePromotionRootIdentity(
-  path: string,
-): NonNullable<RuntimePromotionArtifactMarker['rootIdentity']> {
-  const stat = lstatSync(path, { bigint: true });
-  assertSafeDirectory(stat, 'an operation-owned root');
-  return { device: stat.dev.toString(), inode: stat.ino.toString() };
-}
-
-export function assertPromotionRootIdentity(
-  path: string,
-  expected: NonNullable<RuntimePromotionArtifactMarker['rootIdentity']>,
-): void {
-  const observed = capturePromotionRootIdentity(path);
-  if (observed.device !== expected.device || observed.inode !== expected.inode) {
-    runtimePromotionFilesystemFailure('an operation-owned root was replaced');
-  }
-}
-
 export function openStablePromotionDirectory(
   requestedPath: string,
   description: string,
@@ -232,7 +78,7 @@ export function openStablePromotionDirectory(
   } catch (error) {
     runtimePromotionFilesystemFailure(`${description} could not be opened`, error);
   }
-  assertSafeDirectory(requestedStat, description);
+  assertSafePromotionDirectory(requestedStat, description);
   const canonical = realpathSync(requested);
   const canonicalStat = lstatSync(canonical, { bigint: true });
   if (
@@ -250,7 +96,7 @@ export function openStablePromotionDirectory(
       constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
     );
     const opened = fstatSync(descriptor, { bigint: true });
-    assertSafeDirectory(opened, description);
+    assertSafePromotionDirectory(opened, description);
     if (
       !samePromotionEntryIdentity(promotionIdentityOf(canonicalStat), promotionIdentityOf(opened))
     ) {
@@ -281,13 +127,13 @@ export function assertStablePromotionDirectory(
   } catch (error) {
     runtimePromotionFilesystemFailure(`${description} disappeared`, error);
   }
-  assertSafeDirectory(current, description);
-  if (!sameDirectoryAuthority(directory.identity, promotionIdentityOf(current))) {
+  assertSafePromotionDirectory(current, description);
+  if (!samePromotionDirectoryAuthority(directory.identity, promotionIdentityOf(current))) {
     runtimePromotionFilesystemFailure(`${description} was replaced`);
   }
   if (directory.descriptor === undefined) return;
   const opened = fstatSync(directory.descriptor, { bigint: true });
-  if (!sameDirectoryAuthority(directory.identity, promotionIdentityOf(opened))) {
+  if (!samePromotionDirectoryAuthority(directory.identity, promotionIdentityOf(opened))) {
     runtimePromotionFilesystemFailure(`${description} handle was replaced`);
   }
 }
@@ -418,7 +264,7 @@ export function finalizeStablePromotionDirectoryMode(
       ? capturePromotionPathIdentity(directory.path, 'a finalized operation-created directory')
       : promotionIdentityOf(fstatSync(directory.descriptor, { bigint: true }));
   if (
-    !sameDirectoryObject(directory.identity, observed) ||
+    !samePromotionDirectoryObject(directory.identity, observed) ||
     Number(observed.mode & 0o777n) !== finalMode
   ) {
     runtimePromotionFilesystemFailure('the finalized operation-created directory changed identity');

@@ -9,7 +9,10 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { defineHostCommand } from '../../commands/host-runtime-access.js';
-import { buildRuntimeCommandInventory } from '../build-runtime-command-inventory.js';
+import {
+  buildRuntimeCommandInventory,
+  type BuildRuntimeCommandInventoryInput,
+} from '../build-runtime-command-inventory.js';
 
 function handler(): undefined {
   return undefined;
@@ -42,6 +45,19 @@ function tool(): Tool {
       description: 'fixture',
     },
     commandSpecs: [toolSpec('alpha'), toolSpec('list', 'alpha')],
+  };
+}
+
+function emptyInput(
+  overrides: Partial<BuildRuntimeCommandInventoryInput> = {},
+): BuildRuntimeCommandInventoryInput {
+  return {
+    toolRegistry: new ToolRegistry(),
+    toolCommandSpecs: [],
+    hostSpecs: [],
+    hostGroups: [],
+    toolPluginGroups: [],
+    ...overrides,
   };
 }
 
@@ -158,6 +174,260 @@ describe('buildRuntimeCommandInventory', () => {
         toolPluginGroups: [],
       }),
     ).toThrow(/duplicate path/);
+  });
+
+  it('projects extra mounted tool specs with matched and fallback ownership', () => {
+    const registry = new ToolRegistry();
+    const registered = tool();
+    (
+      registered as { commandSpecs?: readonly CommandSpec<unknown, ToolCliContext>[] }
+    ).commandSpecs = [];
+    registry.register(registered);
+
+    const inventory = buildRuntimeCommandInventory(
+      emptyInput({
+        toolRegistry: registry,
+        toolCommandSpecs: [
+          toolSpec('alpha'),
+          toolSpec('inspect', 'alpha'),
+          toolSpec('inspect', 'missing'),
+          toolSpec('standalone'),
+        ],
+        provenance: [
+          {
+            source: 'bundled',
+            id: 'alpha',
+            version: '1.0.0',
+            manifestHash: 'without-package-name',
+          },
+        ],
+      }),
+    );
+
+    expect(
+      inventory.leaves.map(({ path, ownerLabel, provenanceSource, packageIdentity }) => ({
+        path,
+        ownerLabel,
+        provenanceSource,
+        packageIdentity,
+      })),
+    ).toEqual([
+      {
+        path: 'alpha',
+        ownerLabel: 'alpha',
+        provenanceSource: 'bundled',
+        packageIdentity: undefined,
+      },
+      {
+        path: 'alpha inspect',
+        ownerLabel: 'alpha',
+        provenanceSource: 'bundled',
+        packageIdentity: undefined,
+      },
+      {
+        path: 'missing inspect',
+        ownerLabel: 'missing',
+        provenanceSource: undefined,
+        packageIdentity: undefined,
+      },
+      {
+        path: 'standalone',
+        ownerLabel: 'standalone',
+        provenanceSource: undefined,
+        packageIdentity: undefined,
+      },
+    ]);
+  });
+
+  it('ignores malformed extra mount entries and registry-covered duplicates', () => {
+    const registry = new ToolRegistry();
+    registry.register(tool());
+
+    const inventory = buildRuntimeCommandInventory(
+      emptyInput({
+        toolRegistry: registry,
+        toolCommandSpecs: [
+          null as unknown as object,
+          {},
+          toolSpec('alpha'),
+          toolSpec('list', 'alpha'),
+        ],
+      }),
+    );
+
+    expect(inventory.leaves.map((leaf) => leaf.path)).toEqual(['alpha', 'alpha list']);
+  });
+
+  it('projects only plain alias entries and applies scope and visibility defaults', () => {
+    const aliases = ['short', '', 7, 'also-short'] as unknown[];
+    Object.defineProperty(aliases, '2', {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        throw new Error('alias accessor must not run');
+      },
+    });
+    const rawSpec = {
+      name: 'status',
+      output: 'command-result',
+      visibility: 'internal',
+      aliases,
+      handler,
+    };
+
+    const inventory = buildRuntimeCommandInventory(emptyInput({ hostSpecs: [rawSpec] }));
+
+    expect(inventory.leaves).toEqual([
+      expect.objectContaining({
+        path: 'status',
+        aliases: ['short', 'also-short'],
+        scope: 'project',
+        visibility: 'internal',
+      }),
+    ]);
+  });
+
+  it.each([
+    {
+      name: 'an invalid host entry',
+      input: () => emptyInput({ hostSpecs: [null as unknown as object] }),
+      message: /invalid host command spec/,
+    },
+    {
+      name: 'a host entry without a name',
+      input: () => emptyInput({ hostSpecs: [{}] }),
+      message: /host command missing name/,
+    },
+    {
+      name: 'a leaf without output',
+      input: () => emptyInput({ hostSpecs: [{ name: 'status', handler }] }),
+      message: /missing output/,
+    },
+    {
+      name: 'a leaf without a data handler',
+      input: () =>
+        emptyInput({
+          hostSpecs: [{ name: 'status', output: 'command-result' }],
+        }),
+      message: /handler missing or accessor/,
+    },
+    {
+      name: 'an accessor static handler',
+      input: () => {
+        const spec = { name: 'status', output: 'command-result', handler };
+        Object.defineProperty(spec, 'staticHandler', {
+          get: () => {
+            throw new Error('static handler accessor must not run');
+          },
+        });
+        return emptyInput({ hostSpecs: [spec] });
+      },
+      message: /staticHandler must be own data plain object/,
+    },
+    {
+      name: 'an incomplete static handler',
+      input: () =>
+        emptyInput({
+          hostSpecs: [
+            {
+              name: 'status',
+              output: 'command-result',
+              staticHandler: { package: 'opensip-cli', path: 'status.ts' },
+              handler,
+            },
+          ],
+        }),
+      message: /staticHandler missing package\/path\/declaration/,
+    },
+    {
+      name: 'a hostile property descriptor',
+      input: () =>
+        emptyInput({
+          hostSpecs: [
+            new Proxy(
+              {},
+              {
+                getOwnPropertyDescriptor: () => {
+                  throw new Error('descriptor trap');
+                },
+              },
+            ),
+          ],
+        }),
+      message: /host command missing name/,
+    },
+    {
+      name: 'a command whose name changes between validation and projection',
+      input: () => {
+        let nameReads = 0;
+        const spec = new Proxy(
+          { output: 'command-result', handler },
+          {
+            getOwnPropertyDescriptor: (target, key) => {
+              if (key !== 'name') return Reflect.getOwnPropertyDescriptor(target, key);
+              nameReads++;
+              return nameReads === 1
+                ? {
+                    configurable: true,
+                    enumerable: true,
+                    value: 'status',
+                    writable: false,
+                  }
+                : undefined;
+            },
+          },
+        );
+        return emptyInput({ hostSpecs: [spec] });
+      },
+      message: /command at 'status' missing name/,
+    },
+  ])('rejects $name fail-closed', ({ input, message }) => {
+    expect(() => buildRuntimeCommandInventory(input())).toThrow(message);
+  });
+
+  it('rejects malformed registry command specs before projection', () => {
+    const invalidEntryRegistry = new ToolRegistry();
+    const invalidEntryTool = tool();
+    (invalidEntryTool as unknown as { commandSpecs: readonly unknown[] }).commandSpecs = [null];
+    invalidEntryRegistry.register(invalidEntryTool);
+    expect(() =>
+      buildRuntimeCommandInventory(emptyInput({ toolRegistry: invalidEntryRegistry })),
+    ).toThrow(/invalid commandSpecs entry/);
+
+    const missingNameRegistry = new ToolRegistry();
+    const missingNameTool = tool();
+    (missingNameTool as unknown as { commandSpecs: readonly unknown[] }).commandSpecs = [{}];
+    missingNameRegistry.register(missingNameTool);
+    expect(() =>
+      buildRuntimeCommandInventory(emptyInput({ toolRegistry: missingNameRegistry })),
+    ).toThrow(/command missing name/);
+  });
+
+  it('rejects unnamed host-group and plugin-group leaves', () => {
+    expect(() =>
+      buildRuntimeCommandInventory(
+        emptyInput({
+          hostGroups: [{ name: 'sessions', description: 'sessions', leaves: [{}] } as never],
+        }),
+      ),
+    ).toThrow(/host group 'sessions' leaf missing name/);
+
+    expect(() =>
+      buildRuntimeCommandInventory(
+        emptyInput({
+          toolPluginGroups: [
+            {
+              parentVerb: 'alpha',
+              parentAliases: [],
+              toolVerb: 'alpha',
+              domain: 'alpha',
+              description: 'plugins',
+              leaves: [{}],
+            } as never,
+          ],
+        }),
+      ),
+    ).toThrow(/plugin group 'alpha plugin' leaf missing name/);
   });
 
   it('createRuntimeCommandInventory freezes leaves', () => {

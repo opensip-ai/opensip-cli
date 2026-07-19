@@ -23,6 +23,10 @@ export default mergeConfig(
           // already run as a binary. They are pure wiring around already-
           // tested helpers.
           'src/index.ts',
+          // Imported only by the excluded CLI entrypoint and exercised by the
+          // lightweight-command-probe E2E subprocess lane. V8 cannot attribute
+          // spawned-process execution back to this package-level coverage run.
+          'src/bootstrap/lightweight-command-probe.ts',
           'src/bootstrap/pre-action-hook.ts',
           'src/commands/tools/runtime-probe-entry.ts',
           'src/ui/App.tsx',

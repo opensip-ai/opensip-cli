@@ -82,10 +82,6 @@ function resolveForkChildEnv(
 }
 
 /**
- * Fork a worker, enforce resource ceilings, and expose the single-settle latch.
- * The caller wires protocol-specific `message` handling via `descriptor.onMessage`.
- */
-/**
  * Process-global SIGINT cancellation fan-out (plan 09 Task 5.5).
  *
  * One listener per PROCESS instead of one per concurrent child: >10 parallel
@@ -146,6 +142,10 @@ function registerSigintCancellation(cancel: () => void): () => void {
   };
 }
 
+/**
+ * Fork a worker, enforce resource ceilings, and expose the single-settle latch.
+ * The caller wires protocol-specific `message` handling via `descriptor.onMessage`.
+ */
 export function forkAndSettle(
   descriptor: ForkAndSettleDescriptor,
   ctx: ForkEnvContext = {},

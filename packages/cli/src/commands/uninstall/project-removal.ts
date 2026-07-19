@@ -10,29 +10,30 @@
  * state (Task 4.7 owns user-mode removal).
  */
 
-import { existsSync, lstatSync, realpathSync, rmSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
 
 import {
   acquireRuntimeExclusiveLease,
   acquireRuntimeReadLease,
   discardRuntimePromotionJournal,
   inspectEphemeralRuntimeCandidates,
-  inspectRuntimePromotionRecoveryHeader,
-  resolveProjectPaths,
-  resolveUserPaths,
   type RuntimeExclusiveLease,
   type RuntimeReadLease,
 } from '@opensip-cli/core';
 
 import {
-  collectTargets,
-  printProjectDefault,
-  printProjectPurge,
-  type Target,
-} from './targets.js';
+  assertSafeProjectDir,
+  buildProjectResult,
+  filterProjectTargets,
+  journalBlocksRemoval,
+  performProjectDeletion,
+  targetFingerprint,
+  type ProjectJournal,
+  type ProjectTargetSelection,
+} from './project-removal-safety.js';
+import { collectTargets, printProjectDefault, printProjectPurge } from './targets.js';
 
-import type { UninstallDoneResult, UninstallRemovalBuckets } from '@opensip-cli/contracts';
+import type { UninstallDoneResult } from '@opensip-cli/contracts';
 
 export interface ProjectRemovalOptions {
   readonly projectDir: string;
@@ -41,6 +42,7 @@ export interface ProjectRemovalOptions {
   readonly yes?: boolean;
   /** High-risk break-glass: discard fixed promotion journal after purge. */
   readonly discardRecovery?: boolean;
+  /** Host-owned human-presentation sink; omitted callers receive only the returned result. */
   readonly write?: (s: string) => void;
   readonly prompt?: (question: string) => Promise<string>;
   /** Test hook: inject lease acquisition. */
@@ -60,222 +62,298 @@ async function confirm(
   return answer === 'y' || answer === 'yes';
 }
 
-function assertNotSymlinkLeaf(path: string, label: string): void {
-  let stat: ReturnType<typeof lstatSync>;
+type ProjectWrite = NonNullable<ProjectRemovalOptions['write']>;
+type ProjectPrompt = NonNullable<ProjectRemovalOptions['prompt']>;
+type ProjectAcquireRead = NonNullable<ProjectRemovalOptions['acquireReadLease']>;
+type ProjectAcquireExclusive = NonNullable<ProjectRemovalOptions['acquireExclusiveLease']>;
+
+function ignorePresentation(_chunk: string): void {
+  // Hostless library callers consume the returned structured result.
+}
+
+async function interactivePrompt(question: string): Promise<string> {
+  const { createInterface } = await import('node:readline/promises');
+  // eslint-disable-next-line no-restricted-properties -- readline owns this interactive prompt transport; uninstall presentation still routes through the host write seam.
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    stat = lstatSync(path);
-  } catch {
-    return;
-  }
-  if (stat.isSymbolicLink()) {
-    throw new Error(`Refusing project removal: ${label} is a symbolic link (${path}).`);
+    return await readline.question(question);
+  } finally {
+    readline.close();
   }
 }
 
-function assertSafeProjectDir(projectDir: string): void {
-  const resolved = resolve(projectDir);
-  let stat: ReturnType<typeof lstatSync>;
-  try {
-    stat = lstatSync(resolved);
-  } catch {
-    // Missing path is fine — collectTargets will report empty.
-    return;
-  }
-  if (stat.isSymbolicLink()) {
-    throw new Error(
-      `Refusing project removal: project path is a symbolic link (${resolved}). Pass a real directory.`,
+async function confirmationAccepted(
+  prompt: ProjectPrompt | undefined,
+  message: string,
+): Promise<boolean> {
+  return confirm(prompt ?? interactivePrompt, message);
+}
+
+type ProjectPreflight =
+  | { readonly status: 'ready'; readonly journal: ProjectJournal }
+  | { readonly status: 'done'; readonly result: UninstallDoneResult };
+
+function preflightProjectRemoval(input: {
+  readonly projectDir: string;
+  readonly purge: boolean;
+  readonly discardRecovery: boolean;
+  readonly write: ProjectWrite;
+}): ProjectPreflight {
+  if (input.discardRecovery && !input.purge) {
+    input.write(
+      '\n--discard-recovery requires --project --purge. It is a high-risk break-glass for stuck promotion journals.\n\n',
     );
-  }
-  if (!stat.isDirectory()) {
-    throw new Error(`Refusing project removal: project path is not a directory (${resolved}).`);
-  }
-  // Intermediate layout roots must not be symlinks either.
-  const paths = resolveProjectPaths(resolved);
-  assertNotSymlinkLeaf(paths.userSourceDir, 'opensip-cli/');
-  assertNotSymlinkLeaf(paths.runtimeDir, 'opensip-cli/.runtime/');
-  assertNotSymlinkLeaf(paths.configFile, 'opensip-cli.config.yml');
-}
-
-function isPathInside(parentReal: string, childReal: string): boolean {
-  if (parentReal === childReal) return true;
-  const prefix = parentReal.endsWith(sep) ? parentReal : `${parentReal}${sep}`;
-  return childReal.startsWith(prefix);
-}
-
-/**
- * Ensure every deletion target resolves inside the project tree or the known
- * ephemeral cache root — never follow intermediate symlink escapes.
- */
-function assertTargetsContained(projectDir: string, targets: readonly Target[]): void {
-  let projectReal: string;
-  try {
-    projectReal = realpathSync(projectDir);
-  } catch {
-    projectReal = resolve(projectDir);
-  }
-  let cacheRootReal: string | undefined;
-  try {
-    cacheRootReal = realpathSync(resolveUserPaths().ephemeralProjectsDir);
-  } catch {
-    cacheRootReal = resolve(resolveUserPaths().ephemeralProjectsDir);
-  }
-
-  for (const t of targets) {
-    assertNotSymlinkLeaf(t.path, `target ${t.bucket}`);
-    let real: string;
-    try {
-      real = realpathSync(t.path);
-    } catch {
-      continue; // vanished — skip
-    }
-    const inProject = isPathInside(projectReal, real);
-    const inCache = cacheRootReal !== undefined && isPathInside(cacheRootReal, real);
-    if (!inProject && !inCache) {
-      throw new Error(
-        `Refusing project removal: target escapes allowed roots (${t.bucket}).`,
-      );
-    }
-  }
-}
-
-function targetFingerprint(targets: readonly Target[]): string {
-  return targets
-    .map((t) => `${t.bucket}\0${t.path}\0${t.kind}\0${t.sizeBytes}`)
-    .sort()
-    .join('\n');
-}
-
-function targetsForResult(
-  targets: readonly Target[],
-): readonly { readonly path: string; readonly kind: 'file' | 'dir' }[] {
-  // Paths are returned for the local interactive preview only; JSON consumers
-  // should prefer the path-neutral `buckets` projection.
-  return targets.map((t) => ({ path: t.path, kind: t.kind }));
-}
-
-function projectBuckets(targets: readonly Target[]): UninstallRemovalBuckets {
-  let activeCache = 0;
-  let legacyCache = 0;
-  let projectRuntime = 0;
-  let authored = 0;
-  for (const t of targets) {
-    switch (t.bucket) {
-      case 'active-cache':
-        activeCache += 1;
-        break;
-      case 'legacy-cache':
-        legacyCache += 1;
-        break;
-      case 'runtime':
-        projectRuntime += 1;
-        break;
-      case 'user-content':
-      case 'config':
-        authored += 1;
-        break;
-      default:
-        break;
-    }
-  }
-  return {
-    ...(activeCache > 0 ? { activeCache } : {}),
-    ...(legacyCache > 0 ? { legacyCache } : {}),
-    ...(projectRuntime > 0 ? { projectRuntime } : {}),
-    ...(authored > 0 ? { authored } : {}),
-  };
-}
-
-function filterProjectTargets(
-  purge: boolean,
-  allTargets: readonly Target[],
-): { toDelete: readonly Target[]; toKeep: readonly Target[] } {
-  if (purge) {
-    return { toDelete: allTargets, toKeep: [] };
-  }
-  return {
-    toDelete: allTargets.filter(
-      (t) => t.bucket === 'runtime' || t.bucket === 'active-cache' || t.bucket === 'legacy-cache',
-    ),
-    toKeep: allTargets.filter(
-      (t) => t.bucket === 'user-content' || t.bucket === 'config',
-    ),
-  };
-}
-
-function buildProjectResult(args: {
-  action: UninstallDoneResult['action'];
-  targets: readonly Target[];
-  rootPath: string;
-  recovery?: UninstallDoneResult['recovery'];
-}): UninstallDoneResult {
-  const sizeBytes = args.targets.reduce((sum, t) => sum + t.sizeBytes, 0);
-  const buckets = projectBuckets(args.targets);
-  return {
-    type: 'uninstall-done',
-    action: args.action,
-    mode: 'project',
-    targets: targetsForResult(args.targets),
-    sizeBytes,
-    rootPath: args.rootPath,
-    ...(Object.keys(buckets).length > 0 ? { buckets } : {}),
-    ...(args.recovery === undefined ? {} : { recovery: args.recovery }),
-  };
-}
-
-function journalBlocksRemoval(projectDir: string): {
-  readonly blocked: boolean;
-  readonly recovery: NonNullable<UninstallDoneResult['recovery']>;
-} {
-  const header = inspectRuntimePromotionRecoveryHeader(projectDir);
-  if (header.status === 'absent') {
-    return { blocked: false, recovery: { status: 'absent' } };
-  }
-  if (header.status === 'malformed') {
     return {
-      blocked: true,
-      recovery: { status: 'malformed', reason: header.reason },
+      status: 'done',
+      result: buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+        recovery: { status: 'refused', reason: 'discard-requires-purge' },
+      }),
     };
   }
-  // Open or closed both block normal project removal (closed cleanup must
-  // complete via Init recovery, not uninstall).
+
+  const journal = journalBlocksRemoval(input.projectDir);
+  if (journal.blocked && !input.discardRecovery) {
+    input.write(
+      '\nRefusing project removal while a runtime promotion journal is present.\n' +
+        '  Retry interrupted Init with: opensip init\n' +
+        '  High-risk break-glass (deletes runtime/cache/authored + journal): opensip uninstall --project --purge --discard-recovery\n\n',
+    );
+    return {
+      status: 'done',
+      result: buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+        recovery: journal.recovery,
+      }),
+    };
+  }
+  return { status: 'ready', journal };
+}
+
+function renderProjectPreview(input: {
+  readonly projectDir: string;
+  readonly purge: boolean;
+  readonly discardRecovery: boolean;
+  readonly recoveryOnly: boolean;
+  readonly selection: ProjectTargetSelection;
+  readonly write: ProjectWrite;
+}): void {
+  if (input.recoveryOnly) {
+    input.write(
+      '\nNo rebuildable runtime/cache targets remain, but a promotion journal is still present.\n' +
+        '  --discard-recovery will unlink only the fixed journal after exclusive confirmation.\n\n',
+    );
+  } else if (input.purge) {
+    printProjectPurge(input.write, input.selection.toDelete, input.projectDir);
+  } else {
+    printProjectDefault(
+      input.write,
+      input.selection.toDelete,
+      input.selection.toKeep,
+      input.projectDir,
+    );
+  }
+
+  if (input.discardRecovery) {
+    input.write(
+      '  ⚠ --discard-recovery will also unlink the fixed promotion journal after deleting canonical roots.\n\n',
+    );
+  }
+}
+
+async function executeProjectDryRun(input: {
+  readonly projectDir: string;
+  readonly purge: boolean;
+  readonly journal: ProjectJournal;
+  readonly write: ProjectWrite;
+  readonly acquireRead: ProjectAcquireRead;
+}): Promise<UninstallDoneResult> {
+  const readLease = await input.acquireRead(input.projectDir);
+  try {
+    const allTargets = collectTargets('project', '', input.projectDir);
+    const selection = filterProjectTargets(input.purge, allTargets);
+    if (allTargets.length === 0) {
+      input.write(`\nNothing to remove — no OpenSIP CLI state found at ${input.projectDir}.\n\n`);
+      return buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+      });
+    }
+    if (selection.toDelete.length === 0) {
+      printProjectDefault(input.write, [], selection.toKeep, input.projectDir);
+      return buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+      });
+    }
+    if (input.purge) {
+      printProjectPurge(input.write, selection.toDelete, input.projectDir);
+    } else {
+      printProjectDefault(input.write, selection.toDelete, selection.toKeep, input.projectDir);
+    }
+    return buildProjectResult({
+      action: 'dry-run',
+      targets: selection.toDelete,
+      rootPath: input.projectDir,
+      recovery: input.journal.recovery,
+    });
+  } finally {
+    readLease.release();
+  }
+}
+
+type PreparedProjectRemoval =
+  | {
+      readonly status: 'ready';
+      readonly selection: ProjectTargetSelection;
+      readonly recoveryOnly: boolean;
+    }
+  | { readonly status: 'done'; readonly result: UninstallDoneResult };
+
+function prepareProjectRemoval(input: {
+  readonly projectDir: string;
+  readonly purge: boolean;
+  readonly discardRecovery: boolean;
+  readonly journal: ProjectJournal;
+  readonly write: ProjectWrite;
+}): PreparedProjectRemoval {
+  const targets = collectTargets('project', '', input.projectDir);
+  const selection = filterProjectTargets(input.purge, targets);
+  const recoveryOnly =
+    input.discardRecovery && input.journal.blocked && selection.toDelete.length === 0;
+
+  if (targets.length === 0 && !recoveryOnly) {
+    input.write(`\nNothing to remove — no OpenSIP CLI state found at ${input.projectDir}.\n\n`);
+    return {
+      status: 'done',
+      result: buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+        recovery: input.journal.recovery,
+      }),
+    };
+  }
+  if (selection.toDelete.length === 0 && !recoveryOnly) {
+    printProjectDefault(input.write, [], selection.toKeep, input.projectDir);
+    return {
+      status: 'done',
+      result: buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+        recovery: input.journal.recovery,
+      }),
+    };
+  }
+
+  renderProjectPreview({ ...input, recoveryOnly, selection });
+  return { status: 'ready', selection, recoveryOnly };
+}
+
+type ProjectConfirmation =
+  | { readonly status: 'accepted' }
+  | { readonly status: 'cancelled'; readonly result: UninstallDoneResult };
+
+async function confirmProjectRemoval(input: {
+  readonly yes: boolean;
+  readonly prompt: ProjectPrompt | undefined;
+  readonly projectDir: string;
+  readonly journal: ProjectJournal;
+  readonly selection: ProjectTargetSelection;
+}): Promise<ProjectConfirmation> {
+  if (input.yes || (await confirmationAccepted(input.prompt, 'Proceed? [y/N] '))) {
+    return { status: 'accepted' };
+  }
   return {
-    blocked: true,
-    recovery: { status: 'present', state: header.state },
+    status: 'cancelled',
+    result: buildProjectResult({
+      action: 'cancelled',
+      targets: input.selection.toDelete,
+      rootPath: input.projectDir,
+      recovery: input.journal.recovery,
+    }),
   };
 }
 
-function performProjectDeletion(
-  toDelete: readonly Target[],
-  purge: boolean,
-  projectDir: string,
-): void {
-  assertTargetsContained(projectDir, toDelete);
-  for (const t of toDelete) {
-    try {
-      const st = lstatSync(t.path);
-      if (st.isSymbolicLink()) continue;
-    } catch {
-      continue;
+async function executeProjectMutation(input: {
+  readonly projectDir: string;
+  readonly purge: boolean;
+  readonly discardRecovery: boolean;
+  readonly yes: boolean;
+  readonly recoveryOnly: boolean;
+  readonly selection: ProjectTargetSelection;
+  readonly write: ProjectWrite;
+  readonly acquireExclusive: ProjectAcquireExclusive;
+}): Promise<UninstallDoneResult> {
+  const posture = input.discardRecovery ? 'destructive-discard' : 'normal';
+  const exclusive = await input.acquireExclusive(input.projectDir, posture);
+  try {
+    const lockedJournal = journalBlocksRemoval(input.projectDir);
+    if (lockedJournal.blocked && !input.discardRecovery) {
+      input.write(
+        '\nRefusing project removal: a promotion journal appeared (or remains) under exclusive access.\n' +
+          '  Retry interrupted Init with: opensip init\n\n',
+      );
+      return buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+        recovery: lockedJournal.recovery,
+      });
     }
-    rmSync(t.path, { recursive: true, force: true });
-  }
-  if (!purge) return;
-  const paths = resolveProjectPaths(projectDir);
-  if (existsSync(paths.userSourceDir)) {
-    try {
-      assertNotSymlinkLeaf(paths.userSourceDir, 'opensip-cli/');
-      assertTargetsContained(projectDir, [
-        {
-          path: paths.userSourceDir,
-          kind: 'dir',
-          sizeBytes: 0,
-          bucket: 'user-content',
-        },
-      ]);
-      rmSync(paths.userSourceDir, { recursive: true, force: true });
-    } catch {
-      /* refuse unsafe shell cleanup; children already handled */
+
+    const lockedTargets = collectTargets('project', '', input.projectDir);
+    const lockedSelection = filterProjectTargets(input.purge, lockedTargets);
+    const snapshotChanged =
+      !input.recoveryOnly &&
+      targetFingerprint(lockedSelection.toDelete) !== targetFingerprint(input.selection.toDelete);
+    if (snapshotChanged && !input.yes) {
+      input.write(
+        '\nTarget snapshot changed while waiting for exclusive access. Re-run uninstall --project to review the new set.\n\n',
+      );
+      return buildProjectResult({
+        action: 'cancelled',
+        targets: lockedSelection.toDelete,
+        rootPath: input.projectDir,
+        recovery: lockedJournal.recovery,
+      });
     }
+
+    if (lockedSelection.toDelete.length === 0 && !input.discardRecovery) {
+      return buildProjectResult({
+        action: 'empty',
+        targets: [],
+        rootPath: input.projectDir,
+        recovery: lockedJournal.recovery,
+      });
+    }
+    if (lockedSelection.toDelete.length > 0) {
+      performProjectDeletion(lockedSelection.toDelete, input.purge, input.projectDir);
+    }
+
+    let recovery: UninstallDoneResult['recovery'] = lockedJournal.recovery;
+    if (input.discardRecovery) {
+      // Cache candidates are already proven via collectTargets → inspect.
+      // Never follow marker projectDir for deletion roots.
+      void inspectEphemeralRuntimeCandidates(input.projectDir);
+      await discardRuntimePromotionJournal(exclusive);
+      recovery = { status: 'discarded' };
+    }
+    return buildProjectResult({
+      action: 'removed',
+      targets: lockedSelection.toDelete,
+      rootPath: input.projectDir,
+      recovery,
+    });
+  } finally {
+    exclusive.release();
   }
 }
 
@@ -287,217 +365,57 @@ export async function executeProjectRemoval(
   opts: ProjectRemovalOptions,
 ): Promise<UninstallDoneResult> {
   const projectDir = resolve(opts.projectDir);
-  const write = opts.write ?? ((s: string) => process.stdout.write(s));
+  const write = opts.write ?? ignorePresentation;
   const purge = opts.purge === true;
   const discardRecovery = opts.discardRecovery === true;
 
   assertSafeProjectDir(projectDir);
 
-  if (discardRecovery && !purge) {
-    write(
-      '\n--discard-recovery requires --project --purge. It is a high-risk break-glass for stuck promotion journals.\n\n',
-    );
-    return buildProjectResult({
-      action: 'empty',
-      targets: [],
-      rootPath: projectDir,
-      recovery: { status: 'refused', reason: 'discard-requires-purge' },
-    });
-  }
-
-  const journal = journalBlocksRemoval(projectDir);
-  if (journal.blocked && !discardRecovery) {
-    write(
-      '\nRefusing project removal while a runtime promotion journal is present.\n' +
-        '  Retry interrupted Init with: opensip init\n' +
-        '  High-risk break-glass (deletes runtime/cache/authored + journal): opensip uninstall --project --purge --discard-recovery\n\n',
-    );
-    return buildProjectResult({
-      action: 'empty',
-      targets: [],
-      rootPath: projectDir,
-      recovery: journal.recovery,
-    });
-  }
-
+  const preflight = preflightProjectRemoval({ projectDir, purge, discardRecovery, write });
+  if (preflight.status === 'done') return preflight.result;
   const acquireRead =
-    opts.acquireReadLease ??
-    ((dir: string) => acquireRuntimeReadLease({ projectDir: dir }));
+    opts.acquireReadLease ?? ((dir: string) => acquireRuntimeReadLease({ projectDir: dir }));
   const acquireExclusive =
     opts.acquireExclusiveLease ??
     ((dir: string, posture: 'normal' | 'destructive-discard') =>
       acquireRuntimeExclusiveLease({ projectDir: dir, posture }));
 
-  // Dry-run: short read lease around the snapshot only.
   if (opts.dryRun === true) {
-    let readLease: RuntimeReadLease | undefined;
-    try {
-      readLease = await acquireRead(projectDir);
-      const allTargets = collectTargets('project', '', projectDir);
-      const { toDelete, toKeep } = filterProjectTargets(purge, allTargets);
-      if (allTargets.length === 0) {
-        write(`\nNothing to remove — no OpenSIP CLI state found at ${projectDir}.\n\n`);
-        return buildProjectResult({ action: 'empty', targets: [], rootPath: projectDir });
-      }
-      if (toDelete.length === 0) {
-        printProjectDefault(write, [], toKeep, projectDir);
-        return buildProjectResult({ action: 'empty', targets: [], rootPath: projectDir });
-      }
-      if (purge) printProjectPurge(write, toDelete, projectDir);
-      else printProjectDefault(write, toDelete, toKeep, projectDir);
-      return buildProjectResult({
-        action: 'dry-run',
-        targets: toDelete,
-        rootPath: projectDir,
-        recovery: journal.recovery,
-      });
-    } finally {
-      readLease?.release();
-    }
-  }
-
-  // Pre-confirm snapshot (no exclusive lease yet).
-  const preTargets = collectTargets('project', '', projectDir);
-  const preFiltered = filterProjectTargets(purge, preTargets);
-  const recoveryOnly = discardRecovery && journal.blocked && preFiltered.toDelete.length === 0;
-
-  if (preTargets.length === 0 && !recoveryOnly) {
-    write(`\nNothing to remove — no OpenSIP CLI state found at ${projectDir}.\n\n`);
-    return buildProjectResult({
-      action: 'empty',
-      targets: [],
-      rootPath: projectDir,
-      recovery: journal.recovery,
-    });
-  }
-  if (preFiltered.toDelete.length === 0 && !recoveryOnly) {
-    printProjectDefault(write, [], preFiltered.toKeep, projectDir);
-    return buildProjectResult({
-      action: 'empty',
-      targets: [],
-      rootPath: projectDir,
-      recovery: journal.recovery,
+    return executeProjectDryRun({
+      projectDir,
+      purge,
+      journal: preflight.journal,
+      write,
+      acquireRead,
     });
   }
 
-  if (recoveryOnly) {
-    write(
-      '\nNo rebuildable runtime/cache targets remain, but a promotion journal is still present.\n' +
-        '  --discard-recovery will unlink only the fixed journal after exclusive confirmation.\n\n',
-    );
-  } else if (purge) {
-    printProjectPurge(write, preFiltered.toDelete, projectDir);
-  } else {
-    printProjectDefault(write, preFiltered.toDelete, preFiltered.toKeep, projectDir);
-  }
+  const prepared = prepareProjectRemoval({
+    projectDir,
+    purge,
+    discardRecovery,
+    journal: preflight.journal,
+    write,
+  });
+  if (prepared.status === 'done') return prepared.result;
 
-  if (discardRecovery) {
-    write(
-      '  ⚠ --discard-recovery will also unlink the fixed promotion journal after deleting canonical roots.\n\n',
-    );
-  }
+  const confirmation = await confirmProjectRemoval({
+    yes: opts.yes === true,
+    prompt: opts.prompt,
+    projectDir,
+    journal: preflight.journal,
+    selection: prepared.selection,
+  });
+  if (confirmation.status === 'cancelled') return confirmation.result;
 
-  if (opts.yes !== true) {
-    const prompt = opts.prompt;
-    if (prompt === undefined) {
-      const { createInterface } = await import('node:readline/promises');
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
-      try {
-        const ok = await confirm((q) => rl.question(q), 'Proceed? [y/N] ');
-        if (!ok) {
-          return buildProjectResult({
-            action: 'cancelled',
-            targets: preFiltered.toDelete,
-            rootPath: projectDir,
-            recovery: journal.recovery,
-          });
-        }
-      } finally {
-        rl.close();
-      }
-    } else {
-      const ok = await confirm(prompt, 'Proceed? [y/N] ');
-      if (!ok) {
-        return buildProjectResult({
-          action: 'cancelled',
-          targets: preFiltered.toDelete,
-          rootPath: projectDir,
-          recovery: journal.recovery,
-        });
-      }
-    }
-  }
-
-  const posture = discardRecovery ? 'destructive-discard' : 'normal';
-  let exclusive: RuntimeExclusiveLease | undefined;
-  try {
-    exclusive = await acquireExclusive(projectDir, posture);
-
-    // Re-check journal under exclusive authority before any deletion.
-    const lockedJournal = journalBlocksRemoval(projectDir);
-    if (lockedJournal.blocked && !discardRecovery) {
-      write(
-        '\nRefusing project removal: a promotion journal appeared (or remains) under exclusive access.\n' +
-          '  Retry interrupted Init with: opensip init\n\n',
-      );
-      return buildProjectResult({
-        action: 'empty',
-        targets: [],
-        rootPath: projectDir,
-        recovery: lockedJournal.recovery,
-      });
-    }
-
-    // Re-collect under the exclusive lease and revalidate snapshot.
-    const lockedTargets = collectTargets('project', '', projectDir);
-    const lockedFiltered = filterProjectTargets(purge, lockedTargets);
-    if (
-      !recoveryOnly &&
-      targetFingerprint(lockedFiltered.toDelete) !== targetFingerprint(preFiltered.toDelete)
-    ) {
-      if (opts.yes !== true) {
-        write(
-          '\nTarget snapshot changed while waiting for exclusive access. Re-run uninstall --project to review the new set.\n\n',
-        );
-        return buildProjectResult({
-          action: 'cancelled',
-          targets: lockedFiltered.toDelete,
-          rootPath: projectDir,
-          recovery: lockedJournal.recovery,
-        });
-      }
-      // Explicit --yes: proceed with the revalidated set.
-    }
-
-    if (lockedFiltered.toDelete.length === 0 && !discardRecovery) {
-      return buildProjectResult({
-        action: 'empty',
-        targets: [],
-        rootPath: projectDir,
-        recovery: lockedJournal.recovery,
-      });
-    }
-
-    if (lockedFiltered.toDelete.length > 0) {
-      performProjectDeletion(lockedFiltered.toDelete, purge, projectDir);
-    }
-
-    let recovery: UninstallDoneResult['recovery'] = lockedJournal.recovery;
-    if (discardRecovery) {
-      // Cache candidates are already proven via collectTargets → inspect.
-      // Never follow marker projectDir for deletion roots.
-      void inspectEphemeralRuntimeCandidates(projectDir);
-      await discardRuntimePromotionJournal(exclusive);
-      recovery = { status: 'discarded' };
-    }
-
-    return buildProjectResult({
-      action: 'removed',
-      targets: lockedFiltered.toDelete,
-      rootPath: projectDir,
-      recovery,
-    });
-  } finally {
-    exclusive?.release();
-  }
+  return executeProjectMutation({
+    projectDir,
+    purge,
+    discardRecovery,
+    yes: opts.yes === true,
+    recoveryOnly: prepared.recoveryOnly,
+    selection: prepared.selection,
+    write,
+    acquireExclusive,
+  });
 }

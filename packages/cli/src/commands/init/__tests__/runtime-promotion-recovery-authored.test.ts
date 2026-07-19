@@ -27,7 +27,7 @@ import {
   rollbackAuthoredState,
   type AuthoredStateCheckpoint,
 } from '../authored-state-transaction.js';
-import { sha256Bytes } from '../init-authored-plan-types.js';
+import { sha256Bytes, sha256Parts } from '../init-authored-plan-types.js';
 import * as currentAuthoredPlan from '../init-authored-plan.js';
 import {
   encodeAuthoredReplayManifest,
@@ -174,14 +174,12 @@ function authoredPlan(specifications: readonly MutationSpec[]): InitAuthoredPlan
     replayManifest,
     replayManifestBytes,
     replayManifestDigest: sha256Bytes(replayManifestBytes),
-    digest: sha256Bytes(
-      Buffer.concat([
-        Buffer.from('opensip-init-authored-plan\0v1\0', 'utf8'),
-        Buffer.from(JSON.stringify(inputs), 'utf8'),
-        Buffer.from('\0', 'utf8'),
-        Buffer.from(replayManifestBytes, 'utf8'),
-      ]),
-    ),
+    digest: sha256Parts([
+      'opensip-init-authored-plan\0v1\0',
+      JSON.stringify(inputs),
+      '\0',
+      replayManifestBytes,
+    ]),
     aggregateBlobBytes,
     blobs: { desired, preimage },
   };
@@ -413,7 +411,10 @@ describe('runtime promotion recovery authored orchestration', () => {
 
     const result = await recover(harness);
 
-    expect(result).toMatchObject({ status: 'rolled-back', sourcePreserved: false });
+    expect(result).toMatchObject({
+      status: 'rolled-back',
+      sourcePreserved: false,
+    });
     expect(existsSync(join(harness.root, 'generated.txt'))).toBe(false);
     expectOwnedArtifactsAbsent(harness);
     expect(harness.store.content).toBeUndefined();
@@ -527,7 +528,10 @@ describe('runtime promotion recovery authored orchestration', () => {
 
     const result = await recover(harness);
 
-    expect(result).toMatchObject({ status: 'rolled-back', sourcePreserved: false });
+    expect(result).toMatchObject({
+      status: 'rolled-back',
+      sourcePreserved: false,
+    });
     expect(readFileSync(join(harness.root, 'a.txt'), 'utf8')).toBe(oldA);
     expect(readFileSync(join(harness.root, 'b.txt'), 'utf8')).toBe(oldB);
     expectOwnedArtifactsAbsent(harness);
@@ -574,7 +578,9 @@ describe('runtime promotion recovery authored orchestration', () => {
           break;
         }
         case 'tampered desired blob': {
-          writeFileSync(desiredBlob, 'changed-current-default', { mode: 0o600 });
+          writeFileSync(desiredBlob, 'changed-current-default', {
+            mode: 0o600,
+          });
           break;
         }
       }

@@ -379,7 +379,10 @@ function parseRequiredPorts(raw, label) {
       );
     }
     if (seen.has(port)) {
-      throw contractError('duplicate-required-port', `${label} has duplicate ${JSON.stringify(port)}`);
+      throw contractError(
+        'duplicate-required-port',
+        `${label} has duplicate ${JSON.stringify(port)}`,
+      );
     }
     seen.add(port);
     out.push(port);
@@ -1106,17 +1109,17 @@ function parseContinuityProof(raw, label) {
   const record = requireObject(raw, label);
   rejectUnknownKeys(record, CONTINUITY_PROOF_KEY_SET, label);
   if (record.kind !== 'cache-init-continuity') {
-    throw contractError('invalid-continuity-proof-kind', `${label}.kind must be cache-init-continuity`);
+    throw contractError(
+      'invalid-continuity-proof-kind',
+      `${label}.kind must be cache-init-continuity`,
+    );
   }
   const proofSchemaVersion = requirePositiveInt(
     record.proofSchemaVersion,
     `${label}.proofSchemaVersion`,
   );
   if (proofSchemaVersion !== 1) {
-    throw contractError(
-      'invalid-continuity-proof-schema',
-      `${label}.proofSchemaVersion must be 1`,
-    );
+    throw contractError('invalid-continuity-proof-schema', `${label}.proofSchemaVersion must be 1`);
   }
   const parentRunId = requireString(record.parentRunId, `${label}.parentRunId`, {
     max: MAX_CONTINUITY_ID_LENGTH,

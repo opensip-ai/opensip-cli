@@ -1,11 +1,12 @@
 /**
  * Equivalence-divergence diagnostic builder (pure).
  *
- * When `graph-equivalence-check` reports production decline/phantom divergences,
- * this turns each divergence into a fully-described record — owner occurrence,
- * resolved target occurrences, and the actual call edge on BOTH engines (plus the
- * same-call-site edge whatever its resolution) — so a maintainer can see exactly
- * how exact and sharded disagreed at a call site, not just the bodyHash deltas.
+ * When `graph-equivalence-check` reports production decline, phantom, or
+ * conflict divergences, this turns each divergence into a fully-described
+ * record — owner occurrence, resolved target occurrences, and the actual call
+ * edge on BOTH engines (plus the same-call-site edge whatever its resolution) —
+ * so a maintainer can see exactly how exact and sharded disagreed at a call
+ * site, not just the bodyHash deltas.
  *
  * It is the structured form of the throwaway instrumentation that originally
  * root-caused the 118-decline asymmetry (exact resolves workspace deps via
@@ -75,6 +76,7 @@ export interface EquivalenceDiagnostic {
   readonly counts: {
     readonly productionDecline: number;
     readonly productionPhantom: number;
+    readonly productionConflict: number;
   };
   readonly shards: readonly {
     readonly id: string;
@@ -85,14 +87,18 @@ export interface EquivalenceDiagnostic {
   readonly declineByExactResolution: Record<string, number>;
   /** Histogram: `<resolution>:<crossShard>` of the sharded edge for each phantom. */
   readonly phantomByShardedResolution: Record<string, number>;
+  /** Histogram of `<exact resolution>-><sharded resolution>` for each conflict. */
+  readonly conflictByResolutionPair: Record<string, number>;
   readonly decline: readonly DiffDiagnostic[];
   readonly phantom: readonly DiffDiagnostic[];
+  readonly conflict: readonly DiffDiagnostic[];
 }
 
 export interface BuildEquivalenceDiagnosticInput {
   readonly report: {
     readonly productionDecline: readonly EdgeDifference[];
     readonly productionPhantom: readonly EdgeDifference[];
+    readonly productionConflict: readonly EdgeDifference[];
   };
   readonly exact: Catalog;
   readonly sharded: Catalog;
@@ -113,10 +119,12 @@ export function buildEquivalenceDiagnostic(
     describeDifference(d, input.exact, input.sharded, exactTargets, shardedTargets);
   const decline = input.report.productionDecline.map(describe);
   const phantom = input.report.productionPhantom.map(describe);
+  const conflict = input.report.productionConflict.map(describe);
   return {
     counts: {
       productionDecline: decline.length,
       productionPhantom: phantom.length,
+      productionConflict: conflict.length,
     },
     shards: input.shards.map((s) => ({
       id: s.id,
@@ -125,8 +133,13 @@ export function buildEquivalenceDiagnostic(
     })),
     declineByExactResolution: countBy(decline, (d) => edgeResolutionKey(d.exactEdge)),
     phantomByShardedResolution: countBy(phantom, (d) => edgeResolutionKey(d.shardedEdge)),
+    conflictByResolutionPair: countBy(
+      conflict,
+      (d) => `${edgeResolutionKey(d.exactEdge)}->${edgeResolutionKey(d.shardedEdge)}`,
+    ),
     decline,
     phantom,
+    conflict,
   };
 }
 
@@ -150,16 +163,14 @@ function describeDifference(
   exactTargets: ReadonlyMap<string, readonly FunctionOccurrence[]>,
   shardedTargets: ReadonlyMap<string, readonly FunctionOccurrence[]>,
 ): DiffDiagnostic {
-  const atSign = diff.key.indexOf('@');
-  const ownerHash = atSign === -1 ? diff.key : diff.key.slice(0, atSign);
-  const exactOwner = findOccurrence(exact, ownerHash, diff.ownerFilePath);
-  const shardedOwner = findOccurrence(sharded, ownerHash, diff.ownerFilePath);
+  const exactOwner = findOccurrence(exact, diff);
+  const shardedOwner = findOccurrence(sharded, diff);
   return {
     owner: {
-      hash: ownerHash,
+      hash: diff.ownerBodyHash,
       filePath: diff.ownerFilePath,
-      line: diff.line,
-      column: diff.column,
+      line: diff.ownerLine,
+      column: diff.ownerColumn,
       exact: exactOwner === undefined ? null : summarizeOccurrence(exactOwner),
       sharded: shardedOwner === undefined ? null : summarizeOccurrence(shardedOwner),
     },
@@ -192,12 +203,18 @@ function indexOccurrencesByHash(
 
 function findOccurrence(
   catalog: Catalog,
-  bodyHash: string,
-  filePath: string,
+  owner: Pick<EdgeDifference, 'ownerBodyHash' | 'ownerFilePath' | 'ownerLine' | 'ownerColumn'>,
 ): FunctionOccurrence | undefined {
   for (const occs of Object.values(catalog.functions)) {
     for (const occ of occs ?? []) {
-      if (occ.bodyHash === bodyHash && occ.filePath === filePath) return occ;
+      if (
+        occ.bodyHash === owner.ownerBodyHash &&
+        occ.filePath === owner.ownerFilePath &&
+        occ.line === owner.ownerLine &&
+        occ.column === owner.ownerColumn
+      ) {
+        return occ;
+      }
     }
   }
   return undefined;

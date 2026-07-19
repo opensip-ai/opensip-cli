@@ -23,7 +23,6 @@ import {
   applyToolContributeScope,
   BootstrapDiagnosticsCollector,
   createCapabilityRegistry,
-  type CliDiagnostic,
   LanguageRegistry,
   type Logger,
   LoggerImpl,
@@ -32,9 +31,6 @@ import {
   RunScope,
   runWithScopeSync,
   resolveToolHooks,
-  type RuntimeCommandInventory,
-  type ToolPluginManifest,
-  type ToolProvenance,
   ToolRegistry,
 } from '@opensip-cli/core';
 import { resolveSignalSink } from '@opensip-cli/output';
@@ -50,10 +46,9 @@ import { resolvePolicyForRun } from './run-policy.js';
 import { shouldRunHookInHost } from './tool-provenance.js';
 import { buildDeniedWorkerDatastoreThunk } from './worker-datastore.js';
 
-import type { loadCliDefaults } from './cli-defaults.js';
-import type { PolicyAuditCollector } from './policy-audit.js';
-import type { StartupTimingEvent } from './startup-timing.js';
-import type { RuntimeLeaseLifecycle } from '../commands/host-runtime-access.js';
+import type { BuildPerRunScopeInput } from './build-per-run-scope-contract.js';
+
+export type { BuildPerRunScopeInput } from './build-per-run-scope-contract.js';
 
 export interface BuildInspectionOnlyScopeInput {
   readonly project: ProjectContext;
@@ -84,86 +79,6 @@ export function buildInspectionOnlyScope(
     },
   });
   return { scope, logger: inspectionLogger };
-}
-
-/** Inputs required to build a fully wired per-run scope. */
-export interface BuildPerRunScopeInput {
-  readonly project: ProjectContext;
-  readonly runId: string;
-  readonly cwd: string;
-  /**
-   * Top-level command name the run started under (e.g. `graph`, `fit`) — the
-   * FIRST segment of the invoked command path, NOT a child's own
-   * `graph-shard-worker`. Stamped into the assembled `RunCorrelation` so a child
-   * worker can attribute itself to the parent command (B2 / GAP e).
-   */
-  readonly parentCommand: string;
-  /**
-   * Owning tool id of the dispatched command (e.g. `graph`, `fit`), resolved by
-   * the bootstrap. Stamped into the assembled `RunCorrelation.tool`.
-   */
-  readonly toolName: string;
-  readonly cliDefaults: ReturnType<typeof loadCliDefaults>; // or narrow if we extract a type
-  readonly registries: {
-    readonly languages: LanguageRegistry;
-    readonly tools: ToolRegistry;
-  };
-  readonly manifests: readonly ToolPluginManifest[];
-  /**
-   * Provenance of the tools admitted this run, recorded by the bootstrap and
-   * stamped onto the scope (paired index-wise with `manifests`) so host
-   * commands read it via `currentScope()` rather than a module global.
-   */
-  readonly provenance: readonly ToolProvenance[];
-  /**
-   * Startup bootstrap diagnostics gathered before this scope was built (ADR-0060).
-   */
-  readonly bootstrapDiagnostics?: readonly CliDiagnostic[];
-  /**
-   * Process-startup phase timings gathered before Commander preAction entered
-   * this run scope. Re-emitted here so normal CommandOutcome diagnostics carry
-   * the same local timing facts as logs.
-   */
-  readonly startupTimings?: readonly StartupTimingEvent[];
-  /** Policy audit events gathered before this run scope existed. */
-  readonly bootstrapPolicyAudit?: PolicyAuditCollector;
-  readonly apiKey?: string;
-  readonly noCloud?: boolean;
-  readonly logger: Logger;
-  /**
-   * Plain host+Tool command inventory projected by the composition root.
-   * Defaults to the empty inventory when omitted (bailout / test paths).
-   */
-  readonly runtimeCommands?: RuntimeCommandInventory;
-  /**
-   * Presentation state resolved by the hook before the scope is built:
-   * the CLI package version and the cached newer-version string (if any).
-   * Passed in — NOT derivable from `cliDefaults` (the `cli:` config block
-   * carries no package version).
-   */
-  readonly ui: {
-    readonly version: string;
-    readonly update: string | undefined;
-  };
-  /**
-   * Ambient datastore capability for this scope:
-   *
-   * - `'local'` opens project SQLite lazily, including for teardown audit flush.
-   * - `'local-explicit-only'` permits an action to open project SQLite, but
-   *   teardown never materializes it solely to flush policy audit events.
-   * - `'host-rpc-only'` installs a denied thunk so isolated workers cannot
-   *   recover a local handle via `cli.scope` or `currentScope()`.
-   * - `'none'` denies local persistence for non-runtime host commands.
-   *
-   * Bootstrap resolves this from the internal command path + host marker —
-   * never from config, manifest, CLI option, or RPC.
-   */
-  readonly datastoreAccess: 'local' | 'local-explicit-only' | 'host-rpc-only' | 'none';
-  /**
-   * CLI-only runtime lease ownership. It is consumed by the combined
-   * persistence teardown and is never installed on RunScope.
-   */
-  readonly runtimeLeaseLifecycle?: RuntimeLeaseLifecycle;
 }
 
 /**

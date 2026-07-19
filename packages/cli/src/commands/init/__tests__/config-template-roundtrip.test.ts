@@ -17,7 +17,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolRegistry, resolveToolHooks } from '@opensip-cli/core';
+import { ToolRegistry, isPlainRecord, resolveToolHooks } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BUNDLED_TOOLS } from '../../../__tests__/test-utils/bundled-tools.js';
@@ -65,10 +65,6 @@ function scaffolds(): ToolScaffold[] {
   });
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function hostProjection(document: unknown): {
   schemaVersion: unknown;
   globalExcludes: unknown;
@@ -78,9 +74,9 @@ function hostProjection(document: unknown): {
     throw new Error('expected plain config document');
   }
   return {
-    schemaVersion: document['schemaVersion'],
-    globalExcludes: document['globalExcludes'],
-    targets: document['targets'],
+    schemaVersion: document.schemaVersion,
+    globalExcludes: document.globalExcludes,
+    targets: document.targets,
   };
 }
 
@@ -121,7 +117,9 @@ describe('init config template round-trips through the composed schema', () => {
 
   it('renders identical config bytes from the callback-free Tool snapshot', () => {
     const liveScaffolds = scaffolds();
-    const rendered = enumerateToolScaffolds(liveScaffolds, { languages: LANGUAGES });
+    const rendered = enumerateToolScaffolds(liveScaffolds, {
+      languages: LANGUAGES,
+    });
     expect(generateConfigFromRenderedScaffolds(LANGUAGES, rendered)).toBe(
       generateConfig(LANGUAGES, liveScaffolds),
     );
@@ -134,11 +132,7 @@ describe('init config template round-trips through the composed schema', () => {
     }
   });
 
-  for (const languages of [
-    ['typescript'] as const,
-    ['python', 'go'] as const,
-    LANGUAGES,
-  ]) {
+  for (const languages of [['typescript'] as const, ['python', 'go'] as const, LANGUAGES]) {
     it(`composed host semantics match the starter model (${languages.join('+')})`, () => {
       const configPath = join(dir, 'opensip-cli.config.yml');
       writeFileSync(configPath, generateConfig(languages, scaffolds()), 'utf8');

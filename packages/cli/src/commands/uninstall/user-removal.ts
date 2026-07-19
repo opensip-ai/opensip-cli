@@ -10,14 +10,7 @@
  *  5. `--discard-recovery` unlinks only a malformed/absent-body fixed receipt.
  */
 
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 import {
@@ -39,28 +32,47 @@ import {
   newTombstoneBasename,
   serializeReceipt,
   USER_UNINSTALL_MARKER_BASENAME,
-  type UserUninstallReceiptBody,
 } from './user-uninstall-receipt.js';
 
 import type { UninstallDoneResult } from '@opensip-cli/contracts';
+
+type UserRemovalPosture = 'normal' | 'user-recovery' | 'receipt-only-discard';
 
 export interface UserRemovalOptions {
   readonly userRoot: string;
   readonly yes?: boolean;
   readonly dryRun?: boolean;
   readonly discardRecovery?: boolean;
+  /** Host-owned human-presentation sink; omitted callers receive only the returned result. */
   readonly write?: (s: string) => void;
   readonly prompt?: (question: string) => Promise<string>;
   readonly acquireGlobalLease?: (
-    posture: 'normal' | 'user-recovery' | 'receipt-only-discard',
+    posture: UserRemovalPosture,
   ) => Promise<GlobalRuntimeMaintenanceLease>;
 }
 
-async function confirm(
-  prompt: (question: string) => Promise<string>,
-  message: string,
-): Promise<boolean> {
-  const raw = await prompt(message);
+type UserWrite = NonNullable<UserRemovalOptions['write']>;
+type UserPrompt = NonNullable<UserRemovalOptions['prompt']>;
+type UserAcquireGlobalLease = NonNullable<UserRemovalOptions['acquireGlobalLease']>;
+type UserRecoveryHeader = ReturnType<typeof inspectUserUninstallRecoveryHeader>;
+
+function ignorePresentation(_chunk: string): void {
+  // Hostless library callers consume the returned structured result.
+}
+
+async function interactivePrompt(question: string): Promise<string> {
+  const { createInterface } = await import('node:readline/promises');
+  // eslint-disable-next-line no-restricted-properties -- readline owns this interactive prompt transport; uninstall presentation still routes through the host write seam.
+  const readline = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await readline.question(question);
+  } finally {
+    readline.close();
+  }
+}
+
+async function confirm(prompt: UserPrompt | undefined, message: string): Promise<boolean> {
+  const raw = await (prompt ?? interactivePrompt)(message);
   const answer = raw.trim().toLowerCase();
   return answer === 'y' || answer === 'yes';
 }
@@ -90,6 +102,7 @@ function buildResult(args: {
   };
 }
 
+/** @throws {Error} When the user-state root is a symlink or non-directory. */
 function assertSafeUserRoot(userRoot: string): void {
   const resolved = resolve(userRoot);
   let st: ReturnType<typeof lstatSync>;
@@ -149,24 +162,16 @@ function contentSha256(content: string): string {
   return digestMarkerContent(content);
 }
 
-export async function executeUserRemoval(opts: UserRemovalOptions): Promise<UninstallDoneResult> {
-  const userRoot = resolve(opts.userRoot);
-  const write = opts.write ?? ((s: string) => process.stdout.write(s));
-  const discardRecovery = opts.discardRecovery === true;
+type UserHeaderPresentation =
+  { readonly status: 'ready' } | { readonly status: 'done'; readonly result: UninstallDoneResult };
 
-  assertSafeUserRoot(userRoot);
-
-  const header = inspectUserUninstallRecoveryHeader();
-
-  if (discardRecovery) {
-    return executeReceiptOnlyDiscard(opts, header, write, userRoot);
-  }
-
-  // Resume path when an open receipt already exists.
+function presentUserRecoveryHeader(
+  header: UserRecoveryHeader,
+  write: UserWrite,
+  userRoot: string,
+): UserHeaderPresentation {
   if (header.status === 'valid' && header.state === 'open') {
-    write(
-      '\nAn interrupted user uninstall was found. Re-running under recovery to finish it.\n\n',
-    );
+    write('\nAn interrupted user uninstall was found. Re-running under recovery to finish it.\n\n');
   } else if (header.status === 'valid' && header.state === 'closed') {
     write(
       '\nA closed user-uninstall receipt is present (cleanup pending). Completing cleanup.\n\n',
@@ -175,86 +180,39 @@ export async function executeUserRemoval(opts: UserRemovalOptions): Promise<Unin
     write(
       '\nA malformed user-uninstall receipt is present. Use `opensip uninstall --user --discard-recovery` to unlink only the fixed receipt after review.\n\n',
     );
-    return buildResult({
-      action: 'empty',
-      targets: [],
-      rootPath: userRoot,
-      recovery: { status: 'malformed', reason: header.reason },
-    });
+    return {
+      status: 'done',
+      result: buildResult({
+        action: 'empty',
+        targets: [],
+        rootPath: userRoot,
+        recovery: { status: 'malformed', reason: header.reason },
+      }),
+    };
   }
+  return { status: 'ready' };
+}
 
-  const allTargets = collectTargets('user', userRoot, '');
-  if (allTargets.length === 0 && header.status === 'absent') {
-    write(`\nNothing to remove — ${userRoot} does not exist.\n\n`);
-    return buildResult({ action: 'empty', targets: [], rootPath: userRoot });
-  }
-
-  if (allTargets.length > 0) {
-    printUserModeTargets(write, allTargets);
-  }
-
-  if (opts.dryRun === true) {
-    return buildResult({
-      action: 'dry-run',
-      targets: allTargets,
-      rootPath: userRoot,
-      recovery: header.status === 'absent' ? { status: 'absent' } : { status: 'present', state: header.status === 'valid' ? header.state : 'open' },
-    });
-  }
-
-  if (opts.yes !== true) {
-    const prompt = opts.prompt;
-    if (prompt === undefined) {
-      const { createInterface } = await import('node:readline/promises');
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
-      try {
-        const ok = await confirm((q) => rl.question(q), 'Proceed? [y/N] ');
-        if (!ok) {
-          return buildResult({
-            action: 'cancelled',
-            targets: allTargets,
-            rootPath: userRoot,
-          });
-        }
-      } finally {
-        rl.close();
-      }
-    } else {
-      const ok = await confirm(prompt, 'Proceed? [y/N] ');
-      if (!ok) {
-        return buildResult({
-          action: 'cancelled',
-          targets: allTargets,
-          rootPath: userRoot,
-        });
-      }
-    }
-  }
-
-  const acquire =
-    opts.acquireGlobalLease ??
-    ((posture: 'normal' | 'user-recovery' | 'receipt-only-discard') =>
-      acquireGlobalRuntimeMaintenanceLease({
-        posture,
-        command: 'opensip uninstall --user',
-      }));
-
-  let lease: GlobalRuntimeMaintenanceLease | undefined;
+async function executeUserMutation(input: {
+  readonly userRoot: string;
+  readonly header: UserRecoveryHeader;
+  readonly targets: readonly Target[];
+  readonly acquire: UserAcquireGlobalLease;
+}): Promise<UninstallDoneResult> {
+  const posture = input.header.status === 'valid' ? 'user-recovery' : 'normal';
+  const lease = await input.acquire(posture);
   try {
-    const posture = header.status === 'valid' ? 'user-recovery' : 'normal';
-    lease = await acquire(posture);
-
     // Global acquire itself refuses when project journals block; if we got
     // here, proceed with mutation.
     void anyProjectPromotionJournalBlocks();
 
-    if (!existsSync(userRoot) && header.status === 'absent') {
-      return buildResult({ action: 'empty', targets: [], rootPath: userRoot });
+    if (!existsSync(input.userRoot) && input.header.status === 'absent') {
+      return buildResult({ action: 'empty', targets: [], rootPath: input.userRoot });
     }
 
     const operationId = newOperationId();
     const tombstoneBasename = newTombstoneBasename(operationId);
-    const parentDir = dirname(userRoot);
+    const parentDir = dirname(input.userRoot);
     const tombstonePath = join(parentDir, tombstoneBasename);
     const markerContent = newMarkerContent();
     let markerDigest = digestMarkerContent(markerContent);
@@ -272,12 +230,15 @@ export async function executeUserRemoval(opts: UserRemovalOptions): Promise<Unin
     });
 
     // Marker create (exclusive) inside the live source root.
-    if (existsSync(userRoot) && !markerMatches(userRoot, markerDigest)) {
+    if (existsSync(input.userRoot) && !markerMatches(input.userRoot, markerDigest)) {
       try {
-        markerDigest = createExclusiveMarker(userRoot, markerContent);
+        markerDigest = createExclusiveMarker(input.userRoot, markerContent);
       } catch {
         // Resume path may already have the marker.
-        if (!markerMatches(userRoot, markerDigest) && !markerMatches(tombstonePath, markerDigest)) {
+        if (
+          !markerMatches(input.userRoot, markerDigest) &&
+          !markerMatches(tombstonePath, markerDigest)
+        ) {
           throw new Error('Failed to create exclusive user-uninstall operation marker');
         }
       }
@@ -291,7 +252,7 @@ export async function executeUserRemoval(opts: UserRemovalOptions): Promise<Unin
     sha = contentSha256(serializeReceipt(receipt));
 
     // Rename source → tombstone when source still present with matching marker.
-    if (existsSync(userRoot) && markerMatches(userRoot, markerDigest)) {
+    if (existsSync(input.userRoot) && markerMatches(input.userRoot, markerDigest)) {
       receipt = advanceReceipt(receipt, 'rename-intent');
       await mutateUserUninstallReceipt(lease, {
         operation: 'replace',
@@ -299,7 +260,7 @@ export async function executeUserRemoval(opts: UserRemovalOptions): Promise<Unin
         expectedContentSha256: sha,
       });
       sha = contentSha256(serializeReceipt(receipt));
-      renameSync(userRoot, tombstonePath);
+      renameSync(input.userRoot, tombstonePath);
       receipt = advanceReceipt(receipt, 'renamed');
       await mutateUserUninstallReceipt(lease, {
         operation: 'replace',
@@ -343,19 +304,65 @@ export async function executeUserRemoval(opts: UserRemovalOptions): Promise<Unin
 
     return buildResult({
       action: 'removed',
-      targets: allTargets,
-      rootPath: userRoot,
+      targets: input.targets,
+      rootPath: input.userRoot,
       recovery: { status: 'absent' },
     });
   } finally {
-    lease?.release();
+    lease.release();
   }
+}
+
+export async function executeUserRemoval(opts: UserRemovalOptions): Promise<UninstallDoneResult> {
+  const userRoot = resolve(opts.userRoot);
+  const write = opts.write ?? ignorePresentation;
+
+  assertSafeUserRoot(userRoot);
+
+  const header = inspectUserUninstallRecoveryHeader();
+  if (opts.discardRecovery === true) {
+    return executeReceiptOnlyDiscard(opts, header, write, userRoot);
+  }
+
+  const headerPresentation = presentUserRecoveryHeader(header, write, userRoot);
+  if (headerPresentation.status === 'done') return headerPresentation.result;
+
+  const targets = collectTargets('user', userRoot, '');
+  if (targets.length === 0 && header.status === 'absent') {
+    write(`\nNothing to remove — ${userRoot} does not exist.\n\n`);
+    return buildResult({ action: 'empty', targets: [], rootPath: userRoot });
+  }
+  if (targets.length > 0) printUserModeTargets(write, targets);
+
+  if (opts.dryRun === true) {
+    return buildResult({
+      action: 'dry-run',
+      targets,
+      rootPath: userRoot,
+      recovery:
+        header.status === 'absent'
+          ? { status: 'absent' }
+          : { status: 'present', state: header.status === 'valid' ? header.state : 'open' },
+    });
+  }
+  if (opts.yes !== true && !(await confirm(opts.prompt, 'Proceed? [y/N] '))) {
+    return buildResult({ action: 'cancelled', targets, rootPath: userRoot });
+  }
+
+  const acquire =
+    opts.acquireGlobalLease ??
+    ((posture: UserRemovalPosture) =>
+      acquireGlobalRuntimeMaintenanceLease({
+        posture,
+        command: 'opensip uninstall --user',
+      }));
+  return executeUserMutation({ userRoot, header, targets, acquire });
 }
 
 async function executeReceiptOnlyDiscard(
   opts: UserRemovalOptions,
-  header: ReturnType<typeof inspectUserUninstallRecoveryHeader>,
-  write: (s: string) => void,
+  header: UserRecoveryHeader,
+  write: UserWrite,
   userRoot: string,
 ): Promise<UninstallDoneResult> {
   if (header.status === 'absent') {
@@ -385,38 +392,20 @@ async function executeReceiptOnlyDiscard(
     '\n⚠ --discard-recovery will unlink ONLY the fixed user-uninstall receipt.\n' +
       '  It does not delete user data, tombstones, or markers.\n\n',
   );
-  if (opts.yes !== true) {
-    const prompt = opts.prompt;
-    if (prompt === undefined) {
-      const { createInterface } = await import('node:readline/promises');
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
-      try {
-        const ok = await confirm((q) => rl.question(q), 'Discard fixed receipt only? [y/N] ');
-        if (!ok) {
-          return buildResult({ action: 'cancelled', targets: [], rootPath: userRoot });
-        }
-      } finally {
-        rl.close();
-      }
-    } else {
-      const ok = await confirm(prompt, 'Discard fixed receipt only? [y/N] ');
-      if (!ok) {
-        return buildResult({ action: 'cancelled', targets: [], rootPath: userRoot });
-      }
-    }
+  if (opts.yes !== true && !(await confirm(opts.prompt, 'Discard fixed receipt only? [y/N] '))) {
+    return buildResult({ action: 'cancelled', targets: [], rootPath: userRoot });
   }
 
   const acquire =
     opts.acquireGlobalLease ??
-    ((posture: 'normal' | 'user-recovery' | 'receipt-only-discard') =>
+    ((posture: UserRemovalPosture) =>
       acquireGlobalRuntimeMaintenanceLease({
         posture,
         command: 'opensip uninstall --user --discard-recovery',
       }));
 
-  let lease: GlobalRuntimeMaintenanceLease | undefined;
+  const lease = await acquire('receipt-only-discard');
   try {
-    lease = await acquire('receipt-only-discard');
     await discardUserUninstallReceipt(lease);
     return buildResult({
       action: 'removed',
@@ -425,6 +414,6 @@ async function executeReceiptOnlyDiscard(
       recovery: { status: 'discarded' },
     });
   } finally {
-    lease?.release();
+    lease.release();
   }
 }

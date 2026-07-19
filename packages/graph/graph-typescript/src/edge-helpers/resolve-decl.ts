@@ -38,9 +38,10 @@ import type ts from 'typescript';
  * Resolve `declNode` (a function-shaped node returned by
  * `functionLikeFromDeclaration`) to a catalog bodyHash, or `null` to decline.
  *
- * `candidateNames` is the simple name(s) the call site addressed — the EXPORTED
- * callee name (e.g. `getSharedSourceFile`, `walkNodes`). Used both for the
- * in-project hash lookup and the cross-package export lookup.
+ * `candidateNames` is the semantic SOURCE/export name(s) of the target
+ * declaration (e.g. `getSharedSourceFile`, `walkNodes`). Used both for the
+ * in-project hash lookup and the cross-package export lookup. A caller-local
+ * named-import alias is deliberately not a target candidate.
  *
  * `bindingNames` is the local binding name(s) that were IMPORTED in the call
  * site's file (the namespace receiver for `ns.fn()`, or the callee name itself

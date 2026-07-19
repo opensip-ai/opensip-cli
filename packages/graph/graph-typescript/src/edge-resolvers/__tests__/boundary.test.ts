@@ -104,6 +104,7 @@ describe('extractBoundaryCalls', () => {
     expect(out).toHaveLength(1);
     const [call] = out;
     expect(call?.calleeName).toBe('helper');
+    expect(call?.importedName).toBeUndefined();
     expect(call?.importSpecifier).toBe('./other.js');
     expect(call?.ownerHash).toBe('owner');
     // Owner file is derived project-relative (matches FunctionOccurrence.filePath)
@@ -115,6 +116,22 @@ describe('extractBoundaryCalls', () => {
     expect(call?.line).toBe(3);
     expect(call?.column).toBeGreaterThanOrEqual(0);
     expect(call?.text).toContain('helper');
+  });
+
+  it('carries the exported source name for an aliased named import', () => {
+    const sf = parse(
+      [
+        "import { sourceHelper as localHelper } from './other.js';",
+        'export function caller(): number {',
+        '  return localHelper();',
+        '}',
+      ].join('\n'),
+    );
+
+    const [call] = extractBoundaryCalls(callRecords(sf), NONE_RESOLVED, PROJECT_DIR);
+    expect(call?.calleeName).toBe('localHelper');
+    expect(call?.importedName).toBe('sourceHelper');
+    expect(call?.importSpecifier).toBe('./other.js');
   });
 
   it('marks discarded when the call is a bare ExpressionStatement', () => {

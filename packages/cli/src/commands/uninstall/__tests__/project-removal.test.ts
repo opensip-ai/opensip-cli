@@ -88,7 +88,7 @@ describe('executeProjectRemoval', () => {
       projectDir,
       yes: true,
       write: out.write,
-      acquireExclusiveLease: async () => exclusive,
+      acquireExclusiveLease: () => Promise.resolve(exclusive),
     });
     expect(result.action).toBe('removed');
     expect(result.mode).toBe('project');
@@ -107,7 +107,7 @@ describe('executeProjectRemoval', () => {
       purge: true,
       yes: true,
       write: captureWrite().write,
-      acquireExclusiveLease: async () => exclusive,
+      acquireExclusiveLease: () => Promise.resolve(exclusive),
     });
     expect(result.action).toBe('removed');
     expect(result.buckets?.authored).toBeGreaterThan(0);
@@ -122,8 +122,8 @@ describe('executeProjectRemoval', () => {
       projectDir,
       dryRun: true,
       write: captureWrite().write,
-      acquireReadLease: async () => read,
-      acquireExclusiveLease: async () => exclusive,
+      acquireReadLease: () => Promise.resolve(read),
+      acquireExclusiveLease: () => Promise.resolve(exclusive),
     });
     expect(result.action).toBe('dry-run');
     expect(existsSync(runtimeDir)).toBe(true);
@@ -136,8 +136,8 @@ describe('executeProjectRemoval', () => {
     const result = await executeProjectRemoval({
       projectDir,
       write: captureWrite().write,
-      prompt: async () => 'n',
-      acquireExclusiveLease: async () => exclusive,
+      prompt: () => Promise.resolve('n'),
+      acquireExclusiveLease: () => Promise.resolve(exclusive),
     });
     expect(result.action).toBe('cancelled');
     expect(existsSync(runtimeDir)).toBe(true);
@@ -150,7 +150,7 @@ describe('executeProjectRemoval', () => {
       discardRecovery: true,
       yes: true,
       write: captureWrite().write,
-      acquireExclusiveLease: async () => fakeExclusiveLease('destructive-discard'),
+      acquireExclusiveLease: () => Promise.resolve(fakeExclusiveLease('destructive-discard')),
     });
     expect(result.action).toBe('empty');
     expect(result.recovery?.status).toBe('refused');
@@ -159,7 +159,7 @@ describe('executeProjectRemoval', () => {
 
   it('releases exclusive lease on deletion error', async () => {
     const exclusive = fakeExclusiveLease();
-    const acquire = vi.fn(async () => exclusive);
+    const acquire = vi.fn(() => Promise.resolve(exclusive));
     // Point at a file path as projectDir after setup — assertSafeProjectDir fails.
     const filePath = join(projectDir, 'not-a-dir.txt');
     writeFileSync(filePath, 'x', 'utf8');
@@ -183,7 +183,7 @@ describe('executeProjectRemoval', () => {
         projectDir: link,
         yes: true,
         write: captureWrite().write,
-        acquireExclusiveLease: async () => fakeExclusiveLease(),
+        acquireExclusiveLease: () => Promise.resolve(fakeExclusiveLease()),
       }),
     ).rejects.toThrow(/symbolic link/);
   });
@@ -196,7 +196,7 @@ describe('executeProjectRemoval', () => {
       projectDir,
       yes: true,
       write: out.write,
-      acquireExclusiveLease: async () => fakeExclusiveLease(),
+      acquireExclusiveLease: () => Promise.resolve(fakeExclusiveLease()),
     });
     expect(result.action).toBe('empty');
     expect(out.text()).toContain('no OpenSIP CLI state');
@@ -214,7 +214,7 @@ describe('executeProjectRemoval', () => {
         purge: true,
         yes: true,
         write: captureWrite().write,
-        acquireExclusiveLease: async () => fakeExclusiveLease(),
+        acquireExclusiveLease: () => Promise.resolve(fakeExclusiveLease()),
       }),
     ).rejects.toThrow(/symbolic link/);
     expect(existsSync(join(outside, 'secret.txt'))).toBe(true);
@@ -235,7 +235,7 @@ describe('executeProjectRemoval', () => {
       discardRecovery: true,
       yes: true,
       write: captureWrite().write,
-      acquireExclusiveLease: async () => exclusive,
+      acquireExclusiveLease: () => Promise.resolve(exclusive),
     });
     // No journal + no targets → empty (nothing to discard).
     expect(result.action).toBe('empty');

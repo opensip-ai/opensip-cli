@@ -27,6 +27,15 @@
 import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
 import type { RunCorrelation } from '@opensip-cli/core';
 
+/** Bounded, serializable evidence retained when a shard worker fails. */
+export interface ShardFailureEvidence {
+  readonly shardId: string;
+  readonly exitCode: number;
+  readonly failureClass?: string;
+  readonly signal?: string;
+  readonly stderrTail?: string;
+}
+
 /**
  * One parallelizable unit of a sharded build. The discovery strategies
  * (workspace units, flat-monorepo partitions) map their output onto this

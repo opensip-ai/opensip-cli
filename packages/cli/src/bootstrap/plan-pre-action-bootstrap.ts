@@ -30,7 +30,7 @@ import {
   warnAboutPhantomRuntimes,
 } from './pre-action-guards.js';
 
-import type { loadCliDefaults as loadCliDefaultsFn } from './cli-defaults.js';
+import type { CliDefaults } from './cli-defaults.js';
 import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 import type { HostCommandRuntimePolicy } from '../commands/host-runtime-access.js';
 
@@ -57,7 +57,7 @@ export interface PreActionBootstrapPlan {
   readonly cwd: string;
   readonly cwdExplicit: boolean;
   readonly opts: Record<string, unknown>;
-  readonly cliDefaults: ReturnType<typeof loadCliDefaultsFn>;
+  readonly cliDefaults: CliDefaults;
   readonly project: ProjectContext;
   readonly commandName: string;
   readonly commandPath: string;
@@ -120,9 +120,9 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   // Tentative discovery and inspection-only status must not read user
   // defaults/API-key state. Ordinary authoritative commands retain the
   // established CLI-default behavior.
-  const cliDefaults = shouldLoadCliDefaults
+  const cliDefaults: CliDefaults = shouldLoadCliDefaults
     ? loadCliDefaults(cwd, explicitConfigPath)
-    : ({} as ReturnType<typeof loadCliDefaultsFn>);
+    : {};
   if (shouldLoadCliDefaults) {
     mergeConfigDefaults(opts, cliDefaults);
   }

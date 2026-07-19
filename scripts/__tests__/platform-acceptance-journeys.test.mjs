@@ -41,7 +41,7 @@ import {
 import { FIXTURE_REASON_CODES, packFixtures } from '../platform-acceptance/fixture-packages.mjs';
 import { runCli } from '../platform-acceptance/journey-kit.mjs';
 import { readBoundedOwnedText } from '../platform-acceptance/journeys/output.mjs';
-import { boundedDirSize } from '../platform-acceptance/journeys/persistence.mjs';
+import { boundedDirSize, buildRunsShowArgs } from '../platform-acceptance/journeys/persistence.mjs';
 
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const KNOWN_CATEGORIES = new Set([
@@ -667,6 +667,10 @@ test('state-bounds measures a real read and rejects a runtime symlink escape', a
   assert.equal(outcome.reasonCode, 'runtime-state-escaped');
 });
 
+test('cache-init replay selects the project by process cwd, not an unsupported runs-show flag', () => {
+  assert.deepEqual(buildRunsShowArgs('run_01'), ['runs', 'show', 'run_01', '--json']);
+});
+
 // ---------------------------------------------------------------------------
 // Command journeys via a fake port
 // ---------------------------------------------------------------------------
@@ -1181,8 +1185,7 @@ function persistenceBarrierContext({
         const timer = setInterval(() => {
           if (existsSync(writeLock)) return;
           clearInterval(timer);
-          // No session push: graph's `--json` carrier mode carries no
-          // session contribution by documented contract.
+          sessions.push({ id: 'graph-session-json-waiter', tool: 'graph' });
           resolve(waiterSuccessJson({ withWaitEvent: !waiterOmitsWaitEvents }));
         }, 5);
         spec.signal?.addEventListener(
@@ -1352,9 +1355,8 @@ test('persistence.contention-retry proves bounded exhaustion, a queued writer, a
   assert.equal(harness.exhaustionCalls, 1);
   assert.equal(harness.waiterCalls, 1);
   assert.equal(harness.sessionGraphCalls, 1);
-  // One replay: the phase-B owner. The --json waiter carries no session by
-  // graph's documented carrier-mode contract.
-  assert.equal(harness.calls.filter(({ argv }) => argv.includes('show')).length, 1);
+  // Both direct runs are replayed: the phase-A --json waiter and phase-B owner.
+  assert.equal(harness.calls.filter(({ argv }) => argv.includes('show')).length, 2);
   // Every competitor contended against an already-held lock.
   assert.equal(harness.competitorStartedBeforeOwnerLock, false);
   assert.ok(

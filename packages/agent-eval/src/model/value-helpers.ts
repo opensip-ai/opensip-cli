@@ -22,8 +22,18 @@ export function parseJsonRecord(text: string): UnknownRecord | undefined {
 /** Recursively freeze authored task data while preserving its inferred type. */
 export function deepFreeze<T>(value: T): T {
   if (typeof value !== 'object' || value === null) return value;
-  for (const child of Object.values(value)) deepFreeze(child);
-  return Object.isFrozen(value) ? value : Object.freeze(value);
+  const pending: object[] = [value];
+  const visited = new WeakSet<object>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === undefined || visited.has(current)) continue;
+    visited.add(current);
+    for (const child of Object.values(current as Readonly<Record<string, unknown>>)) {
+      if (typeof child === 'object' && child !== null) pending.push(child);
+    }
+    if (!Object.isFrozen(current)) Object.freeze(current);
+  }
+  return value;
 }
 
 /** Retain the first occurrence of each structurally identical normalized fact. */
@@ -50,6 +60,23 @@ export function stringsAreUnique(values: readonly string[]): boolean {
 /** Escape one literal for interpolation into a JavaScript regular expression. */
 export function escapeRegularExpression(value: string): string {
   return value.replace(/[|\\{}()[\]^$+*?.]/gu, '\\$&');
+}
+
+/** Compare strings by Unicode code point without locale-dependent collation. */
+export function compareCodePoints(left: string, right: string): number {
+  const leftPoints = left[Symbol.iterator]();
+  const rightPoints = right[Symbol.iterator]();
+  for (;;) {
+    const leftStep = leftPoints.next();
+    const rightStep = rightPoints.next();
+    if (leftStep.done || rightStep.done) {
+      if (leftStep.done === rightStep.done) return 0;
+      return leftStep.done ? -1 : 1;
+    }
+    const leftPoint = leftStep.value.codePointAt(0) ?? 0;
+    const rightPoint = rightStep.value.codePointAt(0) ?? 0;
+    if (leftPoint !== rightPoint) return leftPoint - rightPoint;
+  }
 }
 
 /** Truncate a string to a byte ceiling without returning malformed UTF-8. */

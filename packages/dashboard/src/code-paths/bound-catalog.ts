@@ -33,7 +33,11 @@
 
 import { scriptContextJsonBytes } from '../script-context-json.js';
 
-import type { GraphCatalog, GraphFunctionFeatures, GraphFunctionOccurrence } from '@opensip-cli/contracts';
+import type {
+  GraphCatalog,
+  GraphFunctionFeatures,
+  GraphFunctionOccurrence,
+} from '@opensip-cli/contracts';
 
 /**
  * Byte budget for the inlined catalog. 8 MiB keeps a large repository's report

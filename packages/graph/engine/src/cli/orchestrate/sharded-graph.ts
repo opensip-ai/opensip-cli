@@ -47,7 +47,7 @@ import {
   resolveCrossBoundaryCalls,
   stampAndConstrainPackages,
 } from './cross-shard-resolve.js';
-import { planShardWork, runShardsInParallel } from './shard-runner.js';
+import { boundedShardFailureEvidence, planShardWork, runShardsInParallel } from './shard-runner.js';
 
 import type { Shard, ShardBuildResult, ShardRunStats } from './shard-model.js';
 import type {
@@ -313,6 +313,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     resolutionStats: boundaryStats,
     cacheHit: plan.toBuild.length === 0,
     failedShardIds: built.failures.map((f) => f.shardId),
+    shardFailures: built.failures.map(boundedShardFailureEvidence),
     features,
     shardStats,
   };

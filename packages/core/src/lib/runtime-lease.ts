@@ -163,6 +163,12 @@ interface RuntimeLeaseCommonInput {
   readonly signal?: AbortSignal;
 }
 
+type LinkedCreateCheckpoint =
+  | 'after-linked-create-target-proof'
+  | 'after-linked-create-peer-selection'
+  | 'after-linked-create-temporary-proof'
+  | 'after-linked-create-final-stats';
+
 /** Injectable process/time seams for deterministic lease and stale-owner tests. */
 export interface RuntimeLeaseEnvironment {
   readonly now: () => number;
@@ -179,12 +185,24 @@ export interface RuntimeLeaseEnvironment {
   readonly generateToken: () => string;
   readonly poll: (ms: number, signal?: AbortSignal) => Promise<void>;
   readonly pollSync: (ms: number) => void;
+  /**
+   * Conservative per-scan process-inspection bound for direct test/embedding
+   * coordinators. Values are clamped to [1, 256]; production omits this field
+   * and retains the full 256-probe cap. Exhaustion preserves owners.
+   */
+  readonly maxProcessInspectionsPerScan?: number;
   readonly transition?: (name: string) => void;
   /** Direct-module fault harness; intentionally absent from the public barrel. */
   readonly coordinationCheckpoint?: (
     name:
       | 'mutex-entered'
       | 'before-mutex-postcondition'
+      | 'after-mutex-unlink'
+      | LinkedCreateCheckpoint
+      | 'before-stale-mutex-digest-read'
+      | 'before-stale-mutex-final-identity'
+      | 'before-stale-mutex-mutation'
+      | 'before-stale-mutex-unlink'
       | 'before-stale-reader-unlink'
       | 'empty-scaffold-parents-opened'
       | 'before-fixed-recovery-read-parent-revalidation'
@@ -388,6 +406,26 @@ export interface AnchoredRecordMutation extends CoordinationRecordMutation {
   readonly createIdentity?: string;
 }
 
+interface AnchoredRecordMutationRuntimeOptions {
+  /**
+   * A fixed coordination pathname may briefly name a two-link successor while
+   * another process completes its anchored create. Treat that state as
+   * contention; ordinary generic mutations retain the strict single-link rule.
+   */
+  readonly linkedTargetCanBeBusy?: boolean;
+  readonly assertPublicationAllowed?: () => void;
+  readonly afterUnlink?: () => void;
+  readonly linkedCreateCheckpoint?: (name: LinkedCreateCheckpoint) => void;
+  readonly beforeExpectedDigest?: () => void;
+  readonly beforeFinalUnlinkIdentity?: () => void;
+  readonly beforeFinalUnlink?: () => void;
+}
+
+type CoordinationRecordMutationRuntimeOptions = Omit<
+  AnchoredRecordMutationRuntimeOptions,
+  'assertPublicationAllowed' | 'afterUnlink' | 'linkedCreateCheckpoint'
+>;
+
 export type AnchoredLinkedCreateRecovery =
   | {
       /** Explicit authority to settle a linked random-UUID create only. */
@@ -465,6 +503,18 @@ function unsafeCoordination(message: string): SystemError {
   });
 }
 
+/**
+ * Resolve a project coordination key at a boundary where the project dimension is mandatory.
+ *
+ * @throws {SystemError} When project coordination state omits or corrupts its required key.
+ */
+function requiredProjectCoordinationKey(value: string | undefined): string {
+  if (value === undefined || !PROJECT_KEY_PATTERN.test(value)) {
+    throw unsafeCoordination('Project runtime coordination key is missing or invalid');
+  }
+  return value;
+}
+
 class RuntimeSnapshotChangedError extends SystemError {
   constructor(message: string) {
     super(message, { code: 'SYSTEM.RUNTIME_COORDINATION.BUSY' });
@@ -488,6 +538,7 @@ function timeoutError(kind: RuntimeLeaseWaitKind, waitMs: number): TimeoutError 
   );
 }
 
+/** @throws {Error} Always rethrows the input error or maps a coordination timeout. */
 function mapCoordinationTimeout(error: unknown, kind: RuntimeLeaseWaitKind, waitMs: number): never {
   if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION_MUTEX') {
     throw timeoutError(kind, waitMs);
@@ -511,6 +562,7 @@ function boundedPolicyDuration(
   return Math.min(maximum, Math.max(minimum, Math.floor(candidate)));
 }
 
+/** @throws {SystemError} When the requested record-size bound is invalid. */
 function boundedRecordSize(value: number | undefined): number {
   const candidate = value ?? MAX_RECORD_BYTES;
   if (!Number.isSafeInteger(candidate) || candidate < 1 || candidate > ANCHORED_RECORD_MAX_BYTES) {
@@ -519,6 +571,7 @@ function boundedRecordSize(value: number | undefined): number {
   return candidate;
 }
 
+/** @throws {SystemError} When the requested recovery-scan bound is invalid. */
 function boundedAnchoredRecoveryEntries(value: number | undefined): number {
   const candidate = value ?? ANCHORED_CREATE_RECOVERY_MAX_ENTRIES;
   if (
@@ -531,6 +584,7 @@ function boundedAnchoredRecoveryEntries(value: number | undefined): number {
   return candidate;
 }
 
+/** @throws {SystemError} When an anchored-record permission posture is invalid. */
 function anchoredPermissionPosture(
   value: 'private' | 'owner-controlled' | undefined,
   fallback: 'private' | 'owner-controlled',
@@ -612,11 +666,21 @@ function sameProvenRuntimeHost(
 
 interface ProcessInspectionCache {
   readonly present: Map<number, ProcessIncarnationInspection & { readonly status: 'present' }>;
+  readonly maxProbes: number;
   probes: number;
 }
 
-function createProcessInspectionCache(): ProcessInspectionCache {
-  return { present: new Map(), probes: 0 };
+function boundedProcessInspectionBudget(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return MAX_CACHED_PROCESS_INSPECTIONS;
+  return Math.min(MAX_CACHED_PROCESS_INSPECTIONS, Math.max(1, Math.floor(value)));
+}
+
+function createProcessInspectionCache(maxProbes?: number): ProcessInspectionCache {
+  return {
+    present: new Map(),
+    maxProbes: boundedProcessInspectionBudget(maxProbes),
+    probes: 0,
+  };
 }
 
 function inspectProcessForStaleScan(
@@ -630,7 +694,7 @@ function inspectProcessForStaleScan(
     const cached = cache.present.get(pid);
     if (cached !== undefined) return cached;
   }
-  if (cache.probes >= MAX_CACHED_PROCESS_INSPECTIONS) {
+  if (cache.probes >= cache.maxProbes) {
     // Preserve excess owners rather than performing an unbounded number of
     // synchronous platform probes while the coordination mutex is held.
     return { status: 'unknown' };
@@ -731,6 +795,7 @@ interface RecordIdentity extends DirectoryIdentity {
   readonly ctimeNs: bigint;
 }
 
+/** @throws {SystemError} When a coordination directory fails its identity or permission proof. */
 function assertDirectory(
   path: string,
   root?: string,
@@ -809,6 +874,7 @@ function sameRecordIdentity(left: RecordIdentity, right: RecordIdentity): boolea
   );
 }
 
+/** @throws {SystemError} When coordination-record metadata violates its configured bounds. */
 function assertRecordStatMetadata(
   stat: BigIntStats,
   maxBytes: number | undefined,
@@ -837,6 +903,7 @@ function assertRecordStatMetadata(
   }
 }
 
+/** @throws {SystemError} When a coordination record is not a safe single-link regular file. */
 function assertRegularRecordStat(
   stat: BigIntStats,
   maxBytes: number | undefined,
@@ -848,6 +915,7 @@ function assertRegularRecordStat(
   }
 }
 
+/** @throws {SystemError} When a coordination record is absent or fails its safety proof. */
 function assertRegularRecord(
   path: string,
   maxBytes: number,
@@ -862,6 +930,7 @@ function assertRegularRecord(
   assertRegularRecordStat(stat, maxBytes, permissionPosture);
 }
 
+/** @throws {SystemError} When a private coordination directory cannot be created and proven. */
 function mkdirSecure(path: string, root?: string): void {
   let created = false;
   try {
@@ -897,6 +966,7 @@ function readDirectoryBounded(path: string, cap: number, description: string): r
   }
 }
 
+/** @throws {SystemError} When an existing coordination path cannot be safely inspected. */
 function lstatIfPresent(path: string, description: string): BigIntStats | undefined {
   try {
     return lstatSync(path, { bigint: true });
@@ -906,6 +976,7 @@ function lstatIfPresent(path: string, description: string): BigIntStats | undefi
   }
 }
 
+/** @throws {SystemError} When a private coordination record has an unsafe filesystem posture. */
 function assertPrivateRecordEntry(
   path: string,
   maxBytes: number | undefined,
@@ -933,6 +1004,7 @@ function assertPrivateRecordEntry(
   return stat;
 }
 
+/** @throws {SystemError} When a reader directory contains unbounded or unexpected entries. */
 function validateReaderDirectoryEntries(
   readersDir: string,
   coordinationRoot: string,
@@ -957,6 +1029,7 @@ function validateReaderDirectoryEntries(
   return entries;
 }
 
+/** @throws {SystemError} When a project coordination directory is incomplete or malformed. */
 function validateProjectCoordinationEntries(
   paths: CoordinationPaths,
   coordinationKey: string,
@@ -1009,6 +1082,7 @@ function validateProjectCoordinationEntries(
   }
 }
 
+/** @throws {SystemError} When the coordination root contains an unsafe entry set. */
 function validateCoordinationRootEntries(
   paths: CoordinationPaths,
   guard?: RuntimeMutexGuard,
@@ -1076,6 +1150,7 @@ function ensureCoordinationScaffold(): CoordinationPaths {
   return paths;
 }
 
+/** @throws {SystemError} When the project scaffold cannot be created and proven safely. */
 function ensureProjectScaffold(
   paths: CoordinationPaths,
   coordinationKey: string,
@@ -1143,6 +1218,7 @@ function ensureProjectScaffold(
   validateProjectCoordinationEntries(paths, coordinationKey, guard);
 }
 
+/** @throws {SystemError} When the parent directory cannot be opened with a stable identity. */
 function openParentIdentity(
   parentDir: string,
   root: string,
@@ -1171,6 +1247,7 @@ function openParentIdentity(
   }
 }
 
+/** @throws {SystemError} When an anchored parent cannot be opened and proven contained. */
 function openAnchoredParentIdentity(
   parentDir: string,
   root: string,
@@ -1203,6 +1280,7 @@ function openAnchoredParentIdentity(
   }
 }
 
+/** @throws {SystemError} When a no-follow directory walk changes identity or escapes its anchor. */
 function assertNoFollowDirectoryWalk(
   parentDir: string,
   root: string,
@@ -1250,6 +1328,7 @@ function assertNoFollowDirectoryWalk(
   }
 }
 
+/** @throws {SystemError} When a coordination parent changes during mutation. */
 function assertParentUnchanged(
   fd: number,
   before: DirectoryIdentity,
@@ -1264,6 +1343,7 @@ function assertParentUnchanged(
   }
 }
 
+/** @throws {SystemError} When an anchored parent changes during mutation. */
 function assertAnchoredParentUnchanged(
   fd: number,
   before: DirectoryIdentity,
@@ -1279,6 +1359,7 @@ function assertAnchoredParentUnchanged(
   }
 }
 
+/** @throws {SystemError} When a record basename could escape or alias its intended parent. */
 function assertSafeBasename(value: string): void {
   if (
     value.length === 0 ||
@@ -1297,6 +1378,8 @@ function assertSafeBasename(value: string): void {
 /**
  * Derive the one deterministic temporary basename owned by an anchored create.
  * Callers persist `createIdentity`; Core owns and validates the path grammar.
+ *
+ * @throws {SystemError} When the target or operation identity is not a safe basename component.
  */
 export function anchoredRecordTemporaryBasename(
   basenameValue: string,
@@ -1313,6 +1396,7 @@ export function anchoredRecordTemporaryBasename(
   return temporary;
 }
 
+/** @throws {SystemError} When an existing record cannot be inspected or proven safe. */
 function targetIdentity(
   path: string,
   maxBytes: number,
@@ -1326,12 +1410,8 @@ function targetIdentity(
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw unsafeCoordination('Runtime coordination record cannot be inspected');
   }
-  if (
-    linkedCreateCanBeBusy &&
-    stat.isFile() &&
-    !stat.isSymbolicLink() &&
-    (stat.nlink === 0n || stat.nlink === 2n)
-  ) {
+  if (linkedCreateCanBeBusy && (stat.nlink === 0n || stat.nlink === 2n)) {
+    assertRecordStatMetadata(stat, maxBytes, permissionPosture);
     throw new RuntimeSnapshotChangedError('Anchored create publication is still in progress');
   }
   assertRegularRecordStat(stat, maxBytes, permissionPosture);
@@ -1348,6 +1428,7 @@ function fsyncParent(fd: number): void {
   }
 }
 
+/** @throws {Error} When an exclusive coordination record cannot be safely published. */
 function createExclusiveRecord(
   path: string,
   content: string,
@@ -1392,6 +1473,7 @@ function createExclusiveRecord(
           unlinkSync(path);
         }
       } catch {
+        // @swallow-ok Ambiguous failure cleanup preserves the path and rethrows the primary error.
         // Fail closed: never erase a path whose exact create identity cannot
         // still be proven after a partial write/fsync failure.
       }
@@ -1420,12 +1502,22 @@ interface LinkedCreateReconciliation {
   readonly parentPosture: 'private' | 'owner-controlled';
   readonly recordPosture: 'private' | 'owner-controlled';
   readonly expectedContentSha256: string;
+  /**
+   * Ordinary create contention may encounter another creator after its target
+   * link is published but before its temporary link is removed. That incumbent
+   * owns the target content identity; settle its proven target/peer pair before
+   * reporting EXISTS. Explicit recovery remains strict to the caller's digest.
+   */
+  readonly linkedContentIdentity: 'expected' | 'observed-incumbent';
+  /** Deterministic transition seam for direct coordination fault tests. */
+  readonly checkpoint?: (name: LinkedCreateCheckpoint) => void;
   readonly exactTemporaryBasename?: string;
   readonly discardExactUnlinkedTemporary: boolean;
   readonly proveCompleteTarget: boolean;
   readonly maxEntries: number;
 }
 
+/** @throws {SystemError} When a linked create peer does not match its expected proof. */
 function readLinkedRecordProof(
   path: string,
   maxBytes: number,
@@ -1479,12 +1571,13 @@ function readLinkedRecordProof(
   }
 }
 
+/** @throws {SystemError} When linked-create recovery encounters ambiguous or excessive entries. */
 function scanLinkedCreatePeer(
   parentDir: string,
   prefix: string,
   targetIdentityValue: RecordIdentity,
   maxEntries: number,
-): string {
+): string | undefined {
   const directory = opendirSync(parentDir);
   let inspected = 0;
   let matching: string | undefined;
@@ -1515,9 +1608,6 @@ function scanLinkedCreatePeer(
   } finally {
     directory.closeSync();
   }
-  if (matching === undefined) {
-    throw unsafeCoordination('Anchored create link recovery has no proven temporary peer');
-  }
   return matching;
 }
 
@@ -1531,6 +1621,80 @@ function samePublishedRecord(left: RecordIdentity, right: RecordIdentity): boole
   );
 }
 
+/**
+ * Accept a creator that completed publication after this reconciler proved the
+ * same target at two links. The completed target must retain the exact inode,
+ * metadata, and content identity; a different target never becomes contention.
+ *
+ * @throws {SystemError} When completed publication cannot retain the proven
+ *   target, content, temporary-path, durability, or parent identity.
+ */
+function proveConcurrentLinkedSettlement(
+  input: LinkedCreateReconciliation,
+  parent: { readonly fd: number; readonly identity: DirectoryIdentity },
+  targetProof: LinkedRecordProof,
+  contentIdentity: string,
+): boolean {
+  const completedStat = lstatIfPresent(input.target, 'Anchored completed create target');
+  if (completedStat === undefined) return false;
+  assertRecordStatMetadata(completedStat, input.maxBytes, input.recordPosture);
+  if (completedStat.nlink !== 1n) return false;
+  const exactTemporaryPath =
+    input.exactTemporaryBasename === undefined
+      ? undefined
+      : join(input.parentDir, input.exactTemporaryBasename);
+  if (
+    exactTemporaryPath !== undefined &&
+    lstatIfPresent(exactTemporaryPath, 'Anchored owned temporary') !== undefined
+  ) {
+    throw unsafeCoordination('Anchored complete target collides with its owned temporary');
+  }
+  const completed = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 1n);
+  if (
+    completed.sha256 !== contentIdentity ||
+    !samePublishedRecord(targetProof.identity, completed.identity)
+  ) {
+    throw unsafeCoordination('Anchored completed create does not match expected identity');
+  }
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  fsyncParent(parent.fd);
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  const durable = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 1n);
+  if (
+    durable.sha256 !== contentIdentity ||
+    !sameRecordIdentity(completed.identity, durable.identity)
+  ) {
+    throw unsafeCoordination('Anchored completed create changed during durability proof');
+  }
+  if (
+    exactTemporaryPath !== undefined &&
+    lstatIfPresent(exactTemporaryPath, 'Anchored owned temporary') !== undefined
+  ) {
+    throw unsafeCoordination('Anchored complete target collides with its owned temporary');
+  }
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
+  return true;
+}
+
+/** @throws {SystemError} When an owned unlinked temporary cannot be discarded exactly. */
 function discardExactUnlinkedTemporary(
   input: LinkedCreateReconciliation,
   parent: { readonly fd: number; readonly identity: DirectoryIdentity },
@@ -1597,14 +1761,20 @@ function discardExactUnlinkedTemporary(
   }
 }
 
+/** @throws {SystemError} When linked-create settlement cannot prove a single valid survivor. */
 function settleLinkedCreate(
   input: LinkedCreateReconciliation,
   parent: { readonly fd: number; readonly identity: DirectoryIdentity },
   targetProof: LinkedRecordProof,
 ): void {
-  if (targetProof.sha256 !== input.expectedContentSha256) {
+  const contentIdentity =
+    input.linkedContentIdentity === 'observed-incumbent'
+      ? targetProof.sha256
+      : input.expectedContentSha256;
+  if (targetProof.sha256 !== contentIdentity) {
     throw unsafeCoordination('Anchored create content does not match expected identity');
   }
+  if (proveConcurrentLinkedSettlement(input, parent, targetProof, contentIdentity)) return;
   const temporaryBasename =
     input.exactTemporaryBasename ??
     scanLinkedCreatePeer(
@@ -1613,19 +1783,31 @@ function settleLinkedCreate(
       targetProof.identity,
       input.maxEntries,
     );
+  if (temporaryBasename === undefined) {
+    if (proveConcurrentLinkedSettlement(input, parent, targetProof, contentIdentity)) return;
+    throw unsafeCoordination('Anchored create link recovery has no proven temporary peer');
+  }
   const temporaryPath = join(input.parentDir, temporaryBasename);
-  const temporaryProof = readLinkedRecordProof(
-    temporaryPath,
-    input.maxBytes,
-    input.recordPosture,
-    2n,
-  );
+  input.checkpoint?.('after-linked-create-peer-selection');
+  let temporaryProof: LinkedRecordProof;
+  try {
+    temporaryProof = readLinkedRecordProof(temporaryPath, input.maxBytes, input.recordPosture, 2n);
+  } catch (error) {
+    if (
+      error instanceof RuntimeSnapshotChangedError &&
+      proveConcurrentLinkedSettlement(input, parent, targetProof, contentIdentity)
+    ) {
+      return;
+    }
+    throw error;
+  }
   if (
-    temporaryProof.sha256 !== input.expectedContentSha256 ||
+    temporaryProof.sha256 !== contentIdentity ||
     !sameRecordIdentity(targetProof.identity, temporaryProof.identity)
   ) {
     throw unsafeCoordination('Anchored create temporary peer is not content-bound');
   }
+  input.checkpoint?.('after-linked-create-temporary-proof');
   assertAnchoredParentUnchanged(
     parent.fd,
     parent.identity,
@@ -1633,8 +1815,14 @@ function settleLinkedCreate(
     input.trustedAnchorDir,
     input.parentPosture,
   );
-  const finalTarget = lstatSync(input.target, { bigint: true });
-  const finalTemporary = lstatSync(temporaryPath, { bigint: true });
+  const finalTarget = lstatIfPresent(input.target, 'Anchored create target');
+  const finalTemporary = lstatIfPresent(temporaryPath, 'Anchored create temporary');
+  if (finalTarget === undefined || finalTemporary === undefined) {
+    if (proveConcurrentLinkedSettlement(input, parent, targetProof, contentIdentity)) return;
+    throw new RuntimeSnapshotChangedError(
+      'Anchored create disappeared immediately before settlement',
+    );
+  }
   assertRecordStatMetadata(finalTarget, input.maxBytes, input.recordPosture);
   assertRecordStatMetadata(finalTemporary, input.maxBytes, input.recordPosture);
   if (
@@ -1643,9 +1831,21 @@ function settleLinkedCreate(
     !sameRecordIdentity(targetProof.identity, recordIdentity(finalTarget)) ||
     !sameRecordIdentity(temporaryProof.identity, recordIdentity(finalTemporary))
   ) {
+    if (proveConcurrentLinkedSettlement(input, parent, targetProof, contentIdentity)) return;
     throw new RuntimeSnapshotChangedError('Anchored create changed immediately before settlement');
   }
-  unlinkSync(temporaryPath);
+  input.checkpoint?.('after-linked-create-final-stats');
+  try {
+    unlinkSync(temporaryPath);
+  } catch (error) {
+    if (
+      (error as NodeJS.ErrnoException).code === 'ENOENT' &&
+      proveConcurrentLinkedSettlement(input, parent, targetProof, contentIdentity)
+    ) {
+      return;
+    }
+    throw error;
+  }
   fsyncParent(parent.fd);
   assertAnchoredParentUnchanged(
     parent.fd,
@@ -1659,13 +1859,21 @@ function settleLinkedCreate(
   }
   const settled = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 1n);
   if (
-    settled.sha256 !== input.expectedContentSha256 ||
+    settled.sha256 !== contentIdentity ||
     !samePublishedRecord(targetProof.identity, settled.identity)
   ) {
     throw unsafeCoordination('Anchored create settlement lost its content identity');
   }
+  assertAnchoredParentUnchanged(
+    parent.fd,
+    parent.identity,
+    input.parentDir,
+    input.trustedAnchorDir,
+    input.parentPosture,
+  );
 }
 
+/** @throws {SystemError} When anchored-create recovery cannot prove the requested outcome. */
 function reconcileAnchoredCreate(
   input: LinkedCreateReconciliation,
   parent: { readonly fd: number; readonly identity: DirectoryIdentity },
@@ -1727,6 +1935,7 @@ function reconcileAnchoredCreate(
     throw unsafeCoordination('Anchored create link recovery is ambiguous');
   }
   const targetProof = readLinkedRecordProof(input.target, input.maxBytes, input.recordPosture, 2n);
+  input.checkpoint?.('after-linked-create-target-proof');
   settleLinkedCreate(input, parent, targetProof);
   return 'present';
 }
@@ -1758,6 +1967,7 @@ function settleCoordinationLinkedCreate(path: string, maxBytes: number): void {
         parentPosture: 'private',
         recordPosture: 'private',
         expectedContentSha256: proof.sha256,
+        linkedContentIdentity: 'expected',
         discardExactUnlinkedTemporary: false,
         proveCompleteTarget: false,
         maxEntries: 512,
@@ -1769,12 +1979,21 @@ function settleCoordinationLinkedCreate(path: string, maxBytes: number): void {
   }
 }
 
+/** @throws {SystemError} When an anchored mutation fails validation, containment, or recovery. */
 function performAnchoredRecordMutation(
   input: AnchoredRecordMutation,
-  assertPublicationAllowed?: () => void,
+  runtime: AnchoredRecordMutationRuntimeOptions = {},
 ): {
   readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
 } {
+  const {
+    assertPublicationAllowed,
+    afterUnlink,
+    linkedCreateCheckpoint,
+    beforeExpectedDigest,
+    beforeFinalUnlinkIdentity,
+    beforeFinalUnlink,
+  } = runtime;
   const parentPosture = anchoredPermissionPosture(
     input.permissionPosture,
     'owner-controlled',
@@ -1812,6 +2031,8 @@ function performAnchoredRecordMutation(
     throw unsafeCoordination('Runtime coordination mutation exceeds its size bound');
   }
   const target = join(input.parentDir, input.basename);
+  const linkedTargetCanBeBusy =
+    input.operation === 'create' || runtime.linkedTargetCanBeBusy === true;
   const parent = openAnchoredParentIdentity(input.parentDir, input.trustedAnchorDir, parentPosture);
   try {
     if (input.operation === 'create') {
@@ -1825,6 +2046,9 @@ function performAnchoredRecordMutation(
           parentPosture,
           recordPosture,
           expectedContentSha256: createHash('sha256').update(content).digest('hex'),
+          linkedContentIdentity:
+            exactTemporaryBasename === undefined ? 'observed-incumbent' : 'expected',
+          ...(linkedCreateCheckpoint === undefined ? {} : { checkpoint: linkedCreateCheckpoint }),
           exactTemporaryBasename,
           discardExactUnlinkedTemporary: exactTemporaryBasename !== undefined,
           proveCompleteTarget: false,
@@ -1833,22 +2057,22 @@ function performAnchoredRecordMutation(
         parent,
       );
     }
-    const beforeTarget = targetIdentity(
-      target,
-      maxBytes,
-      recordPosture,
-      input.operation === 'create',
-    );
+    const beforeTarget = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
+    /** @throws {SystemError} When the observed record digest differs from the expected digest. */
     const assertExpectedDigest = (): void => {
       if (input.expectedContentSha256 === undefined) return;
-      const observed = readAnchoredRecord({
-        trustedAnchorDir: input.trustedAnchorDir,
-        parentDir: input.parentDir,
-        basename: input.basename,
-        maxBytes,
-        permissionPosture: parentPosture,
-        recordPosture,
-      });
+      beforeExpectedDigest?.();
+      const observed = readAnchoredRecordInternal(
+        {
+          trustedAnchorDir: input.trustedAnchorDir,
+          parentDir: input.parentDir,
+          basename: input.basename,
+          maxBytes,
+          permissionPosture: parentPosture,
+          recordPosture,
+        },
+        linkedTargetCanBeBusy,
+      );
       if (observed.status !== 'present' || observed.sha256 !== input.expectedContentSha256) {
         throw new SystemError('Anchored record changed since the caller observed it', {
           code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
@@ -1902,7 +2126,7 @@ function performAnchoredRecordMutation(
         if (beforeTarget === undefined) {
           throw unsafeCoordination('Runtime coordination record disappeared before replacement');
         }
-        const current = targetIdentity(target, maxBytes, recordPosture);
+        const current = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
         if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed before replacement',
@@ -1918,7 +2142,12 @@ function performAnchoredRecordMutation(
           input.trustedAnchorDir,
           parentPosture,
         );
-        const immediatelyBefore = targetIdentity(target, maxBytes, recordPosture);
+        const immediatelyBefore = targetIdentity(
+          target,
+          maxBytes,
+          recordPosture,
+          linkedTargetCanBeBusy,
+        );
         if (
           immediatelyBefore === undefined ||
           !sameRecordIdentity(beforeTarget, immediatelyBefore)
@@ -1928,7 +2157,7 @@ function performAnchoredRecordMutation(
           );
         }
         assertExpectedDigest();
-        const afterDigest = targetIdentity(target, maxBytes, recordPosture);
+        const afterDigest = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
         if (afterDigest === undefined || !sameRecordIdentity(immediatelyBefore, afterDigest)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed after CAS verification',
@@ -1945,7 +2174,7 @@ function performAnchoredRecordMutation(
         if (beforeTarget === undefined) {
           return { strategy: COORDINATION_MUTATION_STRATEGY };
         }
-        const current = targetIdentity(target, maxBytes, recordPosture);
+        const current = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
         if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed before unlink',
@@ -1959,18 +2188,47 @@ function performAnchoredRecordMutation(
           parentPosture,
         );
         assertExpectedDigest();
-        const afterDigest = targetIdentity(target, maxBytes, recordPosture);
+        const afterDigest = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
         if (afterDigest === undefined || !sameRecordIdentity(current, afterDigest)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed after CAS verification',
           );
         }
         assertPublicationAllowed?.();
-        unlinkSync(target);
-        assertPublicationAllowed?.();
-        if (existsSync(target)) {
-          throw unsafeCoordination('Runtime coordination record remained after unlink');
+        beforeFinalUnlinkIdentity?.();
+        const immediatelyBeforeUnlink = targetIdentity(
+          target,
+          maxBytes,
+          recordPosture,
+          linkedTargetCanBeBusy,
+        );
+        if (
+          immediatelyBeforeUnlink === undefined ||
+          !sameRecordIdentity(afterDigest, immediatelyBeforeUnlink)
+        ) {
+          throw new RuntimeSnapshotChangedError(
+            'Runtime coordination record changed immediately before unlink',
+          );
         }
+        assertPublicationAllowed?.();
+        beforeFinalUnlink?.();
+        try {
+          unlinkSync(target);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            throw new RuntimeSnapshotChangedError(
+              'Runtime coordination record disappeared during unlink',
+            );
+          }
+          throw error;
+        }
+        afterUnlink?.();
+        assertPublicationAllowed?.();
+        // unlinkSync success is the proof that this exact pathname entry was
+        // removed. Re-reading the pathname here is racy: another process may
+        // already have published a valid successor (especially the fixed
+        // coordination mutex), which must not turn a healthy hand-off into an
+        // intermittent release error.
         fsyncParent(parent.fd);
       }
       assertAnchoredParentUnchanged(
@@ -2005,6 +2263,7 @@ function performAnchoredRecordMutation(
           unlinkSync(tempPath);
           assertPublicationAllowed?.();
         } catch {
+          // @swallow-ok Ambiguous temporary state is preserved before rethrowing the primary error.
           // Fail closed: never clean a newly observed/replaced path.
         }
       }
@@ -2067,6 +2326,7 @@ function unlinkFixedAnchoredRecordWithoutSize(
   }
 }
 
+/** @throws {SystemError} When a general anchored read targets runtime coordination state. */
 function assertOutsideRuntimeCoordination(parentDir: string, basenameValue: string): void {
   const coordinationRoot = resolveCoordinationPaths().coordinationDir;
   let canonicalTarget: string;
@@ -2103,6 +2363,9 @@ export function mutateAnchoredRecord(input: AnchoredRecordMutation): {
 function mutateCoordinationRecordWhileOwned(
   input: CoordinationRecordMutation,
   guard?: RuntimeMutexGuard,
+  afterUnlink?: () => void,
+  linkedCreateCheckpoint?: (name: LinkedCreateCheckpoint) => void,
+  runtimeOptions: CoordinationRecordMutationRuntimeOptions = {},
 ): {
   readonly strategy: typeof COORDINATION_MUTATION_STRATEGY;
 } {
@@ -2113,10 +2376,16 @@ function mutateCoordinationRecordWhileOwned(
       trustedAnchorDir: paths.coordinationDir,
       permissionPosture: 'private',
     },
-    guard === undefined ? undefined : () => guard.assertOwned(),
+    {
+      ...runtimeOptions,
+      assertPublicationAllowed: guard === undefined ? undefined : () => guard.assertOwned(),
+      afterUnlink,
+      linkedCreateCheckpoint,
+    },
   );
 }
 
+/** @throws {Error} When the bounded record changes, exceeds its cap, or fails its safety proof. */
 function readAnchoredBoundedRecord(
   path: string,
   maxBytes: number,
@@ -2221,8 +2490,13 @@ function readAnchoredBoundedRecord(
  * authority and is rejected for runtime coordination paths. A later
  * replace/unlink still requires external writer serialization when
  * linearizable compare-and-swap semantics are needed.
+ *
+ * @throws {Error} When the read target or recovery request is unsafe or changes during inspection.
  */
-export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordReadResult {
+function readAnchoredRecordInternal(
+  input: AnchoredRecordRead,
+  linkedCreateCanBeBusy = false,
+): AnchoredRecordReadResult {
   assertSafeBasename(input.basename);
   const parentPosture = anchoredPermissionPosture(
     input.permissionPosture,
@@ -2267,6 +2541,7 @@ export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordRea
           parentPosture,
           recordPosture,
           expectedContentSha256: recovery.expectedContentSha256,
+          linkedContentIdentity: 'expected',
           exactTemporaryBasename,
           discardExactUnlinkedTemporary: recovery.effect === 'settle-or-discard-owned-temporary',
           proveCompleteTarget: true,
@@ -2290,7 +2565,7 @@ export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordRea
       maxBytes,
       input.trustedAnchorDir,
       parentPosture,
-      false,
+      linkedCreateCanBeBusy,
       recordPosture,
     );
     assertAnchoredParentUnchanged(
@@ -2313,6 +2588,10 @@ export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordRea
   } finally {
     closeSync(parent.fd);
   }
+}
+
+export function readAnchoredRecord(input: AnchoredRecordRead): AnchoredRecordReadResult {
+  return readAnchoredRecordInternal(input);
 }
 
 function readBoundedRecord(
@@ -2392,6 +2671,7 @@ function inspectLeaseState(paths: CoordinationPaths): LeaseStateFile {
   return parseLeaseState(raw);
 }
 
+/** @throws {SystemError} When persisted writer-queue state is malformed or inconsistent. */
 function parseLeaseState(raw: string | undefined): LeaseStateFile {
   if (raw === undefined) return initialState();
   let parsed: unknown;
@@ -2433,6 +2713,7 @@ function parseLeaseState(raw: string | undefined): LeaseStateFile {
   };
 }
 
+/** @throws {SystemError} When the writer queue is unsafe or changed before publication. */
 function writeLeaseState(
   paths: CoordinationPaths,
   previous: LeaseStateFile,
@@ -2493,6 +2774,7 @@ interface ObservedRuntimeMutex {
   readonly sha256: string;
 }
 
+/** @throws {SystemError} When persisted mutex ownership metadata is malformed. */
 function parseMutexRecord(raw: string): RuntimeMutexRecord {
   let parsed: unknown;
   try {
@@ -2652,13 +2934,18 @@ function tryCreateRuntimeMutex(
     staleMs: policy.staleMs,
   } satisfies RuntimeMutexRecord);
   try {
-    mutateCoordinationRecordWhileOwned({
-      parentDir: paths.coordinationDir,
-      basename: basename(paths.globalMutexFile),
-      operation: 'create',
-      content,
-      maxBytes: MAX_RECORD_BYTES,
-    });
+    mutateCoordinationRecordWhileOwned(
+      {
+        parentDir: paths.coordinationDir,
+        basename: basename(paths.globalMutexFile),
+        operation: 'create',
+        content,
+        maxBytes: MAX_RECORD_BYTES,
+      },
+      undefined,
+      undefined,
+      (name) => environment.coordinationCheckpoint?.(name),
+    );
     return true;
   } catch (error) {
     if (error instanceof RuntimeSnapshotChangedError) return false;
@@ -2723,13 +3010,27 @@ function recoverStaleRuntimeMutex(
     return false;
   }
   try {
-    mutateCoordinationRecordWhileOwned({
-      parentDir: paths.coordinationDir,
-      basename: basename(paths.globalMutexFile),
-      operation: 'unlink',
-      maxBytes: MAX_RECORD_BYTES,
-      expectedContentSha256: current.sha256,
-    });
+    environment.coordinationCheckpoint?.('before-stale-mutex-mutation');
+    mutateCoordinationRecordWhileOwned(
+      {
+        parentDir: paths.coordinationDir,
+        basename: basename(paths.globalMutexFile),
+        operation: 'unlink',
+        maxBytes: MAX_RECORD_BYTES,
+        expectedContentSha256: current.sha256,
+      },
+      undefined,
+      undefined,
+      undefined,
+      {
+        linkedTargetCanBeBusy: true,
+        beforeExpectedDigest: () =>
+          environment.coordinationCheckpoint?.('before-stale-mutex-digest-read'),
+        beforeFinalUnlinkIdentity: () =>
+          environment.coordinationCheckpoint?.('before-stale-mutex-final-identity'),
+        beforeFinalUnlink: () => environment.coordinationCheckpoint?.('before-stale-mutex-unlink'),
+      },
+    );
   } catch (error) {
     if (error instanceof RuntimeSnapshotChangedError) return false;
     if (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH') {
@@ -2748,6 +3049,7 @@ function recoverStaleRuntimeMutex(
   return true;
 }
 
+/** @throws {SystemError} When the observed mutex is absent or owned by another process. */
 function assertObservedMutexOwner(
   observed: ObservedRuntimeMutex | undefined,
   ownerToken: string,
@@ -2779,12 +3081,14 @@ function ownedRuntimeMutex(
   const observeOwned = (): ObservedRuntimeMutex =>
     assertObservedMutexOwner(observeRuntimeMutex(paths), ownerToken, environment);
   return {
+    /** @throws {SystemError} When this guard no longer owns the runtime mutex. */
     assertOwned: () => {
       if (released) {
         throw unsafeCoordination('Runtime coordination mutex was already released');
       }
       observeOwned();
     },
+    /** @throws {SystemError} When ownership is lost or the heartbeat cannot be republished safely. */
     refresh: () => {
       if (released) {
         throw unsafeCoordination('Runtime coordination mutex was already released');
@@ -2814,13 +3118,17 @@ function ownedRuntimeMutex(
     release: () => {
       if (released) return;
       const observed = observeOwned();
-      mutateCoordinationRecordWhileOwned({
-        parentDir: paths.coordinationDir,
-        basename: basename(paths.globalMutexFile),
-        operation: 'unlink',
-        maxBytes: MAX_RECORD_BYTES,
-        expectedContentSha256: observed.sha256,
-      });
+      mutateCoordinationRecordWhileOwned(
+        {
+          parentDir: paths.coordinationDir,
+          basename: basename(paths.globalMutexFile),
+          operation: 'unlink',
+          maxBytes: MAX_RECORD_BYTES,
+          expectedContentSha256: observed.sha256,
+        },
+        undefined,
+        () => environment.coordinationCheckpoint?.('after-mutex-unlink'),
+      );
       released = true;
     },
   };
@@ -2872,12 +3180,37 @@ function reconcileOrphanedTransitionTemp(
   );
 }
 
+/**
+ * True only when a two-link mutex temporary is the exact hard-link peer of the
+ * fixed mutex currently protecting this scan. Link count alone is never enough:
+ * an unrelated extra hard link remains unsafe and must fail closed.
+ */
+function isLinkedOwnedMutexTemporary(paths: CoordinationPaths, entry: string): boolean {
+  const temporary = lstatIfPresent(
+    join(paths.coordinationDir, entry),
+    'Runtime mutex temporary record',
+  );
+  if (temporary?.nlink !== 2n) return false;
+  const fixed = lstatIfPresent(paths.globalMutexFile, 'Runtime coordination mutex');
+  if (fixed?.nlink !== 2n) return false;
+  assertRecordStatMetadata(temporary, MAX_RECORD_BYTES, 'private');
+  assertRecordStatMetadata(fixed, MAX_RECORD_BYTES, 'private');
+  return sameRecordIdentity(recordIdentity(temporary), recordIdentity(fixed));
+}
+
 function reconcileOrphanedMutexTemp(
   paths: CoordinationPaths,
   entry: string,
   guard: RuntimeMutexGuard,
 ): void {
-  const observed = readOrphanedTemp(paths.coordinationDir, entry, MAX_RECORD_BYTES);
+  guard.refresh();
+  let observed: AnchoredRecordReadResult;
+  try {
+    observed = readOrphanedTemp(paths.coordinationDir, entry, MAX_RECORD_BYTES);
+  } catch (error) {
+    if (isLinkedOwnedMutexTemporary(paths, entry)) return;
+    throw error;
+  }
   if (observed.status === 'absent') return;
   // The fixed mutex is already owned. A competing one-link prepublication
   // temp cannot publish successfully; deleting it is safe whether its creator
@@ -2895,6 +3228,12 @@ function reconcileOrphanedMutexTemp(
       guard,
     );
   } catch (error) {
+    if (isLinkedOwnedMutexTemporary(paths, entry)) {
+      // The fixed target proves which inode owns the second link. Its creator
+      // can finish unlinking the temporary, or the next mutex read will settle
+      // the same proven pair without touching unrelated state.
+      return;
+    }
     if (
       ((error as NodeJS.ErrnoException).code === 'ENOENT' ||
         error instanceof RuntimeSnapshotChangedError ||
@@ -2909,22 +3248,25 @@ function reconcileOrphanedMutexTemp(
   }
 }
 
-function tryAcquireRuntimeMutexNow(
-  paths: CoordinationPaths,
-  policy: RuntimeLeasePolicy,
-  onEvent: RuntimeLeaseCommonInput['onEvent'],
-  ownerToken: string,
-  environment: RuntimeLeaseEnvironment,
-  tracker: RemoteStaleTracker,
-  processInspector: SafetyBiasedProcessInspector,
-  processIncarnation: string | undefined,
-): RuntimeMutexGuard | undefined {
-  if (tryCreateRuntimeMutex(paths, ownerToken, policy, environment, processIncarnation)) {
+interface RuntimeMutexAttempt {
+  readonly paths: CoordinationPaths;
+  readonly policy: RuntimeLeasePolicy;
+  readonly onEvent: RuntimeLeaseCommonInput['onEvent'];
+  readonly ownerToken: string;
+  readonly environment: RuntimeLeaseEnvironment;
+  readonly tracker: RemoteStaleTracker;
+  readonly processInspector: SafetyBiasedProcessInspector;
+  readonly processIncarnation: string | undefined;
+}
+
+function tryAcquireRuntimeMutexNow(attempt: RuntimeMutexAttempt): RuntimeMutexGuard | undefined {
+  const { paths, policy, onEvent, ownerToken, environment, tracker, processInspector } = attempt;
+  if (tryCreateRuntimeMutex(paths, ownerToken, policy, environment, attempt.processIncarnation)) {
     return ownedRuntimeMutex(paths, ownerToken, policy, environment);
   }
   if (
     recoverStaleRuntimeMutex(paths, policy, onEvent, environment, tracker, processInspector) &&
-    tryCreateRuntimeMutex(paths, ownerToken, policy, environment, processIncarnation)
+    tryCreateRuntimeMutex(paths, ownerToken, policy, environment, attempt.processIncarnation)
   ) {
     return ownedRuntimeMutex(paths, ownerToken, policy, environment);
   }
@@ -2953,16 +3295,17 @@ function acquireRuntimeMutex(
     resource: 'runtime',
     operation: 'coordination-transition',
   });
-  const immediate = tryAcquireRuntimeMutexNow(
+  const attempt: RuntimeMutexAttempt = {
     paths,
     policy,
     onEvent,
     ownerToken,
     environment,
-    remoteStaleTracker,
+    tracker: remoteStaleTracker,
     processInspector,
     processIncarnation,
-  );
+  };
+  const immediate = tryAcquireRuntimeMutexNow(attempt);
   if (immediate !== undefined) return immediate;
   return (async () => {
     for (;;) {
@@ -2991,16 +3334,7 @@ function acquireRuntimeMutex(
         Math.min(policy.pollMs, Math.max(1, deadline - environment.monotonicNow())),
         signal,
       );
-      const acquired = tryAcquireRuntimeMutexNow(
-        paths,
-        policy,
-        onEvent,
-        ownerToken,
-        environment,
-        remoteStaleTracker,
-        processInspector,
-        processIncarnation,
-      );
+      const acquired = tryAcquireRuntimeMutexNow(attempt);
       if (acquired !== undefined) return acquired;
     }
   })();
@@ -3025,16 +3359,16 @@ function acquireRuntimeMutexSync(
   const processInspector = createRuntimeMutexProcessInspector(environment);
   const processIncarnation = currentProcessIncarnation(environment);
   for (;;) {
-    const acquired = tryAcquireRuntimeMutexNow(
+    const acquired = tryAcquireRuntimeMutexNow({
       paths,
       policy,
       onEvent,
       ownerToken,
       environment,
-      remoteStaleTracker,
+      tracker: remoteStaleTracker,
       processInspector,
       processIncarnation,
-    );
+    });
     if (acquired !== undefined) return acquired;
     const remainingMs = deadline - environment.monotonicNow();
     if (remainingMs <= 0) {
@@ -3059,20 +3393,20 @@ async function withCoordinationMutex<T>(
   const acquisition = acquireRuntimeMutex(paths, policy, onEvent, remainingMs, environment, signal);
   const guard = acquisition instanceof Promise ? await acquisition : acquisition;
   try {
-    environment.coordinationCheckpoint?.('mutex-entered');
-    guard.refresh();
+    void environment.coordinationCheckpoint?.('mutex-entered');
+    void guard.refresh();
     assertRegularRecord(paths.globalMutexFile, MAX_RECORD_BYTES);
     assertDirectory(paths.coordinationDir);
     validateCoordinationRootEntries(paths, guard);
-    guard.refresh();
+    void guard.refresh();
     const result = fn(paths, guard);
     const resolved = result instanceof Promise ? await result : result;
-    environment.coordinationCheckpoint?.('before-mutex-postcondition');
+    void environment.coordinationCheckpoint?.('before-mutex-postcondition');
     guard.assertOwned();
     assertDirectory(paths.coordinationDir);
     return resolved;
   } finally {
-    guard.release();
+    void guard.release();
   }
 }
 
@@ -3108,6 +3442,7 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
+/** @throws {SystemError} When the polling wait is aborted. */
 async function defaultPoll(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted === true) throw abortedError();
   await new Promise<void>((resolve, reject) => {
@@ -3200,6 +3535,7 @@ function readerFile(readersDir: string, ownerToken: string): string {
   return join(readersDir, `reader-${ownerToken}.json`);
 }
 
+/** @throws {SystemError} When persisted reader ownership metadata is malformed. */
 function parseReaderRecord(raw: string, dimension: ReaderRecord['dimension']): ReaderRecord {
   let parsed: unknown;
   try {
@@ -3288,6 +3624,7 @@ function readObservedReaderRecord(
       };
 }
 
+/** @throws {SystemError} When the bounded reader directory or a reader record is unsafe. */
 function readReaderRecords(
   readersDir: string,
   dimension: ReaderRecord['dimension'],
@@ -3364,6 +3701,7 @@ function removeObservedReaderRecord(
   }
 }
 
+/** @throws {SystemError} When exact reader ownership cannot be proven before removal. */
 function removeRecordIfOwned(
   path: string,
   ownerToken: string,
@@ -3395,17 +3733,30 @@ function removeRecordIfOwned(
   );
 }
 
-function cleanAndListReaders(
-  readersDir: string,
-  dimension: ReaderRecord['dimension'],
-  policy: RuntimeLeasePolicy,
-  onEvent: RuntimeLeaseCommonInput['onEvent'],
-  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
-  guard?: RuntimeMutexGuard,
-  observedAt?: number,
-  remoteStaleTracker?: RemoteStaleTracker,
-  processInspectionCache: ProcessInspectionCache = createProcessInspectionCache(),
-): readonly ReaderRecord[] {
+interface ReaderScan {
+  readonly readersDir: string;
+  readonly dimension: ReaderRecord['dimension'];
+  readonly policy: RuntimeLeasePolicy;
+  readonly onEvent: RuntimeLeaseCommonInput['onEvent'];
+  readonly environment?: RuntimeLeaseEnvironment;
+  readonly guard?: RuntimeMutexGuard;
+  readonly observedAt?: number;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+  readonly processInspectionCache?: ProcessInspectionCache;
+}
+
+function cleanAndListReaders(scan: ReaderScan): readonly ReaderRecord[] {
+  const {
+    readersDir,
+    dimension,
+    policy,
+    onEvent,
+    environment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+    guard,
+    observedAt,
+    remoteStaleTracker,
+    processInspectionCache = createProcessInspectionCache(environment.maxProcessInspectionsPerScan),
+  } = scan;
   const now = observedAt ?? environment.now();
   const records = readReaderRecords(readersDir, dimension, true, guard);
   const live: ReaderRecord[] = [];
@@ -3538,6 +3889,7 @@ function writeReaderRecord(
   );
 }
 
+/** @throws {SystemError} When a reader record changes or cannot be replaced safely. */
 function replaceReaderRecord(
   readersDir: string,
   record: ReaderRecord,
@@ -3646,7 +3998,10 @@ function inspectRecoveryHeader(
     !stat.isFile() ||
     stat.isSymbolicLink() ||
     stat.nlink !== 1n ||
-    (currentUid() !== undefined && stat.uid !== BigInt(currentUid()!)) ||
+    (() => {
+      const uid = currentUid();
+      return uid !== undefined && stat.uid !== BigInt(uid);
+    })() ||
     (process.platform !== 'win32' && Number(stat.mode & 0o777n) !== 0o600)
   ) {
     return { status: 'malformed', reason: 'unsafe-file' };
@@ -3716,6 +4071,7 @@ function inspectUserReceiptHeader(paths: CoordinationPaths): RecoveryHeaderInspe
   return inspectRecoveryHeader(paths.userUninstallReceiptFile, 'user-uninstall');
 }
 
+/** @throws {SystemError} When recovery state blocks normal shared access. */
 function assertNormalSharedAccess(
   paths: CoordinationPaths,
   coordinationKey: string | undefined,
@@ -3746,6 +4102,7 @@ function assertNormalSharedAccess(
   }
 }
 
+/** @throws {SystemError} When project recovery state is incompatible with exclusive posture. */
 function assertProjectExclusivePosture(
   paths: CoordinationPaths,
   coordinationKey: string,
@@ -3779,6 +4136,7 @@ function assertProjectExclusivePosture(
   }
 }
 
+/** @throws {SystemError} When user recovery state is incompatible with global posture. */
 function assertGlobalExclusivePosture(
   paths: CoordinationPaths,
   posture: GlobalRuntimeMaintenancePosture,
@@ -3816,6 +4174,7 @@ interface ExistingReader {
   readonly record: ReaderRecord;
 }
 
+/** @throws {SystemError} When project coordination inventory is excessive or malformed. */
 function listProjectCoordinationKeys(
   paths: CoordinationPaths,
   guard?: RuntimeMutexGuard,
@@ -3988,6 +4347,8 @@ interface DirectParentCompositeReader {
  * direct parent, then bind it to the corresponding live user reader. No parent
  * dimensions means an ordinary top-level acquisition; partial or ambiguous
  * parent evidence is rejected rather than guessed.
+ *
+ * @throws {SystemError} When parent ownership evidence is partial, ambiguous, stale, or unsafe.
  */
 function resolveDirectParentCompositeReader(
   projectReaders: readonly ReaderRecord[],
@@ -4072,17 +4433,30 @@ interface SharedRegistrationResult {
   readonly sequence: number;
 }
 
-function validateOwnedWriterUserReentry(
-  paths: CoordinationPaths,
-  writer: WriterRecord,
-  wantsProject: boolean,
-  wantsUser: boolean,
-  input: RuntimeLeaseCommonInput,
-  policy: RuntimeLeasePolicy,
-  environment: RuntimeLeaseEnvironment,
-  guard?: RuntimeMutexGuard,
-  remoteStaleTracker?: RemoteStaleTracker,
-): boolean {
+interface OwnedWriterReentryCheck {
+  readonly paths: CoordinationPaths;
+  readonly writer: WriterRecord;
+  readonly wantsProject: boolean;
+  readonly wantsUser: boolean;
+  readonly input: RuntimeLeaseCommonInput;
+  readonly policy: RuntimeLeasePolicy;
+  readonly environment: RuntimeLeaseEnvironment;
+  readonly guard?: RuntimeMutexGuard;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+}
+
+function validateOwnedWriterUserReentry(check: OwnedWriterReentryCheck): boolean {
+  const {
+    paths,
+    writer,
+    wantsProject,
+    wantsUser,
+    input,
+    policy,
+    environment,
+    guard,
+    remoteStaleTracker,
+  } = check;
   if (!ownedByRuntimeProcess(writer, environment)) {
     throw new SystemError('Runtime lease owner token belongs to another process', {
       code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
@@ -4097,16 +4471,16 @@ function validateOwnedWriterUserReentry(
   // user policy/tool state. The writer's earlier sequence is the ordering
   // anchor; publish no user reader until its project dimension has drained.
   return (
-    cleanAndListReaders(
-      paths.forProject(writer.coordinationKey!).readersDir,
-      'project',
+    cleanAndListReaders({
+      readersDir: paths.forProject(requiredProjectCoordinationKey(writer.coordinationKey))
+        .readersDir,
+      dimension: 'project',
       policy,
-      input.onEvent,
+      onEvent: input.onEvent,
       environment,
       guard,
-      undefined,
       remoteStaleTracker,
-    ).length === 0
+    }).length === 0
   );
 }
 
@@ -4138,18 +4512,34 @@ function incrementReaderRef(
   );
 }
 
+interface SharedRegistrationRequest {
+  readonly paths: CoordinationPaths;
+  readonly ownerToken: string;
+  readonly projectKey: string | undefined;
+  readonly wantsProject: boolean;
+  readonly wantsUser: boolean;
+  readonly referenceToken: string;
+  readonly input: RuntimeLeaseCommonInput;
+  readonly policy: RuntimeLeasePolicy;
+  readonly guard?: RuntimeMutexGuard;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+}
+
 function registerSharedDimensions(
-  paths: CoordinationPaths,
-  ownerToken: string,
-  projectKey: string | undefined,
-  wantsProject: boolean,
-  wantsUser: boolean,
-  referenceToken: string,
-  input: RuntimeLeaseCommonInput,
-  policy: RuntimeLeasePolicy,
-  guard?: RuntimeMutexGuard,
-  remoteStaleTracker?: RemoteStaleTracker,
+  request: SharedRegistrationRequest,
 ): SharedRegistrationResult | undefined {
+  const {
+    paths,
+    ownerToken,
+    projectKey,
+    wantsProject,
+    wantsUser,
+    referenceToken,
+    input,
+    policy,
+    guard,
+    remoteStaleTracker,
+  } = request;
   const environment = runtimeEnvironment(input);
   if (projectKey !== undefined) ensureProjectScaffold(paths, projectKey, guard);
   assertNormalSharedAccess(
@@ -4171,9 +4561,9 @@ function registerSharedDimensions(
   const ownedWriter = state.writers.find((writer) => writer.ownerToken === ownerToken);
   if (
     ownedWriter !== undefined &&
-    !validateOwnedWriterUserReentry(
+    !validateOwnedWriterUserReentry({
       paths,
-      ownedWriter,
+      writer: ownedWriter,
       wantsProject,
       wantsUser,
       input,
@@ -4181,7 +4571,7 @@ function registerSharedDimensions(
       environment,
       guard,
       remoteStaleTracker,
-    )
+    })
   ) {
     return undefined;
   }
@@ -4207,29 +4597,27 @@ function registerSharedDimensions(
     existing.projects[0]?.coordinationKey === projectKey ? existing.projects[0] : undefined;
   const existingUser = existing.user;
   if (wantsProject && existingProject === undefined) {
-    const projectReaders = cleanAndListReaders(
-      paths.forProject(projectKey!).readersDir,
-      'project',
+    const projectReaders = cleanAndListReaders({
+      readersDir: paths.forProject(requiredProjectCoordinationKey(projectKey)).readersDir,
+      dimension: 'project',
       policy,
-      input.onEvent,
+      onEvent: input.onEvent,
       environment,
       guard,
-      undefined,
       remoteStaleTracker,
-    );
+    });
     if (projectReaders.length >= MAX_READERS_PER_DIMENSION) return undefined;
   }
   if (wantsUser && existingUser === undefined) {
-    const userReaders = cleanAndListReaders(
-      paths.userReadersDir,
-      'user',
+    const userReaders = cleanAndListReaders({
+      readersDir: paths.userReadersDir,
+      dimension: 'user',
       policy,
-      input.onEvent,
+      onEvent: input.onEvent,
       environment,
       guard,
-      undefined,
       remoteStaleTracker,
-    );
+    });
     if (userReaders.length >= MAX_READERS_PER_DIMENSION) return undefined;
   }
   if (
@@ -4254,7 +4642,7 @@ function registerSharedDimensions(
   const replaced: ExistingReader[] = [];
   try {
     if (wantsProject) {
-      const readersDir = paths.forProject(projectKey!).readersDir;
+      const readersDir = paths.forProject(requiredProjectCoordinationKey(projectKey)).readersDir;
       if (existingProject === undefined) {
         writeReaderRecord(readersDir, metadata, 'project', referenceToken, guard);
         created.push({
@@ -4284,6 +4672,7 @@ function registerSharedDimensions(
       try {
         removeRecordIfOwned(entry.path, ownerToken, entry.dimension, guard);
       } catch {
+        // @swallow-ok Ambiguous rollback state remains live before the primary error is rethrown.
         // Fail closed: a partial live record is safer than erasing ambiguous state.
       }
     }
@@ -4292,6 +4681,7 @@ function registerSharedDimensions(
       try {
         replaceReaderRecord(entry.readersDir, entry.record, guard);
       } catch {
+        // @swallow-ok Refcount rollback failure preserves live ownership before rethrow.
         // Fail closed: an elevated refcount remains owned by this live process.
       }
     }
@@ -4313,16 +4703,31 @@ function registerSharedDimensions(
  * cannot re-use the parent's record, span another project, omit the user
  * dimension, or pass a writer that precedes the parent.
  */
+interface ParentInheritedRegistrationRequest {
+  readonly paths: CoordinationPaths;
+  readonly ownerToken: string;
+  readonly projectKey: string;
+  readonly referenceToken: string;
+  readonly input: RuntimeLeaseCommonInput;
+  readonly policy: RuntimeLeasePolicy;
+  readonly guard?: RuntimeMutexGuard;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+}
+
+/** @throws {SystemError} When direct-parent reader inheritance cannot be proven safely. */
 function registerParentInheritedSharedDimensions(
-  paths: CoordinationPaths,
-  ownerToken: string,
-  projectKey: string,
-  referenceToken: string,
-  input: RuntimeLeaseCommonInput,
-  policy: RuntimeLeasePolicy,
-  guard?: RuntimeMutexGuard,
-  remoteStaleTracker?: RemoteStaleTracker,
+  request: ParentInheritedRegistrationRequest,
 ): SharedRegistrationResult | undefined {
+  const {
+    paths,
+    ownerToken,
+    projectKey,
+    referenceToken,
+    input,
+    policy,
+    guard,
+    remoteStaleTracker,
+  } = request;
   const environment = runtimeEnvironment(input);
   ensureProjectScaffold(paths, projectKey, guard);
   assertNormalSharedAccess(paths, projectKey, input, 'runtime-access-composite', guard);
@@ -4335,40 +4740,38 @@ function registerParentInheritedSharedDimensions(
     guard,
     remoteStaleTracker,
   );
-  const projectReaders = cleanAndListReaders(
-    paths.forProject(projectKey).readersDir,
-    'project',
+  const projectReaders = cleanAndListReaders({
+    readersDir: paths.forProject(projectKey).readersDir,
+    dimension: 'project',
     policy,
-    input.onEvent,
+    onEvent: input.onEvent,
     environment,
     guard,
-    undefined,
     remoteStaleTracker,
-  );
-  const userReaders = cleanAndListReaders(
-    paths.userReadersDir,
-    'user',
+  });
+  const userReaders = cleanAndListReaders({
+    readersDir: paths.userReadersDir,
+    dimension: 'user',
     policy,
-    input.onEvent,
+    onEvent: input.onEvent,
     environment,
     guard,
-    undefined,
     remoteStaleTracker,
-  );
+  });
   const parent = resolveDirectParentCompositeReader(projectReaders, userReaders, environment);
   if (parent === undefined) {
-    return registerSharedDimensions(
+    return registerSharedDimensions({
       paths,
       ownerToken,
       projectKey,
-      true,
-      true,
+      wantsProject: true,
+      wantsUser: true,
       referenceToken,
       input,
       policy,
       guard,
       remoteStaleTracker,
-    );
+    });
   }
 
   if (state.writers.some((writer) => writer.ownerToken === ownerToken)) {
@@ -4443,6 +4846,7 @@ function registerParentInheritedSharedDimensions(
       try {
         removeRecordIfOwned(entry.path, ownerToken, entry.dimension, guard);
       } catch {
+        // @swallow-ok Ambiguous child state stays owned before the primary error is rethrown.
         // Fail closed: a partial child record remains owned by this live process.
       }
     }
@@ -4460,10 +4864,12 @@ function abortedError(): SystemError {
   });
 }
 
+/** @throws {SystemError} When runtime lease acquisition has been cancelled. */
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted === true) throw abortedError();
 }
 
+/** @throws {SystemError} When acquisition is cancelled or its deadline expires while polling. */
 async function pollDelay(
   input: RuntimeLeaseCommonInput,
   policy: RuntimeLeasePolicy,
@@ -4614,22 +5020,37 @@ function deferRuntimeLeaseRelease(
     reservation.defer(release, baseDelayMs);
     return true;
   } catch {
+    // @swallow-ok Capacity refusal is the false result; the heartbeat remains active.
     // A prior retry for this exact lease is already registered, or the bounded
     // registry is saturated. The live heartbeat remains the safety fallback.
     return false;
   }
 }
 
+interface FailedSharedRegistrationCleanup {
+  readonly ownerToken: string;
+  readonly coordinationKey: string | undefined;
+  readonly wantsProject: boolean;
+  readonly wantsUser: boolean;
+  readonly referenceToken: string;
+  readonly input: RuntimeLeaseCommonInput;
+  readonly policy: RuntimeLeasePolicy;
+  readonly reservation: DeferredPublicationCleanupReservation;
+}
+
 async function cleanupFailedSharedRegistration(
-  ownerToken: string,
-  coordinationKey: string | undefined,
-  wantsProject: boolean,
-  wantsUser: boolean,
-  referenceToken: string,
-  input: RuntimeLeaseCommonInput,
-  policy: RuntimeLeasePolicy,
-  reservation: DeferredPublicationCleanupReservation,
+  cleanupInput: FailedSharedRegistrationCleanup,
 ): Promise<void> {
+  const {
+    ownerToken,
+    coordinationKey,
+    wantsProject,
+    wantsUser,
+    referenceToken,
+    input,
+    policy,
+    reservation,
+  } = cleanupInput;
   const environment = runtimeEnvironment(input);
   const cleanupWaitMs = Math.min(
     MAX_FAILED_PUBLICATION_CLEANUP_WAIT_MS,
@@ -4641,7 +5062,7 @@ async function cleanupFailedSharedRegistration(
       input.onEvent,
       cleanupWaitMs,
       (paths, guard) =>
-        removeSharedRegistrationWhileOwned(
+        removeSharedRegistrationWhileOwned({
           paths,
           ownerToken,
           coordinationKey,
@@ -4651,18 +5072,20 @@ async function cleanupFailedSharedRegistration(
           policy,
           environment,
           guard,
-        ),
+        }),
       environment,
     );
   try {
     await cleanup();
     reservation.complete();
   } catch {
+    // @swallow-ok Failed immediate cleanup is retained by the bounded retry scheduler.
     const retryEveryMs = Math.max(policy.pollMs, Math.min(policy.heartbeatMs, 1000));
-    reservation.defer(cleanup, retryEveryMs);
+    void reservation.defer(cleanup, retryEveryMs);
   }
 }
 
+/** @throws {Error} When shared dimensions are invalid, blocked, cancelled, or time out. */
 async function acquireSharedDimensions(
   input: RuntimeLeaseCommonInput,
   projectDir: string | undefined,
@@ -4710,20 +5133,20 @@ async function acquireSharedDimensions(
         (paths, guard) => {
           registrationAttempted = true;
           return inheritFromParent === true
-            ? registerParentInheritedSharedDimensions(
+            ? registerParentInheritedSharedDimensions({
                 paths,
                 ownerToken,
-                coordinationKey!,
+                projectKey: requiredProjectCoordinationKey(coordinationKey),
                 referenceToken,
                 input,
                 policy,
                 guard,
                 remoteStaleTracker,
-              )
-            : registerSharedDimensions(
+              })
+            : registerSharedDimensions({
                 paths,
                 ownerToken,
-                coordinationKey,
+                projectKey: coordinationKey,
                 wantsProject,
                 wantsUser,
                 referenceToken,
@@ -4731,14 +5154,14 @@ async function acquireSharedDimensions(
                 policy,
                 guard,
                 remoteStaleTracker,
-              );
+              });
         },
         environment,
         input.signal,
       );
     } catch (error) {
       if (registrationAttempted) {
-        await cleanupFailedSharedRegistration(
+        await cleanupFailedSharedRegistration({
           ownerToken,
           coordinationKey,
           wantsProject,
@@ -4746,8 +5169,8 @@ async function acquireSharedDimensions(
           referenceToken,
           input,
           policy,
-          cleanupReservation,
-        );
+          reservation: cleanupReservation,
+        });
       } else {
         cleanupReservation.complete();
       }
@@ -4819,6 +5242,7 @@ async function heartbeatSharedDimensions(
         environment,
       );
     } catch {
+      // @swallow-ok Heartbeats are best effort; ownership probes remain authoritative.
       // Each dimension is best effort and isolated. A broken/missing project
       // record must not prevent the user-state record from being refreshed.
     }
@@ -4858,6 +5282,7 @@ function startSharedHeartbeat(
   return timer;
 }
 
+/** @throws {SystemError} When the owned reader reference cannot be validated or updated exactly. */
 function decrementReaderRef(
   readersDir: string,
   ownerToken: string,
@@ -4898,17 +5323,30 @@ function decrementReaderRef(
   }
 }
 
-function removeSharedRegistrationWhileOwned(
-  paths: CoordinationPaths,
-  ownerToken: string,
-  coordinationKey: string | undefined,
-  wantsProject: boolean,
-  wantsUser: boolean,
-  referenceToken: string,
-  policy: RuntimeLeasePolicy,
-  environment: RuntimeLeaseEnvironment,
-  guard: RuntimeMutexGuard,
-): void {
+interface SharedRegistrationRemoval {
+  readonly paths: CoordinationPaths;
+  readonly ownerToken: string;
+  readonly coordinationKey: string | undefined;
+  readonly wantsProject: boolean;
+  readonly wantsUser: boolean;
+  readonly referenceToken: string;
+  readonly policy: RuntimeLeasePolicy;
+  readonly environment: RuntimeLeaseEnvironment;
+  readonly guard: RuntimeMutexGuard;
+}
+
+function removeSharedRegistrationWhileOwned(removal: SharedRegistrationRemoval): void {
+  const {
+    paths,
+    ownerToken,
+    coordinationKey,
+    wantsProject,
+    wantsUser,
+    referenceToken,
+    policy,
+    environment,
+    guard,
+  } = removal;
   if (wantsProject && coordinationKey !== undefined) {
     decrementReaderRef(
       paths.forProject(coordinationKey).readersDir,
@@ -4935,6 +5373,7 @@ function removeSharedRegistrationWhileOwned(
     try {
       cleanupEmptyRuntimeLeaseKeyWhileOwned(paths, coordinationKey, policy, environment, guard);
     } catch {
+      // @swallow-ok Exact lease authority is gone; only optional empty-scaffold hygiene failed.
       // Exact reference authority is already removed from every requested
       // dimension. Empty-scaffold cleanup is best-effort hygiene.
     }
@@ -4955,7 +5394,7 @@ function releaseSharedDimensions(
     policy,
     input.onEvent,
     (paths, guard) =>
-      removeSharedRegistrationWhileOwned(
+      removeSharedRegistrationWhileOwned({
         paths,
         ownerToken,
         coordinationKey,
@@ -4965,7 +5404,7 @@ function releaseSharedDimensions(
         policy,
         environment,
         guard,
-      ),
+      }),
     environment,
   );
 }
@@ -4994,7 +5433,7 @@ async function releaseSharedDimensionsAsync(
     input.onEvent,
     policy.waitMs,
     (paths, guard) =>
-      removeSharedRegistrationWhileOwned(
+      removeSharedRegistrationWhileOwned({
         paths,
         ownerToken,
         coordinationKey,
@@ -5004,7 +5443,7 @@ async function releaseSharedDimensionsAsync(
         policy,
         environment,
         guard,
-      ),
+      }),
     environment,
   );
 }
@@ -5062,7 +5501,7 @@ function sharedReleaseHandle(
               input,
               acquired.policy,
             );
-            finalizer.finish();
+            void finalizer.finish();
           },
           acquired.policy.pollMs,
         );
@@ -5097,7 +5536,7 @@ export async function acquireRuntimeReadLease(
     kind: 'runtime-read',
     ownerToken: acquired.ownerToken,
     acquiredAt: acquired.acquiredAt,
-    coordinationKey: acquired.coordinationKey!,
+    coordinationKey: requiredProjectCoordinationKey(acquired.coordinationKey),
     release: sharedReleaseHandle(acquired, true, false, stableInput, 'runtime-read'),
   };
 }
@@ -5116,7 +5555,11 @@ export async function acquireUserStateReadLease(
   };
 }
 
-/** Atomically acquire project and/or user shared dimensions under one owner. */
+/**
+ * Atomically acquire project and/or user shared dimensions under one owner.
+ *
+ * @throws {Error} When the requested dimensions are invalid, blocked, cancelled, or time out.
+ */
 export async function acquireRuntimeAccessLease(
   input: AcquireRuntimeAccessLeaseInput,
 ): Promise<RuntimeAccessLease> {
@@ -5176,24 +5619,37 @@ function globalWriterEligible(writer: WriterRecord, writers: readonly WriterReco
   );
 }
 
-function scanAllProjectReaders(
-  paths: CoordinationPaths,
-  policy: RuntimeLeasePolicy,
-  onEvent: RuntimeLeaseCommonInput['onEvent'],
-  environment: RuntimeLeaseEnvironment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
-  guard?: RuntimeMutexGuard,
-  observedAt = environment.now(),
-  remoteStaleTracker?: RemoteStaleTracker,
-  processInspectionCache: ProcessInspectionCache = createProcessInspectionCache(),
-): readonly ReaderRecord[] {
+interface ProjectReaderScan {
+  readonly paths: CoordinationPaths;
+  readonly policy: RuntimeLeasePolicy;
+  readonly onEvent: RuntimeLeaseCommonInput['onEvent'];
+  readonly environment?: RuntimeLeaseEnvironment;
+  readonly guard?: RuntimeMutexGuard;
+  readonly observedAt?: number;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+  readonly processInspectionCache?: ProcessInspectionCache;
+}
+
+/** @throws {SystemError} When the bounded project-reader scan encounters unsafe state. */
+function scanAllProjectReaders(scan: ProjectReaderScan): readonly ReaderRecord[] {
+  const {
+    paths,
+    policy,
+    onEvent,
+    environment = DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+    guard,
+    observedAt = environment.now(),
+    remoteStaleTracker,
+    processInspectionCache = createProcessInspectionCache(environment.maxProcessInspectionsPerScan),
+  } = scan;
   const readers: ReaderRecord[] = [];
   for (const coordinationKey of listProjectCoordinationKeys(paths, guard)) {
     guard?.refresh();
     const readerDir = paths.forProject(coordinationKey).readersDir;
     readers.push(
-      ...cleanAndListReaders(
-        readerDir,
-        'project',
+      ...cleanAndListReaders({
+        readersDir: readerDir,
+        dimension: 'project',
         policy,
         onEvent,
         environment,
@@ -5201,7 +5657,7 @@ function scanAllProjectReaders(
         observedAt,
         remoteStaleTracker,
         processInspectionCache,
-      ),
+      }),
     );
     if (readers.length > MAX_PROJECT_KEYS * MAX_READERS_PER_DIMENSION) {
       throw unsafeCoordination('Runtime global reader scan exceeds its bound');
@@ -5210,6 +5666,7 @@ function scanAllProjectReaders(
   return readers;
 }
 
+/** @throws {SystemError} When any project retains a recovery journal. */
 function assertNoProjectRecoveryJournals(
   paths: CoordinationPaths,
   guard?: RuntimeMutexGuard,
@@ -5239,6 +5696,7 @@ interface WriterAcquisitionOptions {
   readonly recoveryOperationId?: string;
 }
 
+/** @throws {SystemError} When recovery state is incompatible with the requested writer posture. */
 function assertWriterPosture(
   paths: CoordinationPaths,
   options: WriterAcquisitionOptions,
@@ -5254,7 +5712,7 @@ function assertWriterPosture(
     }
     assertProjectExclusivePosture(
       paths,
-      options.coordinationKey!,
+      requiredProjectCoordinationKey(options.coordinationKey),
       options.projectPosture ?? 'normal',
       options.recoveryOperationId,
       guard,
@@ -5272,16 +5730,28 @@ function assertWriterPosture(
   }
 }
 
-function enqueueWriter(
-  paths: CoordinationPaths,
-  ownerToken: string,
-  options: WriterAcquisitionOptions,
-  input: RuntimeLeaseCommonInput,
-  policy: RuntimeLeasePolicy,
-  guard?: RuntimeMutexGuard,
-  remoteStaleTracker?: RemoteStaleTracker,
-  onPublicationPrepared?: (writer: WriterRecord) => void,
-): WriterRecord {
+interface WriterEnqueueRequest {
+  readonly paths: CoordinationPaths;
+  readonly ownerToken: string;
+  readonly options: WriterAcquisitionOptions;
+  readonly input: RuntimeLeaseCommonInput;
+  readonly policy: RuntimeLeasePolicy;
+  readonly guard?: RuntimeMutexGuard;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+  readonly onPublicationPrepared?: (writer: WriterRecord) => void;
+}
+
+function enqueueWriter(request: WriterEnqueueRequest): WriterRecord {
+  const {
+    paths,
+    ownerToken,
+    options,
+    input,
+    policy,
+    guard,
+    remoteStaleTracker,
+    onPublicationPrepared,
+  } = request;
   const environment = runtimeEnvironment(input);
   assertWriterPosture(paths, options, guard);
   const state = cleanStaleWriters(
@@ -5343,16 +5813,20 @@ interface WriterProgress {
   readonly heartbeatPublished?: boolean;
 }
 
-function progressWriter(
-  paths: CoordinationPaths,
-  ownerToken: string,
-  options: WriterAcquisitionOptions,
-  input: RuntimeLeaseCommonInput,
-  policy: RuntimeLeasePolicy,
-  heartbeatDue: boolean,
-  guard?: RuntimeMutexGuard,
-  remoteStaleTracker?: RemoteStaleTracker,
-): WriterProgress {
+interface WriterProgressRequest {
+  readonly paths: CoordinationPaths;
+  readonly ownerToken: string;
+  readonly options: WriterAcquisitionOptions;
+  readonly input: RuntimeLeaseCommonInput;
+  readonly policy: RuntimeLeasePolicy;
+  readonly heartbeatDue: boolean;
+  readonly guard?: RuntimeMutexGuard;
+  readonly remoteStaleTracker?: RemoteStaleTracker;
+}
+
+function progressWriter(request: WriterProgressRequest): WriterProgress {
+  const { paths, ownerToken, options, input, policy, heartbeatDue, guard, remoteStaleTracker } =
+    request;
   const environment = runtimeEnvironment(input);
   assertWriterPosture(paths, options, guard);
   const state = cleanStaleWriters(
@@ -5411,42 +5885,45 @@ function progressWriter(
   // when scanning began cannot become reclaimable merely because this mutex
   // holder delayed its heartbeat while walking other projects.
   const staleObservationTime = environment.now();
-  const processInspectionCache = createProcessInspectionCache();
+  const processInspectionCache = createProcessInspectionCache(
+    environment.maxProcessInspectionsPerScan,
+  );
   const readers =
     writer.kind === 'project'
-      ? cleanAndListReaders(
-          paths.forProject(writer.coordinationKey!).readersDir,
-          'project',
+      ? cleanAndListReaders({
+          readersDir: paths.forProject(requiredProjectCoordinationKey(writer.coordinationKey))
+            .readersDir,
+          dimension: 'project',
           policy,
-          input.onEvent,
+          onEvent: input.onEvent,
           environment,
           guard,
-          staleObservationTime,
+          observedAt: staleObservationTime,
           remoteStaleTracker,
           processInspectionCache,
-        )
+        })
       : [
-          ...cleanAndListReaders(
-            paths.userReadersDir,
-            'user',
+          ...cleanAndListReaders({
+            readersDir: paths.userReadersDir,
+            dimension: 'user',
             policy,
-            input.onEvent,
+            onEvent: input.onEvent,
             environment,
             guard,
-            staleObservationTime,
+            observedAt: staleObservationTime,
             remoteStaleTracker,
             processInspectionCache,
-          ),
-          ...scanAllProjectReaders(
+          }),
+          ...scanAllProjectReaders({
             paths,
             policy,
-            input.onEvent,
+            onEvent: input.onEvent,
             environment,
             guard,
-            staleObservationTime,
+            observedAt: staleObservationTime,
             remoteStaleTracker,
             processInspectionCache,
-          ),
+          }),
         ];
   return {
     acquired: readers.length === 0,
@@ -5455,6 +5932,7 @@ function progressWriter(
   };
 }
 
+/** @throws {SystemError} When the expected writer request cannot be removed exactly. */
 function removeWriterRequest(
   paths: CoordinationPaths,
   expected: WriterRecord,
@@ -5562,11 +6040,13 @@ async function cleanupFailedWriter(
     await cleanup();
     reservation.complete();
   } catch {
+    // @swallow-ok Failed immediate writer cleanup is retained by the bounded retry scheduler.
     const retryEveryMs = Math.max(policy.pollMs, Math.min(policy.heartbeatMs, 1000));
-    reservation.defer(cleanup, retryEveryMs);
+    void reservation.defer(cleanup, retryEveryMs);
   }
 }
 
+/** @throws {Error} When exclusive acquisition is blocked, cancelled, unsafe, or times out. */
 async function acquireWriter(
   input: RuntimeLeaseCommonInput,
   options: WriterAcquisitionOptions,
@@ -5596,7 +6076,7 @@ async function acquireWriter(
   });
   try {
     throwIfAborted(input.signal);
-    enqueuedWriter = await withCoordinationMutex(
+    const publishedWriter = await withCoordinationMutex(
       policy,
       input.onEvent,
       Math.max(0, deadline - environment.monotonicNow()),
@@ -5604,7 +6084,7 @@ async function acquireWriter(
         if (options.coordinationKey !== undefined) {
           ensureProjectScaffold(paths, options.coordinationKey, guard);
         }
-        return enqueueWriter(
+        return enqueueWriter({
           paths,
           ownerToken,
           options,
@@ -5612,14 +6092,15 @@ async function acquireWriter(
           policy,
           guard,
           remoteStaleTracker,
-          (writer) => {
+          onPublicationPrepared: (writer) => {
             stagedWriter = writer;
           },
-        );
+        });
       },
       environment,
       input.signal,
     );
+    enqueuedWriter = publishedWriter;
     for (;;) {
       throwIfAborted(input.signal);
       const progressObservedAt = environment.monotonicNow();
@@ -5631,7 +6112,7 @@ async function acquireWriter(
         input.onEvent,
         Math.max(0, deadline - environment.monotonicNow()),
         (paths, guard) => {
-          const current = progressWriter(
+          const current = progressWriter({
             paths,
             ownerToken,
             options,
@@ -5640,9 +6121,9 @@ async function acquireWriter(
             heartbeatDue,
             guard,
             remoteStaleTracker,
-          );
+          });
           if (!current.acquired && environment.monotonicNow() >= deadline) {
-            removeWriterRequest(paths, enqueuedWriter!, policy, input.onEvent, environment, guard);
+            removeWriterRequest(paths, publishedWriter, policy, input.onEvent, environment, guard);
             return { ...current, timedOut: true };
           }
           return current;
@@ -5666,7 +6147,7 @@ async function acquireWriter(
           acquiredAt: progress.acquiredAt,
           policy,
           timer,
-          writer: enqueuedWriter,
+          writer: publishedWriter,
         };
       }
       if (progress.timedOut === true) throw timeoutError(options.waitKind, policy.waitMs);
@@ -5707,6 +6188,7 @@ function removeWriterRegistrationWhileOwned(
       guard,
     );
   } catch {
+    // @swallow-ok Exact writer authority is gone; only optional scaffold hygiene failed.
     // Exact writer authority is already removed. Empty-scaffold cleanup is
     // hygiene and must not retain the live heartbeat.
   }
@@ -5769,7 +6251,7 @@ function writerReleaseHandle(
           `${operation}:${acquired.ownerToken}:${String(acquired.writer.sequence)}`,
           async () => {
             await releaseWriterAsync(acquired, input, coordinationKey);
-            finalizer.finish();
+            void finalizer.finish();
           },
           acquired.policy.pollMs,
         );
@@ -5933,6 +6415,7 @@ function readFixedRecoveryRecordWhileOwned(
   }
 }
 
+/** @throws {Error} When fixed-record authority, identity, digest, or durability cannot be proven. */
 function durableIdempotentFixedRecoveryUnlink(
   paths: CoordinationPaths,
   parentDir: string,
@@ -5958,6 +6441,7 @@ function durableIdempotentFixedRecoveryUnlink(
     );
     guard.assertOwned();
   };
+  /** @throws {Error} When the fixed recovery record is still present after unlink. */
   const assertTargetAbsent = (): void => {
     if (targetIdentity(target, RUNTIME_RECOVERY_RECORD_MAX_BYTES, 'private') !== undefined) {
       throw new RuntimeSnapshotChangedError(
@@ -5979,6 +6463,7 @@ function durableIdempotentFixedRecoveryUnlink(
       return { strategy: COORDINATION_MUTATION_STRATEGY };
     }
 
+    /** @throws {Error} When the fixed recovery record no longer matches its expected digest. */
     const assertExpectedDigest = (): RecordIdentity => {
       const observed = readAnchoredRecord({
         trustedAnchorDir: paths.coordinationDir,
@@ -6053,10 +6538,11 @@ function fixedRecoveryMutation(
         : { expectedContentSha256: mutation.expectedContentSha256 }),
       permissionPosture: 'private',
     },
-    () => guard.assertOwned(),
+    { assertPublicationAllowed: () => guard.assertOwned() },
   );
 }
 
+/** @throws {SystemError} When recovery content is malformed or bound to the wrong operation. */
 function assertValidRecoveryMutationContent(
   mutation: RuntimeRecoveryRecordMutation,
   expectedKind: 'init-promotion' | 'user-uninstall',
@@ -6306,6 +6792,7 @@ export function createRuntimeLeaseCoordinator(
   });
 }
 
+/** @throws {SystemError} When coordination-root presence cannot be safely inspected. */
 function coordinationRootPresence(paths: CoordinationPaths): 'absent' | 'present' {
   try {
     lstatSync(paths.coordinationDir);
@@ -6361,6 +6848,7 @@ function sanitizedRecovery(inspection: RecoveryHeaderInspection): RuntimeRecover
   return { status: 'valid', state: inspection.state };
 }
 
+/** @throws {SystemError} When project coordination inspection encounters unsafe state. */
 function readProjectInspection(
   paths: CoordinationPaths,
   coordinationKey: string,
@@ -6394,6 +6882,7 @@ function readProjectInspection(
   };
 }
 
+/** @throws {SystemError} When an inspection target cannot be identified safely. */
 function inspectionIdentity(path: string): string {
   try {
     const stat = lstatSync(path, { bigint: true });
@@ -6555,17 +7044,15 @@ export async function listActiveRuntimeLeaseKeys(
       );
       // Open, closed, and malformed journals all preserve the source cache key
       // until Init recovery or explicit discard has completed.
-      const readers = cleanAndListReaders(
-        projectPaths.readersDir,
-        'project',
+      const readers = cleanAndListReaders({
+        readersDir: projectPaths.readersDir,
+        dimension: 'project',
         policy,
-        input.onEvent,
-        DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
+        onEvent: input.onEvent,
+        environment: DEFAULT_RUNTIME_LEASE_ENVIRONMENT,
         guard,
-        undefined,
-        undefined,
         processInspectionCache,
-      );
+      });
       if (promotion.status !== 'absent' || readers.length > 0) {
         active.add(coordinationKey);
         continue;
@@ -6591,6 +7078,7 @@ export async function listActiveRuntimeLeaseKeys(
 
 export type EmptyRuntimeLeaseKeyCleanup = 'absent' | 'kept' | 'removed';
 
+/** @throws {SystemError} When an empty project scaffold cannot be proven or removed safely. */
 function cleanupEmptyRuntimeLeaseKeyWhileOwned(
   lockedPaths: CoordinationPaths,
   coordinationKey: string,
@@ -6629,8 +7117,14 @@ function cleanupEmptyRuntimeLeaseKeyWhileOwned(
     return 'kept';
   }
   if (
-    cleanAndListReaders(projectPaths.readersDir, 'project', policy, undefined, environment, guard)
-      .length > 0
+    cleanAndListReaders({
+      readersDir: projectPaths.readersDir,
+      dimension: 'project',
+      policy,
+      onEvent: undefined,
+      environment,
+      guard,
+    }).length > 0
   ) {
     return 'kept';
   }

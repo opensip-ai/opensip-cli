@@ -22,6 +22,7 @@ import {
   type StableAuthoredRoot,
 } from './authored-state-transaction-fs.js';
 import { AUTHORED_ARTIFACT_OWNER_FILE } from './authored-state-transaction-types.js';
+import { hasErrorCode } from './error-code.js';
 import { INIT_AUTHORED_PLAN_CAPS } from './init-authored-plan-types.js';
 
 import type {
@@ -134,15 +135,11 @@ function inspectExactBlobRoot(
 
 type CleanupCheckpoint = (checkpoint: AuthoredStateCheckpoint) => void;
 
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}
-
 function assertPathAbsent(path: string, description: string): void {
   try {
     lstatSync(path);
   } catch (error) {
-    if (hasCode(error, 'ENOENT')) return;
+    if (hasErrorCode(error, 'ENOENT')) return;
     throw error;
   }
   authoredTransactionFailure(`${description} was replaced while it was being removed`);
@@ -189,7 +186,7 @@ function pathPresent(path: string): boolean {
     lstatSync(path);
     return true;
   } catch (error) {
-    if (hasCode(error, 'ENOENT')) return false;
+    if (hasErrorCode(error, 'ENOENT')) return false;
     throw error;
   }
 }

@@ -43,7 +43,11 @@ export interface SyntacticContext {
   readonly importIndex: ImportIndex;
 }
 
-const UNRESOLVED: ResolverVerdict = { to: [], resolution: 'syntactic', confidence: 'low' };
+const UNRESOLVED: ResolverVerdict = {
+  to: [],
+  resolution: 'syntactic',
+  confidence: 'low',
+};
 
 /**
  * Collect the set of project-relative file paths the catalog knows about
@@ -154,7 +158,12 @@ function verdictForPin(pin: Pin, candidates: readonly FunctionOccurrence[]): Res
 function nameOnlyVerdict(candidates: readonly FunctionOccurrence[]): ResolverVerdict {
   if (candidates.length === 1) {
     const only = candidates[0];
-    if (only) return { to: [only.bodyHash], resolution: 'syntactic', confidence: 'low' };
+    if (only)
+      return {
+        to: [only.bodyHash],
+        resolution: 'syntactic',
+        confidence: 'low',
+      };
   }
   return UNRESOLVED;
 }
@@ -319,6 +328,70 @@ export function buildImportSpecifierIndex(sourceFile: ts.SourceFile): ReadonlyMa
     }
   }
   return index;
+}
+
+/** Raw module source for one imported local binding. */
+export interface ImportBindingSource {
+  readonly specifier: string;
+  /**
+   * Source module's exported name when the local binding aliases a named import
+   * (`source` in `import { source as local }`). Absent when no name translation
+   * is required.
+   */
+  readonly importedName?: string;
+}
+
+/**
+ * Build the richer import-binding index used by cross-shard boundary
+ * extraction. Unlike {@link buildImportSpecifierIndex}, it preserves the
+ * exported/source name for aliased named imports so the engine does not try to
+ * find the caller-local alias in the imported module.
+ *
+ * Default, namespace, and `import =` bindings intentionally carry only their
+ * specifier: their local spelling has no named-export translation this model
+ * can attest.
+ */
+export function buildImportBindingSourceIndex(
+  sourceFile: ts.SourceFile,
+): ReadonlyMap<string, ImportBindingSource> {
+  const index = new Map<string, ImportBindingSource>();
+  for (const stmt of sourceFile.statements) {
+    if (ts.isImportDeclaration(stmt)) {
+      if (!ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+      indexImportBindingClause(stmt.importClause, stmt.moduleSpecifier.text, index);
+    } else if (
+      ts.isImportEqualsDeclaration(stmt) &&
+      ts.isExternalModuleReference(stmt.moduleReference) &&
+      stmt.moduleReference.expression !== undefined &&
+      ts.isStringLiteral(stmt.moduleReference.expression)
+    ) {
+      index.set(stmt.name.text, {
+        specifier: stmt.moduleReference.expression.text,
+      });
+    }
+  }
+  return index;
+}
+
+function indexImportBindingClause(
+  clause: ts.ImportClause | undefined,
+  specifier: string,
+  index: Map<string, ImportBindingSource>,
+): void {
+  if (clause === undefined) return;
+  if (clause.name !== undefined) index.set(clause.name.text, { specifier });
+  const bindings = clause.namedBindings;
+  if (bindings === undefined) return;
+  if (ts.isNamespaceImport(bindings)) {
+    index.set(bindings.name.text, { specifier });
+    return;
+  }
+  for (const el of bindings.elements) {
+    index.set(el.name.text, {
+      specifier,
+      ...(el.propertyName === undefined ? {} : { importedName: el.propertyName.text }),
+    });
+  }
 }
 
 /**

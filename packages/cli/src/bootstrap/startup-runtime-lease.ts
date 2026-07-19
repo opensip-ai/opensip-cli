@@ -211,43 +211,73 @@ function createStartupRuntimeLeaseHandoff(
   });
 }
 
+interface StartupRuntimeLeaseAttempt {
+  readonly input: AcquireStartupRuntimeLeaseInput;
+  readonly acquire: typeof acquireRuntimeAccessLease;
+  readonly selection: StartupProjectSelection;
+  readonly attempt: number;
+}
+
 /**
  * Acquire the project+user discovery footprint. `inheritFromParent` lets an
  * internal CLI child register at its live parent's earlier reader sequence,
  * preventing a writer queued between parent and child from deadlocking them.
+ *
+ * @throws {ConfigurationError} When project selection is invalid or the canonical
+ * project root cannot be stabilized within the bounded attempt count.
+ * @throws {Error} When the runtime-access lease cannot be acquired.
  */
+async function acquireStabilizedStartupRuntimeLease(
+  state: StartupRuntimeLeaseAttempt,
+): Promise<StartupRuntimeLeaseHandoff> {
+  if (state.attempt >= MAX_STARTUP_PROJECT_STABILIZATION_ATTEMPTS) {
+    throw new ConfigurationError(
+      'The canonical OpenSIP project root changed repeatedly during startup. Stop concurrent project moves or Init operations and retry.',
+      { code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE' },
+    );
+  }
+
+  const { input, acquire, selection } = state;
+  const lease = await acquire({
+    projectRead: { projectDir: selection.project.projectRoot },
+    userStateRead: true,
+    inheritFromParent: true,
+    command: input.command ?? 'opensip-startup',
+    cwdBasename: basename(selection.cwd),
+    ...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
+  });
+
+  let stabilized: StartupProjectSelection;
+  try {
+    stabilized = resolveStartupProjectSelection(input.argv, input.defaultCwd);
+    if (
+      lease.coordinationKey === projectCoordinationKey(selection.project.projectRoot) &&
+      lease.coordinationKey === projectCoordinationKey(stabilized.project.projectRoot)
+    ) {
+      return createStartupRuntimeLeaseHandoff(stabilized, lease);
+    }
+  } catch (error) {
+    lease.release();
+    throw error;
+  }
+
+  lease.release();
+  return acquireStabilizedStartupRuntimeLease({
+    input,
+    acquire,
+    selection: stabilized,
+    attempt: state.attempt + 1,
+  });
+}
+
 export async function acquireStartupRuntimeLease(
   input: AcquireStartupRuntimeLeaseInput,
   deps: AcquireStartupRuntimeLeaseDeps = {},
 ): Promise<StartupRuntimeLeaseHandoff> {
-  const acquire = deps.acquire ?? acquireRuntimeAccessLease;
-  let selection = resolveStartupProjectSelection(input.argv, input.defaultCwd);
-  for (let attempt = 0; attempt < MAX_STARTUP_PROJECT_STABILIZATION_ATTEMPTS; attempt += 1) {
-    const lease = await acquire({
-      projectRead: { projectDir: selection.project.projectRoot },
-      userStateRead: true,
-      inheritFromParent: true,
-      command: input.command ?? 'opensip-startup',
-      cwdBasename: basename(selection.cwd),
-      ...(input.onEvent === undefined ? {} : { onEvent: input.onEvent }),
-    });
-    let accepted = false;
-    try {
-      const stabilized = resolveStartupProjectSelection(input.argv, input.defaultCwd);
-      if (
-        lease.coordinationKey === projectCoordinationKey(selection.project.projectRoot) &&
-        lease.coordinationKey === projectCoordinationKey(stabilized.project.projectRoot)
-      ) {
-        accepted = true;
-        return createStartupRuntimeLeaseHandoff(stabilized, lease);
-      }
-      selection = stabilized;
-    } finally {
-      if (!accepted) lease.release();
-    }
-  }
-  throw new ConfigurationError(
-    'The canonical OpenSIP project root changed repeatedly during startup. Stop concurrent project moves or Init operations and retry.',
-    { code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE' },
-  );
+  return acquireStabilizedStartupRuntimeLease({
+    input,
+    acquire: deps.acquire ?? acquireRuntimeAccessLease,
+    selection: resolveStartupProjectSelection(input.argv, input.defaultCwd),
+    attempt: 0,
+  });
 }

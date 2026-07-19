@@ -13,6 +13,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildImportBindingSourceIndex,
   buildImportIndex,
   buildImportSpecifierIndex,
   collectKnownFiles,
@@ -87,7 +88,11 @@ describe('resolveSyntactic', () => {
     const importIndex: ImportIndex = new Map([['helper', 'util.ts']]);
     const node = firstCall('helper()');
 
-    const v = resolveSyntactic(node, { catalog, currentFileRel: 'app.ts', importIndex });
+    const v = resolveSyntactic(node, {
+      catalog,
+      currentFileRel: 'app.ts',
+      importIndex,
+    });
     expect(v).not.toBeNull();
     expect(v!.resolution).toBe('syntactic');
     expect(v!.confidence).toBe('medium');
@@ -157,7 +162,11 @@ describe('resolveSyntactic', () => {
     const importIndex: ImportIndex = new Map([['chalk', null]]);
     const node = firstCall('chalk()');
 
-    const v = resolveSyntactic(node, { catalog, currentFileRel: 'app.ts', importIndex });
+    const v = resolveSyntactic(node, {
+      catalog,
+      currentFileRel: 'app.ts',
+      importIndex,
+    });
     expect(v!.to).toEqual([]); // does NOT wrongly resolve to local.ts
   });
 
@@ -165,7 +174,11 @@ describe('resolveSyntactic', () => {
     const catalog = catalogOf(occ('helper', 'util.ts', 'h1'));
     const node = firstCall('helper()');
     for (const idx of [new Map([['helper', 'util.ts']]), NO_IMPORTS] as ImportIndex[]) {
-      const v = resolveSyntactic(node, { catalog, currentFileRel: 'app.ts', importIndex: idx });
+      const v = resolveSyntactic(node, {
+        catalog,
+        currentFileRel: 'app.ts',
+        importIndex: idx,
+      });
       expect(v!.resolution).toBe('syntactic');
       expect(v!.confidence).not.toBe('high');
     }
@@ -258,5 +271,25 @@ describe('buildImportSpecifierIndex', () => {
     );
     const idx = buildImportSpecifierIndex(sf);
     expect(idx.get('legacy')).toBe('./legacy.js');
+  });
+});
+
+describe('buildImportBindingSourceIndex', () => {
+  it('preserves the exported source name only for an aliased named import', () => {
+    const source = [
+      "import def from './a.js';",
+      "import { named, source as local } from '@scope/pkg';",
+      "import * as ns from './c.js';",
+    ].join('\n');
+    const sf = ts.createSourceFile('/proj/app.ts', source, ts.ScriptTarget.Latest, true);
+
+    const idx = buildImportBindingSourceIndex(sf);
+    expect(idx.get('local')).toEqual({
+      specifier: '@scope/pkg',
+      importedName: 'source',
+    });
+    expect(idx.get('named')).toEqual({ specifier: '@scope/pkg' });
+    expect(idx.get('def')).toEqual({ specifier: './a.js' });
+    expect(idx.get('ns')).toEqual({ specifier: './c.js' });
   });
 });

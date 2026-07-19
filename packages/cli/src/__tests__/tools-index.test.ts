@@ -23,6 +23,7 @@ import type { CliCommandsContext } from '../commands/shared.js';
 import type { CommandSpec } from '@opensip-cli/core';
 
 const runToolValidation = vi.fn();
+const toolsCreate = vi.fn();
 const toolsInstall = vi.fn();
 const toolsUninstall = vi.fn();
 const toolsDataPurge = vi.fn();
@@ -32,6 +33,9 @@ vi.mock('../commands/tools/validate.js', () => ({
 }));
 vi.mock('../commands/tools/install.js', () => ({
   toolsInstall: (...a: unknown[]) => toolsInstall(...a),
+}));
+vi.mock('../commands/tools/create.js', () => ({
+  toolsCreate: (...a: unknown[]) => toolsCreate(...a),
 }));
 vi.mock('../commands/tools/uninstall.js', () => ({
   toolsUninstall: (...a: unknown[]) => toolsUninstall(...a),
@@ -85,7 +89,9 @@ beforeEach(() => {
   exitCodes = [];
   tmp = mkdtempSync(join(tmpdir(), 'ost-tools-index-'));
   ds = undefined;
-  for (const m of [runToolValidation, toolsInstall, toolsUninstall, toolsDataPurge]) m.mockReset();
+  for (const m of [runToolValidation, toolsCreate, toolsInstall, toolsUninstall, toolsDataPurge]) {
+    m.mockReset();
+  }
 });
 
 afterEach(() => {
@@ -97,6 +103,89 @@ describe('tools list handler', () => {
   it('returns a tools-list result from the (real, pure) inventory builder', async () => {
     const result = (await handlerFor('list')({ cwd: tmp })) as { type: string };
     expect(result.type).toBe('tools-list');
+  });
+
+  it('lists the available adapter catalog and treats a language as implying --available', async () => {
+    const available = (await handlerFor('list')({
+      cwd: tmp,
+      available: true,
+    })) as {
+      type: string;
+    };
+    const filtered = (await handlerFor('list')({
+      cwd: tmp,
+      lang: ' PYTHON ',
+    })) as {
+      type: string;
+    };
+    const unfiltered = (await handlerFor('list')({
+      cwd: tmp,
+      lang: '   ',
+    })) as {
+      type: string;
+    };
+
+    expect(available.type).toBe('tools-available');
+    expect(filtered.type).toBe('tools-available');
+    expect(unfiltered.type).toBe('tools-available');
+  });
+});
+
+describe('tools doctor handler', () => {
+  it('returns the current run bootstrap diagnostics', async () => {
+    const result = (await handlerFor('doctor')({})) as {
+      type: string;
+      diagnostics: readonly unknown[];
+    };
+
+    expect(result.type).toBe('tools-doctor');
+    expect(result.diagnostics).toEqual([]);
+  });
+});
+
+describe('tools create handler', () => {
+  it('uses the discovered project root and forwards scaffold options', async () => {
+    toolsCreate.mockReturnValue({
+      type: 'tools-create',
+      toolId: 'demo',
+      success: true,
+    });
+
+    const result = (await handlerFor('create')({
+      _args: ['demo'],
+      cwd: '/ignored',
+      projectContext: {
+        cwd: tmp,
+        cwdExplicit: false,
+        projectRoot: tmp,
+        configPath: undefined,
+        walkedUp: 0,
+        scope: 'ephemeral',
+      },
+      force: true,
+      template: 'ts-local',
+    })) as { success: boolean };
+
+    expect(result.success).toBe(true);
+    expect(toolsCreate).toHaveBeenCalledWith({
+      toolId: 'demo',
+      projectRoot: tmp,
+      force: true,
+      template: 'ts-local',
+    });
+  });
+
+  it('sets the configuration-error exit code for a failed empty-id scaffold', async () => {
+    toolsCreate.mockReturnValue({
+      type: 'tools-create',
+      toolId: '',
+      success: false,
+      error: 'invalid tool id',
+    });
+
+    await handlerFor('create')({ _args: [], cwd: tmp });
+
+    expect(exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
   });
 });
 

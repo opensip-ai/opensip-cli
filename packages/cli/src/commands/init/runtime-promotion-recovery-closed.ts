@@ -7,18 +7,20 @@ import {
   recoveryAuthoredWasMaterialized,
   recoveryRuntimeAuthority,
   refreshRecoveryJournal,
-  runtimeRecoveryMutationOutcome,
 } from './runtime-promotion-recovery-common.js';
+import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
 import type {
   RuntimePromotionJournal,
   RuntimePromotionOwnedSlotName,
 } from './runtime-promotion-journal-schema.js';
+import type { DurableClosedPromotionJournal } from './runtime-promotion-journal.js';
 import type { RuntimePromotionRecoveryOperation } from './runtime-promotion-recovery-types.js';
 
 const RUNTIME_CLEANUP_ORDER = ['runtimeStage', 'destinationBackup', 'sourceTombstone'] as const;
 const AUTHORED_CLEANUP_SLOTS = ['authoredStage', 'authoredBackup', 'replayManifest'] as const;
 
+/** @throws {Error} When an operation-owned directory is outside its durable parent authority. */
 function assertDirectoryLocation(
   operation: RuntimePromotionRecoveryOperation,
   path: string,
@@ -34,6 +36,7 @@ function assertDirectoryLocation(
  * Closed history is final. Validate only the current authority's canonical
  * location/type; its bytes may legitimately differ after later normal runs.
  */
+/** @throws {Error} When closed recovery no longer has current project or journal authority. */
 function assertClosedCurrentAuthority(operation: RuntimePromotionRecoveryOperation): void {
   assertRecoveryProjectRoot(operation);
   const terminal = operation.journal.terminal;
@@ -64,11 +67,12 @@ async function recordCleanupIntent(
   await refreshRecoveryJournal(operation);
 }
 
+/** @throws {Error} When an owned runtime slot cannot be safely reconciled and cleaned. */
 async function cleanupRuntimeSlot(
   operation: RuntimePromotionRecoveryOperation,
   slot: (typeof RUNTIME_CLEANUP_ORDER)[number] | 'destinationParent',
-): Promise<void> {
-  if (operation.journal.cleanup[slot] !== 'pending') return;
+): Promise<RuntimePromotionRecoveryOperation> {
+  if (operation.journal.cleanup[slot] !== 'pending') return operation;
   const pending = operation.journal.progress.pendingIntent;
   if (pending === null) {
     await recordCleanupIntent(operation, slot);
@@ -94,10 +98,11 @@ async function cleanupRuntimeSlot(
   operation.receipt = await operation.writer.recordCleanupPostcondition(
     asRecoveryClosed(operation),
     slot,
-    runtimeRecoveryMutationOutcome(result.status),
+    runtimePromotionMutationOutcome(result.status),
   );
   operation.dependencies.checkpoint?.('after-closed-cleanup-transition');
   await refreshRecoveryJournal(operation);
+  return operation;
 }
 
 function authoredCleanupNeeded(journal: RuntimePromotionJournal): boolean {
@@ -113,8 +118,8 @@ function authoredCleanupNeeded(journal: RuntimePromotionJournal): boolean {
 
 async function cleanupAuthoredArtifacts(
   operation: RuntimePromotionRecoveryOperation,
-): Promise<void> {
-  if (!authoredCleanupNeeded(operation.journal)) return;
+): Promise<RuntimePromotionRecoveryOperation> {
+  if (!authoredCleanupNeeded(operation.journal)) return operation;
   assertClosedCurrentAuthority(operation);
   const transaction = await operation.dependencies.loadClosedAuthored({
     projectRoot: operation.input.projectRoot,
@@ -132,8 +137,20 @@ async function cleanupAuthoredArtifacts(
   operation.dependencies.checkpoint?.('after-closed-cleanup-transition');
   await refreshRecoveryJournal(operation);
   assertClosedCurrentAuthority(operation);
+  return operation;
 }
 
+async function cleanupRuntimeSlots(
+  operation: RuntimePromotionRecoveryOperation,
+  index = 0,
+): Promise<RuntimePromotionRecoveryOperation> {
+  const slot = RUNTIME_CLEANUP_ORDER[index];
+  if (slot === undefined) return operation;
+  const cleaned = await cleanupRuntimeSlot(operation, slot);
+  return cleanupRuntimeSlots(cleaned, index + 1);
+}
+
+/** @throws {Error} When durable owned-artifact cleanup remains incomplete. */
 function assertCleanupComplete(journal: RuntimePromotionJournal): void {
   if (
     journal.progress.pendingIntent !== null ||
@@ -148,23 +165,24 @@ function assertCleanupComplete(journal: RuntimePromotionJournal): void {
  * current authority with the historical terminal manifest and has no rollback
  * or restore path.
  */
+/** @throws {Error} When closed recovery cleanup or terminal authority verification fails. */
 export async function cleanupRecoveredClosedRuntimePromotion(
   operation: RuntimePromotionRecoveryOperation,
+  expectedReceipt: DurableClosedPromotionJournal = asRecoveryClosed(operation),
 ): Promise<void> {
-  await refreshRecoveryJournal(operation);
+  operation.receipt = expectedReceipt;
+  await refreshRecoveryJournal(operation, expectedReceipt);
   if (operation.receipt.state !== 'closed') {
     throw new Error('Closed cleanup received an open promotion journal');
   }
   assertClosedCurrentAuthority(operation);
-  for (const slot of RUNTIME_CLEANUP_ORDER) {
-    await cleanupRuntimeSlot(operation, slot);
-  }
-  await cleanupAuthoredArtifacts(operation);
-  await cleanupRuntimeSlot(operation, 'destinationParent');
-  assertCleanupComplete(operation.journal);
-  assertClosedCurrentAuthority(operation);
-  operation.dependencies.checkpoint?.('before-journal-unlink');
-  await operation.writer.unlinkClean(asRecoveryClosed(operation));
-  operation.journalUnlinked = true;
-  operation.dependencies.checkpoint?.('after-journal-unlink');
+  const runtimeCleaned = await cleanupRuntimeSlots(operation);
+  const authoredCleaned = await cleanupAuthoredArtifacts(runtimeCleaned);
+  const fullyCleaned = await cleanupRuntimeSlot(authoredCleaned, 'destinationParent');
+  assertCleanupComplete(fullyCleaned.journal);
+  assertClosedCurrentAuthority(fullyCleaned);
+  fullyCleaned.dependencies.checkpoint?.('before-journal-unlink');
+  await fullyCleaned.writer.unlinkClean(asRecoveryClosed(fullyCleaned));
+  fullyCleaned.journalUnlinked = true;
+  fullyCleaned.dependencies.checkpoint?.('after-journal-unlink');
 }

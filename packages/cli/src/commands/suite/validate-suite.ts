@@ -60,7 +60,7 @@ export function validateSuite(args: {
   const steps: ValidatedSuiteStep[] = [];
   args.suite.steps.forEach((step, index) => {
     try {
-      steps.push(validateStep(args.name, step, index, args.tools));
+      steps.push(validateSuiteStep(args.name, step, index, args.tools));
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }
@@ -77,7 +77,7 @@ export function validateSuite(args: {
   };
 }
 
-function validateStep(
+function validateSuiteStep(
   suiteName: string,
   step: SuiteStep,
   index: number,

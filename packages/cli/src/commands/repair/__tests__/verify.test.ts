@@ -2,6 +2,7 @@ import { buildImpactTrust, buildSignalEnvelope } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  defaultProcessRunner,
   repairVerificationChildEnv,
   verifyRepair,
   type ProcessRunRequest,
@@ -187,7 +188,9 @@ describe('repair verification classifier', () => {
       tool: 'fit',
       ruleId: SELECTED.ruleId,
       files: ['src/example.ts'],
-      envelope: envelope({ units: [unit({ passed: false, error: 'parser failed' })] }),
+      envelope: envelope({
+        units: [unit({ passed: false, error: 'parser failed' })],
+      }),
       signal: SELECTED,
       command: COMMAND,
       exitCode: 1,
@@ -284,7 +287,9 @@ describe('repair verification classifier', () => {
         calls.push(request);
         return Promise.resolve({
           exitCode: 0,
-          stdout: JSON.stringify({ envelope: envelope({ verification: buildImpactTrust() }) }),
+          stdout: JSON.stringify({
+            envelope: envelope({ verification: buildImpactTrust() }),
+          }),
           stderr: '',
           durationMs: 17,
           timedOut: false,
@@ -327,13 +332,19 @@ describe('repair verification classifier', () => {
       changes: [],
     };
 
-    const unsupported = await verifyRepair({ projectRoot: '/repo', applyResult });
+    const unsupported = await verifyRepair({
+      projectRoot: '/repo',
+      applyResult,
+    });
     expect(unsupported.status).toBe('unverified');
     expect(unsupported.failure?.code).toBe('verification-tool-unsupported');
 
     const missingEntrypoint = await verifyRepair({
       projectRoot: '/repo',
-      applyResult: { ...applyResult, session: { id: 'sess-1', tool: 'fitness', cwd: '/repo' } },
+      applyResult: {
+        ...applyResult,
+        session: { id: 'sess-1', tool: 'fitness', cwd: '/repo' },
+      },
       cliEntrypoint: '',
     });
     expect(missingEntrypoint.status).toBe('unverified');
@@ -394,6 +405,77 @@ describe('repair verification classifier', () => {
       });
       expect(result.status).toBe('unverified');
       expect(result.failure?.code).toBe(code);
+    }
+  });
+
+  it('captures stdout, stderr, and the exit code from the default process runner', async () => {
+    const result = await defaultProcessRunner({
+      command: process.execPath,
+      args: [
+        '-e',
+        'process.stdout.write("verified-out"); process.stderr.write("verified-err"); process.exitCode = 7;',
+      ],
+      cwd: process.cwd(),
+      timeoutMs: 10_000,
+    });
+
+    expect(result).toMatchObject({
+      exitCode: 7,
+      stdout: 'verified-out',
+      stderr: 'verified-err',
+      timedOut: false,
+      truncated: false,
+    });
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('reports process-spawn errors through the default runner result', async () => {
+    const result = await defaultProcessRunner({
+      command: `${process.cwd()}/opensip-command-that-does-not-exist`,
+      args: [],
+      cwd: process.cwd(),
+      timeoutMs: 10_000,
+    });
+
+    expect(result.exitCode).toBeNull();
+    expect(result.stderr).toMatch(/ENOENT|not found/u);
+    expect(result.timedOut).toBe(false);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('uses the active process entrypoint when no explicit verification entrypoint is supplied', async () => {
+    const applyResult: RepairApplyResult = {
+      type: 'repair-apply',
+      status: 'applied',
+      session: { id: 'sess-1', tool: 'fitness', cwd: '/repo' },
+      signal: SELECTED,
+      action: ACTION,
+      changes: [],
+    };
+    const originalEntrypoint = process.argv[1];
+    process.argv[1] = '/virtual/opensip-entrypoint.js';
+    try {
+      const result = await verifyRepair({
+        projectRoot: '/repo',
+        applyResult,
+        runner: (request) => {
+          expect(request.args[0]).toBe('/virtual/opensip-entrypoint.js');
+          return Promise.resolve({
+            exitCode: 0,
+            stdout: JSON.stringify({
+              envelope: envelope({ verification: buildImpactTrust() }),
+            }),
+            stderr: '',
+            durationMs: 1,
+            timedOut: false,
+            truncated: false,
+          });
+        },
+      });
+
+      expect(result.status).toBe('verified');
+    } finally {
+      process.argv[1] = originalEntrypoint;
     }
   });
 });

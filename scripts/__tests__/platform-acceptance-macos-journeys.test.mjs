@@ -500,11 +500,11 @@ test('interrupted recovery requires cancellation with zero observed residual des
 });
 
 test('permission classification requires structured actionable errors for the exact target', () => {
-  const result = {
+  const resultForKind = (kind) => ({
     status: 1,
     timedOut: false,
     stdoutCapture: JSON.stringify({
-      kind: 'command.error',
+      kind,
       status: 'error',
       exitCode: 1,
       errors: [
@@ -514,11 +514,14 @@ test('permission classification requires structured actionable errors for the ex
         },
       ],
     }),
-  };
-  assert.deepEqual(evaluatePermissionFailure(result, 'opensip-cli.config.yml'), {
-    ok: true,
-    reasonCode: null,
   });
+  for (const kind of ['command.error', 'bootstrap.error']) {
+    assert.deepEqual(evaluatePermissionFailure(resultForKind(kind), 'opensip-cli.config.yml'), {
+      ok: true,
+      reasonCode: null,
+    });
+  }
+  const result = resultForKind('command.error');
   assert.deepEqual(evaluatePermissionFailure({ ...result, status: 0 }, 'opensip-cli.config.yml'), {
     ok: false,
     reasonCode: 'permission-denied-silently-succeeded',
@@ -541,6 +544,10 @@ test('permission classification requires structured actionable errors for the ex
       'opensip-cli.config.yml',
     ),
     { ok: false, reasonCode: 'permission-error-not-actionable' },
+  );
+  assert.deepEqual(
+    evaluatePermissionFailure(resultForKind('unstructured.error'), 'opensip-cli.config.yml'),
+    { ok: false, reasonCode: 'permission-error-shape-invalid' },
   );
 });
 

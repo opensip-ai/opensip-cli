@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeYagni, type ExecuteYagniOptions } from '../execute-yagni.js';
 import { renderYagniLive } from '../yagni-runner.js';
 
+import type * as CliLiveModule from '@opensip-cli/cli-live';
 import type { LiveRunSpec } from '@opensip-cli/cli-live';
 import type * as CoreModule from '@opensip-cli/core';
 
@@ -21,7 +22,8 @@ const runOffThreadOrInProcess = vi.hoisted(() =>
   })),
 );
 
-vi.mock('@opensip-cli/cli-live', () => ({
+vi.mock('@opensip-cli/cli-live', async (importOriginal) => ({
+  ...(await importOriginal<typeof CliLiveModule>()),
   runToolLiveView,
 }));
 

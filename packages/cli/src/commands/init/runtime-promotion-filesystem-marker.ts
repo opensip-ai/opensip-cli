@@ -23,6 +23,7 @@ const MARKER_SLOTS = [
 ] as const;
 type MarkerSlot = (typeof MARKER_SLOTS)[number];
 
+/** @throws {SystemError} Always; constructs the canonical artifact-marker validation failure. */
 function markerFailure(message: string): never {
   throw new Error(`Invalid runtime promotion artifact marker: ${message}`);
 }

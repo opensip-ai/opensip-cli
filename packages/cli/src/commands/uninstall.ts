@@ -22,9 +22,9 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { executeProjectRemoval } from './uninstall/project-removal.js';
-import type { UninstallMode } from './uninstall/targets.js';
 import { executeUserRemoval } from './uninstall/user-removal.js';
 
+import type { UninstallMode } from './uninstall/targets.js';
 import type { UninstallDoneResult } from '@opensip-cli/contracts';
 import type { ProjectContext } from '@opensip-cli/core';
 
@@ -58,13 +58,18 @@ export interface UninstallOptions {
    * promotion journal. Requires `--project --purge`.
    */
   readonly discardRecovery?: boolean;
-  /** Override stdout (primarily for tests). */
+  /** Human-presentation sink supplied by the host renderer (or a test capture). */
   readonly write?: (s: string) => void;
   /** Override the confirmation prompt (primarily for tests). */
   readonly prompt?: (question: string) => Promise<string>;
 }
 
 const DEFAULT_USER_ROOT = join(homedir(), '.opensip-cli');
+
+function writeToStdout(chunk: string): void {
+  // @fitness-ignore-next-line only-documented-toolcli-seams -- Public library compatibility only; the mounted host command always injects its render-backed write seam.
+  process.stdout.write(chunk);
+}
 
 /** Resolve the project directory for `--project [path]`. */
 function resolveProjectDir(opts: UninstallOptions): string {
@@ -79,13 +84,14 @@ function resolveProjectDir(opts: UninstallOptions): string {
  */
 export async function executeUninstall(opts: UninstallOptions = {}): Promise<UninstallDoneResult> {
   const mode: UninstallMode = opts.project === undefined ? 'user' : 'project';
+  const write = opts.write ?? writeToStdout;
   if (mode === 'user') {
     return executeUserRemoval({
       userRoot: opts.rootDir ?? DEFAULT_USER_ROOT,
       yes: opts.yes,
       dryRun: opts.dryRun,
       discardRecovery: opts.discardRecovery,
-      write: opts.write,
+      write,
       prompt: opts.prompt,
     });
   }
@@ -95,7 +101,7 @@ export async function executeUninstall(opts: UninstallOptions = {}): Promise<Uni
     dryRun: opts.dryRun,
     yes: opts.yes,
     discardRecovery: opts.discardRecovery,
-    write: opts.write,
+    write,
     prompt: opts.prompt,
   });
 }

@@ -11,7 +11,9 @@ import {
   rolledBackResult,
 } from './runtime-promotion-result.js';
 import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
+import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
+import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
 import type {
   DurableClosedPromotionJournal,
   DurableOpenPromotionJournal,
@@ -21,10 +23,6 @@ import type {
   RuntimePromotionOperation,
   RuntimePromotionRollbackCompletion,
 } from './runtime-promotion-types.js';
-
-function mutationOutcome(status: string): 'applied' | 'already-satisfied' {
-  return status.startsWith('already-') ? 'already-satisfied' : 'applied';
-}
 
 function recoveryResult(operation: RuntimePromotionOperation): RuntimePromotionRollbackCompletion {
   return {
@@ -61,6 +59,26 @@ function runtimeRollbackRequired(
   );
 }
 
+type AuthoredTransaction = NonNullable<RuntimePromotionOperation['transaction']>;
+
+async function bindAuthoredForRollback(
+  operation: RuntimePromotionOperation,
+  transaction: AuthoredTransaction,
+  receipt: DurableOpenPromotionJournal,
+): Promise<AuthoredTransaction> {
+  await operation.dependencies.bindAuthoredReceipt(transaction, receipt);
+  return transaction;
+}
+
+async function verifyRolledBackAuthoredState(
+  operation: RuntimePromotionOperation,
+  transaction: AuthoredTransaction,
+  receipt: DurableOpenPromotionJournal,
+): Promise<NonNullable<RuntimePromotionOperation['authoredSummary']>> {
+  operation.receipt = receipt;
+  return operation.dependencies.verifyAuthored(transaction, 'preimage');
+}
+
 async function rollbackRuntimeIfNeeded(
   operation: RuntimePromotionOperation,
   initialReceipt: DurableOpenPromotionJournal,
@@ -87,7 +105,10 @@ async function rollbackRuntimeIfNeeded(
     installedWasAuthoritative: journal.progress.runtimeInstallState === 'installed',
   });
   assertFreshRuntimePromotionProjectRoot(operation);
-  return operation.writer.recordRuntimeRolledBack(receipt, mutationOutcome(result.status));
+  return operation.writer.recordRuntimeRolledBack(
+    receipt,
+    runtimePromotionMutationOutcome(result.status),
+  );
 }
 
 async function rollbackAuthoredIfNeeded(
@@ -101,14 +122,11 @@ async function rollbackAuthoredIfNeeded(
     return operation.writer.recordUnmaterializedAuthoredRolledBack(receipt);
   }
   assertFreshRuntimePromotionProjectRoot(operation);
-  await operation.dependencies.bindAuthoredReceipt(operation.transaction, receipt);
-  const rolledBack = await operation.dependencies.rollbackAuthored(operation.transaction);
+  const transaction = await bindAuthoredForRollback(operation, operation.transaction, receipt);
+  const rolledBack = await operation.dependencies.rollbackAuthored(transaction);
   assertFreshRuntimePromotionProjectRoot(operation);
   receipt = await operation.writer.bindAuthoredRolledBack(rolledBack.receipt);
-  operation.authoredSummary = await operation.dependencies.verifyAuthored(
-    operation.transaction,
-    'preimage',
-  );
+  operation.authoredSummary = await verifyRolledBackAuthoredState(operation, transaction, receipt);
   return receipt;
 }
 
@@ -122,13 +140,36 @@ async function closeRolledBack(
   return operation.writer.close(sealed);
 }
 
+async function verifyClosedTerminalReceipt(
+  operation: RuntimePromotionOperation,
+  receipt: DurableClosedPromotionJournal,
+): Promise<DurableClosedPromotionJournal> {
+  await verifyClosedTerminalOperationAuthority(operation, receipt);
+  return receipt;
+}
+
+async function cleanupVerifiedTerminal(
+  operation: RuntimePromotionOperation,
+  receipt: DurableClosedPromotionJournal,
+  journal: RuntimePromotionJournal,
+): Promise<{
+  readonly cleanup: Awaited<ReturnType<typeof cleanupFreshClosedRuntimePromotion>>;
+  readonly journal: RuntimePromotionJournal;
+}> {
+  const cleanup = await cleanupFreshClosedRuntimePromotion(operation, receipt);
+  return { cleanup, journal };
+}
+
 async function terminalResult(
   operation: RuntimePromotionOperation,
   receipt: DurableClosedPromotionJournal,
 ): Promise<RuntimePromotionRollbackCompletion> {
-  await verifyClosedTerminalOperationAuthority(operation, receipt);
-  const journal = await operation.controller.verifyReceipt(receipt, { state: 'closed' });
-  const cleanup = await cleanupFreshClosedRuntimePromotion(operation, receipt);
+  const verifiedReceipt = await verifyClosedTerminalReceipt(operation, receipt);
+  const journal = await operation.controller.verifyReceipt(verifiedReceipt, {
+    state: 'closed',
+  });
+  const terminal = await cleanupVerifiedTerminal(operation, verifiedReceipt, journal);
+  const cleanup = terminal.cleanup;
   const resultInput = {
     preflight: operation.preflight,
     authored: operation.authoredSummary,
@@ -139,11 +180,23 @@ async function terminalResult(
   };
   return {
     result:
-      journal.terminal?.outcome === 'committed'
+      terminal.journal.terminal?.outcome === 'committed'
         ? committedResult(resultInput)
         : rolledBackResult(resultInput),
     closedReceipt: cleanup.receipt,
   };
+}
+
+async function verifyOpenTerminalForJournal(
+  operation: RuntimePromotionOperation,
+  receipt: DurableOpenPromotionJournal,
+  journal: RuntimePromotionJournal,
+): Promise<{
+  readonly receipt: DurableOpenPromotionJournal;
+  readonly journal: RuntimePromotionJournal;
+}> {
+  await verifyOpenTerminalOperationAuthority(operation, receipt);
+  return { receipt, journal };
 }
 
 async function reconcileTerminalOpen(
@@ -152,8 +205,9 @@ async function reconcileTerminalOpen(
 ): Promise<RuntimePromotionRollbackCompletion | null> {
   const journal = await operation.controller.verifyOpen(receipt);
   if (journal.terminal === null) return null;
-  await verifyOpenTerminalOperationAuthority(operation, receipt);
-  return terminalResult(operation, await operation.writer.close(receipt));
+  const verified = await verifyOpenTerminalForJournal(operation, receipt, journal);
+  const closed = await operation.writer.close(verified.receipt);
+  return terminalResult(operation, closed);
 }
 
 async function claimCurrent(
@@ -164,6 +218,51 @@ async function claimCurrent(
   } catch {
     return null;
   }
+}
+
+async function closeRolledBackIfIdle(
+  operation: RuntimePromotionOperation,
+  receipt: DurableOpenPromotionJournal,
+  journal: RuntimePromotionJournal,
+): Promise<RuntimePromotionRollbackCompletion | null> {
+  if (journal.progress.pendingIntent !== null) return null;
+  const closed = await closeRolledBack(operation, receipt);
+  return terminalResult(operation, closed);
+}
+
+function verifyUnreconciledRollbackReceipt(
+  operation: RuntimePromotionOperation,
+  receipt: DurableOpenPromotionJournal,
+  terminal: null,
+): ReturnType<RuntimePromotionOperation['controller']['verifyOpen']> {
+  void terminal;
+  return operation.controller.verifyOpen(receipt);
+}
+
+async function rollbackClaimedOpen(
+  operation: RuntimePromotionOperation,
+  claimed: DurableOpenPromotionJournal,
+): Promise<RuntimePromotionRollbackCompletion> {
+  operation.receipt = claimed;
+  const terminal = await reconcileTerminalOpen(operation, claimed);
+  if (terminal !== null) return terminal;
+  let journal = await verifyUnreconciledRollbackReceipt(operation, claimed, terminal);
+  if (journal.progress.pendingIntent !== null || !rollbackEvidenceComplete(operation, journal)) {
+    return recoveryResult(operation);
+  }
+  let receipt = claimed;
+  if (journal.progress.direction === 'forward') {
+    receipt = await operation.writer.beginRollback(receipt);
+    operation.receipt = receipt;
+  } else if (journal.progress.direction !== 'rollback') {
+    return recoveryResult(operation);
+  }
+  const runtimeRolledBack = await rollbackRuntimeIfNeeded(operation, receipt);
+  const authoredRolledBack = await rollbackAuthoredIfNeeded(operation, runtimeRolledBack);
+  operation.receipt = authoredRolledBack;
+  journal = await operation.controller.verifyOpen(authoredRolledBack);
+  const completed = await closeRolledBackIfIdle(operation, authoredRolledBack, journal);
+  return completed ?? recoveryResult(operation);
 }
 
 /**
@@ -178,25 +277,11 @@ export async function rollbackFreshRuntimePromotion(
     assertFreshRuntimePromotionProjectRoot(operation);
     const claimed = await claimCurrent(operation);
     if (claimed === null) return recoveryResult(operation);
-    if (claimed.state === 'closed') return await terminalResult(operation, claimed);
-    operation.receipt = claimed;
-    const terminal = await reconcileTerminalOpen(operation, claimed);
-    if (terminal !== null) return terminal;
-    let journal = await operation.controller.verifyOpen(operation.receipt);
-    if (journal.progress.pendingIntent !== null || !rollbackEvidenceComplete(operation, journal)) {
-      return recoveryResult(operation);
+    if (claimed.state === 'closed') {
+      return await terminalResult(operation, claimed);
+    } else {
+      return await rollbackClaimedOpen(operation, claimed);
     }
-    if (journal.progress.direction === 'forward') {
-      operation.receipt = await operation.writer.beginRollback(operation.receipt);
-    } else if (journal.progress.direction !== 'rollback') {
-      return recoveryResult(operation);
-    }
-    operation.receipt = await rollbackRuntimeIfNeeded(operation, operation.receipt);
-    operation.receipt = await rollbackAuthoredIfNeeded(operation, operation.receipt);
-    journal = await operation.controller.verifyOpen(operation.receipt);
-    if (journal.progress.pendingIntent !== null) return recoveryResult(operation);
-    const closed = await closeRolledBack(operation, operation.receipt);
-    return await terminalResult(operation, closed);
   } catch (error) {
     if (isRuntimePromotionAuthorityReleaseUnsafe(error)) {
       operation.leaseDisposition.releaseSafe = false;

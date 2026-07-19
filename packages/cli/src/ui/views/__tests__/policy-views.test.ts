@@ -6,6 +6,7 @@ import {
   viewPolicyExplain,
   viewPolicyResult,
   viewPolicyStatus,
+  viewPolicyTrust,
 } from '../policy-views.js';
 
 import type {
@@ -146,6 +147,66 @@ describe('policy views', () => {
 
     expect(renderToText(viewPolicyAudit(audit({ events: [], totalCount: 0 })))).toContain(
       'No policy audit events recorded.',
+    );
+  });
+
+  it('renders granted, revoked, and absent capability trust results', () => {
+    expect(
+      renderToText(
+        viewPolicyResult({
+          type: 'policy-trust',
+          action: 'granted',
+          id: 'demo-pack',
+        }),
+      ),
+    ).toContain('provenance <unknown>');
+    expect(
+      renderToText(
+        viewPolicyTrust({
+          type: 'policy-trust',
+          action: 'revoked',
+          id: 'demo-pack',
+        }),
+      ),
+    ).toContain('Revoked trust');
+    expect(
+      renderToText(
+        viewPolicyTrust({
+          type: 'policy-trust',
+          action: 'not-found',
+          id: 'demo-pack',
+        }),
+      ),
+    ).toContain('No trust grant exists');
+  });
+
+  it('renders provenance-bound capability grants in policy status', () => {
+    const out = renderToText(
+      viewPolicyStatus(
+        status({
+          capabilityGrants: [
+            {
+              id: 'with-date',
+              manifestHash: 'sha256:111',
+              grantedAt: '2026-07-18T00:00:00.000Z',
+            },
+            {
+              id: 'without-date',
+              manifestHash: 'sha256:222',
+            },
+          ],
+        }),
+      ),
+    );
+
+    expect(out).toContain('Trusted capability packs');
+    expect(out).toContain('granted 2026-07-18');
+    expect(out).toContain('without-date');
+  });
+
+  it('fails closed if an unknown policy result reaches the renderer', () => {
+    expect(() => viewPolicyResult({ type: 'future-policy-result' } as never)).toThrow(
+      /Unhandled policy command result/u,
     );
   });
 });

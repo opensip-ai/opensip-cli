@@ -3,7 +3,12 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { logger } from '../lib/logger.js';
 import { createSignal } from '../types/signal.js';
 
-import { filterSignalsBySuppressions, type SuppressionKeywords } from './suppress.js';
+import {
+  filterSignalsBySuppressions,
+  isKnownDirectiveLine,
+  scanSuppressionDirectives,
+  type SuppressionKeywords,
+} from './suppress.js';
 
 import type { Signal } from '../types/signal.js';
 
@@ -209,6 +214,29 @@ describe('filterSignalsBySuppressions', () => {
     });
   });
 
+  it('attributes only missing candidate files and deduplicates their rule ids', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const signals = [sig('graph:cycle', 'anchor-a.ts', 1), sig('graph:cycle', 'anchor-b.ts', 1)];
+    await filterSignalsBySuppressions({
+      signals,
+      keywords: GRAPH_KEYWORDS,
+      readFile: readerFor({
+        'anchor-a.ts': 'code',
+        'anchor-b.ts': 'code',
+      }),
+      locate: (signal) => [
+        { file: signal.code?.file ?? '', line: 1 },
+        { file: 'missing.ts', line: 2 },
+      ],
+    });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[1]).toMatchObject({
+      file: 'missing.ts',
+      ruleId: 'graph:cycle',
+    });
+  });
+
   it('does NOT log the missing-file evt on the happy path (present files)', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const content = ['// @graph-ignore-next-line graph:cycle -- ok', 'function visit() {}'].join(
@@ -245,5 +273,81 @@ describe('filterSignalsBySuppressions', () => {
       ruleIdOf: () => 'my-check',
     });
     expect(res.suppressed).toHaveLength(1);
+  });
+
+  it('does not read a candidate file when a signal has no source location', async () => {
+    const readFile = vi.fn<(path: string) => Promise<string>>();
+    const signal = createSignal({
+      source: 'test',
+      severity: 'medium',
+      category: 'quality',
+      ruleId: 'graph:cycle',
+      message: 'location-free diagnostic',
+    });
+
+    const result = await filterSignalsBySuppressions({
+      signals: [signal],
+      keywords: GRAPH_KEYWORDS,
+      readFile,
+    });
+
+    expect(readFile).not.toHaveBeenCalled();
+    expect(result.kept).toEqual([signal]);
+  });
+});
+
+describe('suppression directive scanning', () => {
+  it('finds a trailing directive after a quoted comment-like string', () => {
+    const scan = scanSuppressionDirectives(
+      'const url = "https://example.test/path"; // @graph-ignore-next-line graph:cycle\ncode',
+      GRAPH_KEYWORDS,
+    );
+
+    expect(scan.lineIgnoredIds.get(2)).toEqual(new Set(['graph:cycle']));
+  });
+
+  it('rejects directive prefixes without a token boundary or identifier', () => {
+    const scan = scanSuppressionDirectives(
+      [
+        '// @graph-ignore-filegraph:cycle',
+        '// @graph-ignore-file ',
+        '// @graph-ignore-next-line',
+        'code',
+      ].join('\n'),
+      GRAPH_KEYWORDS,
+    );
+
+    expect(scan.fileIgnoredIds.size).toBe(0);
+    expect(scan.lineIgnoredIds.size).toBe(0);
+  });
+
+  it('recognizes hash and HTML stacked directives with strict keyword boundaries', () => {
+    expect(isKnownDirectiveLine('# prettier-ignore')).toBe(true);
+    expect(isKnownDirectiveLine('<!-- @ts-ignore: generated -->')).toBe(true);
+    expect(isKnownDirectiveLine('# unrelated-directive')).toBe(false);
+    expect(isKnownDirectiveLine('// prettier-ignored')).toBe(false);
+    expect(isKnownDirectiveLine('const value = 1')).toBe(false);
+  });
+
+  it('coalesces stacked directives that resolve to the same target line', () => {
+    const scan = scanSuppressionDirectives(
+      [
+        '// @graph-ignore-next-line graph:cycle',
+        '// @graph-ignore-next-line graph:wide-function',
+        'code',
+      ].join('\n'),
+      GRAPH_KEYWORDS,
+    );
+
+    expect(scan.lineIgnoredIds.get(3)).toEqual(new Set(['graph:cycle', 'graph:wide-function']));
+  });
+
+  it('honors the near-file-header limit for file directives', () => {
+    const content = [
+      ...Array.from({ length: 50 }, () => ''),
+      '// @graph-ignore-file graph:cycle',
+    ].join('\n');
+
+    expect(scanSuppressionDirectives(content, GRAPH_KEYWORDS).fileIgnoredIds.size).toBe(0);
   });
 });

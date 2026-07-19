@@ -26,12 +26,14 @@ function spawnResult(overrides: Partial<SpawnResult> = {}): SpawnResult {
 }
 
 function dependenciesWith(results: readonly SpawnResult[]): SetupFixtureProjectDependencies & {
+  readonly prepareHome: ReturnType<typeof vi.fn<SetupFixtureProjectDependencies['prepareHome']>>;
   readonly spawnCli: ReturnType<typeof vi.fn<SetupFixtureProjectDependencies['spawnCli']>>;
 } {
   const spawnStub = vi.fn<SetupFixtureProjectDependencies['spawnCli']>();
   for (const result of results) spawnStub.mockResolvedValueOnce(result);
   return {
     ...DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES,
+    prepareHome: vi.fn<SetupFixtureProjectDependencies['prepareHome']>(),
     spawnCli: spawnStub,
   };
 }
@@ -80,6 +82,8 @@ describe('setupFixtureProject', () => {
     });
 
     expect(dependencies.spawnCli).toHaveBeenCalledTimes(2);
+    expect(dependencies.prepareHome).toHaveBeenCalledOnce();
+    expect(dependencies.prepareHome).toHaveBeenCalledWith(join(root, '.agent-eval-home'));
     expect(dependencies.spawnCli.mock.calls[0]?.[0]).toEqual(buildInitArgv(root, 'typescript'));
     expect(dependencies.spawnCli.mock.calls[1]?.[0]).toEqual(buildGraphArgv(root, 'typescript'));
     const initOptions = dependencies.spawnCli.mock.calls[0]?.[1];

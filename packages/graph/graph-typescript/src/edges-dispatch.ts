@@ -113,6 +113,11 @@ function dispatchCall(node: ts.CallExpression, ctx: ResolverContext): ResolverVe
   if (ts.isIdentifier(node.expression)) {
     const direct = resolveDirectCall(node, ctx);
     if (direct.to.length > 0) return direct;
+    // An imported direct-call miss must stay unresolved. A repo-wide lookup by
+    // its caller-local spelling can select an unrelated same-name declaration
+    // and suppress the boundary descriptor that performs exact re-export
+    // recovery after catalogs are assembled.
+    if (ctx.importSpecifiers.has(node.expression.text)) return UNRESOLVED_VERDICT;
     return fallbackWithBinding(node.expression, node.expression.text, ctx);
   }
   if (ts.isPropertyAccessExpression(node.expression)) {
@@ -125,7 +130,11 @@ function dispatchCall(node: ts.CallExpression, ctx: ResolverContext): ResolverVe
   return { to: [], resolution: 'unknown', confidence: 'low' };
 }
 
-const UNRESOLVED_VERDICT: ResolverVerdict = { to: [], resolution: 'unknown', confidence: 'low' };
+const UNRESOLVED_VERDICT: ResolverVerdict = {
+  to: [],
+  resolution: 'unknown',
+  confidence: 'low',
+};
 
 function fallbackWithBinding(
   calleeExpr: ts.Expression,

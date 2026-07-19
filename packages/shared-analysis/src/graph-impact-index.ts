@@ -24,14 +24,14 @@ interface ReverseEdgesForOccurrenceInput {
 // @sequential-ok -- Hashing and adjacency construction mutate shared bounded state;
 // concurrency would reorder the generation identity and cooperative checkpoints.
 async function addReverseEdgesForOccurrence(input: ReverseEdgesForOccurrenceInput): Promise<void> {
-  const { reverse, occurrence, ordinal, work, approximate, signal } = input;
+  const { occurrence, ordinal, work, approximate, signal } = input;
   for (const edge of occurrence.calls) {
     if (edge.confidence !== 'high' || edge.resolution === 'syntactic') approximate.value = true;
     for (const calleeHash of edge.to) {
       assertImpactNotCancelled(signal);
-      const callers = reverse.get(calleeHash) ?? new Set<number>();
+      const callers = input.reverse.get(calleeHash) ?? new Set<number>();
       callers.add(ordinal);
-      reverse.set(calleeHash, callers);
+      input.reverse.set(calleeHash, callers);
       work.value++;
       if (work.value % ASYNC_BATCH_SIZE === 0) await yieldImpactWork(signal);
     }
@@ -48,7 +48,14 @@ async function buildReverseAdjacency(
   for (const [ordinal, occurrence] of occurrences.entries()) {
     assertImpactNotCancelled(signal);
     // @fitness-ignore-next-line async-waterfall-detection -- The shared reverse map and work counter must be updated before the cooperative checkpoint.
-    await addReverseEdgesForOccurrence({ reverse, occurrence, ordinal, work, approximate, signal });
+    await addReverseEdgesForOccurrence({
+      reverse,
+      occurrence,
+      ordinal,
+      work,
+      approximate,
+      signal,
+    });
     work.value++;
     if (work.value % ASYNC_BATCH_SIZE === 0) await yieldImpactWork(signal);
   }

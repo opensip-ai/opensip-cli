@@ -2,13 +2,15 @@ import { join } from 'node:path';
 
 import { encodeOwner, ownerFor } from './authored-state-transaction-artifacts.js';
 import {
+  createDurableDirectory,
+  writeExclusiveDurableFile,
+} from './authored-state-transaction-durable-fs.js';
+import {
   assertStableAuthoredRoot,
   assertStableAuthoredEntry,
   authoredTransactionFailure,
   bindStableAuthoredEntry,
-  createDurableDirectory,
   fsyncStableAuthoredDirectory,
-  writeExclusiveDurableFile,
   type DurableFileWriteCheckpoint,
   type StableAuthoredEntry,
   type StableAuthoredRoot,
@@ -96,16 +98,20 @@ function blobMutations(
   );
 }
 
-function writeBlob(
-  rootPath: string,
-  artifactRoot: StableAuthoredEntry,
-  blobDirectory: StableAuthoredEntry,
-  mutation: InitAuthoredMutation,
-  kind: 'desired' | 'preimage',
-  plan: InitAuthoredPlan,
-  checkpoints: ArtifactCheckpoints,
-  checkpoint: (value: AuthoredStateCheckpoint) => void,
-): void {
+interface WriteBlobInput {
+  readonly rootPath: string;
+  readonly artifactRoot: StableAuthoredEntry;
+  readonly blobDirectory: StableAuthoredEntry;
+  readonly mutation: InitAuthoredMutation;
+  readonly kind: 'desired' | 'preimage';
+  readonly plan: InitAuthoredPlan;
+  readonly checkpoints: ArtifactCheckpoints;
+  readonly checkpoint: (value: AuthoredStateCheckpoint) => void;
+}
+
+function writeBlob(input: WriteBlobInput): void {
+  const { rootPath, artifactRoot, blobDirectory, mutation, kind, plan, checkpoints, checkpoint } =
+    input;
   const name = kind === 'desired' ? mutation.desiredBlob : mutation.preimageBlob;
   const state = kind === 'desired' ? mutation.desired : mutation.preimage;
   if (name === null || !state.exists || state.type !== 'file' || state.mode === null) {
@@ -171,7 +177,16 @@ function writeArtifactRoot(
     if (blobDirectory === null) {
       authoredTransactionFailure('an authored blob directory was not materialized');
     }
-    writeBlob(rootPath, artifactRoot, blobDirectory, mutation, kind, plan, checkpoints, checkpoint);
+    writeBlob({
+      rootPath,
+      artifactRoot,
+      blobDirectory,
+      mutation,
+      kind,
+      plan,
+      checkpoints,
+      checkpoint,
+    });
   }
   if (blobDirectory !== null) {
     fsyncStableAuthoredDirectory(blobDirectory, BLOB_DIRECTORY_DESCRIPTION);

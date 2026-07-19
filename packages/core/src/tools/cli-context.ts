@@ -8,39 +8,17 @@
  * is unchanged.
  */
 
-import type { HostAudit, HostEntitlements, HostGovernance } from './host-planes.js';
+import type { ToolCliHostState } from './cli-context-state.js';
+import type { WireSignalEnvelope, WireWarningDetail } from './cli-context-wire.js';
 import type { LiveViewContext, LiveViewRenderer } from './live-view.js';
 import type { ReportFailureDetail } from './report-failure.js';
-import type { GateCompareResult, SignalDeliveryResult } from './tool-results.js';
+import type { SignalDeliveryResult } from './tool-results.js';
 import type { ToolRunCompletion, ToolRunSessions } from './tool-sessions.js';
 import type { CliDiagnostic } from '../lib/cli-diagnostic.js';
 import type { Logger } from '../lib/logger.js';
 import type { ToolScope } from '../lib/scope-types.js';
 
-/**
- * Wire alias for run envelopes passed across the core ↔ cli seam.
- *
- * Typed `unknown` here because core must not depend on @opensip-cli/contracts
- * (layering). The composition root (cli) narrows it to `SignalEnvelope`.
- * This is the documented cost of strict kernel layering; shape-sync tests
- * and the explicit `Wire*` aliases are the hygiene.
- *
- * (GA Lows cleanup, 2026-06: alias + usage added as part of resolving the
- * "heavy unknown + casts" item. See roadmap item 5.)
- */
-/* eslint-disable sonarjs/redundant-type-aliases -- intentional named alias for the unknown seam type (the "Wire" hygiene marker from the GA "heavy unknown + casts" cleanup); used in JSDoc for the baseline seams to document the layering. */
-type WireSignalEnvelope = unknown;
-
-/**
- * Structural mirror of contracts' `WarningDetail` — a non-fatal run notice the
- * host attaches to the machine outcome (`CommandOutcome.warnings`). Mirrored
- * here (not imported) for the same layering reason as {@link WireSignalEnvelope}:
- * core must not name contracts-layer types.
- */
-export interface WireWarningDetail {
-  readonly message: string;
-  readonly code?: string;
-}
+export type { WireWarningDetail } from './cli-context-wire.js';
 
 /**
  * Context the host hands to each command handler (and the tool's optional
@@ -54,7 +32,7 @@ export interface WireWarningDetail {
  * structural, not merely guarded. The host owns the program internally and passes
  * it to its own mount step (`mountAllToolCommands(registry, program, ctx, provenance)`).
  */
-export interface ToolCliContext {
+export interface ToolCliContext extends ToolCliHostState {
   /**
    * Per-run resources (logger, parseCache, registries, datastore,
    * recipeUnitConfig, projectContext). Constructed once per CLI
@@ -332,81 +310,4 @@ export interface ToolCliContext {
    * `artifactPath` is the artifact FILE path; the host creates `dirname(path)`.
    */
   readonly ensureArtifactDir: (artifactPath: string) => Promise<void>;
-  /**
-   * Host baseline/ratchet plane seams (ADR-0036). The host owns persistence
-   * (`BaselineRepo`), the diff, and exit derivation; a tool inherits a CI ratchet
-   * by emitting fingerprint-stamped signals. The seams are **read-only** of
-   * `signal.fingerprint` — the tool stamps its envelope's signals
-   * (`stampFingerprints`) at envelope-construction time; the plane NEVER
-   * re-fingerprints. `tool` scopes every operation; `envelope` is the
-   * `SignalEnvelope` typed `unknown` here for the same layer reason as
-   * `writeSarif`/`deliverSignals`.
-   */
-  readonly saveBaseline: (tool: string, envelope: WireSignalEnvelope) => Promise<void>;
-  /**
-   * Compare the current (stamped) envelope against this tool's saved baseline.
-   * Throws a `ConfigurationError` (→ exit 2) when no baseline exists. The host
-   * derives the gate exit from `result.degraded` via the `deliverSignals`
-   * runFailed override — no tool calls `setExitCode` for the gate path (ADR-0035).
-   */
-  readonly compareBaseline: (
-    tool: string,
-    envelope: WireSignalEnvelope,
-  ) => Promise<GateCompareResult>;
-  /**
-   * Export this tool's baseline to a SARIF file by reconstructing a synthetic
-   * envelope from the stored per-fingerprint payloads (no stored envelope to
-   * reload). Throws when no baseline exists.
-   */
-  readonly exportBaselineSarif: (tool: string, path: string) => Promise<void>;
-  /**
-   * Export this tool's baseline as the git-trackable fingerprint JSON
-   * (`{version,tool,capturedAt,fingerprints[]}`). Throws when no baseline exists.
-   */
-  readonly exportBaselineFingerprints: (tool: string, path: string) => Promise<void>;
-  /**
-   * Host-owned keyed tool state (ADR-0042) — durable, per-tool, opaque-JSON
-   * persistence over the generic `tool_state` table, the third-party parity
-   * mechanism beside sessions + baselines. ONE grouped member (not four flat
-   * seams — the interface-segregation lesson from the baseline plane). Rules:
-   *
-   *   - `tool` scopes every operation; a tool never sees another's rows.
-   *   - Payloads are opaque JSON, capped at 256 KiB per payload; an oversized
-   *     `put` throws a `ValidationError` (error, never evict).
-   *   - Durable: unlike baselines (drop-and-recapture), a release never drops
-   *     these rows. `tools data purge <tool-id>` clears them on request.
-   *   - Requires the entered project scope (the datastore is per-project);
-   *     calls outside one reject with the host's datastore-unavailable error.
-   */
-  readonly toolState: {
-    readonly get: (tool: string, key: string) => Promise<unknown>;
-    readonly put: (tool: string, key: string, payload: unknown) => Promise<void>;
-    readonly delete: (tool: string, key: string) => Promise<void>;
-    readonly list: (tool: string) => Promise<readonly string[]>;
-  };
-
-  /**
-   * Host-owned evolution bag for additional durable/governance planes.
-   *
-   * This is the combined Host-Owned Governance, Entitlements, and Audit Plane
-   * (H1: Extension/Community Governance, H2: Per-Tool Audit/Provenance/Decision Records,
-   * H3: Entitlements/Licensing/Paid-Extension State).
-   *
-   * See:
-   * - the "Host-Owned Governance, Entitlements & Audit Plane" spec + plan
-   *   (local-only working docs, by that title)
-   * - ADR-0042 (toolState baseline this reuses)
-   *
-   * Design: typed seams here (host provides the impl), opaque/namespaced storage under the
-   * existing toolState seam (and the single host-owned `tool_state` table). Tools never
-   * touch raw datastore for these concerns. The bag prevents interface bloat on ToolCliContext
-   * (symmetric to ToolExtensionPoints on the Tool side).
-   *
-   * All members are optional so this change is purely additive for GA-era code and stubs.
-   */
-  readonly hostPlanes?: {
-    governance?: HostGovernance;
-    audit?: HostAudit;
-    entitlements?: HostEntitlements;
-  };
 }

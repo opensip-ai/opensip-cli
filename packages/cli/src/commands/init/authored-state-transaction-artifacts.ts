@@ -25,7 +25,7 @@ import {
   type AuthoredArtifactRole,
   type AuthoredBlobAvailability,
 } from './authored-state-transaction-types.js';
-import { sha256Bytes } from './init-authored-plan-types.js';
+import { sha256Parts } from './init-authored-plan-types.js';
 import {
   encodeAuthoredReplayManifest,
   INIT_AUTHORED_PLAN_CAPS,
@@ -355,14 +355,12 @@ export function validateAuthoredArtifacts(
 }
 
 function authoredPlanDigest(manifestBytes: string, manifest: AuthoredReplayManifest): string {
-  return sha256Bytes(
-    Buffer.concat([
-      Buffer.from('opensip-init-authored-plan\0v1\0', 'utf8'),
-      Buffer.from(JSON.stringify(manifest.inputs), 'utf8'),
-      Buffer.from('\0', 'utf8'),
-      Buffer.from(manifestBytes, 'utf8'),
-    ]),
-  );
+  return sha256Parts([
+    'opensip-init-authored-plan\0v1\0',
+    JSON.stringify(manifest.inputs),
+    '\0',
+    manifestBytes,
+  ]);
 }
 
 export function loadAuthoredReplayManifest(

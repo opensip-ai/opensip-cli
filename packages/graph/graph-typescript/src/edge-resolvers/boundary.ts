@@ -4,9 +4,9 @@
  * When a shard worker resolves a shard's call sites, the calls that DON'T
  * land on one of the shard's own occurrences are candidate cross-package
  * edges — the target lives in another shard. This module identifies them
- * syntactically (callee name + the raw import specifier the name came
- * from) so the engine's cross-shard pass can re-resolve them against the
- * global merged catalog, where the target is present.
+ * syntactically (local callee name + imported source alias + the raw import
+ * specifier the name came from) so the engine's cross-shard pass can re-resolve
+ * them against the global merged catalog, where the target is present.
  *
  * Detection is by RESOLUTION OUTCOME, not by name: a site is a boundary
  * candidate when its callee name is IMPORTED (carries an import specifier) AND
@@ -27,9 +27,10 @@ import ts from 'typescript';
 
 import { isReturnValueDiscarded } from '../edges.js';
 
-import { calleeAnchorNode, calleeSimpleName, buildImportSpecifierIndex } from './syntactic.js';
+import { buildImportBindingSourceIndex, calleeAnchorNode, calleeSimpleName } from './syntactic.js';
 
 import type { CallSiteRecord } from '../walk.js';
+import type { ImportBindingSource } from './syntactic.js';
 import type { CallEdge, CrossBoundaryCall } from '@opensip-cli/graph';
 
 /** Max length of the descriptor's display text — the CallEdge.text contract. */
@@ -58,8 +59,8 @@ export function extractBoundaryCalls(
   resolveMethodTarget?: MethodTargetResolver,
 ): CrossBoundaryCall[] {
   const out: CrossBoundaryCall[] = [];
-  // One import-specifier index per source file, built lazily and cached.
-  const specifierIndexBySf = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
+  // One import-binding index per source file, built lazily and cached.
+  const bindingIndexBySf = new Map<ts.SourceFile, ReadonlyMap<string, ImportBindingSource>>();
   // Owner-file derivation is per source file; cache it so each boundary call on
   // the same file doesn't re-run the relative/posix math.
   const ownerFileBySf = new Map<ts.SourceFile, string>();
@@ -69,12 +70,13 @@ export function extractBoundaryCalls(
     const callee = calleeSimpleName(r.node);
     if (callee === null) continue;
 
-    let specifierIndex = specifierIndexBySf.get(r.sourceFile);
-    if (specifierIndex === undefined) {
-      specifierIndex = buildImportSpecifierIndex(r.sourceFile);
-      specifierIndexBySf.set(r.sourceFile, specifierIndex);
+    let bindingIndex = bindingIndexBySf.get(r.sourceFile);
+    if (bindingIndex === undefined) {
+      bindingIndex = buildImportBindingSourceIndex(r.sourceFile);
+      bindingIndexBySf.set(r.sourceFile, bindingIndex);
     }
-    const importSpecifier = specifierIndex.get(callee.name);
+    const importBinding = bindingIndex.get(callee.name);
+    const importSpecifier = importBinding?.specifier;
     const methodEligible =
       resolveMethodTarget !== undefined &&
       ts.isCallExpression(r.node) &&
@@ -92,9 +94,16 @@ export function extractBoundaryCalls(
       ownerFileBySf.set(r.sourceFile, ownerFile);
     }
 
-    const bc = boundaryCallFor(r, callee.name, importSpecifier, ownerFile, {
-      resolvedEdgesByOwner,
-      resolveMethodTarget,
+    const bc = boundaryCallFor({
+      record: r,
+      calleeName: callee.name,
+      importSpecifier,
+      importedName: importBinding?.importedName,
+      ownerFile,
+      deps: {
+        resolvedEdgesByOwner,
+        resolveMethodTarget,
+      },
     });
     if (bc !== null) out.push(bc);
   }
@@ -106,19 +115,29 @@ interface BoundaryDeps {
   readonly resolveMethodTarget?: MethodTargetResolver;
 }
 
+interface BoundaryCallInput {
+  readonly record: CallSiteRecord;
+  readonly calleeName: string;
+  readonly importSpecifier: string | undefined;
+  readonly importedName: string | undefined;
+  readonly ownerFile: string;
+  readonly deps: BoundaryDeps;
+}
+
 /**
  * Finish classifying a candidate call site — its callee name, import specifier,
  * and owner file already resolved by the caller — into a boundary descriptor, or
  * `null` when the in-shard pass already resolved the site or it is not a
  * cross-package method. Extracted from the loop to keep each piece simple.
  */
-function boundaryCallFor(
-  r: CallSiteRecord,
-  calleeName: string,
-  importSpecifier: string | undefined,
-  ownerFile: string,
-  deps: BoundaryDeps,
-): CrossBoundaryCall | null {
+function boundaryCallFor({
+  record: r,
+  calleeName,
+  importSpecifier,
+  importedName,
+  ownerFile,
+  deps,
+}: BoundaryCallInput): CrossBoundaryCall | null {
   const pos = positionOf(r.node, r.sourceFile);
   // Skip a site the in-shard resolver already RESOLVED to a real target —
   // emitting a boundary call for it would double the edge. (A `to: []`
@@ -147,6 +166,7 @@ function boundaryCallFor(
     ownerLine: r.ownerLine,
     ownerColumn: r.ownerColumn,
     calleeName,
+    ...(importedName === undefined ? {} : { importedName }),
     ...(importSpecifier === undefined ? {} : { importSpecifier }),
     ...(targetFile === undefined ? {} : { targetFile }),
     line: pos.line,

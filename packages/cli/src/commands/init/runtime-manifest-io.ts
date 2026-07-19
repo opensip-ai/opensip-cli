@@ -1,29 +1,25 @@
 /** Low-level bounded runtime-tree inspection; journal authority lives in the facade. */
 
 import { createHash } from 'node:crypto';
-import {
-  closeSync,
-  constants,
-  fstatSync,
-  lstatSync,
-  openSync,
-  opendirSync,
-  readlinkSync,
-  readSync,
-  realpathSync,
-} from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { lstatSync, opendirSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { EPHEMERAL_MARKER_FILE } from '@opensip-cli/core';
 
 import {
-  RUNTIME_MANIFEST_MAX_DIGEST_BYTES,
+  readSafeRuntimeManifestSymlink,
+  readStableRuntimeManifestFile,
+  runtimeManifestEntryIdentity,
+  safeRuntimeManifestMode,
+  sameRuntimeManifestEntryIdentity,
+  type RuntimeManifestBudget,
+  type RuntimeManifestEntryIdentity,
+} from './runtime-manifest-entry-io.js';
+import {
   RUNTIME_MANIFEST_MAX_ENTRIES,
-  RUNTIME_MANIFEST_MAX_FILE_BYTES,
   RUNTIME_MANIFEST_MAX_PATH_AGGREGATE_BYTES,
   RUNTIME_MANIFEST_MAX_PATH_BYTES,
   RUNTIME_MANIFEST_MAX_SQLITE_SHM_BYTES,
-  RUNTIME_MANIFEST_MAX_TOTAL_BYTES,
   RuntimeManifestError,
 } from './runtime-manifest-model.js';
 import { RuntimePathQueue } from './runtime-path-queue.js';
@@ -40,96 +36,25 @@ import type {
 import type { RuntimeStageOwnershipIdentity } from './runtime-stage-ownership.js';
 import type { BigIntStats } from 'node:fs';
 
-const READ_CHUNK_BYTES = 64 * 1024;
 const DATASTORE_FILE = 'datastore.sqlite';
 const DATASTORE_WAL_FILE = `${DATASTORE_FILE}-wal`;
 const DATASTORE_SHM_FILE = `${DATASTORE_FILE}-shm`;
 const DATASTORE_SIDECARS = new Set([DATASTORE_WAL_FILE, DATASTORE_SHM_FILE]);
 const FIXED_TRANSIENT_LOCKS = new Set(['.project-marker.lock', `${DATASTORE_FILE}.write.lock`]);
 
-interface EntryIdentity {
-  readonly dev: bigint;
-  readonly ino: bigint;
-  readonly uid: bigint;
-  readonly mode: bigint;
-  readonly nlink: bigint;
-  readonly size: bigint;
-  readonly mtimeNs: bigint;
-  readonly ctimeNs: bigint;
-}
-
 interface DirectoryObservation {
   readonly path: string;
-  readonly identity: EntryIdentity;
+  readonly identity: RuntimeManifestEntryIdentity;
   readonly children: readonly string[];
-}
-
-interface ManifestBudget {
-  entries: number;
-  discoveredEntries: number;
-  totalBytes: number;
-  pathBytes: number;
-  digestBytes: number;
 }
 
 export interface RuntimeManifestIoDependencies {
   readonly enumerateDirectoryNames: (path: string) => Iterable<string>;
 }
 
+/** @throws {RuntimeManifestError} Always; runtime-tree inspection cannot remain authoritative. */
 function fail(reason: ConstructorParameters<typeof RuntimeManifestError>[0]): never {
   throw new RuntimeManifestError(reason);
-}
-
-function hasCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
-}
-
-function currentUid(): bigint | undefined {
-  return typeof process.getuid === 'function' ? BigInt(process.getuid()) : undefined;
-}
-
-function identityOf(stat: BigIntStats): EntryIdentity {
-  return {
-    dev: stat.dev,
-    ino: stat.ino,
-    uid: stat.uid,
-    mode: stat.mode,
-    nlink: stat.nlink,
-    size: stat.size,
-    mtimeNs: stat.mtimeNs,
-    ctimeNs: stat.ctimeNs,
-  };
-}
-
-function sameIdentity(left: EntryIdentity, right: EntryIdentity): boolean {
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.uid === right.uid &&
-    left.mode === right.mode &&
-    left.nlink === right.nlink &&
-    left.size === right.size &&
-    left.mtimeNs === right.mtimeNs &&
-    left.ctimeNs === right.ctimeNs
-  );
-}
-
-function safeMode(stat: BigIntStats): number {
-  const uid = currentUid();
-  if (uid !== undefined && stat.uid !== uid) fail('unsafe-owner');
-  const mode = Number(stat.mode & 0o7777n);
-  if (stat.isSymbolicLink()) return mode & 0o777;
-  if (
-    !Number.isSafeInteger(mode) ||
-    (process.platform !== 'win32' &&
-      ((mode & 0o7000) !== 0 ||
-        (mode & 0o022) !== 0 ||
-        (stat.isDirectory() && (mode & 0o700) !== 0o700) ||
-        (stat.isFile() && (mode & 0o400) === 0)))
-  ) {
-    fail('mode');
-  }
-  return mode & 0o777;
 }
 
 function bytewise(left: string, right: string): number {
@@ -166,7 +91,7 @@ function assertSafeEntryName(name: string): void {
   }
 }
 
-function chargeDiscoveredPath(path: string, budget: ManifestBudget): void {
+function chargeDiscoveredPath(path: string, budget: RuntimeManifestBudget): void {
   const bytes = Buffer.byteLength(path, 'utf8');
   if (bytes < 1 || bytes > RUNTIME_MANIFEST_MAX_PATH_BYTES) fail('path-cap');
   budget.discoveredEntries += 1;
@@ -178,7 +103,7 @@ function chargeDiscoveredPath(path: string, budget: ManifestBudget): void {
 function readChildren(
   path: string,
   relativeDirectoryPath: string,
-  budget: ManifestBudget,
+  budget: RuntimeManifestBudget,
   dependencies: RuntimeManifestIoDependencies,
   unchargedPath?: string,
 ): readonly string[] {
@@ -209,14 +134,6 @@ function readChildrenForValidation(
   return names;
 }
 
-function isContained(root: string, path: string): boolean {
-  const fromRoot = relative(root, path);
-  return (
-    fromRoot === '' ||
-    (!isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`))
-  );
-}
-
 function isOwnedArtifactLock(path: string): boolean {
   return path.startsWith('artifacts/') && path.endsWith('.artifact.lock');
 }
@@ -236,7 +153,7 @@ function omissionFor(
   const sidecar = DATASTORE_SIDECARS.has(path);
   if (!marker && !lock && !sidecar) return 'include';
   if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1n) fail('special-entry');
-  safeMode(stat);
+  safeRuntimeManifestMode(stat);
   if (
     (path === DATASTORE_WAL_FILE && stat.size !== 0n) ||
     (path === DATASTORE_SHM_FILE &&
@@ -245,87 +162,6 @@ function omissionFor(
     fail('sqlite-sidecar-nonempty');
   }
   return 'omit';
-}
-
-function chargeFileBudget(expected: BigIntStats, budget: ManifestBudget): number {
-  if (expected.nlink !== 1n) fail('hardlink');
-  if (expected.size > BigInt(RUNTIME_MANIFEST_MAX_FILE_BYTES)) fail('size-cap');
-  const sizeBytes = Number(expected.size);
-  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0) fail('size-cap');
-  budget.totalBytes += sizeBytes;
-  budget.digestBytes += sizeBytes;
-  if (budget.totalBytes > RUNTIME_MANIFEST_MAX_TOTAL_BYTES) fail('size-cap');
-  if (budget.digestBytes > RUNTIME_MANIFEST_MAX_DIGEST_BYTES) fail('digest-cap');
-  return sizeBytes;
-}
-
-function hashOpenedFile(descriptor: number, expected: BigIntStats, sizeBytes: number): string {
-  const opened = fstatSync(descriptor, { bigint: true });
-  if (
-    !opened.isFile() ||
-    opened.nlink !== 1n ||
-    !sameIdentity(identityOf(expected), identityOf(opened))
-  ) {
-    fail('changed');
-  }
-  const digest = createHash('sha256');
-  const chunk = Buffer.allocUnsafe(READ_CHUNK_BYTES);
-  let observed = 0;
-  for (;;) {
-    const bytesRead = readSync(descriptor, chunk, 0, chunk.length, null);
-    if (bytesRead === 0) break;
-    observed += bytesRead;
-    digest.update(chunk.subarray(0, bytesRead));
-  }
-  const after = fstatSync(descriptor, { bigint: true });
-  if (observed !== sizeBytes || !sameIdentity(identityOf(opened), identityOf(after))) {
-    fail('changed');
-  }
-  return digest.digest('hex');
-}
-
-function readStableFile(
-  path: string,
-  expected: BigIntStats,
-  budget: ManifestBudget,
-): {
-  readonly sizeBytes: number;
-  readonly sha256: string;
-} {
-  const sizeBytes = chargeFileBudget(expected, budget);
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-    return {
-      sizeBytes,
-      sha256: hashOpenedFile(descriptor, expected, sizeBytes),
-    };
-  } catch (error) {
-    if (error instanceof RuntimeManifestError) throw error;
-    if (hasCode(error, 'ELOOP')) fail('special-entry');
-    throw error;
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-  }
-}
-
-function readSafeSymlink(root: string, path: string, expected: BigIntStats): string {
-  const target = readlinkSync(path);
-  if (target.length === 0 || target.includes('\0') || isAbsolute(target)) fail('symlink-invalid');
-  const targetPath = resolve(join(path, '..'), target);
-  if (!isContained(root, targetPath)) fail('symlink-escape');
-  let canonicalTarget: string;
-  try {
-    canonicalTarget = realpathSync(targetPath);
-  } catch {
-    fail('symlink-invalid');
-  }
-  if (!isContained(root, canonicalTarget)) fail('symlink-escape');
-  const after = lstatSync(path, { bigint: true });
-  if (!after.isSymbolicLink() || !sameIdentity(identityOf(expected), identityOf(after))) {
-    fail('changed');
-  }
-  return target;
 }
 
 function addDigestEntry(hash: ReturnType<typeof createHash>, entry: RuntimeManifestEntry): void {
@@ -344,7 +180,7 @@ function assertDirectoriesStable(
     if (
       !stat.isDirectory() ||
       stat.isSymbolicLink() ||
-      !sameIdentity(observation.identity, identityOf(stat))
+      !sameRuntimeManifestEntryIdentity(observation.identity, runtimeManifestEntryIdentity(stat))
     ) {
       fail('changed');
     }
@@ -370,7 +206,7 @@ interface RuntimeWalkState {
   readonly queue: RuntimePathQueue;
   readonly directories: DirectoryObservation[];
   readonly entries: RuntimeManifestEntry[];
-  readonly budget: ManifestBudget;
+  readonly budget: RuntimeManifestBudget;
 }
 
 function inspectNextEntry(state: RuntimeWalkState): boolean {
@@ -381,7 +217,7 @@ function inspectNextEntry(state: RuntimeWalkState): boolean {
     return true;
   state.budget.entries += 1;
   if (state.budget.entries > RUNTIME_MANIFEST_MAX_ENTRIES) fail('entry-cap');
-  const mode = safeMode(stat);
+  const mode = safeRuntimeManifestMode(stat);
 
   if (stat.isDirectory() && !stat.isSymbolicLink()) {
     const children = readChildren(
@@ -392,7 +228,7 @@ function inspectNextEntry(state: RuntimeWalkState): boolean {
     );
     state.directories.push({
       path: next.absolutePath,
-      identity: identityOf(stat),
+      identity: runtimeManifestEntryIdentity(stat),
       children,
     });
     state.entries.push({ path: next.relativePath, kind: 'directory', mode });
@@ -405,7 +241,7 @@ function inspectNextEntry(state: RuntimeWalkState): boolean {
     return true;
   }
   if (stat.isFile() && !stat.isSymbolicLink()) {
-    const content = readStableFile(next.absolutePath, stat, state.budget);
+    const content = readStableRuntimeManifestFile(next.absolutePath, stat, state.budget);
     state.entries.push({
       path: next.relativePath,
       kind: 'file',
@@ -415,7 +251,7 @@ function inspectNextEntry(state: RuntimeWalkState): boolean {
     return true;
   }
   if (stat.isSymbolicLink()) {
-    const target = readSafeSymlink(state.canonicalRoot, next.absolutePath, stat);
+    const target = readSafeRuntimeManifestSymlink(state.canonicalRoot, next.absolutePath, stat);
     state.entries.push({
       path: next.relativePath,
       kind: 'symlink',
@@ -442,11 +278,11 @@ export function inspectRuntimeTree(
   const canonicalRoot = realpathSync(runtimeDir);
   const initialRoot = lstatSync(runtimeDir, { bigint: true });
   if (!initialRoot.isDirectory() || initialRoot.isSymbolicLink()) fail('special-entry');
-  const rootMode = safeMode(initialRoot);
+  const rootMode = safeRuntimeManifestMode(initialRoot);
   if (stageOwnership !== undefined) {
     assertRuntimeStageOwnershipMarker(canonicalRoot, stageOwnership);
   }
-  const budget: ManifestBudget = {
+  const budget: RuntimeManifestBudget = {
     entries: 0,
     discoveredEntries: 0,
     totalBytes: 0,
@@ -474,7 +310,7 @@ export function inspectRuntimeTree(
     directories: [
       {
         path: canonicalRoot,
-        identity: identityOf(initialRoot),
+        identity: runtimeManifestEntryIdentity(initialRoot),
         children: rootChildren,
       },
     ],

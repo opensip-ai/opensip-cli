@@ -34,6 +34,18 @@ export function isRuntimePromotionAuthorityReleaseUnsafe(error: unknown): boolea
   );
 }
 
+type AuthoredTransaction = NonNullable<RuntimePromotionOperation['transaction']>;
+
+async function bindAuthoredForVerification(
+  operation: RuntimePromotionOperation,
+  transaction: AuthoredTransaction,
+  receipt: DurableOpenPromotionJournal,
+): Promise<AuthoredTransaction> {
+  await operation.dependencies.bindAuthoredReceipt(transaction, receipt);
+  return transaction;
+}
+
+/** @throws {Error} When the observed manifest no longer matches the expected identity. */
 function assertExactManifest(
   expected: RuntimeManifestIdentity,
   observed: RuntimeManifestIdentity,
@@ -44,6 +56,7 @@ function assertExactManifest(
   }
 }
 
+/** @throws {Error} When a required durable manifest identity is absent. */
 function requiredManifest(
   manifest: RuntimeManifestIdentity | null,
   message: string,
@@ -83,6 +96,7 @@ function rolledBackRuntimeManifest(
   );
 }
 
+/** @throws {Error} When the open journal cannot prove the requested authored-state authority. */
 async function verifyOpenAuthoredAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableOpenPromotionJournal,
@@ -95,9 +109,9 @@ async function verifyOpenAuthoredAuthority(
     return;
   }
   assertFreshRuntimePromotionProjectRoot(operation);
-  await operation.dependencies.bindAuthoredReceipt(operation.transaction, receipt);
+  const transaction = await bindAuthoredForVerification(operation, operation.transaction, receipt);
   assertFreshRuntimePromotionProjectRoot(operation);
-  const summary = await operation.dependencies.verifyAuthored(operation.transaction, expected);
+  const summary = await operation.dependencies.verifyAuthored(transaction, expected);
   assertFreshRuntimePromotionProjectRoot(operation);
   if (!summary.verified) {
     throw new Error(`Authored ${expected} authority was not verified`);
@@ -105,6 +119,7 @@ async function verifyOpenAuthoredAuthority(
   operation.authoredSummary = summary;
 }
 
+/** @throws {Error} When the closed journal cannot prove the requested authored-state authority. */
 async function verifyClosedAuthoredAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableClosedPromotionJournal,
@@ -133,6 +148,7 @@ async function verifyClosedAuthoredAuthority(
   operation.authoredSummary = summary;
 }
 
+/** @throws {RuntimePromotionSelectedSourceError} When selected-source authority cannot be reverified. */
 function verifySelectedSource(
   operation: RuntimePromotionOperation,
   journal: RuntimePromotionJournal,
@@ -214,6 +230,7 @@ function verifyCommittedRuntimeAuthority(
       );
 }
 
+/** @throws {RuntimePromotionSelectedSourceError} When rolled-back runtime authority cannot be proven. */
 function verifyRolledBackRuntimeAuthority(
   operation: RuntimePromotionOperation,
   journal: RuntimePromotionJournal,
@@ -239,14 +256,32 @@ function verifyRolledBackRuntimeAuthority(
   return observed;
 }
 
+async function verifyCommittedAuthoredAuthority(
+  operation: RuntimePromotionOperation,
+  receipt: DurableOpenPromotionJournal,
+  journal: RuntimePromotionJournal,
+): Promise<RuntimeManifestIdentity | null> {
+  verifyCommittedRuntimeAuthority(operation, journal);
+  await verifyOpenAuthoredAuthority(operation, receipt, 'desired');
+  return verifyCommittedRuntimeAuthority(operation, journal);
+}
+
+async function verifyRolledBackAuthoredAuthority(
+  operation: RuntimePromotionOperation,
+  receipt: DurableOpenPromotionJournal,
+  journal: RuntimePromotionJournal,
+): Promise<RuntimeManifestIdentity | null> {
+  verifyRolledBackRuntimeAuthority(operation, journal);
+  await verifyOpenAuthoredAuthority(operation, receipt, 'preimage');
+  return verifyRolledBackRuntimeAuthority(operation, journal);
+}
+
 export async function verifyCommittedOperationAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableOpenPromotionJournal,
 ): Promise<RuntimeManifestIdentity | null> {
   const journal = await operation.controller.verifyOpen(receipt);
-  verifyCommittedRuntimeAuthority(operation, journal);
-  await verifyOpenAuthoredAuthority(operation, receipt, 'desired');
-  return verifyCommittedRuntimeAuthority(operation, journal);
+  return verifyCommittedAuthoredAuthority(operation, receipt, journal);
 }
 
 export async function verifyRolledBackOperationAuthority(
@@ -254,11 +289,10 @@ export async function verifyRolledBackOperationAuthority(
   receipt: DurableOpenPromotionJournal,
 ): Promise<RuntimeManifestIdentity | null> {
   const journal = await operation.controller.verifyOpen(receipt);
-  verifyRolledBackRuntimeAuthority(operation, journal);
-  await verifyOpenAuthoredAuthority(operation, receipt, 'preimage');
-  return verifyRolledBackRuntimeAuthority(operation, journal);
+  return verifyRolledBackAuthoredAuthority(operation, receipt, journal);
 }
 
+/** @throws {Error} When the open terminal outcome or its authority cannot be verified. */
 export async function verifyOpenTerminalOperationAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableOpenPromotionJournal,
@@ -273,11 +307,14 @@ export async function verifyOpenTerminalOperationAuthority(
   await verifyRolledBackOperationAuthority(operation, receipt);
 }
 
+/** @throws {Error} When the closed terminal outcome or its authority cannot be verified. */
 export async function verifyClosedTerminalOperationAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableClosedPromotionJournal,
 ): Promise<void> {
-  const journal = await operation.controller.verifyReceipt(receipt, { state: 'closed' });
+  const journal = await operation.controller.verifyReceipt(receipt, {
+    state: 'closed',
+  });
   const terminal = journal.terminal;
   if (terminal === null) throw new Error('Closed promotion has no terminal authority to verify');
   if (terminal.outcome === 'committed') {

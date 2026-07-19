@@ -7,3 +7,4 @@ export {
   type LiveRunSpec,
   type LiveRunTool,
 } from './run-tool-live-view.js';
+export { workerProjectSelectionArgs } from './worker-project-selection.js';

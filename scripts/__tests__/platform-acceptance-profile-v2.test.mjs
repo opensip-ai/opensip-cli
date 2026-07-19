@@ -17,7 +17,10 @@ import {
   parseAcceptanceProfile,
   profileDigest,
 } from '../platform-acceptance/contract.mjs';
-import { COMMON_V1_JOURNEY_IDS, COMMON_V2_JOURNEY_IDS } from '../platform-acceptance/journey-catalog.mjs';
+import {
+  COMMON_V1_JOURNEY_IDS,
+  COMMON_V2_JOURNEY_IDS,
+} from '../platform-acceptance/journey-catalog.mjs';
 import { runPlatformAcceptance, RUN_OUTCOMES } from '../platform-acceptance/runner.mjs';
 
 const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
