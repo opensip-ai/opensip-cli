@@ -1388,7 +1388,7 @@ describe('buildHostCommandInventory', () => {
       'data-purge',
     ]);
     expect(inventory.groupSubcommands.config).toEqual(['validate', 'schema', 'migrate']);
-    expect(inventory.groupSubcommands.policy).toEqual(['status', 'explain', 'audit']);
+    expect(inventory.groupSubcommands.policy).toEqual(['status', 'explain', 'audit', 'trust', 'untrust']);
     expect(inventory.groupSubcommands.repair).toEqual(['preview', 'apply']);
     expect(inventory.groupSubcommands.suite).toEqual(['run', 'list', 'add']);
     // Exactly the documented action-less groups — no drift.
