@@ -12,35 +12,12 @@
  * pinned check-id universe likewise live in the owning tool's `scaffold/`.
  */
 
-import { renderDocumentHeader, type TargetTemplateInput } from '@opensip-cli/config';
+import { renderDocumentHeader } from '@opensip-cli/config';
 
-import {
-  buildStarterDocumentHeaderInput,
-  starterTargetTemplate,
-  starterTargetTemplates,
-} from '../../bootstrap/starter-config.js';
+import { buildStarterDocumentHeaderInput } from '../../bootstrap/starter-config.js';
 
 import type { SupportedLanguage } from './language-detection.js';
 import type { RenderedToolScaffold, ToolScaffold } from '../shared.js';
-
-/**
- * Per-language target template. Delegates to the shared starter model so
- * Init and no-init cannot drift.
- */
-export function targetTemplate(lang: SupportedLanguage): TargetTemplateInput {
-  return starterTargetTemplate(lang);
-}
-
-/**
- * Target templates for the given languages (input order preserved).
- * Prefer {@link buildStarterDocumentHeaderInput} when host-canonical order
- * and starter excludes are required together.
- */
-export function targetTemplatesForLanguages(
-  languages: readonly SupportedLanguage[],
-): readonly TargetTemplateInput[] {
-  return starterTargetTemplates(languages);
-}
 
 export function generateConfig(
   languages: readonly SupportedLanguage[],

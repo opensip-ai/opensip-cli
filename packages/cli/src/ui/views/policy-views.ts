@@ -14,6 +14,7 @@ import type {
   PolicyAuditRow,
   PolicyExplainResult,
   PolicyStatusResult,
+  PolicyTrustResult,
 } from '@opensip-cli/contracts';
 
 const SPACER: ViewNode = { kind: 'spacer' };
@@ -52,7 +53,7 @@ function auditRow(row: PolicyAuditRow): Span[] {
 
 type PolicyCommandResult = Extract<
   CommandResult,
-  { type: 'policy-status' | 'policy-explain' | 'policy-audit' }
+  { type: 'policy-status' | 'policy-explain' | 'policy-audit' | 'policy-trust' }
 >;
 
 /** @throws {Error} When the closed policy result union and renderer drift. */
@@ -71,10 +72,41 @@ export function viewPolicyResult(result: PolicyCommandResult): ViewNode {
     case 'policy-audit': {
       return viewPolicyAudit(result);
     }
+    case 'policy-trust': {
+      return viewPolicyTrust(result);
+    }
     default: {
       return assertPolicyNever(result);
     }
   }
+}
+
+export function viewPolicyTrust(result: PolicyTrustResult): ViewNode {
+  if (result.action === 'granted') {
+    return group([
+      line([
+        { text: 'Trusted ', tone: 'success' },
+        { text: result.id, bold: true },
+        { text: ` (provenance ${result.manifestHash ?? '<unknown>'})`, dim: true },
+      ]),
+      line([
+        {
+          text: 'The grant is user-level and provenance-bound: if the pack changes, re-run policy trust after verifying it.',
+          dim: true,
+        },
+      ]),
+    ]);
+  }
+  if (result.action === 'revoked') {
+    return line([
+      { text: 'Revoked trust for ', tone: 'warning' },
+      { text: result.id, bold: true },
+    ]);
+  }
+  return line([
+    { text: 'No trust grant exists for ', dim: true },
+    { text: result.id, bold: true },
+  ]);
 }
 
 export function viewPolicyStatus(result: PolicyStatusResult): ViewNode {
@@ -107,6 +139,22 @@ export function viewPolicyStatus(result: PolicyStatusResult): ViewNode {
           { text: exception.action },
           { text: exception.expiresAt ?? '-', dim: exception.expiresAt === undefined },
           { text: exception.sourceTier },
+        ]),
+      ),
+    );
+  }
+  const grants = result.capabilityGrants ?? [];
+  if (grants.length > 0) {
+    children.push(
+      SPACER,
+      line([{ text: 'Trusted capability packs (user-level, provenance-bound)', bold: true }]),
+      ...grants.map((grant) =>
+        line([
+          { text: `  ${grant.id}`, tone: 'brand' as const },
+          { text: `  ${grant.manifestHash}`, dim: true },
+          ...(grant.grantedAt === undefined
+            ? []
+            : [{ text: `  granted ${grant.grantedAt}`, dim: true }]),
         ]),
       ),
     );

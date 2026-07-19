@@ -108,6 +108,54 @@ describe('RunScope — dispose', () => {
     expect(clear).toHaveBeenCalledOnce();
     expect(disposer).toHaveBeenCalledOnce();
   });
+
+  it('logs a disposer failure (never silently drops it) and completes teardown', () => {
+    // Plan 09 Phase 2: a silently-swallowed disposer failure (audit flush,
+    // datastore close) would reintroduce the exact silent evidence loss the
+    // disposal boundary exists to prevent.
+    const warn = vi.fn();
+    const scope = new RunScope({
+      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() },
+    });
+    const second = vi.fn();
+    scope.onDispose(() => {
+      throw new Error('audit flush exploded');
+    });
+    scope.onDispose(second);
+
+    expect(() => scope.dispose()).not.toThrow();
+
+    expect(second).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'core.scope.dispose.failed',
+        module: 'core:run-scope',
+        stage: 'registered-disposer',
+        err: 'audit flush exploded',
+      }),
+    );
+  });
+
+  it('completes teardown even when the log sink itself throws during failure logging', () => {
+    const scope = new RunScope({
+      logger: {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(() => {
+          throw new Error('log sink gone');
+        }),
+        error: vi.fn(),
+      },
+    });
+    const second = vi.fn();
+    scope.onDispose(() => {
+      throw new Error('first disposer failed');
+    });
+    scope.onDispose(second);
+
+    expect(() => scope.dispose()).not.toThrow();
+    expect(second).toHaveBeenCalledOnce();
+  });
 });
 
 describe('runWithScope / currentScope', () => {

@@ -7,16 +7,7 @@
  */
 
 import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
-import {
-  agentCatalogOverlayKeys,
-  agentCatalogPlatformEntryPoints,
-  assembleAgentCatalog,
-  assertAgentCatalogOverlayKeys,
-  commonFlags,
-  hostSupportFromRuntimeProjection,
-  summarizeTargetConventions,
-  type AgentHostSupport,
-} from '@opensip-cli/contracts';
+import { commonFlags, type AgentHostSupport } from '@opensip-cli/contracts';
 import {
   PLATFORM_SUPPORT_CONTRACT_VERSION,
   projectRuntimeHostSupport,
@@ -27,6 +18,14 @@ import {
   type TargetResolver,
   type Tool,
 } from '@opensip-cli/core';
+import {
+  agentCatalogOverlayKeys,
+  agentCatalogPlatformEntryPoints,
+  assembleAgentCatalog,
+  assertAgentCatalogOverlayKeys,
+  hostSupportFromRuntimeProjection,
+  summarizeTargetConventions,
+} from '@opensip-cli/shared-analysis';
 import { describe, expect, it } from 'vitest';
 
 import { registerFirstPartyTools } from '../bootstrap/register-tools.js';

@@ -10,9 +10,15 @@ import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 /**
- * Quick filter keywords for 'any' type patterns
+ * Pre-filter contract: the quick gate must be a strict SUPERSET of what the
+ * AST pass can match. A `ts.SyntaxKind.AnyKeyword` node always spells `any`,
+ * so the bare substring is the guaranteed superset — a keyword list requiring
+ * surrounding punctuation (the old `': any'` form) silently green-passed valid
+ * TypeScript like `:any` / `,any` that a formatter would rewrite. The
+ * authoritative AST pass on the shared per-run Program stays the precise
+ * arbiter; this gate only skips files that cannot possibly match.
  */
-const QUICK_FILTER_KEYWORDS = [': any', 'any)', 'any,', 'any;', '<any', 'any>'];
+const QUICK_FILTER_SUBSTRING = 'any';
 
 /**
  * Find lines with eslint-disable-next-line comments
@@ -109,7 +115,7 @@ export const noAnyTypes = defineCheck({
 **Detects:** Analyzes each file individually using TypeScript AST traversal for \`AnyKeyword\` nodes.
 - \`any\` in function parameters, variable declarations, property signatures, return types, and type aliases
 - Respects \`eslint-disable-next-line\` comments on the preceding line
-- Uses a quick-filter optimization: skips files not containing \`: any\`, \`any)\`, \`any,\`, \`any;\`, \`<any\`, or \`any>\`
+- Uses a quick-filter optimization: skips files not containing the substring \`any\` (a strict superset of every AST match, so no formatting variant escapes the check)
 
 **Why it matters:** The \`any\` type disables TypeScript's type safety, hiding bugs that would otherwise be caught at compile time. Using \`unknown\` with type guards preserves safety while handling dynamic data.
 
@@ -119,8 +125,9 @@ export const noAnyTypes = defineCheck({
   confidence: 'high',
 
   analyze(content: string, filePath: string): CheckViolation[] {
-    // Quick filter: skip files without 'any' type patterns
-    if (!QUICK_FILTER_KEYWORDS.some((kw) => content.includes(kw))) {
+    // Quick filter: a file without the substring cannot contain an AnyKeyword
+    // node (superset gate — see QUICK_FILTER_SUBSTRING).
+    if (!content.includes(QUICK_FILTER_SUBSTRING)) {
       return [];
     }
 

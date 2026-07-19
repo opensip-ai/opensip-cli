@@ -20,7 +20,13 @@ import {
   matchesContinuationIdentity,
 } from '../code-point-order.js';
 
-import { boundedIterableGroups, insertBoundedTopK, type ReadGroupSummary } from './bounded-view.js';
+import {
+  boundedIterableGroups,
+  clampLimit,
+  insertBoundedTopK,
+  isCapReason,
+  type ReadGroupSummary,
+} from './bounded-view.js';
 import {
   toGraphSymbolRef,
   type EffectiveGraphSourceFilter,
@@ -32,6 +38,10 @@ import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './sou
 
 import type { GraphReadError } from './types.js';
 import type { Catalog, Indexes } from '../types.js';
+
+/** Fallback page size when a caller-supplied `limit` is absent/non-finite —
+ * matches the documented identity-search default (20 nodes). */
+const DEFAULT_SEARCH_LIMIT = 20;
 
 /** Match semantics for {@link searchSymbolOccurrences}. */
 export type SymbolSearchMatch = 'substring' | 'exact' | 'qualified';
@@ -182,7 +192,10 @@ export function searchSymbolOccurrences(
   matcher: SourceRoleMatcher,
 ): Result<SymbolSearchView, GraphReadError> {
   try {
-    const limit = Math.max(1, Math.min(500, Math.trunc(query.limit)));
+    // Self-defending clamp: a non-finite caller limit coerces to the default
+    // instead of NaN-poisoning the window (which read as an empty result
+    // labeled complete: true).
+    const limit = clampLimit(query.limit, DEFAULT_SEARCH_LIMIT);
     const windowCap = limit + 1;
     const afterStableKey = resolveAfterStableKey(indexes, query, matcher);
     if (afterStableKey === null) {
@@ -224,7 +237,7 @@ export function searchSymbolOccurrences(
       ...(grouped === undefined ? {} : { groups: grouped.groups }),
       coverage: {
         complete: reasons.length === 0,
-        truncated: reasons.some((reason) => reason.endsWith('-cap')),
+        truncated: reasons.some(isCapReason),
         reasons,
       },
     });

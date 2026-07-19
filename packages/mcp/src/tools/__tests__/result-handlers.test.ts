@@ -6,8 +6,8 @@
  * the live registry (unknown → structured error), and surfaces the err arm.
  */
 
-import { assembleAgentCatalog } from '@opensip-cli/contracts';
 import { err, ok } from '@opensip-cli/core';
+import { assembleAgentCatalog } from '@opensip-cli/shared-analysis';
 import { describe, expect, it } from 'vitest';
 
 import { registerCompareToBaseline } from '../compare-to-baseline.js';

@@ -7,7 +7,7 @@ audience: [contributors, ci-integrators, agent-builders]
 purpose: "How `graph impact` and `fit --changed --include-impacted` report coverage, uncertainty, and conservative fallbacks."
 source-files:
   - packages/contracts/src/impact-trust.ts
-  - packages/contracts/src/graph-impact-compute.ts
+  - packages/shared-analysis/src/graph-impact-compute.ts
   - packages/contracts/src/command-results-variants/graph-impact-result.ts
   - packages/core/src/lib/git-changed-files.ts
   - packages/graph/engine/src/cli/impact.ts

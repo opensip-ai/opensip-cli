@@ -53,14 +53,19 @@ function filesBoundToPackages(
   });
 }
 
+interface SnapshotBaseInput {
+  readonly configIdentity: string;
+  readonly manifests: readonly PackageManifestFacts[];
+  readonly packages: readonly PackageFact[];
+  readonly files: readonly FileFact[];
+  readonly available: boolean;
+  readonly reasons: readonly string[];
+}
+
 function snapshotBase(
-  configIdentity: string,
-  manifests: readonly PackageManifestFacts[],
-  packages: readonly PackageFact[],
-  files: readonly FileFact[],
-  available: boolean,
-  reasons: readonly string[],
+  input: SnapshotBaseInput,
 ): Omit<ProjectInventorySnapshot, 'snapshotId' | 'metadataIdentity'> {
+  const { configIdentity, manifests, packages, files, available, reasons } = input;
   return {
     schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION,
     project: projectFact(configIdentity, manifests, packages, files),
@@ -122,14 +127,14 @@ export function enforceSerializedBudget(input: {
   readonly packages: readonly PackageFact[];
   readonly files: readonly FileFact[];
 } {
-  const full = snapshotBase(
-    input.configIdentity,
-    input.manifests,
-    input.packages,
-    input.files,
-    input.available,
-    [...input.reasons],
-  );
+  const full = snapshotBase({
+    configIdentity: input.configIdentity,
+    manifests: input.manifests,
+    packages: input.packages,
+    files: input.files,
+    available: input.available,
+    reasons: [...input.reasons],
+  });
   const packagePrefixBytes = jsonArrayPrefixBytes(input.packages);
   const filePrefixBytes = jsonArrayPrefixBytes(input.files);
   if (
@@ -148,14 +153,14 @@ export function enforceSerializedBudget(input: {
     const packages = input.packages.slice(0, length);
     return (
       serializedSnapshotBytes(
-        snapshotBase(
-          input.configIdentity,
-          input.manifests,
+        snapshotBase({
+          configIdentity: input.configIdentity,
+          manifests: input.manifests,
           packages,
-          [],
-          input.available,
-          reasonCodes,
-        ),
+          files: [],
+          available: input.available,
+          reasons: reasonCodes,
+        }),
         packagePrefixBytes[length] ?? 0,
         0,
       ) <= input.maximumBytes
@@ -168,14 +173,14 @@ export function enforceSerializedBudget(input: {
     const files = packageBoundFiles.slice(0, length);
     return (
       serializedSnapshotBytes(
-        snapshotBase(
-          input.configIdentity,
-          input.manifests,
+        snapshotBase({
+          configIdentity: input.configIdentity,
+          manifests: input.manifests,
           packages,
           files,
-          input.available,
-          reasonCodes,
-        ),
+          available: input.available,
+          reasons: reasonCodes,
+        }),
         packagePrefixBytes[packageCount] ?? 0,
         boundedFilePrefixBytes[length] ?? 0,
       ) <= input.maximumBytes
@@ -183,14 +188,14 @@ export function enforceSerializedBudget(input: {
   });
   const files = packageBoundFiles.slice(0, fileCount);
   return {
-    base: snapshotBase(
-      input.configIdentity,
-      input.manifests,
+    base: snapshotBase({
+      configIdentity: input.configIdentity,
+      manifests: input.manifests,
       packages,
       files,
-      input.available,
-      reasonCodes,
-    ),
+      available: input.available,
+      reasons: reasonCodes,
+    }),
     packages,
     files,
   };

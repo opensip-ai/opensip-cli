@@ -42,25 +42,32 @@ export {
 
 const FILTER_CHECKPOINT_INTERVAL = 128;
 
+// Named-field options (plan 09 Task 8.5): the previous adjacent same-typed
+// bare booleans were transposition-prone at every call site.
 function frozenResolution(
   files: readonly string[],
-  capped: boolean,
-  cancelled: boolean,
+  outcome: { readonly capped: boolean; readonly cancelled: boolean },
 ): BoundedTargetResolution {
-  return Object.freeze({ files: Object.freeze(files), capped, cancelled });
+  return Object.freeze({
+    files: Object.freeze(files),
+    capped: outcome.capped,
+    cancelled: outcome.cancelled,
+  });
 }
 
 function frozenMembershipResolution(
   memberships: BoundedTargetMembershipResolution['memberships'],
-  capped: boolean,
-  membershipCapped: boolean,
-  cancelled: boolean,
+  outcome: {
+    readonly capped: boolean;
+    readonly membershipCapped: boolean;
+    readonly cancelled: boolean;
+  },
 ): BoundedTargetMembershipResolution {
   return Object.freeze({
     memberships: Object.freeze(memberships),
-    capped,
-    membershipCapped,
-    cancelled,
+    capped: outcome.capped,
+    membershipCapped: outcome.membershipCapped,
+    cancelled: outcome.cancelled,
   });
 }
 
@@ -92,7 +99,7 @@ export async function applyGlobalExcludesBounded(
   const safeInputs = preflightInputs([], globalExcludes);
   const safeFiles = preflightGlobalFilterCandidates(files);
   const retained: string[] = [];
-  if (isAborted(safeOptions.signal)) return frozenResolution(retained, false, true);
+  if (isAborted(safeOptions.signal)) return frozenResolution(retained, { capped: false, cancelled: true });
 
   const absoluteRoot = resolve(rootDir);
   const compiledGlobalExcludes = compileGlobalExcludes(safeInputs.globalExcludes);
@@ -102,7 +109,7 @@ export async function applyGlobalExcludesBounded(
     if (index > 0 && index % FILTER_CHECKPOINT_INTERVAL === 0) {
       await yieldToEventLoop();
     }
-    if (isAborted(safeOptions.signal)) return frozenResolution(retained, capped, true);
+    if (isAborted(safeOptions.signal)) return frozenResolution(retained, { capped, cancelled: true });
     if (!isPathInside(filePath, absoluteRoot)) continue;
     const relativePath = relative(absoluteRoot, filePath);
     if (compiledGlobalExcludes.some((matcher) => matcher.match(relativePath))) continue;
@@ -112,7 +119,7 @@ export async function applyGlobalExcludesBounded(
     }
     retained.push(filePath);
   }
-  return frozenResolution(retained, capped, false);
+  return frozenResolution(retained, { capped, cancelled: false });
 }
 
 /**
@@ -138,10 +145,10 @@ export async function resolveTargetMembershipsBounded(
   const safeInputs = preflightInputs(targets, globalExcludes);
   const memberships: BoundedTargetMembershipResolution['memberships'][number][] = [];
   if (safeOptions.signal?.aborted === true) {
-    return frozenMembershipResolution(memberships, false, false, true);
+    return frozenMembershipResolution(memberships, { capped: false, membershipCapped: false, cancelled: true });
   }
   if (safeInputs.targets.length === 0) {
-    return frozenMembershipResolution(memberships, false, false, false);
+    return frozenMembershipResolution(memberships, { capped: false, membershipCapped: false, cancelled: false });
   }
 
   const absoluteRoot = resolve(rootDir);
@@ -170,12 +177,11 @@ export async function resolveTargetMembershipsBounded(
     },
     { signal: safeOptions.signal },
   );
-  return frozenMembershipResolution(
-    memberships,
-    resultLimitReached || walk.capped,
-    membershipLimitReached,
-    walk.cancelled,
-  );
+  return frozenMembershipResolution(memberships, {
+    capped: resultLimitReached || walk.capped,
+    membershipCapped: membershipLimitReached,
+    cancelled: walk.cancelled,
+  });
 }
 
 /**
@@ -202,8 +208,8 @@ export async function resolveTargetsBounded(
   const safeOptions = snapshotResolutionOptions(options);
   const safeInputs = preflightInputs(targets, globalExcludes);
   const files: string[] = [];
-  if (safeOptions.signal?.aborted === true) return frozenResolution(files, false, true);
-  if (safeInputs.targets.length === 0) return frozenResolution(files, false, false);
+  if (safeOptions.signal?.aborted === true) return frozenResolution(files, { capped: false, cancelled: true });
+  if (safeInputs.targets.length === 0) return frozenResolution(files, { capped: false, cancelled: false });
 
   const absoluteRoot = resolve(rootDir);
   const compiledTargets = compileTargets(safeInputs.targets);
@@ -227,5 +233,5 @@ export async function resolveTargetsBounded(
     },
     { signal: safeOptions.signal },
   );
-  return frozenResolution(files, resultLimitReached || walk.capped, walk.cancelled);
+  return frozenResolution(files, { capped: resultLimitReached || walk.capped, cancelled: walk.cancelled });
 }

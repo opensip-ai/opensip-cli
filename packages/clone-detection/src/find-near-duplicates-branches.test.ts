@@ -41,6 +41,33 @@ function cand(partial: CandidateInput): CloneCandidate {
 }
 
 describe('findNearDuplicates branch behavior', () => {
+  it('caps a pathological LSH bucket and surfaces the lsh-bucket-cap coverage reason', () => {
+    // 300 identical-signature candidates (distinct bodyHash) all hash into the
+    // same buckets — over the 256-per-bucket pairwise cap. The pass must stay
+    // bounded, keep its determinism, and record the skip as coverage evidence
+    // rather than silently sampling.
+    const members = Array.from({ length: 300 }, (_, index) =>
+      cand({ bodyHash: `h${String(index)}`, language: 'typescript' }),
+    );
+    const result = findNearDuplicates(members, { minBodySize: 1 });
+    expect(result.coverage.complete).toBe(false);
+    expect(result.coverage.reasons).toEqual(['lsh-bucket-cap']);
+    expect(result.coverage.cappedBuckets).toBeGreaterThan(0);
+    // The sampled bucket still yields the cluster (bounded, not dropped).
+    expect(result.clusters.length).toBeGreaterThan(0);
+  });
+
+  it('reports complete coverage when no bucket exceeds the cap', () => {
+    const result = findNearDuplicates(
+      [
+        cand({ bodyHash: 'a', language: 'typescript' }),
+        cand({ bodyHash: 'b', language: 'typescript' }),
+      ],
+      { minBodySize: 1 },
+    );
+    expect(result.coverage).toEqual({ complete: true, reasons: [], cappedBuckets: 0 });
+  });
+
   it('returns no clusters when the LSH band count cannot evenly partition the signature', () => {
     expect(
       findNearDuplicates(
@@ -49,7 +76,7 @@ describe('findNearDuplicates branch behavior', () => {
           cand({ bodyHash: 'b', language: 'typescript' }),
         ],
         { lshBands: 7 },
-      ),
+      ).clusters,
     ).toEqual([]);
   });
 
@@ -76,7 +103,7 @@ describe('findNearDuplicates branch behavior', () => {
           }),
         ],
         { minBodySize: 200 },
-      ),
+      ).clusters,
     ).toEqual([]);
   });
 
@@ -89,7 +116,7 @@ describe('findNearDuplicates branch behavior', () => {
           cand({ bodyHash: 'c', language: 'rust' }),
         ],
         { minBodySize: 1 },
-      ),
+      ).clusters,
     ).toEqual([]);
   });
 
@@ -112,13 +139,13 @@ describe('findNearDuplicates branch behavior', () => {
           }),
         ],
         { minBodySize: 1, minSimilarity: 0.85 },
-      ),
+      ).clusters,
     ).toEqual([]);
   });
 
   it('reports exact members embedded in a connected near-duplicate component', () => {
     const sharedSignature = signature();
-    const clusters = findNearDuplicates(
+    const { clusters } = findNearDuplicates(
       [
         cand({
           bodyHash: 'same',
@@ -170,7 +197,7 @@ describe('findNearDuplicates branch behavior', () => {
         language: 'typescript',
       }),
     );
-    const clusters = findNearDuplicates(members, { minBodySize: 1 });
+    const { clusters } = findNearDuplicates(members, { minBodySize: 1 });
     expect(clusters).toHaveLength(1);
     expect(clusters[0]?.clusterSize).toBe(50);
     expect(clusters[0]?.nearMembers.length).toBeLessThanOrEqual(50);

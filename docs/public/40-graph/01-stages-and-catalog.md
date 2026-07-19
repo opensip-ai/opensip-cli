@@ -178,6 +178,15 @@ For the TypeScript adapter, resolver logic is split into one file per call shape
 
 For the TypeScript adapter, a single `ts.Program` is created in `parseProject` and shared across the walk and the resolver pass; `getTypeChecker()` is forced eagerly so parent pointers are populated before visitors walk parent chains. Cold full-rebuild runtime on the opensip-cli self-graph today is ~15 s; subsequent runs hit the incremental path described under "Cache invalidation" below. Tree-sitter adapters (Python, Rust, Go, Java) parse each file into a per-file `Tree` via a vendored `web-tree-sitter` WASM grammar — `Parser.init()` and `Language.load(<wasm>)` run once at module load — and never build a project-wide symbol table.
 
+A file the adapter cannot parse is dropped from the catalog **loudly, not
+silently**: the run log names each dropped file with a bounded parser
+diagnostic (`graph.catalog.parse.dropped` — a capped list of at most 20 files
+plus an overflow count), and the run output surfaces an
+"N file(s) failed to parse" banner beside the summary, so a catalog missing
+unparseable files is never silently green. The persisted build-coverage payload
+stays **count-only** (`parseErrorFiles`) — the per-file list appears in the
+local run log only, never in persisted state.
+
 ### Stage 3 — Index build
 
 [`pipeline/indexes.ts`](../../../packages/graph/engine/src/pipeline/indexes.ts) performs a linear scan over the now-complete catalog and builds inverted indexes that rules need:

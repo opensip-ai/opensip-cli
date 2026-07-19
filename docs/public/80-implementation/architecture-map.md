@@ -24,6 +24,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 3 | `@opensip-cli/config` | capability-configuration composer + schema registry (depends on core) |
 | 3 | `@opensip-cli/targeting` | host file-targeting runtime substrate (scope.targets; depends on core + config) |
 | 3 | `@opensip-cli/codebase` | bounded project inventory substrate (core + contracts) |
+| 3 | `@opensip-cli/shared-analysis` | shared cross-tool analysis runtime: impact compute, review-brief derivation/correlation, agent-catalog assembly (core + contracts) |
 | 3 | `@opensip-cli/lang-*` | language adapters |
 | 3 | `@opensip-cli/dashboard` | HTML report generator (core + contracts) |
 | 3 | `@opensip-cli/external-tool-adapter` | External Tool Adapter substrate (core + contracts; output devDep) |
@@ -37,7 +38,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 | 5 | `@opensip-cli/graph-*` | graph adapter packs (depend on graph) |
 | 6 | `opensip-cli` | CLI composition root (loads Tools dynamically, no static Tool imports) |
 
-## Workspace packages (60: 57 publishable, 3 private)
+## Workspace packages (61: 58 publishable, 3 private)
 
 - `@opensip-cli/agent-eval`
 - `@opensip-cli/checks-cpp`
@@ -76,6 +77,7 @@ gate is `.config/dependency-cruiser.cjs` (enforced by `pnpm depcruise`).
 - `@opensip-cli/mcp`
 - `@opensip-cli/output`
 - `@opensip-cli/session-store`
+- `@opensip-cli/shared-analysis`
 - `@opensip-cli/simulation`
 - `@opensip-cli/targeting`
 - `@opensip-cli/test-support`

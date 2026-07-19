@@ -4,7 +4,11 @@ import { createToolLogger, currentScope } from '@opensip-cli/core';
 import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
-import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
+import {
+  buildUnifiedReportLines,
+  parseFailureBannerText,
+  resolutionBannerText,
+} from './graph-report.js';
 import { graphCompletionLogFields } from './graph-run-outcome.js';
 import { buildGraphSessionContribution } from './graph-session-contribution.js';
 import { readGraphEnv } from './pressure-monitor.js';
@@ -236,6 +240,10 @@ async function renderGraphResult(
 ): Promise<SignalEnvelope> {
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   const envelope = envelopeFor(opts, result, durationMs);
+  // Fail-loud partial-coverage notice: a catalog missing unparseable files is
+  // surfaced on every run-output surface (banner in human mode, outcome
+  // warning in --json); the run log names each dropped file.
+  const parseFailureNotice = parseFailureBannerText(result.catalog?.buildCoverage?.parseErrorFiles);
   if (opts.json === true) {
     log.info({
       evt: 'graph.render.json.start',
@@ -254,7 +262,19 @@ async function renderGraphResult(
         apiKey: opts.apiKey,
       });
     }
-    emitAgentFilteredJsonOutput(cli, envelope, opts);
+    emitAgentFilteredJsonOutput(
+      cli,
+      envelope,
+      opts,
+      parseFailureNotice === undefined
+        ? undefined
+        : [
+            {
+              message: parseFailureNotice,
+              code: 'graph.catalog.parse.partial',
+            },
+          ],
+    );
     log.info({
       evt: 'graph.render.json.complete',
       module: MODULE_GRAPH_RENDER,
@@ -285,18 +305,20 @@ async function renderGraphResult(
         ),
       }
     : undefined;
-  const resolutionBanner = resolutionBannerText(result.catalog?.resolutionMode);
   // envelope-first-presentation RP-2: route graph's static render through the
   // shared RunPresentation. The envelope IS carried (it drives the verdict and
   // optional verbose/detail table); `durationMs` is threaded so the host-owned
   // wall-clock wins over the unit-sum (graph units carry durationMs:0); the
-  // resolution caveat moves to `banners`.
+  // resolution caveat and the parse-failure coverage notice move to `banners`.
+  const banners = [resolutionBannerText(result.catalog?.resolutionMode), parseFailureNotice].filter(
+    (line): line is string => line !== undefined,
+  );
   const presentation: RunPresentation = {
     type: 'run-presentation',
     tool: 'graph',
     envelope,
     ...(verboseDetail === undefined ? {} : { verboseDetail }),
-    ...(resolutionBanner === undefined ? {} : { banners: [resolutionBanner] }),
+    ...(banners.length === 0 ? {} : { banners }),
     durationMs,
   };
   await cli.render(presentation);

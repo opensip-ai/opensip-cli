@@ -15,11 +15,17 @@ import {
 } from './near-duplicate-signature.js';
 import { UnionFind } from './near-duplicate-union-find.js';
 
-import type { CloneCandidate, NearDupOpts, NearDuplicateCluster } from './types.js';
+import type { CloneCandidate, NearDupOpts, NearDuplicateCluster, NearDuplicateResult } from './types.js';
 
 const DEFAULT_MIN_SIMILARITY = 0.85;
 const DEFAULT_MIN_BODY_SIZE = 200;
 const MAX_CLUSTER_SIZE = 50;
+// Pairwise-loop bound per LSH bucket: a pathological bucket (many similar
+// bodies hashing together) otherwise blows up O(k^2), undermining the
+// LSH+MinHash design that exists to avoid all-pairs. Oversized buckets are
+// deterministically sampled (first N in eligible order) and the skip is
+// surfaced as the 'lsh-bucket-cap' coverage reason — bounded, never silent.
+const MAX_BUCKET_PAIRWISE = 256;
 
 /**
  * Detect near-duplicate body clusters (Jaccard ≥ `minSimilarity`, same language, distinct
@@ -28,7 +34,7 @@ const MAX_CLUSTER_SIZE = 50;
 export function findNearDuplicates(
   candidates: readonly CloneCandidate[],
   opts: NearDupOpts = {},
-): NearDuplicateCluster[] {
+): NearDuplicateResult {
   const minSimilarity = opts.minSimilarity ?? DEFAULT_MIN_SIMILARITY;
   const minBodySize = opts.minBodySize ?? DEFAULT_MIN_BODY_SIZE;
   const bands = opts.lshBands ?? NEAR_DUP_LSH_BANDS;
@@ -36,14 +42,25 @@ export function findNearDuplicates(
   // bands MUST divide k evenly — otherwise `rows` is fractional and band slicing is
   // misaligned. `rows * bands === k` alone does not catch this (128/7*7 round-trips to
   // 128 in IEEE-754), so test integrality.
-  if (!Number.isInteger(rows) || rows < 1) return [];
+  if (!Number.isInteger(rows) || rows < 1) return emptyResult();
 
   const eligible = collectEligible(candidates, minBodySize);
-  if (eligible.length < 2) return [];
+  if (eligible.length < 2) return emptyResult();
 
-  const edges = buildNearEdges(eligible, minSimilarity, bands, rows);
+  const { edges, cappedBuckets } = buildNearEdges(eligible, minSimilarity, bands, rows);
   const components = clusterComponents(eligible.length, edges);
-  return emitComponentClusters(eligible, components, edges);
+  return {
+    clusters: emitComponentClusters(eligible, components, edges),
+    coverage: {
+      complete: cappedBuckets === 0,
+      reasons: cappedBuckets === 0 ? [] : ['lsh-bucket-cap'],
+      cappedBuckets,
+    },
+  };
+}
+
+function emptyResult(): NearDuplicateResult {
+  return { clusters: [], coverage: { complete: true, reasons: [], cappedBuckets: 0 } };
 }
 
 function collectEligible(
@@ -71,14 +88,18 @@ function buildNearEdges(
   minSimilarity: number,
   bands: number,
   rows: number,
-): NearEdge[] {
+): { edges: NearEdge[]; cappedBuckets: number } {
   const buckets = indexLshBuckets(eligible, bands, rows);
   const edges: NearEdge[] = [];
   const seenPairs = new Set<string>();
+  let cappedBuckets = 0;
   for (const indices of buckets.values()) {
-    collectBucketEdges(indices, eligible, minSimilarity, seenPairs, edges);
+    // Deterministic sample (first N in eligible order) before the O(k^2) loop.
+    const bounded = indices.length > MAX_BUCKET_PAIRWISE ? indices.slice(0, MAX_BUCKET_PAIRWISE) : indices;
+    if (bounded !== indices) cappedBuckets += 1;
+    collectBucketEdges(bounded, eligible, minSimilarity, seenPairs, edges);
   }
-  return edges;
+  return { edges, cappedBuckets };
 }
 
 function indexLshBuckets(

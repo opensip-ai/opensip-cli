@@ -6,7 +6,6 @@ import path from 'node:path';
 import {
   buildImpactTrust,
   changedEntriesToImpactUncertainties,
-  computeImpact,
   gitWarningsToImpactUncertainties,
   mergeImpactUncertainties,
   type FitOptions,
@@ -15,6 +14,7 @@ import {
   type ImpactUncertainty,
 } from '@opensip-cli/contracts';
 import { createToolLogger, currentScope, resolveChangedFiles } from '@opensip-cli/core';
+import { computeImpact } from '@opensip-cli/shared-analysis';
 
 const log = createToolLogger('fitness:cli');
 const WORKING_TREE_BASIS = 'changed:git:working-tree';

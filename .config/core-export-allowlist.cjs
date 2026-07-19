@@ -7,6 +7,7 @@
 const EXPORT_ALLOWLIST = {
   AuthorSeverity: 'shared-data-contracts',
   BuildSignalBatchInput: 'shared-data-contracts',
+  compareByCodePoint: 'shared-data-contracts',
   COMMENT_OPENERS: 'shared-data-contracts',
   CLI_COMMAND_SURFACE_CONTRACT_VERSION: 'shared-data-contracts',
   CLOUD_WIRE_CONTRACT_VERSION: 'shared-data-contracts',
@@ -238,6 +239,7 @@ const EXPORT_ALLOWLIST = {
   readDeclaredKind: 'discovery-substrate',
   readMarkerKind: 'discovery-substrate',
   readProjectPluginsList: 'discovery-substrate',
+  readDeclaredCapabilityPackageMetadata: 'discovery-substrate',
   readToolPackageMetadata: 'discovery-substrate',
   registerCapabilityDomainsFromManifest: 'discovery-substrate',
   registerRecipesFromMod: 'discovery-substrate',

@@ -26,7 +26,8 @@ export const dogfoodGroundTruth = {
     {
       symbol: 'computeImpact',
       declarationKind: 'function',
-      definingFile: 'packages/contracts/src/graph-impact-compute.ts',
+      // Moved out of contracts by the plan-09 shared-analysis extraction.
+      definingFile: 'packages/shared-analysis/src/graph-impact-compute.ts',
       referenceFiles: [
         'packages/fitness/engine/src/cli/fit/changed-targeting.ts',
         'packages/graph/engine/src/cli/impact.ts',

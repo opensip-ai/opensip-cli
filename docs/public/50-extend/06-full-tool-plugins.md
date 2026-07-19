@@ -444,10 +444,18 @@ controls do not reduce the current user's ordinary Node filesystem/network
 authority and must not be described as an OS sandbox
 ([ADR-0145](../../decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
 
-**In-process capability packs** (custom checks, graph adapters loaded via
-`plugins.<domain>`) are the **least isolated** extension surface: they load in the
-host process with import-error isolation only — no worker boundary. The external
-worker fork does **not** cover them.
+**Capability packs** (custom checks, scenario packs, graph adapters loaded via
+`plugins.<domain>`) follow a split posture
+([ADR-0171](../../decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)):
+bundled first-party packs load in the host process; admitted external packs run
+through the owning tool's capability worker bridge. That worker's resource
+guard is **sharpened-advisory defense-in-depth**, not containment: it exists to
+catch *accidental* undeclared filesystem/network/subprocess use by
+operator-admitted code (and its diagnostic says so). **Admission is the
+enforced boundary** — an admitted pack runs with the host user's real
+filesystem and network authority. True containment is deferred to the
+process-level plugin-isolation roadmap. The external-tool worker fork above
+does **not** cover capability packs.
 
 For the full extension trust-tier matrix, see
 [ADR-0061](../../decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
@@ -468,12 +476,19 @@ What is enforced at admission:
   bounded `cli.trust.tool_wildcard_ignored` warning; it never admits a Tool.
   Managed install records and committed exact project trust remain the normal
   paths ([ADR-0145](../../decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
-- Deny-by-default capability packs for marker-discovered in-process extensions.
-  Bundled first-party packs are trusted, and exact packages listed in
-  `plugins.checkPackages`, `plugins.scenarioPackages`, or `plugins.graphAdapters`
-  are explicit project trust decisions. Ambient marker-discovered packs require
-  `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` by exact package name before import.
-  Wildcard allowlisting is ignored for capability packs.
+- Deny-by-default capability packs for in-process extensions
+  ([ADR-0171](../../decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
+  Bundled first-party packs are trusted. A `plugins.checkPackages`,
+  `plugins.scenarioPackages`, or `plugins.graphAdapters` entry **selects** a
+  pack for discovery but never trusts it — the analyzed repo's own config is
+  exactly the surface an analysis tool must not take trust decisions from.
+  External packs are admitted only by the user-level global-config trust list,
+  written by the operator ceremony `opensip policy trust <pack>`: each grant
+  binds the exact package id to the pack's provenance (its `opensipTools`
+  manifest hash) resolved at grant time, so a repo shadowing a trusted name
+  with different code is denied — re-run `policy trust` after the pack
+  legitimately changes. The former `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` env
+  override is removed, and `*` is never honored for capability packs.
 - **Mount isolation** — a broken external `commandSpecs` declaration warns and
   continues; bundled mount failures abort startup (exit 5).
 - **`tools validate`** — probes a not-yet-trusted package in a child process

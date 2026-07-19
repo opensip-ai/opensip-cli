@@ -94,8 +94,10 @@ export type {
 } from './document/targeting.js';
 export {
   GLOBAL_CONFIG_PATH,
+  grantCapabilityTrust,
   readGlobalConfig,
   readGlobalTrustPolicy,
+  revokeCapabilityTrust,
   writeGlobalConfig,
   resolveApiKey,
   resolveEffectiveCloudConfig,
@@ -126,9 +128,11 @@ export {
   policyResourceClassSchema,
   policySubjectKindSchema,
   provenanceStatusSchema,
+  capabilityTrustGrantSchema,
   trustPolicyExceptionSchema,
   trustPolicyOrgConfigSchema,
   trustPolicySchema,
+  userTrustPolicySchema,
 } from './policy/trust-policy-schema.js';
 export type {
   OrgPolicyCacheDocument,
@@ -147,11 +151,13 @@ export type {
   ProvenanceStatus,
   ResolvedTrustPolicy,
   ResolvedTrustPolicyException,
+  CapabilityTrustGrant,
   TrustPolicyDocument,
   TrustPolicyExceptionDocument,
   TrustPolicyOrgConfig,
   TrustPolicySource,
   TrustPolicySourceTier,
+  UserTrustPolicyDocument,
 } from './policy/trust-policy-schema.js';
 export {
   BUILTIN_TRUST_POLICY,

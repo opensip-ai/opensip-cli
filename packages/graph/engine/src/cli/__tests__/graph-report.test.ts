@@ -14,6 +14,7 @@ import { buildIndexes } from '../../pipeline/indexes.js';
 import {
   buildLiveGraphOutput,
   buildUnifiedReportLines,
+  parseFailureBannerText,
   resolutionBannerText,
 } from '../graph-report.js';
 
@@ -155,6 +156,19 @@ describe('resolutionBannerText', () => {
     expect(resolutionBannerText('fast')).toContain('Resolution: fast (syntactic)');
     expect(resolutionBannerText('exact')).toBeUndefined();
     expect(resolutionBannerText(undefined)).toBeUndefined();
+  });
+});
+
+describe('parseFailureBannerText', () => {
+  it('names the dropped-file count and points at the run log', () => {
+    expect(parseFailureBannerText(2)).toBe(
+      '2 file(s) failed to parse — their functions are missing from the graph; the run log names each file.',
+    );
+  });
+
+  it('stays silent for full coverage', () => {
+    expect(parseFailureBannerText(0)).toBeUndefined();
+    expect(parseFailureBannerText(undefined)).toBeUndefined();
   });
 });
 

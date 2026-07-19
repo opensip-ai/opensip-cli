@@ -2,13 +2,15 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { logger } from '@opensip-cli/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { catalogBuildCoverage } from '../catalog-build-coverage.js';
 
 const roots: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -55,6 +57,62 @@ describe('catalogBuildCoverage', () => {
       discoveredFiles: 1,
       parseErrorFiles: 0,
     });
+  });
+
+  it('names every dropped parse file in the run log without touching the payload', () => {
+    const root = mkdtempSync(join(tmpdir(), 'graph-build-coverage-log-'));
+    roots.push(root);
+    const file = join(root, 'broken.ts');
+    writeFileSync(file, 'const = ;\n');
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const coverage = catalogBuildCoverage({
+      projectRoot: root,
+      files: [file],
+      parseErrors: [{ filePath: 'broken.ts', message: "')' expected.\nsecond line" }],
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.catalog.parse.dropped',
+        module: 'graph:catalog-build-coverage',
+        count: 1,
+        files: ["broken.ts: ')' expected. second line"],
+        overflow: 0,
+      }),
+    );
+    // The persisted payload stays count-only — no paths, no messages.
+    expect(coverage).toMatchObject({ parseErrorFiles: 1 });
+    expect(JSON.stringify(coverage)).not.toContain('broken.ts');
+  });
+
+  it('caps the logged file list and message length, recording the overflow', () => {
+    const root = mkdtempSync(join(tmpdir(), 'graph-build-coverage-cap-'));
+    roots.push(root);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const parseErrors = Array.from({ length: 25 }, (_, index) => ({
+      filePath: `broken-${String(index)}.ts`,
+      message: 'x'.repeat(500),
+    }));
+
+    catalogBuildCoverage({ projectRoot: root, files: [], parseErrors });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    const event = warn.mock.calls[0]?.[0] as { count: number; files: string[]; overflow: number };
+    expect(event.count).toBe(25);
+    expect(event.files).toHaveLength(20);
+    expect(event.overflow).toBe(5);
+    for (const entry of event.files) expect(entry.length).toBeLessThanOrEqual(250);
+  });
+
+  it('stays silent when no parse errors occurred', () => {
+    const root = mkdtempSync(join(tmpdir(), 'graph-build-coverage-quiet-'));
+    roots.push(root);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    catalogBuildCoverage({ projectRoot: root, files: [], parseErrors: [] });
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('degrades a missing project root without masking the graph result', () => {

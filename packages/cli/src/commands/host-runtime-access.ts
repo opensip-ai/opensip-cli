@@ -441,11 +441,6 @@ export function enterHostOwnershipForTests(args: {
   });
 }
 
-/** True when the current process already holds user-state write authority. */
-export function hasEnteredUserStateOwner(): boolean {
-  return enteredHostOwnership?.userState === true;
-}
-
 /**
  * Run `fn` under entered user-state ownership. Reuses an existing user-state
  * owner when present; otherwise acquires a short user-state lease (optionally

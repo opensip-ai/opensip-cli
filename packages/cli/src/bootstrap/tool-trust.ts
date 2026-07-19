@@ -51,12 +51,6 @@ export const PROJECT_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_PROJECT_TOOLS';
  */
 export const INSTALLED_TOOL_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_INSTALLED_TOOLS';
 
-/**
- * Environment variable carrying the capability-pack allowlist. Unlike the older
- * tool allowlists, this launch surface is exact-name only: wildcard `*` is not
- * honored.
- */
-export const CAPABILITY_PACK_ALLOWLIST_ENV = 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS';
 
 const TOOL_TRUST_FILE = 'tool-trust.json';
 const TOOL_TRUST_SCHEMA_VERSION = 1;
@@ -104,16 +98,6 @@ function warnIgnoredToolWildcard(envVar: string, allow: ReadonlySet<string>): vo
   logger.warn({
     evt: 'cli.trust.tool_wildcard_ignored',
     envVar,
-  });
-}
-
-function warnIgnoredCapabilityWildcard(allow: ReadonlySet<string>): void {
-  if (!allow.has('*')) return;
-  logger.warn({
-    evt: 'cli.trust.capability_wildcard_ignored',
-    envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
-    detail:
-      'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS requires exact package names; wildcard * is ignored',
   });
 }
 
@@ -370,16 +354,8 @@ export function isInstalledToolTrusted(id: string, env: NodeJS.ProcessEnv = proc
   return allow.has(id);
 }
 
-/**
- * Decide whether a third-party capability pack may be imported into the host
- * process. First-party bundled packs are handled by the caller; this predicate
- * is exact-name allowlist only and intentionally does not honor `*`.
- */
-export function isCapabilityPackTrusted(
-  packageName: string,
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  const allow = parseAllowlist(env[CAPABILITY_PACK_ALLOWLIST_ENV]);
-  warnIgnoredCapabilityWildcard(allow);
-  return allow.has(packageName);
-}
+// The capability-pack env allowlist (OPENSIP_CLI_ALLOW_CAPABILITY_PACKS) was
+// REMOVED (plan 09 Phase 3): repo-committed workflow files and direnv can set
+// env for a direct `opensip` invocation, so an env allowlist re-opened the
+// trust inversion the admission fix closes. The single capability trust
+// surface is the user-level global-config trust list (`opensip policy trust`).

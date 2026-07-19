@@ -5,12 +5,12 @@
  * orchestration remain private. MCP and other consumers import this subpath only.
  */
 
-export { buildComputeImpactIndex } from '@opensip-cli/contracts';
 export type {
   ComputeImpactAsyncOptions,
   ComputeImpactIndex,
   ComputeImpactOptions,
 } from '@opensip-cli/contracts';
+export { buildComputeImpactIndex } from '@opensip-cli/shared-analysis';
 
 export { readCatalogIdentity, loadCatalogGeneration } from './catalog.js';
 export { catalogGenerationKey } from './catalog-generation-key.js';
@@ -46,7 +46,14 @@ export {
   GRAPH_SYMBOL_PACKAGE_MAX,
 } from './query-contracts.js';
 export { verifyCatalogInputs, isSafeAdapterDescriptor } from './catalog-freshness.js';
-export { makeFacet, mergeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
+export {
+  clampLimit,
+  isCapReason,
+  makeFacet,
+  mergeFacet,
+  rollupFacets,
+  UNREQUESTED_FACET,
+} from './bounded-view.js';
 export type { CoverageFacetSet } from './bounded-view.js';
 export { buildOccurrenceCallView } from './occurrence-call-view.js';
 export {

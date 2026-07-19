@@ -7,9 +7,15 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ContractsModule from '@opensip-cli/contracts';
+
 const loadCliDefaultsFromContracts = vi.fn();
 
-vi.mock('@opensip-cli/contracts', () => ({
+// PARTIAL mock (plan 09 Task 8.7): a full-replacement mock of the
+// highest-churn shared package silently absorbs every other export as
+// `undefined`, letting a defensive fallback stay green through real drift.
+vi.mock('@opensip-cli/contracts', async (importOriginal) => ({
+  ...(await importOriginal<typeof ContractsModule>()),
   loadCliDefaults: loadCliDefaultsFromContracts,
 }));
 

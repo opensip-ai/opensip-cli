@@ -1,5 +1,4 @@
 import {
-  assembleAgentCatalog,
   buildSignalEnvelope,
   type CommandResult,
   type StoredSession,
@@ -15,6 +14,7 @@ import {
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
+import { assembleAgentCatalog } from '@opensip-cli/shared-analysis';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { McpStdioServer } from '../server.js';

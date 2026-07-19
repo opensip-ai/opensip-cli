@@ -1,10 +1,6 @@
 /** Immutable catalog generation identity and derived-index construction. */
 
-import {
-  buildComputeImpactIndex,
-  ComputeImpactCancelledError,
-  type ComputeImpactIndex,
-} from '@opensip-cli/contracts';
+import { ComputeImpactCancelledError, type ComputeImpactIndex } from '@opensip-cli/contracts';
 import {
   buildGraphReadIndexes,
   catalogGenerationKey,
@@ -13,6 +9,7 @@ import {
   type FeatureTable,
   type Indexes,
 } from '@opensip-cli/graph/read';
+import { buildComputeImpactIndex } from '@opensip-cli/shared-analysis';
 
 export type GenerationSource = 'initial-load' | 'persisted-auto-swap' | 'refresh-rebuild';
 

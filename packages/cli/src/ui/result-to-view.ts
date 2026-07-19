@@ -392,7 +392,8 @@ export function resultToView(result: CommandResult): ViewNode {
     }
     case 'policy-audit':
     case 'policy-explain':
-    case 'policy-status': {
+    case 'policy-status':
+    case 'policy-trust': {
       return viewPolicyResult(result);
     }
     case 'clear-done': {

@@ -312,6 +312,7 @@
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/shared-analysis": "workspace:*",
     "@opensip-cli/targeting": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "commander": "^15.0.0",

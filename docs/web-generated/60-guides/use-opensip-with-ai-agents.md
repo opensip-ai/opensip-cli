@@ -7,12 +7,12 @@ audience: [getting-started, ci-integrators]
 purpose: "Three agent loops — Discover, Edit, Final — over the machine-first CLI surface."
 source-files:
   - packages/cli/src/commands/agent-catalog.ts
-  - packages/contracts/src/agent-catalog-assembly.ts
+  - packages/shared-analysis/src/agent-catalog-assembly.ts
   - packages/contracts/src/agent-catalog.ts
   - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/contracts/src/agent-filters.ts
   - packages/contracts/src/impact-trust.ts
-  - packages/contracts/src/review-brief-correlation.ts
+  - packages/shared-analysis/src/review-brief-correlation.ts
   - packages/core/src/lib/git-changed-files.ts
   - packages/graph/engine/src/cli/impact.ts
   - packages/fitness/engine/src/cli/fit/changed-targeting.ts

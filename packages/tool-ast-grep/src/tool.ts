@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { ConfigurationError, readPackageVersion } from '@opensip-cli/core';
 import {
+  buildScannerExclude,
   defineExternalToolAdapter,
   parseFirstSemver,
   parseStdoutSarif,
@@ -63,14 +64,10 @@ export function buildAstGrepExclude(input: { readonly excludePath: string }): {
 } {
   // gitignore-style globs are rooted at the scan root — absolute host paths do
   // not match. Prefer the portable runtime segment (Semgrep-style).
-  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
-  const relativeSegment = normalized.includes('opensip-cli/.runtime')
-    ? 'opensip-cli/.runtime'
-    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
-  const pattern = relativeSegment.endsWith('/**')
-    ? `!${relativeSegment}`
-    : `!${relativeSegment}/**`;
-  return { args: ['--globs', pattern] };
+  return buildScannerExclude(input, {
+    flag: '--globs',
+    pattern: (segment) => (segment.endsWith('/**') ? `!${segment}` : `!${segment}/**`),
+  });
 }
 
 export const tool: Tool = defineExternalToolAdapter({

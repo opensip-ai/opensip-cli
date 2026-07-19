@@ -20,6 +20,8 @@ export * from './host-tool-runtime-import-boundary.js';
 export * from './live-view-through-cli-live.js';
 export * from './mcp-results-no-rerun.js';
 export * from './no-bootstrap-tool-import.js';
+export * from './no-full-replacement-vi-mock.js';
+export * from './string-prefilter-superset.js';
 export * from './no-run-done-result.js';
 export * from './single-opts-assembly-seam.js';
 export * from './subprocess-correlation-required.js';

@@ -6,13 +6,17 @@ import { executeRunsList, executeRunsShow } from '../run-history.js';
 
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
+import type * as SessionStoreModule from '@opensip-cli/session-store';
 
 const readMocks = vi.hoisted(() => ({
   listParentRuns: vi.fn(),
   resolveParentRun: vi.fn(),
 }));
 
-vi.mock('@opensip-cli/session-store', () => readMocks);
+vi.mock('@opensip-cli/session-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof SessionStoreModule>()),
+  ...readMocks,
+}));
 
 const STORE = {} as DataStore;
 

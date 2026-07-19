@@ -5,5 +5,3 @@ export class UserRepository {
     this.records.set(id, name)
   }
 }
-
-// implementation: UserRepository

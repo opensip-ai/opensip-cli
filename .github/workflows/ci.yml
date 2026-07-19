@@ -194,6 +194,14 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: pnpm test:coverage:fresh
 
+      # Plan 09 Phase 4: the shareable report's self-containment guarantee
+      # (293 MB blow-up class) runs post-build against the restored dist —
+      # the offline test executes the REAL built CLI; the validation suite
+      # reports SKIPPED here (no dogfood report in this job) and asserts in
+      # the dogfood job below.
+      - name: Report integration lane (post-build)
+        run: pnpm test:integration:built
+
   dogfood:
     needs: setup
     runs-on: ubuntu-latest
@@ -226,6 +234,14 @@ jobs:
 
       # Fit/graph/yagni share opensip-cli/.runtime/datastore.sqlite — run
       # sequentially in one job (not as parallel background processes).
+      #
+      # The private dogfood check pack is selected by plugins.checkPackages but
+      # no longer trusted by it (plan 09 Phase 3: analyzed-repo config is not
+      # operator trust). The runner is the operator here, so the workflow
+      # performs the provenance-binding grant ceremony before the gate.
+      - name: Trust the repo-local dogfood check pack
+        run: node packages/cli/dist/index.js policy trust @opensip-cli/checks-dogfood
+
       - name: Fit (dogfood)
         id: fit
         run: pnpm fit:ci
@@ -271,6 +287,15 @@ jobs:
       - name: YAGNI (dogfood)
         id: yagni
         run: pnpm yagni:ci
+
+      # Plan 09 Phase 4: compose the dogfood report from the gate runs above
+      # and boot it end-to-end — the validation suite's assertions only run
+      # when this report exists, so this is where they bite.
+      - name: Generate dogfood report
+        run: node packages/cli/dist/index.js report --no-open
+
+      - name: Dashboard validation against the dogfood report
+        run: pnpm --filter=@opensip-cli/dashboard exec vitest run --config vitest.integration.config.ts src/__tests__/dashboard-validation.integration.test.ts
 
       - name: Upload yagni SARIF
         if: >-
@@ -458,6 +483,9 @@ jobs:
 
       - name: Verify pnpm injected packages are fresh
         run: node scripts/verify-pnpm-injection.mjs
+
+      - name: Trust the repo-local dogfood check pack (cold)
+        run: node packages/cli/dist/index.js policy trust @opensip-cli/checks-dogfood
 
       - name: Fit cold dogfood gate
         run: pnpm fit:ci

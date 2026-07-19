@@ -1,30 +1,31 @@
 /**
  * `agent-catalog` command adapter.
  *
- * The catalog projection (`buildAgentCatalog` + its `AgentCatalog` / `CommandTier`
- * types) was re-homed into `@opensip-cli/contracts` (ADR-0084) so
- * `@opensip-cli/mcp` can serve the same surface without importing the
- * composition root. This module re-exports it for existing call sites/tests and
- * keeps the host rendering wrapper (`executeAgentCatalog`).
+ * The catalog projection was re-homed out of the composition root (ADR-0084)
+ * so `@opensip-cli/mcp` can serve the same surface: the `AgentCatalog` /
+ * `CommandTier` TYPES live in `@opensip-cli/contracts`, and the content
+ * builder + transport-parity assembler live in `@opensip-cli/shared-analysis`
+ * (Plan 09 Phase 7). This module re-exports both for existing call
+ * sites/tests and keeps the host rendering wrapper (`executeAgentCatalog`).
  */
 
 import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
-import {
-  assembleAgentCatalog,
-  hostSupportFromRuntimeProjection,
-  summarizeTargetConventions,
-  type AgentHostSupport,
-} from '@opensip-cli/contracts';
+import { type AgentHostSupport } from '@opensip-cli/contracts';
 import {
   currentScope,
   PLATFORM_SUPPORT_CONTRACT_VERSION,
   projectRuntimeHostSupport,
   type ToolRegistry,
 } from '@opensip-cli/core';
+import {
+  assembleAgentCatalog,
+  hostSupportFromRuntimeProjection,
+  summarizeTargetConventions,
+} from '@opensip-cli/shared-analysis';
 
 import { HOST_RESERVED_ROOT_COMMANDS } from '../bootstrap/reserved-names.js';
 
-export { buildAgentCatalog } from '@opensip-cli/contracts';
+export { buildAgentCatalog } from '@opensip-cli/shared-analysis';
 export type { AgentCatalog, CommandTier } from '@opensip-cli/contracts';
 
 /**

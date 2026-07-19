@@ -68,9 +68,11 @@ describe('analysis lifecycle events', () => {
     emitAnalysisLifecycleEvent(cli, configLifecycleEvent('analysis.config.defaulted'));
     emitAnalysisLifecycleEvent(cli, runLifecycleEvent('analysis.run.failed'));
 
+    // 'validate' — the previous 'error' phase was outside the real
+    // DiagnosticPhase union; the untyped seam let it through (plan 09 8.5).
     expect(diagnostics.event).toHaveBeenNthCalledWith(
       1,
-      'error',
+      'validate',
       'debug',
       'analysis.config.rejected',
       {},
@@ -89,8 +91,15 @@ describe('analysis lifecycle events', () => {
       'analysis.run.failed',
       {},
     );
+    // Lean-but-VALID context: scope present, diagnostics absent (a lean test
+    // scope) → no-throw. A context with no scope at all is no longer
+    // tolerated — the typed seam restored the required-ness the old
+    // `as unknown as` cast erased (plan 09 Task 8.5).
     expect(() =>
-      emitAnalysisLifecycleEvent({} as ToolCliContext, runLifecycleEvent('analysis.run.completed')),
+      emitAnalysisLifecycleEvent(
+        { scope: {}, logger: { debug: () => undefined } } as unknown as ToolCliContext,
+        runLifecycleEvent('analysis.run.completed'),
+      ),
     ).not.toThrow();
   });
 });

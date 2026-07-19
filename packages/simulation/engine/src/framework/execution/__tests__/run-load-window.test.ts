@@ -197,12 +197,15 @@ describe('runLoadWindow', () => {
     const ac = new AbortController();
     const ct = countingTarget(5);
     setTimeout(() => ac.abort(), 120);
-    const start = Date.now();
     const r = await runLoadWindow({ workload: { rps: 100 } }, ctx(ac.signal), {
       windowMs: 5000,
       target: ct.target,
     });
-    expect(Date.now() - start).toBeLessThan(2000);
+    // Outcome-based (plan 09 Task 8.7): the abort must have cut the 5s window
+    // short — proven by the dispatched-request count staying far below the
+    // full-window volume (100 rps x 5 s = 500), not by a wall-clock bound
+    // that flakes on loaded CI runners.
     expect(r.metrics.totalRequests).toBeGreaterThan(0);
+    expect(r.metrics.totalRequests).toBeLessThan(100);
   });
 });

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderFitLive } from '../fit-runner.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from '../fit.js';
 
+import type * as CliLiveModule from '@opensip-cli/cli-live';
 import type { LiveRunSpec } from '@opensip-cli/cli-live';
 import type { FitOptions } from '@opensip-cli/contracts';
 import type * as CoreModule from '@opensip-cli/core';
@@ -29,7 +30,8 @@ const runToolLiveView = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() => vi.fn());
 const currentScope = vi.hoisted(() => vi.fn());
 
-vi.mock('@opensip-cli/cli-live', () => ({
+vi.mock('@opensip-cli/cli-live', async (importOriginal) => ({
+  ...(await importOriginal<typeof CliLiveModule>()),
   runToolLiveView,
 }));
 

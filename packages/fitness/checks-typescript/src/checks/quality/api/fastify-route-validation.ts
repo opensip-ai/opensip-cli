@@ -15,7 +15,13 @@ import * as ts from 'typescript';
 /**
  * Quick filter regex to check if file might contain Fastify routes
  */
-const QUICK_FILTER_PATTERNS = /fastify\.(post|patch|put)|\.post\(|\.patch\(|\.put\(/i;
+/**
+ * Pre-filter superset contract: the AST pass matches any call of a property
+ * named `post`/`patch`/`put` (case-insensitive), including generic calls like
+ * `fastify.post<{ Body: X }>(...)` — which the old `\.post\(` form missed
+ * (no `(` directly after the name). Gate on the bare method words instead.
+ */
+const QUICK_FILTER_PATTERNS = /\b(post|patch|put)\b/i;
 
 /**
  * Patterns that indicate Zod validation is present

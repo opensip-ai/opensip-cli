@@ -55,6 +55,8 @@ const EXPECTED = [
   'GRAPH_SYMBOL_PACKAGE_MAX',
   'verifyCatalogInputs',
   'isSafeAdapterDescriptor',
+  'clampLimit',
+  'isCapReason',
   'makeFacet',
   'mergeFacet',
   'rollupFacets',
@@ -288,11 +290,16 @@ describe('@opensip-cli/graph/read catalog Results', () => {
       },
     });
     expect(error).toHaveBeenCalledTimes(1);
-    expect(error).toHaveBeenCalledWith({
-      evt: 'graph.catalog.read.error',
-      module: 'graph:catalog-repo',
-      code: 'GRAPH.CATALOG.READ_FAILED',
-    });
+    // Fail-loud: the read error carries its cause (`err`, plus a bounded
+    // stack when available) beside the stable allowlisted code.
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.catalog.read.error',
+        module: 'graph:catalog-repo',
+        code: 'GRAPH.CATALOG.READ_FAILED',
+        err: expect.any(String) as string,
+      }),
+    );
     expect(JSON.stringify(error.mock.calls)).not.toContain('secret');
     expect(JSON.stringify(error.mock.calls)).not.toContain('sqlite');
   });

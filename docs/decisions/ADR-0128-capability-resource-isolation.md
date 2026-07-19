@@ -1,6 +1,6 @@
 ---
-status: active
-last_verified: 2026-07-02
+status: superseded
+last_verified: 2026-07-18
 owner: opensip-cli
 ---
 
@@ -10,9 +10,9 @@ owner: opensip-cli
 id: ADR-0128
 title: Capability resource isolation
 date: 2026-07-02
-status: active
+status: superseded
 supersedes: [ADR-0081]
-superseded_by: null
+superseded_by: ADR-0171
 related: [ADR-0054, ADR-0061, ADR-0074, ADR-0081, ADR-0126]
 tags: [plugins, capability-packs, isolation, trust-policy]
 enforcement: mechanizable

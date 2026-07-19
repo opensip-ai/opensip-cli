@@ -48,6 +48,9 @@ function makeCli(): ToolCliContext & { _state: { code?: number } } {
   const state: { code?: number } = {};
   return {
     scope: { datastore: () => undefined },
+    // `logger` is a REQUIRED ToolCliContext member — the typed lifecycle seam
+    // (plan 09 Task 8.5) no longer tolerates a context without one.
+    logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     emitEnvelope: vi.fn(),
     emitJson: vi.fn(),
     emitRaw: vi.fn(),

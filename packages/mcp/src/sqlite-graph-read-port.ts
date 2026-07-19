@@ -8,23 +8,17 @@
  * to public graph/read functions — never accesses `.db` or graph persistence.
  */
 
-import { createHash } from 'node:crypto';
-
 import {
-  buildImpactTrust,
   ComputeImpactCancelledError,
-  TEST_SELECTION_SCHEMA_VERSION,
   type ComputeImpactIndex,
   type ProjectInventorySnapshot,
   type TaskContextSnapshotPointer,
-  type TestSelectionSnapshot,
-  type VerificationCommand,
 } from '@opensip-cli/contracts';
 import { err, ok, type LanguageAdapter, type Result } from '@opensip-cli/core';
 import {
   buildArchitectureView,
   buildImpactView,
-  compareCodePointStrings,
+  clampLimit,
   continuationToken,
   deriveGraphReadFeatures,
   loadCatalogGeneration,
@@ -62,10 +56,15 @@ import {
   rejectCursorWithoutGeneration,
   validateCursorBinding,
 } from './graph-query-page.js';
-import { clampLimit } from './graph-read-projection.js';
 import { projectTraversal } from './graph-traversal-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
 import { SqliteGraphDeclarationQueries } from './sqlite-graph-declaration-queries.js';
+import { INVALID_INPUT } from './sqlite-graph-file-input.js';
+import {
+  impactNextActions,
+  missingImpact,
+  validateImpactInput,
+} from './sqlite-graph-impact-queries.js';
 import { SqliteGraphPackageQueries } from './sqlite-graph-package-queries.js';
 import {
   completeInventoryCoverage,
@@ -74,6 +73,12 @@ import {
   SqliteGraphQueryContext,
 } from './sqlite-graph-query-context.js';
 import { SqliteGraphSymbolQueries } from './sqlite-graph-symbol-queries.js';
+import {
+  missingSelection,
+  qualifySelection,
+  selectionProofOptions,
+  validateSelectionInput,
+} from './sqlite-graph-test-selection-queries.js';
 
 import type {
   ArchitectureQuery,
@@ -98,7 +103,6 @@ import type {
   SearchDeclarationsOptions,
   SearchSymbolsOptions,
   SelectTestsOptions,
-  MissingGraphTestSelectionDto,
   SymbolSearchDto,
   TraversalQuery,
   TraversalSnapshot,
@@ -112,256 +116,9 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const DEFAULT_SEARCH_LIMIT = 100;
 const DEFAULT_ARCH_LIMIT = 25;
-const MAX_CONTEXT_FILES = 128;
-const MAX_CONTEXT_DEPTH = 5;
-const MAX_CONTEXT_ROWS = 500;
-const INVALID_INPUT = 'invalid-input';
 
 function aborted(signal: AbortSignal | undefined): boolean {
   return signal?.aborted === true;
-}
-
-function safeProjectFile(file: string): boolean {
-  const normalized = file.replaceAll('\\', '/');
-  return (
-    normalized.length > 0 &&
-    normalized.length <= 1024 &&
-    !normalized.startsWith('/') &&
-    !/^[A-Za-z]:/u.test(normalized) &&
-    !/\p{Cc}/u.test(normalized) &&
-    normalized.split('/').every((part) => part.length > 0 && part !== '.' && part !== '..')
-  );
-}
-
-function validateImpactInput(
-  files: readonly string[],
-  options: ImpactFilesOptions | undefined,
-): Result<void, McpReadError> {
-  if (files.length === 0) {
-    return err(readError(INVALID_INPUT, 'Impact reads require at least one explicit file.'));
-  }
-  if (files.length > MAX_CONTEXT_FILES) {
-    return err(
-      readError('input-cap-exceeded', 'Impact file count exceeds the supported maximum.', {
-        maximum: MAX_CONTEXT_FILES,
-      }),
-    );
-  }
-  const normalized = files.map((file) => file.replaceAll('\\', '/'));
-  if (normalized.some((file) => !safeProjectFile(file))) {
-    return err(readError(INVALID_INPUT, 'Impact files must be project-relative paths.'));
-  }
-  if (new Set(normalized).size !== normalized.length) {
-    return err(readError(INVALID_INPUT, 'Impact files must be unique after normalization.'));
-  }
-  if (
-    options?.maxDepth !== undefined &&
-    (!Number.isSafeInteger(options.maxDepth) ||
-      options.maxDepth < 1 ||
-      options.maxDepth > MAX_CONTEXT_DEPTH)
-  ) {
-    return err(readError(INVALID_INPUT, 'Impact depth is outside the supported range.'));
-  }
-  if (
-    options?.top !== undefined &&
-    (!Number.isSafeInteger(options.top) || options.top < 1 || options.top > MAX_CONTEXT_ROWS)
-  ) {
-    return err(readError(INVALID_INPUT, 'Impact top is outside the supported range.'));
-  }
-  return ok(undefined);
-}
-
-function missingImpact(files: readonly string[]): ImpactFilesDto {
-  const requestedFiles = [...files].map((file) => file.replaceAll('\\', '/')).sort();
-  const coverage = rollupFacets({
-    inventory: makeFacet(true, new Set(['graph-catalog-missing'])),
-    evidence: UNREQUESTED_FACET,
-    grouping: UNREQUESTED_FACET,
-    projection: UNREQUESTED_FACET,
-  });
-  const trust = buildImpactTrust({
-    fallback: 'full-run',
-    uncertainties: [
-      {
-        code: 'graph-catalog-unavailable',
-        source: 'catalog',
-        message: 'No graph catalog is loaded; impact cannot be computed safely.',
-      },
-    ],
-  });
-  return {
-    changedFunctions: [],
-    impactedFunctions: [],
-    impactedPackages: [],
-    impactedFiles: [],
-    requestedFiles,
-    matchedFiles: [],
-    unmatchedFiles: requestedFiles,
-    trust,
-    truncated: false,
-    coverage,
-    nextActions: [
-      'Run refresh_graph, then retry impact_files.',
-      'Run the full verification suite.',
-    ],
-  };
-}
-
-function impactNextActions(
-  impact: Omit<ImpactFilesDto, 'nextActions'>,
-  fresh: boolean,
-): readonly string[] {
-  const actions: string[] = [];
-  if (!fresh) actions.push('Run refresh_graph, then retry impact_files.');
-  if (impact.trust.fallback === 'full-run') actions.push('Run the full verification suite.');
-  else if (impact.unmatchedFiles.length > 0) {
-    actions.push('Run package or full verification for unmatched files.');
-  }
-  return actions;
-}
-
-function selectionSnapshotId(snapshot: object): string {
-  return `ts1:${createHash('sha256').update(JSON.stringify(snapshot), 'utf8').digest('hex')}`;
-}
-
-function selectionCommandKey(command: VerificationCommand): string {
-  return `${command.cwd}\u0000${command.argv.join('\u0000')}`;
-}
-
-function fallbackCommands(
-  inventory: ProjectInventorySnapshot,
-  files: readonly string[],
-  tier: NonNullable<SelectTestsOptions['tier']>,
-  maximum: number,
-): readonly VerificationCommand[] {
-  const byPath = new Map(inventory.files.map((file) => [file.path, file]));
-  const packageNames = new Set(
-    files.flatMap((file) => {
-      const name = byPath.get(file)?.packageName;
-      return name === undefined ? [] : [name];
-    }),
-  );
-  const allowed = tier === 'full' ? new Set(['full']) : new Set(['package', 'full']);
-  const candidates = inventory.packages
-    .filter((item) => packageNames.size === 0 || packageNames.has(item.name) || item.root === '.')
-    .flatMap((item) => item.verificationCommands)
-    .filter((command) => allowed.has(command.tier));
-  const unique = new Map<string, VerificationCommand>();
-  for (const command of candidates) unique.set(selectionCommandKey(command), command);
-  return [...unique.values()]
-    .sort((left, right) =>
-      compareCodePointStrings(selectionCommandKey(left), selectionCommandKey(right)),
-    )
-    .slice(0, maximum);
-}
-
-function missingSelection(
-  files: readonly string[],
-  inventory: ProjectInventorySnapshot,
-  options: SelectTestsOptions | undefined,
-): MissingGraphTestSelectionDto {
-  const normalized = files.map((file) => file.replaceAll('\\', '/')).sort();
-  const commands = fallbackCommands(
-    inventory,
-    normalized,
-    options?.tier ?? 'focused',
-    options?.commandLimit ?? 20,
-  );
-  const reasonCodes = [
-    'graph-catalog-unavailable',
-    ...(inventory.coverage.status === 'complete' ? [] : ['inventory-incomplete']),
-  ];
-  const withoutId: Omit<MissingGraphTestSelectionDto, 'snapshotId'> = {
-    schemaVersion: TEST_SELECTION_SCHEMA_VERSION,
-    files: normalized,
-    tests: [],
-    commands,
-    uncoveredFiles: normalized,
-    trust: {
-      status: 'fallback',
-      reasonCodes,
-      fallbackTier: commands.some((command) => command.tier === 'package') ? 'package' : 'full',
-    },
-    graphIdentity: 'graph:missing',
-    inventoryIdentity: inventory.snapshotId,
-    durable: false,
-  };
-  return { ...withoutId, snapshotId: selectionSnapshotId(withoutId) };
-}
-
-function qualifySelection(
-  snapshot: TestSelectionSnapshot,
-  reasons: readonly string[],
-): TestSelectionSnapshot {
-  const reasonCodes = [...new Set([...snapshot.trust.reasonCodes, ...reasons])].sort().slice(0, 32);
-  if (reasonCodes.length === snapshot.trust.reasonCodes.length) return snapshot;
-  const withoutId: Omit<TestSelectionSnapshot, 'snapshotId'> = {
-    schemaVersion: snapshot.schemaVersion,
-    files: snapshot.files,
-    tests: snapshot.tests,
-    commands: snapshot.commands,
-    uncoveredFiles: snapshot.uncoveredFiles,
-    trust: {
-      ...snapshot.trust,
-      status: snapshot.tests.length === 0 ? 'fallback' : 'partial',
-      reasonCodes,
-    },
-    graphIdentity: snapshot.graphIdentity,
-    inventoryIdentity: snapshot.inventoryIdentity,
-  };
-  return { ...withoutId, snapshotId: selectionSnapshotId(withoutId) };
-}
-
-function validateSelectionInput(
-  files: readonly string[],
-  options: SelectTestsOptions | undefined,
-): Result<void, McpReadError> {
-  if (files.length === 0) {
-    return err(readError(INVALID_INPUT, 'Test selection requires explicit files.'));
-  }
-  if (files.length > MAX_CONTEXT_FILES) {
-    return err(
-      readError('input-cap-exceeded', 'Test-selection file count exceeds the maximum.', {
-        maximum: MAX_CONTEXT_FILES,
-      }),
-    );
-  }
-  const normalized = files.map((file) => file.replaceAll('\\', '/'));
-  if (normalized.some((file) => !safeProjectFile(file))) {
-    return err(readError(INVALID_INPUT, 'Test-selection files must be project-relative paths.'));
-  }
-  if (new Set(normalized).size !== normalized.length) {
-    return err(readError(INVALID_INPUT, 'Test-selection files must be unique.'));
-  }
-  if (
-    options?.maxDepth !== undefined &&
-    (!Number.isSafeInteger(options.maxDepth) ||
-      options.maxDepth < 1 ||
-      options.maxDepth > MAX_CONTEXT_DEPTH)
-  ) {
-    return err(readError(INVALID_INPUT, 'Test-selection depth is outside the supported range.'));
-  }
-  if (
-    options?.limit !== undefined &&
-    (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > MAX_CONTEXT_ROWS)
-  ) {
-    return err(readError(INVALID_INPUT, 'Test-selection limit is outside the supported range.'));
-  }
-  if (
-    options?.commandLimit !== undefined &&
-    (!Number.isSafeInteger(options.commandLimit) ||
-      options.commandLimit < 1 ||
-      options.commandLimit > 100)
-  ) {
-    return err(readError(INVALID_INPUT, 'Command limit is outside the supported range.'));
-  }
-  if (
-    options?.proofLimit !== undefined &&
-    (!Number.isSafeInteger(options.proofLimit) || options.proofLimit < 0 || options.proofLimit > 6)
-  ) {
-    return err(readError(INVALID_INPUT, 'Proof limit is outside the supported range.'));
-  }
-  return ok(undefined);
 }
 
 function validContextPointer(pointer: TaskContextSnapshotPointer): boolean {
@@ -442,16 +199,6 @@ function snapshotPointerStatus(
     };
   }
   return { pointer, status: 'available', reasonCodes: [] };
-}
-
-function selectionProofOptions(options: SelectTestsOptions | undefined): {
-  readonly includeProof: boolean;
-  readonly maxProofNodes: number | undefined;
-} {
-  const detail = options?.proofDetail ?? 'summary';
-  if (detail === 'none') return { includeProof: false, maxProofNodes: 0 };
-  if (detail === 'summary') return { includeProof: true, maxProofNodes: 1 };
-  return { includeProof: true, maxProofNodes: options?.proofLimit };
 }
 
 function toArchitectureSummaryDto(view: {

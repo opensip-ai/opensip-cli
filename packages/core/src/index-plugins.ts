@@ -18,6 +18,7 @@ export {
   isRecord,
   isStringArray,
   hasPackageJson,
+  readDeclaredCapabilityPackageMetadata,
   resolvePackageDir,
   registerRecipesFromMod,
   loadPlugin,

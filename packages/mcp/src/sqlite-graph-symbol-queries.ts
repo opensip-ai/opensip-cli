@@ -1,5 +1,6 @@
 import { err, ok, type Result } from '@opensip-cli/core';
 import {
+  clampLimit,
   compareSymbolRefs,
   makeFacet,
   mergeFacet,
@@ -30,7 +31,7 @@ import {
   type GraphSymbolLocationDto,
   type SymbolSearchDto,
 } from './graph-read-port.js';
-import { clampLimit, toSymbolRef } from './graph-read-projection.js';
+import { toSymbolRef } from './graph-read-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
 import {
   completeInventoryCoverage,

@@ -1,11 +1,12 @@
 import {
+  type CapabilityTrustGrant,
   type OrgPolicyStatus,
   type ResolvedTrustPolicy,
   type ResolvedTrustPolicyException,
   type TrustPolicyOrgConfig,
-  type TrustPolicyDocument,
   type TrustPolicySource,
   type TrustPolicySourceTier,
+  type UserTrustPolicyDocument,
 } from './trust-policy-schema.js';
 
 const DEFAULT_ORG_CACHE_PATH = '.opensip/policy/org-policy.json';
@@ -22,6 +23,7 @@ export const BUILTIN_TRUST_POLICY: ResolvedTrustPolicy = {
   },
   orgStatus: { state: 'available', sourceTier: 'builtin' },
   sourceTiers: ['builtin'],
+  capabilityGrants: [],
 };
 
 interface TrustPolicyResolutionState {
@@ -31,6 +33,7 @@ interface TrustPolicyResolutionState {
   orgStatus: OrgPolicyStatus;
   exceptions: ResolvedTrustPolicyException[];
   sourceTiers: TrustPolicySourceTier[];
+  capabilityGrants: CapabilityTrustGrant[];
 }
 
 export function resolveTrustPolicySources(
@@ -44,6 +47,7 @@ export function resolveTrustPolicySources(
     orgStatus: BUILTIN_TRUST_POLICY.orgStatus,
     exceptions: [],
     sourceTiers: ['builtin'],
+    capabilityGrants: [],
   };
 
   for (const source of sources) {
@@ -57,6 +61,7 @@ export function resolveTrustPolicySources(
     org: state.org,
     orgStatus: state.orgStatus,
     sourceTiers: state.sourceTiers,
+    capabilityGrants: state.capabilityGrants,
   };
 }
 
@@ -76,7 +81,7 @@ function appendSourceTier(sourceTiers: TrustPolicySourceTier[], tier: TrustPolic
 function applyTrustPolicyDocument(
   state: TrustPolicyResolutionState,
   tier: TrustPolicySourceTier,
-  policy: TrustPolicyDocument,
+  policy: UserTrustPolicyDocument,
 ): void {
   if (policy.mode !== undefined) state.mode = policy.mode;
   if (policy.ci !== undefined) state.ci = policy.ci;
@@ -84,6 +89,12 @@ function applyTrustPolicyDocument(
   state.exceptions.push(
     ...(policy.exceptions ?? []).map((exception) => ({ ...exception, sourceTier: tier })),
   );
+  // Capability trust grants are USER-TIER-ONLY: the global config document is
+  // the single out-of-repo trust surface. Any other tier carrying the field
+  // (impossible via the strict project schema, defensive here) is ignored.
+  if (tier === 'user' && policy.trustedCapabilityPacks !== undefined) {
+    state.capabilityGrants.push(...policy.trustedCapabilityPacks);
+  }
 }
 
 function withoutUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
@@ -92,7 +103,7 @@ function withoutUndefined<T extends Record<string, unknown>>(value: T): Partial<
 
 export function trustPolicySource(
   tier: TrustPolicySourceTier,
-  policy: TrustPolicyDocument | undefined,
+  policy: UserTrustPolicyDocument | undefined,
   orgStatus?: OrgPolicyStatus,
 ): TrustPolicySource {
   return orgStatus === undefined ? { tier, policy } : { tier, policy, orgStatus };

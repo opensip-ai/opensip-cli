@@ -362,11 +362,36 @@ function maximumPrefixWithinBudget(
   key: ProjectionListKey,
   maxBytes: number,
 ): number {
+  const items = projection[key];
+  const n = items.length;
+  const baseOmitted = projection.omitted[key];
+  // Fixed skeleton + inlined-catalog cost measured ONCE (list emptied); each
+  // probe then adds only per-item byte deltas instead of re-stringifying the
+  // whole projection per binary-search step. `bytesAt(c)` reproduces
+  // serializedBytes(withRetainedPrefix(projection, key, c)) EXACTLY —
+  // items + separators are compositional in JSON, and the two fields
+  // withRetainedPrefix rewrites (the omitted count's digits and the
+  // detailTruncated boolean) are adjusted analytically — so the search
+  // converges on the same cut as the whole-stringify probe, byte-identical.
+  const emptyBytes = serializedBytes(withRetainedPrefix(projection, key, 0));
+  const itemBytes = items.map((item) => Buffer.byteLength(JSON.stringify(item), 'utf8'));
+  const prefixBytes: number[] = [0];
+  for (const [index, bytes] of itemBytes.entries()) {
+    prefixBytes.push((prefixBytes[index] ?? 0) + bytes);
+  }
+  const boolLen = (value: boolean): number => (value ? 4 : 5);
+  const bytesAt = (count: number): number =>
+    emptyBytes +
+    (prefixBytes[count] ?? 0) +
+    Math.max(0, count - 1) +
+    (String(baseOmitted + n - count).length - String(baseOmitted + n).length) +
+    (boolLen(projection.detailTruncated || n - count > 0) -
+      boolLen(projection.detailTruncated || n > 0));
   let low = 0;
-  let high = projection[key].length;
+  let high = n;
   while (low < high) {
     const middle = Math.ceil((low + high) / 2);
-    if (serializedBytes(withRetainedPrefix(projection, key, middle)) <= maxBytes) {
+    if (bytesAt(middle) <= maxBytes) {
       low = middle;
     } else {
       high = middle - 1;

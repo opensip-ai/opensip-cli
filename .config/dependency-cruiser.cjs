@@ -19,6 +19,7 @@
  *   3. @opensip-cli/config         — capability-configuration composer + schema registry (depends on core)
  *   3. @opensip-cli/targeting      — host file-targeting runtime substrate (scope.targets; depends on core + config)
  *   3. @opensip-cli/codebase       — bounded project inventory substrate (core + contracts)
+ *   3. @opensip-cli/shared-analysis — shared cross-tool analysis runtime: impact compute, review-brief derivation/correlation, agent-catalog assembly (core + contracts)
  *   3. @opensip-cli/lang-*         — language adapters
  *   3. @opensip-cli/dashboard      — HTML report generator (core + contracts)
  *   3. @opensip-cli/external-tool-adapter — External Tool Adapter substrate (core + contracts; output devDep)
@@ -119,6 +120,7 @@ const TOOL_ALLOWED_PACKAGES = Object.freeze({
     '@opensip-cli/config',
     '@opensip-cli/datastore',
     '@opensip-cli/session-store',
+    '@opensip-cli/shared-analysis',
     '@opensip-cli/targeting',
   ]),
   '@opensip-cli/graph': Object.freeze([
@@ -131,6 +133,7 @@ const TOOL_ALLOWED_PACKAGES = Object.freeze({
     '@opensip-cli/config',
     '@opensip-cli/datastore',
     '@opensip-cli/session-store',
+    '@opensip-cli/shared-analysis',
   ]),
   '@opensip-cli/mcp': Object.freeze([
     '@opensip-cli/core',
@@ -144,6 +147,7 @@ const TOOL_ALLOWED_PACKAGES = Object.freeze({
     '@opensip-cli/datastore',
     '@opensip-cli/graph',
     '@opensip-cli/session-store',
+    '@opensip-cli/shared-analysis',
   ]),
   '@opensip-cli/simulation': Object.freeze([
     '@opensip-cli/core',
@@ -756,6 +760,33 @@ module.exports = {
         'pack, graph, simulation, session-store, or output.',
       from: { path: '^packages/targeting/src/' },
       to: { path: '^packages/(?!core/|config/|targeting/)' },
+    },
+
+    // -------------------------------------------------------------------
+    // Layer enforcement — shared-analysis depends on core + contracts only
+    // (Plan 09 Phase 7).
+    //
+    // @opensip-cli/shared-analysis is the shared cross-tool analysis RUNTIME
+    // extracted out of contracts: the changed→impact compute engine, the
+    // review-brief derivation + correlation grouping, and the agent-catalog
+    // assembly both the CLI and MCP transports call. Tool engines and the CLI
+    // depend on it — never the other direction: an edge from shared-analysis
+    // into the CLI, a tool engine (fitness/graph/simulation/yagni/mcp), or a
+    // checks-*/graph-* pack would invert the layer DAG and recreate the very
+    // coupling the extraction removed. Allowlist form (ADR-0133): anything
+    // outside core/contracts/self is forbidden.
+    // -------------------------------------------------------------------
+    {
+      name: 'shared-analysis-no-tool-or-cli-edges',
+      severity: 'error',
+      comment:
+        'shared-analysis hosts the shared cross-tool analysis runtime (impact ' +
+        'compute, review-brief derivation/correlation, agent-catalog assembly). ' +
+        'It depends on core and contracts only — it must never import the cli, ' +
+        'a tool engine (fitness/graph/simulation/yagni/mcp), or a checks-*/' +
+        'graph-* pack.',
+      from: { path: '^packages/shared-analysis/src/' },
+      to: { path: '^packages/(?!core/|contracts/|shared-analysis/)' },
     },
 
     // -------------------------------------------------------------------

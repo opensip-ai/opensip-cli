@@ -15,9 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { admitProjectLocalTool, admitUserGlobalTool } from '../bootstrap/register-tools.js';
 import {
-  CAPABILITY_PACK_ALLOWLIST_ENV,
   INSTALLED_TOOL_ALLOWLIST_ENV,
-  isCapabilityPackTrusted,
   isInstalledToolTrusted,
   isProjectLocalToolTrusted,
   PROJECT_TOOL_ALLOWLIST_ENV,
@@ -320,36 +318,10 @@ describe('managed installed-tool trust records', () => {
   });
 });
 
-describe('isCapabilityPackTrusted (exact-name allowlist)', () => {
-  it('denies by default and admits only exact package-name matches', () => {
-    const env = {
-      [CAPABILITY_PACK_ALLOWLIST_ENV]: '@acme/fit-rules, @acme/graph-go',
-    };
-    expect(isCapabilityPackTrusted('@acme/fit-rules', env)).toBe(true);
-    expect(isCapabilityPackTrusted('@acme/graph-go', env)).toBe(true);
-    expect(isCapabilityPackTrusted('@acme/other', env)).toBe(false);
-    expect(isCapabilityPackTrusted('@acme/fit-rules-extra', env)).toBe(false);
-    expect(isCapabilityPackTrusted('@acme/fit-rules', {})).toBe(false);
-  });
-
-  it('does not honor wildcard and emits the capability-specific warning', () => {
-    const warnSpy = vi.spyOn(logger, 'warn');
-
-    expect(
-      isCapabilityPackTrusted('@acme/fit-rules', {
-        [CAPABILITY_PACK_ALLOWLIST_ENV]: '*',
-      }),
-    ).toBe(false);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        evt: 'cli.trust.capability_wildcard_ignored',
-        envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
-      }),
-    );
-    warnSpy.mockRestore();
-  });
-});
+// The capability-pack env allowlist (OPENSIP_CLI_ALLOW_CAPABILITY_PACKS) was
+// removed (plan 09 Phase 3): the single capability trust surface is the
+// user-level global-config trust list. Admission tests live in
+// load-tool-capabilities.test.ts.
 
 describe('admitProjectLocalTool — trust gate precedes import', () => {
   const staged: string[] = [];

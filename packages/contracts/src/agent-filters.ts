@@ -6,6 +6,7 @@
  */
 import { ConfigurationError, isErrorSeverity } from '@opensip-cli/core';
 
+import type { WarningDetail } from './command-outcome.js';
 import type { SignalEnvelope } from './signal-envelope.js';
 import type { OptionSpec, Signal, SignalSeverity, ToolCliContext } from '@opensip-cli/core';
 
@@ -217,15 +218,22 @@ export interface AgentRunFilterOpts {
 /**
  * Emit tool JSON — unfiltered envelope or agent-filtered result (ADR-0085).
  * Shared by fit/graph/sim/yagni so the filter/raw dispatch cannot drift.
+ *
+ * `warnings` (optional) are non-fatal run notices stamped onto the machine
+ * outcome (`CommandOutcome.warnings`) on the unfiltered-envelope path — e.g.
+ * graph's partial-coverage parse-failure notice. The agent-filtered compact
+ * result deliberately omits them (its consumers opt into a minimal shape).
  */
 export function emitAgentFilteredJsonOutput(
   cli: ToolCliContext,
   envelope: SignalEnvelope,
   opts: AgentRunFilterOpts,
+  warnings?: readonly WarningDetail[],
 ): void {
   const tokens = normalizeAgentRunFilters(opts.filter, opts.top);
   if (tokens.length === 0 && opts.raw !== true) {
-    cli.emitEnvelope(envelope);
+    if (warnings === undefined || warnings.length === 0) cli.emitEnvelope(envelope);
+    else cli.emitEnvelope(envelope, { warnings });
     return;
   }
   const result = buildAgentFilteredResult(envelope, tokens);

@@ -23,6 +23,26 @@ export const DEFAULT_CLOUD_ENDPOINT = 'https://opensip.ai/api';
 
 const MODULE_TAG = 'resolve-signal-sink';
 
+// Bound + scrub the egress failure cause before it reaches the local log: a
+// cloud error can echo the endpoint URL with query credentials or an auth
+// header value in its message. Never log the API key or a request/response
+// body — only this scrubbed, truncated cause.
+const MAX_ERR_CHARS = 300;
+const CREDENTIAL_PATTERNS = [
+  /bearer\s+[\w.~+/-]+=*/gi,
+  /x-api-key['":\s=]+[\w.~+/-]+=*/gi,
+  /(?:api[_-]?key|token|secret)=[^\s&'"]+/gi,
+];
+
+/** Scrubbed, length-bounded error cause for `output.sink.emit.error`. */
+function scrubbedErrorCause(error: unknown): string {
+  let message = error instanceof Error ? error.message : String(error);
+  for (const pattern of CREDENTIAL_PATTERNS) {
+    message = message.replaceAll(pattern, '[redacted]');
+  }
+  return message.length > MAX_ERR_CHARS ? `${message.slice(0, MAX_ERR_CHARS)}…` : message;
+}
+
 export interface ResolveSignalSinkInput {
   readonly apiKey?: string;
   readonly cloud?: { readonly sync?: boolean; readonly endpoint?: string };
@@ -93,8 +113,20 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
           await invalidateEntitlement({ apiKey, cacheDir: input.cacheDir });
         }
         return result;
-      } catch {
-        // Belt and suspenders — emit MUST NOT throw into the run.
+      } catch (error) {
+        // Belt and suspenders — emit MUST NOT throw into the run. But the
+        // user-facing "cloud sync skipped — see the run log" notice must
+        // resolve to a real entry, so log the cause first (itself guarded:
+        // a logging failure must not break the never-throws contract).
+        try {
+          logger.warn({
+            evt: 'output.sink.emit.error',
+            module: MODULE_TAG,
+            err: scrubbedErrorCause(error),
+          });
+        } catch {
+          /* never-throws contract outranks the diagnostic */
+        }
         return { accepted: 0, authRejected: false, skippedReason: 'error' };
       }
     },

@@ -137,14 +137,18 @@ export async function runCatalogJsonMode(
   const runId = opts.runId ?? randomUUID();
   const completedAt = new Date().toISOString();
   // Caller (opensip-side EngineSubprocessPort, Phase 6) inspects the
-  // file's existence + completeness field; engine never emits 'partial'
-  // from this code path (the engine's pressure-monitor / abort-handling
-  // bypass this function entirely on failure). A future task may add
-  // partial-completion semantics by catching MemoryPressureError in
-  // executeGraph and writing a partial CatalogExport here.
+  // file's existence + completeness field. Aborted passes (pressure-monitor /
+  // abort-handling) bypass this function entirely, so `completedAt` is always
+  // real here — but a completed pass whose coverage is partial (unparseable
+  // files dropped from the catalog, malformed adapter paths) is still an
+  // incomplete export, and saying 'complete' would be a silent false-green
+  // for the ingestor. Derive completeness from the catalog's own coverage.
   const provenance = {
     runId,
-    completeness: 'complete' as const,
+    completeness:
+      result.catalog.buildCoverage?.status === 'partial'
+        ? ('partial' as const)
+        : ('complete' as const),
     engineVersion: ENGINE_VERSION,
     startedAt,
     completedAt,

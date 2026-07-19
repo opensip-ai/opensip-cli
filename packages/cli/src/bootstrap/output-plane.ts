@@ -90,10 +90,14 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
         });
       });
     },
-    emitEnvelope: (envelope) => {
+    emitEnvelope: (envelope, opts) => {
       const outputEnvelope = stampDeclaredInputs(envelope as SignalEnvelope);
       renderOutcome(
-        outcomeFromEnvelope(outputEnvelope, exitCode ?? deriveFindingsExitCode(outputEnvelope)),
+        outcomeFromEnvelope(
+          outputEnvelope,
+          exitCode ?? deriveFindingsExitCode(outputEnvelope),
+          opts?.warnings,
+        ),
         {
           jsonRequested: true,
           render: deps.render,

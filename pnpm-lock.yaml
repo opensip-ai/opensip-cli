@@ -238,6 +238,9 @@ importers:
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../session-store
+      '@opensip-cli/shared-analysis':
+        specifier: workspace:*
+        version: link:../shared-analysis
       '@opensip-cli/simulation':
         specifier: workspace:*
         version: link:../simulation/engine
@@ -763,6 +766,9 @@ importers:
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../../session-store
+      '@opensip-cli/shared-analysis':
+        specifier: workspace:*
+        version: link:../../shared-analysis
       '@opensip-cli/targeting':
         specifier: workspace:*
         version: link:../../targeting
@@ -845,6 +851,9 @@ importers:
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../../session-store
+      '@opensip-cli/shared-analysis':
+        specifier: workspace:*
+        version: link:../../shared-analysis
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -1155,6 +1164,9 @@ importers:
       '@opensip-cli/session-store':
         specifier: workspace:*
         version: link:../session-store
+      '@opensip-cli/shared-analysis':
+        specifier: workspace:*
+        version: link:../shared-analysis
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1211,6 +1223,25 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/shared-analysis:
+    dependencies:
+      '@opensip-cli/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -1820,11 +1851,11 @@ packages:
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild-kit/esm-loader@2.6.5':
     resolution: {integrity: sha512-FxEMIkJKnodyA1OaCUoEvbYRkoZlLZ4d/eXFu9Fh8CbBBgP5EmZxrfTRyN0qpXZ4vOvqnE5YdRdcrmUUXuU+dA==}
-    deprecated: 'Merged into tsx: https://tsx.hirok.io'
+    deprecated: 'Merged into tsx: https://tsx.is'
 
   '@esbuild/aix-ppc64@0.25.12':
     resolution: {integrity: sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA==}
@@ -2340,6 +2371,9 @@ packages:
 
   '@opensip-cli/session-store@file:packages/session-store':
     resolution: {directory: packages/session-store, type: directory}
+
+  '@opensip-cli/shared-analysis@file:packages/shared-analysis':
+    resolution: {directory: packages/shared-analysis, type: directory}
 
   '@opensip-cli/targeting@file:packages/targeting':
     resolution: {directory: packages/targeting, type: directory}
@@ -5882,6 +5916,7 @@ snapshots:
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)
+      '@opensip-cli/shared-analysis': file:packages/shared-analysis(commander@15.0.0)
       '@opensip-cli/targeting': file:packages/targeting
       '@opentelemetry/api': 1.9.1
       commander: 15.0.0
@@ -6182,6 +6217,7 @@ snapshots:
       '@opensip-cli/core': file:packages/core
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)
+      '@opensip-cli/shared-analysis': file:packages/shared-analysis(commander@15.0.0)
       '@opentelemetry/api': 1.9.1
       commander: 15.0.0
       drizzle-orm: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
@@ -6258,6 +6294,7 @@ snapshots:
       '@opensip-cli/datastore': file:packages/datastore(@types/better-sqlite3@7.6.13)
       '@opensip-cli/graph': file:packages/graph/engine(@types/better-sqlite3@7.6.13)(@types/react@19.2.17)(better-sqlite3@12.11.1)
       '@opensip-cli/session-store': file:packages/session-store(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(commander@15.0.0)
+      '@opensip-cli/shared-analysis': file:packages/shared-analysis(commander@15.0.0)
       zod: 4.4.3
     transitivePeerDependencies:
       - '@aws-sdk/client-rds-data'
@@ -6333,6 +6370,13 @@ snapshots:
       - prisma
       - sql.js
       - sqlite3
+
+  '@opensip-cli/shared-analysis@file:packages/shared-analysis(commander@15.0.0)':
+    dependencies:
+      '@opensip-cli/contracts': file:packages/contracts(commander@15.0.0)
+      '@opensip-cli/core': file:packages/core
+    transitivePeerDependencies:
+      - commander
 
   '@opensip-cli/targeting@file:packages/targeting':
     dependencies:

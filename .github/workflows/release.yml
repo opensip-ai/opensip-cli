@@ -545,8 +545,8 @@ jobs:
           const manifestName = 'opensip-cli-release-manifest.v1.json';
           const checksumsName = 'SHA256SUMS';
           const sbomName = 'opensip-cli-sbom.cyclonedx.json';
-          const expectedPackageOrderDigest = '11c99ddf52f6f001054179e71a600e9a5d3dfb8bc05014a93b91295f63e7327d';
-          const expectedReleaseComponentSetDigest = 'cce4452f184948d694953401c48b704f699547cc7a68c201a9e00d6902c78c3b';
+          const expectedPackageOrderDigest = '2994c5b64e2af4e81e359b2cf7c0c9387d5c786b4d421b1484fe539fe04f1f2f';
+          const expectedReleaseComponentSetDigest = '46ad6a97f6d576f753dce5e044c00bab532bac4a0822e3178579881cfe3f113c';
           const forbiddenLifecycleScripts = ['preinstall', 'install', 'postinstall'];
           const exactVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
           const hex64 = /^[a-f0-9]{64}$/;
@@ -1139,7 +1139,7 @@ jobs:
       SUPPORT_ROW: macos-26-arm64-node24-npm11-v1
       SUPPORT_CONTRACT_VERSION: '1'
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-      PROMOTION_ORDER_SHA256: 11c99ddf52f6f001054179e71a600e9a5d3dfb8bc05014a93b91295f63e7327d
+      PROMOTION_ORDER_SHA256: 2994c5b64e2af4e81e359b2cf7c0c9387d5c786b4d421b1484fe539fe04f1f2f
     steps:
       # The runner context is unavailable in job-level env — GitHub rejects the
       # entire workflow file at parse time — so PROMOTION_ORDER must resolve

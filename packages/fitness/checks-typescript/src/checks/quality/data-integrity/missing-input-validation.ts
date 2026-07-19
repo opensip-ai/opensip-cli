@@ -37,10 +37,13 @@ type FunctionLike =
   ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression;
 
 /**
- * Quick filter regex for handler patterns
+ * Quick filter regex for handler patterns — pre-filter superset contract: the
+ * AST pass matches parameter names case-insensitively (`/^(req|request)$/i`),
+ * so this gate carries the `i` flag too; a case-sensitive filter would
+ * green-pass a `(Req, Res)` handler without running the checker.
  */
 const QUICK_FILTER_HANDLER_PATTERNS =
-  /\b(req|request|res|response|reply|handler|Handler|route|Route|endpoint|Endpoint|controller|Controller)\b/;
+  /\b(req|request|res|response|reply|handler|route|endpoint|controller)\b/i;
 
 /**
  * Validation patterns

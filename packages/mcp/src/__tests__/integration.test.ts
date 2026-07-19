@@ -21,7 +21,6 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { assembleAgentCatalog } from '@opensip-cli/contracts';
 import {
   applyToolContributeScope,
   err,
@@ -35,6 +34,7 @@ import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { runGraph } from '@opensip-cli/graph/internal';
 import { typescriptGraphAdapter } from '@opensip-cli/graph-typescript';
 import { SessionRepo } from '@opensip-cli/session-store';
+import { assembleAgentCatalog } from '@opensip-cli/shared-analysis';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { registerMcpGraphAdapter } from '../register-mcp-graph-adapters.js';

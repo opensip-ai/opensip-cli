@@ -32,7 +32,7 @@ import { join } from 'node:path';
 import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
-import { trustPolicySchema, type TrustPolicyDocument } from '../policy/trust-policy-schema.js';
+import { userTrustPolicySchema, type UserTrustPolicyDocument } from '../policy/trust-policy-schema.js';
 
 /**
  * Config-layer environment variables (§5.12). Declared as an
@@ -88,15 +88,20 @@ export function readGlobalConfig(): GlobalConfig {
 
 /** Result of reading the user-level trust-policy block without throwing. */
 export interface ReadGlobalTrustPolicyResult {
-  readonly policy?: TrustPolicyDocument;
+  readonly policy?: UserTrustPolicyDocument;
   readonly error?: string;
 }
 
-/** Read + validate the user-level `policy:` block without throwing. */
+/**
+ * Read + validate the user-level `policy:` block without throwing. The USER
+ * document is the one tier whose policy may carry `trustedCapabilityPacks`
+ * (the single out-of-repo capability trust surface); the project tier stays on
+ * the narrower strict schema, which hard-rejects the field.
+ */
 export function readGlobalTrustPolicy(): ReadGlobalTrustPolicyResult {
   const raw = readGlobalConfig().policy;
   if (raw === undefined) return {};
-  const parsed = trustPolicySchema.safeParse(raw);
+  const parsed = userTrustPolicySchema.safeParse(raw);
   if (parsed.success) return { policy: parsed.data };
   const summary = parsed.error.issues
     .map((issue) => {
@@ -105,6 +110,54 @@ export function readGlobalTrustPolicy(): ReadGlobalTrustPolicyResult {
     })
     .join('; ');
   return { error: summary };
+}
+
+/**
+ * Upsert one capability trust grant on the user-level global config (the
+ * single out-of-repo capability trust surface — plan 09 Phase 3).
+ *
+ * @throws {Error} when the existing `policy:` block is invalid — a grant must
+ * never be written next to (or clobber) a policy document the resolver would
+ * reject; the user fixes the file first.
+ */
+export function grantCapabilityTrust(grant: {
+  readonly id: string;
+  readonly manifestHash: string;
+  readonly grantedAt?: string;
+}): void {
+  const config = readGlobalConfig();
+  const existing = readGlobalTrustPolicy();
+  if (existing.error !== undefined) {
+    throw new Error(
+      `user-level policy block is invalid (${existing.error}); fix ${GLOBAL_CONFIG_PATH} before granting trust`,
+    );
+  }
+  const policy: UserTrustPolicyDocument = existing.policy ?? {};
+  const grants = (policy.trustedCapabilityPacks ?? []).filter((entry) => entry.id !== grant.id);
+  writeGlobalConfig({
+    ...config,
+    policy: { ...policy, trustedCapabilityPacks: [...grants, { ...grant }] },
+  });
+}
+
+/**
+ * Remove a capability trust grant from the user-level global config. Returns
+ * `false` when no grant with that id existed (including when the policy block
+ * is absent or invalid — revocation never throws on a broken document; the
+ * broken document already grants nothing).
+ */
+export function revokeCapabilityTrust(id: string): boolean {
+  const config = readGlobalConfig();
+  const existing = readGlobalTrustPolicy();
+  if (existing.error !== undefined || existing.policy === undefined) return false;
+  const grants = existing.policy.trustedCapabilityPacks ?? [];
+  const kept = grants.filter((entry) => entry.id !== id);
+  if (kept.length === grants.length) return false;
+  writeGlobalConfig({
+    ...config,
+    policy: { ...existing.policy, trustedCapabilityPacks: kept },
+  });
+  return true;
 }
 
 /**

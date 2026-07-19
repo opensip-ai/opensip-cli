@@ -98,10 +98,26 @@ function monotonicNow(): number {
   return performance.now();
 }
 
+/**
+ * Blocking sleep for the SYNC lock poll loop — yields the CPU instead of
+ * busy-spinning. `Atomics.wait` on a throwaway SharedArrayBuffer parks the
+ * thread in the kernel for the interval (the buffer value never changes, so
+ * the wait always times out), so a second `opensip` run contending for the
+ * same project DB no longer pegs a core for up to the full lock wait.
+ * Falls back to a bounded spin only if Atomics.wait is unavailable in this
+ * context (it throws in some embedder main threads).
+ */
+const sleepSyncCell = new Int32Array(new SharedArrayBuffer(4));
 function sleepSync(ms: number): void {
-  const end = monotonicNow() + ms;
-  while (monotonicNow() < end) {
-    /* spin */
+  if (ms <= 0) return;
+  try {
+    Atomics.wait(sleepSyncCell, 0, 0, ms);
+  } catch {
+    // @swallow-ok Atomics.wait disallowed on this thread — degrade to the spin.
+    const end = monotonicNow() + ms;
+    while (monotonicNow() < end) {
+      /* spin */
+    }
   }
 }
 

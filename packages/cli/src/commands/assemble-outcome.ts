@@ -25,6 +25,7 @@ import {
   type ErrorDetail,
   type ErrorResult,
   type SignalEnvelope,
+  type WarningDetail,
 } from '@opensip-cli/contracts';
 import { ToolError, currentScope } from '@opensip-cli/core';
 
@@ -62,13 +63,22 @@ export function kindFromResult(value: unknown): string {
  * the break is purely this new outer wrapper). `status` is `'ok'` for any run
  * that completed: a failing gate is a successful run with a non-zero `exitCode`,
  * and the gate verdict is read from `.envelope.verdict`, not the outer status.
+ *
+ * `warnings` are non-fatal run notices (e.g. graph's partial-coverage
+ * parse-failure count) stamped onto `CommandOutcome.warnings`; they never
+ * change `status` or `exitCode`.
  */
-export function outcomeFromEnvelope(envelope: SignalEnvelope, exitCode: number): CommandOutcome {
+export function outcomeFromEnvelope(
+  envelope: SignalEnvelope,
+  exitCode: number,
+  warnings?: readonly WarningDetail[],
+): CommandOutcome {
   return withDiagnostics({
     kind: kindFromEnvelope(envelope),
     status: 'ok',
     exitCode,
     envelope,
+    ...(warnings === undefined || warnings.length === 0 ? {} : { warnings }),
   });
 }
 

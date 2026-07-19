@@ -26,7 +26,7 @@ import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { envelopeToLiveRunTableRows } from './graph-envelope-view.js';
 import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
-import { resolutionBannerText } from './graph-report.js';
+import { parseFailureBannerText, resolutionBannerText } from './graph-report.js';
 import {
   buildLiveGraphOutput,
   contributionFromSignals,
@@ -201,7 +201,13 @@ export async function renderGraphLive(
             createdAt: new Date().toISOString(),
           });
           const { verdict } = envelope;
-          const banner = resolutionBannerText(result.resolutionMode);
+          // Parity with the static path's `RunPresentation.banners`: the live
+          // done frame carries one banner slot, so stack the caveats as lines.
+          const bannerLines = [
+            resolutionBannerText(result.resolutionMode),
+            parseFailureBannerText(result.parseErrorFiles),
+          ].filter((line): line is string => line !== undefined);
+          const banner = bannerLines.length === 0 ? undefined : bannerLines.join('\n');
           const table = shouldRenderRunUnitTable({
             verbose: args.verbose === true,
           })

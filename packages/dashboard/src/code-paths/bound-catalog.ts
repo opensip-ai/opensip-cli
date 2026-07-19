@@ -33,7 +33,7 @@
 
 import { scriptContextJsonBytes } from '../script-context-json.js';
 
-import type { GraphCatalog } from '@opensip-cli/contracts';
+import type { GraphCatalog, GraphFunctionFeatures, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 /**
  * Byte budget for the inlined catalog. 8 MiB keeps a large repository's report
@@ -98,16 +98,16 @@ const EMPTY: BoundedGraphCatalog = { catalog: null, totalFunctions: 0, omittedFu
 type Occurrence = Record<string, unknown>;
 type FunctionMap = Record<string, readonly Occurrence[]>;
 
-interface FunctionMetrics {
-  readonly blast?: { readonly score?: number };
-  readonly bodyLines?: number;
-}
-
-/** Keep only the fields the client reads. */
-function projectOccurrence(occurrence: Occurrence): Occurrence {
+/**
+ * Keep only the fields the client reads. The input is the TYPED contract
+ * occurrence and OCCURRENCE_FIELDS is checked against its keys at compile
+ * time (plan 09 Task 8.5): a `contracts` field rename now breaks this build
+ * instead of silently projecting `undefined` into the report.
+ */
+function projectOccurrence(occurrence: GraphFunctionOccurrence): Occurrence {
   const projected: Occurrence = {};
   for (const field of OCCURRENCE_FIELDS) {
-    const value = occurrence[field];
+    const value: unknown = occurrence[field];
     if (value !== undefined) projected[field] = value;
   }
   return projected;
@@ -121,9 +121,9 @@ function projectOccurrence(occurrence: Occurrence): Occurrence {
  * deterministic, or two runs over the same catalog would truncate differently.
  */
 function compareByImportance(
-  a: readonly [string, readonly Occurrence[]],
-  b: readonly [string, readonly Occurrence[]],
-  metrics: Record<string, FunctionMetrics> | undefined,
+  a: readonly [string, readonly GraphFunctionOccurrence[]],
+  b: readonly [string, readonly GraphFunctionOccurrence[]],
+  metrics: Readonly<Record<string, GraphFunctionFeatures>> | undefined,
 ): number {
   const [keyA] = a;
   const [keyB] = b;
@@ -152,33 +152,26 @@ export function boundGraphCatalog(
 ): BoundedGraphCatalog {
   if (catalog === null || catalog === undefined) return EMPTY;
 
-  const source = catalog as unknown as {
-    version?: string;
-    language?: string;
-    cacheKey?: string;
-    builtAt?: string;
-    resolutionMode?: string;
-    functions?: FunctionMap;
-    features?: { edge?: unknown; function?: Record<string, FunctionMetrics> };
-  };
-
-  const functions = source.functions ?? {};
-  const entries = Object.entries(functions);
+  // Typed reads off the GraphCatalog contract (plan 09 Task 8.5) — the old
+  // `as unknown as` local shape kept compiling across a contracts rename of
+  // `features.blast.score`, silently ranking every function blast=0 and
+  // dropping ARBITRARY (not least-important) functions in the truncation.
+  const entries = Object.entries(catalog.functions);
   const totalFunctions = entries.length;
 
   const base = {
-    ...(source.version === undefined ? {} : { version: source.version }),
-    ...(source.language === undefined ? {} : { language: source.language }),
-    ...(source.cacheKey === undefined ? {} : { cacheKey: source.cacheKey }),
-    ...(source.builtAt === undefined ? {} : { builtAt: source.builtAt }),
-    ...(source.resolutionMode === undefined ? {} : { resolutionMode: source.resolutionMode }),
-    features: { edge: source.features?.edge ?? [] },
+    version: catalog.version,
+    language: catalog.language,
+    ...(catalog.cacheKey === undefined ? {} : { cacheKey: catalog.cacheKey }),
+    builtAt: catalog.builtAt,
+    ...(catalog.resolutionMode === undefined ? {} : { resolutionMode: catalog.resolutionMode }),
+    features: { edge: catalog.features?.edge ?? [] },
   };
 
   // Budget left for the function map once the fixed parts are accounted for.
   let budget = maxBytes - scriptContextJsonBytes({ ...base, functions: {} });
 
-  const metrics = source.features?.function;
+  const metrics = catalog.features?.function;
   const ranked = [...entries].sort((a, b) => compareByImportance(a, b, metrics));
 
   const kept: FunctionMap = {};

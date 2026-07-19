@@ -138,6 +138,36 @@ their own install/build step even when OpenSIP packages do not.
 
 ---
 
+## Capability-pack trust
+
+Capability packs (fitness check packs, simulation scenario packs, graph
+adapters) are executable extensions that load per run, so they get their own
+trust bar
+([ADR-0171](../../decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)):
+
+- **Deny by default.** Bundled first-party packs are trusted; every external
+  pack is denied on load until an operator grants it.
+- **The trust surface is the user-level global-config trust list**, written by
+  `opensip policy trust <pack>` (revoked by `opensip policy untrust <pack>`).
+  Each grant binds the **exact** package id to the pack's provenance (its
+  `opensipTools` manifest hash) resolved at grant time. A resolved pack whose
+  provenance no longer matches the grant is denied with guidance to re-verify
+  and re-grant — a bare trusted *name* would be shadowable through the analyzed
+  repo's `node_modules`. `*` is never honored.
+- **The analyzed repo cannot grant trust.** A `plugins.*` entry in the
+  project's own `opensip-cli.config.yml` selects a pack for discovery but never
+  trusts it, and a trust block in the project config is a hard schema error —
+  only the out-of-repo user config carries grants.
+- **Boundary statement.** This defends direct `opensip` invocations against
+  untrusted repos. Repo-authored automation (the repo's own scripts and
+  workflows) is already arbitrary code execution and sits outside this
+  boundary.
+
+Grant and revoke ceremonies, and every denial, are recorded on the local
+trust-audit plane (`opensip policy audit`).
+
+---
+
 ## Using the reusable check
 
 The universal check pack now includes `package-supply-chain-policy`. It inspects

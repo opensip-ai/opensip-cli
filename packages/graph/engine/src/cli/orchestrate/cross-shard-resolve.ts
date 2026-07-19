@@ -376,6 +376,10 @@ export function resolveCrossBoundaryCalls(
       .flat()
       .map((o) => o.filePath),
   );
+  // Extension-stripped twin of knownFiles, built ONCE per resolve pass so the
+  // relative-import pin does two O(1) lookups per boundary call instead of
+  // spreading + regex-scanning the whole set per call (O(calls x files)).
+  const knownFilesStripped = new Set<string>([...knownFiles].map(stripExt));
   // name → re-export records exposing it (for following a relative import that
   // lands on a re-exporting module rather than the definition).
   const reExportsByName = new Map<string, ReExportRecord[]>();
@@ -390,6 +394,7 @@ export function resolveCrossBoundaryCalls(
     manifestIndex,
     nameIndex,
     knownFiles,
+    knownFilesStripped,
     reExportsByName,
   };
   const stats = createMutableStats();
@@ -443,6 +448,8 @@ interface ResolveContext {
   /** name → all occurrences with that name (the relative-import pin candidates). */
   readonly nameIndex: ReadonlyMap<string, readonly FunctionOccurrence[]>;
   readonly knownFiles: ReadonlySet<string>;
+  /** Extension-stripped knownFiles for O(1) relative-import pin existence checks. */
+  readonly knownFilesStripped: ReadonlySet<string>;
   /** exportedName → re-export records, for following a relative import that lands
    *  on a re-exporting module (`export { x } from '@scope/pkg'`) not the definition. */
   readonly reExportsByName: ReadonlyMap<string, readonly ReExportRecord[]>;
@@ -499,7 +506,7 @@ function resolveOne(bc: CrossBoundaryCall, ctx: ResolveContext): CallEdge {
   // decline-beats-guess). Previously emitted ALL matches as a multi-target edge.
   if (spec?.startsWith('.')) {
     const candidates = ctx.nameIndex.get(bc.calleeName) ?? [];
-    const pinned = pinBySpecifier(bc, candidates, ctx.knownFiles);
+    const pinned = pinBySpecifier(bc, candidates, ctx.knownFilesStripped);
     const distinct = [...new Set(pinned.map((o) => o.bodyHash))];
     if (distinct.length === 1) {
       const edge = { ...base, to: distinct };
@@ -591,7 +598,7 @@ function followReExport(bc: CrossBoundaryCall, ctx: ResolveContext): string | un
 function pinBySpecifier(
   bc: CrossBoundaryCall,
   candidates: readonly FunctionOccurrence[],
-  knownFiles: ReadonlySet<string>,
+  knownFilesStripped: ReadonlySet<string>,
 ): readonly FunctionOccurrence[] {
   const spec = bc.importSpecifier;
   if (!spec?.startsWith('.')) return [];
@@ -602,8 +609,10 @@ function pinBySpecifier(
     const fp = stripExt(filePath);
     return fp === target || fp === `${target}/index`;
   };
-  // Only pin when the resolved target actually exists in the catalog.
-  if (![...knownFiles].some(matchesTarget)) return [];
+  // Only pin when the resolved target actually exists in the catalog — two
+  // O(1) lookups against the precomputed stripped set (was a per-call spread
+  // + regex scan of every known file).
+  if (!knownFilesStripped.has(target) && !knownFilesStripped.has(`${target}/index`)) return [];
   return candidates.filter((c) => matchesTarget(c.filePath));
 }
 

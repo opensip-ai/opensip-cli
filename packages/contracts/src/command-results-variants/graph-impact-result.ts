@@ -2,7 +2,7 @@
  * Graph impact command result (ADR-0085, spec §5.3).
  */
 import type { GraphResolutionMode } from '../graph-catalog.js';
-import type { ImpactFunction, ImpactPackage } from '../graph-impact-compute.js';
+import type { ImpactFunction, ImpactPackage } from '../graph-impact-model.js';
 import type { ImpactTrust } from '../impact-trust.js';
 import type { ChangedFileBasis } from '@opensip-cli/core';
 

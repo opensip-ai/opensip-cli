@@ -123,7 +123,7 @@ packages) is a separate trust gate — see
 [ADR-0068](../docs/decisions/ADR-0068-consumption-side-verification-policy.md)
 and [ADR-0061](../docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
-## The 57 packages
+## The 58 packages
 
 `scripts/release-package-order.mjs` is the source of truth for the publishable
 package set and dependency order. The release workflow, bootstrap script, and
@@ -142,6 +142,7 @@ contract tests derive from or verify against that source.
 | Config         | `@opensip-cli/config`                | `packages/config`                     |
 | Targeting      | `@opensip-cli/targeting`             | `packages/targeting`                  |
 | Substrate      | `@opensip-cli/codebase`              | `packages/codebase`                   |
+| Substrate      | `@opensip-cli/shared-analysis`       | `packages/shared-analysis`            |
 | Shared CLI     | `@opensip-cli/cli-ui`                | `packages/cli-ui`                     |
 | Shared CLI     | `@opensip-cli/cli-live`              | `packages/cli-live`                   |
 | Languages      | `@opensip-cli/tree-sitter`           | `packages/tree-sitter`                |
@@ -202,10 +203,10 @@ parts are obvious. (`git grep -n '<old-version>'` after a bump is the backstop.)
 
 ### 1. Version fields (hand-set, lockstep)
 
-All 57 publishable packages **plus** the private root (`@opensip-cli/root`) and
+All 58 publishable packages **plus** the private root (`@opensip-cli/root`) and
 the private `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
 `@opensip-cli/checks-dogfood` carry one shared version —
-61 `package.json` files. The bump script matches
+62 `package.json` files. The bump script matches
 `name === 'opensip-cli'`,
 `name === '@opensip-cli/root'`, or `name.startsWith('@opensip-cli/')`. Fixture
 packages use other scopes (`@fixture/*`, `@example/*`, `@medium/*`,
@@ -222,7 +223,7 @@ Each reads `packages/core/package.json#version`:
 | Surface                                   | Regenerate with                                                               | Pins                                                  |
 | ----------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
 | CLI `--version`                           | nothing — `readPackageVersion` walks to the nearest `package.json` at runtime | the installed version                                 |
-| Per-package `README.md` (×56 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
+| Per-package `README.md` (×57 scoped)      | `pnpm docs:readmes`                                                           | `tree/vX.Y.Z/…` source + catalog links                |
 | `docs/web-generated/**` + `manifest.json` | `pnpm docs:build`                                                             | `blob/vX.Y.Z/…` links; manifest `version` / `rawBase` |
 
 CI fails if these are stale — `pnpm docs:readmes:check` and `pnpm docs:check`,
@@ -325,7 +326,7 @@ npm/Cargo caret semantics a `^0.y.z` range locks to the **minor**, so every
 
    ```
 
-for p in core datastore contracts tool-test-kit clone-detection format session-store output config targeting codebase cli-ui cli-live tree-sitter \
+for p in core datastore contracts tool-test-kit clone-detection format session-store output config targeting codebase shared-analysis cli-ui cli-live tree-sitter \
 lang-typescript lang-rust lang-python lang-go lang-java lang-cpp \
 dashboard external-tool-adapter fitness simulation graph yagni graph-adapter-common graph-typescript \
 graph-python graph-rust graph-go graph-java mcp tool-gitleaks tool-osv-scanner tool-trivy \
@@ -476,7 +477,7 @@ in `release.yml` or `bootstrap-publish.sh`.
    and `filter`.
 3. **Update this file (`RELEASING.md`)** — CI's release-package-order contract
    test enforces the prose:
-   - Add a row to [The 57 packages](#the-57-packages) (update the section title
+   - Add a row to [The 58 packages](#the-58-packages) (update the section title
      count when the set size changes).
    - Add the unscoped name to the [npm verify loop](#cutting-a-release) `for p in …`
      block (scoped packages only; `opensip-cli` stays on its own line).
