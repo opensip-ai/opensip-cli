@@ -45,7 +45,6 @@ import {
   policyAuditFromCurrentScope,
   policyFromCurrentScope,
 } from './policy-pep.js';
-import { CAPABILITY_PACK_ALLOWLIST_ENV, isCapabilityPackTrusted } from './tool-trust.js';
 
 /**
  * Resolve the directory the CLI was installed into. BUILT-IN capability packs
@@ -214,12 +213,20 @@ function rawContributionFromBridge(
 }
 
 /**
- * The host trust-policy capability-pack admission. Exported so it can be
- * published on `RunScope.capabilityAdmission` (build-per-run-scope): an engine
- * that triggers its own capability load (the fitness check-loader) then admits
- * packs through THIS gate — identical to the bootstrap path — rather than a
- * permissive builtin default that would let a non-bundled `@opensip-cli/*` pack
- * (the private dogfood pack) load in a project that never opted into it.
+ * The host trust-policy capability-pack admission — the ENFORCED security
+ * boundary for external capability packs (plan 09 Phase 3; capability-trust
+ * ADR). Exported so it can be published on `RunScope.capabilityAdmission`
+ * (build-per-run-scope): an engine that triggers its own capability load (the
+ * fitness check-loader) then admits packs through THIS gate — identical to the
+ * bootstrap path.
+ *
+ * Trust direction: a `plugins.<domain>` entry in the ANALYZED REPO's own
+ * config is discovery/selection input, never operator trust — a tool whose
+ * job is analyzing code it does not trust must not let that code nominate
+ * executable packs. Operator trust is exactly one surface: the user-level
+ * global-config trust list (`policy.trustedCapabilityPacks`), each grant an
+ * exact id bound to the provenance (manifest hash) verified at grant time —
+ * a trusted NAME alone would be shadowable through the repo's `node_modules`.
  */
 export function admitCapabilityPackage(
   descriptor: CapabilityDiscoveryDescriptor,
@@ -234,7 +241,9 @@ export function admitCapabilityPackage(
   }
   const bundled = isBundledCapabilityPack(descriptor, pkg.name);
   const explicitlyConfigured = explicitlyConfiguredPackages.has(pkg.name);
-  const envTrusted = isCapabilityPackTrusted(pkg.name);
+  const grant = policyFromCurrentScope().capabilityGrants.find((entry) => entry.id === pkg.name);
+  const grantMatches = grant !== undefined && grant.manifestHash === pkg.packageManifestHash;
+  const operatorTrusted = bundled || grantMatches;
   const policyDecision = evaluatePolicyPep({
     policy: policyFromCurrentScope(),
     audit: policyAuditFromCurrentScope(),
@@ -246,15 +255,17 @@ export function admitCapabilityPackage(
     },
     action: 'load',
     evidence: {
-      legacyTrusted: bundled || explicitlyConfigured || envTrusted,
+      legacyTrusted: operatorTrusted,
       bundled,
+      // Informational only — analyzed-repo config selects packs, it does not
+      // trust them (the audit record keeps the distinction visible).
       explicitlyConfigured,
-      envAllowed: envTrusted,
+      operatorGranted: grantMatches,
       capabilityExport: descriptor.exportName,
       declaredResources: pkg.packageRequires ?? [],
       targetDomain: pkg.packageTargetDomain,
       manifestHash: pkg.packageManifestHash,
-      provenanceStatus: bundled ? 'verified' : 'unavailable',
+      provenanceStatus: operatorTrusted ? 'verified' : 'unavailable',
       ci: policyCiEvidenceFromCurrentEnv(),
     },
   });
@@ -265,30 +276,40 @@ export function admitCapabilityPackage(
       reason: `policy allowed ${pkg.name} but did not return a capability resource decision`,
     };
   }
-  if (bundled && policyDecision.allowed) {
+  if (operatorTrusted && policyDecision.allowed) {
     return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
   }
-  if (explicitlyConfigured && policyDecision.allowed) {
-    return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
-  }
-  if (envTrusted && policyDecision.allowed) {
-    return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
-  }
-  const configuredPackageKey = descriptor.configKeys.packages;
-  const configuredPackageHint =
-    configuredPackageKey === undefined ? '' : ` or list it in plugins.${configuredPackageKey}`;
-  const reason = policyDecision.allowed
-    ? `set ${CAPABILITY_PACK_ALLOWLIST_ENV} to '${pkg.name}'${configuredPackageHint}`
-    : policyDecision.decision.reasons.join('; ');
+  const reason = admissionDenialReason(pkg, grant !== undefined, policyDecision);
   logger.warn({
     evt: 'cli.capability.trust_denied',
     module: 'cli:capability',
     packageName: pkg.name,
     packageDir: pkg.packageDir,
-    envVar: CAPABILITY_PACK_ALLOWLIST_ENV,
+    grantPresent: grant !== undefined,
+    provenanceMatched: grantMatches,
     message: `capability pack ${pkg.name} denied by trust policy`,
   });
   return capabilityPackProvenancePassthrough(pkg, { admit: false, reason });
+}
+
+/**
+ * Human guidance for a denied pack. A stale grant (id matches, provenance
+ * does not) gets its own message — the resolved pack is NOT the artifact the
+ * operator verified, which is either an update or a shadowing attempt.
+ */
+function admissionDenialReason(
+  pkg: SelectedCapabilityPackage,
+  grantPresent: boolean,
+  policyDecision: { readonly allowed: boolean; readonly decision: { readonly reasons: readonly string[] } },
+): string {
+  if (!policyDecision.allowed) return policyDecision.decision.reasons.join('; ');
+  if (grantPresent) {
+    return (
+      `trusted provenance for ${pkg.name} does not match the resolved package — ` +
+      `verify the pack, then re-run: opensip policy trust ${pkg.name}`
+    );
+  }
+  return `not operator-trusted — verify the pack, then run: opensip policy trust ${pkg.name}`;
 }
 
 function capabilityPackProvenancePassthrough(

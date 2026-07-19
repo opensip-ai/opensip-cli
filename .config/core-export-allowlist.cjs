@@ -238,6 +238,7 @@ const EXPORT_ALLOWLIST = {
   readDeclaredKind: 'discovery-substrate',
   readMarkerKind: 'discovery-substrate',
   readProjectPluginsList: 'discovery-substrate',
+  readDeclaredCapabilityPackageMetadata: 'discovery-substrate',
   readToolPackageMetadata: 'discovery-substrate',
   registerCapabilityDomainsFromManifest: 'discovery-substrate',
   registerRecipesFromMod: 'discovery-substrate',

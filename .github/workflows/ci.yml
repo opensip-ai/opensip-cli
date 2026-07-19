@@ -226,6 +226,14 @@ jobs:
 
       # Fit/graph/yagni share opensip-cli/.runtime/datastore.sqlite — run
       # sequentially in one job (not as parallel background processes).
+      #
+      # The private dogfood check pack is selected by plugins.checkPackages but
+      # no longer trusted by it (plan 09 Phase 3: analyzed-repo config is not
+      # operator trust). The runner is the operator here, so the workflow
+      # performs the provenance-binding grant ceremony before the gate.
+      - name: Trust the repo-local dogfood check pack
+        run: node packages/cli/dist/index.js policy trust @opensip-cli/checks-dogfood
+
       - name: Fit (dogfood)
         id: fit
         run: pnpm fit:ci
@@ -458,6 +466,9 @@ jobs:
 
       - name: Verify pnpm injected packages are fresh
         run: node scripts/verify-pnpm-injection.mjs
+
+      - name: Trust the repo-local dogfood check pack (cold)
+        run: node packages/cli/dist/index.js policy trust @opensip-cli/checks-dogfood
 
       - name: Fit cold dogfood gate
         run: pnpm fit:ci

@@ -89,6 +89,7 @@ export type {
   PolicyExplainResult,
   PolicyMode,
   PolicyStatusResult,
+  PolicyTrustResult,
 } from './command-results-variants/policy-results.js';
 export type {
   SessionReplayResult,
@@ -166,6 +167,7 @@ import type {
   PolicyAuditResult,
   PolicyExplainResult,
   PolicyStatusResult,
+  PolicyTrustResult,
 } from './command-results-variants/policy-results.js';
 import type { RepairApplyVerifyResult } from './command-results-variants/repair-apply-verify-results.js';
 import type {
@@ -224,6 +226,7 @@ export type CommandResult =
   | PolicyStatusResult
   | PolicyExplainResult
   | PolicyAuditResult
+  | PolicyTrustResult
   | ClearDoneResult
   | ConfigureDoneResult
   | UninstallDoneResult

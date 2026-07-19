@@ -111,20 +111,11 @@ export const CLI_INFRA_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
       'or authored tools. Pair with OPENSIP_CLI_SKIP_INSTALLED for incident response (kill ' +
       'switch wins).',
   },
-  {
-    canonical: 'OPENSIP_CLI_ALLOW_CAPABILITY_PACKS',
-    coerce: (raw) =>
-      raw
-        .split(/[\s,]+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0),
-    default: [] as readonly string[],
-    docs:
-      'Override for comma/whitespace-separated third-party capability-pack package names. ' +
-      'Names must match exactly, e.g. @scope/opensip-fit-rules. First-party bundled packs ' +
-      'and packages listed in plugins.* are trusted by explicit config. The * wildcard is ' +
-      'intentionally not honored for capability packs.',
-  },
+  // `OPENSIP_CLI_ALLOW_CAPABILITY_PACKS` was REMOVED (plan 09 Phase 3):
+  // repo-committed workflows/direnv can set env for a direct invocation, so an
+  // env allowlist re-opened the analyzed-repo trust inversion. The single
+  // capability trust surface is the user-level global-config trust list
+  // (`opensip policy trust <pack>`).
   // ADR-0054 M4-E: `OPENSIP_CLI_EXTERNAL_WORKER` (the opt-in gate for the
   // out-of-process dispatch plane) was RETIRED. External (installed /
   // project-local / user-global) tools now fork the worker BY DEFAULT — the gate

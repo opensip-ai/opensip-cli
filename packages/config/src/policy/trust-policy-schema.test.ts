@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   capabilityIsolationLevelSchema,
+  capabilityTrustGrantSchema,
   formatPolicySubject,
   orgPolicyCacheSchema,
   parsePolicySubject,
@@ -12,7 +13,55 @@ import {
   trustPolicyExceptionSchema,
   trustPolicyOrgConfigSchema,
   trustPolicySchema,
+  userTrustPolicySchema,
 } from './trust-policy-schema.js';
+import { resolveTrustPolicySources } from './trust-policy-resolution.js';
+
+const GRANT = {
+  id: '@acme/fit-rules',
+  manifestHash: `sha256:${'a'.repeat(64)}`,
+};
+
+describe('capability trust grants (plan 09 Phase 3 — user-tier-only surface)', () => {
+  it('accepts grants on the USER document and rejects them on the project document', () => {
+    expect(
+      userTrustPolicySchema.parse({ trustedCapabilityPacks: [GRANT] }),
+    ).toMatchObject({ trustedCapabilityPacks: [GRANT] });
+    // The project tier stays on the strict base schema: a trust block inside
+    // the analyzed repo's config is a HARD schema error, never silently
+    // ignored — it must not even appear load-bearing.
+    expect(() => trustPolicySchema.parse({ trustedCapabilityPacks: [GRANT] })).toThrow();
+  });
+
+  it('requires exact ids and a sha256 provenance binding', () => {
+    expect(() => capabilityTrustGrantSchema.parse({ id: '', manifestHash: GRANT.manifestHash }))
+      .toThrow();
+    expect(() =>
+      capabilityTrustGrantSchema.parse({ id: '@acme/fit-rules', manifestHash: 'sha256:short' }),
+    ).toThrow();
+    expect(() => capabilityTrustGrantSchema.parse({ id: '@acme/fit-rules' })).toThrow();
+  });
+
+  it('resolves grants from the user tier only (defensive against other tiers)', () => {
+    const NOW = new Date('2026-07-18T00:00:00.000Z');
+    const resolved = resolveTrustPolicySources(
+      [
+        { tier: 'user', policy: { trustedCapabilityPacks: [GRANT] } },
+        {
+          tier: 'project',
+          policy: { trustedCapabilityPacks: [{ ...GRANT, id: '@evil/injected' }] },
+        },
+      ],
+      NOW,
+    );
+    expect(resolved.capabilityGrants).toEqual([GRANT]);
+  });
+
+  it('defaults to no grants (absent field reads as deny)', () => {
+    const resolved = resolveTrustPolicySources([], new Date('2026-07-18T00:00:00.000Z'));
+    expect(resolved.capabilityGrants).toEqual([]);
+  });
+});
 
 describe('trust policy schemas', () => {
   it('validates trust policy documents and bounded exception subjects', () => {

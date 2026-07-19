@@ -270,6 +270,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'resolveEphemeralProjectPaths',
   'resolveEphemeralProjectIdentity',
   'resolveRuntimePathsForScope',
+  'readDeclaredCapabilityPackageMetadata',
   'resolvePackageDir',
   'resolvePackageEntryPoint',
   'resolveProjectConfigPath',

@@ -6,6 +6,10 @@ export const POLICY_ACTIONS = [
   'disable-check',
   'runtime-exclude',
   'baseline-save',
+  // Operator capability-trust ceremonies (`policy trust` / `policy untrust`)
+  // — recorded on the trust-audit plane like every other policy decision.
+  'trust',
+  'untrust',
 ] as const;
 
 export const POLICY_SUBJECT_KINDS = [
@@ -72,6 +76,41 @@ export const trustPolicySchema = z
   })
   .strict();
 
+export const CAPABILITY_TRUST_GRANT_MAX_COUNT = 200;
+
+/**
+ * One operator capability-pack trust grant: an exact pack id bound to the
+ * provenance identity (the pack's `opensipTools` manifest hash) verified at
+ * grant time. Packs resolve from the analyzed repo's `node_modules`, so a bare
+ * trusted NAME would be shadowable by malicious code — admission requires id
+ * AND provenance to match (plan 09 Phase 3, recorded in the capability-trust
+ * ADR).
+ */
+export const capabilityTrustGrantSchema = z
+  .object({
+    id: z.string().min(1).max(214),
+    manifestHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    grantedAt: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict();
+
+/**
+ * USER-TIER-ONLY trust-policy shape: the capability-pack trust list lives on
+ * the user-level global config document exclusively (the single out-of-repo
+ * trust surface). The project-tier schema stays {@link trustPolicySchema}
+ * (strict), so a `trustedCapabilityPacks` key in the analyzed repo's project
+ * config is a hard schema error at compose time — never silently ignored,
+ * never load-bearing.
+ */
+export const userTrustPolicySchema = trustPolicySchema
+  .extend({
+    trustedCapabilityPacks: z
+      .array(capabilityTrustGrantSchema)
+      .max(CAPABILITY_TRUST_GRANT_MAX_COUNT)
+      .optional(),
+  })
+  .strict();
+
 export const orgPolicyCacheSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -87,6 +126,8 @@ export const policyResourceClassSchema = z.enum(POLICY_RESOURCE_CLASSES);
 export const capabilityIsolationLevelSchema = z.enum(CAPABILITY_ISOLATION_LEVELS);
 
 export type TrustPolicyDocument = z.infer<typeof trustPolicySchema>;
+export type CapabilityTrustGrant = z.infer<typeof capabilityTrustGrantSchema>;
+export type UserTrustPolicyDocument = z.infer<typeof userTrustPolicySchema>;
 export type TrustPolicyOrgConfig = z.infer<typeof trustPolicyOrgConfigSchema>;
 export type TrustPolicyExceptionDocument = z.infer<typeof trustPolicyExceptionSchema>;
 export type TrustPolicySourceTier = (typeof TRUST_POLICY_SOURCE_TIERS)[number];
@@ -134,11 +175,17 @@ export interface ResolvedTrustPolicy {
   readonly org: Required<TrustPolicyOrgConfig>;
   readonly orgStatus: OrgPolicyStatus;
   readonly sourceTiers: readonly TrustPolicySourceTier[];
+  /**
+   * Operator capability-pack trust grants, applied from the USER tier only
+   * (the global config document is the single trust surface). Default `[]` —
+   * absent grants read as deny for external packs.
+   */
+  readonly capabilityGrants: readonly CapabilityTrustGrant[];
 }
 
 export interface TrustPolicySource {
   readonly tier: TrustPolicySourceTier;
-  readonly policy?: TrustPolicyDocument;
+  readonly policy?: UserTrustPolicyDocument;
   readonly orgStatus?: OrgPolicyStatus;
 }
 
