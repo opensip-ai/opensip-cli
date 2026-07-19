@@ -88,9 +88,14 @@ jobs:
 
       # Release consistency gate. Catches half-bumped versions, tag
       # mismatch, missing CHANGELOG entry, stale generated docs, and
-      # cross-package dep ranges that drifted off-consensus. Cheap (~1s);
-      # fail-fast here saves a wasted build + the post-publish blast
-      # radius of a broken release.
+      # cross-package dep ranges that drifted off-consensus. Fail-fast here
+      # before the full monorepo build + dogfood blast radius of a broken
+      # release. Check #14 (supported-platforms matrix) loads the built
+      # core registry (`packages/core/dist/index-lib.js`), so core must be
+      # built first; the later `pnpm -r run clean` + full build still run
+      # on a fresh tree for pack/publish fidelity.
+      - name: Build core (supported-platforms verify input)
+        run: pnpm --filter=@opensip-cli/core build
       - name: Verify release consistency
         env:
           RELEASE_TAG: ${{ github.ref_name }}
