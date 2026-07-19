@@ -14,8 +14,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
+import { requireDrizzleHandle } from '../../data-store.js';
 import { DataStoreFactory } from '../../factory.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -83,9 +85,9 @@ describe('datastore write lock — cross-process serialization', () => {
 
       const store = DataStoreFactory.open({ backend: 'sqlite', path: dbPath });
       try {
-        const rows = store.db.$client
-          .prepare("SELECT key FROM tool_state WHERE tool = 'locktest' ORDER BY rowid")
-          .all() as readonly { key: string }[];
+        const rows = requireDrizzleHandle(store).db.all<{ key: string }>(
+          sql`SELECT key FROM tool_state WHERE tool = 'locktest' ORDER BY rowid`,
+        );
         expect(rows).toHaveLength(50);
         // Serialization evidence: in rowid order, the writer id changes at
         // most once — each batch is one contiguous block, never interleaved.

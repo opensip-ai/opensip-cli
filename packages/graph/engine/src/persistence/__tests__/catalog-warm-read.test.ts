@@ -106,8 +106,8 @@ describe('CatalogRepo — trusted warm read', () => {
         cacheKey: 'cache-key-1',
         functions: {},
       };
-      store.db
-        .update(graphCatalog)
+      requireDrizzleHandle(store)
+        .db.update(graphCatalog)
         .set({ payload: preFeature })
         .where(sql`id = 1`)
         .run();
