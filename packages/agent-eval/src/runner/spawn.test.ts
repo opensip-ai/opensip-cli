@@ -119,14 +119,14 @@ describe('spawnProcess', () => {
   });
 
   it('terminates a child that exceeds the time bound', async () => {
-    const started = Date.now();
     const result = await spawnProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
       timeoutMs: 50,
     });
+    // Outcome-based (plan 09 Task 8.7): the contract is "the timeout fired
+    // and the child settled" — the test-runner timeout already bounds a hang,
+    // so a real-elapsed upper bound only adds loaded-CI flake risk.
     expect(result.timedOut).toBe(true);
-    // Bound is "terminates promptly under load", not a tight real-time SLO —
-    // loaded Linux CI has occasionally exceeded a 2s wall (e.g. 2029ms).
-    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(result.exitCode === null || result.signal !== null).toBe(true);
   });
 
   it('terminates and truncates a child that exceeds the output bound', async () => {
