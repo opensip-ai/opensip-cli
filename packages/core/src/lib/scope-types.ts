@@ -25,6 +25,7 @@
  *   inherit the slots for reading.
  */
 
+import type { DiagnosticsBus } from './diagnostics-bus.js';
 import type { Logger } from './logger.js';
 import type { ProjectContext } from './project-context.js';
 import type { LanguageParseCache } from '../languages/parse-cache-class.js';
@@ -350,4 +351,14 @@ export interface ToolScope extends ScopeContribution {
    * names no targeting concrete, so the kernel carries no targeting dependency.
    */
   readonly targets?: TargetResolver;
+  /**
+   * The per-invocation diagnostics bus (north-star §5.10). OPTIONAL and
+   * additive (plan 09 Task 8.5): every host-built `RunScope` carries one, but
+   * lean test scopes may omit it — consumers use `scope.diagnostics?.event`.
+   * A typed member so cross-layer emitters (contracts' lifecycle events)
+   * never reach it through an `as unknown as` cast, which erased the
+   * required-ness of scope/logger and let a diagnostics-wiring regression
+   * silently no-op. Additive read surface — SCOPE_ABI_VERSION is NOT bumped.
+   */
+  readonly diagnostics?: DiagnosticsBus;
 }

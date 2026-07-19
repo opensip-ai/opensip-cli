@@ -1,4 +1,4 @@
-import type { ToolCliContext } from '@opensip-cli/core';
+import type { DiagnosticsBus, ToolCliContext } from '@opensip-cli/core';
 
 export type RunLifecycleEvent =
   'analysis.run.started' | 'analysis.run.completed' | 'analysis.run.failed';
@@ -25,19 +25,6 @@ export interface AnalysisLifecycleRecord<TEvent extends AnalysisLifecycleEvent> 
   readonly metadata: LifecycleMetadata;
 }
 
-interface DiagnosticsLike {
-  event(
-    phase: 'execute' | 'deliver' | 'load' | 'render' | 'persist' | 'error',
-    level: 'debug' | 'info' | 'warn' | 'error',
-    message: string,
-    data?: Readonly<Record<string, unknown>>,
-  ): void;
-}
-
-interface LoggerLike {
-  debug(msgOrObj: string | Record<string, unknown>, data?: Record<string, unknown>): void;
-}
-
 function compactMetadata(metadata: LifecycleMetadata = {}): LifecycleMetadata {
   const compacted: Record<string, LifecycleMetadataValue> = {};
   for (const [key, value] of Object.entries(metadata)) {
@@ -46,9 +33,12 @@ function compactMetadata(metadata: LifecycleMetadata = {}): LifecycleMetadata {
   return compacted;
 }
 
-function eventPhase(event: AnalysisLifecycleEvent): Parameters<DiagnosticsLike['event']>[0] {
+function eventPhase(event: AnalysisLifecycleEvent): Parameters<DiagnosticsBus['event']>[0] {
   if (event.startsWith('analysis.delivery.')) return 'deliver';
-  if (event === 'analysis.config.rejected') return 'error';
+  // The old untyped seam emitted a phase 'error' here — a value the real
+  // DiagnosticPhase union never contained (the cast hid the mismatch). A
+  // config rejection is a validate-phase event; error-ness rides the level.
+  if (event === 'analysis.config.rejected') return 'validate';
   if (event.startsWith('analysis.config.')) return 'load';
   return 'execute';
 }
@@ -85,11 +75,12 @@ export function emitAnalysisLifecycleEvent(
   cli: ToolCliContext,
   record: AnalysisLifecycleRecord<AnalysisLifecycleEvent>,
 ): void {
-  const diagnostics = (cli as unknown as { scope?: { diagnostics?: DiagnosticsLike } }).scope
-    ?.diagnostics;
-  diagnostics?.event(eventPhase(record.event), 'debug', record.event, record.metadata);
-  const logger = (cli as unknown as { logger?: LoggerLike }).logger;
-  logger?.debug({
+  // Typed seam (plan 09 Task 8.5): `scope.diagnostics` is an optional typed
+  // member of the core ToolScope and `logger` is a REQUIRED context member —
+  // the former double-casts erased that required-ness, so a wiring regression
+  // would have silently no-op'd.
+  cli.scope.diagnostics?.event(eventPhase(record.event), 'debug', record.event, record.metadata);
+  cli.logger.debug({
     evt: record.event,
     module: 'contracts:analysis-run',
     ...record.metadata,
