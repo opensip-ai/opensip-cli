@@ -52,6 +52,7 @@
       "@opensip-cli/mcp": ["packages/mcp/src/index.ts"],
       "@opensip-cli/output": ["packages/output/src/index.ts"],
       "@opensip-cli/session-store": ["packages/session-store/src/index.ts"],
+      "@opensip-cli/shared-analysis": ["packages/shared-analysis/src/index.ts"],
       "@opensip-cli/simulation": ["packages/simulation/engine/src/index.ts"],
       "@opensip-cli/simulation/internal": ["packages/simulation/engine/src/internal.ts"],
       "@opensip-cli/targeting": ["packages/targeting/src/index.ts"],

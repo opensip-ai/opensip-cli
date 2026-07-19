@@ -1,0 +1,46 @@
+{
+  "name": "@opensip-cli/shared-analysis",
+  "version": "0.7.0",
+  "license": "Apache-2.0",
+  "description": "Shared cross-tool analysis runtime for OpenSIP CLI — the changed→impact compute engine over GraphCatalog, review-brief risk derivation + correlation grouping, and the agent-catalog assembly both the CLI and MCP transports call",
+  "keywords": [
+    "opensip-cli",
+    "static-analysis",
+    "code-quality"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opensip-ai/opensip-cli.git",
+    "directory": "packages/shared-analysis"
+  },
+  "homepage": "https://github.com/opensip-ai/opensip-cli",
+  "bugs": {
+    "url": "https://github.com/opensip-ai/opensip-cli/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@opensip-cli/contracts": "workspace:*",
+    "@opensip-cli/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

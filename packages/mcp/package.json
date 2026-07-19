@@ -107,6 +107,7 @@
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/shared-analysis": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

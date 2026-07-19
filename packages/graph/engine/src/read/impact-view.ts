@@ -1,8 +1,6 @@
 /** Bounded explicit-file impact projection over the canonical contracts compute. */
 
 import {
-  buildComputeImpactIndex,
-  computeImpactAsync,
   ComputeImpactCancelledError,
   ComputeImpactIndexGenerationMismatchError,
   type ComputeImpactChangedFileEntry,
@@ -11,6 +9,7 @@ import {
   type ImpactTrust,
 } from '@opensip-cli/contracts';
 import { err, ok, type Result } from '@opensip-cli/core';
+import { buildComputeImpactIndex, computeImpactAsync } from '@opensip-cli/shared-analysis';
 
 import { compareCodePointStrings } from '../code-point-order.js';
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { computeImpact } from './graph-impact-compute.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
+import type { GraphCatalog, GraphFunctionOccurrence } from '@opensip-cli/contracts';
 
 function occurrence(
   overrides: Partial<GraphFunctionOccurrence> &

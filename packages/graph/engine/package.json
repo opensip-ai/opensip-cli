@@ -533,6 +533,7 @@
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/shared-analysis": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "commander": "^15.0.0",
     "drizzle-orm": "^0.45.2",

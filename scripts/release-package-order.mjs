@@ -143,6 +143,15 @@ export const RELEASE_PACKAGE_ORDER = [
     filter: '@opensip-cli/codebase',
     publishReason: 'Bounded deterministic project inventory and package-manifest facts',
   },
+  // Layer 3 — shared cross-tool analysis runtime (extracted from contracts, Plan 09 Phase 7)
+  {
+    unscoped: 'shared-analysis',
+    name: '@opensip-cli/shared-analysis',
+    dir: 'packages/shared-analysis',
+    filter: '@opensip-cli/shared-analysis',
+    publishReason:
+      'Impact compute, review-brief derivation/correlation, and agent-catalog assembly shared by tool engines and the CLI',
+  },
   // Layer 3 — shared Ink/React UI primitives
   {
     unscoped: 'cli-ui',

@@ -5,7 +5,6 @@ import { createHash } from 'node:crypto';
 
 import {
   buildSignalEnvelope,
-  computeImpact,
   EXIT_CODES,
   gitWarningsToImpactUncertainties,
   type GraphImpactCatalogIdentity,
@@ -29,6 +28,7 @@ import {
   type ToolCliContext,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
+import { computeImpact } from '@opensip-cli/shared-analysis';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';

@@ -1,3 +1,5 @@
+import { buildImpactTrust, mergeImpactUncertainties } from '@opensip-cli/contracts';
+
 import {
   DEFAULT_MAX_DEPTH,
   catalogUncertainties,
@@ -10,15 +12,15 @@ import {
   toImpactFunction,
   truncatedImpactUncertainty,
 } from './graph-impact-shared.js';
-import { buildImpactTrust, mergeImpactUncertainties } from './impact-trust.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
 import type {
   ComputeImpactOptions,
+  GraphCatalog,
+  GraphFunctionOccurrence,
   ImpactComputation,
   ImpactFunction,
   ImpactPackage,
-} from './graph-impact-model.js';
+} from '@opensip-cli/contracts';
 
 interface SynchronousImpactIndex {
   readonly occurrences: readonly GraphFunctionOccurrence[];

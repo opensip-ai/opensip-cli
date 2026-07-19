@@ -1,11 +1,16 @@
 import {
+  buildImpactTrust,
+  ComputeImpactIndexGenerationMismatchError,
+  mergeImpactUncertainties,
+} from '@opensip-cli/contracts';
+
+import {
   ASYNC_BATCH_SIZE,
   assertImpactNotCancelled,
   sortInBoundedBatches,
   yieldImpactWork,
 } from './graph-impact-cooperative.js';
 import { buildComputeImpactIndex, computeImpactIndexMatchesCatalog } from './graph-impact-index.js';
-import { ComputeImpactIndexGenerationMismatchError } from './graph-impact-model.js';
 import {
   DEFAULT_MAX_DEPTH,
   catalogUncertainties,
@@ -18,16 +23,16 @@ import {
   toImpactFunction,
   truncatedImpactUncertainty,
 } from './graph-impact-shared.js';
-import { buildImpactTrust, mergeImpactUncertainties } from './impact-trust.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
 import type {
   ComputeImpactAsyncOptions,
   ComputeImpactIndex,
+  GraphCatalog,
+  GraphFunctionOccurrence,
   ImpactComputation,
   ImpactFunction,
   ImpactPackage,
-} from './graph-impact-model.js';
+} from '@opensip-cli/contracts';
 
 interface CallerBfsContext {
   readonly occurrences: readonly GraphFunctionOccurrence[];

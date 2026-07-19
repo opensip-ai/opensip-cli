@@ -1,4 +1,4 @@
-import { ComputeImpactCancelledError } from './graph-impact-model.js';
+import { ComputeImpactCancelledError } from '@opensip-cli/contracts';
 
 export const ASYNC_BATCH_SIZE = 512;
 

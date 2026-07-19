@@ -1,3 +1,8 @@
+import {
+  ComputeImpactCancelledError,
+  type GraphCatalog,
+  type GraphFunctionOccurrence,
+} from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -5,9 +10,6 @@ import {
   computeImpact as computeImpactSync,
   computeImpactAsync as computeImpact,
   computeImpactCatalogGenerationIdentity,
-  ComputeImpactCancelledError,
-  type GraphCatalog,
-  type GraphFunctionOccurrence,
 } from '../index.js';
 
 function minimalCatalog(): GraphCatalog {

@@ -8,6 +8,7 @@
 
 import { logger } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
+import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,9 +45,11 @@ function catalog(): Catalog {
 
 function revalidateModes(debug: ReturnType<typeof vi.spyOn>): string[] {
   return debug.mock.calls
-    .map(([entry]) => entry as { evt?: string; mode?: string })
-    .filter((entry) => entry.evt === 'graph.catalog.warmread.revalidate')
-    .map((entry) => entry.mode ?? '');
+    .map(([entry]: readonly unknown[]) => entry as { evt?: string; mode?: string })
+    .filter(
+      (entry: { evt?: string; mode?: string }) => entry.evt === 'graph.catalog.warmread.revalidate',
+    )
+    .map((entry: { evt?: string; mode?: string }) => entry.mode ?? '');
 }
 
 afterEach(() => {
@@ -83,8 +86,8 @@ describe('CatalogRepo — trusted warm read', () => {
       // Validate once (memoizes the ORIGINAL identity), then drift a lifted
       // column: the changed identity must NOT ride the memoized trust.
       repo.loadFullCatalog();
-      store.db
-        .update(graphCatalog)
+      requireDrizzleHandle(store)
+        .db.update(graphCatalog)
         .set({ cacheKey: 'drifted-key' })
         .where(sql`id = 1`)
         .run();
@@ -106,8 +109,8 @@ describe('CatalogRepo — trusted warm read', () => {
       repo.replaceAll(catalog());
       // Corrupt the envelope itself — the always-on shape gate must throw
       // regardless of any trust decision.
-      store.db
-        .update(graphCatalog)
+      requireDrizzleHandle(store)
+        .db.update(graphCatalog)
         .set({ payload: { version: 'evil', tool: 'graph' } })
         .where(sql`id = 1`)
         .run();
@@ -135,8 +138,8 @@ describe('CatalogRepo — trusted warm read', () => {
         cacheKey: 'cache-key-1',
         functions: { alpha: 'not-an-array' },
       };
-      store.db
-        .update(graphCatalog)
+      requireDrizzleHandle(store)
+        .db.update(graphCatalog)
         .set({ payload, cacheKey: 'drifted' })
         .where(sql`id = 1`)
         .run();

@@ -6,8 +6,11 @@ import {
   yieldImpactWork,
 } from './graph-impact-cooperative.js';
 
-import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
-import type { ComputeImpactIndex } from './graph-impact-model.js';
+import type {
+  ComputeImpactIndex,
+  GraphCatalog,
+  GraphFunctionOccurrence,
+} from '@opensip-cli/contracts';
 
 // @sequential-ok -- Hashing and adjacency construction mutate shared bounded state;
 // concurrency would reorder the generation identity and cooperative checkpoints.

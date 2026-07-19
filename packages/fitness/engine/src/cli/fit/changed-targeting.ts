@@ -6,7 +6,6 @@ import path from 'node:path';
 import {
   buildImpactTrust,
   changedEntriesToImpactUncertainties,
-  computeImpact,
   gitWarningsToImpactUncertainties,
   mergeImpactUncertainties,
   type FitOptions,
@@ -14,6 +13,7 @@ import {
   type ImpactTrust,
   type ImpactUncertainty,
 } from '@opensip-cli/contracts';
+import { computeImpact } from '@opensip-cli/shared-analysis';
 import { createToolLogger, currentScope, resolveChangedFiles } from '@opensip-cli/core';
 
 const log = createToolLogger('fitness:cli');

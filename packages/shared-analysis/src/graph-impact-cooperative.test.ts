@@ -1,3 +1,4 @@
+import { ComputeImpactCancelledError } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,7 +7,6 @@ import {
   sortInBoundedBatches,
   yieldImpactWork,
 } from './graph-impact-cooperative.js';
-import { ComputeImpactCancelledError } from './graph-impact-model.js';
 
 const compareNumber = (left: number, right: number): number => left - right;
 const compareString = (left: string, right: string): number => {

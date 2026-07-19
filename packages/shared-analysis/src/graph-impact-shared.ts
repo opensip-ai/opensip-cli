@@ -1,10 +1,11 @@
-import type { GraphCatalog, GraphFunctionOccurrence } from './graph-catalog.js';
 import type {
   ComputeImpactChangedFileEntry,
   ComputeImpactIndex,
+  GraphCatalog,
+  GraphFunctionOccurrence,
   ImpactFunction,
-} from './graph-impact-model.js';
-import type { ImpactUncertainty } from './impact-trust.js';
+  ImpactUncertainty,
+} from '@opensip-cli/contracts';
 
 export const DEFAULT_MAX_DEPTH = 5;
 const HIGH_BLAST_THRESHOLD = 10;

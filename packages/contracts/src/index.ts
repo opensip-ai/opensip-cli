@@ -392,12 +392,11 @@ export type { AgentProjectContext, TargetConventionSummary } from './target-conv
 // projection + the single core→contracts mapper both CLI and MCP call, so their
 // hostSupport output is byte-identical for identical process facts.
 export { hostSupportFromRuntimeProjection, type AgentHostSupport } from './host-support.js';
+// The changed→impact MODEL (types + cancellation/mismatch error classes).
+// The compute runtime (computeImpact / computeImpactAsync / the reusable
+// generation index) moved to @opensip-cli/shared-analysis (Plan 09 Phase 7);
+// contracts keeps only the contract surface.
 export {
-  buildComputeImpactIndex,
-  computeImpact,
-  computeImpactAsync,
-  computeImpactCatalogGenerationIdentity,
-  computeImpactIndexMatchesCatalog,
   ComputeImpactCancelledError,
   ComputeImpactIndexGenerationMismatchError,
   type ComputeImpactChangedFileEntry,
@@ -407,7 +406,7 @@ export {
   type ImpactComputation,
   type ImpactFunction,
   type ImpactPackage,
-} from './graph-impact-compute.js';
+} from './graph-impact-model.js';
 
 // SARIF + cloud reporting moved to @opensip-cli/output (audit
 // 2026-05-29, contracts split; package renamed reporting→output in Phase 2,
