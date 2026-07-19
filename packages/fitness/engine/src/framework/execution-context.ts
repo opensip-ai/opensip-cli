@@ -220,25 +220,31 @@ export function createExecutionContext(
 
     /** @throws {SystemError} When the file exceeds 10MB */
     async readFile(filePath: string): Promise<string> {
-      // Fast-fail on obvious on-disk size before pulling content (optimization).
-      // The authoritative check is performed on the *actual* bytes returned
-      // (closes TOCTOU between stat and read, and protects against a cache
-      // entry that grew or was prewarmed with a larger version).
-      try {
-        const fileStats = await fs.stat(filePath);
-        if (fileStats.size > 10_000_000) {
-          throw new SystemError(`File too large (${fileStats.size} bytes, max 10MB): ${filePath}`, {
-            code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
-          });
+      // Prewarmed-cache fast path: content already in the bounded FileCache
+      // needs no fs.stat — the authoritative size check below runs on the
+      // actual cached bytes. (The unconditional stat here was 100k+ pointless
+      // threadpool calls per fit run, contending with real cache-miss reads.)
+      let content = fc.getCached(filePath);
+      if (content === undefined) {
+        // Genuine miss: fast-fail on obvious on-disk size before pulling
+        // content (optimization). The authoritative check still runs on the
+        // *actual* bytes returned (closes TOCTOU between stat and read).
+        try {
+          const fileStats = await fs.stat(filePath);
+          if (fileStats.size > 10_000_000) {
+            throw new SystemError(
+              `File too large (${fileStats.size} bytes, max 10MB): ${filePath}`,
+              { code: 'SYSTEM.FITNESS.FILE_TOO_LARGE' },
+            );
+          }
+        } catch (error) {
+          // If stat itself fails, let the subsequent get() surface the real FS
+          // error (directory, permission, etc.). Only rethrow our size error.
+          if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE')
+            throw error;
         }
-      } catch (error) {
-        // If stat itself fails, let the subsequent get() surface the real FS error
-        // (directory, permission, etc.). Only swallow the size error we just threw.
-        if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE')
-          throw error;
+        content = await fc.get(filePath);
       }
-
-      const content = await fc.get(filePath);
       if (content.length > 10_000_000) {
         throw new SystemError(`File too large (${content.length} bytes, max 10MB): ${filePath}`, {
           code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
