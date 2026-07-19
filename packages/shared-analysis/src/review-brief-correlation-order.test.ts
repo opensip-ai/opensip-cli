@@ -11,7 +11,7 @@ import type {
   ReviewBriefCorrelationGroup,
   ReviewBriefCorrelationRisk,
   ReviewBriefRiskRef,
-} from './review-brief-correlation-types.js';
+} from '@opensip-cli/contracts';
 
 function risk(overrides: Partial<ReviewBriefCorrelationRisk> = {}): ReviewBriefCorrelationRisk {
   return {

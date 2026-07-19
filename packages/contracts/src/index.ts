@@ -49,18 +49,28 @@ export {
   type CompatibilityStability,
 } from '@opensip-cli/core';
 
-export type * from './review-brief-correlation.js';
+// Review-brief correlation CONTRACT surface: the type family, the bounded
+// limits + priority/rank tables (values — the shared-analysis runtime reads
+// them), and the persisted-payload zod schemas. The correlation runtime
+// (buildReviewBriefCorrelations, reviewBriefEntities, reviewBriefCorrelationKeys)
+// moved to @opensip-cli/shared-analysis (Plan 09 Phase 7).
+export type * from './review-brief-correlation-types.js';
+export {
+  REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT,
+  REVIEW_BRIEF_CORRELATION_GROUP_LIMIT,
+  REVIEW_BRIEF_CORRELATION_KEY_LIMIT,
+  REVIEW_BRIEF_CORRELATION_KEY_PRIORITY,
+  REVIEW_BRIEF_CORRELATION_MEMBER_LIMIT,
+  REVIEW_BRIEF_CORRELATION_REASON_LIMIT,
+  REVIEW_BRIEF_SEVERITY_RANK,
+} from './review-brief-correlation-types.js';
 export { compareCodePoint, compareCodePointStrings } from './code-point-order.js';
+// Review-brief CONTRACT surface: version constant + types + the persisted
+// payload zod schemas MCP replays. The derivation runtime (compare/derive/
+// signalToReviewBriefRisk/builders) moved to @opensip-cli/shared-analysis.
 export {
   REVIEW_BRIEF_VERSION,
-  buildReviewBriefBaselineDelta,
-  buildReviewBriefRecommendedActions,
-  compareReviewBriefRisks,
-  deriveReviewBriefVerdict,
-  pushReviewBriefDegradation,
-  reviewBriefBaselineState,
   reviewBriefBaselineDeltaSchema,
-  reviewBriefBlastRadius,
   reviewBriefBlastRadiusSchema,
   reviewBriefDegradationSchema,
   reviewBriefRecommendedActionSchema,
@@ -68,7 +78,6 @@ export {
   reviewBriefRiskSchema,
   reviewBriefSchema,
   reviewBriefSignalRefSchema,
-  signalToReviewBriefRisk,
   type DeriveReviewBriefVerdictInput,
   type ReviewBrief,
   type ReviewBriefBaselineState,
@@ -83,15 +92,12 @@ export {
   type SignalToReviewBriefRiskInput,
 } from './review-brief.js';
 export {
-  buildReviewBriefCorrelations,
   reviewBriefCorrelationGroupSchema,
   reviewBriefCorrelationKeySchema,
-  reviewBriefCorrelationKeys,
   reviewBriefCorrelationReasonSchema,
-  reviewBriefEntities,
   reviewBriefEntityRefSchema,
   reviewBriefRiskRefSchema,
-} from './review-brief-correlation.js';
+} from './review-brief-correlation-schemas.js';
 
 export type * from './impact-trust.js';
 export {
@@ -369,29 +375,16 @@ export {
 } from './agent-filters.js';
 export type { AgentFilteredResult, AgentRunFilterOpts } from './agent-filters.js';
 
-// Agent command catalog (ADR-0084) — the self-describing entry-point surface
-// the host `agent-catalog` command renders and `@opensip-cli/mcp` serves.
-export {
-  agentCatalogOverlayKeys,
-  agentCatalogPlatformEntryPoints,
-  assertAgentCatalogOverlayKeys,
-  buildAgentCatalog,
-  type AgentCatalog,
-  type AgentCatalogBuildInput,
-  type CommandTier,
-} from './agent-catalog.js';
-export {
-  assembleAgentCatalog,
-  projectAgentCatalogRuntimeFacts,
-  type AgentCatalogAssemblyInput,
-  type AgentCatalogRuntimeFacts,
-} from './agent-catalog-assembly.js';
-export { summarizeTargetConventions } from './target-conventions.js';
+// Agent command catalog TYPES (ADR-0084) — the self-describing entry-point
+// surface the host `agent-catalog` command renders and `@opensip-cli/mcp`
+// serves. The content builder (buildAgentCatalog), curated entries, and the
+// transport-parity assembler moved to @opensip-cli/shared-analysis (Plan 09
+// Phase 7); contracts keeps the serializable shapes.
+export type { AgentCatalog, AgentCatalogBuildInput, CommandTier } from './agent-catalog.js';
 export type { AgentProjectContext, TargetConventionSummary } from './target-conventions.js';
-// Host-support projection (Plan 02, macOS GA). The serializable AgentCatalog
-// projection + the single core→contracts mapper both CLI and MCP call, so their
-// hostSupport output is byte-identical for identical process facts.
-export { hostSupportFromRuntimeProjection, type AgentHostSupport } from './host-support.js';
+// Host-support projection TYPE (Plan 02, macOS GA). The single core→contracts
+// mapper (hostSupportFromRuntimeProjection) lives in shared-analysis.
+export type { AgentHostSupport } from './host-support.js';
 // The changed→impact MODEL (types + cancellation/mismatch error classes).
 // The compute runtime (computeImpact / computeImpactAsync / the reusable
 // generation index) moved to @opensip-cli/shared-analysis (Plan 09 Phase 7);

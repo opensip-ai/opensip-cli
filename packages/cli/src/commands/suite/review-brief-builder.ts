@@ -1,18 +1,20 @@
 import {
-  buildReviewBriefBaselineDelta,
-  buildReviewBriefCorrelations,
-  buildReviewBriefRecommendedActions,
   REVIEW_BRIEF_VERSION,
-  compareReviewBriefRisks,
-  deriveReviewBriefVerdict,
-  pushReviewBriefDegradation,
-  reviewBriefBaselineState,
-  signalToReviewBriefRisk,
   type ReviewBrief,
   type ReviewBriefBaselineState,
   type ReviewBriefDegradation,
   type ReviewBriefRisk,
 } from '@opensip-cli/contracts';
+import {
+  buildReviewBriefBaselineDelta,
+  buildReviewBriefCorrelations,
+  buildReviewBriefRecommendedActions,
+  compareReviewBriefRisks,
+  deriveReviewBriefVerdict,
+  pushReviewBriefDegradation,
+  reviewBriefBaselineState,
+  signalToReviewBriefRisk,
+} from '@opensip-cli/shared-analysis';
 
 import {
   DEFAULT_REVIEW_BRIEF_DEGRADATION_LIMIT,

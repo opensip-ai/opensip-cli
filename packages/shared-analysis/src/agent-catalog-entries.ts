@@ -1,10 +1,9 @@
+import { compareCodePoint } from '@opensip-cli/contracts';
 import { ValidationError } from '@opensip-cli/core';
-
-import { compareCodePoint } from './code-point-order.js';
 
 import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
 
-export { compareCodePoint } from './code-point-order.js';
+export { compareCodePoint } from '@opensip-cli/contracts';
 
 type CommandTier = 'platform' | 'tool' | 'internal';
 

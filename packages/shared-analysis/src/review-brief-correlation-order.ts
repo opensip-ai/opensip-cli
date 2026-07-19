@@ -1,15 +1,15 @@
-import { compareCodePoint } from './code-point-order.js';
 import {
+  compareCodePoint,
   REVIEW_BRIEF_CORRELATION_KEY_PRIORITY as keyPriority,
   REVIEW_BRIEF_SEVERITY_RANK as severityRank,
-} from './review-brief-correlation-types.js';
+} from '@opensip-cli/contracts';
 
 import type {
   ReviewBriefCorrelationGroup,
   ReviewBriefCorrelationRisk,
-} from './review-brief-correlation-types.js';
+} from '@opensip-cli/contracts';
 
-export { compareCodePoint } from './code-point-order.js';
+export { compareCodePoint } from '@opensip-cli/contracts';
 
 export function compareReviewBriefCorrelationRisks(
   left: ReviewBriefCorrelationRisk,

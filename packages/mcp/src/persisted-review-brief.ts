@@ -1,15 +1,7 @@
 import {
-  buildReviewBriefBaselineDelta,
-  buildReviewBriefCorrelations,
-  buildReviewBriefRecommendedActions,
   type CommandResult,
   compareCodePoint,
-  compareReviewBriefRisks,
-  deriveReviewBriefVerdict,
-  pushReviewBriefDegradation,
   REVIEW_BRIEF_VERSION,
-  reviewBriefBaselineState,
-  signalToReviewBriefRisk,
   type ReviewBrief,
   type ReviewBriefBaselineState,
   type ReviewBriefDegradation,
@@ -17,6 +9,16 @@ import {
   type StoredSession,
   type ToolSessionReplay,
 } from '@opensip-cli/contracts';
+import {
+  buildReviewBriefBaselineDelta,
+  buildReviewBriefCorrelations,
+  buildReviewBriefRecommendedActions,
+  compareReviewBriefRisks,
+  deriveReviewBriefVerdict,
+  pushReviewBriefDegradation,
+  reviewBriefBaselineState,
+  signalToReviewBriefRisk,
+} from '@opensip-cli/shared-analysis';
 
 import type { McpEvidenceDegradation } from './result-dto.js';
 

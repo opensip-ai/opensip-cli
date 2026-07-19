@@ -8,14 +8,7 @@
 import { realpathSync } from 'node:fs';
 
 import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
-import {
-  assembleAgentCatalog,
-  EXIT_CODES,
-  hostSupportFromRuntimeProjection,
-  projectAgentCatalogRuntimeFacts,
-  summarizeTargetConventions,
-  type FileEvidenceSupport,
-} from '@opensip-cli/contracts';
+import { EXIT_CODES, type FileEvidenceSupport } from '@opensip-cli/contracts';
 import {
   definePrimaryCommand,
   EnvRegistry,
@@ -30,6 +23,12 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 import { loadGraphReadConfig, rebuildCatalog, type Catalog } from '@opensip-cli/graph/read';
+import {
+  assembleAgentCatalog,
+  hostSupportFromRuntimeProjection,
+  projectAgentCatalogRuntimeFacts,
+  summarizeTargetConventions,
+} from '@opensip-cli/shared-analysis';
 
 import { capturedConfigIdentity } from './captured-config-identity.js';
 import { LiveRuntimeWiringReadPort } from './live-runtime-wiring-read-port.js';

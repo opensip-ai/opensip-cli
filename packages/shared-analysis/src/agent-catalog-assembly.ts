@@ -15,12 +15,12 @@
  * points, or notes.
  */
 
+import { compareCodePoint } from '@opensip-cli/contracts';
 import { ValidationError } from '@opensip-cli/core';
 
 import { buildAgentCatalog } from './agent-catalog.js';
-import { compareCodePoint } from './code-point-order.js';
 
-import type { AgentCatalog, AgentCatalogBuildInput } from './agent-catalog.js';
+import type { AgentCatalog, AgentCatalogBuildInput } from '@opensip-cli/contracts';
 import type { RuntimeCommandInventory } from '@opensip-cli/core';
 
 /**

@@ -29,3 +29,43 @@ export {
   computeImpactCatalogGenerationIdentity,
   computeImpactIndexMatchesCatalog,
 } from './graph-impact-compute.js';
+
+// Review-brief derivation runtime. The ReviewBrief type family, the version
+// constant, and every reviewBrief*Schema zod schema stay in contracts.
+export {
+  buildReviewBriefBaselineDelta,
+  buildReviewBriefRecommendedActions,
+  compareReviewBriefRisks,
+  deriveReviewBriefVerdict,
+  pushReviewBriefDegradation,
+  reviewBriefBaselineState,
+  reviewBriefBlastRadius,
+  signalToReviewBriefRisk,
+} from './review-brief.js';
+export {
+  buildReviewBriefCorrelations,
+  reviewBriefCorrelationKeys,
+  reviewBriefEntities,
+} from './review-brief-correlation.js';
+
+// Agent command catalog runtime (ADR-0084) — the content builder + curated
+// entry points the host `agent-catalog` command renders and @opensip-cli/mcp
+// serves. The AgentCatalog / AgentCatalogBuildInput / CommandTier types stay
+// in contracts.
+export {
+  agentCatalogOverlayKeys,
+  agentCatalogPlatformEntryPoints,
+  assertAgentCatalogOverlayKeys,
+  buildAgentCatalog,
+} from './agent-catalog.js';
+export {
+  assembleAgentCatalog,
+  projectAgentCatalogRuntimeFacts,
+  type AgentCatalogAssemblyInput,
+  type AgentCatalogRuntimeFacts,
+} from './agent-catalog-assembly.js';
+export { summarizeTargetConventions } from './target-conventions.js';
+// Host-support projection (Plan 02, macOS GA): the single core→contracts
+// mapper both CLI and MCP call, so their hostSupport output is byte-identical
+// for identical process facts. The AgentHostSupport type stays in contracts.
+export { hostSupportFromRuntimeProjection } from './host-support.js';

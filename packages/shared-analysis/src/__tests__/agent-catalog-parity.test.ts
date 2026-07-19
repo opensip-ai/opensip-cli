@@ -13,12 +13,10 @@ import {
   assembleAgentCatalog,
   projectAgentCatalogRuntimeFacts,
 } from '../agent-catalog-assembly.js';
-import {
-  assertAgentCatalogOverlayKeys,
-  buildAgentCatalog,
-  type AgentCatalog,
-} from '../agent-catalog.js';
-import { hostSupportFromRuntimeProjection, type AgentHostSupport } from '../host-support.js';
+import { assertAgentCatalogOverlayKeys, buildAgentCatalog } from '../agent-catalog.js';
+import { hostSupportFromRuntimeProjection } from '../host-support.js';
+
+import type { AgentCatalog, AgentHostSupport } from '@opensip-cli/contracts';
 
 const noopHandler = (): { type: 'text-lines'; lines: string[] } => ({
   type: 'text-lines',

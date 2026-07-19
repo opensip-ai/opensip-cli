@@ -1,14 +1,12 @@
-import { compareCodePoint } from './review-brief-correlation-order.js';
 import {
   REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT,
   REVIEW_BRIEF_CORRELATION_KEY_LIMIT,
   REVIEW_BRIEF_CORRELATION_KEY_PRIORITY,
-} from './review-brief-correlation-types.js';
+} from '@opensip-cli/contracts';
 
-import type {
-  ReviewBriefCorrelationKey,
-  ReviewBriefEntityRef,
-} from './review-brief-correlation-types.js';
+import { compareCodePoint } from './review-brief-correlation-order.js';
+
+import type { ReviewBriefCorrelationKey, ReviewBriefEntityRef } from '@opensip-cli/contracts';
 import type { Signal } from '@opensip-cli/core';
 
 const MAX_CORRELATION_STRING_LENGTH = 240;

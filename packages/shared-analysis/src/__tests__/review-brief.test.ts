@@ -1,8 +1,14 @@
+import {
+  REVIEW_BRIEF_VERSION,
+  reviewBriefSchema,
+  type ReviewBrief,
+  type ReviewBriefDegradation,
+  type ReviewBriefRisk,
+} from '@opensip-cli/contracts';
 import { createSignal, type Signal } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import {
-  REVIEW_BRIEF_VERSION,
   buildReviewBriefBaselineDelta,
   buildReviewBriefCorrelations,
   buildReviewBriefRecommendedActions,
@@ -12,10 +18,6 @@ import {
   reviewBriefBaselineState,
   reviewBriefBlastRadius,
   signalToReviewBriefRisk,
-  reviewBriefSchema,
-  type ReviewBrief,
-  type ReviewBriefDegradation,
-  type ReviewBriefRisk,
 } from '../index.js';
 
 function risk(

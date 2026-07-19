@@ -12,7 +12,6 @@
 
 import {
   type AgentHostSupport,
-  assembleAgentCatalog,
   type StoredRun,
   type StoredRunStep,
   buildSignalEnvelope,
@@ -31,6 +30,7 @@ import {
 } from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { RunRepo, SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
+import { assembleAgentCatalog } from '@opensip-cli/shared-analysis';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionResultsReadPort } from '../session-results-read-port.js';

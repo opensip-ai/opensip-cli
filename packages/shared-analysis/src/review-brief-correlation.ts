@@ -1,45 +1,20 @@
 import {
+  REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT,
+  REVIEW_BRIEF_CORRELATION_GROUP_LIMIT,
+  REVIEW_BRIEF_CORRELATION_MEMBER_LIMIT,
+  REVIEW_BRIEF_CORRELATION_REASON_LIMIT,
+} from '@opensip-cli/contracts';
+
+import {
   compareReviewBriefCorrelationGroups,
   compareReviewBriefCorrelationRisks,
   reviewBriefCorrelationMemberSignature,
 } from './review-brief-correlation-order.js';
-import {
-  REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT,
-  REVIEW_BRIEF_CORRELATION_GROUP_LIMIT,
-  REVIEW_BRIEF_CORRELATION_MEMBER_LIMIT,
-  REVIEW_BRIEF_CORRELATION_REASON_LIMIT,
-} from './review-brief-correlation-types.js';
 
-export {
-  reviewBriefCorrelationGroupSchema,
-  reviewBriefCorrelationKeySchema,
-  reviewBriefCorrelationReasonSchema,
-  reviewBriefEntityRefSchema,
-  reviewBriefRiskRefSchema,
-} from './review-brief-correlation-schemas.js';
 export {
   reviewBriefCorrelationKeys,
   reviewBriefEntities,
 } from './review-brief-correlation-projection.js';
-export {
-  REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT,
-  REVIEW_BRIEF_CORRELATION_GROUP_LIMIT,
-  REVIEW_BRIEF_CORRELATION_KEY_LIMIT,
-  REVIEW_BRIEF_CORRELATION_MEMBER_LIMIT,
-  REVIEW_BRIEF_CORRELATION_REASON_LIMIT,
-} from './review-brief-correlation-types.js';
-export type {
-  BuildReviewBriefCorrelationsOptions,
-  ReviewBriefCorrelationBlastRadius,
-  ReviewBriefCorrelationGroup,
-  ReviewBriefCorrelationKey,
-  ReviewBriefCorrelationKeyKind,
-  ReviewBriefCorrelationReason,
-  ReviewBriefCorrelationRisk,
-  ReviewBriefCorrelationSignalRef,
-  ReviewBriefEntityRef,
-  ReviewBriefRiskRef,
-} from './review-brief-correlation-types.js';
 
 import type {
   BuildReviewBriefCorrelationsOptions,
@@ -50,7 +25,7 @@ import type {
   ReviewBriefCorrelationRisk,
   ReviewBriefEntityRef,
   ReviewBriefRiskRef,
-} from './review-brief-correlation-types.js';
+} from '@opensip-cli/contracts';
 
 interface CorrelatedRiskBucket {
   readonly key: ReviewBriefCorrelationKey;

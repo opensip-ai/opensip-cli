@@ -76,6 +76,7 @@
     "@opensip-cli/mcp": "workspace:*",
     "@opensip-cli/output": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
+    "@opensip-cli/shared-analysis": "workspace:*",
     "@opensip-cli/simulation": "workspace:*",
     "@opensip-cli/yagni": "workspace:*",
     "@opensip-cli/targeting": "workspace:*",
