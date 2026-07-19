@@ -132,6 +132,77 @@ function deepFreezeResult(value: GraphImpactResult): GraphImpactResult {
 }
 
 describe('impact report projection boundaries', () => {
+  it('per-item byte-delta search converges on the same cut as a whole-stringify probe', () => {
+    // Plan 09 Task 6.2: the trim search now measures the fixed skeleton once
+    // and probes only per-item byte deltas. Pin byte-identical output against
+    // a brute-force twin of the ORIGINAL algorithm (whole-projection
+    // re-stringify on every binary-search step) across a budget sweep.
+    const projection = projectImpactForReport(
+      result({
+        impactedFunctions: Array.from({ length: 40 }, (_, index) => impactFunction(index)),
+        impactedFiles: Array.from(
+          { length: 25 },
+          (_, index) => `src/file_${String(index).padStart(4, '0')}.ts`,
+        ),
+        recommendedCommands: Array.from(
+          { length: 10 },
+          (_, index) => `pnpm test -- --filter pkg_${String(index)}`,
+        ),
+      }),
+    );
+    const bytesOf = (value: GraphImpactReportProjection): number =>
+      Buffer.byteLength(JSON.stringify(value), 'utf8');
+    type ListKey =
+      | 'changedFiles'
+      | 'changedFunctions'
+      | 'impactedFunctions'
+      | 'impactedFiles'
+      | 'impactedPackages'
+      | 'recommendedCommands';
+    const ORDER: readonly ListKey[] = [
+      'recommendedCommands',
+      'impactedPackages',
+      'impactedFiles',
+      'impactedFunctions',
+      'changedFunctions',
+      'changedFiles',
+    ];
+    const retainPrefix = (
+      value: GraphImpactReportProjection,
+      key: ListKey,
+      count: number,
+    ): GraphImpactReportProjection => {
+      const removed = value[key].length - count;
+      return {
+        ...value,
+        [key]: value[key].slice(0, count),
+        omitted: { ...value.omitted, [key]: value.omitted[key] + removed },
+        detailTruncated: value.detailTruncated || removed > 0,
+      };
+    };
+    const bruteForceFit = (maxBytes: number): GraphImpactReportProjection | undefined => {
+      if (bytesOf(projection) <= maxBytes) return projection;
+      let fitted = projection;
+      for (const key of ORDER) {
+        if (bytesOf(fitted) <= maxBytes) return fitted;
+        let low = 0;
+        let high = fitted[key].length;
+        while (low < high) {
+          const middle = Math.ceil((low + high) / 2);
+          if (bytesOf(retainPrefix(fitted, key, middle)) <= maxBytes) low = middle;
+          else high = middle - 1;
+        }
+        fitted = retainPrefix(fitted, key, low);
+      }
+      return bytesOf(fitted) <= maxBytes ? fitted : undefined;
+    };
+
+    const full = bytesOf(projection);
+    for (const budget of [full - 1, Math.floor(full * 0.8), Math.floor(full * 0.5), 600, 350]) {
+      expect(fitProjectionToByteBudget(projection, budget)).toEqual(bruteForceFit(budget));
+    }
+  });
+
   it('pins the production projection ceiling to exactly one MiB', () => {
     expect(MAX_IMPACT_REPORT_PROJECTION_BYTES).toBe(1024 * 1024);
     expect(MAX_IMPACT_REPORT_PROJECTION_BYTES).toBe(1_048_576);
