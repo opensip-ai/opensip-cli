@@ -338,6 +338,15 @@ state, `opensip policy explain <subject> --action <name> --json` to inspect a
 decision before running a command, and `opensip policy audit --json` to read the
 durable local audit events.
 
+**The capability-pack trust list is not part of this project schema.** The
+`policy.trustedCapabilityPacks` field exists only on the user-level global
+config (`~/.opensip-cli/config.yml` — see
+[User-level config](#user-level-config) below). Placing it in the project
+`opensip-cli.config.yml` is a **hard schema error** at compose time, never
+silently ignored: the analyzed repo must not be able to grant itself trust, so
+the placement is the security property
+([ADR-0171](../../decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
+
 ## `suites`
 
 Host-owned named multi-tool runs. Each step resolves by the tool's stable UUID
@@ -546,6 +555,10 @@ cloud:
   endpoint: https://...     # optional: https override of the built-in cloud URL
 policy:
   ci: strict                # optional: machine-wide local trust policy layer
+  trustedCapabilityPacks:   # capability-pack trust grants — GLOBAL-ONLY, written by `opensip policy trust`
+    - id: '@acme/checks-internal'
+      manifestHash: 'sha256:…'
+      grantedAt: '2026-07-18T09:00:00.000Z'
 ```
 
 Cross-project, flat keys. `apiKey` is the OpenSIP Cloud key (for `--report-to`
@@ -553,8 +566,32 @@ and cloud signal sync). The optional `cloud` block is the machine-wide
 privacy control: `sync: false` disables cloud signal sync for every project run
 from this account (it layers over each project's `cli.cloud:`; a `false` in
 either place wins). The optional `policy` block is the user-level trust-policy
-layer and uses the same schema as project `policy:`. Use `opensip configure` to write the key;
+layer: it uses the same schema as project `policy:` **plus** the user-tier-only
+`trustedCapabilityPacks` list. Use `opensip configure` to write the key;
 `opensip uninstall --user` removes the entire `~/.opensip-cli/` directory.
+
+### `policy.trustedCapabilityPacks` (global-only)
+
+The host-owned capability-pack trust list
+([ADR-0171](../../decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
+Each entry is one operator grant, normally written by
+`opensip policy trust <pack>` (removed by `opensip policy untrust <pack>`)
+rather than by hand:
+
+| Field | Type | Effect |
+|---|---|---|
+| `id` | string | Exact npm package name of the capability pack. No wildcards — `*` is never honored. |
+| `manifestHash` | `sha256:<hex>` | The pack's `opensipTools` manifest hash resolved at grant time. Admission requires id **and** provenance to match; a resolved pack whose hash differs is denied with guidance to re-verify and re-run `policy trust`. |
+| `grantedAt` | ISO datetime (optional) | When the grant was recorded. |
+
+An absent field reads as **deny** — the forward-compatible pre-feature default.
+
+The field is **GLOBAL-ONLY, and the placement is the security property**: this
+document lives outside every analyzed repo, so trust can only come from the
+operator's own machine, never from cloned code. The project-tier `policy:`
+schema deliberately excludes the field — a `trustedCapabilityPacks` key in a
+project `opensip-cli.config.yml` is a **hard schema error**, not an ignored
+extra ([the `plugins.*` lists](#plugins) select packs; they never trust them).
 
 ---
 
