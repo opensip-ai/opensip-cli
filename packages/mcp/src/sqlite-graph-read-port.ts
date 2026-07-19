@@ -289,12 +289,18 @@ function missingSelection(
   return { ...withoutId, snapshotId: selectionSnapshotId(withoutId) };
 }
 
-function qualifySelection(
+/** Exported for the saturated-boundary regression test only (module-internal otherwise). */
+export function qualifySelection(
   snapshot: TestSelectionSnapshot,
   reasons: readonly string[],
 ): TestSelectionSnapshot {
+  // Skip the downgrade only when the incoming reasons are a SUBSET of the
+  // existing set — decided before the 32-reason cap. The old post-slice
+  // length-equality gate missed a downgrade at exactly the saturated
+  // boundary: a new-but-equal-count reason set passed the length check.
+  const existing = new Set(snapshot.trust.reasonCodes);
+  if (reasons.every((reason) => existing.has(reason))) return snapshot;
   const reasonCodes = [...new Set([...snapshot.trust.reasonCodes, ...reasons])].sort().slice(0, 32);
-  if (reasonCodes.length === snapshot.trust.reasonCodes.length) return snapshot;
   const withoutId: Omit<TestSelectionSnapshot, 'snapshotId'> = {
     schemaVersion: snapshot.schemaVersion,
     files: snapshot.files,
