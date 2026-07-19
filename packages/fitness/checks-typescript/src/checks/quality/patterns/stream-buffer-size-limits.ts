@@ -33,8 +33,14 @@ const BOUNDED_PATTERNS = [
   /\b(?:MAX_ROWS_PER_\w+|BATCH_SIZE|CHUNK_SIZE|PAGE_SIZE|MAX_BATCH|MAX_CHUNK|MAX_PAGE)\b/,
 ];
 
-/** Quick filter keywords */
-const QUICK_FILTER = ['Buffer', 'chunks', 'stream'];
+/**
+ * Quick filter keywords — pre-filter superset contract: the AST pass matches
+ * `Buffer.concat` calls and `.push` on receivers named `chunk(s)`/`buffer(s)`/
+ * `dataChunk(s)`/`dataBuffer(s)` in any casing, so the gate tests lowercase
+ * stems against lowercased content. (The old case-sensitive
+ * `['Buffer','chunks','stream']` list green-passed `buffer.push`/`chunk.push`.)
+ */
+const QUICK_FILTER = ['buffer', 'chunk'];
 
 interface CallExpressionContext {
   node: ts.CallExpression;
@@ -158,8 +164,8 @@ export const streamBufferSizeLimits = defineCheck({
   timeout: 180_000, // 3 minutes - scans buffer usage patterns
 
   analyze(content, filePath) {
-    // Quick filter
-    const strippedContent = stripStringsAndComments(content);
+    // Quick filter (superset gate — see QUICK_FILTER)
+    const strippedContent = stripStringsAndComments(content).toLowerCase();
     if (!QUICK_FILTER.some((kw) => strippedContent.includes(kw))) {
       return [];
     }

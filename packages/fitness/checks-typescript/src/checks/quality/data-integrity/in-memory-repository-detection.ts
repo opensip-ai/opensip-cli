@@ -15,14 +15,22 @@ import * as ts from 'typescript';
 const ALLOWED_PATTERNS = [/cache/i, /Cache/, /InMemory/, /Mock/, /Stub/, /Fake/, /Test/];
 
 /**
- * Repository class name patterns
+ * Repository class name patterns — anchored, applied to a class NAME only.
  */
 const REPOSITORY_PATTERNS = [/Repository$/, /Store$/, /Storage$/, /DAO$/, /DataAccess$/];
 
 /**
- * Quick filter keywords
+ * Pre-filter superset contract: the anchored REPOSITORY_PATTERNS apply to a
+ * class NAME; the old gate tested them against whole-file CONTENT, where
+ * `/Repository$/` only matches a file whose final bytes are "Repository" —
+ * never true of a newline-terminated source file, so the check was silently
+ * dead. The content gate now asks only "could a matching class name appear"
+ * via unanchored name stems; the AST pass applies the anchored patterns to
+ * the real class name. (The old `['new Map','= []',…]` storage keyword gate
+ * is gone for the same reason: a non-empty literal initializer like
+ * `= [seed]` or `=[]` escaped it while the AST matcher would flag it.)
  */
-const QUICK_FILTER_STORAGE = ['new Map', 'new Set', '= []', '= {}'];
+const REPOSITORY_NAME_STEMS = ['Repository', 'Store', 'Storage', 'DAO', 'DataAccess'];
 
 /**
  * Repeated suggestion message for in-memory storage violations
@@ -106,10 +114,8 @@ function checkPropertyForStorage(ctx: CheckPropertyContext): CheckViolation | nu
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
 
-  // Quick filter: must have repository pattern AND in-memory storage pattern
-  const hasRepository = REPOSITORY_PATTERNS.some((p) => p.test(content));
-  const hasStorage = QUICK_FILTER_STORAGE.some((kw) => content.includes(kw));
-  if (!hasRepository || !hasStorage) {
+  // Quick filter (superset gate — see REPOSITORY_NAME_STEMS)
+  if (!REPOSITORY_NAME_STEMS.some((stem) => content.includes(stem))) {
     return violations;
   }
 
