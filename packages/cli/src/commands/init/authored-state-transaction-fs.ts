@@ -10,7 +10,7 @@ import {
   readSync,
   realpathSync,
 } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { projectCoordinationKey, SystemError } from '@opensip-cli/core';
 
@@ -20,6 +20,7 @@ import {
   INIT_AUTHORED_PLAN_CAPS,
   normalizeProjectRelativePath,
 } from './init-authored-plan-types.js';
+import { isPathContained } from './path-containment.js';
 import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fallback.js';
 
 import type { RuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
@@ -145,14 +146,6 @@ export function assertSafeAuthoredOwnerMode(stat: BigIntStats, field: string): v
   if (process.platform !== 'win32' && ((mode & 0o7000) !== 0 || (mode & 0o022) !== 0)) {
     authoredTransactionFailure(`${field} has an unsafe mode`);
   }
-}
-
-function isContained(root: string, path: string): boolean {
-  const fromRoot = relative(root, path);
-  return (
-    fromRoot === '' ||
-    (!isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`))
-  );
 }
 
 export function openStableAuthoredRoot(projectRoot: string): StableAuthoredRoot {
@@ -331,7 +324,9 @@ export function transactionAuthoredRoot(root: StableAuthoredRoot): StableAuthore
 export function resolveAuthoredTarget(root: StableAuthoredRoot, relativePath: string): string {
   const normalized = normalizeProjectRelativePath(relativePath);
   const target = join(root.path, ...normalized.split('/'));
-  if (!isContained(root.path, target)) authoredTransactionFailure('a target escaped the project');
+  if (!isPathContained(root.path, target)) {
+    authoredTransactionFailure('a target escaped the project');
+  }
   return target;
 }
 

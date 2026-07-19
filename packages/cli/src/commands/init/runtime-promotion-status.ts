@@ -17,6 +17,7 @@ import {
   type RecoveryHeaderInspection,
 } from '@opensip-cli/core';
 
+import { getErrorCode } from './error-code.js';
 import {
   parseRuntimePromotionJournal,
   RUNTIME_PROMOTION_JOURNAL_MAX_BYTES,
@@ -192,11 +193,7 @@ function retryCommand(journal: RuntimePromotionJournal): RuntimeRecoveryCommand 
   return 'opensip init';
 }
 
-function errorCode(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return;
-  const code = (error as { readonly code?: unknown }).code;
-  return typeof code === 'string' ? code : undefined;
-}
+
 
 function inspectCanonicalJournal(input: {
   readonly observed: AnchoredRecordReadResult;
@@ -263,7 +260,7 @@ function projectStableHeader(input: {
     return recoveryRequired(malformedReason(before.reason));
   }
   if (read.error !== undefined) {
-    const code = errorCode(read.error);
+    const code = getErrorCode(read.error);
     if (
       code === 'SYSTEM.RUNTIME_COORDINATION.BUSY' ||
       code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH'

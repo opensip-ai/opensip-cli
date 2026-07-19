@@ -2,6 +2,7 @@
  * Lease-stable orchestration for the read-only runtime-status projection.
  */
 
+import { getErrorCode } from './init/error-code.js';
 import {
   buildRuntimeStatusContext,
   busyStatus,
@@ -77,14 +78,8 @@ function samePromotionProjection(
   );
 }
 
-function errorCode(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return;
-  const code = (error as { readonly code?: unknown }).code;
-  return typeof code === 'string' ? code : undefined;
-}
-
 function isBoundedCoordinationFailure(error: unknown): boolean {
-  const code = errorCode(error);
+  const code = getErrorCode(error);
   return (
     code === 'CONFIGURATION.RECOVERY_REQUIRED' ||
     code === 'SYSTEM.RUNTIME_COORDINATION.BUSY' ||

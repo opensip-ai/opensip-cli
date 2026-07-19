@@ -327,3 +327,12 @@ export async function verifyClosedTerminalOperationAuthority(
   await verifyClosedAuthoredAuthority(operation, receipt, 'preimage');
   verifyRolledBackRuntimeAuthority(operation, journal);
 }
+
+/** Re-verify closed terminal authority and return the same receipt for chaining. */
+export async function verifyClosedTerminalReceipt(
+  operation: RuntimePromotionOperation,
+  receipt: DurableClosedPromotionJournal,
+): Promise<DurableClosedPromotionJournal> {
+  await verifyClosedTerminalOperationAuthority(operation, receipt);
+  return receipt;
+}

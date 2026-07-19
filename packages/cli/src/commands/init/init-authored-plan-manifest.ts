@@ -8,6 +8,7 @@ import {
   compareUtf8,
   normalizeLanguages,
   normalizeProjectRelativePath,
+  sameAuthoredPathState,
   validateMode,
   validateAuthoredToolIdentity,
 } from './init-authored-plan-types.js';
@@ -97,22 +98,15 @@ function parseState(value: unknown, field: string): InitAuthoredPathState {
   return { exists: true, type, mode, digest: hash };
 }
 
-function sameState(left: InitAuthoredPathState, right: InitAuthoredPathState): boolean {
-  return (
-    left.exists === right.exists &&
-    left.type === right.type &&
-    left.mode === right.mode &&
-    left.digest === right.digest
-  );
-}
-
 function expectedAction(
   preimage: InitAuthoredPathState,
   desired: InitAuthoredPathState,
 ): InitAuthoredMutationAction {
   if (!preimage.exists && desired.exists) return 'create';
   if (preimage.exists && !desired.exists) return 'delete';
-  if (preimage.exists && desired.exists && sameState(preimage, desired)) return 'preserve';
+  if (preimage.exists && desired.exists && sameAuthoredPathState(preimage, desired)) {
+    return 'preserve';
+  }
   if (preimage.exists && desired.exists) return 'replace';
   authoredPlanFailure('a mutation cannot preserve two absent states');
 }

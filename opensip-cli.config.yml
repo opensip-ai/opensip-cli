@@ -37,6 +37,9 @@ globalExcludes:
   - 'packages/agent-eval/**'
   - 'packages/test-support/**'
   - 'packages/fitness/checks-dogfood/**'
+  # Local agent git worktrees are not product source; excluding them keeps
+  # clone/yagni/fit scans from pairing production bodies against scratch copies.
+  - '.claude/worktrees/**'
 
 # =============================================================================
 # Plugins

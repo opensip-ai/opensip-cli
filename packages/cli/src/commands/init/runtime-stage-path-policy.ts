@@ -1,19 +1,12 @@
 import { lstatSync, readlinkSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
+import { isPathContained } from './path-containment.js';
 import {
   runtimeStageFail,
   runtimeStageIdentity,
   sameRuntimeStageIdentity,
 } from './runtime-stage-stable-directory.js';
-
-function isContained(root: string, path: string): boolean {
-  const fromRoot = relative(root, path);
-  return (
-    fromRoot === '' ||
-    (!isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`))
-  );
-}
 
 /** Validate the journal-owned destination-sibling stage basename. */
 export function assertSafeStageBasename(value: string): void {
@@ -44,14 +37,14 @@ export function assertSafeSourceSymlink(root: string, path: string, expectedTarg
     runtimeStageFail('changed');
   }
   const targetPath = resolve(join(path, '..'), target);
-  if (!isContained(root, targetPath)) runtimeStageFail('symlink-escape');
+  if (!isPathContained(root, targetPath)) runtimeStageFail('symlink-escape');
   let canonicalTarget: string;
   try {
     canonicalTarget = realpathSync(targetPath);
   } catch {
     runtimeStageFail('symlink-invalid');
   }
-  if (!isContained(root, canonicalTarget)) runtimeStageFail('symlink-escape');
+  if (!isPathContained(root, canonicalTarget)) runtimeStageFail('symlink-escape');
   const after = lstatSync(path, { bigint: true });
   if (
     !after.isSymbolicLink() ||
@@ -63,5 +56,5 @@ export function assertSafeSourceSymlink(root: string, path: string, expectedTarg
 
 /** Prove one materialized source/destination path remains under its selected root. */
 export function runtimeStagePathIsContained(root: string, path: string): boolean {
-  return isContained(root, path);
+  return isPathContained(root, path);
 }

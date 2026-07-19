@@ -1,5 +1,5 @@
 import {
-  verifyClosedTerminalOperationAuthority,
+  verifyClosedTerminalReceipt,
   verifyCommittedOperationAuthority,
   verifyOpenTerminalOperationAuthority,
 } from './runtime-promotion-authority-verification.js';
@@ -23,14 +23,6 @@ async function verifyOpenTerminalReceipt(
   receipt: DurableOpenPromotionJournal,
 ): Promise<DurableOpenPromotionJournal> {
   await verifyOpenTerminalOperationAuthority(operation, receipt);
-  return receipt;
-}
-
-async function verifyClosedTerminalReceipt(
-  operation: RuntimePromotionOperation,
-  receipt: DurableClosedPromotionJournal,
-): Promise<DurableClosedPromotionJournal> {
-  await verifyClosedTerminalOperationAuthority(operation, receipt);
   return receipt;
 }
 

@@ -309,6 +309,18 @@ export function absentPathState(): InitAuthoredPathState {
   return { exists: false, type: null, mode: null, digest: null };
 }
 
+export function sameAuthoredPathState(
+  left: InitAuthoredPathState,
+  right: InitAuthoredPathState,
+): boolean {
+  return (
+    left.exists === right.exists &&
+    left.type === right.type &&
+    left.mode === right.mode &&
+    left.digest === right.digest
+  );
+}
+
 export function stateFromSnapshot(record: InitAuthoredSnapshotRecord): InitAuthoredPathState {
   return {
     exists: record.exists,

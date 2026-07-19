@@ -1,6 +1,6 @@
 import {
   isRuntimePromotionAuthorityReleaseUnsafe,
-  verifyClosedTerminalOperationAuthority,
+  verifyClosedTerminalReceipt,
   verifyOpenTerminalOperationAuthority,
   verifyRolledBackOperationAuthority,
 } from './runtime-promotion-authority-verification.js';
@@ -138,14 +138,6 @@ async function closeRolledBack(
   const sealed = await operation.writer.sealRolledBack(receipt, authority);
   await verifyOpenTerminalOperationAuthority(operation, sealed);
   return operation.writer.close(sealed);
-}
-
-async function verifyClosedTerminalReceipt(
-  operation: RuntimePromotionOperation,
-  receipt: DurableClosedPromotionJournal,
-): Promise<DurableClosedPromotionJournal> {
-  await verifyClosedTerminalOperationAuthority(operation, receipt);
-  return receipt;
 }
 
 async function cleanupVerifiedTerminal(

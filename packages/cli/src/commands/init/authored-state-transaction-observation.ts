@@ -15,6 +15,8 @@ import { directoryDigest } from './init-authored-plan-types.js';
 import type { InitAuthoredPathState } from './init-authored-plan.js';
 import type { BigIntStats } from 'node:fs';
 
+export { sameAuthoredPathState } from './init-authored-plan-types.js';
+
 export function observeAuthoredPath(
   root: StableAuthoredRoot,
   relativePath: string,
@@ -48,14 +50,4 @@ export function observeAuthoredPath(
   return { exists: true, type: 'file', mode, digest: file.digest };
 }
 
-export function sameAuthoredPathState(
-  left: InitAuthoredPathState,
-  right: InitAuthoredPathState,
-): boolean {
-  return (
-    left.exists === right.exists &&
-    left.type === right.type &&
-    left.mode === right.mode &&
-    left.digest === right.digest
-  );
-}
+

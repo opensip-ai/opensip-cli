@@ -20,6 +20,7 @@ import {
   normalizeLanguages,
   normalizeProjectRelativePath,
   normalizeToolIdentities,
+  sameAuthoredPathState,
   sha256Bytes,
   sha256Parts,
   stateFromSnapshot,
@@ -70,22 +71,13 @@ function generatedDirectory(mode: number): DesiredEntry {
   };
 }
 
-function sameState(left: InitAuthoredPathState, right: InitAuthoredPathState): boolean {
-  return (
-    left.exists === right.exists &&
-    left.type === right.type &&
-    left.mode === right.mode &&
-    left.digest === right.digest
-  );
-}
-
 function mutationAction(
   preimage: InitAuthoredPathState,
   desired: InitAuthoredPathState,
 ): InitAuthoredMutationAction {
   if (!preimage.exists) return 'create';
   if (!desired.exists) return 'delete';
-  return sameState(preimage, desired) ? 'preserve' : 'replace';
+  return sameAuthoredPathState(preimage, desired) ? 'preserve' : 'replace';
 }
 
 function snapshotDesired(record: InitAuthoredSnapshotRecord): DesiredEntry {

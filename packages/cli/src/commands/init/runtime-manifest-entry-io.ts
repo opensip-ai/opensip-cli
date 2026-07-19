@@ -9,9 +9,10 @@ import {
   readSync,
   realpathSync,
 } from 'node:fs';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 import { hasErrorCode } from './error-code.js';
+import { isPathContained } from './path-containment.js';
 import {
   RUNTIME_MANIFEST_MAX_DIGEST_BYTES,
   RUNTIME_MANIFEST_MAX_FILE_BYTES,
@@ -98,14 +99,6 @@ export function safeRuntimeManifestMode(stat: BigIntStats): number {
   return mode & 0o777;
 }
 
-function isContained(root: string, path: string): boolean {
-  const fromRoot = relative(root, path);
-  return (
-    fromRoot === '' ||
-    (!isAbsolute(fromRoot) && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`))
-  );
-}
-
 function chargeFileBudget(expected: BigIntStats, budget: RuntimeManifestBudget): number {
   if (expected.nlink !== 1n) entryIoFailure('hardlink');
   if (expected.size > BigInt(RUNTIME_MANIFEST_MAX_FILE_BYTES)) entryIoFailure('size-cap');
@@ -187,14 +180,14 @@ export function readSafeRuntimeManifestSymlink(
     entryIoFailure('symlink-invalid');
   }
   const targetPath = resolve(join(path, '..'), target);
-  if (!isContained(root, targetPath)) entryIoFailure('symlink-escape');
+  if (!isPathContained(root, targetPath)) entryIoFailure('symlink-escape');
   let canonicalTarget: string;
   try {
     canonicalTarget = realpathSync(targetPath);
   } catch {
     entryIoFailure('symlink-invalid');
   }
-  if (!isContained(root, canonicalTarget)) entryIoFailure('symlink-escape');
+  if (!isPathContained(root, canonicalTarget)) entryIoFailure('symlink-escape');
   const after = lstatSync(path, { bigint: true });
   if (
     !after.isSymbolicLink() ||
