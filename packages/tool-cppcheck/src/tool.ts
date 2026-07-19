@@ -2,7 +2,11 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+import {
+  buildScannerExclude,
+  defineExternalToolAdapter,
+  parseFirstSemver,
+} from '@opensip-cli/external-tool-adapter';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
@@ -37,11 +41,7 @@ export function buildCppcheckExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
   // Relative path matches compile_commands entries and relative scan roots.
-  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
-  const relativeSegment = normalized.includes('opensip-cli/.runtime')
-    ? 'opensip-cli/.runtime'
-    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
-  return { args: ['-i', relativeSegment] };
+  return buildScannerExclude(input, { flag: '-i' });
 }
 
 export const tool: Tool = defineExternalToolAdapter({

@@ -1,5 +1,9 @@
 import { readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+import {
+  buildScannerExclude,
+  defineExternalToolAdapter,
+  parseFirstSemver,
+} from '@opensip-cli/external-tool-adapter';
 
 import { parseRuffJson } from './parse-ruff-json.js';
 
@@ -27,13 +31,9 @@ export function buildRuffExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
   // Ruff exclude patterns are project-relative globs; absolute host paths no-op.
-  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
-  const relativeSegment = normalized.includes('opensip-cli/.runtime')
-    ? 'opensip-cli/.runtime'
-    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
   // --extend-exclude ADDS to defaults/config; --exclude REPLACES them (would
   // scan .venv / node_modules / .git). Same class of footgun Bandit fixed for -x.
-  return { args: ['--extend-exclude', relativeSegment] };
+  return buildScannerExclude(input, { flag: '--extend-exclude' });
 }
 
 export const tool: Tool = defineExternalToolAdapter({

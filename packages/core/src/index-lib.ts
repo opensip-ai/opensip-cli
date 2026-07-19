@@ -16,6 +16,7 @@ export { canonicalToolErrorCode, toolErrorFromCanonicalCode } from './lib/errors
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
 export { appendBoundedUtf8Text } from './lib/bounded-text.js';
 export type { BoundedTextAppendResult } from './lib/bounded-text.js';
+export { compareByCodePoint } from './lib/compare-by-code-point.js';
 
 // Lib — embedded-render mode (suite steps run headless; host owns the visible output).
 export { isEmbeddedRender, runEmbeddedRender } from './lib/embedded-render.js';

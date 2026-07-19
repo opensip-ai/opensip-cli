@@ -1,5 +1,9 @@
 import { readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+import {
+  buildScannerExclude,
+  defineExternalToolAdapter,
+  parseFirstSemver,
+} from '@opensip-cli/external-tool-adapter';
 
 import { parseBanditJson } from './parse-bandit-json.js';
 
@@ -45,12 +49,10 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildBanditExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
-  const relativeRuntime = normalized.includes('opensip-cli/.runtime')
-    ? 'opensip-cli/.runtime'
-    : normalized.split('/').filter(Boolean).slice(-2).join('/') || normalized;
-  const excludes = [...BANDIT_DEFAULT_EXCLUDES, relativeRuntime].join(',');
-  return { args: ['-x', excludes] };
+  return buildScannerExclude(input, {
+    flag: '-x',
+    pattern: (segment) => [...BANDIT_DEFAULT_EXCLUDES, segment].join(','),
+  });
 }
 
 export const tool: Tool = defineExternalToolAdapter({

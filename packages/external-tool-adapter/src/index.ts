@@ -59,6 +59,8 @@ export type {
 } from './json-lines.js';
 export { parseStdoutSarif } from './stdout-sarif.js';
 export type { ParseStdoutSarifOptions } from './stdout-sarif.js';
+export { buildScannerExclude } from './scanner-exclude.js';
+export type { ScannerExcludeInput, ScannerExcludeOptions } from './scanner-exclude.js';
 export { parseFirstSemver } from './version.js';
 export {
   cvssToSeverity,

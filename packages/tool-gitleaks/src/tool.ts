@@ -108,6 +108,9 @@ function resolveExtendSource(
 
 /**
  * A3: build gitleaks's exclusion of opensip's own `.runtime` artifact store.
+ * (Not the shared `buildScannerExclude`: this builder derives the PROJECT ROOT
+ * from the exclude path — to extend the project's own gitleaks config — which
+ * the shared helper deliberately does not.)
  *
  * gitleaks has NO CLI path-exclude, so we generate a `--config` allowlist that
  * EXTENDS either the project config (when `.gitleaks.toml` / `gitleaks.toml` is

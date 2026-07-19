@@ -1,7 +1,11 @@
 import { basename } from 'node:path';
 
 import { readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+import {
+  buildScannerExclude,
+  defineExternalToolAdapter,
+  parseFirstSemver,
+} from '@opensip-cli/external-tool-adapter';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
@@ -53,12 +57,11 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
 export function buildDependencyCheckExclude(input: { readonly excludePath: string }): {
   readonly args: readonly string[];
 } {
-  const normalized = input.excludePath.replace(/\\/g, '/').replace(/\/+$/, '');
   // Ant recursive pattern: match the runtime dir anywhere under the scan root.
-  const pattern = normalized.includes('opensip-cli/.runtime')
-    ? '**/opensip-cli/.runtime/**'
-    : `**/${normalized.split('/').filter(Boolean).slice(-2).join('/')}/**`;
-  return { args: ['--exclude', pattern] };
+  return buildScannerExclude(input, {
+    flag: '--exclude',
+    pattern: (segment) => `**/${segment}/**`,
+  });
 }
 
 export const tool: Tool = defineExternalToolAdapter({
