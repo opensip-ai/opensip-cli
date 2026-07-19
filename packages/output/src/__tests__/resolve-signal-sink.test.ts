@@ -2,7 +2,7 @@ import { access, mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { buildSignalBatch, createSignal, noopSignalSink } from '@opensip-cli/core';
+import { buildSignalBatch, createSignal, logger, noopSignalSink } from '@opensip-cli/core';
 import { describe, it, expect, vi } from 'vitest';
 
 import { checkEntitlement } from '../sink/entitlement.js';
@@ -145,5 +145,46 @@ describe('resolveSignalSink (deferred entitlement)', () => {
     });
     const r = await sink.emit(batch(1));
     expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'error' });
+  });
+
+  it('logs a scrubbed cause before reporting the skip (fail-loud, secrets redacted)', async () => {
+    const cacheDir = await dir();
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    vi.mocked(checkEntitlement).mockRejectedValueOnce(
+      new Error('POST https://x.test/api?api_key=sk-live-12345 failed: Bearer abc.def.ghi rejected'),
+    );
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl: routedFetch(true),
+    });
+    const r = await sink.emit(batch(1));
+    expect(r.skippedReason).toBe('error');
+    const event = warn.mock.calls
+      .map(([entry]) => entry as { evt?: string; err?: string })
+      .find((entry) => entry.evt === 'output.sink.emit.error');
+    expect(event).toBeDefined();
+    expect(event?.err).toContain('[redacted]');
+    expect(event?.err).not.toContain('sk-live-12345');
+    expect(event?.err).not.toContain('abc.def.ghi');
+    warn.mockRestore();
+  });
+
+  it('preserves the never-throws contract even when the logger itself throws', async () => {
+    const cacheDir = await dir();
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {
+      throw new Error('logger sink exploded');
+    });
+    vi.mocked(checkEntitlement).mockRejectedValueOnce(new Error('unexpected'));
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'https://x.test/api' },
+      cacheDir,
+      fetchImpl: routedFetch(true),
+    });
+    const r = await sink.emit(batch(1));
+    expect(r).toEqual({ accepted: 0, authRejected: false, skippedReason: 'error' });
+    warn.mockRestore();
   });
 });
