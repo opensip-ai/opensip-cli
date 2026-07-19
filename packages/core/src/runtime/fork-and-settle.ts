@@ -85,6 +85,67 @@ function resolveForkChildEnv(
  * Fork a worker, enforce resource ceilings, and expose the single-settle latch.
  * The caller wires protocol-specific `message` handling via `descriptor.onMessage`.
  */
+/**
+ * Process-global SIGINT cancellation fan-out (plan 09 Task 5.5).
+ *
+ * One listener per PROCESS instead of one per concurrent child: >10 parallel
+ * forks previously tripped Node's MaxListenersExceededWarning on every
+ * parallel fit/graph run. This is process-lifecycle infrastructure (SIGINT is
+ * delivered once per process — a RunScope-owned handler cannot exist), the
+ * sanctioned singleton case peer to the pinned ALS container in run-scope.ts:
+ * the Symbol.for slot keeps duplicate physical core copies
+ * (injectWorkspacePackages) on ONE registry, it holds only opaque per-child
+ * cancellation callbacks (never scope-derived data), and every child
+ * unregisters on settle. The listener installs on the FIRST active child and
+ * uninstalls on the LAST, so an idle process keeps Node's default Ctrl-C
+ * termination exactly as before.
+ */
+interface SigintCancellationRegistry {
+  readonly callbacks: Set<() => void>;
+  handler: (() => void) | undefined;
+}
+
+const SIGINT_REGISTRY_SLOT = Symbol.for('@opensip-cli/core/sigintCancellationRegistry');
+
+function sigintCancellationRegistry(): SigintCancellationRegistry {
+  const holder = globalThis as Record<PropertyKey, unknown>;
+  let registry = holder[SIGINT_REGISTRY_SLOT] as SigintCancellationRegistry | undefined;
+  if (registry === undefined) {
+    registry = { callbacks: new Set(), handler: undefined };
+    holder[SIGINT_REGISTRY_SLOT] = registry;
+  }
+  return registry;
+}
+
+/** Register a child's cancellation; returns the unregister latch. */
+function registerSigintCancellation(cancel: () => void): () => void {
+  const registry = sigintCancellationRegistry();
+  registry.callbacks.add(cancel);
+  if (registry.handler === undefined) {
+    registry.handler = (): void => {
+      // Iterate a snapshot: a callback unregisters itself during fan-out.
+      for (const callback of [...registry.callbacks]) {
+        try {
+          callback();
+        } catch {
+          /* @swallow-ok cancellation must reach every remaining child */
+        }
+      }
+    };
+    process.on('SIGINT', registry.handler);
+  }
+  let unregistered = false;
+  return (): void => {
+    if (unregistered) return;
+    unregistered = true;
+    registry.callbacks.delete(cancel);
+    if (registry.callbacks.size === 0 && registry.handler !== undefined) {
+      process.off('SIGINT', registry.handler);
+      registry.handler = undefined;
+    }
+  };
+}
+
 export function forkAndSettle(
   descriptor: ForkAndSettleDescriptor,
   ctx: ForkEnvContext = {},
@@ -118,7 +179,7 @@ export function forkAndSettle(
   let timeoutTimer: NodeJS.Timeout | undefined;
   let heartbeatTimer: NodeJS.Timeout | undefined;
   let idleRpcTimer: NodeJS.Timeout | undefined;
-  let sigintHandler: (() => void) | undefined;
+  let unregisterSigint: (() => void) | undefined;
 
   const clearTimers = (): void => {
     if (timeoutTimer !== undefined) clearTimeout(timeoutTimer);
@@ -138,10 +199,8 @@ export function forkAndSettle(
     settled = true;
     clearTimers();
     rssWatchdog.stop();
-    if (sigintHandler !== undefined) {
-      process.off('SIGINT', sigintHandler);
-      sigintHandler = undefined;
-    }
+    unregisterSigint?.();
+    unregisterSigint = undefined;
     apply();
     kill();
   };
@@ -183,11 +242,10 @@ export function forkAndSettle(
   };
 
   if (descriptor.enableSigintCancellation === true) {
-    sigintHandler = (): void => {
+    unregisterSigint = registerSigintCancellation(() => {
       kill('SIGKILL');
       onLimit('cancelled');
-    };
-    process.on('SIGINT', sigintHandler);
+    });
   }
 
   const rssWatchdog = startRssWatchdog({
@@ -253,7 +311,8 @@ export function forkAndSettle(
         settled = true;
         clearTimers();
         rssWatchdog.stop();
-        if (sigintHandler !== undefined) process.off('SIGINT', sigintHandler);
+        unregisterSigint?.();
+        unregisterSigint = undefined;
         kill();
       }
     },

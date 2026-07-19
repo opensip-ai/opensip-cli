@@ -221,6 +221,38 @@ describe('forkAndSettle', () => {
     handle.dispose();
   });
 
+  it('shares ONE process SIGINT listener across concurrent children and removes it when idle', async () => {
+    // Plan 09 Task 5.5: per-child process.on('SIGINT') listeners tripped
+    // MaxListenersExceededWarning on any run with >10 concurrent forks. The
+    // fan-out registry keeps exactly one listener while children are active
+    // and restores default Ctrl-C behavior (zero listeners) once all settle.
+    const baseline = process.listenerCount('SIGINT');
+    const cancelled: string[] = [];
+    const handles = Array.from({ length: 12 }, (_, index) =>
+      forkAndSettle({
+        command: FIXTURE,
+        argv: ['timeout-sleep'],
+        enableSigintCancellation: true,
+        onLimitFailure: (fc) => {
+          cancelled.push(`${String(index)}:${fc}`);
+        },
+      }),
+    );
+    try {
+      expect(process.listenerCount('SIGINT')).toBe(baseline + 1);
+
+      process.emit('SIGINT');
+      await new Promise((r) => setTimeout(r, 150));
+      // Every active child received the cancellation.
+      expect(cancelled).toHaveLength(12);
+      expect(cancelled.every((entry) => entry.endsWith(':cancelled'))).toBe(true);
+      // All settled → the shared listener is gone (default Ctrl-C restored).
+      expect(process.listenerCount('SIGINT')).toBe(baseline);
+    } finally {
+      for (const handle of handles) handle.dispose();
+    }
+  });
+
   it('converts child process errors into spawn failures once', async () => {
     let failureClass: string | undefined;
     let detail: string | undefined;
