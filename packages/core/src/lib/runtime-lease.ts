@@ -992,6 +992,14 @@ function assertPrivateRecordEntry(
     !allowedLinks.includes(stat.nlink) ||
     (maxBytes !== undefined && stat.size > BigInt(maxBytes))
   ) {
+    // Mutex/create temps can briefly look malformed while another process is
+    // publishing or unlinking them. Concurrent absence paths treat that as
+    // contention rather than permanent corruption of the coordination root.
+    if (allowConcurrentAbsence) {
+      throw new RuntimeSnapshotChangedError(
+        'Runtime coordination temporary record changed during inspection',
+      );
+    }
     throw unsafeCoordination('Runtime coordination record has an unsafe type, size, or link count');
   }
   const uid = currentUid();
@@ -5194,6 +5202,13 @@ async function acquireSharedDimensions(
         });
       } else {
         cleanupReservation.complete();
+      }
+      // Concurrent multi-process cold starts race temporary records under the
+      // coordination root. Snapshot/BUSY churn is contention: wait and retry.
+      if (error instanceof RuntimeSnapshotChangedError) {
+        if (environment.monotonicNow() >= deadline) throw timeoutError(waitKind, policy.waitMs);
+        await pollDelay(input, policy, deadline);
+        continue;
       }
       mapCoordinationTimeout(error, waitKind, policy.waitMs);
     }
