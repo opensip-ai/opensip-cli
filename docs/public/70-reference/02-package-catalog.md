@@ -71,6 +71,7 @@ Packages above the substrate, below tool engines. These are shared libraries con
 | `@opensip-cli/config` | `packages/config/` | Project-config schema composer and document loaders — validates host-owned blocks plus tool-contributed namespaces as one strict document before dispatch | `composeConfigSchema`, `validateConfigDocument`, `resolveConfig`, `loadCliDefaults`, `cliConfigSchema`, `ToolConfigDeclaration`, `hostConfigDeclarations`, `resolveEffectiveCloudConfig` |
 | `@opensip-cli/targeting` | `packages/targeting/` | Host file-targeting runtime substrate (ADR-0037) — `TargetRegistry`, uniform glob expansion with `globalExcludes`, built once per run by the CLI bootstrap and exposed as `scope.targets`. Depends on `config` + `core` only (`targeting-imports-config-core-only`) | `TargetRegistry`, `resolveTargets`, `preResolveAllTargets`, `applyGlobalExcludes` |
 | `@opensip-cli/codebase` | `packages/codebase/` | Persistence-free bounded project inventory — deterministic target-backed file metadata, package-manifest facts, conservative verification argv, and read-optimized lookup maps. Retains no source or raw manifest content. | `buildProjectInventory`, `readPackageManifestFacts`, `classifyFileRoles`, `ProjectInventory` |
+| `@opensip-cli/shared-analysis` | `packages/shared-analysis/` | Shared cross-tool analysis runtime (Plan 09 Phase 7, extracted from `contracts`) — the changed→impact compute engine over `GraphCatalog`, review-brief risk derivation + correlation grouping, and the agent-catalog assembly both the CLI and MCP transports call. Types/schemas stay in `contracts`. | `computeImpact`, `computeImpactAsync`, `buildComputeImpactIndex`, `signalToReviewBriefRisk`, `buildReviewBriefCorrelations`, `buildAgentCatalog`, `assembleAgentCatalog` |
 | `@opensip-cli/session-store` | `packages/session-store/` | Session persistence — `SessionRepo` runtime over the (package-internal) `sessions`/`session_tool_payload` schema, session-id helpers. Depends on `core`, `datastore`, `contracts` | `SessionRepo`, `SessionListOptions`, `generateSessionId`, `sanitizeForFilename` |
 | `@opensip-cli/output` | `packages/output/` | Machine output layer (renamed from `@opensip-cli/reporting`, ADR-0011): pure `format/` formatters + effectful `sink/` delivery. Depends on `core`, `contracts` | `formatSignalJson`, `formatSignalSarif`, `buildOpenSipSarif`, `formatSignalTableRows`, `formatSignalTableSummary`, `Formatter`, `postChunked`, `createCloudSignalSink`, `resolveSignalSink`, `resolveRepoIdentity`, `checkEntitlement` |
 | `@opensip-cli/dashboard` | `packages/dashboard/` | Self-contained HTML report generator — renders fit/sim/graph/yagni sessions plus tool catalog data. Consumed by the CLI-owned `report` command and each tool's auto-open hook. | `generateDashboardHtml` |
@@ -184,16 +185,16 @@ Imports every layer below. The published binary.
 Last verified at v0.7.0 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **60 workspace packages** total: **57 publishable** (all at `0.7.0`) and three
+- **61 workspace packages** total: **58 publishable** (all at `0.7.0`) and three
   private packages: `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
   `@opensip-cli/checks-dogfood`. The root manifest is tooling metadata, not a
-  workspace package. The six runtime-layer counts below cover the 57
+  workspace package. The six runtime-layer counts below cover the 58
   publishable packages; the three private packages are listed separately above:
   - Layer 1 (kernel): 1 — `core`
   - Layer 2 (datastore + contracts + authoring helpers + tree-sitter + clone-detection + format + cli-ui): 7 —
     `datastore`, `contracts`, `tool-test-kit`, `tree-sitter`, `clone-detection`, `format`, `cli-ui`
-  - Layer 3 (cli-live + config + targeting + codebase + session-store + output + dashboard + external-tool substrate + fitness language adapters): 14 —
-    `cli-live`, `config`, `targeting`, `codebase`, `session-store`, `output`, `dashboard`, `lang-typescript`,
+  - Layer 3 (cli-live + config + targeting + codebase + shared-analysis + session-store + output + dashboard + external-tool substrate + fitness language adapters): 15 —
+    `cli-live`, `config`, `targeting`, `codebase`, `shared-analysis`, `session-store`, `output`, `dashboard`, `lang-typescript`,
     `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp`, `external-tool-adapter`
   - Layer 4 Tools/tool adapters: 21 — `fitness`, `simulation`, `graph`, `yagni`,
     `mcp`, `tool-gitleaks`, `tool-osv-scanner`, `tool-trivy`, `tool-semgrep`,

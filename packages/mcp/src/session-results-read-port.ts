@@ -5,7 +5,7 @@
  * read API (canonical parent Run readers, Session summary/replay readers, and
  * the bundled replay resolver), and returns the already-assembled common
  * `AgentCatalog` captured at construction (Plan 03 transport parity —
- * `serveMcpStdio` composes it once through the contracts
+ * `serveMcpStdio` composes it once through the shared-analysis
  * `assembleAgentCatalog`; the port never builds it). It is constructed from an
  * injected `DataStore` (+ the live `ToolRegistry`) captured once — it NEVER
  * calls `currentScope()` inside a method (the long-lived server captures scope
@@ -93,7 +93,7 @@ export interface SessionResultsReadPortDeps {
   /**
    * The already-assembled common agent catalog (Plan 03, agent-catalog transport
    * parity). The long-lived server composes it ONCE from the captured scope
-   * (`serveMcpStdio`) via the shared contracts `assembleAgentCatalog`, so the
+   * (`serveMcpStdio`) via the shared `assembleAgentCatalog` (@opensip-cli/shared-analysis), so the
    * common body reaches byte-identical parity with `opensip agent-catalog --json`
    * (reserved roots, reserved suites, bounded target conventions, and Plan 02's
    * process-only `hostSupport`). The read port is a pure conduit: `agentCatalog()`

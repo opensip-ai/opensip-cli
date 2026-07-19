@@ -80,7 +80,7 @@ higher-level packages depend on lower-level substrates, never the other
 direction. Architecture rules are enforced by dependency-cruiser in CI.
 
 The generated inventory in `docs/public/80-implementation/architecture-map.md`
-is authoritative: 60 workspace packages, 57 publishable and three private
+is authoritative: 61 workspace packages, 58 publishable and three private
 (`@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
 `@opensip-cli/checks-dogfood`). The tree below is a hand-maintained orientation
 map, not the source of truth for the exact package set.
@@ -143,6 +143,10 @@ opensip-cli/
 │   ├── codebase/                # @opensip-cli/codebase — bounded deterministic
 │   │                            #   project inventory + package-manifest facts
 │   │                            #   (deps: contracts + core; layer 3)
+│   ├── shared-analysis/         # @opensip-cli/shared-analysis — shared cross-tool
+│   │                            #   analysis runtime extracted from contracts:
+│   │                            #   impact compute, review-brief derivation +
+│   │                            #   correlation, agent-catalog assembly (layer 3)
 │   ├── test-support/            # @opensip-cli/test-support — PRIVATE, never
 │   │                            #   published (ADR-0040): cross-package test
 │   │                            #   scaffolding (RunScope test sugar + the
@@ -720,11 +724,11 @@ is load-bearing, it goes in local-only `docs/internal/`; if it's pending work or
 design exploration not yet ready for external readers, it stays in
 `docs/plans/` (local-only).
 
-**No tracked → gitignored file pointers:** a *tracked* file must not point at a
-specific file or path *inside* the gitignored directories `docs/plans/`,
+**No tracked → gitignored file pointers:** a _tracked_ file must not point at a
+specific file or path _inside_ the gitignored directories `docs/plans/`,
 `docs/internal/`, or `docs/ai-helpers/` (those trees are ephemeral and may be
 deleted anytime). Naming the directories here to describe the ignore boundary is
-fine. References *from within* those gitignored trees are fine. Prefer citing
+fine. References _from within_ those gitignored trees are fine. Prefer citing
 tracked artifacts instead: `ADR-NNNN`, committed docs under `docs/public/` /
 `docs/decisions/`, and source paths.
 

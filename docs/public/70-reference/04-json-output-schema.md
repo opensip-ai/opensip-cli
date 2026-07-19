@@ -15,9 +15,9 @@ source-files:
   - packages/contracts/src/command-results-variants/suite-results.ts
   - packages/graph/engine/src/persistence/impact-report-projection.ts
   - packages/contracts/src/review-brief.ts
-  - packages/contracts/src/review-brief-correlation.ts
-  - packages/contracts/src/review-brief-correlation-order.ts
-  - packages/contracts/src/review-brief-correlation-projection.ts
+  - packages/shared-analysis/src/review-brief-correlation.ts
+  - packages/shared-analysis/src/review-brief-correlation-order.ts
+  - packages/shared-analysis/src/review-brief-correlation-projection.ts
   - packages/contracts/src/review-brief-correlation-types.ts
   - packages/contracts/src/review-brief-correlation-schemas.ts
   - packages/core/src/types/signal.ts

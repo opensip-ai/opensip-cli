@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-18T04:58:26.859Z",
+  "generatedAt": "2026-07-19T02:07:54.757Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -103,7 +103,7 @@
         "byPackage": {
           "agent-eval": 9,
           "cli": 8,
-          "contracts": 4,
+          "contracts": 2,
           "core": 7,
           "dashboard": 1,
           "fitness/checks-dogfood": 10,
@@ -114,6 +114,7 @@
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 3,
           "mcp": 10,
+          "shared-analysis": 2,
           "simulation": 3,
           "targeting": 1,
           "test-support": 2
@@ -160,7 +161,7 @@
         "byPackage": {
           "agent-eval": 9,
           "cli": 8,
-          "contracts": 4,
+          "contracts": 2,
           "core": 7,
           "dashboard": 1,
           "fitness/engine": 12,
@@ -168,6 +169,7 @@
           "graph/graph-typescript": 1,
           "languages/lang-typescript": 3,
           "mcp": 10,
+          "shared-analysis": 2,
           "simulation": 3,
           "targeting": 1
         }
@@ -288,13 +290,12 @@
     },
     "tests": {
       "fitness": {
-        "total": 63,
+        "total": 62,
         "bySlug": {
           "module-coupling-fan-out": 1,
           "test-file-naming": 3,
           "no-generic-error": 1,
           "my-check": 2,
-          "no-stub-tests": 2,
           "no-console-log": 9,
           "no-todo-comments": 4,
           "some-check": 3,
@@ -323,13 +324,13 @@
           "target-b": 1,
           "no-foo": 4,
           "flag-todo": 1,
+          "no-stub-tests": 1,
           "duplicate-utility-functions": 1
         },
         "byPackage": {
           "agent-eval": 1,
           "cli": 3,
           "core": 2,
-          "dashboard": 1,
           "fitness/checks-universal": 26,
           "fitness/engine": 28,
           "graph/engine": 2
@@ -469,7 +470,7 @@
     "productRuntimeCombined": 102,
     "checkPackageFitness": 170,
     "testSupportFitness": 2,
-    "testsFitness": 63,
+    "testsFitness": 62,
     "testsGraph": 27,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,

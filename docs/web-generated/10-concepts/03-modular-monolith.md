@@ -20,13 +20,13 @@ related-docs:
 ---
 # Layered package graph
 
-Sixty workspace packages: 57 publishable and three private. Six runtime layers. One
+Sixty-one workspace packages: 58 publishable and three private. Six runtime layers. One
 enforced rule: dependencies flow up only.
 
 This document is the conceptual map. For the lookup-shaped catalog of every package's role and exports, jump to [`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/). For the literal dep-cruiser rules, see [`80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
 
 > **What you'll understand after this:**
-> - Why opensip-cli ships as 57 publishable packages instead of one.
+> - Why opensip-cli ships as 58 publishable packages instead of one.
 > - The six layers, in order, and what each one is for.
 > - How the layer rule is enforced (and what happens if you break it).
 > - How type-only edges are caught by a second cruiser pass, and the two cross-layer exceptions that were paid down.
@@ -99,8 +99,8 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 
 **Layer 6 — `opensip-cli`.** The composition root. Discovers every first-party tool and language adapter, registers them, builds the Commander tree, runs the dispatcher. The only package that knows everything below it.
 
-The generated architecture map is the inventory source of truth: 60 workspace
-packages, 57 publishable, and three private. `@opensip-cli/agent-eval` is a
+The generated architecture map is the inventory source of truth: 61 workspace
+packages, 58 publishable, and three private. `@opensip-cli/agent-eval` is a
 black-box agent-usability harness outside the runtime layers;
 `@opensip-cli/test-support` carries cross-package test scaffolding; and
 `@opensip-cli/checks-dogfood` carries this repository's architecture checks.
@@ -158,7 +158,7 @@ The upshot: there is **no** standing "you may `import type` upward" allowance. A
 
 ---
 
-## Why 57 publishable packages and not 1
+## Why 58 publishable packages and not 1
 
 A single mega-package was considered. It would compile faster, ship faster, and have a simpler `package.json`. We chose against it for three load-bearing reasons:
 
@@ -170,7 +170,7 @@ A check pack like `@opensip-cli/checks-python` has to be installable on its own.
 opensip fit plugin add @opensip-cli/checks-python
 ```
 
-…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 57 publishable packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
+…and not pull in the JavaScript universe. With a single mega-package, every install pulls every check. With 58 publishable packages, an install pulls only what's needed. (Today the bundled distribution still installs everything; tomorrow's tree-shaken or selectively-installed distribution doesn't have to.)
 
 ### 2. The Tool contract's promise
 
@@ -178,7 +178,7 @@ The Tool contract says "any npm package can be a Tool." That promise only holds 
 
 ### 3. The layer rule needs to be visible
 
-A flat package can have any internal structure. With 60 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
+A flat package can have any internal structure. With 61 workspace packages, the layer is the directory structure: looking at `packages/` tells you the architecture in five seconds. If a contributor accidentally adds an upward edge, the build fails before the PR is even reviewed. The layer rule isn't aspiration — it's a wall.
 
 ---
 
@@ -186,7 +186,7 @@ A flat package can have any internal structure. With 60 workspace packages, the 
 
 Trade-offs are real. The 60-package workspace is more expensive in three places:
 
-- **More `package.json` files to maintain.** Version bumps span 57 publishable packages; `agent-eval`, `test-support`, and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
+- **More `package.json` files to maintain.** Version bumps span 58 publishable packages; `agent-eval`, `test-support`, and `checks-dogfood` remain private. The root manifest is tooling metadata, not a workspace package. We use `pnpm` workspace protocol (`workspace:*`) so internal deps are auto-linked, and release scripts verify the publishable set in lockstep.
 - **More `tsconfig.json` files.** Each package has its own. Project references handle the build graph. The cost is configuration footprint, not build speed.
 - **A discovery cost when reading the codebase.** "Where does `Signal` live?" is one search now: `packages/core/src/types/signal.ts`. But "where does `defineCheck` live?" requires knowing the layer (`fitness`) and the framework subdir (`fitness/engine/src/framework/`). The package catalog ([`70-reference/02-package-catalog.md`](/docs/opensip-cli/70-reference/02-package-catalog/)) is the antidote.
 

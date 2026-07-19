@@ -156,7 +156,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 
 Last verified at v0.7.0 against:
 
-- `packages/` directory listing — `scripts/release-package-order.mjs` is the source of truth (57 publishable packages plus the three workspace-private support packages `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and `@opensip-cli/checks-dogfood`).
+- `packages/` directory listing — `scripts/release-package-order.mjs` is the source of truth (58 publishable packages plus the three workspace-private support packages `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and `@opensip-cli/checks-dogfood`).
 - Each package's `package.json` `description` and `name` field, read directly.
 - The dep-cruiser config for layer rules.
 ```

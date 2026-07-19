@@ -13,8 +13,8 @@ import {
   type ImpactTrust,
   type ImpactUncertainty,
 } from '@opensip-cli/contracts';
-import { computeImpact } from '@opensip-cli/shared-analysis';
 import { createToolLogger, currentScope, resolveChangedFiles } from '@opensip-cli/core';
+import { computeImpact } from '@opensip-cli/shared-analysis';
 
 const log = createToolLogger('fitness:cli');
 const WORKING_TREE_BASIS = 'changed:git:working-tree';

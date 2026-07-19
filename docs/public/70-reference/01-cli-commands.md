@@ -25,7 +25,7 @@ source-files:
   - packages/cli/src/commands/uninstall.ts
   - packages/cli/src/commands/completion.ts
   - packages/cli/src/commands/agent-catalog.ts
-  - packages/contracts/src/agent-catalog-assembly.ts
+  - packages/shared-analysis/src/agent-catalog-assembly.ts
   - packages/contracts/src/agent-catalog.ts
   - packages/mcp/src/tools/get-agent-catalog.ts
   - packages/fitness/engine/src/tool.ts
