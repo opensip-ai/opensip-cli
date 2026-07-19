@@ -17,7 +17,8 @@
       "@opensip-cli/checks-go",
       "@opensip-cli/checks-java",
       "@opensip-cli/checks-cpp",
-      "@opensip-cli/checks-rust"
+      "@opensip-cli/checks-rust",
+      "@opensip-cli/checks-dogfood"
     ],
     "graph-adapter": [
       "@opensip-cli/graph-typescript",
