@@ -11,7 +11,14 @@ export default mergeConfig(
   vitestBase,
   defineConfig({
     test: {
-      include: ['src/__tests__/dashboard-graph-offline.integration.test.ts'],
+      include: [
+        'src/__tests__/dashboard-graph-offline.integration.test.ts',
+        // The end-to-end validation suite: asserts against a generated
+        // dogfood report when one exists and reports SKIPPED (never a
+        // fabricated pass) when it does not — the dogfood CI job generates
+        // the report first, so the assertions run there (plan 09 Phase 4).
+        'src/__tests__/dashboard-validation.integration.test.ts',
+      ],
       passWithNoTests: false,
     },
   }),

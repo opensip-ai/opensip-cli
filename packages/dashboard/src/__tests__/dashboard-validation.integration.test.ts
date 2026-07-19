@@ -1,4 +1,3 @@
-// @fitness-ignore-file no-stub-tests -- expect(true).toBe(true) is used as a deliberate "skip-marker" when the dashboard report isn't present; test bodies are gated by readReportOrSkip()
 /// <reference lib="dom" />
 /**
  * @vitest-environment jsdom
@@ -108,40 +107,35 @@ function activateExploreSubtab(): void {
   if (exploreTab) exploreTab.click();
 }
 
-describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation', () => {
+// Precondition resolved at COLLECT time (sync fs read at module scope): with
+// no bootable dogfood report, every test below is reported SKIPPED — never a
+// silent expect(true) PASS (plan 09 Task 4.2). The oversized-report case
+// additionally writes its loud stderr diagnostic in readReportOrSkip().
+const reportHtml = readReportOrSkip();
+
+describe.runIf(reportHtml !== null)('Phase V — dashboard end-to-end validation', () => {
   // The report embeds the full graph catalog (tens of MB). Boot the dashboard
   // exactly ONCE for the whole file (see bootDashboard) and share the result —
   // re-booting per test accumulated listeners/closures and OOM'd the worker.
-  let env: BootResult | null = null;
-  let reportHtml: string | null = null;
+  let env: BootResult;
 
   beforeAll(() => {
-    reportHtml = readReportOrSkip();
-    if (reportHtml) env = bootDashboard(reportHtml);
+    env = bootDashboard(reportHtml as string);
   }, 120_000);
 
   // Strip transient overlays/drawers between tests so the single shared boot
   // doesn't leak UI state across `it` blocks.
   beforeEach(() => {
-    if (!env) return;
     for (const sel of ['.function-card-overlay', '.help-drawer-overlay', '.help-drawer']) {
       for (const node of document.querySelectorAll(sel)) node.remove();
     }
   });
 
   it('latest.html embeds the graph catalog', () => {
-    if (!reportHtml) {
-      expect(true).toBe(true);
-      return;
-    }
     expect(reportHtml).toContain('id="graph-catalog"');
   });
 
   it('boots without throwing and registers the 3 restructured Code Paths views', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
     expect(env.views).toBeDefined();
     // The restructured explore set: graph (node-link, with the SCC cycle
     // highlight fold) / coupling / distribution. The single-metric views
@@ -155,10 +149,6 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('Code Paths panel hosts Sessions and Explore subtabs', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
     expect(document.querySelector('#panel-code-paths-sessions')).not.toBeNull();
     expect(document.querySelector('#panel-code-paths-explore')).not.toBeNull();
     expect(
@@ -170,10 +160,6 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('renders the name-filter search input inside the Functions (distribution) view', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
     activateExploreSubtab();
     env.activateView('distribution');
     const input = document.querySelector(
@@ -185,10 +171,6 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('every Explore view container exists and the active one renders something', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
     activateExploreSubtab();
     for (const id of ['graph', 'coupling', 'distribution']) {
       const c = document.querySelector('#code-paths-view-' + id);
@@ -201,28 +183,19 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(Boolean(hasRows) || Boolean(hasEmpty)).toBe(true);
   });
 
-  it('Function Card overlay opens for the first row of the distribution view', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
+  it('Function Card overlay opens for the first row of the distribution view', (ctx) => {
     activateExploreSubtab();
     env.activateView('distribution');
     const firstRow = document.querySelector('#code-paths-view-distribution [data-body-hash]');
-    if (!firstRow) {
-      expect(true).toBe(true);
-      return;
-    }
+    // Data-dependent: a report can legitimately carry no distribution rows —
+    // skip VISIBLY rather than fabricating a pass.
+    if (!firstRow) return ctx.skip();
     env.openFunctionCard((firstRow as HTMLElement).dataset.bodyHash!);
     const overlays = document.querySelectorAll('.function-card-overlay');
     expect(overlays.length).toBe(1);
   });
 
   it('typing into the Functions name filter re-filters the table in place', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
     activateExploreSubtab();
     env.activateView('distribution');
     const view = document.querySelector('#code-paths-view-distribution')!;
@@ -242,10 +215,6 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
   });
 
   it('the active view section heading exposes an info button that opens the help drawer', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
     activateExploreSubtab();
     env.activateView('distribution');
     const info = document.querySelector<HTMLButtonElement>(
@@ -261,18 +230,12 @@ describe.runIf(existsSync(REPORT))('Phase V — dashboard end-to-end validation'
     expect(document.querySelector('.help-drawer-overlay')).toBeNull();
   });
 
-  it('openCodePathsSession switches to Code Paths and selects the session row', () => {
-    if (!env) {
-      expect(true).toBe(true);
-      return;
-    }
+  it('openCodePathsSession switches to Code Paths and selects the session row', (ctx) => {
     const firstGraphRow = document.querySelector<HTMLElement>(
       '#panel-code-paths-sessions tr[data-session-id]',
     );
-    if (!firstGraphRow) {
-      expect(true).toBe(true);
-      return;
-    } // No graph sessions yet.
+    // Data-dependent: no graph sessions yet — skip VISIBLY.
+    if (!firstGraphRow) return ctx.skip();
     const sessionId = firstGraphRow.dataset.sessionId!;
     env.openCodePathsSession(sessionId);
     const codePathsTab = document.querySelector('.tab[data-tab="code-paths"]');
