@@ -24,6 +24,7 @@ import { err, ok, type LanguageAdapter, type Result } from '@opensip-cli/core';
 import {
   buildArchitectureView,
   buildImpactView,
+  clampLimit,
   compareCodePointStrings,
   continuationToken,
   deriveGraphReadFeatures,
@@ -62,7 +63,6 @@ import {
   rejectCursorWithoutGeneration,
   validateCursorBinding,
 } from './graph-query-page.js';
-import { clampLimit } from './graph-read-projection.js';
 import { projectTraversal } from './graph-traversal-projection.js';
 import { fromGraphReadError, readError } from './mcp-error.js';
 import { SqliteGraphDeclarationQueries } from './sqlite-graph-declaration-queries.js';

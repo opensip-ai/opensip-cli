@@ -8,6 +8,7 @@
 
 import { err, ok, type Result } from '@opensip-cli/core';
 import {
+  clampLimit,
   compareCodePointStrings,
   compareDeclarationRefs,
   compareReferenceSites,
@@ -41,7 +42,6 @@ import {
   type ReferenceSiteDto,
   type SearchDeclarationsOptions,
 } from './graph-read-port.js';
-import { clampLimit } from './graph-read-projection.js';
 import { readError } from './mcp-error.js';
 import {
   completeInventoryCoverage,

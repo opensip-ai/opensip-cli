@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampLimit, toDeadCodeDto, toSymbolRef } from '../graph-read-projection.js';
+import { toDeadCodeDto, toSymbolRef } from '../graph-read-projection.js';
 
 import type { Signal } from '@opensip-cli/core';
 import type { Indexes } from '@opensip-cli/graph/read';
@@ -27,15 +27,6 @@ function occurrence() {
 }
 
 describe('graph-read-projection', () => {
-  it('clamps limits to the inclusive 1..500 band', () => {
-    expect(clampLimit(undefined, 25)).toBe(25);
-    expect(clampLimit(Number.NaN, 10)).toBe(10);
-    expect(clampLimit(0, 10)).toBe(10);
-    expect(clampLimit(-3, 10)).toBe(10);
-    expect(clampLimit(3.9, 10)).toBe(3);
-    expect(clampLimit(9999, 10)).toBe(500);
-  });
-
   it('projects dead-code signals only when span and occurrence resolve', () => {
     const indexes = {
       byOccId: new Map([['src/a.ts:1:0', occurrence()]]),

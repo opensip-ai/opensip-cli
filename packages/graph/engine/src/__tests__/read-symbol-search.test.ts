@@ -141,6 +141,16 @@ describe('searchSymbolOccurrences', () => {
     }),
   ]);
 
+  it('coerces a non-finite limit to the default instead of an empty complete window', () => {
+    // Regression: Math.trunc(NaN) poisoned the clamp, yielding an empty
+    // result labeled complete: true on a malformed public-read request.
+    const result = search(multi, { query: 'save', match: 'substring', limit: Number.NaN });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.symbols.length).toBeGreaterThan(0);
+    expect(result.value.coverage.complete).toBe(true);
+  });
+
   it('matches substring case-insensitively on simpleName', () => {
     const result = search(multi, { query: 'save', match: 'substring' });
     expect(result.ok).toBe(true);

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  clampLimit,
+  isCapReason,
   makeFacet,
   mergeFacet,
   rollupFacets,
@@ -14,6 +16,35 @@ const facets = (over: Partial<CoverageFacetSet> = {}): CoverageFacetSet => ({
   grouping: UNREQUESTED_FACET,
   projection: UNREQUESTED_FACET,
   ...over,
+});
+
+describe('clampLimit (canonical home — shared by graph read views + MCP pre-clamps)', () => {
+  it('clamps limits to the inclusive 1..500 band, defaulting non-finite input', () => {
+    expect(clampLimit(undefined, 25)).toBe(25);
+    expect(clampLimit(Number.NaN, 10)).toBe(10);
+    expect(clampLimit(Number.POSITIVE_INFINITY, 10)).toBe(10);
+    expect(clampLimit(Number.NEGATIVE_INFINITY, 10)).toBe(10);
+    expect(clampLimit(0, 10)).toBe(10);
+    expect(clampLimit(-3, 10)).toBe(10);
+    expect(clampLimit(3.9, 10)).toBe(3);
+    expect(clampLimit(9999, 10)).toBe(500);
+  });
+});
+
+describe('isCapReason (declared cap vocabulary + suffix defense-in-depth)', () => {
+  it('classifies every registered cap code as truncating', () => {
+    expect(isCapReason('group-key-cap')).toBe(true);
+    expect(isCapReason('test-selection-depth-cap')).toBe(true);
+  });
+
+  it('keeps the -cap suffix convention for not-yet-registered codes', () => {
+    expect(isCapReason('future-window-cap')).toBe(true);
+  });
+
+  it('never classifies an informational reason as truncating', () => {
+    expect(isCapReason('malformed-symbol-omitted')).toBe(false);
+    expect(isCapReason('capitalization')).toBe(false);
+  });
 });
 
 describe('makeFacet (P2 Phase 2.1)', () => {

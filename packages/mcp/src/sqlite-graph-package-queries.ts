@@ -2,6 +2,7 @@ import { err, type Result } from '@opensip-cli/core';
 import {
   buildPackageEvidence,
   buildPackageScc,
+  clampLimit,
   compareCodePointStrings,
   makeFacet,
   mergeFacet,
@@ -16,7 +17,6 @@ import {
 } from '@opensip-cli/graph/read';
 
 import { digestNormalizedQuery, rejectCursorWithoutGeneration } from './graph-query-page.js';
-import { clampLimit } from './graph-read-projection.js';
 import { fromGraphReadError } from './mcp-error.js';
 import {
   pagePackageCycles,

@@ -10,6 +10,78 @@ export interface ReadGroupSummary {
   readonly count: number;
 }
 
+/**
+ * Clamp a caller-supplied limit to a positive integer in [1, 500], defaulting
+ * when absent or non-finite. The read surface is self-defending: a malformed
+ * `limit` (NaN/Infinity) must coerce to `fallback` here, never propagate into
+ * `Math.min`/`Math.max` (whose NaN result silently yields an empty window
+ * labeled `complete: true`). Canonical home for both the graph read views and
+ * the MCP query pre-clamps (consolidated from `mcp/graph-read-projection`).
+ */
+export function clampLimit(limit: number | undefined, fallback: number): number {
+  const selected = limit === undefined || !Number.isFinite(limit) || limit <= 0 ? fallback : limit;
+  return Math.min(500, Math.max(1, Math.trunc(selected)));
+}
+
+/**
+ * Declared vocabulary of truncation (cap) reason codes across the graph read
+ * surface and the MCP projections. A reason's cap-ness is DECLARED here at its
+ * definition — the classifiers never re-derive it from the code's spelling at
+ * each site (the old duplicated `endsWith('-cap')` sniffs could drift and
+ * silently flip `truncated` to `false` on a rename). {@link isCapReason} keeps
+ * the `-cap` suffix convention as defense-in-depth for a not-yet-registered
+ * code; a NEW cap code that breaks the suffix convention MUST be added here.
+ */
+const CAP_REASON_CODES: ReadonlySet<string> = new Set([
+  'blast-membership-cap',
+  'call-evidence-cap',
+  'candidate-cap',
+  'declaration-cap',
+  'edge-cap',
+  'entity-decorator-cap',
+  'entity-parameter-cap',
+  'fact-cap',
+  'group-key-cap',
+  'hop-evidence-cap',
+  'hotspot-cap',
+  'impact-projection-cap',
+  'import-evidence-cap',
+  'inventory-cap',
+  'node-cap',
+  'orphan-evaluation-cap',
+  'package-edge-cap',
+  'package-edge-group-cap',
+  'page-edge-cap',
+  'proof-edge-cap',
+  'reference-cap',
+  'references-per-declaration-cap',
+  'resolved-evidence-cap',
+  'span-candidate-cap',
+  'specifier-cap',
+  'target-omitted-by-cap',
+  'test-selection-candidate-cap',
+  'test-selection-command-cap',
+  'test-selection-depth-cap',
+  'test-selection-edge-cap',
+  'test-selection-node-cap',
+  'test-selection-reason-cap',
+  'unresolved-detail-cap',
+  'unresolved-sample-cap',
+  'view-depth-cap',
+  'walk-membership-cap',
+  'walk-node-cap',
+]);
+
+/**
+ * The one truncation classifier for read-coverage reasons: registered cap
+ * codes (declared cap-ness) plus the `-cap` suffix convention as
+ * defense-in-depth. Every consumer (`makeFacet`, symbol search) routes
+ * through this — no per-site suffix sniffing.
+ */
+export function isCapReason(code: string): boolean {
+  return CAP_REASON_CODES.has(code) || code.endsWith('-cap');
+}
+
 // ── P2 Phase 2.1: facet coverage helpers ─────────────────────────
 
 /** A facet the caller did not request — complete, untruncated, contributes nothing. */
@@ -30,7 +102,7 @@ export function makeFacet(requested: boolean, reasons: ReadonlySet<string>): Cov
   return {
     requested,
     complete: values.length === 0,
-    truncated: values.some((reason) => reason.endsWith('-cap')),
+    truncated: values.some(isCapReason),
     reasons: values,
   };
 }

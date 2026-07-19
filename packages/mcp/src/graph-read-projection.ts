@@ -33,8 +33,3 @@ export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | u
   };
 }
 
-/** Clamp a caller-supplied limit to a positive integer, defaulting when absent. */
-export function clampLimit(limit: number | undefined, fallback: number): number {
-  const selected = limit === undefined || !Number.isFinite(limit) || limit <= 0 ? fallback : limit;
-  return Math.min(500, Math.max(1, Math.trunc(selected)));
-}

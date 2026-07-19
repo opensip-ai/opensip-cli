@@ -55,6 +55,8 @@ const EXPECTED = [
   'GRAPH_SYMBOL_PACKAGE_MAX',
   'verifyCatalogInputs',
   'isSafeAdapterDescriptor',
+  'clampLimit',
+  'isCapReason',
   'makeFacet',
   'mergeFacet',
   'rollupFacets',
