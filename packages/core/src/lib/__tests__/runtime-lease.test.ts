@@ -3309,15 +3309,35 @@ describe('runtime lease coordination', () => {
   });
 
   it('does not treat equal unproven hostnames as local PID authority', async () => {
+    // Controlled clocks keep foreign-owner expiry (staleMs) strictly outside the
+    // exclusive wait budget so a dead-looking PID cannot reclaim via wall time.
+    let wallNow = 10_000;
+    let monotonic = 0;
+    const advance = async (ms: number): Promise<void> => {
+      wallNow += ms;
+      monotonic += ms;
+      await Promise.resolve();
+    };
     const first = createRuntimeLeaseCoordinator({
       hostname: () => 'shared-unproven-hostname',
       hostInstanceIdentity: () => undefined,
       pid: 424_242,
+      now: () => wallNow,
+      monotonicNow: () => monotonic,
+      poll: advance,
+      // Unproven hosts must not treat ESRCH as owner death. Absence still has
+      // no local PID authority when host identity is unproven.
+      isProcessAlive: () => false,
+      inspectProcessIncarnation: () => ({ status: 'absent' as const }),
     });
     const second = createRuntimeLeaseCoordinator({
       hostname: () => 'shared-unproven-hostname',
       hostInstanceIdentity: () => undefined,
+      now: () => wallNow,
+      monotonicNow: () => monotonic,
+      poll: advance,
       isProcessAlive: () => false,
+      inspectProcessIncarnation: () => ({ status: 'absent' as const }),
     });
     const reader = track(
       await first.acquireRuntimeReadLease({
@@ -3329,6 +3349,12 @@ describe('runtime lease coordination', () => {
       resolveCoordinationPaths().forProject(reader.coordinationKey).readersDir,
       `reader-${reader.ownerToken}.json`,
     );
+    const persisted = JSON.parse(readFileSync(readerPath, 'utf8')) as {
+      hostIdentityProven: boolean;
+      processIncarnation?: string;
+    };
+    expect(persisted.hostIdentityProven).toBe(false);
+    expect(persisted.processIncarnation).toBeUndefined();
 
     await expect(
       second.acquireRuntimeExclusiveLease({

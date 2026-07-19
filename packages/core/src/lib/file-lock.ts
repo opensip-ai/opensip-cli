@@ -36,6 +36,7 @@ import {
   defaultHostInstanceIdentity,
   deriveHostIdentity,
   inspectProcessIncarnation,
+  type SafetyBiasedProcessInspector,
 } from './host-process-identity.js';
 import { generateUUID } from './ids.js';
 
@@ -600,18 +601,27 @@ function currentProcessIncarnation(): string | undefined {
   return inspection.status === 'present' ? inspection.identity : undefined;
 }
 
-const processInspector = createSafetyBiasedProcessInspector({
-  inspect: inspectProcessIncarnation,
-  monotonicNow,
-  ttlMs: PROCESS_PROBE_CACHE_MS,
-  maxEntries: PROCESS_PROBE_CACHE_ENTRIES,
-});
+/**
+ * One inspector per acquisition attempt. Positive observations must survive the
+ * full wait budget plus scheduler overshoot on `Atomics.wait` / `setTimeout` —
+ * a fixed short global TTL re-probes live owners when the final timeout poll
+ * lands after the cache expires even though `waitMs` itself is shorter.
+ */
+function createAcquisitionProcessInspector(waitMs: number): SafetyBiasedProcessInspector {
+  return createSafetyBiasedProcessInspector({
+    inspect: inspectProcessIncarnation,
+    monotonicNow,
+    ttlMs: Math.max(PROCESS_PROBE_CACHE_MS, waitMs + POLL_MS * 8 + 1_000),
+    maxEntries: PROCESS_PROBE_CACHE_ENTRIES,
+  });
+}
 
 type OwnerRecoveryClassification = 'live' | 'proven-dead' | 'observe-unchanged';
 const OBSERVE_UNCHANGED: OwnerRecoveryClassification = 'observe-unchanged';
 
 function classifyOwnerForRecovery(
   metadata: FileLockMetadata,
+  processInspector: SafetyBiasedProcessInspector,
   freshProcessProbe = false,
 ): OwnerRecoveryClassification {
   const localHost = currentHostIdentity();
@@ -749,6 +759,7 @@ interface StaleLockRecoveryContext {
   readonly snapshot: LockRecordSnapshot;
   readonly policy: StateLockPolicy;
   readonly tracker: LockStaleTracker;
+  readonly processInspector: SafetyBiasedProcessInspector;
   readonly onEvent?: (event: FileLockEvent) => void;
   readonly resource: FileLockResource;
   readonly operation?: string;
@@ -759,11 +770,12 @@ function recoverStaleLock({
   snapshot,
   policy,
   tracker,
+  processInspector,
   onEvent,
   resource,
   operation,
 }: StaleLockRecoveryContext): boolean {
-  const classification = classifyOwnerForRecovery(snapshot.metadata);
+  const classification = classifyOwnerForRecovery(snapshot.metadata, processInspector);
   if (classification === 'live') {
     resetStaleObservation(tracker);
     return false;
@@ -790,7 +802,7 @@ function recoverStaleLock({
     // Cached process observations may delay recovery, but may never authorize
     // deletion. Re-probe after the exact record re-read and immediately before
     // the final exact-snapshot unlink guard.
-    const freshClassification = classifyOwnerForRecovery(current.metadata, true);
+    const freshClassification = classifyOwnerForRecovery(current.metadata, processInspector, true);
     if (freshClassification === 'live') {
       resetStaleObservation(tracker);
       return false;
@@ -897,6 +909,7 @@ function evaluateLockContention(
   metadata: FileLockMetadata,
   options: WithFileLockOptions,
   tracker: LockStaleTracker,
+  processInspector: SafetyBiasedProcessInspector,
   deadline: number,
   acquisitionStartedAt: number,
 ): LockContentionOutcome {
@@ -916,6 +929,7 @@ function evaluateLockContention(
       snapshot: existing,
       policy: options.policy,
       tracker,
+      processInspector,
       onEvent: options.onEvent,
       resource: options.resource,
       operation: options.operation,
@@ -1048,6 +1062,7 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
   const acquisitionStartedAt = monotonicNow();
   const deadline = acquisitionStartedAt + policy.waitMs;
   const tracker: LockStaleTracker = {};
+  const processInspector = createAcquisitionProcessInspector(policy.waitMs);
   let acquired = false;
 
   while (!acquired) {
@@ -1056,6 +1071,7 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
       metadata,
       normalizedOptions,
       tracker,
+      processInspector,
       deadline,
       acquisitionStartedAt,
     );
@@ -1136,6 +1152,7 @@ export async function withFileLockAsync<T>(
   const acquisitionStartedAt = monotonicNow();
   const deadline = acquisitionStartedAt + policy.waitMs;
   const tracker: LockStaleTracker = {};
+  const processInspector = createAcquisitionProcessInspector(policy.waitMs);
   let acquired = false;
 
   const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -1146,6 +1163,7 @@ export async function withFileLockAsync<T>(
       metadata,
       normalizedOptions,
       tracker,
+      processInspector,
       deadline,
       acquisitionStartedAt,
     );

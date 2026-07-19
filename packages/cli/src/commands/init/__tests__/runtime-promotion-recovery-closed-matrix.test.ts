@@ -704,8 +704,12 @@ describe('closed runtime promotion recovery matrix', () => {
       expect(readFileSync(runtime, 'utf8')).toBe('not-a-directory');
 
       rmSync(runtime);
-      ensureDirectory(runtime);
       if (authority === 'cache') {
+        // Cache authority is bound to the journaled directory object. Recreating
+        // a directory at the same path is not enough when identity differs; when
+        // a filesystem reuses the prior inode the type-only restore can succeed.
+        // Leave a non-directory residual so the closed receipt stays deterministic.
+        writePrivateFile(runtime, 'still-not-a-directory');
         await expect(harness.run()).resolves.toMatchObject({
           status: 'rolled-back',
           cleanupPending: true,
@@ -713,6 +717,7 @@ describe('closed runtime promotion recovery matrix', () => {
         });
         expect(storedJournal(fixture.store).state).toBe('closed');
       } else {
+        ensureDirectory(runtime);
         await expect(harness.run()).resolves.toMatchObject({
           status: 'rolled-back',
         });
