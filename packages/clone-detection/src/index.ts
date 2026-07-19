@@ -36,7 +36,9 @@ export type {
   DuplicateGroup,
   CrossPackageAggregate,
   DuplicateFindings,
+  NearDupCoverage,
   NearDuplicateCluster,
+  NearDuplicateResult,
 } from './types.js';
 export { findDuplicateBodies, isEligibleKind } from './find-duplicate-bodies.js';
 export { findNearDuplicates } from './find-near-duplicates.js';

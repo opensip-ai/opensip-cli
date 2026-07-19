@@ -9,6 +9,7 @@
  */
 
 import { findNearDuplicates } from '@opensip-cli/clone-detection';
+import { currentLogger } from '@opensip-cli/core';
 
 import { languageOfFile } from '../lang-adapter/language-of-file.js';
 
@@ -26,11 +27,22 @@ export const nearDuplicateFunctionBodyRule = defineRule({
   defaultSeverity: 'warning',
   evaluate({ catalog, config }): readonly Signal[] {
     const candidates = toCandidates(catalog);
-    const clusters = findNearDuplicates(candidates, {
+    const { clusters, coverage } = findNearDuplicates(candidates, {
       minSimilarity: config.minNearDuplicateSimilarity,
       minBodySize: config.minNearDuplicateBodySize,
       lshBands: config.nearDuplicateLshBands,
     });
+    if (!coverage.complete) {
+      // Fail-loud: a capped LSH bucket means the pass sampled a pathological
+      // bucket — near-duplicate coverage is bounded, not exhaustive, and the
+      // run log is the record of that (the pass stays deterministic).
+      currentLogger().warn({
+        evt: 'graph.rules.neardup.bucket_capped',
+        module: 'graph:rules',
+        cappedBuckets: coverage.cappedBuckets,
+        reasons: coverage.reasons,
+      });
+    }
 
     return clusters.map((c) =>
       createGraphSignal(SLUG, config, {

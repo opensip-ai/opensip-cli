@@ -86,6 +86,22 @@ export interface DuplicateFindings {
   readonly groups: readonly DuplicateGroup[];
 }
 
+/** Coverage evidence for a near-duplicate pass — a capped bucket is a bounded,
+ *  OBSERVABLE skip, never a silent one (plan 09 fail-loud consistency). */
+export interface NearDupCoverage {
+  readonly complete: boolean;
+  /** `['lsh-bucket-cap']` when any bucket exceeded the pairwise cap and was sampled. */
+  readonly reasons: readonly string[];
+  /** Number of LSH buckets sampled down to the pairwise cap. */
+  readonly cappedBuckets: number;
+}
+
+/** Result of {@link findNearDuplicates}: clusters + the pass's coverage evidence. */
+export interface NearDuplicateResult {
+  readonly clusters: readonly NearDuplicateCluster[];
+  readonly coverage: NearDupCoverage;
+}
+
 /** A near-duplicate cluster (connected component over LSH/Jaccard edges). */
 export interface NearDuplicateCluster {
   readonly anchor: CloneCandidate;

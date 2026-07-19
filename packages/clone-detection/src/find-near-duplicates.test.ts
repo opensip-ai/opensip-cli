@@ -40,7 +40,7 @@ describe('findNearDuplicates', () => {
     expect(
       estimateJaccard(bodySignature(baseBody), bodySignature(nearBody)),
     ).toBeGreaterThanOrEqual(0.85);
-    const clusters = findNearDuplicates([
+    const { clusters } = findNearDuplicates([
       signedCand(baseBody, 'a.ts', 1),
       signedCand(nearBody, 'b.ts', 2),
     ]);
@@ -49,7 +49,7 @@ describe('findNearDuplicates', () => {
   });
 
   it('does not cluster unrelated bodies', () => {
-    const clusters = findNearDuplicates([
+    const { clusters } = findNearDuplicates([
       signedCand(baseBody, 'a.ts', 1),
       signedCand(unrelated, 'b.ts', 2),
     ]);
@@ -57,7 +57,7 @@ describe('findNearDuplicates', () => {
   });
 
   it('does not cluster across languages', () => {
-    const clusters = findNearDuplicates([
+    const { clusters } = findNearDuplicates([
       signedCand(baseBody, 'a.ts', 1, 'typescript'),
       signedCand(nearBody, 'b.rs', 2, 'rust'),
     ]);
