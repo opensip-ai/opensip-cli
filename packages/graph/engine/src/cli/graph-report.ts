@@ -61,6 +61,13 @@ export interface LiveGraphOutput {
    * same `catalog.resolutionMode`. Absent / `exact` ⇒ no banner.
    */
   readonly resolutionMode?: 'exact' | 'fast';
+  /**
+   * Count of discovered files the parser dropped (from
+   * `catalog.buildCoverage.parseErrorFiles`). Plain data for the IPC boundary;
+   * the live done frame surfaces it as the parse-failure banner — parity with
+   * the static path's `RunPresentation.banners`. Absent / `0` ⇒ no banner.
+   */
+  readonly parseErrorFiles?: number;
 }
 
 /**
@@ -84,6 +91,7 @@ export async function buildLiveGraphOutput(
     signals: finalized.signals,
   };
   const resolutionMode = input.catalog?.resolutionMode;
+  const parseErrorFiles = input.catalog?.buildCoverage?.parseErrorFiles;
   return {
     signals: finalized.signals,
     suppressedCount: finalized.suppressedCount,
@@ -91,6 +99,7 @@ export async function buildLiveGraphOutput(
       includeSummary: false,
     }),
     ...(resolutionMode === undefined ? {} : { resolutionMode }),
+    ...(parseErrorFiles === undefined || parseErrorFiles === 0 ? {} : { parseErrorFiles }),
   };
 }
 
@@ -166,6 +175,18 @@ export function resolutionBannerText(
   resolutionMode: 'exact' | 'fast' | undefined,
 ): string | undefined {
   return resolutionMode === 'fast' ? resolutionBanner() : undefined;
+}
+
+/**
+ * The parse-failure coverage notice for a run, or `undefined` when every
+ * discovered file parsed. Surfaced beside the resolution caveat through
+ * `RunPresentation.banners` / the live done-frame banner so a catalog missing
+ * unparseable files is never silently green — the run log
+ * (`graph.catalog.parse.dropped`) names each dropped file.
+ */
+export function parseFailureBannerText(parseErrorFiles: number | undefined): string | undefined {
+  if (parseErrorFiles === undefined || parseErrorFiles === 0) return undefined;
+  return `${String(parseErrorFiles)} file(s) failed to parse — their functions are missing from the graph; the run log names each file.`;
 }
 
 function renderCatalogSection(catalog: Catalog | null, cacheHit: boolean): readonly string[] {

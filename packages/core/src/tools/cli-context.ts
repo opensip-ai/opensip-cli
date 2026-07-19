@@ -32,6 +32,17 @@ import type { ToolScope } from '../lib/scope-types.js';
 type WireSignalEnvelope = unknown;
 
 /**
+ * Structural mirror of contracts' `WarningDetail` — a non-fatal run notice the
+ * host attaches to the machine outcome (`CommandOutcome.warnings`). Mirrored
+ * here (not imported) for the same layering reason as {@link WireSignalEnvelope}:
+ * core must not name contracts-layer types.
+ */
+export interface WireWarningDetail {
+  readonly message: string;
+  readonly code?: string;
+}
+
+/**
  * Context the host hands to each command handler (and the tool's optional
  * lifecycle hooks): the shared CLI behaviour a handler calls back into — Ink
  * rendering, machine-output emit seams, report auto-open, structured logging,
@@ -201,8 +212,15 @@ export interface ToolCliContext {
    * Hygiene note (GA Low): this `unknown` + cast pattern is the cost of
    * strict layering (core imports nothing workspace). See the shape-sync
    * tests and `WireSignalEnvelope` alias below for the invariant.
+   *
+   * `opts.warnings` (optional) are non-fatal run notices the host stamps onto
+   * `CommandOutcome.warnings` — e.g. graph's "N files failed to parse" partial
+   * -coverage notice. They never alter the exit code.
    */
-  readonly emitEnvelope: (envelope: WireSignalEnvelope) => void;
+  readonly emitEnvelope: (
+    envelope: WireSignalEnvelope,
+    opts?: { readonly warnings?: readonly WireWarningDetail[] },
+  ) => void;
   /**
    * Emit a **structured error** as machine-output (launch, §5.5). The
    * host wraps `{ message, exitCode, suggestion? }` in a `status:'error'`
