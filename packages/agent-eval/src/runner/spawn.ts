@@ -293,10 +293,22 @@ export function spawnProcess(
       });
     };
 
+    // Escalation latch, extracted so the settlement path is ACYCLIC (plan 09
+    // Task 8.6): forceSettle joins/starts termination through this leaf
+    // instead of re-entering terminate — whose ensureForceSettlement arm
+    // schedules forceSettle, which previously closed the repo's one
+    // architecture.cycle. (When the timer fires, re-arming it was a no-op
+    // anyway, so beginTermination alone is semantics-identical here.)
+    const beginTermination = (): void => {
+      if (terminating) return;
+      terminating = true;
+      terminationPromise = escalate();
+    };
+
     const forceSettle = async (): Promise<void> => {
       error ??=
         'Child process stdio did not settle after root exit; an unobserved detached descendant may remain.';
-      terminate();
+      beginTermination();
       await (terminationPromise ?? Promise.resolve());
       child.stdout?.destroy();
       child.stderr?.destroy();
@@ -311,8 +323,7 @@ export function spawnProcess(
 
     const terminate = (): void => {
       if (terminating) return;
-      terminating = true;
-      terminationPromise = escalate();
+      beginTermination();
       ensureForceSettlement();
     };
 
