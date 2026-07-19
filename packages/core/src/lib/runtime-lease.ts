@@ -3209,6 +3209,10 @@ function reconcileOrphanedMutexTemp(
     observed = readOrphanedTemp(paths.coordinationDir, entry, MAX_RECORD_BYTES);
   } catch (error) {
     if (isLinkedOwnedMutexTemporary(paths, entry)) return;
+    // Multi-process cold starts race orphan temps through publication and
+    // unlink. A snapshot change means another creator still owns that inode;
+    // skip and let the next mutex owner re-scan rather than failing release.
+    if (error instanceof RuntimeSnapshotChangedError) return;
     throw error;
   }
   if (observed.status === 'absent') return;
