@@ -1535,7 +1535,15 @@ function readLinkedRecordProof(
   const beforeIdentity = recordIdentity(before);
   let fd: number | undefined;
   try {
-    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    } catch (error) {
+      // TOCTOU: peer unlinked between lstat and open under multi-process cold start.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new RuntimeSnapshotChangedError('Anchored create disappeared before proof open');
+      }
+      throw error;
+    }
     const opened = fstatSync(fd, { bigint: true });
     if (!sameRecordIdentity(beforeIdentity, recordIdentity(opened))) {
       throw new RuntimeSnapshotChangedError('Anchored create changed before proof read');
@@ -3269,11 +3277,19 @@ function tryAcquireRuntimeMutexNow(attempt: RuntimeMutexAttempt): RuntimeMutexGu
   if (tryCreateRuntimeMutex(paths, ownerToken, policy, environment, attempt.processIncarnation)) {
     return ownedRuntimeMutex(paths, ownerToken, policy, environment);
   }
-  if (
-    recoverStaleRuntimeMutex(paths, policy, onEvent, environment, tracker, processInspector) &&
-    tryCreateRuntimeMutex(paths, ownerToken, policy, environment, attempt.processIncarnation)
-  ) {
-    return ownedRuntimeMutex(paths, ownerToken, policy, environment);
+  try {
+    if (
+      recoverStaleRuntimeMutex(paths, policy, onEvent, environment, tracker, processInspector) &&
+      tryCreateRuntimeMutex(paths, ownerToken, policy, environment, attempt.processIncarnation)
+    ) {
+      return ownedRuntimeMutex(paths, ownerToken, policy, environment);
+    }
+  } catch (error) {
+    // Multi-process cold starts race linked-create settlement while recovering
+    // a contested mutex. Treat snapshot churn as contention and retry the wait
+    // loop rather than failing the whole acquisition.
+    if (error instanceof RuntimeSnapshotChangedError) return undefined;
+    throw error;
   }
   return undefined;
 }
