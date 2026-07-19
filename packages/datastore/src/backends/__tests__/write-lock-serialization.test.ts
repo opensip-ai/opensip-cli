@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
@@ -22,9 +22,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // The built package dist — the child imports the same code production runs.
 const DATASTORE_DIST = join(HERE, '..', '..', '..', 'dist', 'index.js');
 
+// A PLAIN string (no template interpolation): the datastore dist path
+// arrives via argv, and every SQL statement inside is fully parameterized —
+// keeping the script free of the interpolation-next-to-SQL shape.
 const WRITER_SCRIPT = `
-import { DataStoreFactory } from ${JSON.stringify(DATASTORE_DIST)};
-const [dbPath, writerId] = process.argv.slice(2);
+const [datastoreDist, dbPath, writerId] = process.argv.slice(2);
+const { DataStoreFactory } = await import(datastoreDist);
 const store = DataStoreFactory.open({
   backend: 'sqlite',
   path: dbPath,
@@ -47,9 +50,13 @@ store.close();
 
 function runWriter(script: string, dbPath: string, writerId: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [script, dbPath, writerId], {
-      stdio: ['ignore', 'ignore', 'inherit'],
-    });
+    const child = spawn(
+      process.execPath,
+      [script, pathToFileURL(DATASTORE_DIST).href, dbPath, writerId],
+      {
+        stdio: ['ignore', 'ignore', 'inherit'],
+      },
+    );
     child.on('exit', (code) => {
       resolve(code ?? 1);
     });
