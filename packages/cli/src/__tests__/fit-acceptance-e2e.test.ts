@@ -198,13 +198,37 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
       'utf8',
     );
 
+    // Plan 09 Phase 3: the analyzed repo's plugins config SELECTS the pack but
+    // no longer trusts it — without the operator ceremony the pack is denied.
+    const deniedRun = cli.run(['fit', 'list', '--json', '--cwd', testDir], {
+      cwd: testDir,
+      timeout: 120_000,
+    });
+    expect(deniedRun.exitCode, deniedRun.stderr).toBe(0);
+    expect(JSON.stringify(JSON.parse(deniedRun.stdout))).not.toContain(
+      'capability-worker-fixture',
+    );
+
+    // The real operator ceremony through the real binary, against an isolated
+    // HOME so the developer's actual ~/.opensip-cli is never touched.
+    const fakeHome = join(testDir, 'fake-home');
+    mkdirSync(fakeHome, { recursive: true });
+    const homeEnv = { HOME: fakeHome, USERPROFILE: fakeHome };
+    const ceremony = cli.run(['policy', 'trust', '@fixture/checks-worker', '--cwd', testDir], {
+      cwd: testDir,
+      env: homeEnv,
+      timeout: 120_000,
+    });
+    expect(ceremony.exitCode, ceremony.stderr).toBe(0);
+
     const result = cli.run(['fit', 'list', '--json', '--cwd', testDir], {
       cwd: testDir,
+      env: homeEnv,
       timeout: 120_000,
     });
     expect(result.exitCode, result.stderr).toBe(0);
     expect(JSON.stringify(JSON.parse(result.stdout))).toContain('capability-worker-fixture');
-  }, 180_000);
+  }, 240_000);
 
   it('the `fit --json` CommandOutcome is identical (volatile fields normalized) + same exit code', () => {
     const bundled = cli.run(['fit', '--json', '--cwd', testDir], {

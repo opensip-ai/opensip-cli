@@ -109,7 +109,13 @@ describe('registerCliCommands', () => {
   it('mounts the documented policy subcommands', () => {
     const program = new Command('opensip');
     registerCliCommands(program, makeContext());
-    expect(subcommandNames(program, 'policy')).toEqual(['audit', 'explain', 'status']);
+    expect(subcommandNames(program, 'policy')).toEqual([
+      'audit',
+      'explain',
+      'status',
+      'trust',
+      'untrust',
+    ]);
   });
 
   it('mounts the documented suite subcommands', () => {
