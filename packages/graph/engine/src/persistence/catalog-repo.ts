@@ -34,6 +34,13 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 const MODULE_NAME = 'graph:catalog-repo';
 
+// Per-process validated-identity memo for the trusted warm-read gate (plan 09
+// Task 6.1). A validation FACT cache (content-keyed, idempotent) — not run
+// state: keyed by the datastore handle (WeakMap — dies with the store) and
+// bounded per store.
+const VALIDATED_CATALOG_IDENTITIES = new WeakMap<object, Set<string>>();
+const MAX_VALIDATED_IDENTITIES = 4;
+
 // Error-log cause bound (message only, no stack: the public-read-surface
 // privacy test forbids backend vocabulary like module paths in this log).
 const MAX_ERR_CHARS = 300;
@@ -197,11 +204,14 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
 }
 
 /**
- * Validate the persisted catalog envelope and bound its nested containers.
+ * Cheap top-level integrity gate: envelope shape, version, provenance,
+ * coverage, and the (self-degrading) semantic-fact plane. O(1) in the
+ * function-container count — this ALWAYS runs on read, so a genuinely corrupt
+ * or wrong-generation row still fails loud even on the trusted fast path.
  *
- * @throws {Error} when the payload shape, provenance, or container bounds are invalid.
+ * @throws {Error} when the payload shape or provenance is invalid.
  */
-function validateCatalogPayload(value: unknown): asserts value is CatalogRowPayload {
+function validateCatalogShape(value: unknown): asserts value is CatalogRowPayload {
   if (!isRecord(value)) throw new Error('Malformed catalog payload');
   if (
     value.version !== '3.0' ||
@@ -218,22 +228,6 @@ function validateCatalogPayload(value: unknown): asserts value is CatalogRowPayl
     !isRecord(value.functions)
   ) {
     throw new Error('Malformed catalog payload');
-  }
-  const entries = Object.entries(value.functions);
-  if (entries.length > MAX_FUNCTION_BUCKETS) throw new Error('Malformed catalog payload');
-  let occurrenceCount = 0;
-  const nestedCounts = { edges: 0, targets: 0 };
-  for (const [name, bucket] of entries) {
-    if (!isSafeCatalogText(name) || !Array.isArray(bucket)) {
-      throw new Error('Malformed catalog function container');
-    }
-    occurrenceCount += bucket.length;
-    if (
-      occurrenceCount > MAX_OCCURRENCES ||
-      !bucket.every((occurrence) => hasBoundedOccurrenceContainers(occurrence, nestedCounts))
-    ) {
-      throw new Error('Malformed catalog function container');
-    }
   }
   validateOptionalProvenance(value);
   if (value.semanticFacts !== undefined) {
@@ -252,6 +246,43 @@ function validateCatalogPayload(value: unknown): asserts value is CatalogRowPayl
       });
     }
   }
+}
+
+/**
+ * The exhaustive O(occurrences) container walk — every bucket, occurrence,
+ * edge, and target bound-checked. Runs on first-load/untrusted reads; a
+ * trusted warm re-read (lifted-column identity consistent with the payload)
+ * skips it (plan 09 Task 6.1 — the read-side twin of the 293 MB report bug).
+ *
+ * @throws {Error} when a function container or its bounds are invalid.
+ */
+function validateFunctionContainers(value: CatalogRowPayload): void {
+  const entries = Object.entries(value.functions);
+  if (entries.length > MAX_FUNCTION_BUCKETS) throw new Error('Malformed catalog payload');
+  let occurrenceCount = 0;
+  const nestedCounts = { edges: 0, targets: 0 };
+  for (const [name, bucket] of entries) {
+    if (!isSafeCatalogText(name) || !Array.isArray(bucket)) {
+      throw new Error('Malformed catalog function container');
+    }
+    occurrenceCount += bucket.length;
+    if (
+      occurrenceCount > MAX_OCCURRENCES ||
+      !bucket.every((occurrence) => hasBoundedOccurrenceContainers(occurrence, nestedCounts))
+    ) {
+      throw new Error('Malformed catalog function container');
+    }
+  }
+}
+
+/**
+ * Validate the persisted catalog envelope and bound its nested containers.
+ *
+ * @throws {Error} when the payload shape, provenance, or container bounds are invalid.
+ */
+function validateCatalogPayload(value: unknown): asserts value is CatalogRowPayload {
+  validateCatalogShape(value);
+  validateFunctionContainers(value);
 }
 
 function isSafeCatalogText(value: unknown): value is string {
@@ -349,6 +380,30 @@ export class CatalogRepo {
   // @yagni-ignore-next-line duplicate-body-candidate -- repository constructors intentionally share the same datastore narrowing idiom; a base class would add indirection without reducing behavior.
   constructor(datastore: DataStore) {
     this.datastore = requireDrizzleHandle(datastore);
+  }
+
+  /**
+   * True when a full container walk already validated this lifted identity
+   * for this datastore in this process. Content-keyed validation-fact cache
+   * (idempotent, never run state); keyed by the datastore handle via WeakMap
+   * so it cannot outlive the store.
+   */
+  private hasValidatedIdentity(identityKey: string): boolean {
+    return VALIDATED_CATALOG_IDENTITIES.get(this.datastore)?.has(identityKey) === true;
+  }
+
+  private markValidatedIdentity(identityKey: string): void {
+    let validated = VALIDATED_CATALOG_IDENTITIES.get(this.datastore);
+    if (validated === undefined) {
+      validated = new Set();
+      VALIDATED_CATALOG_IDENTITIES.set(this.datastore, validated);
+    }
+    validated.add(identityKey);
+    // Bounded: evict the oldest identity (insertion order) past the cap.
+    if (validated.size > MAX_VALIDATED_IDENTITIES) {
+      const oldest = validated.values().next().value;
+      if (oldest !== undefined) validated.delete(oldest);
+    }
   }
 
   /**
@@ -476,7 +531,33 @@ export class CatalogRepo {
         return null;
       }
       const payload: unknown = row.payload;
-      validateCatalogPayload(payload);
+      // The cheap gate (shape/version/provenance) ALWAYS runs — a corrupt or
+      // wrong-generation row fails loud on every path.
+      validateCatalogShape(payload);
+      // Trusted warm re-read (plan 09 Task 6.1): the exhaustive
+      // O(occurrences) container walk runs on the FIRST load of an identity
+      // in this process (and after any identity/lifted-column drift), then is
+      // memoized — repeat loads of the already-validated identity skip it.
+      // Tampered rows stay fail-closed: a tamper lands on a not-yet-validated
+      // read (fresh process) or changes the payload the walk validated, and
+      // the memo key includes the lifted columns, so the P2 Phase 0
+      // dependency-classification rejection contract is preserved.
+      const identityConsistent =
+        row.language === payload.language &&
+        row.cacheKey === payload.cacheKey &&
+        row.builtAt === payload.builtAt &&
+        row.filesFingerprint === (payload.filesFingerprint ?? '');
+      const identityKey = `${row.language}\n${row.cacheKey}\n${row.builtAt}\n${row.filesFingerprint}`;
+      const trustedWarmRead = identityConsistent && this.hasValidatedIdentity(identityKey);
+      if (!trustedWarmRead) {
+        validateFunctionContainers(payload);
+        if (identityConsistent) this.markValidatedIdentity(identityKey);
+      }
+      logger.debug({
+        evt: 'graph.catalog.warmread.revalidate',
+        module: MODULE_NAME,
+        mode: trustedWarmRead ? 'skipped' : 'full',
+      });
       logger.info({
         evt: 'graph.catalog.read.hit',
         module: MODULE_NAME,
