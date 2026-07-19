@@ -9,7 +9,8 @@ import type * as NodeOs from 'node:os';
 
 // Mock the cloud entitlement check so the configure flow's key-verification
 // step (audit P2-2) never hits the network in tests.
-vi.mock('@opensip-cli/output', () => ({
+vi.mock('@opensip-cli/output', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@opensip-cli/output')>()),
   checkEntitlement: vi.fn(),
   DEFAULT_CLOUD_ENDPOINT: 'https://cloud.example',
 }));

@@ -17,6 +17,8 @@ export const ARCHITECTURE_DISPLAY = Object.freeze<Record<string, CheckDisplayEnt
   'host-tool-runtime-import-boundary': ['🧱', 'Host Tool Runtime Import Boundary'],
   'live-view-through-cli-live': ['🖥️', 'Live View Through cli-live'],
   'mcp-results-no-rerun': ['♻️', 'MCP Results Replay (No Re-Run)'],
+  'no-full-replacement-vi-mock': ['🧪', 'No Full-Replacement vi.mock'],
+  'string-prefilter-superset': ['🔎', 'String Pre-Filter Superset'],
   'no-bootstrap-tool-import': ['🔌', 'No Bootstrap Tool Import'],
   'architecture-no-run-done-result': ['🎯', 'No Per-Tool Run Done-Result'],
   'single-opts-assembly-seam': ['🧩', 'Single Opts Assembly Seam'],

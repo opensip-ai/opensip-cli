@@ -12,7 +12,10 @@ const readMocks = vi.hoisted(() => ({
   resolveParentRun: vi.fn(),
 }));
 
-vi.mock('@opensip-cli/session-store', () => readMocks);
+vi.mock('@opensip-cli/session-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@opensip-cli/session-store')>()),
+  ...readMocks,
+}));
 
 const STORE = {} as DataStore;
 

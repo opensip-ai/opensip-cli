@@ -29,7 +29,8 @@ const runToolLiveView = vi.hoisted(() => vi.fn());
 const runOffThreadOrInProcess = vi.hoisted(() => vi.fn());
 const currentScope = vi.hoisted(() => vi.fn());
 
-vi.mock('@opensip-cli/cli-live', () => ({
+vi.mock('@opensip-cli/cli-live', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@opensip-cli/cli-live')>()),
   runToolLiveView,
 }));
 
