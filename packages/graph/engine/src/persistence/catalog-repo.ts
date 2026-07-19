@@ -33,6 +33,17 @@ import type { GraphCatalog } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
 const MODULE_NAME = 'graph:catalog-repo';
+
+// Error-log cause bound (message only, no stack: the public-read-surface
+// privacy test forbids backend vocabulary like module paths in this log).
+const MAX_ERR_CHARS = 300;
+
+/** Length-bounded error cause for the catalog error events. */
+function boundedErrorCause(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.length > MAX_ERR_CHARS ? `${message.slice(0, MAX_ERR_CHARS)}…` : message;
+}
+
 const MAX_ADAPTER_ID = 64;
 const MAX_SHARD_INPUTS = 10_000;
 const MAX_SHARD_ID = 256;
@@ -427,10 +438,14 @@ export class CatalogRepo {
         });
       } catch (error) {
         /* v8 ignore start */
+        // Call sites swallow this as best-effort cache behavior ("already
+        // logged"), so this line is the ONLY record of a repeated cache-write
+        // failure that silently forces full rebuilds — it must carry the cause.
         logger.error({
           evt: 'graph.catalog.write.error',
           module: MODULE_NAME,
           msg: 'Failed to write catalog',
+          err: boundedErrorCause(error),
         });
         throw error;
         /* v8 ignore stop */
@@ -486,10 +501,13 @@ export class CatalogRepo {
       };
     } catch (error) {
       /* v8 ignore start */
+      // Read-side twin of the write-error cause (a cause-less line was the
+      // only record of a cache serving stale data / forcing rebuilds).
       logger.error({
         evt: 'graph.catalog.read.error',
         module: MODULE_NAME,
         code: 'GRAPH.CATALOG.READ_FAILED',
+        err: boundedErrorCause(error),
       });
       throw error;
       /* v8 ignore stop */
