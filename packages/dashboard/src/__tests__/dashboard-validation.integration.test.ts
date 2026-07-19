@@ -120,7 +120,7 @@ describe.runIf(reportHtml !== null)('Phase V — dashboard end-to-end validation
   let env: BootResult;
 
   beforeAll(() => {
-    env = bootDashboard(reportHtml as string);
+    env = bootDashboard(reportHtml!);
   }, 120_000);
 
   // Strip transient overlays/drawers between tests so the single shared boot

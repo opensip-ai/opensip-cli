@@ -51,6 +51,9 @@ function envelope(): SignalEnvelope {
 
 function mockCli(): ToolCliContext {
   return {
+    // `scope` is a REQUIRED ToolCliContext member — the typed lifecycle seam
+    // (plan 09 Task 8.5) no longer tolerates a context without one.
+    scope: { datastore: () => undefined },
     emitEnvelope: vi.fn(),
     render: vi.fn(() => Promise.resolve()),
     emitJson: vi.fn(),

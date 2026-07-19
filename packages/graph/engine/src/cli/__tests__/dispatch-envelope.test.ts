@@ -180,26 +180,14 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
     } as unknown as Parameters<typeof dispatchGraphResult>[1];
 
     const humanCli = mockCli();
-    await dispatchGraphResult(
-      { cwd: '/x' } as unknown as Parameters<typeof dispatchGraphResult>[0],
-      partialResult,
-      humanCli,
-      STARTED,
-      '/x',
-    );
+    await dispatchGraphResult({ cwd: '/x' }, partialResult, humanCli, STARTED, '/x');
     const presentation = (humanCli.render as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
       banners?: readonly string[];
     };
     expect(presentation.banners).toEqual([expect.stringContaining('2 file(s) failed to parse')]);
 
     const jsonCli = mockCli();
-    await dispatchGraphResult(
-      { json: true, cwd: '/x' } as unknown as Parameters<typeof dispatchGraphResult>[0],
-      partialResult,
-      jsonCli,
-      STARTED,
-      '/x',
-    );
+    await dispatchGraphResult({ json: true, cwd: '/x' }, partialResult, jsonCli, STARTED, '/x');
     expect(jsonCli.emitEnvelope).toHaveBeenCalledWith(expect.anything(), {
       warnings: [
         {
@@ -212,26 +200,14 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
 
   it('emits no banner and no warnings when every discovered file parsed', async () => {
     const humanCli = mockCli();
-    await dispatchGraphResult(
-      { cwd: '/x' } as unknown as Parameters<typeof dispatchGraphResult>[0],
-      result,
-      humanCli,
-      STARTED,
-      '/x',
-    );
+    await dispatchGraphResult({ cwd: '/x' }, result, humanCli, STARTED, '/x');
     const presentation = (humanCli.render as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
       banners?: readonly string[];
     };
     expect(presentation.banners).toBeUndefined();
 
     const jsonCli = mockCli();
-    await dispatchGraphResult(
-      { json: true, cwd: '/x' } as unknown as Parameters<typeof dispatchGraphResult>[0],
-      result,
-      jsonCli,
-      STARTED,
-      '/x',
-    );
+    await dispatchGraphResult({ json: true, cwd: '/x' }, result, jsonCli, STARTED, '/x');
     expect(jsonCli.emitEnvelope).toHaveBeenCalledWith(expect.anything());
   });
 

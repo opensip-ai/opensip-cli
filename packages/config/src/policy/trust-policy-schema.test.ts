@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolveTrustPolicySources } from './trust-policy-resolution.js';
 import {
   capabilityIsolationLevelSchema,
   capabilityTrustGrantSchema,
@@ -15,7 +16,6 @@ import {
   trustPolicySchema,
   userTrustPolicySchema,
 } from './trust-policy-schema.js';
-import { resolveTrustPolicySources } from './trust-policy-resolution.js';
 
 const GRANT = {
   id: '@acme/fit-rules',
@@ -24,9 +24,9 @@ const GRANT = {
 
 describe('capability trust grants (plan 09 Phase 3 — user-tier-only surface)', () => {
   it('accepts grants on the USER document and rejects them on the project document', () => {
-    expect(
-      userTrustPolicySchema.parse({ trustedCapabilityPacks: [GRANT] }),
-    ).toMatchObject({ trustedCapabilityPacks: [GRANT] });
+    expect(userTrustPolicySchema.parse({ trustedCapabilityPacks: [GRANT] })).toMatchObject({
+      trustedCapabilityPacks: [GRANT],
+    });
     // The project tier stays on the strict base schema: a trust block inside
     // the analyzed repo's config is a HARD schema error, never silently
     // ignored — it must not even appear load-bearing.
@@ -34,8 +34,9 @@ describe('capability trust grants (plan 09 Phase 3 — user-tier-only surface)',
   });
 
   it('requires exact ids and a sha256 provenance binding', () => {
-    expect(() => capabilityTrustGrantSchema.parse({ id: '', manifestHash: GRANT.manifestHash }))
-      .toThrow();
+    expect(() =>
+      capabilityTrustGrantSchema.parse({ id: '', manifestHash: GRANT.manifestHash }),
+    ).toThrow();
     expect(() =>
       capabilityTrustGrantSchema.parse({ id: '@acme/fit-rules', manifestHash: 'sha256:short' }),
     ).toThrow();

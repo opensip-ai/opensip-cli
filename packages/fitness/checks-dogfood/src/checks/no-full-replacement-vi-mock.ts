@@ -14,7 +14,6 @@
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const TEST_FILE = /(?:\.test\.tsx?$|\/__tests__\/)/;
-const FIXTURE_PATH = /\/__fixtures__\//;
 
 /** A `vi.mock('<workspace pkg>', <factory>` head with its content offset. */
 const WORKSPACE_VI_MOCK = /vi\.mock\(\s*['"](@opensip-cli\/[^'"]+)['"]\s*,/g;
@@ -31,10 +30,13 @@ export function analyzeNoFullReplacementViMock(
   filePath: string,
 ): CheckViolation[] {
   const normalized = filePath.replaceAll('\\', '/');
-  if (!TEST_FILE.test(normalized) || FIXTURE_PATH.test(normalized)) return [];
+  if (!TEST_FILE.test(normalized) || normalized.includes('/__fixtures__/')) return [];
   const violations: CheckViolation[] = [];
   for (const match of content.matchAll(WORKSPACE_VI_MOCK)) {
-    const window = content.slice(match.index, match.index + match[0].length + IMPORT_ORIGINAL_WINDOW);
+    const window = content.slice(
+      match.index,
+      match.index + match[0].length + IMPORT_ORIGINAL_WINDOW,
+    );
     if (window.includes('importOriginal')) continue;
     const line = content.slice(0, match.index).split('\n').length;
     violations.push({

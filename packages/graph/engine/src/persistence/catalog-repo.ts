@@ -275,16 +275,6 @@ function validateFunctionContainers(value: CatalogRowPayload): void {
   }
 }
 
-/**
- * Validate the persisted catalog envelope and bound its nested containers.
- *
- * @throws {Error} when the payload shape, provenance, or container bounds are invalid.
- */
-function validateCatalogPayload(value: unknown): asserts value is CatalogRowPayload {
-  validateCatalogShape(value);
-  validateFunctionContainers(value);
-}
-
 function isSafeCatalogText(value: unknown): value is string {
   return (
     typeof value === 'string' &&

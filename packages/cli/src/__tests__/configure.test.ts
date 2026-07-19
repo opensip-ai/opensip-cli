@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { checkEntitlement } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
+import type * as OutputModule from '@opensip-cli/output';
 import type * as NodeOs from 'node:os';
 
 // Mock the cloud entitlement check so the configure flow's key-verification
 // step (audit P2-2) never hits the network in tests.
 vi.mock('@opensip-cli/output', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@opensip-cli/output')>()),
+  ...(await importOriginal<typeof OutputModule>()),
   checkEntitlement: vi.fn(),
   DEFAULT_CLOUD_ENDPOINT: 'https://cloud.example',
 }));
@@ -99,7 +100,7 @@ describe('executeConfigure', () => {
   it('emits the "current key" hint when one is already stored', async () => {
     nextAnswer = 'first-key-with-mask-1234';
     await withUserStateOwnership(async () => {
-      let mod = await loadModule();
+      const mod = await loadModule();
       await mod.executeConfigure();
     });
 
