@@ -309,14 +309,17 @@ async function addEvidenceTarget(
   return true;
 }
 
-async function addOccurrenceEvidence(
-  reverse: Map<string, ReverseEvidence[]>,
-  seen: Map<string, Set<string>>,
-  occurrence: FunctionOccurrence,
-  sites: Iterable<OccurrenceEvidenceSite>,
-  state: ReverseBuildState,
-  signal: AbortSignal | undefined,
-): Promise<boolean> {
+interface OccurrenceEvidenceInput {
+  readonly reverse: Map<string, ReverseEvidence[]>;
+  readonly seen: Map<string, Set<string>>;
+  readonly occurrence: FunctionOccurrence;
+  readonly sites: Iterable<OccurrenceEvidenceSite>;
+  readonly state: ReverseBuildState;
+  readonly signal: AbortSignal | undefined;
+}
+
+async function addOccurrenceEvidence(input: OccurrenceEvidenceInput): Promise<boolean> {
+  const { reverse, seen, occurrence, sites, state, signal } = input;
   const fromOccurrence = occurrenceId(occurrence);
   if (fromOccurrence === undefined) {
     state.malformedEvidence = true;
@@ -364,21 +367,19 @@ function* callEvidenceSites(
   }
 }
 
-function addOccurrenceCallEvidence(
-  reverse: Map<string, ReverseEvidence[]>,
-  seen: Map<string, Set<string>>,
-  occurrence: FunctionOccurrence,
-  state: ReverseBuildState,
-  signal: AbortSignal | undefined,
-): Promise<boolean> {
-  return addOccurrenceEvidence(
-    reverse,
-    seen,
-    occurrence,
-    callEvidenceSites(occurrence, state),
-    state,
-    signal,
-  );
+interface OccurrenceEvidenceScanInput {
+  readonly reverse: Map<string, ReverseEvidence[]>;
+  readonly seen: Map<string, Set<string>>;
+  readonly occurrence: FunctionOccurrence;
+  readonly state: ReverseBuildState;
+  readonly signal: AbortSignal | undefined;
+}
+
+function addOccurrenceCallEvidence(input: OccurrenceEvidenceScanInput): Promise<boolean> {
+  return addOccurrenceEvidence({
+    ...input,
+    sites: callEvidenceSites(input.occurrence, input.state),
+  });
 }
 
 function dependencyConfidence(
@@ -411,21 +412,11 @@ function* dependencyEvidenceSites(
   }
 }
 
-function addOccurrenceDependencyEvidence(
-  reverse: Map<string, ReverseEvidence[]>,
-  seen: Map<string, Set<string>>,
-  occurrence: FunctionOccurrence,
-  state: ReverseBuildState,
-  signal: AbortSignal | undefined,
-): Promise<boolean> {
-  return addOccurrenceEvidence(
-    reverse,
-    seen,
-    occurrence,
-    dependencyEvidenceSites(occurrence, state),
-    state,
-    signal,
-  );
+function addOccurrenceDependencyEvidence(input: OccurrenceEvidenceScanInput): Promise<boolean> {
+  return addOccurrenceEvidence({
+    ...input,
+    sites: dependencyEvidenceSites(input.occurrence, input.state),
+  });
 }
 
 function compareReverseEvidence(left: ReverseEvidence, right: ReverseEvidence): number {
@@ -506,21 +497,10 @@ async function scanReverseEvidence(
     const occurrences = catalog.functions[name] ?? [];
     for (const occurrence of occurrences) {
       throwIfAborted(signal);
-      const callsComplete = await addOccurrenceCallEvidence(
-        reverse,
-        seen,
-        occurrence,
-        state,
-        signal,
-      );
+      const scan: OccurrenceEvidenceScanInput = { reverse, seen, occurrence, state, signal };
+      const callsComplete = await addOccurrenceCallEvidence(scan);
       if (!callsComplete) return { reverse, complete: false };
-      const dependenciesComplete = await addOccurrenceDependencyEvidence(
-        reverse,
-        seen,
-        occurrence,
-        state,
-        signal,
-      );
+      const dependenciesComplete = await addOccurrenceDependencyEvidence(scan);
       if (!dependenciesComplete) return { reverse, complete: false };
       await advanceReverseWork(state, signal);
     }
@@ -588,14 +568,17 @@ function basisFor(entry: QueueEntry): TestSelectionBasis {
   return entry.depth <= 1 ? 'direct-call' : 'transitive-call';
 }
 
-function addCandidate(
-  candidates: Map<string, Candidate>,
-  occurrence: FunctionOccurrence,
-  entry: QueueEntry,
-  maxCandidates: number,
-  reasons: Set<string>,
-  maxProofNodes: number,
-): void {
+interface AddCandidateInput {
+  readonly candidates: Map<string, Candidate>;
+  readonly occurrence: FunctionOccurrence;
+  readonly entry: QueueEntry;
+  readonly maxCandidates: number;
+  readonly reasons: Set<string>;
+  readonly maxProofNodes: number;
+}
+
+function addCandidate(input: AddCandidateInput): void {
+  const { candidates, occurrence, entry, maxCandidates, reasons, maxProofNodes } = input;
   const path = safeProjectPath(occurrence.filePath);
   const identity = occurrenceId(occurrence);
   if (path === undefined || identity === undefined) {
@@ -665,15 +648,18 @@ function conventionBasis(
   }
 }
 
-function addConventionCandidate(
-  changedFile: string,
-  changed: FileFact | undefined,
-  test: FileFact,
-  candidates: Map<string, Candidate>,
-  maxCandidates: number,
-  reasons: Set<string>,
-  maxProofNodes: number,
-): boolean {
+interface ConventionCandidateInput {
+  readonly changedFile: string;
+  readonly changed: FileFact | undefined;
+  readonly test: FileFact;
+  readonly candidates: Map<string, Candidate>;
+  readonly maxCandidates: number;
+  readonly reasons: Set<string>;
+  readonly maxProofNodes: number;
+}
+
+function addConventionCandidate(input: ConventionCandidateInput): boolean {
+  const { changedFile, changed, test, candidates, maxCandidates, reasons, maxProofNodes } = input;
   const basis = conventionBasis(changedFile, changed, test);
   if (basis === undefined) return true;
   const safeTestPath = safeProjectPath(test.path);
@@ -728,15 +714,15 @@ async function addConventionCandidates(
     const changed = byPath.get(changedFile);
     for (const test of tests) {
       throwIfAborted(context.signal);
-      const hasCapacity = addConventionCandidate(
+      const hasCapacity = addConventionCandidate({
         changedFile,
         changed,
         test,
-        context.candidates,
-        context.limits.maxCandidates,
-        context.reasons,
-        context.limits.maxProofNodes,
-      );
+        candidates: context.candidates,
+        maxCandidates: context.limits.maxCandidates,
+        reasons: context.reasons,
+        maxProofNodes: context.limits.maxProofNodes,
+      });
       if (!hasCapacity) return;
       work++;
       if (work % ASYNC_BATCH_SIZE === 0) await yieldToEventLoop(context.signal);
@@ -793,14 +779,17 @@ function inventoryCommands(
   return [...byKey.values()].sort(compareCommands);
 }
 
-function selectCommands(
-  inventory: ProjectInventorySnapshot,
-  files: readonly string[],
-  candidates: readonly Candidate[],
-  tier: NonNullable<StaticTestSelectionOptions['tier']>,
-  maxCommands: number,
-  reasons: Set<string>,
-): readonly VerificationCommand[] {
+interface SelectCommandsInput {
+  readonly inventory: ProjectInventorySnapshot;
+  readonly files: readonly string[];
+  readonly candidates: readonly Candidate[];
+  readonly tier: NonNullable<StaticTestSelectionOptions['tier']>;
+  readonly maxCommands: number;
+  readonly reasons: Set<string>;
+}
+
+function selectCommands(input: SelectCommandsInput): readonly VerificationCommand[] {
+  const { inventory, files, candidates, tier, maxCommands, reasons } = input;
   const packageNames = packageNamesForSelection(inventory, files, candidates);
   const ordered = inventoryCommands(inventory, packageNames, tier);
   if (ordered.length === 0) {
@@ -978,10 +967,10 @@ async function seedOccurrence(
       state.evidenceReasons.add(MALFORMED_EVIDENCE_REASON);
       return true;
     }
-    addCandidate(
-      state.candidates,
-      seed,
-      {
+    addCandidate({
+      candidates: state.candidates,
+      occurrence: seed,
+      entry: {
         hash: seed.bodyHash,
         occurrenceKey: identity,
         depth: 0,
@@ -990,10 +979,10 @@ async function seedOccurrence(
         proof: [identity],
         sourceFile,
       },
-      limits.maxCandidates,
-      state.evidenceReasons,
-      limits.maxProofNodes,
-    );
+      maxCandidates: limits.maxCandidates,
+      reasons: state.evidenceReasons,
+      maxProofNodes: limits.maxProofNodes,
+    });
   }
   if (state.ambiguousBodyHashes.has(seed.bodyHash)) {
     state.evidenceReasons.add('test-selection-body-twin-ambiguous');
@@ -1070,14 +1059,14 @@ function addTestsForEntry(
     return;
   }
   if (!isTestOccurrence(occurrence, state.fileByPath, state.sourceRoleMatcher)) return;
-  addCandidate(
-    state.candidates,
+  addCandidate({
+    candidates: state.candidates,
     occurrence,
     entry,
-    limits.maxCandidates,
-    state.evidenceReasons,
-    limits.maxProofNodes,
-  );
+    maxCandidates: limits.maxCandidates,
+    reasons: state.evidenceReasons,
+    maxProofNodes: limits.maxProofNodes,
+  });
 }
 
 function nextBasis(current: QueueEntry['basis'], edge: ReverseEvidence): QueueEntry['basis'] {
@@ -1193,14 +1182,17 @@ function selectionStatus(
   return 'partial';
 }
 
-async function projectSelection(
-  catalog: Catalog,
-  inventory: ProjectInventorySnapshot,
-  requestedFiles: readonly string[],
-  state: SelectionState,
-  limits: SelectionLimits,
-  options: StaticTestSelectionOptions,
-): Promise<StaticTestSelectionView> {
+interface ProjectSelectionInput {
+  readonly catalog: Catalog;
+  readonly inventory: ProjectInventorySnapshot;
+  readonly requestedFiles: readonly string[];
+  readonly state: SelectionState;
+  readonly limits: SelectionLimits;
+  readonly options: StaticTestSelectionOptions;
+}
+
+async function projectSelection(input: ProjectSelectionInput): Promise<StaticTestSelectionView> {
+  const { catalog, inventory, requestedFiles, state, limits, options } = input;
   await addConventionCandidates(requestedFiles, {
     inventory,
     candidates: state.candidates,
@@ -1217,14 +1209,14 @@ async function projectSelection(
   if (uncoveredFiles.length > 0) {
     state.evidenceReasons.add('test-selection-uncovered-files');
   }
-  const commands = selectCommands(
+  const commands = selectCommands({
     inventory,
-    requestedFiles,
-    orderedCandidates,
-    options.tier ?? 'focused',
-    limits.maxCommands,
-    state.projectionReasons,
-  );
+    files: requestedFiles,
+    candidates: orderedCandidates,
+    tier: options.tier ?? 'focused',
+    maxCommands: limits.maxCommands,
+    reasons: state.projectionReasons,
+  });
   const reasonCodes = mergeReasonCodes(state);
   const withoutId: Omit<TestSelectionSnapshot, 'snapshotId'> = {
     schemaVersion: 1,
@@ -1295,14 +1287,14 @@ export async function selectStaticTests(
       options.signal,
     );
     return ok(
-      await projectSelection(
+      await projectSelection({
         catalog,
         inventory,
         requestedFiles,
-        traversedState.state,
+        state: traversedState.state,
         limits,
         options,
-      ),
+      }),
     );
   } catch (error) {
     if (error instanceof TestSelectionCancelledError) {

@@ -43,14 +43,17 @@ interface CallerBfsContext {
   readonly resultLimit: number | undefined;
 }
 
-async function enqueueUnvisitedCallers(
-  context: CallerBfsContext,
-  bodyHash: string,
-  depth: number,
-  maxDepth: number,
-  work: { value: number },
-  signal: AbortSignal | undefined,
-): Promise<boolean> {
+interface EnqueueUnvisitedCallersInput {
+  readonly context: CallerBfsContext;
+  readonly bodyHash: string;
+  readonly depth: number;
+  readonly maxDepth: number;
+  readonly work: { value: number };
+  readonly signal: AbortSignal | undefined;
+}
+
+async function enqueueUnvisitedCallers(input: EnqueueUnvisitedCallersInput): Promise<boolean> {
+  const { context, bodyHash, depth, maxDepth, work, signal } = input;
   if (depth > maxDepth) return false;
   for (const caller of context.reverse.get(bodyHash) ?? []) {
     assertImpactNotCancelled(signal);
@@ -91,7 +94,14 @@ async function collectImpactedOccurrenceOrdinals(
     const occurrence = index.occurrences[ordinal];
     if (
       occurrence !== undefined &&
-      (await enqueueUnvisitedCallers(context, occurrence.bodyHash, 1, maxDepth, work, signal))
+      (await enqueueUnvisitedCallers({
+        context,
+        bodyHash: occurrence.bodyHash,
+        depth: 1,
+        maxDepth,
+        work,
+        signal,
+      }))
     ) {
       truncated = true;
       break;
@@ -107,14 +117,14 @@ async function collectImpactedOccurrenceOrdinals(
     impactedOrdinals.push(current.ordinal);
     if (
       !truncated &&
-      (await enqueueUnvisitedCallers(
+      (await enqueueUnvisitedCallers({
         context,
-        occurrence.bodyHash,
-        current.depth + 1,
+        bodyHash: occurrence.bodyHash,
+        depth: current.depth + 1,
         maxDepth,
         work,
         signal,
-      ))
+      }))
     ) {
       truncated = true;
     }

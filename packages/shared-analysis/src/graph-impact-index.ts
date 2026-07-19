@@ -12,16 +12,19 @@ import type {
   GraphFunctionOccurrence,
 } from '@opensip-cli/contracts';
 
+interface ReverseEdgesForOccurrenceInput {
+  readonly reverse: Map<string, Set<number>>;
+  readonly occurrence: GraphFunctionOccurrence;
+  readonly ordinal: number;
+  readonly work: { value: number };
+  readonly approximate: { value: boolean };
+  readonly signal: AbortSignal | undefined;
+}
+
 // @sequential-ok -- Hashing and adjacency construction mutate shared bounded state;
 // concurrency would reorder the generation identity and cooperative checkpoints.
-async function addReverseEdgesForOccurrence(
-  reverse: Map<string, Set<number>>,
-  occurrence: GraphFunctionOccurrence,
-  ordinal: number,
-  work: { value: number },
-  approximate: { value: boolean },
-  signal: AbortSignal | undefined,
-): Promise<void> {
+async function addReverseEdgesForOccurrence(input: ReverseEdgesForOccurrenceInput): Promise<void> {
+  const { reverse, occurrence, ordinal, work, approximate, signal } = input;
   for (const edge of occurrence.calls) {
     if (edge.confidence !== 'high' || edge.resolution === 'syntactic') approximate.value = true;
     for (const calleeHash of edge.to) {
@@ -45,7 +48,7 @@ async function buildReverseAdjacency(
   for (const [ordinal, occurrence] of occurrences.entries()) {
     assertImpactNotCancelled(signal);
     // @fitness-ignore-next-line async-waterfall-detection -- The shared reverse map and work counter must be updated before the cooperative checkpoint.
-    await addReverseEdgesForOccurrence(reverse, occurrence, ordinal, work, approximate, signal);
+    await addReverseEdgesForOccurrence({ reverse, occurrence, ordinal, work, approximate, signal });
     work.value++;
     if (work.value % ASYNC_BATCH_SIZE === 0) await yieldImpactWork(signal);
   }

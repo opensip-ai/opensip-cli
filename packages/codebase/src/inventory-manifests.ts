@@ -236,14 +236,19 @@ async function scanWorkspaceManifests(input: {
   if (walk.readFailed) input.state.reasons.add('manifest-read-failed');
 }
 
+interface DiscoverManifestRootsInput {
+  readonly projectRoot: string;
+  readonly limits: InventoryLimits;
+  readonly signal: AbortSignal | undefined;
+  readonly resolver: BoundedTargetResolver | undefined;
+  readonly workspacePatterns: readonly string[];
+  readonly maximum: number;
+}
+
 async function discoverManifestRoots(
-  projectRoot: string,
-  limits: InventoryLimits,
-  signal: AbortSignal | undefined,
-  resolver: BoundedTargetResolver | undefined,
-  workspacePatterns: readonly string[],
-  maximum: number,
+  input: DiscoverManifestRootsInput,
 ): Promise<ManifestRootDiscovery> {
+  const { projectRoot, limits, signal, resolver, workspacePatterns, maximum } = input;
   const state: ManifestScanState = {
     selected: new Map<string, ManifestRoot>(),
     reasons: new Set<string>(),
@@ -279,14 +284,17 @@ async function discoverManifestRoots(
   };
 }
 
-function collectManifestFact(
-  root: ManifestRoot,
-  projectRoot: string,
-  limits: InventoryLimits,
-  signal: AbortSignal | undefined,
-  facts: PackageManifestFacts[],
-  reasons: Set<string>,
-): void {
+interface CollectManifestFactInput {
+  readonly root: ManifestRoot;
+  readonly projectRoot: string;
+  readonly limits: InventoryLimits;
+  readonly signal: AbortSignal | undefined;
+  readonly facts: PackageManifestFacts[];
+  readonly reasons: Set<string>;
+}
+
+function collectManifestFact(input: CollectManifestFactInput): void {
+  const { root, projectRoot, limits, signal, facts, reasons } = input;
   const result = readPackageManifestFacts({
     packageRoot: root.absolutePath,
     projectRoot,
@@ -318,7 +326,7 @@ export async function discoverManifestFacts(
         ? []
         : await applyManifestGlobalExcludes(projectRoot, [root], resolver, reasons, signal);
     if (allowed[0] !== undefined) {
-      collectManifestFact(allowed[0], projectRoot, limits, signal, facts, reasons);
+      collectManifestFact({ root: allowed[0], projectRoot, limits, signal, facts, reasons });
     }
   }
   const rootFact = facts.find((fact) => fact.root === '.');
@@ -332,14 +340,14 @@ export async function discoverManifestFacts(
     reasons.add('manifest-workspace-cap-reached');
   }
   const workspacePatterns = combinedWorkspacePatterns.slice(0, MAX_WORKSPACE_PATTERNS);
-  const discovery = await discoverManifestRoots(
+  const discovery = await discoverManifestRoots({
     projectRoot,
     limits,
     signal,
     resolver,
     workspacePatterns,
-    Math.max(0, limits.packages - facts.length),
-  );
+    maximum: Math.max(0, limits.packages - facts.length),
+  });
   for (const reason of discovery.reasons) reasons.add(reason);
   if (
     rootFact !== undefined &&
@@ -356,7 +364,7 @@ export async function discoverManifestFacts(
   for (const [index, root] of discovery.roots.entries()) {
     if (index > 0 && index % INVENTORY_BATCH_SIZE === 0) await yieldToEventLoop();
     if (cancelled(signal, reasons)) break;
-    collectManifestFact(root, projectRoot, limits, signal, facts, reasons);
+    collectManifestFact({ root, projectRoot, limits, signal, facts, reasons });
   }
   facts.sort(
     (left, right) => byCodePoint(left.root, right.root) || byCodePoint(left.name, right.name),
