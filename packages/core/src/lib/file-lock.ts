@@ -611,7 +611,7 @@ function createAcquisitionProcessInspector(waitMs: number): SafetyBiasedProcessI
   return createSafetyBiasedProcessInspector({
     inspect: inspectProcessIncarnation,
     monotonicNow,
-    ttlMs: Math.max(PROCESS_PROBE_CACHE_MS, waitMs + POLL_MS * 8 + 1_000),
+    ttlMs: Math.max(PROCESS_PROBE_CACHE_MS, waitMs + POLL_MS * 8 + 1000),
     maxEntries: PROCESS_PROBE_CACHE_ENTRIES,
   });
 }
