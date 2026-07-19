@@ -32,4 +32,3 @@ export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | u
     ...(signal.suggestion === undefined ? {} : { suggestion: signal.suggestion }),
   };
 }
-

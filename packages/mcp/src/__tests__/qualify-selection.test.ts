@@ -37,9 +37,7 @@ describe('qualifySelection (trust downgrade gate)', () => {
     // 32 existing reasons — the cap. A NEW reason that sorts before the last
     // existing one displaces it, leaving the merged count at exactly 32:
     // the old length-equality gate returned the original snapshot here.
-    const existing = Array.from({ length: 32 }, (_, i) =>
-      `reason-${String(i).padStart(2, '0')}`,
-    );
+    const existing = Array.from({ length: 32 }, (_, i) => `reason-${String(i).padStart(2, '0')}`);
     const snapshot = snapshotWithReasons(existing);
     const qualified = qualifySelection(snapshot, ['aaa-new-reason']);
     expect(qualified).not.toBe(snapshot);

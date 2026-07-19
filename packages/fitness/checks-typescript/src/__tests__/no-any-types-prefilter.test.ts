@@ -36,9 +36,7 @@ describe('no-any-types — pre-filter superset contract', () => {
   });
 
   it('flags a line-final `as any` assertion', async () => {
-    expect(
-      await findingCount('export const n = (JSON.parse("1") as unknown) as any\n'),
-    ).toBe(1);
+    expect(await findingCount('export const n = (JSON.parse("1") as unknown) as any\n')).toBe(1);
   });
 
   it('reports clean when `any` appears only inside identifiers', async () => {

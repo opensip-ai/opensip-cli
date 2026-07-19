@@ -190,9 +190,7 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
     const presentation = (humanCli.render as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
       banners?: readonly string[];
     };
-    expect(presentation.banners).toEqual([
-      expect.stringContaining('2 file(s) failed to parse'),
-    ]);
+    expect(presentation.banners).toEqual([expect.stringContaining('2 file(s) failed to parse')]);
 
     const jsonCli = mockCli();
     await dispatchGraphResult(
