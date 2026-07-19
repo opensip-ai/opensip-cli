@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-15
-release: v0.7.0
+release: v0.8.0
 title: "CLI dispatch"
 audience: [contributors]
 purpose: "How argv becomes a Tool action handler. The CLI bootstrap, registration order, the global flag set, error suggestions."

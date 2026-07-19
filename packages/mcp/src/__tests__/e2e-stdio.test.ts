@@ -102,6 +102,17 @@ const SOURCE = BASE_PROJECT_SOURCE;
 const OVERSIZED_SESSION_ID = 'graph-e2e-oversized';
 const TEST_HOME = mkdtempSync(join(tmpdir(), 'mcp-e2e-home-'));
 
+/**
+ * Seed wall-clock timestamps relative to "now" so host session retention
+ * (default maxAgeDays=60) cannot prune fixtures when calendar time advances.
+ * An earlier e2e step runs `opensip graph` on fixture A, which enforces
+ * retention and would delete absolute May-2026 seeds once they fall outside
+ * the window — turning the 4 MiB ceiling proof into a not-found flake.
+ */
+function seedIso(daysAgo: number, offsetMs = 0): string {
+  return new Date(Date.now() - daysAgo * 86_400_000 + offsetMs).toISOString();
+}
+
 // A config with NON-EMPTY target conventions, so both transports emit an equal
 // bounded `projectContext.targetConventions` for the same fixture (Plan 03,
 // Task 2.2). Kept in a dedicated fixture so its conventions never perturb the
@@ -455,8 +466,8 @@ function graphSession(root: string): StoredSession {
   return {
     id: 'graph-e2e-1',
     tool: 'graph',
-    startedAt: '2026-05-21T12:00:00.000Z',
-    completedAt: '2026-05-21T12:00:30.000Z',
+    startedAt: seedIso(1),
+    completedAt: seedIso(1, 30_000),
     cwd: realpathSync(root),
     suiteRunId: 'suite-e2e-1',
     suiteName: 'audit',
@@ -494,8 +505,8 @@ function executionRun(root: string): StoredRun {
     name: 'audit',
     source: 'built-in-suite',
     cwd: realpathSync(root),
-    startedAt: '2026-05-21T12:00:00.000Z',
-    completedAt: '2026-05-21T12:00:30.000Z',
+    startedAt: seedIso(1),
+    completedAt: seedIso(1, 30_000),
     durationMs: 30_000,
     exitCode: 0,
     aggregate: { steps: 2, passed: 2, failed: 0, faulted: 0, errors: 0, warnings: 1 },
@@ -539,8 +550,9 @@ function oversizedGraphSession(root: string): StoredSession {
   return {
     ...graphSession(root),
     id: OVERSIZED_SESSION_ID,
-    startedAt: '2026-05-20T12:00:00.000Z',
-    completedAt: '2026-05-20T12:00:30.000Z',
+    // One day older than graph-e2e-1, still well inside the 60-day window.
+    startedAt: seedIso(2),
+    completedAt: seedIso(2, 30_000),
     suiteRunId: 'suite-oversized',
     suiteName: 'oversized',
     payload: {

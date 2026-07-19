@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-15
-release: v0.7.0
+release: v0.8.0
 title: "Report"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."

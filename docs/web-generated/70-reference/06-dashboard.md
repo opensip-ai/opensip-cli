@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-15
-release: v0.7.0
+release: v0.8.0
 title: "Report"
 audience: [users, contributors]
 purpose: "The HTML report — what it shows, when it opens, how it's generated, and where it lives."
@@ -47,7 +47,7 @@ report command opens by default:
    snapshot from stored evidence, writes it, and opens it by default unless
    `--no-open` or `--json` is selected.
 
-The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/open-report.ts)) returns `shouldOpen: true` only when **all** of these hold:
+The launcher's `decideReportOpen` ([`packages/cli/src/open-report.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/cli/src/open-report.ts)) returns `shouldOpen: true` only when **all** of these hold:
 
 - The user requested it (`--open` was passed).
 - Output isn't `--json` (machine-readable runs don't open browsers).
@@ -66,7 +66,7 @@ failure never changes an audit verdict or exit code.
 
 ## What it shows
 
-Six first-party top-level tabs (`Overview`, `Change Impact`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`) are available when their data exists. An `External Tools` tab appears when the report includes sessions from installed Tool plugins that are not claimed by a first-party tab, such as `gitleaks`, `semgrep`, `ruff`, `osv-scanner`, or `trivy`. The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/tool-tabs.ts).
+Six first-party top-level tabs (`Overview`, `Change Impact`, `Fitness`, `Simulation`, `Code Graph`, `YAGNI`) are available when their data exists. An `External Tools` tab appears when the report includes sessions from installed Tool plugins that are not claimed by a first-party tab, such as `gitleaks`, `semgrep`, `ruff`, `osv-scanner`, or `trivy`. The Fitness and Simulation tabs each carry three subtabs (`Sessions`, `Catalog`, `Recipes`). The Code Graph (graph) tab carries four subtabs (`Sessions`, `Catalog`, `Recipes`, `Explore`). The YAGNI tab carries two subtabs (`Sessions`, `Detectors`). Browser panel modules live under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/); the top-of-page tool-tab switcher is registered through [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/tool-tabs-registrations.ts) and rendered by [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/tool-tabs.ts).
 
 ### Change Impact
 
@@ -115,11 +115,11 @@ All evidence crosses the self-contained HTML boundary through safe JSON
 serialization and escaped/text-only DOM construction. The feature adds no
 network call, model call, source text, diff body, absolute project root,
 environment value, or secret. See
-[ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
+[ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
 Canonical command selection and human-only `audit --open` behavior are defined
-by [ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0155-canonical-audit-command.md); Run and
+by [ADR-0155](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0155-canonical-audit-command.md); Run and
 RunStep identity remains authoritative per
-[ADR-0143](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/docs/decisions/ADR-0143-host-owned-run-step-ledger.md).
+[ADR-0143](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0143-host-owned-run-step-ledger.md).
 
 ### Overview
 
@@ -130,7 +130,7 @@ The default landing panel. Shows:
 - The breakdown by category (security, quality, architecture, etc.).
 - Quick links into the other panels.
 
-Source: [`packages/dashboard/src/client/overview.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/overview.ts).
+Source: [`packages/dashboard/src/client/overview.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/overview.ts).
 
 ### Sessions list (per-tool Overview subtab)
 
@@ -138,7 +138,7 @@ A list of every past run, sorted reverse-chronological. Click into one to see it
 
 Per-run detail expands into a tree: check → file → finding. Each finding shows the rule id, severity, line, and (when present) the suggestion text.
 
-Source: [`packages/dashboard/src/client/sessions.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/tool-tabs.ts).
+Source: [`packages/dashboard/src/client/sessions.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/sessions.ts). Rendered inside each per-tool tab's Overview subtab; the tab switcher is in [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/tool-tabs.ts).
 
 ### Catalog (per-tool Catalog subtab)
 
@@ -150,13 +150,13 @@ Every check that was registered for the current project, with per-check stats:
 
 Filterable by tag, by source pack, by pass-rate. Useful for spotting the noisiest checks (high failure rate) and the dormant ones (haven't run in weeks — maybe a recipe drift).
 
-Source: [`packages/dashboard/src/client/checks.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/checks.ts).
+Source: [`packages/dashboard/src/client/checks.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/checks.ts).
 
 ### Recipes (per-tool Recipes subtab)
 
 The configured recipes, with per-recipe stats. Same shape as the catalog but a level up: how often each recipe has run, its pass rate, its average duration.
 
-Source: [`packages/dashboard/src/client/recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/recipes.ts).
+Source: [`packages/dashboard/src/client/recipes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/recipes.ts).
 
 ### Code Paths panel
 
@@ -194,20 +194,20 @@ The **Universal Function Card** is the cross-cutting drill-down: every clickable
 
 Filter chips apply across the Explore views: package multi-select, kind multi-select, and a production/test toggle (default: production-only).
 
-Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/code-paths.ts) and the per-view browser modules under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/) (`view-graph.ts`, `view-coupling.ts`, `view-distribution.ts`).
+Source: [`packages/dashboard/src/code-paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/code-paths.ts) and the per-view browser modules under [`packages/dashboard/src/client/`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/) (`view-graph.ts`, `view-coupling.ts`, `view-distribution.ts`).
 
 ### Tool tabs
 
-The report supports audit Run evidence plus fit, sim, graph, yagni, and installed Tool plugin runs. The top-of-page tab switcher filters the panels by view/tool. Change Impact joins a parent Run to its graph session; fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Installed external scanner adapters fall into `External Tools`: their sessions render with the same Overview rows, run detail, verdicts, timing, findings, and tool badges as built-in tools, without requiring a custom dashboard module for each scanner. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/tool-tabs-registrations.ts).
+The report supports audit Run evidence plus fit, sim, graph, yagni, and installed Tool plugin runs. The top-of-page tab switcher filters the panels by view/tool. Change Impact joins a parent Run to its graph session; fit and sim use the shared Sessions/Catalog/Recipes shape, graph uses Code Graph with catalog exploration, and YAGNI uses Sessions/Detectors. Installed external scanner adapters fall into `External Tools`: their sessions render with the same Overview rows, run detail, verdicts, timing, findings, and tool badges as built-in tools, without requiring a custom dashboard module for each scanner. Source: [`tool-tabs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/tool-tabs.ts) and [`tool-tabs-registrations.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/tool-tabs-registrations.ts).
 
 ---
 
 ## How it's generated
 
-Static HTML. The generator ([`packages/dashboard/src/generator.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/generator.ts)) assembles:
+Static HTML. The generator ([`packages/dashboard/src/generator.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/generator.ts)) assembles:
 
 1. The base HTML scaffold (head, body shell, the panel containers).
-2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/css.ts)).
+2. The CSS, inlined via `<style>` (from [`css.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/css.ts)).
 3. Session and catalog data (checks, recipes), inlined directly into the panel `<script type="module">` blocks as `const sessions = …` / `const catalog = …` literals — there's no separate `<script type="application/json">` for these.
 4. The graph catalog (Code Paths panel) when present, embedded as `<script type="application/json" id="graph-catalog">…</script>` and consumed by the Code Paths panel JS at init time. This one *does* use the `application/json` idiom because it's loaded across module boundaries.
 5. The JS panels, inlined via `<script type="module">…</script>` (from each panel's `dashboard*Js()` function).
@@ -244,7 +244,7 @@ optional fields. Don't grow positional parameters; add a new
 optional field to `DashboardInput` and surface it in the generator's
 top-of-page `<script>` block via the existing
 `serializeOptionalBlob(id, value, kind)` helper (in
-[`packages/dashboard/src/generator.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/generator.ts)).
+[`packages/dashboard/src/generator.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/generator.ts)).
 
 ### `defineRankedView` — the rank-and-render skeleton
 
@@ -253,7 +253,7 @@ rank-and-render skeleton: walk `indexes.byBodyHash.values()`, apply
 chip filters and an optional view-specific predicate, compute a
 numeric metric, sort descending, and hand the result to
 `renderFunctionRows`. That skeleton lives in
-[`client/view-template.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/view-template.ts);
+[`client/view-template.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/view-template.ts);
 the view file is declarative config (`id`, `label`, `help`, `metric`,
 optional `predicate` / `preamble` / `searchByName` / `filterToggle`,
 `columns`, `headingText`, `emptyMessage`). The Functions view uses this
@@ -261,7 +261,7 @@ skeleton with sortable columns for the common size, caller, width, and
 test-reachability questions.
 
 A new ranked view that fits this shape is one config and one
-registration in [`code-paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/code-paths.ts).
+registration in [`code-paths.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/code-paths.ts).
 Bespoke views (Graph, Coupling) have different shapes and
 keep their own emitters.
 
@@ -288,7 +288,7 @@ to be loaded into this page".
 
 The registry helpers (`registerTabActivator`,
 `activateTabForSession`) are declared in
-[`tab-activators.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/dashboard/src/client/tab-activators.ts) and
+[`tab-activators.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/dashboard/src/client/tab-activators.ts) and
 are available wherever any tab JS runs.
 
 ---
@@ -306,7 +306,7 @@ creating project files. The internal `ephemeral` path name means the whole cache
 entry is automatically evictable, not that the report disappears when the
 process exits.
 
-Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the active runtime's SQLite session store (`datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/report-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/cli/src/report-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until retention or `sessions purge` removes them.
+Single rolling file. Each generation overwrites the previous file — the dashboard is "show me the most recent state of the project", not a per-run archive. Per-run history lives in the active runtime's SQLite session store (`datastore.sqlite`, read via `SessionRepo`); the Sessions panel inlines the **most recent 20 sessions** (`new SessionRepo(datastore).list({ limit: 20 })` in [`packages/cli/src/report-compose.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/cli/src/report-compose.ts)) so historical runs are browsable inside the HTML up to that bound. Older sessions stay in the store until retention or `sessions purge` removes them.
 
 The HTML file is fully self-contained — no asset directory, no CDN, no fetches. Email a stakeholder the file and they can open it on their machine without opensip-cli installed. Useful for: post-incident reports, security review handoffs, compliance audits.
 

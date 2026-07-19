@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.7.0
+release: v0.8.0
 title: "Verifiable releases"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "How opensip-cli release artifacts are checksummed, attested, published, and verified."

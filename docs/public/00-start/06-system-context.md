@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-15
-release: v0.7.0
+release: v0.8.0
 title: "System context"
 audience: [contributors, plugin-authors, ci-integrators]
 purpose: "Where opensip-cli sits between you, your codebase, CI, and OpenSIP Cloud — and what it touches on disk."

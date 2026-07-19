@@ -2,6 +2,89 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.8.0] - 2026-07-19
+
+A cache-first continuity and fail-loud hardening release. Evidence stays
+addressable from first run through `init` without losing parent-run identity,
+capability packs trust the operator (not the analyzed repo), silent-wrong
+analysis paths get loud diagnostics, and a new `@opensip-cli/shared-analysis`
+layer owns cross-tool impact and agent-catalog assembly. CI gains a shared
+setup artifact and a strict required surface.
+
+While opensip-cli is pre-1.0, this **minor is potentially breaking** for
+consumers that placed capability-pack trust in project-local config, assumed
+report HTML could target non-impact runs without exact run selection, or
+imported analysis helpers from `@opensip-cli/contracts` that now live in
+`@opensip-cli/shared-analysis`.
+
+### Added
+
+- **Cache-first runtime evidence continuity** (ADR-0170): no-init runs keep
+  rebuildable evidence in the user cache; MCP can serve that evidence before
+  `init`; transactional adoption promotes cache → project `.runtime` with
+  journaled recovery and leased writers.
+- **Exact parent Run identity** on CLI, report, and MCP: retain sessions and
+  parent runs together, select run-addressed report artifacts, and read
+  canonical execution runs (`list_execution_runs` / `show_execution_run` style
+  surfaces) instead of “latest.”
+- **Coordinated runtime leases** and bounded SQLite integrity checks so
+  concurrent invocations and uninstall/purge cannot clobber live evidence.
+- **`@opensip-cli/shared-analysis`**: graph impact, review-brief, and
+  agent-catalog assembly extracted out of contracts (ADR-0172).
+- **Capability-pack operator trust ceremony**: `policy trust` / `policy untrust`
+  on the user-level global config with provenance binding; analyzed-repo config
+  is not a trust grant (ADR-0171).
+- **Graph parse-failure surfacing**: unparseable sources are logged and the run
+  reports a non-zero parse-failure count when coverage is partial.
+- **Dogfood checks** for the string pre-filter superset invariant and
+  no-full-replacement `vi.mock` posture (ADR-0173).
+- **CI required surface + shared setup** (ADR-0168): cold-gate in the stable
+  aggregator path, shared install/build artifact handoff, pinned actions,
+  fork-safe SARIF uploads, report integration lane.
+- **No-flaky-tests policy** (ADR-0169) and agent-eval orphan-sweep hardening.
+- Platform acceptance **v2** macOS qualification profile and continuity
+  evidence for cache→init journeys.
+- ADRs 0168–0173 (CI surface, no flakes, cache-first continuity, capability
+  trust, shared-analysis layer, pre-filter superset).
+
+### Changed
+
+- Capability-worker resource guard is **advisory defense-in-depth**; admission
+  is the enforced trust boundary. Admitted packs still run with the host user’s
+  filesystem and network authority.
+- Report generation **fail-closes** for non-impact runs without an exact retained
+  parent run and prunes orphan report artifacts.
+- Graph warm reads skip full catalog re-validation when identity is trusted;
+  impact-trim and cross-shard resolve take measured hot-path wins (O(1) known
+  paths, fixed-cost byte search, clone-detection bucket caps).
+- Fitness `FileCache` hits skip redundant `fs.stat`; core file locks yield
+  instead of busy-spinning; a single shared SIGINT handler covers forked
+  children.
+- Init accepts polyglot language detection and surfaces transactional adoption
+  state in the CLI UI.
+- Graph engine types split into cohesive modules; MCP impact/test-selection
+  reads extracted from the read-port facade.
+
+### Fixed
+
+- **`no-any-types` silent green**: pre-filter is a true superset of the AST match
+  (including no-space forms like `:any` / `,any`); broader string pre-filter
+  audit across checks.
+- Graph catalog write/read and cloud-sync skip paths log **causes** instead of
+  cause-less lines; disposer failures during scope teardown are logged, not
+  swallowed.
+- MCP trust downgrade uses set membership (not reason-count equality); NaN-safe
+  graph read limit clamp with typed truncation classification.
+- Uninstall/sessions purge: leased project and user-state removal, recovery
+  when user data deletion is interrupted, purge of active local evidence.
+- Live runtime cache pruning no longer deletes in-use runtimes.
+- macOS qualification never-green lane and weekly correctness audit bugs.
+- Release workflow GitHub-parser rejection + actionlint gate; main CI coverage,
+  dogfood scope, Linux hang, and perf-SLO restorations.
+- Repository quality-gate restoration: exact/sharded graph equivalence,
+  persistence boundaries, fitness/uninstall findings, bounded workspace test
+  concurrency without retries or timeout widening.
+
 ## [0.7.0] - 2026-07-15
 
 An agent-context, first-run, and proof-of-change release. `opensip audit` works

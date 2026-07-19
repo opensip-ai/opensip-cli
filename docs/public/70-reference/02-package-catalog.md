@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-14
-release: v0.7.0
+release: v0.8.0
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -182,10 +182,10 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v0.7.0 against `scripts/release-package-order.mjs` (the publishable
+Last verified at v0.8.0 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **61 workspace packages** total: **58 publishable** (all at `0.7.0`) and three
+- **61 workspace packages** total: **58 publishable** (all at `0.8.0`) and three
   private packages: `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
   `@opensip-cli/checks-dogfood`. The root manifest is tooling metadata, not a
   workspace package. The six runtime-layer counts below cover the 58

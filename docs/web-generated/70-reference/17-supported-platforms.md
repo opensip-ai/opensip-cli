@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-14
-release: v0.7.0
+release: v0.8.0
 title: "Supported platforms"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "The generated, authoritative host-support matrix: the exact qualified tuple, its status, explicitly unsupported hosts, and what unqualified means."
@@ -24,7 +24,7 @@ The npm package declares `engines.node: ">=24"`, which is an install/runtime
 floor — not a support claim. Qualified support is narrower than "any host that
 can run Node 24": it names an exact host tuple with measured evidence. This
 page is generated from the platform-support policy registry
-([`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.7.0/packages/core/src/lib/platform-support.ts)) and is the authoritative
+([`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/core/src/lib/platform-support.ts)) and is the authoritative
 matrix. The same registry drives the CLI/MCP agent catalogs and the release
 acceptance harness, so human and machine claims cannot drift.
 

@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-cargo-clippy",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "license": "Apache-2.0",
   "description": "External Tool Adapter for cargo clippy — wraps Rust lint diagnostics as an opensip-cli tool. Determinism caveat: cargo clippy only re-emits diagnostics for crates it recompiles; a warm target/ cache can yield zero findings. Use a cold cache or set CARGO_TARGET_DIR for stable --gate-compare rechecks.",
   "keywords": [

@@ -42,5 +42,5 @@ Out of scope:
 
 | Version | Supported |
 | ------- | --------- |
-| 0.7.0   | Yes       |
+| 0.8.0   | Yes       |
 We recommend running the latest `opensip-cli` release.

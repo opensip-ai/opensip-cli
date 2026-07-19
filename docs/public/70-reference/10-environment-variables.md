@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-13
-release: v0.7.0
+release: v0.8.0
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
