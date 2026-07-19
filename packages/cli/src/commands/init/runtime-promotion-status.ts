@@ -193,8 +193,6 @@ function retryCommand(journal: RuntimePromotionJournal): RuntimeRecoveryCommand 
   return 'opensip init';
 }
 
-
-
 function inspectCanonicalJournal(input: {
   readonly observed: AnchoredRecordReadResult;
   readonly header: Extract<RecoveryHeaderInspection, { readonly status: 'valid' }>;

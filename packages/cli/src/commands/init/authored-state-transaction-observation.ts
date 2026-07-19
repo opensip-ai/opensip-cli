@@ -49,5 +49,3 @@ export function observeAuthoredPath(
   const file = readStableArtifactFile(path);
   return { exists: true, type: 'file', mode, digest: file.digest };
 }
-
-
