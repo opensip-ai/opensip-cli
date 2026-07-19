@@ -57,6 +57,75 @@ afterEach(() => {
 });
 
 describe('CatalogRepo — trusted warm read', () => {
+  it('carries the error cause on graph.catalog.write.error (fail-loud, Task 0.3)', () => {
+    const store = DataStoreFactory.open({ backend: 'memory' });
+    const repo = new CatalogRepo(store);
+    store.close();
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    expect(() => repo.replaceAll(catalog())).toThrow();
+    const event = error.mock.calls
+      .map(([entry]) => entry as { evt?: string; err?: string })
+      .find((entry) => entry.evt === 'graph.catalog.write.error');
+    expect(event).toBeDefined();
+    expect(typeof event?.err).toBe('string');
+    expect((event?.err ?? '').length).toBeGreaterThan(0);
+  });
+
+  it('round-trips value-identically on the trusted warm fast path', () => {
+    const store = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const repo = new CatalogRepo(store);
+      const written = catalog();
+      repo.replaceAll(written);
+      const first = repo.loadFullCatalog();
+      const warm = repo.loadFullCatalog(); // memoized fast path
+      // The fast path must not silently drop or mutate fields (plan 09 9.1).
+      expect(warm).toEqual(first);
+      expect(warm?.functions).toEqual(written.functions);
+      expect(warm?.cacheKey).toBe(written.cacheKey);
+      expect(warm?.builtAt).toBe(written.builtAt);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('reads a pre-feature payload (absent optional fields) with the documented defaults', () => {
+    const store = DataStoreFactory.open({ backend: 'memory' });
+    try {
+      const repo = new CatalogRepo(store);
+      repo.replaceAll(catalog());
+      // Simulate an OLDER engine's write: none of the later optional fields
+      // (resolutionMode, adapterSelection, engineMode, buildCoverage,
+      // reExports, semanticFacts, features) are present.
+      const preFeature = {
+        version: '3.0',
+        tool: 'graph',
+        language: 'typescript',
+        builtAt: '2026-07-18T00:00:00.000Z',
+        cacheKey: 'cache-key-1',
+        functions: {},
+      };
+      store.db
+        .update(graphCatalog)
+        .set({ payload: preFeature })
+        .where(sql`id = 1`)
+        .run();
+
+      const loaded = repo.loadFullCatalog();
+      // Forward-compatible read: absent optional field = default, never a throw.
+      expect(loaded).not.toBeNull();
+      expect(loaded?.resolutionMode).toBeUndefined();
+      expect(loaded?.buildCoverage).toBeUndefined();
+      expect(loaded?.features).toBeUndefined();
+      // The coverage payload contract stays count-only: nothing in the stored
+      // payload carries per-file parse diagnostics (Phase 0 privacy posture).
+      expect(JSON.stringify(preFeature)).not.toContain('files');
+    } finally {
+      store.close();
+    }
+  });
+
   it('walks on the FIRST load of an identity, then skips on the warm re-read', () => {
     const store = DataStoreFactory.open({ backend: 'memory' });
     try {
