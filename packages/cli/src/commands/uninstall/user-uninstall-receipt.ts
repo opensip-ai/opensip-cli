@@ -11,6 +11,9 @@ import { RUNTIME_RECOVERY_HEADER_VERSION } from '@opensip-cli/core';
 
 export const USER_UNINSTALL_MARKER_BASENAME = '.opensip-user-uninstall-marker';
 export const USER_UNINSTALL_TOMBSTONE_PREFIX = '.opensip-user-uninstall-tombstone-';
+const OPERATION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/u;
+const MARKER_DIGEST_PATTERN = /^[a-f0-9]{64}$/u;
+const MAX_REASON_BYTES = 96;
 
 export type UserUninstallPhase =
   | 'marker-create-intent'
@@ -106,22 +109,62 @@ export function serializeReceipt(receipt: UserUninstallReceiptBody): string {
   return `${JSON.stringify(receipt)}\n`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPhase(value: unknown): value is UserUninstallPhase {
+  return (
+    value === 'marker-create-intent' ||
+    value === 'marker-created' ||
+    value === 'rename-intent' ||
+    value === 'renamed' ||
+    value === 'delete-intent' ||
+    value === 'deleted'
+  );
+}
+
 export function parseReceiptBody(content: string): UserUninstallReceiptBody | undefined {
   try {
-    const parsed = JSON.parse(content) as Partial<UserUninstallReceiptBody>;
+    const parsed = JSON.parse(content) as unknown;
     if (
+      !isRecord(parsed) ||
       parsed.kind !== 'user-uninstall' ||
       parsed.version !== RUNTIME_RECOVERY_HEADER_VERSION ||
       (parsed.state !== 'open' && parsed.state !== 'closed') ||
       typeof parsed.operationId !== 'string' ||
-      typeof parsed.phase !== 'string' ||
-      typeof parsed.tombstoneBasename !== 'string' ||
+      !OPERATION_ID_PATTERN.test(parsed.operationId) ||
+      !isPhase(parsed.phase) ||
+      parsed.tombstoneBasename !== newTombstoneBasename(parsed.operationId) ||
       parsed.markerBasename !== USER_UNINSTALL_MARKER_BASENAME ||
-      typeof parsed.markerDigest !== 'string'
+      typeof parsed.markerDigest !== 'string' ||
+      !MARKER_DIGEST_PATTERN.test(parsed.markerDigest) ||
+      typeof parsed.createdAtMs !== 'number' ||
+      !Number.isSafeInteger(parsed.createdAtMs) ||
+      parsed.createdAtMs < 0 ||
+      typeof parsed.updatedAtMs !== 'number' ||
+      !Number.isSafeInteger(parsed.updatedAtMs) ||
+      parsed.updatedAtMs < 0 ||
+      (parsed.reason !== undefined &&
+        (typeof parsed.reason !== 'string' ||
+          Buffer.byteLength(parsed.reason, 'utf8') > MAX_REASON_BYTES)) ||
+      (parsed.state === 'closed' && parsed.phase !== 'deleted')
     ) {
       return undefined;
     }
-    return parsed as UserUninstallReceiptBody;
+    return {
+      kind: parsed.kind,
+      version: parsed.version,
+      state: parsed.state,
+      operationId: parsed.operationId,
+      phase: parsed.phase,
+      tombstoneBasename: parsed.tombstoneBasename,
+      markerBasename: parsed.markerBasename,
+      markerDigest: parsed.markerDigest,
+      createdAtMs: parsed.createdAtMs,
+      updatedAtMs: parsed.updatedAtMs,
+      ...(parsed.reason === undefined ? {} : { reason: parsed.reason }),
+    };
   } catch {
     return undefined;
   }

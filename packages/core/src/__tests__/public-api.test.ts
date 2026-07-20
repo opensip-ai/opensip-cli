@@ -398,6 +398,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'mutateUserUninstallReceipt',
   'readAnchoredRecord',
   'readRuntimePromotionJournal',
+  'readUserUninstallReceipt',
   'resolveCoordinationPaths',
   'RUNTIME_PROMOTION_JOURNAL_FILE',
   'RUNTIME_RECOVERY_HEADER_VERSION',

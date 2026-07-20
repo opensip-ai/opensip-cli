@@ -257,6 +257,7 @@ export {
   mutateUserUninstallReceipt,
   readAnchoredRecord,
   readRuntimePromotionJournal,
+  readUserUninstallReceipt,
   RUNTIME_RECOVERY_HEADER_VERSION,
   RUNTIME_RECOVERY_RECORD_MAX_BYTES,
 } from './lib/runtime-lease.js';

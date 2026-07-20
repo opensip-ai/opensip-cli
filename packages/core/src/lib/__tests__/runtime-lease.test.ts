@@ -47,6 +47,7 @@ import {
   mutateUserUninstallReceipt,
   readAnchoredRecord,
   readRuntimePromotionJournal,
+  readUserUninstallReceipt,
   RUNTIME_RECOVERY_HEADER_VERSION,
   RUNTIME_RECOVERY_RECORD_MAX_BYTES,
   type RuntimeLease,
@@ -4591,6 +4592,11 @@ describe('recovery barriers', () => {
         policy: POLICY,
       }),
     );
+    await expect(readUserUninstallReceipt(recovery)).resolves.toMatchObject({
+      status: 'present',
+      content: expect.stringContaining('"operationId":"uninstall-1"'),
+      sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+    });
     release(recovery);
 
     writeFileSync(receipt, '{bad', { encoding: 'utf8', mode: 0o600 });
@@ -4601,6 +4607,9 @@ describe('recovery barriers', () => {
       }),
     );
     expect(discard.receiptOnlyDiscard).toBe(true);
+    await expect(readUserUninstallReceipt(discard)).rejects.toMatchObject({
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
     privateWrite(receipt, {
       kind: 'user-uninstall',
       version: 1,

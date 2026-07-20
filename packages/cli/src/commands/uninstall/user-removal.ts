@@ -18,6 +18,7 @@ import {
   discardUserUninstallReceipt,
   inspectUserUninstallRecoveryHeader,
   mutateUserUninstallReceipt,
+  readUserUninstallReceipt,
   type GlobalRuntimeMaintenanceLease,
 } from '@opensip-cli/core';
 
@@ -31,8 +32,11 @@ import {
   newMarkerContent,
   newOperationId,
   newTombstoneBasename,
+  parseReceiptBody,
   serializeReceipt,
   USER_UNINSTALL_MARKER_BASENAME,
+  type UserUninstallPhase,
+  type UserUninstallReceiptBody,
 } from './user-uninstall-receipt.js';
 
 import type { UninstallDoneResult } from '@opensip-cli/contracts';
@@ -49,6 +53,7 @@ export interface UserRemovalOptions {
   readonly prompt?: (question: string) => Promise<string>;
   readonly acquireGlobalLease?: (
     posture: UserRemovalPosture,
+    recoveryOperationId?: string,
   ) => Promise<GlobalRuntimeMaintenanceLease>;
 }
 
@@ -152,6 +157,260 @@ function contentSha256(content: string): string {
   return digestMarkerContent(content);
 }
 
+type TransactionHeader = Extract<UserRecoveryHeader, { readonly status: 'absent' | 'valid' }>;
+
+interface ReceiptCursor {
+  readonly receipt: UserUninstallReceiptBody;
+  readonly sha256: string;
+  readonly pendingMarkerContent?: Buffer;
+}
+
+interface TransactionContext {
+  readonly userRoot: string;
+  readonly tombstonePath: string;
+  readonly lease: GlobalRuntimeMaintenanceLease;
+}
+
+const MAX_RECEIPT_TRANSITIONS = 10;
+
+function recoveryFailure(message: string): never {
+  throw new Error(`Cannot recover user uninstall safely: ${message}`);
+}
+
+function safeDirectoryExists(path: string): boolean {
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+  if (stat.isSymbolicLink() || !stat.isDirectory()) {
+    recoveryFailure(`expected an owned directory at ${path}`);
+  }
+  return true;
+}
+
+async function replaceReceipt(
+  lease: GlobalRuntimeMaintenanceLease,
+  cursor: ReceiptCursor,
+  receipt: UserUninstallReceiptBody,
+  pendingMarkerContent?: Buffer,
+): Promise<ReceiptCursor> {
+  const content = serializeReceipt(receipt);
+  await mutateUserUninstallReceipt(lease, {
+    operation: 'replace',
+    content,
+    expectedContentSha256: cursor.sha256,
+  });
+  return {
+    receipt,
+    sha256: contentSha256(content),
+    ...(pendingMarkerContent === undefined ? {} : { pendingMarkerContent }),
+  };
+}
+
+async function initialReceiptCursor(
+  lease: GlobalRuntimeMaintenanceLease,
+  header: TransactionHeader,
+): Promise<ReceiptCursor> {
+  if (header.status === 'valid') {
+    const observed = await readUserUninstallReceipt(lease);
+    if (observed.status !== 'present') {
+      recoveryFailure('the admitted receipt disappeared before recovery');
+    }
+    const receipt = parseReceiptBody(observed.content);
+    if (receipt?.operationId !== header.operationId) {
+      recoveryFailure('the bounded receipt body does not match its admitted recovery header');
+    }
+    return { receipt, sha256: observed.sha256 };
+  }
+
+  const operationId = newOperationId();
+  const pendingMarkerContent = newMarkerContent();
+  const receipt = buildOpenReceipt({
+    operationId,
+    phase: 'marker-create-intent',
+    tombstoneBasename: newTombstoneBasename(operationId),
+    markerDigest: digestMarkerContent(pendingMarkerContent),
+  });
+  const content = serializeReceipt(receipt);
+  await mutateUserUninstallReceipt(lease, { operation: 'create', content });
+  return {
+    receipt,
+    sha256: contentSha256(content),
+    pendingMarkerContent,
+  };
+}
+
+async function setReceiptPhase(
+  context: TransactionContext,
+  cursor: ReceiptCursor,
+  phase: UserUninstallPhase,
+  pendingMarkerContent?: Buffer,
+): Promise<ReceiptCursor> {
+  return replaceReceipt(
+    context.lease,
+    cursor,
+    advanceReceipt(
+      cursor.receipt,
+      phase,
+      pendingMarkerContent === undefined
+        ? {}
+        : { markerDigest: digestMarkerContent(pendingMarkerContent) },
+    ),
+    pendingMarkerContent,
+  );
+}
+
+async function handleMarkerCreateIntent(
+  context: TransactionContext,
+  cursor: ReceiptCursor,
+  tombstoneExists: boolean,
+): Promise<ReceiptCursor> {
+  if (tombstoneExists) {
+    if (!markerMatches(context.tombstonePath, cursor.receipt.markerDigest)) {
+      recoveryFailure('the tombstone marker does not match the recovery receipt');
+    }
+    return setReceiptPhase(context, cursor, 'renamed');
+  }
+  if (markerMatches(context.userRoot, cursor.receipt.markerDigest)) {
+    return setReceiptPhase(context, cursor, 'marker-created');
+  }
+  if (existsSync(join(context.userRoot, USER_UNINSTALL_MARKER_BASENAME))) {
+    recoveryFailure('the live user root has a foreign operation marker');
+  }
+
+  const markerContent = cursor.pendingMarkerContent ?? newMarkerContent();
+  const current =
+    cursor.pendingMarkerContent === undefined
+      ? await setReceiptPhase(context, cursor, 'marker-create-intent', markerContent)
+      : cursor;
+  createExclusiveMarker(context.userRoot, markerContent);
+  if (!markerMatches(context.userRoot, current.receipt.markerDigest)) {
+    recoveryFailure('the exclusive operation marker could not be verified after creation');
+  }
+  return setReceiptPhase(context, current, 'marker-created');
+}
+
+async function handleMarkerCreated(
+  context: TransactionContext,
+  cursor: ReceiptCursor,
+  tombstoneExists: boolean,
+): Promise<ReceiptCursor> {
+  const markerRoot = tombstoneExists ? context.tombstonePath : context.userRoot;
+  if (!markerMatches(markerRoot, cursor.receipt.markerDigest)) {
+    recoveryFailure('the operation marker does not match the recovery receipt');
+  }
+  return setReceiptPhase(context, cursor, tombstoneExists ? 'renamed' : 'rename-intent');
+}
+
+async function handleRenameIntent(
+  context: TransactionContext,
+  cursor: ReceiptCursor,
+  sourceExists: boolean,
+): Promise<ReceiptCursor> {
+  if (sourceExists) {
+    if (!markerMatches(context.userRoot, cursor.receipt.markerDigest)) {
+      recoveryFailure('the live user root marker does not match the recovery receipt');
+    }
+    renameSync(context.userRoot, context.tombstonePath);
+  }
+  if (!markerMatches(context.tombstonePath, cursor.receipt.markerDigest)) {
+    recoveryFailure('the renamed tombstone marker does not match the recovery receipt');
+  }
+  return setReceiptPhase(context, cursor, 'renamed');
+}
+
+async function advanceRemovalTransaction(
+  context: TransactionContext,
+  cursor: ReceiptCursor,
+  sourceExists: boolean,
+  tombstoneExists: boolean,
+): Promise<ReceiptCursor> {
+  switch (cursor.receipt.phase) {
+    case 'marker-create-intent': {
+      return handleMarkerCreateIntent(context, cursor, tombstoneExists);
+    }
+    case 'marker-created': {
+      return handleMarkerCreated(context, cursor, tombstoneExists);
+    }
+    case 'rename-intent': {
+      return handleRenameIntent(context, cursor, sourceExists);
+    }
+    case 'renamed': {
+      if (!tombstoneExists || !markerMatches(context.tombstonePath, cursor.receipt.markerDigest)) {
+        recoveryFailure('the recovery tombstone does not match the receipt');
+      }
+      return setReceiptPhase(context, cursor, 'delete-intent');
+    }
+    case 'delete-intent': {
+      if (!tombstoneExists || !markerMatches(context.tombstonePath, cursor.receipt.markerDigest)) {
+        recoveryFailure('the recovery tombstone does not match the receipt');
+      }
+      rmSync(context.tombstonePath, { recursive: true, force: true });
+      return setReceiptPhase(context, cursor, 'deleted');
+    }
+    case 'deleted': {
+      if (sourceExists || tombstoneExists) {
+        recoveryFailure('the deleted receipt phase still has user state');
+      }
+      return replaceReceipt(context.lease, cursor, closeReceipt(cursor.receipt));
+    }
+  }
+}
+
+async function completeUserRemovalTransaction(input: {
+  readonly userRoot: string;
+  readonly header: TransactionHeader;
+  readonly lease: GlobalRuntimeMaintenanceLease;
+}): Promise<void> {
+  let cursor = await initialReceiptCursor(input.lease, input.header);
+  let context: TransactionContext = {
+    userRoot: input.userRoot,
+    tombstonePath: join(dirname(input.userRoot), cursor.receipt.tombstoneBasename),
+    lease: input.lease,
+  };
+  if (cursor.receipt.state === 'closed') {
+    await mutateUserUninstallReceipt(input.lease, {
+      operation: 'unlink',
+      expectedContentSha256: cursor.sha256,
+    });
+    if (!safeDirectoryExists(input.userRoot)) return;
+    cursor = await initialReceiptCursor(input.lease, { status: 'absent' });
+    context = {
+      ...context,
+      tombstonePath: join(dirname(input.userRoot), cursor.receipt.tombstoneBasename),
+    };
+  }
+  let transitions = 0;
+
+  while (cursor.receipt.state === 'open') {
+    if (transitions >= MAX_RECEIPT_TRANSITIONS) {
+      recoveryFailure('the receipt exceeded its bounded transition count');
+    }
+
+    const phase = cursor.receipt.phase;
+    const sourceExists = safeDirectoryExists(context.userRoot);
+    const tombstoneExists = safeDirectoryExists(context.tombstonePath);
+    if (sourceExists && tombstoneExists) {
+      recoveryFailure('both the live user root and recovery tombstone exist');
+    }
+    if (!sourceExists && !tombstoneExists && phase !== 'deleted') {
+      cursor = await setReceiptPhase(context, cursor, 'deleted');
+      transitions += 1;
+      continue;
+    }
+    cursor = await advanceRemovalTransaction(context, cursor, sourceExists, tombstoneExists);
+    transitions += 1;
+  }
+
+  await mutateUserUninstallReceipt(input.lease, {
+    operation: 'unlink',
+    expectedContentSha256: cursor.sha256,
+  });
+}
+
 type UserHeaderPresentation =
   { readonly status: 'ready' } | { readonly status: 'done'; readonly result: UninstallDoneResult };
 
@@ -190,7 +449,9 @@ async function executeUserMutation(input: {
   readonly acquire: UserAcquireGlobalLease;
 }): Promise<UninstallDoneResult> {
   const posture = input.header.status === 'valid' ? 'user-recovery' : 'normal';
-  const lease = await input.acquire(posture);
+  const recoveryOperationId =
+    input.header.status === 'valid' ? input.header.operationId : undefined;
+  const lease = await input.acquire(posture, recoveryOperationId);
   try {
     // Global acquire itself refuses when project journals block; if we got
     // here, proceed with mutation.
@@ -200,96 +461,13 @@ async function executeUserMutation(input: {
       return buildResult({ action: 'empty', targets: [], rootPath: input.userRoot });
     }
 
-    const operationId = newOperationId();
-    const tombstoneBasename = newTombstoneBasename(operationId);
-    const parentDir = dirname(input.userRoot);
-    const tombstonePath = join(parentDir, tombstoneBasename);
-    const markerContent = newMarkerContent();
-    let markerDigest = digestMarkerContent(markerContent);
-
-    let receipt = buildOpenReceipt({
-      operationId,
-      phase: 'marker-create-intent',
-      tombstoneBasename,
-      markerDigest,
-    });
-    let sha = contentSha256(serializeReceipt(receipt));
-    await mutateUserUninstallReceipt(lease, {
-      operation: 'create',
-      content: serializeReceipt(receipt),
-    });
-
-    // Marker create (exclusive) inside the live source root.
-    if (existsSync(input.userRoot) && !markerMatches(input.userRoot, markerDigest)) {
-      try {
-        markerDigest = createExclusiveMarker(input.userRoot, markerContent);
-      } catch {
-        // Resume path may already have the marker.
-        if (
-          !markerMatches(input.userRoot, markerDigest) &&
-          !markerMatches(tombstonePath, markerDigest)
-        ) {
-          throw new Error('Failed to create exclusive user-uninstall operation marker');
-        }
-      }
+    if (input.header.status === 'malformed') {
+      recoveryFailure('malformed receipts require explicit receipt-only discard');
     }
-    receipt = advanceReceipt(receipt, 'marker-created', { markerDigest });
-    await mutateUserUninstallReceipt(lease, {
-      operation: 'replace',
-      content: serializeReceipt(receipt),
-      expectedContentSha256: sha,
-    });
-    sha = contentSha256(serializeReceipt(receipt));
-
-    // Rename source → tombstone when source still present with matching marker.
-    if (existsSync(input.userRoot) && markerMatches(input.userRoot, markerDigest)) {
-      receipt = advanceReceipt(receipt, 'rename-intent');
-      await mutateUserUninstallReceipt(lease, {
-        operation: 'replace',
-        content: serializeReceipt(receipt),
-        expectedContentSha256: sha,
-      });
-      sha = contentSha256(serializeReceipt(receipt));
-      renameSync(input.userRoot, tombstonePath);
-      receipt = advanceReceipt(receipt, 'renamed');
-      await mutateUserUninstallReceipt(lease, {
-        operation: 'replace',
-        content: serializeReceipt(receipt),
-        expectedContentSha256: sha,
-      });
-      sha = contentSha256(serializeReceipt(receipt));
-    }
-
-    // Delete only the tombstone that still holds the matching marker.
-    if (existsSync(tombstonePath) && markerMatches(tombstonePath, markerDigest)) {
-      receipt = advanceReceipt(receipt, 'delete-intent');
-      await mutateUserUninstallReceipt(lease, {
-        operation: 'replace',
-        content: serializeReceipt(receipt),
-        expectedContentSha256: sha,
-      });
-      sha = contentSha256(serializeReceipt(receipt));
-      rmSync(tombstonePath, { recursive: true, force: true });
-      receipt = advanceReceipt(receipt, 'deleted');
-      await mutateUserUninstallReceipt(lease, {
-        operation: 'replace',
-        content: serializeReceipt(receipt),
-        expectedContentSha256: sha,
-      });
-      sha = contentSha256(serializeReceipt(receipt));
-    }
-
-    // Close + unlink receipt.
-    const closed = closeReceipt(receipt);
-    await mutateUserUninstallReceipt(lease, {
-      operation: 'replace',
-      content: serializeReceipt(closed),
-      expectedContentSha256: sha,
-    });
-    sha = contentSha256(serializeReceipt(closed));
-    await mutateUserUninstallReceipt(lease, {
-      operation: 'unlink',
-      expectedContentSha256: sha,
+    await completeUserRemovalTransaction({
+      userRoot: input.userRoot,
+      header: input.header,
+      lease,
     });
 
     return buildResult({
@@ -341,9 +519,10 @@ export async function executeUserRemoval(opts: UserRemovalOptions): Promise<Unin
 
   const acquire =
     opts.acquireGlobalLease ??
-    ((posture: UserRemovalPosture) =>
+    ((posture: UserRemovalPosture, recoveryOperationId?: string) =>
       acquireGlobalRuntimeMaintenanceLease({
         posture,
+        ...(recoveryOperationId === undefined ? {} : { recoveryOperationId }),
         command: 'opensip uninstall --user',
       }));
   return executeUserMutation({ userRoot, header, targets, acquire });
@@ -364,17 +543,18 @@ async function executeReceiptOnlyDiscard(
       recovery: { status: 'absent' },
     });
   }
-  if (header.status === 'valid' && header.state === 'open') {
-    // Valid open receipts must be resumed, not discarded (except pre-mutation
-    // abandonment which is not distinguished without body read — refuse).
+  if (header.status === 'valid') {
+    // Every admitted receipt must be resumed under its operation-bound
+    // authority; receipt-only discard is limited to malformed bytes.
     write(
-      '\nA valid open user-uninstall receipt must be resumed with `opensip uninstall --user`, not discarded.\n\n',
+      `\nA valid ${header.state} user-uninstall receipt must be resumed with ` +
+        '`opensip uninstall --user`, not discarded.\n\n',
     );
     return buildResult({
       action: 'empty',
       targets: [],
       rootPath: userRoot,
-      recovery: { status: 'refused', reason: 'valid-open-must-resume' },
+      recovery: { status: 'refused', reason: `valid-${header.state}-must-resume` },
     });
   }
 
@@ -388,9 +568,10 @@ async function executeReceiptOnlyDiscard(
 
   const acquire =
     opts.acquireGlobalLease ??
-    ((posture: UserRemovalPosture) =>
+    ((posture: UserRemovalPosture, recoveryOperationId?: string) =>
       acquireGlobalRuntimeMaintenanceLease({
         posture,
+        ...(recoveryOperationId === undefined ? {} : { recoveryOperationId }),
         command: 'opensip uninstall --user --discard-recovery',
       }));
 

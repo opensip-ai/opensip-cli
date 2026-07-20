@@ -6658,6 +6658,38 @@ export async function readRuntimePromotionJournal(
   );
 }
 
+/**
+ * Read only the fixed user-uninstall receipt while the exact global writer
+ * remains live. The returned digest is suitable for fixed-record CAS updates.
+ */
+export async function readUserUninstallReceipt(
+  lease: GlobalRuntimeMaintenanceLease,
+): Promise<AnchoredRecordReadResult> {
+  if (lease.receiptOnlyDiscard) {
+    throw new SystemError('Receipt-only authority cannot read the recovery body', {
+      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    });
+  }
+  const policy = normalizePolicy();
+  const environment = writerAuthorityEnvironment(lease);
+  return withCoordinationMutex(
+    policy,
+    undefined,
+    policy.waitMs,
+    (paths, guard) => {
+      assertRecoveryMutationAuthority(paths, lease, 'global', 'user-record');
+      return readFixedRecoveryRecordWhileOwned(
+        paths,
+        paths.coordinationDir,
+        USER_UNINSTALL_RECEIPT_FILE,
+        guard,
+        environment,
+      );
+    },
+    environment,
+  );
+}
+
 /** Mutate only the fixed project promotion journal while its writer is live. */
 export async function mutateRuntimePromotionJournal(
   lease: RuntimeExclusiveLease,

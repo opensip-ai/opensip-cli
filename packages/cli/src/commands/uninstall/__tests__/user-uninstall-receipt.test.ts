@@ -54,5 +54,32 @@ describe('user-uninstall-receipt helpers', () => {
   it('rejects malformed receipt bodies', () => {
     expect(parseReceiptBody('{')).toBeUndefined();
     expect(parseReceiptBody(JSON.stringify({ kind: 'other' }))).toBeUndefined();
+
+    const valid = buildOpenReceipt({
+      operationId: 'uu-abc',
+      phase: 'marker-create-intent',
+      tombstoneBasename: newTombstoneBasename('uu-abc'),
+      markerDigest: 'd'.repeat(64),
+    });
+    for (const malformed of [
+      null,
+      [],
+      { ...valid, phase: 'arbitrary-phase' },
+      { ...valid, tombstoneBasename: '../outside' },
+      { ...valid, markerDigest: 'short' },
+      { ...valid, createdAtMs: Number.NaN },
+      { ...valid, reason: 'x'.repeat(97) },
+      { ...valid, state: 'closed', phase: 'renamed' },
+    ]) {
+      expect(parseReceiptBody(JSON.stringify(malformed))).toBeUndefined();
+    }
+    expect(
+      parseReceiptBody(
+        JSON.stringify({
+          ...valid,
+          updatedAtMs: valid.createdAtMs - 1,
+        }),
+      ),
+    ).toMatchObject({ operationId: valid.operationId });
   });
 });
