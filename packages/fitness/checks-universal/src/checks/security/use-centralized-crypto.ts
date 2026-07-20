@@ -3,12 +3,16 @@
  */
 
 import { logger } from '@opensip-cli/core';
+import { createPathMatcher, defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+
 import {
-  createPathMatcher,
-  defineCheck,
-  isCommentLine,
-  type CheckViolation,
-} from '@opensip-cli/fitness';
+  createCodeMask,
+  createLiteralAwareCodeMask,
+  findCodeMatch,
+  findStaticModuleReferences,
+  findStaticStringLiterals,
+  type StaticModuleReference,
+} from '../code-aware-match.js';
 
 /**
  * Pattern configuration for detecting direct crypto usage
@@ -18,6 +22,13 @@ interface CryptoPattern {
   message: string;
   suggestion: string;
   severity: 'error' | 'warning';
+}
+
+interface CryptoModulePattern {
+  readonly matches: (moduleSpecifier: string) => boolean;
+  readonly message: string;
+  readonly suggestion: string;
+  readonly severity: 'error' | 'warning';
 }
 
 /**
@@ -43,64 +54,64 @@ function createCryptoPattern(
 const DIRECT_CRYPTO_PATTERNS: CryptoPattern[] = [
   // Node.js crypto module - symmetric/hashing
   createCryptoPattern(
-    String.raw`crypto\.createHash\s*\(`,
+    String.raw`crypto\.\s*createHash\s*\(`,
     'Direct crypto.createHash usage - use hashingService.sha256() from crypto module',
     'Use a centralized crypto utility instead of direct crypto.createHash calls.',
     'error',
   ),
   createCryptoPattern(
-    String.raw`crypto\.createHmac\s*\(`,
+    String.raw`crypto\.\s*createHmac\s*\(`,
     'Direct crypto.createHmac usage - use hashingService.hmac() from crypto module',
     'Use a centralized crypto utility instead of direct crypto.createHmac calls.',
     'error',
   ),
   createCryptoPattern(
-    String.raw`crypto\.createCipheriv\s*\(`,
+    String.raw`crypto\.\s*createCipheriv\s*\(`,
     'Direct crypto.createCipheriv usage - use encryptionService.encrypt() from crypto module',
     'Use a centralized crypto utility for encryption instead of direct crypto.createCipheriv calls.',
     'error',
   ),
   createCryptoPattern(
-    String.raw`crypto\.createDecipheriv\s*\(`,
+    String.raw`crypto\.\s*createDecipheriv\s*\(`,
     'Direct crypto.createDecipheriv usage - use encryptionService.decrypt() from crypto module',
     'Use a centralized crypto utility for decryption instead of direct crypto.createDecipheriv calls.',
     'error',
   ),
   createCryptoPattern(
-    String.raw`crypto\.pbkdf2(?:Sync)?\s*\(`,
+    String.raw`crypto\.\s*pbkdf2(?:Sync)?\s*\(`,
     'Direct crypto.pbkdf2 usage - use deriveKeyPbkdf2() from crypto module',
     'Use a centralized crypto utility for key derivation instead of direct crypto.pbkdf2 calls.',
     'error',
   ),
   createCryptoPattern(
-    String.raw`crypto\.scrypt(?:Sync)?\s*\(`,
+    String.raw`crypto\.\s*scrypt(?:Sync)?\s*\(`,
     'Direct crypto.scrypt usage - use deriveKeyScrypt() from crypto module',
     'Use a centralized crypto utility for key derivation instead of direct crypto.scrypt calls.',
     'error',
   ),
   // Node.js crypto module - asymmetric signing
   createCryptoPattern(
-    String.raw`crypto\.createSign\s*\(`,
+    String.raw`crypto\.\s*createSign\s*\(`,
     'Direct crypto.createSign usage - use signingService.sign() from crypto module',
     'Use a centralized crypto utility for signing instead of direct crypto.createSign calls.',
     'error',
   ),
   // @fitness-ignore-next-line jwt-validation -- Fitness check definition, not production code; .verify() in suggestion text
   createCryptoPattern(
-    String.raw`crypto\.createVerify\s*\(`,
+    String.raw`crypto\.\s*createVerify\s*\(`,
     'Direct crypto.createVerify usage - use signingService.verify() from crypto module',
     'Use a centralized crypto utility for signature verification instead of direct crypto.createVerify calls.',
     'error',
   ),
   createCryptoPattern(
-    String.raw`crypto\.sign\s*\(`,
+    String.raw`crypto\.\s*sign\s*\(`,
     'Direct crypto.sign usage - use signingService.sign() from crypto module',
     'Use a centralized crypto utility for signing instead of direct crypto.sign calls.',
     'error',
   ),
   // @fitness-ignore-next-line jwt-validation -- Fitness check definition, not production code; .verify() in suggestion text
   createCryptoPattern(
-    String.raw`crypto\.verify\s*\(`,
+    String.raw`crypto\.\s*verify\s*\(`,
     'Direct crypto.verify usage - use signingService.verify() from crypto module',
     'Use a centralized crypto utility for signature verification instead of direct crypto.verify calls.',
     'error',
@@ -112,45 +123,44 @@ const DIRECT_CRYPTO_PATTERNS: CryptoPattern[] = [
     'Use a centralized crypto utility instead of direct createHmac calls.',
     'error',
   ),
-  // AWS KMS direct imports
   createCryptoPattern(
-    '@aws-sdk/client-kms',
-    'Direct AWS KMS SDK import - use a centralized crypto utility with KMS provider',
-    'Use a centralized crypto utility that handles KMS integration for key management.',
-    'error',
-  ),
-  createCryptoPattern(
-    String.raw`new KMSClient\s*\(`,
+    String.raw`new\s+KMSClient\s*\(`,
     'Direct KMSClient usage - use a centralized crypto utility with KMS provider',
     'Use a centralized crypto utility that handles KMS integration for key management.',
     'error',
   ),
-  // bcrypt/argon2 direct imports
-  createCryptoPattern(
-    'from [\'"]bcrypt[\'"]',
-    'Direct bcrypt import - use hashingService.hashPassword() from crypto module',
-    'Use a centralized crypto utility for password hashing instead of direct bcrypt calls.',
-    'error',
-  ),
-  createCryptoPattern(
-    'from [\'"]argon2[\'"]',
-    'Direct argon2 import - use hashingService.hashPassword() from crypto module',
-    'Use a centralized crypto utility for password hashing instead of direct argon2 calls.',
-    'error',
-  ),
-  // Direct jose imports (should use ISigningService wrapper)
-  createCryptoPattern(
-    'from [\'"]jose[\'"]',
-    'Direct jose import - use ISigningService from crypto module',
-    'Use a centralized crypto utility for JWT operations instead of direct jose imports.',
-    'warning',
-  ),
-  createCryptoPattern(
-    String.raw`import\s+\*\s+as\s+jose\s+from`,
-    'Direct jose import - use ISigningService from crypto module',
-    'Use a centralized crypto utility for JWT operations instead of direct jose imports.',
-    'warning',
-  ),
+];
+
+const STATIC_CRYPTO_MODULE_PATTERNS: readonly CryptoModulePattern[] = [
+  {
+    matches: (moduleSpecifier) =>
+      moduleSpecifier === '@aws-sdk/client-kms' ||
+      moduleSpecifier.startsWith('@aws-sdk/client-kms/'),
+    message: 'Direct AWS KMS SDK import - use a centralized crypto utility with KMS provider',
+    suggestion: 'Use a centralized crypto utility that handles KMS integration for key management.',
+    severity: 'error',
+  },
+  {
+    matches: (moduleSpecifier) => moduleSpecifier === 'bcrypt',
+    message: 'Direct bcrypt import - use hashingService.hashPassword() from crypto module',
+    suggestion:
+      'Use a centralized crypto utility for password hashing instead of direct bcrypt calls.',
+    severity: 'error',
+  },
+  {
+    matches: (moduleSpecifier) => moduleSpecifier === 'argon2',
+    message: 'Direct argon2 import - use hashingService.hashPassword() from crypto module',
+    suggestion:
+      'Use a centralized crypto utility for password hashing instead of direct argon2 calls.',
+    severity: 'error',
+  },
+  {
+    matches: (moduleSpecifier) => moduleSpecifier === 'jose',
+    message: 'Direct jose import - use ISigningService from crypto module',
+    suggestion:
+      'Use a centralized crypto utility for JWT operations instead of direct jose imports.',
+    severity: 'warning',
+  },
 ];
 
 // Paths to exclude from checking
@@ -173,6 +183,66 @@ const CRYPTO_IMPL_PATTERNS = [
 ];
 
 const isExcludedCryptoPath = createPathMatcher(CRYPTO_IMPL_PATTERNS);
+const KMS_IMPORT_MESSAGE =
+  'Direct AWS KMS SDK import - use a centralized crypto utility with KMS provider';
+const KMS_IMPORT_SUGGESTION =
+  'Use a centralized crypto utility that handles KMS integration for key management.';
+
+function sourceLine(content: string, reference: StaticModuleReference): string {
+  const lineStart = content.lastIndexOf('\n', reference.index - 1) + 1;
+  const lineEnd = content.indexOf('\n', reference.index);
+  return content.slice(lineStart, lineEnd === -1 ? content.length : lineEnd).trim();
+}
+
+function staticCryptoImportViolations(content: string, filePath: string): CheckViolation[] {
+  return findStaticModuleReferences(filePath, content)
+    .filter((reference) => reference.keyword === 'import' && reference.runtimeImport)
+    .flatMap((reference) => {
+      const lineStart = content.lastIndexOf('\n', reference.index - 1) + 1;
+      return STATIC_CRYPTO_MODULE_PATTERNS.filter((pattern) =>
+        pattern.matches(reference.moduleSpecifier),
+      ).map((pattern) => ({
+        line: content.slice(0, reference.index).split('\n').length,
+        column: reference.index - lineStart,
+        message: pattern.message,
+        severity: pattern.severity,
+        suggestion: pattern.suggestion,
+        match: sourceLine(content, reference),
+        filePath,
+      }));
+    });
+}
+
+function dynamicKmsImportViolations(
+  content: string,
+  filePath: string,
+  codeMask: string,
+): CheckViolation[] {
+  return findStaticStringLiterals(filePath, content).flatMap((literal) => {
+    const importCall = /\bimport\s*\(\s*$/.exec(codeMask.slice(0, literal.start));
+    if (!importCall) return [];
+    const moduleSpecifier = literal.value;
+    if (
+      moduleSpecifier !== '@aws-sdk/client-kms' &&
+      !moduleSpecifier.startsWith('@aws-sdk/client-kms/')
+    ) {
+      return [];
+    }
+
+    const lineStart = content.lastIndexOf('\n', importCall.index - 1) + 1;
+    return [
+      {
+        line: content.slice(0, importCall.index).split('\n').length,
+        column: importCall.index - lineStart,
+        message: KMS_IMPORT_MESSAGE,
+        severity: 'error' as const,
+        suggestion: KMS_IMPORT_SUGGESTION,
+        match: content.slice(importCall.index, literal.end),
+        filePath,
+      },
+    ];
+  });
+}
 
 /**
  * Check: security/use-centralized-crypto
@@ -185,7 +255,7 @@ export const useCentralizedCrypto = defineCheck({
   slug: 'use-centralized-crypto',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Enforce use of centralized crypto module instead of direct crypto operations',
@@ -213,19 +283,22 @@ export const useCentralizedCrypto = defineCheck({
       return [];
     }
 
-    const violations: CheckViolation[] = [];
+    const codeMask = createCodeMask(filePath, content);
+    const violations = [
+      ...staticCryptoImportViolations(content, filePath),
+      ...dynamicKmsImportViolations(content, filePath, codeMask),
+    ];
     const lines = content.split('\n');
+    const codeLines = codeMask.split('\n');
+    const literalCodeLines = createLiteralAwareCodeMask(filePath, content).split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
       const line = line_ ?? '';
-
-      if (isCommentLine(line)) {
-        continue;
-      }
+      const codeLine = codeLines[lineNum] ?? '';
+      const literalCodeLine = literalCodeLines[lineNum] ?? '';
 
       for (const pattern of DIRECT_CRYPTO_PATTERNS) {
-        pattern.regex.lastIndex = 0;
-        const match = pattern.regex.exec(line);
+        const match = findCodeMatch(pattern.regex, literalCodeLine, codeLine);
         if (match) {
           violations.push({
             line: lineNum + 1,
@@ -233,7 +306,7 @@ export const useCentralizedCrypto = defineCheck({
             message: pattern.message,
             severity: pattern.severity,
             suggestion: pattern.suggestion,
-            match: match[0],
+            match: line.slice(match.index, match.index + match[0].length),
             filePath,
           });
         }

@@ -7,6 +7,8 @@
 import { logger } from '@opensip-cli/core';
 import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
+import { createCodeMask, findStaticModuleReferences, hasCodeMatch } from '../code-aware-match.js';
+
 // =============================================================================
 // EVENT ARCHITECTURE
 // =============================================================================
@@ -25,12 +27,10 @@ const EVENT_HANDLER_PATTERNS = [
 /**
  * Patterns indicating proper event handling
  */
-const PROPER_EVENT_PATTERNS = [
-  /eventBus/i,
-  /eventEmitter/i,
-  /infrastructure\/events/,
-  /EventPublisher/i,
-];
+const PROPER_EVENT_PATTERNS = [/\beventBus\b/i, /\bEventPublisher\b/i];
+
+const NEW_EVENT_EMITTER_PATTERN = /new\s+(?:[\w$]+\s*\.\s*)?EventEmitter\s*\(/i;
+const DIRECT_EMIT_PATTERN = /\.emit\s*\(\s*['"]/;
 
 /**
  * Patterns indicating idempotency handling.
@@ -68,23 +68,15 @@ const STATE_CHANGING_PATTERNS = [
  * @param line - Line to check.
  * @returns True if line has direct EventEmitter pattern.
  */
-function hasDirectEventEmitterPattern(line: string): boolean {
+function hasDirectEventEmitterPattern(line: string, codeLine: string): boolean {
   logger.debug({
     evt: 'fitness.checks.event_patterns.has_direct_event_emitter_pattern',
     msg: 'Checking line for direct EventEmitter pattern',
   });
-  // Check for "new EventEmitter("
-  if (line.includes('new EventEmitter(') || line.includes('new EventEmitter (')) {
-    return true;
-  }
-
-  // Check for ".emit('event'" or '.emit("event"'
-  const emitIdx = line.indexOf('.emit(');
-  if (emitIdx === -1) {
-    return false;
-  }
-  const afterEmit = line.slice(emitIdx + 6).trimStart();
-  return afterEmit.startsWith("'") || afterEmit.startsWith('"');
+  return (
+    hasCodeMatch(NEW_EVENT_EMITTER_PATTERN, codeLine, codeLine) ||
+    hasCodeMatch(DIRECT_EMIT_PATTERN, line, codeLine)
+  );
 }
 
 /**
@@ -118,7 +110,7 @@ export const eventArchitecture = defineCheck({
   slug: 'event-architecture',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Validate event handling follows architectural patterns',
@@ -148,15 +140,26 @@ export const eventArchitecture = defineCheck({
     }
 
     // Skip if file uses proper infrastructure patterns
-    const usesProperPatterns = PROPER_EVENT_PATTERNS.some((p) => p.test(content));
+    const codeMask = createCodeMask(filePath, content);
+    const usesProperIdentifier = PROPER_EVENT_PATTERNS.some((pattern) =>
+      hasCodeMatch(pattern, content, codeMask),
+    );
+    const usesProperImport = findStaticModuleReferences(filePath, content).some(
+      (reference) =>
+        reference.keyword === 'import' &&
+        reference.runtimeImport &&
+        reference.moduleSpecifier.includes('infrastructure/events'),
+    );
+    const usesProperPatterns = usesProperIdentifier || usesProperImport;
     if (usesProperPatterns) {
       return violations;
     }
 
     // Check each line for direct EventEmitter usage
     const lines = content.split('\n');
+    const codeLines = codeMask.split('\n');
     for (const [i, line] of lines.entries()) {
-      if (!line || !hasDirectEventEmitterPattern(line)) {
+      if (!line || !hasDirectEventEmitterPattern(line, codeLines[i] ?? '')) {
         continue;
       }
 

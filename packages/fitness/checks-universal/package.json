@@ -47,6 +47,7 @@
     "@opensip-cli/fitness": "workspace:*"
   },
   "devDependencies": {
+    "@opensip-cli/lang-typescript": "workspace:*",
     "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.3",
     "vitest": "^4.1.10"

@@ -10,7 +10,12 @@ import {
   type CheckViolation,
   getLineNumber,
 } from '@opensip-cli/fitness';
-import { stripStringsAndCommentsPreservingPositions } from '@opensip-cli/fitness';
+import {
+  isInsideStringLiteral,
+  stripStringsAndCommentsPreservingPositions,
+} from '@opensip-cli/fitness';
+
+import { createCodeMask } from '../code-aware-match.js';
 
 const COLLECTION_TYPES = ['new Map(', 'new Set(', '= []', ': []'] as const;
 
@@ -88,12 +93,57 @@ const EVICTION_KEYWORDS = [
   'truncate',
   'lru',
   'overflow',
-  '@bounded-collection',
 ] as const;
 
 function hasEvictionKeyword(content: string): boolean {
   const lowerContent = content.toLowerCase();
   return EVICTION_KEYWORDS.some((keyword) => lowerContent.includes(keyword.toLowerCase()));
+}
+
+const BOUNDED_COLLECTION_MARKER = '@bounded-collection';
+
+function isCommentDelimiter(content: string, codeMask: string, index: number): boolean {
+  const lineStart = content.lastIndexOf('\n', index) + 1;
+  const linePrefix = content.slice(lineStart, index);
+  return (
+    index >= 0 &&
+    /\s/.test(codeMask[index] ?? '') &&
+    /\s/.test(codeMask[index + 1] ?? '') &&
+    !isInsideLiteral(codeMask, index) &&
+    !isInsideStringLiteral(linePrefix, linePrefix.length)
+  );
+}
+
+function isBoundedCollectionComment(
+  content: string,
+  codeMask: string,
+  markerIndex: number,
+): boolean {
+  const lineStart = content.lastIndexOf('\n', markerIndex) + 1;
+  const lineCommentStart = content.lastIndexOf('//', markerIndex);
+  if (lineCommentStart >= lineStart && isCommentDelimiter(content, codeMask, lineCommentStart)) {
+    return true;
+  }
+
+  const blockCommentStart = content.lastIndexOf('/*', markerIndex);
+  const precedingBlockCommentEnd = content.lastIndexOf('*/', markerIndex);
+  return (
+    blockCommentStart > precedingBlockCommentEnd &&
+    isCommentDelimiter(content, codeMask, blockCommentStart)
+  );
+}
+
+function hasBoundedCollectionComment(content: string, codeMask: string): boolean {
+  const lowerContent = content.toLowerCase();
+  let markerIndex = lowerContent.indexOf(BOUNDED_COLLECTION_MARKER);
+  while (markerIndex !== -1) {
+    if (isBoundedCollectionComment(content, codeMask, markerIndex)) return true;
+    markerIndex = lowerContent.indexOf(
+      BOUNDED_COLLECTION_MARKER,
+      markerIndex + BOUNDED_COLLECTION_MARKER.length,
+    );
+  }
+  return false;
 }
 
 /** String literals for pattern matching, not actual fs calls. */
@@ -191,11 +241,64 @@ function hasGuardedReadWrapper(content: string): boolean {
   return GUARDED_READ_MARKERS.some((marker) => lower.includes(marker));
 }
 
-function isReadingKnownSmallFile(content: string, readIndex: number): boolean {
-  const start = Math.max(0, readIndex - 100);
-  const end = Math.min(content.length, readIndex + 150);
-  const context = content.slice(start, end).toLowerCase();
-  return KNOWN_SMALL_FILE_PATTERNS.some((pattern) => context.includes(pattern));
+interface CallArgument {
+  readonly raw: string;
+  readonly code: string;
+}
+
+function firstCallArgument(content: string, code: string, callIndex: number): CallArgument | null {
+  const openingParen = code.indexOf('(', callIndex);
+  if (openingParen === -1) return null;
+
+  let nestingDepth = 0;
+  for (let index = openingParen + 1; index < code.length; index++) {
+    const character = code[index];
+    if (character === '(' || character === '[' || character === '{') {
+      nestingDepth++;
+    } else if ((character === ')' || character === ',') && nestingDepth === 0) {
+      return {
+        raw: content.slice(openingParen + 1, index),
+        code: code.slice(openingParen + 1, index),
+      };
+    } else if (character === ')' || character === ']' || character === '}') {
+      nestingDepth = Math.max(0, nestingDepth - 1);
+    }
+  }
+
+  return null;
+}
+
+function isInsideLiteral(code: string, index: number): boolean {
+  return ['"', "'", '`'].some((delimiter) => {
+    let count = 0;
+    for (let cursor = 0; cursor < index; cursor++) {
+      if (code[cursor] === delimiter) count++;
+    }
+    return count % 2 === 1;
+  });
+}
+
+function isReadingKnownSmallFile(content: string, code: string, readIndex: number): boolean {
+  const argument = firstCallArgument(content, code, readIndex);
+  if (!argument) return false;
+
+  const lowerArgument = argument.raw.toLowerCase();
+  return KNOWN_SMALL_FILE_PATTERNS.some((pattern) => {
+    let index = lowerArgument.indexOf(pattern);
+    while (index !== -1) {
+      const startsInCode =
+        argument.code[index] !== undefined && !/\s/.test(argument.code[index] ?? ' ');
+      if (
+        startsInCode ||
+        isInsideLiteral(argument.code, index) ||
+        isInsideStringLiteral(argument.raw, index)
+      ) {
+        return true;
+      }
+      index = lowerArgument.indexOf(pattern, index + pattern.length);
+    }
+    return false;
+  });
 }
 
 function findFileReadCalls(content: string): { index: number; match: string }[] {
@@ -234,7 +337,7 @@ function hasGrowthMethod(content: string): boolean {
 export const unboundedMemory = defineCheck({
   id: '1f3c347d-3511-4157-87e0-050fd57c28b3',
   slug: 'unbounded-memory',
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
   description: 'Detect unbounded collections and file reads that may cause OOM',
   longDescription: `**Purpose:** Identifies potential memory leaks from collections that grow without bounds and file reads without size validation.
 
@@ -260,11 +363,13 @@ export const unboundedMemory = defineCheck({
     const violations: CheckViolation[] = [];
 
     const codeOnly = stripStringsAndCommentsPreservingPositions(content);
+    const literalCodeMask = createCodeMask(filePath, content);
 
     const collectionDeclarations = findCollectionDeclarations(codeOnly);
     for (const declaration of collectionDeclarations) {
-      const hasEviction = hasEvictionKeyword(content);
-      const hasGrowth = hasGrowthMethod(content);
+      const hasEviction =
+        hasEvictionKeyword(codeOnly) || hasBoundedCollectionComment(content, literalCodeMask);
+      const hasGrowth = hasGrowthMethod(codeOnly);
 
       if (hasGrowth && !hasEviction) {
         const lineNumber = getLineNumber(content, declaration.index);
@@ -282,17 +387,19 @@ export const unboundedMemory = defineCheck({
       }
     }
 
-    if (hasGuardedReadWrapper(content)) {
+    if (hasGuardedReadWrapper(codeOnly)) {
       return violations;
     }
 
     const fileReadCalls = findFileReadCalls(codeOnly);
     for (const readCall of fileReadCalls) {
       const start = Math.max(0, readCall.index - 1500);
-      const context = content.slice(start, readCall.index);
       const codeContext = codeOnly.slice(start, readCall.index);
 
-      if (isKnownBoundedSourceRead(filePath) || isReadingKnownSmallFile(content, readCall.index)) {
+      if (
+        isKnownBoundedSourceRead(filePath) ||
+        isReadingKnownSmallFile(content, literalCodeMask, readCall.index)
+      ) {
         continue;
       }
 
@@ -303,7 +410,7 @@ export const unboundedMemory = defineCheck({
         continue;
       }
 
-      if (!hasFileSizeCheck(context)) {
+      if (!hasFileSizeCheck(codeContext)) {
         const lineNumber = getLineNumber(content, readCall.index);
         violations.push({
           line: lineNumber,

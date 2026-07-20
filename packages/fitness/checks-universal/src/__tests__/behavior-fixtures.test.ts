@@ -716,10 +716,7 @@ describe('expo-vector-icons', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 
-  it('runs the analyzer on .tsx files and short-circuits when no discouraged library is mentioned', async () => {
-    // The check's strip-strings contentFilter blanks the import path before
-    // analyze sees it, so the regex cannot match a real import. We still
-    // exercise the analyze function's quick-filter bail-out.
+  it('short-circuits when no discouraged library is mentioned', async () => {
     const result = await findCheck('expo-vector-icons').run(cwd, {
       targetFiles: [join(cwd, 'src/Good.tsx')],
     });
@@ -727,13 +724,12 @@ describe('expo-vector-icons', () => {
     expect(result.errors).toBe(0);
   });
 
-  it('runs without throwing when discouraged libraries are mentioned in source', async () => {
+  it('flags discouraged libraries imported through package subpaths', async () => {
     const result = await findCheck('expo-vector-icons').run(cwd, {
       targetFiles: [join(cwd, 'src/Bad.tsx'), join(cwd, 'src/AlsoBad.tsx')],
     });
-    // Strip-strings empties the import string contents, so detection is a
-    // no-op in this configuration. Just assert it ran without errors.
     expect(result.errors).toBe(0);
+    expect(result.signals).toHaveLength(2);
   });
 });
 
@@ -1699,14 +1695,11 @@ describe('rate-limit-coverage', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 
-  it('runs the analyzer on files that contain framework calls', async () => {
-    // Strip-strings blanks out route paths inside quotes; the regex
-    // requires at least one non-quote char between quotes, so detection
-    // is suppressed. This test exercises the framework-detection path.
+  it('flags API routes without rate limiting', async () => {
     const result = await findCheck('rate-limit-coverage').run(cwd, {
       targetFiles: [join(cwd, 'src/api-routes.ts')],
     });
-    expect(result.errors).toBe(0);
+    expect(result.signals.length).toBeGreaterThan(0);
   });
 
   it('does not fire when global rate limiting is registered', async () => {

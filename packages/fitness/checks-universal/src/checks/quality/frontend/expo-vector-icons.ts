@@ -7,6 +7,8 @@
 
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
+import { findStaticModuleReferences } from '../../code-aware-match.js';
+
 const PREFERRED_ICON_LIBRARY = '@expo/vector-icons';
 const DISCOURAGED_LIBRARIES = [
   'react-native-vector-icons',
@@ -15,34 +17,22 @@ const DISCOURAGED_LIBRARIES = [
 ];
 
 /**
- * Escape special regex characters in a string
- */
-function escapeRegExp(str: string): string {
-  // @fitness-ignore-next-line fitness-check-standards -- Character class regex is safe from ReDoS, no backtracking
-  return str.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-}
-
-/**
  * Analyze a file for icon library issues
  * @param {string} content - File content to analyze
  * @param {string} filePath - Path to the file
  * @returns {CheckViolation[]} Array of violations found
  */
 function analyzeFile(content: string, filePath: string): CheckViolation[] {
-  // Quick filter: skip if no discouraged library mentioned
-  if (!DISCOURAGED_LIBRARIES.some((lib) => content.includes(lib))) {
-    return [];
-  }
-
   const violations: CheckViolation[] = [];
-
-  for (const lib of DISCOURAGED_LIBRARIES) {
-    const escapedLib = escapeRegExp(lib);
-    const pattern = String.raw`import\s+.*\s+from\s+['"]${escapedLib}['"]`;
-    const regex = new RegExp(pattern, 'g');
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      const line = content.slice(0, Math.max(0, match.index)).split('\n').length;
+  const imports = findStaticModuleReferences(filePath, content).filter(
+    (reference) => reference.keyword === 'import' && reference.runtimeImport,
+  );
+  for (const reference of imports) {
+    for (const lib of DISCOURAGED_LIBRARIES) {
+      if (reference.moduleSpecifier !== lib && !reference.moduleSpecifier.startsWith(`${lib}/`)) {
+        continue;
+      }
+      const line = content.slice(0, reference.index).split('\n').length;
       violations.push({
         filePath,
         line,
@@ -69,7 +59,7 @@ export const expoVectorIcons = defineCheck({
   slug: 'expo-vector-icons',
   disabled: true,
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Ensure consistent icon library usage with @expo/vector-icons',

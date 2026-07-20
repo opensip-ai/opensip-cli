@@ -7,6 +7,14 @@
 import { logger } from '@opensip-cli/core';
 import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
+import {
+  createCodeMask,
+  decodeJavaScriptStaticText,
+  findCodeMatches,
+  findStaticStringLiterals,
+  templateRawSpans,
+} from '../code-aware-match.js';
+
 // =============================================================================
 // TRANSACTION BOUNDARY VALIDATION
 // =============================================================================
@@ -17,25 +25,24 @@ import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@op
  * Note: Patterns must be specific enough to avoid false positives on
  * unrelated uses of similar words (e.g., "Transactional" SMS type in AWS SNS).
  */
-const TRANSACTION_PATTERNS = [
+const CODE_TRANSACTION_PATTERNS = [
   /\.transaction\s*\(/g,
   /\.beginTransaction\s*\(/g,
   /\.startTransaction\s*\(/g,
-  /BEGIN\s+TRANSACTION/gi,
   /@Transaction\b/g,
   /@Transactional\b/g, // Match decorator only, not SMS type configurations
-  /queryRunner\.startTransaction/g,
 ];
 
 /**
  * Patterns indicating proper transaction handling
  */
-const PROPER_TRANSACTION_PATTERNS = [
-  /\.commit\s*\(\)/,
-  /\.rollback\s*\(\)/,
-  /COMMIT/i,
-  /ROLLBACK/i,
+const PROPER_CODE_TRANSACTION_PATTERNS = [
+  /\.commit(?:Transaction)?\s*\(\)/g,
+  /\.rollback(?:Transaction)?\s*\(\)/g,
 ];
+const SQL_TAG_START_PATTERN = /\bsql\s*`/g;
+const BEGIN_SQL_PATTERN = /\bBEGIN\s+TRANSACTION\b/i;
+const COMPLETE_SQL_PATTERN = /\b(?:COMMIT|ROLLBACK)\b/i;
 
 /**
  * Patterns indicating async operations inside transactions (risky).
@@ -59,16 +66,95 @@ const TIMEOUT_PATTERNS = [
   /lockTimeout/i,
 ];
 
-/**
- * M7: shared `/g` (or sticky) regexes retain `lastIndex` across `.test()` calls.
- * A prior match that leaves `lastIndex` past the next haystack can false-negative.
- * Always reset before a presence probe.
- */
-function anyPatternMatches(patterns: readonly RegExp[], content: string): boolean {
-  return patterns.some((pattern) => {
-    pattern.lastIndex = 0;
-    return pattern.test(content);
-  });
+interface TransactionMatch {
+  readonly index: number;
+  readonly match: string;
+}
+
+function findStaticSqlCallMatches(
+  filePath: string,
+  content: string,
+  codeMask: string,
+  sqlPattern: RegExp,
+): TransactionMatch[] {
+  const matches: TransactionMatch[] = [];
+  for (const literal of findStaticStringLiterals(filePath, content)) {
+    const callPrefix = /\b(?:query|execute|exec)\s*\(\s*$/.exec(codeMask.slice(0, literal.start));
+    if (!callPrefix) continue;
+    sqlPattern.lastIndex = 0;
+    const sqlMatch = sqlPattern.exec(literal.value);
+    if (sqlMatch) {
+      matches.push({
+        index: literal.start,
+        match: sqlMatch[0],
+      });
+    }
+  }
+  return matches;
+}
+
+function findTaggedSqlMatches(
+  content: string,
+  codeMask: string,
+  sqlPattern: RegExp,
+): TransactionMatch[] {
+  const matches: TransactionMatch[] = [];
+  for (const tag of findCodeMatches(SQL_TAG_START_PATTERN, content, codeMask)) {
+    const backtick = tag.index + tag[0].lastIndexOf('`');
+    for (const span of templateRawSpans(content, codeMask, backtick)) {
+      const fragment = decodeJavaScriptStaticText(content.slice(span.start, span.end));
+      sqlPattern.lastIndex = 0;
+      const sqlMatch = sqlPattern.exec(fragment);
+      if (sqlMatch) {
+        matches.push({
+          index: span.start + sqlMatch.index,
+          match: sqlMatch[0],
+        });
+      }
+    }
+  }
+  return matches;
+}
+
+function findTransactionStarts(
+  filePath: string,
+  content: string,
+  codeMask: string,
+): TransactionMatch[] {
+  const byIndex = new Map<number, TransactionMatch>();
+  for (const pattern of CODE_TRANSACTION_PATTERNS) {
+    for (const match of findCodeMatches(pattern, codeMask, codeMask)) {
+      byIndex.set(match.index, {
+        index: match.index,
+        match: content.slice(match.index, match.index + match[0].length),
+      });
+    }
+  }
+  for (const match of [
+    ...findStaticSqlCallMatches(filePath, content, codeMask, BEGIN_SQL_PATTERN),
+    ...findTaggedSqlMatches(content, codeMask, BEGIN_SQL_PATTERN),
+  ]) {
+    byIndex.set(match.index, match);
+  }
+  return [...byIndex.values()].sort((left, right) => left.index - right.index);
+}
+
+function findTransactionCompletions(
+  filePath: string,
+  content: string,
+  codeMask: string,
+): TransactionMatch[] {
+  const completions = PROPER_CODE_TRANSACTION_PATTERNS.flatMap((pattern) =>
+    findCodeMatches(pattern, codeMask, codeMask).map((match) => ({
+      index: match.index,
+      match: content.slice(match.index, match.index + match[0].length),
+    })),
+  );
+  return [
+    ...completions,
+    ...findStaticSqlCallMatches(filePath, content, codeMask, COMPLETE_SQL_PATTERN),
+    ...findTaggedSqlMatches(content, codeMask, COMPLETE_SQL_PATTERN),
+  ].sort((left, right) => left.index - right.index);
 }
 
 /**
@@ -98,75 +184,93 @@ function isTransactionDelegation(content: string, matchIndex: number): boolean {
 }
 
 /**
- * Detect callback-style transactions: `.transaction((tx) => { ... })` or
- * `.transaction(async (tx) => { ... })`. The callback model commits on
- * normal return and rolls back on throw — no manual commit/rollback
- * needed. Used by drizzle, better-sqlite3, knex, and our own DataStore.
+ * Detect managed transaction calls. A non-empty first argument is a callback
+ * (inline or named) or an adapter-owned transaction configuration; those APIs
+ * commit on normal return and roll back on throw. Bare `.transaction()` calls
+ * remain manual and require an explicit completion.
  */
-function isCallbackStyleTransaction(content: string, matchIndex: number): boolean {
-  // Look at the slice starting at the match for callback signatures.
-  // Bounded window keeps this O(1) per match.
-  const window = content.slice(matchIndex, matchIndex + 200);
-  return (
-    /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?(?:\([^)]{0,80}\)|\w+)\s*=>/.test(
-      window,
-    ) ||
-    /\.(?:transaction|beginTransaction|startTransaction)\s*\(\s*(?:async\s+)?function\b/.test(
-      window,
-    )
-  );
+function isCallbackStyleTransaction(codeMask: string, matchIndex: number): boolean {
+  const openingParen = codeMask.indexOf('(', matchIndex);
+  if (openingParen === -1) return false;
+  const firstArgumentOffset = codeMask.slice(openingParen + 1).search(/\S/);
+  if (firstArgumentOffset === -1) return false;
+  return codeMask[openingParen + 1 + firstArgumentOffset] !== ')';
 }
 
-function findUncommittedTransactionViolations(content: string, filePath: string): CheckViolation[] {
+function findUncommittedTransactionViolations(
+  content: string,
+  filePath: string,
+  codeMask: string,
+  transactionStarts: readonly TransactionMatch[],
+  transactionCompletions: readonly TransactionMatch[],
+): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.transaction_patterns.find_uncommitted_transaction_violations',
     msg: 'Searching for uncommitted transaction violations',
   });
   const violations: CheckViolation[] = [];
-
-  for (const pattern of TRANSACTION_PATTERNS) {
-    pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
-      const isSkippable =
-        match[0].includes('@') ||
-        isTransactionDelegation(content, match.index) ||
-        isCallbackStyleTransaction(content, match.index);
-      if (isSkippable) {
-        continue;
-      }
-
-      violations.push({
-        line: getLineNumber(content, match.index),
-        column: 0,
-        message: 'Transaction may not be properly committed or rolled back',
-        severity: 'warning',
-        suggestion:
-          'Ensure all code paths commit or rollback the transaction. Use try/finally: try { await queryRunner.commitTransaction(); } catch { await queryRunner.rollbackTransaction(); } finally { await queryRunner.release(); }',
-        match: match[0],
-        type: 'uncommitted-transaction',
-        filePath,
-      });
+  for (const [startIndex, transaction] of transactionStarts.entries()) {
+    const nextStart = transactionStarts[startIndex + 1]?.index ?? Number.POSITIVE_INFINITY;
+    const hasFollowingCompletion = transactionCompletions.some(
+      (completion) => completion.index > transaction.index && completion.index < nextStart,
+    );
+    const isSkippable =
+      hasFollowingCompletion ||
+      transaction.match.includes('@') ||
+      isTransactionDelegation(content, transaction.index) ||
+      isCallbackStyleTransaction(codeMask, transaction.index);
+    if (isSkippable) {
+      continue;
     }
+
+    violations.push({
+      line: getLineNumber(content, transaction.index),
+      column: 0,
+      message: 'Transaction may not be properly committed or rolled back',
+      severity: 'warning',
+      suggestion:
+        'Ensure all code paths commit or rollback the transaction. Use try/finally: try { await queryRunner.commitTransaction(); } catch { await queryRunner.rollbackTransaction(); } finally { await queryRunner.release(); }',
+      match: transaction.match,
+      type: 'uncommitted-transaction',
+      filePath,
+    });
   }
 
   return violations;
 }
 
-function findAsyncInTransactionViolations(content: string, filePath: string): CheckViolation[] {
+function findAsyncInTransactionViolations(
+  content: string,
+  filePath: string,
+  codeMask: string,
+  transactionStarts: readonly TransactionMatch[],
+  transactionCompletions: readonly TransactionMatch[],
+): CheckViolation[] {
   logger.debug({
     evt: 'fitness.checks.transaction_patterns.find_async_in_transaction_violations',
     msg: 'Searching for async operations inside transactions',
   });
   const violations: CheckViolation[] = [];
-
   for (const pattern of ASYNC_IN_TRANSACTION_PATTERNS) {
-    pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
-      const beforeMatch = content.slice(0, Math.max(0, match.index));
-      // M7: presence probe must reset lastIndex on shared /g TRANSACTION_PATTERNS.
-      const hasOpenTransaction = anyPatternMatches(TRANSACTION_PATTERNS, beforeMatch.slice(-500));
+    for (const match of findCodeMatches(pattern, codeMask, codeMask)) {
+      const windowStart = Math.max(0, match.index - 500);
+      const events = [
+        ...transactionStarts.map((transaction) => ({
+          index: transaction.index,
+          delta: 1,
+        })),
+        ...transactionCompletions.map((completion) => ({
+          index: completion.index,
+          delta: -1,
+        })),
+      ]
+        .filter((event) => event.index >= windowStart && event.index < match.index)
+        .sort((left, right) => left.index - right.index);
+      let openTransactions = 0;
+      for (const event of events) {
+        openTransactions = Math.max(0, openTransactions + event.delta);
+      }
+      const hasOpenTransaction = openTransactions > 0;
 
       if (!hasOpenTransaction) {
         continue;
@@ -179,7 +283,7 @@ function findAsyncInTransactionViolations(content: string, filePath: string): Ch
         severity: 'warning',
         suggestion:
           'Move network/external calls outside transaction boundary. Collect data first, then start transaction for DB writes only. Publish events after commit.',
-        match: match[0],
+        match: content.slice(match.index, match.index + match[0].length),
         type: 'async-in-transaction',
         filePath,
       });
@@ -201,7 +305,7 @@ export const transactionBoundaryValidation = defineCheck({
   id: '77c69adc-7ccd-4f83-98d1-fb9599d3e16f',
   slug: 'transaction-boundary-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Validate transaction boundaries are properly managed',
@@ -223,17 +327,28 @@ export const transactionBoundaryValidation = defineCheck({
     // commit/rollback, callback throws, etc.) to verify detection logic.
     if (isTestFile(filePath)) return [];
 
-    const usesTransactions = anyPatternMatches(TRANSACTION_PATTERNS, content);
-    if (!usesTransactions) {
+    const codeMask = createCodeMask(filePath, content);
+    const transactionStarts = findTransactionStarts(filePath, content, codeMask);
+    if (transactionStarts.length === 0) {
       return [];
     }
 
-    const hasProperHandling = anyPatternMatches(PROPER_TRANSACTION_PATTERNS, content);
-    const uncommittedViolations = hasProperHandling
-      ? []
-      : findUncommittedTransactionViolations(content, filePath);
+    const transactionCompletions = findTransactionCompletions(filePath, content, codeMask);
+    const uncommittedViolations = findUncommittedTransactionViolations(
+      content,
+      filePath,
+      codeMask,
+      transactionStarts,
+      transactionCompletions,
+    );
 
-    const asyncViolations = findAsyncInTransactionViolations(content, filePath);
+    const asyncViolations = findAsyncInTransactionViolations(
+      content,
+      filePath,
+      codeMask,
+      transactionStarts,
+      transactionCompletions,
+    );
 
     return [...uncommittedViolations, ...asyncViolations];
   },
@@ -268,43 +383,25 @@ export const transactionTimeout = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = [];
+    const codeMask = createCodeMask(filePath, content);
+    const manualPattern = /(?:\.beginTransaction|\.startTransaction|queryRunner)/g;
+    const manualMatch = findCodeMatches(manualPattern, codeMask, codeMask)[0];
+    const hasTimeout = TIMEOUT_PATTERNS.some(
+      (pattern) => findCodeMatches(pattern, codeMask, codeMask).length > 0,
+    );
 
-    // Check if this file uses transactions (M7: reset lastIndex on /g patterns)
-    const usesTransactions = anyPatternMatches(TRANSACTION_PATTERNS, content);
-    if (!usesTransactions) {
-      return violations;
-    }
-
-    // Check for timeout configuration
-    const hasTimeout = anyPatternMatches(TIMEOUT_PATTERNS, content);
-
-    // Only flag if using manual transaction management (not ORM decorators)
-    const usesManualTransactions =
-      content.includes('.beginTransaction') ||
-      content.includes('.startTransaction') ||
-      content.includes('queryRunner');
-
-    if (usesManualTransactions && !hasTimeout) {
-      // Find the transaction usage for line number
-      for (const pattern of TRANSACTION_PATTERNS) {
-        pattern.lastIndex = 0;
-        const match = pattern.exec(content);
-        if (match) {
-          const lineNumber = getLineNumber(content, match.index);
-          violations.push({
-            line: lineNumber,
-            column: 0,
-            message: 'Transaction without timeout configuration may hang indefinitely',
-            severity: 'warning',
-            suggestion:
-              'Configure transactionTimeout or statementTimeout. Example: SET statement_timeout = 30000; or configure in TypeORM: { extra: { statement_timeout: 30000 } }',
-            match: match[0],
-            type: 'missing-transaction-timeout',
-            filePath,
-          });
-          break;
-        }
-      }
+    if (manualMatch && !hasTimeout) {
+      violations.push({
+        line: getLineNumber(content, manualMatch.index),
+        column: 0,
+        message: 'Transaction without timeout configuration may hang indefinitely',
+        severity: 'warning',
+        suggestion:
+          'Configure transactionTimeout or statementTimeout. Example: SET statement_timeout = 30000; or configure in TypeORM: { extra: { statement_timeout: 30000 } }',
+        match: content.slice(manualMatch.index, manualMatch.index + manualMatch[0].length),
+        type: 'missing-transaction-timeout',
+        filePath,
+      });
     }
 
     return violations;

@@ -3,13 +3,21 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import { defineCheck, isCommentLine, type CheckViolation } from '@opensip-cli/fitness';
+import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+
+import {
+  createCodeMask,
+  findCodeMatch,
+  findStaticModuleReferences,
+  hasCodeMatch,
+} from '../code-aware-match.js';
 
 /**
  * Security pattern configuration
  */
 interface SecurityPattern {
   regex: RegExp;
+  codeEvidence?: RegExp;
   message: string;
   suggestion: string;
   severity: 'error' | 'warning';
@@ -22,6 +30,7 @@ interface SecurityPattern {
 interface CreateSecurityPatternOptions {
   pattern: string;
   flags: string;
+  codeEvidence?: RegExp;
   message: string;
   suggestion: string;
   severity: 'error' | 'warning';
@@ -35,10 +44,11 @@ interface CreateSecurityPatternOptions {
  * @returns Security pattern configuration
  */
 function createSecurityPattern(options: CreateSecurityPatternOptions): SecurityPattern {
-  const { pattern, flags, message, suggestion, severity, category } = options;
+  const { pattern, flags, codeEvidence, message, suggestion, severity, category } = options;
   // @fitness-ignore-next-line semgrep-scan -- non-literal RegExp is intentional; patterns are hardcoded string constants for code analysis, not user input
   return {
     regex: new RegExp(pattern, flags),
+    ...(codeEvidence ? { codeEvidence } : {}),
     message,
     suggestion,
     severity,
@@ -65,62 +75,40 @@ function isWebhookRelatedFile(filePath: string): boolean {
   return lowerPath.includes('/hook/') || lowerPath.includes('/hooks/');
 }
 
-// Patterns indicating proper verifier usage - simple string checks
-const VERIFIER_STRINGS = [
-  'infrastructure/webhooks',
-  'createHmacVerifier',
-  'createStripeVerifier',
-  'createTwilioVerifier',
-  'createSendGridVerifier',
-  'verifySignature',
-  'validateSignature',
-];
-
 /**
  * Check if content has proper verifier imports
  * @param content - File content
  * @returns True if content has verifier imports
  */
-function hasVerifierImport(content: string): boolean {
+function hasVerifierEvidence(filePath: string, content: string, codeMask: string): boolean {
   logger.debug({
     evt: 'fitness.checks.webhook_signature.has_verifier_import',
     msg: 'Checking if content has verifier imports',
   });
-  return VERIFIER_STRINGS.some((str) => content.includes(str));
+  const hasInfrastructureImport = findStaticModuleReferences(filePath, content).some(
+    (reference) =>
+      reference.keyword === 'import' &&
+      reference.runtimeImport &&
+      reference.moduleSpecifier.includes('infrastructure/webhooks'),
+  );
+  if (hasInfrastructureImport) return true;
+  return hasCodeMatch(
+    /\b(?:createHmacVerifier|createStripeVerifier|createTwilioVerifier|createSendGridVerifier|verifySignature|validateSignature)\s*\(/,
+    codeMask,
+    codeMask,
+  );
 }
 
 // Security issue patterns - using RegExp constructor to avoid sonarjs warnings
 const SECURITY_ISSUE_PATTERNS: SecurityPattern[] = [
-  // Hardcoded webhook secrets - simplified non-backtracking pattern
   createSecurityPattern({
-    pattern: String.raw`(?:webhook)?secret\s*[:=]\s*['"][^'"]{10,}['"]`,
+    pattern: String.raw`['"\`]whsec_[a-zA-Z0-9]+['"\`]`,
     flags: 'gi',
-    message: 'Hardcoded webhook secret detected - use environment variables',
-    suggestion:
-      'Move webhook secret to environment variable: process.env.WEBHOOK_SECRET. Never commit secrets to source control.',
-    severity: 'error',
-    category: 'hardcoded-secret',
-  }),
-  createSecurityPattern({
-    pattern: 'whsec_[a-zA-Z0-9]+',
-    flags: 'g',
     message: 'Hardcoded Stripe webhook secret detected - use environment variables',
     suggestion:
       'Move Stripe webhook secret to process.env.STRIPE_WEBHOOK_SECRET. Rotate the secret immediately if it was exposed in git history.',
     severity: 'error',
     category: 'hardcoded-secret',
-  }),
-  // Direct string comparison for signatures (not timing-safe)
-  // Simplified pattern without lookahead to avoid slow-regex/backtracking
-  createSecurityPattern({
-    pattern: String.raw`signature\s*(?:===|!==|==|!=)\s*[^;]+`,
-    flags: 'gi',
-    message:
-      'Direct signature comparison detected - use timing-safe comparison to prevent timing attacks',
-    suggestion:
-      'Use crypto.timingSafeEqual() for signature comparison: crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)). Direct comparison is vulnerable to timing attacks.',
-    severity: 'warning',
-    category: 'insecure-signature',
   }),
 ];
 
@@ -129,6 +117,7 @@ const UNSAFE_JSON_PATTERNS: SecurityPattern[] = [
   createSecurityPattern({
     pattern: String.raw`JSON\.parse\s*\([^)]*(?:req\.body|request\.body|rawBody)`,
     flags: 'gi',
+    codeEvidence: /\b(?:req\.body|request\.body|rawBody)\b/,
     message:
       'JSON.parse on webhook body without signature verification - use a shared webhook verification utility',
     suggestion:
@@ -154,6 +143,7 @@ function shouldSkipFile(filePath: string): boolean {
 function checkPatterns(
   patterns: SecurityPattern[],
   line: string,
+  codeLine: string,
   lineNum: number,
   filePath: string,
 ): CheckViolation[] {
@@ -164,9 +154,9 @@ function checkPatterns(
   const violations: CheckViolation[] = [];
 
   for (const pattern of patterns) {
-    pattern.regex.lastIndex = 0;
-    const match = pattern.regex.exec(line);
-    if (match) {
+    const match = findCodeMatch(pattern.regex, line, codeLine);
+    const matchedCode = match ? codeLine.slice(match.index, match.index + match[0].length) : '';
+    if (match && (!pattern.codeEvidence || pattern.codeEvidence.test(matchedCode))) {
       violations.push({
         line: lineNum + 1,
         column: match.index + 1,
@@ -183,6 +173,61 @@ function checkPatterns(
   return violations;
 }
 
+function namedSecretViolations(
+  line: string,
+  codeLine: string,
+  lineNum: number,
+  filePath: string,
+): CheckViolation[] {
+  const violations: CheckViolation[] = [];
+  const secretAssignment =
+    /\b(?:[A-Z_$][\w$]*(?:WebhookSecret|_webhook_secret)|webhookSecret|webhook_secret|secret)\b\s*[:=]\s*(['"`])/gi;
+  for (const match of codeLine.matchAll(secretAssignment)) {
+    if (match.index === undefined || !match[1]) continue;
+    const quoteStart = match.index + match[0].lastIndexOf(match[1]);
+    const quoteEnd = codeLine.indexOf(match[1], quoteStart + 1);
+    if (quoteEnd === -1 || line.slice(quoteStart + 1, quoteEnd).length < 10) continue;
+    violations.push({
+      line: lineNum + 1,
+      column: match.index,
+      message: 'Hardcoded webhook secret detected - use environment variables',
+      severity: 'error',
+      suggestion:
+        'Move webhook secret to environment variable: process.env.WEBHOOK_SECRET. Never commit secrets to source control.',
+      match: line.slice(match.index, quoteEnd + 1),
+      type: 'hardcoded-secret',
+      filePath,
+    });
+  }
+  return violations;
+}
+
+function insecureSignatureViolations(
+  line: string,
+  codeLine: string,
+  lineNum: number,
+  filePath: string,
+): CheckViolation[] {
+  const comparison = /\bsignature\b\s*(?:===|!==|==|!=)\s*[^;\n]+/gi;
+  return [...codeLine.matchAll(comparison)].flatMap((match) => {
+    if (match.index === undefined) return [];
+    return [
+      {
+        line: lineNum + 1,
+        column: match.index,
+        message:
+          'Direct signature comparison detected - use timing-safe comparison to prevent timing attacks',
+        severity: 'warning' as const,
+        suggestion:
+          'Use crypto.timingSafeEqual() for signature comparison: crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b)). Direct comparison is vulnerable to timing attacks.',
+        match: line.slice(match.index, match.index + match[0].length),
+        type: 'insecure-signature',
+        filePath,
+      },
+    ];
+  });
+}
+
 /**
  * Check: security/webhook-signature-verification
  *
@@ -194,7 +239,7 @@ export const webhookSignatureVerification = defineCheck({
   disabled: true,
   tags: ['security'],
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Detect webhook endpoints without signature verification',
@@ -220,21 +265,27 @@ export const webhookSignatureVerification = defineCheck({
     }
 
     const violations: CheckViolation[] = [];
-    const fileHasVerifierImport = hasVerifierImport(content);
+    const codeMask = createCodeMask(filePath, content);
+    const fileHasVerifierEvidence = hasVerifierEvidence(filePath, content, codeMask);
     const lines = content.split('\n');
+    const codeLines = codeMask.split('\n');
 
     for (const [lineNum, line_] of lines.entries()) {
       const line = line_ ?? '';
+      const codeLine = codeLines[lineNum] ?? '';
 
-      if (isCommentLine(line)) {
-        continue;
+      const lineViolations = [
+        ...namedSecretViolations(line, codeLine, lineNum, filePath),
+        ...insecureSignatureViolations(line, codeLine, lineNum, filePath),
+        ...checkPatterns(SECURITY_ISSUE_PATTERNS, line, codeLine, lineNum, filePath),
+      ];
+
+      if (!fileHasVerifierEvidence) {
+        lineViolations.push(
+          ...checkPatterns(UNSAFE_JSON_PATTERNS, line, codeLine, lineNum, filePath),
+        );
       }
-
-      violations.push(...checkPatterns(SECURITY_ISSUE_PATTERNS, line, lineNum, filePath));
-
-      if (!fileHasVerifierImport) {
-        violations.push(...checkPatterns(UNSAFE_JSON_PATTERNS, line, lineNum, filePath));
-      }
+      violations.push(...lineViolations);
     }
 
     return violations;

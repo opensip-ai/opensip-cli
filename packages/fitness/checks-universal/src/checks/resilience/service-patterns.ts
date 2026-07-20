@@ -5,20 +5,26 @@
 import { logger } from '@opensip-cli/core';
 import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 
+import {
+  createCodeMask,
+  findCodeMatch,
+  findStaticStringLiterals,
+  hasCodeMatch,
+} from '../code-aware-match.js';
+
 // =============================================================================
 // PRE-COMPILED REGEX PATTERNS (Safe for static code analysis)
 // =============================================================================
 
 // Service entry patterns (bounded quantifiers to prevent slow regex)
-const LISTEN_PATTERN = /\.listen\s{0,5}\(/;
-const FASTIFY_PATTERN = /fastify\s{0,5}\(\)/;
-const EXPRESS_PATTERN = /express\s{0,5}\(\)/;
-const CREATE_SERVER_PATTERN = /createServer\s{0,5}\(/;
+const LISTEN_PATTERN = /\.listen\s*\(/;
+const FASTIFY_PATTERN = /fastify\s*\(\)/;
+const EXPRESS_PATTERN = /express\s*\(\)/;
+const CREATE_SERVER_PATTERN = /createServer\s*\(/;
 
 // Shutdown patterns (bounded quantifiers to prevent slow regex)
-const SIGTERM_PATTERN = /process\.on\s{0,5}\(\s{0,5}['"]SIGTERM['"]/;
-const SIGINT_PATTERN = /process\.on\s{0,5}\(\s{0,5}['"]SIGINT['"]/;
-const CLOSE_PATTERN = /\.close\s{0,5}\(\s{0,5}\)/;
+const SIGNAL_HANDLER_PATTERN = /process\.(?:on|once)\s*\(\s*['"`](?:SIGTERM|SIGINT)['"`]/;
+const CLOSE_PATTERN = /\.close\s*\(\s*\)/;
 const GRACEFUL_PATTERN = /graceful(?:Shutdown|Stop)/i;
 
 // API endpoint patterns
@@ -52,8 +58,6 @@ const SERVICE_ENTRY_PATTERNS = [
   CREATE_SERVER_PATTERN,
 ];
 
-const SHUTDOWN_PATTERNS = [SIGTERM_PATTERN, SIGINT_PATTERN, CLOSE_PATTERN, GRACEFUL_PATTERN];
-
 const API_ENDPOINT_PATTERNS = [
   GET_ENDPOINT_PATTERN,
   POST_ENDPOINT_PATTERN,
@@ -81,20 +85,32 @@ const SENSITIVE_ENDPOINTS = [
 // HELPER FUNCTIONS
 // =============================================================================
 
-function isServiceEntryPoint(content: string): boolean {
+function isServiceEntryPoint(content: string, codeMask: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.is_service_entry_point',
     msg: 'Checking if content is a service entry point',
   });
-  return SERVICE_ENTRY_PATTERNS.some((pattern) => pattern.test(content));
+  return SERVICE_ENTRY_PATTERNS.some((pattern) => hasCodeMatch(pattern, codeMask, codeMask));
 }
 
-function hasShutdownHandler(content: string): boolean {
+function hasStaticSignalHandler(filePath: string, content: string, codeMask: string): boolean {
+  return findStaticStringLiterals(filePath, content).some((literal) => {
+    if (literal.value !== 'SIGTERM' && literal.value !== 'SIGINT') return false;
+    return /\bprocess\s*\.\s*(?:on|once)\s*\(\s*$/.test(codeMask.slice(0, literal.start));
+  });
+}
+
+function hasShutdownHandler(filePath: string, content: string, codeMask: string): boolean {
   logger.debug({
     evt: 'fitness.checks.service_patterns.has_shutdown_handler',
     msg: 'Checking if content has shutdown handler',
   });
-  return SHUTDOWN_PATTERNS.some((pattern) => pattern.test(content));
+  return (
+    hasStaticSignalHandler(filePath, content, codeMask) ||
+    hasCodeMatch(SIGNAL_HANDLER_PATTERN, content, codeMask) ||
+    hasCodeMatch(CLOSE_PATTERN, codeMask, codeMask) ||
+    hasCodeMatch(GRACEFUL_PATTERN, codeMask, codeMask)
+  );
 }
 
 function hasApiEndpoints(content: string): boolean {
@@ -143,7 +159,7 @@ export const gracefulShutdown = defineCheck({
   id: '3e98b441-1ec9-4963-bb97-6f5b0bce0fbe',
   slug: 'graceful-shutdown',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Validate services implement graceful shutdown handling',
@@ -151,7 +167,7 @@ export const gracefulShutdown = defineCheck({
 
 **Detects:**
 - Files containing service entry patterns (\`.listen(\`, \`fastify()\`, \`express()\`, \`createServer(\`) without shutdown handlers
-- Checks for \`process.on('SIGTERM'\`, \`process.on('SIGINT'\`, \`.close()\`, or \`gracefulShutdown\`/\`gracefulStop\` patterns
+- Checks for \`process.on/once('SIGTERM'\`, \`process.on/once('SIGINT'\`, \`.close()\`, or \`gracefulShutdown\`/\`gracefulStop\` patterns
 
 **Why it matters:** Without graceful shutdown, deploys and restarts drop in-flight requests, corrupt transactions, and leak resources.
 
@@ -161,20 +177,20 @@ export const gracefulShutdown = defineCheck({
 
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = [];
+    const codeMask = createCodeMask(filePath, content);
 
-    if (!isServiceEntryPoint(content)) {
+    if (!isServiceEntryPoint(content, codeMask)) {
       return violations;
     }
 
-    if (hasShutdownHandler(content)) {
+    if (hasShutdownHandler(filePath, content, codeMask)) {
       return violations;
     }
 
     // Find service entry violation
     for (const pattern of SERVICE_ENTRY_PATTERNS) {
       // @lazy-ok -- 'await' appears in suggestion string literal, not actual await
-      pattern.lastIndex = 0;
-      const match = pattern.exec(content);
+      const match = findCodeMatch(pattern, codeMask, codeMask);
       if (!match) {
         continue;
       }
@@ -187,7 +203,7 @@ export const gracefulShutdown = defineCheck({
         severity: 'warning',
         suggestion:
           'Add SIGTERM/SIGINT handlers to gracefully close connections. Example: process.on("SIGTERM", async () => { await server.close(); process.exit(0); })',
-        match: match[0],
+        match: content.slice(match.index, match.index + match[0].length),
         type: 'missing-shutdown-handler',
         filePath,
       });

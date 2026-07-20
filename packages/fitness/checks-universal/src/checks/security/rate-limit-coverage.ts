@@ -4,20 +4,21 @@
 
 import { logger } from '@opensip-cli/core';
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
+
 import {
-  stripStringLiteralsPreservingPositions,
-  stripStringsAndComments,
-} from '@opensip-cli/fitness';
+  createCodeMask,
+  createLiteralAwareCodeMask,
+  findCodeMatches,
+  hasCodeMatch,
+} from '../code-aware-match.js';
 
 /**
  * Pre-compiled regex patterns for rate limit detection.
  * These patterns match fixed, bounded strings with no user input - safe from ReDoS.
  */
-const RATE_LIMIT_REGEX = new RegExp(
-  'rateLimit|rateLimiter|preHandler.*rateLimit|onRequest.*rateLimit',
-  'i',
-);
+const RATE_LIMIT_REGEX = /\b(?:rateLimit|rateLimiter)\b/i;
 const INTERNAL_ROUTE_REGEX = new RegExp('/health|/metrics|/ready|/live|internal', 'i');
+const ROUTE_PATH_REGEX = /\.(?:get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]{1,500})['"`]/i;
 const FASTIFY_ROUTE_REGEX = new RegExp(
   'fastify\\.(get|post|put|patch|delete)\\s*\\(\\s*[\'"`]/api[^\'"`]*[\'"`]',
   'gi',
@@ -31,11 +32,11 @@ const SENSITIVE_ENDPOINT_REGEX = new RegExp(
   'gi',
 );
 const GLOBAL_RATE_LIMIT_REGISTER_REGEX = new RegExp(
-  String.raw`register\s*\(\s*(?:rateLimit|rateLimiter)`,
+  String.raw`\bfastify\s*\.\s*register\s*\(\s*(?:rateLimit|rateLimiter)\b`,
   'i',
 );
 const GLOBAL_RATE_LIMIT_USE_REGEX = new RegExp(
-  String.raw`use\s*\(\s*(?:rateLimit|rateLimiter)`,
+  String.raw`\b(?:app|router)\s*\.\s*use\s*\(\s*(?:rateLimit|rateLimiter)\b`,
   'i',
 );
 const FRAMEWORK_DETECT_REGEX = /(?:fastify|app|router)\.(get|post|put|patch|delete)\s*\(/i;
@@ -45,12 +46,12 @@ const FRAMEWORK_DETECT_REGEX = /(?:fastify|app|router)\.(get|post|put|patch|dele
  * @param context - The code context to check
  * @returns True if rate limiting is present
  */
-function hasRateLimiting(context: string): boolean {
+function hasRateLimiting(_context: string, codeContext: string): boolean {
   logger.debug({
     evt: 'fitness.checks.rate_limit_coverage.has_rate_limiting',
     msg: 'Checking if context has rate limiting',
   });
-  return RATE_LIMIT_REGEX.test(context);
+  return hasCodeMatch(RATE_LIMIT_REGEX, codeContext, codeContext);
 }
 
 /**
@@ -58,12 +59,13 @@ function hasRateLimiting(context: string): boolean {
  * @param context - The code context to check
  * @returns True if the route is internal
  */
-function isInternalRoute(context: string): boolean {
+function isInternalRoute(routeLine: string): boolean {
   logger.debug({
     evt: 'fitness.checks.rate_limit_coverage.is_internal_route',
     msg: 'Checking if route is internal',
   });
-  return INTERNAL_ROUTE_REGEX.test(context);
+  const routePath = ROUTE_PATH_REGEX.exec(routeLine)?.[1];
+  return routePath !== undefined && INTERNAL_ROUTE_REGEX.test(routePath);
 }
 
 // Patterns that indicate route definitions needing rate limiting
@@ -71,7 +73,8 @@ const ROUTE_PATTERNS = [
   // Fastify routes
   {
     regex: FASTIFY_ROUTE_REGEX,
-    check: (context: string) => !hasRateLimiting(context) && !isInternalRoute(context),
+    check: (context: string, codeContext: string, routeLine: string) =>
+      !hasRateLimiting(context, codeContext) && !isInternalRoute(routeLine),
     message: 'API route may be missing rate limiting configuration',
     suggestion:
       'Add rate limiting middleware: fastify.register(rateLimiter, { max: 100, timeWindow: "1 minute" }). Apply per-route or globally.',
@@ -80,7 +83,8 @@ const ROUTE_PATTERNS = [
   // Express routes
   {
     regex: EXPRESS_ROUTE_REGEX,
-    check: (context: string) => !hasRateLimiting(context) && !isInternalRoute(context),
+    check: (context: string, codeContext: string, routeLine: string) =>
+      !hasRateLimiting(context, codeContext) && !isInternalRoute(routeLine),
     message: 'API route may be missing rate limiting configuration',
     suggestion:
       'Add rate limiting middleware: app.use(rateLimiter({ max: 100, windowMs: 60000 })). Apply per-route or globally.',
@@ -89,13 +93,33 @@ const ROUTE_PATTERNS = [
   // Sensitive endpoints that must have rate limiting
   {
     regex: SENSITIVE_ENDPOINT_REGEX,
-    check: (context: string) => !hasRateLimiting(context),
+    check: (context: string, codeContext: string) => !hasRateLimiting(context, codeContext),
     message: 'Sensitive authentication endpoint should have rate limiting',
     suggestion:
       'Authentication endpoints must have strict rate limiting to prevent brute force attacks. Apply a limit of ~5-10 requests per minute for login/password endpoints.',
     severity: 'error' as const,
   },
 ];
+
+function callEnd(codeMask: string, matchIndex: number): number {
+  const openingParen = codeMask.indexOf('(', matchIndex);
+  if (openingParen === -1) return matchIndex;
+  let depth = 0;
+  for (let index = openingParen; index < codeMask.length; index++) {
+    if (codeMask[index] === '(') depth++;
+    if (codeMask[index] !== ')') continue;
+    depth--;
+    if (depth === 0) return index + 1;
+  }
+  return codeMask.length;
+}
+
+function globalRateLimitIndexes(codeMask: string): readonly number[] {
+  return [
+    ...findCodeMatches(GLOBAL_RATE_LIMIT_REGISTER_REGEX, codeMask, codeMask),
+    ...findCodeMatches(GLOBAL_RATE_LIMIT_USE_REGEX, codeMask, codeMask),
+  ].map((match) => match.index);
+}
 
 /**
  * Check: security/rate-limit-coverage
@@ -107,20 +131,20 @@ export const rateLimitCoverage = defineCheck({
   slug: 'rate-limit-coverage',
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'medium',
   description: 'Validate routes have rate limiting configured',
   longDescription: `**Purpose:** Ensures API routes have rate limiting configured to prevent abuse, with stricter enforcement on authentication endpoints.
 
 **Detects:**
-- Fastify routes (\`fastify.get/post/put/patch/delete('/api/...')\`) without rateLimit/rateLimiter in the surrounding context (next 8 lines)
+- Fastify routes (\`fastify.get/post/put/patch/delete('/api/...')\`) without rateLimit/rateLimiter in the same route call
 - Express routes (\`app/router.get/post/put/patch/delete('/api/...')\`) without rate limiting
 - Sensitive authentication endpoints (\`.post/.put\` with login, signin, signup, register, password, reset, auth, or token in path) missing rate limiting (elevated to error severity)
 
 **Why it matters:** Without rate limiting, APIs are vulnerable to brute-force attacks, credential stuffing, and denial-of-service. Authentication endpoints are especially critical targets.
 
-**Scope:** General best practice. Analyzes each file individually. Skips files with global rate limiting (\`register(rateLimit)\` or \`use(rateLimit)\`).`,
+**Scope:** General best practice. Analyzes each file individually. A global \`register(rateLimit)\` or \`use(rateLimit)\` protects only routes declared after that registration.`,
   tags: ['security', 'rate-limiting', 'api'],
   fileTypes: ['ts'],
 
@@ -130,52 +154,36 @@ export const rateLimitCoverage = defineCheck({
       msg: 'Analyzing file for rate limit coverage',
     });
     // Only check files that might define routes
-    if (!FRAMEWORK_DETECT_REGEX.test(stripStringsAndComments(content))) {
-      return [];
-    }
-
-    // Check if file has global rate limiting applied
-    const hasGlobalRateLimit =
-      GLOBAL_RATE_LIMIT_REGISTER_REGEX.test(content) || GLOBAL_RATE_LIMIT_USE_REGEX.test(content);
-
-    // If global rate limiting is applied, skip detailed checking
-    if (hasGlobalRateLimit) {
+    const codeMask = createCodeMask(filePath, content);
+    const literalCodeMask = createLiteralAwareCodeMask(filePath, content);
+    const syntaxMask = literalCodeMask === codeMask ? content : literalCodeMask;
+    if (!hasCodeMatch(FRAMEWORK_DETECT_REGEX, syntaxMask, codeMask)) {
       return [];
     }
 
     const violations: CheckViolation[] = [];
-    const lines = content.split('\n');
+    const globalIndexes = globalRateLimitIndexes(codeMask);
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum] ?? '';
-
-      // Get context (current line + next few lines)
-      const context = lines.slice(lineNum, lineNum + 8).join(' ');
-
-      // Skip comments
-      const trimmed = line.trim();
-      if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-        continue;
-      }
-
-      const strippedLine = stripStringLiteralsPreservingPositions(line);
-      const strippedContext = stripStringLiteralsPreservingPositions(context);
-
-      for (const pattern of ROUTE_PATTERNS) {
-        // Reset regex state
-        pattern.regex.lastIndex = 0;
-        const match = pattern.regex.exec(strippedLine);
-        if (match && pattern.check(strippedContext)) {
-          violations.push({
-            line: lineNum + 1,
-            column: match.index + 1,
-            message: pattern.message,
-            severity: pattern.severity,
-            suggestion: pattern.suggestion,
-            match: match[0],
-            filePath,
-          });
+    for (const pattern of ROUTE_PATTERNS) {
+      for (const match of findCodeMatches(pattern.regex, syntaxMask, codeMask)) {
+        const end = callEnd(codeMask, match.index);
+        const routeCode = codeMask.slice(match.index, end);
+        const routeSyntax = syntaxMask.slice(match.index, end);
+        const hasPrecedingGlobal = globalIndexes.some((index) => index < match.index);
+        if (hasPrecedingGlobal || !pattern.check(routeSyntax, routeCode, routeSyntax)) {
+          continue;
         }
+
+        const lineStart = content.lastIndexOf('\n', match.index - 1) + 1;
+        violations.push({
+          line: content.slice(0, match.index).split('\n').length,
+          column: match.index - lineStart,
+          message: pattern.message,
+          severity: pattern.severity,
+          suggestion: pattern.suggestion,
+          match: content.slice(match.index, match.index + match[0].length),
+          filePath,
+        });
       }
     }
 
