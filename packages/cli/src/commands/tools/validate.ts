@@ -300,7 +300,7 @@ export async function runToolValidation(
           verdict: 'failed',
           sections: [section('staging', 'failed', [staged.stagingError])],
         },
-        cleanup: NOOP_CLEANUP,
+        cleanup: keepStaged ? staged.cleanup : NOOP_CLEANUP,
       };
     }
 

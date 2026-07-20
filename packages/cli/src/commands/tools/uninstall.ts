@@ -75,6 +75,10 @@ function failed(target: string, error: string): ToolsUninstallResult {
 
 /** Resolve + remove one installed tool. Never touches the datastore. */
 export function toolsUninstall(opts: ToolsUninstallOptions): ToolsUninstallResult {
+  if (opts.global === true && opts.project === true) {
+    return failed(opts.target, '--global and --project are mutually exclusive');
+  }
+
   // Bundled tools are not uninstallable — resolve the bundled id set from the
   // run's provenance (always present: bundled admission is fail-closed).
   const bundledIds = new Set(

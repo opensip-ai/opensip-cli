@@ -21,7 +21,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { resolveProjectPaths, resolveUserPaths } from '@opensip-cli/core';
 import { satisfies as satisfiesSemver } from 'semver';
@@ -175,6 +175,22 @@ export function findInstalledName(
   return findInstalledPackage(dir, requestedSpec, depsBefore)?.name;
 }
 
+function findInstalledLocalPackage(
+  dir: string,
+  nodeModulesDir: string,
+  requestedSpec: string,
+): PackageManifest | undefined {
+  const requestedLocalPath = resolveLocalSpecPath(dir, requestedSpec);
+  if (requestedLocalPath === undefined) return undefined;
+  const host = readPackageJson(join(dir, HOST_PACKAGE_JSON));
+  for (const [name, spec] of Object.entries(host?.dependencies ?? {})) {
+    if (resolveLocalSpecPath(dir, spec) !== requestedLocalPath) continue;
+    const pkg = readPackageJson(join(nodeModulesDir, name, HOST_PACKAGE_JSON));
+    if (pkg?.name === name) return pkg;
+  }
+  return undefined;
+}
+
 function findInstalledPackage(
   dir: string,
   requestedSpec: string,
@@ -189,6 +205,9 @@ function findInstalledPackage(
     if (pkg) return pkg;
   }
 
+  const localPackage = findInstalledLocalPackage(dir, nodeModulesDir, requestedSpec);
+  if (localPackage !== undefined) return localPackage;
+
   // Local-path installs: the new dep key is whichever entry is in the
   // host package.json now that wasn't there before.
   const depsAfter = readHostDependencies(dir);
@@ -198,6 +217,12 @@ function findInstalledPackage(
     if (pkg?.name === name) return pkg;
   }
   return undefined;
+}
+
+function resolveLocalSpecPath(dir: string, spec: string): string | undefined {
+  const raw = spec.startsWith('file:') ? spec.slice('file:'.length) : spec;
+  if (!isAbsolute(raw) && !raw.startsWith('.')) return undefined;
+  return resolve(dir, raw);
 }
 
 export function readHostDependencies(dir: string): Set<string> {

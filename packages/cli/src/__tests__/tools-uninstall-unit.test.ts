@@ -135,6 +135,22 @@ describe('toolsUninstall — rejection / resolution failures (no shell-out)', ()
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/not installed in the global scope/);
   });
+
+  it('rejects mutually exclusive scope selectors', () => {
+    writeToolPackage(projectHost(), '@x/dual', 'dual');
+    writeToolPackage(globalHost(), '@x/dual', 'dual');
+
+    const result = toolsUninstall({
+      target: 'dual',
+      cwd: projectDir,
+      global: true,
+      project: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/mutually exclusive/);
+    expect(removeToolPlugin).not.toHaveBeenCalled();
+  });
 });
 
 describe('toolsUninstall — removal (mocked npm boundary)', () => {

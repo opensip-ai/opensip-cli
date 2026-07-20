@@ -164,6 +164,24 @@ describe('findInstalledName', () => {
     expect(findInstalledName(dir, 'file:../local', depsBefore)).toBe('@org/from-local');
   });
 
+  it('resolves a repeated local-path install whose dependency key already existed', () => {
+    const dir = ensurePluginHostDir('fit', projectRoot);
+    const nm = join(dir, 'node_modules');
+    writeInstalledPackage(nm, '@org/from-local', { version: '0.0.2' });
+    writeFileSync(
+      join(dir, HOST_PACKAGE_JSON),
+      JSON.stringify({
+        name: 'host',
+        dependencies: { '@org/from-local': 'file:../local' },
+      }),
+      'utf8',
+    );
+
+    expect(findInstalledName(dir, 'file:../local', new Set(['@org/from-local']))).toBe(
+      '@org/from-local',
+    );
+  });
+
   it('returns undefined for a local-path spec when the new dep is not on disk', () => {
     const dir = ensurePluginHostDir('fit', projectRoot);
     mkdirSync(join(dir, 'node_modules'), { recursive: true });

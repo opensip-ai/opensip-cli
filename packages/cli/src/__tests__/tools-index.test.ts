@@ -129,6 +129,18 @@ describe('tools list handler', () => {
     expect(filtered.type).toBe('tools-available');
     expect(unfiltered.type).toBe('tools-available');
   });
+
+  it('rejects mutually exclusive scope filters', async () => {
+    await expect(
+      Promise.resolve().then(() =>
+        handlerFor('list')({
+          cwd: tmp,
+          global: true,
+          project: true,
+        }),
+      ),
+    ).rejects.toThrow(/mutually exclusive/);
+  });
 });
 
 describe('tools doctor handler', () => {
@@ -225,16 +237,17 @@ describe('tools validate handler', () => {
 
 describe('tools install handler', () => {
   it('rejects --global + --project as mutually exclusive without delegating', async () => {
-    const result = (await handlerFor('install')({
-      cwd: tmp,
-      _args: ['pkg'],
-      global: true,
-      project: true,
-    })) as { success: boolean; error: string };
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/mutually exclusive/);
+    await expect(
+      Promise.resolve().then(() =>
+        handlerFor('install')({
+          cwd: tmp,
+          _args: ['pkg'],
+          global: true,
+          project: true,
+        }),
+      ),
+    ).rejects.toThrow(/mutually exclusive/);
     expect(toolsInstall).not.toHaveBeenCalled();
-    expect(exitCodes).toContain(EXIT_CODES.CONFIGURATION_ERROR);
   });
 
   it('delegates a valid install and passes success through', async () => {
@@ -288,6 +301,20 @@ describe('tools uninstall handler', () => {
     })) as { success: boolean; error: string };
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/project-local only/);
+    expect(toolsUninstall).not.toHaveBeenCalled();
+  });
+
+  it('rejects --global + --project before delegating', async () => {
+    await expect(
+      Promise.resolve().then(() =>
+        handlerFor('uninstall')({
+          cwd: tmp,
+          _args: ['t'],
+          global: true,
+          project: true,
+        }),
+      ),
+    ).rejects.toThrow(/mutually exclusive/);
     expect(toolsUninstall).not.toHaveBeenCalled();
   });
 
@@ -351,15 +378,7 @@ describe('tools install handler', () => {
 });
 
 describe('tools handlers — empty argv defaults to an empty spec/target', () => {
-  it('install rejection, uninstall rejection, and data-purge error all tolerate missing _args', async () => {
-    const install = (await handlerFor('install')({
-      cwd: tmp,
-      _args: [],
-      global: true,
-      project: true,
-    })) as { target: string };
-    expect(install.target).toBe('');
-
+  it('uninstall rejection and data-purge error tolerate missing _args', async () => {
     const uninstall = (await handlerFor('uninstall')({
       cwd: tmp,
       _args: [],

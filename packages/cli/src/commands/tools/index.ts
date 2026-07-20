@@ -9,7 +9,7 @@
  */
 
 import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
-import { currentScope, type ProjectContext } from '@opensip-cli/core';
+import { ConfigurationError, currentScope, type ProjectContext } from '@opensip-cli/core';
 
 import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
 import {
@@ -52,6 +52,14 @@ interface ScopeFilterOpts {
  */
 function effectiveCwd(opts: ScopeFilterOpts): string {
   return opts.projectContext?.projectRoot ?? opts.cwd ?? process.cwd();
+}
+
+function assertExclusiveScope(opts: ScopeFilterOpts): void {
+  if (opts.global === true && opts.project === true) {
+    throw new ConfigurationError('--global and --project are mutually exclusive', {
+      code: 'CONFIG.TOOLS.SCOPE_CONFLICT',
+    });
+  }
 }
 
 function buildToolsDoctorSpec(): HostSpec {
@@ -112,6 +120,7 @@ function buildToolsListSpec(): HostSpec {
     output: COMMAND_RESULT_OUTPUT,
     handler: (rawOpts) => {
       const opts = rawOpts as ScopeFilterOpts & { available?: boolean; lang?: string };
+      assertExclusiveScope(opts);
       // The admitted-tool set is per-run state on the entered RunScope (stamped
       // by the bootstrap), read here and passed into the pure `toolsList`.
       const scope = currentScope();
@@ -224,15 +233,7 @@ function buildToolsInstallSpec(ctx: CliCommandsContext): HostSpec {
       output: COMMAND_RESULT_OUTPUT,
       handler: async (rawOpts) => {
         const opts = rawOpts as ScopeFilterOpts & { _args: string[] };
-        if (opts.global === true && opts.project === true) {
-          ctx.setExitCode(EXIT_CODES.CONFIGURATION_ERROR);
-          return {
-            type: 'tools-uninstall',
-            target: opts._args[0] ?? '',
-            success: false,
-            error: '--global and --project are mutually exclusive',
-          } satisfies CommandResult;
-        }
+        assertExclusiveScope(opts);
         const result = await toolsInstall({
           spec: opts._args[0] ?? '',
           cwd: effectiveCwd(opts),
@@ -283,6 +284,7 @@ function buildToolsUninstallSpec(ctx: CliCommandsContext): HostSpec {
           _args: string[];
           purgeData?: boolean;
         };
+        assertExclusiveScope(opts);
         // --purge-data is project-local only: runtime data lives per project
         // (the spec's explicit rejection for --global).
         if (opts.purgeData === true && opts.global === true) {
