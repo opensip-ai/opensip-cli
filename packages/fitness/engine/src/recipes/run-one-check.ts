@@ -49,6 +49,8 @@ export interface RunOneCheckOptions {
   readonly recipeTimeoutMs: number;
   readonly retryEnabled: boolean;
   readonly maxRetries: number;
+  /** Service-level cancellation signal, combined with the per-check timeout signal. */
+  readonly abortSignal?: AbortSignal;
   readonly checkTargetFiles?: ReadonlyMap<string, readonly string[]>;
   readonly globalExcludes?: readonly string[];
   /** Per-service FileCache (for SaaS isolation; forwarded from ExecutionOptions). */
@@ -101,7 +103,7 @@ export async function runOneCheck(
     timeoutMs: checkTimeout,
   });
 
-  const targetFiles = opts.checkTargetFiles?.get(checkSlug);
+  const targetFiles = opts.checkTargetFiles?.get(checkId) ?? opts.checkTargetFiles?.get(checkSlug);
 
   // Run on the shared execution substrate (release 2.13.0, §5.8): per-check
   // timeout/abort + retry. The single-source abort invariant is preserved by
@@ -114,9 +116,11 @@ export async function runOneCheck(
     'fitness.check.execute',
     async () => {
       return await runWithTimeout({
-        run: (signal) =>
+        run: (timeoutSignal) =>
           check.run(opts.cwd, {
-            signal,
+            signal: opts.abortSignal
+              ? AbortSignal.any([timeoutSignal, opts.abortSignal])
+              : timeoutSignal,
             ...(targetFiles ? { targetFiles } : {}),
             ...(opts.globalExcludes ? { globalExcludes: opts.globalExcludes } : {}),
             ...(opts.fileCache ? { fileCache: opts.fileCache } : {}),

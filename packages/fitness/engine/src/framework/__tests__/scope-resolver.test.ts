@@ -165,6 +165,41 @@ describe('buildScopeBasedFileMap', () => {
     expect(out.get('broad-check')?.length).toBe(2);
   });
 
+  it('keeps same-slug namespaced checks isolated by stable check id', () => {
+    fixture('src/a.ts');
+    fixture('test/b.ts');
+    const registry = makeRegistry([
+      makeTarget('src', {
+        include: ['src/**/*.ts'],
+        languages: ['typescript'],
+        concerns: ['backend'],
+      }),
+      makeTarget('test', {
+        include: ['test/**/*.ts'],
+        languages: ['typescript'],
+        concerns: ['test'],
+      }),
+    ]);
+    const checks = [
+      {
+        id: 'id-pack-a',
+        slug: 'duplicate',
+        scope: { languages: ['typescript'], concerns: ['backend'] },
+      },
+      {
+        id: 'id-pack-b',
+        slug: 'duplicate',
+        scope: { languages: ['typescript'], concerns: ['test'] },
+      },
+    ];
+
+    const out = buildScopeBasedFileMap(checks, registry, makeConfig(), testDir);
+
+    expect(out.get('id-pack-a')).toEqual([join(testDir, 'src/a.ts')]);
+    expect(out.get('id-pack-b')).toEqual([join(testDir, 'test/b.ts')]);
+    expect(out.has('duplicate')).toBe(false);
+  });
+
   it('applies globalExcludes during pre-resolution', () => {
     fixture('src/a.ts');
     fixture('src/ignore-me/b.ts');

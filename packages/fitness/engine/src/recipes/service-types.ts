@@ -73,7 +73,7 @@ export interface FitnessRecipeServiceConfig {
   prewarmCache?: boolean;
   prewarmPatterns?: string[];
   callbacks?: FitnessRecipeServiceCallbacks;
-  /** Per-check pre-resolved file paths from target overrides. Map of check slug → absolute file paths. */
+  /** Per-check pre-resolved paths keyed by stable check id (bare slug remains compatible). */
   checkTargetFiles?: ReadonlyMap<string, readonly string[]>;
   /** Optional check registry (defaults to the current scope's check registry). */
   checkRegistry?: CheckRegistry;

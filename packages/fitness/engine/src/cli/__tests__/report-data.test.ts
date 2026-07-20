@@ -73,6 +73,8 @@ const makeTestScope = (): RunScope =>
   });
 const withScope = runWithScope;
 
+import { defineCheck } from '../../framework/define-check.js';
+import { currentCheckRegistry } from '../../framework/scope-registry.js';
 import { fitnessTool } from '../../tool.js';
 import { collectFitnessReportData } from '../report-data.js';
 
@@ -158,6 +160,42 @@ describe('collectFitnessReportData', () => {
         confidence: expect.stringMatching(/^(high|medium|low)$/),
         source: expect.stringMatching(/^(built-in|community)$/),
       }),
+    );
+  });
+
+  it('classifies same-slug checks by their exact registration namespace', async () => {
+    const scope = makeFitnessScope();
+    const result = await withScope(scope, async () => {
+      const registry = currentCheckRegistry();
+      registry.register(
+        defineCheck({
+          id: '00000000-0000-4000-8000-000000000096',
+          slug: 'duplicate-catalog-slug',
+          description: 'built-in collision',
+          tags: ['test'],
+          analyze: () => [],
+        }),
+        '@opensip-cli/checks-test',
+      );
+      registry.register(
+        defineCheck({
+          id: '00000000-0000-4000-8000-000000000097',
+          slug: 'duplicate-catalog-slug',
+          description: 'community collision',
+          tags: ['test'],
+          analyze: () => [],
+        }),
+        'community-pack',
+      );
+      return collectFitnessReportData(scope);
+    });
+    const checkCatalog = result.checkCatalog as readonly CheckCatalogEntry[];
+
+    expect(checkCatalog.find((entry) => entry.description === 'built-in collision')?.source).toBe(
+      'built-in',
+    );
+    expect(checkCatalog.find((entry) => entry.description === 'community collision')?.source).toBe(
+      'community',
     );
   });
 

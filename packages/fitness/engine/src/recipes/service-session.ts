@@ -53,12 +53,13 @@ export function collectAppliedDirectives(session: FitnessRecipeSession | null): 
 /** Build the final {@link FitnessRecipeResult} from completed session state. */
 export function buildRecipeResult(session: FitnessRecipeSession): FitnessRecipeResult {
   const completedAt = new Date();
+  const completedSkippedChecks = session.checkResults.filter((result) => result.skipped).length;
 
   const summary: RecipeRunSummary = {
     totalChecks: session.totalChecks,
     passedChecks: session.passedChecks,
     failedChecks: session.failedChecks,
-    skippedChecks: session.totalChecks - session.completedChecks,
+    skippedChecks: session.totalChecks - session.completedChecks + completedSkippedChecks,
     erroredChecks: session.checkResults.filter((r) => r.error !== undefined).length,
     totalViolations: session.checkResults.reduce((sum, r) => sum + r.violationCount, 0),
     totalErrors: session.totalErrors,

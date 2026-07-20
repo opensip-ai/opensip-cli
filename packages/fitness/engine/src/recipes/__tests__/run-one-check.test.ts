@@ -234,4 +234,39 @@ describe('runOneCheck — timeout-detection invariant (audit F7)', () => {
     expect(cr?.timedOut).not.toBe(true);
     expect(cr?.passed).toBe(true);
   });
+
+  it('resolves pre-targeted files by stable check id before the bare slug', async () => {
+    let receivedTargetFiles: readonly string[] | undefined;
+    const baseCheck = defineCheck({
+      id: uid(),
+      slug: 'shared-slug',
+      description: 'captures target files',
+      tags: ['quality'],
+      analyzeAll: () => Promise.resolve([]),
+    });
+    const check: typeof baseCheck = {
+      ...baseCheck,
+      run: (cwd, options) => {
+        receivedTargetFiles = options?.targetFiles;
+        return baseCheck.run(cwd, options);
+      },
+    };
+    const expectedFiles = ['/project/src/only-this-file.ts'];
+
+    await runOneCheck(
+      check,
+      {
+        cwd: process.cwd(),
+        checkIndex: 1,
+        totalChecks: 1,
+        recipeTimeoutMs: 5000,
+        retryEnabled: false,
+        maxRetries: 0,
+        checkTargetFiles: new Map([[check.config.id, expectedFiles]]),
+      },
+      makeProcessorContext(),
+    );
+
+    expect(receivedTargetFiles).toEqual(expectedFiles);
+  });
 });

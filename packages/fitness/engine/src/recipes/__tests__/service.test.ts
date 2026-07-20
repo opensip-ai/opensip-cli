@@ -579,19 +579,34 @@ describe('FitnessRecipeService — abort', () => {
 
   it('abort() during a run cancels remaining checks', async () => {
     const checkRegistry = new CheckRegistry();
+    let activeSignal: AbortSignal | undefined;
     let secondRan = false;
-    checkRegistry.register(
-      defineCheck({
-        id: uid(),
-        slug: 'first',
-        description: 'first',
-        tags: ['demo'],
-        analyzeAll: async () => {
-          await new Promise((r) => setTimeout(r, 10));
-          return [];
-        },
-      }),
-    );
+    let markStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let releaseFirst: () => void = () => undefined;
+    const released = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const first = defineCheck({
+      id: uid(),
+      slug: 'first',
+      description: 'first',
+      tags: ['demo'],
+      analyzeAll: async () => {
+        await released;
+        return [];
+      },
+    });
+    checkRegistry.register({
+      ...first,
+      run: (cwd, options) => {
+        activeSignal = options?.signal;
+        markStarted();
+        return first.run(cwd, options);
+      },
+    });
     checkRegistry.register(
       defineCheck({
         id: uid(),
@@ -623,12 +638,15 @@ describe('FitnessRecipeService — abort', () => {
         },
       }),
     );
-    setTimeout(() => svc.abort(), 5);
+    await started;
+
+    svc.abort();
+    const activeCheckWasAborted = activeSignal?.aborted;
+    releaseFirst();
     await promise;
 
-    // Whether or not the second ran is timing-dependent, but abort()
-    // should not throw and the run should complete.
-    expect(typeof secondRan).toBe('boolean');
+    expect(activeCheckWasAborted).toBe(true);
+    expect(secondRan).toBe(false);
   });
 });
 

@@ -51,6 +51,7 @@ export async function executeSequential(
           recipeTimeoutMs: recipeTimeout,
           retryEnabled: recipe.execution.retryOnFailure ?? false,
           maxRetries: recipe.execution.maxRetries ?? 2,
+          ...(abortController ? { abortSignal: abortController.signal } : {}),
           ...(checkTargetFiles ? { checkTargetFiles } : {}),
           ...(globalExcludes ? { globalExcludes } : {}),
           ...(opts.fileCache ? { fileCache: opts.fileCache } : {}),

@@ -170,12 +170,12 @@ export function resolveChangedSet(
 
 /**
  * Intersect each per-file check's scope-resolved target file list with the changed
- * set. `fullScopeSlugs` (the `analyzeAll` checks) are exempt — they keep their FULL
+ * set. `fullScopeKeys` (the `analyzeAll` checks) are exempt — they keep their FULL
  * file list.
  *
  * Two invariants:
  * 1. A per-file (`analyze`) check with NO changed files keeps an EMPTY entry — it
- *    is NOT dropped. Dropping it would leave `checkTargetFiles.get(slug)` undefined,
+ *    is NOT dropped. Dropping it would leave `checkTargetFiles.get(checkId)` undefined,
  *    and the check's `matchFiles()` then falls back to the whole-repo fileCache
  *    (which honors only `globalExcludes`, not the target-level `*.test.ts` /
  *    `__tests__` excludes) — so a `--changed` run would silently scan the ENTIRE
@@ -189,13 +189,13 @@ export function resolveChangedSet(
 export function restrictFileMapToChanged(
   scopeMap: Map<string, readonly string[]>,
   changedAbs: ReadonlySet<string>,
-  fullScopeSlugs: ReadonlySet<string>,
+  fullScopeKeys: ReadonlySet<string>,
 ): Map<string, readonly string[]> {
   const narrowed = new Map<string, readonly string[]>();
-  for (const [slug, files] of scopeMap) {
+  for (const [key, files] of scopeMap) {
     narrowed.set(
-      slug,
-      fullScopeSlugs.has(slug) ? files : files.filter((f) => changedAbs.has(path.resolve(f))),
+      key,
+      fullScopeKeys.has(key) ? files : files.filter((f) => changedAbs.has(path.resolve(f))),
     );
   }
   return narrowed;

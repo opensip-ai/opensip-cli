@@ -103,18 +103,22 @@ export async function collectFitnessReportData(scope: ToolScope): Promise<Record
   await ensureChecksLoaded(projectDir);
 
   const checkRegistry = currentCheckRegistry();
-  const checkCatalog: CheckCatalogEntry[] = checkRegistry.list().map((check) => {
-    const namespace = checkRegistry.getNamespace(check.config.slug);
-    return {
-      slug: check.config.slug,
-      name: getDisplayName(check.config.slug),
-      icon: getIcon(check.config.slug),
-      description: check.config.description,
-      longDescription: check.config.longDescription,
-      tags: [...(check.config.tags ?? [])],
-      confidence: check.config.confidence ?? 'medium',
-      source: classifyCheckSource(namespace),
-    };
+  const checkCatalog: CheckCatalogEntry[] = checkRegistry.listSlugs().flatMap((registryKey) => {
+    const check = checkRegistry.getBySlug(registryKey);
+    if (check === undefined) return [];
+    const namespace = checkRegistry.getNamespace(registryKey);
+    return [
+      {
+        slug: check.config.slug,
+        name: getDisplayName(check.config.slug),
+        icon: getIcon(check.config.slug),
+        description: check.config.description,
+        longDescription: check.config.longDescription,
+        tags: [...(check.config.tags ?? [])],
+        confidence: check.config.confidence ?? 'medium',
+        source: classifyCheckSource(namespace),
+      },
+    ];
   });
 
   const recipeCatalog: RecipeCatalogEntry[] = [...currentRecipeRegistry().getAllRecipes()].map(

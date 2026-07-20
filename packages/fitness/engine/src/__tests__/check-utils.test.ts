@@ -91,6 +91,17 @@ describe('createPathMatcher', () => {
     expect(regexOnly('foo.ts')).toBe(false);
   });
 
+  it('matches global RegExp patterns consistently across calls', () => {
+    const regexOnly = createPathMatcher([/\.test\.ts$/g]);
+    expect(regexOnly('foo.test.ts')).toBe(true);
+    expect(regexOnly('foo.test.ts')).toBe(true);
+  });
+
+  it('does not mutate stateless RegExp patterns', () => {
+    const regexOnly = createPathMatcher([Object.freeze(/\.test\.ts$/)]);
+    expect(regexOnly('foo.test.ts')).toBe(true);
+  });
+
   it('matches mixed string and RegExp patterns', () => {
     const mixed = createPathMatcher(['/dist/', /node_modules/]);
     expect(mixed('/proj/dist/x.js')).toBe(true);
@@ -207,6 +218,11 @@ describe('isTestFile', () => {
       expect(isTestFile('src/__tests__/types.d.ts')).toBe(false);
     });
 
+    it('excludes .d.mts and .d.cts declaration files even in __tests__', () => {
+      expect(isTestFile('src/__tests__/types.d.mts')).toBe(false);
+      expect(isTestFile('src/__tests__/types.d.cts')).toBe(false);
+    });
+
     it('handles Windows-style path separators', () => {
       expect(isTestFile(String.raw`src\__tests__\foo.ts`)).toBe(true);
     });
@@ -253,6 +269,17 @@ describe('isTestFile', () => {
           additionalPatterns: [/\.fixture\.tsx?$/],
         }),
       ).toBe(true);
+    });
+
+    it('matches global custom regexes consistently across calls', () => {
+      const options = { additionalPatterns: [/\.fixture\.tsx?$/g] };
+      expect(isTestFile('src/foo.fixture.ts', options)).toBe(true);
+      expect(isTestFile('src/foo.fixture.ts', options)).toBe(true);
+    });
+
+    it('does not mutate stateless custom regexes', () => {
+      const options = { additionalPatterns: [Object.freeze(/\.fixture\.tsx?$/)] };
+      expect(isTestFile('src/foo.fixture.ts', options)).toBe(true);
     });
 
     it('returns false when no patterns match', () => {

@@ -10,9 +10,9 @@ import { isErrorSeverity } from '@opensip-cli/core';
 
 import type { SignalSeverity } from '@opensip-cli/core';
 
-/** Returns true for 'medium' severity signals (warning-level) */
+/** Returns true for warning-rung (`medium` or `low`) signals. */
 function isWarningSeverity(severity: SignalSeverity): boolean {
-  return severity === 'medium';
+  return severity === 'medium' || severity === 'low';
 }
 
 /** Count error-level signals in an array */

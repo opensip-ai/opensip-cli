@@ -83,6 +83,18 @@ describe('executeCommand', () => {
     expect(result.exitCode).toBe(1);
   });
 
+  it('returns an error when the command is terminated by a signal', async () => {
+    const config: CommandConfig = {
+      bin: 'sh',
+      args: ['-c', 'kill -TERM $$'],
+      parseOutput: () => [],
+    };
+    const result = await executeCommand(config, [], { cwd });
+    expect(result.exitCode).toBeNull();
+    expect(result.error).toContain('terminated without an exit code');
+    expect(result.violations).toEqual([]);
+  });
+
   it('returns aborted=true when the abort signal fires mid-run', async () => {
     const ctrl = new AbortController();
     const config: CommandConfig = {

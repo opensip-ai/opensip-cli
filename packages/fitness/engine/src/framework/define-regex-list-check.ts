@@ -241,9 +241,25 @@ function matchPatternOnLine(
     // would loop forever (lastIndex stays at 0).
     if (!pattern.regex.global) break;
     if (singleMatch) break;
+    if (match[0].length === 0) {
+      advanceRegexIndex(pattern.regex, line);
+    }
     match = pattern.regex.exec(line);
   }
   return pushed;
+}
+
+/** Advance a global regex after an empty match using ECMAScript Unicode code-point semantics. */
+function advanceRegexIndex(regex: RegExp, input: string): void {
+  const index = regex.lastIndex;
+  if (regex.unicode || regex.flags.includes('v')) {
+    const codePoint = input.codePointAt(index);
+    if (codePoint !== undefined && codePoint > 0xff_ff) {
+      regex.lastIndex = index + 2;
+      return;
+    }
+  }
+  regex.lastIndex = index + 1;
 }
 
 /**

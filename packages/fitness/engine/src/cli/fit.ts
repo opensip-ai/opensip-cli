@@ -96,7 +96,7 @@ export interface ExecuteFitOptions {
 function resolveFitScopeMap(
   args: FitOptions,
   initialScopeMap: CheckScopeMap,
-  fullScopeSlugs: ReadonlySet<string>,
+  fullScopeKeys: ReadonlySet<string>,
 ): {
   readonly scopeMap: CheckScopeMap;
   readonly warnings: readonly string[];
@@ -119,7 +119,7 @@ function resolveFitScopeMap(
   }
   if (changed.files.size === 0) {
     // "Target nothing" must be expressed as every scoped check → EMPTY target
-    // list, NOT an empty map. An empty map leaves `checkTargetFiles.get(slug)`
+    // list, NOT an empty map. An empty map leaves `checkTargetFiles.get(checkId)`
     // undefined for every check, which routes each one to the whole-repo
     // fileCache fallback (globalExcludes-only, no per-target `*.test.ts` /
     // `__tests__` excludes) — the exact opposite of "target nothing". Running
@@ -127,13 +127,13 @@ function resolveFitScopeMap(
     // check to `[]`, so it scans nothing. (Same defect, sibling branch to the
     // key-preservation fix in restrictFileMapToChanged.)
     return {
-      scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeSlugs),
+      scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
       warnings: ['No changed files detected — fit run will target nothing.'],
       verification: changed.trust,
     };
   }
   return {
-    scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeSlugs),
+    scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
     warnings: [],
     verification: changed.trust,
   };
@@ -215,26 +215,30 @@ export async function executeFit(
 
   const validationWarnings = await validateLanguagesAgainstAdapters(targetRegistry);
 
-  const allChecks = checkRegistry.listSlugs().map((key) => {
-    const check = checkRegistry.getBySlug(key);
-    return { slug: check?.config.slug ?? key, scope: check?.config.checkScope };
+  const allChecks = checkRegistry.listSlugs().map((registryKey) => {
+    const check = checkRegistry.getBySlug(registryKey);
+    return {
+      ...(check ? { id: check.config.id } : {}),
+      slug: check?.config.slug ?? registryKey,
+      scope: check?.config.checkScope,
+    };
   });
   // `analyzeAll` checks verify CROSS-FILE / whole-repo invariants (e.g. "these two
   // composition roots must share one helper"), so they cannot be narrowed to a
   // `--changed` subset — a target that simply didn't change would read as absent.
   // They keep their FULL scope under `--changed`; only per-file `analyze` checks
   // are narrowed to the changed set (ADR-0085).
-  const fullScopeSlugs = new Set(
+  const fullScopeKeys = new Set(
     checkRegistry
       .listSlugs()
       .map((key) => checkRegistry.getBySlug(key))
       .filter((c): c is NonNullable<typeof c> => c?.config.analysisMode === 'analyzeAll')
-      .map((c) => c.config.slug),
+      .map((c) => c.config.id),
   );
   const changedResolution = resolveFitScopeMap(
     args,
     buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd),
-    fullScopeSlugs,
+    fullScopeKeys,
   );
   const scopeMap = changedResolution.scopeMap;
   const checkTargetFiles =

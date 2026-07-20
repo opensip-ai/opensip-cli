@@ -27,7 +27,7 @@ export interface ExecutionOptions {
   checks: Check[];
   cwd: string;
   recipe: FitnessRecipe;
-  /** Per-check pre-resolved file paths from target overrides */
+  /** Per-check pre-resolved file paths, keyed by stable check id (bare slug remains compatible). */
   checkTargetFiles?: ReadonlyMap<string, readonly string[]>;
   /**
    * Run-wide globalExcludes from project config. Forwarded into each
@@ -94,6 +94,7 @@ export async function executeParallel(
           recipeTimeoutMs: recipeTimeout,
           retryEnabled: recipe.execution.retryOnFailure ?? false,
           maxRetries: recipe.execution.maxRetries ?? 2,
+          ...(abortController ? { abortSignal: abortController.signal } : {}),
           ...(checkTargetFiles ? { checkTargetFiles } : {}),
           ...(globalExcludes ? { globalExcludes } : {}),
           ...(opts.fileCache ? { fileCache: opts.fileCache } : {}),

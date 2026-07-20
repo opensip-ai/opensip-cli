@@ -13,6 +13,19 @@
  */
 export type PathPattern = string | RegExp;
 
+function testFromStart(pattern: RegExp, value: string): boolean {
+  if (!pattern.global && !pattern.sticky) {
+    return pattern.test(value);
+  }
+  const previousLastIndex = pattern.lastIndex;
+  try {
+    pattern.lastIndex = 0;
+    return pattern.test(value);
+  } finally {
+    pattern.lastIndex = previousLastIndex;
+  }
+}
+
 /**
  * Creates a path matcher function from an array of patterns.
  *
@@ -44,7 +57,7 @@ export function createPathMatcher(patterns: readonly PathPattern[]): (path: stri
   return (path) => {
     const normalized = path.replaceAll('\\', '/');
     return patterns.some((p) =>
-      typeof p === 'string' ? normalized.includes(p) : p.test(normalized),
+      typeof p === 'string' ? normalized.includes(p) : testFromStart(p, normalized),
     );
   };
 }

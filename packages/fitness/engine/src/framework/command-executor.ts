@@ -69,6 +69,15 @@ function unexpectedExitResult(
   };
 }
 
+function missingExitCodeResult(stderr: string): CommandExecutionResult {
+  return {
+    violations: [],
+    aborted: false,
+    exitCode: null,
+    error: `Command terminated without an exit code. stderr: ${truncateStream(stderr)}`,
+  };
+}
+
 function emptyFindingsOnNonzeroResult(
   exitCode: number | null,
   stderr: string,
@@ -121,14 +130,18 @@ export async function executeCommand(
     return notInstalledResult(config.bin, 127);
   }
 
+  if (result.exitCode === null) {
+    return missingExitCodeResult(result.stderr);
+  }
+
   const expectedCodes = config.expectedExitCodes ?? DEFAULT_EXPECTED_EXIT_CODES;
-  if (result.exitCode !== null && !expectedCodes.includes(result.exitCode)) {
+  if (!expectedCodes.includes(result.exitCode)) {
     return unexpectedExitResult(result.exitCode, expectedCodes, result.stderr);
   }
 
   let violations: CheckViolation[];
   try {
-    violations = config.parseOutput(result.stdout, result.stderr, result.exitCode ?? 0, files, cwd);
+    violations = config.parseOutput(result.stdout, result.stderr, result.exitCode, files, cwd);
   } catch (parseError) {
     const message = parseError instanceof Error ? parseError.message : String(parseError);
     return {
@@ -141,7 +154,7 @@ export async function executeCommand(
 
   // Nonzero exit that is "allowed" as findings, but parse produced nothing —
   // do not green-wash (truncated JSON / wrong schema / silent scanner failure).
-  if ((result.exitCode ?? 0) !== 0 && violations.length === 0) {
+  if (result.exitCode !== 0 && violations.length === 0) {
     return emptyFindingsOnNonzeroResult(result.exitCode, result.stderr);
   }
 

@@ -151,6 +151,38 @@ describe('defineRegexListCheck', () => {
       expect(columns).toEqual([1, 5, 9]);
     });
 
+    it('advances by a full code point after a zero-width Unicode global match', async () => {
+      const regex = /(?=)/gu;
+      const nativeExec = regex.exec.bind(regex);
+      let previousStart: number | undefined;
+      regex.exec = function boundedExec(value: string): RegExpExecArray | null {
+        if (value === '😀' && previousStart === this.lastIndex) {
+          throw new Error('regex did not advance');
+        }
+        previousStart = this.lastIndex;
+        return nativeExec(value);
+      };
+      const check = defineRegexListCheck({
+        id: FIXED_ID,
+        slug: 'zero-width',
+        description: 'd',
+        tags: ['demo'],
+        fileTypes: ['ts'],
+        patterns: [
+          {
+            id: PATTERN_ID_A,
+            slug: 'foo',
+            regex,
+            message: 'position',
+          },
+        ],
+      });
+
+      const signals = await runOnContent(check, '😀');
+
+      expect(signals.map((signal) => signal.code?.column)).toEqual([1, 3]);
+    });
+
     it('emits at most one violation per line for non-global regexes', async () => {
       const check = defineRegexListCheck({
         id: FIXED_ID,

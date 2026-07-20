@@ -83,9 +83,13 @@ export class CheckRegistry {
     return this.inner.getAll().map((r) => r.check);
   }
 
-  /** Get the namespace a check was registered under. Returns undefined for bare slugs. */
-  getNamespace(bareSlug: string): string | undefined {
-    const keys = this.bareSlugIndex.get(bareSlug);
+  /** Get the namespace for an exact registry key or the first registered bare-slug match. */
+  getNamespace(slugOrKey: string): string | undefined {
+    if (this.inner.has(slugOrKey)) {
+      const colonIdx = slugOrKey.indexOf(':');
+      return colonIdx === -1 ? undefined : slugOrKey.slice(0, colonIdx);
+    }
+    const keys = this.bareSlugIndex.get(slugOrKey);
     if (!keys || keys.length === 0) return undefined;
     const key = keys[0];
     const colonIdx = key.indexOf(':');

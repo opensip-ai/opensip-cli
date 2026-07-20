@@ -76,6 +76,13 @@ interface CheckFileResolutionContext {
   resolvedTargets?: Map<string, readonly string[]>;
 }
 
+interface ScopeResolvableCheck {
+  /** Stable UUID used as the output-map key when available. */
+  readonly id?: string;
+  readonly slug: string;
+  readonly scope?: CheckScope;
+}
+
 function resolveFilesForCheck(
   slug: string,
   scope: CheckScope | undefined,
@@ -139,7 +146,7 @@ function resolveFilesForCheck(
  * in-memory lookup against the pre-resolved file lists.
  */
 export function buildScopeBasedFileMap(
-  checks: readonly { slug: string; scope?: CheckScope }[],
+  checks: readonly ScopeResolvableCheck[],
   registry: TargetRegistry,
   config: TargetsConfig,
   rootDir: string,
@@ -159,7 +166,7 @@ export function buildScopeBasedFileMap(
   for (const check of checks) {
     const files = resolveFilesForCheck(check.slug, check.scope, ctx);
     if (files !== undefined) {
-      result.set(check.slug, files);
+      result.set(check.id ?? check.slug, files);
     }
   }
 

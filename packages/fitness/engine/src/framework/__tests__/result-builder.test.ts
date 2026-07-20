@@ -47,6 +47,13 @@ describe('ResultBuilder', () => {
     expect(builder.warningCount).toBe(1);
   });
 
+  it('counts low-severity signals on the warning rung', () => {
+    const builder = ResultBuilder.create({ checkId: 'c1', itemType: 'files' });
+    builder.addSignal(sig({ severity: 'low' }));
+    expect(builder.warningCount).toBe(1);
+    expect(builder.build().warnings).toBe(1);
+  });
+
   it('hasSignals reflects the signal collection', () => {
     const builder = ResultBuilder.create({ checkId: 'c1', itemType: 'files' });
     expect(builder.hasSignals).toBe(false);
