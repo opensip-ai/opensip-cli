@@ -1,9 +1,12 @@
+import { runCheckOnFixture } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { analyzeCommandHandlerHostOwnedOutput } from '../checks/command-handler-host-owned-output.js';
 import { analyzeExternalToolAdapterContracts } from '../checks/external-tool-adapter-contract.js';
+import { firstPartyCommandStaticHandler } from '../checks/first-party-command-static-handler.js';
 import { analyzeNoRunDoneResult } from '../checks/no-run-done-result.js';
 import { analyzeSingleOptsAssemblySeam } from '../checks/single-opts-assembly-seam.js';
+import { analyzeStringPrefilterSuperset } from '../checks/string-prefilter-superset.js';
 
 import type { FileAccessor } from '@opensip-cli/fitness';
 
@@ -242,6 +245,51 @@ describe('no-run-done-result branch coverage', () => {
         };
         `,
         'packages/contracts/src/command-results.ts',
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('first-party-command-static-handler branch coverage', () => {
+  it('recognizes the CLI host factory alias used by production command specs', async () => {
+    const result = await runCheckOnFixture(firstPartyCommandStaticHandler, {
+      files: [
+        {
+          path: 'packages/cli/src/commands/sample.ts',
+          content: `
+            import { defineHostCommand as defineCommand } from './host-runtime-access.js';
+            export const sample = defineCommand({
+              handler: () => undefined,
+            });
+          `,
+        },
+      ],
+    });
+
+    expect(result.findings).toHaveLength(1);
+  });
+});
+
+describe('string-prefilter-superset branch coverage', () => {
+  const CHECK_PATH = 'packages/fitness/checks-universal/src/checks/subject.ts';
+
+  it('ignores QUICK_FILTER examples in comments and strings', () => {
+    expect(
+      analyzeStringPrefilterSuperset(
+        `
+        // const QUICK_FILTER = [' any'];
+        const docs = "QUICK_FILTER = [' any']";
+        `,
+        CHECK_PATH,
+      ),
+    ).toEqual([]);
+  });
+
+  it('does not classify a multiline regex as an end-of-file anchor', () => {
+    expect(
+      analyzeStringPrefilterSuperset(
+        'export const matches = /Repository$/m.test(content);\n',
+        CHECK_PATH,
       ),
     ).toEqual([]);
   });

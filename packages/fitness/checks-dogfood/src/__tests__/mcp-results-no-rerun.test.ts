@@ -93,6 +93,21 @@ describe('analyzeMcpResultsNoRerun (AST)', () => {
       ),
     ).toEqual([]);
   });
+
+  it('does NOT flag type-only imports of producer declarations', () => {
+    expect(
+      analyzeMcpResultsNoRerun(
+        "import type { runGraph } from '@opensip-cli/graph/read';\nexport type Runner = typeof runGraph;",
+        TOOL_PATH,
+      ),
+    ).toEqual([]);
+    expect(
+      analyzeMcpResultsNoRerun(
+        "import { type produceContextGraph } from '@opensip-cli/graph/read';",
+        CONTEXT_PORT_PATH,
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe('mcp-results-no-rerun (gate)', () => {

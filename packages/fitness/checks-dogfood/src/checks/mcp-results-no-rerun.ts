@@ -59,7 +59,14 @@ function normalized(path: string): string {
   return path.replaceAll('\\', '/');
 }
 
+function isTypeOnlyImport(clause: ts.ImportClause | undefined): boolean {
+  // sonarjs/deprecation false positive: the ImportClause.isTypeOnly PROPERTY is not deprecated.
+  // eslint-disable-next-line sonarjs/deprecation -- TypeScript's createImportClause parameter, not this property, is deprecated
+  return clause?.isTypeOnly === true;
+}
+
 /** Pure analysis over a parsed source file. Exported for unit tests. */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- import-form exclusions and symbol classification are one bounded statement pass
 export function analyzeMcpResultsNoRerun(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
   const sourceFile = getSharedSourceFile(filePath, content);
@@ -67,9 +74,11 @@ export function analyzeMcpResultsNoRerun(content: string, filePath: string): Che
 
   for (const stmt of sourceFile.statements) {
     if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    if (isTypeOnlyImport(stmt.importClause)) continue;
     const named = stmt.importClause?.namedBindings;
     if (named === undefined || !ts.isNamedImports(named)) continue;
     for (const element of named.elements) {
+      if (element.isTypeOnly) continue;
       // The ORIGINAL imported name (`{ runGraph as build }` → `runGraph`).
       const imported = (element.propertyName ?? element.name).text;
       if (!RUN_COMMAND_SYMBOLS.has(imported)) continue;

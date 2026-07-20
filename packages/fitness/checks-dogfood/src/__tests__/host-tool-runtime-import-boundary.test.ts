@@ -55,6 +55,32 @@ describe('analyzeHostToolRuntimeImportBoundary (AST, M4-G capstone)', () => {
     expect(v).toEqual([]);
   });
 
+  it('allows an aliased host policy helper', () => {
+    const v = analyzeHostToolRuntimeImportBoundary(
+      [
+        "import { hostRuntimeImportPolicyFor as hostPolicy, importToolRuntime } from './admit-tool-package.js';",
+        'export async function load(dir: string) {',
+        "  return importToolRuntime(dir, hostPolicy('bundled'));",
+        '}',
+      ].join('\n'),
+      DISCOVERY_PATH,
+    );
+    expect(v).toEqual([]);
+  });
+
+  it("allows a bundled source literal wrapped in 'as const'", () => {
+    const v = analyzeHostToolRuntimeImportBoundary(
+      [
+        "import { importToolRuntime } from './admit-tool-package.js';",
+        'export async function load(dir: string) {',
+        "  return importToolRuntime(dir, { source: 'bundled' as const });",
+        '}',
+      ].join('\n'),
+      REGISTER_TOOLS_PATH,
+    );
+    expect(v).toEqual([]);
+  });
+
   it('allows the WORKER policy on the worker-owned plane (discovery file)', () => {
     const v = analyzeHostToolRuntimeImportBoundary(
       [

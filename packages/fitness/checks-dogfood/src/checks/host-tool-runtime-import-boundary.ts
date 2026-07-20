@@ -99,38 +99,67 @@ function propertyNameText(name: ts.PropertyName): string | undefined {
 /** The kind of policy a runtime-import argument expresses (capstone discrimination). */
 type PolicyKind = 'host-bundled' | 'worker' | 'other';
 
+function unwrapExpression(expr: ts.Expression): ts.Expression {
+  let current = expr;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 /** A call to a named policy helper, e.g. `hostRuntimeImportPolicyFor(source)`. */
 function helperCallName(arg: ts.Expression): string | undefined {
-  if (ts.isCallExpression(arg) && ts.isIdentifier(arg.expression)) return arg.expression.text;
+  const expression = unwrapExpression(arg);
+  if (ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)) {
+    return expression.expression.text;
+  }
   return undefined;
 }
 
 /** Whether an object literal is exactly `{ source: 'bundled' }` (the host policy). */
 function isBundledLiteral(arg: ts.Expression): boolean {
-  if (!ts.isObjectLiteralExpression(arg)) return false;
+  const expression = unwrapExpression(arg);
+  if (!ts.isObjectLiteralExpression(expression)) return false;
   let bundled = false;
-  for (const prop of arg.properties) {
+  for (const prop of expression.properties) {
     if (!ts.isPropertyAssignment(prop)) return false;
     const name = propertyNameText(prop.name);
     if (name !== 'source') return false;
-    if (!ts.isStringLiteral(prop.initializer) || prop.initializer.text !== 'bundled') return false;
+    const initializer = unwrapExpression(prop.initializer);
+    if (!ts.isStringLiteral(initializer) || initializer.text !== 'bundled') return false;
     bundled = true;
   }
   return bundled;
 }
 
 /** Classify the policy argument of an `importToolRuntime(dir, policy)` call. */
-function classifyPolicyArg(arg: ts.Expression | undefined): PolicyKind {
+function classifyPolicyArg(
+  arg: ts.Expression | undefined,
+  policyBindings: ReadonlyMap<string, PolicyKind>,
+): PolicyKind {
   if (arg === undefined) return 'other';
   const helper = helperCallName(arg);
-  if (helper === HOST_POLICY_HELPER) return 'host-bundled';
-  if (helper === WORKER_POLICY_HELPER) return 'worker';
+  if (helper !== undefined) {
+    const kind = policyBindings.get(helper);
+    if (kind !== undefined) return kind;
+  }
   if (isBundledLiteral(arg)) return 'host-bundled';
   return 'other';
 }
 
-function localRuntimeImportNames(sourceFile: ts.SourceFile): Set<string> {
-  const names = new Set<string>();
+// eslint-disable-next-line sonarjs/cognitive-complexity -- import binding classification deliberately keeps runtime and both policy aliases in one pass
+function localImportBindings(sourceFile: ts.SourceFile): {
+  readonly runtimeNames: ReadonlySet<string>;
+  readonly policyKinds: ReadonlyMap<string, PolicyKind>;
+} {
+  const runtimeNames = new Set<string>();
+  const policyKinds = new Map<string, PolicyKind>();
   for (const stmt of sourceFile.statements) {
     if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
     const module = stmt.moduleSpecifier.text;
@@ -141,12 +170,18 @@ function localRuntimeImportNames(sourceFile: ts.SourceFile): Set<string> {
     if (named === undefined || !ts.isNamedImports(named)) continue;
     for (const element of named.elements) {
       const imported = (element.propertyName ?? element.name).text;
-      if (imported === IMPORT_RUNTIME) names.add(element.name.text);
+      if (imported === IMPORT_RUNTIME) runtimeNames.add(element.name.text);
+      if (imported === HOST_POLICY_HELPER) policyKinds.set(element.name.text, 'host-bundled');
+      if (imported === WORKER_POLICY_HELPER) policyKinds.set(element.name.text, 'worker');
     }
   }
   // The defining module calls its own exported function by name.
-  if (isAllowedCallsite(sourceFile.fileName)) names.add(IMPORT_RUNTIME);
-  return names;
+  if (isAllowedCallsite(sourceFile.fileName)) {
+    runtimeNames.add(IMPORT_RUNTIME);
+    policyKinds.set(HOST_POLICY_HELPER, 'host-bundled');
+    policyKinds.set(WORKER_POLICY_HELPER, 'worker');
+  }
+  return { runtimeNames, policyKinds };
 }
 
 /** Pure analysis over a parsed source file. Exported for unit tests. */
@@ -158,7 +193,7 @@ export function analyzeHostToolRuntimeImportBoundary(
   const sourceFile = getSharedSourceFile(filePath, content);
   if (!sourceFile) return violations;
 
-  const runtimeNames = localRuntimeImportNames(sourceFile);
+  const { runtimeNames, policyKinds } = localImportBindings(sourceFile);
   if (runtimeNames.size === 0) return violations;
 
   const allowedFile = isAllowedCallsite(filePath);
@@ -168,7 +203,7 @@ export function analyzeHostToolRuntimeImportBoundary(
       const callee = node.expression.text;
       if (runtimeNames.has(callee)) {
         const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-        const kind = classifyPolicyArg(node.arguments[1]);
+        const kind = classifyPolicyArg(node.arguments[1], policyKinds);
         if (!allowedFile) {
           violations.push({
             message:

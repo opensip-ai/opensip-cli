@@ -18,4 +18,12 @@ describe('live-view-through-cli-live', () => {
     );
     expect(violations).toHaveLength(0);
   });
+
+  it('does not flag a type-only render import', () => {
+    const violations = analyzeLiveViewThroughCliLive(
+      `import { type render } from 'ink';\n`,
+      'packages/fitness/engine/src/cli/fit-runner.tsx',
+    );
+    expect(violations).toHaveLength(0);
+  });
 });

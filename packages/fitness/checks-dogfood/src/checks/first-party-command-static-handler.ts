@@ -78,6 +78,12 @@ function hasStaticHandler(obj: ts.ObjectLiteralExpression): boolean {
   return false;
 }
 
+function isFactoryBinding(imported: string, local: string): boolean {
+  return (
+    FACTORY_NAMES.has(imported) || (imported === 'defineHostCommand' && FACTORY_NAMES.has(local))
+  );
+}
+
 function collectFactoryBindings(sourceFile: ts.SourceFile): ReadonlySet<string> {
   const bindings = new Set<string>();
   for (const stmt of sourceFile.statements) {
@@ -87,7 +93,11 @@ function collectFactoryBindings(sourceFile: ts.SourceFile): ReadonlySet<string> 
     if (
       mod.text !== '@opensip-cli/core' &&
       mod.text !== '@opensip-cli/contracts' &&
-      !mod.text.endsWith('/command-presets.js')
+      !mod.text.endsWith('/command-presets.js') &&
+      !mod.text.endsWith('/host-runtime-access.js') &&
+      mod.text !== './host-runtime-access.js' &&
+      !mod.text.endsWith('/host-subcommand-shared.js') &&
+      mod.text !== './host-subcommand-shared.js'
     ) {
       continue;
     }
@@ -95,7 +105,10 @@ function collectFactoryBindings(sourceFile: ts.SourceFile): ReadonlySet<string> 
     if (named === undefined || !ts.isNamedImports(named)) continue;
     for (const el of named.elements) {
       const imported = (el.propertyName ?? el.name).text;
-      if (FACTORY_NAMES.has(imported)) bindings.add(el.name.text);
+      // CLI host commands intentionally import `defineHostCommand as
+      // defineCommand`; the authored local factory vocabulary is what call
+      // sites use and therefore must be enforced too.
+      if (isFactoryBinding(imported, el.name.text)) bindings.add(el.name.text);
     }
   }
   return bindings;
