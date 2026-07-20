@@ -37,6 +37,11 @@ describe('stripStrings (C/C++)', () => {
     expect(stripStrings("char c = 'a';")).toContain("'a'");
   });
 
+  it('preserves long multicharacter literals that contain comment tokens', () => {
+    const src = "int tag = '////////////////';\nint after = 1;";
+    expect(stripComments(src)).toBe(src);
+  });
+
   it('handles char literal that overruns the 8-char scan window', () => {
     // The scan looks at most 8 chars for the closing quote; an oversized
     // char literal exits the scan fallback and just advances by one.

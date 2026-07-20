@@ -111,14 +111,14 @@ function scan(src: string): ScanResult {
       if (charPrefixLen >= 0) {
         const startQuote = i + charPrefixLen;
         // Scan the body from the opening apostrophe via the shared helper.
-        // Use a generous cap (12) so unicode escapes like '\u{1F600}'
-        // (10 chars including quotes) close cleanly. Branch order is
-        // load-bearing — see core's scanCharLiteral docstring.
-        // Scan past the literal (or, on overflow/unterminated, past the
-        // opening apostrophe so we don't loop). The shared helper returns
-        // `start + 1` on overflow — that's already the bail-out we want
-        // when no closing quote is found within the cap.
-        const result = scanCharLiteral(src, startQuote, { maxScan: 12 });
+        // C and C++ ordinary character literals may be conditionally
+        // supported multicharacter literals, so there is no small fixed
+        // lexical bound. Scan through the remaining line; the shared helper
+        // still stops at an unescaped newline and recovers at the opener when
+        // no closing apostrophe exists.
+        const result = scanCharLiteral(src, startQuote, {
+          maxScan: len - startQuote + 1,
+        });
         i = result.end;
         continue;
       }
