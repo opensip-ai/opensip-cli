@@ -204,11 +204,26 @@ describe('createToolCliContextDouble', () => {
 
 describe('assertion helpers', () => {
   it('throws typed assertion errors for malformed command results', () => {
+    expect(() => assertCommandResult({ type: 'help' })).not.toThrow();
     expect(() => assertCommandResult(null)).toThrow(TypeError);
     expect(() => assertCommandResult({ type: '' })).toThrow(TypeError);
+    expect(() => assertCommandResult({ type: 'text-line', lines: [] })).toThrow(TypeError);
   });
 
   it('throws typed assertion errors for malformed signal envelopes', () => {
+    const valid = sampleEnvelope();
+    assertSignalEnvelope(valid);
+    expect(() => assertSignalEnvelope({ ...valid, createdAt: undefined })).toThrow(/createdAt/u);
+    expect(() =>
+      assertSignalEnvelope({
+        ...valid,
+        verdict: { ...valid.verdict, score: Number.NaN },
+      }),
+    ).toThrow(/score/u);
+    expect(() => assertSignalEnvelope({ ...valid, baselineIdentity: undefined })).toThrow(
+      /baselineIdentity/u,
+    );
+
     expect(() => assertSignalEnvelope(null)).toThrow(TypeError);
     expect(() => assertSignalEnvelope({ schemaVersion: 1 })).toThrow(TypeError);
     expect(() => assertSignalEnvelope({ schemaVersion: 2, tool: '' })).toThrow(TypeError);
@@ -218,6 +233,16 @@ describe('assertion helpers', () => {
     expect(() => assertSignalEnvelope({ schemaVersion: 2, tool: 'fit', runId: 'run_1' })).toThrow(
       TypeError,
     );
+    expect(() =>
+      assertSignalEnvelope({
+        schemaVersion: 2,
+        tool: 'fit',
+        runId: 'run_1',
+        verdict: {},
+        units: [],
+        signals: [],
+      }),
+    ).toThrow(TypeError);
     expect(() =>
       assertSignalEnvelope({
         schemaVersion: 2,
@@ -241,9 +266,21 @@ describe('assertion helpers', () => {
 
   it('throws typed assertion errors for malformed report failure details', () => {
     expect(() => assertReportFailureDetail(null)).toThrow(TypeError);
+    expect(() => assertReportFailureDetail({})).toThrow(TypeError);
     expect(() => assertReportFailureDetail({ message: 42 })).toThrow(TypeError);
-    expect(() => assertReportFailureDetail({ exitCode: '2' })).toThrow(TypeError);
-    expect(() => assertReportFailureDetail({ jsonRequested: 'yes' })).toThrow(TypeError);
+    expect(() => assertReportFailureDetail({ message: 'failed', exitCode: '2' })).toThrow(
+      TypeError,
+    );
+    expect(() => assertReportFailureDetail({ message: 'failed', exitCode: Number.NaN })).toThrow(
+      TypeError,
+    );
+    expect(() => assertReportFailureDetail({ message: 'failed', jsonRequested: 'yes' })).toThrow(
+      TypeError,
+    );
+    expect(() => assertReportFailureDetail({ message: 'failed', suggestion: 42 })).toThrow(
+      TypeError,
+    );
+    expect(() => assertReportFailureDetail({ message: 'failed', code: 42 })).toThrow(TypeError);
   });
 });
 
