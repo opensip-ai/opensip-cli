@@ -9,7 +9,7 @@ import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@op
 
 import {
   createCodeMask,
-  decodeJavaScriptStaticText,
+  decodeJavaScriptStaticTextWithOffsets,
   findCodeMatches,
   findStaticStringLiterals,
   templateRawSpans,
@@ -81,11 +81,15 @@ function findStaticSqlCallMatches(
   for (const literal of findStaticStringLiterals(filePath, content)) {
     const callPrefix = /\b(?:query|execute|exec)\s*\(\s*$/.exec(codeMask.slice(0, literal.start));
     if (!callPrefix) continue;
+    const fragment = decodeJavaScriptStaticTextWithOffsets(
+      content.slice(literal.start + 1, literal.end - 1),
+    );
     sqlPattern.lastIndex = 0;
-    const sqlMatch = sqlPattern.exec(literal.value);
-    if (sqlMatch) {
+    const sqlMatch = sqlPattern.exec(fragment.text);
+    const rawOffset = sqlMatch ? fragment.rawOffsets[sqlMatch.index] : undefined;
+    if (sqlMatch && rawOffset !== undefined) {
       matches.push({
-        index: literal.start,
+        index: literal.start + 1 + rawOffset,
         match: sqlMatch[0],
       });
     }
@@ -102,12 +106,13 @@ function findTaggedSqlMatches(
   for (const tag of findCodeMatches(SQL_TAG_START_PATTERN, content, codeMask)) {
     const backtick = tag.index + tag[0].lastIndexOf('`');
     for (const span of templateRawSpans(content, codeMask, backtick)) {
-      const fragment = decodeJavaScriptStaticText(content.slice(span.start, span.end));
+      const fragment = decodeJavaScriptStaticTextWithOffsets(content.slice(span.start, span.end));
       sqlPattern.lastIndex = 0;
-      const sqlMatch = sqlPattern.exec(fragment);
-      if (sqlMatch) {
+      const sqlMatch = sqlPattern.exec(fragment.text);
+      const rawOffset = sqlMatch ? fragment.rawOffsets[sqlMatch.index] : undefined;
+      if (sqlMatch && rawOffset !== undefined) {
         matches.push({
-          index: span.start + sqlMatch.index,
+          index: span.start + rawOffset,
           match: sqlMatch[0],
         });
       }

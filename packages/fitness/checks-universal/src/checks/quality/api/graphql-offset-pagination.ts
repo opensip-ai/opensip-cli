@@ -12,13 +12,14 @@ import { defineCheck, getLineNumber, type CheckViolation } from '@opensip-cli/fi
 import {
   createCodeMask,
   decodeJavaScriptStaticText,
+  decodeJavaScriptStaticTextWithOffsets,
   findCodeMatches,
   findTaggedTemplateStarts,
   templateRawSpans,
   type SourceSpan,
 } from '../../code-aware-match.js';
 
-const OFFSET_VAR_AT_START_PATTERN = /^\$offset\s*:\s*Int/;
+const OFFSET_VAR_PATTERN = /\$offset\s*:\s*Int/g;
 const GQL_TEMPLATE_START_PATTERN = /\bgql(?:\s*<[^`\n]+>)?\s*`/;
 const ASSIGNED_TEMPLATE_START_PATTERN = /=\s*`/;
 
@@ -72,11 +73,11 @@ function findOffsetIndexes(
   for (const spans of templateSpans) {
     for (const span of spans) {
       const fragment = content.slice(span.start, span.end);
-      for (let index = 0; index < fragment.length; index++) {
-        if (fragment[index] !== '$' && fragment[index] !== '\\') continue;
-        if (OFFSET_VAR_AT_START_PATTERN.test(decodeJavaScriptStaticText(fragment.slice(index)))) {
-          indexes.add(span.start + index);
-        }
+      const decoded = decodeJavaScriptStaticTextWithOffsets(fragment);
+      for (const match of decoded.text.matchAll(OFFSET_VAR_PATTERN)) {
+        if (match.index === undefined) continue;
+        const rawOffset = decoded.rawOffsets[match.index];
+        if (rawOffset !== undefined) indexes.add(span.start + rawOffset);
       }
     }
   }

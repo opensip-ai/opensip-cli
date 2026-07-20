@@ -7,6 +7,7 @@ import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { findStaticModuleReferences } from '../checks/code-aware-match.js';
 import { checks } from '../index.js';
 
 const languages = new LanguageRegistry();
@@ -87,6 +88,121 @@ describe('literal-sensitive checks with production-style string filtering', () =
     );
     const result = await runCheck('heavy-import-detection');
     expect(result.signals).toHaveLength(3);
+  });
+
+  it('keeps fallback type-only named imports non-runtime while empty imports execute', () => {
+    const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
+    const typeOnly = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences('fallback.ts', 'import { type A } from "jose";'),
+    );
+    const empty = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences('fallback.ts', 'import {} from "jose";'),
+    );
+    expect(typeOnly).toHaveLength(1);
+    expect(typeOnly[0]?.runtimeImport).toBe(false);
+    expect(empty).toHaveLength(1);
+    expect(empty[0]?.runtimeImport).toBe(true);
+  });
+
+  it('finds fallback import-equals declarations, including exported aliases', () => {
+    const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
+    const references = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences(
+        'fallback.ts',
+        ['import first = require("moment");', 'export import second = require("moment");'].join(
+          '\n',
+        ),
+      ),
+    );
+    expect(
+      references.map(({ keyword, moduleSpecifier, runtimeImport, runtimeBindingNames }) => ({
+        keyword,
+        moduleSpecifier,
+        runtimeImport,
+        runtimeBindingNames,
+      })),
+    ).toEqual([
+      {
+        keyword: 'import',
+        moduleSpecifier: 'moment',
+        runtimeImport: true,
+        runtimeBindingNames: ['first'],
+      },
+      {
+        keyword: 'import',
+        moduleSpecifier: 'moment',
+        runtimeImport: true,
+        runtimeBindingNames: ['second'],
+      },
+    ]);
+  });
+
+  it('finds fallback imports after a same-line statement boundary', () => {
+    const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
+    const references = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences('fallback.ts', 'const value = 1; import moment from "moment";'),
+    );
+    expect(references).toHaveLength(1);
+    expect(references[0]?.moduleSpecifier).toBe('moment');
+    expect(references[0]?.runtimeImport).toBe(true);
+  });
+
+  it('does not mistake regex text for a same-line fallback import', () => {
+    const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
+    const regexReferences = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences('fallback.ts', 'const pattern = /; import moment from "moment"/;'),
+    );
+    const divisionReferences = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences(
+        'fallback.ts',
+        'const ratio = numerator / denominator; import moment from "moment";',
+      ),
+    );
+    const controlBodyReferences = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences(
+        'fallback.ts',
+        'if (enabled) /; import moment from "moment"/.test(source);',
+      ),
+    );
+    const afterBlockReferences = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences(
+        'fallback.ts',
+        'if (enabled) {} /; import moment from "moment"/.test(source);',
+      ),
+    );
+    expect(regexReferences).toHaveLength(0);
+    expect(divisionReferences).toHaveLength(1);
+    expect(controlBodyReferences).toHaveLength(0);
+    expect(afterBlockReferences).toHaveLength(0);
+  });
+
+  it('rejects malformed fallback import-equals calls', () => {
+    const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
+    const references = runWithScope(fallbackScope, () =>
+      findStaticModuleReferences(
+        'fallback.ts',
+        [
+          'import first = require("moment" junk);',
+          'import second = require("moment").default;',
+        ].join('\n'),
+      ),
+    );
+    expect(references).toHaveLength(0);
+  });
+
+  it('rejects malformed unquoted module specifiers', async () => {
+    fixture(
+      'src/heavy.ts',
+      ['import moment from moment;', 'import momentAgain from `moment`;'].join('\n'),
+    );
+    const result = await runCheck('heavy-import-detection');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('detects exported import-equals declarations as runtime imports', async () => {
+    fixture('src/heavy.ts', 'export import moment = require("moment");');
+    const result = await runCheck('heavy-import-detection');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toEqual(['DEPRECATED_LIBRARY']);
   });
 
   it('detects deprecated side-effect imports', async () => {
@@ -245,6 +361,13 @@ describe('literal-sensitive checks with production-style string filtering', () =
     );
     const result = await runCheck('graphql-offset-pagination');
     expect(result.signals).toHaveLength(1);
+  });
+
+  it('maps GraphQL matches after a line continuation to their raw source line', async () => {
+    fixture('src/query.ts', ['const q = gql`\\', '$offset: Int`;'].join('\n'));
+    const result = await runCheck('graphql-offset-pagination');
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.line).toBe(2);
   });
 
   it('ignores commented GraphQL examples', async () => {
@@ -687,6 +810,36 @@ describe('literal-sensitive checks with production-style string filtering', () =
     ).toHaveLength(3);
   });
 
+  it('rejects dynamic computed secret keys while retaining static computed keys', async () => {
+    fixture(
+      'src/jwt.ts',
+      [
+        'declare const secret: string;',
+        'const jwtConfig = { [secret]: "tiny" };',
+        'jwtConfig[secret] = "small";',
+        'const staticJwtConfig = { ["secret"]: "short" };',
+      ].join('\n'),
+    );
+    const result = await runCheck('jwt-validation');
+    expect(
+      result.signals.filter((signal) => signal.message?.includes('appears weak')),
+    ).toHaveLength(1);
+  });
+
+  it('retains static computed secret keys through transparent wrappers', async () => {
+    fixture(
+      'src/jwt.ts',
+      [
+        'const jwtConfig = { [("secret")]: "tiny", [("secret" as const)]: "small" };',
+        'jwtConfig[("secret")] = "short";',
+      ].join('\n'),
+    );
+    const result = await runCheck('jwt-validation');
+    expect(
+      result.signals.filter((signal) => signal.message?.includes('appears weak')),
+    ).toHaveLength(3);
+  });
+
   it('correlates literal error codes across files', async () => {
     fixture('src/error-codes.ts', 'export const known = "APP.KNOWN.ERROR";');
     fixture('src/service.ts', 'throw { code: "APP.UNKNOWN.ERROR" };');
@@ -719,6 +872,29 @@ describe('literal-sensitive checks with production-style string filtering', () =
     fixture('src/transaction.ts', 'export const begin = sql`BEGIN TRANSACTION`;');
     const result = await runCheck('transaction-boundary-validation');
     expect(result.signals.length).toBeGreaterThan(0);
+  });
+
+  it('maps tagged SQL after a line continuation to its raw source line', async () => {
+    fixture('src/transaction.ts', ['await db.query(sql`\\', 'BEGIN TRANSACTION`);'].join('\n'));
+    const result = await runCheck('transaction-boundary-validation');
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.metadata?.type).toBe('uncommitted-transaction');
+    expect(result.signals[0]?.line).toBe(2);
+  });
+
+  it('maps quoted SQL after a line continuation to its raw source line', async () => {
+    fixture('src/transaction.ts', ['await db.query("\\', 'BEGIN TRANSACTION");'].join('\n'));
+    const result = await runCheck('transaction-boundary-validation');
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.metadata?.type).toBe('uncommitted-transaction');
+    expect(result.signals[0]?.line).toBe(2);
+  });
+
+  it('preserves the cooked value of legacy-octal SQL literals', async () => {
+    fixture('src/transaction.ts', String.raw`await db.query("\102EGIN TRANSACTION");`);
+    const result = await runCheck('transaction-boundary-validation');
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.metadata?.type).toBe('uncommitted-transaction');
   });
 
   it('recognizes matching query-based SQL commit literals', async () => {

@@ -76,17 +76,60 @@ export interface StaticStringLiteral {
   readonly propertyName?: string;
 }
 
-function opaqueNodeName(node: OpaqueParseNode): string | undefined {
-  if (
-    isOpaqueParseNode(node.argumentExpression) &&
-    typeof node.argumentExpression.text === 'string'
-  ) {
-    return node.argumentExpression.text;
+function staticQuotedNodeText(
+  node: unknown,
+  tree: OpaqueParseNode,
+  content: string,
+  allowBacktick = true,
+): string | undefined {
+  if (!isOpaqueParseNode(node) || typeof node.text !== 'string' || !node.getStart || !node.getEnd) {
+    return undefined;
   }
-  if (!isOpaqueParseNode(node.name)) return undefined;
+  const start = node.getStart(tree);
+  const end = node.getEnd();
+  const quote = content[start];
+  return (quote === '"' || quote === "'" || (allowBacktick && quote === '`')) &&
+    content[end - 1] === quote
+    ? node.text
+    : undefined;
+}
+
+function transparentExpressionNode(node: OpaqueParseNode, tree: OpaqueParseNode): OpaqueParseNode {
+  let current = node;
+  while (isOpaqueParseNode(current.expression)) {
+    const source = current.getText?.(tree).trim() ?? '';
+    const isTransparent =
+      current.type !== undefined ||
+      (source.startsWith('(') && source.endsWith(')')) ||
+      source.endsWith('!');
+    if (!isTransparent) break;
+    current = current.expression;
+  }
+  return current;
+}
+
+function staticComputedNodeText(
+  node: OpaqueParseNode,
+  tree: OpaqueParseNode,
+  content: string,
+): string | undefined {
+  return staticQuotedNodeText(transparentExpressionNode(node, tree), tree, content);
+}
+
+function opaqueNodeName(
+  node: OpaqueParseNode,
+  tree: OpaqueParseNode,
+  content: string,
+): string | undefined {
+  if (isOpaqueParseNode(node.argumentExpression)) {
+    return staticComputedNodeText(node.argumentExpression, tree, content);
+  }
+  if (!isOpaqueParseNode(node.name)) {
+    return typeof node.text === 'string' ? node.text : undefined;
+  }
   if (typeof node.name.text === 'string') return node.name.text;
-  if (isOpaqueParseNode(node.name.expression) && typeof node.name.expression.text === 'string') {
-    return node.name.expression.text;
+  if (isOpaqueParseNode(node.name.expression)) {
+    return staticComputedNodeText(node.name.expression, tree, content);
   }
   return undefined;
 }
@@ -94,19 +137,22 @@ function opaqueNodeName(node: OpaqueParseNode): string | undefined {
 function roleWithName(
   role: StaticStringLiteral['role'],
   node: OpaqueParseNode,
+  tree: OpaqueParseNode,
+  content: string,
 ): Pick<StaticStringLiteral, 'role' | 'propertyName'> {
-  const propertyName =
-    opaqueNodeName(node) ?? (typeof node.text === 'string' ? node.text : undefined);
+  const propertyName = opaqueNodeName(node, tree, content);
   return propertyName ? { role, propertyName } : { role };
 }
 
 function initializerLiteralRole(
   parent: OpaqueParseNode,
+  tree: OpaqueParseNode,
+  content: string,
 ): Pick<StaticStringLiteral, 'role' | 'propertyName'> {
   const container = isOpaqueParseNode(parent.parent) ? parent.parent : null;
   return container?.properties?.includes(parent)
-    ? roleWithName('object-property', parent)
-    : roleWithName('initializer', parent);
+    ? roleWithName('object-property', parent, tree, content)
+    : roleWithName('initializer', parent, tree, content);
 }
 
 function isSimpleAssignment(parent: OpaqueParseNode, node: OpaqueParseNode): boolean {
@@ -132,13 +178,17 @@ function transparentWrappedNode(node: OpaqueParseNode): OpaqueParseNode {
   return current;
 }
 
-function literalRole(node: OpaqueParseNode): Pick<StaticStringLiteral, 'role' | 'propertyName'> {
+function literalRole(
+  node: OpaqueParseNode,
+  tree: OpaqueParseNode,
+  content: string,
+): Pick<StaticStringLiteral, 'role' | 'propertyName'> {
   const roleNode = transparentWrappedNode(node);
   if (!isOpaqueParseNode(roleNode.parent)) return { role: 'other' };
   const parent = roleNode.parent;
-  if (parent.initializer === roleNode) return initializerLiteralRole(parent);
+  if (parent.initializer === roleNode) return initializerLiteralRole(parent, tree, content);
   if (isSimpleAssignment(parent, roleNode) && isOpaqueParseNode(parent.left))
-    return roleWithName('assignment', parent.left);
+    return roleWithName('assignment', parent.left, tree, content);
   if (parent.elements?.includes(roleNode)) return { role: 'array-element' };
   return { role: 'other' };
 }
@@ -169,7 +219,7 @@ export function findStaticStringLiterals(
           value: node.text,
           start,
           end,
-          ...literalRole(node),
+          ...literalRole(node, tree, content),
         });
       }
     }
@@ -461,14 +511,16 @@ function staticModuleReferenceFromNode(
   node: OpaqueParseNode,
 ): StaticModuleReference | null {
   if (!node.getStart) return null;
-  const moduleSpecifier = nodeText(staticModuleLiteral(node));
+  const moduleLiteral = staticModuleLiteral(node);
+  const moduleSpecifier = staticQuotedNodeText(moduleLiteral, tree, content, false);
   if (moduleSpecifier === undefined) return null;
 
   const index = node.getStart(tree);
-  const keyword = staticReferenceKeyword(content, index);
-  if (!keyword) return null;
+  const sourceKeyword = staticReferenceKeyword(content, index);
+  if (!sourceKeyword) return null;
 
-  const isImportEquals = keyword === 'import' && isOpaqueParseNode(node.moduleReference);
+  const isImportEquals = isOpaqueParseNode(node.moduleReference);
+  const keyword = isImportEquals ? 'import' : sourceKeyword;
   const candidateClause = keyword === 'import' ? node.importClause : node.exportClause;
   const clause = isOpaqueParseNode(candidateClause) ? candidateClause : null;
   const bindings = staticReferenceBindings(keyword, node, isImportEquals);
@@ -496,6 +548,29 @@ const SIMPLE_JAVASCRIPT_ESCAPES: Readonly<Record<string, string>> = {
 interface DecodedEscape {
   readonly value: string;
   readonly nextIndex: number;
+}
+
+function decodedLegacyOctalEscape(source: string, escapeIndex: number): DecodedEscape | null {
+  const firstDigit = source[escapeIndex] ?? '';
+  if (!/^[0-7]$/.test(firstDigit)) return null;
+
+  let digits = firstDigit;
+  const secondDigit = source[escapeIndex + 1] ?? '';
+  if (/^[0-7]$/.test(secondDigit)) {
+    digits += secondDigit;
+    const thirdDigit = source[escapeIndex + 2] ?? '';
+    if (/^[0-3]$/.test(firstDigit) && /^[0-7]$/.test(thirdDigit)) {
+      digits += thirdDigit;
+    }
+  }
+
+  // A bare `\0` is handled by SIMPLE_JAVASCRIPT_ESCAPES. It becomes a
+  // legacy octal escape only when followed by another octal digit.
+  if (digits === '0') return null;
+  return {
+    value: String.fromCodePoint(Number.parseInt(digits, 8)),
+    nextIndex: escapeIndex + digits.length,
+  };
 }
 
 function decodedHexEscape(
@@ -530,6 +605,8 @@ function decodedUnicodeEscape(source: string, escapeIndex: number): DecodedEscap
 function decodeJavaScriptEscape(source: string, escapeIndex: number): DecodedEscape {
   const escaped = source[escapeIndex];
   if (escaped === undefined) return { value: '', nextIndex: source.length };
+  const octalEscape = decodedLegacyOctalEscape(source, escapeIndex);
+  if (octalEscape) return octalEscape;
   if (escaped in SIMPLE_JAVASCRIPT_ESCAPES) {
     return {
       value: SIMPLE_JAVASCRIPT_ESCAPES[escaped] ?? '',
@@ -548,22 +625,40 @@ function decodeJavaScriptEscape(source: string, escapeIndex: number): DecodedEsc
   return decoded ?? { value: escaped, nextIndex: escapeIndex + 1 };
 }
 
-export function decodeJavaScriptStaticText(value: string): string {
-  let decoded = '';
+export interface DecodedJavaScriptStaticText {
+  readonly text: string;
+  /**
+   * Source offset for each UTF-16 code unit in `text`. Escapes that emit
+   * multiple code units map each unit to the escape's opening backslash;
+   * line-continuation escapes emit no entry.
+   */
+  readonly rawOffsets: readonly number[];
+}
+
+export function decodeJavaScriptStaticTextWithOffsets(value: string): DecodedJavaScriptStaticText {
+  let text = '';
+  const rawOffsets: number[] = [];
   let index = 0;
   while (index < value.length) {
     const character = value[index] ?? '';
     if (character !== '\\') {
-      decoded += character;
+      text += character;
+      rawOffsets.push(index);
       index++;
       continue;
     }
 
+    const escapeStart = index;
     const escape = decodeJavaScriptEscape(value, index + 1);
-    decoded += escape.value;
+    text += escape.value;
+    rawOffsets.push(...escape.value.split('').map(() => escapeStart));
     index = escape.nextIndex;
   }
-  return decoded;
+  return { text, rawOffsets };
+}
+
+export function decodeJavaScriptStaticText(value: string): string {
+  return decodeJavaScriptStaticTextWithOffsets(value).text;
 }
 
 function isFallbackTypeOnlyBinding(binding: string): boolean {
@@ -606,13 +701,15 @@ function fallbackImportBindingMetadata(clauseCode: string): ImportBindingMetadat
   if (starIndex >= 0) prefixEnd = Math.min(prefixEnd, starIndex);
   const defaultBinding = trimmed.slice(0, prefixEnd).replace(/,\s*$/, '').trim();
   if (defaultBinding) bindingNames.push(defaultBinding);
+  const hasEmptyNamedImports = namedBody?.trim().length === 0;
 
   return {
     runtimeImport:
       trimmed.length === 0 ||
       defaultBinding.length > 0 ||
       namespaceMatch !== null ||
-      namedBody !== undefined,
+      hasEmptyNamedImports ||
+      runtimeNamedBindings.length > 0,
     runtimeNamedBindingCount: runtimeNamedBindings.length,
     runtimeBindingNames: [...new Set(bindingNames)],
     namespaceImport: namespaceMatch !== null,
@@ -647,6 +744,148 @@ interface FallbackSourceClause {
   readonly clauseCode: string;
 }
 
+interface FallbackImportEqualsClause extends FallbackSourceClause {
+  readonly bindingName: string;
+}
+
+function sourceIdentifierAt(
+  content: string,
+  fromIndex: number,
+  end: number,
+): { readonly name: string; readonly end: number } | null {
+  const match = /^[$A-Z_a-z][$\w]*/.exec(content.slice(fromIndex, end));
+  return match
+    ? {
+        name: match[0],
+        end: fromIndex + match[0].length,
+      }
+    : null;
+}
+
+function sourceTokenEnd(
+  content: string,
+  fromIndex: number,
+  end: number,
+  token: string,
+): number | null {
+  const index = skipSourceTrivia(content, fromIndex, end);
+  if (
+    !content.startsWith(token, index) ||
+    (/[$\w]/.test(token.at(-1) ?? '') && /[$\w]/.test(content[index + token.length] ?? ''))
+  ) {
+    return null;
+  }
+  return index + token.length;
+}
+
+function fallbackImportEqualsClause(
+  keyword: StaticModuleReference['keyword'],
+  content: string,
+  afterKeyword: number,
+  end: number,
+): FallbackImportEqualsClause | null {
+  let cursor = afterKeyword;
+  if (keyword === 'export') {
+    const importEnd = sourceTokenEnd(content, cursor, end, 'import');
+    if (importEnd === null) return null;
+    cursor = importEnd;
+  }
+
+  cursor = skipSourceTrivia(content, cursor, end);
+  const binding = sourceIdentifierAt(content, cursor, end);
+  if (!binding) return null;
+  cursor = binding.end;
+
+  const equalsEnd = sourceTokenEnd(content, cursor, end, '=');
+  if (equalsEnd === null) return null;
+  const requireEnd = sourceTokenEnd(content, equalsEnd, end, 'require');
+  if (requireEnd === null) return null;
+  const openParenthesisEnd = sourceTokenEnd(content, requireEnd, end, '(');
+  if (openParenthesisEnd === null) return null;
+  const quoteStart = skipSourceTrivia(content, openParenthesisEnd, end);
+  if (!/['"]/.test(content[quoteStart] ?? '')) return null;
+
+  return {
+    bindingName: binding.name,
+    clauseCode: binding.name,
+    quoteStart,
+  };
+}
+
+function previousSourceWord(content: string, beforeIndex: number): string {
+  let end = beforeIndex;
+  while (end > 0 && /\s/.test(content[end - 1] ?? '')) end--;
+  let start = end;
+  while (start > 0 && /[$\w]/.test(content[start - 1] ?? '')) start--;
+  return content.slice(start, end);
+}
+
+function wordBeforeMatchingParenthesis(content: string, closeIndex: number): string {
+  let depth = 1;
+  for (let index = closeIndex - 1; index >= 0; index--) {
+    if (content[index] === ')') depth++;
+    if (content[index] !== '(') continue;
+    depth--;
+    if (depth === 0) return previousSourceWord(content, index);
+  }
+  return '';
+}
+
+function canStartFallbackRegexLiteral(content: string, slashIndex: number): boolean {
+  let previous = slashIndex - 1;
+  while (previous >= 0 && /\s/.test(content[previous] ?? '')) previous--;
+  if (previous < 0) return true;
+
+  const character = content[previous] ?? '';
+  if (/[[{:,(;=!?&|+\-*%^~<>]/.test(character) || character === '}') return true;
+  if (
+    character === ')' &&
+    /^(?:for|if|while|with)$/.test(wordBeforeMatchingParenthesis(content, previous))
+  ) {
+    return true;
+  }
+  return /^(?:await|case|delete|do|else|in|instanceof|new|of|return|throw|typeof|void|yield)$/.test(
+    previousSourceWord(content, previous + 1),
+  );
+}
+
+function fallbackRegexEnd(content: string, slashIndex: number): number {
+  let escaped = false;
+  let inCharacterClass = false;
+  for (let cursor = slashIndex + 1; cursor < content.length; cursor++) {
+    const character = content[cursor] ?? '';
+    if (character === '\n') return -1;
+    if (escaped) {
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (character === '[') {
+      inCharacterClass = true;
+    } else if (character === ']') {
+      inCharacterClass = false;
+    } else if (character === '/' && !inCharacterClass) {
+      return cursor;
+    }
+  }
+  return -1;
+}
+
+function insideFallbackRegexLiteral(content: string, targetIndex: number): boolean {
+  const lineStart = content.lastIndexOf('\n', targetIndex - 1) + 1;
+  let index = lineStart;
+  while (index < targetIndex) {
+    if (content[index] !== '/' || !canStartFallbackRegexLiteral(content, index)) {
+      index++;
+      continue;
+    }
+
+    const regexEnd = fallbackRegexEnd(content, index);
+    if (regexEnd !== -1 && targetIndex < regexEnd) return true;
+    index = regexEnd === -1 ? index + 1 : regexEnd + 1;
+  }
+  return false;
+}
+
 function fallbackSourceClause(
   keyword: StaticModuleReference['keyword'],
   content: string,
@@ -679,19 +918,45 @@ function fallbackStaticModuleReference(
   match: RegExpMatchArray,
   end: number,
 ): StaticModuleReference | null {
-  if (match.index === undefined || (match[1] !== 'import' && match[1] !== 'export')) return null;
-  const keyword = match[1];
-  const keywordIndex = match.index + match[0].lastIndexOf(keyword);
-  const afterKeyword = keywordIndex + keyword.length;
+  const sourceKeyword = match[2];
+  if (match.index === undefined || (sourceKeyword !== 'import' && sourceKeyword !== 'export')) {
+    return null;
+  }
+  const keywordIndex = match.index + match[0].lastIndexOf(sourceKeyword);
+  if (insideFallbackRegexLiteral(codeMask, keywordIndex)) return null;
+  const afterKeyword = keywordIndex + sourceKeyword.length;
   if (/^\s*[.(]/.test(codeMask.slice(afterKeyword, end))) return null;
 
-  const sourceClause = fallbackSourceClause(keyword, content, codeMask, afterKeyword, end);
+  const importEquals = fallbackImportEqualsClause(sourceKeyword, content, afterKeyword, end);
+  const sourceClause =
+    importEquals ?? fallbackSourceClause(sourceKeyword, content, codeMask, afterKeyword, end);
   if (!sourceClause) return null;
   const quoteEnd = sourceQuoteEnd(content, sourceClause.quoteStart, end);
   if (quoteEnd === -1) return null;
 
+  if (importEquals) {
+    const closeParenthesis = skipSourceTrivia(content, quoteEnd + 1, end);
+    if (content[closeParenthesis] !== ')') return null;
+    const lineEnd = content.indexOf('\n', closeParenthesis + 1);
+    const suffixEnd = lineEnd === -1 ? end : Math.min(lineEnd, end);
+    const suffixStart = skipSourceTrivia(content, closeParenthesis + 1, suffixEnd);
+    if (suffixStart < suffixEnd && content[suffixStart] !== ';') return null;
+    return {
+      index: keywordIndex,
+      keyword: 'import',
+      clauseCode: importEquals.clauseCode,
+      moduleSpecifier: decodeJavaScriptStaticText(
+        content.slice(sourceClause.quoteStart + 1, quoteEnd),
+      ),
+      runtimeImport: true,
+      runtimeNamedBindingCount: 0,
+      runtimeBindingNames: [importEquals.bindingName],
+      namespaceImport: true,
+    };
+  }
+
   const bindings: ImportBindingMetadata =
-    keyword === 'import'
+    sourceKeyword === 'import'
       ? fallbackImportBindingMetadata(sourceClause.clauseCode)
       : {
           runtimeImport: false,
@@ -701,7 +966,7 @@ function fallbackStaticModuleReference(
         };
   return {
     index: keywordIndex,
-    keyword,
+    keyword: sourceKeyword,
     clauseCode: sourceClause.clauseCode,
     moduleSpecifier: decodeJavaScriptStaticText(
       content.slice(sourceClause.quoteStart + 1, quoteEnd),
@@ -715,7 +980,7 @@ function fallbackStaticModuleReferences(
   content: string,
 ): readonly StaticModuleReference[] {
   const codeMask = createCodeMask(filePath, content);
-  const declarations = [...codeMask.matchAll(/^[\t ]*(import|export)\b/gm)];
+  const declarations = [...codeMask.matchAll(/(^|[;}])[\t ]*(import|export)\b/gm)];
   const references: StaticModuleReference[] = [];
 
   for (const [declarationIndex, match] of declarations.entries()) {
