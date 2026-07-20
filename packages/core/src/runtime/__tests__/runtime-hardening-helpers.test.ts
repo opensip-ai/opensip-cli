@@ -85,6 +85,12 @@ describe('runtime hardening helpers', () => {
     ).rejects.toBeInstanceOf(IpcPayloadTooLargeError);
   });
 
+  it('drain is a no-op when the process has no IPC channel (not forked)', async () => {
+    restoreProcessSend();
+    delete (process as NodeJS.Process & { send?: NodeJS.Process['send'] }).send;
+    await expect(sendWorkerIpcMessageAndDrain({ kind: 'result' }, 1024)).resolves.toBeUndefined();
+  });
+
   it('drain treats send-returns-false as backpressure while connected, fatal only when disconnected', async () => {
     const originalConnected = Object.getOwnPropertyDescriptor(process, 'connected');
     const setConnected = (value: boolean): void => {

@@ -142,7 +142,19 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
       env: AS_INSTALLED,
     });
     expect(installed.exitCode).toBe(bundled.exitCode);
-    expect(normalize(JSON.parse(installed.stdout))).toEqual(normalize(JSON.parse(bundled.stdout)));
+    const bundledNorm = normalize(JSON.parse(bundled.stdout));
+    const installedNorm = normalize(JSON.parse(installed.stdout));
+    // On divergence, surface both runs' stderr — a dropped pack announces its
+    // reason there, and the bare envelope diff hides it (root-cause aid, not
+    // an assertion change).
+    if (JSON.stringify(installedNorm) !== JSON.stringify(bundledNorm)) {
+      console.error('[fit-acceptance] check-list divergence — bundled stderr:\n', bundled.stderr);
+      console.error(
+        '[fit-acceptance] check-list divergence — installed stderr:\n',
+        installed.stderr,
+      );
+    }
+    expect(installedNorm).toEqual(bundledNorm);
   });
 
   it('loads an explicitly configured fit pack through the real capability worker', () => {
@@ -251,6 +263,12 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
     };
     expect(i.kind).toBe(b.kind);
     expect(i.status).toBe(b.status);
+    // On divergence, surface both runs' stderr — a dropped pack announces its
+    // reason there, and the bare envelope diff hides it.
+    if (JSON.stringify(i.envelope) !== JSON.stringify(b.envelope)) {
+      console.error('[fit-acceptance] envelope divergence — bundled stderr:\n', bundled.stderr);
+      console.error('[fit-acceptance] envelope divergence — installed stderr:\n', installed.stderr);
+    }
     // The whole normalized envelope (verdict, units, signals) is byte-identical:
     // the same checks ran on the same files and produced the same findings,
     // regardless of which path loaded fit.

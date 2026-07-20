@@ -103,6 +103,7 @@ async function importEntryWithRetry(entryHref: string): Promise<Record<string, u
       return (await import(entryHref)) as Record<string, unknown>;
     } catch (error) {
       if (attempt >= IMPORT_RETRY_ATTEMPTS || !isTransientImportError(error)) throw error;
+      /* v8 ignore next -- reachable only under real descriptor exhaustion (EMFILE/ENFILE mid-import); exercised by loaded lanes, not unit-injectable without fs fault injection. */
       await new Promise((resolve) => setTimeout(resolve, IMPORT_RETRY_DELAY_MS * attempt));
     }
   }
@@ -145,6 +146,7 @@ async function loadViaHostImport(
   const { descriptor, onDiagnostic } = options;
   const resolved = resolvePackageEntryPoint(pkg.packageDir, pkg.name);
   if (!resolved) {
+    /* v8 ignore next 6 -- selection already proved a readable manifest, so an unresolvable entry here needs a mid-run manifest mutation (e.g. a concurrent rebuild deleting it); the required arm still fails loud when that race fires. */
     if (admission.required === true) {
       throw new SystemError(
         `required capability pack ${pkg.name} has no readable package entry (${pkg.packageDir})`,
