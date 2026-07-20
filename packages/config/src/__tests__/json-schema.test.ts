@@ -174,6 +174,43 @@ describe('jsonSchemaObjectToZod (coarse manifest descriptor → Zod)', () => {
     expect(single.safeParse({ only: 'y' }).success).toBe(false);
   });
 
+  it.each([
+    ['enum', { enum: [] }],
+    ['type union', { type: [] }],
+  ] as const)('an empty %s accepts no value', (_label, valueSchema) => {
+    const zod = jsonSchemaObjectToZod({
+      type: 'object',
+      properties: { value: valueSchema },
+      required: ['value'],
+    });
+
+    for (const value of ['text', 1, null, false]) {
+      expect(zod.safeParse({ value }).success).toBe(false);
+    }
+  });
+
+  it('intersects enum membership with a declared primitive type', () => {
+    const zod = jsonSchemaObjectToZod({
+      type: 'object',
+      properties: { value: { type: 'string', enum: ['allowed', 1] } },
+      required: ['value'],
+    });
+
+    expect(zod.safeParse({ value: 'allowed' }).success).toBe(true);
+    expect(zod.safeParse({ value: 1 }).success).toBe(false);
+    expect(zod.safeParse({ value: 'other' }).success).toBe(false);
+  });
+
+  it.each([
+    ['opaque', { type: 'object', enum: ['impossible'] }],
+    ['declared', { type: 'object', properties: {}, enum: ['impossible'] }],
+  ] as const)('intersects a top-level %s object schema with its enum', (_label, schema) => {
+    const zod = jsonSchemaObjectToZod(schema);
+
+    expect(zod.safeParse({}).success).toBe(false);
+    expect(zod.safeParse('impossible').success).toBe(false);
+  });
+
   it('a type union (`type: ["string","null"]`) accepts either member', () => {
     const zod = jsonSchemaObjectToZod({
       type: 'object',

@@ -45,12 +45,13 @@ export function toJsonSchema(composed: ZodType): JsonSchema {
 
 /**
  * Build a coarse union over `members`. A single member returns as-is; an empty
- * list falls back to `z.unknown()` (a degenerate enum/type-union descriptor).
+ * list accepts no value, preserving empty enum/type-union semantics for direct
+ * converter callers even though manifest admission rejects that malformed form.
  * `z.union` requires a 2+ tuple at the type level, so the dynamic array is cast
  * once here (the runtime accepts any-length schema array).
  */
 function unionOf(members: readonly ZodType[]): ZodType {
-  if (members.length === 0) return z.unknown();
+  if (members.length === 0) return z.never();
   if (members.length === 1) return members[0];
   return z.union(members as unknown as [ZodType, ZodType, ...ZodType[]]);
 }
@@ -93,14 +94,10 @@ function primitiveToZod(type: JsonSchemaPrimitiveType): ZodType {
  * deliberately treated as `z.unknown()` — the worker's deep Zod pass is
  * authoritative for semantics; the host pass is coarse by design.
  */
-function nodeToZod(node: JsonSchemaNode): ZodType {
-  if (node.enum !== undefined && node.enum.length > 0) {
-    // Coarse literal membership: a union of literals over the declared values.
-    return unionOf(node.enum.map((v) => z.literal(v as never)));
-  }
+function nodeTypeToZod(node: JsonSchemaNode): ZodType {
   const type = node.type;
   if (type === undefined) {
-    // No `type` (and no enum) → an unconstrained value at the coarse layer.
+    // No `type` → an unconstrained value before any enum intersection.
     return z.unknown();
   }
   if (typeof type !== 'string') {
@@ -114,6 +111,16 @@ function nodeToZod(node: JsonSchemaNode): ZodType {
     return node.items === undefined ? z.array(z.unknown()) : z.array(nodeToZod(node.items));
   }
   return primitiveToZod(type);
+}
+
+function nodeToZod(node: JsonSchemaNode): ZodType {
+  const typeSchema = nodeTypeToZod(node);
+  if (node.enum === undefined) return typeSchema;
+
+  // JSON-Schema keywords intersect: enum membership must not bypass a declared
+  // primitive type. Empty enums defensively reduce the intersection to never.
+  const enumSchema = unionOf(node.enum.map((value) => z.literal(value as never)));
+  return z.intersection(typeSchema, enumSchema);
 }
 
 /**
@@ -156,10 +163,15 @@ function objectNodeToZod(node: JsonSchemaNode): ZodType {
  * @returns A Zod schema the composer folds into the whole-document schema.
  */
 export function jsonSchemaObjectToZod(schema: JsonSchemaObject): ZodType {
-  if (schema.properties === undefined) {
-    // No declared keys → coarse "is an object" check; defer all shape to the
-    // worker deep pass. Permit unknown keys (the deep pass owns rejection).
-    return z.record(z.string(), z.unknown());
-  }
-  return objectNodeToZod(schema);
+  const objectSchema =
+    schema.properties === undefined
+      ? // No declared keys → coarse "is an object" check; defer all shape to the
+        // worker deep pass. Permit unknown keys (the deep pass owns rejection).
+        z.record(z.string(), z.unknown())
+      : objectNodeToZod(schema);
+  if (schema.enum === undefined) return objectSchema;
+  return z.intersection(
+    objectSchema,
+    unionOf(schema.enum.map((value) => z.literal(value as never))),
+  );
 }

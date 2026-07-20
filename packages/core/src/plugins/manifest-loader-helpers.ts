@@ -366,7 +366,10 @@ function isJsonSchemaType(
 ): value is JsonSchemaPrimitiveType | readonly JsonSchemaPrimitiveType[] {
   return (
     isJsonSchemaPrimitiveType(value) ||
-    (Array.isArray(value) && value.every(isJsonSchemaPrimitiveType))
+    (Array.isArray(value) &&
+      value.length > 0 &&
+      new Set(value).size === value.length &&
+      value.every(isJsonSchemaPrimitiveType))
   );
 }
 
@@ -377,6 +380,8 @@ function isJsonSchemaEnum(value: unknown): boolean {
   // membership faithfully in the host's coarse converter.
   return (
     Array.isArray(value) &&
+    value.length > 0 &&
+    new Set(value).size === value.length &&
     value.every(
       (member) =>
         member === null ||

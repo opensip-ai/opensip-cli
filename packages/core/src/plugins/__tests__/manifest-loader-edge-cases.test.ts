@@ -86,6 +86,13 @@ describe('manifest loader fail-closed edges', () => {
       { type: 'object', properties: { values: { type: 'array', items: null } } },
     ],
     ['a non-array enum', { type: 'object', properties: { mode: { enum: 'fast' } } }],
+    ['an empty enum', { type: 'object', properties: { mode: { enum: [] } } }],
+    ['a duplicate enum', { type: 'object', properties: { mode: { enum: ['fast', 'fast'] } } }],
+    ['an empty type union', { type: 'object', properties: { mode: { type: [] } } }],
+    [
+      'a duplicate type union',
+      { type: 'object', properties: { mode: { type: ['string', 'string'] } } },
+    ],
     [
       'an array-valued enum member',
       { type: 'object', properties: { mode: { enum: [['fast', 'exact']] } } },
