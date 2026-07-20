@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DataStoreFactory, DataStoreVersionError } from '../index.js';
+import { DataStoreFactory, DataStoreMigrationError, DataStoreVersionError } from '../index.js';
 import {
   isDbNewerThanCli,
   LEGACY_PRE_SQUASH_MAX_USER_VERSION,
@@ -33,6 +33,23 @@ function writeUserVersion(path: string, version: number): void {
   const db = new Database(path);
   try {
     db.pragma(`user_version = ${version}`);
+  } finally {
+    db.close();
+  }
+}
+
+function readPersistentPragmas(path: string): {
+  readonly journalMode: unknown;
+  readonly autoVacuum: unknown;
+  readonly userVersion: unknown;
+} {
+  const db = new Database(path);
+  try {
+    return {
+      journalMode: db.pragma('journal_mode', { simple: true }),
+      autoVacuum: db.pragma('auto_vacuum', { simple: true }),
+      userVersion: db.pragma('user_version', { simple: true }),
+    };
   } finally {
     db.close();
   }
@@ -183,6 +200,24 @@ describe('DataStoreFactory.open — downgrade guard', () => {
     expect(readUserVersion(path)).toBe(9999);
   });
 
+  it('rejects a newer database before mutating its persistent SQLite settings', () => {
+    const path = join(tmp, 'future-settings.sqlite');
+    const db = new Database(path);
+    try {
+      db.pragma('journal_mode = DELETE');
+      db.pragma('auto_vacuum = NONE');
+      db.exec('CREATE TABLE future_owned (id INTEGER PRIMARY KEY)');
+      db.pragma('user_version = 9999');
+    } finally {
+      db.close();
+    }
+    const before = readPersistentPragmas(path);
+
+    expect(() => DataStoreFactory.open({ backend: 'sqlite', path })).toThrow(DataStoreVersionError);
+
+    expect(readPersistentPragmas(path)).toEqual(before);
+  });
+
   it('the error message points at the install script and the delete fallback', () => {
     const path = join(tmp, 'future-msg.sqlite');
     DataStoreFactory.open({ backend: 'sqlite', path }).close();
@@ -198,6 +233,70 @@ describe('DataStoreFactory.open — downgrade guard', () => {
       expect(err.supportedVersion).toBe(readSupportedDbVersion(MIGRATIONS_FOLDER));
       expect(err.message).toContain('curl -fsSL https://opensip.ai/cli/install.sh | bash');
       expect(err.message).toContain(path);
+    }
+  });
+});
+
+describe('DataStoreFactory.open — migration failure cleanup', () => {
+  it('preserves the migration error when a pinned reader makes the close checkpoint busy', () => {
+    const migrations = join(tmp, 'failing-migrations');
+    cpSync(MIGRATIONS_FOLDER, migrations, { recursive: true });
+    const journalPath = join(migrations, 'meta', '_journal.json');
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+      entries: Record<string, unknown>[];
+    };
+    journal.entries.push({
+      idx: journal.entries.length,
+      version: '6',
+      when: 1_783_942_987_827,
+      tag: '0011_forced_failure',
+      breakpoints: true,
+    });
+    writeFileSync(journalPath, JSON.stringify(journal), 'utf8');
+    writeFileSync(
+      join(migrations, '0011_forced_failure.sql'),
+      [
+        'PRAGMA busy_timeout = 0;',
+        '--> statement-breakpoint',
+        'SELECT * FROM definitely_missing_table;',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const path = join(tmp, 'migration-close-busy.sqlite');
+    const seed = new Database(path);
+    seed.pragma('auto_vacuum = INCREMENTAL');
+    seed.exec('VACUUM');
+    seed.pragma('journal_mode = WAL');
+    seed.exec(
+      "CREATE TABLE pin (id INTEGER PRIMARY KEY, value TEXT); INSERT INTO pin(value) VALUES ('old')",
+    );
+    seed.close();
+
+    const reader = new Database(path);
+    try {
+      reader.exec('BEGIN');
+      reader.prepare('SELECT * FROM pin').all();
+      const writer = new Database(path);
+      try {
+        writer.prepare('INSERT INTO pin(value) VALUES (?)').run('new');
+      } finally {
+        writer.close();
+      }
+
+      try {
+        DataStoreFactory.open({ backend: 'sqlite', path, migrationsFolder: migrations });
+        expect.unreachable('migration should have failed');
+      } catch (error) {
+        expect(error).toBeInstanceOf(DataStoreMigrationError);
+        expect((error as DataStoreMigrationError).cause).toBeInstanceOf(Error);
+        expect(((error as DataStoreMigrationError).cause as Error).message).toContain(
+          'definitely_missing_table',
+        );
+      }
+    } finally {
+      reader.exec('ROLLBACK');
+      reader.close();
     }
   });
 });

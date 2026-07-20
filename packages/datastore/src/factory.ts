@@ -1,7 +1,9 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ConfigurationError, withSpan } from '@opensip-cli/core';
+import Database from 'better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 import { openMemoryBackend } from './backends/memory.js';
@@ -43,6 +45,27 @@ export const DataStoreFactory = {
     }
 
     const path = requireSqlitePath(opts);
+    // Reject a stable future-version database through a read-only connection
+    // before the writable backend can enable WAL or convert auto-vacuum.
+    const supportedVersion = readSupportedDbVersion(migrationsFolder);
+    if (supportedVersion !== undefined) {
+      let existingVersion: number | undefined;
+      try {
+        existingVersion = readExistingUserVersion(path);
+      } catch (error) {
+        throw new DataStoreMigrationError(openFailureMessage(opts, error), {
+          cause: error,
+        });
+      }
+      if (existingVersion !== undefined && isDbNewerThanCli(existingVersion, supportedVersion)) {
+        throw new DataStoreVersionError({
+          path,
+          dbVersion: existingVersion,
+          supportedVersion,
+        });
+      }
+    }
+
     let handle;
     try {
       handle = openSqliteBackend({ path, lock: opts.lock });
@@ -56,7 +79,6 @@ export const DataStoreFactory = {
 
     // `undefined` (unreadable journal) means "skip the guard" — migrate() reads
     // the same journal and will surface the canonical failure loudly.
-    const supportedVersion = readSupportedDbVersion(migrationsFolder);
     if (supportedVersion !== undefined) {
       const dbVersion = handle.readUserVersion();
       if (isDbNewerThanCli(dbVersion, supportedVersion)) {
@@ -78,7 +100,12 @@ export const DataStoreFactory = {
         if (supportedVersion !== undefined) handle.writeUserVersion(supportedVersion);
       });
     } catch (error) {
-      handle.close();
+      const closeResult = handle.closeForLifecycle();
+      // A failed checkpoint is secondary once native closure is proven: keep
+      // the migration failure and its actionable recovery message. An unclosed
+      // native handle remains authority-bearing, so close() rethrows that
+      // bounded lifecycle failure instead.
+      if (!closeResult.closed) handle.close();
       throw new DataStoreMigrationError(migrateFailureMessage(opts), {
         cause: error,
       });
@@ -177,4 +204,18 @@ function requireSqlitePath(opts: DataStoreOpenOptions): string {
     });
   }
   return opts.path;
+}
+
+/**
+ * Read the schema stamp of an existing SQLite file without running writable
+ * backend initialization. A missing file has no version to guard.
+ */
+function readExistingUserVersion(path: string): number | undefined {
+  if (!existsSync(path)) return undefined;
+  const sqlite = new Database(path, { readonly: true, fileMustExist: true });
+  try {
+    return Number(sqlite.pragma('user_version', { simple: true }));
+  } finally {
+    sqlite.close();
+  }
 }
