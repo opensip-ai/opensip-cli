@@ -86,4 +86,24 @@ describe('graph-java discover.ts — branches', () => {
     expect(out.files.every((f) => !f.includes('/build/'))).toBe(true);
     expect([...out.files]).toEqual([...out.files].sort());
   });
+
+  it('keeps build-like package names beneath canonical Java source roots', () => {
+    for (const packageName of ['build', 'target', 'out', 'bin']) {
+      const sourceDir = join(dir, 'src/main/java/com/acme', packageName);
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(
+        join(sourceDir, `${packageName}Source.java`),
+        `package com.acme.${packageName};\nclass ${packageName}Source {}\n`,
+        'utf8',
+      );
+    }
+
+    const out = discoverFiles({ diagnosticIntent: 'quiet', cwd: dir });
+    expect(out.files.map((file) => file.slice(file.lastIndexOf('/') + 1))).toEqual([
+      'binSource.java',
+      'buildSource.java',
+      'outSource.java',
+      'targetSource.java',
+    ]);
+  });
 });

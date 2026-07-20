@@ -37,6 +37,26 @@ const EXCLUDED_DIR_GLOBS: readonly string[] = [
   '**/.git/**',
 ];
 
+const BUILD_OUTPUT_DIRS: ReadonlySet<string> = new Set(['target', 'build', 'out', 'bin']);
+const ALWAYS_EXCLUDED_DIRS: ReadonlySet<string> = new Set(['.gradle', 'node_modules', '.git']);
+
+function preserveCanonicalSourcePath(projectRelativePath: string): boolean {
+  const segments = projectRelativePath.split('/');
+  if (segments.some((segment) => ALWAYS_EXCLUDED_DIRS.has(segment))) return false;
+
+  const sourceRootIndex = segments.findIndex(
+    (segment, index) =>
+      segment === 'src' &&
+      (segments[index + 1] === 'main' || segments[index + 1] === 'test') &&
+      segments[index + 2] === 'java',
+  );
+  if (sourceRootIndex === -1) return false;
+
+  return segments.every(
+    (segment, index) => !BUILD_OUTPUT_DIRS.has(segment) || index > sourceRootIndex + 2,
+  );
+}
+
 // Search order: lockfile (most resolved) → pom.xml → build.gradle.kts → build.gradle.
 const CONFIG_CANDIDATES: readonly string[] = [
   'gradle.lockfile',
@@ -48,6 +68,7 @@ const CONFIG_CANDIDATES: readonly string[] = [
 export const discoverFiles = createDiscover({
   extension: 'java',
   excludedDirGlobs: EXCLUDED_DIR_GLOBS,
+  preserveExcludedPath: preserveCanonicalSourcePath,
   configCandidates: CONFIG_CANDIDATES,
   languageId: 'java',
 });

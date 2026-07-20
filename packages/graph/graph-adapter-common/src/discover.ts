@@ -20,7 +20,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { logger } from '@opensip-cli/core';
-import { glob } from 'glob';
+import { glob, Ignore, type IgnoreLike } from 'glob';
 
 import type { DiscoverInput, DiscoverOutput } from '@opensip-cli/graph';
 
@@ -30,6 +30,11 @@ export interface TreeSitterDiscoverConfig {
   readonly extension: string;
   /** Directory globs to exclude from the recursive source-file walk. */
   readonly excludedDirGlobs: readonly string[];
+  /**
+   * Optional exception for paths that match an excluded glob but are valid
+   * source locations. Receives a project-relative POSIX path.
+   */
+  readonly preserveExcludedPath?: (projectRelativePath: string) => boolean;
   /**
    * Ordered config-file precedence list (resolved-deps first). The first
    * candidate that exists at the project root becomes the cacheKey anchor.
@@ -43,7 +48,13 @@ export interface TreeSitterDiscoverConfig {
 export function createDiscover(
   config: TreeSitterDiscoverConfig,
 ): (input: DiscoverInput) => DiscoverOutput {
-  const { extension, excludedDirGlobs, configCandidates, languageId } = config;
+  const {
+    extension,
+    excludedDirGlobs,
+    preserveExcludedPath,
+    configCandidates,
+    languageId,
+  } = config;
   const module = `graph:discover:${languageId}`;
   const pattern = `**/*.${extension}`;
 
@@ -59,7 +70,7 @@ export function createDiscover(
       input.configPathOverride,
       configCandidates,
     );
-    const files = collectFiles(projectDirAbs, pattern, excludedDirGlobs);
+    const files = collectFiles(projectDirAbs, pattern, excludedDirGlobs, preserveExcludedPath);
 
     const out: DiscoverOutput =
       configPathAbs === undefined
@@ -110,11 +121,13 @@ function collectFiles(
   projectDirAbs: string,
   pattern: string,
   excludedDirGlobs: readonly string[],
+  preserveExcludedPath: ((projectRelativePath: string) => boolean) | undefined,
 ): readonly string[] {
+  const ignore = buildIgnore(excludedDirGlobs, preserveExcludedPath);
   const matches: string[] = glob.sync(pattern, {
     cwd: projectDirAbs,
     absolute: true,
-    ignore: [...excludedDirGlobs],
+    ignore,
     nodir: true,
     follow: false,
     dot: false,
@@ -137,4 +150,19 @@ function collectFiles(
   }
   out.sort();
   return out;
+}
+
+function buildIgnore(
+  excludedDirGlobs: readonly string[],
+  preserveExcludedPath: ((projectRelativePath: string) => boolean) | undefined,
+): IgnoreLike {
+  const baseIgnore = new Ignore([...excludedDirGlobs], {});
+  if (preserveExcludedPath === undefined) return baseIgnore;
+
+  return {
+    ignored: (path) =>
+      !preserveExcludedPath(path.relativePosix()) && baseIgnore.ignored(path),
+    childrenIgnored: (path) =>
+      !preserveExcludedPath(path.relativePosix()) && baseIgnore.childrenIgnored(path),
+  };
 }
