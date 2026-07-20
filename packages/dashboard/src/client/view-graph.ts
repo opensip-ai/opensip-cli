@@ -110,7 +110,7 @@ function gvApplySccHighlight(): void {
   if (!cy) return;
   cy.batch(() => {
     cy.elements().removeClass('gv-scc-member gv-scc-edge gv-scc-dimmed');
-    if (!gvState.sccHighlight) return;
+    if (!gvState.sccHighlight || gvState.level !== 'package') return;
     cy.nodes().forEach((n) => {
       if (n.data('sccId')) n.addClass('gv-scc-member');
       else n.addClass('gv-scc-dimmed');

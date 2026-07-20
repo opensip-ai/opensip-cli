@@ -15,6 +15,7 @@ import { formatScore } from '@opensip-cli/format';
 
 import { el } from './el.js';
 import { paginateGroupedRows, renderPageButtons, wirePagination } from './pagination.js';
+import { registerSortRefreshHandler } from './sortable.js';
 
 /** A check catalog entry (tool domain vocabulary, read structurally). */
 interface CheckEntry {
@@ -54,11 +55,26 @@ function renderFilteredPage(
   currentPage: number,
   totalPages: number,
 ): void {
-  // Hide all filtered rows first, then reveal only the current page's data rows.
-  groups.forEach((g) => g.forEach((r) => (r.style.display = 'none')));
+  // Hide all filtered rows first, then reveal the current page's complete row
+  // groups. An open expander must reappear when the reader pages away and back.
+  groups.forEach((group) =>
+    group.forEach((row) => {
+      row.style.display = 'none';
+      if (row.classList.contains(EXPANDER_ROW)) row.dataset.paged = 'no';
+    }),
+  );
   const start = currentPage * PAGE_SIZE;
   const end = start + PAGE_SIZE;
-  groups.slice(start, end).forEach((g) => (g[0].style.display = ''));
+  groups.slice(start, end).forEach((group) =>
+    group.forEach((row) => {
+      if (row.classList.contains(EXPANDER_ROW)) {
+        row.dataset.paged = 'yes';
+        row.style.display = row.classList.contains('open') ? 'table-row' : 'none';
+      } else {
+        row.style.display = '';
+      }
+    }),
+  );
 
   while (pag.firstChild) pag.firstChild.remove();
   if (groups.length <= PAGE_SIZE) return;
@@ -95,6 +111,7 @@ function paginateFilteredGroups(pag: HTMLElement, groups: HTMLElement[][]): void
 function computeCheckStats(): Record<string, CheckStat> {
   const stats: Record<string, CheckStat> = {};
   for (const s of sessions) {
+    if (s.tool !== 'fit') continue;
     // Per-session detail lives in the tool-owned opaque payload; fitness
     // sessions carry { summary, checks }. Sessions without checks (graph, sim)
     // contribute nothing here.
@@ -183,6 +200,15 @@ function buildRateCell(rate: number): HTMLElement {
   return rateCell;
 }
 
+function buildLastRunCell(lastRun: string | null): HTMLElement {
+  const cell = el('td', {
+    text: lastRun ? new Date(lastRun).toLocaleDateString() : EM_DASH,
+    style: DIM + ';font-size:12px',
+  });
+  if (lastRun) cell.dataset.sortValue = String(Date.parse(lastRun));
+  return cell;
+}
+
 /** Build one catalog data row (+ its expander row when it has a long description). */
 function buildCheckRow(check: CheckEntry, i: number, uid: string): HTMLElement[] {
   const st = checkStats[check.slug] ?? EMPTY_STAT;
@@ -241,12 +267,7 @@ function buildCheckRow(check: CheckEntry, i: number, uid: string): HTMLElement[]
 
   row.append(el('td', { text: st.runs > 0 ? '' + st.runs : EM_DASH, style: DIM }));
   row.append(buildRateCell(rate));
-  row.append(
-    el('td', {
-      text: st.lastRun ? new Date(st.lastRun).toLocaleDateString() : EM_DASH,
-      style: DIM + ';font-size:12px',
-    }),
-  );
+  row.append(buildLastRunCell(st.lastRun));
 
   const rows = [row];
   if (hasDesc) {
@@ -358,8 +379,8 @@ export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly un
     if (arrowTd) arrowTd.textContent = '▶';
   }
 
-  /** First pass: mark each data row visible/hidden, collapse its expander. */
-  function markRowVisibility(allRows: HTMLElement[]): number {
+  /** First pass: mark each data row visible/hidden and optionally collapse expanders. */
+  function markRowVisibility(allRows: HTMLElement[], collapseExpanders: boolean): number {
     let visibleCount = 0;
     for (let i = 0; i < allRows.length; i++) {
       const row = allRows[i];
@@ -368,7 +389,7 @@ export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly un
       row.style.display = visible ? '' : 'none';
       filterVisible.set(row, visible);
       if (visible) visibleCount++;
-      collapseExpander(row, allRows[i + 1]);
+      if (collapseExpanders) collapseExpander(row, allRows[i + 1]);
     }
     return visibleCount;
   }
@@ -388,9 +409,9 @@ export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly un
     return groups;
   }
 
-  function applyFilters(): void {
+  function applyFilters(collapseExpanders = true): void {
     const allRows = [...tbody.children] as HTMLElement[];
-    const visibleCount = markRowVisibility(allRows);
+    const visibleCount = markRowVisibility(allRows, collapseExpanders);
     emptyMsg.style.display = visibleCount === 0 ? '' : 'none';
 
     const hasFilters = searchInput.value || tagSelect.value || sourceSelect.value;
@@ -401,7 +422,8 @@ export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly un
     }
   }
 
-  searchInput.addEventListener('input', applyFilters);
-  tagSelect.addEventListener('change', applyFilters);
-  sourceSelect.addEventListener('change', applyFilters);
+  registerSortRefreshHandler(table, () => applyFilters(false));
+  searchInput.addEventListener('input', () => applyFilters());
+  tagSelect.addEventListener('change', () => applyFilters());
+  sourceSelect.addEventListener('change', () => applyFilters());
 }

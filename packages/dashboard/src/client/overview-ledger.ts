@@ -104,6 +104,7 @@ function appendTimestampCell(row: HTMLElement, iso: string | undefined): void {
     el('td', {
       class: 'cell-nowrap',
       text: iso === undefined ? '' : new Date(iso).toLocaleString(),
+      ...(iso === undefined ? {} : { 'data-sort-value': String(Date.parse(iso)) }),
       style: DIM_STYLE,
     }),
   );
@@ -224,6 +225,7 @@ function appendImplicitRunRow(
   row.append(
     el('td', {
       text: formatDuration(run.durationMs),
+      'data-sort-value': String(run.durationMs),
       style: DIM_STYLE,
     }),
   );
@@ -271,6 +273,7 @@ function appendLedgerRunRow(
     el('td', {
       class: 'cell-nowrap',
       text: new Date(run.startedAt).toLocaleString(),
+      'data-sort-value': String(Date.parse(run.startedAt)),
       style: DIM_STYLE,
     }),
   );
@@ -292,6 +295,7 @@ function appendLedgerRunRow(
   row.append(
     el('td', {
       text: formatDuration(run.durationMs),
+      'data-sort-value': String(run.durationMs),
       style: DIM_STYLE,
     }),
   );

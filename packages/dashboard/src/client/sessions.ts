@@ -156,6 +156,7 @@ export function renderSessionTable(
       el('td', {
         class: 'cell-nowrap',
         text: new Date(s.startedAt).toLocaleString(),
+        'data-sort-value': String(Date.parse(s.startedAt)),
       }),
     );
     row.append(
@@ -185,7 +186,13 @@ export function renderSessionTable(
       }),
     );
     row.append(el('td', { text: '' + ((sm.errors ?? 0) + (sm.warnings ?? 0)) }));
-    row.append(el('td', { text: formatDuration(s.durationMs), style: DIM }));
+    row.append(
+      el('td', {
+        text: formatDuration(s.durationMs),
+        'data-sort-value': String(s.durationMs),
+        style: DIM,
+      }),
+    );
     tbody.append(row);
   });
   table.append(tbody);

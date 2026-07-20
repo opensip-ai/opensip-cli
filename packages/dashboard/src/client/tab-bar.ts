@@ -31,10 +31,13 @@ export function activateReportTab(id: string, options: ActivateReportTabOptions 
   panel.classList.add('active');
   panel.hidden = false;
   if (options.focus) tab.focus();
+  if (id !== 'code-paths' && globalThis.location.hash.startsWith('#code-paths/')) {
+    replaceHash(globalThis.location.href.split('#', 1)[0] ?? '');
+  }
   return true;
 }
 
-function replaceHash(hash: string): void {
+export function replaceHash(hash: string): void {
   try {
     globalThis.history.replaceState(null, '', hash);
   } catch {

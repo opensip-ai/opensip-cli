@@ -161,7 +161,7 @@ export function boundGraphCatalog(
   // `features.blast.score`, silently ranking every function blast=0 and
   // dropping ARBITRARY (not least-important) functions in the truncation.
   const entries = Object.entries(catalog.functions);
-  const totalFunctions = entries.length;
+  const totalFunctions = entries.reduce((total, [, occurrences]) => total + occurrences.length, 0);
 
   const base = {
     version: catalog.version,
@@ -186,7 +186,7 @@ export function boundGraphCatalog(
     // comma) so the budget is not silently overrun by tens of thousands of keys.
     const cost = scriptContextJsonBytes(projected) + key.length + 8;
     if (cost > budget) {
-      omittedFunctions++;
+      omittedFunctions += occurrences.length;
       continue;
     }
     budget -= cost;

@@ -278,6 +278,7 @@ function appendCheckRow(
     row.append(
       el('td', {
         text: formatDuration(check.durationMs ?? 0),
+        'data-sort-value': String(check.durationMs ?? 0),
         style: DIM,
       }),
     );

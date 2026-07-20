@@ -180,7 +180,7 @@ function buildActions(occ: OccLike, card: HTMLElement): HTMLElement {
  * Delegation is what keeps the render path acyclic: list items no longer carry
  * per-item `openFunctionCard` closures.
  */
-function getOrCreateOverlay(): HTMLElement {
+export function getOrCreateOverlay(): HTMLElement {
   const existing = document.querySelector<HTMLElement>('.function-card-overlay');
   if (existing) return existing;
   const overlay = el('div', { class: 'function-card-overlay' });

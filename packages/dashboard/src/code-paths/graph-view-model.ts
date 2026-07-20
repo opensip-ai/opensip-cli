@@ -11,9 +11,9 @@
  * nodes — unusable in a node-link layout. This projector aggregates the
  * function call graph up to packages:
  *
- *  - Node  = one package (id = label = package name via the same
- *    attribution the Coupling view uses — see `packageOf` below, which
- *    mirrors `pkgOf` in `path-utils.ts`).
+ *  - Node  = one package (id = full package identity; label = compact package
+ *    name) via the same attribution the Coupling view uses — see `packageOf`
+ *    below, which mirrors `pkgOf` in `path-utils.ts`.
  *  - Edge  = caller-package → callee-package, with `weight` = the number
  *    of underlying function→function call edges between those packages.
  *
@@ -61,10 +61,10 @@ export interface GraphViewModel {
 }
 
 export interface GraphViewModelNode {
-  /** Stable handle AND display label — the package name. */
+  /** Stable handle — the full package identity. */
   readonly id: string;
 
-  /** Display label — the package name (same as {@link id}). */
+  /** Compact display label; identity remains in {@link id}. */
   readonly label: string;
 
   /**
@@ -144,8 +144,9 @@ export function projectCatalogToGraphViewModel(catalog: GraphCatalog): GraphView
   }
 
   const packageByHash = mapHashesToPackages(catalog); // Pass A
-  const edgeByKey = aggregatePackageEdges(catalog, packageByHash); // Pass B
-  const { nodes, edges } = deriveNodesAndEdges(packageByHash, edgeByKey); // Pass C
+  const packageIds = collectPackageIds(catalog);
+  const edgeByKey = aggregateFeatureEdges(catalog) ?? aggregatePackageEdges(catalog, packageByHash); // Pass B
+  const { nodes, edges } = deriveNodesAndEdges(packageIds, edgeByKey); // Pass C
 
   // Pass D: Tarjan SCC over the package graph. Self-loops (intra-package
   // calls — the matrix diagonal) are excluded so a single package with
@@ -172,12 +173,12 @@ export function projectCatalogToGraphViewModel(catalog: GraphCatalog): GraphView
  * The package a function occurrence belongs to. Mirrors `pkgOf` in
  * `path-utils.ts` (the browser-side helper the Coupling view uses) so the
  * server-side projection and the client-side coupling matrix attribute
- * functions to packages identically: prefer the build-time-stamped
- * `occurrence.package` (scope-stripped), else the path heuristic.
+ * functions to packages identically: prefer the build-time-stamped full
+ * `occurrence.package` identity, else the path heuristic.
  */
 export function packageOf(occ: GraphFunctionOccurrence): string {
   if (occ && typeof occ.package === 'string' && occ.package.length > 0) {
-    return shortPackage(occ.package);
+    return occ.package;
   }
   return packageOfPath(occ ? occ.filePath : '');
 }
@@ -203,6 +204,35 @@ function mapHashesToPackages(catalog: GraphCatalog): Map<string, string> {
     for (const occ of occs) packageByHash.set(occ.bodyHash, packageOf(occ));
   }
   return packageByHash;
+}
+
+/** Every package that owns an occurrence, without collapsing body-hash twins. */
+function collectPackageIds(catalog: GraphCatalog): Set<string> {
+  const packageIds = new Set<string>();
+  for (const occurrences of Object.values(catalog.functions)) {
+    for (const occurrence of occurrences) packageIds.add(packageOf(occurrence));
+  }
+  return packageIds;
+}
+
+/**
+ * Prefer the engine-emitted package coupling feature when it is present. It is
+ * the same canonical dataset the Coupling view renders and has already resolved
+ * body-hash twins at the graph boundary.
+ */
+function aggregateFeatureEdges(catalog: GraphCatalog): Map<string, MutableEdge> | undefined {
+  const featureEdges = catalog.features?.edge;
+  if (featureEdges === undefined) return undefined;
+  const edgeByKey = new Map<string, MutableEdge>();
+  for (const edge of featureEdges) {
+    const source = edge.callerPackage;
+    const target = edge.calleePackage;
+    const key = source + '\n' + target;
+    const existing = edgeByKey.get(key);
+    if (existing) existing.weight += edge.count;
+    else edgeByKey.set(key, { source, target, weight: edge.count });
+  }
+  return edgeByKey;
 }
 
 /**
@@ -259,7 +289,7 @@ function bumpEdge(edgeByKey: Map<string, MutableEdge>, source: string, target: s
  * (sum of incident edge weights) on each.
  */
 function deriveNodesAndEdges(
-  packageByHash: ReadonlyMap<string, string>,
+  packageIds: ReadonlySet<string>,
   edgeByKey: ReadonlyMap<string, MutableEdge>,
 ): { nodes: MutableNode[]; edges: MutableEdge[] } {
   const nodeById = new Map<string, MutableNode>();
@@ -272,7 +302,7 @@ function deriveNodesAndEdges(
     return n;
   };
   // Every package that hosts a function is a node, even if it has no edges.
-  for (const pkg of packageByHash.values()) ensure(pkg);
+  for (const pkg of packageIds) ensure(pkg);
 
   const edges = [...edgeByKey.values()];
   for (const e of edges) {
@@ -283,7 +313,12 @@ function deriveNodesAndEdges(
 }
 
 function toViewModelNode(n: MutableNode): GraphViewModelNode {
-  return { id: n.id, label: n.id, totalCoupling: n.totalCoupling, sccId: n.sccId };
+  return {
+    id: n.id,
+    label: shortPackage(n.id),
+    totalCoupling: n.totalCoupling,
+    sccId: n.sccId,
+  };
 }
 
 function toViewModelEdge(

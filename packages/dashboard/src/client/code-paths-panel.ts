@@ -44,7 +44,7 @@ import { buildIndexes } from './indexes.js';
 import { renderSessionTable } from './sessions.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { registerTabActivator } from './tab-activators.js';
-import { activateReportTab } from './tab-bar.js';
+import { activateReportTab, replaceHash } from './tab-bar.js';
 import { activateView, views } from './views-registry.js';
 // view-coupling / view-distribution / view-graph register themselves into the
 // `views` array as a load-time side effect. Importing them here (the panel is
@@ -155,6 +155,10 @@ export function renderCodePathsTab(): void {
       },
     },
   ]);
+  panel.querySelector<HTMLElement>('.subtab-bar')?.addEventListener('click', (event) => {
+    const subtab = (event.target as Element | null)?.closest<HTMLElement>('.subtab');
+    if (subtab?.dataset.subtab !== 'explore') clearCodePathsHash();
+  });
   if (readViewIdFromHash() !== null && activateReportTab('code-paths')) {
     activateExploreSubtab(panel);
   }
@@ -228,8 +232,15 @@ function renderCodePathsExplore(host: HTMLElement): void {
 // CODE PATHS — HASH ROUTE (deep-link initial view)
 // =======================================================
 function readViewIdFromHash(): string | null {
-  const m = /^#code-paths\/([a-z]+)/.exec(globalThis.location.hash || '');
-  return m ? m[1] : null;
+  const m = /^#code-paths\/([a-z][a-z-]*)$/u.exec(globalThis.location.hash || '');
+  const id = m?.[1];
+  return id !== undefined && views.some((view) => view.id === id) ? id : null;
+}
+
+/** A view hash is only valid while the Explore subtab is visible. */
+function clearCodePathsHash(): void {
+  if (!globalThis.location.hash.startsWith('#code-paths/')) return;
+  replaceHash(globalThis.location.href.split('#', 1)[0] ?? '');
 }
 
 // =======================================================
@@ -246,14 +257,14 @@ export function openCodePathsSession(sessionId: string): void {
   const panel = document.querySelector('#panel-code-paths');
   if (!panel || !activateReportTab('code-paths')) return;
   // Force the Sessions subtab.
-  const sessionsSub = panel.querySelector('.subtab[data-subtab="sessions"]');
-  const exploreSub = panel.querySelector('.subtab[data-subtab="explore"]');
   const sessionsPanel = document.querySelector('#panel-code-paths-sessions');
-  const explorePanel = document.querySelector('#panel-code-paths-explore');
-  if (sessionsSub) sessionsSub.classList.add('active');
-  if (exploreSub) exploreSub.classList.remove('active');
-  if (sessionsPanel) sessionsPanel.classList.add('active');
-  if (explorePanel) explorePanel.classList.remove('active');
+  panel.querySelectorAll<HTMLElement>('.subtab').forEach((subtab) => {
+    subtab.classList.toggle('active', subtab.dataset.subtab === 'sessions');
+  });
+  panel.querySelectorAll<HTMLElement>('.subtab-panel').forEach((subpanel) => {
+    subpanel.classList.toggle('active', subpanel === sessionsPanel);
+  });
+  clearCodePathsHash();
   // Click the matching row to trigger the standard renderDetail flow.
   const row = sessionsPanel?.querySelector<HTMLElement>('tr[data-session-id="' + sessionId + '"]');
   if (row) row.click();

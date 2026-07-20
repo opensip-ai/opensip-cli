@@ -218,6 +218,180 @@ describe('View 4 — Coupling matrix', () => {
     expect(overlay!.textContent).toContain('target');
   });
 
+  it('uses the engine package identity consistently for feature cells and drilldowns', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        caller: [
+          makeOcc({
+            bodyHash: 'c1',
+            simpleName: 'caller',
+            package: '@opensip-cli/cli',
+            filePath: 'packages/cli/src/c.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 7,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        target: [
+          makeOcc({
+            bodyHash: 't1',
+            simpleName: 'target',
+            package: '@opensip-cli/contracts',
+            filePath: 'packages/contracts/src/t.ts',
+          }),
+        ],
+      },
+      features: {
+        edge: [
+          {
+            callerPackage: '@opensip-cli/cli',
+            calleePackage: '@opensip-cli/contracts',
+            count: 1,
+          },
+        ],
+      },
+    };
+    const env = loadEnv(catalog);
+    const container = document.createElement('div');
+    env.views
+      .find((view) => view.id === 'coupling')!
+      .render(container, env.graphCatalog, env.graphIndexes, env.filterState);
+
+    const cell = container.querySelector<HTMLElement>(
+      'td.coupling-cell[data-caller="@opensip-cli/cli"][data-callee="@opensip-cli/contracts"]',
+    );
+    expect(cell).not.toBeNull();
+    cell?.click();
+    expect(document.querySelector('.function-card-overlay')?.textContent).toContain('caller');
+    expect(document.querySelector('.function-card-overlay')?.textContent).toContain('target');
+  });
+
+  it('finds call sites owned by a non-winning body-hash twin', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        caller: [
+          makeOcc({
+            bodyHash: 'shared-caller',
+            simpleName: 'realCaller',
+            package: '@scope/cli',
+            filePath: 'packages/cli/src/c.ts',
+            calls: [
+              {
+                to: ['target'],
+                line: 7,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+          makeOcc({
+            bodyHash: 'shared-caller',
+            simpleName: 'collisionWinner',
+            package: '@scope/other',
+            filePath: 'packages/other/src/c.ts',
+          }),
+        ],
+        target: [
+          makeOcc({
+            bodyHash: 'target',
+            simpleName: 'target',
+            package: '@scope/contracts',
+            filePath: 'packages/contracts/src/t.ts',
+          }),
+        ],
+      },
+      features: {
+        edge: [
+          {
+            callerPackage: '@scope/cli',
+            calleePackage: '@scope/contracts',
+            count: 1,
+          },
+        ],
+      },
+    };
+    const env = loadEnv(catalog);
+    const container = document.createElement('div');
+    env.views
+      .find((view) => view.id === 'coupling')!
+      .render(container, env.graphCatalog, env.graphIndexes, env.filterState);
+
+    container
+      .querySelector<HTMLElement>(
+        'td.coupling-cell[data-caller="@scope/cli"][data-callee="@scope/contracts"]',
+      )!
+      .click();
+
+    expect(document.querySelector('.function-card-overlay')?.textContent).toContain('realCaller');
+  });
+
+  it('keeps Function Card drill-in navigation working after opening from a coupling cell', () => {
+    const catalog: GraphCatalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        caller: [
+          makeOcc({
+            bodyHash: 'c1',
+            simpleName: 'caller',
+            filePath: 'packages/cli/src/c.ts',
+            calls: [
+              {
+                to: ['t1'],
+                line: 7,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        target: [
+          makeOcc({
+            bodyHash: 't1',
+            simpleName: 'target',
+            filePath: 'packages/contracts/src/t.ts',
+          }),
+        ],
+      },
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
+    };
+    const env = loadEnv(catalog);
+    const container = document.createElement('div');
+    env.views
+      .find((view) => view.id === 'coupling')!
+      .render(container, env.graphCatalog, env.graphIndexes, env.filterState);
+
+    container
+      .querySelector<HTMLElement>('td.coupling-cell[data-caller="cli"][data-callee="contracts"]')!
+      .click();
+    document.querySelector<HTMLElement>('li[data-body-hash="c1"]')!.click();
+    expect(document.querySelector('.function-card h3')?.textContent).toBe('caller');
+
+    document.querySelector<HTMLElement>('li[data-body-hash="t1"]')!.click();
+    expect(document.querySelector('.function-card h3')?.textContent).toBe('target');
+  });
+
   it('emits an empty cell shape when there are no calls in this direction', () => {
     const catalog: GraphCatalog = {
       version: '2.0',

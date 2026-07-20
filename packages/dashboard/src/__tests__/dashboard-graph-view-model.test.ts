@@ -123,12 +123,12 @@ function twoPackageCatalog(): GraphCatalog {
 }
 
 describe('packageOf', () => {
-  it('prefers the build-stamped package, scope-stripped', () => {
+  it('prefers the full build-stamped package identity', () => {
     expect(
       packageOf(
         makeOcc({ bodyHash: 'h', simpleName: 'f', package: '@opensip-cli/lang-typescript' }),
       ),
-    ).toBe('lang-typescript');
+    ).toBe('@opensip-cli/lang-typescript');
   });
 
   it('falls back to the path heuristic when package is absent', () => {
@@ -185,12 +185,12 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
     expect(vm.language).toBe('typescript');
   });
 
-  it('emits PACKAGE nodes (id = label = package name) — not function nodes', () => {
+  it('emits full-identity PACKAGE nodes with compact labels — not function nodes', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
     const ids = vm.nodes.map((n) => n.id).sort();
-    expect(ids).toEqual(['pkg-a', 'pkg-b']);
+    expect(ids).toEqual(['@scope/pkg-a', '@scope/pkg-b']);
     for (const node of vm.nodes) {
-      expect(node.id).toBe(node.label);
+      expect(node.label).toBe(node.id.slice(node.id.indexOf('/') + 1));
       // No function-level fields leak into the package node.
       expect(node).not.toHaveProperty('kind');
       expect(node).not.toHaveProperty('filePath');
@@ -203,11 +203,11 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
     const vm = projectCatalogToGraphViewModel(twoPackageCatalog());
     const byKey = new Map(vm.edges.map((e) => [e.source + '->' + e.target, e]));
     // a1→a2 is an internal package-a call → self-loop weight 1.
-    expect(byKey.get('pkg-a->pkg-a')?.weight).toBe(1);
+    expect(byKey.get('@scope/pkg-a->@scope/pkg-a')?.weight).toBe(1);
     // a1→b1 cross edge, weight 1.
-    expect(byKey.get('pkg-a->pkg-b')?.weight).toBe(1);
+    expect(byKey.get('@scope/pkg-a->@scope/pkg-b')?.weight).toBe(1);
     // b1→a1 cross edge, weight 1.
-    expect(byKey.get('pkg-b->pkg-a')?.weight).toBe(1);
+    expect(byKey.get('@scope/pkg-b->@scope/pkg-a')?.weight).toBe(1);
   });
 
   it('aggregates multiple function calls between the same package pair into one weighted edge', () => {
@@ -254,8 +254,116 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
       },
     };
     const vm = projectCatalogToGraphViewModel(catalog);
-    const edge = vm.edges.find((e) => e.source === 'pa' && e.target === 'pb');
+    const edge = vm.edges.find((e) => e.source === '@s/pa' && e.target === '@s/pb');
     expect(edge?.weight).toBe(2);
+  });
+
+  it('uses the canonical package-edge feature when body-hash twins make raw attribution ambiguous', () => {
+    const sharedA = makeOcc({
+      bodyHash: 'shared',
+      simpleName: 'sharedA',
+      package: '@s/pa',
+      filePath: 'packages/pa/src/shared.ts',
+    });
+    const sharedB = makeOcc({
+      bodyHash: 'shared',
+      simpleName: 'sharedB',
+      package: '@s/pb',
+      filePath: 'packages/pb/src/shared.ts',
+    });
+    const caller = makeOcc({
+      bodyHash: 'caller',
+      simpleName: 'caller',
+      package: '@s/pa',
+      filePath: 'packages/pa/src/caller.ts',
+      calls: [
+        {
+          to: ['shared'],
+          line: 1,
+          column: 0,
+          resolution: 'static',
+          confidence: 'high',
+          text: 'shared()',
+        },
+      ],
+    });
+    const catalog: GraphCatalog = {
+      version: '3.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: { caller: [caller], shared: [sharedA, sharedB] },
+      features: {
+        edge: [{ callerPackage: '@s/pa', calleePackage: '@s/pb', count: 7 }],
+      },
+    };
+
+    const vm = projectCatalogToGraphViewModel(catalog);
+
+    expect(vm.nodes.map((node) => node.id).sort()).toEqual(['@s/pa', '@s/pb']);
+    expect(vm.edges).toContainEqual({
+      source: '@s/pa',
+      target: '@s/pb',
+      weight: 7,
+      isCycleEdge: false,
+    });
+  });
+
+  it('keeps same-named packages in different scopes as distinct nodes', () => {
+    const catalog: GraphCatalog = {
+      version: '3.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        left: [
+          makeOcc({
+            bodyHash: 'left',
+            simpleName: 'left',
+            package: '@scope-a/shared',
+          }),
+        ],
+        right: [
+          makeOcc({
+            bodyHash: 'right',
+            simpleName: 'right',
+            package: '@scope-b/shared',
+          }),
+        ],
+      },
+      features: {
+        edge: [
+          {
+            callerPackage: '@scope-a/shared',
+            calleePackage: '@scope-b/shared',
+            count: 1,
+          },
+        ],
+      },
+    };
+
+    const vm = projectCatalogToGraphViewModel(catalog);
+
+    expect(vm.nodes).toEqual([
+      {
+        id: '@scope-a/shared',
+        label: 'shared',
+        totalCoupling: 1,
+        sccId: null,
+      },
+      {
+        id: '@scope-b/shared',
+        label: 'shared',
+        totalCoupling: 1,
+        sccId: null,
+      },
+    ]);
+    expect(vm.edges).toContainEqual({
+      source: '@scope-a/shared',
+      target: '@scope-b/shared',
+      weight: 1,
+      isCycleEdge: false,
+    });
   });
 
   it('drops calls whose target is not an in-project function (external)', () => {
@@ -367,7 +475,7 @@ describe('projectCatalogToGraphViewModel (package-level)', () => {
       },
     };
     const vm = projectCatalogToGraphViewModel(catalog);
-    expect(vm.nodes.map((n) => n.id)).toEqual(['pa']);
+    expect(vm.nodes.map((n) => n.id)).toEqual(['@s/pa']);
     expect(vm.edges).toHaveLength(0);
     expect(vm.nodes[0].totalCoupling).toBe(0);
     expect(vm.nodes[0].sccId).toBeNull();

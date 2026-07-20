@@ -683,4 +683,67 @@ describe('Overview suite rows', () => {
       }
     }
   });
+
+  it('sorts timestamps chronologically instead of by the first displayed number', async () => {
+    const december = makeSession('december', '2025-12-31T12:00:00.000Z');
+    const january = makeSession('january', '2026-01-01T12:00:00.000Z');
+    bootReport(
+      [january, december],
+      [implicitRunForSession(january), implicitRunForSession(december)],
+    );
+    await flushTimers();
+
+    const timestampHeader = [...document.querySelectorAll<HTMLElement>('#panel-overview th')].find(
+      (header) => header.textContent === 'Timestamp',
+    )!;
+    timestampHeader.click();
+
+    expect(directRunRows().map((row) => cells(row)[3]?.getAttribute('title'))).toEqual([
+      'run-december',
+      'run-january',
+    ]);
+  });
+
+  it('sorts mixed-unit duration labels by their raw milliseconds', async () => {
+    const shorter = makeSession('shorter', '2026-01-01T00:00:00.000Z', {
+      durationMs: 59_900,
+    });
+    const longer = makeSession('longer', '2026-01-01T00:01:00.000Z', {
+      durationMs: 60_000,
+    });
+    bootReport([longer, shorter], [implicitRunForSession(longer), implicitRunForSession(shorter)]);
+    await flushTimers();
+
+    const durationHeader = [...document.querySelectorAll<HTMLElement>('#panel-overview th')].find(
+      (header) => header.textContent === 'Duration',
+    )!;
+    durationHeader.click();
+
+    expect(directRunRows().map((row) => cells(row)[3]?.getAttribute('title'))).toEqual([
+      'run-shorter',
+      'run-longer',
+    ]);
+  });
+
+  it('sorts mixed-unit suite durations by their raw milliseconds', async () => {
+    const longer = makeRun({
+      id: 'longer',
+      legacySuiteRunId: 'longer',
+      durationMs: 60_000,
+    });
+    const shorter = makeRun({
+      id: 'shorter',
+      legacySuiteRunId: 'shorter',
+      durationMs: 59_900,
+    });
+    bootReport([], [longer, shorter]);
+    await flushTimers();
+
+    const durationHeader = [...document.querySelectorAll<HTMLElement>('#panel-overview th')].find(
+      (header) => header.textContent === 'Duration',
+    )!;
+    durationHeader.click();
+
+    expect(suiteRows().map((row) => row.dataset.suiteRunId)).toEqual(['shorter', 'longer']);
+  });
 });

@@ -71,6 +71,14 @@ describe('generateDashboardHtml', () => {
     expect(html).toContain('Pass Rate: 85%');
   });
 
+  it('uses the canonical rounded score label in the document title', () => {
+    const html = generateDashboardHtml({
+      sessions: [makeSession({ score: 67.6 })],
+    });
+    expect(html).toContain('Pass Rate: 68%');
+    expect(html).not.toContain('Pass Rate: 67.6%');
+  });
+
   it('omits the score from the title when there are no sessions', () => {
     const html = generateDashboardHtml({ sessions: [] });
     expect(html).toMatch(/<title>OpenSIP CLI<\/title>/);

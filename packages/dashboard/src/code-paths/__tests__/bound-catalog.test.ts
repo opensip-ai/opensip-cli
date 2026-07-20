@@ -133,6 +133,26 @@ describe('boundGraphCatalog', () => {
     expect(Object.keys(bounded.catalog?.functions ?? {})).toHaveLength(5);
   });
 
+  it('counts occurrences rather than simple-name buckets in truncation metadata', () => {
+    const source = catalog(2);
+    const withSharedName = {
+      ...source,
+      functions: {
+        ...source.functions,
+        h0000: [...(source.functions.h0000 ?? []), occurrence('h0000-twin')],
+      },
+    } as GraphCatalog;
+
+    const bounded = boundGraphCatalog(withSharedName, 1);
+    const retainedOccurrences = Object.values(bounded.catalog?.functions ?? {}).reduce(
+      (total, occurrences) => total + occurrences.length,
+      0,
+    );
+
+    expect(bounded.totalFunctions).toBe(3);
+    expect(retainedOccurrences + bounded.omittedFunctions).toBe(3);
+  });
+
   it('bounds the catalog to the byte budget and reports what it dropped', () => {
     const bounded = boundGraphCatalog(catalog(200), 4000);
 

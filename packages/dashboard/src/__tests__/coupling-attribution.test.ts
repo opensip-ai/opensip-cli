@@ -117,4 +117,33 @@ describe('coupling callee attribution', () => {
     const resolved = env.resolveCalleeOcc('H', caller, indexes);
     expect(resolved?.qualifiedName).toBe('packages/pkg-a/src/f.f'); // deterministic lowest
   });
+
+  it('does not conflate packages with the same scope-stripped display name', () => {
+    const env = loadCouplingEnv();
+    const otherScope = occ({
+      bodyHash: 'H',
+      package: '@scope-b/shared',
+      filePath: 'packages/scope-b/src/f.ts',
+      qualifiedName: 'a.other',
+    });
+    const callerScope = occ({
+      bodyHash: 'H',
+      package: '@scope-a/shared',
+      filePath: 'packages/scope-a/src/f.ts',
+      qualifiedName: 'z.same',
+    });
+    const caller = occ({
+      bodyHash: 'C',
+      package: '@scope-a/shared',
+      filePath: 'packages/scope-a/src/call.ts',
+      qualifiedName: 'scope-a.caller',
+      simpleName: 'caller',
+    });
+    const catalog = {
+      functions: { f: [otherScope, callerScope], caller: [caller] },
+    } as unknown as GraphCatalog;
+    const indexes = env.buildIndexes(catalog);
+
+    expect(env.resolveCalleeOcc('H', caller, indexes)?.qualifiedName).toBe('z.same');
+  });
 });

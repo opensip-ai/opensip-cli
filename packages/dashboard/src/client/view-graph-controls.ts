@@ -137,10 +137,15 @@ function gvMultiSelect(opts: MultiSelectOpts): HTMLElement {
 // The "Highlight cycles" checkbox — rendered into the row-1 control grid (beside
 // the search box). Package-level SCC emphasis; toggles the emphasis on the live
 // graph in place (no re-render) via the injected handler.
-function gvRenderCyclesToggle(host: HTMLElement, applySccHighlight: () => void): void {
+function gvRenderCyclesToggle(
+  host: HTMLElement,
+  applySccHighlight: () => void,
+  disabled: boolean,
+): void {
   const sccToggle = el('label', { class: 'code-paths-graph-checkbox' });
   const sccCb = el('input', { type: 'checkbox', 'data-scc-toggle': '1' }) as HTMLInputElement;
   sccCb.checked = gvState.sccHighlight;
+  sccCb.disabled = disabled;
   sccCb.addEventListener('change', () => {
     gvState.sccHighlight = sccCb.checked;
     applySccHighlight();
@@ -223,7 +228,7 @@ export function gvRenderControls(
 
   // Highlight cycles (unlabeled cell) — the checkbox toggle.
   const cyclesCell = el('div', { class: 'code-paths-graph-cell' });
-  gvRenderCyclesToggle(cyclesCell, applySccHighlight);
+  gvRenderCyclesToggle(cyclesCell, applySccHighlight, fnLevel);
   grid.append(cyclesCell);
 
   // ---- Row 2: Level · Package · Kind · Edges ----
@@ -371,7 +376,7 @@ export function gvBuildFunctionElements(
       if (!callee) return;
       const external = pkgOf(callee) !== pkg;
       if (external && !crossPackage) return;
-      if (!external && !passes(callee)) return;
+      if (!passes(callee)) return;
       addNode(callee, external);
       const ekey = seed.bodyHash + '\n' + callee.bodyHash;
       if (edgeSeen[ekey]) return;

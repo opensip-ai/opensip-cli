@@ -23,10 +23,10 @@
 
 import { el } from './el.js';
 import { passesFilter } from './filters.js';
-import { closeFunctionCard, openFunctionCard } from './function-card.js';
+import { closeFunctionCard, getOrCreateOverlay } from './function-card.js';
 import { makeSectionHeading } from './function-row.js';
 import { resolveCalleeOcc } from './indexes.js';
-import { displayName, pkgOf } from './path-utils.js';
+import { displayName, packageIdentityOf } from './path-utils.js';
 import { views } from './views-registry.js';
 
 import type { FilterStateLike, IndexesLike, OccLike } from './code-paths-types.js';
@@ -265,7 +265,9 @@ function callSitesFromOcc(occ: OccLike, calleePkg: string, indexes: IndexesLike)
   for (const edge of occ.calls ?? []) {
     for (const target of edge.to ?? []) {
       const callee = resolveCalleeOcc(target, occ, indexes);
-      if (callee && pkgOf(callee) === calleePkg) sites.push({ occ, callee, line: edge.line });
+      if (callee && packageIdentityOf(callee) === calleePkg) {
+        sites.push({ occ, callee, line: edge.line });
+      }
     }
   }
   return sites;
@@ -281,11 +283,13 @@ function collectCallSites(
   filterState: FilterStateLike,
 ): CallSite[] {
   const sites: CallSite[] = [];
-  for (const occ of indexes.byBodyHash.values()) {
-    if (!passesFilter(occ, filterState)) continue;
-    if (pkgOf(occ) !== callerPkg) continue;
-    sites.push(...callSitesFromOcc(occ, calleePkg, indexes));
-    if (sites.length > 200) return sites;
+  for (const occurrences of indexes.occurrencesByHash.values()) {
+    for (const occ of occurrences) {
+      if (!passesFilter(occ, filterState)) continue;
+      if (packageIdentityOf(occ) !== callerPkg) continue;
+      sites.push(...callSitesFromOcc(occ, calleePkg, indexes));
+      if (sites.length > 200) return sites;
+    }
   }
   return sites;
 }
@@ -299,14 +303,7 @@ function openCouplingDrilldown(
   // Render an inline Function Card overlay listing the call sites for the
   // (callerPkg, calleePkg) pair. We piggyback on the overlay used by the
   // universal Function Card to keep the singleton invariant.
-  let overlay = document.querySelector<HTMLElement>('.function-card-overlay');
-  if (!overlay) {
-    overlay = el('div', { class: 'function-card-overlay' });
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeFunctionCard();
-    });
-    document.body.append(overlay);
-  }
+  const overlay = getOrCreateOverlay();
   while (overlay.firstChild) overlay.firstChild.remove();
   const card = el('div', { class: 'function-card' });
   overlay.append(card);
@@ -328,8 +325,6 @@ function openCouplingDrilldown(
         line +
         ')',
     });
-    const hash = occ.bodyHash;
-    item.addEventListener('click', () => openFunctionCard(hash));
     list.append(item);
   }
   if (sites.length === 0)

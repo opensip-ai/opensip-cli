@@ -94,6 +94,83 @@ beforeEach(() => {
 });
 
 describe('renderSessionTable / renderDetail', () => {
+  it('sorts session timestamps chronologically instead of by the localized leading number', async () => {
+    const panel = loadEnv().render([
+      makeSession({ id: 'january', startedAt: '2026-01-01T12:00:00.000Z' }),
+      makeSession({ id: 'december', startedAt: '2025-12-31T12:00:00.000Z' }),
+    ]);
+    document.body.append(panel);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const timestampHeader = [...panel.querySelectorAll<HTMLElement>('thead th')].find(
+      (header) => header.textContent === 'Timestamp',
+    )!;
+    timestampHeader.click();
+
+    expect(
+      [...panel.querySelectorAll<HTMLElement>('.section:first-child tbody > tr')].map(
+        (row) => row.dataset.sessionId,
+      ),
+    ).toEqual(['december', 'january']);
+  });
+
+  it('sorts mixed-unit session durations by their raw milliseconds', async () => {
+    const panel = loadEnv().render([
+      makeSession({ id: 'longer', durationMs: 60_000 }),
+      makeSession({ id: 'shorter', durationMs: 59_900 }),
+    ]);
+    document.body.append(panel);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const durationHeader = [...panel.querySelectorAll<HTMLElement>('thead th')].find(
+      (header) => header.textContent === 'Duration',
+    )!;
+    durationHeader.click();
+
+    expect(
+      [...panel.querySelectorAll<HTMLElement>('.section:first-child tbody > tr')].map(
+        (row) => row.dataset.sessionId,
+      ),
+    ).toEqual(['shorter', 'longer']);
+  });
+
+  it('sorts mixed-unit per-check durations by their raw milliseconds', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        payload: {
+          summary: { total: 2, passed: 2, failed: 0, errors: 0, warnings: 0 },
+          checks: [
+            {
+              checkSlug: 'longer',
+              passed: true,
+              violationCount: 0,
+              durationMs: 60_000,
+              findings: [],
+            },
+            {
+              checkSlug: 'shorter',
+              passed: true,
+              violationCount: 0,
+              durationMs: 59_900,
+              findings: [],
+            },
+          ],
+        },
+      }),
+    ]);
+    const detail = detailSection(panel)!;
+    const durationHeader = [...detail.querySelectorAll<HTMLElement>('thead th')].find(
+      (header) => header.textContent === 'Duration',
+    )!;
+    durationHeader.click();
+
+    expect(
+      [...detail.querySelectorAll<HTMLElement>('tbody > tr:not(.expander-row)')].map(
+        (row) => row.querySelectorAll('td')[1]?.textContent,
+      ),
+    ).toEqual(['shorter', 'longer']);
+  });
+
   it('renders per-check detail with a "Check" column for a fitness payload', () => {
     const panel = loadEnv().render([
       makeSession({

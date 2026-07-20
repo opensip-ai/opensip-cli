@@ -22,7 +22,7 @@
  * TypeScript (DOM lib) bundled into the inlined client `<script>`.
  */
 
-import { pkgOf } from './path-utils.js';
+import { packageIdentityOf } from './path-utils.js';
 
 import type { CatalogLike, IndexesLike, OccLike } from './code-paths-types.js';
 
@@ -133,11 +133,11 @@ export function resolveCalleeOcc(
   const candidates = indexes.occurrencesByHash?.get(target);
   if (!candidates || candidates.length === 0) return indexes.byBodyHash.get(target);
   if (candidates.length === 1) return candidates[0];
-  const callerPkg = pkgOf(callerOcc);
+  const callerPkg = packageIdentityOf(callerOcc);
   let samePkg: OccLike | null = null;
   let lowest = candidates[0];
   for (const c of candidates) {
-    if (!samePkg && pkgOf(c) === callerPkg) samePkg = c;
+    if (!samePkg && packageIdentityOf(c) === callerPkg) samePkg = c;
     if ((c.qualifiedName ?? '') < (lowest.qualifiedName ?? '')) lowest = c;
   }
   return samePkg ?? lowest;

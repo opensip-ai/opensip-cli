@@ -22,10 +22,23 @@ interface SortState {
   asc: boolean;
 }
 
+/**
+ * Tables with their own filtered paginator can replace the default post-sort
+ * pagination pass. The check catalog uses this to keep its active filters
+ * authoritative after rows are reordered.
+ */
+const sortRefreshHandlers = new WeakMap<HTMLElement, () => void>();
+
+export function registerSortRefreshHandler(table: HTMLElement, refresh: () => void): void {
+  sortRefreshHandlers.set(table, refresh);
+}
+
 /** Compare two row groups by the text of column `colIdx` (numeric → date → string). */
 function compareGroups(a: HTMLElement[], b: HTMLElement[], colIdx: number, asc: boolean): number {
-  const aText = (a[0].children[colIdx]?.textContent || '').trim();
-  const bText = (b[0].children[colIdx]?.textContent || '').trim();
+  const aCell = a[0].children[colIdx] as HTMLElement | undefined;
+  const bCell = b[0].children[colIdx] as HTMLElement | undefined;
+  const aText = (aCell?.dataset.sortValue ?? aCell?.textContent ?? '').trim();
+  const bText = (bCell?.dataset.sortValue ?? bCell?.textContent ?? '').trim();
   // Try numeric comparison
   const aNum = Number.parseFloat(aText);
   const bNum = Number.parseFloat(bText);
@@ -51,6 +64,11 @@ function reorderRows(tbody: Element, groups: HTMLElement[][]): void {
 
 /** Re-run pagination after a sort if a `.pagination` container follows the table. */
 function repaginate(table: HTMLElement, tbody: HTMLElement, groups: HTMLElement[][]): void {
+  const refresh = sortRefreshHandlers.get(table);
+  if (refresh) {
+    refresh();
+    return;
+  }
   const pagContainer = table.parentElement?.querySelector('.pagination');
   if (!(pagContainer instanceof HTMLElement)) return;
   const hasExpanders = groups.some((g) => g.length > 1);

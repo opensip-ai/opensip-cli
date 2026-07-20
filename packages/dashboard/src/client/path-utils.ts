@@ -2,8 +2,8 @@
  * Path / name display helpers shared across the Explore views.
  *
  * - pkgOf:         the package an occurrence belongs to — prefers the
- *   build-time-stamped `occurrence.package` (nearest package.json name, shown
- *   scope-stripped), falling back to the path heuristic for old catalogs.
+ *   build-time-stamped `occurrence.package` (nearest package.json name),
+ *   falling back to the path heuristic for old catalogs.
  * - packageOfPath: path-only fallback (first segment under packages/).
  * - displayName:   collapse synthetic graph names like
  *   "<arrow:packages/.../foo.ts:234:45>" into a short tag the table
@@ -29,14 +29,15 @@ export function shortPkg(name: unknown): string {
   return name.codePointAt(0) === 64 /* @ */ ? name.slice(name.indexOf('/') + 1) : name;
 }
 
-// The package an occurrence belongs to. Prefers the build-time-stamped
-// occurrence.package (accurate for any repo layout); falls back to the path
-// heuristic for legacy catalogs. Scope-stripped for compact display.
+// The full package identity an occurrence belongs to. Keep npm scopes intact
+// anywhere this value participates in matching or attribution.
 export function pkgOf(occ: OccLike | null | undefined): string {
-  if (occ && typeof occ.package === 'string' && occ.package.length > 0)
-    return shortPkg(occ.package);
+  if (occ && typeof occ.package === 'string' && occ.package.length > 0) return occ.package;
   return packageOfPath(occ ? occ.filePath : '');
 }
+
+// Explicit alias for call sites where identity-vs-display is worth spelling out.
+export const packageIdentityOf = pkgOf;
 
 export function displayName(simpleName: unknown): string {
   if (typeof simpleName !== 'string') return '';

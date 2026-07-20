@@ -13,6 +13,7 @@
 
 import { describe, expect, it, beforeEach } from 'vitest';
 
+import { gvBuildFunctionElements } from '../client/view-graph-controls.js';
 import { DASHBOARD_CLIENT_BUNDLE } from '../client-bundle.generated.js';
 import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
 
@@ -202,6 +203,45 @@ describe('View 8 — Visualization', () => {
     expect(edges!.disabled).toBe(true);
   });
 
+  it('disables package-cycle highlighting at function level', () => {
+    const occurrence = {
+      bodyHash: 'A',
+      simpleName: 'a',
+      filePath: 'packages/pkg-a/src/a.ts',
+      kind: 'function-declaration',
+      inTestFile: false,
+      qualifiedName: 'a',
+    };
+    const indexes = {
+      byBodyHash: new Map<string, unknown>([['A', occurrence]]),
+      occurrencesByHash: new Map<string, unknown[]>([['A', [occurrence]]]),
+      bySimpleName: new Map(),
+      callees: new Map(),
+      callers: new Map(),
+    };
+    const catalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: { a: [occurrence] },
+    };
+    const env = loadEnv(true);
+    embedViewModel(SAMPLE_VM);
+    const container = document.createElement('div');
+    document.body.append(container);
+    env.views.find((view) => view.id === 'graph')!.render(container, catalog, indexes, null);
+
+    const level = container.querySelector<HTMLSelectElement>('select[data-control="level"]')!;
+    level.value = 'function';
+    level.dispatchEvent(new Event('change'));
+
+    expect(
+      container.querySelector<HTMLInputElement>('input[type="checkbox"][data-scc-toggle]')
+        ?.disabled,
+    ).toBe(true);
+  });
+
   it('Kind multi-select enables at function level and updates the graph on close', () => {
     const occA = {
       bodyHash: 'A',
@@ -331,5 +371,84 @@ describe('View 8 — Visualization', () => {
     expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
     // The Edges (intra vs cross-package) toggle appears only at function level.
     expect(c.querySelector('[data-control="granularity"]')).not.toBeNull();
+  });
+
+  it('keeps external test callees out of the production-only function graph', () => {
+    const production = {
+      bodyHash: 'A',
+      simpleName: 'production',
+      filePath: 'packages/pkg-a/src/a.ts',
+      kind: 'function-declaration',
+      inTestFile: false,
+      qualifiedName: 'production',
+    };
+    const externalTest = {
+      bodyHash: 'B',
+      simpleName: 'externalTest',
+      filePath: 'packages/pkg-b/src/b.test.ts',
+      kind: 'function-declaration',
+      inTestFile: true,
+      qualifiedName: 'externalTest',
+    };
+    const indexes = {
+      byBodyHash: new Map([
+        ['A', production],
+        ['B', externalTest],
+      ]),
+      occurrencesByHash: new Map([
+        ['A', [production]],
+        ['B', [externalTest]],
+      ]),
+      bySimpleName: new Map(),
+      callees: new Map([['A', ['B']]]),
+      callers: new Map([['B', ['A']]]),
+    };
+
+    const elements = gvBuildFunctionElements(indexes, 'pkg-a', false, [], true);
+
+    expect(
+      elements.filter((element) => element.group === 'nodes').map((element) => element.data.id),
+    ).toEqual(['A']);
+    expect(elements.some((element) => element.group === 'edges')).toBe(false);
+  });
+
+  it('selects one exact package when two scopes contain the same local name', () => {
+    const left = {
+      bodyHash: 'left',
+      simpleName: 'left',
+      qualifiedName: 'left',
+      filePath: 'packages/left/src/index.ts',
+      package: '@scope-a/shared',
+      kind: 'function-declaration',
+      inTestFile: false,
+    };
+    const right = {
+      bodyHash: 'right',
+      simpleName: 'right',
+      qualifiedName: 'right',
+      filePath: 'packages/right/src/index.ts',
+      package: '@scope-b/shared',
+      kind: 'function-declaration',
+      inTestFile: false,
+    };
+    const indexes = {
+      byBodyHash: new Map([
+        ['left', left],
+        ['right', right],
+      ]),
+      occurrencesByHash: new Map([
+        ['left', [left]],
+        ['right', [right]],
+      ]),
+      bySimpleName: new Map(),
+      callees: new Map(),
+      callers: new Map(),
+    };
+
+    const elements = gvBuildFunctionElements(indexes, '@scope-a/shared', false, [], false);
+
+    expect(
+      elements.filter((element) => element.group === 'nodes').map((element) => element.data.id),
+    ).toEqual(['left']);
   });
 });

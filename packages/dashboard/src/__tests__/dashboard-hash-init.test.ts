@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { generateDashboardHtml } from '../generator.js';
 
-import type { GraphCatalog } from '@opensip-cli/contracts';
+import type { GraphCatalog, StoredSession } from '@opensip-cli/contracts';
 
 const minimalCatalog: GraphCatalog = {
   version: '2.0',
@@ -35,6 +35,21 @@ const minimalCatalog: GraphCatalog = {
         calls: [],
       },
     ],
+  },
+};
+
+const graphSession: StoredSession = {
+  id: 'graph-session',
+  tool: 'graph',
+  startedAt: '2026-07-19T12:00:00.000Z',
+  completedAt: '2026-07-19T12:00:01.000Z',
+  cwd: '/repo',
+  score: 100,
+  passed: true,
+  durationMs: 1000,
+  payload: {
+    summary: { total: 1, passed: 1, failed: 0, errors: 0, warnings: 0 },
+    checks: [],
   },
 };
 
@@ -72,5 +87,90 @@ describe('dashboard hash init', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
     bootReport(html);
     expect(globalThis.location.hash).toBe('#code-paths/distribution');
+  });
+
+  it('rejects unknown and prefix-lookalike Code Paths hashes without blanking Overview', () => {
+    for (const hash of ['#code-paths/not-a-view', '#code-paths/distribution/extra']) {
+      globalThis.history.replaceState(null, '', '/latest.html' + hash);
+      const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+      bootReport(html);
+      expect(document.querySelector('#panel-overview')?.classList.contains('active')).toBe(true);
+      expect(document.querySelector('#panel-code-paths')?.classList.contains('active')).toBe(false);
+    }
+  });
+
+  it('clears a Code Paths deep link when the reader leaves that top-level tab', () => {
+    globalThis.history.replaceState(null, '', '/latest.html#code-paths/distribution');
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    bootReport(html);
+
+    document.querySelector<HTMLButtonElement>('[data-tab="overview"]')?.click();
+
+    expect(globalThis.location.hash).toBe('');
+    expect(document.querySelector('#panel-overview')?.classList.contains('active')).toBe(true);
+  });
+
+  it('clears a Code Paths deep link during programmatic top-level navigation', () => {
+    globalThis.history.replaceState(null, '', '/latest.html#code-paths/distribution');
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    bootReport(html);
+
+    (
+      globalThis as typeof globalThis & {
+        activateReportTab: (id: string) => boolean;
+      }
+    ).activateReportTab('fitness');
+
+    expect(globalThis.location.hash).toBe('');
+    expect(document.querySelector('#panel-fitness')?.classList.contains('active')).toBe(true);
+  });
+
+  it('clears a Code Paths view hash when the reader leaves the Explore subtab', () => {
+    globalThis.history.replaceState(null, '', '/latest.html#code-paths/distribution');
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    bootReport(html);
+
+    document
+      .querySelector<HTMLElement>('#panel-code-paths .subtab[data-subtab="catalog"]')
+      ?.click();
+
+    expect(globalThis.location.hash).toBe('');
+    expect(
+      document
+        .querySelector('#panel-code-paths .subtab[data-subtab="catalog"]')
+        ?.classList.contains('active'),
+    ).toBe(true);
+  });
+
+  it('opens a graph session with only the Sessions subtab active', () => {
+    const html = generateDashboardHtml({
+      sessions: [graphSession],
+      graphCatalog: minimalCatalog,
+      graphRuleCatalog: [{ slug: 'graph:cycle', defaultSeverity: 'warning', source: 'built-in' }],
+    });
+    bootReport(html);
+    document
+      .querySelector<HTMLElement>('#panel-code-paths .subtab[data-subtab="catalog"]')
+      ?.click();
+    expect(
+      document
+        .querySelector('#panel-code-paths .subtab[data-subtab="catalog"]')
+        ?.classList.contains('active'),
+    ).toBe(true);
+
+    (
+      globalThis as typeof globalThis & {
+        openCodePathsSession: (sessionId: string) => void;
+      }
+    ).openCodePathsSession(graphSession.id);
+
+    const activeSubtabs = [
+      ...document.querySelectorAll<HTMLElement>('#panel-code-paths .subtab.active'),
+    ].map((tab) => tab.dataset.subtab);
+    const activePanels = [
+      ...document.querySelectorAll<HTMLElement>('#panel-code-paths .subtab-panel.active'),
+    ].map((panel) => panel.id);
+    expect(activeSubtabs).toEqual(['sessions']);
+    expect(activePanels).toEqual(['panel-code-paths-sessions']);
   });
 });
