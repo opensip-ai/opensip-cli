@@ -80,6 +80,25 @@ function allowlistedWorkerDetailCode(detailCode: string | undefined): string | u
   return detailCode;
 }
 
+/**
+ * Give a worker's final IPC message time to settle the handle before acting on
+ * a premature `exit`. Runners under load intermittently deliver `exit` ahead of
+ * a clean worker's drained final `process.send` (exit races message) — the same
+ * race 61849de7 closed on the capability-worker path. Two macrotasks
+ * (setImmediate + short timer) cover both "already in the parent's queue" and
+ * "still crossing the kernel pipe" cases; `settle` runs only if the handle is
+ * still unsettled after the grace window.
+ */
+function afterIpcExitGrace(isSettled: () => boolean, settle: () => void): void {
+  setImmediate(() => {
+    if (isSettled()) return;
+    setTimeout(() => {
+      if (isSettled()) return;
+      settle();
+    }, 50);
+  });
+}
+
 /** Resolve the package dir for an external tool, or fail with a structured error. */
 export function requirePackageDir(provenance: ToolProvenance): string {
   const dir = provenance.resolvedPath;
@@ -286,29 +305,20 @@ function forkAndAwait({
     });
     handle.child.on('exit', (code: number | null) => {
       if (handle.isSettled()) return;
-      // Defer the premature-exit rejection so a result/error message already
-      // queued on the IPC channel is processed first. Without this, runners
-      // under load intermittently reject clean workers that drained their
-      // final `process.send` just before exiting (exit races message) — the
-      // same race 61849de7 closed on the capability-worker path. Two
-      // macrotasks (setImmediate + short timer) cover both "already in the
-      // parent's queue" and "still crossing the kernel pipe" cases.
-      setImmediate(() => {
-        if (handle.isSettled()) return;
-        setTimeout(() => {
-          if (handle.isSettled()) return;
-          handle.done(() => {
-            reject(
-              dispatchError({
-                spec,
-                message: `worker exited (code ${code ?? 'null'}) before producing a result`,
-                failureClass: 'exit_nonzero',
-                stderrTail: handle.getStderrTail(),
-              }),
-            );
-          });
-        }, 50);
-      });
+      const rejectPrematureExit = (): void => {
+        reject(
+          dispatchError({
+            spec,
+            message: `worker exited (code ${code ?? 'null'}) before producing a result`,
+            failureClass: 'exit_nonzero',
+            stderrTail: handle.getStderrTail(),
+          }),
+        );
+      };
+      afterIpcExitGrace(
+        () => handle.isSettled(),
+        () => handle.done(rejectPrematureExit),
+      );
     });
   });
 }
