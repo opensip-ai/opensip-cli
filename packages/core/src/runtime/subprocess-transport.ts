@@ -200,19 +200,26 @@ export function createSubprocessProgressRun<TEvent, TResult>(
 
   handle.child.on('exit', (code: number | null) => {
     if (handle.isSettled()) return;
+    const rejectPrematureExit = (): void => {
+      logFailed('exit_nonzero');
+      settle.reject(
+        workerError(
+          `worker exited (code ${code ?? 'null'}) before producing a result`,
+          undefined,
+          handle.getStderrTail(),
+        ),
+      );
+    };
     // Defer so a result/error already queued on the IPC channel wins over exit.
+    // Two macrotasks (setImmediate + short timer) match the capability and
+    // dispatch supervisors: they cover both "already in the parent's queue"
+    // and "still crossing the kernel pipe" under load (see 61849de7).
     setImmediate(() => {
       if (handle.isSettled()) return;
-      handle.done(() => {
-        logFailed('exit_nonzero');
-        settle.reject(
-          workerError(
-            `worker exited (code ${code ?? 'null'}) before producing a result`,
-            undefined,
-            handle.getStderrTail(),
-          ),
-        );
-      });
+      setTimeout(() => {
+        if (handle.isSettled()) return;
+        handle.done(rejectPrematureExit);
+      }, 50);
     });
   });
 

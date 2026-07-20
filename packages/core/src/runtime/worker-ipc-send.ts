@@ -60,8 +60,12 @@ export async function sendWorkerIpcMessageAndDrain(msg: unknown, maxBytes?: numb
       if (error) reject(error);
       else resolve();
     });
-    // Some Node versions return false when the channel is full / disconnected.
-    if (ok === false) {
+    // `process.send` returns false BOTH for a closed channel and for plain
+    // backpressure (message queued, callback still pending). Only a
+    // disconnected channel is fatal — rejecting on backpressure kills a busy
+    // worker (host-RPC streams share this pipe) right before its terminal
+    // message. A genuinely closed channel also errors through the callback.
+    if (ok === false && process.connected !== true) {
       reject(new Error('worker IPC channel closed before message could be sent'));
     }
   });

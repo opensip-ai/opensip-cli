@@ -85,6 +85,40 @@ describe('runtime hardening helpers', () => {
     ).rejects.toBeInstanceOf(IpcPayloadTooLargeError);
   });
 
+  it('drain treats send-returns-false as backpressure while connected, fatal only when disconnected', async () => {
+    const originalConnected = Object.getOwnPropertyDescriptor(process, 'connected');
+    const setConnected = (value: boolean): void => {
+      Object.defineProperty(process, 'connected', { configurable: true, value });
+    };
+    try {
+      // Backpressure: send returns false but the channel is connected and the
+      // write callback later succeeds — the terminal message must NOT be
+      // treated as fatal (a busy host-RPC pipe returns false routinely).
+      Object.defineProperty(process, 'send', {
+        configurable: true,
+        value: (_msg: unknown, cb?: (error: Error | null) => void) => {
+          setImmediate(() => cb?.(null));
+          return false;
+        },
+      });
+      setConnected(true);
+      await expect(sendWorkerIpcMessageAndDrain({ kind: 'result' }, 1024)).resolves.toBeUndefined();
+
+      // Disconnected: false means the channel is genuinely gone — reject.
+      setConnected(false);
+      await expect(sendWorkerIpcMessageAndDrain({ kind: 'result' }, 1024)).rejects.toThrow(
+        /channel closed/,
+      );
+    } finally {
+      if (originalConnected === undefined) {
+        delete (process as { connected?: boolean }).connected;
+      } else {
+        Object.defineProperty(process, 'connected', originalConnected);
+      }
+      restoreProcessSend();
+    }
+  });
+
   it('falls back to child.kill when pid is unavailable or taskkill is unavailable', () => {
     const noPidKill = vi.fn();
     killTree({ kill: noPidKill } as unknown as ChildProcess, 'SIGTERM');
