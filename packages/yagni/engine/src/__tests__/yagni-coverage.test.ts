@@ -509,6 +509,132 @@ describe('yagni detectors and scoring helpers', () => {
     expect(outcome.signals[0]?.filePath).toBe('src/binding-config.ts');
   });
 
+  it('counts static element access as a config property read', async () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'fixture-element-access',
+        type: 'module',
+        exports: { '.': './src/index.ts' },
+      }),
+    );
+    writeFileSync(
+      join(dir, 'src', 'index.ts'),
+      `export type { ElementAccessConfig } from './element-access-config.js';\n`,
+    );
+    writeFileSync(
+      join(dir, 'src', 'element-access-config.ts'),
+      [
+        'declare const symbolKey: unique symbol;',
+        '',
+        'export interface ElementAccessConfig {',
+        '  readonly bracketRead: string;',
+        '  readonly templateRead: string;',
+        "  readonly 'literal-read': string;",
+        "  readonly 'literal-unused': string;",
+        "  readonly ['computed-read']: string;",
+        "  readonly ['computed-unused']: string;",
+        '  readonly elementKeyNameOnly: string;',
+        '  readonly inKeyNameOnly: string;',
+        '  readonly [symbolKey]: string;',
+        '  readonly genuinelyUnused: string;',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(dir, 'src', 'consumer.ts'),
+      [
+        "import type { ElementAccessConfig } from './element-access-config.js';",
+        '',
+        'export function read(config: ElementAccessConfig): string {',
+        "  const elementKeyNameOnly: keyof ElementAccessConfig = 'bracketRead';",
+        "  const inKeyNameOnly: keyof ElementAccessConfig = 'templateRead';",
+        '  void config[elementKeyNameOnly];',
+        '  void (inKeyNameOnly in config);',
+        "  return config['bracketRead'] + config[`templateRead`] +",
+        "    config['literal-read'] + config['computed-read'];",
+        '}',
+        '',
+      ].join('\n'),
+    );
+
+    const outcome = await unusedConfigSurfaceDetector.run({
+      cwd: dir,
+      config: {},
+      includeTests: false,
+    });
+    const properties = outcome.signals.map((signal) => {
+      const data = (signal.metadata.yagni as { evidence?: { data?: { property?: string } }[] })
+        ?.evidence?.[0]?.data;
+      return data?.property;
+    });
+    expect(properties).toEqual([
+      'literal-unused',
+      'computed-unused',
+      'elementKeyNameOnly',
+      'inKeyNameOnly',
+      'genuinelyUnused',
+    ]);
+  });
+
+  it('does not treat simple property assignments as config reads', async () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: 'fixture-write-only-config',
+        type: 'module',
+        exports: { '.': './src/index.ts' },
+      }),
+    );
+    writeFileSync(
+      join(dir, 'src', 'index.ts'),
+      `export type { WriteOnlyConfig } from './write-only-config.js';\n`,
+    );
+    writeFileSync(
+      join(dir, 'src', 'write-only-config.ts'),
+      [
+        'export interface WriteOnlyConfig {',
+        '  directWriteOnly: string;',
+        '  elementWriteOnly: string;',
+        '  compoundRead: string;',
+        '  existenceChecked: string;',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(dir, 'src', 'consumer.ts'),
+      [
+        "import type { WriteOnlyConfig } from './write-only-config.js';",
+        '',
+        'export function update(config: WriteOnlyConfig): void {',
+        "  config.directWriteOnly = 'direct';",
+        "  config['elementWriteOnly'] = 'element';",
+        "  config.compoundRead += ' used';",
+        "  void ('existenceChecked' in config);",
+        '}',
+        '',
+      ].join('\n'),
+    );
+
+    const outcome = await unusedConfigSurfaceDetector.run({
+      cwd: dir,
+      config: {},
+      includeTests: false,
+    });
+    const properties = outcome.signals.map((signal) => {
+      const data = (signal.metadata.yagni as { evidence?: { data?: { property?: string } }[] })
+        ?.evidence?.[0]?.data;
+      return data?.property;
+    });
+    expect(properties).toEqual(['directWriteOnly', 'elementWriteOnly']);
+  });
+
   it('covers presentation variants and unreadable/oversized source skips', async () => {
     const outcome = await unusedConfigSurfaceDetector.run({
       cwd: FIXTURE_ROOT,

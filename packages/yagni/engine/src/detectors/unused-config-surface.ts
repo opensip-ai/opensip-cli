@@ -57,6 +57,38 @@ interface ConfigProperty {
   readonly isOptional: boolean;
 }
 
+function staticLiteralPropertyName(node: ts.Node): string | undefined {
+  if (
+    ts.isStringLiteral(node) ||
+    ts.isNoSubstitutionTemplateLiteral(node) ||
+    ts.isNumericLiteral(node)
+  ) {
+    return node.text;
+  }
+  return undefined;
+}
+
+function staticPropertyName(node: ts.Node): string | undefined {
+  if (ts.isIdentifier(node)) return node.text;
+  const literalName = staticLiteralPropertyName(node);
+  if (literalName !== undefined) return literalName;
+  if (ts.isComputedPropertyName(node)) {
+    return staticLiteralPropertyName(node.expression);
+  }
+  return undefined;
+}
+
+function isSimpleAssignmentWrite(
+  node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+): boolean {
+  const parent = node.parent;
+  return (
+    ts.isBinaryExpression(parent) &&
+    parent.left === node &&
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+  );
+}
+
 function isPublicConfigSurfaceInterface(interfaceName: string): boolean {
   return /\b(?:\w*Config|\w*Options)\b/.test(interfaceName);
 }
@@ -82,8 +114,9 @@ function extractPropertyFromMember(
   interfaceName: string,
   filePath: string,
 ): ConfigProperty | null {
-  if (!ts.isPropertySignature(member) || !ts.isIdentifier(member.name)) return null;
-  const propName = member.name.text;
+  if (!ts.isPropertySignature(member)) return null;
+  const propName = staticPropertyName(member.name);
+  if (propName === undefined) return null;
   if (COMMON_PROPERTY_NAMES.has(propName)) return null;
   const { line } = sourceFile.getLineAndCharacterOfPosition(member.getStart());
   return {
@@ -136,21 +169,29 @@ function countPropertyAccesses(filePaths: readonly string[]): Map<string, number
     if (!sourceFile) continue;
 
     const visit = (node: ts.Node): void => {
-      if (ts.isPropertyAccessExpression(node)) {
+      if (ts.isPropertyAccessExpression(node) && !isSimpleAssignmentWrite(node)) {
         const propertyName = node.name.text;
         accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+      }
+      if (ts.isElementAccessExpression(node) && !isSimpleAssignmentWrite(node)) {
+        const propertyName = staticLiteralPropertyName(node.argumentExpression);
+        if (propertyName !== undefined) {
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+        }
+      }
+      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.InKeyword) {
+        const propertyName = staticLiteralPropertyName(node.left);
+        if (propertyName !== undefined) {
+          accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
+        }
       }
       // Object destructuring (`const { foo } = opts`) is a property read.
       // Renames (`const { realKey: localName } = opts`) read `realKey`, not the local.
       // Array patterns (`const [foo] = items`) are not config property access.
       if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
         const nameNode = node.propertyName ?? node.name;
-        if (
-          ts.isIdentifier(nameNode) ||
-          ts.isStringLiteral(nameNode) ||
-          ts.isNoSubstitutionTemplateLiteral(nameNode)
-        ) {
-          const propertyName = nameNode.text;
+        const propertyName = staticPropertyName(nameNode);
+        if (propertyName !== undefined) {
           accessCounts.set(propertyName, (accessCounts.get(propertyName) ?? 0) + 1);
         }
       }

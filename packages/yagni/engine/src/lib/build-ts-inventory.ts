@@ -152,7 +152,7 @@ function classify(
   enclosingClass: string | undefined,
   projectRel: string,
 ): Shape | undefined {
-  const base = projectRel.replace(/\.tsx?$/, '');
+  const base = projectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '');
   const inClass = (name: string): string =>
     enclosingClass ? `${base}.${enclosingClass}.${name}` : `${base}.${name}`;
 
@@ -198,16 +198,46 @@ function functionDeclName(node: ts.FunctionDeclaration): string | undefined {
 /** Method name exactly as graph-typescript records it. */
 function methodName(node: ts.MethodDeclaration, sf: ts.SourceFile): string | undefined {
   const name = node.name;
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
-  if (ts.isComputedPropertyName(name)) return name.expression.getText(sf);
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  if (ts.isComputedPropertyName(name)) {
+    const expression = name.expression;
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression) ||
+      ts.isNumericLiteral(expression)
+    ) {
+      return expression.text;
+    }
+    return expression.getText(sf);
+  }
   if (ts.isPrivateIdentifier(name)) return name.text;
   return undefined;
 }
 
-/** Accessor name exactly as graph-typescript records it; computed/private accessors are skipped. */
+/** Accessor name exactly as graph-typescript records it. */
 function accessorName(node: ts.AccessorDeclaration): string | undefined {
   const name = node.name;
-  return ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
+  if (
+    ts.isIdentifier(name) ||
+    ts.isPrivateIdentifier(name) ||
+    ts.isStringLiteral(name) ||
+    ts.isNumericLiteral(name)
+  ) {
+    return name.text;
+  }
+  if (ts.isComputedPropertyName(name)) {
+    const expression = name.expression;
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression) ||
+      ts.isNumericLiteral(expression)
+    ) {
+      return expression.text;
+    }
+  }
+  return undefined;
 }
 
 function accessorShape(
@@ -225,7 +255,12 @@ function ctxSourceFile(node: ts.Node): ts.SourceFile {
 }
 
 function isGraphTsSourceFile(filePath: string): boolean {
-  return (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) && !filePath.endsWith('.d.ts');
+  return (
+    /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/.test(filePath) &&
+    !filePath.endsWith('.d.ts') &&
+    !filePath.endsWith('.d.mts') &&
+    !filePath.endsWith('.d.cts')
+  );
 }
 
 /** Read a source file, skipping anything over the byte bound (H3). */

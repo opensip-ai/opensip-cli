@@ -64,4 +64,62 @@ describe('walkTypeScriptFiles', () => {
       'src/view.tsx',
     ]);
   });
+
+  it('walks every source extension handled by the TypeScript language family', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-yagni-walk-'));
+    roots.push(root);
+    mkdirSync(join(root, 'src'), { recursive: true });
+    for (const file of [
+      'a.ts',
+      'b.tsx',
+      'c.mts',
+      'd.cts',
+      'e.js',
+      'f.jsx',
+      'g.mjs',
+      'h.cjs',
+      'ignored.test.js',
+      'ignored.spec.mjs',
+    ]) {
+      writeFileSync(join(root, 'src', file), 'export const value = 1;\n');
+    }
+
+    expect(rel(root, walkTypeScriptFiles(root, false))).toEqual([
+      'src/a.ts',
+      'src/b.tsx',
+      'src/c.mts',
+      'src/d.cts',
+      'src/e.js',
+      'src/f.jsx',
+      'src/g.mjs',
+      'src/h.cjs',
+    ]);
+    expect(rel(root, walkTypeScriptFiles(root, true))).toEqual([
+      'src/a.ts',
+      'src/b.tsx',
+      'src/c.mts',
+      'src/d.cts',
+      'src/e.js',
+      'src/f.jsx',
+      'src/g.mjs',
+      'src/h.cjs',
+      'src/ignored.spec.mjs',
+      'src/ignored.test.js',
+    ]);
+  });
+
+  it('returns each file once when requested roots overlap', () => {
+    const root = mkdtempSync(join(tmpdir(), 'opensip-yagni-walk-'));
+    roots.push(root);
+    const src = join(root, 'src');
+    const nested = join(src, 'nested');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(join(src, 'root.ts'), 'export const root = true;\n');
+    writeFileSync(join(nested, 'child.ts'), 'export const child = true;\n');
+
+    expect(rel(root, walkTypeScriptFiles(root, true, [src, nested, src]))).toEqual([
+      'src/nested/child.ts',
+      'src/root.ts',
+    ]);
+  });
 });

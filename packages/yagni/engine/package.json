@@ -106,8 +106,7 @@
           },
           {
             "flag": "--include-tests",
-            "description": "Include test and fixture code in analysis",
-            "default": false
+            "description": "Include test and fixture code in analysis"
           },
           {
             "flag": "--filter",

@@ -11,7 +11,7 @@ const SKIP_DIRS = new Set([
   '.opensip-cli',
 ]);
 
-const TS_EXT = /\.(ts|tsx|mts|cts)$/;
+const SOURCE_EXT = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- iterative directory walk with test-path and skip-dir guards
 export function walkTypeScriptFiles(
@@ -19,7 +19,7 @@ export function walkTypeScriptFiles(
   includeTests: boolean,
   roots?: readonly string[],
 ): string[] {
-  const out: string[] = [];
+  const out = new Set<string>();
   const stack = roots !== undefined && roots.length > 0 ? [...roots] : [root];
   while (stack.length > 0) {
     const dir = stack.pop();
@@ -37,18 +37,18 @@ export function walkTypeScriptFiles(
         stack.push(full);
         continue;
       }
-      if (!entry.isFile() || !TS_EXT.test(entry.name)) continue;
+      if (!entry.isFile() || !SOURCE_EXT.test(entry.name)) continue;
       if (!includeTests && isTestPath(full)) continue;
-      out.push(full);
+      out.add(full);
     }
   }
-  return out.sort();
+  return [...out].sort();
 }
 
 function isTestPath(filePath: string): boolean {
   return (
     /[/\\]__tests__[/\\]/.test(filePath) ||
-    /\.test\.(ts|tsx|mts|cts)$/.test(filePath) ||
-    /\.spec\.(ts|tsx|mts|cts)$/.test(filePath)
+    /\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(filePath) ||
+    /\.spec\.(?:[cm]?[jt]s|[jt]sx)$/.test(filePath)
   );
 }

@@ -93,6 +93,14 @@ describe('buildYagniCommandSpec', () => {
     expect(spec.commonFlags).toContain('open');
   });
 
+  it('leaves --include-tests unset so the resolved config can supply its default', () => {
+    const spec = buildYagniCommandSpec(() => undefined);
+    const includeTests = spec.options?.find((option) => option.flag === '--include-tests');
+
+    expect(includeTests).toBeDefined();
+    expect(includeTests).not.toHaveProperty('default');
+  });
+
   it('routes gate flags through the host gate dispatch path', async () => {
     const spec = buildYagniCommandSpec(() => undefined);
     const cli = mockCli();

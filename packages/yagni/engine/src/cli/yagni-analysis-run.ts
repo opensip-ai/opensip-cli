@@ -132,7 +132,6 @@ export function buildYagniAnalysisRunCommand(setUpLiveView: (cli: ToolCliContext
       {
         flag: '--include-tests',
         description: 'Include test and fixture code in analysis',
-        default: false,
       },
       ...agentRunFlagSpecs,
     ],

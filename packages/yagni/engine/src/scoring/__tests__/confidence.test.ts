@@ -120,6 +120,22 @@ describe('sortYagniSignals tie-breaker chain', () => {
     const out = sortYagniSignals([noMeta('/b.ts'), noMeta('/a.ts')]);
     expect(out[0].filePath).toBe('/a.ts');
   });
+
+  it('orders locations by code-point path and numeric source position', () => {
+    const byPath = sortYagniSignals([noMeta('/a.ts'), noMeta('/Z.ts')]);
+    expect(byPath.map((signal) => signal.filePath)).toEqual(['/Z.ts', '/a.ts']);
+
+    const byLine = sortYagniSignals([
+      noMeta('/same.ts', 10, 1),
+      noMeta('/same.ts', 2, 1),
+      noMeta('/same.ts', 2, 0),
+    ]);
+    expect(byLine.map((signal) => [signal.line, signal.column])).toEqual([
+      [2, 0],
+      [2, 1],
+      [10, 1],
+    ]);
+  });
 });
 
 describe('filterByMinConfidence', () => {

@@ -3,7 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
 import { buildSignalEnvelope, groupSignalsBySource } from '@opensip-cli/contracts';
-import { filterSignalsBySuppressions, isErrorSignal, yieldToEventLoop } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  filterSignalsBySuppressions,
+  isErrorSignal,
+  yieldToEventLoop,
+} from '@opensip-cli/core';
 
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
 import { YAGNI_DETECTORS } from '../detectors/registry.js';
@@ -73,6 +78,18 @@ function matchesDetectorFilter(detector: YagniDetector, filter: readonly string[
   );
 }
 
+function validateDetectorFilter(
+  detectors: readonly YagniDetector[],
+  detectorFilter: readonly string[],
+): void {
+  const unknown = detectorFilter.find(
+    (requested) => !detectors.some((detector) => matchesDetectorFilter(detector, [requested])),
+  );
+  if (unknown !== undefined) {
+    throw new ConfigurationError(`Unknown YAGNI detector '${unknown}'.`);
+  }
+}
+
 function planDetectors(
   detectors: readonly YagniDetector[],
   config: YagniConfig,
@@ -80,24 +97,30 @@ function planDetectors(
 ): {
   readonly run: readonly YagniDetector[];
   readonly skipped: readonly SkippedDetector[];
+  readonly notRunSlugs: readonly string[];
 } {
   const run: YagniDetector[] = [];
   const skipped: SkippedDetector[] = [];
+  const notRunSlugs: string[] = [];
 
   for (const detector of detectors) {
-    if (!matchesDetectorFilter(detector, detectorFilter)) continue;
+    if (!matchesDetectorFilter(detector, detectorFilter)) {
+      notRunSlugs.push(detector.slug);
+      continue;
+    }
     if (isDisabled(detector, config)) {
       skipped.push({
         id: detector.id,
         slug: detector.slug,
         reason: 'disabled',
       });
+      notRunSlugs.push(detector.slug);
       continue;
     }
     run.push(detector);
   }
 
-  return { run, skipped };
+  return { run, skipped, notRunSlugs };
 }
 
 function yagniDirectiveId(signal: Signal): string {
@@ -161,12 +184,13 @@ export async function executeYagni(
   const includeTests = opts.includeTests ?? config.includeTests ?? false;
   const minConfidence = opts.minConfidence ?? config.defaultMinConfidence ?? 'medium';
 
-  const { run, skipped } = planDetectors(detectors, config, opts.detectors ?? []);
+  validateDetectorFilter(detectors, opts.detectors ?? []);
+  const { run, skipped, notRunSlugs } = planDetectors(detectors, config, opts.detectors ?? []);
   const allSignals: Signal[] = [];
   const units: UnitResult[] = [];
   const total = run.length;
   opts.onProgress?.(0, total);
-  if (skipped.length > 0) opts.onDetectorsSkipped?.(skipped.map((s) => s.slug));
+  if (notRunSlugs.length > 0) opts.onDetectorsSkipped?.(notRunSlugs);
 
   for (const detector of run) {
     const started = Date.now();

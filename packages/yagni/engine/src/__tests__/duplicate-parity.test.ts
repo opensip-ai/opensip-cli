@@ -91,12 +91,14 @@ beforeAll(() => {
     join(root, 'tsconfig.json'),
     JSON.stringify({
       compilerOptions: {
+        allowJs: true,
+        checkJs: false,
         target: 'ES2022',
-        module: 'Node16',
-        moduleResolution: 'Node16',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
         skipLibCheck: true,
       },
-      include: ['**/*.ts', '**/*.tsx'],
+      include: ['**/*'],
     }),
   );
   const pkg = (name: string): string => {
@@ -141,11 +143,35 @@ beforeAll(() => {
   // ARROW duplicated across packages → excluded by kind (never emitted by yagni).
   writeFileSync(join(a, 'src', 'arr.ts'), ARROW);
   writeFileSync(join(b, 'src', 'arr.ts'), ARROW);
-  // Graph's TS discovery excludes declarations and module-format TS files today; yagni's
-  // walker must keep the same duplicate-detection source scope.
+  // Graph and yagni admit the same eight TypeScript-family source extensions and
+  // exclude all declaration-file variants.
   writeFileSync(join(a, 'src', 'ambient.d.ts'), `declare class Ambient { constructor(); }\n`);
-  writeFileSync(join(a, 'src', 'module.mts'), MEDIUM);
-  writeFileSync(join(a, 'src', 'common.cts'), MEDIUM);
+  writeFileSync(join(a, 'src', 'ambient.d.mts'), `export declare function ambientMts(): void;\n`);
+  writeFileSync(join(a, 'src', 'ambient.d.cts'), `export declare function ambientCts(): void;\n`);
+  writeFileSync(
+    join(a, 'src', 'module.mts'),
+    `export function mtsOnly(value: number): number { return value + 301; }\n`,
+  );
+  writeFileSync(
+    join(a, 'src', 'common.cts'),
+    `export function ctsOnly(value: number): number { return value + 302; }\n`,
+  );
+  writeFileSync(
+    join(a, 'src', 'plain.js'),
+    `export function jsOnly(value) { return value + 303; }\n`,
+  );
+  writeFileSync(
+    join(a, 'src', 'component.jsx'),
+    `export function jsxOnly(value) { return value + 304; }\n`,
+  );
+  writeFileSync(
+    join(a, 'src', 'module-js.mjs'),
+    `export function mjsOnly(value) { return value + 305; }\n`,
+  );
+  writeFileSync(
+    join(a, 'src', 'common-js.cjs'),
+    `function cjsOnly(value) { return value + 306; }\nmodule.exports = { cjsOnly };\n`,
+  );
 
   // A class + default-export + an overload signature — exercises the method / constructor /
   // getter / setter / default-export classify branches and the body-less skip. Single
@@ -162,6 +188,14 @@ export default function (): number { return 42; }
 export function overload(x: number): number;
 export function overload(x: string): string;
 export function overload(x: unknown): unknown { return x; }
+export class LiteralNames {
+  7(): number { return 7; }
+  ['quoted'](): number { return 8; }
+  [\`templated\`](): number { return 9; }
+  get #privateValue(): number { return 10; }
+  get 11(): number { return 11; }
+  get ['computed'](): number { return 12; }
+}
 `,
   );
 });
@@ -194,6 +228,23 @@ describe('yagni duplicate detection — extraction + shared policy parity', () =
       candidates.filter((c) => c.simpleName === 'normalizeName').map((c) => c.bodyHash),
     );
     expect(mediumHashes.size).toBe(1);
+  });
+
+  it('inventories every supported source extension and excludes declarations', () => {
+    const filePaths = new Set(buildTsInventory(root).map((candidate) => candidate.filePath));
+    for (const filePath of [
+      'a/src/u.ts',
+      'a/src/cls.ts',
+      'a/src/module.mts',
+      'a/src/common.cts',
+      'a/src/plain.js',
+      'a/src/component.jsx',
+      'a/src/module-js.mjs',
+      'a/src/common-js.cjs',
+    ]) {
+      expect(filePaths.has(filePath), filePath).toBe(true);
+    }
+    expect([...filePaths].some((filePath) => /\.d\.(?:ts|mts|cts)$/.test(filePath))).toBe(false);
   });
 
   it('applies the shared curation policy exactly (cross-package, test-exclusion, floors, kind)', () => {
@@ -235,6 +286,9 @@ describe('yagni duplicate detection — extraction + shared policy parity', () =
     const names = candidates.filter((c) => c.filePath.endsWith('cls.ts')).map((c) => c.simpleName);
     expect(names).toContain('<default>');
     expect(names).toContain('Widget');
+    expect(names).toEqual(
+      expect.arrayContaining(['7', 'quoted', 'templated', '#privateValue', '11', 'computed']),
+    );
     expect(names.filter((n) => n === 'overload')).toHaveLength(1);
   });
 

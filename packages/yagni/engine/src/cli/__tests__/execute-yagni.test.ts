@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createSignal } from '@opensip-cli/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../execute-yagni.js';
 
@@ -79,5 +79,32 @@ describe('executeYagni', () => {
 
     expect(result.envelope.verdict.passed).toBe(true);
     expect(result.session.passed).toBe(true);
+  });
+
+  it('rejects an unknown explicit detector instead of reporting an empty pass', async () => {
+    await expect(
+      executeYagni(
+        {
+          cwd: fixtureDir(),
+          detectors: ['ghost-detector'],
+        },
+        [cleanDetector()],
+      ),
+    ).rejects.toThrow("Unknown YAGNI detector 'ghost-detector'");
+  });
+
+  it('settles live rows for detectors excluded by an explicit filter', async () => {
+    const onDetectorsSkipped = vi.fn();
+
+    await executeYagni(
+      {
+        cwd: fixtureDir(),
+        detectors: ['warning-detector'],
+        onDetectorsSkipped,
+      },
+      [warningDetector(), cleanDetector()],
+    );
+
+    expect(onDetectorsSkipped).toHaveBeenCalledWith(['yagni:clean-detector']);
   });
 });

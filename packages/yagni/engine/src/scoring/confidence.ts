@@ -1,3 +1,5 @@
+import { compareCodePoint } from '@opensip-cli/contracts';
+
 import type { SkippedDetector } from '../detectors/types.js';
 import type {
   YagniConfidence,
@@ -57,12 +59,6 @@ export function filterByReductionCategories(
   });
 }
 
-function locationKey(signal: Signal): string {
-  const line = signal.line ?? 0;
-  const col = signal.column ?? 0;
-  return `${signal.filePath}:${String(line)}:${String(col)}`;
-}
-
 /** Stable sort: confidence DESC → estimateKind → netEstimate DESC → detector → location. */
 export function sortYagniSignals(signals: readonly Signal[]): Signal[] {
   return [...signals].sort((a, b) => {
@@ -82,9 +78,14 @@ export function sortYagniSignals(signals: readonly Signal[]): Signal[] {
 
     const detA = ma?.detector ?? '';
     const detB = mb?.detector ?? '';
-    if (detA !== detB) return detA.localeCompare(detB);
+    const detectorOrder = compareCodePoint(detA, detB);
+    if (detectorOrder !== 0) return detectorOrder;
 
-    return locationKey(a).localeCompare(locationKey(b));
+    const fileOrder = compareCodePoint(a.filePath, b.filePath);
+    if (fileOrder !== 0) return fileOrder;
+    const lineOrder = (a.line ?? 0) - (b.line ?? 0);
+    if (lineOrder !== 0) return lineOrder;
+    return (a.column ?? 0) - (b.column ?? 0);
   });
 }
 
