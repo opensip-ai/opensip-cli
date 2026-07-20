@@ -161,11 +161,14 @@ export const rateLimitCoverage = defineCheck({
       return [];
     }
 
-    const violations: CheckViolation[] = [];
+    // A sensitive route also matches its framework's generic route pattern.
+    // Keep one finding per syntactic call, preferring the elevated error.
+    const violationsByCall = new Map<number, CheckViolation>();
     const globalIndexes = globalRateLimitIndexes(codeMask);
 
     for (const pattern of ROUTE_PATTERNS) {
       for (const match of findCodeMatches(pattern.regex, syntaxMask, codeMask)) {
+        const openingParen = codeMask.indexOf('(', match.index);
         const end = callEnd(codeMask, match.index);
         const routeCode = codeMask.slice(match.index, end);
         const routeSyntax = syntaxMask.slice(match.index, end);
@@ -175,7 +178,7 @@ export const rateLimitCoverage = defineCheck({
         }
 
         const lineStart = content.lastIndexOf('\n', match.index - 1) + 1;
-        violations.push({
+        const violation: CheckViolation = {
           line: content.slice(0, match.index).split('\n').length,
           column: match.index - lineStart,
           message: pattern.message,
@@ -183,10 +186,14 @@ export const rateLimitCoverage = defineCheck({
           suggestion: pattern.suggestion,
           match: content.slice(match.index, match.index + match[0].length),
           filePath,
-        });
+        };
+        const existing = violationsByCall.get(openingParen);
+        if (existing?.severity !== 'error') {
+          violationsByCall.set(openingParen, violation);
+        }
       }
     }
 
-    return violations;
+    return [...violationsByCall.values()];
   },
 });

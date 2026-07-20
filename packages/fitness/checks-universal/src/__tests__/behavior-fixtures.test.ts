@@ -1699,7 +1699,13 @@ describe('rate-limit-coverage', () => {
     const result = await findCheck('rate-limit-coverage').run(cwd, {
       targetFiles: [join(cwd, 'src/api-routes.ts')],
     });
-    expect(result.signals.length).toBeGreaterThan(0);
+    expect(result.signals).toHaveLength(2);
+    expect(result.errors).toBe(1);
+    expect(result.warnings).toBe(1);
+    expect(result.signals.map((signal) => [signal.code?.line, signal.severity])).toEqual([
+      [2, 'medium'],
+      [3, 'high'],
+    ]);
   });
 
   it('does not fire when global rate limiting is registered', async () => {
