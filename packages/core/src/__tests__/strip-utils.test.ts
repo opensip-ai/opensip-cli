@@ -111,6 +111,13 @@ describe('scanRegularString', () => {
     expect(result.next).toBe(4);
   });
 
+  it('stops at a bare carriage return when multiline strings are disabled', () => {
+    const src = '"abc\rdef"';
+    const result = scanRegularString(src, 0);
+    expect(src[result.contentEnd]).toBe('\r');
+    expect(result.next).toBe(4);
+  });
+
   it('returns EOF position when the string is unterminated by EOF', () => {
     const src = '"abc';
     const result = scanRegularString(src, 0);
@@ -192,6 +199,12 @@ describe('scanLineComment', () => {
     const src = '// no terminator';
     const result = scanLineComment(src, 0);
     expect(result.end).toBe(src.length);
+  });
+
+  it('stops at a bare carriage-return line terminator', () => {
+    const src = '// comment\rint x = 1;';
+    const result = scanLineComment(src, 0);
+    expect(src[result.end]).toBe('\r');
   });
 
   it('does NOT honor line continuation by default (Java/Go semantics)', () => {
@@ -325,6 +338,12 @@ describe('scanCharLiteral', () => {
 
   it('bails at unescaped newline and treats the apostrophe as code', () => {
     const src = "'a\nint x = 1;";
+    const result = scanCharLiteral(src, 0);
+    expect(result.end).toBe(1);
+  });
+
+  it('bails at an unescaped bare carriage return', () => {
+    const src = "'a\r' trailing";
     const result = scanCharLiteral(src, 0);
     expect(result.end).toBe(1);
   });

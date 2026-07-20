@@ -137,7 +137,7 @@ function scanSingleString(src: string, contentStart: number, quote: string): Str
     // error to span lines without explicit continuation, but for
     // strip purposes treat newline as a terminator to avoid eating
     // the rest of the file on malformed input).
-    if (ch === '\n') {
+    if (ch === '\n' || ch === '\r') {
       return { contentStart, contentEnd: i, next: i };
     }
     if (ch === '\\') {
@@ -175,7 +175,7 @@ function scan(src: string): ScanResult {
     if (c === '#') {
       const start = i;
       i++;
-      while (i < len && src[i] !== '\n') i++;
+      while (i < len && src[i] !== '\n' && src[i] !== '\r') i++;
       commentRegions.push({ start, end: i });
       continue;
     }

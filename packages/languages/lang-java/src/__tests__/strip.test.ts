@@ -15,6 +15,12 @@ describe('stripStrings (Java)', () => {
     expect(out).not.toContain('line2');
   });
 
+  it('recognizes form feed in a text-block opening delimiter', () => {
+    const src = 'String s = """\f\nsecret\n""";';
+    const out = stripStrings(src);
+    expect(out).not.toContain('secret');
+  });
+
   it('handles escape sequences', () => {
     const out = stripStrings(String.raw`String s = "a\"b";`);
     expect(out).not.toContain('a');
@@ -50,6 +56,12 @@ describe('stripComments (Java)', () => {
   it('strips line comments', () => {
     const out = stripComments('int x = 1; // comment');
     expect(out).not.toContain('comment');
+  });
+
+  it('ends a line comment at a bare carriage return', () => {
+    const out = stripComments('// hidden\rint x = 1;');
+    expect(out).not.toContain('hidden');
+    expect(out).toContain('int x = 1;');
   });
 
   it('strips block comments', () => {

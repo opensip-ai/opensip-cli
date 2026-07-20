@@ -42,6 +42,11 @@ describe('stripStrings', () => {
     expect(out).toContain('x = ');
   });
 
+  it('terminates non-triple strings at a classic-Mac carriage return', () => {
+    const out = stripStrings("x = 'unclosed\ry = 2");
+    expect(out).toContain('y = 2');
+  });
+
   it('passes through code with no strings unchanged', () => {
     const code = 'def foo():\n    return 1';
     expect(stripStrings(code)).toBe(code);
@@ -87,5 +92,11 @@ describe('stripComments', () => {
     expect(out).not.toContain('top');
     expect(out).not.toContain('mid');
     expect(out).not.toContain('end');
+  });
+
+  it('ends a comment at a classic-Mac carriage return', () => {
+    const out = stripComments('# hidden\ry = 2');
+    expect(out).not.toContain('hidden');
+    expect(out).toContain('y = 2');
   });
 });

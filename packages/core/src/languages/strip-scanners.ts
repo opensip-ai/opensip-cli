@@ -70,10 +70,10 @@ export function scanRegularString(
     if (ch === '"') {
       return { contentEnd: i, next: i + 1 };
     }
-    if (ch === '\n' && !allowMultiline) {
+    if ((ch === '\n' || ch === '\r') && !allowMultiline) {
       // Unterminated regular string — language-specific scanners must
-      // decide how to recover; we stop here so we don't consume the
-      // rest of the file.
+      // decide how to recover; recognize both source line terminators so
+      // classic-Mac files do not consume the rest of the file.
       return { contentEnd: i, next: i };
     }
     i++;
@@ -105,11 +105,17 @@ export interface ScanLineCommentOptions {
   readonly allowLineContinuation?: boolean;
 }
 
+function lineTerminatorWidth(src: string, index: number): number {
+  if (src[index] === '\n') return 1;
+  if (src[index] !== '\r') return 0;
+  return src[index + 1] === '\n' ? 2 : 1;
+}
+
 /**
  * Scan a `//` line comment starting at `start` (which must reference
- * the first `/` of the opener). Returns the index of the next `\n`
- * (or EOF) — i.e. where the outer scanner resumes. The returned index
- * does not include the `\n` itself.
+ * the first `/` of the opener). Returns the index of the next CR/LF
+ * line terminator (or EOF) — i.e. where the outer scanner resumes.
+ * The returned index does not include the terminator itself.
  *
  * Pass `{ allowLineContinuation: true }` for C/C++-style line splices:
  * a `\<newline>` continues the comment onto the next physical line
@@ -129,21 +135,13 @@ export function scanLineComment(
   const bodyStart = start + 2; // skip the opening //
   let i = bodyStart;
   while (i < len) {
-    // CRLF: treat `\r\n` as one terminator; splice check looks before `\r`.
-    if (src[i] === '\r' && src[i + 1] === '\n') {
-      if (allowLineContinuation && hasUnescapedTrailingBackslash(src, bodyStart, i)) {
-        i += 2;
-        continue;
-      }
-      break;
-    }
-    if (src[i] === '\n') {
-      if (allowLineContinuation && hasUnescapedTrailingBackslash(src, bodyStart, i)) {
-        // Line splice — continue onto the next physical line.
-        i++;
-        continue;
-      }
-      break;
+    // Treat CR, LF, and CRLF as line terminators; the splice check looks
+    // before the first terminator byte.
+    const terminatorWidth = lineTerminatorWidth(src, i);
+    if (terminatorWidth > 0) {
+      if (!allowLineContinuation || !hasUnescapedTrailingBackslash(src, bodyStart, i)) break;
+      i += terminatorWidth;
+      continue;
     }
     i++;
   }
@@ -311,7 +309,7 @@ export function scanCharLiteral(
       closed = true;
       break;
     }
-    if (ch === '\n') {
+    if (ch === '\n' || ch === '\r') {
       // Unterminated — bail at the newline.
       break;
     }

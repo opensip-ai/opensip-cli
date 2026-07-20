@@ -64,7 +64,7 @@ function scan(src: string): ScanResult {
     if (c === '"' && src[i + 1] === '"' && src[i + 2] === '"') {
       // Look past optional whitespace for a newline to confirm text block
       let j = i + 3;
-      while (j < len && (src[j] === ' ' || src[j] === '\t')) j++;
+      while (j < len && (src[j] === ' ' || src[j] === '\t' || src[j] === '\f')) j++;
       if (j < len && (src[j] === '\n' || src[j] === '\r')) {
         // It's a text block. Body starts after the line terminator.
         // Skip the line terminator (handle \r\n).
