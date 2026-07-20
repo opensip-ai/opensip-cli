@@ -11,9 +11,11 @@ describe('isTestFilePath', () => {
     expect(isTestFilePath('src/__fixtures__/bar.ts')).toBe(true);
   });
 
-  it('classifies .test.ts/.test.tsx suffixes', () => {
+  it('classifies .test and .spec TS/JS suffixes', () => {
     expect(isTestFilePath('src/util.test.ts')).toBe(true);
     expect(isTestFilePath('src/util.test.tsx')).toBe(true);
+    expect(isTestFilePath('src/util.spec.js')).toBe(true);
+    expect(isTestFilePath('src/util.spec.jsx')).toBe(true);
   });
 
   it('classifies _test.ts suffixes', () => {
