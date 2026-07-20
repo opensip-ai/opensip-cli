@@ -80,6 +80,31 @@ describe('parseClangTidyOutput', () => {
     expect(violations[2]?.line).toBe(9);
   });
 
+  it('parses Windows CRLF-delimited diagnostics', () => {
+    const out = [
+      'C:\\project\\first.cpp:2:3: warning: first [check-a]',
+      'C:\\project\\second.cpp:4:5: error: second [check-b]',
+      '',
+    ].join('\r\n');
+
+    const violations = parseClangTidyOutput(out, '', 1, [], 'C:\\project');
+
+    expect(violations).toHaveLength(2);
+    expect(violations.map((violation) => violation.message)).toEqual([
+      '[check-a] first',
+      '[check-b] second',
+    ]);
+  });
+
+  it('keeps an in-project path beginning with two dots project-relative', () => {
+    const out = `/project/...generated/foo.cpp:3:1: warning: generated warning [check-x]`;
+
+    const violations = parseClangTidyOutput(out, '', 0, [], '/project');
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.filePath).toBe('...generated/foo.cpp');
+  });
+
   it('preserves per-file grouping across violations from multiple files', () => {
     // This is the core bug the fix addresses: without filePath capture
     // every violation was bucketed under '' and per-file grouping in the

@@ -29,9 +29,14 @@ const CLANG_TIDY_LINE =
 function resolveFilePath(capturedPath: string, cwd: string): string {
   const absolute = path.resolve(cwd, capturedPath);
   const relative = path.relative(cwd, absolute);
-  // `path.relative` returns a `..`-prefixed path (or absolute on Windows
-  // when drives differ) when the resolved path is outside `cwd`.
-  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+  // `path.relative` returns `..` or `..${path.sep}…` (or an absolute path
+  // when Windows drives differ) when the resolved path is outside `cwd`.
+  if (
+    relative === '' ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
     return absolute;
   }
   return relative;
@@ -91,7 +96,7 @@ export function parseClangTidyOutput(
   cwd: string,
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  const lines = mergeClangTidyStreams(stdout, stderr).split('\n');
+  const lines = mergeClangTidyStreams(stdout, stderr).split(/\r?\n/u);
   for (const line of lines) {
     const match = CLANG_TIDY_LINE.exec(line);
     if (!match) continue;
