@@ -23,6 +23,7 @@ describe('detectTerminalCapabilities', () => {
 
   beforeEach(() => {
     delete process.env.NO_COLOR;
+    delete process.env.FORCE_COLOR;
     delete process.env.COLORTERM;
     delete process.env.TERM_PROGRAM;
     delete process.env.TERM;
@@ -40,6 +41,12 @@ describe('detectTerminalCapabilities', () => {
     expect(caps.supportsColor).toBe(false);
     expect(caps.supports256Color).toBe(false);
     expect(caps.supportsTrueColor).toBe(false);
+  });
+
+  it('honors FORCE_COLOR when stdout is not a TTY', () => {
+    process.env.FORCE_COLOR = '1';
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    expect(detectTerminalCapabilities().supportsColor).toBe(true);
   });
 
   it('reports truecolor when COLORTERM=truecolor and stdout is a TTY', () => {

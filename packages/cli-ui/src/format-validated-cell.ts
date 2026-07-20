@@ -5,10 +5,16 @@
  * fitness envelope derivations so the column cannot drift per tool.
  */
 
+const IRREGULAR_SINGULARS: Readonly<Record<string, string>> = {
+  classes: 'class',
+  dependencies: 'dependency',
+};
+
 /** Render a validated-count cell with singular/plural noun (e.g. `450 files`, `1 file`, `—`). */
 export function formatValidatedCell(totalItems: number | undefined, itemType = 'items'): string {
   if (!totalItems) return '—';
-  const singular = itemType.endsWith('s') ? itemType.slice(0, -1) : itemType;
+  const singular =
+    IRREGULAR_SINGULARS[itemType] ?? (itemType.endsWith('s') ? itemType.slice(0, -1) : itemType);
   return totalItems === 1 ? `${totalItems} ${singular}` : `${totalItems} ${itemType}`;
 }
 

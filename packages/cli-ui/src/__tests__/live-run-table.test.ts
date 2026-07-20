@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { formatValidatedCell } from '../format-validated-cell.js';
 import { liveRunTable } from '../live-run-table.js';
 import { renderToText } from '../render-to-text.js';
+
+describe('formatValidatedCell', () => {
+  it('singularizes the supported irregular item types', () => {
+    expect(formatValidatedCell(1, 'classes')).toBe('1 class');
+    expect(formatValidatedCell(1, 'dependencies')).toBe('1 dependency');
+  });
+});
 
 describe('liveRunTable', () => {
   it('returns null for an empty row list', () => {

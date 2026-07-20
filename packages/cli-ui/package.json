@@ -41,7 +41,8 @@
   "dependencies": {
     "ink": "^7.1.0",
     "react": "^19.2.7",
-    "@opensip-cli/format": "workspace:*"
+    "@opensip-cli/format": "workspace:*",
+    "string-width": "^8.2.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

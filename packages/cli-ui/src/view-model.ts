@@ -20,6 +20,8 @@
  * pull React into the process.
  */
 
+import stringWidth from 'string-width';
+
 /**
  * Semantic color intent. The Ink interpreter maps each tone onto a
  * `DEFAULT_THEME` token; the text interpreter ignores tones entirely. The
@@ -126,9 +128,9 @@ export function tableColumnWidths(
   const colCount = Math.max(columns.length, ...rows.map((r) => r.length), 0);
   return Array.from({ length: colCount }, (_, i) =>
     Math.max(
-      columns[i]?.length ?? 0,
+      stringWidth(columns[i] ?? ''),
       minWidths?.[i] ?? 0,
-      ...rows.map((r) => r[i]?.text.length ?? 0),
+      ...rows.map((r) => stringWidth(r[i]?.text ?? '')),
       0,
     ),
   );
@@ -136,7 +138,8 @@ export function tableColumnWidths(
 
 /** Pad `value` to `width`; `'right'` pads on the left (numeric/duration columns). */
 export function padTableCell(value: string, width: number, align: 'left' | 'right'): string {
-  return align === 'right' ? value.padStart(width) : value.padEnd(width);
+  const padding = ' '.repeat(Math.max(0, width - stringWidth(value)));
+  return align === 'right' ? padding + value : value + padding;
 }
 
 /** Per-column spec for {@link viewTable}: a header label, alignment, min width. */

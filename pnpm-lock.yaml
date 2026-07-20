@@ -374,6 +374,9 @@ importers:
       react:
         specifier: ^19.2.7
         version: 19.2.7
+      string-width:
+        specifier: ^8.2.1
+        version: 8.2.1
     devDependencies:
       '@types/node':
         specifier: ^24.13.3
@@ -5838,6 +5841,7 @@ snapshots:
       '@opensip-cli/format': file:packages/format
       ink: 7.1.0(@types/react@19.2.17)(react@19.2.7)
       react: 19.2.7
+      string-width: 8.2.1
     transitivePeerDependencies:
       - '@types/react'
       - bufferutil

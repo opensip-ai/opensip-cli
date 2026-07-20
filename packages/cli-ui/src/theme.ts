@@ -93,6 +93,7 @@ export interface TerminalCapabilities {
 export function detectTerminalCapabilities(): TerminalCapabilities {
   const isTTY = !!process.stdout.isTTY;
   const noColor = !!process.env.NO_COLOR;
+  const forceColor = !!process.env.FORCE_COLOR;
   const colorTerm = process.env.COLORTERM ?? '';
   const termProgram = process.env.TERM_PROGRAM ?? '';
   const term = process.env.TERM ?? '';
@@ -111,15 +112,12 @@ export function detectTerminalCapabilities(): TerminalCapabilities {
   const envSuggests256Color =
     envSuggestsTrueColor || term.includes('256color') || termProgram === 'Apple_Terminal';
 
-  // All capability flags MUST be gated on `isTTY`. When stdout is piped to a
-  // file or CI log, ANSI truecolor escapes still leak in if callers inspect
-  // `supports256Color` / `supportsTrueColor` to decide whether to emit hex
-  // color values — even though `supportsColor` itself is correctly false.
-  // Treating capability as a single coherent gate (`isTTY && env signal`)
-  // prevents the exported surface from contradicting itself.
+  // Higher color-depth capabilities stay gated on `isTTY`: FORCE_COLOR only
+  // promises that ANSI color is enabled, not that a piped stream supports a
+  // particular palette depth.
   const supportsTrueColor = isTTY && envSuggestsTrueColor;
   const supports256Color = isTTY && envSuggests256Color;
-  const supportsColor = isTTY && (envSuggests256Color || term !== 'dumb');
+  const supportsColor = forceColor || (isTTY && (envSuggests256Color || term !== 'dumb'));
 
   return { isTTY, supportsColor, supports256Color, supportsTrueColor };
 }

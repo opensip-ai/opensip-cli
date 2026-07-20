@@ -60,6 +60,15 @@ describe('renderToText — content', () => {
     expect(renderToText({ kind: 'hints', items: [{ text: 'x' }, { text: 'y' }] })).toBe('  x | y');
   });
 
+  it('aligns table cells by terminal width for wide Unicode text', () => {
+    const rendered = renderToText({
+      kind: 'table',
+      columns: ['Name', 'Status'],
+      rows: [[{ text: '漢字' }, { text: 'PASS' }]],
+    });
+    expect(rendered.split('\n')[2]).toBe('漢字 | PASS');
+  });
+
   it('indents group children', () => {
     const node = group([line('one'), line('two')], 2);
     expect(renderToText(node)).toBe('  one\n  two');

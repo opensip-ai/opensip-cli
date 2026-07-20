@@ -30,6 +30,8 @@ import type {
   ProgressSurface,
 } from './progress-event.js';
 
+const FAILED_STAGE_DETAILS = new Set(['fail', 'failed', 'failure', 'fault', 'faulted', 'error']);
+
 // ---------------------------------------------------------------------------
 // Reduced render state
 // ---------------------------------------------------------------------------
@@ -174,11 +176,7 @@ function PhaseLine({
   if (status.kind === 'done') {
     const dur = formatDuration(status.durationMs);
     const detail = status.detail ? `${status.detail} (${dur})` : dur;
-    const detailLower = (status.detail ?? '').toLowerCase();
-    const failed =
-      detailLower.includes('fail') ||
-      detailLower.includes('fault') ||
-      detailLower.includes('error');
+    const failed = FAILED_STAGE_DETAILS.has((status.detail ?? '').trim().toLowerCase());
     const glyph = failed ? '✗' : '✓';
     const tone = failed ? theme.error : theme.success;
     return (

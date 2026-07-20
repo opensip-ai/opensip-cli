@@ -113,6 +113,29 @@ describe('<LiveProgress> — phases mode', () => {
     unmount();
   });
 
+  it('does not infer failure from informational detail text', async () => {
+    const { subscribe, emit } = controllable();
+    const { lastFrame, unmount } = mount(PHASES, subscribe);
+    await waitForFrame(lastFrame, 'Discover files');
+
+    emit({ type: 'stage-done', stage: 'parse', durationMs: 10, detail: '0 errors' });
+    await waitForFrame(lastFrame, '0 errors (10ms)');
+    expect(lastFrame()).toContain('✓ Parse project');
+    expect(lastFrame()).not.toContain('✗ Parse project');
+    unmount();
+  });
+
+  it('renders an explicit failure outcome word as failed', async () => {
+    const { subscribe, emit } = controllable();
+    const { lastFrame, unmount } = mount(PHASES, subscribe);
+    await waitForFrame(lastFrame, 'Discover files');
+
+    emit({ type: 'stage-done', stage: 'rules', durationMs: 10, detail: 'fail' });
+    await waitForFrame(lastFrame, 'fail (10ms)');
+    expect(lastFrame()).toContain('✗ Evaluate rules');
+    unmount();
+  });
+
   it('renders a cache hit as (cached)', async () => {
     const { subscribe, emit } = controllable();
     const { lastFrame, unmount } = mount(PHASES, subscribe);
