@@ -150,4 +150,32 @@ describe('addSuiteStep', () => {
     expect(result.changed).toBe(false);
     expect(readFileSync(configPath, 'utf8')).toBe(content);
   });
+
+  it('treats signed zero as the same numeric suite argument', () => {
+    const configPath = join(tmp, 'opensip-cli.config.yml');
+    const content = [
+      'suites:',
+      '  security:',
+      '    steps:',
+      `      - tool: ${TOOL_ID}`,
+      '        name: fitness',
+      '        command: fit',
+      '        args:',
+      '          count: 0',
+      '',
+    ].join('\n');
+    writeFileSync(configPath, content, 'utf8');
+
+    const result = addSuiteStep({
+      suite: 'security',
+      tool: 'fitness',
+      command: 'fit',
+      argPairs: ['count=-0'],
+      tools: [fixtureTool()],
+      projectRoot: tmp,
+    });
+
+    expect(result.changed).toBe(false);
+    expect(readFileSync(configPath, 'utf8')).toBe(content);
+  });
 });

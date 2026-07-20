@@ -133,7 +133,11 @@ function appendSuiteStep(
     });
   }
   const yamlSeq = seq;
-  if (yamlSeq.items.some((item) => isDeepStrictEqual(yamlNodeToJson(item), step))) {
+  if (
+    yamlSeq.items.some((item) =>
+      isDeepStrictEqual(normalizeSignedZero(yamlNodeToJson(item)), normalizeSignedZero(step)),
+    )
+  ) {
     currentLogger().info?.({
       evt: 'cli.suite.add.duplicate_step',
       suite: suiteName,
@@ -152,6 +156,17 @@ function yamlNodeToJson(item: unknown): unknown {
     return (item as { toJSON(): unknown }).toJSON();
   }
   return item;
+}
+
+function normalizeSignedZero(value: unknown): unknown {
+  if (typeof value === 'number') return Object.is(value, -0) ? 0 : value;
+  if (Array.isArray(value)) return value.map(normalizeSignedZero);
+  if (value === null || typeof value !== 'object') return value;
+  const prototype = Reflect.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [key, normalizeSignedZero(nested)]),
+  );
 }
 
 function readOrCreateDocument(configPath: string): YAMLDocument {
