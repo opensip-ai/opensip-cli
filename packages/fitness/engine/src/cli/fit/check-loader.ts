@@ -139,6 +139,14 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
   const scope = currentScope();
   const registry = scope?.capabilities;
   if (!registry?.hasDomain('fit-pack')) return [];
+  // The fit-pack capability load is memoized on ONE canonical key: the scope's
+  // resolved project root. The host bootstrap driver (loadOwningToolCapabilities)
+  // loads under that same key in its pre-action phase, so this engine-side call
+  // observes the host's load and no-ops instead of re-loading under a divergent
+  // anchor (`opts.cwd`, e.g. `.`) — the two-path / two-key split that made the
+  // in-process and dispatched (external) fit surfaces diverge. Falls back to the
+  // passed dir only for programmatic use with no host-built scope.
+  const canonicalKey = scope?.projectContext?.projectRoot ?? projectDir;
   const descriptor = registry.getDomain('fit-pack')?.discovery;
   const preferences =
     descriptor === undefined
@@ -160,12 +168,12 @@ async function loadFitCheckPackages(projectDir: string): Promise<readonly string
       ? (pkg: SelectedCapabilityPackage): CapabilityPackageAdmission =>
           admit(descriptor, pkg, explicitPackages)
       : undefined;
-  const errors = registry.isDomainLoaded('fit-pack', projectDir)
+  const errors = registry.isDomainLoaded('fit-pack', canonicalKey)
     ? registry.domainLoadErrors('fit-pack')
     : await loadCapabilityDomain({
         registry,
         domainId: 'fit-pack',
-        projectDir,
+        projectDir: canonicalKey,
         cliDir: cliInstallDir(),
         preferences,
         ...(shouldLoadPackage === undefined ? {} : { shouldLoadPackage }),

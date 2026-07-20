@@ -10,7 +10,7 @@
  */
 
 import { isSignalEnvelope } from '@opensip-cli/contracts';
-import { type CommandSpec, type ToolCliContext } from '@opensip-cli/core';
+import { currentScope, type CommandSpec, type ToolCliContext } from '@opensip-cli/core';
 
 import { dispatchOutput } from '../commands/mount-command-spec.js';
 
@@ -61,6 +61,14 @@ export async function replayResult(
   ctx: DispatchHostCtx,
   invocation: ReplayContext,
 ): Promise<void> {
+  // Fold the worker run's diagnostics into the HOST bus BEFORE any output is
+  // assembled — `dispatchOutput` → assemble-outcome → `withDiagnostics` snapshots
+  // the host bus, so ingesting here is what surfaces a worker-side capability
+  // decision (0-of-N routed, denied pack, foreign-core skip) in `--json`
+  // diagnostics. Without this the dispatched half of the run is invisible.
+  if (result.diagnostics !== undefined) {
+    currentScope()?.diagnostics.ingest(result.diagnostics, 'worker');
+  }
   // Stage host evidence before any replayed output can mutate or throw. The
   // run-plane validates/captures only a real SignalEnvelope from these bounded
   // worker-return candidates.

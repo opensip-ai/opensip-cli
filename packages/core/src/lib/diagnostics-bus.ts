@@ -126,6 +126,28 @@ export class DiagnosticsBus {
   }
 
   /**
+   * Fold a snapshot produced by ANOTHER bus into this one — the seam that carries
+   * a dispatched worker's lifecycle events + metrics back into the host run so a
+   * `--json` consumer sees the WHOLE run, not just the host half. Without this a
+   * worker-side decision (a capability domain that routed 0-of-N packs, a denied
+   * pack, a foreign-core skip) is recorded only in the worker's bus and dies with
+   * the worker process — invisible to the operator and to the outcome diagnostics.
+   *
+   * Each ingested event is re-stamped with `data.origin` (default `'worker'`) so
+   * host and worker events stay distinguishable in the merged stream; metrics are
+   * summed under a namespaced key so worker counters never silently overwrite the
+   * host's. Idempotency is the caller's responsibility (ingest a snapshot once).
+   */
+  ingest(snapshot: RunDiagnostics, origin = 'worker'): void {
+    for (const event of snapshot.events) {
+      this.emit({ ...event, data: { ...event.data, origin } });
+    }
+    for (const [name, value] of Object.entries(snapshot.metrics ?? {})) {
+      this.counter(`${origin}.${name}`, value);
+    }
+  }
+
+  /**
    * Materialize the JSON-emittable snapshot carried on a `CommandOutcome`. Pure
    * read: copies the event stream + metrics and bridges the active OTEL trace.
    */

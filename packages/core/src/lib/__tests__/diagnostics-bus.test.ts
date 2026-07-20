@@ -134,4 +134,54 @@ describe('DiagnosticsBus', () => {
       });
     });
   });
+
+  describe('ingest', () => {
+    it("folds another bus's snapshot in, stamping data.origin and namespacing metrics", () => {
+      const host = new DiagnosticsBus('host_run');
+      host.event('load', 'info', 'host loaded');
+      host.counter('plugins.loaded', 3);
+
+      const worker = new DiagnosticsBus('worker_run');
+      worker.event('load', 'warn', "capability domain 'fit-pack' loaded 0 contribution(s)", {
+        domainId: 'fit-pack',
+        routed: 0,
+      });
+      worker.counter('plugins.loaded', 5);
+
+      host.ingest(worker.snapshot());
+
+      const snap = host.snapshot();
+      expect(snap.events.map((e) => e.message)).toEqual([
+        'host loaded',
+        "capability domain 'fit-pack' loaded 0 contribution(s)",
+      ]);
+      // Host events keep no origin; ingested worker events are tagged.
+      expect(snap.events[0].data?.origin).toBeUndefined();
+      expect(snap.events[1].data).toMatchObject({
+        domainId: 'fit-pack',
+        routed: 0,
+        origin: 'worker',
+      });
+      // Worker metrics are namespaced, never overwriting the host counter.
+      expect(snap.metrics).toMatchObject({
+        'plugins.loaded': 3,
+        'worker.plugins.loaded': 5,
+      });
+    });
+
+    it('honors a custom origin label', () => {
+      const host = new DiagnosticsBus('h');
+      const shard = new DiagnosticsBus('s');
+      shard.event('load', 'debug', 'shard done');
+      host.ingest(shard.snapshot(), 'shard-3');
+      expect(host.snapshot().events[0].data?.origin).toBe('shard-3');
+    });
+
+    it('is a no-op for an empty snapshot', () => {
+      const host = new DiagnosticsBus('h');
+      host.ingest(new DiagnosticsBus('empty').snapshot());
+      expect(host.snapshot().events).toEqual([]);
+      expect(host.snapshot().metrics).toBeUndefined();
+    });
+  });
 });

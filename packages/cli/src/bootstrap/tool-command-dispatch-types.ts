@@ -34,6 +34,7 @@
 import type {
   CliDiagnostic,
   CommandOutputMode,
+  RunDiagnostics,
   ToolSessionContribution,
   ToolSource,
 } from '@opensip-cli/core';
@@ -217,6 +218,17 @@ export interface ToolCommandResult {
    * return).
    */
   readonly returned?: unknown;
+  /**
+   * The worker run's diagnostics snapshot (`scope.diagnostics.snapshot()`) — its
+   * lifecycle events + metrics, including the capability-domain load results
+   * (routed/error counts, denied packs, foreign-core skips) the worker's OWN
+   * bootstrap produced. The supervisor folds this into the HOST bus during replay
+   * (`DiagnosticsBus.ingest`) so a `--json` consumer sees the whole run, not just
+   * the host half — a worker-side capability decision is no longer invisible.
+   * `undefined` when the worker recorded nothing (or an older worker predates the
+   * field).
+   */
+  readonly diagnostics?: RunDiagnostics;
 }
 
 // ───────────────────────────────────────────────────────────────────────────

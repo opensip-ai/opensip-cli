@@ -107,12 +107,19 @@ export async function loadCapabilityDomain(
   });
 
   let routed = 0;
+  const sourcePackages = new Set<string>();
   for (const contribution of contributions) {
-    if (routeLoadedContribution(registry, domainId, contribution, errors)) routed++;
+    if (routeLoadedContribution(registry, domainId, contribution, errors)) {
+      routed++;
+      sourcePackages.add(contribution.sourcePackage);
+    }
   }
 
   registry.markDomainLoaded(domainId, projectKey, errors);
-  emitLoadedEvent(domainId, routed, errors);
+  emitLoadedEvent(domainId, routed, errors, {
+    cliDir,
+    packages: [...sourcePackages].sort(),
+  });
   return errors;
 }
 
@@ -191,13 +198,31 @@ function formatDiscoveryError(domainId: string, diagnostic: CapabilityDiscoveryD
  * scope-owned diagnostics bus (the single vocabulary that replaces the three
  * per-domain event sets). No-op when there is no active scope (a programmatic
  * call outside `runWithScope`).
+ *
+ * The event carries the resolving `anchor` (cliDir) and the distinct
+ * `packages` routed, so two loads of the SAME domain that resolve a different
+ * pack set (the in-process host-seeded load vs a dispatched-worker load) are
+ * directly comparable in `--json` diagnostics — the divergence names itself
+ * instead of requiring a bisect.
  */
-function emitLoadedEvent(domainId: string, routed: number, errors: readonly string[]): void {
+function emitLoadedEvent(
+  domainId: string,
+  routed: number,
+  errors: readonly string[],
+  resolution: { readonly cliDir?: string; readonly packages: readonly string[] },
+): void {
   currentScope()?.diagnostics.event(
     'load',
     errors.length > 0 ? 'warn' : 'info',
-    `capability domain '${domainId}' loaded ${String(routed)} contribution(s)` +
+    `capability domain '${domainId}' loaded ${String(routed)} contribution(s) from ${String(resolution.packages.length)} pack(s)` +
       (errors.length > 0 ? `, ${String(errors.length)} error(s)` : ''),
-    { domainId, routed, errors: errors.length },
+    {
+      domainId,
+      routed,
+      errors: errors.length,
+      packageCount: resolution.packages.length,
+      packages: resolution.packages,
+      ...(resolution.cliDir === undefined ? {} : { anchor: resolution.cliDir }),
+    },
   );
 }

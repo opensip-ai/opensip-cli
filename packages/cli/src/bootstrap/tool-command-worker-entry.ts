@@ -56,6 +56,7 @@ import {
 
 import { type CliCommandsContext } from '../commands/shared.js';
 
+import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { runDeepConfigPass } from './tool-command-worker-config-pass.js';
 import { buildWorkerContext, type ResultAccumulator } from './tool-command-worker-context.js';
 import {
@@ -208,6 +209,25 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
   // throw becomes a structured `tool-handler-throw` via the outer catch.
   await runWorkerInitialize(tool);
 
+  // Drive the DISPATCHED tool's capability domains here, worker-side, with the
+  // SAME host-seeded resolution the in-process path uses. The worker bootstraps
+  // the host `__tool-command-worker` subcommand (owned by NO tool), so the
+  // pre-action `owning-capability-load` phase drove nothing for the dispatched
+  // tool — leaving the tool's own lazy loader (e.g. fitness `ensureChecksLoaded`)
+  // to fall through to auto-discovery under a divergent anchor, which resolved a
+  // DIFFERENT pack set than the host's seeded load (the bundled≡installed check-
+  // surface divergence). Loading here, keyed on the canonical project root, makes
+  // the host driver the single authoritative capability loader on both paths;
+  // the tool's lazy loader then observes the domain already loaded and no-ops.
+  const workerProjectDir =
+    currentScope()?.projectContext?.projectRoot ??
+    (typeof spec.opts.cwd === 'string' ? spec.opts.cwd : '');
+  await loadOwningToolCapabilities({
+    owningTool: tool,
+    projectDir: workerProjectDir,
+    pluginsConfig: currentScope()?.configDocument?.plugins ?? {},
+  });
+
   // The host-RPC upcall client over the live IPC channel (M4-C). `process` is the
   // duplex: requests post via `process.send`; replies arrive on
   // `process.on('message')`. Disposed in the finally so the listener is removed.
@@ -337,23 +357,40 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
   const spec = readSpec(specPath);
   if ('kind' in spec) return spec; // bad-spec error message
   try {
-    return await runLoadedCommand(spec);
+    return stampWorkerDiagnostics(await runLoadedCommand(spec));
   } catch (error) {
-    return errorMessage(
-      error instanceof Error ? error.message : String(error),
-      classifyThrow(error),
-      error instanceof Error ? error.stack : undefined,
-      // Carry the canonical exit-class code for a typed ToolError so the host
-      // rebuilds the right subclass (NotFound → 3, Network → 4, …) instead of the
-      // SystemError → exit 1 fallthrough. ConfigurationError ALSO rides
-      // `failureClass: 'config-invalid'` above; this carry generalizes the rest.
-      error instanceof ToolError ? canonicalToolErrorCode(error) : undefined,
-      // Keep the stable subcode separate from the canonical class. In particular,
-      // ADR-0145's direct-datastore denial must remain machine-identifiable after
-      // the worker boundary.
-      error instanceof ToolError ? error.code : undefined,
+    return stampWorkerDiagnostics(
+      errorMessage(
+        error instanceof Error ? error.message : String(error),
+        classifyThrow(error),
+        error instanceof Error ? error.stack : undefined,
+        // Carry the canonical exit-class code for a typed ToolError so the host
+        // rebuilds the right subclass (NotFound → 3, Network → 4, …) instead of the
+        // SystemError → exit 1 fallthrough. ConfigurationError ALSO rides
+        // `failureClass: 'config-invalid'` above; this carry generalizes the rest.
+        error instanceof ToolError ? canonicalToolErrorCode(error) : undefined,
+        // Keep the stable subcode separate from the canonical class. In particular,
+        // ADR-0145's direct-datastore denial must remain machine-identifiable after
+        // the worker boundary.
+        error instanceof ToolError ? error.code : undefined,
+      ),
     );
   }
+}
+
+/**
+ * Attach the worker run's diagnostics snapshot to the terminal result message so
+ * the host can fold it into its own bus (observability parity, this ADR): a
+ * worker-side capability decision (a domain that routed 0-of-N packs, a denied
+ * pack, a foreign-core skip) reaches the operator's `--json` diagnostics instead
+ * of dying with the worker. The error IPC arm carries its own structured
+ * message/stack; result diagnostics are the observability-critical path.
+ */
+function stampWorkerDiagnostics(msg: DispatchWorkerMessage): DispatchWorkerMessage {
+  if (msg.kind !== 'result') return msg;
+  const diagnostics = currentScope()?.diagnostics.snapshot();
+  if (diagnostics === undefined) return msg;
+  return { ...msg, value: { ...msg.value, diagnostics } };
 }
 
 /**
