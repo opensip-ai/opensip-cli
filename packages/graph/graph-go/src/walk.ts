@@ -182,9 +182,8 @@ function pushImportSpec(
   ownerHash: string,
   out: DependencySiteRecord[],
 ): void {
-  // The `path` field is an interpreted_string_literal. Its `text` is the
-  // quoted form (`"fmt"`); strip outer quotes to get the raw specifier.
-  const pathNode = spec.childForFieldName('path') ?? findInterpretedString(spec);
+  // Go's ImportPath production accepts either form of string literal.
+  const pathNode = spec.childForFieldName('path') ?? findImportString(spec);
   if (!pathNode) return;
   const specifier = unquoteGoStringLiteral(pathNode.text);
   if (specifier === null) return;
@@ -198,21 +197,21 @@ function pushImportSpec(
   });
 }
 
-function findInterpretedString(node: Node): Node | null {
+function findImportString(node: Node): Node | null {
   /* v8 ignore start */
   for (const child of namedChildrenOf(node)) {
-    if (child.type === 'interpreted_string_literal') return child;
+    if (child.type === 'interpreted_string_literal' || child.type === 'raw_string_literal') {
+      return child;
+    }
   }
   return null;
   /* v8 ignore stop */
 }
 
 function unquoteGoStringLiteral(text: string): string | null {
-  // Go import paths are always interpreted strings — wrapped in `"…"`
-  // with no escape sequences relevant to module paths. (Raw `\`…\``
-  // strings are NOT valid in import declarations per the Go spec.)
   if (text.length < 2) return null;
   if (text.startsWith('"') && text.endsWith('"')) return text.slice(1, -1);
+  if (text.startsWith('`') && text.endsWith('`')) return text.slice(1, -1).replaceAll('\r', '');
   /* v8 ignore next */
   return null;
 }

@@ -98,14 +98,12 @@ describe('graph-go branch coverage (round 2)', () => {
     expect(bar?.enclosingClass).toBe('Foo');
   });
 
-  it('ignores an import whose path is a raw string literal (backtick)', () => {
-    // A backtick-quoted import path is not a valid interpreted string,
-    // so unquoteGoStringLiteral returns null and pushImportSpec bails out
-    // via the `specifier === null` branch — no dependency site emitted.
+  it('emits an import whose path is a raw string literal (backtick)', () => {
+    // Go's ImportPath grammar accepts any string_lit, including raw strings.
     writeFileSync(join(dir, 'main.go'), 'package main\nimport `fmt`\nfunc main() {}\n', 'utf8');
     const out = walk();
-    // The malformed raw-string import yields zero dependency sites.
-    expect(out.dependencySites).toEqual([]);
+    expect(out.dependencySites).toHaveLength(1);
+    expect(out.dependencySites[0]?.specifier).toBe('fmt');
     // The walker still produces the module-init for the file.
     const moduleInits = Object.keys(out.occurrences).filter((n) => n.startsWith('<module-init:'));
     expect(moduleInits.length).toBe(1);

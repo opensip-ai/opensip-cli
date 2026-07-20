@@ -61,12 +61,9 @@ function decodeReceiverTypeNode(node: Node): string | null {
 }
 
 export function classifyVisibility(name: string): FunctionOccurrence['visibility'] {
-  // Go visibility is determined by the first character's case. The
-  // primary check is "is the first character an uppercase ASCII letter".
-  // Unicode-case rules also count per the Go spec, but ASCII covers the
-  // overwhelming majority of real-world Go.
-  const first = name.charAt(0);
-  if (first >= 'A' && first <= 'Z') return 'exported';
+  // The Go spec defines an exported identifier by Unicode general
+  // category Lu, not only by the ASCII A-Z range.
+  if (/^\p{Lu}/u.test(name)) return 'exported';
   return 'module-local';
 }
 

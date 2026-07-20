@@ -100,6 +100,12 @@ describe('graph-go walk.ts', () => {
     expect(walk.occurrences.unexported?.[0]?.visibility).toBe('module-local');
   });
 
+  it('classifies Unicode uppercase identifiers as exported', () => {
+    writeFileSync(join(dir, 'main.go'), `package main\nfunc Ärger() {}\n`, 'utf8');
+    const walk = run(dir);
+    expect(walk.occurrences['Ärger']?.[0]?.visibility).toBe('exported');
+  });
+
   it('flags _test.go files as inTestFile', () => {
     writeFileSync(join(dir, 'thing_test.go'), `package main\nfunc TestSomething() {}\n`, 'utf8');
     const walk = run(dir);
