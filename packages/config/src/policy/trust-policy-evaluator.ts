@@ -21,11 +21,18 @@ interface DecisionDraft {
   readonly sourceTier: TrustPolicySourceTier | 'none';
 }
 
+interface EffectiveMode {
+  readonly value: 'default' | 'strict';
+  readonly sourceTier: TrustPolicySourceTier;
+}
+
 function effectiveMode(
   policy: ResolvedTrustPolicy,
   request: PolicyEvaluationRequest,
-): 'default' | 'strict' {
-  return request.evidence?.ci === true && policy.ci === 'strict' ? 'strict' : policy.mode;
+): EffectiveMode {
+  return request.evidence?.ci === true && policy.ci === 'strict'
+    ? { value: 'strict', sourceTier: policy.ciSourceTier ?? 'builtin' }
+    : { value: policy.mode, sourceTier: policy.modeSourceTier ?? 'builtin' };
 }
 
 function unexpired(exception: ResolvedTrustPolicyException, now: Date): boolean {
@@ -98,7 +105,7 @@ function exceptionDecision(
 
 function executableDecision(
   request: PolicyEvaluationRequest,
-  mode: 'default' | 'strict',
+  mode: EffectiveMode,
   baseReasons: readonly string[],
 ): DecisionDraft {
   const status = provenanceStatus(request);
@@ -109,10 +116,11 @@ function executableDecision(
   if (isVerified(request)) {
     return allow(baseReasons, 'verified first-party or signed provenance');
   }
-  if (mode === 'strict') {
+  if (mode.value === 'strict') {
     return deny(
       baseReasons,
       `strict mode requires verified provenance or an unexpired exception for ${subject}`,
+      mode.sourceTier,
     );
   }
   return {
@@ -124,18 +132,22 @@ function executableDecision(
         : 'provenance unavailable; default mode preserves local trust behavior',
     ],
     matchedExceptionIds: [],
-    sourceTier: 'builtin',
+    sourceTier: mode.sourceTier,
   };
 }
 
 function guardedActionDecision(
   action: string,
-  mode: 'default' | 'strict',
+  mode: EffectiveMode,
   baseReasons: readonly string[],
 ): DecisionDraft {
-  return mode === 'strict'
-    ? deny(baseReasons, `strict mode requires an unexpired exception for ${action}`)
-    : allow(baseReasons, `${action} allowed in default mode`);
+  return mode.value === 'strict'
+    ? deny(
+        baseReasons,
+        `strict mode requires an unexpired exception for ${action}`,
+        mode.sourceTier,
+      )
+    : allow(baseReasons, `${action} allowed in default mode`, mode.sourceTier);
 }
 
 function defaultActionDecision(action: string, baseReasons: readonly string[]): DecisionDraft {
@@ -149,7 +161,7 @@ function defaultActionDecision(action: string, baseReasons: readonly string[]): 
 
 function actionDecision(
   request: PolicyEvaluationRequest,
-  mode: 'default' | 'strict',
+  mode: EffectiveMode,
   baseReasons: readonly string[],
 ): DecisionDraft {
   if (isExecutableLoad(request.subject, request.action)) {
@@ -171,21 +183,29 @@ function applyOptionalOrgCondition(
   return { ...draft, outcome: 'allow-with-conditions' };
 }
 
-function allow(baseReasons: readonly string[], reason: string): DecisionDraft {
+function allow(
+  baseReasons: readonly string[],
+  reason: string,
+  sourceTier: TrustPolicySourceTier = 'builtin',
+): DecisionDraft {
   return {
     outcome: 'allow',
     reasons: [...baseReasons, reason],
     matchedExceptionIds: [],
-    sourceTier: 'builtin',
+    sourceTier,
   };
 }
 
-function deny(baseReasons: readonly string[], reason: string): DecisionDraft {
+function deny(
+  baseReasons: readonly string[],
+  reason: string,
+  sourceTier: TrustPolicySourceTier = 'builtin',
+): DecisionDraft {
   return {
     outcome: 'deny',
     reasons: [...baseReasons, reason],
     matchedExceptionIds: [],
-    sourceTier: 'builtin',
+    sourceTier,
   };
 }
 
@@ -224,13 +244,15 @@ function buildDecision(
     reasons: draft.reasons,
     exceptionIds: draft.matchedExceptionIds,
     metadata: sanitizeMetadata({
+      // Evidence is caller-supplied and may contain arbitrary diagnostic keys.
+      // Apply it first so it cannot forge the authoritative policy fields.
+      ...request.evidence,
       subjectKind: request.subject.kind,
       provenanceStatus: status,
-      policyMode: effectiveMode(policy, request),
-      ...(resourceDecision === undefined ? {} : { resourceDecision }),
+      policyMode: effectiveMode(policy, request).value,
+      resourceDecision,
       sourceTiers: policy.sourceTiers,
       orgStatus: policy.orgStatus.state,
-      ...request.evidence,
     }),
   };
   return {

@@ -35,6 +35,46 @@ describe('evaluateTrustPolicy', () => {
 
     expect(decision.outcome).toBe('deny');
     expect(decision.reasons.join(' ')).toContain('strict mode requires verified provenance');
+    expect(decision.auditEvent.sourceTier).toBe('project');
+  });
+
+  it('attributes CI-mode decisions to the tier that supplied the CI policy', () => {
+    const policy = resolveTrustPolicySources(
+      [
+        { tier: 'org', policy: { mode: 'default' } },
+        { tier: 'project', policy: { ci: 'strict' } },
+      ],
+      NOW,
+    );
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'baseline', id: 'fit' },
+      action: 'baseline-save',
+      evidence: { ci: true },
+      now: NOW,
+    });
+
+    expect(decision.outcome).toBe('deny');
+    expect(decision.auditEvent.sourceTier).toBe('project');
+  });
+
+  it('keeps legacy resolved-policy objects auditable when scalar provenance is absent', () => {
+    const resolved = resolveTrustPolicySources([], NOW);
+    const legacy = {
+      mode: resolved.mode,
+      ci: resolved.ci,
+      exceptions: resolved.exceptions,
+      org: resolved.org,
+      orgStatus: resolved.orgStatus,
+      sourceTiers: resolved.sourceTiers,
+      capabilityGrants: resolved.capabilityGrants,
+    };
+    const decision = evaluateTrustPolicy(legacy, {
+      subject: { kind: 'baseline', id: 'fit' },
+      action: 'baseline-save',
+      now: NOW,
+    });
+
+    expect(decision.auditEvent.sourceTier).toBe('builtin');
   });
 
   it('allows a strict-mode action with an unexpired exact exception', () => {
@@ -253,5 +293,35 @@ describe('evaluateTrustPolicy', () => {
       { resource: 'filesystem', scope: 'src/**' },
       { resource: 'subprocess', reason: 'run scanner' },
     ]);
+  });
+
+  it('does not let arbitrary evidence forge authoritative audit metadata', () => {
+    const policy = resolveTrustPolicySources(
+      [{ tier: 'project', policy: { mode: 'strict' } }],
+      NOW,
+    );
+    const decision = evaluateTrustPolicy(policy, {
+      subject: { kind: 'installed-tool', id: 'demo' },
+      action: 'load',
+      evidence: {
+        legacyTrusted: true,
+        provenanceStatus: 'unavailable',
+        subjectKind: 'baseline',
+        policyMode: 'default',
+        sourceTiers: ['forged'],
+        orgStatus: 'forged',
+        resourceDecision: { isolation: 'host' },
+      },
+      now: NOW,
+    });
+
+    expect(decision.auditEvent.metadata).toMatchObject({
+      subjectKind: 'installed-tool',
+      provenanceStatus: 'unavailable',
+      policyMode: 'strict',
+      sourceTiers: ['builtin', 'project'],
+      orgStatus: 'available',
+    });
+    expect(decision.auditEvent.metadata).not.toHaveProperty('resourceDecision');
   });
 });

@@ -170,7 +170,11 @@ export type OrgPolicyStatus =
 
 export interface ResolvedTrustPolicy {
   readonly mode: 'default' | 'strict';
+  /** Tier that supplied the effective `mode` scalar. */
+  readonly modeSourceTier?: TrustPolicySourceTier;
   readonly ci: 'default' | 'strict';
+  /** Tier that supplied the effective `ci` scalar. */
+  readonly ciSourceTier?: TrustPolicySourceTier;
   readonly exceptions: readonly ResolvedTrustPolicyException[];
   readonly org: Required<TrustPolicyOrgConfig>;
   readonly orgStatus: OrgPolicyStatus;
