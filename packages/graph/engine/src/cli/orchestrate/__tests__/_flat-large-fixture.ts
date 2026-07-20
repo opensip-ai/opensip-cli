@@ -17,7 +17,7 @@
  *     are byte-identical file-by-file.
  *   - **Warm-safe.** If `targetDir` already exists the generator returns
  *     `{ skipped: true }` and touches NOTHING — the fragment cache's
- *     files-fingerprint is mtime+size, so a rewrite would silently destroy
+ *     files-fingerprint is mtime+ctime+size, so a rewrite would silently destroy
  *     every warm measurement. Callers wanting a fresh fixture remove the
  *     directory first.
  *   - **Acyclic by construction.** Every import targets a LOWER-indexed

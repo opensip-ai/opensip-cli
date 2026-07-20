@@ -6,7 +6,7 @@
  *       file-by-file;
  *   (b) warm-safety — re-invoking on an existing dir is a strict no-op
  *       (`skipped: true`, mtimes unchanged — the fragment cache fingerprint
- *       is mtime+size, so any rewrite would poison warm measurements);
+ *       is mtime+ctime+size, so any rewrite would poison warm measurements);
  *   (c) resolvable imports — every emitted relative specifier resolves to a
  *       generated file;
  *   (d) misalignment — each `src/dN` directory mixes files from more than

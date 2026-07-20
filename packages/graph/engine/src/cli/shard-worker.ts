@@ -28,7 +28,7 @@ import {
   TENANT_OTEL_ATTR,
 } from '@opensip-cli/core';
 
-import { computeFilesFingerprint } from '../cache/invalidate.js';
+import { buildAgainstStableFiles } from '../cache/stable-files-build.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
 
 import { spanRunStage } from './graph-tracer.js';
@@ -213,22 +213,27 @@ async function buildShard(
   // propagates into this worker's env (extracted at the CLI boundary by
   // initTelemetry). No live view here — the worker is headless — so no
   // progress/monitor plumbing.
-  const built = await buildAndResolveCatalog({
-    runStage: spanRunStage(shardSpanAttrs(correlation)),
-    adapter,
-    discovery,
-    resolutionMode,
-    emitBoundaryCalls: true,
-    // Stamp this fragment's cacheKey with `mode=sharded` so it matches what
-    // `planShardWork` compares against (loadValidShardFragment) and never
-    // collides with a single-program (exact) catalog row.
-    engineMode: 'sharded',
+  const stableBuild = await buildAgainstStableFiles({
+    files: shard.files,
+    build: async () =>
+      await buildAndResolveCatalog({
+        runStage: spanRunStage(shardSpanAttrs(correlation)),
+        adapter,
+        discovery,
+        resolutionMode,
+        emitBoundaryCalls: true,
+        // Stamp this fragment's cacheKey with `mode=sharded` so it matches what
+        // `planShardWork` compares against (loadValidShardFragment) and never
+        // collides with a single-program (exact) catalog row.
+        engineMode: 'sharded',
+      }),
   });
+  const built = stableBuild.value;
 
   return {
     shardId: shard.id,
     fragment: built.catalog,
-    fingerprint: computeFilesFingerprint(shard.files),
+    fingerprint: stableBuild.filesFingerprint,
     boundaryCalls: built.boundaryCalls ?? [],
     parseErrors: built.parseErrors,
   };

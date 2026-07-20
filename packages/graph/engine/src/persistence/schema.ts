@@ -55,7 +55,7 @@ export const graphCatalog = sqliteTable('graph_catalog', {
  * serialized `ShardBuildResult` (fragment + boundary calls + parse
  * errors). A fragment is valid for incremental reuse only when BOTH its
  * `cache_key` (the shard's tsconfig/version/mode key) and its
- * `shard_fingerprint` (mtime+size over the shard's files) match the
+ * `shard_fingerprint` (nanosecond mtime+ctime+size over the shard's files) match the
  * current run — the same validity discipline as the full-catalog path.
  * On a rebuild, shards whose fingerprint matches load their fragment with
  * no parse; only changed shards re-run a worker.

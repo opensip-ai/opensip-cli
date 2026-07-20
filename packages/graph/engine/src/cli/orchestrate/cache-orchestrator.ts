@@ -10,6 +10,7 @@
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { classifyCatalog, computeFilesFingerprint } from '../../cache/invalidate.js';
+import { buildAgainstStableFiles } from '../../cache/stable-files-build.js';
 
 import { catalogBuildCoverage } from './catalog-build-coverage.js';
 import {
@@ -71,11 +72,13 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
       resolutionMode: input.resolutionMode,
     }),
   );
+  const initialFilesFingerprint = computeFilesFingerprint(input.discovery.files);
   const verdict = cachedCatalog
     ? classifyCatalog(cachedCatalog, {
         currentLanguage: input.adapter.id,
         currentCacheKey,
         currentFiles: input.discovery.files,
+        currentFilesFingerprint: initialFilesFingerprint,
       })
     : ({ kind: 'invalid', reason: 'no-cache' } as const);
 
@@ -87,38 +90,42 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
     }
     return { catalog: cachedCatalog, cacheHit: true, resolutionStats: null };
   }
-  const built =
-    verdict.kind === 'incremental' && cachedCatalog
-      ? await buildAndResolveCatalogIncremental({
-          runStage: input.runStage,
-          adapter: input.adapter,
-          discovery: input.discovery,
-          cachedCatalog,
-          changedFilesAbs: verdict.changedFiles,
-          resolutionMode: input.resolutionMode,
-          onProgress: input.onProgress,
-          monitor: input.monitor,
-          emitBoundaryCalls: true,
-        })
-      : await buildAndResolveCatalog({
-          runStage: input.runStage,
-          adapter: input.adapter,
-          discovery: input.discovery,
-          resolutionMode: input.resolutionMode,
-          onProgress: input.onProgress,
-          monitor: input.monitor,
-          emitBoundaryCalls: true,
-        });
+  const stableBuild = await buildAgainstStableFiles({
+    files: input.discovery.files,
+    initialFingerprint: initialFilesFingerprint,
+    build: async (attempt) => {
+      const useIncremental =
+        attempt === 0 && verdict.kind === 'incremental' && cachedCatalog !== null;
+      const built = useIncremental
+        ? await buildAndResolveCatalogIncremental({
+            runStage: input.runStage,
+            adapter: input.adapter,
+            discovery: input.discovery,
+            cachedCatalog,
+            changedFilesAbs: verdict.changedFiles,
+            resolutionMode: input.resolutionMode,
+            onProgress: input.onProgress,
+            monitor: input.monitor,
+            emitBoundaryCalls: true,
+          })
+        : await buildAndResolveCatalog({
+            runStage: input.runStage,
+            adapter: input.adapter,
+            discovery: input.discovery,
+            resolutionMode: input.resolutionMode,
+            onProgress: input.onProgress,
+            monitor: input.monitor,
+            emitBoundaryCalls: true,
+          });
 
-  // ONE resolution model (Phase 3, Option A): the single-program (exact) catalog
-  // IS the whole/merged catalog, so run the SAME cross-shard linker the sharded
-  // engine runs post-merge over its syntactic boundary calls. This converges the
-  // two engines — exact is the 1-shard case — resolving the cross-package call
-  // sites exact's type-checker-driven inline pass captures inconsistently (it
-  // only fires where `getSymbolAtLocation` succeeds and the reference kind
-  // dispatches; the syntactic boundary extractor captures every imported call
-  // site). The extractor already skips sites resolved inline, so no double edge.
-  const recovered = recoverExactBoundaryEdges(built, input.discovery.files, input.projectRoot);
+      // ONE resolution model (Phase 3, Option A): the single-program (exact)
+      // catalog IS the whole/merged catalog, so run the SAME cross-shard linker
+      // the sharded engine runs post-merge over its syntactic boundary calls.
+      const recovered = recoverExactBoundaryEdges(built, input.discovery.files, input.projectRoot);
+      return { built, recovered, useIncremental };
+    },
+  });
+  const { built, recovered, useIncremental } = stableBuild.value;
 
   // Stamp packages (nearest package.json), then drop name-guessed edges that
   // contradict the import graph. Order matters: the constraint reads the
@@ -126,7 +133,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
   const catalog: Catalog = stampAndConstrainPackages(
     {
       ...recovered,
-      filesFingerprint: computeFilesFingerprint(input.discovery.files),
+      filesFingerprint: stableBuild.filesFingerprint,
       // Provenance for freshness verification — only stamped on actual rebuilds;
       // legacy cache hits above return byte-unchanged.
       adapterSelection: input.adapterSelection,
@@ -135,7 +142,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
         projectRoot: input.projectRoot,
         files: input.discovery.files,
         parseErrors: built.parseErrors,
-        status: verdict.kind === 'incremental' ? 'partial' : 'complete',
+        status: useIncremental ? 'partial' : 'complete',
       }),
     },
     input.projectRoot,

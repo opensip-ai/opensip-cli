@@ -6,7 +6,7 @@
  * `tsConfigPath` fields.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -126,6 +126,18 @@ describe('computeFilesFingerprint', () => {
     writeFileSync(f, 'one-and-two', 'utf8');
     const fp2 = computeFilesFingerprint([f]);
     expect(fp1).not.toBe(fp2);
+  });
+
+  it('changes after a same-size rewrite whose mtime is restored', () => {
+    const f = join(dir, 'a.ts');
+    writeFileSync(f, 'before', 'utf8');
+    const original = statSync(f);
+    const fp1 = computeFilesFingerprint([f]);
+
+    writeFileSync(f, 'after!', 'utf8');
+    utimesSync(f, original.atime, original.mtime);
+
+    expect(computeFilesFingerprint([f])).not.toBe(fp1);
   });
 });
 

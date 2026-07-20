@@ -33,11 +33,14 @@ import type { Shard } from '../shard-model.js';
 // same stamped key so a no-change rerun is a clean cache hit.
 const STAMPED_KEY = stampEngineVersion('key-none', 'sharded');
 const WORKER_SCRIPT = String.raw`
-const { readFileSync } = require('node:fs');
+const { existsSync, readFileSync, statSync, writeFileSync } = require('node:fs');
 const spec = JSON.parse(readFileSync(process.argv[3], 'utf8'));
 const id = spec.shard.id;
 if (id.startsWith('fail:')) { process.stderr.write('boom\n'); process.exit(2); }
-const name = id.replace(/[^a-zA-Z0-9]/g, '_');
+const files = spec.shard.files;
+const name = id === 'race:source'
+  ? readFileSync(files[0], 'utf8')
+  : id.replace(/[^a-zA-Z0-9]/g, '_');
 const occ = {
   bodyHash: 'h-' + id, simpleName: name, qualifiedName: id + '.' + name,
   filePath: id + '/index.ts', line: 1, column: 0, endLine: 1,
@@ -49,12 +52,21 @@ const occ = {
 // is a clean cache hit: cacheKey mirrors adapter.cacheKey (configPathAbs
 // is undefined here → 'key-none'); the fingerprint is computed over the
 // shard's own file list exactly as planShardWork does.
-const { statSync } = require('node:fs');
-const files = spec.shard.files;
 const parts = [String(files.length)];
 for (const f of files) {
-  try { const st = statSync(f); parts.push(f + '|' + String(st.mtimeMs) + '|' + String(st.size)); }
+  try {
+    const st = statSync(f, { bigint: true });
+    parts.push(f + '|' + String(st.mtimeNs) + '|' + String(st.ctimeNs) + '|' + String(st.size));
+  }
   catch { parts.push(f + '|missing'); }
+}
+// Deterministic parent/worker race fixture: mutate only after this worker has
+// captured both its parsed occurrence and fragment fingerprint. The parent
+// must discard the stale fragment and rebuild the complete sharded snapshot.
+const raceMarker = spec.projectRoot + '/.race-mutated';
+if (id === 'race:source' && !existsSync(raceMarker)) {
+  writeFileSync(files[0], 'afterVersionLonger', 'utf8');
+  writeFileSync(raceMarker, 'done', 'utf8');
 }
 // Shard ids starting with 'bc:' inject one unresolvable boundary call so the
 // shardStats.boundaryCallSites plumbing can be asserted (ADR-0045).
@@ -136,6 +148,36 @@ describe('runShardedGraph', () => {
     expect(out.signals[0]?.message).toBe('saw 2 functions');
     expect(evaluatedAgainst).not.toBeNull();
     expect(out.resolutionStats.totalCallSites).toBe(0);
+  });
+
+  it('rebuilds when a source changes after a shard worker captures its fingerprint', async () => {
+    const sourceFile = join(dir, 'race-source.ts');
+    writeFileSync(sourceFile, 'beforeVersion', 'utf8');
+    const datastore: DataStore = DataStoreFactory.open({ backend: 'memory' });
+    const repo = new CatalogRepo(datastore);
+    const input = {
+      shards: [{ id: 'race:source', rootDir: dir, files: [sourceFile] }],
+      projectRoot: dir,
+      cliScript,
+      adapter,
+      resolutionMode: 'exact' as const,
+      useCache: true,
+      catalogRepo: repo,
+      rules: [],
+    };
+
+    try {
+      const out = await runShardedGraph(input);
+      expect(out.catalog.functions.afterVersionLonger).toHaveLength(1);
+      expect(out.catalog.functions.beforeVersion).toBeUndefined();
+      expect(repo.loadFullCatalog()?.functions.afterVersionLonger).toHaveLength(1);
+
+      const cached = await runShardedGraph(input);
+      expect(cached.cacheHit).toBe(true);
+      expect(cached.catalog.functions.afterVersionLonger).toHaveLength(1);
+    } finally {
+      datastore.close();
+    }
   });
 
   it('reports per-run shard statistics (ADR-0045 measurement plane)', async () => {

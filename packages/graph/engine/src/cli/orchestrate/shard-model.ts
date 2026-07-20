@@ -110,7 +110,7 @@ export interface ShardBuildResult {
    * could resolve LOCALLY (semantic in exact mode, syntactic in fast).
    */
   readonly fragment: Catalog;
-  /** Per-shard files fingerprint (mtime+size) — the per-shard cache validity key. */
+  /** Per-shard files fingerprint (nanosecond mtime+ctime+size) — the cache validity key. */
   readonly fingerprint: string;
   /**
    * Call sites the worker could not resolve within its own files — the

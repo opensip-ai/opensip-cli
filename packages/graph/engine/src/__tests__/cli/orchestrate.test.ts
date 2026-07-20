@@ -9,7 +9,7 @@
  * branch of `obtainCatalog` is reachable.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -201,6 +201,73 @@ describe('runGraph orchestrator', () => {
       const persisted = new CatalogRepo(datastore).loadFullCatalog();
       expect(persisted).not.toBeNull();
       expect(persisted?.functions.fn?.[0]?.bodyHash).toBe('h-persisted');
+    });
+  });
+
+  it('rebuilds when a source changes after parsing instead of caching stale content', async () => {
+    await inGraphScope(async () => {
+      const sourceDir = join(projectDir, 'src');
+      const sourceFile = join(sourceDir, 'a.ts');
+      mkdirSync(sourceDir, { recursive: true });
+      writeFileSync(sourceFile, 'beforeVersion', 'utf8');
+
+      let parseCount = 0;
+      let resolveCount = 0;
+      const adapter: GraphLanguageAdapter<{ readonly functionName: string }> = {
+        id: 'fake',
+        fileExtensions: ['.ts'],
+        displayName: 'fake',
+        discoverFiles: () => ({
+          projectDirAbs: projectDir,
+          files: [sourceFile],
+        }),
+        parseProject: () => {
+          parseCount += 1;
+          return {
+            project: { functionName: readFileSync(sourceFile, 'utf8') },
+            parseErrors: [],
+          };
+        },
+        walkProject: ({ project }) => ({
+          occurrences: {
+            [project.functionName]: [
+              occurrence({
+                bodyHash: `hash-${project.functionName}`,
+                simpleName: project.functionName,
+              }),
+            ],
+          },
+          callSites: [],
+          parseErrors: [],
+        }),
+        resolveCallSites: () => {
+          resolveCount += 1;
+          if (resolveCount === 1) {
+            writeFileSync(sourceFile, 'afterVersionLonger', 'utf8');
+          }
+          return {
+            edgesByOwner: new Map(),
+            stats: {
+              totalCallSites: 0,
+              resolvedHigh: 0,
+              resolvedMedium: 0,
+              resolvedLow: 0,
+              unresolved: 0,
+            },
+          };
+        },
+        cacheKey: () => 'stable-key',
+      };
+      currentAdapterRegistry().register(adapter);
+
+      const built = await runGraph({ cwd: projectDir, rules: [], datastore });
+      expect(parseCount).toBe(2);
+      expect(built.catalog?.functions.afterVersionLonger).toHaveLength(1);
+      expect(built.catalog?.functions.beforeVersion).toBeUndefined();
+
+      const cached = await runGraph({ cwd: projectDir, rules: [], datastore });
+      expect(cached.cacheHit).toBe(true);
+      expect(cached.catalog?.functions.afterVersionLonger).toHaveLength(1);
     });
   });
 

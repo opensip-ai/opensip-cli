@@ -5,13 +5,14 @@
  *  1. language       — adapter id; mismatch invalidates immediately.
  *  2. cacheKey       — opaque per-adapter invalidation key; mismatch
  *                      invalidates (e.g. TS upgrade or tsconfig change).
- *  3. filesFingerprint — per-file mtime + size agreement; any source
+ *  3. filesFingerprint — per-file mtime + ctime + size agreement; any source
  *                      file change re-runs stages 1+2.
  *
- * Per-file fingerprinting uses mtime + size to keep the cost low.
+ * Per-file fingerprinting uses nanosecond mtime + ctime + size to keep the cost
+ * low while detecting same-size rewrites whose mtime was restored.
  *
  * Wave 4 layered an "incremental" verdict on top: when language +
- * cacheKey agree but some files have changed mtimes, the orchestrator
+ * cacheKey agree but some files have changed metadata, the orchestrator
  * can re-walk only the changed files (plus their transitive edge-
  * dependents) instead of rebuilding everything. See `classifyCatalog`
  * and the orchestrator's incremental path.
@@ -33,6 +34,9 @@ export interface ValidationContext {
   readonly currentLanguage: string;
   readonly currentCacheKey: string;
   readonly currentFiles: readonly string[];
+  /** Optional caller-captured snapshot used to bind cache classification to
+   * the build that follows it. */
+  readonly currentFilesFingerprint?: string;
 }
 
 /**
@@ -88,7 +92,8 @@ export function classifyCatalog(cached: Catalog, ctx: ValidationContext): Catalo
     });
     return { kind: 'invalid', reason: 'no-fingerprint' };
   }
-  const currentFingerprint = computeFilesFingerprint(ctx.currentFiles);
+  const currentFingerprint =
+    ctx.currentFilesFingerprint ?? computeFilesFingerprint(ctx.currentFiles);
   if (cachedFingerprint === currentFingerprint) {
     return { kind: 'valid' };
   }
@@ -102,16 +107,16 @@ export function classifyCatalog(cached: Catalog, ctx: ValidationContext): Catalo
 }
 
 /**
- * Compute a fingerprint over the project's source files. Uses mtime
- * (nanosecond resolution) per file plus the file count; cheap to
- * compute and stable for unchanged trees.
+ * Compute a fingerprint over the project's source files. Uses nanosecond mtime,
+ * ctime, and size per file plus the file count; cheap to compute and stable for
+ * unchanged trees.
  */
 export function computeFilesFingerprint(files: readonly string[]): string {
   const parts: string[] = [String(files.length)];
   for (const f of files) {
     try {
-      const st = statSync(f);
-      parts.push(`${f}|${String(st.mtimeMs)}|${String(st.size)}`);
+      const st = statSync(f, { bigint: true });
+      parts.push(`${f}|${String(st.mtimeNs)}|${String(st.ctimeNs)}|${String(st.size)}`);
     } catch {
       parts.push(`${f}|missing`);
     }
@@ -122,7 +127,7 @@ export function computeFilesFingerprint(files: readonly string[]): string {
 /**
  * Diff two fingerprints (computed by `computeFilesFingerprint`) and
  * return the absolute file paths that differ. A file appears in the
- * result if it was added, removed, or had its mtime/size change. The
+ * result if it was added, removed, or had its mtime/ctime/size change. The
  * leading file-count line is ignored. Used by the incremental
  * rebuild path.
  */

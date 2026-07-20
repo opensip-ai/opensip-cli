@@ -24,10 +24,12 @@ import {
   type Span,
 } from '@opensip-cli/core';
 
+import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import {
   buildShardedCatalogCacheKey,
   sortShardedCatalogAnchors,
 } from '../../cache/sharded-cache-key.js';
+import { sourceFilesChangedDuringBuildError } from '../../cache/stable-files-build.js';
 import { buildPackageManifestIndex } from '../../cross-package/export-index.js';
 import { unionFeatureDeps } from '../../pipeline/feature-deps.js';
 import {
@@ -61,6 +63,8 @@ import type { Catalog, GraphConfig } from '../../types.js';
 
 export type { RunShardedInput, RunShardedResult } from './types.js';
 
+const MAX_SOURCE_STABILITY_ATTEMPTS = 2;
+
 /** Run the full sharded build and return a unified RunGraphResult-shaped value. */
 export async function runShardedGraph(input: RunShardedInput): Promise<RunShardedResult> {
   // One parent span for the whole sharded build. withSpanAsync keeps it open
@@ -75,7 +79,11 @@ export async function runShardedGraph(input: RunShardedInput): Promise<RunSharde
   );
 }
 
-async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<RunShardedResult> {
+async function buildShardedGraph(
+  input: RunShardedInput,
+  span: Span,
+  sourceStabilityAttempt = 0,
+): Promise<RunShardedResult> {
   const { shards, projectRoot, cliScript, adapter, resolutionMode, useCache, catalogRepo } = input;
   const onProgress = input.onProgress;
 
@@ -94,6 +102,7 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // file set is fixed before any phase runs (shards are pre-enumerated), so the
   // `discover` stage is a zero-cost report of the partitioned total.
   const allFiles = shards.flatMap((s) => s.files);
+  const initialFilesFingerprint = computeFilesFingerprint(allFiles);
   emitStageStart(onProgress, 'discover');
   emitStage(onProgress, 'discover', 0, `${String(allFiles.length)} files`);
 
@@ -103,7 +112,8 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   //    subprocesses) — its sub-label reflects the shard count.
   const parseStart = Date.now();
   emitStageStart(onProgress, 'parse');
-  const plan = await planShardWork(shards, catalogRepo, adapter, resolutionMode, useCache);
+  const mayReuseCache = useCache && sourceStabilityAttempt === 0;
+  const plan = await planShardWork(shards, catalogRepo, adapter, resolutionMode, mayReuseCache);
   const built = await runShardsInParallel({
     shards: plan.toBuild,
     projectRoot,
@@ -248,6 +258,16 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
     `${String(countCatalogCallSites(catalog))} call site(s)`,
   );
 
+  const finalFilesFingerprint = computeFilesFingerprint(allFiles);
+  const retry = retryShardedBuildForChangedSources(
+    input,
+    span,
+    sourceStabilityAttempt,
+    initialFilesFingerprint,
+    finalFilesFingerprint,
+  );
+  if (retry !== null) return retry;
+
   // 4. Derive indexes + features over the unified catalog. Features run once
   //    here on the merged global catalog (not per shard), after merge / before
   //    rules — the same stage order as the single-program path.
@@ -271,9 +291,13 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
   // 5. Persist: each rebuilt shard's fragment, prune removed shards, and the
   //    unified full catalog (with materialized features when requested) so
   //    whole-catalog consumers (incl. the dashboard) still work.
-  if (useCache && catalogRepo) {
-    persistShardedCatalog(catalogRepo, built.fragments, shards, catalogToPersist);
-  }
+  persistShardedCatalogWhenEnabled(
+    useCache,
+    catalogRepo,
+    built.fragments,
+    shards,
+    catalogToPersist,
+  );
 
   // 6. Run rules over the unified catalog, threading the feature table (5th arg).
   //    The shared evaluateRules seam (also used by runGraph) appends signals in
@@ -322,6 +346,31 @@ async function buildShardedGraph(input: RunShardedInput, span: Span): Promise<Ru
 function projectRelativePath(projectRoot: string, absolutePath: string): string {
   const value = relative(projectRoot, absolutePath).split(sep).join('/');
   return value.length === 0 ? '.' : value;
+}
+
+function retryShardedBuildForChangedSources(
+  input: RunShardedInput,
+  span: Span,
+  sourceStabilityAttempt: number,
+  initialFilesFingerprint: string,
+  finalFilesFingerprint: string,
+): Promise<RunShardedResult> | null {
+  if (initialFilesFingerprint === finalFilesFingerprint) return null;
+  if (sourceStabilityAttempt + 1 < MAX_SOURCE_STABILITY_ATTEMPTS) {
+    return buildShardedGraph(input, span, sourceStabilityAttempt + 1);
+  }
+  throw sourceFilesChangedDuringBuildError();
+}
+
+function persistShardedCatalogWhenEnabled(
+  useCache: boolean,
+  catalogRepo: CatalogRepo | null,
+  builtFragments: readonly ShardBuildResult[],
+  shards: readonly Shard[],
+  catalogToPersist: Catalog,
+): void {
+  if (!useCache || catalogRepo === null) return;
+  persistShardedCatalog(catalogRepo, builtFragments, shards, catalogToPersist);
 }
 
 /**
