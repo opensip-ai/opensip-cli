@@ -140,6 +140,18 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
     return;
   }
 
+  // Effectful egress + host-owned findings exit live at the root (cloud sink +
+  // `--report-to` exit 4 + the verdict-derived exit, ADR-0035). Once per run.
+  // Settle it before presentation so JSON outcomes and rendered summaries
+  // observe the final host-owned exit status.
+  // envelope-first-presentation: `result` is the render-only RunPresentation —
+  // cwd comes from `opts.cwd` (in scope), recipe from `result.envelope.recipe`.
+  await cli.deliverSignals(result.envelope, {
+    cwd: opts.cwd,
+    reportTo: opts.reportTo,
+    apiKey: opts.apiKey,
+  });
+
   // ADR-0011: one render path per mode. `--json` emits the envelope
   // through the shared formatSignalJson; default renders the envelope-
   // derived per-scenario table.
@@ -148,16 +160,6 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
   } else {
     await cli.render(result);
   }
-
-  // Effectful egress + host-owned findings exit live at the root (cloud sink +
-  // `--report-to` exit 4 + the verdict-derived exit, ADR-0035). Once per run.
-  // envelope-first-presentation: `result` is the render-only RunPresentation —
-  // cwd comes from `opts.cwd` (in scope), recipe from `result.envelope.recipe`.
-  await cli.deliverSignals(result.envelope, {
-    cwd: opts.cwd,
-    reportTo: opts.reportTo,
-    apiKey: opts.apiKey,
-  });
 
   await cli.maybeOpenReport({
     openRequested: Boolean(opts.open),

@@ -60,11 +60,13 @@ function makeFakeContext(): {
   exitCodes: number[];
   emitted: unknown[];
   delivered: unknown[];
+  callOrder: string[];
 } {
   const rendered: unknown[] = [];
   const exitCodes: number[] = [];
   const emitted: unknown[] = [];
   const delivered: unknown[] = [];
+  const callOrder: string[] = [];
   const project = {
     cwd: '/test',
     cwdExplicit: false,
@@ -81,6 +83,7 @@ function makeFakeContext(): {
   const ctx: ToolCliContext = {
     scope: ctxScope,
     render: vi.fn((result: unknown) => {
+      callOrder.push('render');
       rendered.push(result);
       return Promise.resolve();
     }),
@@ -103,6 +106,7 @@ function makeFakeContext(): {
       emitted.push(value);
     },
     emitEnvelope: (value: unknown) => {
+      callOrder.push('emit');
       emitted.push(value);
     },
     emitError: (detail: { message: string; exitCode: number; suggestion?: string }) => {
@@ -131,6 +135,7 @@ function makeFakeContext(): {
       },
     ),
     deliverSignals: (_envelope: unknown, opts: unknown) => {
+      callOrder.push('deliver');
       delivered.push(opts);
       return Promise.resolve({ cloudAccepted: 0 });
     },
@@ -171,7 +176,7 @@ function makeFakeContext(): {
       },
     },
   };
-  return { ctx, rendered, exitCodes, emitted, delivered };
+  return { ctx, rendered, exitCodes, emitted, delivered, callOrder };
 }
 
 /**
@@ -306,6 +311,18 @@ describe('sim command handler', () => {
 
     expect(delivered).toHaveLength(1);
     expect(delivered[0]).toMatchObject({ cwd: HERE });
+  });
+
+  it.each([
+    { json: true, presentation: 'emit' },
+    { json: false, presentation: 'render' },
+  ])('settles delivery exit status before $presentation output', async ({ json, presentation }) => {
+    const { ctx, callOrder } = makeFakeContext();
+    registerProbeScenario();
+
+    await simSpec().handler({ cwd: process.cwd(), json }, ctx);
+
+    expect(callOrder).toEqual(['deliver', presentation]);
   });
 
   it('returns exit code 2 in JSON mode when the recipe is unknown', async () => {
