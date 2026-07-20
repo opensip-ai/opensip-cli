@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -27,12 +27,19 @@ afterEach(() => {
 
 /**
  * The walker climbs past testDir through the shared OS tmpdir to the
- * filesystem root by design (nearest-ancestor resolution), so concurrent
- * test trees elsewhere under tmpdir can legitimately appear in results.
+ * filesystem root by design (nearest-ancestor resolution), so packages in an
+ * ancestor such as the shared tmpdir's node_modules can legitimately appear.
  * The invariant under test is what THIS test's tree yields — scope to it.
  */
 function underTestDir<T extends { packageDir: string }>(out: readonly T[]): T[] {
-  return out.filter((p) => p.packageDir.startsWith(`${testDir}/`));
+  return out.filter((p) => {
+    const pathFromTestDir = relative(testDir, p.packageDir);
+    return (
+      pathFromTestDir !== '..' &&
+      !pathFromTestDir.startsWith(`..${sep}`) &&
+      !isAbsolute(pathFromTestDir)
+    );
+  });
 }
 
 describe('isMarkerKind', () => {
@@ -79,7 +86,7 @@ describe('readMarkerKind', () => {
 });
 
 describe('discoverPackagesByDeclaredKind', () => {
-  it('returns an empty list when node_modules is missing', () => {
+  it('returns no packages from the test tree when node_modules is missing', () => {
     expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
