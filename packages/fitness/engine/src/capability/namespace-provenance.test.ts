@@ -112,6 +112,10 @@ describe('fit-pack capability namespace provenance', () => {
           registry: capabilities,
           domainId: 'fit-pack',
           projectDir,
+          preferences: {
+            packages: ['@acme/checks-a', '@other/checks-b'],
+            autoDiscover: false,
+          },
           shouldLoadPackage: ADMIT_ALL,
         });
         const registry = currentCheckRegistry();
