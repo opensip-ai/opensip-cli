@@ -32,7 +32,14 @@ export function compareReviewBriefCorrelationRisks(
   if (column !== 0) return column;
   const rule = compareCodePoint(left.ruleId, right.ruleId);
   if (rule !== 0) return rule;
-  return compareCodePoint(left.signalRef.fingerprint ?? '', right.signalRef.fingerprint ?? '');
+  const fingerprint = compareCodePoint(
+    left.signalRef.fingerprint ?? '',
+    right.signalRef.fingerprint ?? '',
+  );
+  if (fingerprint !== 0) return fingerprint;
+  const stepIndex = left.signalRef.stepIndex - right.signalRef.stepIndex;
+  if (stepIndex !== 0) return stepIndex;
+  return left.signalRef.signalIndex - right.signalRef.signalIndex;
 }
 
 function correlationPriority(group: ReviewBriefCorrelationGroup): number {

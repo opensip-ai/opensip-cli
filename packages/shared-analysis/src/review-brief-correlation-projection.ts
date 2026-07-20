@@ -72,7 +72,6 @@ function addUniqueEntity(out: ReviewBriefEntityRef[], entity: ReviewBriefEntityR
 
 function addUniqueKey(out: ReviewBriefCorrelationKey[], key: ReviewBriefCorrelationKey): void {
   if (out.some((existing) => existing.kind === key.kind && existing.value === key.value)) return;
-  if (out.length >= REVIEW_BRIEF_CORRELATION_KEY_LIMIT) return;
   out.push(key);
 }
 

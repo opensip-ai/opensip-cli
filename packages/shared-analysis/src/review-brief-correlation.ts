@@ -1,11 +1,13 @@
 import {
   REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT,
   REVIEW_BRIEF_CORRELATION_GROUP_LIMIT,
+  REVIEW_BRIEF_CORRELATION_KEY_PRIORITY,
   REVIEW_BRIEF_CORRELATION_MEMBER_LIMIT,
   REVIEW_BRIEF_CORRELATION_REASON_LIMIT,
 } from '@opensip-cli/contracts';
 
 import {
+  compareCodePoint,
   compareReviewBriefCorrelationGroups,
   compareReviewBriefCorrelationRisks,
   reviewBriefCorrelationMemberSignature,
@@ -147,6 +149,16 @@ function bucketRisksByKey(
   return byKey;
 }
 
+function compareCorrelatedRiskBuckets(
+  left: CorrelatedRiskBucket,
+  right: CorrelatedRiskBucket,
+): number {
+  const priority =
+    REVIEW_BRIEF_CORRELATION_KEY_PRIORITY[left.key.kind] -
+    REVIEW_BRIEF_CORRELATION_KEY_PRIORITY[right.key.kind];
+  return priority || compareCodePoint(left.key.value, right.key.value);
+}
+
 function nextGroupId(key: ReviewBriefCorrelationKey, usedIds: Map<string, number>): string {
   const idBase = groupId(key);
   const idCount = usedIds.get(idBase) ?? 0;
@@ -208,7 +220,8 @@ export function buildReviewBriefCorrelations(
   const groups: ReviewBriefCorrelationGroup[] = [];
   const usedIds = new Map<string, number>();
 
-  for (const { key, risks: groupRisks } of bucketRisksByKey(risks).values()) {
+  const buckets = [...bucketRisksByKey(risks).values()].sort(compareCorrelatedRiskBuckets);
+  for (const { key, risks: groupRisks } of buckets) {
     const group = buildGroup({
       key,
       risks: groupRisks,

@@ -607,6 +607,38 @@ describe('review brief correlation inputs', () => {
     expect(projected.entities?.length).toBeLessThanOrEqual(12);
     expect(projected.correlationKeys?.length).toBeLessThanOrEqual(12);
   });
+
+  it('applies the correlation-key cap after priority ordering', () => {
+    const signal = stamped(
+      createSignal({
+        source: 'graph',
+        ruleId: 'graph:large-function',
+        severity: 'medium',
+        message: 'large',
+        code: { file: 'src/a.ts', line: 1, column: 2 },
+        metadata: {
+          qualifiedName: 'src/a.handler',
+          bodyHash: 'body-a',
+          sccId: 'scc-a',
+          packages: ['pkg-0', 'pkg-1', 'pkg-2', 'pkg-3', 'pkg-4', 'pkg-5'],
+        },
+      }),
+    );
+
+    const projected = signalToReviewBriefRisk({
+      suiteRunId: 'suite_1',
+      stepIndex: 0,
+      signalIndex: 0,
+      signal,
+      tool: 'graph',
+      runId: 'GRAPH_1',
+    });
+
+    expect(projected.correlationKeys).toHaveLength(12);
+    expect(projected.correlationKeys).toContainEqual(
+      expect.objectContaining({ kind: 'rule-location' }),
+    );
+  });
 });
 
 describe('buildReviewBriefCorrelations', () => {
@@ -671,6 +703,21 @@ describe('buildReviewBriefCorrelations', () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0]?.reasons[0]?.kind).toBe('same-symbol');
+  });
+
+  it('assigns colliding slug IDs independently of risk input order', () => {
+    const plusGroup = [
+      keyedCorrelationRisk('symbol', 'a+b', 0),
+      keyedCorrelationRisk('symbol', 'a+b', 1),
+    ];
+    const spaceGroup = [
+      keyedCorrelationRisk('symbol', 'a b', 2),
+      keyedCorrelationRisk('symbol', 'a b', 3),
+    ];
+
+    expect(buildReviewBriefCorrelations([...plusGroup, ...spaceGroup])).toEqual(
+      buildReviewBriefCorrelations([...spaceGroup, ...plusGroup]),
+    );
   });
 
   it('applies group and member limits deterministically', () => {

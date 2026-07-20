@@ -234,6 +234,39 @@ describe('compareReviewBriefCorrelationRisks', () => {
     expect(compareReviewBriefCorrelationRisks(left, rightSource)).toBeLessThan(0);
     expect(compareReviewBriefCorrelationRisks(left, rightFile)).toBeLessThan(0);
   });
+
+  it('uses signal position after an equal fingerprint', () => {
+    const earlier = risk({
+      signalRef: {
+        tool: 'fit',
+        suiteRunId: 'suite_1',
+        stepIndex: 0,
+        signalIndex: 1,
+        fingerprint: 'same',
+      },
+    });
+    const laterStep = risk({
+      signalRef: {
+        tool: 'fit',
+        suiteRunId: 'suite_1',
+        stepIndex: 1,
+        signalIndex: 0,
+        fingerprint: 'same',
+      },
+    });
+    const laterSignal = risk({
+      signalRef: {
+        tool: 'fit',
+        suiteRunId: 'suite_1',
+        stepIndex: 0,
+        signalIndex: 2,
+        fingerprint: 'same',
+      },
+    });
+
+    expect(compareReviewBriefCorrelationRisks(earlier, laterStep)).toBeLessThan(0);
+    expect(compareReviewBriefCorrelationRisks(earlier, laterSignal)).toBeLessThan(0);
+  });
 });
 
 describe('compareReviewBriefCorrelationGroups', () => {
