@@ -40,6 +40,7 @@ import {
   isCapabilityValidator,
   isStructuralContributionSchema,
   type CapabilityDomainSpec,
+  type CapabilityRegistrationContext,
   type CapabilityRegistrar,
 } from '../tools/capability.js';
 
@@ -48,7 +49,7 @@ import type { ToolPluginManifest } from '../tools/manifest.js';
 // `CapabilityRegistrar` now lives in the leaf `tools/capability.ts` so the
 // `Tool` contract can name it without an import cycle through this host
 // module. Re-export it here for back-compat with the prior import path.
-export type { CapabilityRegistrar } from '../tools/capability.js';
+export type { CapabilityRegistrar, CapabilityRegistrationContext } from '../tools/capability.js';
 
 /** A registered domain: its spec plus the owner's registrar. */
 interface RegisteredDomain {
@@ -186,14 +187,19 @@ export class CapabilityRegistry {
    * the domain is declared, (b) validates `contribution` against the
    * domain's `contributionSchema`, then (c) hands it to the owner's
    * registrar. The host never interprets the contribution beyond the
-   * schema check — the domain owner does.
+   * schema check — the domain owner does. Discovery callers may include the
+   * package provenance context; direct callers may omit it.
    *
    * @throws {NotFoundError} (`CAPABILITY.DOMAIN.UNKNOWN`) when no domain
    *   `domainId` is registered.
    * @throws {ValidationError} (`CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH`)
    *   when the contribution fails the domain's schema check.
    */
-  routeContribution(domainId: string, contribution: unknown): void {
+  routeContribution(
+    domainId: string,
+    contribution: unknown,
+    context?: CapabilityRegistrationContext,
+  ): void {
     const entry = this.domains.get(domainId);
     if (entry === undefined) {
       const known = [...this.domains.keys()];
@@ -213,7 +219,11 @@ export class CapabilityRegistry {
       );
     }
 
-    entry.registrar(contribution);
+    if (context === undefined) {
+      entry.registrar(contribution);
+    } else {
+      entry.registrar(contribution, context);
+    }
   }
 }
 

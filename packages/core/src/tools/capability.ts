@@ -256,6 +256,16 @@ export interface ToolCapabilityDeclaration {
 }
 
 /**
+ * Provenance supplied by the host when a discovered package contribution is
+ * routed to its owning tool. The context is additive: direct/in-process callers
+ * that do not have package provenance may omit it.
+ */
+export interface CapabilityRegistrationContext {
+  /** npm package name from the raw discovery contribution. */
+  readonly sourcePackage: string;
+}
+
+/**
  * The owner-supplied callback the host invokes once a contribution has passed
  * the domain's schema check. The host hands the validated contribution
  * straight through — it never inspects the contribution's domain-specific
@@ -268,8 +278,15 @@ export interface ToolCapabilityDeclaration {
  * it without importing the host registry — which would pull in
  * `lib/run-scope.ts` and reintroduce the `run-scope → … → tools/types`
  * import cycle. `capability-registry.ts` re-exports it for back-compat.
+ *
+ * The context parameter is optional so existing one-argument registrars remain
+ * source-compatible and direct callers can continue to route contributions
+ * without manufacturing package provenance.
  */
-export type CapabilityRegistrar = (contribution: unknown) => void;
+export type CapabilityRegistrar = (
+  contribution: unknown,
+  context?: CapabilityRegistrationContext,
+) => void;
 
 /**
  * A tool's namespaced configuration contribution, as the kernel sees it

@@ -167,8 +167,8 @@ const fitCommandSpecs = [
  * `requiredKeys: ['slug']` schema by the host) is registered into THIS run's
  * scope-owned check registry — fitness owns the registration semantics.
  */
-const registerFitCheck: CapabilityRegistrar = (contribution) => {
-  currentCheckRegistry().register(contribution as Check);
+const registerFitCheck: CapabilityRegistrar = (contribution, context) => {
+  currentCheckRegistry().register(contribution as Check, context?.sourcePackage);
 };
 
 /**

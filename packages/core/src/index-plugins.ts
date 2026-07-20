@@ -42,6 +42,7 @@ export {
 export type {
   AdmissionResult,
   AuthoredToolCandidate,
+  CapabilityRegistrationContext,
   CapabilityRegistrar,
   LoadCapabilityDomainOptions,
   CapabilityCompatibilityVerdict,

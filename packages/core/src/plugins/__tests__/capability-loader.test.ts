@@ -85,8 +85,8 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
 
     expect(errors).toEqual([]);
     expect(registrar).toHaveBeenCalledTimes(2);
-    expect(registrar).toHaveBeenNthCalledWith(1, { id: 'a' });
-    expect(registrar).toHaveBeenNthCalledWith(2, { id: 'b' });
+    expect(registrar).toHaveBeenNthCalledWith(1, { id: 'a' }, { sourcePackage: '@acme/items-a' });
+    expect(registrar).toHaveBeenNthCalledWith(2, { id: 'b' }, { sourcePackage: '@acme/items-a' });
     expect(registry.isDomainLoaded('items', testDir)).toBe(true);
   });
 
@@ -160,7 +160,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
     });
 
     expect(registrar).toHaveBeenCalledTimes(1);
-    expect(registrar).toHaveBeenCalledWith({ id: 'ok' });
+    expect(registrar).toHaveBeenCalledWith({ id: 'ok' }, { sourcePackage: '@acme/items-mixed' });
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('@acme/items-mixed');
     // The captured errors are retrievable from the registry's load-state.

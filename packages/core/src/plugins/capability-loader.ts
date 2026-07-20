@@ -158,7 +158,7 @@ function routeLoadedContribution(
     return false;
   }
   try {
-    registry.routeContribution(target, loaded.contribution);
+    registry.routeContribution(target, loaded.contribution, { sourcePackage });
     return true;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
