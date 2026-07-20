@@ -65,6 +65,47 @@ describe('stripStrings', () => {
   });
 });
 
+describe('stripStrings · PEP 701 nested-quote f-strings (2026-07-20 regression)', () => {
+  // Python 3.12+ lets an f-string expression reuse the string's own quote
+  // character, e.g. f"{d["key"]}". A quote scanner that isn't aware of the
+  // `{...}` expression must not treat that inner quote as the string's
+  // terminator — doing so leaks the dict-key literal unstripped and
+  // misclassifies the rest of the f-string body.
+  it('fully blanks a same-quote-nested f-string body', () => {
+    const out = stripStrings('x = f"{d["key"]}"');
+    expect(out).toBe('x = f"          "');
+  });
+
+  it('does not leak nested literal content as unstripped code', () => {
+    const out = stripStrings('x = f"{d["key"]}"');
+    expect(out).not.toContain('key');
+  });
+
+  it('does not corrupt stripping on a following line', () => {
+    const out = stripStrings(['x = f"{d["key"]}"', 'password = "hunter2"'].join('\n'));
+    expect(out).not.toContain('hunter2');
+    expect(out).toContain('password = "');
+  });
+
+  it('still recognizes a real comment immediately after the f-string', () => {
+    const out = stripComments('x = f"{d["key"]}" # secret');
+    expect(out).not.toContain('secret');
+    expect(out).not.toContain('key');
+  });
+
+  it('handles a same-quote-nested triple-quoted f-string', () => {
+    const out = stripStrings('x = f"""{d["key"]}"""');
+    expect(out).not.toContain('key');
+  });
+
+  it('leaves non-f-string same-quote content unaffected', () => {
+    // Sanity: the new brace-depth tracking is gated on the f-prefix, so a
+    // plain string containing `{`/`}` text is unaffected.
+    const out = stripStrings('x = "{d[" + "key" + "]}"');
+    expect(out).not.toContain('key');
+  });
+});
+
 describe('stripComments', () => {
   it('strips line comments', () => {
     const out = stripComments('x = 1 # comment');

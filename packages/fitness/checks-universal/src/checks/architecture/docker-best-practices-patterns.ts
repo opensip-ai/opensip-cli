@@ -59,11 +59,15 @@ export const SECRET_PATTERNS = [
   SECRET_JWT_PATTERN,
 ];
 
-const PNPM_INSTALL_PATTERN = /pnpm\s{1,10}install(?!\s{1,10}--frozen-lockfile)/;
+// The lockfile/global flags are looked for anywhere after `install`/`ci` on
+// the line (not just immediately adjacent) — a command like
+// `pnpm install --prod --frozen-lockfile` is a correctly-frozen install
+// regardless of flag order, and an adjacency-only lookahead flagged it.
+const PNPM_INSTALL_PATTERN = /pnpm\s{1,10}install(?![^\n]*\s--frozen-lockfile\b)/;
 const NPM_INSTALL_PATTERN =
-  /npm\s{1,10}(?:install|ci)(?!\s{1,10}-g)(?!\s{1,10}--global)(?!\s{1,10}--ci)(?!\s{1,10}--frozen-lockfile)/;
+  /npm\s{1,10}(?:install|ci)(?![^\n]*(?:\s-g\b|\s--global\b|\s--ci\b|\s--frozen-lockfile\b))/;
 const YARN_INSTALL_PATTERN =
-  /yarn\s{1,10}install(?!\s{1,10}--frozen-lockfile)(?!\s{1,10}--immutable)/;
+  /yarn\s{1,10}install(?![^\n]*(?:\s--frozen-lockfile\b|\s--immutable\b))/;
 
 interface PackageManagerPattern {
   pattern: RegExp;

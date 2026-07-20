@@ -268,11 +268,29 @@ function isProxyTarget(node: ts.Node, sourceFile: ts.SourceFile): boolean {
 // CHECK FUNCTIONS
 // =============================================================================
 
+/**
+ * Peel through a chain of `as`/`<T>` casts and enclosing parens to the
+ * innermost expression — so `({} as unknown as Service)` is recognised as an
+ * empty-object stub cast to `Service` (the outermost, real target type)
+ * rather than stopping at the intermediate `unknown` cast and missing it.
+ */
+function unwrapCasts(expr: ts.Expression): ts.Expression {
+  let current = expr;
+  while (
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isParenthesizedExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 function checkEmptyObjectStub(options: CheckNodeOptions): CheckViolation | null {
   const { node, sourceFile } = options;
   if (!ts.isAsExpression(node) && !ts.isTypeAssertionExpression(node)) return null;
 
-  const expression = node.expression;
+  const expression = unwrapCasts(node.expression);
   if (!ts.isObjectLiteralExpression(expression) || expression.properties.length > 0) return null;
 
   const typeText = node.type.getText(sourceFile);

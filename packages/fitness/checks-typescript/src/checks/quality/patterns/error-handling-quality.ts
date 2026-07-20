@@ -216,11 +216,17 @@ function hasAcceptablePattern(text: string): boolean {
 function getReturnValue(expr: ts.Expression | undefined, sourceFile: ts.SourceFile): string | null {
   /* v8 ignore next -- defensive AST/type guard */
   if (!expr) return 'undefined';
-  if (expr.kind === ts.SyntaxKind.FalseKeyword) return 'false';
-  if (expr.kind === ts.SyntaxKind.NullKeyword) return 'null';
-  if (ts.isIdentifier(expr) && expr.getText(sourceFile) === 'undefined') return 'undefined';
-  if (ts.isArrayLiteralExpression(expr) && expr.elements.length === 0) return '[]';
-  if (ts.isObjectLiteralExpression(expr) && expr.properties.length === 0) return '{}';
+  // Unwrap `as`/`satisfies`/parens so `return [] as const;` / `return null as
+  // unknown;` are recognised as the same sentinel return as the bare form.
+  let e = expr;
+  while (ts.isAsExpression(e) || ts.isSatisfiesExpression(e) || ts.isParenthesizedExpression(e)) {
+    e = e.expression;
+  }
+  if (e.kind === ts.SyntaxKind.FalseKeyword) return 'false';
+  if (e.kind === ts.SyntaxKind.NullKeyword) return 'null';
+  if (ts.isIdentifier(e) && e.getText(sourceFile) === 'undefined') return 'undefined';
+  if (ts.isArrayLiteralExpression(e) && e.elements.length === 0) return '[]';
+  if (ts.isObjectLiteralExpression(e) && e.properties.length === 0) return '{}';
   return null;
 }
 

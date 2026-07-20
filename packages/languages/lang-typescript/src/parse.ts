@@ -1,11 +1,20 @@
 import ts from 'typescript';
 
 /**
+ * .ts/.mts/.cts files parse as plain TS; every other extension this adapter
+ * handles (.tsx/.js/.jsx/.mjs/.cjs) parses as TSX, permissively. TSX mode
+ * disambiguates a bare `<T>` as a JSX opening tag, which misparses valid
+ * plain-TS syntax (generic arrow functions, `<T>value` casts) and swallows
+ * the remainder of the file into inert JSX nodes — so plain TS files must
+ * not use TSX mode.
+ */
+function scriptKindFor(filePath: string): ts.ScriptKind {
+  return /\.[mc]?ts$/.test(filePath) ? ts.ScriptKind.TS : ts.ScriptKind.TSX;
+}
+
+/**
  * Parse TypeScript/JavaScript source into a SourceFile.
  * Returns null on parse failure.
- *
- * Uses ts.ScriptKind.TSX so the same parse path handles .ts and .tsx
- * (and is permissive enough for .js / .jsx).
  */
 export function parseSource(content: string, filePath: string): ts.SourceFile | null {
   try {
@@ -14,7 +23,7 @@ export function parseSource(content: string, filePath: string): ts.SourceFile | 
       content,
       ts.ScriptTarget.Latest,
       /* setParentNodes */ true,
-      ts.ScriptKind.TSX,
+      scriptKindFor(filePath),
     );
   } catch {
     return null;
