@@ -57,19 +57,21 @@ export function parseGitleaksVersion(stdout: string): string {
 
 /**
  * Build the gitleaks scan argv (no shell — args are passed to `execFile`). Scans
- * the project working tree (`detect --no-git --source <root>`) and writes a JSON
+ * the project working tree (`detect --no-git --source .`) and writes a JSON
  * report to the host-owned artifact path the substrate composes for this run.
  *
- * VERIFY-against-installed-binary: `detect --no-git --source <root>` scans files
- * on disk (incl. uncommitted) rather than git history; v8.19 renamed the verb to
- * `gitleaks dir <root>`.
+ * The substrate runs the scanner with `cwd = projectRoot`; the relative source
+ * keeps Gitleaks's reported file paths and OpenSIP fingerprints portable across
+ * checkout locations. VERIFY-against-installed-binary: `detect --no-git` scans
+ * files on disk (incl. uncommitted) rather than git history; v8.19 renamed the
+ * verb to `gitleaks dir`.
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   return [
     'detect',
     '--no-git',
     '--source',
-    ctx.projectRoot,
+    '.',
     '--report-format',
     'json',
     '--report-path',
@@ -106,6 +108,88 @@ function resolveExtendSource(
   return { kind: 'default' };
 }
 
+const RUNTIME_ALLOWLIST_PATH = "'''(^|/)opensip-cli/\\.runtime(/|$)'''";
+const EXCLUSION_MARKER = '# opensip-cli A3 exclude: opensip-cli/.runtime';
+const LEGACY_ALLOWLIST_HEADER = /(?:^|\r?\n)[ \t]*\[allowlist\][ \t]*(?:#[^\r\n]*)?(?=\r?\n|$)/;
+const MODERN_ALLOWLIST_HEADER =
+  /(?:^|\r?\n)[ \t]*\[\[allowlists\]\][ \t]*(?:#[^\r\n]*)?(?=\r?\n|$)/;
+const MODERN_ALLOWLIST = [
+  '[[allowlists]]',
+  'description = "opensip-cli: skip the .runtime artifact store"',
+  `paths = [${RUNTIME_ALLOWLIST_PATH}]`,
+  '',
+].join('\n');
+const LEGACY_ALLOWLIST = [
+  '[allowlist]',
+  'description = "opensip-cli: skip the .runtime artifact store"',
+  `paths = [${RUNTIME_ALLOWLIST_PATH}]`,
+  '',
+].join('\n');
+
+function lineBreakLengthAt(value: string, index: number): number {
+  if (value.startsWith('\r\n', index)) return 2;
+  if (value[index] === '\n') return 1;
+  return 0;
+}
+
+/**
+ * Add the runtime path to an existing legacy global allowlist. A second
+ * `[allowlist]` table is invalid TOML, while mixing it with `[[allowlists]]`
+ * is explicitly rejected by Gitleaks.
+ */
+function mergeLegacyRuntimePath(projectConfig: string): string {
+  const header = LEGACY_ALLOWLIST_HEADER.exec(projectConfig);
+  if (header === null) return projectConfig;
+
+  const headerEnd = header.index + header[0].length;
+  const lineBreakLength = lineBreakLengthAt(projectConfig, headerEnd);
+  const sectionStart = headerEnd + lineBreakLength;
+  const nextHeader = /^[ \t]*\[/m.exec(projectConfig.slice(sectionStart));
+  const sectionEnd = nextHeader === null ? projectConfig.length : sectionStart + nextHeader.index;
+  const section = projectConfig.slice(sectionStart, sectionEnd);
+  const paths = /(?:^|\r?\n)[ \t]*(?:paths|"paths"|'paths')[ \t]*=[ \t]*\[/.exec(section);
+  if (paths !== null) {
+    const openBracket = sectionStart + paths.index + paths[0].lastIndexOf('[');
+    return (
+      projectConfig.slice(0, openBracket + 1) +
+      `${RUNTIME_ALLOWLIST_PATH}, ` +
+      projectConfig.slice(openBracket + 1)
+    );
+  }
+
+  const newline = projectConfig.includes('\r\n') ? '\r\n' : '\n';
+  const insertion = `paths = [${RUNTIME_ALLOWLIST_PATH}]${newline}`;
+  const prefix = lineBreakLength === 0 ? newline : '';
+  return (
+    projectConfig.slice(0, sectionStart) + prefix + insertion + projectConfig.slice(sectionStart)
+  );
+}
+
+function defaultExclusionConfig(): string {
+  return [EXCLUSION_MARKER, '[extend]', 'useDefault = true', '', LEGACY_ALLOWLIST].join('\n');
+}
+
+function readProjectConfig(path: string): string | undefined {
+  try {
+    // Config files are small TOML; reject oversized inputs before reading.
+    const MAX_GITLEAKS_CONFIG_BYTES = 1_048_576;
+    if (statSync(path).size > MAX_GITLEAKS_CONFIG_BYTES) return undefined;
+    return readFileSync(path, 'utf8').trimEnd();
+  } catch {
+    return undefined;
+  }
+}
+
+function addRuntimeExclusion(projectConfig: string): string {
+  if (LEGACY_ALLOWLIST_HEADER.test(projectConfig)) {
+    return [EXCLUSION_MARKER, mergeLegacyRuntimePath(projectConfig)].join('\n');
+  }
+  const allowlistBlock = MODERN_ALLOWLIST_HEADER.test(projectConfig)
+    ? MODERN_ALLOWLIST
+    : LEGACY_ALLOWLIST;
+  return [EXCLUSION_MARKER, projectConfig, '', allowlistBlock].join('\n');
+}
+
 /**
  * A3: build gitleaks's exclusion of opensip's own `.runtime` artifact store.
  * (Not the shared `buildScannerExclude`: this builder derives the PROJECT ROOT
@@ -138,65 +222,12 @@ export function buildGitleaksExclude(input: {
   // Flatten: never wrap project config in `[extend] path = ...` — that burns one
   // of gitleaks's maxExtendDepth=2 hops and can drop base/org rules. Inline the
   // project file (preserving its own extends) and append our runtime allowlist.
-  // Prefer modern [[allowlists]]; if the project still uses deprecated singular
-  // [allowlist], use the same form so gitleaks does not hard-fail on mix.
-  const modernAllowlist = [
-    '[[allowlists]]',
-    'description = "opensip-cli: skip the .runtime artifact store"',
-    "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
-    '',
-  ].join('\n');
-  const legacyAllowlist = [
-    '[allowlist]',
-    'description = "opensip-cli: skip the .runtime artifact store"',
-    "paths = ['''(^|/)opensip-cli/\\.runtime(/|$)''']",
-    '',
-  ].join('\n');
-  let contents: string;
-  if (extend.kind === 'path') {
-    let projectConfig = '';
-    try {
-      // Config files are small TOML; reject oversized inputs before reading.
-      const MAX_GITLEAKS_CONFIG_BYTES = 1_048_576;
-      const size = statSync(extend.path).size;
-      if (size <= MAX_GITLEAKS_CONFIG_BYTES) {
-        projectConfig = readFileSync(extend.path, 'utf8').trimEnd();
-      }
-    } catch {
-      projectConfig = '';
-    }
-    if (projectConfig.length > 0) {
-      // Match project allowlist form (singular vs plural) to avoid gitleaks
-      // "cannot be used alongside" config rejection.
-      const usesLegacyAllowlist =
-        /(?:^|\n)\s*\[allowlist\]\s*(?:\n|$)/.test(projectConfig) &&
-        !/(?:^|\n)\s*\[\[allowlists\]\]\s*(?:\n|$)/.test(projectConfig);
-      const allowlistBlock = usesLegacyAllowlist ? legacyAllowlist : modernAllowlist;
-      contents = [
-        // Marker text after the colon must stay a bare path for the walking fake.
-        '# opensip-cli A3 exclude: opensip-cli/.runtime',
-        projectConfig,
-        '',
-        allowlistBlock,
-      ].join('\n');
-    } else {
-      contents = [
-        '# opensip-cli A3 exclude: opensip-cli/.runtime',
-        '[extend]',
-        'useDefault = true',
-        '',
-        modernAllowlist,
-      ].join('\n');
-    }
-  } else {
-    contents = [
-      '# opensip-cli A3 exclude: opensip-cli/.runtime',
-      '[extend]',
-      'useDefault = true',
-      '',
-      modernAllowlist,
-    ].join('\n');
-  }
+  // The singular form is supported by the adapter's minimum Gitleaks 8.18 and
+  // remains backward-compatible in current Gitleaks. Use plural only when the
+  // project already uses it; Gitleaks rejects mixed singular/plural forms.
+  const projectConfig = extend.kind === 'path' ? readProjectConfig(extend.path) : undefined;
+  const contents =
+    projectConfig === undefined ? defaultExclusionConfig() : addRuntimeExclusion(projectConfig);
   return { args: ['--config', path], configFile: { path, contents } };
 }
 
