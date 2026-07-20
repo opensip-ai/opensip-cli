@@ -6,13 +6,17 @@ export function findOwningPackage(
   packages: readonly PackageFact[],
 ): PackageFact | undefined {
   let owner: PackageFact | undefined;
-  let ownerLength = -1;
+  let ownerSpecificity = -1;
   for (const candidate of packages) {
     const { root } = candidate;
     const containsPath = root === '.' || path === root || path.startsWith(`${root}/`);
-    if (containsPath && root.length > ownerLength) {
+    // `.` is the workspace fallback, not a one-character package root. Giving
+    // both the same string-length score makes an actual root such as `a` lose
+    // whenever the workspace package is visited first.
+    const specificity = root === '.' ? 0 : root.length;
+    if (containsPath && specificity > ownerSpecificity) {
       owner = candidate;
-      ownerLength = root.length;
+      ownerSpecificity = specificity;
     }
   }
   return owner;
