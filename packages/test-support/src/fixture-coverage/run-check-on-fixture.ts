@@ -98,6 +98,15 @@ export async function runCheckOnFixture(check: Check, fixture: FixtureCase): Pro
     const targetFiles = fixture.targetPaths
       ? fixture.targetPaths.map((p) => resolveUnderRoot(root, p))
       : written;
+    if (fixture.targetPaths !== undefined) {
+      const writtenFiles = new Set(written);
+      const missingTarget = targetFiles.find((target) => !writtenFiles.has(target));
+      if (missingTarget !== undefined) {
+        throw new Error(
+          `fixture targetPath does not name a written fixture file: ${relative(root, missingTarget)}`,
+        );
+      }
+    }
     const result = await withScope(scope, () => check.run(root, { targetFiles }));
     const ruleId = `fit:${check.config.slug}`;
     return {

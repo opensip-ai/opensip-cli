@@ -90,6 +90,15 @@ describe('runCheckOnFixture', () => {
       }),
     ).rejects.toThrow(/\.\./);
   });
+
+  it('rejects a targetPath that was not written by the fixture', async () => {
+    await expect(
+      runCheckOnFixture(bannedCheck, {
+        files: [{ path: 'written.ts', content: 'export const x = "BANNED"\n' }],
+        targetPaths: ['missing.ts'],
+      }),
+    ).rejects.toThrow(/does not name a written fixture file/u);
+  });
 });
 
 /** A check that reads only `.config` for the planner; never run here. */
