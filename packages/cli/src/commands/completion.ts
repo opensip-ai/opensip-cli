@@ -72,10 +72,18 @@ export interface SpecLike {
   readonly parent?: string;
 }
 
-/** One action-less group (`runs` / `sessions` / `tools`) and its leaf command names. */
+/** A grouped command leaf whose completion surface is derived like any other spec. */
+export interface GroupLeafLike {
+  readonly name: string;
+  readonly aliases?: readonly string[];
+  readonly commonFlags?: readonly CommonFlagKey[];
+  readonly options?: readonly { readonly flag: string }[];
+}
+
+/** One action-less group (`runs` / `sessions` / `tools`) and its leaf commands. */
 export interface GroupLike {
   readonly name: string;
-  readonly leaves: readonly { readonly name: string }[];
+  readonly leaves: readonly GroupLeafLike[];
 }
 
 /**
@@ -87,7 +95,7 @@ export interface GroupLike {
 export interface ToolPluginGroupLike {
   readonly parentVerb: string;
   readonly parentAliases?: readonly string[];
-  readonly leaves: readonly { readonly name: string }[];
+  readonly leaves: readonly GroupLeafLike[];
 }
 
 /** Long `--flag` form of each registry spec (short alias + arg placeholder
@@ -96,7 +104,7 @@ export interface ToolPluginGroupLike {
  *  re-listing flag names that can drift. Dot-access stays null-safe. */
 const LONG_FLAGS = Object.fromEntries(
   Object.entries(commonFlags).map(([key, spec]) => {
-    const match = /--[a-z][a-z-]*/.exec(spec.flags);
+    const match = /--[a-z][a-z0-9-]*/.exec(spec.flags);
     return [key, match ? match[0] : spec.flags];
   }),
 ) as Record<CommonFlagKey, string>;
@@ -121,7 +129,7 @@ const COMMON_FLAGS: readonly string[] = [
  * flag (none exist in the current surface, but the caller filters defensively).
  */
 export function extractLongFlag(flags: string): string | undefined {
-  const match = /--[a-z][a-z-]*/.exec(flags);
+  const match = /--[a-z][a-z0-9-]*/.exec(flags);
   return match ? match[0] : undefined;
 }
 
@@ -184,11 +192,23 @@ function addSpecToInventory(
 function addGroupedCommands(
   groups: readonly GroupLike[],
   subcommands: string[],
+  commandFlags: Record<string, readonly string[]>,
   groupSubcommands: Record<string, readonly string[]>,
 ): void {
   for (const group of groups) {
     subcommands.push(group.name);
-    groupSubcommands[group.name] = group.leaves.map((l) => l.name);
+    const leaves: string[] = [];
+    for (const leaf of group.leaves) {
+      const flags = specLongFlags({
+        ...leaf,
+        commonFlags: leaf.commonFlags ?? [],
+      });
+      for (const name of [leaf.name, ...(leaf.aliases ?? [])]) {
+        leaves.push(name);
+        commandFlags[`${group.name} ${name}`] = flags;
+      }
+    }
+    groupSubcommands[group.name] = leaves;
   }
 }
 
@@ -214,13 +234,25 @@ function foldToolLeaves(
 
 function foldToolPluginGroups(
   toolPluginGroups: readonly ToolPluginGroupLike[] | undefined,
+  commandFlags: Record<string, readonly string[]>,
   groupSubcommands: Record<string, readonly string[]>,
 ): void {
   for (const group of toolPluginGroups ?? []) {
     const pluginParents = [group.parentVerb, ...(group.parentAliases ?? [])];
     for (const parent of pluginParents) {
       groupSubcommands[parent] = [...(groupSubcommands[parent] ?? []), 'plugin'];
-      groupSubcommands[`${parent} plugin`] = group.leaves.map((l) => l.name);
+      const leaves: string[] = [];
+      for (const leaf of group.leaves) {
+        const flags = specLongFlags({
+          ...leaf,
+          commonFlags: leaf.commonFlags ?? [],
+        });
+        for (const name of [leaf.name, ...(leaf.aliases ?? [])]) {
+          leaves.push(name);
+          commandFlags[`${parent} plugin ${name}`] = flags;
+        }
+      }
+      groupSubcommands[`${parent} plugin`] = leaves;
     }
   }
 }
@@ -268,7 +300,7 @@ export function assembleCompletionInventory(input: {
   }
 
   const groupSubcommands: Record<string, readonly string[]> = {};
-  addGroupedCommands(input.groups, acc.subcommands, groupSubcommands);
+  addGroupedCommands(input.groups, acc.subcommands, acc.commandFlags, groupSubcommands);
   // Fold tool-command sub-subcommands into the group map. A primary verb
   // (e.g. `graph`) is already a top-level subcommand with its own flags; adding
   // its nested leaves here lets the script also complete `graph export` etc.
@@ -277,7 +309,7 @@ export function assembleCompletionInventory(input: {
   // under the tool verb (`opensip fit <TAB>` ⇒ `… plugin`), and the bound
   // leaf names register under the doubly-nested `${parentVerb} plugin` key for
   // deeper completion. There is NO top-level `plugin` group anymore.
-  foldToolPluginGroups(input.toolPluginGroups, groupSubcommands);
+  foldToolPluginGroups(input.toolPluginGroups, acc.commandFlags, groupSubcommands);
 
   // `help` is a Commander built-in the script also surfaces.
   acc.subcommands.push('help');
@@ -293,6 +325,36 @@ export function assembleCompletionInventory(input: {
 // bash
 // ---------------------------------------------------------------------------
 
+function shellCasePattern(path: string): string {
+  return path.replaceAll(' ', '\\ ');
+}
+
+function completionPaths(inv: CompletionInventory): readonly string[] {
+  return [...new Set([...Object.keys(inv.groupSubcommands), ...Object.keys(inv.commandFlags)])];
+}
+
+function nestedPathPatterns(inv: CompletionInventory): string {
+  return completionPaths(inv)
+    .filter((path) => path.includes(' '))
+    .map(shellCasePattern)
+    .join('|');
+}
+
+function bashPathResolver(inv: CompletionInventory): string {
+  const patterns = nestedPathPatterns(inv);
+  if (patterns.length === 0) return '';
+  return `
+  # Resolve the longest selected nested command path.
+  command_path="\${COMP_WORDS[1]}"
+  for ((i = 2; i < COMP_CWORD; i++)); do
+    candidate_path="\${command_path} \${COMP_WORDS[i]}"
+    case "\${candidate_path}" in
+      ${patterns}) command_path="\${candidate_path}" ;;
+    esac
+  done
+`;
+}
+
 // @graph-ignore-next-line graph:near-duplicate-function-body -- bash and zsh renderers intentionally mirror the same inventory while emitting different shell syntaxes.
 function bashScript(inv: CompletionInventory): string {
   const subs = inv.subcommands.join(' ');
@@ -306,18 +368,22 @@ function bashScript(inv: CompletionInventory): string {
     // group (`plugin`/`sessions`) has no own flags, so its union is just leaves.
     const ownFlags = inv.commandFlags[name] ?? [];
     const offered = [...new Set([...subsList, ...ownFlags])];
-    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${offered.join(' ')}" -- "\${cur}")) ;;`);
+    arms.push(
+      `    ${shellCasePattern(name)}) COMPREPLY=($(compgen -W "${offered.join(' ')}" -- "\${cur}")) ;;`,
+    );
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
-    arms.push(`    ${name}) COMPREPLY=($(compgen -W "${flags.join(' ')}" -- "\${cur}")) ;;`);
+    arms.push(
+      `    ${shellCasePattern(name)}) COMPREPLY=($(compgen -W "${flags.join(' ')}" -- "\${cur}")) ;;`,
+    );
   }
   arms.push(`    *) COMPREPLY=($(compgen -W "${commonFlagList}" -- "\${cur}")) ;;`);
   return `# bash completion for opensip
 # Source this file from ~/.bashrc or /etc/bash_completion.d/
 
 _opensip() {
-  local cur prev words cword
+  local cur prev words cword command_path candidate_path i
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
@@ -327,9 +393,10 @@ _opensip() {
     COMPREPLY=($(compgen -W "${subs}" -- "\${cur}"))
     return 0
   fi
+${bashPathResolver(inv)}
 
   # Subcommand-specific flags (derived from the live command specs)
-  case "\${COMP_WORDS[1]}" in
+  case "\${command_path:-\${COMP_WORDS[1]}}" in
 ${arms.join('\n')}
   esac
   return 0
@@ -343,6 +410,21 @@ complete -F _opensip opensip
 // zsh
 // ---------------------------------------------------------------------------
 
+function zshPathResolver(inv: CompletionInventory): string {
+  const patterns = nestedPathPatterns(inv);
+  if (patterns.length === 0) return '';
+  return `
+  # Resolve the longest selected nested command path.
+  command_path="\${words[2]}"
+  for (( i = 3; i < CURRENT; i++ )); do
+    candidate_path="\${command_path} \${words[i]}"
+    case "\${candidate_path}" in
+      ${patterns}) command_path="\${candidate_path}" ;;
+    esac
+  done
+`;
+}
+
 function zshScript(inv: CompletionInventory): string {
   const subs = inv.subcommands.join(' ');
   const commonFlagList = COMMON_FLAGS.join(' ');
@@ -351,11 +433,13 @@ function zshScript(inv: CompletionInventory): string {
     // Union of nested subcommands + the parent verb's own flags (see bashScript).
     const ownFlags = inv.commandFlags[name] ?? [];
     const offered = [...new Set([...subsList, ...ownFlags])];
-    arms.push(`    ${name}) _values '${name} subcommand' ${offered.join(' ')} ;;`);
+    arms.push(
+      `    ${shellCasePattern(name)}) _values '${name} subcommand' ${offered.join(' ')} ;;`,
+    );
   }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
     if (name in inv.groupSubcommands) continue;
-    arms.push(`    ${name}) _values 'flag' ${flags.join(' ')} ;;`);
+    arms.push(`    ${shellCasePattern(name)}) _values 'flag' ${flags.join(' ')} ;;`);
   }
   arms.push(`    *) _values 'flag' ${commonFlagList} ;;`);
   return `#compdef opensip
@@ -364,14 +448,16 @@ function zshScript(inv: CompletionInventory): string {
 
 _opensip() {
   local -a subcommands
+  local command_path candidate_path i
   subcommands=(${subs})
 
   if (( CURRENT == 2 )); then
     _describe 'subcommand' subcommands
     return
   fi
+${zshPathResolver(inv)}
 
-  case "\${words[2]}" in
+  case "\${command_path:-\${words[2]}}" in
 ${arms.join('\n')}
   esac
 }
@@ -384,6 +470,15 @@ compdef _opensip opensip
 // fish
 // ---------------------------------------------------------------------------
 
+function fishPathCondition(path: string, childNames: readonly string[] = []): string {
+  const seen = path
+    .split(' ')
+    .map((part) => `__fish_seen_subcommand_from ${part}`)
+    .join('; and ');
+  if (childNames.length === 0) return seen;
+  return `${seen}; and not __fish_seen_subcommand_from ${childNames.join(' ')}`;
+}
+
 function fishScript(inv: CompletionInventory): string {
   const subs = inv.subcommands.join(' ');
   const lines: string[] = [
@@ -392,17 +487,15 @@ function fishScript(inv: CompletionInventory): string {
     '',
     `complete -c opensip -f -n "__fish_use_subcommand" -a "${subs}" -d "opensip subcommand"`,
   ];
+  for (const [path, childNames] of Object.entries(inv.groupSubcommands)) {
+    lines.push(
+      `complete -c opensip -f -n "${fishPathCondition(path, childNames)}" -a "${childNames.join(' ')}" -d "${path} subcommand"`,
+    );
+  }
   for (const [name, flags] of Object.entries(inv.commandFlags)) {
-    // A primary tool verb that also hosts nested `<tool> <verb>` children stays
-    // in `groupSubcommands`, but it still owns its own flags — emit them so fish
-    // completes `fit --<flag>` (the qualified `${parent} ${name}` keys for the
-    // nested leaves are skipped here; they are not top-level commands). An
-    // action-less host group has no `commandFlags` entry, so it is unaffected.
-    if (name.includes(' ')) continue; // a nested `${parent} ${name}` key, not a verb
+    const condition = fishPathCondition(name, inv.groupSubcommands[name]);
     for (const flag of flags) {
-      lines.push(
-        `complete -c opensip -n "__fish_seen_subcommand_from ${name}" -l "${flag.replace(/^--/, '')}"`,
-      );
+      lines.push(`complete -c opensip -n "${condition}" -l "${flag.replace(/^--/, '')}"`);
     }
   }
   return lines.join('\n') + '\n';

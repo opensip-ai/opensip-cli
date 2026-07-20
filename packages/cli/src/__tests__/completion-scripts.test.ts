@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+
 import { type CommonFlagKey } from '@opensip-cli/contracts';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -76,6 +78,16 @@ describe('buildCompletionScript', () => {
     // Subcommand list should appear in the first complete line.
     expect(s).toContain('init');
   });
+
+  it('preserves digits in a declared long flag', () => {
+    const inventory = assembleCompletionInventory({
+      toolSpecs: [spec('hash', [], ['--sha256-check'])],
+      hostSpecs: [],
+      groups: [],
+    });
+
+    expect(inventory.commandFlags.hash).toContain('--sha256-check');
+  });
 });
 
 // The base fixture has no groups, so the per-shell group-arm loops never run.
@@ -95,9 +107,49 @@ function groupedInventory(): CompletionInventory {
   });
 }
 
+function nestedInventory(): CompletionInventory {
+  return assembleCompletionInventory({
+    toolSpecs: [
+      spec('fit', ['cwd', 'json'], ['--recipe']),
+      { ...spec('export', ['cwd'], ['--format']), parent: 'fit' },
+    ],
+    hostSpecs: [],
+    groups: [
+      {
+        name: 'sessions',
+        leaves: [spec('list', ['json'], ['--limit'])],
+      },
+    ],
+    toolPluginGroups: [
+      {
+        parentVerb: 'fit',
+        leaves: [spec('add', ['json'], ['--cwd'])],
+      },
+    ],
+  });
+}
+
 /** Count lines that (after leading whitespace) begin a `<name>)` case arm. */
 function countArmsFor(script: string, name: string): number {
   return script.split('\n').filter((l) => l.trimStart().startsWith(`${name})`)).length;
+}
+
+function runBashCompletion(script: string, words: readonly string[]): readonly string[] {
+  const commandWords = words.map((word) => `'${word.replaceAll("'", "'\\''")}'`).join(' ');
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `${script}
+COMP_WORDS=(${commandWords})
+COMP_CWORD=${words.length - 1}
+_opensip
+printf '%s\\n' "\${COMPREPLY[@]}"`,
+    ],
+    { encoding: 'utf8' },
+  );
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout.trim().split('\n').filter(Boolean);
 }
 
 describe('buildCompletionScript — action-less groups (plugin / sessions)', () => {
@@ -145,6 +197,56 @@ describe('buildCompletionScript — action-less groups (plugin / sessions)', () 
     const fish = buildCompletionScript('fish', inv);
     expect(fish).toContain('__fish_seen_subcommand_from plugin');
     expect(fish).toContain('__fish_seen_subcommand_from fit');
+  });
+});
+
+describe('buildCompletionScript — nested command paths', () => {
+  it('emits sourceable bash and zsh scripts when the inventory has nested commands', () => {
+    const inventory = nestedInventory();
+    const bash = buildCompletionScript('bash', inventory);
+    const parsed = spawnSync('bash', ['-n'], { input: bash, encoding: 'utf8' });
+
+    expect(parsed.status, parsed.stderr).toBe(0);
+    expect(buildCompletionScript('zsh', inventory)).toContain('fit\\ export)');
+  });
+
+  it('routes bash completion to the selected nested tool command', () => {
+    const script = buildCompletionScript('bash', nestedInventory());
+
+    expect(runBashCompletion(script, ['opensip', 'fit', 'export', '--'])).toEqual(
+      expect.arrayContaining(['--format']),
+    );
+    expect(runBashCompletion(script, ['opensip', 'sessions', 'list', '--'])).toEqual(
+      expect.arrayContaining(['--limit']),
+    );
+    expect(runBashCompletion(script, ['opensip', 'fit', 'plugin', 'add', '--'])).toEqual(
+      expect.arrayContaining(['--cwd']),
+    );
+  });
+
+  it('derives flags for host-group and tool-plugin leaves', () => {
+    const inventory = nestedInventory();
+
+    expect(inventory.commandFlags['sessions list']).toEqual(
+      expect.arrayContaining(['--json', '--limit']),
+    );
+    expect(inventory.commandFlags['fit plugin add']).toEqual(
+      expect.arrayContaining(['--json', '--cwd']),
+    );
+  });
+
+  it('emits fish candidates and flags for nested paths', () => {
+    const fish = buildCompletionScript('fish', nestedInventory());
+
+    expect(fish).toContain(
+      '-n "__fish_seen_subcommand_from sessions; and not __fish_seen_subcommand_from list" -a "list"',
+    );
+    expect(fish).toContain(
+      '-n "__fish_seen_subcommand_from sessions; and __fish_seen_subcommand_from list" -l "limit"',
+    );
+    expect(fish).toContain(
+      '-n "__fish_seen_subcommand_from fit; and __fish_seen_subcommand_from plugin; and __fish_seen_subcommand_from add" -l "cwd"',
+    );
   });
 });
 

@@ -327,7 +327,7 @@ function buildHostCompletionSurface(ctx: CliCommandsContext): HostCompletionSurf
     toolPluginGroups: buildToolPluginGroups(ctx, ctx.tools).map((g) => ({
       parentVerb: g.parentVerb,
       parentAliases: g.parentAliases,
-      leaves: g.leaves.map((l) => ({ name: l.name })),
+      leaves: g.leaves,
     })),
   };
 }
