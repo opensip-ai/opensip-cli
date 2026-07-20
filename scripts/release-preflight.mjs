@@ -66,8 +66,8 @@ function run(label, command, args, opts = {}) {
   }
 }
 
-function pnpm(label, args) {
-  run(label, 'pnpm', args);
+function pnpm(label, args, opts = {}) {
+  run(label, 'pnpm', args, opts);
 }
 
 function main() {
@@ -84,7 +84,21 @@ function main() {
   pnpm('supply-chain policy', ['supply-chain:verify']);
   pnpm('lint', ['lint']);
   pnpm('test with fresh coverage thresholds', ['test:coverage:fresh']);
-  pnpm('fit dogfood gate', ['fit:ci']);
+  // Project config selects the private dogfood pack but cannot trust it. Keep
+  // the local release ceremony isolated from the developer's real user config.
+  const policyHome = mkdtempSync(join(tmpdir(), 'opensip-cli-release-policy-'));
+  try {
+    const policyEnv = { ...process.env, HOME: policyHome, USERPROFILE: policyHome };
+    run(
+      'trust repo-local dogfood check pack',
+      'node',
+      ['packages/cli/dist/index.js', 'policy', 'trust', '@opensip-cli/checks-dogfood'],
+      { env: policyEnv },
+    );
+    pnpm('fit dogfood gate', ['fit:ci'], { env: policyEnv });
+  } finally {
+    rmSync(policyHome, { recursive: true, force: true });
+  }
   pnpm('graph dogfood gate', ['graph:ci']);
   pnpm('release consistency', ['verify-release', '--expected-version', args.expectedVersion]);
 

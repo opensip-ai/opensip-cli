@@ -45,15 +45,16 @@ globalExcludes:
 # Plugins
 # =============================================================================
 #
-# checkPackages explicitly admits fitness check packs beyond the bundled
-# @opensip-cli/checks-* set. We list our PRIVATE dogfood pack here:
+# checkPackages explicitly selects fitness check packs beyond the bundled
+# @opensip-cli/checks-* set; selection is not operator trust. We list our
+# PRIVATE dogfood pack here:
 # @opensip-cli/checks-dogfood is `private: true` (never published) and holds the
 # opensip-cli-INTERNAL architecture checks (ToolCliContext seams, cli-live,
 # bootstrap admission, MCP replay). It is a dev-only dependency of the CLI, so
-# the trust-policy PEP treats it as a non-bundled pack — listing it here is how
-# THIS repo opts its own dogfood pack into the fit:ci gate without faking
-# "bundled/verified" provenance. Adopters never see it: they don't install the
-# pack and their generated config does not list it.
+# the trust-policy PEP treats it as a non-bundled pack. This entry selects it for
+# THIS repo's fit:ci gate; clean runners separately bind operator trust with
+# `opensip policy trust @opensip-cli/checks-dogfood`. Adopters never see it:
+# they don't install the pack and their generated config does not list it.
 plugins:
   checkPackages:
     - '@opensip-cli/checks-dogfood'

@@ -169,6 +169,10 @@ jobs:
         run: pnpm lint
       - name: Test with coverage thresholds (mirror ci.yml — ADR-0017)
         run: pnpm test:coverage:fresh
+      # plugins.checkPackages selects the private dogfood pack but cannot grant
+      # trust. This clean release runner is the operator, matching ci.yml.
+      - name: Trust the repo-local dogfood check pack
+        run: node packages/cli/dist/index.js policy trust @opensip-cli/checks-dogfood
       - name: Fit (dogfood — mirror ci.yml; ADR-0017)
         run: pnpm fit:ci
       - name: Graph (dogfood — mirror ci.yml; ADR-0017)

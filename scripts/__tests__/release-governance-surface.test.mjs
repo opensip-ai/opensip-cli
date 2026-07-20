@@ -80,6 +80,28 @@ test('release.yml pack comment avoids stale literal package counts', () => {
   );
 });
 
+test('clean release lanes bind dogfood trust before running the fit gate', () => {
+  const releaseYml = read('.github/workflows/release.yml');
+  const releaseTrust = releaseYml.indexOf(
+    'node packages/cli/dist/index.js policy trust @opensip-cli/checks-dogfood',
+  );
+  const releaseFit = releaseYml.indexOf('run: pnpm fit:ci');
+  assert.ok(releaseTrust >= 0, 'release workflow must perform the dogfood trust ceremony');
+  assert.ok(releaseTrust < releaseFit, 'release workflow must trust dogfood before fit:ci');
+
+  const preflight = read('scripts/release-preflight.mjs');
+  const preflightTrust = preflight.indexOf("'@opensip-cli/checks-dogfood'");
+  const preflightFit = preflight.indexOf("pnpm('fit dogfood gate'");
+  assert.ok(preflightTrust >= 0, 'local release preflight must perform the trust ceremony');
+  assert.ok(preflightTrust < preflightFit, 'local release preflight must trust before fit:ci');
+  assert.match(preflight, /HOME: policyHome, USERPROFILE: policyHome/);
+  assert.match(
+    preflight,
+    /rmSync\(policyHome, \{ recursive: true, force: true \}\)/,
+    'local ceremony must remove its isolated user-policy directory',
+  );
+});
+
 test('package catalog verification trail matches publishable count or source-of-truth wording', () => {
   const catalog = read('docs/public/70-reference/02-package-catalog.md');
   const publishableCount = RELEASE_PACKAGE_ORDER.length;

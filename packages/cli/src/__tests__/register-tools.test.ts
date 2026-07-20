@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +19,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { resetBootstrapDiagnosticsBuffer } from '../bootstrap/bootstrap-diagnostics-buffer.js';
 import {
+  BUNDLED_CAPABILITY_PACKS,
   BUNDLED_TOOL_PACKAGES,
   discoverAndRegisterToolPackages,
   mountAllToolCommands,
@@ -1119,6 +1120,30 @@ describe('bundled-tools manifest (data-driven)', () => {
       '@opensip-cli/mcp',
     ]);
     expect(BUNDLED_TOOL_PACKAGES).toContain('@opensip-cli/fitness');
+  });
+
+  it('keeps bundled capability packs to CLI runtime dependencies and excludes private dogfood', () => {
+    const cliManifest = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
+    ) as {
+      dependencies?: Readonly<Record<string, string>>;
+      devDependencies?: Readonly<Record<string, string>>;
+    };
+    const dogfoodManifest = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../../fitness/checks-dogfood/package.json', import.meta.url)),
+        'utf8',
+      ),
+    ) as { name: string; private?: boolean };
+    const bundledCapabilityPacks = Object.values(BUNDLED_CAPABILITY_PACKS).flat();
+
+    expect(dogfoodManifest.private).toBe(true);
+    expect(cliManifest.dependencies).not.toHaveProperty(dogfoodManifest.name);
+    expect(cliManifest.devDependencies).toHaveProperty(dogfoodManifest.name);
+    expect(bundledCapabilityPacks).not.toContain(dogfoodManifest.name);
+    for (const packageName of bundledCapabilityPacks) {
+      expect(cliManifest.dependencies).toHaveProperty(packageName);
+    }
   });
 
   it('registerFirstPartyTools accepts an injected packages list (proves new manifest entry would be admitted/mounted via the exact same path)', async () => {

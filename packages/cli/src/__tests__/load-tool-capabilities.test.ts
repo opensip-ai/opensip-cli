@@ -38,6 +38,7 @@ function policyWithGrants(
 }
 
 let testDir: string;
+const DOGFOOD_PACK = '@opensip-cli/checks-dogfood';
 
 function makeTool(id: string): Tool {
   return {
@@ -48,7 +49,15 @@ function makeTool(id: string): Tool {
 }
 
 /** A marker-mode domain spec owned by `ownerToolId`, discovering kind `marker`. */
-function domain(id: string, ownerToolId: string, marker: string): CapabilityDomainSpec {
+function domain(
+  id: string,
+  ownerToolId: string,
+  marker: string,
+  options: {
+    readonly builtinScope?: string;
+    readonly explicitListMode?: 'replace' | 'augment';
+  } = {},
+): CapabilityDomainSpec {
   return {
     id,
     ownerToolId,
@@ -61,6 +70,7 @@ function domain(id: string, ownerToolId: string, marker: string): CapabilityDoma
       exportName: 'adapter',
       exportShape: 'single',
       configKeys: { packages: 'pkgs' },
+      ...options,
     },
   };
 }
@@ -70,6 +80,7 @@ function writeExplicitAdapterPackage(
   name: string,
   exportSource: string,
   targetDomain = 'mine',
+  markerKind?: string,
 ): void {
   const dir = join(testDir, 'node_modules', name);
   mkdirSync(dir, { recursive: true });
@@ -80,6 +91,7 @@ function writeExplicitAdapterPackage(
       type: 'module',
       main: './index.mjs',
       opensipTools: {
+        ...(markerKind === undefined ? {} : { kind: markerKind }),
         targetDomain,
         targetDomainApiVersion: 1,
       },
@@ -171,21 +183,28 @@ describe('loadOwningToolCapabilities', () => {
     });
   });
 
-  it('denies a pack referenced only by the analyzed-repo config (config selects, never trusts)', async () => {
+  it('denies the non-bundled dogfood pack when only analyzed-repo config selects it', async () => {
     // Plan 09 Phase 3: the analyzed repo's own `plugins.<domain>` entry must
     // not be admitted as operator intent — that inverts the trust direction
     // for a tool whose job is analyzing code it does not trust.
     const registry = new CapabilityRegistry();
     const registrar = vi.fn();
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-    registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
-    writeExplicitAdapterPackage('@acme/configured-adapter', "{ id: 'from-config' }");
+    registry.registerDomain(
+      domain('fit-pack', 'mytool', 'fit-pack', {
+        builtinScope: '@opensip-cli',
+        explicitListMode: 'augment',
+      }),
+      registrar,
+    );
+    writeExplicitAdapterPackage(DOGFOOD_PACK, "{ id: 'from-config' }", 'fit-pack', 'fit-pack');
 
     await withCapabilities(registry, async () => {
       const driven = await loadOwningToolCapabilities({
         owningTool: makeTool('mytool'),
         projectDir: testDir,
-        pluginsConfig: { pkgs: ['@acme/configured-adapter'] },
+        cliDir: testDir,
+        pluginsConfig: { pkgs: [DOGFOOD_PACK] },
       });
 
       expect(driven).toBe(1);
@@ -193,28 +212,44 @@ describe('loadOwningToolCapabilities', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.objectContaining({
           evt: 'cli.capability.trust_denied',
-          packageName: '@acme/configured-adapter',
+          packageName: DOGFOOD_PACK,
           grantPresent: false,
         }),
       );
     });
   });
 
-  it('admits a config-selected pack whose user-level grant matches the resolved provenance', async () => {
+  it('admits the config-selected dogfood pack through worker isolation when its user grant matches', async () => {
     const registry = new CapabilityRegistry();
     const registrar = vi.fn();
+    const createHostContributions = vi.fn((context) => {
+      expect(context.pkg.name).toBe(DOGFOOD_PACK);
+      expect(context.resourceDecision).toMatchObject({
+        isolation: 'worker',
+        denyUndeclared: true,
+      });
+      return Promise.resolve([{ contribution: { id: 'from-config' } }]);
+    }) satisfies CapabilityIsolationBridge['createHostContributions'];
     const workerBridge: CapabilityIsolationBridge = {
-      createHostContributions: vi.fn(() =>
-        Promise.resolve([{ contribution: { id: 'from-config' } }]),
-      ),
+      createHostContributions,
       runInWorker: vi.fn(),
     };
-    registry.registerDomain(domain('mine', 'mytool', 'mine-pack'), registrar);
-    writeExplicitAdapterPackage('@acme/configured-adapter', "{ id: 'from-config' }");
+    registry.registerDomain(
+      domain('fit-pack', 'mytool', 'fit-pack', {
+        builtinScope: '@opensip-cli',
+        explicitListMode: 'augment',
+      }),
+      registrar,
+    );
+    writeExplicitAdapterPackage(DOGFOOD_PACK, "{ id: 'from-config' }", 'fit-pack', 'fit-pack');
     const grants = [
       {
-        id: '@acme/configured-adapter',
-        manifestHash: manifestHashOf({ targetDomain: 'mine', targetDomainApiVersion: 1 }),
+        id: DOGFOOD_PACK,
+        manifestHash: manifestHashOf({
+          kind: 'fit-pack',
+          targetDomain: 'fit-pack',
+          targetDomainApiVersion: 1,
+        }),
       },
     ];
 
@@ -224,19 +259,51 @@ describe('loadOwningToolCapabilities', () => {
         const driven = await loadOwningToolCapabilities({
           owningTool: {
             ...makeTool('mytool'),
-            extensionPoints: { capabilityIsolationBridges: { mine: workerBridge } },
+            extensionPoints: { capabilityIsolationBridges: { 'fit-pack': workerBridge } },
           },
           projectDir: testDir,
-          pluginsConfig: { pkgs: ['@acme/configured-adapter'] },
+          cliDir: testDir,
+          pluginsConfig: { pkgs: [DOGFOOD_PACK] },
         });
 
         expect(driven).toBe(1);
-        expect(workerBridge.createHostContributions).toHaveBeenCalledTimes(1);
+        expect(createHostContributions).toHaveBeenCalledTimes(1);
         expect(registrar).toHaveBeenCalledTimes(1);
         expect(registrar).toHaveBeenCalledWith({ id: 'from-config' });
       },
       policyWithGrants(grants),
     );
+  });
+
+  it('does not seed a missing private dogfood package in a consumer-style CLI tree', async () => {
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(
+      domain('fit-pack', 'mytool', 'fit-pack', {
+        builtinScope: '@opensip-cli',
+        explicitListMode: 'augment',
+      }),
+      vi.fn(),
+    );
+    const scope = new RunScope();
+    Object.assign(scope, { capabilities: registry });
+
+    await runWithScope(scope, async () => {
+      await loadOwningToolCapabilities({
+        owningTool: makeTool('mytool'),
+        projectDir: testDir,
+        cliDir: testDir,
+        pluginsConfig: {},
+      });
+    });
+
+    const unresolvedPackages = scope.bootstrapDiagnostics
+      .list()
+      .filter((diagnostic) => diagnostic.logRef === 'capability.discovery.package_not_resolved')
+      .map((diagnostic) => diagnostic.provenance?.packageName);
+    // This empty consumer-style CLI tree proves manifest-seeded packages are
+    // observable at the diagnostic seam, making the dogfood absence meaningful.
+    expect(unresolvedPackages).toContain('@opensip-cli/checks-universal');
+    expect(unresolvedPackages).not.toContain(DOGFOOD_PACK);
   });
 
   it('denies a granted name whose resolved provenance differs (shadowed pack)', async () => {
