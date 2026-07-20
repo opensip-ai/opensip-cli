@@ -349,8 +349,14 @@ export async function composeAndWriteReport(opts: ComposeReportOptions): Promise
 
   // Bound accumulation of run-addressed artifacts: delete only orphans whose
   // Run is no longer retained. Uncertainty preserves the file.
-  const retainedRunIds = (input.runs ?? []).map((run) => run.id);
-  const pruned = pruneOrphanRunAddressedReports(paths.reportsDir, retainedRunIds);
+  const datastore = scope?.datastore() as DataStore | undefined;
+  const retainedRunIds = datastore
+    ? new RunRepo(datastore).listRuns().map((run) => run.id)
+    : undefined;
+  const pruned =
+    retainedRunIds === undefined
+      ? 0
+      : pruneOrphanRunAddressedReports(paths.reportsDir, retainedRunIds);
   if (pruned > 0) {
     logger.info?.({
       evt: 'cli.report.compose.orphan_pruned',

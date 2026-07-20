@@ -1,6 +1,7 @@
 // @fitness-ignore-file dogfood-one-config-document-ratchet -- `suite add` is the host-owned config authoring command: it intentionally edits opensip-cli.config.yml and does not participate in runtime config loading.
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { isReservedSuiteName, reservedSuiteNameMessage } from '@opensip-cli/config';
 import { ConfigurationError, currentLogger, type Tool } from '@opensip-cli/core';
@@ -102,15 +103,23 @@ function appendSuiteStep(
   const doc = readOrCreateDocument(configPath);
   const root = ensureRootMap(doc, configPath);
   let suites = root.get('suites');
-  if (!isMap(suites)) {
+  if (suites === undefined) {
     suites = doc.createNode({});
     root.set('suites', suites);
+  } else if (!isMap(suites)) {
+    throw new ConfigurationError(`Cannot edit suites in ${configPath}.`, {
+      code: 'CONFIG.SUITE_ADD.INVALID_SUITES',
+    });
   }
   const suitesMap = suites as YAMLMap;
   let suite = suitesMap.get(suiteName);
-  if (!isMap(suite)) {
+  if (suite === undefined) {
     suite = doc.createNode({ steps: [] });
     suitesMap.set(suiteName, suite);
+  } else if (!isMap(suite)) {
+    throw new ConfigurationError(`Cannot edit suites.${suiteName} in ${configPath}.`, {
+      code: 'CONFIG.SUITE_ADD.INVALID_SUITE',
+    });
   }
   const suiteMap = suite as YAMLMap;
   let seq = suiteMap.get('steps');
@@ -124,8 +133,7 @@ function appendSuiteStep(
     });
   }
   const yamlSeq = seq;
-  const stepKey = JSON.stringify(step);
-  if (yamlSeq.items.some((item) => JSON.stringify(yamlNodeToJson(item)) === stepKey)) {
+  if (yamlSeq.items.some((item) => isDeepStrictEqual(yamlNodeToJson(item), step))) {
     currentLogger().info?.({
       evt: 'cli.suite.add.duplicate_step',
       suite: suiteName,

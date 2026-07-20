@@ -82,16 +82,22 @@ function appendToPluginList(
   configPath: string,
 ): boolean {
   let plugins = root.get('plugins');
-  if (!isMap(plugins)) {
+  if (plugins === undefined) {
     plugins = doc.createNode({});
     root.set('plugins', plugins);
+  } else if (!isMap(plugins)) {
+    throw new Error(`Cannot edit plugins.${domain} in ${configPath}: plugins must be a mapping.`);
   }
   const pluginsMap = plugins as YAMLMap;
 
   let list = pluginsMap.get(domain);
-  if (!isSeq(list)) {
+  if (list === undefined) {
     list = doc.createNode([]);
     pluginsMap.set(domain, list);
+  } else if (!isSeq(list)) {
+    throw new Error(
+      `Cannot edit plugins.${domain} in ${configPath}: plugins.${domain} must be a sequence.`,
+    );
   }
   const seq = list as YAMLSeq;
 

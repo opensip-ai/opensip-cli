@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { err, ok, type Result } from '@opensip-cli/core';
 
@@ -28,7 +28,7 @@ function normalizeRelativePath(value: string): string {
 
 function isInsideRoot(root: string, candidate: string): boolean {
   const rel = relative(root, candidate);
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
 function repairError(code: string, message: string): RepairError {

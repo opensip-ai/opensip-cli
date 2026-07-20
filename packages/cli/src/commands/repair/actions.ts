@@ -43,10 +43,16 @@ function targetPath(signal: Signal, action: SignalRepairAction): string | undefi
 
 function splitContentLines(content: string): {
   readonly lines: string[];
-  readonly newline: string;
+  readonly endings: string[];
 } {
-  const newline = content.includes('\r\n') ? '\r\n' : '\n';
-  return { lines: content.split(newline), newline };
+  return {
+    lines: content.split(/\r\n|\n|\r/u),
+    endings: content.match(/\r\n|\n|\r/gu) ?? [],
+  };
+}
+
+function joinContentLines(lines: readonly string[], endings: readonly string[]): string {
+  return lines.map((line, index) => `${line}${endings[index] ?? ''}`).join('');
 }
 
 function plannedChange(
@@ -95,7 +101,7 @@ function replaceTsIgnore(input: ActionInput): Result<ActionPlanDetails, RepairEr
   const file = readSafeTextFile(input.projectRoot, rawPath);
   if (!file.ok) return file;
 
-  const { lines, newline } = splitContentLines(file.value.content);
+  const { lines, endings } = splitContentLines(file.value.content);
   const index = line - 1;
   const current = lines[index];
   if (current === undefined) {
@@ -130,7 +136,7 @@ function replaceTsIgnore(input: ActionInput): Result<ActionPlanDetails, RepairEr
   }
 
   lines[index] = current.replace(expectedText, replacementText);
-  const after = lines.join(newline);
+  const after = joinContentLines(lines, endings);
   const change = plannedChange(
     file.value.absolutePath,
     file.value.relativePath,
@@ -238,6 +244,7 @@ function dependencyLineIndex(
 
 function removeDependencyLine(
   lines: string[],
+  endings: string[],
   bounds: { readonly start: number; readonly end: number },
   removeIndex: number,
 ): void {
@@ -252,6 +259,7 @@ function removeDependencyLine(
     }
   }
   lines.splice(removeIndex, 1);
+  endings.splice(removeIndex, 1);
 }
 
 function validateJson(content: string, relativePath: string): Result<true, RepairError> {
@@ -293,7 +301,7 @@ function removePackageJsonDependency(input: ActionInput): Result<ActionPlanDetai
     });
   }
 
-  const { lines, newline } = splitContentLines(file.value.content);
+  const { lines, endings } = splitContentLines(file.value.content);
   const bounds = findSectionBounds(lines, target.value.dependencySection);
   if (bounds === undefined) {
     return err(
@@ -314,8 +322,8 @@ function removePackageJsonDependency(input: ActionInput): Result<ActionPlanDetai
     );
   }
 
-  removeDependencyLine(lines, bounds, removeIndex.value);
-  const after = lines.join(newline);
+  removeDependencyLine(lines, endings, bounds, removeIndex.value);
+  const after = joinContentLines(lines, endings);
   const validJson = validateJson(after, file.value.relativePath);
   if (!validJson.ok) return validJson;
 

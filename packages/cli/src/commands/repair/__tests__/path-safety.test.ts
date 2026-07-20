@@ -60,6 +60,20 @@ describe('repair path safety', () => {
     }
   });
 
+  it('accepts in-root filenames that begin with two dots', () => {
+    const filePath = join(root, '..generated.ts');
+    writeFileSync(filePath, 'generated\n', 'utf8');
+
+    expect(resolveRepairTargetPath(root, '..generated.ts')).toMatchObject({
+      ok: true,
+      value: { relativePath: '..generated.ts' },
+    });
+    expect(readSafeTextFile(root, '..generated.ts')).toMatchObject({
+      ok: true,
+      value: { content: 'generated\n' },
+    });
+  });
+
   it('rejects directory and oversized file targets', () => {
     mkdirSync(join(root, 'src'), { recursive: true });
     expect(readSafeTextFile(root, 'src')).toMatchObject({

@@ -46,6 +46,18 @@ describe('addToConfigPluginList', () => {
     expect(text).toContain('sim');
     expect(text).toContain('@org/scen');
   });
+
+  it.each([
+    ['plugins node', 'plugins: disabled\n'],
+    ['domain node', 'plugins:\n  fit: disabled\n'],
+  ])('refuses to replace an authored non-sequence %s', (_label, content) => {
+    writeFileSync(configPath, content, 'utf8');
+
+    expect(() => addToConfigPluginList(configPath, 'fit', '@org/pack')).toThrow(
+      /Cannot edit plugins\.fit/,
+    );
+    expect(readFileSync(configPath, 'utf8')).toBe(content);
+  });
 });
 
 describe('removeFromConfigPluginList', () => {

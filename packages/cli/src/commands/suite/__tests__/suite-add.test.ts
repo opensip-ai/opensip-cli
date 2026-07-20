@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -100,5 +100,54 @@ describe('addSuiteStep', () => {
     ).toThrow(/reserved for the built-in audit suite/);
 
     expect(existsSync(join(tmp, 'opensip-cli.config.yml'))).toBe(false);
+  });
+
+  it.each([
+    ['a non-map suites block', 'suites:\n  - existing\n'],
+    ['a non-map named suite', 'suites:\n  security: existing\n'],
+  ])('refuses to replace %s', (_label, content) => {
+    const configPath = join(tmp, 'opensip-cli.config.yml');
+    writeFileSync(configPath, content, 'utf8');
+
+    expect(() =>
+      addSuiteStep({
+        suite: 'security',
+        tool: 'fitness',
+        command: 'fit',
+        argPairs: [],
+        tools: [fixtureTool()],
+        projectRoot: tmp,
+      }),
+    ).toThrow(/Cannot edit/);
+    expect(readFileSync(configPath, 'utf8')).toBe(content);
+  });
+
+  it('recognizes a semantically identical authored step regardless of key order', () => {
+    const configPath = join(tmp, 'opensip-cli.config.yml');
+    const content = [
+      'suites:',
+      '  security:',
+      '    steps:',
+      '      - command: fit',
+      '        args:',
+      '          count: 3',
+      '          recipe: security',
+      '        name: fitness',
+      `        tool: ${TOOL_ID}`,
+      '',
+    ].join('\n');
+    writeFileSync(configPath, content, 'utf8');
+
+    const result = addSuiteStep({
+      suite: 'security',
+      tool: 'fitness',
+      command: 'fit',
+      argPairs: ['recipe=security', 'count=3'],
+      tools: [fixtureTool()],
+      projectRoot: tmp,
+    });
+
+    expect(result.changed).toBe(false);
+    expect(readFileSync(configPath, 'utf8')).toBe(content);
   });
 });

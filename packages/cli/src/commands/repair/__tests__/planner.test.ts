@@ -152,6 +152,30 @@ describe('repair planner', () => {
     );
   });
 
+  it('uses logical line numbers without normalizing mixed line endings', () => {
+    const before = '// first\n// @ts-ignore\r\nlegacy();\n';
+    writeFixture(root, 'src/example.ts', before);
+    const result = applyRepair({
+      ...input(root, [
+        action({
+          target: {
+            filePath: 'src/example.ts',
+            line: 2,
+            expectedText: '@ts-ignore',
+            replacementText: '@ts-expect-error',
+          },
+        }),
+      ]),
+      actionId: 'replace-ts-ignore',
+      force: true,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(join(root, 'src/example.ts'), 'utf8')).toBe(
+      '// first\n// @ts-expect-error\r\nlegacy();\n',
+    );
+  });
+
   it('applies and verifies through an injected verifier', async () => {
     writeFixture(root, 'src/example.ts', '// @ts-ignore -- legacy third-party type\nlegacy();\n');
     const verification: RepairVerificationResult = {
@@ -460,6 +484,39 @@ describe('repair planner', () => {
     const dev = previewRepair(input(root, [removeDevDependency]));
     expect(dev.ok).toBe(true);
     if (dev.ok) expect(dev.value.changes[0]?.diff).toContain('-    "vitest"');
+  });
+
+  it('removes a dependency without normalizing mixed line endings', () => {
+    const before = [
+      '{\r\n',
+      '  "dependencies": {\n',
+      '    "alpha": "^1.0.0",\r\n',
+      '    "lodash": "^4.0.0"\n',
+      '  }\r\n',
+      '}\n',
+    ].join('');
+    writeFixture(root, 'package.json', before);
+    const remove = action({
+      id: 'remove-unused-dependency',
+      kind: 'package-json-remove-dependency',
+      title: 'Remove lodash',
+      target: {
+        filePath: 'package.json',
+        packageName: 'lodash',
+        dependencySection: 'dependencies',
+      },
+    });
+
+    const result = applyRepair({
+      ...input(root, [remove]),
+      actionId: 'remove-unused-dependency',
+      force: true,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(join(root, 'package.json'), 'utf8')).toBe(
+      ['{\r\n', '  "dependencies": {\n', '    "alpha": "^1.0.0"\r\n', '  }\r\n', '}\n'].join(''),
+    );
   });
 
   it('rejects dependency removal when the package section is not an object', () => {

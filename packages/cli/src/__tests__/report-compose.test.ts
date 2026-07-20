@@ -332,6 +332,33 @@ describe('composeAndWriteReport', () => {
     expect(readFileSync(join(runsDir, 'not-a-digest.html'), 'utf8')).toContain('ignore');
   });
 
+  it('preserves run-addressed reports for retained Runs outside the recent dashboard page', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    const datastore = openMemoryDatastore();
+    const repo = new RunRepo(datastore);
+    repo.saveRun(storedRun('run-retained-old'));
+    for (let index = 1; index <= 20; index += 1) {
+      const completedAt = new Date(Date.UTC(2026, 6, index + 1, 0, 0, 1)).toISOString();
+      repo.saveRun({
+        ...storedRun(`run-new-${String(index).padStart(2, '0')}`),
+        startedAt: new Date(Date.UTC(2026, 6, index + 1)).toISOString(),
+        completedAt,
+      });
+    }
+    const reportsDir = resolveProjectPaths(projectRoot).reportsDir;
+    const retainedPath = join(reportsDir, 'runs', runAddressedReportFilename('run-retained-old'));
+    mkdirSync(join(reportsDir, 'runs'), { recursive: true });
+    writeFileSync(retainedPath, '<html>retained</html>', 'utf8');
+
+    await runWithScope(makeScope([], datastore), () =>
+      composeAndWriteReport({
+        open: false,
+      }),
+    );
+
+    expect(readFileSync(retainedPath, 'utf8')).toContain('retained');
+  });
+
   it('omits malformed or oversized run identity text before embedding and launch', async () => {
     const launch = vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
     const scope = makeScope([]);
