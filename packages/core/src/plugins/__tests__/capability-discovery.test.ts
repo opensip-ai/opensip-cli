@@ -654,6 +654,56 @@ describe('discoverCapabilityContributions — per-package isolation', () => {
     ]);
   });
 
+  it('a required (host-component) pack whose import throws FAILS the load instead of skipping', async () => {
+    const dir = join(testDir, 'node_modules', '@acme', 'items-required-broken');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({
+        name: '@acme/items-required-broken',
+        type: 'module',
+        main: './index.mjs',
+        opensipTools: { kind: 'items-pack' },
+      }),
+    );
+    writeFileSync(join(dir, 'index.mjs'), "throw new Error('boom at import');\n");
+
+    await expect(
+      discoverCapabilityContributions({
+        descriptor: MARKER_DESCRIPTOR,
+        projectDir: testDir,
+        shouldLoadPackage: () => ({ admit: true, required: true }),
+      }),
+    ).rejects.toMatchObject({
+      name: 'SystemError',
+      code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+    });
+  });
+
+  it('a required pack failing through the contribution loader also fails the load', async () => {
+    writeFixturePackage({
+      relDir: 'node_modules/@acme/items-required-loader-throws',
+      name: '@acme/items-required-loader-throws',
+      markerKind: 'items-pack',
+      exportName: 'items',
+      exportSource: "[{ id: 'must-not-import' }]",
+    });
+
+    await expect(
+      discoverCapabilityContributions({
+        descriptor: MARKER_DESCRIPTOR,
+        projectDir: testDir,
+        shouldLoadPackage: () => ({ admit: true, required: true }),
+        contributionLoader: () => {
+          throw new Error('worker load failed');
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: 'SystemError',
+      code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+    });
+  });
+
   it('skips a package whose array export is the wrong shape, with a diagnostic', async () => {
     writeFixturePackage({
       relDir: 'node_modules/@acme/items-bad',

@@ -63,7 +63,18 @@ export interface CapabilityDiscoveryDiagnostic {
 
 /** Policy-free admission decision for a selected capability package. */
 export type CapabilityPackageAdmission =
-  | { readonly admit: true; readonly resourceDecision?: CapabilityResourceDecision }
+  | {
+      readonly admit: true;
+      readonly resourceDecision?: CapabilityResourceDecision;
+      /**
+       * The policy plane vouches this pack is a host component (e.g. a
+       * manifest-bundled pack): a load failure must FAIL the run instead of
+       * skip-with-diagnostic — a silently missing bundled check pack corrupts
+       * gate results (a fit gate can false-green on the checks that never
+       * loaded). Optional/third-party packs stay skip-with-diagnostic.
+       */
+      readonly required?: boolean;
+    }
   | { readonly admit: false; readonly reason: string };
 
 /**

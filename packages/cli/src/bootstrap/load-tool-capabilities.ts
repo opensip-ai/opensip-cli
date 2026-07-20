@@ -282,7 +282,13 @@ export function admitCapabilityPackage(
     };
   }
   if (operatorTrusted && policyDecision.allowed) {
-    return capabilityPackProvenancePassthrough(pkg, { admit: true, resourceDecision });
+    return capabilityPackProvenancePassthrough(pkg, {
+      admit: true,
+      resourceDecision,
+      // Bundled packs are host components: their load failure must fail the
+      // run loudly, never silently shrink the check surface.
+      ...(bundled ? { required: true } : {}),
+    });
   }
   const reason = admissionDenialReason(pkg, grant !== undefined, policyDecision);
   logger.warn({

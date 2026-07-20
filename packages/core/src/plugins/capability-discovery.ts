@@ -17,6 +17,7 @@
 
 import { pathToFileURL } from 'node:url';
 
+import { SystemError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
 import { readOneExport } from './capability-export-reader.js';
@@ -77,10 +78,44 @@ export async function discoverCapabilityContributions(
 }
 
 /**
+ * Errno codes for transient resource exhaustion during a module import
+ * (descriptor/table pressure). One short retry usually clears them — other
+ * processes release descriptors within milliseconds.
+ */
+const TRANSIENT_IMPORT_ERRNO = new Set(['EMFILE', 'ENFILE', 'EAGAIN']);
+const IMPORT_RETRY_ATTEMPTS = 3;
+const IMPORT_RETRY_DELAY_MS = 25;
+
+function isTransientImportError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && TRANSIENT_IMPORT_ERRNO.has(code);
+}
+
+/**
+ * Dynamic-import with a bounded retry on transient resource errnos. A loaded
+ * lane (parallel workers, forked CLIs) can momentarily exhaust descriptors;
+ * without the retry that reads as "pack failed to load" for a pack that is
+ * present and healthy.
+ */
+async function importEntryWithRetry(entryHref: string): Promise<Record<string, unknown>> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return (await import(entryHref)) as Record<string, unknown>;
+    } catch (error) {
+      if (attempt >= IMPORT_RETRY_ATTEMPTS || !isTransientImportError(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, IMPORT_RETRY_DELAY_MS * attempt));
+    }
+  }
+}
+
+/**
  * Resolve a package's entry, dynamic-import it, and read the declared export.
  * `exportShape: 'array'` spreads the array; `'single'` yields the one value.
  * Missing package metadata, a missing/wrong-shape export, or an import that
- * throws all skip the package with a diagnostic — never propagate.
+ * throws all skip the package with a diagnostic — except for packs admitted
+ * with `required: true` (host components), whose load failure throws
+ * `SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED` so the run fails loudly instead
+ * of silently shrinking the check surface.
  */
 async function loadPackageContributions(
   pkg: SelectedCapabilityPackage,
@@ -98,8 +133,24 @@ async function loadPackageContributions(
     diagnoseIsolationUnsupported(pkg, onDiagnostic);
     return [];
   }
+  return loadViaHostImport(pkg, admission, options);
+}
+
+/** The in-process import leg of {@link loadPackageContributions}. */
+async function loadViaHostImport(
+  pkg: SelectedCapabilityPackage,
+  admission: Extract<CapabilityPackageAdmission, { readonly admit: true }>,
+  options: DiscoverCapabilityContributionsOptions,
+): Promise<RawCapabilityContribution[]> {
+  const { descriptor, onDiagnostic } = options;
   const resolved = resolvePackageEntryPoint(pkg.packageDir, pkg.name);
   if (!resolved) {
+    if (admission.required === true) {
+      throw new SystemError(
+        `required capability pack ${pkg.name} has no readable package entry (${pkg.packageDir})`,
+        { code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED' },
+      );
+    }
     onDiagnostic?.({
       evt: 'capability.discovery.unreadable_package',
       packageName: pkg.name,
@@ -108,7 +159,7 @@ async function loadPackageContributions(
     return [];
   }
   try {
-    const mod = (await import(pathToFileURL(resolved.entry).href)) as Record<string, unknown>;
+    const mod = await importEntryWithRetry(pathToFileURL(resolved.entry).href);
     const metadataTag = {
       ...(pkg.packageTargetDomain === undefined
         ? {}
@@ -153,13 +204,20 @@ async function loadPackageContributions(
     const msg = error instanceof Error ? error.message : String(error);
     // Structured log of the substrate's own failure (the caller's onDiagnostic is
     // a separate channel; this keeps the import failure observable in the logs even
-    // when no diagnostic sink is wired). Per-package isolation: skip, never throw.
+    // when no diagnostic sink is wired). Per-package isolation: skip, never throw —
+    // EXCEPT for required (host-component) packs, which must fail the run.
     logger.warn({
       evt: 'capability.discovery.load_failed',
       module: 'core:plugins',
       name: pkg.name,
       error: msg,
     });
+    if (admission.required === true) {
+      throw new SystemError(`required capability pack ${pkg.name} failed to load: ${msg}`, {
+        code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+        cause: error,
+      });
+    }
     onDiagnostic?.({
       evt: 'capability.discovery.load_failed',
       packageName: pkg.name,
@@ -196,6 +254,13 @@ async function tryContributionLoader(
     });
     return loaded === undefined ? undefined : [...loaded];
   } catch (error) {
+    if (admission.required === true) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new SystemError(`required capability pack ${pkg.name} failed to load: ${msg}`, {
+        code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+        cause: error,
+      });
+    }
     return diagnoseLoadFailed(pkg, error, onDiagnostic);
   }
 }
