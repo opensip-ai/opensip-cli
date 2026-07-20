@@ -599,7 +599,7 @@ describe('sessions spec — action bodies', () => {
     expect(executeClear).not.toHaveBeenCalled();
   });
 
-  it.each(['0.5', '7days', '9007199254740992'])(
+  it.each(['0.5', '7days', '9007199254740991', '9007199254740992'])(
     'sessions purge --older-than rejects non-integer value %s without clearing sessions',
     async (raw) => {
       const { ctx } = makeCtx();

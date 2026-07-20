@@ -47,9 +47,10 @@ function parsePositiveInt(raw: string): number {
 /** @throws {Error} When the raw value is not a non-negative integer. */
 function parseOlderThanDays(raw: string): number {
   const n = parseDecimalInteger(raw);
-  if (n === undefined) {
+  const cutoff = n === undefined ? Number.NaN : Date.now() - n * 24 * 60 * 60 * 1000;
+  if (n === undefined || Number.isNaN(new Date(cutoff).getTime())) {
     throw new ValidationError(
-      `Invalid --older-than value: '${raw}'. Must be a non-negative integer.`,
+      `Invalid --older-than value: '${raw}'. Must be a non-negative integer within the supported date range.`,
     );
   }
   return n;
