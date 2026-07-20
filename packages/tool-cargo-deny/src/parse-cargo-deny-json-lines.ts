@@ -13,7 +13,7 @@ import type { Signal, SignalCategory } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
 
 /**
- * cargo-deny `check --format json` emits NDJSON `{ type, fields }` messages. Only
+ * cargo-deny `--format json check` emits NDJSON `{ type, fields }` messages. Only
  * `type: "diagnostic"` carries a finding; the `fields` bag holds `severity`,
  * `message`, `code`, optional nested `advisory` (with `id`), and `labels[]` (each
  * a dependency-graph/manifest span with an optional `line`/`column`). It is NOT
@@ -45,6 +45,48 @@ function ruleIdOf(fields: Record<string, unknown>): string {
 }
 
 /**
+ * Bans/license codes that can reach cargo-deny's default warn/error JSON stream
+ * and do not carry an obvious `ban`/`license` marker. Cargo-deny omits the
+ * originating check from its JSON envelope, so exact codes are the only reliable
+ * domain discriminator for these cases.
+ */
+const QUALITY_CODES = new Set([
+  // bans
+  'not-allowed',
+  'unmatched-skip',
+  'unnecessary-skip',
+  'unmatched-wrapper',
+  'unmatched-skip-root',
+  'exact-features-mismatch',
+  'feature-not-explicitly-allowed',
+  'unknown-feature',
+  'default-feature-enabled',
+  'checksum-mismatch',
+  'denied-by-extension',
+  'detected-executable',
+  'detected-executable-script',
+  'unable-to-check-path',
+  'unmatched-bypass',
+  'unmatched-path-bypass',
+  'unmatched-glob',
+  'unused-wrapper',
+  'workspace-duplicate',
+  'unresolved-workspace-dependency',
+  'unused-workspace-dependency',
+  'non-utf8-path',
+  'non-root-path',
+  'replaced-in-std',
+  'unmatched-replacement-ignore',
+  // licenses
+  'accepted',
+  'rejected',
+  'unlicensed',
+  'missing-clarification-file',
+  'parse-error',
+  'gather-failure',
+]);
+
+/**
  * Map cargo-deny's real diagnostic codes (and legacy letter prefixes) to a
  * canonical category. Advisory / source-policy findings are security; bans and
  * license policy are quality/compliance (no dedicated `license` SignalCategory).
@@ -68,6 +110,7 @@ function categoryOf(ruleId: string, code: string | undefined): SignalCategory {
     return 'security';
   }
   if (
+    QUALITY_CODES.has(c) ||
     c === 'banned' ||
     c === 'denied' ||
     c === 'duplicate' ||
@@ -100,7 +143,12 @@ function normalize(value: unknown): Signal | undefined {
   return createSignal({
     source: 'cargo-deny',
     category: categoryOf(ruleId, code),
-    severity: nativeLabelToSeverity(severityLabel, 'medium'),
+    // cargo-deny serializes codespan's internal-bug severity as `bug`; its SARIF
+    // renderer maps that to `error`, which corresponds to OpenSIP `high`.
+    severity:
+      severityLabel?.trim().toLowerCase() === 'bug'
+        ? 'high'
+        : nativeLabelToSeverity(severityLabel, 'medium'),
     ruleId,
     message,
     code: {
@@ -122,7 +170,7 @@ function normalize(value: unknown): Signal | undefined {
 }
 
 /**
- * Parse cargo-deny's `check --format json` NDJSON stream into signals — one per
+ * Parse cargo-deny's `--format json check` NDJSON stream into signals — one per
  * `diagnostic` message. Non-diagnostic lines (`summary`/`log`) and messages
  * without a `message` field are skipped. Advisory findings prefer
  * `fields.advisory.id` (e.g. `RUSTSEC-…`) as `ruleId`.

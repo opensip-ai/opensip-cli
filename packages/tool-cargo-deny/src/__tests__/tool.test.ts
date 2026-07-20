@@ -95,9 +95,9 @@ describe('cargo-deny tool — commandSpecs', () => {
 });
 
 describe('cargo-deny tool — scan helper', () => {
-  it('builds the `check --format json` argv', () => {
+  it('places the top-level `--format` option before the `check` subcommand', () => {
     const ctx = { projectRoot: '/proj' } as unknown as AdapterRunContext;
-    expect(buildScanArgs(ctx)).toEqual(['check', '--format', 'json']);
+    expect(buildScanArgs(ctx)).toEqual(['--format', 'json', 'check']);
   });
 });
 

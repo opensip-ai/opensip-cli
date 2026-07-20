@@ -63,6 +63,21 @@ describe('parseCargoDenyJsonLines', () => {
     expect(warn?.severity).toBe('medium');
   });
 
+  it('maps cargo-deny internal bug diagnostics to high severity', () => {
+    const [bug] = parseCargoDenyJsonLines(
+      output(
+        diagnostic({
+          severity: 'bug',
+          message: 'failed to resolve a workspace dependency',
+          code: 'unresolved-workspace-dependency',
+          labels: [],
+        }),
+      ),
+      CTX,
+    );
+    expect(bug?.severity).toBe('high');
+  });
+
   it('derives the category from the code prefix (L* → quality, A* → security)', () => {
     const [license] = parseCargoDenyJsonLines(
       output(
@@ -171,6 +186,52 @@ describe('parseCargoDenyJsonLines', () => {
     );
     expect(banned?.category).toBe('quality');
     expect(vuln?.category).toBe('security');
+  });
+
+  it('maps bans/license codes that reach the default cargo-deny JSON stream to quality', () => {
+    const qualityCodes = [
+      // bans
+      'not-allowed',
+      'unmatched-skip',
+      'unnecessary-skip',
+      'unmatched-wrapper',
+      'unmatched-skip-root',
+      'exact-features-mismatch',
+      'feature-not-explicitly-allowed',
+      'unknown-feature',
+      'default-feature-enabled',
+      'checksum-mismatch',
+      'denied-by-extension',
+      'detected-executable',
+      'detected-executable-script',
+      'unable-to-check-path',
+      'unmatched-bypass',
+      'unmatched-path-bypass',
+      'unmatched-glob',
+      'unused-wrapper',
+      'workspace-duplicate',
+      'unresolved-workspace-dependency',
+      'unused-workspace-dependency',
+      'non-utf8-path',
+      'non-root-path',
+      'replaced-in-std',
+      'unmatched-replacement-ignore',
+      // licenses
+      'accepted',
+      'rejected',
+      'unlicensed',
+      'missing-clarification-file',
+      'parse-error',
+      'gather-failure',
+    ];
+
+    for (const code of qualityCodes) {
+      const [signal] = parseCargoDenyJsonLines(
+        output(diagnostic({ severity: 'error', message: code, code, labels: [] })),
+        CTX,
+      );
+      expect(signal?.category, code).toBe('quality');
+    }
   });
 
   it('skips a diagnostic with no message', () => {
