@@ -45,6 +45,7 @@ import {
   IpcPayloadTooLargeError,
   resolveToolHooks,
   sendWorkerIpcMessage,
+  sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   ToolError,
   type CommandSpec,
@@ -91,6 +92,28 @@ function send(msg: DispatchWorkerMessage): void {
   } catch (error) {
     if (error instanceof IpcPayloadTooLargeError) {
       process.send?.({
+        kind: 'error',
+        message: error.message,
+        failureClass: 'payload_too_large',
+      });
+      return;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Terminal IPC send — drains before the worker process exits so the parent
+ * does not race `exit` ahead of `message` under load (the 61849de7 race,
+ * closed here for the external-tool dispatch path). Progress/host-RPC sends
+ * stay synchronous; only the final result/error needs the drain.
+ */
+async function sendTerminal(msg: DispatchWorkerMessage): Promise<void> {
+  try {
+    await sendWorkerIpcMessageAndDrain(msg);
+  } catch (error) {
+    if (error instanceof IpcPayloadTooLargeError) {
+      await sendWorkerIpcMessageAndDrain({
         kind: 'error',
         message: error.message,
         failureClass: 'payload_too_large',
@@ -342,7 +365,7 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
 export async function executeToolCommandWorker(specPath: string): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
   try {
-    send(await runToolCommandWorker(specPath));
+    await sendTerminal(await runToolCommandWorker(specPath));
   } finally {
     stopHeartbeat();
   }
