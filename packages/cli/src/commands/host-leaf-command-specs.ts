@@ -110,7 +110,14 @@ function parseMaxCatalogMb(raw: string | undefined): number | undefined {
       { code: 'CONFIG.REPORT.INVALID_CATALOG_BUDGET' },
     );
   }
-  return Math.floor(mb * 1024 * 1024);
+  const bytes = Math.floor(mb * 1024 * 1024);
+  if (!Number.isSafeInteger(bytes) || bytes <= 0) {
+    throw new ConfigurationError(
+      `report: --max-catalog-mb must be a positive number of megabytes (got '${raw}').`,
+      { code: 'CONFIG.REPORT.INVALID_CATALOG_BUDGET' },
+    );
+  }
+  return bytes;
 }
 
 /** Build the CLI-owned cross-tool report command. */

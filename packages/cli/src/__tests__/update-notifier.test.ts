@@ -120,6 +120,13 @@ describe('isNewerVersion', () => {
     expect(isNewerVersion('2.2.1', '2.2.1-beta.1')).toBe(true);
     expect(isNewerVersion('2.2.1-beta.1', '2.2.1')).toBe(false);
   });
+
+  it('orders prereleases using SemVer identifier precedence', () => {
+    expect(isNewerVersion('2.2.1-beta.2', '2.2.1-beta.1')).toBe(true);
+    expect(isNewerVersion('2.2.1-beta.11', '2.2.1-beta.2')).toBe(true);
+    expect(isNewerVersion('2.2.1-rc.1', '2.2.1-beta.11')).toBe(true);
+    expect(isNewerVersion('2.2.1-beta.1', '2.2.1-beta.2')).toBe(false);
+  });
 });
 
 describe('checkForUpdate', () => {

@@ -29,10 +29,16 @@ function normalizeFilterOption(filter: string | string[] | undefined): string[] 
   return undefined;
 }
 
+function parseDecimalInteger(raw: string): number | undefined {
+  if (!/^\d+$/u.test(raw)) return undefined;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? value : undefined;
+}
+
 /** @throws {Error} When the raw value is not a positive integer. */
 function parsePositiveInt(raw: string): number {
-  const n = Number.parseInt(raw, 10);
-  if (Number.isNaN(n) || n <= 0) {
+  const n = parseDecimalInteger(raw);
+  if (n === undefined || n <= 0) {
     throw new ValidationError(`Invalid --limit value: '${raw}'. Must be a positive integer.`);
   }
   return n;
@@ -40,8 +46,8 @@ function parsePositiveInt(raw: string): number {
 
 /** @throws {Error} When the raw value is not a non-negative integer. */
 function parseOlderThanDays(raw: string): number {
-  const n = Number.parseInt(raw, 10);
-  if (Number.isNaN(n) || n < 0) {
+  const n = parseDecimalInteger(raw);
+  if (n === undefined) {
     throw new ValidationError(
       `Invalid --older-than value: '${raw}'. Must be a non-negative integer.`,
     );

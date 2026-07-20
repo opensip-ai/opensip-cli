@@ -176,4 +176,14 @@ describe('policy command specs', () => {
     expect(readFileSync(out, 'utf8')).toContain('"type": "policy-audit"');
     expect(collector.list()).toEqual([]);
   });
+
+  it.each(['1.5', '2events', '9007199254740992'])(
+    'rejects non-integer policy audit limit %s',
+    (raw) => {
+      const auditSpec = buildPolicyGroupLeaves(makeContext())[2];
+      const limitOption = auditSpec.options?.find((option) => option.flag === '--limit');
+
+      expect(() => limitOption?.parse?.(raw, undefined)).toThrow(/positive integer/);
+    },
+  );
 });

@@ -497,6 +497,28 @@ describe('sessions spec — action bodies', () => {
     expect(showHistory).not.toHaveBeenCalled();
   });
 
+  it.each(['1.5', '2sessions', '9007199254740992'])(
+    'sessions list --limit rejects non-integer value %s without reading history',
+    async (raw) => {
+      const { ctx } = makeCtx();
+      const program = mount(ctx);
+      program.exitOverride();
+
+      const origWrite = process.stderr.write.bind(process.stderr);
+      process.stderr.write = () => true;
+      try {
+        await expect(
+          program.parseAsync(['sessions', 'list', '--limit', raw], {
+            from: 'user',
+          }),
+        ).rejects.toThrow(/Invalid --limit/);
+      } finally {
+        process.stderr.write = origWrite;
+      }
+      expect(showHistory).not.toHaveBeenCalled();
+    },
+  );
+
   it('sessions show delegates replay options to executeSessionShow', async () => {
     const { ctx } = makeCtx();
     const program = mount(ctx);
@@ -576,6 +598,28 @@ describe('sessions spec — action bodies', () => {
     }
     expect(executeClear).not.toHaveBeenCalled();
   });
+
+  it.each(['0.5', '7days', '9007199254740992'])(
+    'sessions purge --older-than rejects non-integer value %s without clearing sessions',
+    async (raw) => {
+      const { ctx } = makeCtx();
+      const program = mount(ctx);
+      program.exitOverride();
+
+      const origWrite = process.stderr.write.bind(process.stderr);
+      process.stderr.write = () => true;
+      try {
+        await expect(
+          program.parseAsync(['sessions', 'purge', '--older-than', raw, '--yes'], {
+            from: 'user',
+          }),
+        ).rejects.toThrow(/Invalid --older-than/);
+      } finally {
+        process.stderr.write = origWrite;
+      }
+      expect(executeClear).not.toHaveBeenCalled();
+    },
+  );
 
   it('sessions purge --json: emits JSON and skips render', async () => {
     const { ctx, rendered } = makeCtx();

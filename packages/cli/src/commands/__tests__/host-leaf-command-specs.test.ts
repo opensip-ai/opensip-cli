@@ -239,6 +239,19 @@ describe('top-level host leaf command specs', () => {
     },
   );
 
+  it.each(['1e308', '0.0000001'])(
+    'rejects report catalog budget %s when it cannot produce a finite positive byte count',
+    (maxCatalogMb) => {
+      const { ctx } = makeContext();
+      const spec = createReportCommandSpec();
+
+      expect(() => spec.handler({ open: false, json: false, maxCatalogMb }, ctx)).toThrow(
+        /must be a positive number of megabytes/u,
+      );
+      expect(composeAndWriteReport).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects mutually exclusive uninstall targets before delegation', async () => {
     const { ctx } = makeContext();
     const spec = createUninstallCommandSpec(ctx);

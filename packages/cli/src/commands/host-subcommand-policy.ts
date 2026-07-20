@@ -47,10 +47,11 @@ import type {
 const POLICY_ACTION_CHOICES = [...POLICY_ACTIONS];
 const POLICY_HANDLER_PACKAGE = 'opensip-cli';
 const POLICY_HANDLER_PATH = 'packages/cli/src/commands/host-subcommand-policy.ts';
+const DECIMAL_INTEGER = /^\d+$/u;
 
 function parsePositiveInt(raw: string): number {
-  const n = Number.parseInt(raw, 10);
-  if (Number.isNaN(n) || n <= 0) {
+  const n = DECIMAL_INTEGER.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(n) || n <= 0) {
     throw new ValidationError(`Invalid --limit value: '${raw}'. Must be a positive integer.`);
   }
   return n;
