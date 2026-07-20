@@ -6,7 +6,8 @@
 //   may span multiple lines (unlike Java/Go/C++), so we pass
 //   `allowMultiline: true` to core's shared scanner.
 // - Raw strings (r"...", r#"..."#, ..., r####"..."####)
-// - Byte strings (b"...") and byte-raw strings (br#"..."#) — note that
+// - Byte strings (b"..."), byte-raw strings (br#"..."#), and raw C
+//   strings (cr#"..."#) — note that
 //   byte-string content is treated as opaque bytes; this layer does NOT
 //   enforce the ASCII-only / valid-escape rules of `b"..."`. A future
 //   check that wants to flag invalid byte literals will have to layer
@@ -57,14 +58,17 @@ function scan(src: string): ScanResult {
     }
 
     // Raw string: r"..." or r#"..."# or r##"..."## (any number of #)
-    // Byte-raw string: br"..." or br#"..."#
-    // Require identifier boundary so mid-ident `…r#` / `…br"` is not a string.
+    // Byte-raw / C-raw string: br"..." / cr"..." and hashed variants.
+    // Require identifier boundary so mid-ident `…r#` / `…br"` / `…cr"` is
+    // not a string.
     if (
       (i === 0 || !isIdentChar(src[i - 1])) &&
       ((c === 'r' && (next === '"' || next === '#')) ||
-        (c === 'b' && src[i + 1] === 'r' && (src[i + 2] === '"' || src[i + 2] === '#')))
+        ((c === 'b' || c === 'c') &&
+          src[i + 1] === 'r' &&
+          (src[i + 2] === '"' || src[i + 2] === '#')))
     ) {
-      const prefixLen = c === 'b' ? 2 : 1; // br vs r
+      const prefixLen = c === 'r' ? 1 : 2;
       let j = i + prefixLen;
       let hashes = 0;
       while (j < len && src[j] === '#') {

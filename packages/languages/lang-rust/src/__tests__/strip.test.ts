@@ -175,6 +175,15 @@ describe('rust stripStrings — regular-string escape sequences', () => {
     expect(out).not.toContain('quotes');
     expect(out).not.toContain('within');
   });
+
+  it('handles raw C strings with hashes and embedded quotes', () => {
+    const src = 'let c = cr#"before "quoted" after"#;';
+    const out = stripStrings(src);
+    expect(out.length).toBe(src.length);
+    expect(out).not.toContain('before');
+    expect(out).not.toContain('quoted');
+    expect(out).not.toContain('after');
+  });
 });
 
 describe('rust stripComments — additional cases', () => {
