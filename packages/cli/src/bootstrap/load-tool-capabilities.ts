@@ -36,6 +36,7 @@ import {
   type RawCapabilityContribution,
   type SelectedCapabilityPackage,
   type Tool,
+  type ToolProvenance,
 } from '@opensip-cli/core';
 
 import { BUNDLED_CAPABILITY_PACKS } from './bundled-manifest.js';
@@ -46,6 +47,7 @@ import {
   policyAuditFromCurrentScope,
   policyFromCurrentScope,
 } from './policy-pep.js';
+import { shouldRunHookInHost } from './tool-provenance.js';
 
 /**
  * Resolve the directory the CLI was installed into. BUILT-IN capability packs
@@ -68,6 +70,14 @@ export interface LoadOwningToolCapabilitiesOptions {
   readonly pluginsConfig?: unknown;
   /** Discovery anchor for built-in packs (those under a descriptor's `builtinScope`). */
   readonly cliDir?: string;
+  /**
+   * Per-run tool provenance. An EXTERNAL owning tool's capability domains are
+   * loaded worker-side under dispatch (ADR-0054 M4-F), exactly as its
+   * `initialize` hook is — its registrars do not exist in this process, so
+   * loading here discovers every contribution and then fails to route all of
+   * them. Omitted (or empty) keeps the bundled/in-host behaviour.
+   */
+  readonly provenance?: readonly ToolProvenance[];
 }
 
 /**
@@ -83,8 +93,13 @@ export interface LoadOwningToolCapabilitiesOptions {
 export async function loadOwningToolCapabilities(
   options: LoadOwningToolCapabilitiesOptions,
 ): Promise<number> {
-  const { owningTool, projectDir, pluginsConfig = {} } = options;
+  const { owningTool, projectDir, pluginsConfig = {}, provenance = [] } = options;
   if (!owningTool) return 0;
+  // M4-F parity with `maybeInitializeOwningTool`: an external owning tool's
+  // capability domains load worker-side. Driving them here routes 0 of N
+  // contributions (the registrars are worker-local) and records N errors that
+  // never reach stderr — a silent, wasted load.
+  if (!shouldRunHookInHost(owningTool, provenance)) return 0;
   // Built-in packs (those under a descriptor's `builtinScope`, e.g. the bundled
   // @opensip-cli/graph-* adapters) resolve from the CLI's own install tree.
   const cliDir = options.cliDir ?? cliInstallDir();

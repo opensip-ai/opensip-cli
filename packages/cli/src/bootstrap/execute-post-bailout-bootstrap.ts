@@ -377,6 +377,9 @@ export async function executePostBailoutBootstrap(
           owningTool,
           projectDir: plan.project.projectRoot,
           pluginsConfig: scope.configDocument?.plugins ?? {},
+          // Same M4-F gate the initialize hook above uses: an external owning
+          // tool loads its capability domains worker-side.
+          provenance,
         }),
       );
       if (driven > 0) {
