@@ -129,11 +129,8 @@ describe('lang-rust walk.ts — attribute extraction', () => {
 });
 
 describe('lang-rust walk.ts — trait method declarations', () => {
-  it('records provided (default) methods declared inside a `trait` block', () => {
+  it('records public-trait default methods as exported methods', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
-    // A trait with a default method body — the function_item lives inside
-    // a `trait_item` (not an `impl_item`), so enclosingImpl stays null and
-    // the method is recorded as a function-declaration owned by module-init.
     writeFileSync(
       join(dir, 'src/lib.rs'),
       `pub trait Greeter {\n` + `    fn greet(&self) -> i32 { 7 }\n` + `}\n`,
@@ -142,8 +139,22 @@ describe('lang-rust walk.ts — trait method declarations', () => {
     const { walk } = runAdapter();
     const greet = walk.occurrences.greet?.[0];
     expect(greet).toBeDefined();
-    // Not inside an impl → enclosingClass null, function-declaration kind.
-    expect(greet?.enclosingClass).toBe(null);
-    expect(greet?.kind).toBe('function-declaration');
+    expect(greet?.enclosingClass).toBe('Greeter');
+    expect(greet?.kind).toBe('method');
+    expect(greet?.visibility).toBe('exported');
+  });
+
+  it('keeps methods on restricted traits module-local', () => {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'src/lib.rs'),
+      `pub(crate) trait Internal {\n    fn run(&self) {}\n}\n`,
+      'utf8',
+    );
+    const { walk } = runAdapter();
+    const run = walk.occurrences.run?.[0];
+    expect(run?.enclosingClass).toBe('Internal');
+    expect(run?.kind).toBe('method');
+    expect(run?.visibility).toBe('module-local');
   });
 });

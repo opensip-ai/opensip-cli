@@ -116,6 +116,40 @@ describe('Rust adapter — depends_on emission (Phase 4)', () => {
     expect(libDeps![0].to).toEqual([fooInit!.bodyHash]);
   });
 
+  it('resolves an unqualified local module import from the current scope', () => {
+    writeFile('Cargo.toml', CARGO_TOML);
+    writeFile('src/lib.rs', `pub mod foo;\n\nuse foo::Bar;\n\nfn _use(_: Bar) {}\n`);
+    writeFile('src/foo.rs', `pub struct Bar;\n`);
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const libInit = findModuleInit(catalog, 'src/lib.rs');
+    const fooInit = findModuleInit(catalog, 'src/foo.rs');
+
+    expect(libInit).toBeDefined();
+    expect(fooInit).toBeDefined();
+    const deps = dependenciesByOwner!.get(libInit!.bodyHash);
+    expect(deps).toHaveLength(1);
+    expect(deps![0].specifier).toBe('foo::Bar');
+    expect(deps![0].to).toEqual([fooInit!.bodyHash]);
+  });
+
+  it('resolves an unqualified child module from a nested module', () => {
+    writeFile('Cargo.toml', CARGO_TOML);
+    writeFile('src/lib.rs', `pub mod parent;\n`);
+    writeFile('src/parent/mod.rs', `pub mod child;\n\nuse child::Thing;\n\nfn _use(_: Thing) {}\n`);
+    writeFile('src/parent/child.rs', `pub struct Thing;\n`);
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const parentInit = findModuleInit(catalog, 'src/parent/mod.rs');
+    const childInit = findModuleInit(catalog, 'src/parent/child.rs');
+
+    expect(parentInit).toBeDefined();
+    expect(childInit).toBeDefined();
+    const deps = dependenciesByOwner!.get(parentInit!.bodyHash);
+    expect(deps).toHaveLength(1);
+    expect(deps![0].to).toEqual([childInit!.bodyHash]);
+  });
+
   it('resolves a nested module import — `crate::foo::sub`', () => {
     writeFile('Cargo.toml', CARGO_TOML);
     writeFile('src/lib.rs', `pub mod foo;\n\nuse crate::foo::sub::Item;\n\nfn _use(_: Item) {}\n`);

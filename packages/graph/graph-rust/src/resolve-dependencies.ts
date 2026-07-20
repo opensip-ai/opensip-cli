@@ -153,12 +153,12 @@ function readCargoPackageName(projectDirAbs: string): string | null {
     if (line.length === 0 || line.startsWith('#')) continue;
     if (line.startsWith('[')) {
       // New section header — `[package]` enters, anything else exits.
-      inPackage = /^\[package\]\s*$/.test(line);
+      inPackage = /^\[package\]\s*(?:#.*)?$/.test(line);
       continue;
     }
     if (!inPackage) continue;
-    const match = /^name\s*=\s*"([^"]+)"\s*$/.exec(line);
-    if (match) return match[1] ?? null;
+    const match = /^name\s*=\s*(?:"([^"]+)"|'([^']+)')\s*(?:#.*)?$/.exec(line);
+    if (match) return match[1] ?? match[2] ?? null;
   }
   return null;
 }
@@ -217,11 +217,35 @@ function resolveRustUseSpecifier(
   const segments = specifier.split('::');
   if (segments.length === 0 || segments[0] === undefined) return [];
 
+  const local = lookupLocalUse(segments, importerModulePath, moduleInitByModulePath);
+  if (local.length > 0) return local;
+
   // Rewrite the head segment into an absolute `crate::…` path.
   const absolute = rewriteToAbsoluteModulePath(segments, packageName, importerModulePath);
   if (absolute === null) return [];
 
   return lookupRustModule(absolute, moduleInitByModulePath);
+}
+
+function lookupLocalUse(
+  segments: readonly string[],
+  importerModulePath: string | null,
+  moduleInitByModulePath: ReadonlyMap<string, string>,
+): readonly string[] {
+  const head = segments[0];
+  if (
+    head === undefined ||
+    head === 'crate' ||
+    head === 'self' ||
+    head === 'super' ||
+    importerModulePath === null
+  ) {
+    return [];
+  }
+  const current = importerModulePath.split('::');
+  const childModule = [...current, head].join('::');
+  if (!moduleInitByModulePath.has(childModule)) return [];
+  return lookupRustModule([...current, ...segments], moduleInitByModulePath);
 }
 
 /**

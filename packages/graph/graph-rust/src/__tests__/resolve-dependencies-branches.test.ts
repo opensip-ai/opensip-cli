@@ -190,6 +190,25 @@ describe('Rust depends-on — Cargo.toml parsing edge cases', () => {
     // `decoy::` alias therefore cannot anchor → unresolved.
     expect(deps![0].to).toEqual([]);
   });
+
+  it('accepts literal package names and trailing TOML comments', () => {
+    writeFile(
+      'Cargo.toml',
+      `[package] # package metadata\nname = 'my-proj' # Rust exposes this as my_proj\nversion = "0.1.0"\n`,
+    );
+    writeFile('src/lib.rs', `pub mod foo;\n\nuse my_proj::foo::Bar;\n\nfn _u(_: Bar) {}\n`);
+    writeFile('src/foo.rs', `pub struct Bar;\n`);
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const libInit = findModuleInit(catalog, 'src/lib.rs');
+    const fooInit = findModuleInit(catalog, 'src/foo.rs');
+    expect(libInit).toBeDefined();
+    expect(fooInit).toBeDefined();
+
+    const deps = dependenciesByOwner!.get(libInit!.bodyHash);
+    expect(deps).toHaveLength(1);
+    expect(deps![0].to).toEqual([fooInit!.bodyHash]);
+  });
 });
 
 describe('Rust depends-on — module-path mapping via mod.rs layout', () => {

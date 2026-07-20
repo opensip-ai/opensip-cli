@@ -45,6 +45,7 @@ import { relative, sep } from 'node:path';
 import {
   childrenOf,
   makeFileClassifier,
+  nameOf,
   record,
   runWalk,
   synthesizeModuleInit as buildModuleInit,
@@ -55,6 +56,7 @@ import { digestSyntheticBody } from './body-digest.js';
 import {
   buildClosureOccurrence,
   buildFunctionOccurrence,
+  hasExportedVisibility,
   implTargetName,
   type Frame,
   type WalkCtx,
@@ -113,7 +115,11 @@ function walkFile(
     out,
     callSites,
   };
-  const initialFrame: Frame = { ownerHash: moduleInit.bodyHash, enclosingImpl: null };
+  const initialFrame: Frame = {
+    ownerHash: moduleInit.bodyHash,
+    enclosingImpl: null,
+    enclosingTrait: null,
+  };
 
   for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
@@ -122,6 +128,10 @@ function walkFile(
 function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
   if (node.type === 'impl_item') {
     visitImpl(node, frame, ctx);
+    return;
+  }
+  if (node.type === 'trait_item') {
+    visitTrait(node, frame, ctx);
     return;
   }
   if (node.type === 'function_item') {
@@ -144,7 +154,23 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
 
 function visitImpl(node: Node, frame: Frame, ctx: WalkCtx): void {
   const typeName = implTargetName(node);
-  const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingImpl: typeName };
+  const childFrame: Frame = {
+    ownerHash: frame.ownerHash,
+    enclosingImpl: typeName,
+    enclosingTrait: null,
+  };
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
+}
+
+function visitTrait(node: Node, frame: Frame, ctx: WalkCtx): void {
+  const childFrame: Frame = {
+    ownerHash: frame.ownerHash,
+    enclosingImpl: null,
+    enclosingTrait: {
+      name: nameOf(node) ?? '<anon-trait>',
+      exported: hasExportedVisibility(node),
+    },
+  };
   for (const child of childrenOf(node)) visit(child, childFrame, ctx);
 }
 
@@ -152,7 +178,11 @@ function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   const occ = buildFunctionOccurrence(node, frame, ctx);
   if (!occ) return;
   record(ctx.out, occ);
-  const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingImpl: null };
+  const childFrame: Frame = {
+    ownerHash: occ.bodyHash,
+    enclosingImpl: null,
+    enclosingTrait: null,
+  };
   const body = node.childForFieldName('body');
   if (body) {
     for (const child of childrenOf(body)) visit(child, childFrame, ctx);
@@ -174,7 +204,7 @@ function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   }
   const body = node.childForFieldName('body');
   if (body) {
-    visit(body, { ownerHash: occ.bodyHash, enclosingImpl: null }, ctx);
+    visit(body, { ownerHash: occ.bodyHash, enclosingImpl: null, enclosingTrait: null }, ctx);
   }
   return true;
 }

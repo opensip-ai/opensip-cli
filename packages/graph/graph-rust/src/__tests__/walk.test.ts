@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { digestRustBody } from '../body-digest.js';
 import { rustGraphAdapter } from '../index.js';
 
 describe('lang-rust walk.ts — comment-stripping branches', () => {
@@ -137,6 +138,12 @@ describe('lang-rust walk.ts — comment-stripping branches', () => {
     });
     expect(Object.keys(walk.occurrences)).toContain('with_strings');
   });
+
+  it('preserves raw strings with embedded quotes while hashing bodies', () => {
+    const first = digestRustBody(`fn sample() { let _ = r#"before " // alpha"#; first(); }`);
+    const second = digestRustBody(`fn sample() { let _ = r#"before " // beta"#; second(); }`);
+    expect(first.hash).not.toBe(second.hash);
+  });
 });
 
 /**
@@ -213,6 +220,18 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
     expect(priv?.visibility).toBe('module-local');
     expect(priv?.enclosingClass).toBe(null);
     expect(exp?.visibility).toBe('exported');
+  });
+
+  it('does not classify restricted public functions as externally exported', () => {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'src/lib.rs'),
+      `pub(crate) fn crate_visible() {}\npub(self) fn self_visible() {}\n`,
+      'utf8',
+    );
+    const walk = run();
+    expect(walk.occurrences.crate_visible?.[0]?.visibility).toBe('module-local');
+    expect(walk.occurrences.self_visible?.[0]?.visibility).toBe('module-local');
   });
 
   it('emits an arrow occurrence + creation edge for an inline closure', () => {

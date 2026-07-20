@@ -14,6 +14,7 @@
  * to warrant its own file.
  */
 
+import { isIdentChar } from '@opensip-cli/core';
 import {
   digestCanonicalBody,
   normalizeWhitespace,
@@ -57,6 +58,12 @@ function stripRustComments(text: string): string {
       i = skipBlockComment(text, i + 2);
       continue;
     }
+    const rawString = consumeRawStringLiteral(text, i);
+    if (rawString !== null) {
+      out += rawString.text;
+      i = rawString.index;
+      continue;
+    }
     const c = text[i];
     if (c === '"') {
       const block = consumeStringLiteral(text, i);
@@ -76,6 +83,35 @@ function stripRustComments(text: string): string {
     i++;
   }
   return out;
+}
+
+function consumeRawStringLiteral(
+  text: string,
+  start: number,
+): { readonly text: string; readonly index: number } | null {
+  if (start > 0 && isIdentChar(text[start - 1])) return null;
+  const prefixLength = rawStringPrefixLength(text, start);
+  if (prefixLength === 0) return null;
+
+  let delimiter = start + prefixLength;
+  let hashes = 0;
+  while (text[delimiter] === '#') {
+    delimiter++;
+    hashes++;
+  }
+  if (text[delimiter] !== '"') return null;
+
+  const closingDelimiter = `"${'#'.repeat(hashes)}`;
+  const closeStart = text.indexOf(closingDelimiter, delimiter + 1);
+  const index = closeStart === -1 ? text.length : closeStart + closingDelimiter.length;
+  return { text: text.slice(start, index), index };
+}
+
+function rawStringPrefixLength(text: string, start: number): number {
+  const first = text[start];
+  if (first === 'r') return 1;
+  if ((first === 'b' || first === 'c') && text[start + 1] === 'r') return 2;
+  return 0;
 }
 
 function skipBlockComment(text: string, start: number): number {

@@ -13,6 +13,7 @@ import type { Node } from '@opensip-cli/tree-sitter';
 export interface Frame {
   readonly ownerHash: string;
   readonly enclosingImpl: string | null;
+  readonly enclosingTrait: { readonly name: string; readonly exported: boolean } | null;
 }
 
 export interface WalkCtx {
@@ -35,10 +36,15 @@ export function implTargetName(node: Node): string {
   /* v8 ignore stop */
 }
 
-function classifyVisibility(node: Node): FunctionOccurrence['visibility'] {
+export function hasExportedVisibility(node: Node): boolean {
   for (const c of childrenOf(node)) {
-    if (c.type === 'visibility_modifier') return 'exported';
+    if (c.type === 'visibility_modifier') return c.text.trim() === 'pub';
   }
+  return false;
+}
+
+function classifyVisibility(node: Node, frame: Frame): FunctionOccurrence['visibility'] {
+  if (hasExportedVisibility(node) || frame.enclosingTrait?.exported === true) return 'exported';
   return 'module-local';
 }
 
@@ -133,9 +139,10 @@ function hasTestAttribute(node: Node): boolean {
 function classifyRustFunctionKind(
   name: string,
   enclosingImpl: string | null,
+  enclosingTrait: Frame['enclosingTrait'],
 ): FunctionOccurrence['kind'] {
-  if (enclosingImpl === null) return 'function-declaration';
-  if (name === 'new') return 'constructor';
+  if (enclosingImpl !== null && name === 'new') return 'constructor';
+  if (enclosingImpl === null && enclosingTrait === null) return 'function-declaration';
   return 'method';
 }
 
@@ -147,12 +154,13 @@ export function buildFunctionOccurrence(
   const name = nameOf(node) ?? '<anon-fn>';
   const digest = digestRustBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const isTest = ctx.fileInTestFile || hasTestAttribute(node);
-  const kind = classifyRustFunctionKind(name, frame.enclosingImpl);
+  const kind = classifyRustFunctionKind(name, frame.enclosingImpl, frame.enclosingTrait);
+  const enclosingClass = frame.enclosingImpl ?? frame.enclosingTrait?.name ?? null;
   const qualifiedBase = ctx.filePathProjectRel.replace(/\.rs$/, '').split('/').join('::');
   const qualifiedName =
-    frame.enclosingImpl === null
+    enclosingClass === null
       ? `${qualifiedBase}::${name}`
-      : `${qualifiedBase}::${frame.enclosingImpl}::${name}`;
+      : `${qualifiedBase}::${enclosingClass}::${name}`;
   return {
     bodyHash: digest.hash,
     bodySize: digest.size,
@@ -166,9 +174,9 @@ export function buildFunctionOccurrence(
     kind,
     params: extractParams(node),
     returnType: null,
-    enclosingClass: frame.enclosingImpl,
+    enclosingClass,
     decorators: extractAttributes(node),
-    visibility: classifyVisibility(node),
+    visibility: classifyVisibility(node, frame),
     inTestFile: isTest,
     definedInGenerated: ctx.definedInGenerated,
     calls: [],
