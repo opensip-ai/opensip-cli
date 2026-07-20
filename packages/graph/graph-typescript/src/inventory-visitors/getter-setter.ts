@@ -21,8 +21,8 @@ export const visitGetterSetter: InventoryVisitor<ts.AccessorDeclaration> = (node
   const enclosingClass = ctx.enclosingClass ?? findEnclosingClassName(node);
   const kind = node.kind === ts.SyntaxKind.GetAccessor ? 'getter' : 'setter';
   const qualified = enclosingClass
-    ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.${name}`
-    : `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`;
+    ? `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${enclosingClass}.${name}`
+    : `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${name}`;
   const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
     bodyHash: digest.hash,
@@ -48,8 +48,24 @@ export const visitGetterSetter: InventoryVisitor<ts.AccessorDeclaration> = (node
 
 function accessorName(node: ts.AccessorDeclaration): string | null {
   const n = node.name;
-  if (ts.isIdentifier(n)) return n.text;
-  /* v8 ignore next 2 */
-  if (ts.isStringLiteral(n)) return n.text;
+  if (
+    ts.isIdentifier(n) ||
+    ts.isPrivateIdentifier(n) ||
+    ts.isStringLiteral(n) ||
+    ts.isNumericLiteral(n)
+  ) {
+    return n.text;
+  }
+  if (ts.isComputedPropertyName(n)) {
+    const expression = n.expression;
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression) ||
+      ts.isNumericLiteral(expression)
+    ) {
+      return expression.text;
+    }
+  }
+  /* v8 ignore next */
   return null;
 }

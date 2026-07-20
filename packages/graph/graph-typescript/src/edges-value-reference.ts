@@ -50,11 +50,13 @@ function isParentNamePosition(node: ts.Identifier, parent: ts.Node): boolean {
 function readNamedSlot(parent: ts.Node): ts.Node | undefined {
   if (ts.isVariableDeclaration(parent)) return parent.name;
   if (ts.isParameter(parent)) return parent.name;
-  if (ts.isFunctionDeclaration(parent)) return parent.name;
-  if (ts.isClassDeclaration(parent)) return parent.name;
+  if (ts.isFunctionDeclaration(parent) || ts.isFunctionExpression(parent)) return parent.name;
+  if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) return parent.name;
   if (ts.isMethodDeclaration(parent)) return parent.name;
+  if (ts.isGetAccessor(parent) || ts.isSetAccessor(parent)) return parent.name;
   if (ts.isPropertyDeclaration(parent)) return parent.name;
   if (ts.isPropertyAssignment(parent)) return parent.name;
+  if (ts.isShorthandPropertyAssignment(parent)) return parent.name;
   if (ts.isPropertyAccessExpression(parent)) return parent.name;
   if (ts.isLabeledStatement(parent)) return parent.label;
   if (ts.isBindingElement(parent)) return parent.name;

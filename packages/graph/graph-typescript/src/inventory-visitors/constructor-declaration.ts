@@ -25,7 +25,7 @@ export const visitConstructorDeclaration: InventoryVisitor<ts.ConstructorDeclara
     bodySize: digest.size,
     bodySignature: digest.signature,
     simpleName: className,
-    qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${className}.constructor`,
+    qualifiedName: `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${className}.constructor`,
     filePath: ctx.filePathProjectRel,
     line: startLC.line + 1,
     column: startLC.character,

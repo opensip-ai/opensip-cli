@@ -185,7 +185,7 @@ describe('resolveSyntactic', () => {
   });
 
   it('resolves the rightmost name of a property-access call', () => {
-    const catalog = catalogOf(occ('method', 'svc.ts', 'M'));
+    const catalog = catalogOf(occ('method', 'svc.ts', 'M'), occ('method', 'other.ts', 'OTHER'));
     const node = firstCall('svc.method()');
     const v = resolveSyntactic(node, {
       catalog,
@@ -194,6 +194,46 @@ describe('resolveSyntactic', () => {
     });
     // 'method' resolves by name; svc pins the file.
     expect(v!.to).toEqual(['M']);
+  });
+
+  it('resolves an aliased named import by its exported source name', () => {
+    const catalog = catalogOf(occ('sourceHelper', 'util.ts', 'H'));
+    const node = firstCall('localHelper()');
+    const v = resolveSyntactic(node, {
+      catalog,
+      currentFileRel: 'app.ts',
+      importIndex: new Map([['localHelper', 'util.ts']]),
+      importBindings: new Map([
+        [
+          'localHelper',
+          {
+            specifier: './util.js',
+            importedName: 'sourceHelper',
+          },
+        ],
+      ]),
+    });
+
+    expect(v?.to).toEqual(['H']);
+    expect(v?.confidence).toBe('medium');
+  });
+
+  it('keeps `default as` imports keyed by their local callable name', () => {
+    const sourceFile = ts.createSourceFile(
+      '/proj/app.ts',
+      "import { default as Foo } from './foo.js';\nFoo();",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const node = firstCall(sourceFile.text);
+    const v = resolveSyntactic(node, {
+      catalog: catalogOf(occ('Foo', 'foo.ts', 'H')),
+      currentFileRel: 'app.ts',
+      importIndex: new Map([['Foo', 'foo.ts']]),
+      importBindings: buildImportBindingSourceIndex(sourceFile),
+    });
+
+    expect(v?.to).toEqual(['H']);
   });
 });
 
@@ -244,6 +284,83 @@ describe('buildImportIndex', () => {
     const idx = buildImportIndex(sf, '/proj', known);
     expect(idx.get('legacy')).toBe('legacy.ts');
   });
+
+  it('resolves extensionless imports to JavaScript files in supported resolution modes', () => {
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import { helper } from './helper';",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const known = collectKnownFiles(catalogOf(occ('helper', 'helper.js', 'H')));
+
+    const idx = buildImportIndex(sf, '/proj', known);
+
+    expect(idx.get('helper')).toBe('helper.js');
+  });
+
+  it.each(['helper.mts', 'helper.cts'])(
+    'does not invent extensionless resolution to module-specific source %s',
+    (filePath) => {
+      const sf = ts.createSourceFile(
+        '/proj/app.ts',
+        "import { helper } from './helper';",
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      const known = collectKnownFiles(catalogOf(occ('helper', filePath, 'H')));
+
+      const idx = buildImportIndex(sf, '/proj', known);
+
+      expect(idx.get('helper')).toBeNull();
+    },
+  );
+
+  it('does not substitute an unknown explicit extension with a TypeScript source suffix', () => {
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import { helper } from './config.json';",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const known = collectKnownFiles(catalogOf(occ('helper', 'config.json.ts', 'H')));
+
+    const idx = buildImportIndex(sf, '/proj', known);
+
+    expect(idx.get('helper')).toBeNull();
+  });
+
+  it('applies TypeScript extension substitution before a same-named JavaScript file', () => {
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import { helper } from './helper.js';",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const known = collectKnownFiles(
+      catalogOf(occ('helper', 'helper.ts', 'TS'), occ('helper', 'helper.js', 'JS')),
+    );
+
+    const idx = buildImportIndex(sf, '/proj', known);
+
+    expect(idx.get('helper')).toBe('helper.ts');
+  });
+
+  it('prefers the TSX analogue for an explicit JSX specifier', () => {
+    const sf = ts.createSourceFile(
+      '/proj/app.ts',
+      "import { View } from './view.jsx';",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const known = collectKnownFiles(
+      catalogOf(occ('View', 'view.ts', 'TS'), occ('View', 'view.tsx', 'TSX')),
+    );
+
+    const idx = buildImportIndex(sf, '/proj', known);
+
+    expect(idx.get('View')).toBe('view.tsx');
+  });
 });
 
 describe('buildImportSpecifierIndex', () => {
@@ -279,6 +396,7 @@ describe('buildImportBindingSourceIndex', () => {
     const source = [
       "import def from './a.js';",
       "import { named, source as local } from '@scope/pkg';",
+      "import { default as defaultAlias } from './default.js';",
       "import * as ns from './c.js';",
     ].join('\n');
     const sf = ts.createSourceFile('/proj/app.ts', source, ts.ScriptTarget.Latest, true);
@@ -290,6 +408,7 @@ describe('buildImportBindingSourceIndex', () => {
     });
     expect(idx.get('named')).toEqual({ specifier: '@scope/pkg' });
     expect(idx.get('def')).toEqual({ specifier: './a.js' });
+    expect(idx.get('defaultAlias')).toEqual({ specifier: './default.js' });
     expect(idx.get('ns')).toEqual({ specifier: './c.js' });
   });
 });

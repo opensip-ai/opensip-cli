@@ -22,9 +22,11 @@ import {
 } from '@opensip-cli/graph';
 
 import {
+  buildImportBindingSourceIndex,
   buildImportIndex,
   buildImportSpecifierIndex,
   collectKnownFiles,
+  type ImportBindingSource,
   resolveSyntactic,
   type ImportIndex,
 } from './edge-resolvers/syntactic.js';
@@ -141,6 +143,7 @@ export async function resolveEdgesSyntactic(
   const sink = { edgesByOwner: callsByHash, stats };
   const knownFiles = collectKnownFiles(input.catalog);
   const importIndexByFile = new Map<ts.SourceFile, ImportIndex>();
+  const importBindingsByFile = new Map<ts.SourceFile, ReadonlyMap<string, ImportBindingSource>>();
 
   let processed = 0;
   for (const r of input.callSites) {
@@ -162,6 +165,11 @@ export async function resolveEdgesSyntactic(
       importIndex = buildImportIndex(r.sourceFile, input.projectDirAbs, knownFiles);
       importIndexByFile.set(r.sourceFile, importIndex);
     }
+    let importBindings = importBindingsByFile.get(r.sourceFile);
+    if (importBindings === undefined) {
+      importBindings = buildImportBindingSourceIndex(r.sourceFile);
+      importBindingsByFile.set(r.sourceFile, importBindings);
+    }
     const currentFileRel = relative(input.projectDirAbs, r.sourceFile.fileName)
       .split(sep)
       .join('/');
@@ -169,6 +177,7 @@ export async function resolveEdgesSyntactic(
       catalog: input.catalog,
       currentFileRel,
       importIndex,
+      importBindings,
     });
     if (verdict === null) continue;
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);

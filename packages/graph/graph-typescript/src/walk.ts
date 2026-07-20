@@ -651,14 +651,7 @@ function isStructuralParent(parent: ts.Node): boolean {
 
 /** Identifier IS the declaration's name (binding position, not value). */
 function isDeclarationName(node: ts.Identifier, parent: ts.Node): boolean {
-  if (ts.isVariableDeclaration(parent) && parent.name === node) return true;
-  if (ts.isParameter(parent) && parent.name === node) return true;
-  if (ts.isFunctionDeclaration(parent) && parent.name === node) return true;
-  if (ts.isClassDeclaration(parent) && parent.name === node) return true;
-  if (ts.isMethodDeclaration(parent) && parent.name === node) return true;
-  if (ts.isPropertyDeclaration(parent) && parent.name === node) return true;
-  if (ts.isBindingElement(parent) && parent.name === node) return true;
-  return false;
+  return (parent as ts.NamedDeclaration).name === node;
 }
 
 /** Identifier is a property/label name (not a value reference). */

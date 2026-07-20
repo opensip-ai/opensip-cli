@@ -31,7 +31,7 @@ export const visitArrowFunction: InventoryVisitor<ts.ArrowFunction> = (node, ctx
     bodySize: digest.size,
     bodySignature: digest.signature,
     simpleName: name,
-    qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`,
+    qualifiedName: `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${name}`,
     filePath: ctx.filePathProjectRel,
     line: startLC.line + 1,
     column: startLC.character,

@@ -163,7 +163,10 @@ describe('resolveDeclToHash — intra-package .d.ts→source method pin', () => 
       language: 'typescript',
       builtAt: 'x',
       cacheKey: 'k',
-      functions: { getAll: [occ('getAll', 'packages/lib/src/registry.ts', GETALL_HASH)] },
+      functions: {
+        getAll: [occ('getAll', 'packages/lib/src/registry.ts', GETALL_HASH)],
+        getMts: [occ('getMts', 'packages/lib/src/registry.mts', GETALL_HASH)],
+      },
     };
     const manifestIndex = buildPackageManifestIndexFromRoots([libDir, appDir], root);
     crossPackage = {
@@ -179,6 +182,18 @@ describe('resolveDeclToHash — intra-package .d.ts→source method pin', () => 
     const sf = ts.createSourceFile(
       join(libDir, 'dist', 'registry.d.ts'),
       'export declare class R { getAll(): void; }',
+      ts.ScriptTarget.ES2022,
+      true,
+    );
+    const [node] = sf.statements;
+    if (node === undefined) throw new Error('fixture parse produced no statement');
+    return { node, sf };
+  }
+
+  function libDistMtsDecl(): { node: ts.Node; sf: ts.SourceFile } {
+    const sf = ts.createSourceFile(
+      join(libDir, 'dist', 'registry.d.mts'),
+      'export declare class R { getMts(): void; }',
       ts.ScriptTarget.ES2022,
       true,
     );
@@ -204,6 +219,12 @@ describe('resolveDeclToHash — intra-package .d.ts→source method pin', () => 
     const { node, sf } = libDistDecl();
     const ctx = ctxOwnedBy(join(libDir, 'src', 'caller.ts'));
     expect(resolveDeclToHash(node, sf, ['getAll'], ctx)).toBe(GETALL_HASH);
+  });
+
+  it('preserves the .mts source extension when pinning a .d.mts declaration', () => {
+    const { node, sf } = libDistMtsDecl();
+    const ctx = ctxOwnedBy(join(libDir, 'src', 'caller.mts'));
+    expect(resolveDeclToHash(node, sf, ['getMts'], ctx)).toBe(GETALL_HASH);
   });
 
   it('declines when the OWNER is in a DIFFERENT package (cross-shard, left to the completeness floor)', () => {

@@ -30,7 +30,7 @@ import { isReturnValueDiscarded } from '../edges.js';
 import { buildImportBindingSourceIndex, calleeAnchorNode, calleeSimpleName } from './syntactic.js';
 
 import type { CallSiteRecord } from '../walk.js';
-import type { ImportBindingSource } from './syntactic.js';
+import type { Callee, ImportBindingSource } from './syntactic.js';
 import type { CallEdge, CrossBoundaryCall } from '@opensip-cli/graph';
 
 /** Max length of the descriptor's display text — the CallEdge.text contract. */
@@ -61,6 +61,7 @@ export function extractBoundaryCalls(
   const out: CrossBoundaryCall[] = [];
   // One import-binding index per source file, built lazily and cached.
   const bindingIndexBySf = new Map<ts.SourceFile, ReadonlyMap<string, ImportBindingSource>>();
+  const namespaceBindingsBySf = new Map<ts.SourceFile, ReadonlySet<string>>();
   // Owner-file derivation is per source file; cache it so each boundary call on
   // the same file doesn't re-run the relative/posix math.
   const ownerFileBySf = new Map<ts.SourceFile, string>();
@@ -70,12 +71,15 @@ export function extractBoundaryCalls(
     const callee = calleeSimpleName(r.node);
     if (callee === null) continue;
 
-    let bindingIndex = bindingIndexBySf.get(r.sourceFile);
-    if (bindingIndex === undefined) {
-      bindingIndex = buildImportBindingSourceIndex(r.sourceFile);
-      bindingIndexBySf.set(r.sourceFile, bindingIndex);
-    }
-    const importBinding = bindingIndex.get(callee.name);
+    const bindingIndex = cachedValue(bindingIndexBySf, r.sourceFile, () =>
+      buildImportBindingSourceIndex(r.sourceFile),
+    );
+    const importBinding = importBindingForCallee(
+      callee,
+      r.sourceFile,
+      bindingIndex,
+      namespaceBindingsBySf,
+    );
     const importSpecifier = importBinding?.specifier;
     const methodEligible =
       resolveMethodTarget !== undefined &&
@@ -85,14 +89,12 @@ export function extractBoundaryCalls(
     // Everything else (globals/locals/intra) is skipped before the position math.
     if (importSpecifier === undefined && !methodEligible) continue;
 
-    let ownerFile = ownerFileBySf.get(r.sourceFile);
-    if (ownerFile === undefined) {
-      // Byte-identical to FunctionOccurrence.filePath (walk.ts) so the merge's
-      // ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn) lookup hits
-      // and relative-import pinning resolves against the owner's REAL directory.
-      ownerFile = relative(projectDirAbs, r.sourceFile.fileName).split(sep).join('/');
-      ownerFileBySf.set(r.sourceFile, ownerFile);
-    }
+    // Byte-identical to FunctionOccurrence.filePath (walk.ts) so the merge's
+    // ownerEdgeKey(ownerHash, ownerFile, ownerLine, ownerColumn) lookup hits
+    // and relative-import pinning resolves against the owner's REAL directory.
+    const ownerFile = cachedValue(ownerFileBySf, r.sourceFile, () =>
+      relative(projectDirAbs, r.sourceFile.fileName).split(sep).join('/'),
+    );
 
     const bc = boundaryCallFor({
       record: r,
@@ -108,6 +110,48 @@ export function extractBoundaryCalls(
     if (bc !== null) out.push(bc);
   }
   return out;
+}
+
+function importBindingForCallee(
+  callee: Callee,
+  sourceFile: ts.SourceFile,
+  bindingIndex: ReadonlyMap<string, ImportBindingSource>,
+  namespaceBindingsBySf: Map<ts.SourceFile, ReadonlySet<string>>,
+): ImportBindingSource | undefined {
+  if (callee.bindingName === undefined) return bindingIndex.get(callee.name);
+  const namespaceBindings = cachedValue(namespaceBindingsBySf, sourceFile, () =>
+    collectNamespaceBindings(sourceFile),
+  );
+  if (namespaceBindings.has(callee.bindingName)) {
+    return bindingIndex.get(callee.bindingName);
+  }
+  return undefined;
+}
+
+function cachedValue<K, V>(cache: Map<K, V>, key: K, create: () => V): V {
+  const existing = cache.get(key);
+  if (existing !== undefined) return existing;
+  const created = create();
+  cache.set(key, created);
+  return created;
+}
+
+function collectNamespaceBindings(sourceFile: ts.SourceFile): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const bindings = statement.importClause?.namedBindings;
+      if (bindings !== undefined && ts.isNamespaceImport(bindings)) {
+        names.add(bindings.name.text);
+      }
+    } else if (
+      ts.isImportEqualsDeclaration(statement) &&
+      ts.isExternalModuleReference(statement.moduleReference)
+    ) {
+      names.add(statement.name.text);
+    }
+  }
+  return names;
 }
 
 interface BoundaryDeps {

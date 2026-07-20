@@ -40,11 +40,11 @@ export function methodTargetFile(
     // other decls): the first declaration is the canonical one.
     if (!sf.isDeclarationFile) return null;
     const rel = relative(projectDirAbs, sf.fileName).split(sep).join('/');
-    if (!rel.endsWith('.d.ts') || !rel.includes('/dist/')) return null;
+    if (!isTypeScriptDeclarationPath(rel) || !rel.includes('/dist/')) return null;
     // (1) Workspace-package built dist — how the single-program (EXACT) build
     //     resolves `@scope/pkg`: `packages/X/dist/sub.d.ts` -> `packages/X/src/sub.ts`.
     if (!rel.includes('/node_modules/')) {
-      return rel.replace('/dist/', '/src/').replace(/\.d\.ts$/, '.ts');
+      return declarationPathToSource(rel.replace('/dist/', '/src/'));
     }
     // (2) The SAME workspace package resolved through pnpm's INJECTED copy — how
     //     each SHARDED shard's per-shard program resolves `@scope/pkg`:
@@ -79,8 +79,18 @@ export function decodeInjectedDist(rel: string): string | null {
   const pnpmDir = rel.slice(pnpmAt + PNPM.length, dirEnd);
   const encoded = encodedWorkspaceFromPnpmDir(pnpmDir);
   if (encoded === null) return null;
-  const sub = rel.slice(distAt + '/dist/'.length).replace(/\.d\.ts$/, '.ts');
+  const sub = declarationPathToSource(rel.slice(distAt + '/dist/'.length));
+  if (sub === null) return null;
   return `${encoded.split('+').join('/')}/src/${sub}`;
+}
+
+function isTypeScriptDeclarationPath(path: string): boolean {
+  return /\.d\.[cm]?ts$/.test(path);
+}
+
+function declarationPathToSource(path: string): string | null {
+  if (!isTypeScriptDeclarationPath(path)) return null;
+  return path.replace(/\.d\.([cm]?)ts$/, '.$1ts');
 }
 
 /**

@@ -31,7 +31,7 @@ export function synthesizeModuleInit(
     bodySize: digest.size,
     bodySignature: digest.signature,
     simpleName: name,
-    qualifiedName: `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.<module-init>`,
+    qualifiedName: `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.<module-init>`,
     filePath: ctx.filePathProjectRel,
     line: 1,
     column: 0,

@@ -31,6 +31,17 @@ describe('decodeInjectedDist', () => {
     ).toBe('packages/fitness/engine/src/framework/define-check.ts');
   });
 
+  it.each([
+    ['registry.d.mts', 'registry.mts'],
+    ['registry.d.cts', 'registry.cts'],
+  ])('preserves the source module kind when decoding %s', (declarationFile, sourceFile) => {
+    expect(
+      decodeInjectedDist(
+        `node_modules/.pnpm/@scope+lib@file+packages+lib/node_modules/@scope/lib/dist/${declarationFile}`,
+      ),
+    ).toBe(`packages/lib/src/${sourceFile}`);
+  });
+
   it('stops before pnpm peer-dep suffixes on file: virtual-store paths', () => {
     expect(
       decodeInjectedDist(
@@ -69,6 +80,10 @@ describe('methodTargetFile', () => {
         '',
       ].join('\n'),
     );
+    writeFileSync(
+      join(root, 'packages', 'lib', 'dist', 'registry.d.mts'),
+      'export declare class MR { esm(): void; }\n',
+    );
     // A `.d.ts` NOT under /dist/ (e.g. a hand-authored ambient) → must decline.
     writeFileSync(
       join(root, 'packages', 'lib', 'types', 'amb.d.ts'),
@@ -99,15 +114,18 @@ describe('methodTargetFile', () => {
       callerPath,
       [
         `import type { Ctx, R } from '../../lib/dist/registry.js';`,
+        `import type { MR } from '../../lib/dist/registry.mjs';`,
         `import type { A } from '../../lib/types/amb.js';`,
         `import type { IR } from '../../../node_modules/.pnpm/@scope+lib@file+packages+lib/node_modules/@scope/lib/dist/injected.js';`,
         `declare const r: R;`,
+        `declare const mr: MR;`,
         `declare const ctx: Ctx;`,
         `declare const a: A;`,
         `declare const ir: IR;`,
         `class Local { foo(): void {} }`,
         `function caller(): void {`,
         `  r.getAll();`, // cross-package dist method → maps to source
+        `  mr.esm();`, // .d.mts boundary → maps to .mts source
         `  ctx.setExitCode(0);`, // INTERFACE-attested → maps to source; linker declines
         `  a.ambient();`, // .d.ts but not /dist/ → decline
         `  ir.ping();`, // pnpm-injected workspace dist → decode to source
@@ -144,6 +162,12 @@ describe('methodTargetFile', () => {
   it('maps a cross-package dist/*.d.ts method decl to its SOURCE file', () => {
     expect(methodTargetFile(calls.get('getAll')!, checker, root)).toBe(
       'packages/lib/src/registry.ts',
+    );
+  });
+
+  it('maps a cross-package dist/*.d.mts method declaration to its .mts source', () => {
+    expect(methodTargetFile(calls.get('esm')!, checker, root)).toBe(
+      'packages/lib/src/registry.mts',
     );
   });
 

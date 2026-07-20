@@ -3,12 +3,13 @@
  *
  * Covers tsconfig resolution (default path, explicit relative override,
  * explicit ABSOLUTE override), the missing-config error, and the
- * source-file filter (drops non-.ts/.tsx and .d.ts, dedups, sorts).
+ * TypeScript-family source filter (drops declarations and non-source files,
+ * dedups, sorts).
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { ConfigurationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -60,6 +61,32 @@ describe('discoverFiles', () => {
     expect(out.files.some((f) => f.endsWith('.d.ts'))).toBe(false);
     expect(out.files.some((f) => f.endsWith('.md'))).toBe(false);
     expect(out.files.some((f) => f.endsWith('.json'))).toBe(false);
+  });
+
+  it('admits every TypeScript and allowJs source extension handled by the adapter', () => {
+    writeFileSync(
+      join(dir, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          allowJs: true,
+          target: 'ES2022',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+        },
+        include: ['**/*'],
+      }),
+      'utf8',
+    );
+    for (const file of ['a.ts', 'b.tsx', 'c.mts', 'd.cts', 'e.js', 'f.jsx', 'g.mjs', 'h.cjs']) {
+      writeFileSync(join(dir, file), 'export const value = 1;\n', 'utf8');
+    }
+    writeFileSync(join(dir, 'types.d.mts'), 'export declare const value: number;\n', 'utf8');
+    writeFileSync(join(dir, 'types.d.cts'), 'export declare const value: number;\n', 'utf8');
+
+    const out = discoverFiles({ projectDir: dir });
+    const names = out.files.map((file) => relative(out.projectDirAbs, file));
+
+    expect(names).toEqual(['a.ts', 'b.tsx', 'c.mts', 'd.cts', 'e.js', 'f.jsx', 'g.mjs', 'h.cjs']);
   });
 
   it('accepts an explicit RELATIVE tsConfigPath override', () => {

@@ -152,8 +152,8 @@ function pinByDtsDeclSource(
   ctx: ResolverContext,
 ): string | null {
   const rel = relative(ctx.projectDirAbs, declSourceFile.fileName).split(sep).join('/');
-  if (!rel.endsWith('.d.ts') || !rel.includes('/dist/')) return null;
-  const srcRel = rel.replace('/dist/', '/src/').replace(/\.d\.ts$/, '.ts');
+  if (!/\.d\.[cm]?ts$/.test(rel) || !rel.includes('/dist/')) return null;
+  const srcRel = rel.replace('/dist/', '/src/').replace(/\.d\.([cm]?)ts$/, '.$1ts');
   const ownerRel = relative(ctx.projectDirAbs, ctx.sourceFile.fileName).split(sep).join('/');
   if (packageOf(srcRel) !== packageOf(ownerRel)) return null; // cross-package → decline (symmetry)
   return pinBySourceRel(srcRel, candidateNames, ctx);

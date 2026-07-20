@@ -81,6 +81,16 @@ describe('value-reference + shorthand edge resolution', () => {
         useCtor(Widget);
       }
     `,
+
+    'named-expression.ts': `
+      export const named = function inner(): number { return 5; };
+    `,
+
+    'named-class-expression.ts': `
+      export const NamedClass = class InnerClass {
+        constructor() {}
+      };
+    `,
   });
   let catalog!: Catalog;
   beforeAll(async () => {
@@ -102,9 +112,9 @@ describe('value-reference + shorthand edge resolution', () => {
   it('resolves a shorthand property assignment to its function', () => {
     const occ = findOccurrence(catalog, (o) => o.simpleName === 'buildBag');
     expect(occ).toBeDefined();
-    const edge = occ!.calls.find((e) => e.text.includes('shorthandTarget'));
-    expect(edge).toBeDefined();
-    expect(edge!.to.length).toBeGreaterThan(0);
+    const edges = occ!.calls.filter((e) => e.text.includes('shorthandTarget'));
+    expect(edges).toHaveLength(1);
+    expect(edges[0].to.length).toBeGreaterThan(0);
   });
 
   it('resolves an arrow-in-variable referenced as a value', () => {
@@ -127,5 +137,22 @@ describe('value-reference + shorthand edge resolution', () => {
     // Widget-as-value resolves to the class constructor's catalog entry.
     const edge = occ!.calls.find((e) => e.text.includes('Widget') && e.to.length > 0);
     expect(edge).toBeDefined();
+  });
+
+  it('does not emit a self-reference edge for a function-expression declaration name', () => {
+    const occurrence = findOccurrence(catalog, (item) => item.simpleName === 'inner');
+
+    expect(occurrence).toBeDefined();
+    expect(occurrence?.calls).toEqual([]);
+  });
+
+  it('does not emit a self-reference edge for a class-expression declaration name', () => {
+    const occurrence = findOccurrence(
+      catalog,
+      (item) => item.kind === 'module-init' && item.filePath.endsWith('named-class-expression.ts'),
+    );
+
+    expect(occurrence).toBeDefined();
+    expect(occurrence?.calls.some((edge) => edge.text === 'InnerClass')).toBe(false);
   });
 });

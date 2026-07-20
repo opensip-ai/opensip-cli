@@ -41,6 +41,8 @@ export interface SyntacticContext {
   readonly currentFileRel: string;
   /** Import index for {@link currentFileRel}. */
   readonly importIndex: ImportIndex;
+  /** Import binding metadata used to translate caller-local named aliases. */
+  readonly importBindings?: ReadonlyMap<string, ImportBindingSource>;
 }
 
 const UNRESOLVED: ResolverVerdict = {
@@ -77,7 +79,12 @@ export function resolveSyntactic(node: ts.Node, ctx: SyntacticContext): Resolver
   const callee = calleeSimpleName(node);
   if (callee === null) return null;
 
-  const candidates = ctx.catalog.functions[callee.name];
+  const bindingName = callee.bindingName ?? callee.name;
+  const targetName =
+    callee.bindingName === undefined
+      ? (ctx.importBindings?.get(bindingName)?.importedName ?? callee.name)
+      : callee.name;
+  const candidates = ctx.catalog.functions[targetName];
   const isCallish = callee.shape === 'call';
 
   if (!candidates || candidates.length === 0) {
@@ -86,7 +93,7 @@ export function resolveSyntactic(node: ts.Node, ctx: SyntacticContext): Resolver
     return isCallish ? UNRESOLVED : null;
   }
 
-  const pin = resolvePin(callee.name, ctx, candidates);
+  const pin = resolvePin(bindingName, ctx, candidates);
   const verdict = verdictForPin(pin, candidates);
 
   // Suppress an empty bare-reference verdict (parity with exact mode).
@@ -172,6 +179,8 @@ function nameOnlyVerdict(candidates: readonly FunctionOccurrence[]): ResolverVer
 
 export interface Callee {
   readonly name: string;
+  /** Imported receiver binding for a qualified/member call, when syntactically known. */
+  readonly bindingName?: string;
   /** 'call' = call/new/jsx (a real invocation); 'ref' = bare value reference. */
   readonly shape: 'call' | 'ref';
 }
@@ -186,12 +195,12 @@ export interface Callee {
  */
 export function calleeSimpleName(node: ts.Node): Callee | null {
   if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-    const name = expressionSimpleName(node.expression);
-    return name === null ? null : { name, shape: 'call' };
+    const target = expressionTarget(node.expression);
+    return target === null ? null : { ...target, shape: 'call' };
   }
   if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-    const name = jsxTagSimpleName(node.tagName);
-    return name === null ? null : { name, shape: 'call' };
+    const target = jsxTagTarget(node.tagName);
+    return target === null ? null : { ...target, shape: 'call' };
   }
   if (ts.isShorthandPropertyAssignment(node)) {
     return { name: node.name.text, shape: 'ref' };
@@ -202,10 +211,18 @@ export function calleeSimpleName(node: ts.Node): Callee | null {
   return null;
 }
 
-/** Rightmost simple name of a call/new target expression. */
-function expressionSimpleName(expr: ts.Expression): string | null {
-  if (ts.isIdentifier(expr)) return expr.text;
-  if (ts.isPropertyAccessExpression(expr)) return expr.name.text;
+/** Rightmost target name plus an imported receiver binding when qualified. */
+function expressionTarget(
+  expr: ts.Expression,
+): { readonly name: string; readonly bindingName?: string } | null {
+  if (ts.isIdentifier(expr)) return { name: expr.text };
+  if (ts.isPropertyAccessExpression(expr)) {
+    const bindingName = leftmostIdentifier(expr.expression);
+    return {
+      name: expr.name.text,
+      ...(bindingName === undefined ? {} : { bindingName }),
+    };
+  }
   return null;
 }
 
@@ -234,11 +251,25 @@ export function calleeAnchorNode(node: ts.Node): ts.Node {
   return node;
 }
 
-/** Rightmost simple name of a JSX tag (`Foo` or `A.B.Foo`). */
-function jsxTagSimpleName(tag: ts.JsxTagNameExpression): string | null {
-  if (ts.isIdentifier(tag)) return tag.text;
-  if (ts.isPropertyAccessExpression(tag)) return tag.name.text;
+/** Rightmost simple name and namespace binding of a JSX tag (`Foo` / `A.B.Foo`). */
+function jsxTagTarget(
+  tag: ts.JsxTagNameExpression,
+): { readonly name: string; readonly bindingName?: string } | null {
+  if (ts.isIdentifier(tag)) return { name: tag.text };
+  if (ts.isPropertyAccessExpression(tag)) {
+    const bindingName = leftmostIdentifier(tag.expression);
+    return {
+      name: tag.name.text,
+      ...(bindingName === undefined ? {} : { bindingName }),
+    };
+  }
   return null;
+}
+
+function leftmostIdentifier(expression: ts.Expression): string | undefined {
+  let current = expression;
+  while (ts.isPropertyAccessExpression(current)) current = current.expression;
+  return ts.isIdentifier(current) ? current.text : undefined;
 }
 
 // ── import-index construction ─────────────────────────────────────
@@ -389,7 +420,9 @@ function indexImportBindingClause(
   for (const el of bindings.elements) {
     index.set(el.name.text, {
       specifier,
-      ...(el.propertyName === undefined ? {} : { importedName: el.propertyName.text }),
+      ...(el.propertyName === undefined || el.propertyName.text === 'default'
+        ? {}
+        : { importedName: el.propertyName.text }),
     });
   }
 }
@@ -409,20 +442,65 @@ function resolveSpecifierToFile(
   if (!specifier.startsWith('.')) return null; // bare/external
   const baseDir = posix.dirname(currentFileRel);
   const joined = posix.normalize(posix.join(baseDir, specifier));
-  const stripped = joined.replace(/\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts)$/, '');
-  const candidates = [
-    joined,
-    `${stripped}.ts`,
-    `${stripped}.tsx`,
-    `${stripped}.mts`,
-    `${stripped}.cts`,
-    `${stripped}/index.ts`,
-    `${stripped}/index.tsx`,
-  ];
+  const candidates = resolutionCandidates(joined);
   for (const candidate of candidates) {
     if (knownFilesRel.has(candidate)) return candidate;
   }
   return null;
+}
+
+/**
+ * Mirror TypeScript's source-extension substitution order, excluding declaration
+ * files because they never enter the callable catalog. Module-specific source
+ * kinds (`.mts` / `.cts` and their JavaScript counterparts) deliberately do not
+ * participate in extensionless resolution.
+ */
+function resolutionCandidates(joined: string): readonly string[] {
+  const extension = moduleResolutionExtension(joined);
+  const stem = extension.length === 0 ? joined : joined.slice(0, -extension.length);
+  switch (extension) {
+    case '.mjs':
+    case '.mts':
+    case '.d.mts': {
+      return [`${stem}.mts`, `${stem}.mjs`];
+    }
+    case '.cjs':
+    case '.cts':
+    case '.d.cts': {
+      return [`${stem}.cts`, `${stem}.cjs`];
+    }
+    case '.jsx':
+    case '.tsx': {
+      return [`${stem}.tsx`, `${stem}.ts`, `${stem}.jsx`, `${stem}.js`];
+    }
+    case '.js':
+    case '.ts':
+    case '.d.ts': {
+      return [`${stem}.ts`, `${stem}.tsx`, `${stem}.js`, `${stem}.jsx`];
+    }
+    case '': {
+      return [
+        `${stem}.ts`,
+        `${stem}.tsx`,
+        `${stem}.js`,
+        `${stem}.jsx`,
+        `${stem}/index.ts`,
+        `${stem}/index.tsx`,
+        `${stem}/index.js`,
+        `${stem}/index.jsx`,
+      ];
+    }
+    default: {
+      return [];
+    }
+  }
+}
+
+function moduleResolutionExtension(path: string): string {
+  for (const extension of ['.d.mts', '.d.cts', '.d.ts'] as const) {
+    if (path.endsWith(extension)) return extension;
+  }
+  return posix.extname(path);
 }
 
 /** Absolute file path → project-relative POSIX path (catalog filePath shape). */

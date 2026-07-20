@@ -26,9 +26,9 @@ export const visitClassStaticBlock: InventoryVisitor<ts.ClassStaticBlockDeclarat
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
   const enclosingClass = ctx.enclosingClass;
   const qualified = enclosingClass
-    ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.<static-init>`
+    ? `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${enclosingClass}.<static-init>`
     : /* v8 ignore next */
-      `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.<static-init>`;
+      `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.<static-init>`;
   const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
     bodyHash: digest.hash,

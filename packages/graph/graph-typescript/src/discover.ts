@@ -123,8 +123,7 @@ function filterToSourceFiles(fileNames: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const f of fileNames) {
-    if (!f.endsWith('.ts') && !f.endsWith('.tsx')) continue;
-    if (f.endsWith('.d.ts')) continue;
+    if (!isSupportedSourceFile(f) || isDeclarationFile(f)) continue;
     let real = f;
     /* v8 ignore start */
     try {
@@ -141,4 +140,14 @@ function filterToSourceFiles(fileNames: readonly string[]): string[] {
   }
   out.sort();
   return out;
+}
+
+const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'] as const;
+
+function isSupportedSourceFile(filePath: string): boolean {
+  return SOURCE_EXTENSIONS.some((extension) => filePath.endsWith(extension));
+}
+
+function isDeclarationFile(filePath: string): boolean {
+  return filePath.endsWith('.d.ts') || filePath.endsWith('.d.mts') || filePath.endsWith('.d.cts');
 }

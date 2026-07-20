@@ -25,8 +25,8 @@ export const visitMethodDeclaration: InventoryVisitor<ts.MethodDeclaration> = (n
   const end = ctx.sourceFile.getLineAndCharacterOfPosition(node.getEnd());
   const enclosingClass = ctx.enclosingClass ?? findEnclosingClassName(node);
   const qualified = enclosingClass
-    ? `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${enclosingClass}.${name}`
-    : `${ctx.filePathProjectRel.replace(/\.tsx?$/, '')}.${name}`;
+    ? `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${enclosingClass}.${name}`
+    : `${ctx.filePathProjectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '')}.${name}`;
   const digest = digestFunctionBody(node, ctx.sourceFile);
   return {
     bodyHash: digest.hash,
@@ -54,8 +54,18 @@ function methodName(node: ts.MethodDeclaration): string | null {
   const n = node.name;
   if (ts.isIdentifier(n)) return n.text;
   /* v8 ignore start */
-  if (ts.isStringLiteral(n)) return n.text;
-  if (ts.isComputedPropertyName(n)) return n.expression.getText();
+  if (ts.isStringLiteral(n) || ts.isNumericLiteral(n)) return n.text;
+  if (ts.isComputedPropertyName(n)) {
+    const expression = n.expression;
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression) ||
+      ts.isNumericLiteral(expression)
+    ) {
+      return expression.text;
+    }
+    return expression.getText();
+  }
   // PrivateIdentifier carries the leading '#' in its text already
   // (e.g. '#priv'), which matches how TypeScript's own AST exposes it.
   if (ts.isPrivateIdentifier(n)) return n.text;

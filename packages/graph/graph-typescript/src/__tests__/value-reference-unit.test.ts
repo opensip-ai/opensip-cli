@@ -41,6 +41,24 @@ function ident(sf: ts.SourceFile, text: string): ts.Identifier {
   return found;
 }
 
+function findNode<T extends ts.Node>(
+  sourceFile: ts.SourceFile,
+  predicate: (node: ts.Node) => node is T,
+): T {
+  let found: T | undefined;
+  const visit = (node: ts.Node): void => {
+    if (found !== undefined) return;
+    if (predicate(node)) {
+      found = node;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  if (found === undefined) throw new Error('node not found');
+  return found;
+}
+
 describe('isValueReference — structural-name branches', () => {
   it('treats a variable-declaration name as structural (not a value ref)', () => {
     const sf = parse('const myVar = 1;');
@@ -96,6 +114,36 @@ describe('isValueReference — structural-name branches', () => {
   it('treats an import-specifier name as structural', () => {
     const sf = parse("import { thing } from './x.js';");
     expect(isValueReference(ident(sf, 'thing'))).toBe(false);
+  });
+
+  it('treats a named function-expression name as structural', () => {
+    const sf = parse('const fn = function inner() { return 1; };');
+    expect(isValueReference(ident(sf, 'inner'))).toBe(false);
+  });
+
+  it('treats a named class-expression name as structural', () => {
+    const sf = parse('const C = class Inner { constructor() {} };');
+    expect(isValueReference(ident(sf, 'Inner'))).toBe(false);
+  });
+
+  it('treats accessor declaration names as structural', () => {
+    const sf = parse('class C { get value() { return 1; } set value(next: number) {} }');
+    const names: ts.Identifier[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isIdentifier(node) && node.text === 'value') names.push(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+
+    expect(names).toHaveLength(2);
+    expect(names.every((name) => !isValueReference(name))).toBe(true);
+  });
+
+  it('does not duplicate a shorthand assignment through its child identifier', () => {
+    const sf = parse('declare const handler: () => void; const bag = { handler };');
+    const shorthand = findNode(sf, ts.isShorthandPropertyAssignment);
+
+    expect(isValueReference(shorthand.name)).toBe(false);
   });
 
   it('classifies a bare value use (function argument) as a value reference', () => {

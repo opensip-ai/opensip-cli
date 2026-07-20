@@ -21,8 +21,15 @@ describe('jsx-resolution acceptance fixture', () => {
   });
 
   writeFixture(fixtureDir, {
-    'foo.tsx': `export function Foo(): JSX.Element { return <span>foo</span>; }\n`,
-    'caller.tsx': `import { Foo } from './foo.js';\nexport function Caller(): JSX.Element {\n  return <div><Foo /></div>;\n}\n`,
+    'foo.tsx':
+      `export function Foo(): JSX.Element { return <span>foo</span>; }\n` +
+      `export function Bar(): JSX.Element { return <span>bar</span>; }\n`,
+    'caller.tsx':
+      `import { Foo } from './foo.js';\n` +
+      `import * as Components from './foo.js';\n` +
+      `export function Caller(): JSX.Element {\n` +
+      `  return <div><Foo /><Components.Bar /></div>;\n` +
+      `}\n`,
   });
   let catalog!: Catalog;
   beforeAll(async () => {
@@ -53,5 +60,15 @@ describe('jsx-resolution acceptance fixture', () => {
     // call site IS recorded as an edge with `to: []`. The acceptance
     // shape is: no resolved entry pointing at any catalog occurrence.
     for (const e of divEdges) expect(e.to.length).toBe(0);
+  });
+
+  it('resolves a namespace-qualified JSX component by its exported member name', () => {
+    const callerOcc = findOccurrence(catalog, (o) => o.simpleName === 'Caller');
+    const barOcc = findOccurrence(catalog, (o) => o.simpleName === 'Bar');
+    const barEdge = callerOcc?.calls.find((edge) => edge.text.includes('<Components.Bar'));
+
+    expect(barOcc).toBeDefined();
+    expect(barEdge?.resolution).toBe('jsx');
+    expect(barEdge?.to).toEqual([barOcc!.bodyHash]);
   });
 });

@@ -41,7 +41,7 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   const real = unaliasSymbol(symbol, ctx.typeChecker);
   const decls = real.getDeclarations() ?? [];
 
-  const candidateName = ts.isIdentifier(tagName) ? tagName.text : tagName.getText();
+  const candidateName = jsxTargetName(tagName);
   // Cross-package binding name: `<Foo/>` binds `Foo`; `<A.B/>` binds the leftmost
   // identifier `A` (the namespace import). The exported callee name to look up
   // stays `candidateName`.
@@ -57,6 +57,11 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   }
   return UNRESOLVED;
 };
+
+/** Exported callable name addressed by a JSX tag (the rightmost member). */
+function jsxTargetName(tagName: ts.JsxTagNameExpression): string {
+  return ts.isPropertyAccessExpression(tagName) ? tagName.name.text : tagName.getText();
+}
 
 /**
  * The local binding name(s) a JSX tag could be imported under: the tag itself

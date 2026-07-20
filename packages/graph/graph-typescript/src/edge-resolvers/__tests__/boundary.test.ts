@@ -265,6 +265,59 @@ describe('extractBoundaryCalls', () => {
     expect(out).toEqual([]);
   });
 
+  it('uses a namespace import as the binding for a qualified function call', () => {
+    const sf = parse(
+      [
+        "import * as helpers from './helpers.js';",
+        'export function caller(): number {',
+        '  return helpers.run();',
+        '}',
+      ].join('\n'),
+    );
+
+    const [call] = extractBoundaryCalls(callRecords(sf), NONE_RESOLVED, PROJECT_DIR);
+    expect(call?.calleeName).toBe('run');
+    expect(call?.importSpecifier).toBe('./helpers.js');
+  });
+
+  it('does not confuse a namespace member with a same-named direct import', () => {
+    const sf = parse(
+      [
+        "import { run } from './other.js';",
+        "import * as helpers from './helpers.js';",
+        'export function caller(): number {',
+        '  return helpers.run();',
+        '}',
+      ].join('\n'),
+    );
+
+    const [call] = extractBoundaryCalls(callRecords(sf), NONE_RESOLVED, PROJECT_DIR);
+    expect(call?.calleeName).toBe('run');
+    expect(call?.importSpecifier).toBe('./helpers.js');
+  });
+
+  it('does not bind an imported receiver method to an unrelated same-named direct import', () => {
+    const sf = parse(
+      [
+        "import { service } from './service.js';",
+        "import { run } from './other.js';",
+        'export function caller(): number {',
+        '  return service.run();',
+        '}',
+      ].join('\n'),
+    );
+
+    const [call] = extractBoundaryCalls(
+      callRecords(sf),
+      NONE_RESOLVED,
+      PROJECT_DIR,
+      () => 'packages/service/src/service.ts',
+    );
+    expect(call?.calleeName).toBe('run');
+    expect(call?.importSpecifier).toBeUndefined();
+    expect(call?.targetFile).toBe('packages/service/src/service.ts');
+  });
+
   it('emits for an `import =` (ImportEqualsDeclaration) boundary call', () => {
     const sf = parse(
       [
@@ -275,6 +328,19 @@ describe('extractBoundaryCalls', () => {
 
     const [call] = extractBoundaryCalls(callRecords(sf), NONE_RESOLVED, PROJECT_DIR);
     expect(call?.calleeName).toBe('legacy');
+    expect(call?.importSpecifier).toBe('./legacy.js');
+  });
+
+  it('uses an `import =` binding for a qualified boundary call', () => {
+    const sf = parse(
+      [
+        "import legacy = require('./legacy.js');",
+        'export function caller(): unknown { return legacy.run(); }',
+      ].join('\n'),
+    );
+
+    const [call] = extractBoundaryCalls(callRecords(sf), NONE_RESOLVED, PROJECT_DIR);
+    expect(call?.calleeName).toBe('run');
     expect(call?.importSpecifier).toBe('./legacy.js');
   });
 

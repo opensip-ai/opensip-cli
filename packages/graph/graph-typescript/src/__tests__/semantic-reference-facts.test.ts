@@ -1,6 +1,6 @@
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { DEFAULT_SEMANTIC_FACT_LIMITS, MAX_SEMANTIC_DECLARATIONS } from '@opensip-cli/graph';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -20,7 +20,10 @@ afterEach(() => {
   }
 });
 
-function writeProject(files: Record<string, string>): string {
+function writeProject(
+  files: Record<string, string>,
+  include: readonly string[] = ['**/*.ts'],
+): string {
   dir = mkdtempSync(join(tmpdir(), 'sem-facts-'));
   writeFileSync(
     join(dir, 'tsconfig.json'),
@@ -32,7 +35,7 @@ function writeProject(files: Record<string, string>): string {
         strict: true,
         skipLibCheck: true,
       },
-      include: ['**/*.ts'],
+      include,
     }),
     'utf8',
   );
@@ -105,6 +108,14 @@ describe('collectSemanticReferenceFacts', () => {
     );
     expect(cross.some((r) => r.filePath.includes('use.ts'))).toBe(true);
     expect(cross.every((r) => r.filePath !== iface?.filePath)).toBe(true);
+    expect(
+      facts.references
+        .filter((reference) => reference.reason === 'target-not-in-project-inventory')
+        .map((reference) => reference.targetName),
+    ).toEqual([]);
+    expect(new Set(facts.references.map((reference) => reference.referenceId)).size).toBe(
+      facts.references.length,
+    );
   });
 
   it('omits the plane in fast mode', async () => {
@@ -212,5 +223,89 @@ describe('collectSemanticReferenceFacts', () => {
       );
       expect(sameFileRefs).toHaveLength(0);
     }
+  });
+
+  it('does not emit declarations from compiler-loaded files outside discovery', async () => {
+    const projectDir = writeProject(
+      {
+        'src/entry.ts':
+          `import { hidden } from '../excluded/hidden.js';\n` +
+          `export function entry() { return hidden(); }\n`,
+        'excluded/hidden.ts': `export function hidden() { return 1; }\n`,
+      },
+      ['src/entry.ts'],
+    );
+
+    const { resolved, discovery } = await exactSemanticFacts(projectDir);
+
+    expect(discovery.files.map((file) => relative(discovery.projectDirAbs, file))).toEqual([
+      'src/entry.ts',
+    ]);
+    expect(
+      resolved.semanticFacts!.declarations.some(
+        (declaration) => declaration.filePath === 'excluded/hidden.ts',
+      ),
+    ).toBe(false);
+  });
+
+  it('preserves export-list and ECMAScript-private visibility on declaration facts', async () => {
+    const projectDir = writeProject({
+      'src/visibility.ts':
+        `function listed() { return 1; }\n` +
+        `export { listed };\n` +
+        `export const direct = 2;\n` +
+        `class Service { #method() { return 3; } }\n`,
+    });
+
+    const { resolved } = await exactSemanticFacts(projectDir);
+    const declarations = resolved.semanticFacts!.declarations;
+    const listed = declarations.find(
+      (declaration) => declaration.kind === 'function' && declaration.name === 'listed',
+    );
+    const direct = declarations.find(
+      (declaration) => declaration.kind === 'variable' && declaration.name === 'direct',
+    );
+    const privateMethod = declarations.find(
+      (declaration) => declaration.kind === 'method' && declaration.name === '#method',
+    );
+
+    expect(listed).toMatchObject({ visibility: 'exported', exportRole: 'named-export' });
+    expect(direct).toMatchObject({ visibility: 'exported', exportRole: 'named-export' });
+    expect(privateMethod?.visibility).toBe('private');
+  });
+
+  it('emits named function and class expressions as declarations', async () => {
+    const projectDir = writeProject({
+      'src/expressions.ts':
+        `export const fn = function inner() { return 1; };\n` +
+        `export const C = class InnerClass {};\n`,
+    });
+
+    const { resolved } = await exactSemanticFacts(projectDir);
+    const declarations = resolved.semanticFacts!.declarations;
+
+    expect(
+      declarations.some(
+        (declaration) => declaration.kind === 'function' && declaration.name === 'inner',
+      ),
+    ).toBe(true);
+    expect(
+      declarations.some(
+        (declaration) => declaration.kind === 'class' && declaration.name === 'InnerClass',
+      ),
+    ).toBe(true);
+  });
+
+  it('classifies a declaration exported with TypeScript `export =` as exported', async () => {
+    const projectDir = writeProject({
+      'src/export-equals.ts': `function helper() { return 1; }\nexport = helper;\n`,
+    });
+
+    const { resolved } = await exactSemanticFacts(projectDir);
+    const helper = resolved.semanticFacts!.declarations.find(
+      (declaration) => declaration.kind === 'function' && declaration.name === 'helper',
+    );
+
+    expect(helper).toMatchObject({ visibility: 'exported', exportRole: 'default-export' });
   });
 });

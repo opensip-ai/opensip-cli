@@ -434,6 +434,10 @@ function emitNonLocalReference(
   }
   const declSf = primary.getSourceFile();
   if (!declSf.isDeclarationFile) {
+    if (declSf === ctx.sourceFile) {
+      ctx.coverage.omittedReferences++;
+      return;
+    }
     // Source decl outside discovered set / path filter — unresolved.
     emitRefFact(ctx, {
       targetName: boundText(real.getName(), ctx.limits),
@@ -743,7 +747,9 @@ function declarationKindOf(node: ts.Node): DeclarationKind | undefined {
 function declarationNameNode(node: ts.Node): ts.Node | undefined {
   if (
     ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
     ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node) ||
     ts.isInterfaceDeclaration(node) ||
     ts.isTypeAliasDeclaration(node) ||
     ts.isEnumDeclaration(node) ||
@@ -781,19 +787,20 @@ function symbolOfDeclaration(node: ts.Node, checker: ts.TypeChecker): ts.Symbol 
   return symbol;
 }
 
-function visibilityOf(node: ts.Node, _sourceFile: ts.SourceFile): SemanticVisibility {
+function visibilityOf(node: ts.Node, sourceFile: ts.SourceFile): SemanticVisibility {
   const mods = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-  if (mods?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)) return 'private';
+  const name = (node as ts.NamedDeclaration).name;
   if (
-    mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
-    hasExportModifierInParent(node)
+    mods?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword) ||
+    (name !== undefined && ts.isPrivateIdentifier(name))
   ) {
-    return 'exported';
+    return 'private';
   }
-  return 'module-local';
+  return exportRoleOf(node, sourceFile) === 'none' ? 'module-local' : 'exported';
 }
 
-function exportRoleOf(node: ts.Node, _sourceFile: ts.SourceFile): SemanticExportRole {
+function exportRoleOf(node: ts.Node, sourceFile: ts.SourceFile): SemanticExportRole {
+  if (ts.isExportSpecifier(node)) return 're-export';
   const mods = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
   if (mods?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) return 'default-export';
   if (
@@ -802,17 +809,79 @@ function exportRoleOf(node: ts.Node, _sourceFile: ts.SourceFile): SemanticExport
   ) {
     return 'named-export';
   }
-  if (ts.isExportSpecifier(node)) return 're-export';
+  const bindingName = topLevelDeclarationName(node);
+  if (bindingName !== undefined) {
+    const listedRole = exportListRole(bindingName, sourceFile);
+    if (listedRole !== undefined) return listedRole;
+  }
   return 'none';
 }
 
 function hasExportModifierInParent(node: ts.Node): boolean {
-  const parent = node.parent;
-  if (parent !== undefined && ts.isVariableStatement(parent)) {
-    const mods = ts.getModifiers(parent);
+  const statement = owningVariableStatement(node);
+  if (statement !== undefined) {
+    const mods = ts.getModifiers(statement);
     return mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true;
   }
   return false;
+}
+
+function owningVariableStatement(node: ts.Node): ts.VariableStatement | undefined {
+  let parent: ts.Node | undefined = node.parent;
+  while (parent !== undefined) {
+    if (ts.isVariableStatement(parent)) return parent;
+    if (!ts.isVariableDeclarationList(parent)) return undefined;
+    parent = parent.parent;
+  }
+  return undefined;
+}
+
+function topLevelDeclarationName(node: ts.Node): string | undefined {
+  if (
+    (ts.isFunctionDeclaration(node) ||
+      ts.isClassDeclaration(node) ||
+      ts.isInterfaceDeclaration(node) ||
+      ts.isTypeAliasDeclaration(node) ||
+      ts.isEnumDeclaration(node) ||
+      ts.isModuleDeclaration(node)) &&
+    ts.isSourceFile(node.parent)
+  ) {
+    return node.name?.text;
+  }
+  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+    const statement = owningVariableStatement(node);
+    if (statement !== undefined && ts.isSourceFile(statement.parent)) return node.name.text;
+  }
+  return undefined;
+}
+
+function exportListRole(
+  bindingName: string,
+  sourceFile: ts.SourceFile,
+): 'named-export' | 'default-export' | undefined {
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier === undefined &&
+      statement.exportClause !== undefined &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      const exported = statement.exportClause.elements.find(
+        (element) => (element.propertyName ?? element.name).text === bindingName,
+      );
+      if (exported !== undefined) {
+        return exported.name.text === 'default' ? 'default-export' : 'named-export';
+      }
+    }
+    if (
+      ts.isExportAssignment(statement) &&
+      ts.isIdentifier(statement.expression) &&
+      statement.expression.text === bindingName
+    ) {
+      return 'default-export';
+    }
+  }
+  return undefined;
 }
 
 function referenceKindOf(
@@ -857,16 +926,22 @@ function isDeclarationName(id: ts.Identifier): boolean {
   if (p === undefined) return false;
   if (
     (ts.isFunctionDeclaration(p) ||
+      ts.isFunctionExpression(p) ||
       ts.isClassDeclaration(p) ||
+      ts.isClassExpression(p) ||
       ts.isInterfaceDeclaration(p) ||
       ts.isTypeAliasDeclaration(p) ||
       ts.isEnumDeclaration(p) ||
       ts.isModuleDeclaration(p) ||
       ts.isMethodDeclaration(p) ||
       ts.isMethodSignature(p) ||
+      ts.isGetAccessorDeclaration(p) ||
+      ts.isSetAccessorDeclaration(p) ||
       ts.isPropertyDeclaration(p) ||
       ts.isPropertySignature(p) ||
-      ts.isVariableDeclaration(p)) &&
+      ts.isVariableDeclaration(p) ||
+      ts.isParameter(p) ||
+      ts.isBindingElement(p)) &&
     p.name === id
   ) {
     return true;

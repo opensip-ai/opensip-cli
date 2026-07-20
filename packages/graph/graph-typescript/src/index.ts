@@ -25,7 +25,7 @@
  * `graph-no-typescript-import-outside-lang-typescript` enforces it.
  */
 
-import { relative, sep } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 
 import { ownerEdgeKey, resolveSpecifierToPackage } from '@opensip-cli/graph';
 import ts from 'typescript';
@@ -282,10 +282,7 @@ async function resolveCallSitesExact(
 
   // Phase 3 semantic declaration/reference plane — exact tier only. Always a
   // present bundle (empty arrays = supported, no facts). Fast mode omits it.
-  const discoveredFiles = project.program
-    .getSourceFiles()
-    .filter((sf) => !sf.isDeclarationFile)
-    .map((sf) => sf.fileName);
+  const discoveredFiles = catalogSourceFiles(input.catalog, input.projectDirAbs);
   const semanticFacts = collectSemanticReferenceFacts({
     program: project.program,
     discoveredFiles,
@@ -299,6 +296,20 @@ async function resolveCallSitesExact(
     semanticFacts,
     stats: result.resolutionStats,
   };
+}
+
+/** Absolute paths for files intentionally admitted to the callable catalog. */
+function catalogSourceFiles(catalog: Catalog, projectDirAbs: string): string[] {
+  const files = new Set<string>();
+  for (const occurrences of Object.values(catalog.functions)) {
+    if (occurrences === undefined) continue;
+    for (const occurrence of occurrences) {
+      if (occurrence.kind === 'module-init') {
+        files.add(resolve(projectDirAbs, occurrence.filePath));
+      }
+    }
+  }
+  return [...files];
 }
 
 /**
@@ -605,7 +616,7 @@ function collectByOwner(catalog: Catalog): ReadonlyMap<string, readonly CallEdge
 
 export const typescriptGraphAdapter: GraphLanguageAdapter<TsParsed> = {
   id: 'typescript',
-  fileExtensions: ['.ts', '.tsx'],
+  fileExtensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'],
   displayName: 'TypeScript',
   discoverFiles: discoverFilesAdapter,
   parseProject: (input: ParseInput): ParseOutput<TsParsed> => parseTypescriptProject(input),

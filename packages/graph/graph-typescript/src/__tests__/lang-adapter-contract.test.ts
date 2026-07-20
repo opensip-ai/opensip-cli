@@ -158,6 +158,19 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
     expect(typeof typescriptGraphAdapter.cacheKey).toBe('function');
   });
 
+  it('advertises every TypeScript and JavaScript source extension it parses', () => {
+    expect(typescriptGraphAdapter.fileExtensions).toEqual([
+      '.ts',
+      '.tsx',
+      '.mts',
+      '.cts',
+      '.js',
+      '.jsx',
+      '.mjs',
+      '.cjs',
+    ]);
+  });
+
   // ── I-1: walkProject is deterministic ────────────────────────
 
   it('I-1 — walkProject is deterministic across two runs over the same project', async () => {
