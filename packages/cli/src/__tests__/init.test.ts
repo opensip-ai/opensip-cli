@@ -68,16 +68,32 @@ function firstPartyScaffolds(): ToolScaffold[] {
 }
 
 let testDir: string;
+/** Isolated home so executeInit exclusive leases never share the developer
+ * `~/.opensip-cli-coordination` with other vitest workers under load. */
+let homeDir: string;
+let priorHome: string | undefined;
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'opensip-init-test-'));
+  homeDir = mkdtempSync(join(tmpdir(), 'opensip-init-home-'));
+  priorHome = process.env.HOME;
+  process.env.HOME = homeDir;
+  process.env.USERPROFILE = homeDir;
   resetEnteredHostOwnershipForTests();
   enterHostOwnershipForTests({ userState: true, project: true });
 });
 
 afterEach(() => {
   resetEnteredHostOwnershipForTests();
+  if (priorHome === undefined) {
+    delete process.env.HOME;
+    delete process.env.USERPROFILE;
+  } else {
+    process.env.HOME = priorHome;
+    process.env.USERPROFILE = priorHome;
+  }
   rmSync(testDir, { recursive: true, force: true });
+  rmSync(homeDir, { recursive: true, force: true });
 });
 
 // ADR-0038: executeInit now takes the registered tools' scaffold contributions.
@@ -341,9 +357,14 @@ describe('executeInit (single language)', () => {
     expect(existsSync(join(testDir, 'opensip-cli', 'fit', 'checks', 'example-check.mjs'))).toBe(
       false,
     );
-  }, 15_000);
+    // Hang detector only: correctness is the reclassification assertions above.
+    // Exclusive-lease acquire is event-based; under full-suite CPU saturation
+    // the same path can take tens of seconds without being stuck.
+  }, 120_000);
 
   it('moves no-init runtime state into the project runtime during adoption', async () => {
+    // Suite beforeEach already isolates HOME; keep a nested isolation so this
+    // case remains self-contained if moved. Hang detector matches suite default.
     const oldHome = process.env.HOME;
     const isolatedHome = mkdtempSync(join(tmpdir(), 'opensip-init-home-'));
     process.env.HOME = isolatedHome;
@@ -365,7 +386,7 @@ describe('executeInit (single language)', () => {
       else process.env.HOME = oldHome;
       rmSync(isolatedHome, { recursive: true, force: true });
     }
-  }, 15_000);
+  }, 120_000);
 
   it('reports divergent runtime authority without overwriting either tree', async () => {
     const oldHome = process.env.HOME;

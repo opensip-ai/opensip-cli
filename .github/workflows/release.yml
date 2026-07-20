@@ -728,7 +728,22 @@ jobs:
           while IFS=$'\t' read -r name tarball; do
             [ -n "$name" ] && [ -n "$tarball" ] || { echo "::error::invalid publish order row"; exit 1; }
             if npm view "${name}@${VERSION}" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
-              echo "::notice::skip ${name}@${VERSION} (already on npm)"
+              # Idempotent skip is only safe when the registry bytes match the
+              # staged artifact. A prior bootstrap (or any other non-staged
+              # publish) can leave the same version with a different digest and
+              # would otherwise fail only at qualify-macos.
+              staged_sha="$(sha256sum "$BUNDLE_DIR/$tarball" | awk '{print $1}')"
+              tarball_url="$(npm view "${name}@${VERSION}" dist.tarball --registry https://registry.npmjs.org/)"
+              [ -n "$tarball_url" ] || { echo "::error::${name}@${VERSION} on npm but dist.tarball missing"; exit 1; }
+              registry_tgz="$(mktemp "$RUNNER_TEMP/registry-XXXXXX.tgz")"
+              curl -fsSL "$tarball_url" -o "$registry_tgz"
+              registry_sha="$(sha256sum "$registry_tgz" | awk '{print $1}')"
+              rm -f "$registry_tgz"
+              if [ "$registry_sha" != "$staged_sha" ]; then
+                echo "::error::${name}@${VERSION} already on npm but registry sha256 ${registry_sha} != staged ${staged_sha} (${tarball}). Unpublish the mismatched version (if policy allows) or finish recovery with the staged artifact before re-running stage."
+                exit 1
+              fi
+              echo "::notice::skip ${name}@${VERSION} (already on npm; digest matches staged)"
               continue
             fi
             npm publish "$BUNDLE_DIR/$tarball" \

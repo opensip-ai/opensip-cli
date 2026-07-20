@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-12
-release: v0.8.0
+release: v0.8.1
 title: "Configuration"
 audience: [getting-started, ci-integrators, plugin-authors]
 purpose: "The opensip-cli.config.yml schema, every field, defaults, and where each is read."

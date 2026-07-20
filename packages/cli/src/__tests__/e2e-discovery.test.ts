@@ -167,8 +167,23 @@ describe('no project found', () => {
 
 describe('init from a fresh tmpdir', () => {
   it('scaffolds with schemaVersion: 1 in the config', () => {
-    const { exitCode } = runCli(['init', '--language', 'typescript'], testDir);
-    expect(exitCode).toBe(0);
+    // Isolate HOME/XDG: under the full suite, concurrent e2e processes otherwise
+    // share the developer's ~/.opensip-cli and can block on user-cache leases
+    // until the harness 60s spawn timeout (exit 1, status null).
+    const home = join(testDir, 'home');
+    mkdirSync(home, { recursive: true });
+    const { exitCode, stdout, stderr } = runCli(['init', '--language', 'typescript'], testDir, {
+      HOME: home,
+      USERPROFILE: home,
+      XDG_CACHE_HOME: join(home, 'xdg-cache'),
+      XDG_CONFIG_HOME: join(home, 'xdg-config'),
+      OPENSIP_NO_UPDATE: '1',
+      NO_UPDATE_NOTIFIER: '1',
+    });
+    expect(
+      exitCode,
+      `init exit ${exitCode}; stdout=${stdout.slice(0, 400)}; stderr=${stderr.slice(0, 400)}`,
+    ).toBe(0);
     const cfg = readFileSync(join(testDir, 'opensip-cli.config.yml'), 'utf8');
     expect(cfg).toMatch(/^schemaVersion: 1$/m);
   });

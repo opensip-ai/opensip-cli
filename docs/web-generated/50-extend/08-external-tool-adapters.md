@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-08
-release: v0.8.0
+release: v0.8.1
 title: "External tool adapters"
 audience: [plugin-authors]
 purpose: "Wrap a local CLI scanner (gitleaks/semgrep/ruff/osv-scanner/trivy/…) as a first-class OpenSIP Tool with defineExternalToolAdapter — a descriptor plus a parser, not a from-scratch Tool."
@@ -51,7 +51,7 @@ ordinary OpenSIP `Tool`. The scanner runs as a subprocess; its native output
 currency, persisted, gated by the baseline ratchet, and egressed exactly like a
 `fit` or `graph` finding. The author writes a **descriptor plus a parser**, not a
 from-scratch Tool: the substrate
-[`@opensip-cli/external-tool-adapter`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/external-tool-adapter)
+[`@opensip-cli/external-tool-adapter`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/external-tool-adapter)
 owns binary resolution, the run loop, the shared SARIF/JSON ingest, the
 `doctor`/`version` commands, live progress events, secret redaction, provenance,
 and the gate.
@@ -60,37 +60,37 @@ The shipped adapters are:
 
 | Adapter | Wraps | Scans | Native output | Posture |
 |---------|-------|-------|---------------|---------|
-| [`@opensip-cli/tool-gitleaks`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-gitleaks) | `gitleaks` | Committed secrets in the working tree | JSON (`parse`) | `local-only` |
-| [`@opensip-cli/tool-osv-scanner`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-osv-scanner) | `osv-scanner` | Dependency vulnerabilities | JSON (`parse`) | `local-only` |
-| [`@opensip-cli/tool-trivy`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-trivy) | `trivy` | Vulnerabilities + misconfigurations | SARIF (shared `ingestSarif`) | `local-only` |
-| [`@opensip-cli/tool-semgrep`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-semgrep) | `semgrep` | SAST / policy rules | SARIF (shared `ingestSarif`) | `networked` when using `--config auto` |
-| [`@opensip-cli/tool-ast-grep`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-ast-grep) | `ast-grep` | Structural search rules | stdout SARIF (`parseStdoutSarif`) | `local-only` |
-| [`@opensip-cli/tool-ruff`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-ruff) | `ruff` | Python lint diagnostics | JSON (`parse`) | `local-only` |
-| [`@opensip-cli/tool-golangci-lint`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-golangci-lint) | `golangci-lint` | Go lint aggregation | stdout JSON (`parse`) | `local-only` |
-| [`@opensip-cli/tool-govulncheck`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-govulncheck) | `govulncheck` | Go vulnerabilities | stdout JSON lines (`parse`) | `networked` |
-| [`@opensip-cli/tool-cargo-deny`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-cargo-deny) | `cargo-deny` | Rust dependency policy | stdout JSON lines (`parse`) | `networked` |
-| [`@opensip-cli/tool-bandit`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-bandit) | `bandit` | Python security issues | JSON (`parse`) | `local-only` |
-| [`@opensip-cli/tool-pip-audit`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-pip-audit) | `pip-audit` | Python dependency vulnerabilities | JSON (`parse`) | `networked` |
-| [`@opensip-cli/tool-cargo-clippy`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-cargo-clippy) | `cargo clippy` | Rust lint diagnostics | stdout JSON lines (`parse`) | `local-only` |
-| [`@opensip-cli/tool-spotbugs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-spotbugs) | `spotbugs` | Java bytecode issues | SARIF (shared `ingestSarif`) | `local-only` |
-| [`@opensip-cli/tool-pmd`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-pmd) | `pmd` | Java source rules | SARIF (shared `ingestSarif`) | `local-only` |
-| [`@opensip-cli/tool-dependency-check`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-dependency-check) | `dependency-check` | Dependency vulnerabilities | SARIF (shared `ingestSarif`) | `local-only` with a pre-populated DB |
-| [`@opensip-cli/tool-cppcheck`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-cppcheck) | `cppcheck` | C/C++ static analysis | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-gitleaks`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-gitleaks) | `gitleaks` | Committed secrets in the working tree | JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-osv-scanner`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-osv-scanner) | `osv-scanner` | Dependency vulnerabilities | JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-trivy`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-trivy) | `trivy` | Vulnerabilities + misconfigurations | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-semgrep`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-semgrep) | `semgrep` | SAST / policy rules | SARIF (shared `ingestSarif`) | `networked` when using `--config auto` |
+| [`@opensip-cli/tool-ast-grep`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-ast-grep) | `ast-grep` | Structural search rules | stdout SARIF (`parseStdoutSarif`) | `local-only` |
+| [`@opensip-cli/tool-ruff`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-ruff) | `ruff` | Python lint diagnostics | JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-golangci-lint`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-golangci-lint) | `golangci-lint` | Go lint aggregation | stdout JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-govulncheck`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-govulncheck) | `govulncheck` | Go vulnerabilities | stdout JSON lines (`parse`) | `networked` |
+| [`@opensip-cli/tool-cargo-deny`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-cargo-deny) | `cargo-deny` | Rust dependency policy | stdout JSON lines (`parse`) | `networked` |
+| [`@opensip-cli/tool-bandit`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-bandit) | `bandit` | Python security issues | JSON (`parse`) | `local-only` |
+| [`@opensip-cli/tool-pip-audit`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-pip-audit) | `pip-audit` | Python dependency vulnerabilities | JSON (`parse`) | `networked` |
+| [`@opensip-cli/tool-cargo-clippy`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-cargo-clippy) | `cargo clippy` | Rust lint diagnostics | stdout JSON lines (`parse`) | `local-only` |
+| [`@opensip-cli/tool-spotbugs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-spotbugs) | `spotbugs` | Java bytecode issues | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-pmd`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-pmd) | `pmd` | Java source rules | SARIF (shared `ingestSarif`) | `local-only` |
+| [`@opensip-cli/tool-dependency-check`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-dependency-check) | `dependency-check` | Dependency vulnerabilities | SARIF (shared `ingestSarif`) | `local-only` with a pre-populated DB |
+| [`@opensip-cli/tool-cppcheck`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-cppcheck) | `cppcheck` | C/C++ static analysis | SARIF (shared `ingestSarif`) | `local-only` |
 
 Adapters are **opt-in and never bundled** — the core CLI stays scanner-agnostic.
 A user installs one with `opensip tools install`, then trusts it (see
 [Trust and execution model](#trust-and-execution-model)). The full user-facing
 flow is in the [CLI command reference](/docs/opensip-cli/70-reference/01-cli-commands/#external-tool-adapters-opt-in).
 
-This shape is decided in [ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0090-external-tool-adapter-substrate.md)
-(the substrate + worker dispatch), [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md)
-(ingestion, artifacts, exit modeling), and [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md)
+This shape is decided in [ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0090-external-tool-adapter-substrate.md)
+(the substrate + worker dispatch), [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md)
+(ingestion, artifacts, exit modeling), and [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md)
 (network posture + the no-egress confidentiality rule).
-[ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md)
+[ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md)
 keeps live rendering host-owned through a private progress bridge,
-[ADR-0140](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0140-polyglot-external-adapter-package-contract.md)
+[ADR-0140](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0140-polyglot-external-adapter-package-contract.md)
 records the adapter package contract, and
-[ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0141-external-scanner-binary-ownership.md)
+[ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0141-external-scanner-binary-ownership.md)
 keeps scanner binaries customer-owned.
 
 ## When to write an adapter
@@ -126,7 +126,7 @@ never interpolates a command string. Args are an array.
 ## A complete worked example
 
 Here is the gitleaks descriptor in full (the real shipped
-[`packages/tool-gitleaks/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-gitleaks/src/tool.ts)),
+[`packages/tool-gitleaks/src/tool.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-gitleaks/src/tool.ts)),
 the canonical model for a JSON adapter:
 
 ```typescript
@@ -189,12 +189,12 @@ the host loads.
 ### The descriptor, field by field
 
 `defineExternalToolAdapter(spec)` takes an
-[`ExternalToolAdapterSpec`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/external-tool-adapter/src/types.ts):
+[`ExternalToolAdapterSpec`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/external-tool-adapter/src/types.ts):
 
 - **`identity`** — a `ToolIdentity` (`name` + optional `aliases`). `gitleaks` is
   reachable as `opensip gitleaks` **or** `opensip secrets`. The `name` is also the
   artifact-store subdir and the `binaries.<name>.path` config key.
-- **`metadata.id`** — a stable UUID ([ADR-0048](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0048-tool-stable-uuid-identity.md)).
+- **`metadata.id`** — a stable UUID ([ADR-0048](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0048-tool-stable-uuid-identity.md)).
   Generate it once; it must match `package.json#opensipTools.stableId`.
 - **`metadata.version`** — `readPackageVersion(import.meta.url)` reads the
   package's own version; stamped into Tool metadata and provenance.
@@ -220,7 +220,7 @@ the host loads.
 ### The `scan` command
 
 Each entry of `commands` is an
-[`ExternalCommandSpec`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/external-tool-adapter/src/types.ts):
+[`ExternalCommandSpec`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/external-tool-adapter/src/types.ts):
 
 - **`args: (ctx) => readonly string[]`** — build the scanner argv from the
   [`AdapterRunContext`](#the-run-context). Write the scanner's native report to
@@ -240,7 +240,7 @@ Each entry of `commands` is an
 ### The run context
 
 The substrate hands `args(ctx)` and `parse(raw, ctx)` a read-only
-[`AdapterRunContext`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/external-tool-adapter/src/types.ts):
+[`AdapterRunContext`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/external-tool-adapter/src/types.ts):
 
 ```typescript
 interface AdapterRunContext {
@@ -291,7 +291,7 @@ Every parser targets `createSignal(...)`. `SignalSeverity` has **only four
 buckets** — `'critical' | 'high' | 'medium' | 'low'` (no info/unknown rung). Set
 `category: 'security'`, the `code: { file, line?, column? }` location, and put the
 scanner's **native** severity and any scanner-specific facts on the opaque
-`metadata` bag ([ADR-0042](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0042-tool-storage-contract-and-state-store.md)).
+`metadata` bag ([ADR-0042](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0042-tool-storage-contract-and-state-store.md)).
 Always preserve the raw label as `metadata.nativeSeverity` (Trivy's `CRITICAL…`,
 OSV's `MODERATE`/numeric/unknown, gitleaks' `null`) so a downstream reader knows
 the four-bucket value is a mapping, not the scanner's own word. `fingerprint` is
@@ -311,7 +311,7 @@ secretHash('AKIAIOSFODNN7EXAMPLE');    // → first 12 hex of SHA-256
 ```
 
 The gitleaks parser
-([`parse-gitleaks-json.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/tool-gitleaks/src/parse-gitleaks-json.ts))
+([`parse-gitleaks-json.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/tool-gitleaks/src/parse-gitleaks-json.ts))
 is the model: gitleaks emits `Secret` (the raw credential) **and** `Match` (the
 surrounding region, which *includes* the secret). The parser stores only
 `redactSecret(Secret)` as `metadata.secretPreview` and **drops `Match` entirely**:
@@ -382,7 +382,7 @@ The substrate adds a `doctor` and a `version` subcommand to **every** adapter �
 write neither. They probe the binary worker-side:
 
 `opensip <tool> doctor` reports a plain
-[`AdapterDoctorReport`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/packages/external-tool-adapter/src/doctor-command.ts)
+[`AdapterDoctorReport`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/external-tool-adapter/src/doctor-command.ts)
 (not a `CommandResult` variant — that union is closed): the binary (found / path /
 resolution layer), the detected version vs. `minVersion`, the `network` posture,
 a credential-env presence check for `auth-required` postures, the install hint
@@ -401,7 +401,7 @@ invocation (`opensip gitleaks …`) it **forks a worker** that re-runs CLI boots
 re-discovers and imports the real runtime, runs the handler, and replays a slim
 result through the host seams. Both the `scan` handler **and** the `doctor`/
 `version` probes run **worker-side**. The worker is the fault-isolation boundary
-([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md)) — a crashing
+([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md)) — a crashing
 or hanging scanner cannot take down the host.
 
 Consequences for an author: the run loop body executes in the worker; every
@@ -420,7 +420,7 @@ output; see [Command surface taxonomy](/docs/opensip-cli/50-extend/07-command-ta
 The scanner's raw native report persists under
 `<project>/opensip-cli/.runtime/artifacts/<tool>/<runId>/<name>` through the
 host-owned `cli.writeArtifact` seam
-([ADR-0080](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0080-host-owned-artifact-write-seam.md)) — adapter
+([ADR-0080](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0080-host-owned-artifact-write-seam.md)) — adapter
 code never writes `.runtime` with raw `fs`. The store is:
 
 - **`0600`** — owner-read/write only (the host writer sets the mode; the single
@@ -472,10 +472,10 @@ cargo-deny, and pip-audit also declare `network`. Trivy and Dependency-Check are
 
 `requires` is **declaration-only** — honest labeling for review and
 provenance, not an enforced sandbox. Capability *enforcement* is **shelved**
-([ADR-0087](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0087-public-ecosystem-readiness-shelved.md): plan 03
+([ADR-0087](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0087-public-ecosystem-readiness-shelved.md): plan 03
 found no portable, bypass-resistant network mechanism — Node `--permission` blocks
 fs/child/worker but not raw `node:net` sockets), so external tools stay
-trusted/private extensions ([ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)).
+trusted/private extensions ([ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md)).
 The field becomes enforceable with no contract change if a future ADR unshelves it.
 Declare the posture honestly anyway.
 
@@ -520,10 +520,10 @@ adapter is installable today (deny-by-default trust opt-in) but is not a
 - [CLI command reference — External tool adapters](/docs/opensip-cli/70-reference/01-cli-commands/#external-tool-adapters-opt-in)
 - [`tools` command](/docs/opensip-cli/70-reference/12-tools-command/)
 - [Environment variables](/docs/opensip-cli/70-reference/10-environment-variables/)
-- [ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0090-external-tool-adapter-substrate.md) ·
-  [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md) ·
-  [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md) ·
-  [ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md) ·
-  [ADR-0140](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0140-polyglot-external-adapter-package-contract.md) ·
-  [ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0141-external-scanner-binary-ownership.md) ·
-  [ADR-0142](https://github.com/opensip-ai/opensip-cli/blob/v0.8.0/docs/decisions/ADR-0142-dependency-check-offline-safe-default.md)
+- [ADR-0090](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0090-external-tool-adapter-substrate.md) ·
+  [ADR-0091](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0091-external-scanner-finding-ingestion.md) ·
+  [ADR-0092](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0092-external-adapter-network-auth-trust.md) ·
+  [ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md) ·
+  [ADR-0140](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0140-polyglot-external-adapter-package-contract.md) ·
+  [ADR-0141](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0141-external-scanner-binary-ownership.md) ·
+  [ADR-0142](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0142-dependency-check-offline-safe-default.md)

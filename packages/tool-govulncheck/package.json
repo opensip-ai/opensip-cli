@@ -1,6 +1,6 @@
 {
   "name": "@opensip-cli/tool-govulncheck",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "license": "Apache-2.0",
   "description": "External Tool Adapter for govulncheck — wraps Go vulnerability scanning as an opensip-cli tool",
   "keywords": [

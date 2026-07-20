@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-14
-release: v0.8.0
+release: v0.8.1
 title: "Supported platforms"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "The generated, authoritative host-support matrix: the exact qualified tuple, its status, explicitly unsupported hosts, and what unqualified means."

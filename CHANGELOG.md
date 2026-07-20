@@ -2,7 +2,42 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.8.1] - 2026-07-19
+
+Ships the 0.8.0 feature set to npm `latest`. The 0.8.0 cut reached a partial
+`release-candidate-0.8.0` stage only: a one-time bootstrap of
+`@opensip-cli/shared-analysis@0.8.0` left registry bytes that did not match the
+staged release artifact, and npm permanently retires a version after unpublish,
+so 0.8.0 could not be completed as a coherent set. Consumer-visible `latest`
+remained on 0.7.0 throughout.
+
+### Fixed
+
+- **Release stage skip verifies registry digests** against the staged tarball
+  before treating a version as already published, so a bootstrap or other
+  non-staged publish fails at stage instead of at macOS qualification.
+- Multi-process runtime lease races: retry shared acquire on concurrent temp
+  inspection, convert linked-create TOCTOU into mutex wait, skip racing orphan
+  mutex temps, and tolerate CAS races when unlinking orphan temps.
+- YAGNI dogfood gate: consolidate duplicate helpers that tripped
+  `failOnWarnings`.
+- Host trust treats `checks-dogfood` as a bundled fit-pack; prettier/format
+  cleanup on touched CLI files.
+- Init e2e/unit tests isolate `HOME` so exclusive runtime leases cannot contend
+  on the developer `~/.opensip-cli-coordination` under parallel suite load.
+
+### Changed
+
+- Document partial-publish recovery when a registry version exists with a
+  different digest than the staged release artifact (unpublish-window recovery
+  or next lockstep version — never re-pack and skip mismatched bytes).
+
 ## [0.8.0] - 2026-07-19
+
+> **Not promoted to npm `latest`.** See 0.8.1. A partial
+> `release-candidate-0.8.0` set may exist on the registry for most packages;
+> `@opensip-cli/shared-analysis@0.8.0` was unpublished and cannot be
+> re-published.
 
 A cache-first continuity and fail-loud hardening release. Evidence stays
 addressable from first run through `init` without losing parent-run identity,

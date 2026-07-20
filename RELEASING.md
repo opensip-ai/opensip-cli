@@ -417,9 +417,10 @@ node scripts/verify-release-publish-surface.mjs --expected-version vX.Y.Z --tag 
 **Safe recovery:**
 
 1. Re-run the failed release workflow on the **same tag**. Publish is idempotent:
-   packages already on npm are skipped; the Mac gate re-runs against the same
-   exact version; promotion runs again for any version that exists but is not yet
-   on `latest`.
+   packages already on npm are skipped **only when the registry tarball SHA-256
+   matches the staged artifact**; the Mac gate re-runs against the same exact
+   version; promotion runs again for any version that exists but is not yet on
+   `latest`.
 2. If the workflow cannot be re-run and staging is complete **and** the Mac gate
    verified, publish any missing tarballs manually with the same staging tag,
    then promote each name to `latest` in dependency order from
@@ -428,6 +429,42 @@ node scripts/verify-release-publish-surface.mjs --expected-version vX.Y.Z --tag 
 3. Do **not** bump a patch version just to “fix” a partial publish — npm versions
    are immutable. Finish `X.Y.Z` on the registry, or yank only as a last resort
    after operator review.
+
+**Digest mismatch (bootstrap burned the release version):** If a package was
+published outside the staged bundle (most often a one-time bootstrap at the
+same version the release is cutting), `stage-release` skips the name and
+`qualify-macos` fails with `registry sha256 … != manifest …`. Do **not**
+re-run the full workflow from a fresh build — that re-packs every tarball and
+will mismatch the already-staged set.
+
+Recovery (within npm’s unpublish window, no dependents):
+
+```bash
+# 1. Download the successful attempt's staging bundle (artifact name is attempt-bound)
+gh run download <run-id> -n release-staging-bundle-vX.Y.Z-runN -D /tmp/opensip-release-recover
+
+# 2. Confirm the staged tarball matches the failure's expected manifest digest
+shasum -a 256 /tmp/opensip-release-recover/opensip-cli-<pkg>-X.Y.Z.tgz
+
+# 3. Unpublish the wrong bytes, then publish the staged artifact to the RC tag
+npm unpublish @opensip-cli/<pkg>@X.Y.Z --force --registry https://registry.npmjs.org/
+npm publish /tmp/opensip-release-recover/opensip-cli-<pkg>-X.Y.Z.tgz \
+  --access public --ignore-scripts \
+  --tag release-candidate-X.Y.Z \
+  --registry https://registry.npmjs.org/
+
+# 4. If the package has no other versions, drop a premature `latest` if npm set one
+npm dist-tag ls @opensip-cli/<pkg>
+# optional: npm dist-tag rm @opensip-cli/<pkg> latest   # only when latest must stay on a prior release
+
+# 5. Re-run only the failed jobs (keeps the original staged bytes)
+gh run rerun <run-id> --failed
+```
+
+Never bootstrap a brand-new name at the version you are about to cut with the
+tag-driven OIDC release — bootstrap at an earlier placeholder only when
+necessary, or bootstrap after the prior release and let the next tag publish
+the first real version with provenance.
 
 **macOS gate + GitHub Release coupling:** `promote-release` runs only after
 `stage-release` **and** `qualify-macos` succeed, so `latest` promotion and the
