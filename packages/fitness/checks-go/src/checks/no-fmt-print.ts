@@ -12,7 +12,7 @@
  */
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
-const FMT_PRINT_PATTERN = /\bfmt\.(Print|Println|Printf)\s*\(/g;
+const FMT_PRINT_PATTERN = /(?<![\p{L}\p{Nd}_.])fmt\s*\.\s*(Print|Println|Printf)\s*\(/gu;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the

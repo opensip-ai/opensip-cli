@@ -35,6 +35,14 @@ describe('analyzeFmtPrint', () => {
     expect(violations.length).toBe(0);
   });
 
+  it('does not flag fmt-named fields in a selector chain', () => {
+    expect(analyzeFmtPrint('client.fmt.Println("hi")')).toEqual([]);
+  });
+
+  it('accepts legal spacing between selector tokens', () => {
+    expect(analyzeFmtPrint('fmt . Println("hi")')).toHaveLength(1);
+  });
+
   it('reports correct line numbers across multiple matches', () => {
     const src = `package main
 
