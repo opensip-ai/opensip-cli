@@ -106,6 +106,8 @@ function collectFromImportFromStatement(
  *     → ONE dep site with `prefix + inner` as specifier.
  *   - relative_import is dots-only (`from . import sibling, other`)
  *     → ONE dep site PER imported name, specifier `prefix + name`.
+ *   - dots-only wildcard (`from . import *`) → ONE dep site for the source
+ *     package itself, using the bare relative prefix as the specifier.
  */
 function collectFromRelativeImport(
   stmt: Node,
@@ -123,7 +125,9 @@ function collectFromRelativeImport(
   }
   // `from . import sibling, other` — one site PER imported name,
   // specifier = `.sibling`, `.other`.
-  for (const named of namedChildrenOf(stmt)) {
+  const importedChildren = namedChildrenOf(stmt);
+  let emittedImportedName = false;
+  for (const named of importedChildren) {
     // web-tree-sitter returns fresh Node wrappers per access, so `named`
     // is never reference-identical to `moduleNameField`; skip the module
     // node by its stable byte span instead of `===`.
@@ -131,6 +135,12 @@ function collectFromRelativeImport(
     const dotted = resolveImportedNameDotted(named);
     if (!dotted) continue;
     pushDependencySite(stmt, file, moduleInitHash, prefix + dotted.text, out);
+    emittedImportedName = true;
+  }
+  // `from . import *` names the current package itself as its source; there
+  // is no imported-name node to append to the relative prefix.
+  if (!emittedImportedName && importedChildren.some((child) => child.type === 'wildcard_import')) {
+    pushDependencySite(stmt, file, moduleInitHash, prefix, out);
   }
 }
 

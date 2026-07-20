@@ -12,6 +12,10 @@
  *      unresolved.
  *
  *   2. Look up matching catalog entries by simple name. Confidence
+ *      also indexes each `__init__` constructor by its enclosing class
+ *      name so `Widget()` can reach `Widget.__init__`.
+ *
+ *      Confidence
  *      ladder:
  *      - 0 matches  → `to: []`, resolution `'unknown'`,    confidence `'low'`
  *      - 1 match    → `to: [hash]`, resolution `'static'`, confidence `'medium'`
@@ -73,7 +77,11 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:python' });
   // Same-language only (see graph-go/resolve.ts): `.py`/`.pyi` only, never a
   // same-named occurrence from another language in the merged exact catalog.
-  const byName = buildNameIndex(input.catalog.functions, sameLanguageFileFilter('python'));
+  const keepPythonFile = sameLanguageFileFilter('python');
+  const indexes: PythonNameIndexes = {
+    byName: buildNameIndex(input.catalog.functions, keepPythonFile),
+    constructorsByClass: buildConstructorNameIndex(input.catalog, keepPythonFile),
+  };
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner, stats };
@@ -86,7 +94,7 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
       pushCreationEdge(pythonPosition(node, file), r.ownerHash, r.childHash, sink);
       continue;
     }
-    pushCallEdge(node, file, r.ownerHash, byName, sink);
+    pushCallEdge(node, file, r.ownerHash, indexes, sink);
   }
 
   const finalStats: ResolutionStats = {
@@ -270,7 +278,8 @@ function resolveRelativeModule(
 
 /**
  * Given dotted module segments (e.g. `['foo', 'bar']`), try the two
- * canonical file forms: `foo/bar.py` and `foo/bar/__init__.py`. Returns
+ * canonical file forms in Python's import precedence: the regular package
+ * `foo/bar/__init__.py`, then the module `foo/bar.py`. Returns
  * the matching module-init bodyHash in a single-element array, or `[]`.
  */
 function lookupModuleCandidates(
@@ -279,7 +288,7 @@ function lookupModuleCandidates(
 ): readonly string[] {
   if (segments.length === 0) return [];
   const joined = segments.join('/');
-  const candidates = [`${joined}.py`, `${joined}/__init__.py`];
+  const candidates = [`${joined}/__init__.py`, `${joined}.py`];
   for (const candidate of candidates) {
     const hash = moduleInitByFilePath.get(candidate);
     if (hash !== undefined) return [hash];
@@ -287,11 +296,39 @@ function lookupModuleCandidates(
   return [];
 }
 
+interface PythonNameIndexes {
+  readonly byName: ReadonlyMap<string, readonly string[]>;
+  readonly constructorsByClass: ReadonlyMap<string, readonly string[]>;
+}
+
+function buildConstructorNameIndex(
+  catalog: Catalog,
+  keepFile: (filePath: string) => boolean,
+): ReadonlyMap<string, readonly string[]> {
+  const out = new Map<string, string[]>();
+  for (const occurrences of Object.values(catalog.functions)) {
+    if (!occurrences) continue;
+    for (const occurrence of occurrences) {
+      if (
+        occurrence.kind !== 'constructor' ||
+        occurrence.enclosingClass === null ||
+        !keepFile(occurrence.filePath)
+      ) {
+        continue;
+      }
+      const hashes = out.get(occurrence.enclosingClass) ?? [];
+      hashes.push(occurrence.bodyHash);
+      out.set(occurrence.enclosingClass, hashes);
+    }
+  }
+  return out;
+}
+
 function pushCallEdge(
   node: Node,
   file: PythonParsedFile,
   ownerHash: string,
-  byName: ReadonlyMap<string, readonly string[]>,
+  indexes: PythonNameIndexes,
   sink: EdgeSink,
 ): void {
   const { edgesByOwner, stats } = sink;
@@ -301,7 +338,7 @@ function pushCallEdge(
   const truncated = truncateForCallEdge(pos.text);
   const discarded = isReturnValueDiscarded(node);
 
-  const edge: CallEdge = buildPythonCallEdge(target, byName, {
+  const edge: CallEdge = buildPythonCallEdge(target, indexes, {
     line: pos.line,
     column: pos.column,
     text: truncated,
@@ -320,14 +357,17 @@ interface CallEdgeLoc {
 
 function buildPythonCallEdge(
   target: string | null,
-  byName: ReadonlyMap<string, readonly string[]>,
+  indexes: PythonNameIndexes,
   loc: CallEdgeLoc,
 ): CallEdge {
   if (target === null) {
     return { to: [], ...loc, resolution: 'unknown', confidence: 'low' };
   }
-  const matches = byName.get(target);
-  if (!matches || matches.length === 0) {
+  const matches = [
+    ...(indexes.byName.get(target) ?? []),
+    ...(indexes.constructorsByClass.get(target) ?? []),
+  ];
+  if (matches.length === 0) {
     return { to: [], ...loc, resolution: 'unknown', confidence: 'low' };
   }
   if (matches.length === 1) {
@@ -343,8 +383,14 @@ function buildPythonCallEdge(
  */
 function extractCallTargetName(node: Node): string | null {
   // tree-sitter-python `call` has a `function` field for the callee.
-  const fn = node.childForFieldName('function');
+  let fn = node.childForFieldName('function');
   if (!fn) return null;
+  while (fn.type === 'parenthesized_expression') {
+    if (fn.namedChildCount !== 1) return null;
+    const inner = fn.namedChild(0);
+    if (!inner) return null;
+    fn = inner;
+  }
   if (fn.type === 'identifier') return fn.text;
   if (fn.type === 'attribute') {
     const attr = fn.childForFieldName('attribute');

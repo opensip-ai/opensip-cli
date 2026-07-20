@@ -154,6 +154,29 @@ describe('lang-python resolve.ts — branches', () => {
     expect(greetCall?.to).toHaveLength(1);
   });
 
+  it('resolves class calls to the class constructor occurrence', () => {
+    writeFileSync(
+      join(dir, 'main.py'),
+      `class Widget:
+    def __init__(self, value):
+        self.value = value
+
+def make():
+    return Widget(1)
+`,
+      'utf8',
+    );
+    const { occurrences, edgesByOwner } = runPipeline(dir);
+    const constructor = occurrences.__init__?.find(
+      (occurrence) => occurrence.enclosingClass === 'Widget',
+    );
+    const widgetCall = flattenEdges(edgesByOwner).find((edge) => edge.text.startsWith('Widget('));
+    expect(constructor).toBeDefined();
+    expect(widgetCall?.to).toEqual([constructor?.bodyHash]);
+    expect(widgetCall?.resolution).toBe('static');
+    expect(widgetCall?.confidence).toBe('medium');
+  });
+
   it('emits method-dispatch low-confidence when multiple catalog entries share a name', () => {
     writeFileSync(join(dir, 'a.py'), `class A:\n    def run(self):\n        return 1\n`, 'utf8');
     writeFileSync(join(dir, 'b.py'), `class B:\n    def run(self):\n        return 2\n`, 'utf8');
@@ -187,6 +210,25 @@ describe('lang-python resolve.ts — branches', () => {
     // The (lambda...)(1) is a call whose target is a parenthesized
     // lambda — neither identifier nor attribute → unknown.
     expect(all.some((e) => e.resolution === 'unknown')).toBe(true);
+  });
+
+  it('resolves a parenthesized identifier call', () => {
+    writeFileSync(
+      join(dir, 'main.py'),
+      `def helper():
+    return 1
+
+def entry():
+    return (helper)()
+`,
+      'utf8',
+    );
+    const { occurrences, edgesByOwner } = runPipeline(dir);
+    const helper = occurrences.helper?.[0];
+    const helperCall = flattenEdges(edgesByOwner).find((edge) => edge.text === '(helper)()');
+    expect(helper).toBeDefined();
+    expect(helperCall?.to).toEqual([helper?.bodyHash]);
+    expect(helperCall?.resolution).toBe('static');
   });
 
   it('emits unknown for subscript calls (e.g. fns[0]())', () => {

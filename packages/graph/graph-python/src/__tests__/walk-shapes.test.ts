@@ -71,6 +71,21 @@ describe('lang-python walk.ts — function/param shapes', () => {
     expect(x?.optional).toBe(false);
   });
 
+  it('preserves typed variadic parameter names and rest semantics', () => {
+    writeFileSync(
+      join(dir, 'main.py'),
+      `def f(*args: str, **kwargs: int):
+    return (args, kwargs)
+`,
+      'utf8',
+    );
+    const walk = runWalk(dir);
+    expect(walk.occurrences.f?.[0]?.params).toEqual([
+      { name: 'args', optional: false, rest: true },
+      { name: 'kwargs', optional: false, rest: true },
+    ]);
+  });
+
   it('classifies methods and __init__ correctly', () => {
     writeFileSync(
       join(dir, 'main.py'),
@@ -116,6 +131,28 @@ describe('lang-python walk.ts — function/param shapes', () => {
     expect(creation?.childHash).toBe(arrow?.bodyHash);
   });
 
+  it('attributes calls in lambda defaults to the enclosing function', () => {
+    writeFileSync(
+      join(dir, 'main.py'),
+      `def make_default():
+    return 1
+
+def outer():
+    return lambda value=make_default(): value
+`,
+      'utf8',
+    );
+    const walk = runWalk(dir);
+    const outer = walk.occurrences.outer?.[0];
+    const defaultCall = walk.callSites.find(
+      (site) =>
+        site.kind === 'call' &&
+        (site.nodeRef as { readonly text?: string }).text === 'make_default()',
+    );
+    expect(defaultCall).toBeDefined();
+    expect(defaultCall?.ownerHash).toBe(outer?.bodyHash);
+  });
+
   it('treats lambdas at module scope as their own owner (no creation edge to themselves)', () => {
     // Lambda assigned at module level: parent frame is module-init.
     // The creation edge IS emitted because module-init's bodyHash !=
@@ -148,6 +185,19 @@ describe('lang-python walk.ts — function/param shapes', () => {
     const walk = runWalk(dir);
     const x = walk.occurrences.x?.[0];
     expect(x?.definedInGenerated).toBe(true);
+  });
+
+  it('does not treat a hyphenated build-like directory as generated output', () => {
+    mkdirSync(join(dir, 'release-build'), { recursive: true });
+    writeFileSync(
+      join(dir, 'release-build/main.py'),
+      `def maintained():
+    return 1
+`,
+      'utf8',
+    );
+    const walk = runWalk(dir);
+    expect(walk.occurrences.maintained?.[0]?.definedInGenerated).toBe(false);
   });
 
   it('includes synthetic <module-init> occurrence for each file', () => {

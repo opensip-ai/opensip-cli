@@ -88,4 +88,137 @@ describe('lang-python walk.ts — comment-stripping branches', () => {
     });
     expect(Object.keys(walk.occurrences)).toContain('with_docstring');
   });
+
+  it('excludes function docstrings from walked body hashes', () => {
+    writeFileSync(
+      join(dir, 'a.py'),
+      `def work():
+    """First description."""
+    return 1
+`,
+      'utf8',
+    );
+    writeFileSync(
+      join(dir, 'b.py'),
+      `def work():
+    """Different description."""
+    return 1
+`,
+      'utf8',
+    );
+    const discovery = pythonGraphAdapter.discoverFiles({
+      cwd: dir,
+      diagnosticIntent: 'quiet',
+    });
+    const parsed = pythonGraphAdapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
+    });
+    const walk = pythonGraphAdapter.walkProject({
+      project: parsed.project,
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+    });
+    const workOccurrences = walk.occurrences.work ?? [];
+    expect(workOccurrences).toHaveLength(2);
+    expect(workOccurrences[0]?.bodyHash).toBe(workOccurrences[1]?.bodyHash);
+  });
+
+  it('excludes ordinary quoted and concatenated function docstrings from body hashes', () => {
+    writeFileSync(
+      join(dir, 'a.py'),
+      `def work():
+    'First description.'
+    return 1
+`,
+      'utf8',
+    );
+    writeFileSync(
+      join(dir, 'b.py'),
+      `def work():
+    "Different " "description."
+    return 1
+`,
+      'utf8',
+    );
+    writeFileSync(
+      join(dir, 'c.py'),
+      `def work():
+    (
+        r"Third "
+        u"description."
+    )
+    return 1
+`,
+      'utf8',
+    );
+    const discovery = pythonGraphAdapter.discoverFiles({
+      cwd: dir,
+      diagnosticIntent: 'quiet',
+    });
+    const parsed = pythonGraphAdapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
+    });
+    const walk = pythonGraphAdapter.walkProject({
+      project: parsed.project,
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+    });
+    const workOccurrences = walk.occurrences.work ?? [];
+    expect(workOccurrences).toHaveLength(3);
+    expect(new Set(workOccurrences.map((occurrence) => occurrence.bodyHash)).size).toBe(1);
+  });
+
+  it('keeps bytes and formatted string expressions in body hashes', () => {
+    writeFileSync(
+      join(dir, 'a.py'),
+      `def bytes_work():
+    b"first"
+    return 1
+
+def formatted_work():
+    f"first"
+    return 1
+`,
+      'utf8',
+    );
+    writeFileSync(
+      join(dir, 'b.py'),
+      `def bytes_work():
+    b"second"
+    return 1
+
+def formatted_work():
+    f"second"
+    return 1
+`,
+      'utf8',
+    );
+    const discovery = pythonGraphAdapter.discoverFiles({
+      cwd: dir,
+      diagnosticIntent: 'quiet',
+    });
+    const parsed = pythonGraphAdapter.parseProject({
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+      compilerOptions: discovery.compilerOptions,
+      resolutionMode: 'exact',
+    });
+    const walk = pythonGraphAdapter.walkProject({
+      project: parsed.project,
+      projectDirAbs: discovery.projectDirAbs,
+      files: discovery.files,
+    });
+    const bytesOccurrences = walk.occurrences.bytes_work ?? [];
+    const formattedOccurrences = walk.occurrences.formatted_work ?? [];
+    expect(bytesOccurrences).toHaveLength(2);
+    expect(bytesOccurrences[0]?.bodyHash).not.toBe(bytesOccurrences[1]?.bodyHash);
+    expect(formattedOccurrences).toHaveLength(2);
+    expect(formattedOccurrences[0]?.bodyHash).not.toBe(formattedOccurrences[1]?.bodyHash);
+  });
 });

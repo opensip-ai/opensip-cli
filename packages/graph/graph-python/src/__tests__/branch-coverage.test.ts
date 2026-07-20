@@ -180,17 +180,21 @@ describe('walk-dependencies.ts — import-shape branches', () => {
     expect(specs).toEqual(['foo']);
   });
 
-  it('emits no dotted dep site for a relative wildcard import (`from . import *`)', () => {
-    // `from . import *` has a relative_import (dots-only) module-name and
-    // a wildcard child that resolves to no dotted_name — so the per-name
-    // loop emits nothing.
+  it('emits the source-package dep site for a relative wildcard import', () => {
     writeFile('pkg/__init__.py', '');
     writeFile('pkg/a.py', `from . import *\n`);
     const walk = runWalk();
     const aSites = walk.dependencySites.filter((s) =>
       (s.sourceFileRef as { source: string }).source.includes('from . import'),
     );
-    expect(aSites).toHaveLength(0);
+    expect(aSites.map((site) => site.specifier)).toEqual(['.']);
+
+    const { catalog, byOwner } = resolveDeps();
+    const aInit = findModuleInit(catalog, 'pkg/a.py');
+    const packageInit = findModuleInit(catalog, 'pkg/__init__.py');
+    expect(aInit).toBeDefined();
+    expect(packageInit).toBeDefined();
+    expect(byOwner?.get(aInit!.bodyHash)?.[0]?.to).toEqual([packageInit!.bodyHash]);
   });
 
   it('emits one dep site each for a mixed comma import (`import a, b.c`)', () => {

@@ -57,7 +57,7 @@ import type { Node } from '@opensip-cli/tree-sitter';
 
 const TEST_PATH_RE = /(?:^|\/)tests?\//;
 const TEST_FILE_NAME_RE = /(?:^|\/)test_[^/]+\.py$|_test\.py$/;
-const GENERATED_PATH_RE = /\bdist\/|\bbuild\/|\.generated\./;
+const GENERATED_PATH_RE = /(?:^|\/)(?:dist|build)\/|\.generated\./;
 
 const { isTestFile, isGeneratedFile } = makeFileClassifier({
   testRe: TEST_FILE_NAME_RE,
@@ -196,6 +196,12 @@ function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx): boolean {
       childHash: occ.bodyHash,
     });
   }
+  // Like `def` defaults, lambda defaults are evaluated in the enclosing
+  // scope when the lambda expression creates its function object.
+  const params = node.childForFieldName('parameters');
+  if (params) {
+    for (const child of childrenOf(params)) visit(child, frame, ctx);
+  }
   const body = node.childForFieldName('body');
   if (body) {
     visit(body, { ownerHash: occ.bodyHash, enclosingClass: null }, ctx);
@@ -210,7 +216,7 @@ function visitFunctionDefinition(
 ): FunctionOccurrence | null {
   const { file, filePathProjectRel, inTestFile, definedInGenerated } = ctx;
   const name = nameOf(node) ?? '<anon-fn>';
-  const digest = digestPythonBody(file.source.slice(node.startIndex, node.endIndex));
+  const digest = digestFunctionDefinition(node, file);
   const kind = classifyFunctionKind(name, enclosingClass);
   const qualifiedBase = filePathProjectRel.replace(/\.py$/, '').split('/').join('.');
   const qualifiedName =
@@ -237,6 +243,47 @@ function visitFunctionDefinition(
     definedInGenerated,
     calls: [],
   };
+}
+
+function digestFunctionDefinition(
+  node: Node,
+  file: PythonParsedFile,
+): ReturnType<typeof digestPythonBody> {
+  const body = node.childForFieldName('body');
+  const firstStatement = body
+    ? namedChildrenOf(body).find((child) => child.type !== 'comment')
+    : undefined;
+  const firstExpression =
+    firstStatement?.type === 'expression_statement'
+      ? namedChildrenOf(firstStatement)[0]
+      : undefined;
+  if (
+    firstStatement === undefined ||
+    firstExpression === undefined ||
+    !isDocstringExpression(firstExpression)
+  ) {
+    return digestPythonBody(file.source.slice(node.startIndex, node.endIndex));
+  }
+  return digestPythonBody(
+    file.source.slice(node.startIndex, firstStatement.startIndex) +
+      file.source.slice(firstStatement.endIndex, node.endIndex),
+  );
+}
+
+function isDocstringExpression(node: Node): boolean {
+  if (node.type === 'string') {
+    const start = namedChildrenOf(node).find((child) => child.type === 'string_start');
+    return start !== undefined && /^(?:[ru])?(?:'''|"""|'|")$/i.test(start.text);
+  }
+  if (node.type === 'concatenated_string') {
+    const strings = namedChildrenOf(node).filter((child) => child.type !== 'comment');
+    return strings.length > 0 && strings.every((child) => isDocstringExpression(child));
+  }
+  if (node.type === 'parenthesized_expression') {
+    const expressions = namedChildrenOf(node).filter((child) => child.type !== 'comment');
+    return expressions.length === 1 && isDocstringExpression(expressions[0]);
+  }
+  return false;
 }
 
 function classifyFunctionKind(
@@ -302,7 +349,6 @@ function extractParam(child: Node): { name: string; optional: boolean; rest: boo
     case 'identifier': {
       return { name: child.text, optional: false, rest: false };
     }
-    case 'typed_parameter':
     case 'default_parameter':
     case 'typed_default_parameter': {
       const name = child.childForFieldName('name') ?? child.namedChild(0);
@@ -312,6 +358,14 @@ function extractParam(child: Node): { name: string; optional: boolean; rest: boo
         optional: child.type === 'default_parameter' || child.type === 'typed_default_parameter',
         rest: false,
       };
+    }
+    case 'typed_parameter': {
+      const name = child.childForFieldName('name') ?? child.namedChild(0);
+      if (!name) return null;
+      if (name.type === 'list_splat_pattern' || name.type === 'dictionary_splat_pattern') {
+        return extractParam(name);
+      }
+      return { name: name.text, optional: false, rest: false };
     }
     /* v8 ignore start */
     case 'list_splat_pattern':

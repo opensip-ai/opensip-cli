@@ -145,6 +145,26 @@ describe('Python adapter — depends_on emission (Phase 4)', () => {
     expect(mainDeps![0].to).toEqual([helpersInit!.bodyHash]);
   });
 
+  it('prefers a regular package when a same-named module file also exists', () => {
+    writeFile('main.py', `import choice\n`);
+    writeFile('choice.py', `kind = "module"\n`);
+    writeFile('choice/__init__.py', `kind = "package"\n`);
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const mainInit = findModuleInit(catalog, 'main.py');
+    const packageInit = findModuleInit(catalog, 'choice/__init__.py');
+    const moduleInit = findModuleInit(catalog, 'choice.py');
+
+    expect(mainInit).toBeDefined();
+    expect(packageInit).toBeDefined();
+    expect(moduleInit).toBeDefined();
+
+    const mainDeps = dependenciesByOwner!.get(mainInit!.bodyHash);
+    expect(mainDeps).toHaveLength(1);
+    expect(mainDeps![0].to).toEqual([packageInit!.bodyHash]);
+    expect(mainDeps![0].to).not.toContain(moduleInit!.bodyHash);
+  });
+
   it('resolves a same-package relative import `from . import sibling`', () => {
     writeFile('pkg/__init__.py', '');
     writeFile('pkg/a.py', `from . import b\n\ndef use():\n    return b.value\n`);
