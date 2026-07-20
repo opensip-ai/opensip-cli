@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -55,6 +55,25 @@ describe('checkEntitlement', () => {
     expect(headers['X-API-Key']).toBeUndefined();
   });
 
+  it('normalizes a trailing endpoint slash before appending /entitlements', async () => {
+    const cacheDir = await dir();
+    const urls: string[] = [];
+    const net = vi.fn((url: unknown) => {
+      urls.push(String(url));
+      return Promise.resolve(ok(true));
+    }) as unknown as typeof fetch;
+
+    await checkEntitlement({
+      apiKey: 'k',
+      endpoint: `${ENDPOINT}/`,
+      now: 1000,
+      cacheDir,
+      fetchImpl: net,
+    });
+
+    expect(urls).toEqual([`${ENDPOINT}/entitlements`]);
+  });
+
   it('re-checks over the network once the positive TTL elapses', async () => {
     const cacheDir = await dir();
     await checkEntitlement({
@@ -73,6 +92,58 @@ describe('checkEntitlement', () => {
       fetchImpl: net,
     });
     expect(r.source).toBe('network');
+    expect(net).toHaveBeenCalledOnce();
+  });
+
+  it('does not reuse an entitlement decision for a different endpoint', async () => {
+    const cacheDir = await dir();
+    await checkEntitlement({
+      apiKey: 'shared-key',
+      endpoint: ENDPOINT,
+      now: 1000,
+      cacheDir,
+      fetchImpl: vi.fn(() => Promise.resolve(ok(true))),
+    });
+
+    const net = vi.fn(() => Promise.resolve(ok(false))) as unknown as typeof fetch;
+    const result = await checkEntitlement({
+      apiKey: 'shared-key',
+      endpoint: 'https://other-cloud.test/api',
+      now: 2000,
+      cacheDir,
+      fetchImpl: net,
+    });
+
+    expect(result).toEqual({ entitled: false, source: 'network' });
+    expect(net).toHaveBeenCalledOnce();
+  });
+
+  it('treats a cache entry with malformed runtime types as a miss', async () => {
+    const cacheDir = await dir();
+    await checkEntitlement({
+      apiKey: 'k',
+      endpoint: ENDPOINT,
+      now: 1000,
+      cacheDir,
+      fetchImpl: vi.fn(() => Promise.resolve(ok(true))),
+    });
+    const cacheFiles = await readdir(cacheDir);
+    const cacheFile = cacheFiles.find((name) => name.startsWith('entitlement-'));
+    if (cacheFile === undefined) throw new Error('expected entitlement cache file');
+    const path = join(cacheDir, cacheFile);
+    const cached = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+    await writeFile(path, JSON.stringify({ ...cached, entitled: 'false' }), 'utf8');
+
+    const net = vi.fn(() => Promise.resolve(ok(false))) as unknown as typeof fetch;
+    const result = await checkEntitlement({
+      apiKey: 'k',
+      endpoint: ENDPOINT,
+      now: 2000,
+      cacheDir,
+      fetchImpl: net,
+    });
+
+    expect(result).toEqual({ entitled: false, source: 'network' });
     expect(net).toHaveBeenCalledOnce();
   });
 
@@ -135,6 +206,22 @@ describe('checkEntitlement', () => {
     const cacheDir = await dir();
     const r = await checkEntitlement({ apiKey: '', endpoint: ENDPOINT, now: 0, cacheDir });
     expect(r).toEqual({ entitled: false, source: 'fail-closed' });
+  });
+
+  it('fails closed without sending the key to a plaintext endpoint', async () => {
+    const cacheDir = await dir();
+    const net = vi.fn(() => Promise.resolve(ok(true))) as unknown as typeof fetch;
+
+    const result = await checkEntitlement({
+      apiKey: 'secret',
+      endpoint: 'http://cloud.test/api',
+      now: 0,
+      cacheDir,
+      fetchImpl: net,
+    });
+
+    expect(result).toEqual({ entitled: false, source: 'fail-closed' });
+    expect(net).not.toHaveBeenCalled();
   });
 
   it.each([

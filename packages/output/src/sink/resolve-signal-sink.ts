@@ -15,6 +15,7 @@ import { logger, noopSignalSink } from '@opensip-cli/core';
 
 import { createCloudSignalSink } from './cloud-signal-sink.js';
 import { checkEntitlement, invalidateEntitlement } from './entitlement.js';
+import { isHttpsUrl } from './https-url.js';
 
 import type { EmitResult, SignalBatch, SignalSink } from '@opensip-cli/core';
 
@@ -86,7 +87,7 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
   if (input.noCloud || input.cloud?.sync === false) return noopSignalSink;
 
   const endpoint = input.cloud?.endpoint ?? DEFAULT_CLOUD_ENDPOINT;
-  if (!endpoint.startsWith('https://')) {
+  if (!isHttpsUrl(endpoint)) {
     // Never send the credential-bearing X-API-Key over plaintext.
     logger.warn({ evt: 'cli.signal-sync.insecure-endpoint', module: MODULE_TAG, endpoint });
     return noopSignalSink;

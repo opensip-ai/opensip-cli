@@ -86,6 +86,18 @@ describe('resolveSignalSink (deferred entitlement)', () => {
     expect(r.accepted).toBe(2);
   });
 
+  it('accepts an uppercase HTTPS scheme allowed by project config validation', async () => {
+    const cacheDir = await dir();
+    const sink = resolveSignalSink({
+      apiKey: 'k',
+      cloud: { endpoint: 'HTTPS://x.test/api' },
+      cacheDir,
+      fetchImpl: routedFetch(true),
+    });
+
+    await expect(sink.emit(batch(1))).resolves.toMatchObject({ accepted: 1 });
+  });
+
   it('does not emit (and never hits /signals) when not entitled', async () => {
     const cacheDir = await dir();
     const fetchImpl = routedFetch(false);

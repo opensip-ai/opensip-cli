@@ -66,8 +66,8 @@ export interface PostChunkedArgs {
   readonly evtPrefix: string;
   /**
    * Extra request headers merged into every chunk POST (e.g.
-   * `x-opensip-repo`). The transport-owned `Content-Type` and `Authorization`
-   * headers always win — a caller cannot override auth via this bag.
+   * `x-opensip-repo`). The transport-owned `Content-Type`, `Authorization`,
+   * and `Idempotency-Key` headers always win.
    */
   readonly extraHeaders?: Readonly<Record<string, string>>;
   readonly fetchImpl?: typeof fetch;
@@ -77,6 +77,7 @@ export interface PostChunkedArgs {
 }
 
 const MODULE_TAG = 'http-egress';
+const TRANSPORT_HEADER_NAMES = new Set(['authorization', 'content-type', 'idempotency-key']);
 
 function isTransient(status: number): boolean {
   return status >= 500 || status === 429;
@@ -130,12 +131,14 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     };
   }
 
-  // Caller-supplied headers go in first so the transport-owned `Content-Type`
-  // and `Authorization` below always win (auth is never caller-overridable).
-  const headersBase: Record<string, string> = {
-    ...args.extraHeaders,
-    'Content-Type': 'application/json',
-  };
+  // Keep transport-owned names out of the caller bag case-insensitively.
+  // Otherwise Fetch combines `authorization` + `Authorization` into one value
+  // instead of letting the transport's auth/idempotency values win.
+  const headersBase: Record<string, string> = {};
+  for (const [name, value] of Object.entries(args.extraHeaders ?? {})) {
+    if (!TRANSPORT_HEADER_NAMES.has(name.toLowerCase())) headersBase[name] = value;
+  }
+  headersBase['Content-Type'] = 'application/json';
   // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
   // token only (the api-key strategy matches `Bearer osk_`); the historical
   // `X-API-Key` header never reached a route and is removed outright — no
@@ -163,11 +166,15 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
 
       let retryAfterMs: number | undefined;
       try {
+        const requestTimeoutMs = Math.min(
+          args.timeoutFor(chunks[ci], ci),
+          Math.max(0, deadlineLeft()),
+        );
         const res = await fetchImpl(args.url, {
           method: 'POST',
           headers: { ...headersBase, 'Idempotency-Key': args.idempotencyKeyFor(ci) },
           body: JSON.stringify(chunks[ci]),
-          signal: AbortSignal.timeout(args.timeoutFor(chunks[ci], ci)),
+          signal: AbortSignal.timeout(requestTimeoutMs),
         });
 
         if (res.ok) {

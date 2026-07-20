@@ -78,7 +78,8 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
     async emit(batch: SignalBatch): Promise<EmitResult> {
       try {
         if (batch.signals.length === 0) return { accepted: 0, authRejected: false };
-        const url = opts.endpoint.endsWith('/signals') ? opts.endpoint : `${opts.endpoint}/signals`;
+        const endpoint = opts.endpoint.replace(/\/+$/u, '');
+        const url = endpoint.endsWith('/signals') ? endpoint : `${endpoint}/signals`;
         const chunks = chunkBatch(batch, MAX_SIGNALS_PER_CHUNK);
 
         const result = await withSpanAsync(

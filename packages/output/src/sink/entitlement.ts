@@ -17,10 +17,13 @@ import { dirname, join } from 'node:path';
 
 import { logger } from '@opensip-cli/core';
 
+import { isHttpsUrl } from './https-url.js';
+
 const MODULE_TAG = 'entitlement';
 const POSITIVE_TTL_MS = 6 * 60 * 60 * 1000; // 6h — re-check entitled keys infrequently
 const NEGATIVE_TTL_MS = 5 * 60 * 1000; // 5m — a real "no" caches briefly to avoid hammering
 const REQUEST_TIMEOUT_MS = 10_000;
+const FAIL_CLOSED_SOURCE = 'fail-closed' as const;
 
 /** Where the decision came from — also the metric dimension. */
 export type EntitlementSource = 'cache' | 'network' | 'fail-closed';
@@ -30,8 +33,9 @@ export interface EntitlementResult {
 }
 
 interface CacheEntry {
-  entitled: boolean;
-  checkedAt: number;
+  readonly entitled: boolean;
+  readonly checkedAt: number;
+  readonly endpointHash: string;
 }
 
 /** Input to {@link checkEntitlement}. `now`/`fetchImpl`/`cacheDir` are injectable for tests. */
@@ -49,9 +53,30 @@ function cacheFileFor(cacheDir: string, apiKey: string): string {
   return join(cacheDir, `entitlement-${hash}.json`);
 }
 
-async function readCache(file: string, now: number): Promise<boolean | undefined> {
+function hashEndpoint(endpoint: string): string {
+  return createHash('sha256').update(endpoint).digest('hex');
+}
+
+function isCacheEntry(value: unknown): value is CacheEntry {
+  if (typeof value !== 'object' || value === null) return false;
+  const entry = value as Partial<CacheEntry>;
+  return (
+    typeof entry.entitled === 'boolean' &&
+    typeof entry.checkedAt === 'number' &&
+    Number.isFinite(entry.checkedAt) &&
+    typeof entry.endpointHash === 'string'
+  );
+}
+
+async function readCache(
+  file: string,
+  endpoint: string,
+  now: number,
+): Promise<boolean | undefined> {
   try {
-    const entry = JSON.parse(await readFile(file, 'utf8')) as CacheEntry;
+    const parsed: unknown = JSON.parse(await readFile(file, 'utf8'));
+    if (!isCacheEntry(parsed) || parsed.endpointHash !== hashEndpoint(endpoint)) return undefined;
+    const entry = parsed;
     const ttl = entry.entitled ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS;
     if (now - entry.checkedAt < ttl) return entry.entitled;
   } catch {
@@ -60,10 +85,22 @@ async function readCache(file: string, now: number): Promise<boolean | undefined
   return undefined;
 }
 
-async function writeCache(file: string, entitled: boolean, now: number): Promise<void> {
+async function writeCache(
+  file: string,
+  endpoint: string,
+  entitled: boolean,
+  now: number,
+): Promise<void> {
   try {
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, JSON.stringify({ entitled, checkedAt: now } satisfies CacheEntry));
+    await writeFile(
+      file,
+      JSON.stringify({
+        entitled,
+        checkedAt: now,
+        endpointHash: hashEndpoint(endpoint),
+      } satisfies CacheEntry),
+    );
   } catch {
     /* cache write is best-effort — a failure just means we re-check next run */
   }
@@ -88,15 +125,19 @@ function log(result: EntitlementResult): EntitlementResult {
  */
 export async function checkEntitlement(input: CheckEntitlementInput): Promise<EntitlementResult> {
   const { apiKey, endpoint, now, cacheDir } = input;
-  if (!apiKey) return log({ entitled: false, source: 'fail-closed' });
+  if (!apiKey) return log({ entitled: false, source: FAIL_CLOSED_SOURCE });
+  if (!isHttpsUrl(endpoint)) return log({ entitled: false, source: FAIL_CLOSED_SOURCE });
 
   const file = cacheFileFor(cacheDir, apiKey);
-  const cached = await readCache(file, now);
+  const cached = await readCache(file, endpoint, now);
   if (cached !== undefined) return log({ entitled: cached, source: 'cache' });
 
   const fetchImpl = input.fetchImpl ?? fetch;
   try {
-    const url = endpoint.endsWith('/entitlements') ? endpoint : `${endpoint}/entitlements`;
+    const normalizedEndpoint = endpoint.replace(/\/+$/u, '');
+    const url = normalizedEndpoint.endsWith('/entitlements')
+      ? normalizedEndpoint
+      : `${normalizedEndpoint}/entitlements`;
     const res = await fetchImpl(url, {
       method: 'GET',
       // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
@@ -108,19 +149,19 @@ export async function checkEntitlement(input: CheckEntitlementInput): Promise<En
     });
 
     if (res.status === 401 || res.status === 403) {
-      await writeCache(file, false, now); // real negative
+      await writeCache(file, endpoint, false, now); // real negative
       return log({ entitled: false, source: 'network' });
     }
-    if (!res.ok) return log({ entitled: false, source: 'fail-closed' }); // 5xx/other → don't trust, don't cache
+    if (!res.ok) return log({ entitled: false, source: FAIL_CLOSED_SOURCE }); // 5xx/other → don't trust, don't cache
 
     const body = (await res.json().catch(() => null)) as { entitled?: unknown } | null;
     if (!body || typeof body.entitled !== 'boolean') {
-      return log({ entitled: false, source: 'fail-closed' });
+      return log({ entitled: false, source: FAIL_CLOSED_SOURCE });
     }
-    await writeCache(file, body.entitled, now);
+    await writeCache(file, endpoint, body.entitled, now);
     return log({ entitled: body.entitled, source: 'network' });
   } catch {
-    return log({ entitled: false, source: 'fail-closed' });
+    return log({ entitled: false, source: FAIL_CLOSED_SOURCE });
   }
 }
 

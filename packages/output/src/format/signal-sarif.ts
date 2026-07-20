@@ -56,12 +56,13 @@ function mapSeverityToSarifLevel(severity: SignalSeverity): SarifLevel {
 
 /**
  * SARIF 2.1.0 validity filter for region coordinates (startLine / startColumn
- * must be ≥ 1). Signal construction already owns the **1-based column base**
- * (ADR-0179 / `createSignal`); this helper must not re-guess 0-vs-1 — it only
- * drops invalid residuals so they are omitted rather than emitted as 0.
+ * must be integers ≥ 1). Signal construction already owns the **1-based column
+ * base** (ADR-0179 / `createSignal`); this helper must not re-guess 0-vs-1 — it
+ * only drops invalid residuals (fractional, < 1, or non-finite) so they are
+ * omitted rather than emitted as an out-of-range value.
  */
 function atLeastOne(value: number | undefined): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? value : undefined;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : undefined;
 }
 
 /** Minimal SARIF v2.1.0 shape — only the fields this emitter populates. */

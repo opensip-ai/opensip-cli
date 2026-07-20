@@ -186,6 +186,28 @@ describe('postChunked', () => {
     expect(r.outcome).toBe('partial');
   });
 
+  it('caps each request timeout to the remaining overall deadline', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      return new AbortController().signal;
+    });
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 200 })),
+    ) as unknown as typeof fetch;
+
+    try {
+      await postChunked(
+        args({
+          fetchImpl,
+          timeoutFor: () => 30_000,
+          policy: { maxAttempts: 1, overallDeadlineMs: 125, honorRetryAfter: true },
+        }),
+      );
+      expect(timeout).toHaveBeenCalledWith(125);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
   it('never throws when fetch rejects', async () => {
     const fetchImpl = vi.fn(() =>
       Promise.reject(new Error('ECONNRESET')),
@@ -242,6 +264,31 @@ describe('postChunked', () => {
     expect(r.outcome).toBe('ok');
     expect(authHeader).toBe('Bearer osk_testkey1234567890123456789012');
     expect(hadLegacyHeader).toBe(false);
+  });
+
+  it('keeps transport-owned headers authoritative regardless of caller casing', async () => {
+    let seen: Headers | undefined;
+    const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
+      seen = new Headers(init.headers);
+      return Promise.resolve(new Response(null, { status: 200 }));
+    }) as unknown as typeof fetch;
+
+    const r = await postChunked(
+      args({
+        fetchImpl,
+        apiKey: 'real-key',
+        extraHeaders: {
+          authorization: 'Bearer caller-key',
+          'content-type': 'text/plain',
+          'idempotency-key': 'caller-id',
+        },
+      }),
+    );
+
+    expect(r.outcome).toBe('ok');
+    expect(seen?.get('authorization')).toBe('Bearer real-key');
+    expect(seen?.get('content-type')).toBe('application/json');
+    expect(seen?.get('idempotency-key')).toBe('run:0');
   });
 
   it('records a non-Error rejection value as a string', async () => {

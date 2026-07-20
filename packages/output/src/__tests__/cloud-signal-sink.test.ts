@@ -82,6 +82,23 @@ describe('createCloudSignalSink', () => {
     expect(urls[0]).toBe('https://x.test/api/signals');
   });
 
+  it('normalizes a trailing endpoint slash before appending /signals', async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn((url: unknown) => {
+      urls.push(String(url));
+      return Promise.resolve(new Response(null, { status: 200 }));
+    }) as unknown as typeof fetch;
+    const sink = createCloudSignalSink({
+      endpoint: 'https://x.test/api/',
+      apiKey: 'k',
+      fetchImpl,
+    });
+
+    await sink.emit(batch(1));
+
+    expect(urls).toEqual(['https://x.test/api/signals']);
+  });
+
   it('chunks a large batch into multiple POSTs', async () => {
     const fetchImpl = vi.fn(() =>
       Promise.resolve(new Response(null, { status: 200 })),

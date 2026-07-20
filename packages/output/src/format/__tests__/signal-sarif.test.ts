@@ -270,6 +270,42 @@ describe('formatSignalSarif', () => {
     expect(r1.locations[0].physicalLocation.region).toBeUndefined();
   });
 
+  it('omits fractional region coordinates that are invalid in SARIF', () => {
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          code: undefined,
+          filePath: 'src/fractional-line.ts',
+          line: 4.5,
+          column: 2,
+        },
+        {
+          ...FIXTURE_ENVELOPE.signals[1],
+          code: undefined,
+          filePath: 'src/fractional-column.ts',
+          line: 5,
+          column: 2.5,
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: {
+        results: {
+          locations: {
+            physicalLocation: {
+              region?: { startLine?: number; startColumn?: number };
+            };
+          }[];
+        }[];
+      }[];
+    };
+    const [fractionalLine, fractionalColumn] = parsed.runs[0].results;
+    expect(fractionalLine.locations[0].physicalLocation.region).toBeUndefined();
+    expect(fractionalColumn.locations[0].physicalLocation.region).toEqual({ startLine: 5 });
+  });
+
   it('produces a single run with no results for an empty envelope', () => {
     const parsed = JSON.parse(formatSignalSarif(EMPTY_ENVELOPE)) as {
       version: string;
