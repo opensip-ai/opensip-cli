@@ -189,6 +189,73 @@ describe('error-handling-quality — branch coverage', () => {
     expect(result.signals.filter((s) => s.message?.includes('as Error'))).toHaveLength(0);
   });
 
+  it('recognizes module-resolution probes after production content filtering', async () => {
+    fx(
+      'src/module-resolution.ts',
+      [
+        'const selfCorePath = (() => {',
+        '  try {',
+        '    return createRequire(import.meta.url).resolve("@opensip-cli/core")',
+        '  } catch {',
+        '    return',
+        '  }',
+        '})()',
+      ].join('\n'),
+    );
+    const result = await runCheck('error-handling-quality');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('does not let logging examples in strings suppress silent catches', async () => {
+    fx(
+      'src/eh/string-example.ts',
+      [
+        'export function probe() {',
+        '  try { work() } catch {',
+        '    const docs = "logger.error(err)"',
+        '    const moduleDocs = "createRequire .resolve( @opensip-cli/core"',
+        '    return undefined',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await runCheck('error-handling-quality');
+    expect(result.signals.length).toBeGreaterThan(0);
+  });
+
+  it('does not let logging examples in comments suppress silent catches', async () => {
+    fx(
+      'src/eh/comment-example.ts',
+      [
+        'export function probe() {',
+        '  try { work() } catch {',
+        '    // logger.error(err)',
+        '    return undefined',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await runCheck('error-handling-quality');
+    expect(result.signals.length).toBeGreaterThan(0);
+  });
+
+  it('does not let instanceof examples in comments suppress unsafe casts', async () => {
+    fx(
+      'src/eh/comment-cast.ts',
+      [
+        'export function probe() {',
+        '  try { work() } catch (e) {',
+        '    // e instanceof Error',
+        '    const err = e as Error',
+        '    console.error(err)',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await runCheck('error-handling-quality');
+    expect(result.signals.some((signal) => signal.message?.includes('as Error'))).toBe(true);
+  });
+
   it('skips test files', async () => {
     fx('src/eh/foo.test.ts', ['try { 1 } catch {}'].join('\n'));
     const result = await runCheck('error-handling-quality');

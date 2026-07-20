@@ -9,7 +9,7 @@
  */
 
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
-import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
+import { filterContent, getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 import { getContainingFunctionName } from './containing-function-name.js';
@@ -38,13 +38,13 @@ const LOGGING_PATTERNS = [
 /**
  * Patterns that indicate intentional silent handling
  */
-const MARKER_PATTERNS = [
+const COMMENT_MARKER_PATTERNS = [
   /@swallow-ok/,
   /@handles/,
   /\/\/\s*intentionally/i,
   /\/\/\s*expected/i,
-  /graceful/i,
 ];
+const CODE_MARKER_PATTERNS = [/graceful/i];
 
 /**
  * Patterns that indicate error propagation
@@ -150,16 +150,38 @@ function isCompositionRootPath(filePath: string): boolean {
   );
 }
 
-function isModuleInitResolutionProbe(node: ts.CatchClause, sourceFile: ts.SourceFile): boolean {
+function isModuleInitResolutionProbe(node: ts.CatchClause): boolean {
   let current: ts.Node | undefined = node.parent;
   while (current) {
     if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      const bodyText = current.body?.getText(sourceFile) ?? '';
-      return (
-        bodyText.includes('createRequire') &&
-        bodyText.includes('.resolve(') &&
-        (bodyText.includes('@opensip-cli/core') || bodyText.includes("'@opensip-cli/"))
-      );
+      let hasCreateRequireCall = false;
+      let hasOpenSipResolveCall = false;
+      const visit = (candidate: ts.Node): void => {
+        if (ts.isCallExpression(candidate)) {
+          if (
+            ts.isIdentifier(candidate.expression) &&
+            candidate.expression.text === 'createRequire'
+          ) {
+            hasCreateRequireCall = true;
+          }
+          if (
+            ts.isPropertyAccessExpression(candidate.expression) &&
+            candidate.expression.name.text === 'resolve'
+          ) {
+            const moduleName = candidate.arguments[0];
+            if (
+              moduleName &&
+              ts.isStringLiteralLike(moduleName) &&
+              moduleName.text.startsWith('@opensip-cli/')
+            ) {
+              hasOpenSipResolveCall = true;
+            }
+          }
+        }
+        ts.forEachChild(candidate, visit);
+      };
+      visit(current.body);
+      return hasCreateRequireCall && hasOpenSipResolveCall;
     }
     current = current.parent;
   }
@@ -167,7 +189,7 @@ function isModuleInitResolutionProbe(node: ts.CatchClause, sourceFile: ts.Source
 }
 
 function isProbeFunctionCatch(node: ts.CatchClause, sourceFile: ts.SourceFile): boolean {
-  if (isModuleInitResolutionProbe(node, sourceFile)) {
+  if (isModuleInitResolutionProbe(node)) {
     return true;
   }
   const funcName = getContainingFunctionName(node, sourceFile);
@@ -196,14 +218,28 @@ function isResultMatchCall(node: ts.CallExpression): boolean {
 /**
  * Check if text contains acceptable error handling
  * @param text - Text to check
+ * @param filePath - Source path used to select the correct TS/TSX grammar
  * @returns True if acceptable pattern found
  */
-function hasAcceptablePattern(text: string): boolean {
-  if (LOGGING_PATTERNS.some((p) => p.test(text))) return true;
-  if (MARKER_PATTERNS.some((p) => p.test(text))) return true;
+function hasAcceptablePattern(text: string, filePath: string): boolean {
+  const filtered = filterContent(text, filePath);
+  const code = filtered.codeNoCommentsOrRegexLiterals;
+  if (LOGGING_PATTERNS.some((p) => p.test(code))) return true;
+  if (CODE_MARKER_PATTERNS.some((p) => p.test(code))) return true;
+  for (const pattern of COMMENT_MARKER_PATTERNS) {
+    const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+    const iterable = new RegExp(pattern.source, flags);
+    for (const match of text.matchAll(iterable)) {
+      if (match.index === undefined) continue;
+      const before = text.slice(0, match.index);
+      const line = before.split('\n').length;
+      const column = before.length - (before.lastIndexOf('\n') + 1);
+      if (filtered.isInComment(line, column)) return true;
+    }
+  }
   /* v8 ignore next -- defensive AST/type guard */
-  if (PROPAGATION_PATTERNS.some((p) => p.test(text))) return true;
-  if (RETHROW_PATTERN.test(text)) return true;
+  if (PROPAGATION_PATTERNS.some((p) => p.test(code))) return true;
+  if (RETHROW_PATTERN.test(code)) return true;
   return false;
 }
 
@@ -240,9 +276,11 @@ function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): Chec
   }
 
   // Skip if has acceptable pattern
-  if (hasAcceptablePattern(catchText)) return violations;
+  if (hasAcceptablePattern(catchText, sourceFile.fileName)) return violations;
 
-  const trimmed = catchText.replaceAll(/[{}]/g, '').trim();
+  const trimmed = filterContent(catchText, sourceFile.fileName)
+    .codeNoCommentsOrRegexLiterals.replaceAll(/[{}]/g, '')
+    .trim();
 
   // Strip leading single-line comments (`// ...` lines, including
   // multi-line stacks) and block comments before testing for empty.
@@ -314,7 +352,7 @@ function checkResultIsErr(node: ts.IfStatement, sourceFile: ts.SourceFile): Chec
 
   const thenText = node.thenStatement.getText(sourceFile);
   /* v8 ignore next -- defensive AST/type guard */
-  if (hasAcceptablePattern(thenText)) return violations;
+  if (hasAcceptablePattern(thenText, sourceFile.fileName)) return violations;
 
   // Check for silent sentinel returns
   const visitReturn = (n: ts.Node): void => {
@@ -359,7 +397,7 @@ function checkResultMethods(node: ts.CallExpression, sourceFile: ts.SourceFile):
     /* v8 ignore next -- defensive AST/type guard */
     if (!firstArg) return violations;
     const callback = firstArg.getText(sourceFile);
-    if (!hasAcceptablePattern(callback)) {
+    if (!hasAcceptablePattern(callback, sourceFile.fileName)) {
       const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
       violations.push({
         line: line + 1,
@@ -380,7 +418,7 @@ function checkResultMethods(node: ts.CallExpression, sourceFile: ts.SourceFile):
     /* v8 ignore next -- defensive AST/type guard */
     if (!secondArg) return violations;
     const errHandler = secondArg.getText(sourceFile);
-    if (!hasAcceptablePattern(errHandler)) {
+    if (!hasAcceptablePattern(errHandler, sourceFile.fileName)) {
       const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
       violations.push({
         line: line + 1,
@@ -404,7 +442,10 @@ function checkCatchClauseAsErrorCast(
   sourceFile: ts.SourceFile,
 ): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  const catchText = node.block.getText(sourceFile);
+  const catchText = filterContent(
+    node.block.getText(sourceFile),
+    sourceFile.fileName,
+  ).codeNoCommentsOrRegexLiterals;
 
   // Skip if the catch block contains an instanceof Error guard
   if (catchText.includes('instanceof Error')) return violations;
@@ -481,7 +522,7 @@ export const errorHandlingQuality = defineCheck({
   id: '6bae5be9-87f4-499e-a886-ca78a233cfb7',
   slug: 'error-handling-quality',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
   confidence: 'high',
   description: 'Detect silent error handling in try/catch and Result patterns',
   longDescription: `**Purpose:** Detects silent error handling in both try/catch blocks and Result pattern usage, ensuring errors are always logged or propagated.

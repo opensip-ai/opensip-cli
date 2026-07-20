@@ -469,7 +469,7 @@ describe('drizzle-orm-migration-guardrails — branch coverage', () => {
       ].join('\n'),
     );
     const result = await runCheck('drizzle-orm-migration-guardrails');
-    expect(result).toBeDefined();
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('MIGRATION_GUARDRAIL');
   });
 
   it('runs over safe DDL (CREATE TABLE / ADD COLUMN)', async () => {
@@ -481,7 +481,47 @@ describe('drizzle-orm-migration-guardrails — branch coverage', () => {
       ].join('\n'),
     );
     const result = await runCheck('drizzle-orm-migration-guardrails');
-    expect(result).toBeDefined();
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('ignores dangerous SQL examples that are not executed', async () => {
+    fx('src/db/migrations/003_docs.ts', 'export const example = "sql`DROP TABLE users`"');
+    const result = await runCheck('drizzle-orm-migration-guardrails');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('ignores dangerous SQL examples inside template interpolations', async () => {
+    fx(
+      'src/db/migrations/004_interpolation.ts',
+      [
+        'const condition = true',
+        'const table = "users"',
+        'export const query = sql`SELECT ${condition ? "DROP TABLE users" : table}`',
+        'export const other = sql`SELECT ${/* TRUNCATE users */ table}`',
+      ].join('\n'),
+    );
+    const result = await runCheck('drizzle-orm-migration-guardrails');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('detects qualified sql.unsafe calls', async () => {
+    fx(
+      'src/db/schema/qualified.ts',
+      'export const result = ctx.db.sql.unsafe("SELECT * FROM users")',
+    );
+    const result = await runCheck('drizzle-orm-migration-guardrails');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('MIGRATION_GUARDRAIL');
+  });
+
+  it('does not treat DATA-LOSS text in strings as a confirmation comment', async () => {
+    fx(
+      'src/db/migrations/005_string-confirmation.ts',
+      ['const docs = "DATA-LOSS: intentional"', 'export const query = sql`DROP TABLE users`'].join(
+        '\n',
+      ),
+    );
+    const result = await runCheck('drizzle-orm-migration-guardrails');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('MIGRATION_GUARDRAIL');
   });
 });
 

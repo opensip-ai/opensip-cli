@@ -351,7 +351,7 @@ describe('fastify-schema-coverage — branch coverage', () => {
       ].join('\n'),
     );
     const result = await runCheck('fastify-schema-coverage');
-    expect(result).toBeDefined();
+    expect(result.signals.length).toBeGreaterThan(0);
   });
 
   it('flags POST route with body access but no body schema', async () => {
@@ -369,7 +369,7 @@ describe('fastify-schema-coverage — branch coverage', () => {
       ].join('\n'),
     );
     const result = await runCheck('fastify-schema-coverage');
-    expect(result).toBeDefined();
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('missing-body-schema');
   });
 
   it('flags route with path params (:) but no params schema', async () => {
@@ -387,7 +387,9 @@ describe('fastify-schema-coverage — branch coverage', () => {
       ].join('\n'),
     );
     const result = await runCheck('fastify-schema-coverage');
-    expect(result).toBeDefined();
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain(
+      'missing-params-schema',
+    );
   });
 
   it('flags route reading req.query without querystring schema', async () => {
@@ -426,6 +428,116 @@ describe('fastify-schema-coverage — branch coverage', () => {
     expect(result).toBeDefined();
   });
 
+  it('ignores route examples embedded in strings', async () => {
+    fx(
+      'src/routes/docs.ts',
+      [
+        'import fastify from "fastify"',
+        'export const docs = `app.get("/users/:id", async () => ({}))`',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('ignores route examples embedded in logger templates', async () => {
+    fx(
+      'src/routes/logger-docs.ts',
+      [
+        'declare const logger: { info(message: string): void }',
+        'logger.info(`app.get("/users/:id", async () => ({}))`)',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('ignores object-route examples embedded in documentation values', async () => {
+    fx(
+      'src/routes/object-docs.ts',
+      'export const config = { docs: `method: "POST", url: "/users/:id"` }',
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('does not let schema examples in handler strings suppress findings', async () => {
+    fx(
+      'src/routes/string-schema-docs.ts',
+      [
+        'import fastify from "fastify"',
+        'const app = fastify()',
+        'app.get("/users/:id", async () => {',
+        '  const docs = "schema: response: params:"',
+        '  return docs',
+        '})',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('missing-schema');
+  });
+
+  it('does not let schema examples in comments suppress findings', async () => {
+    fx(
+      'src/routes/comment-schema-docs.ts',
+      [
+        'import fastify from "fastify"',
+        'const app = fastify()',
+        'app.get("/users/:id", async () => {',
+        '  // schema: response: params:',
+        '  return {}',
+        '})',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('missing-schema');
+  });
+
+  it('does not let Zod examples in comments suppress body-schema findings', async () => {
+    fx(
+      'src/routes/comment-zod-docs.ts',
+      [
+        'import fastify from "fastify"',
+        'const app = fastify()',
+        'app.post("/users", async (req) => {',
+        '  // BodySchema.parse(req.body)',
+        '  return req.body',
+        '})',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('missing-schema');
+  });
+
+  it('recognizes quoted Fastify schema keys', async () => {
+    fx(
+      'src/routes/quoted-schema.ts',
+      [
+        'import fastify from "fastify"',
+        'const app = fastify()',
+        'app.get("/users", {',
+        '  "schema": { "response": { 200: { type: "object" } } },',
+        '}, async () => ({}))',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('recognizes shorthand Fastify schema options', async () => {
+    fx(
+      'src/routes/shorthand-schema.ts',
+      [
+        'import fastify from "fastify"',
+        'const app = fastify()',
+        'declare const schema: object',
+        'app.get("/users", { schema }, async () => ({}))',
+      ].join('\n'),
+    );
+    const result = await runCheck('fastify-schema-coverage');
+    expect(result.signals.map((signal) => signal.metadata?.type)).not.toContain('missing-schema');
+  });
+
   it('exercises object-literal route declarations', async () => {
     fx(
       'src/routes/object.ts',
@@ -452,7 +564,7 @@ describe('fastify-schema-coverage — branch coverage', () => {
       ].join('\n'),
     );
     const result = await runCheck('fastify-schema-coverage');
-    expect(result).toBeDefined();
+    expect(result.signals.length).toBeGreaterThan(0);
   });
 
   it('skips non-route files', async () => {
@@ -528,7 +640,8 @@ describe('test-only-frontend-modules — branch coverage', () => {
       ['import { Helper } from "../components/Helper.js"', 'export const x = Helper'].join('\n'),
     );
     const result = await runCheck('test-only-frontend-modules');
-    expect(result).toBeDefined();
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.code?.file).toBe(join(cwd, 'src/components/Helper.tsx'));
   });
 
   it('does not flag modules imported by production code', async () => {
@@ -538,7 +651,25 @@ describe('test-only-frontend-modules — branch coverage', () => {
       ['import { Used } from "./components/Used.js"', 'export const r = Used'].join('\n'),
     );
     const result = await runCheck('test-only-frontend-modules');
-    expect(result).toBeDefined();
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('does not treat import-like text in comments or strings as an importer', async () => {
+    fx('src/components/CommentOnly.tsx', 'export const CommentOnly = () => null');
+    fx(
+      'src/__tests__/CommentOnly.test.tsx',
+      'import { CommentOnly } from "../components/CommentOnly.js"',
+    );
+    fx(
+      'src/main.tsx',
+      [
+        '// import { CommentOnly } from "./components/CommentOnly.js"',
+        'export const example = `from "./components/CommentOnly.js"`',
+      ].join('\n'),
+    );
+    const result = await runCheck('test-only-frontend-modules');
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.code?.file).toBe(join(cwd, 'src/components/CommentOnly.tsx'));
   });
 });
 

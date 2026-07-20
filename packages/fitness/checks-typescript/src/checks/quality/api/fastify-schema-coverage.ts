@@ -11,17 +11,19 @@
  */
 
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
-import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
+import { filterContent, getSharedSourceFile } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
 interface CheckRouteSchemaOptions {
-  routeText: string;
+  codeText: string;
   method: string;
   line: number;
   filePath: string;
   routePath: string;
+  routePropertyNames: ReadonlySet<string>;
+  schemaPropertyNames: ReadonlySet<string>;
 }
 
 function createSchemaViolation(
@@ -43,8 +45,10 @@ function createSchemaViolation(
   };
 }
 
-function hasProperty(routeText: string, propertyName: string): boolean {
-  return routeText.includes(`${propertyName}:`) || routeText.includes(`${propertyName} :`);
+function hasProperty(options: CheckRouteSchemaOptions, propertyName: string): boolean {
+  return propertyName === 'schema'
+    ? options.routePropertyNames.has(propertyName)
+    : options.schemaPropertyNames.has(propertyName);
 }
 
 interface ZodValidationResult {
@@ -109,13 +113,13 @@ function checkMissingBodySchema(
   if (!BODY_METHODS.has(options.method)) {
     return null;
   }
-  if (hasProperty(options.routeText, 'body')) {
+  if (hasProperty(options, 'body')) {
     return null;
   }
   if (zodResult.hasBody) {
     return null;
   }
-  if (!handlerReadsBody(options.routeText)) {
+  if (!handlerReadsBody(options.codeText)) {
     return null;
   }
   return createSchemaViolation(
@@ -149,7 +153,7 @@ function schemaViolationUnlessCovered(input: {
   readonly message: string;
   readonly suggestion: string;
 }): CheckViolation | null {
-  if (hasProperty(input.options.routeText, input.propertyName)) {
+  if (hasProperty(input.options, input.propertyName)) {
     return null;
   }
   if (input.coveredByZod) {
@@ -166,7 +170,7 @@ function checkMissingParamsSchema(
   if (!hasParams) {
     return null;
   }
-  if (hasProperty(options.routeText, 'params')) {
+  if (hasProperty(options, 'params')) {
     return null;
   }
   if (zodResult.hasParams) {
@@ -185,11 +189,11 @@ function checkMissingQuerySchema(
   zodResult: ZodValidationResult,
 ): CheckViolation | null {
   const accessesQuery =
-    options.routeText.includes('request.query') || options.routeText.includes('req.query');
+    options.codeText.includes('request.query') || options.codeText.includes('req.query');
   if (!accessesQuery) {
     return null;
   }
-  if (hasProperty(options.routeText, 'querystring')) {
+  if (hasProperty(options, 'querystring')) {
     return null;
   }
   if (zodResult.hasQuery) {
@@ -206,7 +210,7 @@ function checkMissingQuerySchema(
 function checkRouteSchema(options: CheckRouteSchemaOptions): CheckViolation[] {
   const violations: CheckViolation[] = [];
 
-  const zodResult = detectZodValidation(options.routeText);
+  const zodResult = detectZodValidation(options.codeText);
 
   const missingSchemaViolation = checkMissingSchema(options, zodResult);
   if (missingSchemaViolation) {
@@ -237,25 +241,79 @@ function checkRouteSchema(options: CheckRouteSchemaOptions): CheckViolation[] {
   return violations;
 }
 
-function matchObjectMethod(nodeText: string): string | null {
-  const match = /method\s{0,5}:\s{0,5}['"]?(GET|POST|PUT|PATCH|DELETE)['"]?/i.exec(nodeText);
-  return match?.[1]?.toUpperCase() ?? null;
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
 }
 
-function matchObjectUrl(nodeText: string): string | null {
-  const match = /url\s{0,5}:\s{0,5}['"`]([^'"`]{1,200})['"`]/.exec(nodeText);
-  return match?.[1] ?? null;
+function propertyNameText(property: ts.ObjectLiteralElementLike): string | undefined {
+  if (!('name' in property) || property.name === undefined) return undefined;
+  if (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) {
+    return property.name.text;
+  }
+  if (ts.isComputedPropertyName(property.name)) {
+    const expression = unwrapExpression(property.name.expression);
+    if (ts.isStringLiteralLike(expression)) return expression.text;
+  }
+  return undefined;
 }
 
-function matchShorthandMethod(callText: string): string | null {
-  const match = /(?:fastify|app|server)\.(get|post|put|patch|delete)\s{0,5}\(/i.exec(callText);
-  return match?.[1]?.toUpperCase() ?? null;
+function literalProperty(node: ts.ObjectLiteralExpression, propertyName: string): string | null {
+  const property = node.properties.find(
+    (candidate) => propertyNameText(candidate) === propertyName,
+  );
+  if (!property || !ts.isPropertyAssignment(property)) return null;
+  const initializer = unwrapExpression(property.initializer);
+  return ts.isStringLiteralLike(initializer) ? initializer.text : null;
 }
 
-function matchPathArgument(callText: string): string | null {
-  const match = /\(\s{0,5}['"`]([^'"`]{1,200})['"`]/.exec(callText);
-  /* v8 ignore next -- defensive AST/type guard */
-  return match?.[1] ?? null;
+function objectRouteMethod(node: ts.ObjectLiteralExpression): string | null {
+  const method = literalProperty(node, 'method')?.toUpperCase();
+  return method && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? method : null;
+}
+
+function propertyNames(node: ts.ObjectLiteralExpression | undefined): ReadonlySet<string> {
+  if (!node) return new Set();
+  return new Set(
+    node.properties
+      .map((property) => propertyNameText(property))
+      .filter((name): name is string => name !== undefined),
+  );
+}
+
+function schemaObject(
+  node: ts.ObjectLiteralExpression | undefined,
+): ts.ObjectLiteralExpression | undefined {
+  const schemaProperty = node?.properties.find(
+    (property) => propertyNameText(property) === 'schema',
+  );
+  if (!schemaProperty || !ts.isPropertyAssignment(schemaProperty)) return undefined;
+  const initializer = unwrapExpression(schemaProperty.initializer);
+  return ts.isObjectLiteralExpression(initializer) ? initializer : undefined;
+}
+
+function shorthandRouteMethod(node: ts.CallExpression, sourceFile: ts.SourceFile): string | null {
+  if (!ts.isPropertyAccessExpression(node.expression)) return null;
+  const receiver = node.expression.expression.getText(sourceFile);
+  if (!/(?:^|\.)(?:fastify|app|server)$/.test(receiver)) return null;
+  const method = node.expression.name.text.toUpperCase();
+  return ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? method : null;
+}
+
+function routePathArgument(node: ts.CallExpression): string {
+  const argument = node.arguments[0];
+  if (!argument) return '';
+  const unwrapped = unwrapExpression(argument);
+  return ts.isStringLiteralLike(unwrapped) ? unwrapped.text : '';
 }
 
 function analyzeObjectLiteral(
@@ -264,8 +322,8 @@ function analyzeObjectLiteral(
   filePath: string,
 ): CheckViolation[] {
   const nodeText = node.getText(sourceFile);
-  const method = matchObjectMethod(nodeText);
-  const routePath = matchObjectUrl(nodeText);
+  const method = objectRouteMethod(node);
+  const routePath = literalProperty(node, 'url');
 
   if (!method || !routePath) {
     return [];
@@ -274,11 +332,13 @@ function analyzeObjectLiteral(
   const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
 
   return checkRouteSchema({
-    routeText: nodeText,
+    codeText: filterContent(nodeText, filePath).codeNoCommentsOrRegexLiterals,
     method,
     line: line + 1,
     filePath,
     routePath,
+    routePropertyNames: propertyNames(node),
+    schemaPropertyNames: propertyNames(schemaObject(node)),
   });
 }
 
@@ -288,22 +348,29 @@ function analyzeCallExpression(
   filePath: string,
 ): CheckViolation[] {
   const callText = node.getText(sourceFile);
-  const method = matchShorthandMethod(callText);
+  const method = shorthandRouteMethod(node, sourceFile);
 
   if (!method) {
     return [];
   }
 
   const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-  /* v8 ignore next -- defensive nullish fallback */
-  const routePath = matchPathArgument(callText) ?? '';
+  const routePath = routePathArgument(node);
+  const routeOptions = node.arguments[1];
+  const unwrappedRouteOptions = routeOptions ? unwrapExpression(routeOptions) : undefined;
+  const routeOptionsObject =
+    unwrappedRouteOptions && ts.isObjectLiteralExpression(unwrappedRouteOptions)
+      ? unwrappedRouteOptions
+      : undefined;
 
   return checkRouteSchema({
-    routeText: callText,
+    codeText: filterContent(callText, filePath).codeNoCommentsOrRegexLiterals,
     method,
     line: line + 1,
     filePath,
     routePath,
+    routePropertyNames: propertyNames(routeOptionsObject),
+    schemaPropertyNames: propertyNames(schemaObject(routeOptionsObject)),
   });
 }
 
@@ -345,7 +412,7 @@ export const fastifySchemaCoverage = defineCheck({
   id: '16f14276-7a70-43bb-8097-181dd277371c',
   slug: 'fastify-schema-coverage',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
 
   confidence: 'high',
   description: 'Validate that Fastify routes have proper request/response schema validation',

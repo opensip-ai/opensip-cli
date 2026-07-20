@@ -14,6 +14,8 @@ import {
   type CheckViolation,
   type FileAccessor,
 } from '@opensip-cli/fitness';
+import { getSharedSourceFile, walkNodes } from '@opensip-cli/lang-typescript';
+import * as ts from 'typescript';
 
 /**
  * Type guard to validate a Map with array values.
@@ -25,48 +27,51 @@ function validateImportMap(value: unknown): value is Map<string, string[]> {
 }
 
 /**
- * Safe regex pattern for extracting named imports (bounded to prevent ReDoS)
- * Pattern is safe because:
- * - Uses bounded negated character class [^'"]{1,500}
- * - Has clear boundaries with quotes
- */
-const NAMED_IMPORT_PATTERN = /from\s+['"]([^'"]{1,500})['"]/g;
-
-/**
- * Safe regex pattern for extracting side-effect imports (`import './foo.js'`)
- * Pattern is safe because:
- * - Uses bounded negated character class [^'"]{1,500}
- * - Has clear boundaries with quotes
- */
-const SIDE_EFFECT_IMPORT_PATTERN = /^import\s+['"]([^'"]{1,500})['"]/gm;
-
-/**
  * Extract import paths from file content
+ * @param filePath - File path used to select the correct parser mode
  * @param content - File content
  * @returns Array of import paths
  */
 // @fitness-ignore-next-line duplicate-implementation-detection -- import extraction is intentionally co-located with each check for isolation; shared utility would couple unrelated checks
-function extractImportPaths(content: string): string[] {
+function extractImportPaths(filePath: string, content: string): string[] {
+  const sourceFile = getSharedSourceFile(filePath, content);
+  if (!sourceFile) return [];
+
   const paths: string[] = [];
-
-  // Match named imports: import { x } from './path'
-  const namedPattern = new RegExp(NAMED_IMPORT_PATTERN.source, 'g');
-  let match;
-  while ((match = namedPattern.exec(content)) !== null) {
-    const importPath = match[1];
-    if (importPath && (importPath.startsWith('.') || importPath.startsWith('@'))) {
+  const addPath = (importPath: string): void => {
+    if (importPath.startsWith('.') || importPath.startsWith('@')) {
       paths.push(importPath);
     }
-  }
+  };
 
-  // Match side-effect imports: import './path'
-  const sideEffectPattern = new RegExp(SIDE_EFFECT_IMPORT_PATTERN.source, 'gm');
-  while ((match = sideEffectPattern.exec(content)) !== null) {
-    const importPath = match[1];
-    if (importPath && (importPath.startsWith('.') || importPath.startsWith('@'))) {
-      paths.push(importPath);
+  walkNodes(sourceFile, (node) => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteralLike(node.moduleSpecifier)
+    ) {
+      addPath(node.moduleSpecifier.text);
+      return;
     }
-  }
+
+    if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteralLike(node.moduleReference.expression)
+    ) {
+      addPath(node.moduleReference.expression.text);
+      return;
+    }
+
+    if (!ts.isCallExpression(node)) return;
+    const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+    const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
+    const argument = node.arguments[0];
+    if ((isDynamicImport || isRequire) && argument && ts.isStringLiteralLike(argument)) {
+      addPath(argument.text);
+    }
+  });
 
   return paths;
 }
@@ -82,7 +87,7 @@ async function buildImportMap(files: FileAccessor): Promise<Map<string, string[]
   for (const fp of files.paths) {
     try {
       const content = await files.read(fp);
-      const importPaths = extractImportPaths(content);
+      const importPaths = extractImportPaths(fp, content);
 
       for (const importPath of importPaths) {
         /* v8 ignore next -- defensive nullish fallback */
@@ -126,7 +131,7 @@ function findImporters(filePath: string, importMap: Map<string, string[]>): stri
     const hasValidImporters = Array.isArray(importerFiles) && importerFiles.length > 0;
 
     if (matchesBasename && hasValidImporters) {
-      importers.push(...importerFiles);
+      for (const importerFile of importerFiles) importers.push(importerFile);
     }
   }
 
@@ -142,7 +147,7 @@ export const testOnlyFrontendModules = defineCheck({
   id: '78a085b3-55c4-42d3-a74c-8dfaad8123f1',
   slug: 'test-only-frontend-modules',
   scope: { languages: ['typescript', 'tsx'], concerns: ['frontend', 'ui'] },
-  contentFilter: 'strip-strings',
+  contentFilter: 'raw',
   confidence: 'medium',
   description: 'Detects frontend code only imported by test files',
   tags: ['quality', 'code-quality', 'maintainability'],
