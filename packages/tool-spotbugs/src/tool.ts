@@ -102,7 +102,11 @@ export function classTargets(projectRoot: string): readonly string[] {
   const found = new Set<string>();
   collectWellKnownClassDirs(projectRoot, found);
   walkNestedClassDirs(projectRoot, found);
-  return [...found].sort();
+  const targets = [...found].sort();
+  return targets.filter(
+    (candidate) =>
+      !targets.some((other) => other !== candidate && candidate.startsWith(`${other}${sep}`)),
+  );
 }
 
 function isDirectory(path: string): boolean {

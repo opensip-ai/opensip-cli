@@ -147,6 +147,26 @@ describe('spotbugs tool — scan-arg builder (requires compiled classes)', () =>
       nested,
     ]);
   });
+
+  it('does not scan a nested Gradle class directory twice through its parent', () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'spotbugs-gradle-'));
+    const classes = join(projectRoot, 'build', 'classes');
+    mkdirSync(join(classes, 'java', 'main'), { recursive: true });
+    const ctx = {
+      projectRoot,
+      artifactPath: (name: string) => `${projectRoot}/.runtime/artifacts/spotbugs/run1/${name}`,
+    } as unknown as AdapterRunContext;
+
+    expect(buildScanArgs(ctx)).toEqual([
+      '-textui',
+      '-effort:max',
+      '-low',
+      '-sarif',
+      '-output',
+      `${projectRoot}/.runtime/artifacts/spotbugs/run1/spotbugs.sarif`,
+      classes,
+    ]);
+  });
 });
 
 describe('spotbugs tool — exit model (SpotBugs bitmask, Phase-0 decision 4)', () => {
