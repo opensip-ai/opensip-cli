@@ -231,7 +231,12 @@ export class RunRepo {
         .select()
         .from(runSteps)
         .where(inArray(runSteps.run_id, chunk))
-        .orderBy(runSteps.run_id, runSteps.ordinal, runSteps.attempt)
+        .orderBy(
+          asc(runSteps.run_id),
+          asc(runSteps.ordinal),
+          asc(runSteps.attempt),
+          asc(runSteps.id),
+        )
         .all();
       for (const row of rows) {
         const step = stepFromRow(row);

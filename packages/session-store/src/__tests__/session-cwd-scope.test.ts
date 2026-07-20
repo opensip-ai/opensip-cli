@@ -1,3 +1,5 @@
+import { join, parse } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { isSessionCwdWithin } from '../session-cwd-scope.js';
@@ -6,6 +8,11 @@ describe('isSessionCwdWithin', () => {
   it('accepts the exact root and nested children', () => {
     expect(isSessionCwdWithin('/repo', '/repo')).toBe(true);
     expect(isSessionCwdWithin('/repo/packages/app', '/repo')).toBe(true);
+  });
+
+  it('accepts descendants when the project root is a filesystem root', () => {
+    const filesystemRoot = parse(process.cwd()).root;
+    expect(isSessionCwdWithin(join(filesystemRoot, 'repo'), filesystemRoot)).toBe(true);
   });
 
   it('rejects sibling-prefix paths', () => {

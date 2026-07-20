@@ -12,5 +12,6 @@ export function isSessionCwdWithin(storedCwd: string, root: string): boolean {
   if (storedCwd.length === 0 || !isAbsolute(storedCwd)) return false;
   const resolvedRoot = resolve(root);
   const resolvedCwd = resolve(storedCwd);
-  return resolvedCwd === resolvedRoot || resolvedCwd.startsWith(`${resolvedRoot}${sep}`);
+  const descendantPrefix = resolvedRoot.endsWith(sep) ? resolvedRoot : `${resolvedRoot}${sep}`;
+  return resolvedCwd === resolvedRoot || resolvedCwd.startsWith(descendantPrefix);
 }

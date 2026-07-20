@@ -771,6 +771,22 @@ describe('RunRepo', () => {
     expect(byRun.get('run-b')?.map((step) => step.id)).toEqual(['b-0', 'b-1']);
   });
 
+  it('uses the same deterministic tie-breaker for batch and single-run step reads', () => {
+    repo.saveRunWithSteps(makeRun({ id: 'run-tied', source: 'reconstructed' }), [
+      makeStep({ id: 'step-z', runId: 'run-tied' }),
+      makeStep({ id: 'step-a', runId: 'run-tied' }),
+    ]);
+
+    const singleRunIds = repo.listStepsForRun('run-tied').map((step) => step.id);
+    const batchIds = repo
+      .listStepsForRuns(['run-tied'])
+      .get('run-tied')
+      ?.map((step) => step.id);
+
+    expect(singleRunIds).toEqual(['step-a', 'step-z']);
+    expect(batchIds).toEqual(singleRunIds);
+  });
+
   it('upserts a step via saveStep without rewriting the parent run', () => {
     repo.saveRun(makeRun());
     const step = makeStep({ id: 'orphan-save', ordinal: 3, logicalStepKey: '3:fit:extra' });
