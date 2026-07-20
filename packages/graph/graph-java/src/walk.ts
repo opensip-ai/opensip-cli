@@ -7,6 +7,8 @@
  *     - `enclosingClass` = immediate enclosing
  *       class/interface/record/enum/annotation_type name.
  *   - `constructor_declaration`                        → 'constructor'
+ *   - `compact_constructor_declaration` in a record    → 'constructor'
+ *   - `annotation_type_element_declaration`            → 'method'
  *   - `lambda_expression`                              → 'arrow'
  *   - one synthetic `<module-init>` per file owning the file's
  *     top-level structure (package, imports, type declarations).
@@ -151,7 +153,11 @@ function walkFile(
     out,
     callSites,
   };
-  const initialFrame: Frame = { ownerHash: moduleInit.bodyHash, enclosingClass: null };
+  const initialFrame: Frame = {
+    ownerHash: moduleInit.bodyHash,
+    enclosingClass: null,
+    inTestScope: inTestFile,
+  };
 
   for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
 }
@@ -159,6 +165,7 @@ function walkFile(
 interface Frame {
   readonly ownerHash: string;
   readonly enclosingClass: string | null;
+  readonly inTestScope: boolean;
 }
 
 interface WalkCtx {
@@ -181,7 +188,15 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
     visitMethodOrConstructor(node, frame, ctx, 'method');
     return;
   }
+  if (node.type === 'annotation_type_element_declaration') {
+    visitMethodOrConstructor(node, frame, ctx, 'method');
+    return;
+  }
   if (node.type === 'constructor_declaration') {
+    visitMethodOrConstructor(node, frame, ctx, 'constructor');
+    return;
+  }
+  if (node.type === 'compact_constructor_declaration') {
     visitMethodOrConstructor(node, frame, ctx, 'constructor');
     return;
   }
@@ -203,7 +218,7 @@ function visitTypeDeclaration(node: Node, frame: Frame, ctx: WalkCtx): void {
   const typeName = nameOf(node) ?? '<anon-type>';
   // Type declarations don't emit a function — their bodies' methods do.
   // Keep the same owner hash but update enclosingClass for children.
-  const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingClass: typeName };
+  const childFrame: Frame = { ...frame, enclosingClass: typeName };
   for (const child of childrenOf(node)) visit(child, childFrame, ctx);
 }
 
@@ -216,7 +231,11 @@ function visitMethodOrConstructor(
   const occ = buildMethodOccurrence(node, frame, ctx, kind);
   if (!occ) return;
   record(ctx.out, occ);
-  const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingClass: null };
+  const childFrame: Frame = {
+    ownerHash: occ.bodyHash,
+    enclosingClass: null,
+    inTestScope: occ.inTestFile,
+  };
   const body = node.childForFieldName('body');
   if (body) {
     for (const child of childrenOf(body)) visit(child, childFrame, ctx);
@@ -225,7 +244,7 @@ function visitMethodOrConstructor(
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- Java lambda and Python lambda-node visitors share adapter bookkeeping but differ by grammar.
 function visitLambda(node: Node, frame: Frame, ctx: WalkCtx): boolean {
-  const occ = buildLambdaOccurrence(node, ctx);
+  const occ = buildLambdaOccurrence(node, frame, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
   if (frame.ownerHash !== occ.bodyHash) {
@@ -239,7 +258,11 @@ function visitLambda(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   }
   const body = node.childForFieldName('body');
   if (body) {
-    visit(body, { ownerHash: occ.bodyHash, enclosingClass: null }, ctx);
+    visit(
+      body,
+      { ownerHash: occ.bodyHash, enclosingClass: null, inTestScope: occ.inTestFile },
+      ctx,
+    );
   }
   return true;
 }
@@ -253,7 +276,7 @@ function buildMethodOccurrence(
   const name = nameOf(node) ?? '<anon-fn>';
   const digest = digestJavaBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const decorators = extractAnnotations(node);
-  const inTest = ctx.fileInTestFile || hasTestAnnotation(decorators);
+  const inTest = frame.inTestScope || ctx.fileInTestFile || hasTestAnnotation(decorators);
   const visibility = classifyVisibility(node);
   const qualifiedBase = packageQualifier(ctx.packageName, ctx.filePathProjectRel);
   const qualifiedName =
@@ -282,7 +305,7 @@ function buildMethodOccurrence(
   };
 }
 
-function buildLambdaOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | null {
+function buildLambdaOccurrence(node: Node, frame: Frame, ctx: WalkCtx): FunctionOccurrence | null {
   const digest = digestJavaBody(ctx.file.source.slice(node.startIndex, node.endIndex));
   const startLine = node.startPosition.row + 1;
   const startCol = node.startPosition.column;
@@ -304,7 +327,7 @@ function buildLambdaOccurrence(node: Node, ctx: WalkCtx): FunctionOccurrence | n
     enclosingClass: null,
     decorators: [],
     visibility: 'private',
-    inTestFile: ctx.fileInTestFile,
+    inTestFile: frame.inTestScope || ctx.fileInTestFile,
     definedInGenerated: ctx.definedInGenerated,
     calls: [],
   };

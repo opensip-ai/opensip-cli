@@ -114,6 +114,29 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
     expect(deps![0].to).toEqual([barInit!.bodyHash]);
   });
 
+  it('decodes comments between tokens in package and import names', () => {
+    writeFile(
+      'com/example/Main.java',
+      `package com./* package comment */example;
+
+import com.example./* import comment */foo.Bar;
+
+class Main { void run(Bar b) {} }
+`,
+    );
+    writeFile('com/example/foo/Bar.java', `package com.example.foo;\n\npublic class Bar {}\n`);
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const mainInit = findModuleInit(catalog, 'com/example/Main.java');
+    const barInit = findModuleInit(catalog, 'com/example/foo/Bar.java');
+
+    expect(mainInit?.qualifiedName).toBe('com.example.<module-init>');
+    expect(dependenciesByOwner?.get(mainInit!.bodyHash)?.[0]).toMatchObject({
+      specifier: 'com.example.foo.Bar',
+      to: [barInit!.bodyHash],
+    });
+  });
+
   it('resolves a wildcard import to every module-init in the package (polymorphic)', () => {
     writeFile(
       'com/example/Main.java',
@@ -135,6 +158,24 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
     expect(deps).toHaveLength(1);
     expect(deps![0].specifier).toBe('com.example.foo.*');
     expect([...deps![0].to].sort()).toEqual([aInit!.bodyHash, bInit!.bodyHash].sort());
+  });
+
+  it('does not resolve wildcard imports to package-info metadata', () => {
+    writeFile(
+      'com/example/Main.java',
+      `package com.example;\n\nimport com.example.foo.*;\n\nclass Main {}\n`,
+    );
+    writeFile('com/example/foo/Bar.java', `package com.example.foo;\n\npublic class Bar {}\n`);
+    writeFile('com/example/foo/package-info.java', `@Deprecated\npackage com.example.foo;\n`);
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const mainInit = findModuleInit(catalog, 'com/example/Main.java');
+    const barInit = findModuleInit(catalog, 'com/example/foo/Bar.java');
+    const packageInfoInit = findModuleInit(catalog, 'com/example/foo/package-info.java');
+    const targets = dependenciesByOwner?.get(mainInit!.bodyHash)?.[0]?.to;
+
+    expect(targets).toEqual([barInit!.bodyHash]);
+    expect(targets).not.toContain(packageInfoInit!.bodyHash);
   });
 
   it('resolves an inner-class import via fall-back to the outer class', () => {
@@ -183,6 +224,35 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
     expect(deps).toHaveLength(1);
     expect(deps![0].specifier).toBe('static com.example.foo.Bar.someMethod');
     expect(deps![0].to).toEqual([barInit!.bodyHash]);
+  });
+
+  it('resolves a static member import from a nested class to the outer source file', () => {
+    writeFile(
+      'com/example/Main.java',
+      `package com.example;
+
+import static com.example.foo.Outer.Inner.someMethod;
+
+class Main {}
+`,
+    );
+    writeFile(
+      'com/example/foo/Outer.java',
+      `package com.example.foo;
+
+public class Outer {
+  public static class Inner {
+    public static void someMethod() {}
+  }
+}
+`,
+    );
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const mainInit = findModuleInit(catalog, 'com/example/Main.java');
+    const outerInit = findModuleInit(catalog, 'com/example/foo/Outer.java');
+
+    expect(dependenciesByOwner?.get(mainInit!.bodyHash)?.[0]?.to).toEqual([outerInit!.bodyHash]);
   });
 
   it('resolves a static wildcard import to the owning class module-init', () => {
@@ -241,6 +311,23 @@ describe('Java adapter — depends_on emission (Phase 4)', () => {
     for (const d of deps!) {
       expect(d.to).toEqual([]);
     }
+  });
+
+  it('resolves a jakarta namespace import when the type is part of the project', () => {
+    writeFile(
+      'com/example/Main.java',
+      `package com.example;\n\nimport jakarta.example.Widget;\n\nclass Main { Widget widget; }\n`,
+    );
+    writeFile(
+      'jakarta/example/Widget.java',
+      `package jakarta.example;\n\npublic class Widget {}\n`,
+    );
+
+    const { catalog, dependenciesByOwner } = runAdapter();
+    const mainInit = findModuleInit(catalog, 'com/example/Main.java');
+    const widgetInit = findModuleInit(catalog, 'jakarta/example/Widget.java');
+
+    expect(dependenciesByOwner?.get(mainInit!.bodyHash)?.[0]?.to).toEqual([widgetInit!.bodyHash]);
   });
 
   it('emits unresolved edges for external third-party imports', () => {

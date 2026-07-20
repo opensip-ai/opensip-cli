@@ -22,6 +22,8 @@
 
 import { namedChildrenOf } from '@opensip-cli/graph-adapter-common';
 
+import { decodeQualifiedIdentifier } from './walk-metadata.js';
+
 import type { JavaParsedFile } from './parse.js';
 import type { DependencySiteRecord } from '@opensip-cli/graph';
 import type { Node } from '@opensip-cli/tree-sitter';
@@ -63,7 +65,7 @@ function decodeImportSpecifier(decl: Node): string | null {
   let wildcard = false;
   for (const c of namedChildrenOf(decl)) {
     if (c.type === 'scoped_identifier' || c.type === 'identifier') {
-      path = c.text;
+      path = decodeQualifiedIdentifier(c);
     } else if (c.type === 'asterisk') {
       wildcard = true;
     }

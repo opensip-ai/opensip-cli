@@ -63,6 +63,27 @@ describe('graph-java walk.ts', () => {
     expect(ctor?.some((o) => o.kind === 'constructor')).toBe(true);
   });
 
+  it('emits a record compact constructor with its derived parameters and owned calls', () => {
+    writeFileSync(
+      join(dir, 'Point.java'),
+      `package x;
+record Point(int x) {
+  Point {
+    validate(x);
+  }
+  private static void validate(int x) {}
+}
+`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const ctor = walk.occurrences.Point?.find((o) => o.kind === 'constructor');
+
+    expect(ctor?.enclosingClass).toBe('Point');
+    expect(ctor?.params.map((p) => p.name)).toEqual(['x']);
+    expect(walk.callSites.some((site) => site.ownerHash === ctor?.bodyHash)).toBe(true);
+  });
+
   it('tracks enclosingClass through interface_declaration', () => {
     writeFileSync(
       join(dir, 'I.java'),
@@ -71,6 +92,38 @@ describe('graph-java walk.ts', () => {
     );
     const walk = run(dir);
     expect(walk.occurrences.m?.[0]?.enclosingClass).toBe('I');
+  });
+
+  it('classifies interface methods without an access modifier as exported', () => {
+    writeFileSync(
+      join(dir, 'I.java'),
+      'package x;\ninterface I { void abstractMethod(); default void defaultMethod() {} }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+
+    expect(walk.occurrences.abstractMethod?.[0]?.visibility).toBe('exported');
+    expect(walk.occurrences.defaultMethod?.[0]?.visibility).toBe('exported');
+  });
+
+  it('emits annotation-interface elements as exported methods', () => {
+    writeFileSync(
+      join(dir, 'Label.java'),
+      'package x;\npublic @interface Label { String value() default "x"; int count(); }\n',
+      'utf8',
+    );
+    const walk = run(dir);
+
+    expect(walk.occurrences.value?.[0]).toMatchObject({
+      kind: 'method',
+      enclosingClass: 'Label',
+      visibility: 'exported',
+    });
+    expect(walk.occurrences.count?.[0]).toMatchObject({
+      kind: 'method',
+      enclosingClass: 'Label',
+      visibility: 'exported',
+    });
   });
 
   it('tracks enclosingClass through record_declaration', () => {
@@ -148,6 +201,44 @@ describe('graph-java walk.ts', () => {
     );
     const walk = run(dir);
     expect(walk.occurrences.annotatedTest?.[0]?.inTestFile).toBe(true);
+  });
+
+  it('recognizes a qualified @Test annotation with comments between name tokens', () => {
+    writeFileSync(
+      join(dir, 'Inline.java'),
+      `package x;
+class Inline {
+  @org.junit./* legal input element */jupiter.api.Test
+  public void annotatedTest() {}
+}
+`,
+      'utf8',
+    );
+    const walk = run(dir);
+
+    expect(walk.occurrences.annotatedTest?.[0]?.inTestFile).toBe(true);
+  });
+
+  it('preserves inline @Test classification for nested lambdas', () => {
+    writeFileSync(
+      join(dir, 'Inline.java'),
+      `package x;
+class Inline {
+  @Test
+  public void annotatedTest() {
+    Runnable callback = () -> helper();
+  }
+  private void helper() {}
+}
+`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const arrow = Object.values(walk.occurrences)
+      .flat()
+      .find((occ) => occ.kind === 'arrow');
+
+    expect(arrow?.inTestFile).toBe(true);
   });
 
   it('preserves regular and text-block string literals when stripping comments', () => {

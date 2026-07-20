@@ -17,8 +17,9 @@
  *        `this` → unresolved (we can't tell which sibling ctor without
  *        argument-arity matching, which is out of scope).
  *
- *   2. Look up matching catalog entries by simple name. Confidence
- *      ladder mirrors graph-python/graph-go:
+ *   2. Look up matching catalog entries by simple name and callable kind:
+ *      method invocations target methods; object creation targets constructors.
+ *      The confidence ladder mirrors graph-python/graph-go:
  *      - 0 matches  → `to: []`, resolution `'unknown'`,    confidence `'low'`
  *      - 1 match    → `to: [hash]`, resolution `'static'`, confidence `'medium'`
  *      - N matches  → `to: [allHashes]`, resolution `'method-dispatch'`,
@@ -34,11 +35,7 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import {
-  buildNameIndex,
-  isReturnValueDiscarded,
-  sameLanguageFileFilter,
-} from '@opensip-cli/graph-adapter-common';
+import { isReturnValueDiscarded, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -46,6 +43,7 @@ import type { JavaParsedFile, JavaParsedProject } from './parse.js';
 import type {
   CallEdge,
   EdgeSink,
+  FunctionOccurrence,
   ResolutionStats,
   ResolveInput,
   ResolveOutput,
@@ -71,7 +69,7 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:java' });
   // Same-language only (see graph-go/resolve.ts): keep cross-language false
   // edges out of the merged exact catalog.
-  const byName = buildNameIndex(input.catalog.functions, sameLanguageFileFilter('java'));
+  const names = buildJavaNameIndexes(input.catalog.functions);
   const edgesByOwner = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
   const sink: EdgeSink = { edgesByOwner, stats };
@@ -84,7 +82,7 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
       pushCreationEdge(javaPosition(node, file), r.ownerHash, r.childHash, sink);
       continue;
     }
-    pushCallEdge(node, file, r.ownerHash, byName, sink);
+    pushCallEdge(node, file, r.ownerHash, names, sink);
   }
 
   const finalStats: ResolutionStats = {
@@ -113,7 +111,7 @@ function pushCallEdge(
   node: Node,
   file: JavaParsedFile,
   ownerHash: string,
-  byName: ReadonlyMap<string, readonly string[]>,
+  names: JavaNameIndexes,
   sink: EdgeSink,
 ): void {
   const { edgesByOwner, stats } = sink;
@@ -122,6 +120,7 @@ function pushCallEdge(
   const pos = javaPosition(node, file);
   const truncated = truncateForCallEdge(pos.text);
   const discarded = isReturnValueDiscarded(node);
+  const byName = node.type === 'object_creation_expression' ? names.constructors : names.methods;
 
   const edge = buildJavaCallEdge(target, byName, {
     line: pos.line,
@@ -131,6 +130,43 @@ function pushCallEdge(
   });
   appendEdge(edgesByOwner, ownerHash, edge);
   stats.apply(edge);
+}
+
+interface JavaNameIndexes {
+  readonly methods: ReadonlyMap<string, readonly string[]>;
+  readonly constructors: ReadonlyMap<string, readonly string[]>;
+}
+
+function buildJavaNameIndexes(
+  functions: Readonly<Record<string, readonly FunctionOccurrence[]>>,
+): JavaNameIndexes {
+  const methods = new Map<string, string[]>();
+  const constructors = new Map<string, string[]>();
+  const keepJavaFile = sameLanguageFileFilter('java');
+  for (const [name, occurrences] of Object.entries(functions)) {
+    if (!occurrences || name.startsWith('<')) continue;
+    for (const occurrence of occurrences) {
+      indexJavaOccurrence(name, occurrence, keepJavaFile, methods, constructors);
+    }
+  }
+  return { methods, constructors };
+}
+
+function indexJavaOccurrence(
+  name: string,
+  occurrence: FunctionOccurrence,
+  keepJavaFile: (filePath: string) => boolean,
+  methods: Map<string, string[]>,
+  constructors: Map<string, string[]>,
+): void {
+  if (!keepJavaFile(occurrence.filePath)) return;
+  let index: Map<string, string[]>;
+  if (occurrence.kind === 'constructor') index = constructors;
+  else if (occurrence.kind === 'method') index = methods;
+  else return;
+  const bucket = index.get(name);
+  if (bucket) bucket.push(occurrence.bodyHash);
+  else index.set(name, [occurrence.bodyHash]);
 }
 
 interface CallEdgeLoc {

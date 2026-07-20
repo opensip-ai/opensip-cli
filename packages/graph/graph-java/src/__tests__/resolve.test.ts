@@ -148,6 +148,32 @@ describe('graph-java resolve.ts', () => {
     expect(edges[0]?.to.length).toBe(1);
   });
 
+  it('does not conflate constructors with same-named methods', () => {
+    writeFileSync(
+      join(dir, 'Foo.java'),
+      `package x;
+class Foo {
+  Foo() {}
+  void Foo() {}
+  void caller() {
+    new Foo();
+    Foo();
+  }
+}
+`,
+      'utf8',
+    );
+    const { walk, resolved } = pipeline(dir);
+    const constructor = walk.occurrences.Foo?.find((occ) => occ.kind === 'constructor');
+    const method = walk.occurrences.Foo?.find((occ) => occ.kind === 'method');
+    const edges = allEdges(resolved);
+    const creation = edges.find((edge) => edge.text.startsWith('new Foo'));
+    const invocation = edges.find((edge) => edge.text === 'Foo()');
+
+    expect(creation?.to).toEqual([constructor!.bodyHash]);
+    expect(invocation?.to).toEqual([method!.bodyHash]);
+  });
+
   it('handles generic types in object_creation_expression (new Box<T>())', () => {
     writeFileSync(
       join(dir, 'G.java'),

@@ -30,6 +30,7 @@ import type {
  *      - `static X.*`  → that type's module-init.
  *      - `static X.m`  → X's module-init (m is a member).
  *      - `X` or `X.Y`  → direct type lookup with one-level outer-class fallback.
+ *      Static imports use the same fallback when X is a nested type.
  *
  * Out of scope: non-default Gradle `sourceSets`, multi-module Maven
  * layouts, and generated-source dirs (`target/generated-sources/...`).
@@ -37,9 +38,9 @@ import type {
  * may produce inflated FQNs that miss the lookup (those imports
  * surface as `to: []`, which is the correct unresolved behavior).
  *
- * Stdlib classes (`java.*`, `javax.*`, `jakarta.*`) are treated as
- * external — they're never in the project catalog so we short-circuit
- * to `to: []` without attempting lookup.
+ * Java Platform classes (`java.*`) are treated as external. `javax.*`
+ * and `jakarta.*` are still looked up because projects may contain source
+ * for those non-reserved namespaces.
  */
 export function resolveDependencies(
   sites: readonly DependencySiteRecord[],
@@ -128,9 +129,12 @@ function indexModuleInitOccurrence(
  *   - `src/com/example/foo/Bar.java`           → `com.example.foo.Bar`
  *   - `com/example/foo/Bar.java`               → `com.example.foo.Bar`
  *   - `Bar.java`                               → `Bar` (default package)
+ *   - `com/example/package-info.java`           → null (package metadata, not a type)
  */
 function filePathToJavaTypeFQN(filePath: string): string | null {
   if (!filePath.endsWith('.java')) /* v8 ignore next */ return null;
+  const fileName = filePath.slice(filePath.lastIndexOf('/') + 1);
+  if (fileName === 'package-info.java' || fileName === 'module-info.java') return null;
   let stripped = filePath;
   for (const prefix of JAVA_SOURCE_ROOT_PREFIXES) {
     if (filePath.startsWith(prefix)) {
@@ -146,8 +150,8 @@ function filePathToJavaTypeFQN(filePath: string): string | null {
  * Resolve one Java import-specifier string to its target module-init
  * bodyHash(es).
  *
- * Stdlib short-circuit: `java.*`, `javax.*`, `jakarta.*` are never in
- * the catalog. The `kotlin.*` and `scala.*` runtimes are similarly
+ * Platform short-circuit: `java.*` is never in the project catalog.
+ * The `kotlin.*` and `scala.*` runtimes are similarly
  * external for Java projects, but we don't special-case them — they
  * fall through to the type-FQN lookup and miss naturally.
  *
@@ -164,8 +168,8 @@ function resolveJavaImportSpecifier(
 ): readonly string[] {
   const { raw, isStatic } = parseStaticPrefix(specifier);
 
-  // Stdlib short-circuit. These never reside in a project catalog.
-  if (isJavaStdlibSpecifier(raw)) return [];
+  // Java Platform short-circuit. These never reside in a project catalog.
+  if (isJavaPlatformSpecifier(raw)) return [];
 
   if (raw.endsWith('.*')) {
     return resolveWildcardImport(raw.slice(0, -'.*'.length), isStatic, typeFQN, packageFQN);
@@ -184,8 +188,8 @@ function parseStaticPrefix(specifier: string): {
   return { raw: specifier, isStatic: false };
 }
 
-function isJavaStdlibSpecifier(raw: string): boolean {
-  return raw.startsWith('java.') || raw.startsWith('javax.') || raw.startsWith('jakarta.');
+function isJavaPlatformSpecifier(raw: string): boolean {
+  return raw.startsWith('java.');
 }
 
 /**
@@ -201,8 +205,7 @@ function resolveWildcardImport(
   packageFQN: ReadonlyMap<string, readonly string[]>,
 ): readonly string[] {
   if (isStatic) {
-    const hash = typeFQN.get(head);
-    return hash === undefined ? [] : [hash];
+    return resolveTypeOrOuter(head, typeFQN);
   }
   const bucket = packageFQN.get(head);
   return bucket === undefined ? [] : [...bucket];
@@ -226,10 +229,13 @@ function resolveSingleTargetImport(
   if (isStatic) {
     const lastDot = raw.lastIndexOf('.');
     if (lastDot === -1) return [];
-    const hash = typeFQN.get(raw.slice(0, lastDot));
-    return hash === undefined ? [] : [hash];
+    return resolveTypeOrOuter(raw.slice(0, lastDot), typeFQN);
   }
 
+  return resolveTypeOrOuter(raw, typeFQN);
+}
+
+function resolveTypeOrOuter(raw: string, typeFQN: ReadonlyMap<string, string>): readonly string[] {
   const direct = typeFQN.get(raw);
   if (direct !== undefined) return [direct];
   const lastDot = raw.lastIndexOf('.');
