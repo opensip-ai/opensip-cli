@@ -20,11 +20,17 @@ export interface LanguageAdapter<TTree = unknown, _TNode = unknown> {
   /** Parse a file's text into the adapter's native tree. Returns null on parse failure. */
   parse(content: string, filePath: string): TTree | null;
 
-  /** Replace string literal content with whitespace of equal length. */
-  stripStrings(content: string): string;
+  /**
+   * Replace string literal content with whitespace of equal length.
+   * The optional path lets adapters select extension-specific grammars.
+   */
+  stripStrings(content: string, filePath?: string): string;
 
-  /** Replace both string literals AND comments with whitespace of equal length. */
-  stripComments(content: string): string;
+  /**
+   * Replace both string literals AND comments with whitespace of equal length.
+   * The optional path lets adapters select extension-specific grammars.
+   */
+  stripComments(content: string, filePath?: string): string;
 
   /**
    * Optional workspace discovery. When implemented, returns the units

@@ -10,6 +10,8 @@ import { logger, currentScope } from '@opensip-cli/core';
 import { buildLineStarts } from '@opensip-cli/core/languages';
 import ts from 'typescript';
 
+import { parseSource, scriptKindForFilePath } from './parse.js';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -27,6 +29,16 @@ export interface FilteredContent {
    * a doc string).
    */
   readonly codeNoComments: string;
+  /**
+   * Content with string contents, comments, and regular-expression bodies
+   * replaced by whitespace of equal length. This is an opt-in view for checks
+   * that pattern-match executable identifiers: text inside `/.../` is data,
+   * even though regular expressions are otherwise valid code expressions.
+   *
+   * `code` and `codeNoComments` intentionally continue to preserve regular
+   * expressions for checks that inspect regex syntax.
+   */
+  readonly codeNoCommentsOrRegexLiterals: string;
   /** Original content (unchanged) */
   readonly raw: string;
   /** Set of line numbers (1-based) that are entirely inside comments */
@@ -41,6 +53,11 @@ export interface FilteredContent {
 interface Region {
   readonly start: number;
   readonly end: number;
+}
+
+interface RegularExpressionRegion extends Region {
+  readonly bodyStart: number;
+  readonly bodyEnd: number;
 }
 
 // =============================================================================
@@ -122,6 +139,56 @@ function replaceCharsInRange(
   }
 }
 
+/**
+ * Mask regular-expression bodies using parser-classified literal nodes.
+ *
+ * Slash-token heuristics cannot distinguish every context-sensitive regular
+ * expression from division (for example, a regex statement after an `if`
+ * condition). The TypeScript parser already makes that distinction, so this
+ * opt-in view derives its spans from the AST instead.
+ */
+function findRegularExpressionRegions(
+  content: string,
+  filePath: string,
+): readonly RegularExpressionRegion[] {
+  const sourceFile = parseSource(content, filePath);
+  if (!sourceFile) return [];
+
+  const regions: RegularExpressionRegion[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isRegularExpressionLiteral(node)) {
+      const start = node.getStart(sourceFile);
+      const literalText = node.getText(sourceFile);
+      const closingSlash = literalText.lastIndexOf('/');
+      if (closingSlash > 0) {
+        regions.push({
+          start,
+          end: node.end,
+          bodyStart: start + 1,
+          bodyEnd: start + closingSlash,
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return regions;
+}
+
+function maskRegularExpressionBodies(
+  codeNoComments: string,
+  regions: readonly RegularExpressionRegion[],
+): string {
+  const chars = codeNoComments.split('');
+  for (const region of regions) {
+    for (let index = region.bodyStart; index < region.bodyEnd; index++) {
+      if (chars[index] !== '\n') chars[index] = ' ';
+    }
+  }
+  return chars.join('');
+}
+
 // =============================================================================
 // MAIN
 // =============================================================================
@@ -156,17 +223,24 @@ function replaceCharsInRange(
 // fallback, not a hot-path concern, because production paths always
 // run inside a scope established by the CLI's pre-action-hook.
 
-/** Strips TS comments and string literals; result is cached per-content on the active scope. */
-export function filterContent(content: string): FilteredContent {
+/**
+ * Strip TypeScript comments and string literals.
+ *
+ * Supplying `filePath` selects the exact TS/TSX/JS/JSX grammar. Callers that
+ * only have a fragment retain the historical permissive TSX default.
+ */
+export function filterContent(content: string, filePath = 'filtered-content.tsx'): FilteredContent {
   const scope = currentScope();
+  const scriptKind = scriptKindForFilePath(filePath);
+  const cacheKey = `${scriptKind}\0${content}`;
   if (scope) {
-    const cached = scope.parseCache.filteredContent.get(content) as FilteredContent | undefined;
+    const cached = scope.parseCache.filteredContent.get(cacheKey) as FilteredContent | undefined;
     if (cached) return cached;
   }
 
   try {
-    const result = filterContentImpl(content);
-    if (scope) scope.parseCache.filteredContent.set(content, result);
+    const result = filterContentImpl(content, filePath, scriptKind);
+    if (scope) scope.parseCache.filteredContent.set(cacheKey, result);
     return result;
     /* v8 ignore start -- defensive: TypeScript scanner is robust and recovers from malformed input rather than throwing; this fallback exists for theoretical scanner exceptions */
   } catch {
@@ -201,12 +275,13 @@ export function filterContent(content: string): FilteredContent {
     const fallback: FilteredContent = {
       code: content,
       codeNoComments: content,
+      codeNoCommentsOrRegexLiterals: content,
       raw: content,
       commentLines: new Set(),
       isInString: () => false,
       isInComment: () => false,
     };
-    if (scope) scope.parseCache.filteredContent.set(content, fallback);
+    if (scope) scope.parseCache.filteredContent.set(cacheKey, fallback);
     return fallback;
   }
   /* v8 ignore stop */
@@ -260,11 +335,18 @@ function canStartRegExpLiteral(prev: ts.SyntaxKind | undefined): boolean {
 }
 
 // eslint-disable-next-line sonarjs/cognitive-complexity -- TS scanner driver: token-by-token loop with per-kind handling; flatter shape would scatter token classification
-function filterContentImpl(content: string): FilteredContent {
-  // JSX variant so `</div>` closing tags are not re-scanned as regex openers
-  // (Standard + reScanSlashToken treats `LessThan` + `/` as regex start and can
-  // desync on same-line `http://` / string quotes). Matches TSX ScriptKind.
-  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, content);
+function filterContentImpl(
+  content: string,
+  filePath: string,
+  scriptKind: ts.ScriptKind,
+): FilteredContent {
+  const languageVariant =
+    scriptKind === ts.ScriptKind.TSX || scriptKind === ts.ScriptKind.JSX
+      ? ts.LanguageVariant.JSX
+      : ts.LanguageVariant.Standard;
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, languageVariant, content);
+  const regularExpressionRegions = findRegularExpressionRegions(content, filePath);
+  const regularExpressionStarts = new Set(regularExpressionRegions.map((region) => region.start));
 
   const stringRegions: Region[] = [];
   const commentRegions: Region[] = [];
@@ -301,7 +383,11 @@ function filterContentImpl(content: string): FilteredContent {
 
     // Bare scanner emits SlashToken for `/`; only reScanSlashToken yields regex.
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
-    if (token === ts.SyntaxKind.SlashToken && canStartRegExpLiteral(prevSignificant)) {
+    if (
+      token === ts.SyntaxKind.SlashToken &&
+      (regularExpressionStarts.has(scanner.getTokenStart()) ||
+        canStartRegExpLiteral(prevSignificant))
+    ) {
       token = scanner.reScanSlashToken();
     }
 
@@ -378,10 +464,18 @@ function filterContentImpl(content: string): FilteredContent {
     }
   }
   const codeNoComments = charsNoComments.join('');
+  let codeNoCommentsOrRegexLiterals: string | undefined;
 
   return {
     code,
     codeNoComments,
+    get codeNoCommentsOrRegexLiterals() {
+      codeNoCommentsOrRegexLiterals ??= maskRegularExpressionBodies(
+        codeNoComments,
+        regularExpressionRegions,
+      );
+      return codeNoCommentsOrRegexLiterals;
+    },
     raw: content,
     commentLines,
     isInString: (line, column) => isInRegions(content, stringRegions, line, column),

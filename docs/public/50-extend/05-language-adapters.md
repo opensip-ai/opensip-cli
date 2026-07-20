@@ -65,8 +65,8 @@ interface LanguageAdapter<TTree = unknown, _TNode = unknown> {
   readonly aliases?: readonly string[];                // ['c'] → canonicalized to this id
 
   parse(content: string, filePath: string): TTree | null;
-  stripStrings(content: string): string;
-  stripComments(content: string): string;
+  stripStrings(content: string, filePath?: string): string;
+  stripComments(content: string, filePath?: string): string;
 
   discoverWorkspaceUnits?(rootDir: string): Promise<readonly WorkspaceUnit[]>;
 }
@@ -88,13 +88,19 @@ The two filter operations are the spine of the content-filter system. Both must:
 
 The names describe what's left, not what's stripped: `stripStrings` removes strings (comments preserved), `stripComments` removes both strings *and* comments. The asymmetry is intentional: a check that reads comment-based directives (e.g. `// @fitness-ignore-next-line`) wants strings stripped but comments kept, while a check that scans for identifier patterns (e.g. `console.log`) wants both stripped.
 
+The dispatcher passes the source `filePath` to both operations. The parameter is
+optional for adapter compatibility, but adapters whose grammar varies by
+extension should use it. For example, the TypeScript adapter selects TS, TSX,
+JS, or JSX parsing from the path so a valid `.ts` angle-bracket assertion is
+not interpreted as JSX while filtering.
+
 The framework's content-filter dispatcher ([`packages/core/src/languages/content-filter-dispatch.ts`](../../../packages/core/src/languages/content-filter-dispatch.ts)) maps the check's `contentFilter` setting to one of these:
 
 | Check declares | Adapter call |
 |---|---|
 | `contentFilter: 'raw'` (default) | none — pass through |
-| `contentFilter: 'strip-strings'` | `adapter.stripStrings(content)` |
-| `contentFilter: 'strip-strings-and-comments'` | `adapter.stripComments(content)` |
+| `contentFilter: 'strip-strings'` | `adapter.stripStrings(content, filePath)` |
+| `contentFilter: 'strip-strings-and-comments'` | `adapter.stripComments(content, filePath)` |
 
 If no adapter is registered for the file's extension, the framework falls back to passing content through unchanged — a fail-safe that matches "raw" mode rather than crashing the check.
 

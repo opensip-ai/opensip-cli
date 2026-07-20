@@ -20,13 +20,13 @@ import { filterContent } from './filter.js';
  * Replace string literal content with whitespace of equal length.
  * Quote/backtick delimiters are preserved; only the inside is blanked.
  */
-export function stripStrings(content: string): string {
-  return filterContent(content).code;
+export function stripStrings(content: string, filePath?: string): string {
+  return filterContent(content, filePath).code;
 }
 
 /**
  * Replace string literals AND comments with whitespace of equal length.
  */
-export function stripComments(content: string): string {
-  return filterContent(content).codeNoComments;
+export function stripComments(content: string, filePath?: string): string {
+  return filterContent(content, filePath).codeNoComments;
 }

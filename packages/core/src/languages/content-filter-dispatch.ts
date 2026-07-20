@@ -87,5 +87,7 @@ export function applyContentFilter(
     // expected here, so this path stays silent.
     return content;
   }
-  return mode === 'strip-strings' ? adapter.stripStrings(content) : adapter.stripComments(content);
+  return mode === 'strip-strings'
+    ? adapter.stripStrings(content, filePath)
+    : adapter.stripComments(content, filePath);
 }

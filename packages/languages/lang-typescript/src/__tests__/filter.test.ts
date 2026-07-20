@@ -190,6 +190,17 @@ describe('filterContent', () => {
       // No scope -> no shared cache -> each call returns a fresh instance.
       expect(second).not.toBe(first);
     });
+
+    it('keeps parser modes distinct for identical .ts and .tsx content', () => {
+      const scope = new RunScope();
+      runWithScopeSync(scope, () => {
+        const src = 'const value = <Result>input;';
+        const typescript = filterContent(src, 'value.ts');
+        const typescriptReact = filterContent(src, 'value.tsx');
+
+        expect(typescriptReact).not.toBe(typescript);
+      });
+    });
   });
 
   describe('template middle (multi-substitution)', () => {
@@ -229,6 +240,51 @@ describe('filterContent', () => {
         'const number = 10; const x = number / 2; const url = "http://example.com"; const after = 1;';
       const { code } = filterContent(src);
       expect(code).toContain('const after = 1');
+    });
+  });
+
+  describe('codeNoCommentsOrRegexLiterals — opt-in regex masking', () => {
+    it('masks regex bodies without changing existing filtered views', () => {
+      const src = 'const pattern = /logger\\.error\\(err\\)/gi; const after = logger.error(err);';
+      const filtered = filterContent(src);
+
+      expect(filtered.code).toContain('/logger\\.error\\(err\\)/gi');
+      expect(filtered.codeNoComments).toContain('/logger\\.error\\(err\\)/gi');
+      expect(filtered.codeNoCommentsOrRegexLiterals).not.toContain('logger\\.error\\(err\\)');
+      expect(filtered.codeNoCommentsOrRegexLiterals).toContain('logger.error(err)');
+      expect(filtered.codeNoCommentsOrRegexLiterals).toHaveLength(src.length);
+    });
+
+    it('uses parser context to mask a regex statement after a control-flow condition', () => {
+      const src = 'if (ready) /ResultSchema\\.parse\\(value\\)/.test(input);';
+      const { codeNoCommentsOrRegexLiterals } = filterContent(src);
+
+      expect(codeNoCommentsOrRegexLiterals).not.toContain('ResultSchema');
+      expect(codeNoCommentsOrRegexLiterals).toContain('.test(input)');
+    });
+
+    it('preserves division expressions', () => {
+      const src = 'const ratio = total / count;';
+      const { codeNoCommentsOrRegexLiterals } = filterContent(src);
+
+      expect(codeNoCommentsOrRegexLiterals).toBe(src);
+    });
+
+    it('preserves code after a quoted regex following a control-flow condition', () => {
+      const src = `if (ready) /["']/.test(value); const hash = <unknown>crypto.createHash("sha256");`;
+      const { codeNoCommentsOrRegexLiterals } = filterContent(src, 'handler.ts');
+
+      expect(codeNoCommentsOrRegexLiterals).not.toContain(`["']`);
+      expect(codeNoCommentsOrRegexLiterals).toContain('crypto.createHash');
+      expect(codeNoCommentsOrRegexLiterals).toHaveLength(src.length);
+    });
+
+    it('preserves TSX code after a regex inside a JSX expression', () => {
+      const src = `const view = <div>{/["']/.test(value)}</div>; const after = logger.error(err);`;
+      const { codeNoCommentsOrRegexLiterals } = filterContent(src, 'view.tsx');
+
+      expect(codeNoCommentsOrRegexLiterals).not.toContain(`["']`);
+      expect(codeNoCommentsOrRegexLiterals).toContain('logger.error(err)');
     });
   });
 });

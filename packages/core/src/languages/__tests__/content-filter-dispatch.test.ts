@@ -58,6 +58,26 @@ describe('applyContentFilter', () => {
     ).toBe('const x = 1 \nconst y = 2');
   });
 
+  it('passes the source path to extension-sensitive adapter filters', () => {
+    const stripStrings = vi.fn((content: string) => content);
+    const stripComments = vi.fn((content: string) => content);
+    const registry = new LanguageRegistry();
+    registry.register({
+      ...fakeAdapter,
+      stripStrings,
+      stripComments,
+    });
+    const pathAwareScope = new RunScope({ languages: registry });
+
+    runWithScopeSync(pathAwareScope, () => {
+      applyContentFilter('nested/source.fake', 'const value = 1', 'strip-strings');
+      applyContentFilter('nested/source.fake', 'const value = 1', 'strip-strings-and-comments');
+    });
+
+    expect(stripStrings).toHaveBeenCalledWith('const value = 1', 'nested/source.fake');
+    expect(stripComments).toHaveBeenCalledWith('const value = 1', 'nested/source.fake');
+  });
+
   it('returns raw content when no adapter matches the extension', () => {
     const text = 'const x = "hi"';
     expect(inScope(() => applyContentFilter('a.unknown', text, 'strip-strings'))).toBe(text);

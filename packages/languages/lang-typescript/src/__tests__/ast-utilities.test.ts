@@ -35,6 +35,33 @@ describe('parseSource', () => {
     expect(parse('const x = 1;')).not.toBeNull();
   });
 
+  it('uses the TypeScript grammar for angle-bracket assertions in .ts files', () => {
+    const sourceFile = parseSource('const value = <Result>input;', 'x.ts');
+    if (!sourceFile) throw new Error('parse failed');
+
+    let typeAssertions = 0;
+    let jsxElements = 0;
+    walkNodes(sourceFile, (node) => {
+      if (ts.isTypeAssertionExpression(node)) typeAssertions++;
+      if (ts.isJsxElement(node)) jsxElements++;
+    });
+
+    expect(typeAssertions).toBe(1);
+    expect(jsxElements).toBe(0);
+  });
+
+  it('continues to use the JSX grammar for .tsx files', () => {
+    const sourceFile = parseSource('const view = <Result>{input}</Result>;', 'x.tsx');
+    if (!sourceFile) throw new Error('parse failed');
+
+    let jsxElements = 0;
+    walkNodes(sourceFile, (node) => {
+      if (ts.isJsxElement(node)) jsxElements++;
+    });
+
+    expect(jsxElements).toBe(1);
+  });
+
   it('returns null on parse failure', () => {
     // Note: TS parser is permissive — try with a sentinel call that throws.
     // Most invalid syntax still produces a tree; instead exercise the catch
