@@ -45,14 +45,20 @@ import type { McpToolDeps } from '../types.js';
 
 type Handler = (...args: unknown[]) => CallToolResult | Promise<CallToolResult>;
 
-function captureServer(): { handlers: Map<string, Handler>; server: McpStdioServer } {
+function captureServer(): {
+  configs: Map<string, unknown>;
+  handlers: Map<string, Handler>;
+  server: McpStdioServer;
+} {
+  const configs = new Map<string, unknown>();
   const handlers = new Map<string, Handler>();
   const server = {
-    register: (name: string, _config: unknown, cb: Handler) => {
+    register: (name: string, config: unknown, cb: Handler) => {
+      configs.set(name, config);
       handlers.set(name, cb);
     },
   } as unknown as McpStdioServer;
-  return { handlers, server };
+  return { configs, handlers, server };
 }
 
 function parseResult(result: CallToolResult): { isError: boolean; body: Record<string, unknown> } {
@@ -854,6 +860,38 @@ describe('graph handlers (async GraphToolResult)', () => {
       proofLimit: 0,
       filter: expect.objectContaining({ packages: ['pkg-a'] }),
     });
+  });
+
+  it('defaults why_depends to combined call and import evidence', async () => {
+    let captured: unknown;
+    const graph = fakePort({
+      whyDepends: (query) => {
+        captured = query;
+        return Promise.resolve(
+          ok(
+            wrap({
+              edgeKind: query.edgeKind ?? 'combined',
+              calls: [],
+              imports: [],
+              totalMatchingEvidence: 0,
+            }),
+          ),
+        );
+      },
+    });
+    const { configs, handlers, server } = captureServer();
+    registerWhyDepends(server, deps(graph));
+    const config = configs.get('why_depends') as {
+      inputSchema: { parse: (value: unknown) => unknown };
+    };
+    const args = config.inputSchema.parse({
+      fromPackage: 'pkg-a',
+      toPackage: 'pkg-b',
+    });
+
+    await handlers.get('why_depends')!(args);
+
+    expect(captured).toMatchObject({ edgeKind: 'combined' });
   });
 
   it('maps port errors through errorResult', async () => {

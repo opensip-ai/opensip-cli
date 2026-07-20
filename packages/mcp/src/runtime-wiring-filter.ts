@@ -18,10 +18,10 @@ function addAdjacent(adjacency: Map<string, string[]>, from: string, to: string)
 }
 
 function nestedCommandClosure(
-  nodes: readonly RuntimeWiringNode[],
+  seeds: ReadonlySet<string>,
   edges: readonly RuntimeWiringEdge[],
 ): Set<string> {
-  const commands = new Set(nodes.map((node) => node.id));
+  const commands = new Set(seeds);
   const queue = [...commands];
   const nested = new Map<string, string[]>();
   for (const edge of edges) {
@@ -97,8 +97,24 @@ function relatedNodeIds(
   nodes: readonly RuntimeWiringNode[],
   edges: readonly RuntimeWiringEdge[],
 ): Set<string> {
-  const commands = nestedCommandClosure(nodes, edges);
-  const selected = new Set(commands);
+  const selected = new Set(nodes.map((node) => node.id));
+  const commandSeeds = new Set(
+    nodes
+      .filter((node) => node.kind === 'command' || node.kind === 'command-group')
+      .map((node) => node.id),
+  );
+  for (const edge of edges) {
+    if (edge.kind === 'command-dispatches-handler' && selected.has(edge.to)) {
+      selected.add(edge.from);
+    }
+  }
+  for (const edge of edges) {
+    if (edge.kind === 'host-mounts-command' && selected.has(edge.to)) {
+      commandSeeds.add(edge.from);
+    }
+  }
+  const commands = nestedCommandClosure(commandSeeds, edges);
+  for (const command of commands) selected.add(command);
   const tools = addCommandAttachments(commands, edges, selected);
   const provenance = addAdmissions(tools, edges, selected);
   addWorkerPosture(provenance, edges, selected);

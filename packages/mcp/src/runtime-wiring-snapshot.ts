@@ -1,6 +1,8 @@
 // @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /** Command/tool graph assembly for immutable live runtime-wiring snapshots. */
 
+import { isAbsolute, relative, resolve, sep } from 'node:path';
+
 import {
   EMPTY_RUNTIME_COMMAND_INVENTORY,
   ephemeralProjectCacheKey,
@@ -55,11 +57,13 @@ export interface RuntimeWiringSnapshot {
 
 function projectRelativeConfigPath(projectRoot: string, configPath: string): string {
   if (/\p{Cc}/u.test(configPath)) return '<invalid-config-path>';
-  // Keep as project-relative claim; never invent absolute paths in the response.
-  if (configPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(configPath)) {
-    return 'opensip-cli.config.yml';
+  const root = resolve(projectRoot);
+  const absolute = resolve(root, configPath);
+  const value = relative(root, absolute);
+  if (value === '..' || value.startsWith(`..${sep}`) || isAbsolute(value)) {
+    return '<outside-project>';
   }
-  return configPath.replaceAll('\\', '/');
+  return (value || '.').split(sep).join('/');
 }
 
 function inventoryIdentityPayload(inventory: RuntimeCommandInventory): unknown {
@@ -437,8 +441,9 @@ export function buildRuntimeWiringSnapshot(deps: LiveRuntimeWiringDeps): Runtime
   const snapshotKey = `w1:${digestCanonicalIdentity({
     version: 1,
     inventory: inventoryIdentityPayload(inventory),
-    nodes: nodes.map((n) => n.id),
-    edges: edges.map((e) => `${e.from}|${e.kind}|${e.to}|${e.source}`),
+    identityBindings: identityIndex.bindings,
+    nodes,
+    edges,
   })}`;
   const truncated = state.nodeTruncated || state.edgeTruncated || state.factTruncated;
   const reasons = [...state.reasons].sort();

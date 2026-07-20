@@ -316,8 +316,9 @@ export const traversalIdentity = () =>
 /** Symbol search match mode. */
 export const searchMatch = () => z.enum(['substring', 'exact', 'qualified']).default('substring');
 
-/** Package edge kind. */
-export const packageEdgeKind = () => z.enum(['call', 'import', 'combined']).default('call');
+/** Package edge kind, with a tool-specific default. */
+export const packageEdgeKind = (defaultKind: 'call' | 'import' | 'combined' = 'call') =>
+  z.enum(['call', 'import', 'combined']).default(defaultKind);
 
 /** Architecture section family selector (unique, non-empty). Default metrics-only. */
 export const architectureSections = () =>

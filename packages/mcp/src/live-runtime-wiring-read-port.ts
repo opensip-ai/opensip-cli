@@ -102,6 +102,12 @@ function summarizeBridges(edges: RuntimeWiringResult['edges']): {
   return { resolvedBridgeCount, unresolvedBridgeCount };
 }
 
+function hasUnresolvedDispatch(edges: RuntimeWiringResult['edges']): boolean {
+  return edges.some(
+    (edge) => edge.kind === 'command-dispatches-handler' && edge.staticBridge !== 'resolved',
+  );
+}
+
 function summarize(
   nodes: RuntimeWiringResult['nodes'],
   edges: RuntimeWiringResult['edges'],
@@ -215,7 +221,11 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
     }
     const { refs, pathByKey } = collectHandlerRefs(this.snapshot);
     if (refs.length === 0) {
-      return { nodes, edges, staticBridgeComplete: true };
+      return {
+        nodes,
+        edges,
+        staticBridgeComplete: !hasUnresolvedDispatch(edges),
+      };
     }
     const batch = await this.resolveStaticHandlers(this.snapshot.snapshotKey, refs);
     const byPath = mapOutcomesByPath(batch.outcomes, pathByKey, this.snapshot);
@@ -223,7 +233,8 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
     return {
       nodes: overlaid.nodes,
       edges: overlaid.edges,
-      staticBridgeComplete: batch.catalogStatus === 'loaded' && overlaid.unresolvedCount === 0,
+      staticBridgeComplete:
+        batch.catalogStatus === 'loaded' && !hasUnresolvedDispatch(overlaid.edges),
     };
   }
 
@@ -293,12 +304,29 @@ export class LiveRuntimeWiringReadPort implements RuntimeWiringReadPort {
 
       if (detail === 'groups') {
         const grouped = groupRuntimeNodes(filtered.nodes, groupBy);
+        const page = pageRows(
+          grouped.groups ?? [],
+          {
+            projectKey: this.snapshot.projectKey,
+            generationKey: this.snapshot.snapshotKey,
+            queryDigest,
+            limit,
+            cursor: input.cursor,
+          },
+          (group) => group.key,
+        );
+        if (!page.ok) return page;
         return ok({
           context,
           nodes: [],
           edges: [],
-          page: { limit, hasMore: false, edgeTruncated: false },
-          groups: grouped.groups,
+          page: {
+            limit,
+            hasMore: page.value.hasMore,
+            nextCursor: page.value.nextCursor,
+            edgeTruncated: false,
+          },
+          groups: page.value.rows,
           groupTruncated: grouped.groupTruncated,
           coverage: {
             ...coverageBase,

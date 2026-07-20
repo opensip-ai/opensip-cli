@@ -473,6 +473,41 @@ describe('SqliteGraphReadPort (async cutover)', () => {
     expect(stale.ok && stale.value.pointer.id).toBe('g1:recorded-older-generation');
   });
 
+  it('excludes synthetic module-init spans when resolving a declared symbol by location', async () => {
+    const callable = fnOcc({
+      bodyHash: 'h-callable',
+      simpleName: 'callable',
+      filePath: 'src/module.ts',
+      line: 10,
+      column: 2,
+      endLine: 20,
+    });
+    const moduleInit = fnOcc({
+      bodyHash: 'h-module-init',
+      simpleName: '<module-init:src/module.ts>',
+      qualifiedName: 'src/module.<module-init>',
+      filePath: 'src/module.ts',
+      line: 1,
+      column: 0,
+      endLine: 100,
+      kind: 'module-init',
+    });
+    new CatalogRepo(store).replaceAll({
+      ...seededCatalog(),
+      functions: { callable: [callable], moduleInit: [moduleInit] },
+    });
+    const port = makePort(store);
+
+    const result = await port.symbolAtLocation('src/module.ts', 10, 'entity');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.data).toMatchObject({
+      candidates: [{ symbolId: 'src/module.ts:10:2', qualifiedName: 'callable' }],
+      entity: { symbol: { symbolId: 'src/module.ts:10:2', qualifiedName: 'callable' } },
+    });
+  });
+
   it('propagates impact cancellation after bounded index work has started', async () => {
     new CatalogRepo(store).replaceAll(wideCatalog(12_000));
     const port = makePort(store);

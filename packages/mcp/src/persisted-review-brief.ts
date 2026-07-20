@@ -51,6 +51,10 @@ export function buildPersistedReviewBrief(
 ): PersistedReviewBriefResult {
   const riskLimit = input.limit ?? DEFAULT_REVIEW_BRIEF_RISK_LIMIT;
   const degradationLimit = DEFAULT_REVIEW_BRIEF_DEGRADATION_LIMIT;
+  const focusedFiles =
+    input.files === undefined
+      ? undefined
+      : [...new Set(input.files.map((file) => file.replaceAll('\\', '/')))];
   const orderedSteps = orderSteps(input.steps);
   const collected = collectRisks({
     suiteRunId: input.suiteRunId,
@@ -58,7 +62,7 @@ export function buildPersistedReviewBrief(
     degradationLimit,
   });
   const sortedRisks = [...collected.risks].sort(compareReviewBriefRisks);
-  const focusedRisks = focusRisks(sortedRisks, input.files);
+  const focusedRisks = focusRisks(sortedRisks, focusedFiles);
   const correlatedRisks = buildReviewBriefCorrelations(focusedRisks);
   const unavailableBaseline = collected.baselineStates.length === 0 && sortedRisks.length > 0;
   const degraded = [...collected.reviewDegraded];
@@ -82,7 +86,7 @@ export function buildPersistedReviewBrief(
     suite: input.suiteName ?? input.suiteRunId,
     suiteRunId: input.suiteRunId,
     verdict,
-    changedFiles: input.files?.length ?? null,
+    changedFiles: focusedFiles?.length ?? null,
     topRisks: focusedRisks.slice(0, riskLimit),
     newFindings: focusedRisks.filter((risk) => risk.isNew).slice(0, riskLimit),
     baselineDelta: buildReviewBriefBaselineDelta(sortedRisks, collected.baselineStates),

@@ -101,6 +101,16 @@ describe('buildPersistedReviewBrief', () => {
     expect(result.degraded).toBeUndefined();
   });
 
+  it('counts normalized focused files once', () => {
+    const result = buildPersistedReviewBrief({
+      suiteRunId: 'suite-1',
+      files: ['src\\a.ts', 'src/a.ts'],
+      steps: [{ session: session('only'), replay: replay() }],
+    });
+
+    expect(result.reviewBrief.changedFiles).toBe(1);
+  });
+
   it('records replay errors, missing envelopes, missing fingerprints, and failing empty verdicts', () => {
     const result = buildPersistedReviewBrief({
       suiteRunId: 'suite-2',

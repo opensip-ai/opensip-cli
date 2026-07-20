@@ -167,6 +167,23 @@ function codebase(identity = INVENTORY_ID): CodebaseReadPort {
   } as unknown as CodebaseReadPort;
 }
 
+function partiallyVerifiedCodebase(): CodebaseReadPort {
+  return {
+    inventoryStatus: () =>
+      Promise.resolve(
+        ok({
+          identity: INVENTORY_ID,
+          freshness: {
+            fresh: false,
+            capturedAt: '2026-07-13T00:00:00.000Z',
+            verification: 'partial',
+            reasonCodes: ['file-cap'],
+          },
+        } as never),
+      ),
+  } as unknown as CodebaseReadPort;
+}
+
 function failingCodebase(): CodebaseReadPort {
   return {
     inventoryStatus: () =>
@@ -412,6 +429,35 @@ describe('SqliteContextReadPort', () => {
     });
     expect(result.value.reasonCodes).toContain('inventory-snapshot-not-current');
     expect(JSON.stringify(result.value)).not.toContain(replacement);
+  });
+
+  it('marks an exact inventory pointer stale when current freshness verification is partial', async () => {
+    seed(CONTEXT_RUN_ID, root, true);
+    const contextPointerStatus = vi.fn((pointer: TaskContextSnapshotPointer) =>
+      Promise.resolve(ok({ pointer, status: 'available' as const, reasonCodes: [] })),
+    );
+    const port = new SqliteContextReadPort({
+      store,
+      projectRoot: root,
+      graph: { contextPointerStatus } as unknown as GraphReadPort,
+      codebase: partiallyVerifiedCodebase(),
+    });
+
+    const result = await port.contextStatus({ runId: CONTEXT_RUN_ID });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.pointers).toContainEqual({
+      pointer: {
+        owner: 'graph',
+        kind: 'inventory',
+        id: INVENTORY_ID,
+        schemaVersion: 1,
+      },
+      status: 'stale',
+      reasonCodes: ['inventory-freshness-incomplete'],
+    });
+    expect(result.value.reasonCodes).toContain('inventory-freshness-incomplete');
   });
 
   it('qualifies an inventory freshness read failure instead of failing exact Run replay', async () => {

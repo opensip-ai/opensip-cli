@@ -46,6 +46,7 @@ function projectSpanOccurrence(
   selected: SymbolRef[],
   state: { malformed: boolean },
 ): number {
+  if (occurrence.kind === 'module-init') return 0;
   if (occurrence.filePath !== file || occurrence.line > line || line > occurrence.endLine) return 0;
   const ref = toSymbolRef(occurrence);
   if (ref === undefined) {

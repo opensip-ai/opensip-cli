@@ -198,6 +198,11 @@ async function verifyCurrentInventory(
   }
   if (current.value.freshness.verification === 'missing') {
     reasons.push('inventory-freshness-unavailable');
+  } else if (
+    current.value.freshness.verification !== 'complete' ||
+    !current.value.freshness.fresh
+  ) {
+    reasons.push('inventory-freshness-incomplete');
   }
   if (reasons.length === 0) return ok(statuses);
 

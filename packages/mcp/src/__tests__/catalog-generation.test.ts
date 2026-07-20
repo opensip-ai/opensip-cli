@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { err, ok } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
+import { CatalogFreshnessController } from '../catalog-freshness-controller.js';
 import {
   catalogGenerationKey,
   createGeneration,
@@ -301,6 +302,33 @@ function harness(initial = catalog('01')) {
     },
   };
 }
+
+describe('CatalogFreshnessController', () => {
+  it('does not reuse a cache entry timestamped in the future after clock rollback', async () => {
+    const generation = createGeneration(catalog('01'), 'initial-load');
+    const verify = vi.fn(() => Promise.resolve(ok(FRESH)));
+    const controller = new CatalogFreshnessController({
+      projectRoot: '/project',
+      adapters: {
+        size: 0,
+        getAll: () => [],
+        getById: () => undefined,
+      },
+      verify,
+      isCurrentGeneration: () => true,
+    });
+    controller.restore({
+      key: generation.key,
+      verifiedAtMs: Date.now() + 60_000,
+      verdict: FRESH,
+    });
+
+    const result = await controller.verify(generation);
+
+    expect(result.ok).toBe(true);
+    expect(verify).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('GraphGenerationController', () => {
   it('preserves typed identity and load error arms', async () => {

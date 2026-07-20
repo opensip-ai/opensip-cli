@@ -67,12 +67,12 @@ export class CatalogFreshnessController {
     options?: CatalogFreshnessVerifyOptions,
   ): Promise<Result<FreshnessVerification, McpReadError>> {
     const now = Date.now();
-    if (
-      options?.forceFresh !== true &&
-      this.cache?.key === gen.key &&
-      now - this.cache.verifiedAtMs < FRESHNESS_BURST_MS
-    ) {
-      return ok(this.cache.verdict);
+    const cache = this.cache;
+    if (options?.forceFresh !== true && cache?.key === gen.key) {
+      const cacheAgeMs = now - cache.verifiedAtMs;
+      if (cacheAgeMs >= 0 && cacheAgeMs < FRESHNESS_BURST_MS) {
+        return ok(cache.verdict);
+      }
     }
     const active = this.inFlight.get(gen.key);
     if (active !== undefined) return await active;

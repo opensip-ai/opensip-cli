@@ -100,6 +100,7 @@ function inventory(
 function port(
   options: {
     readonly projectRoot?: string;
+    readonly configPath?: string;
     readonly tools?: readonly Tool[];
     readonly manifests?: readonly ToolPluginManifest[];
     readonly provenance?: readonly ToolProvenance[];
@@ -111,7 +112,7 @@ function port(
   for (const value of options.tools ?? [tool()]) registry.register(value);
   return new LiveRuntimeWiringReadPort({
     projectRoot: options.projectRoot ?? '/fixture/project',
-    configPath: 'opensip-cli.config.yml',
+    configPath: options.configPath ?? 'opensip-cli.config.yml',
     tools: registry,
     manifests: options.manifests ?? [manifest()],
     provenance: options.provenance ?? [provenance()],
@@ -123,6 +124,26 @@ function port(
 }
 
 describe('LiveRuntimeWiringReadPort', () => {
+  it('reports the selected absolute config path relative to the project', async () => {
+    const outcome = await port({
+      configPath: '/fixture/project/config/custom-opensip.yml',
+    }).query({ detail: 'summary' });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.value.context.project.configPath).toBe('config/custom-opensip.yml');
+  });
+
+  it('does not misreport an absolute config outside the project as the default config', async () => {
+    const outcome = await port({
+      configPath: '/fixture/other/custom-opensip.yml',
+    }).query({ detail: 'summary' });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.value.context.project.configPath).toBe('<outside-project>');
+  });
+
   it('returns deterministic repeated projections from one immutable snapshot', async () => {
     const runtime = port();
     const first = await runtime.query({ detail: 'nodes', groupBy: 'none', limit: 100 });
@@ -284,6 +305,28 @@ describe('LiveRuntimeWiringReadPort', () => {
     expect(outcome.value.groups).toContainEqual({ key: 'alpha', count: expect.any(Number) });
   });
 
+  it('honors limit and cursor when paging grouped runtime wiring', async () => {
+    const runtime = port();
+    const first = await runtime.query({ detail: 'groups', groupBy: 'source', limit: 1 });
+
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.value.groups).toHaveLength(1);
+    expect(first.value.page.hasMore).toBe(true);
+    expect(first.value.page.nextCursor).toBeTypeOf('string');
+
+    const second = await runtime.query({
+      detail: 'groups',
+      groupBy: 'source',
+      limit: 1,
+      cursor: first.value.page.nextCursor,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.value.groups).toHaveLength(1);
+    expect(second.value.groups?.[0]?.key).not.toBe(first.value.groups?.[0]?.key);
+  });
+
   it('rejects detail=groups without groupBy', async () => {
     const outcome = await port().query({ detail: 'groups' });
     expect(outcome).toMatchObject({ ok: false, error: { code: 'invalid-query' } });
@@ -396,6 +439,43 @@ describe('LiveRuntimeWiringReadPort', () => {
     expect(a.ok && b.ok).toBe(true);
     if (!a.ok || !b.ok) return;
     expect(a.value.context.runtime.identity).toBe(b.value.context.runtime.identity);
+  });
+
+  it('changes w1 identity when captured alias or version metadata changes', async () => {
+    const base = await port().query({ detail: 'summary' });
+    const aliasChanged = await port({
+      tools: [
+        tool({
+          identity: { name: 'alpha', aliases: ['renamed'], layoutKey: 'alpha-layout' },
+        }),
+      ],
+    }).query({ detail: 'summary' });
+    const versionChanged = await port({
+      provenance: [provenance({ version: '9.9.9' })],
+    }).query({ detail: 'summary' });
+
+    expect(base.ok && aliasChanged.ok && versionChanged.ok).toBe(true);
+    if (!base.ok || !aliasChanged.ok || !versionChanged.ok) return;
+    expect(aliasChanged.value.context.runtime.identity).not.toBe(
+      base.value.context.runtime.identity,
+    );
+    expect(versionChanged.value.context.runtime.identity).not.toBe(
+      base.value.context.runtime.identity,
+    );
+  });
+
+  it('does not claim a complete static bridge when every handler lacks metadata', async () => {
+    const resolveStaticHandlers = vi.fn<ResolveStaticHandlers>();
+    const outcome = await port({
+      runtimeCommands: inventory([leaf({ staticHandler: undefined })]),
+      resolveStaticHandlers,
+    }).query({ detail: 'summary' });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(resolveStaticHandlers).not.toHaveBeenCalled();
+    expect(outcome.value.coverage.staticBridgeComplete).toBe(false);
+    expect(outcome.value.summary?.unresolvedBridgeCount).toBe(1);
   });
 
   it('overlays resolved static handler bridges via injected resolver', async () => {

@@ -142,6 +142,27 @@ describe('filterRuntimeSnapshot', () => {
     expect(out.nodes.some((n) => n.id === 'command:graph:export')).toBe(false);
   });
 
+  it('retains the owning command graph when only a handler declaration matches', () => {
+    const out = filterRuntimeSnapshot(snapshot, { command: 'runfitlist' }, undefined);
+    const ids = new Set(out.nodes.map((n) => n.id));
+
+    expect(ids).toEqual(
+      new Set([
+        'prov:bundled',
+        'tool:fit',
+        'command:fit:list',
+        'mount:fit:list',
+        'handler:fit:list',
+      ]),
+    );
+    expect(out.edges.map((value) => value.kind)).toEqual([
+      'registry-owns-command',
+      'host-mounts-command',
+      'command-dispatches-handler',
+      'manifest-admits-tool',
+    ]);
+  });
+
   it('matches command path case-insensitively', () => {
     const out = filterRuntimeSnapshot(snapshot, { command: 'EXPORT' }, undefined);
     expect(out.nodes.some((n) => n.id === 'command:graph:export')).toBe(true);

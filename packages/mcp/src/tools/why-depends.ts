@@ -25,7 +25,7 @@ export function registerWhyDepends(server: McpStdioServer, deps: McpToolDeps): v
       inputSchema: strictInput({
         fromPackage: packageName(),
         toPackage: packageName(),
-        edgeKind: packageEdgeKind(),
+        edgeKind: packageEdgeKind('combined'),
         evidenceLimit: packageEvidenceLimit(),
         ...sourceFilterFields('production'),
         ...pageFields(),
