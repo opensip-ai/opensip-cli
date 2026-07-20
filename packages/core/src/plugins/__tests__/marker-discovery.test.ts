@@ -25,6 +25,16 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
+/**
+ * The walker climbs past testDir through the shared OS tmpdir to the
+ * filesystem root by design (nearest-ancestor resolution), so concurrent
+ * test trees elsewhere under tmpdir can legitimately appear in results.
+ * The invariant under test is what THIS test's tree yields — scope to it.
+ */
+function underTestDir<T extends { packageDir: string }>(out: readonly T[]): T[] {
+  return out.filter((p) => p.packageDir.startsWith(`${testDir}/`));
+}
+
 describe('isMarkerKind', () => {
   it('narrows the host marker tool', () => {
     expect(isMarkerKind('tool')).toBe(true);
@@ -70,7 +80,7 @@ describe('readMarkerKind', () => {
 
 describe('discoverPackagesByDeclaredKind', () => {
   it('returns an empty list when node_modules is missing', () => {
-    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
+    expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
   it('finds a fit-pack package under an unscoped name', () => {
@@ -78,7 +88,7 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: 'acme-fit',
       opensipTools: { kind: 'fit-pack' },
     });
-    const out = discoverPackagesByDeclaredKind(testDir, 'fit-pack');
+    const out = underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'));
     expect(out.map((p) => p.name)).toEqual(['acme-fit']);
     expect(out[0]?.kind).toBe('fit-pack');
   });
@@ -88,7 +98,7 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: '@acme/fit',
       opensipTools: { kind: 'fit-pack' },
     });
-    const out = discoverPackagesByDeclaredKind(testDir, 'fit-pack');
+    const out = underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'));
     expect(out.map((p) => p.name)).toEqual(['@acme/fit']);
   });
 
@@ -101,7 +111,7 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: '@acme/fit',
       opensipTools: { kind: 'fit-pack' },
     });
-    const out = discoverPackagesByDeclaredKind(testDir, 'sim-pack');
+    const out = underTestDir(discoverPackagesByDeclaredKind(testDir, 'sim-pack'));
     expect(out.map((p) => p.name)).toEqual(['@acme/sim']);
   });
 
@@ -110,14 +120,14 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: '@opensip-cli/fitness',
       opensipTools: { kind: 'tool' },
     });
-    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
+    expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
   it('skips packages with no opensipTools field', () => {
     writePkg(join(testDir, 'node_modules', 'random-pkg'), {
       name: 'random-pkg',
     });
-    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
+    expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
   it('skips packages declaring an unknown kind', () => {
@@ -125,7 +135,7 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: '@acme/graph',
       opensipTools: { kind: 'graph-pack' },
     });
-    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
+    expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
   it('skips dot-prefixed entries (.bin, .pnpm, etc.)', () => {
@@ -133,14 +143,14 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: 'fake-pack',
       opensipTools: { kind: 'fit-pack' },
     });
-    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
+    expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
   it('treats malformed package.json as non-pack (no crash)', () => {
     const dir = join(testDir, 'node_modules', 'broken');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{not-json');
-    expect(discoverPackagesByDeclaredKind(testDir, 'fit-pack')).toEqual([]);
+    expect(underTestDir(discoverPackagesByDeclaredKind(testDir, 'fit-pack'))).toEqual([]);
   });
 
   it('walks ancestor node_modules and dedupes by package name (nearest wins)', () => {
@@ -156,7 +166,7 @@ describe('discoverPackagesByDeclaredKind', () => {
       opensipTools: { kind: 'fit-pack' },
     });
 
-    const out = discoverPackagesByDeclaredKind(nested, 'fit-pack');
+    const out = underTestDir(discoverPackagesByDeclaredKind(nested, 'fit-pack'));
     expect(out).toHaveLength(1);
     expect(out[0]?.packageDir).toBe(join(nested, 'node_modules', '@acme', 'fit'));
   });
@@ -189,7 +199,7 @@ describe('discoverPackagesByDeclaredKind', () => {
       name: '@my-co/audit',
       opensipTools: { kind: 'tool' },
     });
-    const tools = discoverToolPackages({ projectDir: testDir });
+    const tools = underTestDir(discoverToolPackages({ projectDir: testDir }));
     expect(tools.map((t) => t.name)).toEqual(['@my-co/audit']);
   });
 });

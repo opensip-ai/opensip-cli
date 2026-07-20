@@ -26,9 +26,19 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
+/**
+ * The walker climbs past testDir through the shared OS tmpdir to the
+ * filesystem root by design (nearest-ancestor resolution), so concurrent
+ * test trees elsewhere under tmpdir can legitimately appear in results.
+ * The invariant under test is what THIS test's tree yields — scope to it.
+ */
+function underTestDir<T extends { packageDir: string }>(out: readonly T[]): T[] {
+  return out.filter((p) => p.packageDir.startsWith(`${testDir}/`));
+}
+
 describe('discoverToolPackages', () => {
   it('returns an empty list when node_modules is missing', () => {
-    expect(discoverToolPackages({ projectDir: testDir })).toEqual([]);
+    expect(underTestDir(discoverToolPackages({ projectDir: testDir }))).toEqual([]);
   });
 
   it('finds an unscoped package marked as a tool', () => {
@@ -36,7 +46,7 @@ describe('discoverToolPackages', () => {
       name: 'audit',
       opensipTools: { kind: 'tool' },
     });
-    const out = discoverToolPackages({ projectDir: testDir });
+    const out = underTestDir(discoverToolPackages({ projectDir: testDir }));
     expect(out.map((t) => t.name)).toEqual(['audit']);
   });
 
@@ -45,7 +55,7 @@ describe('discoverToolPackages', () => {
       name: '@opensip-cli/fitness',
       opensipTools: { kind: 'tool' },
     });
-    const out = discoverToolPackages({ projectDir: testDir });
+    const out = underTestDir(discoverToolPackages({ projectDir: testDir }));
     expect(out.map((t) => t.name)).toEqual(['@opensip-cli/fitness']);
   });
 
@@ -53,7 +63,7 @@ describe('discoverToolPackages', () => {
     writePkg(join(testDir, 'node_modules', 'random-pkg'), {
       name: 'random-pkg',
     });
-    expect(discoverToolPackages({ projectDir: testDir })).toEqual([]);
+    expect(underTestDir(discoverToolPackages({ projectDir: testDir }))).toEqual([]);
   });
 
   it('skips dot-prefixed entries (.bin, .pnpm, etc.)', () => {
@@ -61,7 +71,7 @@ describe('discoverToolPackages', () => {
       name: 'fake-tool',
       opensipTools: { kind: 'tool' },
     });
-    expect(discoverToolPackages({ projectDir: testDir })).toEqual([]);
+    expect(underTestDir(discoverToolPackages({ projectDir: testDir }))).toEqual([]);
   });
 
   it('walks ancestor node_modules and dedupes by package name', () => {
@@ -77,7 +87,7 @@ describe('discoverToolPackages', () => {
       opensipTools: { kind: 'tool' },
     });
 
-    const out = discoverToolPackages({ projectDir: nested });
+    const out = underTestDir(discoverToolPackages({ projectDir: nested }));
     expect(out).toHaveLength(1);
     // Nearest-ancestor wins: the inner copy
     expect(out[0]?.packageDir).toBe(join(nested, 'node_modules', '@opensip-cli', 'fitness'));
@@ -87,7 +97,7 @@ describe('discoverToolPackages', () => {
     const dir = join(testDir, 'node_modules', 'broken');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{not-json');
-    expect(discoverToolPackages({ projectDir: testDir })).toEqual([]);
+    expect(underTestDir(discoverToolPackages({ projectDir: testDir }))).toEqual([]);
   });
 });
 
@@ -136,13 +146,15 @@ describe('discoverToolPackagesFromAnchors', () => {
       opensipTools: { kind: 'tool' },
     });
 
-    const out = discoverToolPackagesFromAnchors([
-      {
-        dir: join(testDir, 'proj', '.runtime', 'plugins', 'tool'),
-        mode: 'scanDir',
-      },
-      { dir: join(testDir, 'cwd'), mode: 'walkUp' },
-    ]);
+    const out = underTestDir(
+      discoverToolPackagesFromAnchors([
+        {
+          dir: join(testDir, 'proj', '.runtime', 'plugins', 'tool'),
+          mode: 'scanDir',
+        },
+        { dir: join(testDir, 'cwd'), mode: 'walkUp' },
+      ]),
+    );
     expect(out.map((t) => t.name).sort()).toEqual(['audit', 'other']);
     // First source (project-local scanDir) wins for the duplicate name.
     expect(out.find((t) => t.name === 'audit')?.packageDir).toBe(
@@ -152,7 +164,9 @@ describe('discoverToolPackagesFromAnchors', () => {
 
   it('returns [] when no source yields a tool', () => {
     expect(
-      discoverToolPackagesFromAnchors([{ dir: join(testDir, 'empty'), mode: 'walkUp' }]),
+      underTestDir(
+        discoverToolPackagesFromAnchors([{ dir: join(testDir, 'empty'), mode: 'walkUp' }]),
+      ),
     ).toEqual([]);
   });
 });
