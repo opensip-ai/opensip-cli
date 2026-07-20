@@ -83,6 +83,9 @@ describe('BaselineRepo', () => {
   });
 
   it('dedupes by fingerprint (last wins) and sorts deterministically', () => {
+    // Make SQLite reverse every SELECT whose ordering is left implicit. This
+    // turns an accidental primary-key scan order into an executable failure.
+    requireDrizzleHandle(ds).db.run(sql`PRAGMA reverse_unordered_selects = ON`);
     repo.save(
       'graph',
       [

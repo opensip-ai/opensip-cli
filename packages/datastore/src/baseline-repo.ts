@@ -6,6 +6,10 @@ import { toolBaselineEntries, toolBaselineMeta } from './schema/baseline.js';
 
 const MODULE_NAME = 'datastore:baseline-repo';
 
+function compareFingerprint(a: string, b: string): number {
+  return Number(a > b) - Number(a < b);
+}
+
 /** One baseline entry to persist: its opaque fingerprint + the full Signal payload. */
 export interface BaselineEntry {
   readonly fingerprint: string;
@@ -50,7 +54,7 @@ export class BaselineRepo {
         const byFingerprint = new Map<string, Signal>();
         for (const e of entries) byFingerprint.set(e.fingerprint, e.payload);
         const rows = [...byFingerprint.entries()]
-          .sort(([a], [b]) => Number(a > b) - Number(a < b))
+          .sort(([a], [b]) => compareFingerprint(a, b))
           .map(([fingerprint, payload]) => ({
             tool,
             fingerprint,
@@ -125,7 +129,8 @@ export class BaselineRepo {
         })
         .from(toolBaselineEntries)
         .where(eq(toolBaselineEntries.tool, tool))
-        .all();
+        .all()
+        .sort((a, b) => compareFingerprint(a.fingerprint, b.fingerprint));
       logger.info({
         evt: 'datastore.baseline.load.complete',
         module: MODULE_NAME,
