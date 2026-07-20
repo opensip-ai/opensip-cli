@@ -20,8 +20,53 @@
  * warning events) stays in each engine's outer discovery function.
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+
+import { SystemError } from '../lib/errors.js';
+
+/** Errno codes that genuinely mean "this path is not there". */
+const ABSENT_ERRNO = new Set(['ENOENT', 'ENOTDIR']);
+
+/**
+ * Errno codes for present-but-unreadable paths. The ancestor walk crosses
+ * system directories on its way to the filesystem root, so a permission
+ * denial is a legitimate "nothing discoverable here", same as absence.
+ */
+const UNREADABLE_ERRNO = new Set(['EACCES', 'EPERM']);
+
+function errnoOf(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : 'unknown';
+}
+
+function isAbsenceErrno(code: string): boolean {
+  return ABSENT_ERRNO.has(code) || UNREADABLE_ERRNO.has(code);
+}
+
+/**
+ * Any other errno (EMFILE/ENFILE fd exhaustion, EIO, …) is an environment
+ * failure, not evidence of absence. Treating it as "not installed" silently
+ * drops packs — under load this reads as a nondeterministically shrinking
+ * check surface (the v0.8.2 fit-acceptance divergence) — so it must throw.
+ */
+function probeFailure(path: string, error: unknown): SystemError {
+  return new SystemError(
+    `Filesystem probe failed for ${path} (${errnoOf(error)}); refusing to treat an environment failure as "package not installed"`,
+    { code: 'SYSTEM.PLUGINS.FS_PROBE_FAILED', cause: error },
+  );
+}
+
+/** True when `path` exists; absence/unreadable errnos → false; anything else throws. */
+function probePathPresent(path: string): boolean {
+  try {
+    statSync(path);
+    return true;
+  } catch (error) {
+    if (isAbsenceErrno(errnoOf(error))) return false;
+    throw probeFailure(path, error);
+  }
+}
 
 /** A package discovered (or resolved) inside node_modules. */
 export interface DiscoveredScopedPackage {
@@ -61,7 +106,7 @@ export function discoverScopedPackages(
   while (dir !== prev) {
     for (const scope of scopes) {
       const scopeDir = join(dir, 'node_modules', scope);
-      if (!existsSync(scopeDir)) continue;
+      if (!probePathPresent(scopeDir)) continue;
       for (const entry of safeReaddir(scopeDir)) {
         if (!entry.startsWith(prefix)) continue;
         const name = `${scope}/${entry}`;
@@ -95,21 +140,27 @@ export function resolvePackageDir(projectDir: string, name: string): string | un
   return undefined;
 }
 
-/** True when `packageDir` exists and contains a `package.json`. */
+/**
+ * True when `packageDir` exists and contains a `package.json`. Absence and
+ * permission denial read as `false`; any other probe failure (EMFILE, EIO, …)
+ * throws `SYSTEM.PLUGINS.FS_PROBE_FAILED` — resource exhaustion must never
+ * masquerade as "not installed".
+ */
 export function hasPackageJson(packageDir: string): boolean {
-  if (!existsSync(packageDir)) return false;
-  return existsSync(join(packageDir, 'package.json'));
+  return probePathPresent(join(packageDir, 'package.json'));
 }
 
 /**
- * Read a directory's entries, returning `[]` on any failure. A filesystem
- * probe: a missing directory or permission denial yields "no entries",
- * indistinguishable from a genuinely empty directory.
+ * Read a directory's entries. A missing directory or permission denial yields
+ * `[]` — indistinguishable from a genuinely empty directory, which is the
+ * intended ancestor-walk semantics. Any other failure (EMFILE, EIO, …) throws
+ * `SYSTEM.PLUGINS.FS_PROBE_FAILED` instead of silently shrinking discovery.
  */
 export function safeReaddir(dir: string): string[] {
   try {
     return readdirSync(dir);
-  } catch {
-    return [];
+  } catch (error) {
+    if (isAbsenceErrno(errnoOf(error))) return [];
+    throw probeFailure(dir, error);
   }
 }

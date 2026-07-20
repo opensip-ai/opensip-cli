@@ -1,9 +1,10 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { SystemError } from '../../lib/errors.js';
 import {
   discoverScopedPackages,
   hasPackageJson,
@@ -97,5 +98,56 @@ describe('hasPackageJson / safeReaddir', () => {
     installPkg(root, '@scope', 'scenarios-a');
     expect(safeReaddir(join(root, 'node_modules', '@scope'))).toContain('scenarios-a');
     expect(safeReaddir(join(root, 'does', 'not', 'exist'))).toEqual([]);
+  });
+});
+
+describe('probe-failure classification (fail-loud, never silent absence)', () => {
+  // A >255-byte path segment yields ENAMETOOLONG on every supported platform —
+  // a deterministic stand-in for the resource-class errnos (EMFILE, EIO) that
+  // must never read as "package not installed" (the v0.8.2 fit-acceptance
+  // silent check-pack drop).
+  const overlongSegment = 'x'.repeat(300);
+
+  it('hasPackageJson throws SYSTEM.PLUGINS.FS_PROBE_FAILED on a resource-class errno', () => {
+    let caught: unknown;
+    try {
+      hasPackageJson(join(root, overlongSegment));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SystemError);
+    expect((caught as SystemError).code).toBe('SYSTEM.PLUGINS.FS_PROBE_FAILED');
+  });
+
+  it('safeReaddir throws SYSTEM.PLUGINS.FS_PROBE_FAILED on a resource-class errno', () => {
+    let caught: unknown;
+    try {
+      safeReaddir(join(root, overlongSegment));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SystemError);
+    expect((caught as SystemError).code).toBe('SYSTEM.PLUGINS.FS_PROBE_FAILED');
+  });
+
+  it('resolvePackageDir surfaces the probe failure instead of returning undefined', () => {
+    expect(() => resolvePackageDir(join(root, overlongSegment), '@scope/scenarios-a')).toThrow(
+      SystemError,
+    );
+  });
+
+  it('permission denial still reads as absence (ancestor walks cross unreadable dirs)', () => {
+    const locked = join(root, 'locked');
+    installPkg(locked, '@scope', 'scenarios-a');
+    chmodSync(locked, 0o000);
+    try {
+      expect(hasPackageJson(join(locked, 'node_modules', '@scope', 'scenarios-a'))).toBe(false);
+      expect(safeReaddir(join(locked, 'node_modules'))).toEqual([]);
+      expect(
+        discoverScopedPackages({ projectDir: locked, scopes: ['@scope'], prefix: 'scenarios-' }),
+      ).toEqual([]);
+    } finally {
+      chmodSync(locked, 0o755);
+    }
   });
 });
