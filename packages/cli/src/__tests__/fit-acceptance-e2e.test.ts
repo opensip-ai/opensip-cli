@@ -117,6 +117,37 @@ function normalize(value: unknown): unknown {
   return value;
 }
 
+/** Slugs from a `fit list --json` payload, in whatever shape it carries. */
+function slugsOf(raw: Record<string, unknown>): string[] {
+  const data = (raw.data ?? raw) as { checks?: { slug?: string }[] };
+  return (data.checks ?? []).map((c) => c.slug ?? '<none>').sort();
+}
+
+/**
+ * Dump everything the normalized comparison hides when bundled ≠ installed:
+ * per-run diagnostics (a denied or skipped capability pack records its reason
+ * here, never on stderr), the slug delta, and both stderrs.
+ */
+function reportDivergence(
+  label: string,
+  bundled: { stderr: string },
+  installed: { stderr: string },
+  bundledRaw: Record<string, unknown>,
+  installedRaw: Record<string, unknown>,
+): void {
+  const b = new Set(slugsOf(bundledRaw));
+  const i = new Set(slugsOf(installedRaw));
+  console.error(`[fit-acceptance] ${label} divergence — bundled=${b.size} installed=${i.size}`);
+  console.error('  only-bundled:', [...b].filter((s) => !i.has(s)).join(', ') || '(none)');
+  console.error('  only-installed:', [...i].filter((s) => !b.has(s)).join(', ') || '(none)');
+  console.error('  bundled diagnostics:', JSON.stringify(bundledRaw.diagnostics));
+  console.error('  installed diagnostics:', JSON.stringify(installedRaw.diagnostics));
+  console.error('  bundled warnings:', JSON.stringify(bundledRaw.warnings));
+  console.error('  installed warnings:', JSON.stringify(installedRaw.warnings));
+  console.error('  bundled stderr:', bundled.stderr || '(empty)');
+  console.error('  installed stderr:', installed.stderr || '(empty)');
+}
+
 describe('fit acceptance — bundled ≡ installed, through the real binary (§1/§8)', () => {
   it('loads fit through the installed path when dropped from the bundled set (and it runs)', () => {
     const installed = cli.run(['fit', '--json', '--cwd', testDir], {
@@ -142,17 +173,15 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
       env: AS_INSTALLED,
     });
     expect(installed.exitCode).toBe(bundled.exitCode);
-    const bundledNorm = normalize(JSON.parse(bundled.stdout));
-    const installedNorm = normalize(JSON.parse(installed.stdout));
-    // On divergence, surface both runs' stderr — a dropped pack announces its
-    // reason there, and the bare envelope diff hides it (root-cause aid, not
-    // an assertion change).
+    const bundledRaw = JSON.parse(bundled.stdout) as Record<string, unknown>;
+    const installedRaw = JSON.parse(installed.stdout) as Record<string, unknown>;
+    const bundledNorm = normalize(bundledRaw);
+    const installedNorm = normalize(installedRaw);
+    // On divergence, surface the evidence normalize() strips: the run
+    // diagnostics (where a denied/skipped pack states its reason — these never
+    // reach stderr) plus both stderrs. Root-cause aid, not an assertion change.
     if (JSON.stringify(installedNorm) !== JSON.stringify(bundledNorm)) {
-      console.error('[fit-acceptance] check-list divergence — bundled stderr:\n', bundled.stderr);
-      console.error(
-        '[fit-acceptance] check-list divergence — installed stderr:\n',
-        installed.stderr,
-      );
+      reportDivergence('check-list', bundled, installed, bundledRaw, installedRaw);
     }
     expect(installedNorm).toEqual(bundledNorm);
   });
@@ -251,23 +280,23 @@ describe('fit acceptance — bundled ≡ installed, through the real binary (§1
 
     expect(installed.exitCode).toBe(bundled.exitCode);
 
-    const b = normalize(JSON.parse(bundled.stdout)) as {
+    const bundledRaw = JSON.parse(bundled.stdout) as Record<string, unknown>;
+    const installedRaw = JSON.parse(installed.stdout) as Record<string, unknown>;
+    const b = normalize(bundledRaw) as {
       kind: string;
       status: string;
       envelope?: unknown;
     };
-    const i = normalize(JSON.parse(installed.stdout)) as {
+    const i = normalize(installedRaw) as {
       kind: string;
       status: string;
       envelope?: unknown;
     };
     expect(i.kind).toBe(b.kind);
     expect(i.status).toBe(b.status);
-    // On divergence, surface both runs' stderr — a dropped pack announces its
-    // reason there, and the bare envelope diff hides it.
+    // On divergence, surface the evidence normalize() strips (see above).
     if (JSON.stringify(i.envelope) !== JSON.stringify(b.envelope)) {
-      console.error('[fit-acceptance] envelope divergence — bundled stderr:\n', bundled.stderr);
-      console.error('[fit-acceptance] envelope divergence — installed stderr:\n', installed.stderr);
+      reportDivergence('envelope', bundled, installed, bundledRaw, installedRaw);
     }
     // The whole normalized envelope (verdict, units, signals) is byte-identical:
     // the same checks ran on the same files and produced the same findings,
