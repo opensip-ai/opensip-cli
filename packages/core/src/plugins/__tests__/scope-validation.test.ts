@@ -40,6 +40,11 @@ describe('resolveScopes', () => {
     expect(out).toEqual(['@opensip-cli']);
   });
 
+  it('supports an intentionally absent default scope', () => {
+    expect(resolveScopes(undefined, [], 'plugin.invalid_scope')).toEqual([]);
+    expect(resolveScopes(undefined, ['@customer'], 'plugin.invalid_scope')).toEqual(['@customer']);
+  });
+
   it('appends valid extra scopes after the default', () => {
     const out = resolveScopes('@opensip-cli', ['@other', '@third'], 'plugin.invalid_scope');
     expect(out).toEqual(['@opensip-cli', '@other', '@third']);
@@ -75,6 +80,17 @@ describe('resolveScopes', () => {
     expect(warnSpy.mock.calls[1]?.[0]).toMatchObject({
       evt: 'plugin.invalid_scope',
       scope: '@Bad',
+    });
+  });
+
+  it('validates and drops a malformed default scope before path resolution', () => {
+    const out = resolveScopes('../..', ['@valid'], 'plugin.invalid_scope');
+    expect(out).toEqual(['@valid']);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0]?.[0]).toMatchObject({
+      evt: 'plugin.invalid_scope',
+      module: 'core:plugins',
+      scope: '../..',
     });
   });
 

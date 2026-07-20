@@ -72,13 +72,34 @@ describe('normalizeDiscovery — happy path', () => {
       discovery: {
         mode: 'name-pattern',
         prefix: 'opensip-',
-        defaultScopes: ['backend'],
+        defaultScopes: ['@backend'],
       },
       exportName: 'register',
       exportShape: 'array',
       configKeys: {},
     });
     expect(result.status).toBe('ok');
+  });
+
+  it('accepts an intentionally empty default scope list', () => {
+    const result = normalizeDiscovery({
+      discovery: {
+        mode: 'name-pattern',
+        prefix: 'opensip-',
+        defaultScopes: [],
+      },
+      exportName: 'register',
+      exportShape: 'array',
+      configKeys: {},
+    });
+    expect(result).toMatchObject({
+      status: 'ok',
+      descriptor: {
+        discovery: {
+          defaultScopes: [],
+        },
+      },
+    });
   });
 });
 
@@ -113,6 +134,20 @@ describe('normalizeDiscovery — invalid discovery mode', () => {
     [
       'name-pattern bad defaultScopes',
       { discovery: { mode: 'name-pattern', prefix: 'p', defaultScopes: 'x' } },
+    ],
+    [
+      'name-pattern path-shaped default scope',
+      { discovery: { mode: 'name-pattern', prefix: 'p', defaultScopes: ['../..'] } },
+    ],
+    [
+      'name-pattern malformed scope after a valid default',
+      {
+        discovery: {
+          mode: 'name-pattern',
+          prefix: 'p',
+          defaultScopes: ['@opensip-cli', 'not-a-scope'],
+        },
+      },
     ],
   ])('rejects when %s', (_label, override) => {
     const d = { ...validDiscovery(), ...override };

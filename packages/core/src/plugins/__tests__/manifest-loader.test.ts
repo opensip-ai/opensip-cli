@@ -632,6 +632,20 @@ describe('capability discovery descriptor (§5.3)', () => {
     });
     expect(loadToolManifest('installed', testDir)).toBeUndefined();
   });
+
+  it('rejects a name-pattern descriptor before a path-shaped default scope can be walked', () => {
+    withCapability({
+      discovery: {
+        mode: 'name-pattern',
+        prefix: 'items-',
+        defaultScopes: ['../..'],
+      },
+      exportName: 'items',
+      exportShape: 'array',
+      configKeys: {},
+    });
+    expect(loadToolManifest('installed', testDir)).toBeUndefined();
+  });
 });
 
 describe('admitTool', () => {

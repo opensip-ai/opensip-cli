@@ -11,7 +11,12 @@ import { normalizeDiscovery } from './manifest-discovery.js';
 
 import type { PluginLayout } from './types.js';
 import type { CapabilityContributionKind, ToolCapabilityDeclaration } from '../tools/capability.js';
-import type { ToolConfigManifestDescriptor } from '../tools/manifest-config.js';
+import type {
+  JsonSchemaNode,
+  JsonSchemaObject,
+  JsonSchemaPrimitiveType,
+  ToolConfigManifestDescriptor,
+} from '../tools/manifest-config.js';
 import type {
   RawToolPluginManifest,
   ToolResourceClass,
@@ -336,8 +341,90 @@ function normalizeConfig(value: unknown): ConfigParseResult {
   if (!isRecord(value)) return { ok: false };
   const { namespace, schema } = value;
   if (!isManifestIdentityString(namespace)) return { ok: false };
-  if (!isRecord(schema)) return { ok: false };
+  if (!isJsonSchemaObject(schema)) return { ok: false };
   return { ok: true, config: { namespace, schema } };
+}
+
+const JSON_SCHEMA_PRIMITIVE_TYPES: ReadonlySet<JsonSchemaPrimitiveType> = new Set([
+  'string',
+  'number',
+  'integer',
+  'boolean',
+  'object',
+  'array',
+  'null',
+]);
+
+function isJsonSchemaPrimitiveType(value: unknown): value is JsonSchemaPrimitiveType {
+  return (
+    typeof value === 'string' && JSON_SCHEMA_PRIMITIVE_TYPES.has(value as JsonSchemaPrimitiveType)
+  );
+}
+
+function isJsonSchemaType(
+  value: unknown,
+): value is JsonSchemaPrimitiveType | readonly JsonSchemaPrimitiveType[] {
+  return (
+    isJsonSchemaPrimitiveType(value) ||
+    (Array.isArray(value) && value.every(isJsonSchemaPrimitiveType))
+  );
+}
+
+function isJsonSchemaEnum(value: unknown): boolean {
+  // Zod's literal constructor accepts JSON scalars. Arrays are interpreted as
+  // a list of separate literal values (and [] throws); objects use identity
+  // rather than JSON-value equality. Neither can represent JSON-Schema enum
+  // membership faithfully in the host's coarse converter.
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (member) =>
+        member === null ||
+        typeof member === 'string' ||
+        typeof member === 'number' ||
+        typeof member === 'boolean',
+    )
+  );
+}
+
+function areJsonSchemaPropertiesValid(value: unknown): boolean {
+  // The converter assembles its Zod shape in an ordinary `{}`. Assigning an own
+  // `__proto__` property mutates that object's prototype and silently loses the
+  // declared schema key, so reject precisely that unrepresentable property.
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      !Object.hasOwn(value, '__proto__') &&
+      Object.values(value).every((child) => isJsonSchemaNode(child)))
+  );
+}
+
+function isAdditionalPropertiesValid(value: unknown): boolean {
+  return value === undefined || typeof value === 'boolean' || isJsonSchemaNode(value);
+}
+
+/**
+ * Validate every modelled JSON-Schema keyword before the config layer walks it.
+ * Unknown keywords remain plain inert data for forward compatibility; the host
+ * coarse pass only interprets this documented subset and the worker owns deeper
+ * semantics.
+ */
+function isJsonSchemaNode(value: unknown): value is JsonSchemaNode {
+  if (!isRecord(value)) return false;
+
+  return (
+    (value.type === undefined || isJsonSchemaType(value.type)) &&
+    (value.required === undefined || isStringArray(value.required)) &&
+    (value.enum === undefined || isJsonSchemaEnum(value.enum)) &&
+    areJsonSchemaPropertiesValid(value.properties) &&
+    isAdditionalPropertiesValid(value.additionalProperties) &&
+    (value.items === undefined || isJsonSchemaNode(value.items))
+  );
+}
+
+/** A tool namespace is always object-shaped, even when its `type` is omitted. */
+function isJsonSchemaObject(value: unknown): value is JsonSchemaObject {
+  return isJsonSchemaNode(value) && (value.type === undefined || value.type === 'object');
 }
 
 /** Compute a stable SHA-256 fingerprint of a normalized tool manifest. */

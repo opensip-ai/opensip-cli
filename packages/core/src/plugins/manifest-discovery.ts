@@ -6,6 +6,7 @@
  */
 
 import { isRecord, isStringArray } from './json-guards.js';
+import { VALID_NPM_SCOPE_REGEX } from './scope-validation.js';
 
 import type {
   CapabilityCoContribution,
@@ -122,6 +123,7 @@ function normalizeDiscoveryMode(value: unknown): CapabilityDiscoveryMode | undef
   if (value.mode === 'name-pattern') {
     if (typeof value.prefix !== 'string' || value.prefix === '') return undefined;
     if (!isStringArray(value.defaultScopes)) return undefined;
+    if (!value.defaultScopes.every((scope) => VALID_NPM_SCOPE_REGEX.test(scope))) return undefined;
     return {
       mode: 'name-pattern',
       prefix: value.prefix,

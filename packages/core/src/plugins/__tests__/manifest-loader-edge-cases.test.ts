@@ -72,6 +72,91 @@ describe('manifest loader fail-closed edges', () => {
     expect(validateManifest(block, name, version)).toBeUndefined();
   });
 
+  it.each([
+    ['a null property schema', { type: 'object', properties: { x: null } }],
+    ['an unsupported top-level type', { type: 'string' }],
+    ['an unsupported nested type', { type: 'object', properties: { createdAt: { type: 'date' } } }],
+    ['non-string required members', { type: 'object', properties: { x: {} }, required: [1] }],
+    [
+      'a malformed additionalProperties schema',
+      { type: 'object', properties: { x: {} }, additionalProperties: null },
+    ],
+    [
+      'a malformed array item schema',
+      { type: 'object', properties: { values: { type: 'array', items: null } } },
+    ],
+    ['a non-array enum', { type: 'object', properties: { mode: { enum: 'fast' } } }],
+    [
+      'an array-valued enum member',
+      { type: 'object', properties: { mode: { enum: [['fast', 'exact']] } } },
+    ],
+    [
+      'an object-valued enum member',
+      { type: 'object', properties: { mode: { enum: [{ mode: 'fast' }] } } },
+    ],
+  ])('rejects config descriptors with %s', (_label, schema) => {
+    expect(
+      validateManifest(
+        {
+          ...baseBlock(),
+          config: { namespace: 'edge', schema },
+        },
+        'package',
+        '1.0.0',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('rejects an own __proto__ property that the coarse converter cannot represent', () => {
+    const schema: unknown = JSON.parse(
+      '{"type":"object","properties":{"__proto__":{"type":"string"}}}',
+    );
+
+    expect(
+      validateManifest(
+        {
+          ...baseBlock(),
+          config: { namespace: 'edge', schema },
+        },
+        'package',
+        '1.0.0',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('admits every recursively supported config-schema shape without changing catchall intent', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        mode: { enum: ['fast', 'exact'] },
+        scalarKinds: { enum: ['text', 1, true, null] },
+        optional: { type: ['string', 'null'] },
+        nested: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean' },
+            count: { type: 'integer' },
+          },
+          required: ['enabled'],
+          additionalProperties: { type: 'number' },
+        },
+        values: { type: 'array', items: { type: 'string' } },
+      },
+      additionalProperties: true,
+    };
+
+    expect(
+      validateManifest(
+        {
+          ...baseBlock(),
+          config: { namespace: 'edge', schema },
+        },
+        'package',
+        '1.0.0',
+      )?.config?.schema,
+    ).toEqual(schema);
+  });
+
   it('normalizes valid requirements and rejects each malformed shape', () => {
     expect(normalizeResourceRequirement(null)).toBeUndefined();
     expect(normalizeResourceRequirement({ resource: 'unknown' })).toBeUndefined();
