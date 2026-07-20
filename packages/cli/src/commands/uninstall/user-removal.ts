@@ -6,12 +6,24 @@
  *  2. Acquire global maintenance lease.
  *  3. Refuse if any project promotion journal exists.
  *  4. Write open receipt → exclusive marker in user root → rename to tombstone
- *     → recursive delete of tombstone → closed receipt → unlink receipt.
+ *     → delete tombstone children with the marker last → closed receipt →
+ *     unlink receipt.
  *  5. `--discard-recovery` unlinks only a malformed/absent-body fixed receipt.
  */
 
-import { existsSync, lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import {
+  existsSync,
+  linkSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, resolve, sep } from 'node:path';
 
 import {
   acquireGlobalRuntimeMaintenanceLease,
@@ -130,23 +142,60 @@ function anyProjectPromotionJournalBlocks(): boolean {
   }
 }
 
-function createExclusiveMarker(userRoot: string, content: Buffer): string {
-  const markerPath = join(userRoot, USER_UNINSTALL_MARKER_BASENAME);
-  // wx = exclusive create, fail if exists; mode 0600.
-  writeFileSync(markerPath, content, { flag: 'wx', mode: 0o600 });
-  return digestMarkerContent(content);
-}
-
-function markerMatches(root: string, expectedDigest: string): boolean {
-  const markerPath = join(root, USER_UNINSTALL_MARKER_BASENAME);
+function regularFileMatches(path: string, expectedDigest: string): boolean {
   try {
-    const st = lstatSync(markerPath);
+    const st = lstatSync(path);
     if (st.isSymbolicLink() || !st.isFile()) return false;
-    const body = readFileSync(markerPath);
+    const body = readFileSync(path);
     return digestMarkerContent(body) === expectedDigest;
   } catch {
     return false;
   }
+}
+
+function markerMatches(root: string, expectedDigest: string): boolean {
+  return regularFileMatches(join(root, USER_UNINSTALL_MARKER_BASENAME), expectedDigest);
+}
+
+function markerTempPath(userRoot: string, operationId: string): string {
+  return join(userRoot, `${USER_UNINSTALL_MARKER_BASENAME}.tmp-${operationId}`);
+}
+
+function publishExclusiveMarker(userRoot: string, operationId: string, content: Buffer): void {
+  const markerPath = join(userRoot, USER_UNINSTALL_MARKER_BASENAME);
+  const tempPath = markerTempPath(userRoot, operationId);
+  const expectedDigest = digestMarkerContent(content);
+
+  if (existsSync(tempPath) && !regularFileMatches(tempPath, expectedDigest)) {
+    const tempStat = lstatSync(tempPath);
+    if (tempStat.isSymbolicLink() || !tempStat.isFile()) {
+      recoveryFailure('the operation marker temporary path is not a regular file');
+    }
+    unlinkSync(tempPath);
+  }
+  if (!existsSync(tempPath)) {
+    // A failed/partial write remains operation-bound at the temporary path and
+    // is safely replaced on retry; the final marker is published atomically.
+    writeFileSync(tempPath, content, { flag: 'wx', mode: 0o600 });
+  }
+  if (!regularFileMatches(tempPath, expectedDigest)) {
+    recoveryFailure('the operation marker temporary file could not be verified');
+  }
+
+  try {
+    linkSync(tempPath, markerPath);
+  } catch (error) {
+    if (
+      (error as NodeJS.ErrnoException).code !== 'EEXIST' ||
+      !markerMatches(userRoot, expectedDigest)
+    ) {
+      recoveryFailure('the final operation marker path is occupied by a foreign entry');
+    }
+  }
+  if (!markerMatches(userRoot, expectedDigest)) {
+    recoveryFailure('the published operation marker could not be verified');
+  }
+  unlinkSync(tempPath);
 }
 
 /**
@@ -171,7 +220,26 @@ interface TransactionContext {
   readonly lease: GlobalRuntimeMaintenanceLease;
 }
 
+type TombstoneEntryName = string | Buffer;
+type TombstoneEntryPath = string | Buffer;
+
+interface TombstoneRemovalOperations {
+  readonly listEntries: (path: string) => readonly TombstoneEntryName[];
+  readonly removeEntry: (path: TombstoneEntryPath) => void;
+  readonly unlinkMarker: (path: string) => void;
+  readonly removeDirectory: (path: string) => void;
+}
+
+const DEFAULT_TOMBSTONE_REMOVAL_OPERATIONS: TombstoneRemovalOperations = {
+  listEntries: (path) => readdirSync(path, { encoding: 'buffer' }),
+  removeEntry: (path) => rmSync(path, { recursive: true, force: true }),
+  unlinkMarker: (path) => unlinkSync(path),
+  removeDirectory: (path) => rmdirSync(path),
+};
+const USER_UNINSTALL_MARKER_BASENAME_BYTES = Buffer.from(USER_UNINSTALL_MARKER_BASENAME);
+
 const MAX_RECEIPT_TRANSITIONS = 10;
+const MAX_REMOVAL_RECEIPTS = 2;
 
 function recoveryFailure(message: string): never {
   throw new Error(`Cannot recover user uninstall safely: ${message}`);
@@ -189,6 +257,57 @@ function safeDirectoryExists(path: string): boolean {
     recoveryFailure(`expected an owned directory at ${path}`);
   }
   return true;
+}
+
+function isTombstoneMarkerEntry(entry: TombstoneEntryName | undefined): boolean {
+  return typeof entry === 'string'
+    ? entry === USER_UNINSTALL_MARKER_BASENAME
+    : entry?.equals(USER_UNINSTALL_MARKER_BASENAME_BYTES) === true;
+}
+
+function tombstoneEntryPath(tombstonePath: string, entry: TombstoneEntryName): TombstoneEntryPath {
+  return typeof entry === 'string'
+    ? join(tombstonePath, entry)
+    : Buffer.concat([Buffer.from(tombstonePath), Buffer.from(sep), entry]);
+}
+
+/**
+ * Delete a verified tombstone while preserving its ownership marker until every
+ * other entry is gone. If the process stops after unlinking the marker but
+ * before removing the root, recovery may remove only that empty directory.
+ */
+export function removeOwnedTombstone(
+  tombstonePath: string,
+  expectedMarkerDigest: string,
+  operations: TombstoneRemovalOperations = DEFAULT_TOMBSTONE_REMOVAL_OPERATIONS,
+): void {
+  const markerPath = join(tombstonePath, USER_UNINSTALL_MARKER_BASENAME);
+
+  if (!markerMatches(tombstonePath, expectedMarkerDigest)) {
+    if (operations.listEntries(tombstonePath).length > 0) {
+      recoveryFailure('the markerless recovery tombstone is not empty');
+    }
+    operations.removeDirectory(tombstonePath);
+    return;
+  }
+
+  for (const entry of operations.listEntries(tombstonePath)) {
+    if (!isTombstoneMarkerEntry(entry)) {
+      operations.removeEntry(tombstoneEntryPath(tombstonePath, entry));
+    }
+  }
+
+  const remaining = operations.listEntries(tombstonePath);
+  if (
+    remaining.length !== 1 ||
+    !isTombstoneMarkerEntry(remaining[0]) ||
+    !markerMatches(tombstonePath, expectedMarkerDigest)
+  ) {
+    recoveryFailure('the recovery tombstone changed during deletion');
+  }
+
+  operations.unlinkMarker(markerPath);
+  operations.removeDirectory(tombstonePath);
 }
 
 async function replaceReceipt(
@@ -286,7 +405,7 @@ async function handleMarkerCreateIntent(
     cursor.pendingMarkerContent === undefined
       ? await setReceiptPhase(context, cursor, 'marker-create-intent', markerContent)
       : cursor;
-  createExclusiveMarker(context.userRoot, markerContent);
+  publishExclusiveMarker(context.userRoot, current.receipt.operationId, markerContent);
   if (!markerMatches(context.userRoot, current.receipt.markerDigest)) {
     recoveryFailure('the exclusive operation marker could not be verified after creation');
   }
@@ -345,19 +464,53 @@ async function advanceRemovalTransaction(
       return setReceiptPhase(context, cursor, 'delete-intent');
     }
     case 'delete-intent': {
-      if (!tombstoneExists || !markerMatches(context.tombstonePath, cursor.receipt.markerDigest)) {
-        recoveryFailure('the recovery tombstone does not match the receipt');
+      if (!tombstoneExists) {
+        recoveryFailure('the recovery tombstone is missing');
       }
-      rmSync(context.tombstonePath, { recursive: true, force: true });
+      removeOwnedTombstone(context.tombstonePath, cursor.receipt.markerDigest);
       return setReceiptPhase(context, cursor, 'deleted');
     }
     case 'deleted': {
-      if (sourceExists || tombstoneExists) {
-        recoveryFailure('the deleted receipt phase still has user state');
+      if (tombstoneExists) {
+        recoveryFailure('the deleted receipt phase still has its recovery tombstone');
       }
       return replaceReceipt(context.lease, cursor, closeReceipt(cursor.receipt));
     }
   }
+}
+
+async function finishOpenRemovalReceipt(
+  context: TransactionContext,
+  initial: ReceiptCursor,
+): Promise<ReceiptCursor> {
+  let cursor = initial;
+  let transitions = 0;
+  while (cursor.receipt.state === 'open') {
+    if (transitions >= MAX_RECEIPT_TRANSITIONS) {
+      recoveryFailure('the receipt exceeded its bounded transition count');
+    }
+
+    const phase = cursor.receipt.phase;
+    const sourceExists = safeDirectoryExists(context.userRoot);
+    const tombstoneExists = safeDirectoryExists(context.tombstonePath);
+    const deletionAlreadyCompleted =
+      !tombstoneExists && (phase === 'delete-intent' || (!sourceExists && phase !== 'deleted'));
+    if (deletionAlreadyCompleted) {
+      cursor = await setReceiptPhase(context, cursor, 'deleted');
+    } else {
+      // Once a verified tombstone exists, any simultaneous live root is a
+      // recreated generation. Finish the tombstone receipt before removing it.
+      const sourceBelongsToReceipt = sourceExists && !tombstoneExists;
+      cursor = await advanceRemovalTransaction(
+        context,
+        cursor,
+        sourceBelongsToReceipt,
+        tombstoneExists,
+      );
+    }
+    transitions += 1;
+  }
+  return cursor;
 }
 
 async function completeUserRemovalTransaction(input: {
@@ -371,44 +524,27 @@ async function completeUserRemovalTransaction(input: {
     tombstonePath: join(dirname(input.userRoot), cursor.receipt.tombstoneBasename),
     lease: input.lease,
   };
-  if (cursor.receipt.state === 'closed') {
-    await mutateUserUninstallReceipt(input.lease, {
-      operation: 'unlink',
-      expectedContentSha256: cursor.sha256,
-    });
-    if (!safeDirectoryExists(input.userRoot)) return;
-    cursor = await initialReceiptCursor(input.lease, { status: 'absent' });
-    context = {
-      ...context,
-      tombstonePath: join(dirname(input.userRoot), cursor.receipt.tombstoneBasename),
-    };
+  let retiredReceipts = 0;
+
+  for (;;) {
+    if (cursor.receipt.state === 'closed') {
+      await mutateUserUninstallReceipt(input.lease, {
+        operation: 'unlink',
+        expectedContentSha256: cursor.sha256,
+      });
+      retiredReceipts += 1;
+      if (!safeDirectoryExists(input.userRoot)) return;
+      if (retiredReceipts >= MAX_REMOVAL_RECEIPTS) {
+        recoveryFailure('the user root was recreated repeatedly during removal');
+      }
+      cursor = await initialReceiptCursor(input.lease, { status: 'absent' });
+      context = {
+        ...context,
+        tombstonePath: join(dirname(input.userRoot), cursor.receipt.tombstoneBasename),
+      };
+    }
+    cursor = await finishOpenRemovalReceipt(context, cursor);
   }
-  let transitions = 0;
-
-  while (cursor.receipt.state === 'open') {
-    if (transitions >= MAX_RECEIPT_TRANSITIONS) {
-      recoveryFailure('the receipt exceeded its bounded transition count');
-    }
-
-    const phase = cursor.receipt.phase;
-    const sourceExists = safeDirectoryExists(context.userRoot);
-    const tombstoneExists = safeDirectoryExists(context.tombstonePath);
-    if (sourceExists && tombstoneExists) {
-      recoveryFailure('both the live user root and recovery tombstone exist');
-    }
-    if (!sourceExists && !tombstoneExists && phase !== 'deleted') {
-      cursor = await setReceiptPhase(context, cursor, 'deleted');
-      transitions += 1;
-      continue;
-    }
-    cursor = await advanceRemovalTransaction(context, cursor, sourceExists, tombstoneExists);
-    transitions += 1;
-  }
-
-  await mutateUserUninstallReceipt(input.lease, {
-    operation: 'unlink',
-    expectedContentSha256: cursor.sha256,
-  });
 }
 
 type UserHeaderPresentation =

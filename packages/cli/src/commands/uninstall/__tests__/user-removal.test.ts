@@ -2,9 +2,19 @@
  * User uninstall — crash-recoverable path unit coverage with injectable leases.
  */
 
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join, sep } from 'node:path';
 
 import {
   acquireGlobalRuntimeMaintenanceLease,
@@ -14,7 +24,7 @@ import {
 } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { executeUserRemoval } from '../user-removal.js';
+import { executeUserRemoval, removeOwnedTombstone } from '../user-removal.js';
 import {
   buildOpenReceipt,
   closeReceipt,
@@ -74,11 +84,37 @@ function seedCoordinationReceipt(
   });
 }
 
+function seedDeleteIntentTombstone(
+  homeDir: string,
+  userRoot: string,
+): {
+  readonly markerDigest: string;
+  readonly tombstonePath: string;
+} {
+  const operationId = 'uu-0123456789abcdef01234567';
+  const tombstoneBasename = newTombstoneBasename(operationId);
+  const tombstonePath = join(homeDir, tombstoneBasename);
+  const markerContent = Buffer.alloc(32, 0x61);
+  const markerDigest = digestMarkerContent(markerContent);
+  const receipt = buildOpenReceipt({
+    operationId,
+    phase: 'delete-intent',
+    tombstoneBasename,
+    markerDigest,
+  });
+  writeFileSync(join(userRoot, USER_UNINSTALL_MARKER_BASENAME), markerContent, {
+    mode: 0o600,
+  });
+  renameSync(userRoot, tombstonePath);
+  seedCoordinationReceipt(receipt);
+  return { markerDigest, tombstonePath };
+}
+
 interface CrashFixture {
   readonly label: string;
   readonly phase: UserUninstallPhase;
   readonly state?: 'open' | 'closed';
-  readonly location: 'source' | 'tombstone' | 'none';
+  readonly location: 'source' | 'tombstone' | 'both' | 'none';
   readonly marker: boolean;
 }
 
@@ -126,12 +162,36 @@ const CRASH_FIXTURES: readonly CrashFixture[] = [
     marker: true,
   },
   {
+    label: 'after rename-intent moved the root and a new root was recreated',
+    phase: 'rename-intent',
+    location: 'both',
+    marker: true,
+  },
+  {
+    label: 'during delete-intent after a new root was recreated',
+    phase: 'delete-intent',
+    location: 'both',
+    marker: true,
+  },
+  {
     label: 'after delete but before its receipt transition',
     phase: 'delete-intent',
     location: 'none',
     marker: false,
   },
+  {
+    label: 'after delete but before its receipt transition when a new root was recreated',
+    phase: 'delete-intent',
+    location: 'source',
+    marker: false,
+  },
   { label: 'after deleted', phase: 'deleted', location: 'none', marker: false },
+  {
+    label: 'after deleted before receipt close when user state was recreated',
+    phase: 'deleted',
+    location: 'source',
+    marker: false,
+  },
   {
     label: 'after the receipt is closed',
     phase: 'deleted',
@@ -219,6 +279,63 @@ describe('executeUserRemoval', () => {
     expect(inspectUserUninstallRecoveryHeader()).toEqual({ status: 'absent' });
   });
 
+  it('recovers an operation-bound partial marker temporary file', async () => {
+    const operationId = 'uu-0123456789abcdef01234567';
+    const markerContent = Buffer.alloc(32, 0x63);
+    seedCoordinationReceipt(
+      buildOpenReceipt({
+        operationId,
+        phase: 'marker-create-intent',
+        tombstoneBasename: newTombstoneBasename(operationId),
+        markerDigest: digestMarkerContent(markerContent),
+      }),
+    );
+    writeFileSync(
+      join(userRoot, `${USER_UNINSTALL_MARKER_BASENAME}.tmp-${operationId}`),
+      markerContent.subarray(0, 5),
+      { mode: 0o600 },
+    );
+
+    const result = await executeUserRemoval({
+      userRoot,
+      yes: true,
+      write: captureWrite().write,
+    });
+
+    expect(result.action).toBe('removed');
+    expect(existsSync(userRoot)).toBe(false);
+    expect(inspectUserUninstallRecoveryHeader()).toEqual({ status: 'absent' });
+  });
+
+  it('does not replace a genuinely foreign final marker', async () => {
+    const operationId = 'uu-0123456789abcdef01234567';
+    const markerContent = Buffer.alloc(32, 0x64);
+    seedCoordinationReceipt(
+      buildOpenReceipt({
+        operationId,
+        phase: 'marker-create-intent',
+        tombstoneBasename: newTombstoneBasename(operationId),
+        markerDigest: digestMarkerContent(markerContent),
+      }),
+    );
+    const markerPath = join(userRoot, USER_UNINSTALL_MARKER_BASENAME);
+    writeFileSync(markerPath, 'foreign', { mode: 0o600 });
+
+    await expect(
+      executeUserRemoval({
+        userRoot,
+        yes: true,
+        write: captureWrite().write,
+      }),
+    ).rejects.toThrow(/foreign operation marker/u);
+
+    expect(readFileSync(markerPath, 'utf8')).toBe('foreign');
+    expect(inspectUserUninstallRecoveryHeader()).toMatchObject({
+      status: 'valid',
+      state: 'open',
+    });
+  });
+
   it.each(CRASH_FIXTURES)('resumes safely $label', async (fixture) => {
     const operationId = 'uu-0123456789abcdef01234567';
     const tombstoneBasename = newTombstoneBasename(operationId);
@@ -238,8 +355,12 @@ describe('executeUserRemoval', () => {
         mode: 0o600,
       });
     }
-    if (fixture.location === 'tombstone') {
+    if (fixture.location === 'tombstone' || fixture.location === 'both') {
       renameSync(userRoot, tombstonePath);
+      if (fixture.location === 'both') {
+        mkdirSync(userRoot);
+        writeFileSync(join(userRoot, 'config.yml'), 'replacement: true\n', 'utf8');
+      }
     } else if (fixture.location === 'none') {
       rmSync(userRoot, { recursive: true, force: true });
     }
@@ -255,6 +376,114 @@ describe('executeUserRemoval', () => {
     expect(existsSync(userRoot)).toBe(false);
     expect(existsSync(tombstonePath)).toBe(false);
     expect(inspectUserUninstallRecoveryHeader()).toEqual({ status: 'absent' });
+  });
+
+  it('keeps the marker until child deletion completes and resumes after a child failure', async () => {
+    writeFileSync(join(userRoot, 'cache.bin'), 'cached', 'utf8');
+    const { markerDigest, tombstonePath } = seedDeleteIntentTombstone(homeDir, userRoot);
+    const events: string[] = [];
+    let childRemovals = 0;
+
+    expect(() =>
+      removeOwnedTombstone(tombstonePath, markerDigest, {
+        listEntries: (path) => readdirSync(path).sort(),
+        removeEntry: (path) => {
+          const entryName = typeof path === 'string' ? basename(path) : path.toString('utf8');
+          events.push(`remove:${entryName}`);
+          childRemovals += 1;
+          if (childRemovals === 2) throw new Error('injected child deletion failure');
+          rmSync(path, { recursive: true, force: true });
+        },
+        unlinkMarker: (path) => {
+          events.push('unlink-marker');
+          unlinkSync(path);
+        },
+        removeDirectory: (path) => {
+          events.push('remove-directory');
+          rmdirSync(path);
+        },
+      }),
+    ).toThrow('injected child deletion failure');
+
+    expect(events).toEqual(['remove:cache.bin', 'remove:config.yml']);
+    expect(existsSync(join(tombstonePath, 'cache.bin'))).toBe(false);
+    expect(existsSync(join(tombstonePath, 'config.yml'))).toBe(true);
+    expect(existsSync(join(tombstonePath, USER_UNINSTALL_MARKER_BASENAME))).toBe(true);
+
+    const result = await executeUserRemoval({
+      userRoot,
+      yes: true,
+      write: captureWrite().write,
+    });
+
+    expect(result.action).toBe('removed');
+    expect(existsSync(tombstonePath)).toBe(false);
+    expect(inspectUserUninstallRecoveryHeader()).toEqual({ status: 'absent' });
+  });
+
+  it('preserves raw filename bytes when constructing tombstone child paths', () => {
+    const tombstonePath = join(homeDir, 'byte-preserving-tombstone');
+    const markerContent = Buffer.alloc(32, 0x62);
+    const markerDigest = digestMarkerContent(markerContent);
+    const markerName = Buffer.from(USER_UNINSTALL_MARKER_BASENAME);
+    const invalidName = Buffer.from([0x66, 0x6f, 0x80]);
+    let listCalls = 0;
+    let removedPath: string | Buffer | undefined;
+
+    mkdirSync(tombstonePath);
+    writeFileSync(join(tombstonePath, USER_UNINSTALL_MARKER_BASENAME), markerContent);
+    removeOwnedTombstone(tombstonePath, markerDigest, {
+      listEntries: () => {
+        listCalls += 1;
+        return listCalls === 1 ? [markerName, invalidName] : [markerName];
+      },
+      removeEntry: (path) => {
+        removedPath = path;
+      },
+      unlinkMarker: (path) => unlinkSync(path),
+      removeDirectory: (path) => rmdirSync(path),
+    });
+
+    expect(removedPath).toEqual(
+      Buffer.concat([Buffer.from(tombstonePath), Buffer.from(sep), invalidName]),
+    );
+    expect(existsSync(tombstonePath)).toBe(false);
+  });
+
+  it('resumes from an empty markerless tombstone after the final unlink boundary', async () => {
+    const { tombstonePath } = seedDeleteIntentTombstone(homeDir, userRoot);
+    for (const entry of readdirSync(tombstonePath)) {
+      rmSync(join(tombstonePath, entry), { recursive: true, force: true });
+    }
+
+    const result = await executeUserRemoval({
+      userRoot,
+      yes: true,
+      write: captureWrite().write,
+    });
+
+    expect(result.action).toBe('removed');
+    expect(existsSync(tombstonePath)).toBe(false);
+    expect(inspectUserUninstallRecoveryHeader()).toEqual({ status: 'absent' });
+  });
+
+  it('refuses a markerless tombstone that still contains user data', async () => {
+    const { tombstonePath } = seedDeleteIntentTombstone(homeDir, userRoot);
+    unlinkSync(join(tombstonePath, USER_UNINSTALL_MARKER_BASENAME));
+
+    await expect(
+      executeUserRemoval({
+        userRoot,
+        yes: true,
+        write: captureWrite().write,
+      }),
+    ).rejects.toThrow(/markerless recovery tombstone is not empty/u);
+
+    expect(existsSync(join(tombstonePath, 'config.yml'))).toBe(true);
+    expect(inspectUserUninstallRecoveryHeader()).toMatchObject({
+      status: 'valid',
+      state: 'open',
+    });
   });
 
   it('fails closed when a valid header carries an unsafe receipt body', async () => {
