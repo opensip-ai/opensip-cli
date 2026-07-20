@@ -194,8 +194,8 @@ function assertProjectRootWritableForInit(cwd: string): void {
       error !== null &&
       typeof error === 'object' &&
       'code' in error &&
-      typeof (error as { code: unknown }).code === 'string'
-        ? (error as { code: string }).code
+      typeof error.code === 'string'
+        ? error.code
         : 'EACCES';
     throw new SystemError(
       `Cannot write opensip-cli.config.yml: the project directory is not writable (${code}).`,

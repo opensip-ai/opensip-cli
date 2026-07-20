@@ -298,7 +298,7 @@ describe('McpArmSession handshake', () => {
       projectRootVerified: true,
       projectScope: 'project',
       stderr: { bytes: 9, truncated: true },
-      surfaceEpoch: 7,
+      surfaceEpoch: EXPECTED_MCP_SURFACE_EPOCH,
       surfaceVerified: true,
       toolCount: TOOL_NAMES.length,
       toolNames: [...TOOL_NAMES].sort(),
