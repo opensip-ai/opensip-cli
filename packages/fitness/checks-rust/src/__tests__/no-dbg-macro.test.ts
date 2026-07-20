@@ -61,4 +61,19 @@ describe('analyzeDbgMacro', () => {
   it('handles whitespace between dbg! and delimiter', () => {
     expect(analyzeDbgMacro('dbg! (x);')).toHaveLength(1);
   });
+
+  it('handles whitespace between the macro name and bang', () => {
+    expect(analyzeDbgMacro('dbg ! (x);')).toHaveLength(1);
+  });
+
+  it('handles a macro invocation split across lines', () => {
+    const violations = analyzeDbgMacro(['dbg', '!', '(x);'].join('\n'));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.line).toBe(1);
+  });
+
+  it('does not flag dbg as a suffix of a Unicode Rust identifier', () => {
+    expect(analyzeDbgMacro('λdbg!(x);')).toHaveLength(0);
+  });
 });

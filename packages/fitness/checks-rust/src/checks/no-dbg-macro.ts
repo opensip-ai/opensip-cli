@@ -13,11 +13,11 @@
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 // Matches `dbg!(` / `dbg![` / `dbg!{` — Rust macros accept any of the
-// three delimiter pairs. `\b` anchors so `xdbg!(...)` doesn't match.
-// Whitespace between `dbg` and `!` is technically legal but vanishingly
-// rare in practice, so we require them adjacent to avoid the
-// `dbg != foo` (binary !=) false-positive trap.
-const DBG_MACRO_PATTERN = /\bdbg!\s*[([{]/g;
+// three delimiter pairs, with whitespace allowed between tokens. The
+// XID_Continue guard follows Rust's Unicode identifier grammar so a custom
+// macro such as `λdbg!()` is not mistaken for `dbg!()`. Requiring an opening
+// delimiter after `!` keeps the `dbg != foo` operator case out.
+const DBG_MACRO_PATTERN = /(?<!\p{XID_Continue})dbg\s*!\s*[([{]/gu;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
@@ -25,18 +25,20 @@ const DBG_MACRO_PATTERN = /\bdbg!\s*[([{]/g;
  */
 export function analyzeDbgMacro(content: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  const lines = content.split('\n');
-  for (const [i, line] of lines.entries()) {
-    const matches = line.match(DBG_MACRO_PATTERN);
-    if (!matches) continue;
-    violations.push(
-      ...matches.map(() => ({
-        message: "dbg!() is a debug-only macro and shouldn't ship",
-        severity: 'warning' as const,
-        line: i + 1,
-        suggestion: 'Remove the dbg!() call or replace it with a structured log statement',
-      })),
-    );
+  let line = 1;
+  let cursor = 0;
+  for (const match of content.matchAll(DBG_MACRO_PATTERN)) {
+    const matchIndex = match.index;
+    while (cursor < matchIndex) {
+      if (content.codePointAt(cursor) === 10) line++;
+      cursor++;
+    }
+    violations.push({
+      message: "dbg!() is a debug-only macro and shouldn't ship",
+      severity: 'warning',
+      line,
+      suggestion: 'Remove the dbg!() call or replace it with a structured log statement',
+    });
   }
   return violations;
 }
