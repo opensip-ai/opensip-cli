@@ -45,6 +45,16 @@ describe('analyzePrintStackTrace', () => {
     expect(violations.length).toBe(1);
   });
 
+  it('flags calls separated from the selector by filtered whitespace', () => {
+    expect(analyzePrintStackTrace('e.             printStackTrace();')).toHaveLength(1);
+  });
+
+  it('flags calls split across legal Java line breaks', () => {
+    const violations = analyzePrintStackTrace('e.\n  printStackTrace();');
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.line).toBe(1);
+  });
+
   it('does not flag printStackTrace with arguments (different signature)', () => {
     // printStackTrace(PrintStream) is a legitimate call — only the
     // no-arg variant goes to System.err implicitly.

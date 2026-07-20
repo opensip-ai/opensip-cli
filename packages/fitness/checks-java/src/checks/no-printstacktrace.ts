@@ -13,7 +13,7 @@
  */
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
-const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g;
+const PRINT_STACK_TRACE_PATTERN = /\.\s*printStackTrace\s*\(\s*\)/g;
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
@@ -23,18 +23,23 @@ const PRINT_STACK_TRACE_PATTERN = /\.printStackTrace\s*\(\s*\)/g;
  */
 export function analyzePrintStackTrace(content: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  const lines = content.split('\n');
-  for (const [i, line_] of lines.entries()) {
-    const line = line_;
-    PRINT_STACK_TRACE_PATTERN.lastIndex = 0;
-    while (PRINT_STACK_TRACE_PATTERN.exec(line) !== null) {
-      violations.push({
-        message: 'e.printStackTrace() bypasses the logging framework — use a logger instead',
-        severity: 'warning',
-        line: i + 1,
-        suggestion: 'Replace with logger.error("...", e) so the trace lands in centralized logs',
-      });
+  let line = 1;
+  let lineCursor = 0;
+  PRINT_STACK_TRACE_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = PRINT_STACK_TRACE_PATTERN.exec(content)) !== null) {
+    let newline = content.indexOf('\n', lineCursor);
+    while (newline !== -1 && newline < match.index) {
+      line++;
+      lineCursor = newline + 1;
+      newline = content.indexOf('\n', lineCursor);
     }
+    violations.push({
+      message: 'e.printStackTrace() bypasses the logging framework — use a logger instead',
+      severity: 'warning',
+      line,
+      suggestion: 'Replace with logger.error("...", e) so the trace lands in centralized logs',
+    });
   }
   return violations;
 }
