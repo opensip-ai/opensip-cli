@@ -41,6 +41,10 @@ describe('skipToEndOfLine', () => {
     expect(skipToEndOfLine('abc\ndef', 0)).toBe(3);
   });
 
+  it('recognizes a bare carriage-return line terminator', () => {
+    expect(skipToEndOfLine('abc\rdef', 0)).toBe(3);
+  });
+
   it('advances to end of text when no newline', () => {
     expect(skipToEndOfLine('abc', 1)).toBe(3);
   });
