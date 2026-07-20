@@ -22,6 +22,7 @@
  * each owning tool.
  */
 
+import { ConfigurationError } from '@opensip-cli/core';
 import { z } from 'zod';
 
 // =============================================================================
@@ -298,8 +299,29 @@ export function createPluginsConfigSchema(
     fit: pluginStringArraySchema.optional(),
     sim: pluginStringArraySchema.optional(),
   };
+  const kinds = new Map<string, PluginConfigKeyKind>([
+    ['fit', 'packages'],
+    ['sim', 'packages'],
+  ]);
 
   for (const { key, kind } of keys) {
+    if (key === '__proto__') {
+      throw new ConfigurationError(`Plugin config key '${key}' is not supported.`, {
+        code: 'CONFIGURATION_ERROR',
+        namespace: 'plugins',
+      });
+    }
+    const existing = kinds.get(key);
+    if (existing !== undefined) {
+      if (existing !== kind) {
+        throw new ConfigurationError(
+          `Plugin config key '${key}' is declared with conflicting value kinds (${existing}, ${kind}).`,
+          { code: 'CONFIGURATION_ERROR', namespace: 'plugins' },
+        );
+      }
+      continue;
+    }
+    kinds.set(key, kind);
     shape[key] = (kind === 'autoDiscover' ? z.boolean() : pluginStringArraySchema).optional();
   }
 

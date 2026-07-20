@@ -80,7 +80,7 @@ function resolveNamePatternScopes(
   customerScopes: readonly string[],
 ): readonly string[] | undefined {
   if (descriptor.discovery.mode !== 'name-pattern') return undefined;
-  const [primary = '@opensip-cli', ...restDefaults] = descriptor.discovery.defaultScopes;
+  const [primary, ...restDefaults] = descriptor.discovery.defaultScopes;
   return resolveScopes(
     primary,
     [...restDefaults, ...customerScopes],

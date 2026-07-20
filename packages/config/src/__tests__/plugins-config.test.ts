@@ -1,3 +1,4 @@
+import { ConfigurationError, type ToolPluginManifest } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 import { type z } from 'zod';
 
@@ -8,8 +9,6 @@ import {
   type PluginConfigKeyDeclaration,
   type PluginsConfig,
 } from '../document/targeting.js';
-
-import type { ToolPluginManifest } from '@opensip-cli/core';
 
 // A minimal manifest shape for config-key derivation: this suite only reads
 // `capabilities`, so the return is narrowed to what it builds and consumes
@@ -121,5 +120,22 @@ describe('PluginsConfig — schema-driven extension', () => {
       customPackages: ['@acme/custom'],
       autoDiscoverCustom: false,
     });
+  });
+
+  it('preserves host plugin-key types when a manifest repeats or conflicts with them', () => {
+    const sameKind = createPluginsConfigSchema([{ key: 'fit', kind: 'packages' }]);
+    expect(sameKind.parse({ fit: ['@acme/fit-pack'] })).toEqual({
+      fit: ['@acme/fit-pack'],
+    });
+
+    expect(() => createPluginsConfigSchema([{ key: 'fit', kind: 'autoDiscover' }])).toThrow(
+      ConfigurationError,
+    );
+  });
+
+  it('rejects the prototype-magic key instead of silently losing its schema entry', () => {
+    expect(() => createPluginsConfigSchema([{ key: '__proto__', kind: 'packages' }])).toThrow(
+      ConfigurationError,
+    );
   });
 });

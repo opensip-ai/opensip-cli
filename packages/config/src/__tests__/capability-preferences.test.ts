@@ -68,6 +68,18 @@ describe('resolveCapabilityPreferences', () => {
     expect(resolveCapabilityPreferences(SIM, {}).scopes).toEqual(['@opensip-cli']);
   });
 
+  it('preserves an intentionally empty default scope list', () => {
+    const descriptor: CapabilityDiscoveryDescriptor = {
+      ...SIM,
+      discovery: { mode: 'name-pattern', prefix: 'scenarios-', defaultScopes: [] },
+    };
+
+    expect(resolveCapabilityPreferences(descriptor, {}).scopes).toEqual([]);
+    expect(
+      resolveCapabilityPreferences(descriptor, { packageScopes: ['@customer'] }).scopes,
+    ).toEqual(['@customer']);
+  });
+
   it('sim name-pattern: customer packageScopes merge with the default, deduped + validated', () => {
     const prefs = resolveCapabilityPreferences(SIM, {
       packageScopes: ['@acme', '@opensip-cli', 'not-a-scope', '@beta'],
