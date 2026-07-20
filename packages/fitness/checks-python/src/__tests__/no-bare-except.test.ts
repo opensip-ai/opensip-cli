@@ -80,4 +80,15 @@ except :
     const violations = analyzeBareExcept(src);
     expect(violations.length).toBe(1);
   });
+
+  it('flags a bare except split by an explicit line continuation', () => {
+    const src = `try:
+    a()
+except \\
+:
+    pass`;
+    const violations = analyzeBareExcept(src);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.line).toBe(3);
+  });
 });

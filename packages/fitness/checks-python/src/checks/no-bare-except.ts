@@ -8,34 +8,32 @@
  * E722, pylint W0702) flag this. Always specify what you're catching,
  * even if it's just `except Exception:`.
  *
- * Detection is line-pattern based: a line whose first non-whitespace
- * characters are `except:` (with optional whitespace before the colon).
- * The check uses `strip-strings` content filtering so a literal like
- * `"except:"` inside a docstring or string doesn't false-fire.
+ * Detection uses the Python syntax tree so legal token separation, including
+ * an explicit line continuation before the colon, cannot hide the clause.
  */
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
-
-const BARE_EXCEPT_PATTERN = /^\s*except\s*:/gm;
+import { getLineNumber, getSharedTree, isExcept, walkNodes } from '@opensip-cli/lang-python';
 
 /**
  * Pure analysis function. Exported so unit tests can exercise the
  * detection logic without standing up the full Check framework.
  */
-export function analyzeBareExcept(content: string): CheckViolation[] {
+export function analyzeBareExcept(
+  content: string,
+  filePath = '<python-no-bare-except>.py',
+): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  BARE_EXCEPT_PATTERN.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = BARE_EXCEPT_PATTERN.exec(content)) !== null) {
-    // Compute 1-based line number from match index.
-    const upto = content.slice(0, match.index);
-    const line = upto.split('\n').length;
+  const parsed = getSharedTree(filePath, content);
+  if (!parsed) return violations;
+  walkNodes(parsed.tree.rootNode, (node) => {
+    if (!isExcept(node) || node.childForFieldName('value') !== null) return;
     violations.push({
       message: 'Bare `except:` catches BaseException — including KeyboardInterrupt and SystemExit',
       severity: 'warning',
-      line,
+      line: getLineNumber(node),
       suggestion: 'Catch a specific exception (e.g. `except Exception:` or a narrower type)',
     });
-  }
+  });
   return violations;
 }
 
@@ -49,5 +47,5 @@ export const noBareExcept = defineCheck({
   // not matched. Comments are still visible — but `# except:` won't
   // match the leading-whitespace anchor since `#` is in the way.
   contentFilter: 'strip-strings',
-  analyze: (content) => analyzeBareExcept(content),
+  analyze: (content, filePath) => analyzeBareExcept(content, filePath),
 });
