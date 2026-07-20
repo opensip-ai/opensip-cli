@@ -103,7 +103,7 @@ describe('graph-go branch coverage (round 2)', () => {
     writeFileSync(join(dir, 'main.go'), 'package main\nimport `fmt`\nfunc main() {}\n', 'utf8');
     const out = walk();
     expect(out.dependencySites).toHaveLength(1);
-    expect(out.dependencySites[0]?.specifier).toBe('fmt');
+    expect(out.dependencySites?.[0]?.specifier).toBe('fmt');
     // The walker still produces the module-init for the file.
     const moduleInits = Object.keys(out.occurrences).filter((n) => n.startsWith('<module-init:'));
     expect(moduleInits.length).toBe(1);
