@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { LanguageRegistry, RunScope, runWithScope } from '@opensip-cli/core';
+import { LanguageRegistry, RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { typescriptAdapter } from '@opensip-cli/lang-typescript';
 import { fitnessTestFileCache } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -92,10 +92,10 @@ describe('literal-sensitive checks with production-style string filtering', () =
 
   it('keeps fallback type-only named imports non-runtime while empty imports execute', () => {
     const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
-    const typeOnly = runWithScope(fallbackScope, () =>
+    const typeOnly = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences('fallback.ts', 'import { type A } from "jose";'),
     );
-    const empty = runWithScope(fallbackScope, () =>
+    const empty = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences('fallback.ts', 'import {} from "jose";'),
     );
     expect(typeOnly).toHaveLength(1);
@@ -106,7 +106,7 @@ describe('literal-sensitive checks with production-style string filtering', () =
 
   it('finds fallback import-equals declarations, including exported aliases', () => {
     const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
-    const references = runWithScope(fallbackScope, () =>
+    const references = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences(
         'fallback.ts',
         ['import first = require("moment");', 'export import second = require("moment");'].join(
@@ -139,7 +139,7 @@ describe('literal-sensitive checks with production-style string filtering', () =
 
   it('finds fallback imports after a same-line statement boundary', () => {
     const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
-    const references = runWithScope(fallbackScope, () =>
+    const references = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences('fallback.ts', 'const value = 1; import moment from "moment";'),
     );
     expect(references).toHaveLength(1);
@@ -149,22 +149,22 @@ describe('literal-sensitive checks with production-style string filtering', () =
 
   it('does not mistake regex text for a same-line fallback import', () => {
     const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
-    const regexReferences = runWithScope(fallbackScope, () =>
+    const regexReferences = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences('fallback.ts', 'const pattern = /; import moment from "moment"/;'),
     );
-    const divisionReferences = runWithScope(fallbackScope, () =>
+    const divisionReferences = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences(
         'fallback.ts',
         'const ratio = numerator / denominator; import moment from "moment";',
       ),
     );
-    const controlBodyReferences = runWithScope(fallbackScope, () =>
+    const controlBodyReferences = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences(
         'fallback.ts',
         'if (enabled) /; import moment from "moment"/.test(source);',
       ),
     );
-    const afterBlockReferences = runWithScope(fallbackScope, () =>
+    const afterBlockReferences = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences(
         'fallback.ts',
         'if (enabled) {} /; import moment from "moment"/.test(source);',
@@ -178,7 +178,7 @@ describe('literal-sensitive checks with production-style string filtering', () =
 
   it('rejects malformed fallback import-equals calls', () => {
     const fallbackScope = new RunScope({ languages: new LanguageRegistry() });
-    const references = runWithScope(fallbackScope, () =>
+    const references = runWithScopeSync(fallbackScope, () =>
       findStaticModuleReferences(
         'fallback.ts',
         [
