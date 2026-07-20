@@ -382,8 +382,8 @@ function filterContentImpl(
     }
 
     // Bare scanner emits SlashToken for `/`; only reScanSlashToken yields regex.
-    // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (
+      // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
       token === ts.SyntaxKind.SlashToken &&
       (regularExpressionStarts.has(scanner.getTokenStart()) ||
         canStartRegExpLiteral(prevSignificant))
