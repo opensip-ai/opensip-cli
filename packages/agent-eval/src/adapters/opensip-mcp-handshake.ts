@@ -9,7 +9,7 @@ const EXPECTED_SERVER_NAME = 'opensip-cli-mcp';
 const MAX_HANDSHAKE_STRING_BYTES = 4096;
 const MAX_TOOL_NAME_BYTES = 128;
 const MAX_TOOL_COUNT = 256;
-export const EXPECTED_MCP_SURFACE_EPOCH = 7;
+export const EXPECTED_MCP_SURFACE_EPOCH = 8;
 
 /** MCP capabilities required by harness setup and every registered OpenSIP strategy. */
 export const REQUIRED_MCP_TOOL_NAMES: readonly string[] = Object.freeze([

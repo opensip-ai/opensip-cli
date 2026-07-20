@@ -84,11 +84,12 @@
  * (or refuse).
  */
 
-import { existsSync } from 'node:fs';
+import { accessSync, constants, existsSync } from 'node:fs';
 
 import {
   inspectRuntimePromotionRecoveryHeader,
   resolveProjectPaths,
+  SystemError,
   type ProjectContext,
 } from '@opensip-cli/core';
 
@@ -175,6 +176,31 @@ function baseInitResult(cwd: string): BaseInitResult {
     cwd,
     configFilename: 'opensip-cli.config.yml',
   };
+}
+
+/**
+ * Fail closed before journal/promotion work when the project root cannot accept
+ * authored files. Soft "rolled-back" InitResult shapes hide EACCES behind
+ * status:ok + exit 1; agents and platform-acceptance require a structured
+ * `command.error` that names `opensip-cli.config.yml` and the permission failure.
+ *
+ * @throws {SystemError} When the project directory is not writable.
+ */
+function assertProjectRootWritableForInit(cwd: string): void {
+  try {
+    accessSync(cwd, constants.W_OK);
+  } catch (error) {
+    const code =
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      typeof (error as { code: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : 'EACCES';
+    throw new SystemError(
+      `Cannot write opensip-cli.config.yml: the project directory is not writable (${code}).`,
+    );
+  }
 }
 
 function invalidInitInput(
@@ -325,6 +351,7 @@ export async function executeInit(
   const baseResult = baseInitResult(cwd);
   const invalid = invalidInitInput({ ...targetArgs, cwd: requestedCwd }, baseResult);
   if (invalid !== undefined) return invalid;
+  assertProjectRootWritableForInit(cwd);
 
   const header = inspectRuntimePromotionRecoveryHeader(cwd);
   if (header.status !== 'absent') {

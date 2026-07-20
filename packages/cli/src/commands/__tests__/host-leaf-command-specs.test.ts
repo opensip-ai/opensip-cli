@@ -112,6 +112,7 @@ describe('top-level host leaf command specs', () => {
         bootstrapMode: 'inspection-only',
       },
     });
+    expect(report.commonFlags).toEqual(['json', 'cwd']);
     expect(report.options?.map((option) => option.flag)).toEqual([
       '--no-open',
       '--run',

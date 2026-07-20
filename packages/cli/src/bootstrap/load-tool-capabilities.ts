@@ -27,6 +27,7 @@ import {
   currentScope,
   loadCapabilityDomain,
   logger,
+  resolvePackageDir,
   type CapabilityBridgeContribution,
   type CapabilityContributionLoader,
   type CapabilityDiscoveryDescriptor,
@@ -104,7 +105,11 @@ export async function loadOwningToolCapabilities(
     if (descriptor === undefined) continue;
     const configuredPreferences = resolveCapabilityPreferences(descriptor, pluginsConfig);
     const explicitlyConfiguredPackages = new Set(configuredPreferences.packages);
-    const preferences = augmentBundledCapabilityPreferences(descriptor, configuredPreferences);
+    const preferences = augmentBundledCapabilityPreferences(
+      descriptor,
+      configuredPreferences,
+      cliDir,
+    );
     await loadCapabilityDomain({
       registry,
       domainId: domain.id,
@@ -342,14 +347,23 @@ function isBundledCapabilityPack(
  * Seed manifest-declared built-in packs when config did not supply an explicit
  * package list. Domains with `explicitListMode: 'augment'` still auto-discover
  * project-local packs on top of this list.
+ *
+ * Only packs that actually resolve under the CLI install tree are seeded. The
+ * manifest may still list monorepo-only private packs (e.g. checks-dogfood) so
+ * they remain trust-admitted when present, without emitting
+ * "configured package … is not installed" noise on every published-install run —
+ * that warning rides stderr and breaks pure `--json` under a PTY.
  */
 function augmentBundledCapabilityPreferences(
   descriptor: CapabilityDiscoveryDescriptor,
   preferences: CapabilityPreferences,
+  cliDir: string,
 ): CapabilityPreferences {
   if (preferences.packages !== undefined) return preferences;
   if (descriptor.discovery.mode !== 'marker') return preferences;
   const bundled = BUNDLED_CAPABILITY_PACKS[descriptor.discovery.markerKind];
   if (bundled === undefined || bundled.length === 0) return preferences;
-  return { ...preferences, packages: [...bundled] };
+  const installed = bundled.filter((name) => resolvePackageDir(cliDir, name) !== undefined);
+  if (installed.length === 0) return preferences;
+  return { ...preferences, packages: installed };
 }

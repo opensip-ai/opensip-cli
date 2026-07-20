@@ -126,7 +126,9 @@ export function createReportCommandSpec(): HostSpec {
     // First-run capable: `audit --open` and `report` must work on a pre-init
     // run. The HTML lands in the ephemeral runtime's reports dir, not the repo.
     noInit: true,
-    commonFlags: ['json'],
+    // `--cwd` is required by platform-acceptance continuity journeys (and by
+    // any agent that generates a report for a project other than process.cwd).
+    commonFlags: ['json', 'cwd'],
     options: [
       {
         flag: '--no-open',
