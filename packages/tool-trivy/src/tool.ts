@@ -30,7 +30,7 @@
  */
 
 import { readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter } from '@opensip-cli/external-tool-adapter';
+import { compareVersion, defineExternalToolAdapter } from '@opensip-cli/external-tool-adapter';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
@@ -66,9 +66,9 @@ export function parseTrivyVersion(stdout: string): string {
  *
  * Scanner selection (A8): `trivy fs` defaults to `vuln,secret` ONLY — misconfig is
  * OFF unless requested. The adapter advertises misconfig (metadata, docs, the DS002
- * golden), so it MUST pass `--scanners vuln,secret,misconfig` or a real run would
- * silently emit zero misconfig findings while the fixtures assert them. VERIFY-
- * against-installed-trivy: the `--scanners` value set + name across versions.
+ * golden), so it MUST request that scanner or a real run would silently emit zero
+ * misconfig findings while the fixtures assert them. Trivy calls the value `config`
+ * before 0.48 and `misconfig` from 0.48 onward.
  *
  * Local-only posture (ADR-0092): Trivy fetches its vulnerability DB from GHCR on
  * first run, so the scan is pinned offline with `--skip-db-update`,
@@ -82,10 +82,21 @@ export function parseTrivyVersion(stdout: string): string {
  * substrate derives findings from the parsed SARIF (any nonzero is a fault).
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
+  // Trivy renamed the scanner value `config` → `misconfig` in 0.48 and the
+  // check-update flag in 0.51. Keep the adapter's declared 0.40 floor usable.
+  const scanners =
+    compareVersion(ctx.binary.version, '0.48.0') === 'too-old'
+      ? 'vuln,secret,config'
+      : 'vuln,secret,misconfig';
+  const skipCheckUpdate =
+    compareVersion(ctx.binary.version, '0.51.0') === 'too-old'
+      ? '--skip-policy-update'
+      : '--skip-check-update';
+
   return [
     'fs',
     '--scanners',
-    'vuln,secret,misconfig',
+    scanners,
     '--format',
     'sarif',
     '--output',
@@ -93,7 +104,7 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
     '--skip-db-update',
     '--skip-java-db-update',
     '--offline-scan',
-    '--skip-check-update',
+    skipCheckUpdate,
     '.', // cwd is projectRoot — keep reported paths project-relative
   ];
 }

@@ -133,6 +133,7 @@ describe('trivy tool — binary helpers', () => {
   it('builds the filesystem-scan argv with the local-only flags, writing SARIF to the run artifact path', () => {
     const ctx = {
       projectRoot: '/proj',
+      binary: { path: '/usr/local/bin/trivy', layer: 'path', version: '0.72.0' },
       artifactPath: (name: string) => `/proj/.runtime/artifacts/trivy/run1/${name}`,
     } as unknown as AdapterRunContext;
     expect(buildScanArgs(ctx)).toEqual([
@@ -151,6 +152,28 @@ describe('trivy tool — binary helpers', () => {
     ]);
   });
 
+  it.each([
+    ['0.40.0', 'vuln,secret,config', '--skip-policy-update'],
+    ['0.47.0', 'vuln,secret,config', '--skip-policy-update'],
+    ['0.48.0', 'vuln,secret,misconfig', '--skip-policy-update'],
+    ['0.50.1', 'vuln,secret,misconfig', '--skip-policy-update'],
+    ['0.51.0', 'vuln,secret,misconfig', '--skip-check-update'],
+    ['0.72.0', 'vuln,secret,misconfig', '--skip-check-update'],
+  ])('uses the Trivy %s scanner and check-update spellings', (version, scanners, updateFlag) => {
+    const ctx = {
+      projectRoot: '/proj',
+      binary: { path: '/usr/local/bin/trivy', layer: 'path', version },
+      artifactPath: (name: string) => `/proj/.runtime/artifacts/trivy/run1/${name}`,
+    } as unknown as AdapterRunContext;
+
+    const args = buildScanArgs(ctx);
+    expect(args[args.indexOf('--scanners') + 1]).toBe(scanners);
+    expect(args).toContain(updateFlag);
+    expect(args).not.toContain(
+      updateFlag === '--skip-check-update' ? '--skip-policy-update' : '--skip-check-update',
+    );
+  });
+
   it('A8: requests the misconfig scanner (offline) so the advertised Dockerfile findings are actually produced', () => {
     // `trivy fs` defaults to `vuln,secret` only — without `--scanners …,misconfig`
     // a real run emits ZERO misconfig results while metadata/docs/the DS002 golden
@@ -158,6 +181,7 @@ describe('trivy tool — binary helpers', () => {
     // misconfig checks-bundle fetch offline.
     const ctx = {
       projectRoot: '/proj',
+      binary: { path: '/usr/local/bin/trivy', layer: 'path', version: '0.72.0' },
       artifactPath: (name: string) => `/proj/.runtime/artifacts/trivy/run1/${name}`,
     } as unknown as AdapterRunContext;
     const args = buildScanArgs(ctx);
