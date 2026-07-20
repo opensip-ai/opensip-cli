@@ -41,10 +41,23 @@ function normalize(vuln: Record<string, unknown>, dependency: Record<string, unk
   });
 }
 
+function normalizeSkippedDependency(reason: string): Signal {
+  return createSignal({
+    source: 'pip-audit',
+    category: 'quality',
+    severity: 'medium',
+    ruleId: 'pip-audit-skipped-dependency',
+    message: reason,
+    code: { file: '' },
+    metadata: withNativeSeverity({ reason }, null),
+  });
+}
+
 /**
  * Parse pip-audit's JSON report into findings by walking each dependency's
  * `vulns[]` and emitting one signal per vulnerability, labelled with the
- * affected `name@version` and any available fix versions.
+ * affected `name@version` and any available fix versions. Dependencies that
+ * pip-audit explicitly skipped are preserved as quality signals.
  */
 export function parsePipAuditJson(
   raw: ParsedScannerOutput,
@@ -54,6 +67,10 @@ export function parsePipAuditJson(
   for (const dep of asArray(parsedObjectDocument(raw)?.dependencies) ?? []) {
     const dependency = asObject(dep);
     if (dependency === undefined) continue;
+    const skipReason = getString(dependency, 'skip_reason');
+    if (skipReason !== undefined) {
+      signals.push(normalizeSkippedDependency(skipReason));
+    }
     for (const vuln of asArray(dependency.vulns) ?? []) {
       const record = asObject(vuln);
       if (record !== undefined) signals.push(normalize(record, dependency));

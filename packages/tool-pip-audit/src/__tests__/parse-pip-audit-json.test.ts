@@ -76,6 +76,33 @@ describe('parsePipAuditJson', () => {
     ]);
   });
 
+  it('surfaces dependencies that pip-audit could not audit', () => {
+    const raw = JSON.stringify({
+      dependencies: [
+        {
+          name: 'private-package',
+          skip_reason:
+            'Dependency not found on PyPI and could not be audited: private-package (1.0)',
+        },
+      ],
+    });
+
+    expect(parsePipAuditJson(output(raw), CTX)).toEqual([
+      expect.objectContaining({
+        source: 'pip-audit',
+        category: 'quality',
+        severity: 'medium',
+        ruleId: 'pip-audit-skipped-dependency',
+        message: 'Dependency not found on PyPI and could not be audited: private-package (1.0)',
+        filePath: '',
+        metadata: expect.objectContaining({
+          reason: 'Dependency not found on PyPI and could not be audited: private-package (1.0)',
+          nativeSeverity: null,
+        }),
+      }),
+    ]);
+  });
+
   it('falls back to a default rule id and omits the suggestion / aliases when fields are absent', () => {
     const raw = JSON.stringify({
       dependencies: [{ name: 'x', version: '1', vulns: [{}] }],
