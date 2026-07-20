@@ -151,6 +151,22 @@ describe('warnIfInsecureOtlpEndpoint', () => {
     warn.mockRestore();
   });
 
+  it('does not copy endpoint credentials into the plaintext warning', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    warnIfInsecureOtlpEndpoint(
+      'http://collector-user:collector-password@collector.example.com:4318/v1/traces?api_key=collector-token#collector-fragment',
+    );
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    const warning = JSON.stringify(warn.mock.calls);
+    warn.mockRestore();
+    expect(warning).toContain('http://collector.example.com:4318/v1/traces');
+    expect(warning).not.toContain('collector-user');
+    expect(warning).not.toContain('collector-password');
+    expect(warning).not.toContain('collector-token');
+    expect(warning).not.toContain('collector-fragment');
+  });
+
   it.each([
     ['https remote', 'https://collector.example.com/v1/traces'],
     ['loopback localhost', 'http://localhost:4318/v1/traces'],

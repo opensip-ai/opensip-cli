@@ -115,11 +115,16 @@ export function warnIfInsecureOtlpEndpoint(endpoint: string): void {
   if (url.protocol !== 'http:') return;
   const host = url.hostname.replace(/^\[|\]$/g, ''); // strip IPv6 brackets
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
+  url.username = '';
+  url.password = '';
+  url.search = '';
+  url.hash = '';
+  const displayEndpoint = url.href;
   logger.warn('telemetry.endpoint.insecure', {
     evt: 'telemetry.endpoint.insecure',
     module: 'cli:telemetry',
-    endpoint,
-    msg: `OTLP endpoint '${endpoint}' uses plaintext ${url.protocol}// to a non-loopback host; traces can carry identity (tenant_id/run_id from OTEL_RESOURCE_ATTRIBUTES) and will egress unencrypted. Use https:// for remote collectors.`,
+    endpoint: displayEndpoint,
+    msg: `OTLP endpoint '${displayEndpoint}' uses plaintext ${url.protocol}// to a non-loopback host; traces can carry identity (tenant_id/run_id from OTEL_RESOURCE_ATTRIBUTES) and will egress unencrypted. Use https:// for remote collectors.`,
   });
 }
 
