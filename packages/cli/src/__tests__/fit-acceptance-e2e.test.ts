@@ -22,15 +22,19 @@
  * `packages/cli/dist/index.js`).
  */
 
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { distRunner } from './harness/cli-acceptance.js';
 
 const cli = distRunner();
+const WORKSPACE_FITNESS_PACKAGE = realpathSync(
+  fileURLToPath(new URL('../../../fitness/engine/', import.meta.url)),
+);
 /** Run `fit` through the INSTALLED path: drop it from the bundled set so the CLI
  *  discovers + loads it as an external plugin (the §1 "as if external" lever). */
 const AS_INSTALLED = {
@@ -42,6 +46,17 @@ let testDir: string;
 
 beforeEach(() => {
   testDir = realpathSync(mkdtempSync(join(tmpdir(), 'opensip-fit-acceptance-')));
+  // This contract compares the SAME fitness build through bundled and installed
+  // provenance. Pin the fixture's nearest package so an ambient ancestor
+  // node_modules (for example /tmp/node_modules) cannot substitute another
+  // published version for the installed leg.
+  const opensipScopeDir = join(testDir, 'node_modules', '@opensip-cli');
+  mkdirSync(opensipScopeDir, { recursive: true });
+  symlinkSync(
+    WORKSPACE_FITNESS_PACKAGE,
+    join(opensipScopeDir, 'fitness'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
   // A minimal but real project: a config + a source file that a universal check
   // flags, so the run produces deterministic findings to compare (not just 0).
   // Also write package.json so this temp dir is treated as an independent project
@@ -52,13 +67,6 @@ beforeEach(() => {
   // Without this the "bundled" vs "installed" fitness paths can see different check
   // sets, causing the normalized CommandOutcome envelope comparison to fail even
   // though behaviour on the fixture is identical.
-  //
-  // The private @opensip-cli/checks-dogfood fit-pack is a separate (builtin-scoped,
-  // non-bundled) case: this project does NOT opt into it via plugins.checkPackages,
-  // so the host trust gate — now applied on BOTH the bootstrap and the engine's own
-  // capability load (ADR-0138) — denies it on both provenance paths. A regression
-  // that let the engine default-admit it would surface here as a bundled≠installed
-  // envelope diff, which is exactly what this test guards.
   writeFileSync(
     join(testDir, 'package.json'),
     JSON.stringify({ name: 'fit-acceptance-fixture', private: true }, null, 2),
