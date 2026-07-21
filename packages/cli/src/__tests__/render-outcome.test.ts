@@ -160,7 +160,7 @@ describe('renderOutcome — guaranteed JSON fallback (ADR-0175)', () => {
     spyStdout();
     const render = vi.fn();
     // Intentionally hostile residual payload — envelope/data are not emit-normalized.
-    const circular: CommandResult & { self?: unknown } = { type: 'hostile' };
+    const circular = { type: 'hostile' } as unknown as CommandResult & { self?: unknown };
     circular.self = circular;
     const outcome: CommandOutcome = {
       kind: 'fit.run',

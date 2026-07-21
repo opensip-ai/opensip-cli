@@ -442,6 +442,10 @@ const EXPORT_ALLOWLIST = {
   DiagnosticLevel: 'run-kernel',
   DiagnosticPhase: 'run-kernel',
   BootstrapDiagnosticsCollector: 'run-kernel',
+  // ADR-0176 — bootstrap→outcome diagnostics fold. The merge fn is consumed by
+  // the CLI (assemble-outcome); the origin tag is the contract consumers assert.
+  BOOTSTRAP_DIAGNOSTIC_ORIGIN: 'run-kernel',
+  mergeBootstrapIntoRunDiagnostics: 'run-kernel',
   CLI_DIAGNOSTIC_CODES: 'shared-data-contracts',
   CliDiagnostic: 'shared-data-contracts',
   CliDiagnosticCategory: 'shared-data-contracts',

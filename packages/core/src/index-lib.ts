@@ -107,7 +107,6 @@ export type {
 export {
   BOOTSTRAP_DIAGNOSTIC_ORIGIN,
   BootstrapDiagnosticsCollector,
-  cliDiagnosticToEvent,
   isRelevantDiagnostic,
   mergeBootstrapIntoRunDiagnostics,
 } from './lib/bootstrap-diagnostics.js';
@@ -135,16 +134,9 @@ export type { ReadYamlFileOrThrowOptions } from './lib/yaml.js';
 export { isPlainRecord } from './lib/json-guards.js';
 export { projectJsonScalarMetadata } from './lib/json-scalars.js';
 export type { JsonScalar } from './lib/json-scalars.js';
-// Lib — bounded JSON-safe trees for diagnostics admission (ADR-0175).
-export {
-  JSON_VALUE_MAX_ARRAY_ITEMS,
-  JSON_VALUE_MAX_DEPTH,
-  JSON_VALUE_MAX_OBJECT_KEYS,
-  JSON_VALUE_MAX_STRING_LENGTH,
-  toJsonRecord,
-  toJsonValue,
-} from './lib/json-value.js';
-export type { JsonRecord, JsonValue, ToJsonValueOptions } from './lib/json-value.js';
+// Lib — bounded JSON-safe trees for diagnostics admission (ADR-0175). The
+// normalizer + its caps/types are internal: callers never normalize (the
+// DiagnosticsBus admits and normalizes on emit), so they stay unexported.
 
 // Lib — IDs
 export { generateId, generatePrefixedId, extractTimestamp, generateUUID } from './lib/ids.js';
