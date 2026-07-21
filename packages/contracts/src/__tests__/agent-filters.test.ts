@@ -159,6 +159,17 @@ describe('applyAgentFilters', () => {
     expect(() => normalizeAgentRunFilters([], 'abc')).toThrow(AgentFilterParseError);
   });
 
+  it('rejects partial integer top values (parseInt("10abc") trap)', () => {
+    // M15: Number.parseInt accepted a prefix integer; full-string match only.
+    expect(() => applyAgentFilters(env, ['top:10abc'])).toThrow(AgentFilterParseError);
+    expect(() => normalizeAgentRunFilters([], '10abc')).toThrow(AgentFilterParseError);
+    expect(() => normalizeAgentRunFilters([], '1.5')).toThrow(AgentFilterParseError);
+    expect(() => normalizeAgentRunFilters([], ' 5')).toThrow(AgentFilterParseError);
+    // Valid full-string integers still work.
+    expect(normalizeAgentRunFilters([], '5')).toEqual(['top:5']);
+    expect(normalizeAgentRunFilters([], '0')).toEqual(['top:0']);
+  });
+
   it('declares the repeatable --filter parser used by live-run command specs', () => {
     const spec = agentRunFlagSpecs.find((option) => option.flag === '--filter');
     expect(spec?.arrayDefault).toEqual([]);

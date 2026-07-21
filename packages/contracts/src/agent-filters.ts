@@ -55,6 +55,11 @@ function severityRank(severity: SignalSeverity): number {
 }
 
 function parseTopN(value: string): number {
+  // Full-string integer only — parseInt("10abc") === 10 would silently accept
+  // malformed --top / top: tokens (M15).
+  if (!/^\d+$/.test(value)) {
+    throw new AgentFilterParseError(`Invalid top value "${value}": must be a non-negative integer`);
+  }
   const n = Number.parseInt(value, 10);
   if (!Number.isFinite(n) || n < 0) {
     throw new AgentFilterParseError(`Invalid top value "${value}": must be a non-negative integer`);
