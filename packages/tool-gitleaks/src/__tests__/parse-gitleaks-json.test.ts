@@ -84,6 +84,48 @@ describe('parseGitleaksJson', () => {
     expect(serialized.toLowerCase()).not.toContain('aws_key =');
   });
 
+  it('redacts a secret embedded in Description before it reaches Signal.message (L10)', () => {
+    // On main, Description is copied into message verbatim — a custom rule that
+    // embeds the credential would leak into --json / SARIF / report.
+    const secret = 'AKIAIOSFODNN7EXAMPLE';
+    const signals = parseGitleaksJson(
+      parsed(
+        JSON.stringify([
+          {
+            RuleID: 'custom-aws',
+            Description: `Found leaked key ${secret} in config`,
+            Secret: secret,
+            File: 'config.env',
+            StartLine: 1,
+            StartColumn: 1,
+          },
+        ]),
+      ),
+      CTX,
+    );
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.message).not.toContain(secret);
+    expect(signals[0]?.message).toContain('AKIA…');
+    expect(JSON.stringify(signals)).not.toContain(secret);
+  });
+
+  it('redacts credential-shaped free text in Description via redactCredentials', () => {
+    const signals = parseGitleaksJson(
+      parsed(
+        JSON.stringify([
+          {
+            RuleID: 'token-rule',
+            Description: 'token=super-secret-token-value',
+            File: 'a.env',
+          },
+        ]),
+      ),
+      CTX,
+    );
+    expect(signals[0]?.message).toBe('token=***');
+    expect(signals[0]?.message).not.toContain('super-secret-token-value');
+  });
+
   it('returns [] for a clean run (empty array)', () => {
     expect(parseGitleaksJson(parsed('[]'), CTX)).toEqual([]);
   });

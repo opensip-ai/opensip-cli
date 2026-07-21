@@ -22,6 +22,7 @@ import {
   asObject,
   getNumber,
   getString,
+  redactCredentials,
   redactSecret,
   withNativeSeverity,
 } from '@opensip-cli/external-tool-adapter';
@@ -46,6 +47,24 @@ function safeParse(text: string): unknown {
 }
 
 /**
+ * Build a Signal message from Description without leaking Secret/Match text.
+ * Applies free-text credential redaction, then scrubs any exact Secret substring
+ * (custom rules may embed the live credential in Description).
+ */
+function sanitizeFindingMessage(
+  description: string | undefined,
+  secret: string | undefined,
+  ruleId: string,
+): string {
+  const base = description ?? `Secret detected (${ruleId})`;
+  let message = redactCredentials(base);
+  if (secret !== undefined && secret.length > 0 && message.includes(secret)) {
+    message = message.split(secret).join(redactSecret(secret));
+  }
+  return message;
+}
+
+/**
  * Normalize one gitleaks finding to a {@link Signal}. Returns `undefined` for a
  * non-object entry so a malformed element is skipped rather than throwing.
  */
@@ -54,15 +73,16 @@ function normalizeFinding(entry: unknown): Signal | undefined {
   if (finding === undefined) return undefined;
 
   const ruleId = getString(finding, 'RuleID') ?? 'gitleaks-secret';
-  const message = getString(finding, 'Description') ?? `Secret detected (${ruleId})`;
+  const secret = getString(finding, 'Secret');
+  const message = sanitizeFindingMessage(getString(finding, 'Description'), secret, ruleId);
   const file = getString(finding, 'File') ?? '';
   const line = getNumber(finding, 'StartLine');
   const column = getNumber(finding, 'StartColumn');
 
   // SECRET HYGIENE: `Secret` is masked to a short non-reversible preview; `Match`
-  // (which embeds the secret) is NEVER read into the bag. The metadata carries no
-  // raw credential bytes.
-  const secretPreview = redactSecret(getString(finding, 'Secret'));
+  // (which embeds the secret) is NEVER read into the bag. Description is run
+  // through redactCredentials + secret scrub before it becomes Signal.message.
+  const secretPreview = redactSecret(secret);
 
   const metadata = withNativeSeverity(
     {
