@@ -2,6 +2,30 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.8.3] - 2026-07-20
+
+Promotes the 0.8.2 change set to npm `latest`. The 0.8.2 cut published a
+complete staged set but did not promote: the independent macOS qualifier
+false-failed on the `persistence.cache-init-promotion` journey's two
+intentional clean command failures (a lock/refusal exit and a gate exit),
+which its expected-abnormal-terminal allowlist never accounted for. All 59
+journeys passed; the block was a harness gap, not a product defect. Per the
+partial-publish policy (npm versions are immutable), the fix ships forward as
+0.8.3 rather than re-cutting 0.8.2.
+
+### Fixed
+
+- **macOS release qualifier allowlists the cache-init-promotion journey's
+  intentional non-zero exits** (`EXPECTED_NON_ZERO_EXIT` {1,2} +
+  `EXPECTED_ABNORMAL_TERMINAL_COUNTS` positive-exit:2), so a journey that
+  correctly asserts two clean command failures no longer reads as an
+  `unexpected-abnormal-terminal`. Verified against the real 0.8.2 qualification
+  evidence.
+
+All other changes in this release are the 0.8.2 set below (capability-load
+parity/ADR-0174, worker→host diagnostics, the `brace-expansion` DoS patch, the
+four macOS qualify product fixes), carried forward unchanged.
+
 ## [0.8.2] - 2026-07-20
 
 Carries the fixes for the four macOS qualification failures that stopped the
