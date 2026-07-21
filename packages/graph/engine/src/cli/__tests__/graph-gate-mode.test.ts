@@ -55,23 +55,28 @@ function envelopeOf(signals: readonly Signal[]): SignalEnvelope {
 function mockCli(): {
   cli: ToolCliContext;
   saveBaseline: ReturnType<typeof vi.fn>;
+  compareBaseline: ReturnType<typeof vi.fn>;
   deliverSignals: ReturnType<typeof vi.fn>;
   render: ReturnType<typeof vi.fn>;
   setExitCode: ReturnType<typeof vi.fn>;
 } {
   const saveBaseline = vi.fn(() => Promise.resolve());
+  const compareBaseline = vi.fn(() =>
+    Promise.resolve({ added: [], resolved: [], unchanged: [], degraded: false }),
+  );
   const deliverSignals = vi.fn(() => Promise.resolve());
   const render = vi.fn(() => Promise.resolve());
   const setExitCode = vi.fn();
   const cli = {
     saveBaseline,
+    compareBaseline,
     deliverSignals,
     render,
     setExitCode,
     logger: console,
     reportFailure: makeReportFailureMock(setExitCode, render),
   } as unknown as ToolCliContext;
-  return { cli, saveBaseline, deliverSignals, render, setExitCode };
+  return { cli, saveBaseline, compareBaseline, deliverSignals, render, setExitCode };
 }
 
 function gateSaveOpts(): GraphCommandOptions {
@@ -132,6 +137,29 @@ describe('runGateMode --gate-save (ADR-0020 graph hard-fail, ADR-0036 host-owned
       expect.objectContaining({
         type: 'gate-done',
         lines: expect.arrayContaining([expect.stringContaining('Graph gate FAILED')]),
+      }),
+    );
+  });
+
+  // A7: the gate-COMPARE FAILED output must print each added signal's STAMPED
+  // fingerprint (which carries `#n` collision ordinals), never a display-time
+  // re-hash via graphFingerprintStrategy — a re-hash drops the ordinal and
+  // mislabels multi-instance findings. Fails on `main`, which re-hashes.
+  it('A7: gate-compare FAILED lines print the stamped fingerprint incl #n ordinal, not a re-hash', async () => {
+    const { cli, compareBaseline, render } = mockCli();
+    // A #n ordinal that a single-signal re-hash can never reproduce.
+    const added = { ...signal(), fingerprint: 'STAMPED-FP-SENTINEL#7' } as Signal;
+    compareBaseline.mockResolvedValueOnce({
+      added: [added],
+      resolved: [],
+      unchanged: [],
+      degraded: true,
+    });
+    await runGateMode({ cwd: '/x', gateCompare: true }, envelopeOf([]), cli, 'exact');
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'gate-done',
+        lines: expect.arrayContaining([expect.stringContaining('STAMPED-FP-SENTINEL#7')]),
       }),
     );
   });
