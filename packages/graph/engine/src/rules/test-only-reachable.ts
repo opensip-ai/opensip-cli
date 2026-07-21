@@ -5,11 +5,7 @@
  * should live in __tests__/, not in the production tree.
  */
 
-import {
-  eachOccurrence,
-  everyTwinInTestFile,
-  hasProductionTwin,
-} from '../occurrence-iter.js';
+import { eachOccurrence, everyTwinInTestFile, hasProductionTwin } from '../occurrence-iter.js';
 
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
