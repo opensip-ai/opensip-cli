@@ -137,7 +137,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | Plugin author | [Plugin authoring](/docs/opensip-cli/50-extend/01-plugin-authoring/) -> [Publishable packs](/docs/opensip-cli/50-extend/03-publishable-packs/) -> [Full Tool plugins](/docs/opensip-cli/50-extend/06-full-tool-plugins/) -> [Command taxonomy](/docs/opensip-cli/50-extend/07-command-taxonomy/) -> [External tool adapters](/docs/opensip-cli/50-extend/08-external-tool-adapters/) |
 | Graph adopter | [Use graph](/docs/opensip-cli/60-guides/06-use-graph/) -> [Stages and catalog](/docs/opensip-cli/40-graph/01-stages-and-catalog/) -> [Rules and gating](/docs/opensip-cli/40-graph/02-rules-and-gating/) -> [Impact analysis](/docs/opensip-cli/40-graph/05-impact-analysis/) |
 | AI agent (CLI + MCP) | [Use OpenSIP with AI agents](/docs/opensip-cli/60-guides/use-opensip-with-ai-agents/) -> [Connect MCP clients](/docs/opensip-cli/60-guides/08-connect-mcp-clients/) |
-| Contributor | [Architecture overview](/docs/opensip-cli/00-start/07-architecture-overview/) -> [Layered package graph](/docs/opensip-cli/10-concepts/03-modular-monolith/) -> [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/) |
+| Contributor | [Repository layout](/docs/opensip-cli/80-implementation/00-repository-layout/) -> [Architecture overview](/docs/opensip-cli/00-start/07-architecture-overview/) -> [Layered package graph](/docs/opensip-cli/10-concepts/03-modular-monolith/) -> [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/) |
 
 ## Full Docs Map
 
@@ -233,15 +233,16 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ### 80 - Internals
 
-60. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
-61. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
-62. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
-63. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
-64. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
-65. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
-66. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
-67. [Tool live view](/docs/opensip-cli/80-implementation/08-tool-live-view/)
-68. [Architecture map](/docs/opensip-cli/80-implementation/architecture-map/)
+62. [Repository layout](/docs/opensip-cli/80-implementation/00-repository-layout/)
+63. [CLI dispatch](/docs/opensip-cli/80-implementation/01-cli-dispatch/)
+64. [Plugin loader](/docs/opensip-cli/80-implementation/02-plugin-loader/)
+65. [Session and persistence](/docs/opensip-cli/80-implementation/03-session-and-persistence/)
+66. [Coding standards](/docs/opensip-cli/80-implementation/04-coding-standards/)
+67. [Layer policy](/docs/opensip-cli/80-implementation/05-layer-policy/)
+68. [Doc conventions](/docs/opensip-cli/80-implementation/06-doc-conventions/)
+69. [Website integration](/docs/opensip-cli/80-implementation/07-website-integration/)
+70. [Tool live view](/docs/opensip-cli/80-implementation/08-tool-live-view/)
+71. [Architecture map](/docs/opensip-cli/80-implementation/architecture-map/)
 
 ## Factual Baseline
 

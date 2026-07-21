@@ -13,6 +13,7 @@ source-files:
   - packages/contracts/src/exit-codes.ts
   - .config/knip.json
 related-docs:
+  - ./00-repository-layout.md
   - ./05-layer-policy.md
   - ./06-doc-conventions.md
   - ../70-reference/02-package-catalog.md
@@ -270,6 +271,7 @@ Naming: `*.test.ts` for unit tests, `*.integration.test.ts` for cross-package in
 
 ## What's next
 
+- **[`00-repository-layout.md`](./00-repository-layout.md)** — ownership and maintenance rules for root files and directories.
 - **[`05-layer-policy.md`](./05-layer-policy.md)** — the dep-cruiser config, rule by rule, with rationale.
 - **[`06-doc-conventions.md`](./06-doc-conventions.md)** — voice, frontmatter, and verification trails for documentation.
 - **[`../70-reference/02-package-catalog.md`](../70-reference/02-package-catalog.md)** — the workspace package list these standards apply to.

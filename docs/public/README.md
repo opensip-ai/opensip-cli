@@ -137,7 +137,7 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 | Plugin author | [Plugin authoring](./50-extend/01-plugin-authoring.md) -> [Publishable packs](./50-extend/03-publishable-packs.md) -> [Full Tool plugins](./50-extend/06-full-tool-plugins.md) -> [Command taxonomy](./50-extend/07-command-taxonomy.md) -> [External tool adapters](./50-extend/08-external-tool-adapters.md) |
 | Graph adopter | [Use graph](./60-guides/06-use-graph.md) -> [Stages and catalog](./40-graph/01-stages-and-catalog.md) -> [Rules and gating](./40-graph/02-rules-and-gating.md) -> [Impact analysis](./40-graph/05-impact-analysis.md) |
 | AI agent (CLI + MCP) | [Use OpenSIP with AI agents](./60-guides/use-opensip-with-ai-agents.md) -> [Connect MCP clients](./60-guides/08-connect-mcp-clients.md) |
-| Contributor | [Architecture overview](./00-start/07-architecture-overview.md) -> [Layered package graph](./10-concepts/03-modular-monolith.md) -> [Layer policy](./80-implementation/05-layer-policy.md) |
+| Contributor | [Repository layout](./80-implementation/00-repository-layout.md) -> [Architecture overview](./00-start/07-architecture-overview.md) -> [Layered package graph](./10-concepts/03-modular-monolith.md) -> [Layer policy](./80-implementation/05-layer-policy.md) |
 
 ## Full Docs Map
 
@@ -233,15 +233,16 @@ For every command, flag, exit code, and machine-output contract, use the [CLI co
 
 ### 80 - Internals
 
-60. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
-61. [Plugin loader](./80-implementation/02-plugin-loader.md)
-62. [Session and persistence](./80-implementation/03-session-and-persistence.md)
-63. [Coding standards](./80-implementation/04-coding-standards.md)
-64. [Layer policy](./80-implementation/05-layer-policy.md)
-65. [Doc conventions](./80-implementation/06-doc-conventions.md)
-66. [Website integration](./80-implementation/07-website-integration.md)
-67. [Tool live view](./80-implementation/08-tool-live-view.md)
-68. [Architecture map](./80-implementation/architecture-map.md)
+62. [Repository layout](./80-implementation/00-repository-layout.md)
+63. [CLI dispatch](./80-implementation/01-cli-dispatch.md)
+64. [Plugin loader](./80-implementation/02-plugin-loader.md)
+65. [Session and persistence](./80-implementation/03-session-and-persistence.md)
+66. [Coding standards](./80-implementation/04-coding-standards.md)
+67. [Layer policy](./80-implementation/05-layer-policy.md)
+68. [Doc conventions](./80-implementation/06-doc-conventions.md)
+69. [Website integration](./80-implementation/07-website-integration.md)
+70. [Tool live view](./80-implementation/08-tool-live-view.md)
+71. [Architecture map](./80-implementation/architecture-map.md)
 
 ## Factual Baseline
 

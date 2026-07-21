@@ -747,6 +747,16 @@
       "purpose": "The generated, authoritative host-support matrix: the exact qualified tuple, its status, explicitly unsupported hosts, and what unqualified means."
     },
     {
+      "file": "docs/web-generated/80-implementation/00-repository-layout.md",
+      "path": "/docs/opensip-cli/80-implementation/00-repository-layout/",
+      "section": "80-implementation",
+      "title": "Repository layout",
+      "audience": [
+        "contributors"
+      ],
+      "purpose": "Why each tracked root entry exists, which paths are discovery contracts, and which generated directories are safe to clean."
+    },
+    {
       "file": "docs/web-generated/80-implementation/01-cli-dispatch.md",
       "path": "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
       "section": "80-implementation",
@@ -956,6 +966,7 @@
       "section": "80-implementation",
       "title": "80 — Implementation",
       "pages": [
+        "/docs/opensip-cli/80-implementation/00-repository-layout/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
         "/docs/opensip-cli/80-implementation/03-session-and-persistence/",
@@ -1135,6 +1146,7 @@
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
         "/docs/opensip-cli/70-reference/16-performance-profiling/",
         "/docs/opensip-cli/70-reference/17-supported-platforms/",
+        "/docs/opensip-cli/80-implementation/00-repository-layout/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
         "/docs/opensip-cli/80-implementation/03-session-and-persistence/",

@@ -23,6 +23,9 @@ pnpm fit          # Run fitness checks against this repo
 
 Layered pnpm/Turborepo monorepo with a strict kernel, host packages, tool
 packages, language adapters, graph adapters, and first-party check packs.
+For the repository composition root—including why `action.yml`, agent guidance,
+OpenSIP dogfood state, and the toolchain manifests live where they do—see the
+[repository layout guide](docs/public/80-implementation/00-repository-layout.md).
 
 ```
 packages/
@@ -61,6 +64,8 @@ the layer rules enforced by dependency-cruiser.
 
 - [Architecture map](docs/public/80-implementation/architecture-map.md) — generated
   layer/seam reference (`pnpm docs:arch-map`)
+- [Repository layout](docs/public/80-implementation/00-repository-layout.md) — root
+  files, discovery contracts, and generated-state ownership
 - [Toolchain support matrix](SUPPORT.md) — Node, pnpm, and quality-tool versions
 
 ## Writing a Fitness Check

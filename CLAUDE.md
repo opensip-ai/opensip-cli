@@ -749,7 +749,7 @@ tracked artifacts instead: `ADR-NNNN`, committed docs under `docs/public/` /
 
 ## Release Process
 
-Releases are tag-driven. See `RELEASING.md` — there are 42 packages
+Releases are tag-driven. See `RELEASING.md` — there are 58 publishable packages
 to publish, in a specific dependency order, via OIDC trusted publishing.
 
 When asked to prep a release, use the **release-prep** skill

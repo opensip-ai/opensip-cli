@@ -7,7 +7,7 @@ Contributor and CI environment expectations for the opensip-cli monorepo.
 | Component | Version | Notes |
 |-----------|---------|-------|
 | Node.js | ≥ 24 | Pinned in `.nvmrc` and `package.json#engines` |
-| pnpm | 11.5.x | `packageManager` field in root `package.json` |
+| pnpm | 11.10.0 | `packageManager` field in root `package.json` |
 
 ## Build and quality toolchain
 
@@ -17,7 +17,7 @@ Contributor and CI environment expectations for the opensip-cli monorepo.
 | ESLint | 10.x | Flat config only (`.config/eslint.config.mjs`) |
 | Vitest | 4.x | Coverage thresholds enforced per package |
 | Turborepo | 2.x | Task cache; use `--force` for release-preflight freshness |
-| dependency-cruiser | 17.x | Architecture layer gate in `pnpm lint` |
+| dependency-cruiser | 18.x | Architecture layer gate in `pnpm lint` |
 
 ## Verification commands
 
