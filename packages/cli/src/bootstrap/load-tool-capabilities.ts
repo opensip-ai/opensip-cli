@@ -23,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 import { resolveCapabilityPreferences, type CapabilityPreferences } from '@opensip-cli/config';
 import {
   capabilityDiscoveryToCliDiagnostic,
-  currentCapabilityRegistry,
   currentScope,
   loadCapabilityDomain,
   logger,
@@ -104,9 +103,14 @@ export async function loadOwningToolCapabilities(
   // @opensip-cli/graph-* adapters) resolve from the CLI's own install tree.
   const cliDir = options.cliDir ?? cliInstallDir();
 
-  // The per-run capability registry is read off the current scope (the loader's
-  // registrars register into this same scope's tool registries).
-  const registry = currentCapabilityRegistry();
+  // The per-run capability registry is read SOFTLY off the current scope (the
+  // loader's registrars register into this same scope's tool registries). A run
+  // without a capability plane — a programmatic embed, or a dispatch worker
+  // running a tool that declares no capability domains (an external scanner) —
+  // is a clean no-op, never a throw: this driver is called from the worker path
+  // (ADR-0174) where not every dispatched tool has a wired capability registry.
+  const registry = currentScope()?.capabilities;
+  if (registry === undefined) return 0;
 
   const ownedDomains = registry
     .listDomains()
