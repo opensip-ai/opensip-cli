@@ -91,6 +91,10 @@ function isValidSymbolId(value: string): boolean {
     Number.isSafeInteger(parts.line) &&
     parts.line >= 1 &&
     Number.isSafeInteger(parts.column) &&
+    // M13: columns are non-negative (0-based or 1-based catalog bases both ≥ 0).
+    // Regex `\d+` already rejects a leading `-`, but keep the bound explicit so
+    // a future parser change cannot re-admit negatives.
+    parts.column >= 0 &&
     safeNormalizeProjectRelativePath(parts.filePath) !== undefined
   );
 }

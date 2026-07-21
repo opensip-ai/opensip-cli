@@ -15,6 +15,8 @@ import type { RepairApplyVerifyResult } from '@opensip-cli/contracts';
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_CAPTURE_BYTES = 5 * 1024 * 1024;
+/** Grace after SIGTERM before escalating to SIGKILL (M14). */
+const KILL_GRACE_MS = 2_000;
 const CHILD_ENV_SPECS = [
   'PATH',
   'HOME',
@@ -152,26 +154,53 @@ export class CliRepairWritePort implements RepairWritePort {
       let stderr = '';
       let timedOut = false;
       let truncated = false;
+      let settled = false;
+      let killEscalationTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const settle = (result: Result<RepairApplyVerifyResult, McpReadError>): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (killEscalationTimer !== undefined) clearTimeout(killEscalationTimer);
+        resolve(result);
+      };
+
+      /** M14: SIGTERM first, then SIGKILL if the child ignores cooperative stop. */
+      const requestStop = (): void => {
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // Already exited.
+        }
+        if (killEscalationTimer !== undefined) return;
+        killEscalationTimer = setTimeout(() => {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Already exited between TERM and KILL.
+          }
+        }, KILL_GRACE_MS);
+      };
+
       const timer = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+        requestStop();
       }, this.timeoutMs);
 
       child.stdout.on('data', (chunk: Buffer) => {
         const next = appendBoundedUtf8Text(stdout, chunk, MAX_CAPTURE_BYTES);
         stdout = next.value;
         truncated ||= next.truncated;
-        if (truncated) child.kill('SIGTERM');
+        if (truncated) requestStop();
       });
       child.stderr.on('data', (chunk: Buffer) => {
         const next = appendBoundedUtf8Text(stderr, chunk, MAX_CAPTURE_BYTES);
         stderr = next.value;
         truncated ||= next.truncated;
-        if (truncated) child.kill('SIGTERM');
+        if (truncated) requestStop();
       });
       child.on('error', (error) => {
-        clearTimeout(timer);
-        resolve(
+        settle(
           err(
             readError(
               'repair-spawn-failed',
@@ -180,21 +209,21 @@ export class CliRepairWritePort implements RepairWritePort {
           ),
         );
       });
+      // M14: always settle — close is the terminal event even after SIGKILL.
       child.on('close', () => {
-        clearTimeout(timer);
         if (timedOut) {
-          resolve(err(readError('repair-timeout', 'repair apply verify timed out')));
+          settle(err(readError('repair-timeout', 'repair apply verify timed out')));
           return;
         }
         if (truncated) {
-          resolve(
+          settle(
             err(readError('repair-output-too-large', 'repair output exceeded capture limit')),
           );
           return;
         }
         const parsed = parseApplyVerifyResult(stdout);
         if (!parsed.ok && stderr.trim() !== '') {
-          resolve(
+          settle(
             err(
               readError(
                 parsed.error.code,
@@ -206,7 +235,7 @@ export class CliRepairWritePort implements RepairWritePort {
           );
           return;
         }
-        resolve(parsed);
+        settle(parsed);
       });
     });
   }

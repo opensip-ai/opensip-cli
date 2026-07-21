@@ -179,6 +179,29 @@ describe('CliRepairWritePort', () => {
     });
   });
 
+  it('M14: settles with repair-timeout even when the child ignores SIGTERM', async () => {
+    // Child ignores SIGTERM; port must escalate to SIGKILL and still settle.
+    const entrypoint = writeChild(`
+      process.on('SIGTERM', () => { /* ignore cooperative stop */ });
+      setInterval(() => {}, 10_000);
+    `);
+
+    const result = await port(entrypoint, 50).applyVerify({
+      ref: 'session:0',
+      tool: 'fit',
+      signal: '1',
+      action: 'fix-test',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'repair-timeout',
+        message: 'repair apply verify timed out',
+      },
+    });
+  }, 15_000);
+
   it('bounds child output capture', async () => {
     const entrypoint = writeChild(`process.stdout.write('x'.repeat(6 * 1024 * 1024));`);
 

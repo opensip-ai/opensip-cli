@@ -60,6 +60,16 @@ describe('symbolId schema', () => {
     expect(symbolId().safeParse('a.ts:0:0').success).toBe(false);
   });
 
+  it('M13: rejects a negative column (and negative line) even if shape-ish', () => {
+    // Leading `-` is rejected by the `\d+` groups; pin so the contract stays.
+    expect(symbolId().safeParse('a.ts:12:-1').success).toBe(false);
+    expect(symbolId().safeParse('a.ts:-1:0').success).toBe(false);
+  });
+
+  it('M13: accepts column 0 (0-based catalog base)', () => {
+    expect(symbolId().safeParse('packages/core/src/a.ts:1:0').success).toBe(true);
+  });
+
   it('rejects absolute, UNC, and traversal-bearing symbol paths', () => {
     expect(symbolId().safeParse('/etc/passwd:1:0').success).toBe(false);
     expect(symbolId().safeParse('C:\\windows\\system32:1:0').success).toBe(false);
