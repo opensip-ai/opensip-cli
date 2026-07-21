@@ -60,6 +60,18 @@ const TIMEOUT_PATTERNS = [
 ];
 
 /**
+ * M7: shared `/g` (or sticky) regexes retain `lastIndex` across `.test()` calls.
+ * A prior match that leaves `lastIndex` past the next haystack can false-negative.
+ * Always reset before a presence probe.
+ */
+function anyPatternMatches(patterns: readonly RegExp[], content: string): boolean {
+  return patterns.some((pattern) => {
+    pattern.lastIndex = 0;
+    return pattern.test(content);
+  });
+}
+
+/**
  * Check if a line is a simple delegation pattern like:
  * return this.repository.transaction(work);
  * These delegate transaction management to another layer.
@@ -153,7 +165,8 @@ function findAsyncInTransactionViolations(content: string, filePath: string): Ch
     let match;
     while ((match = pattern.exec(content)) !== null) {
       const beforeMatch = content.slice(0, Math.max(0, match.index));
-      const hasOpenTransaction = TRANSACTION_PATTERNS.some((p) => p.test(beforeMatch.slice(-500)));
+      // M7: presence probe must reset lastIndex on shared /g TRANSACTION_PATTERNS.
+      const hasOpenTransaction = anyPatternMatches(TRANSACTION_PATTERNS, beforeMatch.slice(-500));
 
       if (!hasOpenTransaction) {
         continue;
@@ -210,12 +223,12 @@ export const transactionBoundaryValidation = defineCheck({
     // commit/rollback, callback throws, etc.) to verify detection logic.
     if (isTestFile(filePath)) return [];
 
-    const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content));
+    const usesTransactions = anyPatternMatches(TRANSACTION_PATTERNS, content);
     if (!usesTransactions) {
       return [];
     }
 
-    const hasProperHandling = PROPER_TRANSACTION_PATTERNS.some((p) => p.test(content));
+    const hasProperHandling = anyPatternMatches(PROPER_TRANSACTION_PATTERNS, content);
     const uncommittedViolations = hasProperHandling
       ? []
       : findUncommittedTransactionViolations(content, filePath);
@@ -256,14 +269,14 @@ export const transactionTimeout = defineCheck({
   analyze(content: string, filePath: string): CheckViolation[] {
     const violations: CheckViolation[] = [];
 
-    // Check if this file uses transactions
-    const usesTransactions = TRANSACTION_PATTERNS.some((p) => p.test(content));
+    // Check if this file uses transactions (M7: reset lastIndex on /g patterns)
+    const usesTransactions = anyPatternMatches(TRANSACTION_PATTERNS, content);
     if (!usesTransactions) {
       return violations;
     }
 
     // Check for timeout configuration
-    const hasTimeout = TIMEOUT_PATTERNS.some((p) => p.test(content));
+    const hasTimeout = anyPatternMatches(TIMEOUT_PATTERNS, content);
 
     // Only flag if using manual transaction management (not ORM decorators)
     const usesManualTransactions =

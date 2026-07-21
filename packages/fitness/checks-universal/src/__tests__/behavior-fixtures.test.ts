@@ -124,6 +124,22 @@ describe('transaction-boundary-validation', () => {
     const types = result.signals.map((s) => s.metadata.type);
     expect(types).not.toContain('uncommitted-transaction');
   });
+
+  it('M7: still detects transactions after a prior file dirtied shared /g lastIndex', async () => {
+    // Running the check across multiple files reuses module-level /g regexes.
+    // Without lastIndex resets, a match on file N can leave lastIndex past the
+    // start of file N+1 and false-negative the presence probe.
+    const result = await findCheck('transaction-boundary-validation').run(cwd, {
+      targetFiles: [
+        join(cwd, 'src/uncommitted.ts'),
+        join(cwd, 'src/async-in-tx.ts'),
+        join(cwd, 'src/properly-handled.ts'),
+      ],
+    });
+    const types = result.signals.map((s) => s.metadata.type);
+    expect(types).toContain('uncommitted-transaction');
+    expect(types).toContain('async-in-transaction');
+  });
 });
 
 describe('transaction-timeout', () => {
