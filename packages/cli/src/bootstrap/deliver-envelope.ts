@@ -279,13 +279,36 @@ export async function deliverEnvelope(
   }
 
   const repoSlug = repoSlugFromIdentity(repo);
-  const result = await reportSarif(
-    stampedEnvelope,
-    opts.reportTo,
-    opts.apiKey,
-    opts.fetchImpl,
-    repoSlug,
-  );
+  // H8: --report-to must never throw out of deliverEnvelope — cloud path is
+  // already fail-closed; wrap reportSarif so path/format/fetch failures become
+  // a failed EgressResult and the exit-4 matrix still applies.
+  let result: EgressResult;
+  try {
+    result = await reportSarif(
+      stampedEnvelope,
+      opts.reportTo,
+      opts.apiKey,
+      opts.fetchImpl,
+      repoSlug,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.warn({
+      evt: 'cli.report.throw',
+      module: MODULE_TAG,
+      url: opts.reportTo,
+      err: message,
+    });
+    result = {
+      acceptedChunks: 0,
+      chunkResults: [],
+      outcome: 'failed',
+      authRejected: false,
+      throttled: false,
+      deadlineExceeded: false,
+      errors: [message],
+    };
+  }
   const reportSuccess = result.outcome === 'ok';
   if (!reportSuccess) {
     // Branch on the typed auth-status discriminator (never string-sniff

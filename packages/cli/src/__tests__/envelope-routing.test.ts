@@ -590,6 +590,31 @@ describe('root --report-to (deliverEnvelope owns exit 4)', () => {
     expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
   });
 
+  it('H8: never throws when --report-to path throws — returns reportSuccess false + exit 4', async () => {
+    // deliverEnvelope's contract is "never throws"; a throw inside reportSarif
+    // (e.g. format/transport) must become a failed EgressResult, not bubble.
+    const setExitCode = vi.fn();
+    const throwingFetch: typeof fetch = () => {
+      throw new Error('report transport exploded');
+    };
+    let out: Awaited<ReturnType<typeof deliverEnvelope>>;
+    await expect(
+      runWithScope(makeScope(NOOP_SINK), async () => {
+        out = await deliverEnvelope(ENVELOPE, {
+          cwd: process.cwd(),
+          repo: {},
+          reportTo: 'https://sink.example',
+          runFailed: false,
+          setExitCode,
+          fetchImpl: throwingFetch,
+        });
+        return out;
+      }),
+    ).resolves.toBeDefined();
+    expect(out!.reportSuccess).toBe(false);
+    expect(setExitCode).toHaveBeenCalledWith(EXIT_CODES.REPORT_FAILED);
+  });
+
   it('sets the findings exit (RUNTIME_ERROR), not exit 4, when the run failed (real failure dominates)', async () => {
     const setExitCode = vi.fn();
     await runWithScope(makeScope(NOOP_SINK), () =>
