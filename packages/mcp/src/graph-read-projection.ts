@@ -12,14 +12,23 @@ export function toSymbolRef(
   return toGraphSymbolRef(occurrence);
 }
 
-/** Map a `graph:orphan-subtree` signal to a {@link DeadCodeDto} without filesystem reads. */
+/**
+ * Map a `graph:orphan-subtree` signal to a {@link DeadCodeDto} without filesystem reads.
+ *
+ * Signal columns are **1-based** (ADR-0179); catalog `byOccId` keys use parser-native
+ * **0-based** occurrence columns. Convert before lookup so dead-code projection
+ * still resolves after the Signal base canonicalization.
+ */
 export function toDeadCodeDto(signal: Signal, indexes: Indexes): DeadCodeDto | undefined {
   const code = signal.code;
   if (code?.file === undefined || code.line === undefined || code.column === undefined) {
     return undefined;
   }
+  // Signal.column is 1-based; occurrence identity is 0-based.
+  const occurrenceColumn = code.column - 1;
+  if (!Number.isFinite(occurrenceColumn) || occurrenceColumn < 0) return undefined;
   const occurrence = indexes.byOccId.get(
-    `${code.file}:${String(code.line)}:${String(code.column)}`,
+    `${code.file}:${String(code.line)}:${String(occurrenceColumn)}`,
   );
   if (occurrence === undefined) return undefined;
   const symbol = toSymbolRef(occurrence);

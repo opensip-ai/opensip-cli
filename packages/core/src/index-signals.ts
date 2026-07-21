@@ -10,7 +10,12 @@ export type {
   SignalRepairActionTarget,
   SignalRepairVerification,
 } from './types/signal.js';
-export { createSignal, isErrorSeverity, isErrorSignal } from './types/signal.js';
+export {
+  createSignal,
+  isErrorSeverity,
+  isErrorSignal,
+  toOneBasedCoordinate,
+} from './types/signal.js';
 
 // Severity & Signal policy (north-star §5.9, launch). One home for
 // author→wire severity mapping + the override clamp + the gate's error/warning

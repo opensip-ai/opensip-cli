@@ -229,7 +229,7 @@ function matchPatternOnLine(
   while (match !== null) {
     violations.push({
       line: lineNum,
-      column: match.index,
+      column: match.index + 1,
       message: pattern.message,
       severity: pattern.severity ?? 'warning',
       suggestion: pattern.suggestion,

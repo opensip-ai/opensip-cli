@@ -146,8 +146,9 @@ describe('defineRegexListCheck', () => {
       expect(signals.length).toBe(3);
       const lines = signals.map((s) => s.code?.line);
       expect(lines).toEqual([1, 1, 1]);
+      // Columns are 1-based (ADR-0179); match.index was 0, 4, 8 → 1, 5, 9.
       const columns = signals.map((s) => s.code?.column);
-      expect(columns).toEqual([0, 4, 8]);
+      expect(columns).toEqual([1, 5, 9]);
     });
 
     it('emits at most one violation per line for non-global regexes', async () => {

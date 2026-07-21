@@ -33,10 +33,24 @@ export interface GraphSignalBody {
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- mirrors Signal.category (open at the plugin layer)
   readonly category: SignalCategory | string;
   readonly message: string;
+  /**
+   * Location on the primary site. **`column` is 0-based** (catalog / tree-sitter
+   * / TS character space). {@link createGraphSignal} lifts it to the Signal
+   * 1-based contract (ADR-0179) before `createSignal`.
+   */
   readonly code?: { file?: string; line?: number; column?: number };
   readonly suggestion?: string;
   readonly metadata?: Record<string, unknown>;
   readonly repair?: SignalRepair;
+}
+
+/**
+ * Lift a graph occurrence column (0-based, parser-native) to Signal 1-based
+ * (ADR-0179). Non-finite values are left for `createSignal` to omit.
+ */
+function graphColumnToSignalColumn(column: number | undefined): number | undefined {
+  if (typeof column !== 'number' || !Number.isFinite(column)) return undefined;
+  return column + 1;
 }
 
 /**
@@ -49,13 +63,22 @@ export function createGraphSignal(
   config: GraphConfig,
   body: GraphSignalBody,
 ): Signal {
+  const code =
+    body.code === undefined
+      ? undefined
+      : {
+          ...body.code,
+          ...(body.code.column === undefined
+            ? {}
+            : { column: graphColumnToSignalColumn(body.code.column) }),
+        };
   return createSignal({
     source: 'graph',
     ruleId: slug,
     severity: applySeverityOverride(body.severity, slug, config),
     category: body.category,
     message: body.message,
-    code: body.code,
+    code,
     suggestion: body.suggestion,
     metadata: body.metadata,
     repair: body.repair,

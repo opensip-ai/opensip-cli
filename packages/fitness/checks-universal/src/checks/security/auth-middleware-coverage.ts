@@ -218,7 +218,7 @@ export const authMiddlewareCoverage = defineCheck({
         if (match && pattern.check(context)) {
           violations.push({
             line: lineNum + 1,
-            column: match.index,
+            column: match.index + 1,
             message: pattern.message,
             severity: pattern.severity,
             suggestion: pattern.suggestion,

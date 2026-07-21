@@ -168,7 +168,7 @@ export const rateLimitCoverage = defineCheck({
         if (match && pattern.check(strippedContext)) {
           violations.push({
             line: lineNum + 1,
-            column: match.index,
+            column: match.index + 1,
             message: pattern.message,
             severity: pattern.severity,
             suggestion: pattern.suggestion,

@@ -238,7 +238,7 @@ export const unsafeSecretComparison = defineCheck({
             // `operatorToken.getStart() - node.getStart()` — the operator's offset
             // WITHIN the binary expression, which points into the left operand for
             // any comparison not starting at column 0.)
-            column: getColumn(node.operatorToken, sourceFile),
+            column: getColumn(node.operatorToken, sourceFile) + 1,
             message: `Timing-unsafe ${operator} comparison on '${secretName}' — use crypto.timingSafeEqual() (Node.js built-in)`,
             severity: 'error',
             suggestion: `Replace \`a ${operator} b\` with \`${operator === '!==' ? '!' : ''}safeCompare(a, b)\` to prevent timing side-channel attacks.`,

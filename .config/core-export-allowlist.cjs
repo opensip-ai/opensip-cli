@@ -85,6 +85,7 @@ const EXPORT_ALLOWLIST = {
   contentHashFallbackFingerprintStrategy: 'shared-data-contracts',
   createSignal: 'shared-data-contracts',
   createSignalFromViolation: 'shared-data-contracts',
+  toOneBasedCoordinate: 'shared-data-contracts',
   defaultFingerprintStrategy: 'shared-data-contracts',
   fileLevelFingerprintStrategy: 'shared-data-contracts',
   findCompatibilityPolicy: 'shared-data-contracts',

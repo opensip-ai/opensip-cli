@@ -55,10 +55,10 @@ function mapSeverityToSarifLevel(severity: SignalSeverity): SarifLevel {
 }
 
 /**
- * Coerce a 1-based SARIF region coordinate (startLine / startColumn) to a valid
- * value, returning undefined for anything < 1 or non-finite. SARIF 2.1.0
- * rejects region coordinates below 1; checks that report 0 (meaning "no
- * specific line/column") must be omitted rather than emitted as 0.
+ * SARIF 2.1.0 validity filter for region coordinates (startLine / startColumn
+ * must be ≥ 1). Signal construction already owns the **1-based column base**
+ * (ADR-0179 / `createSignal`); this helper must not re-guess 0-vs-1 — it only
+ * drops invalid residuals so they are omitted rather than emitted as 0.
  */
 function atLeastOne(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? value : undefined;
@@ -206,11 +206,8 @@ export function buildOpenSipSarif(
     ruleIds.add(signal.ruleId);
 
     const filePath = signal.code?.file ?? signal.filePath;
-    // SARIF 2.1.0 requires region.startLine / region.startColumn to be >= 1.
-    // Some checks report 0 to mean "no specific line/column" (a whole-file or
-    // whole-line finding). Normalize <1 (and non-finite) values to undefined so
-    // they are omitted here rather than emitted as invalid 0s — an omitted
-    // startColumn denotes the whole line, which is the intended semantics.
+    // Signals already carry 1-based coordinates when present (ADR-0179). Filter
+    // invalid residuals for SARIF 2.1.0 (≥ 1); omitted startColumn = whole line.
     const startLine = atLeastOne(signal.code?.line ?? signal.line);
     const startColumn = atLeastOne(signal.code?.column ?? signal.column);
 

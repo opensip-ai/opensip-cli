@@ -38,7 +38,7 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
     while ((match = HARDCODED_CORR_ID_PATTERN.exec(line)) !== null) {
       violations.push({
         line: i + 1,
-        column: match.index,
+        column: match.index + 1,
         message: `Hardcoded correlationId '${match[1]}' — use generateCorrelationId() instead`,
         severity: 'warning',
         suggestion:

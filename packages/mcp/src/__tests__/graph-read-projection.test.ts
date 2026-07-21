@@ -40,7 +40,8 @@ describe('graph-read-projection', () => {
       toDeadCodeDto(
         {
           message: 'orphan',
-          code: { file: 'src/missing.ts', line: 1, column: 0 },
+          // 1-based Signal column for a missing file
+          code: { file: 'src/missing.ts', line: 1, column: 1 },
         } as Signal,
         indexes,
       ),
@@ -50,7 +51,8 @@ describe('graph-read-projection', () => {
       {
         message: 'orphan',
         suggestion: 'delete it',
-        code: { file: 'src/a.ts', line: 1, column: 0 },
+        // 1-based Signal column 1 ↔ occurrence column 0 (ADR-0179)
+        code: { file: 'src/a.ts', line: 1, column: 1 },
       } as Signal,
       indexes,
     );

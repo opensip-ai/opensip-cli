@@ -41,19 +41,36 @@ describe('createGraphSignal', () => {
     expect(s.metadata).toEqual({ sccId: 's1' });
   });
 
-  it('reproduces the former hand-assembled signal byte-for-byte (sans id/timestamp)', () => {
+  it('lifts 0-based occurrence columns to 1-based Signal columns (ADR-0179)', () => {
+    // BODY.code.column is parser-native 0-based (2 → character index 2).
+    // Signal must store 1-based (3) so SARIF startColumn points at that char.
     const viaFactory = createGraphSignal('graph:cycle', CONFIG, BODY);
+    expect(viaFactory.column).toBe(3);
+    expect(viaFactory.code?.column).toBe(3);
+
     const viaHand = createSignal({
       source: 'graph',
       severity: applySeverityOverride(BODY.severity, 'graph:cycle', CONFIG),
       category: BODY.category,
       ruleId: 'graph:cycle',
       message: BODY.message,
-      code: BODY.code,
+      code: {
+        ...BODY.code,
+        column: (BODY.code.column ?? 0) + 1,
+      },
       suggestion: BODY.suggestion,
       metadata: BODY.metadata,
     });
     expect(stable(viaFactory)).toEqual(stable(viaHand));
+  });
+
+  it('maps 0-based column 0 to Signal column 1 (start of line)', () => {
+    const s = createGraphSignal('graph:large-function', CONFIG, {
+      ...BODY,
+      code: { file: 'src/a.ts', line: 10, column: 0 },
+    });
+    expect(s.column).toBe(1);
+    expect(s.code?.column).toBe(1);
   });
 
   it('applies a configured severity override', () => {

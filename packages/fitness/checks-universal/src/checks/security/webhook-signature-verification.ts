@@ -169,7 +169,7 @@ function checkPatterns(
     if (match) {
       violations.push({
         line: lineNum + 1,
-        column: match.index,
+        column: match.index + 1,
         message: pattern.message,
         severity: pattern.severity,
         suggestion: pattern.suggestion,

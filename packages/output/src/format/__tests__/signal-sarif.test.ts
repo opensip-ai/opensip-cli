@@ -198,6 +198,39 @@ describe('formatSignalSarif', () => {
     expect(loc.region).toEqual({ startLine: 5 });
   });
 
+  it('emits 1-based signal columns as SARIF startColumn (ADR-0179; fails on main off-by-one)', () => {
+    // On main, a 0-based emitter could store column 5 and SARIF would print
+    // startColumn 5 (wrong character). After ADR-0179, createSignal admits only
+    // 1-based columns; a correct emitter stores 6 for 0-based index 5.
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          code: { file: 'src/col.ts', line: 1, column: 6 },
+          filePath: 'src/col.ts',
+          line: 1,
+          column: 6,
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: {
+        results: {
+          locations: {
+            physicalLocation: {
+              region?: { startLine?: number; startColumn?: number };
+            };
+          }[];
+        }[];
+      }[];
+    };
+    expect(parsed.runs[0].results[0].locations[0].physicalLocation.region).toEqual({
+      startLine: 1,
+      startColumn: 6,
+    });
+  });
+
   it('omits region coordinates < 1 (SARIF requires startLine/startColumn >= 1)', () => {
     const env: SignalEnvelope = {
       ...FIXTURE_ENVELOPE,

@@ -28,7 +28,16 @@ export interface Signal {
   readonly message: string;
   readonly suggestion?: string;
   readonly filePath: string;
+  /**
+   * 1-based line when present (ADR-0179). Omitted for whole-file findings.
+   * Only finite integers ≥ 1 are recorded by {@link createSignal}.
+   */
   readonly line?: number;
+  /**
+   * 1-based column when present (ADR-0179). Omitted for whole-file / whole-line
+   * findings. Only finite integers ≥ 1 are recorded by {@link createSignal};
+   * emitters must convert from native 0-based indices before construction.
+   */
   readonly column?: number;
   readonly code?: { file?: string; line?: number; column?: number };
   readonly fixAction?: string;
@@ -154,9 +163,39 @@ function repairFromFix(fix: FixHint | undefined): SignalRepair | undefined {
   };
 }
 
+/**
+ * Admit a 1-based line/column coordinate for {@link Signal} (ADR-0179).
+ * Finite integers ≥ 1 are kept; missing, non-finite, and `< 1` values are
+ * omitted (whole-file / whole-line). This is the sole construction gate for
+ * coordinate base — SARIF and other emitters must not re-guess 0-vs-1.
+ */
+export function toOneBasedCoordinate(value: number | undefined): number | undefined {
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= 1
+    ? value
+    : undefined;
+}
+
+/** Normalize optional `code` so line/column honor the 1-based Signal contract. */
+function normalizeSignalCode(
+  code: CreateSignalInput['code'],
+): CreateSignalInput['code'] | undefined {
+  if (code === undefined) return undefined;
+  const line = toOneBasedCoordinate(code.line);
+  const column = toOneBasedCoordinate(code.column);
+  return {
+    ...(code.file === undefined ? {} : { file: code.file }),
+    ...(line === undefined ? {} : { line }),
+    ...(column === undefined ? {} : { column }),
+  };
+}
+
 /** Builds a {@link Signal} with default provider, generated id, and ISO timestamp. */
 export function createSignal(input: CreateSignalInput): Signal {
   const repair = input.repair ?? repairFromFix(input.fix);
+  const code = normalizeSignalCode(input.code);
   return {
     id: `sig_${randomUUID().slice(0, 12)}`,
     source: input.source,
@@ -166,10 +205,10 @@ export function createSignal(input: CreateSignalInput): Signal {
     ruleId: input.ruleId,
     message: input.message,
     suggestion: input.suggestion,
-    filePath: input.code?.file ?? '',
-    line: input.code?.line,
-    column: input.code?.column,
-    code: input.code,
+    filePath: code?.file ?? '',
+    line: code?.line,
+    column: code?.column,
+    code,
     fixAction: input.fix?.action,
     fixConfidence: input.fix?.confidence,
     metadata: input.metadata ?? {},

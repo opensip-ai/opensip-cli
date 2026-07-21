@@ -72,6 +72,31 @@ describe('createSignal', () => {
     expect(signal.code).toEqual({ file: 'src/index.ts', line: 10, column: 5 });
   });
 
+  it('keeps 1-based columns and omits column 0 / non-finite (ADR-0179)', () => {
+    const withColumn = createSignal({
+      ...minimalInput,
+      code: { file: 'src/a.ts', line: 1, column: 6 },
+    });
+    expect(withColumn.column).toBe(6);
+    expect(withColumn.code?.column).toBe(6);
+
+    // Whole-line / whole-file: column 0 and non-finite must not become SARIF 1
+    // via a base-guessing clamp — they are omitted at construction.
+    const zeroCol = createSignal({
+      ...minimalInput,
+      code: { file: 'src/a.ts', line: 3, column: 0 },
+    });
+    expect(zeroCol.column).toBeUndefined();
+    expect(zeroCol.code?.column).toBeUndefined();
+    expect(zeroCol.line).toBe(3);
+
+    const nanCol = createSignal({
+      ...minimalInput,
+      code: { file: 'src/a.ts', line: 2, column: Number.NaN },
+    });
+    expect(nanCol.column).toBeUndefined();
+  });
+
   it('defaults filePath to empty string when no code', () => {
     const signal = createSignal(minimalInput);
     expect(signal.filePath).toBe('');

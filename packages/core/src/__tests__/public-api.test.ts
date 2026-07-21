@@ -152,6 +152,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'createRunTimer',
   'createRuntimeCommandInventory',
   'createSignal',
+  'toOneBasedCoordinate',
   'createSignalFromViolation',
   'createSubprocessProgressRun',
   'currentCapabilityRegistry',

@@ -141,7 +141,7 @@ export const noRawFetch = defineCheck({
       while ((match = RAW_FETCH_PATTERN.exec(line)) !== null) {
         violations.push({
           line: lineNum + 1,
-          column: match.index,
+          column: match.index + 1,
           message: 'Raw fetch() usage detected',
           severity: 'warning',
           suggestion:
