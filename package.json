@@ -126,6 +126,7 @@
     "adapter-catalog": "node scripts/build-adapter-catalog.mjs",
     "adapter-catalog:check": "node scripts/build-adapter-catalog.mjs --check",
     "verify-release": "node scripts/verify-release.mjs",
+    "release:check-publish-readiness": "node scripts/verify-oidc-publish-readiness.mjs",
     "verify:published-artifacts": "node scripts/verify-published-artifacts.mjs",
     "release:artifacts": "node scripts/build-release-artifacts.mjs",
     "release:artifacts:verify": "node scripts/verify-release-artifacts.mjs",
