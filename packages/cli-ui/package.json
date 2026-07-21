@@ -39,7 +39,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "ink": "^7.1.0",
+    "ink": "^7.1.1",
     "react": "^19.2.7",
     "@opensip-cli/format": "workspace:*"
   },
