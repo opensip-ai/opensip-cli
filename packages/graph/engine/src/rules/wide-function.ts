@@ -15,7 +15,7 @@
  * (ADR-0005). Language-agnostic: every adapter emits `params`.
  */
 
-import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+import { eachOccurrence } from '../occurrence-iter.js';
 
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';

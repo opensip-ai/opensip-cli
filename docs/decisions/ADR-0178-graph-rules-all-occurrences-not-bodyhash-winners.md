@@ -59,7 +59,7 @@ twin test-ness for hash features), so a test twin never masks a production twin.
 **Consequences:**
 
 - Shared helpers (`eachOccurrence`, `anyTwinInTestFile`, `everyTwinInTestFile`)
-  live next to the index surface and are the preferred rule/feature iterators.
+  live at the graph engine root (rules-safe; not under pipeline/) and are the preferred rule/feature iterators.
 - Rules updated: large-function, wide-function, high-blast-untested,
   orphan-subtree, test-only-reachable, no-side-effect-path,
   always-throws-branch; entry-point inference walks all occurrences;

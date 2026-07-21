@@ -23,7 +23,7 @@
  * reachability are NOT cheaply recomputable in-rule, so there is no fallback.
  */
 
-import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+import { eachOccurrence } from '../occurrence-iter.js';
 
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';

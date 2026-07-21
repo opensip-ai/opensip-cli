@@ -39,7 +39,7 @@
 import { currentScope } from '@opensip-cli/core';
 import { minimatch } from 'minimatch';
 
-import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+import { eachOccurrence } from '../occurrence-iter.js';
 
 import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 

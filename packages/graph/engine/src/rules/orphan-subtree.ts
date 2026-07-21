@@ -8,7 +8,7 @@
  * the graph (their module-init is its own entry by name-match).
  */
 
-import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+import { eachOccurrence } from '../occurrence-iter.js';
 
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';

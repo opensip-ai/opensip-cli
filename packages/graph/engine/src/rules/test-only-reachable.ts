@@ -9,7 +9,7 @@ import {
   eachOccurrence,
   everyTwinInTestFile,
   hasProductionTwin,
-} from '../pipeline/occurrence-iter.js';
+} from '../occurrence-iter.js';
 
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';

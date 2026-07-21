@@ -33,7 +33,7 @@
  * gracefully when an adapter omits a given hint.
  */
 
-import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+import { eachOccurrence } from '../occurrence-iter.js';
 
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
