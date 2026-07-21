@@ -32,6 +32,7 @@ import {
   type RawCapabilityContribution,
   type SelectedCapabilityPackage,
 } from './capability-discovery.js';
+import { selectPackages } from './capability-package-selection.js';
 
 import type { CapabilityRegistry } from './capability-registry.js';
 
@@ -93,6 +94,14 @@ export async function loadCapabilityDomain(
   }
 
   const errors: string[] = [];
+  // Count the selected pack set without a diagnostic sink so the real discovery
+  // pass (below) remains the single author of per-package errors.
+  const selected = selectPackages({
+    descriptor,
+    projectDir: projectKey,
+    ...(cliDir === undefined ? {} : { cliDir }),
+    ...(preferences === undefined ? {} : { preferences }),
+  });
   const contributions = await discoverCapabilityContributions({
     descriptor,
     projectDir: projectKey,
@@ -119,6 +128,8 @@ export async function loadCapabilityDomain(
   emitLoadedEvent(domainId, routed, errors, {
     cliDir,
     packages: [...sourcePackages].sort(),
+    selectedCount: selected.length,
+    seededCount: preferences?.packages?.length,
   });
   return errors;
 }
@@ -204,25 +215,85 @@ function formatDiscoveryError(domainId: string, diagnostic: CapabilityDiscoveryD
  * pack set (the in-process host-seeded load vs a dispatched-worker load) are
  * directly comparable in `--json` diagnostics — the divergence names itself
  * instead of requiring a bisect.
+ *
+ * **Unexpected-zero contract (finishes ADR-0174):** when discovery selected
+ * packs but routed 0 contributions, or routed fewer packs than an explicit
+ * seed list, the level is `warn` (not silent info) and `data.gap` names the
+ * shortfall. Legitimate no-ops stay quiet at this layer:
+ * - domain with no `discovery` descriptor (caller returns before emit)
+ * - no capability plane / tool declares no domains (never calls this loader)
+ * A clean load (selected === routed, no errors) stays `info`.
  */
 function emitLoadedEvent(
   domainId: string,
   routed: number,
   errors: readonly string[],
-  resolution: { readonly cliDir?: string; readonly packages: readonly string[] },
+  resolution: {
+    readonly cliDir?: string;
+    readonly packages: readonly string[];
+    readonly selectedCount: number;
+    readonly seededCount?: number;
+  },
 ): void {
-  currentScope()?.diagnostics.event(
-    'load',
-    errors.length > 0 ? 'warn' : 'info',
+  const gap = resolveLoadGap({
+    routed,
+    errorCount: errors.length,
+    packageCount: resolution.packages.length,
+    selectedCount: resolution.selectedCount,
+    seededCount: resolution.seededCount,
+  });
+  const level = gap === undefined ? 'info' : 'warn';
+  const base =
     `capability domain '${domainId}' loaded ${String(routed)} contribution(s) from ${String(resolution.packages.length)} pack(s)` +
-      (errors.length > 0 ? `, ${String(errors.length)} error(s)` : ''),
-    {
-      domainId,
-      routed,
-      errors: errors.length,
-      packageCount: resolution.packages.length,
-      packages: resolution.packages,
-      ...(resolution.cliDir === undefined ? {} : { anchor: resolution.cliDir }),
-    },
-  );
+    (errors.length > 0 ? `, ${String(errors.length)} error(s)` : '');
+  const message = gap === undefined ? base : `${base} (${formatGap(gap, resolution)})`;
+
+  currentScope()?.diagnostics.event('load', level, message, {
+    domainId,
+    routed,
+    errors: errors.length,
+    packageCount: resolution.packages.length,
+    packages: resolution.packages,
+    selectedCount: resolution.selectedCount,
+    ...(resolution.seededCount === undefined ? {} : { seededCount: resolution.seededCount }),
+    ...(gap === undefined ? {} : { gap }),
+    ...(resolution.cliDir === undefined ? {} : { anchor: resolution.cliDir }),
+  });
+}
+
+/** Gap kinds for the unexpected-zero / seed-shortfall contract. */
+type CapabilityLoadGap = 'zero-routed' | 'seed-shortfall' | 'errors';
+
+function resolveLoadGap(input: {
+  readonly routed: number;
+  readonly errorCount: number;
+  readonly packageCount: number;
+  readonly selectedCount: number;
+  readonly seededCount?: number;
+}): CapabilityLoadGap | undefined {
+  if (input.errorCount > 0) return 'errors';
+  // Selected packs but zero contributions routed — unexpected empty surface.
+  if (input.selectedCount > 0 && input.routed === 0) return 'zero-routed';
+  // Explicit config seeded more pack names than successfully contributed.
+  if (
+    input.seededCount !== undefined &&
+    input.seededCount > 0 &&
+    input.packageCount < input.seededCount
+  ) {
+    return 'seed-shortfall';
+  }
+  return undefined;
+}
+
+function formatGap(
+  gap: CapabilityLoadGap,
+  resolution: { readonly packages: readonly string[]; readonly selectedCount: number; readonly seededCount?: number },
+): string {
+  if (gap === 'zero-routed') {
+    return `unexpected zero: selected ${String(resolution.selectedCount)} pack(s), routed 0`;
+  }
+  if (gap === 'seed-shortfall') {
+    return `seed shortfall: ${String(resolution.packages.length)}/${String(resolution.seededCount ?? 0)} pack(s)`;
+  }
+  return 'with errors';
 }

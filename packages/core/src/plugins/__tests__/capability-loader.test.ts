@@ -269,6 +269,86 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
       .snapshot()
       .events.find((e) => e.phase === 'load' && e.message.includes("'items'"));
     expect(loaded).toBeDefined();
+    expect(loaded?.level).toBe('info');
     expect(loaded?.data?.routed).toBe(1);
+    expect(loaded?.data?.gap).toBeUndefined();
+  });
+
+  /**
+   * Unexpected-zero (finishes ADR-0174 / OBS): on main, routed 0 of N is only
+   * info-level, so --json consumers miss the empty capability surface. Must warn
+   * and name the gap when packs were selected but nothing routed.
+   */
+  it('warns on unexpected zero when packs were selected but 0 contributions routed', async () => {
+    // Pack is discoverable but contributes an empty array → selected > 0, routed 0.
+    writeItemsPackage('@acme/items-empty', '[]');
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(itemsDomain(), vi.fn());
+
+    const scope = new RunScope();
+    await runWithScope(scope, async () => {
+      await loadCapabilityDomain({
+        registry,
+        domainId: 'items',
+        projectDir: testDir,
+        shouldLoadPackage: ADMIT_ALL,
+      });
+    });
+
+    const loaded = scope.diagnostics
+      .snapshot()
+      .events.find((e) => e.phase === 'load' && e.message.includes("'items'"));
+    expect(loaded?.level).toBe('warn');
+    expect(loaded?.data).toMatchObject({
+      domainId: 'items',
+      routed: 0,
+      selectedCount: 1,
+      gap: 'zero-routed',
+    });
+    expect(loaded?.message).toMatch(/unexpected zero/i);
+  });
+
+  it('warns on seed shortfall when fewer packs route than the explicit seed list', async () => {
+    writeItemsPackage('@acme/items-a', "[{ id: 'a' }]");
+    // Second seed name is not installed → package_not_resolved diagnostic + shortfall.
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(itemsDomain(), vi.fn());
+
+    const scope = new RunScope();
+    await runWithScope(scope, async () => {
+      await loadCapabilityDomain({
+        registry,
+        domainId: 'items',
+        projectDir: testDir,
+        shouldLoadPackage: ADMIT_ALL,
+        preferences: { packages: ['@acme/items-a', '@acme/items-missing'] },
+      });
+    });
+
+    const loaded = scope.diagnostics
+      .snapshot()
+      .events.find((e) => e.phase === 'load' && e.message.includes("'items'"));
+    // Missing package also produces an error diagnostic → gap is 'errors' (warn).
+    expect(loaded?.level).toBe('warn');
+    expect(loaded?.data?.seededCount).toBe(2);
+    expect(loaded?.data?.packageCount).toBe(1);
+    expect(['errors', 'seed-shortfall']).toContain(loaded?.data?.gap);
+  });
+
+  it('stays silent (no loaded event) when the domain has no discovery plane', async () => {
+    const registry = new CapabilityRegistry();
+    registry.registerDomain(
+      itemsDomain({ discovery: undefined }),
+      vi.fn(),
+    );
+    const scope = new RunScope();
+    await runWithScope(scope, async () => {
+      await loadCapabilityDomain({
+        registry,
+        domainId: 'items',
+        projectDir: testDir,
+      });
+    });
+    expect(scope.diagnostics.snapshot().events).toEqual([]);
   });
 });
