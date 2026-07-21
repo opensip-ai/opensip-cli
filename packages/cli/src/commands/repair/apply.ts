@@ -70,7 +70,10 @@ export function applyAllOrRollback(
     }
     return ok(undefined);
   } catch (error) {
-    for (const done of committed.reverse()) {
+    // LIFO restore of files written in this batch.
+    for (let i = committed.length - 1; i >= 0; i--) {
+      const done = committed[i];
+      if (done === undefined) continue;
       try {
         writeFileSync(done.absolutePath, done.before, 'utf8');
       } catch {

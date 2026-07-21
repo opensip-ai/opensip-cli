@@ -30,8 +30,11 @@ function sliceAvoidingSurrogateSplit(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   let end = maxChars;
   // High surrogate at end-1 with no room for its low pair → drop the high.
-  const last = text.charCodeAt(end - 1);
-  if (last >= 0xd800 && last <= 0xdbff) {
+  // Must inspect UTF-16 *code units* (not code points): codePointAt at a high
+  // surrogate that still has a low twin returns the full astral scalar and would
+  // leave a lone high surrogate at the cut (M18).
+  const lastUnit = text[end - 1];
+  if (lastUnit !== undefined && lastUnit >= '\uD800' && lastUnit <= '\uDBFF') {
     end -= 1;
   }
   return text.slice(0, end);

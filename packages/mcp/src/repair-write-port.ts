@@ -16,7 +16,7 @@ import type { RepairApplyVerifyResult } from '@opensip-cli/contracts';
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_CAPTURE_BYTES = 5 * 1024 * 1024;
 /** Grace after SIGTERM before escalating to SIGKILL (M14). */
-const KILL_GRACE_MS = 2_000;
+const KILL_GRACE_MS = 2000;
 const CHILD_ENV_SPECS = [
   'PATH',
   'HOME',

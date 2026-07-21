@@ -150,6 +150,27 @@ function isIdChar(char: string): boolean {
  * hidden inside string literals (false positives) and ensures trailing
  * directives after code-with-embedded-// are found (false negatives).
  */
+/**
+ * Advance past one character inside a quoted string, honouring backslash escapes
+ * so `\"` / `\'` do not end the string early (M6).
+ * Returns the next index and whether the string closed.
+ */
+function advanceInQuotedString(
+  line: string,
+  i: number,
+  quote: string,
+): { next: number; closed: boolean } {
+  const ch = line[i];
+  // M6: honour backslash escapes (e.g. const s = "foo\" // not-a-comment"; // @graph-ignore-next-line x).
+  if (ch === '\\' && i + 1 < line.length) {
+    return { next: i + 2, closed: false };
+  }
+  if (ch === quote) {
+    return { next: i + 1, closed: true };
+  }
+  return { next: i + 1, closed: false };
+}
+
 function findFirstRealCommentOpener(line: string): { index: number; length: number } | null {
   let i = 0;
   const len = line.length;
@@ -157,16 +178,9 @@ function findFirstRealCommentOpener(line: string): { index: number; length: numb
   while (i < len) {
     const ch = line[i];
     if (inString) {
-      // M6: honour backslash escapes so `\"` / `\'` do not end the string early
-      // (e.g. const s = "foo\" // not-a-comment"; // @graph-ignore-next-line x).
-      if (ch === '\\' && i + 1 < len) {
-        i += 2;
-        continue;
-      }
-      if (ch === inString) {
-        inString = null;
-      }
-      i++;
+      const stepped = advanceInQuotedString(line, i, inString);
+      if (stepped.closed) inString = null;
+      i = stepped.next;
       continue;
     }
     if (ch === '"' || ch === "'") {

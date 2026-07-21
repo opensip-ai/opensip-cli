@@ -115,7 +115,7 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   // M1: fractional maxParallel used to over-launch (e.g. 2.9 → 3 loop iterations).
   const maxParallel = Math.max(
     1,
-    Math.floor(Number.isFinite(opts.maxParallel) ? (opts.maxParallel as number) : 1),
+    Math.floor(Number.isFinite(opts.maxParallel) ? opts.maxParallel! : 1),
   );
   let nextIndex = 0;
   let activeCount = 0;

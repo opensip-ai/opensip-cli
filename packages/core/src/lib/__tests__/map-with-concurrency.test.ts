@@ -41,6 +41,6 @@ describe('forEachWithConcurrency', () => {
       seen.push(item);
       return Promise.resolve();
     });
-    expect(seen.sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(seen.toSorted((a, b) => a - b)).toEqual([1, 2]);
   });
 });

@@ -221,6 +221,60 @@ async function reportSarif(
 }
 
 /**
+ * H8: run reportSarif and convert any throw into a failed EgressResult so
+ * deliverEnvelope never throws on the --report-to path.
+ */
+async function reportSarifFailClosed(
+  envelope: SignalEnvelope,
+  reportTo: string,
+  opts: Pick<DeliverEnvelopeOptions, 'apiKey' | 'fetchImpl'>,
+  repoSlug: string | undefined,
+  log: Logger,
+): Promise<EgressResult> {
+  try {
+    return await reportSarif(envelope, reportTo, opts.apiKey, opts.fetchImpl, repoSlug);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.warn({
+      evt: 'cli.report.throw',
+      module: MODULE_TAG,
+      url: reportTo,
+      err: message,
+    });
+    return {
+      acceptedChunks: 0,
+      chunkResults: [],
+      outcome: 'failed',
+      authRejected: false,
+      throttled: false,
+      deadlineExceeded: false,
+      errors: [message],
+    };
+  }
+}
+
+/**
+ * Emit a stderr hint for a failed --report-to upload, branching on auth status
+ * (401 key rejected vs 403 missing ingest:write).
+ */
+function writeReportFailureHint(reportTo: string, result: EgressResult): void {
+  // Branch on the typed auth-status discriminator (never string-sniff
+  // `errors[]`): 401 = the key was rejected; 403 = authenticated but missing
+  // the `ingest:write` permission. The hint tells the user whether to fix the
+  // key or upgrade its role — the funnel's incentive to grant ingest:write.
+  let hint = '';
+  if (result.authStatus === 401) {
+    hint = ` — the API key was rejected; check --api-key / your config`;
+  } else if (result.authStatus === 403) {
+    hint = ` — the API key lacks the \`ingest:write\` permission; use an operator/admin key`;
+  }
+  process.stderr.write(
+    `opensip: --report-to failed (${reportTo})${hint}: ` +
+      `${result.errors.length > 0 ? result.errors.join('; ') : 'unknown error'}\n`,
+  );
+}
+
+/**
  * The root's post-run signal-delivery step. Emits the envelope to the cloud
  * sink (best-effort) and, when `--report-to` is set, uploads its SARIF
  * (owning exit code 4). Never throws.
@@ -282,49 +336,10 @@ export async function deliverEnvelope(
   // H8: --report-to must never throw out of deliverEnvelope — cloud path is
   // already fail-closed; wrap reportSarif so path/format/fetch failures become
   // a failed EgressResult and the exit-4 matrix still applies.
-  let result: EgressResult;
-  try {
-    result = await reportSarif(
-      stampedEnvelope,
-      opts.reportTo,
-      opts.apiKey,
-      opts.fetchImpl,
-      repoSlug,
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    log.warn({
-      evt: 'cli.report.throw',
-      module: MODULE_TAG,
-      url: opts.reportTo,
-      err: message,
-    });
-    result = {
-      acceptedChunks: 0,
-      chunkResults: [],
-      outcome: 'failed',
-      authRejected: false,
-      throttled: false,
-      deadlineExceeded: false,
-      errors: [message],
-    };
-  }
+  const result = await reportSarifFailClosed(stampedEnvelope, opts.reportTo, opts, repoSlug, log);
   const reportSuccess = result.outcome === 'ok';
   if (!reportSuccess) {
-    // Branch on the typed auth-status discriminator (never string-sniff
-    // `errors[]`): 401 = the key was rejected; 403 = authenticated but missing
-    // the `ingest:write` permission. The hint tells the user whether to fix the
-    // key or upgrade its role — the funnel's incentive to grant ingest:write.
-    let hint = '';
-    if (result.authStatus === 401) {
-      hint = ` — the API key was rejected; check --api-key / your config`;
-    } else if (result.authStatus === 403) {
-      hint = ` — the API key lacks the \`ingest:write\` permission; use an operator/admin key`;
-    }
-    process.stderr.write(
-      `opensip: --report-to failed (${opts.reportTo})${hint}: ` +
-        `${result.errors.length > 0 ? result.errors.join('; ') : 'unknown error'}\n`,
-    );
+    writeReportFailureHint(opts.reportTo, result);
   }
   // Exit-code contract (ADR-0008): a report-upload failure exits 4 — but only
   // when the run otherwise passed; a real failure (`runFailed`, derived from the

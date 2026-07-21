@@ -22,8 +22,8 @@ import { logger } from '@opensip-cli/core';
 import { pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 
-import { eachOccurrence, everyTwinInTestFile, hasProductionTwin } from './occurrence-iter.js';
 import { occurrenceCallGraphFor } from './occurrence-call-graph.js';
+import { eachOccurrence, everyTwinInTestFile, hasProductionTwin } from './occurrence-iter.js';
 import { stronglyConnectedComponents } from './strongly-connected-components.js';
 
 import type {

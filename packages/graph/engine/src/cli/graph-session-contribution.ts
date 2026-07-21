@@ -14,10 +14,10 @@ import type { Rule } from '../types.js';
 import type { Signal, ToolSessionContribution } from '@opensip-cli/core';
 
 /** Headline verdict fields copied onto the generic session contribution row. */
-export type SessionVerdict = {
+export interface SessionVerdict {
   readonly score: number;
   readonly passed: boolean;
-};
+}
 
 /**
  * Build the generic-session contribution for a single-process graph run from
