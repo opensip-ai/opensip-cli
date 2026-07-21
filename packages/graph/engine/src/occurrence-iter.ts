@@ -7,7 +7,7 @@
  * cannot mask a production twin.
  */
 
-import type { FunctionOccurrence, Indexes } from '../types.js';
+import type { FunctionOccurrence, Indexes } from './types.js';
 
 /** Yield every occurrence in the catalog (all body-hash twins). */
 export function* eachOccurrence(indexes: Indexes): IterableIterator<FunctionOccurrence> {
