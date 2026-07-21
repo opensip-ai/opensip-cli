@@ -170,14 +170,14 @@ export class CliRepairWritePort implements RepairWritePort {
         try {
           child.kill('SIGTERM');
         } catch {
-          // Already exited.
+          // @swallow-ok child already exited; kill is best-effort stop
         }
         if (killEscalationTimer !== undefined) return;
         killEscalationTimer = setTimeout(() => {
           try {
             child.kill('SIGKILL');
           } catch {
-            // Already exited between TERM and KILL.
+            // @swallow-ok child already exited between TERM and KILL
           }
         }, KILL_GRACE_MS);
       };
