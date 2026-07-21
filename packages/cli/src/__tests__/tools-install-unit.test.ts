@@ -37,7 +37,7 @@ vi.mock('node:child_process', () => ({
   execFileSync: (...a: unknown[]) => execFileSync(...a),
 }));
 vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
     readFileSync: (...a: unknown[]) => readFileSync(...a),

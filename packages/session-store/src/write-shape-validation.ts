@@ -1,4 +1,4 @@
-import { isPlainRecord, tryCatch } from '@opensip-cli/core';
+import { isFiniteNumber, isPlainRecord, tryCatch } from '@opensip-cli/core';
 
 /** Package-private primitives for validating mapped rows before any write lock. */
 export function isNonEmptyString(value: unknown): value is string {
@@ -13,9 +13,10 @@ export function isOptionalNonEmptyString(value: unknown): value is string | unde
   return value === undefined || isNonEmptyString(value);
 }
 
-export function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
+// `isFiniteNumber` is owned by @opensip-cli/core (ADR-0180 finite-number decode
+// plane); re-exported here so existing session-store import sites are unchanged
+// and there is a single implementation.
+export { isFiniteNumber };
 
 export function isFiniteNonNegativeNumber(value: unknown): value is number {
   return isFiniteNumber(value) && value >= 0;

@@ -58,6 +58,8 @@ export function expectedNpmPackTarballName(packageName: string, version: string)
  * 1. package.json name+version → expected basename (known identity)
  * 2. basename-only of the last pack stdout line, only if it is a bare `.tgz`
  *    name with no path separators / `..` and resolves inside the staged dir
+ * @throws {Error} when the pack stdout cannot be safely resolved to a tarball
+ *   inside the staged package dir (unsafe path, `..`, or outside the dir).
  */
 export function resolvePackedTarballPath(stagedPkgDir: string, packStdout: string): string {
   let expected: string | undefined;
