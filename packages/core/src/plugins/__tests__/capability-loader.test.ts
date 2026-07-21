@@ -337,10 +337,7 @@ describe('loadCapabilityDomain — the live routeContribution path', () => {
 
   it('stays silent (no loaded event) when the domain has no discovery plane', async () => {
     const registry = new CapabilityRegistry();
-    registry.registerDomain(
-      itemsDomain({ discovery: undefined }),
-      vi.fn(),
-    );
+    registry.registerDomain(itemsDomain({ discovery: undefined }), vi.fn());
     const scope = new RunScope();
     await runWithScope(scope, async () => {
       await loadCapabilityDomain({

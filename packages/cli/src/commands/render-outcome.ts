@@ -27,11 +27,7 @@
  * never emits zero stdout, then rethrow so the host exit plane can mark failure.
  */
 
-import {
-  EXIT_CODES,
-  type CommandOutcome,
-  type CommandResult,
-} from '@opensip-cli/contracts';
+import { EXIT_CODES, type CommandOutcome, type CommandResult } from '@opensip-cli/contracts';
 import { isEmbeddedRender } from '@opensip-cli/core';
 
 /** Pretty-print width matches the legacy `formatSignalJson` / `emitJson` writers. */
@@ -93,11 +89,7 @@ export function renderRaw(value: unknown): void {
  * fallback document, then rethrow so the output plane can flip a successful
  * run to RUNTIME_ERROR (ADR-0175).
  */
-function writeJsonDocument(
-  value: unknown,
-  buildFallback: () => unknown,
-  pretty = true,
-): void {
+function writeJsonDocument(value: unknown, buildFallback: () => unknown, pretty = true): void {
   const space = pretty ? JSON_INDENT : undefined;
   try {
     process.stdout.write(JSON.stringify(value, null, space) + '\n');
@@ -116,7 +108,8 @@ function writeJsonDocument(
 export function buildOutcomeSerializeFallback(outcome: CommandOutcome): CommandOutcome {
   const reason = 'CommandOutcome JSON serialization failed';
   return {
-    kind: typeof outcome.kind === 'string' && outcome.kind.length > 0 ? outcome.kind : 'command.error',
+    kind:
+      typeof outcome.kind === 'string' && outcome.kind.length > 0 ? outcome.kind : 'command.error',
     status: 'error',
     exitCode: EXIT_CODES.RUNTIME_ERROR,
     errors: [

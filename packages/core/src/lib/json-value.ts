@@ -11,8 +11,7 @@
  */
 
 /** JSON-serializable value tree produced by {@link toJsonValue}. */
-export type JsonValue =
-  boolean | null | number | string | readonly JsonValue[] | JsonRecord;
+export type JsonValue = boolean | null | number | string | readonly JsonValue[] | JsonRecord;
 
 /**
  * Plain JSON object of {@link JsonValue} leaves.
@@ -105,9 +104,7 @@ function normalize(
   limits: Limits,
 ): JsonValue {
   const primitive = normalizePrimitive(value, limits.maxStringLength);
-  return primitive === undefined
-    ? normalizeObjectLike(value, depth, seen, limits)
-    : primitive;
+  return primitive === undefined ? normalizeObjectLike(value, depth, seen, limits) : primitive;
 }
 
 /**

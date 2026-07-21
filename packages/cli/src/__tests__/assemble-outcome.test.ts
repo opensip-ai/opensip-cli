@@ -201,10 +201,7 @@ describe('withDiagnostics — bootstrap fold into outcome plane (ADR-0176)', () 
 
     expect(outcome.diagnostics?.runId).toBe('run_bootstrap_fold');
     const events = outcome.diagnostics?.events ?? [];
-    expect(events.map((e) => e.message)).toEqual([
-      capabilityDiag.message,
-      'handler ran',
-    ]);
+    expect(events.map((e) => e.message)).toEqual([capabilityDiag.message, 'handler ran']);
     expect(events[0]).toMatchObject({
       phase: 'load',
       level: 'warn',

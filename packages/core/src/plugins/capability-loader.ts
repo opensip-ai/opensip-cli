@@ -287,7 +287,11 @@ function resolveLoadGap(input: {
 
 function formatGap(
   gap: CapabilityLoadGap,
-  resolution: { readonly packages: readonly string[]; readonly selectedCount: number; readonly seededCount?: number },
+  resolution: {
+    readonly packages: readonly string[];
+    readonly selectedCount: number;
+    readonly seededCount?: number;
+  },
 ): string {
   if (gap === 'zero-routed') {
     return `unexpected zero: selected ${String(resolution.selectedCount)} pack(s), routed 0`;

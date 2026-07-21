@@ -27,11 +27,7 @@ import {
   type SignalEnvelope,
   type WarningDetail,
 } from '@opensip-cli/contracts';
-import {
-  ToolError,
-  currentScope,
-  mergeBootstrapIntoRunDiagnostics,
-} from '@opensip-cli/core';
+import { ToolError, currentScope, mergeBootstrapIntoRunDiagnostics } from '@opensip-cli/core';
 
 /**
  * Attach the authoritative outcome diagnostics snapshot (north-star §5.10,

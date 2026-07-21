@@ -128,7 +128,13 @@ describe('ast-grep tool — stdout SARIF parse', () => {
       tool: 'ast-grep',
       projectRoot: '/proj',
     } as unknown as AdapterRunContext;
-    expect(() => parseAstGrepSarif(raw, ctx)).toThrow(/invalid SARIF/);
+    // Assert the stable error CODE (the contract), not the human message text:
+    // the shared external-tool-adapter owns the SARIF-invalid wording (OBS-SARIF /
+    // ADR-0175 centralization), which must be free to change without breaking
+    // every consuming scanner's test.
+    expect(() => parseAstGrepSarif(raw, ctx)).toThrow(
+      expect.objectContaining({ code: 'ADAPTER.ARTIFACT.INVALID' }),
+    );
   });
 });
 
