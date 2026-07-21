@@ -53,6 +53,11 @@ function waitForChildOutput(
   child: ChildProcessWithoutNullStreams,
   expected: string,
 ): Promise<string> {
+  // Arm child stdin against EPIPE: a worker that dies before consuming its stdin
+  // cue must fail via the exit/timeout path below, never crash the vitest worker
+  // with an unhandled stream 'error' (a bare ELIFECYCLE with no assertion). This
+  // runs on every child before any stdin.write. ADR-0169.
+  if (child.stdin.listenerCount('error') === 0) child.stdin.on('error', () => undefined);
   return new Promise((resolve, reject) => {
     let output = '';
     const timer = setTimeout(() => finish(new Error(`Timed out waiting for ${expected}`)), 10_000);

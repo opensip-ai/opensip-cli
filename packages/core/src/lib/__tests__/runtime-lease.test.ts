@@ -87,6 +87,11 @@ async function waitForChildOutput(
   expected: string,
   timeoutMs = 30_000,
 ): Promise<void> {
+  // Arm child stdin against EPIPE: a worker that dies before consuming its stdin
+  // cue must fail via the exit/timeout path below, never crash the vitest worker
+  // with an unhandled stream 'error' (a bare ELIFECYCLE with no assertion). This
+  // runs on every child before any stdin.write. ADR-0169.
+  if (child.stdin.listenerCount('error') === 0) child.stdin.on('error', () => undefined);
   await new Promise<void>((resolve, reject) => {
     let output = '';
     let errors = '';
