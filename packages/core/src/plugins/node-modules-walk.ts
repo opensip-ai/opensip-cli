@@ -57,7 +57,12 @@ function probeFailure(path: string, error: unknown): SystemError {
   );
 }
 
-/** True when `path` exists; absence/unreadable errnos → false; anything else throws. */
+/**
+ * True when `path` exists; absence/unreadable errnos → false.
+ *
+ * @throws {SystemError} `SYSTEM.PLUGINS.FS_PROBE_FAILED` on any non-absence
+ *   errno (EMFILE/EIO/…) — resource exhaustion must never read as "not there".
+ */
 function probePathPresent(path: string): boolean {
   try {
     statSync(path);
@@ -153,8 +158,11 @@ export function hasPackageJson(packageDir: string): boolean {
 /**
  * Read a directory's entries. A missing directory or permission denial yields
  * `[]` — indistinguishable from a genuinely empty directory, which is the
- * intended ancestor-walk semantics. Any other failure (EMFILE, EIO, …) throws
- * `SYSTEM.PLUGINS.FS_PROBE_FAILED` instead of silently shrinking discovery.
+ * intended ancestor-walk semantics.
+ *
+ * @throws {SystemError} `SYSTEM.PLUGINS.FS_PROBE_FAILED` on any non-absence
+ *   errno (EMFILE, EIO, …) — a resource failure must fail loud, not silently
+ *   shrink discovery.
  */
 export function safeReaddir(dir: string): string[] {
   try {

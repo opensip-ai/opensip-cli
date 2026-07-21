@@ -42,16 +42,12 @@ import {
   currentScope,
   defineCommand,
   getWorkerLimits,
-  IpcPayloadTooLargeError,
   resolveToolHooks,
-  sendWorkerIpcMessage,
-  sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   ToolError,
   type CommandSpec,
   type Tool,
   type ToolSessionRecord,
-  type WorkerMessage,
 } from '@opensip-cli/core';
 
 import { type CliCommandsContext } from '../commands/shared.js';
@@ -59,6 +55,13 @@ import { type CliCommandsContext } from '../commands/shared.js';
 import { loadOwningToolCapabilities } from './load-tool-capabilities.js';
 import { runDeepConfigPass } from './tool-command-worker-config-pass.js';
 import { buildWorkerContext, type ResultAccumulator } from './tool-command-worker-context.js';
+import {
+  send,
+  sendTerminal,
+  errorMessage,
+  stampWorkerDiagnostics,
+  type DispatchWorkerMessage,
+} from './tool-command-worker-ipc.js';
 import {
   classifyThrow,
   findCommandSpec,
@@ -72,81 +75,8 @@ import {
 } from './tool-command-worker-result.js';
 import { createWorkerRpcClient } from './tool-command-worker-rpc.js';
 
-import type {
-  DispatchProgressEvent,
-  ToolCommandFailureClass,
-  ToolCommandResult,
-  ToolCommandWorkerSpec,
-} from './tool-command-dispatch-types.js';
+import type { ToolCommandResult, ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
 import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-adapter';
-
-/**
- * The worker's IPC message type binding: host-RPC requests stream on the
- * `progress` arm; the final {@link ToolCommandResult} settles `result`.
- */
-type DispatchWorkerMessage = WorkerMessage<DispatchProgressEvent, ToolCommandResult>;
-
-/** Post one IPC message to the parent (no-op when not forked — e.g. a unit call). */
-function send(msg: DispatchWorkerMessage): void {
-  try {
-    sendWorkerIpcMessage(msg);
-  } catch (error) {
-    if (error instanceof IpcPayloadTooLargeError) {
-      process.send?.({
-        kind: 'error',
-        message: error.message,
-        failureClass: 'payload_too_large',
-      });
-      return;
-    }
-    throw error;
-  }
-}
-
-/**
- * Terminal IPC send — drains before the worker process exits so the parent
- * does not race `exit` ahead of `message` under load (the 61849de7 race,
- * closed here for the external-tool dispatch path). Progress/host-RPC sends
- * stay synchronous; only the final result/error needs the drain.
- */
-async function sendTerminal(msg: DispatchWorkerMessage): Promise<void> {
-  try {
-    await sendWorkerIpcMessageAndDrain(msg);
-  } catch (error) {
-    if (error instanceof IpcPayloadTooLargeError) {
-      await sendWorkerIpcMessageAndDrain({
-        kind: 'error',
-        message: error.message,
-        failureClass: 'payload_too_large',
-      });
-      return;
-    }
-    throw error;
-  }
-}
-
-/**
- * Build a structured `error` IPC message with a failure class (+ stack when
- * present). `code` carries the canonical exit class while `detailCode` carries
- * the original stable subcode, so the supervisor can rebuild the right subclass
- * without discarding machine-readable capability diagnostics.
- */
-function errorMessage(
-  message: string,
-  failureClass: ToolCommandFailureClass,
-  stack?: string,
-  code?: string,
-  detailCode?: string,
-): DispatchWorkerMessage {
-  return {
-    kind: 'error',
-    message,
-    failureClass,
-    ...(stack === undefined ? {} : { stack }),
-    ...(code === undefined ? {} : { code }),
-    ...(detailCode === undefined ? {} : { detailCode }),
-  };
-}
 
 /** Read + parse the worker spec file, or return a `bad-spec` error message. */
 function readSpec(specPath: string): ToolCommandWorkerSpec | DispatchWorkerMessage {
@@ -376,21 +306,6 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
       ),
     );
   }
-}
-
-/**
- * Attach the worker run's diagnostics snapshot to the terminal result message so
- * the host can fold it into its own bus (observability parity, this ADR): a
- * worker-side capability decision (a domain that routed 0-of-N packs, a denied
- * pack, a foreign-core skip) reaches the operator's `--json` diagnostics instead
- * of dying with the worker. The error IPC arm carries its own structured
- * message/stack; result diagnostics are the observability-critical path.
- */
-function stampWorkerDiagnostics(msg: DispatchWorkerMessage): DispatchWorkerMessage {
-  if (msg.kind !== 'result') return msg;
-  const diagnostics = currentScope()?.diagnostics.snapshot();
-  if (diagnostics === undefined) return msg;
-  return { ...msg, value: { ...msg.value, diagnostics } };
 }
 
 /**
