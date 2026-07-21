@@ -259,3 +259,56 @@ describe('runScanLoop — A11: invalid file-backed report ⇒ fault, report not 
     expect(spies.writeArtifact).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * OBS-SARIF — on main, ingestSarif treats non-array `runs` as empty and a scanner
+ * that exits 0 with `{ "runs": {} }` / `{ "error": "…" }` becomes a clean
+ * 0-signal envelope (writeArtifact + deliver). Acceptance at the run-loop boundary
+ * must fail closed with ADAPTER.ARTIFACT.INVALID and not overwrite/deliver.
+ */
+describe('runScanLoop — OBS-SARIF: structural acceptance at the run-loop boundary', () => {
+  it('exit 0 + non-array runs ({"runs":{}}) faults without overwrite or delivery', async () => {
+    const { cli, spies } = makeCli();
+    await expect(
+      runScanLoop(
+        input(cli, sarifCommand()),
+        makeDeps({ code: 0, artifact: '{"version":"2.1.0","runs":{}}' }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'ADAPTER.ARTIFACT.INVALID',
+      message: expect.stringContaining('structure'),
+    });
+    expect(spies.writeArtifact).not.toHaveBeenCalled();
+    expect(spies.deliverSignals).not.toHaveBeenCalled();
+    expect(spies.emitEnvelope).not.toHaveBeenCalled();
+  });
+
+  it('exit 0 + error-shaped report ({"error":"…"}) faults without overwrite or delivery', async () => {
+    const { cli, spies } = makeCli();
+    await expect(
+      runScanLoop(
+        input(cli, sarifCommand()),
+        makeDeps({ code: 0, artifact: '{"error":"database not found"}' }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'ADAPTER.ARTIFACT.INVALID',
+      message: expect.stringMatching(/structure|error-shaped|unsupported-version/),
+    });
+    expect(spies.writeArtifact).not.toHaveBeenCalled();
+    expect(spies.deliverSignals).not.toHaveBeenCalled();
+  });
+
+  it('exit 0 + non-array results under a run faults', async () => {
+    const { cli, spies } = makeCli();
+    await expect(
+      runScanLoop(
+        input(cli, sarifCommand()),
+        makeDeps({
+          code: 0,
+          artifact: '{"version":"2.1.0","runs":[{"results":{}}]}',
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    expect(spies.writeArtifact).not.toHaveBeenCalled();
+  });
+});

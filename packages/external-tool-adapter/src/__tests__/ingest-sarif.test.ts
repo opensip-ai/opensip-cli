@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { normalizedSignalShape } from '../acceptance-harness.js';
 import { messageHashFingerprintStrategy } from '../fingerprint.js';
-import { ingestSarif } from '../ingest-sarif.js';
+import { acceptSarifDocument, ingestSarif } from '../ingest-sarif.js';
 
 import type { SarifLog } from '../ingest-sarif.js';
 
@@ -308,6 +308,7 @@ describe('ingestSarif — robustness over non-conformant (non-array) SARIF', () 
     // JSON-valid but not SARIF-shaped (the artifact reader only checks
     // JSON-parseability). `?? []` used to pass these truthy non-arrays straight
     // through and crash `for..of` / `rules.find` with a raw stack trace.
+    // Library path stays tolerant; run-loop acceptance is {@link acceptSarifDocument}.
     expect(ingestSarif({ runs: {} } as unknown as SarifLog)).toEqual([]);
     expect(ingestSarif({ runs: [{ results: {} }] } as unknown as SarifLog)).toEqual([]);
     const withBadRules = {
@@ -315,5 +316,34 @@ describe('ingestSarif — robustness over non-conformant (non-array) SARIF', () 
     } as unknown as SarifLog;
     // Non-array `rules` must not crash `rules.find`; the result still maps.
     expect(ingestSarif(withBadRules)).toHaveLength(1);
+  });
+});
+
+/** OBS-SARIF — fail-closed acceptance (run-loop boundary), not library ingest. */
+describe('acceptSarifDocument (OBS-SARIF)', () => {
+  it('accepts a minimal valid SARIF 2.1.0 document with empty runs', () => {
+    expect(acceptSarifDocument({ version: '2.1.0', runs: [] })).toEqual({
+      ok: true,
+      log: { version: '2.1.0', runs: [] },
+    });
+  });
+
+  it('rejects non-array runs, error-shaped docs, and non-array results', () => {
+    expect(acceptSarifDocument({ version: '2.1.0', runs: {} })).toEqual({
+      ok: false,
+      reason: 'runs-not-array',
+    });
+    expect(acceptSarifDocument({ error: 'database not found' })).toEqual({
+      ok: false,
+      reason: 'error-shaped',
+    });
+    expect(acceptSarifDocument({ version: '2.1.0', runs: [{ results: {} }] })).toEqual({
+      ok: false,
+      reason: 'results-not-array',
+    });
+    expect(acceptSarifDocument({ runs: [] })).toEqual({
+      ok: false,
+      reason: 'unsupported-version',
+    });
   });
 });

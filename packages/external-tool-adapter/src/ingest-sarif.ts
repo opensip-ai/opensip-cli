@@ -278,6 +278,13 @@ function resultToSignal(
  * `level` (ADR-0091); native fingerprints/level/severity are preserved on
  * `metadata`. `Signal.fingerprint` is left unstamped — the host ratchet's
  * `message-hash` strategy stamps it worker-side at envelope construction.
+ *
+ * **Library tolerance (not run-loop acceptance):** non-array `runs`/`results`
+ * become zero signals rather than throwing — useful for fixtures and partial
+ * logs. The run-loop boundary uses {@link acceptSarifDocument} first so a
+ * scanner that exits 0 with an error-shaped or structurally invalid report
+ * faults as `ADAPTER.ARTIFACT.INVALID` instead of a silent clean pass
+ * (OBS-SARIF).
  */
 export function ingestSarif(sarif: SarifLog, options?: IngestSarifOptions): readonly Signal[] {
   const category = options?.category ?? 'security';
@@ -297,4 +304,75 @@ export function ingestSarif(sarif: SarifLog, options?: IngestSarifOptions): read
     }
   }
   return signals;
+}
+
+/** Why a SARIF document failed run-loop acceptance (OBS-SARIF). */
+export type SarifAcceptRejectReason =
+  | 'not-object'
+  | 'unsupported-version'
+  | 'runs-not-array'
+  | 'run-not-object'
+  | 'results-not-array'
+  | 'error-shaped';
+
+/** Result of {@link acceptSarifDocument}. */
+export type SarifAcceptResult =
+  | { readonly ok: true; readonly log: SarifLog }
+  | { readonly ok: false; readonly reason: SarifAcceptRejectReason };
+
+/**
+ * Supported SARIF version strings at the run-loop acceptance boundary.
+ * Library {@link ingestSarif} does not enforce this.
+ */
+const SUPPORTED_SARIF_VERSION = /^2\.1(\.\d+)*$/u;
+
+/**
+ * Run-loop **acceptance** gate for a parsed SARIF document (OBS-SARIF).
+ *
+ * Fail-closed requirements (distinct from tolerant {@link ingestSarif}):
+ * - top-level value is a plain object
+ * - `version` is a supported 2.1.x string
+ * - `runs` is an array
+ * - each run is an object; if `results` is present it must be an array
+ *
+ * Rejects error-shaped payloads such as `{ "error": "…" }` and non-array
+ * `runs` (`{ "runs": {} }`) that would otherwise become a clean 0-signal
+ * envelope under exit 0.
+ */
+export function acceptSarifDocument(value: unknown): SarifAcceptResult {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, reason: 'not-object' };
+  }
+  const doc = value as Record<string, unknown>;
+
+  // Scanner error envelopes that are valid JSON but not SARIF.
+  if (
+    typeof doc.error === 'string' &&
+    doc.runs === undefined &&
+    (doc.version === undefined || typeof doc.version !== 'string')
+  ) {
+    return { ok: false, reason: 'error-shaped' };
+  }
+
+  if (typeof doc.version !== 'string' || !SUPPORTED_SARIF_VERSION.test(doc.version)) {
+    return { ok: false, reason: 'unsupported-version' };
+  }
+
+  if (!Array.isArray(doc.runs)) {
+    return { ok: false, reason: 'runs-not-array' };
+  }
+
+  for (const run of doc.runs) {
+    if (run === null || typeof run !== 'object' || Array.isArray(run)) {
+      return { ok: false, reason: 'run-not-object' };
+    }
+    const results = (run as { results?: unknown }).results;
+    if (results !== undefined && !Array.isArray(results)) {
+      return { ok: false, reason: 'results-not-array' };
+    }
+  }
+
+  // Validated shape is a SarifLog; assign through unknown for the type checker.
+  const log: SarifLog = doc;
+  return { ok: true, log };
 }

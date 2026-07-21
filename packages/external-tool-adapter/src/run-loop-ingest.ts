@@ -9,26 +9,29 @@
 import { ToolError } from '@opensip-cli/core';
 
 import { safeParseJson } from './ingest-json.js';
-import { ingestSarif } from './ingest-sarif.js';
+import { acceptSarifDocument, ingestSarif } from './ingest-sarif.js';
 import { redactCredentials } from './redact.js';
 
-import type { SarifLog } from './ingest-sarif.js';
 import type { AdapterRunContext, ExternalCommandSpec, ParsedScannerOutput } from './types.js';
 import type { Signal } from '@opensip-cli/core';
 
 /** Trailing stderr bytes preserved on an artifact/exit fault (credential-redacted). */
 export const STDERR_TAIL = 2000;
 
-/** Parse native output into signals (SARIF via shared ingest; JSON/stdout via the descriptor). */
+/**
+ * Parse native output into signals (SARIF via shared ingest; JSON/stdout via the descriptor).
+ *
+ * For `output.kind === 'sarif'`, applies {@link acceptSarifDocument} **before**
+ * tolerant {@link ingestSarif} (OBS-SARIF): structurally invalid SARIF faults with
+ * `ADAPTER.ARTIFACT.INVALID` instead of a silent 0-signal clean pass under exit 0.
+ */
 export function parseSignals(
   command: ExternalCommandSpec,
   raw: string,
   ctx: AdapterRunContext,
 ): readonly Signal[] {
   if (command.output.kind === 'sarif') {
-    const parsed = safeParseJson(raw);
-    if (!parsed.ok) return [];
-    return ingestSarif(parsed.value as SarifLog, { source: ctx.tool });
+    return parseSarifSignals(raw, ctx.tool);
   }
   if (command.parse === undefined) return [];
   const json = command.output.kind === 'json' ? safeParseJson(raw) : undefined;
@@ -38,6 +41,29 @@ export function parseSignals(
     ...(json?.ok === true ? { json: json.value } : {}),
   };
   return command.parse(payload, ctx);
+}
+
+/**
+ * Accept + ingest SARIF for the run-loop boundary. Throws
+ * `ADAPTER.ARTIFACT.INVALID` when JSON is invalid or the document fails
+ * structural acceptance.
+ */
+export function parseSarifSignals(raw: string, tool: string): readonly Signal[] {
+  const parsed = safeParseJson(raw);
+  if (!parsed.ok) {
+    throw new ToolError(
+      `${tool} produced no usable sarif report (report unparseable).`,
+      'ADAPTER.ARTIFACT.INVALID',
+    );
+  }
+  const accepted = acceptSarifDocument(parsed.value);
+  if (!accepted.ok) {
+    throw new ToolError(
+      `${tool} produced no usable sarif report (report structure: ${accepted.reason}).`,
+      'ADAPTER.ARTIFACT.INVALID',
+    );
+  }
+  return ingestSarif(accepted.log, { source: tool });
 }
 
 /** Why a file-backed scanner report is unusable (A11). */

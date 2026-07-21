@@ -36,9 +36,11 @@ export type {
 } from './types.js';
 
 // ── Ingest + normalization ──────────────────────────────────────────────────
-export { ingestSarif } from './ingest-sarif.js';
+export { acceptSarifDocument, ingestSarif } from './ingest-sarif.js';
 export type {
   IngestSarifOptions,
+  SarifAcceptRejectReason,
+  SarifAcceptResult,
   SarifDriver,
   SarifLocation,
   SarifLog,
