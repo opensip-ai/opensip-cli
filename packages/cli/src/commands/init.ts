@@ -1,16 +1,14 @@
 /**
  * init command — scaffold the project layout.
  *
- * Registry-driven (ADR-0038): `init` scaffolds one directory tree per
- * REGISTERED tool, never a hardcoded fit/sim pair. Each tool owns its own
- * example bytes + config block; the host owns only the directory layout
- * (`pluginLayout`), the document header, and `targets:`. With the bundled
- * fitness + simulation tools registered, a TypeScript project gets:
+ * Registry-driven (ADR-0038): `init` scaffolds one directory tree per REGISTERED
+ * tool, never a hardcoded fit/sim pair. Each tool owns its own example bytes +
+ * config block; the host owns only the directory layout (`pluginLayout`), the
+ * document header, and `targets:`. With the bundled fitness + simulation tools
+ * registered, a TypeScript project gets:
  *   <cwd>/opensip-cli.config.yml                                    (TRACKED)
- *   <cwd>/opensip-cli/fit/checks/example-check.mjs                  (TRACKED)
- *   <cwd>/opensip-cli/fit/recipes/example-recipe.mjs                (TRACKED)
- *   <cwd>/opensip-cli/sim/scenarios/example-scenario.mjs            (TRACKED)
- *   <cwd>/opensip-cli/sim/recipes/example-recipe.mjs                (TRACKED)
+ *   <cwd>/opensip-cli/fit/{checks,recipes}/example-*.mjs            (TRACKED)
+ *   <cwd>/opensip-cli/sim/{scenarios,recipes}/example-*.mjs         (TRACKED)
  * A tool with no `pluginLayout` (e.g. `graph`) contributes no directory.
  *
  * Consequence — the scaffolded set equals the REGISTERED set:
@@ -84,15 +82,15 @@
  * (or refuse).
  */
 
-import { accessSync, constants, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 
 import {
   inspectRuntimePromotionRecoveryHeader,
   resolveProjectPaths,
-  SystemError,
   type ProjectContext,
 } from '@opensip-cli/core';
 
+import { assertProjectRootWritableForInit } from './init/assert-writable.js';
 import { classifyFiles } from './init/file-classifier.js';
 import { createInitAuthoredPlan } from './init/init-authored-plan.js';
 import {
@@ -176,31 +174,6 @@ function baseInitResult(cwd: string): BaseInitResult {
     cwd,
     configFilename: 'opensip-cli.config.yml',
   };
-}
-
-/**
- * Fail closed before journal/promotion work when the project root cannot accept
- * authored files. Soft "rolled-back" InitResult shapes hide EACCES behind
- * status:ok + exit 1; agents and platform-acceptance require a structured
- * `command.error` that names `opensip-cli.config.yml` and the permission failure.
- *
- * @throws {SystemError} When the project directory is not writable.
- */
-function assertProjectRootWritableForInit(cwd: string): void {
-  try {
-    accessSync(cwd, constants.W_OK);
-  } catch (error) {
-    const code =
-      error !== null &&
-      typeof error === 'object' &&
-      'code' in error &&
-      typeof error.code === 'string'
-        ? error.code
-        : 'EACCES';
-    throw new SystemError(
-      `Cannot write opensip-cli.config.yml: the project directory is not writable (${code}).`,
-    );
-  }
 }
 
 function invalidInitInput(

@@ -1,20 +1,19 @@
 /**
  * dispatch-fork-core — the shared fork + IPC settle + host-RPC supervisor for the
- * ADR-0054 out-of-process external-tool worker (increments M4-C / M4-D / M4-F).
+ * ADR-0054 out-of-process external-tool worker (M4-C / M4-D / M4-F).
  *
  * Both supervisors fork the SAME internal `__tool-command-worker` subcommand and
  * settle on the SAME `ToolCommandResult` shape:
  *   - `dispatch-external-tool-command.ts` runs an external tool's COMMAND;
- *   - `dispatch-external-tool-hook.ts` (M4-F) runs an external tool's LIFECYCLE
- *     HOOK (`collectReportData` / `sessionReplay`).
+ *   - `dispatch-external-tool-hook.ts` (M4-F) runs a LIFECYCLE HOOK.
  *
  * They differ only in the {@link ToolCommandWorkerSpec} they marshal (a
  * `commandName` vs a `hook`) and how they replay the result. This module owns the
  * common machinery so neither duplicates it: marshal the spec to a temp file,
  * fork the CLI binary as the worker subcommand (full bootstrap re-runs
  * worker-local), enforce a wall-clock timeout, serve mid-run host-RPC upcalls
- * against the REAL host `ToolCliContext`, and resolve the worker's
- * {@link ToolCommandResult} (or reject with a structured {@link ToolError}).
+ * against the REAL host `ToolCliContext`, and resolve the worker's result (or
+ * reject with a structured {@link ToolError}).
  *
  * The host remains the ONLY process that performs the privileged effect; a worker
  * fault (throw / `process.exit` / crash / timeout / fork failure) becomes a
@@ -81,20 +80,15 @@ function allowlistedWorkerDetailCode(detailCode: string | undefined): string | u
 }
 
 /**
- * Give a worker's final IPC message time to settle the handle before acting on
- * a premature `exit`. Runners under load intermittently deliver `exit` ahead of
- * a clean worker's drained final `process.send` (exit races message) — the same
- * race 61849de7 closed on the capability-worker path. Two macrotasks
- * (setImmediate + short timer) cover both "already in the parent's queue" and
- * "still crossing the kernel pipe" cases; `settle` runs only if the handle is
- * still unsettled after the grace window.
+ * Defer acting on a premature worker `exit` across two macrotasks so a final IPC
+ * message already queued/crossing the pipe settles the handle first (the race
+ * 61849de7 closed on the capability path); `settle` runs only if still unsettled.
  */
 function afterIpcExitGrace(isSettled: () => boolean, settle: () => void): void {
   setImmediate(() => {
     if (isSettled()) return;
     setTimeout(() => {
-      if (isSettled()) return;
-      settle();
+      if (!isSettled()) settle();
     }, 50);
   });
 }
@@ -325,10 +319,9 @@ function forkAndAwait({
 
 /**
  * Post one host-RPC {@link RpcReply} back to the worker, only while the child is
- * still attached: a settle (result/exit/timeout) kills it, after which
- * `child.send` would write to a closed channel. The send callback swallows a
- * racing EPIPE so a reply to a departing worker never surfaces as a spurious
- * dispatch failure — a dropped reply is logged at debug and otherwise ignored.
+ * still attached (a settle kills it, after which `child.send` writes to a closed
+ * channel). The callback swallows a racing EPIPE so a reply to a departing worker
+ * is a debug-logged no-op, never a spurious dispatch failure.
  */
 function sendRpcReply(child: ChildProcess, reply: RpcReply, spec: ToolCommandWorkerSpec): void {
   if (!child.connected) return;

@@ -5,12 +5,11 @@
  *
  * These are the ONLY shapes that cross the host↔worker IPC boundary for a
  * dispatched external-tool command. Everything here MUST be structured-clone
- * safe (the transport forks with `serialization: 'advanced'`): plain data only,
- * no functions, no class instances, no live handles (datastore, registries,
- * Commander). The host marshals the spec → temp file → fork; the worker imports
- * the tool runtime, runs the handler against a worker-side `ToolCliContext`
- * shim, and posts back a {@link ToolCommandResult} (the final-result-return
- * subset of the seam→RPC mapping in ADR-0054's Build Plan).
+ * safe (the transport forks with `serialization: 'advanced'`): plain data only —
+ * no functions/classes/live handles (datastore, registries, Commander). The host
+ * marshals the spec → temp file → fork; the worker imports the tool runtime, runs
+ * the handler against a worker-side `ToolCliContext` shim, and posts back a
+ * {@link ToolCommandResult} (the final-result-return subset of ADR-0054).
  *
  * Two transport strategies cross this boundary (ADR-0054 M4-C):
  *   - final-result-return (FRR): the worker accumulates the value and returns it
@@ -105,25 +104,20 @@ export interface ToolCommandWorkerSpec {
 
 /**
  * A structured error category for a dispatched-command failure, so the host can
- * triage why a worker run failed (mirrors the transport's `failureClass`
- * taxonomy but for the COMMAND layer, not the fork layer).
+ * triage why a worker run failed (mirrors the transport's `failureClass` but for
+ * the COMMAND layer, not the fork layer).
  *
  *   - `tool-handler-throw`   — the handler threw inside the worker.
- *   - `unsupported-seam`     — the handler called a seam the worker cannot
- *                              marshal (the live-view seams; Ink/TTY rendering
- *                              cannot leave the host). The host-RPC seams are no
- *                              longer in this class — they upcall (M4-C).
- *   - `host-rpc-failed`      — a host-RPC upcall faulted host-side (the error
- *                              crossed back as a structured {@link RpcReply}).
- *   - `command-not-found`    — `commandName` did not match any `commandSpecs`.
+ *   - `unsupported-seam`     — the handler called a seam the worker cannot marshal
+ *                              (the live-view seams; Ink/TTY can't leave the host).
+ *   - `host-rpc-failed`      — a host-RPC upcall faulted host-side (error crossed
+ *                              back as a structured {@link RpcReply}).
+ *   - `command-not-found`    — `commandName` matched no `commandSpecs`.
  *   - `runtime-load-failed`  — `importToolRuntime` failed in the worker.
  *   - `bad-spec`             — the spec file was missing or unparseable.
- *   - `config-invalid`       — the tool's REAL Zod (the worker deep pass)
- *                              rejected its config namespace block (ADR-0054 M4-E
- *                              Config two-pass). The host maps this to the SAME
- *                              typed config error + exit code as the host coarse
- *                              pass, so the UX is identical regardless of which
- *                              pass caught the failure.
+ *   - `config-invalid`       — the worker deep-pass Zod rejected the tool's config
+ *                              block (ADR-0054 M4-E); mapped to the SAME typed
+ *                              error + exit code as the host coarse pass.
  */
 export type ToolCommandFailureClass =
   | 'tool-handler-throw'
@@ -219,14 +213,9 @@ export interface ToolCommandResult {
    */
   readonly returned?: unknown;
   /**
-   * The worker run's diagnostics snapshot (`scope.diagnostics.snapshot()`) — its
-   * lifecycle events + metrics, including the capability-domain load results
-   * (routed/error counts, denied packs, foreign-core skips) the worker's OWN
-   * bootstrap produced. The supervisor folds this into the HOST bus during replay
-   * (`DiagnosticsBus.ingest`) so a `--json` consumer sees the whole run, not just
-   * the host half — a worker-side capability decision is no longer invisible.
-   * `undefined` when the worker recorded nothing (or an older worker predates the
-   * field).
+   * The worker run's diagnostics snapshot (events + metrics, incl. capability-load
+   * results). The supervisor folds it into the host bus during replay
+   * (`DiagnosticsBus.ingest`, ADR-0174) so `--json` shows the whole run.
    */
   readonly diagnostics?: RunDiagnostics;
 }

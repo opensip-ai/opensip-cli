@@ -75,7 +75,7 @@ import {
 } from './tool-command-worker-result.js';
 import { createWorkerRpcClient } from './tool-command-worker-rpc.js';
 
-import type { ToolCommandResult, ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
+import type { ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
 import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-adapter';
 
 /** Read + parse the worker spec file, or return a `bad-spec` error message. */
