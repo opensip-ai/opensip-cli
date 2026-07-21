@@ -111,18 +111,40 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   // Parallel sliding window — mirrors fitness's executeParallel.
   // Defensive: even though recipe authors go through defineSimulationRecipe (and
   // fitness through its own paths), a direct caller or future plugin could pass
-  // NaN/0/negative. Force a safe minimum.
-  const maxParallel = Math.max(1, Number.isFinite(opts.maxParallel) ? opts.maxParallel! : 1);
+  // NaN/0/negative/fractional. Floor to an integer and force a safe minimum.
+  // M1: fractional maxParallel used to over-launch (e.g. 2.9 → 3 loop iterations).
+  const maxParallel = Math.max(
+    1,
+    Math.floor(Number.isFinite(opts.maxParallel) ? (opts.maxParallel as number) : 1),
+  );
   let nextIndex = 0;
   let activeCount = 0;
   let stopping = false;
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const settleOk = (): void => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const settleErr = (error: unknown): void => {
+      if (settled) return;
+      settled = true;
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
     const launch = (unit: Unit, index: number): void => {
       activeCount++;
+      // M3: attach catch so a rejecting runUnit never becomes an unhandled
+      // rejection and still drains the sliding window.
       void runUnit(unit, index)
         .then(({ shouldStop }) => {
           if (shouldStop) stopping = true;
+        })
+        .catch((error: unknown) => {
+          stopping = true;
+          settleErr(error);
         })
         .finally(() => {
           activeCount--;
@@ -138,7 +160,7 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
           // Drain condition now includes external abort as a terminal reason.
           // Once all in-flight units complete, we resolve even if units remain.
           if (activeCount === 0 && (nextIndex >= units.length || stopping || aborted)) {
-            resolve();
+            settleOk();
           }
         });
     };
@@ -156,7 +178,7 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
     // `.finally()` will ever run to resolve the promise, so settle it here.
     // (Launched units are still in flight at this synchronous point, so a
     // positive activeCount means their `.finally()` drain will resolve later.)
-    if (activeCount === 0) resolve();
+    if (activeCount === 0) settleOk();
   });
 }
 /* eslint-enable sonarjs/cognitive-complexity */

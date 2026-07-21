@@ -84,6 +84,16 @@ export async function runWithRetry<T>(
         };
       } catch (retryError) {
         lastError = retryError;
+        // M5: shouldNotRetry must apply on every failure, not only the first —
+        // an abort (or other non-retryable) mid-retry train must stop immediately.
+        if (options.shouldNotRetry?.(retryError) === true) {
+          return {
+            result: undefined,
+            lastError: retryError,
+            retryCount: attempt + 1,
+            wasRetried: true,
+          };
+        }
       }
     }
     return {

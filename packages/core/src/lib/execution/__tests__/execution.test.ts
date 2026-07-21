@@ -158,6 +158,33 @@ describe('runWithRetry', () => {
     expect(out.wasRetried).toBe(false);
   });
 
+  /**
+   * M5: shouldNotRetry was only checked on the first failure. A later attempt
+   * that throws a non-retryable error must stop the train immediately.
+   */
+  it('stops mid-retry when shouldNotRetry matches a later failure (M5)', async () => {
+    let calls = 0;
+    class AbortLike extends Error {}
+    const out = await runWithRetry(
+      () => {
+        calls++;
+        // First failure is retryable; second is an abort.
+        if (calls === 1) return Promise.reject(new Error('transient'));
+        return Promise.reject(new AbortLike());
+      },
+      {
+        enabled: true,
+        maxRetries: 5,
+        shouldNotRetry: (e) => e instanceof AbortLike,
+        backoffMs: [0, 0, 0, 0, 0],
+      },
+    );
+    expect(calls).toBe(2);
+    expect(out.wasRetried).toBe(true);
+    expect(out.retryCount).toBe(1);
+    expect(out.lastError).toBeInstanceOf(AbortLike);
+  });
+
   it('runs once when disabled', async () => {
     let calls = 0;
     await runWithRetry(
@@ -271,6 +298,46 @@ describe('scheduleUnits', () => {
       },
     });
     expect([...seen].sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
+  });
+
+  /**
+   * M1: fractional maxParallel used to over-launch (e.g. 2.9 → three iterations
+   * of the initial for-loop). Floor to integer concurrency.
+   */
+  it('floors fractional maxParallel so concurrency is never over-launched (M1)', async () => {
+    let active = 0;
+    let maxActive = 0;
+    await scheduleUnits<number>({
+      units: [1, 2, 3, 4, 5, 6],
+      mode: 'parallel',
+      maxParallel: 2.9,
+      runUnit: async () => {
+        active++;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => setTimeout(r, 5));
+        active--;
+        return { shouldStop: false };
+      },
+    });
+    expect(maxActive).toBeLessThanOrEqual(2);
+  });
+
+  /**
+   * M3: a rejecting runUnit must not leave an unhandled rejection; the
+   * scheduler surfaces the error and drains.
+   */
+  it('rejects cleanly when a parallel runUnit throws (M3 unhandled rejection)', async () => {
+    await expect(
+      scheduleUnits<number>({
+        units: [1, 2, 3],
+        mode: 'parallel',
+        maxParallel: 2,
+        runUnit: (u) => {
+          if (u === 1) return Promise.reject(new Error('unit-boom'));
+          return Promise.resolve({ shouldStop: false });
+        },
+      }),
+    ).rejects.toThrow(/unit-boom/);
   });
 });
 

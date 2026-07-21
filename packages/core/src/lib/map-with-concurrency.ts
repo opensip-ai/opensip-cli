@@ -12,9 +12,12 @@ export async function mapWithConcurrency<T, R>(
   concurrency: number,
   fn: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
+  if (items.length === 0) return [];
+  // M2: concurrency <= 0 used to spawn 0 workers and hang on empty Promise.all
+  // while results stayed undefined. Floor at 1 for non-empty inputs.
+  const workerCount = Math.max(1, Math.min(Math.floor(concurrency), items.length));
   const results: ({ readonly value: R } | undefined)[] = [];
   let nextIndex = 0;
-  const workerCount = Math.min(concurrency, items.length);
   const workers = Array.from({ length: workerCount }, async () => {
     while (true) {
       const index = nextIndex;
@@ -40,8 +43,10 @@ export async function forEachWithConcurrency<T>(
   concurrency: number,
   fn: (item: T) => Promise<void>,
 ): Promise<void> {
+  if (items.length === 0) return;
+  // M2: same floor as mapWithConcurrency — never spawn zero workers.
+  const workerCount = Math.max(1, Math.min(Math.floor(concurrency), items.length));
   let nextIndex = 0;
-  const workerCount = Math.min(concurrency, items.length);
   const workers = Array.from({ length: workerCount }, async () => {
     while (true) {
       const index = nextIndex;

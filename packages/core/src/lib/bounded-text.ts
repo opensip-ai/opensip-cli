@@ -11,9 +11,28 @@ export function appendBoundedUtf8Text(
   maxLength: number,
 ): BoundedTextAppendResult {
   const limit = Math.max(0, maxLength);
-  if (buffer.length >= limit) return { value: buffer.slice(0, limit), truncated: true };
+  if (buffer.length >= limit) {
+    return { value: sliceAvoidingSurrogateSplit(buffer, limit), truncated: true };
+  }
   const remaining = limit - buffer.length;
   const text = chunk.toString('utf8');
   if (text.length <= remaining) return { value: buffer + text, truncated: false };
-  return { value: buffer + text.slice(0, remaining), truncated: true };
+  // M18: do not leave a lone high surrogate at the cut boundary.
+  return {
+    value: buffer + sliceAvoidingSurrogateSplit(text, remaining),
+    truncated: true,
+  };
+}
+
+/** Slice `text` to at most `maxChars` code units without splitting a surrogate pair. */
+function sliceAvoidingSurrogateSplit(text: string, maxChars: number): string {
+  if (maxChars <= 0) return '';
+  if (text.length <= maxChars) return text;
+  let end = maxChars;
+  // High surrogate at end-1 with no room for its low pair → drop the high.
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) {
+    end -= 1;
+  }
+  return text.slice(0, end);
 }
