@@ -13,12 +13,12 @@
  * object — `import` / `default` / `node` selected in that order) →
  * `pkg.main` → `./index.js`. Returns the joined absolute path of the
  * entry, plus the package name from `pkg.name`. Returns `undefined`
- * when `package.json` is missing, malformed, or has no resolvable
- * entry.
+ * when `package.json` is missing, malformed, has no resolvable entry, or
+ * the entry escapes the package directory (absolute / `..` / symlink).
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 /** The result of {@link resolvePackageEntryPoint}: a package's resolved entry point plus its name. */
 export interface PackageEntryResolution {
@@ -43,7 +43,8 @@ interface PackageJsonShape {
  * @param fallbackName Name to use if `pkg.name` is missing — typically
  *                     the directory entry the caller iterated over.
  * @returns The resolved entry plus name, or `undefined` if `package.json`
- *          is absent, malformed, or has no resolvable entry.
+ *          is absent, malformed, has no resolvable entry, or the entry
+ *          path escapes `packageDir`.
  */
 export function resolvePackageEntryPoint(
   packageDir: string,
@@ -63,11 +64,52 @@ export function resolvePackageEntryPoint(
   if (!name) return undefined;
 
   const rawEntry = resolveEntryFromExportsField(pkg.exports) ?? pkg.main ?? './index.js';
+  if (typeof rawEntry !== 'string' || rawEntry.length === 0) return undefined;
+
+  const entry = resolveContainedEntry(packageDir, rawEntry);
+  if (entry === undefined) return undefined;
+
   return {
     name,
-    entry: join(packageDir, rawEntry),
+    entry,
     rawEntry,
   };
+}
+
+/**
+ * Resolve `rawEntry` under `packageDir` and reject absolute / `..` escapes
+ * (and symlink escapes when the entry already exists on disk).
+ */
+function resolveContainedEntry(packageDir: string, rawEntry: string): string | undefined {
+  // Absolute entry (or Windows drive path) must never be joined — `path.join`
+  // discards prior segments when a later segment is absolute, which is a
+  // classic package-entry escape.
+  if (isAbsolute(rawEntry)) return undefined;
+  if (rawEntry.includes('\0')) return undefined;
+
+  const packageRoot = resolve(packageDir);
+  const candidate = resolve(packageRoot, rawEntry);
+  const rel = relative(packageRoot, candidate);
+  // `relative` yields `..` / absolute when candidate is outside packageRoot.
+  if (rel.startsWith('..') || isAbsolute(rel)) return undefined;
+
+  // When the entry already exists, re-check after symlink resolution so a
+  // crafted package cannot point at a symlink that leaves the tree.
+  if (existsSync(candidate)) {
+    try {
+      const realEntry = realpathSync(candidate);
+      const realPackage = realpathSync(packageRoot);
+      if (realEntry !== realPackage && !realEntry.startsWith(realPackage + sep)) {
+        return undefined;
+      }
+      return realEntry;
+    } catch {
+      // @swallow-ok unreadable / race mid-resolution — fail closed
+      return undefined;
+    }
+  }
+
+  return candidate;
 }
 
 /**

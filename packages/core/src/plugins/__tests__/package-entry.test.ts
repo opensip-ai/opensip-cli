@@ -142,4 +142,25 @@ describe('resolvePackageEntryPoint', () => {
     const r = resolvePackageEntryPoint(dir);
     expect(r?.entry).toBe(join(dir, './main.js'));
   });
+
+  it('rejects absolute main entry (path escape)', () => {
+    const absoluteEscape = join(testDir, 'outside.js');
+    writeFileSync(absoluteEscape, 'export {}\n');
+    const dir = writePkg({ name: 'p', main: absoluteEscape });
+    expect(resolvePackageEntryPoint(dir)).toBeUndefined();
+  });
+
+  it('rejects `..` traversal main entry (path escape)', () => {
+    const outside = join(testDir, 'escape.js');
+    writeFileSync(outside, 'export {}\n');
+    const dir = writePkg({ name: 'p', main: '../escape.js' });
+    expect(resolvePackageEntryPoint(dir)).toBeUndefined();
+  });
+
+  it('rejects absolute exports string entry', () => {
+    const absoluteEscape = join(testDir, 'abs-export.js');
+    writeFileSync(absoluteEscape, 'export {}\n');
+    const dir = writePkg({ name: 'p', exports: absoluteEscape });
+    expect(resolvePackageEntryPoint(dir)).toBeUndefined();
+  });
 });
