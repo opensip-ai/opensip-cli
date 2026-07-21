@@ -34,10 +34,18 @@ export const JSON_VALUE_MAX_ARRAY_ITEMS = 50;
 /** Default maximum object keys retained (stable insertion order). */
 export const JSON_VALUE_MAX_OBJECT_KEYS = 64;
 
+/**
+ * Optional caps for {@link toJsonValue} / {@link toJsonRecord}. Omitted fields
+ * use the `JSON_VALUE_MAX_*` defaults.
+ */
 export interface ToJsonValueOptions {
+  /** Maximum nesting depth (root = 0). */
   readonly maxDepth?: number;
+  /** Maximum string length in characters. */
   readonly maxStringLength?: number;
+  /** Maximum array items retained. */
   readonly maxArrayItems?: number;
+  /** Maximum object keys retained (insertion order). */
   readonly maxObjectKeys?: number;
 }
 
@@ -151,7 +159,7 @@ function normalizeObjectLike(
 
   // Prefer structural Error projection over empty `{}` from JSON.stringify.
   if (value instanceof Error) {
-    return normalizeError(value, depth, seen, limits);
+    return projectErrorAsJsonRecord(value, depth, seen, limits);
   }
 
   // Date → ISO string (matches JSON.stringify's toJSON behaviour without
@@ -223,7 +231,7 @@ function truncateString(value: string, maxLength: number): string {
   return value.slice(0, maxLength - SENTINEL_TRUNCATED.length) + SENTINEL_TRUNCATED;
 }
 
-function normalizeError(
+function projectErrorAsJsonRecord(
   error: Error,
   depth: number,
   seen: WeakSet<object>,
