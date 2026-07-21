@@ -86,4 +86,16 @@ overrides:
   'esbuild@<0.25.0': '>=0.25.0'
   'esbuild@>=0.27.3 <0.28.1': '>=0.28.1'
   'undici@<7.28.0': '7.28.0'
+  # fast-uri < 3.1.4: two HIGH host-confusion advisories (GHSA-4c8g-83qw-93j6,
+  # GHSA-v2hh-gcrm-f6hx), transitive via @modelcontextprotocol/sdk > ajv (which
+  # wants fast-uri ^3.0.1). Pin to the patched 3.x — stays in ajv's major.
+  'fast-uri@<3.1.4': '^3.1.4'
+  # @hono/node-server < 2.0.5: MODERATE path-traversal (GHSA-frvp-7c67-39w9),
+  # transitive via @modelcontextprotocol/sdk's HTTP transport. Forcing 2.x is a
+  # MAJOR bump the SDK (1.29.0) pins to ^1.19.9, but OpenSIP's MCP server is
+  # stdio-only (packages/mcp/src/server.ts uses StdioServerTransport exclusively)
+  # so the HTTP-transport code that pulls in @hono is never loaded — the bump is
+  # runtime-safe here. Forced (not left as a warning) because the repo dogfood
+  # gate fails on warnings too. Drop this when the SDK adopts @hono >= 2.0.5.
+  '@hono/node-server@<2.0.5': '^2.0.5'
   'vite@5': '^7.1.0'
