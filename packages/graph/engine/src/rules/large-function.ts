@@ -19,6 +19,8 @@
  * (ADR-0005). Language-agnostic: every adapter emits `endLine`.
  */
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
@@ -37,7 +39,9 @@ export const largeFunctionRule = defineRule({
     const error = config.largeFunctionErrorLines ?? DEFAULT_ERROR_LINES;
 
     const signals: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: every occurrence, not byBodyHash winners — a test twin that
+    // wins the content-dedup slot must not hide a production large function.
+    for (const occ of eachOccurrence(indexes)) {
       // Skip occurrences with empty filePath (defensive, as orphan-subtree does).
       /* v8 ignore next */
       if (!occ.filePath) continue;

@@ -15,6 +15,8 @@
  * (ADR-0005). Language-agnostic: every adapter emits `params`.
  */
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
@@ -33,7 +35,9 @@ export const wideFunctionRule = defineRule({
     const error = config.wideFunctionErrorParams ?? DEFAULT_ERROR_PARAMS;
 
     const signals: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: every occurrence — test twin winning byBodyHash must not hide
+    // a wide production signature at another path.
+    for (const occ of eachOccurrence(indexes)) {
       /* v8 ignore next */
       if (!occ.filePath) continue;
       // Test files are not production code subject to this quality gate (same

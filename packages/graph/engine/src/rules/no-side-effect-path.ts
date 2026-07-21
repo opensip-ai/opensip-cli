@@ -33,6 +33,8 @@
  * gracefully when an adapter omits a given hint.
  */
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
@@ -137,7 +139,9 @@ export const noSideEffectPathRule = defineRule({
     const detector = buildSideEffectDetector(hints);
     const sideEffecting = computeSideEffecting(indexes, detector);
     const signals: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: every occurrence so a production pure site is not hidden by a
+    // test twin that won byBodyHash.
+    for (const occ of eachOccurrence(indexes)) {
       if (!isPureCandidate(occ, sideEffecting, features)) continue;
       const reachable = transitiveCallees(occ, indexes);
       let anyEffecting = false;
@@ -307,7 +311,8 @@ function isPureCandidate(
 
 function computeSideEffecting(indexes: Indexes, detector: SideEffectDetector): Set<string> {
   const set = new Set<string>();
-  for (const occ of indexes.byBodyHash.values()) {
+  // Union side-effect edges across all twins of a body hash (ADR-0178).
+  for (const occ of eachOccurrence(indexes)) {
     if (textualSideEffect(occ, detector)) set.add(occ.bodyHash);
   }
   return set;

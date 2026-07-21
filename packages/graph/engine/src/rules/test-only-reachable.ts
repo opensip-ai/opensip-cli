@@ -5,6 +5,8 @@
  * should live in __tests__/, not in the production tree.
  */
 
+import { eachOccurrence, everyTwinInTestFile, hasProductionTwin } from '../pipeline/occurrence-iter.js';
+
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 import { createGraphSignal } from './create-graph-signal.js';
@@ -33,7 +35,9 @@ export const testOnlyReachableRule = defineRule({
     // Missing prod-caller edges on a fast catalog can fake "test-only".
     const caveat = approximateSuffix(catalog);
     const signals: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: every occurrence so a production site is not hidden by a
+    // test twin that won byBodyHash.
+    for (const occ of eachOccurrence(indexes)) {
       if (occ.kind === 'module-init') continue;
       if (occ.inTestFile) continue; // Tests-of-tests are fine.
       if (occ.definedInGenerated) continue;
@@ -73,7 +77,8 @@ function computeTestOnlyLocal(
   if (reachableFromProd.has(hash)) return false;
   const callers = indexes.callers.get(hash) ?? [];
   if (callers.length === 0) return false;
-  return callers.every((h) => indexes.byBodyHash.get(h)?.inTestFile === true);
+  // ADR-0178: a caller hash is "test" only when every twin is in a test file.
+  return callers.every((h) => everyTwinInTestFile(indexes, h));
 }
 
 function computeProductionEntries(
@@ -82,10 +87,8 @@ function computeProductionEntries(
 ): Set<string> {
   const out = new Set<string>();
   for (const ep of inferEntryPoints(catalog, indexes)) {
-    const occ = indexes.byBodyHash.get(ep.bodyHash);
-    /* v8 ignore next */
-    if (!occ) continue;
-    if (occ.inTestFile) continue; // Test-runner entries don't count.
+    // ADR-0178: seed when any twin is production (winner may be a test twin).
+    if (!hasProductionTwin(indexes, ep.bodyHash)) continue;
     out.add(ep.bodyHash);
   }
   return out;

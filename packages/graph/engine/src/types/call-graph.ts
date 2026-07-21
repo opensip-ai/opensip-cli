@@ -391,7 +391,16 @@ export interface Catalog {
   readonly features?: PersistedFeatures;
 }
 
-/** O(1) lookups derived from the catalog. Not persisted. */
+/**
+ * O(1) lookups derived from the catalog. Not persisted.
+ *
+ * Consumer contract (ADR-0003 + ADR-0178):
+ * - `byBodyHash` is last-writer-wins content dedup — valid for hash-keyed
+ *   adjacency keys and cheap one-row features (bodyLines/blast rows).
+ * - Occurrence-local rules and twin-sensitive `inTestFile` predicates MUST
+ *   walk `occurrencesByHash` (or `eachOccurrence`) so a test twin that wins
+ *   the content slot cannot mask a production twin.
+ */
 export interface Indexes {
   readonly byBodyHash: ReadonlyMap<string, FunctionOccurrence>;
   /**
@@ -407,7 +416,8 @@ export interface Indexes {
    * bodyHash → ALL occurrences sharing that body. Unlike `byBodyHash`
    * (one occurrence per hash, content-dedup), this preserves every
    * occurrence so a callee whose body is duplicated across packages can be
-   * disambiguated to the correct package. Consumed by `resolveCallee`.
+   * disambiguated to the correct package. Consumed by `resolveCallee` and by
+   * occurrence-local rules (ADR-0178).
    */
   readonly occurrencesByHash: ReadonlyMap<string, readonly FunctionOccurrence[]>;
   /**

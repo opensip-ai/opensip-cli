@@ -23,6 +23,8 @@
  * reachability are NOT cheaply recomputable in-rule, so there is no fallback.
  */
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
@@ -43,7 +45,9 @@ export const highBlastUntestedRule = defineRule({
     const error = config.highBlastErrorThreshold ?? DEFAULT_ERROR_BLAST;
 
     const signals: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: every occurrence — a test twin winning byBodyHash must not
+    // suppress the high-blast gate on the production twin.
+    for (const occ of eachOccurrence(indexes)) {
       /* v8 ignore next */
       if (!occ.filePath) continue;
       // A function DEFINED in a test file is itself test code — asking whether

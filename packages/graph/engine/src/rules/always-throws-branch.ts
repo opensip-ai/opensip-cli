@@ -23,6 +23,8 @@
  * v0.3.
  */
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import { createGraphSignal } from './create-graph-signal.js';
 import { defineRule } from './define-rule.js';
 
@@ -151,7 +153,9 @@ export const alwaysThrowsBranchRule = defineRule({
     // candidate inside `nestedSpansWithin`).
     const occurrencesByFile = groupOccurrencesByFile(catalog);
     const signals: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: every occurrence — test twin winning byBodyHash must not hide
+    // a production always-throws site.
+    for (const occ of eachOccurrence(indexes)) {
       if (occ.kind === 'module-init') continue;
       // An always-throwing arrow in a test file is an intentional
       // `expect(...).toThrow()` fixture (`() => { throw boom }`), not a

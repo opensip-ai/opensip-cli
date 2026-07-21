@@ -22,6 +22,7 @@ import { logger } from '@opensip-cli/core';
 import { pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 
+import { eachOccurrence, everyTwinInTestFile, hasProductionTwin } from './occurrence-iter.js';
 import { occurrenceCallGraphFor } from './occurrence-call-graph.js';
 import { stronglyConnectedComponents } from './strongly-connected-components.js';
 
@@ -168,7 +169,8 @@ function isReachableOnlyFromTests(
   if (prodReachable.has(hash)) return false;
   const callers = indexes.callers.get(hash) ?? [];
   if (callers.length === 0) return false;
-  return callers.every((h) => indexes.byBodyHash.get(h)?.inTestFile === true);
+  // ADR-0178: caller hash is purely test only when every twin is in a test file.
+  return callers.every((h) => everyTwinInTestFile(indexes, h));
 }
 
 // ── Blast (verbatim port of dashboard code-paths/indexes.ts) ───────
@@ -238,10 +240,8 @@ function computeReachableFromEntry(
 function computeProdReachable(catalog: Catalog, indexes: Indexes): Set<string> {
   const seeds = new Set<string>();
   for (const ep of inferEntryPoints(catalog, indexes)) {
-    const occ = indexes.byBodyHash.get(ep.bodyHash);
-    /* v8 ignore next */
-    if (!occ) continue;
-    if (occ.inTestFile || occ.definedInGenerated) continue;
+    // ADR-0178: seed when any twin is production (winner may be test).
+    if (!hasProductionTwin(indexes, ep.bodyHash)) continue;
     seeds.add(ep.bodyHash);
   }
   return bfsForward(seeds, indexes);
@@ -258,8 +258,9 @@ function computeProdReachable(catalog: Catalog, indexes: Indexes): Set<string> {
  */
 function computeTestReachable(indexes: Indexes): Set<string> {
   const seeds = new Set<string>();
-  for (const [hash, occ] of indexes.byBodyHash) {
-    if (occ.inTestFile) seeds.add(hash);
+  // ADR-0178: any twin in a test file seeds the hash (union inTestFile).
+  for (const [hash, occs] of indexes.occurrencesByHash) {
+    if (occs.some((o) => o.inTestFile)) seeds.add(hash);
   }
   return bfsForward(seeds, indexes);
 }
@@ -328,7 +329,8 @@ function computePackageCoupling(indexes: Indexes): {
   edge: readonly PackageEdgeFeature[];
 } {
   const counts = new Map<string, Map<string, number>>();
-  for (const occ of indexes.byBodyHash.values()) {
+  // ADR-0178: every occurrence so package edges from losing twins are counted.
+  for (const occ of eachOccurrence(indexes)) {
     // Package coupling is a PRODUCTION-architecture gate (graph:unexpected-coupling).
     // Test-file occurrences are not production architecture — and, because an
     // anonymous body duplicated between packages can resolve to a same-hash

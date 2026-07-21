@@ -8,6 +8,8 @@
  * the graph (their module-init is its own entry by name-match).
  */
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import { approximateSuffix } from './_approximation.js';
 import { inferEntryPoints } from './_entry-points.js';
 import { createGraphSignal } from './create-graph-signal.js';
@@ -28,7 +30,8 @@ export const orphanSubtreeRule = defineRule({
     // On a fast catalog a missing caller-edge can fake an orphan; mark it.
     const caveat = approximateSuffix(catalog);
     const orphans: Signal[] = [];
-    for (const occ of indexes.byBodyHash.values()) {
+    // ADR-0178: report each occurrence site; winner-only walks hide losing twins.
+    for (const occ of eachOccurrence(indexes)) {
       if (isReachable(occ.bodyHash)) continue;
       // module-init occurrences are entry points themselves; never orphan.
       if (occ.kind === 'module-init') continue;

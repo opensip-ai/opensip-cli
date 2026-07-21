@@ -39,6 +39,8 @@
 import { currentScope } from '@opensip-cli/core';
 import { minimatch } from 'minimatch';
 
+import { eachOccurrence } from '../pipeline/occurrence-iter.js';
+
 import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
 const NAME_HEURISTICS = new Set([
@@ -60,7 +62,9 @@ export interface EntryPoint {
 export function inferEntryPoints(catalog: Catalog, indexes: Indexes): readonly EntryPoint[] {
   const out: EntryPoint[] = [];
   const seen = new Set<string>();
-  for (const occ of indexes.byBodyHash.values()) {
+  // ADR-0178: classify every occurrence — a production entry twin must not be
+  // lost when a test twin wins the byBodyHash slot.
+  for (const occ of eachOccurrence(indexes)) {
     const reason = classify(occ, indexes);
     if (reason !== null) {
       out.push({ bodyHash: occ.bodyHash, reason });
@@ -97,7 +101,7 @@ function targetConventionEntryHashes(indexes: Indexes): readonly string[] {
   if (!patterns || patterns.length === 0) return [];
 
   const out: string[] = [];
-  for (const occ of indexes.byBodyHash.values()) {
+  for (const occ of eachOccurrence(indexes)) {
     if (!occ.filePath) continue;
     if (matchesAnyConventionPattern(occ.filePath, patterns)) out.push(occ.bodyHash);
   }
@@ -189,7 +193,7 @@ function dynamicImportEntryHashes(indexes: Indexes): readonly string[] {
  *  directory. */
 function collectDynamicImportTargetFiles(indexes: Indexes): ReadonlySet<string> {
   const targets = new Set<string>();
-  for (const occ of indexes.byBodyHash.values()) {
+  for (const occ of eachOccurrence(indexes)) {
     for (const call of occ.calls) {
       const match = DYNAMIC_IMPORT_RE.exec(call.text);
       if (!match) continue;
@@ -205,7 +209,7 @@ function collectDynamicImportTargetFiles(indexes: Indexes): ReadonlySet<string> 
 /** filePath → exported function occurrences declared in that file. */
 function buildExportedByFile(indexes: Indexes): ReadonlyMap<string, FunctionOccurrence[]> {
   const byFile = new Map<string, FunctionOccurrence[]>();
-  for (const occ of indexes.byBodyHash.values()) {
+  for (const occ of eachOccurrence(indexes)) {
     if (occ.visibility !== 'exported') continue;
     if (!occ.filePath) continue;
     const bucket = byFile.get(occ.filePath);
