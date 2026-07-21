@@ -151,7 +151,7 @@ describe('graphReplayFromSession', () => {
           summary: { total: 'x', passed: 0, failed: 0, errors: 0, warnings: 0 },
           checks: [],
         },
-        message: /total must be a number/,
+        message: /total must be a finite number/,
       },
       {
         name: 'missing checks[]',

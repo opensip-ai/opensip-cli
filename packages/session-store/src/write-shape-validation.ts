@@ -13,10 +13,8 @@ export function isOptionalNonEmptyString(value: unknown): value is string | unde
   return value === undefined || isNonEmptyString(value);
 }
 
-// `isFiniteNumber` is owned by @opensip-cli/core (ADR-0180 finite-number decode
-// plane); re-exported here so existing session-store import sites are unchanged
-// and there is a single implementation.
-export { isFiniteNumber };
+// `isFiniteNumber` is imported from @opensip-cli/core (ADR-0180 finite-number
+// decode plane) and used by the guards below; one implementation, owned by core.
 
 export function isFiniteNonNegativeNumber(value: unknown): value is number {
   return isFiniteNumber(value) && value >= 0;

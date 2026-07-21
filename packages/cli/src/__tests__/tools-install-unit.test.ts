@@ -36,13 +36,16 @@ vi.mock('../bootstrap/tool-trust.js', () => ({
 vi.mock('node:child_process', () => ({
   execFileSync: (...a: unknown[]) => execFileSync(...a),
 }));
+// Preserve the real node:fs surface (the chain uses fs.constants etc.) and
+// override only the two functions the test drives. Object.assign accepts the
+// untyped importOriginal() result without a spread (avoids TS2698 / an
+// import()-type cast the linter forbids).
 vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
+  const actual = await importOriginal();
+  return Object.assign({}, actual, {
     readFileSync: (...a: unknown[]) => readFileSync(...a),
     existsSync: (...a: unknown[]) => existsSync(...a),
-  };
+  });
 });
 
 const { expectedNpmPackTarballName, resolvePackedTarballPath, toolsInstall } =

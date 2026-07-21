@@ -1,10 +1,15 @@
-import { ValidationError, currentScope, extractPayloadVersion, logger } from '@opensip-cli/core';
+import {
+  ValidationError,
+  currentScope,
+  extractPayloadVersion,
+  isFiniteNumber,
+  logger,
+} from '@opensip-cli/core';
 
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 import { writeHostMetricsRowOrThrow } from './session-repo-host-metrics.js';
 import {
   isFiniteNonNegativeNumber,
-  isFiniteNumber,
   isJsonSerializable,
   isNonEmptyString,
   isOptionalString,
