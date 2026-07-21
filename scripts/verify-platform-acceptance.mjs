@@ -143,7 +143,7 @@ const CANDIDATE_KINDS = new Set(['packed-release', 'published-version']);
 // A small, closed set of journeys intentionally treats a non-zero CLI exit as
 // the behavior under test (for example, a seeded fitness finding exits 1). All
 // other passing journeys must carry clean zero-exit terminal evidence.
-const EXPECTED_NON_ZERO_EXIT = new Map([
+export const EXPECTED_NON_ZERO_EXIT = new Map([
   // The cache-init promotion journey intentionally drives two clean command
   // failures — a bounded-lock/refusal exit (2) and a gate/config exit (1) — and
   // asserts each fails cleanly (structured error, no signal/timeout). Allow both
@@ -163,7 +163,7 @@ const EXPECTED_NON_ZERO_EXIT = new Map([
   ['macos.path-semantics', new Set([1])],
   ['macos.pty-human-view', new Set([1])],
 ]);
-const EXPECTED_POSITIVE_EXIT = new Set([
+export const EXPECTED_POSITIVE_EXIT = new Set([
   'extensions.sim-pack',
   'persistence.contention-retry',
   'resilience.permissions',
@@ -171,7 +171,7 @@ const EXPECTED_POSITIVE_EXIT = new Set([
   'macos.browser-open',
   'macos.contention-recovery',
 ]);
-const EXPECTED_ABNORMAL_TERMINAL_COUNTS = new Map([
+export const EXPECTED_ABNORMAL_TERMINAL_COUNTS = new Map([
   ['persistence.cache-init-promotion', new Map([['positive-exit', 2]])],
   ['persistence.contention-retry', new Map([['positive-exit', 1]])],
   ['persistence.interrupted-recovery', new Map([['cancellation', 1]])],
@@ -1625,11 +1625,16 @@ function main(argv) {
   return emit(parsed, result);
 }
 
-try {
-  process.exitCode = main(process.argv.slice(2));
-} catch (error) {
-  process.stderr.write(
-    `verify-platform-acceptance: unexpected error (${error instanceof Error ? error.name : 'error'})\n`,
-  );
-  process.exitCode = 2;
+// Run only when invoked directly (CI: `node scripts/verify-platform-acceptance.mjs …`),
+// not when imported for its exported allowlist constants — otherwise the import
+// side-effect parses the importer's argv and clobbers its exit code.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    process.exitCode = main(process.argv.slice(2));
+  } catch (error) {
+    process.stderr.write(
+      `verify-platform-acceptance: unexpected error (${error instanceof Error ? error.name : 'error'})\n`,
+    );
+    process.exitCode = 2;
+  }
 }
