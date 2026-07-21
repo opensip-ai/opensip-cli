@@ -216,9 +216,7 @@ export class CliRepairWritePort implements RepairWritePort {
           return;
         }
         if (truncated) {
-          settle(
-            err(readError('repair-output-too-large', 'repair output exceeded capture limit')),
-          );
+          settle(err(readError('repair-output-too-large', 'repair output exceeded capture limit')));
           return;
         }
         const parsed = parseApplyVerifyResult(stdout);

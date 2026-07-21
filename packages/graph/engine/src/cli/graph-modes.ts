@@ -85,7 +85,9 @@ export async function runGateMode(
             `Graph gate FAILED: ${String(result.added.length)} new finding(s) since baseline.`,
             // A7: print stamped fingerprint (includes #n collision ordinals);
             // never re-hash via strategy at display time.
-            ...result.added.map((s) => `  + ${s.fingerprint ?? graphFingerprintStrategy.fingerprint(s)}`),
+            ...result.added.map(
+              (s) => `  + ${s.fingerprint ?? graphFingerprintStrategy.fingerprint(s)}`,
+            ),
           ]
         : [
             `Graph gate PASS: no regressions (${String(result.resolved.length)} resolved since baseline).`,

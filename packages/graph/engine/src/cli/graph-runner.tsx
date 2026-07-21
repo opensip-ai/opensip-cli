@@ -29,15 +29,8 @@ import { buildGraphEnvelope } from './build-envelope.js';
 import { envelopeToLiveRunTableRows } from './graph-envelope-view.js';
 import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
 import { parseFailureBannerText, resolutionBannerText } from './graph-report.js';
-import {
-  contributionFromGraphPayload,
-  evaluatedRuleSlugs,
-} from './graph-session-contribution.js';
-import {
-  buildLiveGraphOutput,
-  runShardedLiveBuild,
-  type LiveGraphOutput,
-} from './graph.js';
+import { contributionFromGraphPayload, evaluatedRuleSlugs } from './graph-session-contribution.js';
+import { buildLiveGraphOutput, runShardedLiveBuild, type LiveGraphOutput } from './graph.js';
 import { GRAPH_STAGES, runGraph } from './orchestrate.js';
 
 import type { Shard } from './orchestrate/shard-model.js';

@@ -10,9 +10,7 @@
 import type { FunctionOccurrence, Indexes } from '../types.js';
 
 /** Yield every occurrence in the catalog (all body-hash twins). */
-export function* eachOccurrence(
-  indexes: Indexes,
-): IterableIterator<FunctionOccurrence> {
+export function* eachOccurrence(indexes: Indexes): IterableIterator<FunctionOccurrence> {
   for (const occs of indexes.occurrencesByHash.values()) {
     yield* occs;
   }

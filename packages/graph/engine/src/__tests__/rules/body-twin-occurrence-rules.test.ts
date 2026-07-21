@@ -119,13 +119,7 @@ describe('ADR-0178 body-twin occurrence rules (test twin wins byBodyHash)', () =
       highBlastWarnThreshold: 8,
       highBlastErrorThreshold: 20,
     };
-    const signals = highBlastUntestedRule.evaluate(
-      catalog,
-      indexes,
-      config,
-      undefined,
-      features,
-    );
+    const signals = highBlastUntestedRule.evaluate(catalog, indexes, config, undefined, features);
     expect(signals.map((s) => s.filePath)).toEqual(['src/prod.ts']);
     expect(signals[0]?.severity).toBe('high');
   });
