@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-19T12:14:35.092Z",
+  "generatedAt": "2026-07-21T06:16:21.992Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -175,16 +175,17 @@
         }
       },
       "graph": {
-        "total": 32,
+        "total": 33,
         "byRuleId": {
           "graph:always-throws-branch": 1,
           "graph:near-duplicate-function-body": 25,
+          "graph:x).": 1,
           "graph:cycle": 6
         },
         "byPackage": {
           "cli": 3,
           "cli-ui": 1,
-          "core": 1,
+          "core": 2,
           "fitness/engine": 1,
           "graph/engine": 5,
           "graph/graph-adapter-common": 1,
@@ -337,17 +338,18 @@
         }
       },
       "graph": {
-        "total": 32,
+        "total": 34,
         "byRuleId": {
           "graph:cycle": 19,
           "graph:wide-function": 3,
-          "graph:cycle\\ncode": 1,
+          "graph:cycle\\ncode": 2,
+          "graph:cycle\";\\ncode": 1,
           "graph:": 1,
           "graph:large-function": 7,
           "graph:cycle\\nfunction": 1
         },
         "byPackage": {
-          "core": 13,
+          "core": 15,
           "fitness/checks-universal": 10,
           "graph/engine": 9
         }
@@ -467,13 +469,13 @@
     "budgetGateFitnessSlugs": 72,
     "productRuntimeFitness": 72,
     "productRuntimeFitnessSlugs": 27,
-    "productRuntimeGraph": 32,
-    "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 104,
+    "productRuntimeGraph": 33,
+    "productRuntimeGraphRuleIds": 4,
+    "productRuntimeCombined": 105,
     "checkPackageFitness": 172,
     "testSupportFitness": 2,
     "testsFitness": 62,
-    "testsGraph": 32,
+    "testsGraph": 34,
     "budgetGateSafetyTotal": 2,
     "productRuntimeSafetyTotal": 0,
     "unbudgetedProductRuntimeSlugs": 25
@@ -490,8 +492,8 @@
     },
     "delta": {
       "productRuntimeFitness": -233,
-      "productRuntimeGraph": 25,
-      "productRuntimeCombined": -208,
+      "productRuntimeGraph": 26,
+      "productRuntimeCombined": -207,
       "budgetGateFitness": -296,
       "checkPackageFitness": -62,
       "productRuntimeSafetyTotal": -183,
