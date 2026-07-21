@@ -20,7 +20,10 @@ import * as barrel from '../index.js';
 /** The complete, intended set of runtime value exports. Keep alphabetised. */
 const EXPECTED_VALUE_EXPORTS = [
   'BASELINE_FORMAT_VERSION',
+  'BOOTSTRAP_DIAGNOSTIC_ORIGIN',
   'BootstrapDiagnosticsCollector',
+  'cliDiagnosticToEvent',
+  'mergeBootstrapIntoRunDiagnostics',
   'CLI_COMMAND_SURFACE_CONTRACT_VERSION',
   'CLI_DIAGNOSTIC_CODES',
   'CLI_SUPPORTED_SCHEMA_VERSION',

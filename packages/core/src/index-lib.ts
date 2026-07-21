@@ -105,8 +105,11 @@ export type {
   CliDiagnosticSeverity,
 } from './lib/cli-diagnostic.js';
 export {
+  BOOTSTRAP_DIAGNOSTIC_ORIGIN,
   BootstrapDiagnosticsCollector,
+  cliDiagnosticToEvent,
   isRelevantDiagnostic,
+  mergeBootstrapIntoRunDiagnostics,
 } from './lib/bootstrap-diagnostics.js';
 export {
   classifyIntegrityFailure,

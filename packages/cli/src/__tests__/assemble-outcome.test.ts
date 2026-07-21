@@ -2,10 +2,22 @@
  * assemble-outcome — the host stamper. Pins kind/status/exitCode derivation for
  * each outcome flavour (envelope / result / error) and the byte-identity of the
  * wrapped envelope.
+ *
+ * ADR-0176: withDiagnostics dual-reads bootstrapDiagnostics into
+ * outcome.diagnostics.events (fails on main when only the lifecycle bus is read).
  */
 
 import { buildSignalEnvelope, type ErrorResult } from '@opensip-cli/contracts';
-import { ConfigurationError, HOST_VERDICT_POLICY_FALLBACK, NotFoundError } from '@opensip-cli/core';
+import {
+  BOOTSTRAP_DIAGNOSTIC_ORIGIN,
+  CLI_DIAGNOSTIC_CODES,
+  ConfigurationError,
+  HOST_VERDICT_POLICY_FALLBACK,
+  NotFoundError,
+  RunScope,
+  runWithScopeSync,
+  type CliDiagnostic,
+} from '@opensip-cli/core';
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -156,5 +168,64 @@ describe('outcome assembly contract — uniform CommandOutcome across host paths
     expect(o.status).toBe('error');
     expect(o.exitCode).toBe(1);
     expect(o.kind).toBe('command.error');
+  });
+});
+
+/**
+ * OBS-DIAG / ADR-0176 — fails on main: withDiagnostics only read
+ * scope.diagnostics.snapshot() and never bootstrapDiagnostics, so a recorded
+ * capability/policy CliDiagnostic never reached --json diagnostics.events.
+ */
+describe('withDiagnostics — bootstrap fold into outcome plane (ADR-0176)', () => {
+  const capabilityDiag: CliDiagnostic = {
+    severity: 'warning',
+    code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_PACK_UNTRUSTED,
+    category: 'compatibility',
+    message: "capability pack '@vendor/pack' is not trusted",
+    impact: 'Pack contributions were not loaded for this run.',
+    action: 'opensip policy trust add @vendor/pack',
+    provenance: { capabilityDomain: 'fit-pack', packageName: '@vendor/pack' },
+  };
+
+  it('surfaces a bootstrap capability diagnostic in outcome.diagnostics.events with origin bootstrap', () => {
+    const scope = new RunScope({
+      runId: 'run_bootstrap_fold',
+      bootstrapDiagnostics: [capabilityDiag],
+    });
+    // Lifecycle host event coexists; bootstrap must still appear (prepended).
+    scope.diagnostics.event('execute', 'info', 'handler ran', { step: 1 });
+
+    const outcome = runWithScopeSync(scope, () =>
+      outcomeFromResult({ type: 'fit-list', totalCount: 0 }, 0),
+    );
+
+    expect(outcome.diagnostics?.runId).toBe('run_bootstrap_fold');
+    const events = outcome.diagnostics?.events ?? [];
+    expect(events.map((e) => e.message)).toEqual([
+      capabilityDiag.message,
+      'handler ran',
+    ]);
+    expect(events[0]).toMatchObject({
+      phase: 'load',
+      level: 'warn',
+      message: capabilityDiag.message,
+      data: {
+        origin: BOOTSTRAP_DIAGNOSTIC_ORIGIN,
+        code: CLI_DIAGNOSTIC_CODES.OPENSIP_CAPABILITY_PACK_UNTRUSTED,
+        category: 'compatibility',
+        impact: capabilityDiag.impact,
+        action: capabilityDiag.action,
+        provenance: capabilityDiag.provenance,
+      },
+    });
+    // Snapshot is JSON-safe for --json consumers.
+    expect(() => JSON.stringify(outcome.diagnostics)).not.toThrow();
+  });
+
+  it('leaves diagnostics.events empty when bootstrap buffer and bus are empty', () => {
+    const scope = new RunScope({ runId: 'run_clean' });
+    const outcome = runWithScopeSync(scope, () => outcomeFromResult({ type: 'help' }, 0));
+    expect(outcome.diagnostics?.runId).toBe('run_clean');
+    expect(outcome.diagnostics?.events).toEqual([]);
   });
 });

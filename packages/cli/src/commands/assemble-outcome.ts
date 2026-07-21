@@ -12,7 +12,7 @@
  * first-party or external, off the privilege of choosing its own error JSON or
  * success carrier.
  *
- * No stdout here — the builders only read the current scope's diagnostics bus.
+ * No stdout here — the builders only read the current scope's diagnostics plane.
  * {@link renderOutcome} (the sibling) is the one place an outcome reaches a stream.
  */
 
@@ -27,18 +27,27 @@ import {
   type SignalEnvelope,
   type WarningDetail,
 } from '@opensip-cli/contracts';
-import { ToolError, currentScope } from '@opensip-cli/core';
+import {
+  ToolError,
+  currentScope,
+  mergeBootstrapIntoRunDiagnostics,
+} from '@opensip-cli/core';
 
 /**
- * Attach the scope-owned diagnostics snapshot (north-star §5.10) to a freshly
- * built outcome. The host stamps it here — a handler never assembles diagnostics
- * (it cannot: the bus is scope-collected). Omitted entirely when no scope is
- * bound (isolated unit tests) or the bus is empty-and-untraced, keeping the
- * outcome shape minimal.
+ * Attach the authoritative outcome diagnostics snapshot (north-star §5.10,
+ * ADR-0176) to a freshly built outcome. Dual-reads the scope lifecycle
+ * {@link DiagnosticsBus} and the typed {@link BootstrapDiagnosticsCollector},
+ * projecting bootstrap `CliDiagnostic`s as lifecycle events with
+ * `data.origin: 'bootstrap'`. Omitted when no scope is bound (isolated unit
+ * tests).
  */
 function withDiagnostics(outcome: CommandOutcome): CommandOutcome {
-  const diagnostics = currentScope()?.diagnostics?.snapshot();
-  if (diagnostics === undefined) return outcome;
+  const scope = currentScope();
+  if (scope?.diagnostics === undefined) return outcome;
+  const diagnostics = mergeBootstrapIntoRunDiagnostics(
+    scope.diagnostics.snapshot(),
+    scope.bootstrapDiagnostics.list(),
+  );
   return { ...outcome, diagnostics };
 }
 

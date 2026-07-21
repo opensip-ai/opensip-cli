@@ -82,8 +82,9 @@ export interface RenderHints {
  * - `data` (a `CommandResult`) and `envelope` (a `SignalEnvelope`) are the two
  *   mutually-informative payload slots — BOTH optional, because an error or
  *   bootstrap outcome has neither, only `errors` + `diagnostics`.
- * - `diagnostics` is attached by the host from the scope-owned diagnostics bus
- *   (north-star §5.10).
+ * - `diagnostics` is attached by the host from the scope-owned diagnostics plane
+ *   (north-star §5.10; ADR-0176 folds bootstrap `CliDiagnostic`s into the same
+ *   `events` stream with `data.origin: 'bootstrap'`).
  */
 export interface CommandOutcome<T = unknown> {
   readonly kind: string;
