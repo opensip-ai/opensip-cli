@@ -103,11 +103,27 @@ export function diffBaseline(
           `(stampFingerprints) at envelope-construction time before the gate seam; the plane never fingerprints.`,
       );
     }
+    // M9: fail closed on fingerprint collisions — last-writer-wins would drop
+    // a real finding from the ratchet (silent under-count of added/unchanged).
+    if (currentByFp.has(signal.fingerprint)) {
+      throw new Error(
+        `diffBaseline: duplicate fingerprint among current signals (${signal.fingerprint}) — ` +
+          `tools must stamp unique fingerprints; the plane refuses last-writer-wins.`,
+      );
+    }
     currentByFp.set(signal.fingerprint, signal);
   }
 
   const baselineByFp = new Map<string, BaselineDiffRow>();
-  for (const row of baseline) baselineByFp.set(row.fingerprint, row);
+  for (const row of baseline) {
+    if (baselineByFp.has(row.fingerprint)) {
+      throw new Error(
+        `diffBaseline: duplicate fingerprint among baseline rows (${row.fingerprint}) — ` +
+          `baseline store must not collapse multi-instance findings.`,
+      );
+    }
+    baselineByFp.set(row.fingerprint, row);
+  }
 
   const added: Signal[] = [];
   const unchanged: Signal[] = [];

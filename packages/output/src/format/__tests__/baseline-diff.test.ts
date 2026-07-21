@@ -59,4 +59,16 @@ describe('diffBaseline', () => {
     const unstamped = createSignal({ source: 's', severity: 'high', ruleId: 'r', message: 'm' });
     expect(() => diffBaseline([unstamped], [])).toThrow(/no fingerprint/);
   });
+
+  it('M9: throws on duplicate fingerprints among current signals (no last-writer-wins)', () => {
+    expect(() => diffBaseline([sig('dup'), sig('dup', 'other')], [])).toThrow(
+      /duplicate fingerprint among current/,
+    );
+  });
+
+  it('M9: throws on duplicate fingerprints among baseline rows', () => {
+    expect(() => diffBaseline([], [row('dup'), row('dup')])).toThrow(
+      /duplicate fingerprint among baseline/,
+    );
+  });
 });
