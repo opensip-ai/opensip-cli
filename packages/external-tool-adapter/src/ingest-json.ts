@@ -76,6 +76,12 @@ export function navigate(root: unknown, path: readonly string[]): unknown {
   for (const segment of path) {
     if (current === null || current === undefined) return undefined;
     if (Array.isArray(current)) {
+      // L12: full-string integer only — parseInt("0abc") === 0 would silently
+      // accept a non-index segment and index into the array incorrectly.
+      if (!/^\d+$/.test(segment)) {
+        current = undefined;
+        continue;
+      }
       const index = Number.parseInt(segment, 10);
       current = Number.isInteger(index) ? current[index] : undefined;
     } else {

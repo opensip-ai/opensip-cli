@@ -65,4 +65,11 @@ describe('navigate', () => {
     expect(navigate(null, ['x'])).toBeUndefined();
     expect(navigate(doc, ['results', 'notanindex'])).toBeUndefined();
   });
+
+  it('L12: rejects partial integer array segments (parseInt("0abc") trap)', () => {
+    // parseInt("0abc", 10) === 0 would incorrectly return results[0].
+    expect(navigate(doc, ['results', '0abc', 'packages'])).toBeUndefined();
+    expect(navigate(doc, ['results', '1e2'])).toBeUndefined();
+    expect(navigate(doc, ['results', '-1'])).toBeUndefined();
+  });
 });

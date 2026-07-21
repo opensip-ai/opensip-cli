@@ -18,7 +18,7 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
-import { mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   currentLogger,
   currentScope,
@@ -135,8 +135,9 @@ function applyThrownLiveError(
   const raw = error instanceof Error ? error.message : String(error);
   const message = scrubErrorMessage(raw);
   deps.logger.error({ evt: 'cli.liveview.run.error', tool: deps.tool, message });
-  // Preserve ADR-0020 taxonomy (e.g. ConfigurationError → exit 2), not hard-coded 1.
-  const exitCode = error instanceof ToolError ? mapToolErrorToExitCode(error) : 1;
+  // L8: use EXIT_CODES taxonomy (ADR-0020) — never hard-code bare `1`.
+  const exitCode =
+    error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
   deps.glue.setExitCode?.(exitCode);
   deps.setState({ phase: 'error', message });
   setTimeout(() => deps.exit(), 50);
