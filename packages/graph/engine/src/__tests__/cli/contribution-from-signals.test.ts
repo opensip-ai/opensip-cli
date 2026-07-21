@@ -12,10 +12,17 @@
  * DEFAULTS to the scope's full registry (never the empty set) — so a caller that
  * forgets to pass rules still records the rule list rather than reproducing the
  * bug.
+ *
+ * ADR-0177: session score/passed MUST copy buildGraphEnvelope(...).verdict, not
+ * passRate of the all-evaluated payload summary. One high-severity finding +
+ * several clean evaluated rules is the fails-on-main shape (live ~0%, old
+ * session ~80%).
  */
 
+import { passRate } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { buildGraphEnvelope } from '../../cli/build-envelope.js';
 import { contributionFromSignals, evaluatedRuleSlugs } from '../../cli/graph.js';
 import { withGraphScopeSync } from '../test-utils/with-graph-scope.js';
 
@@ -100,6 +107,56 @@ describe('contributionFromSignals', () => {
     expect(payload.checks).toHaveLength(allSlugs.length);
     expect(payload.checks.every((c) => c.passed)).toBe(true);
     expect(payload.checks.every((c) => c.checkSlug.startsWith('graph:'))).toBe(true);
+  });
+
+  it('ADR-0177: score/passed copy envelope.verdict, not passRate of all-evaluated summary (fails on main concept)', () => {
+    // One high-severity finding + four clean evaluated rules.
+    // Envelope units are per fired rule only → score 0, passed false.
+    // All-evaluated payload summary → passRate ~80 — the old session bug.
+    const signals = [
+      sig({
+        ruleId: 'graph:cycle',
+        severity: 'high',
+        filePath: 'a.ts',
+        line: 1,
+      }),
+    ];
+    const evaluated = [
+      'graph:cycle',
+      'graph:large-function',
+      'graph:wide-function',
+      'graph:high-blast-untested',
+      'graph:duplicated-function-body',
+    ];
+
+    const contribution = contributionFromSignals({ cwd: '/repo' }, signals, evaluated);
+    const payload = contribution.payload as GraphSessionPayload;
+    const envelope = buildGraphEnvelope({
+      signals,
+      runId: '',
+      createdAt: '',
+    });
+
+    // Clean-rule inventory remains in payload detail.
+    expect(payload.checks).toHaveLength(evaluated.length);
+    expect(payload.summary.total).toBe(5);
+    expect(payload.summary.passed).toBe(4);
+    expect(payload.summary.failed).toBe(1);
+    expect(payload.summary.errors).toBe(1);
+
+    // The diverging "main" concept: passRate of all-evaluated summary is ~80.
+    const inflatedScore = passRate(payload.summary);
+    expect(inflatedScore).toBe(80);
+    expect(envelope.verdict.score).toBe(0);
+    expect(envelope.verdict.passed).toBe(false);
+
+    // Session must match envelope (live delivery), not the inflated inventory rate.
+    expect(contribution.score).toBe(envelope.verdict.score);
+    expect(contribution.passed).toBe(envelope.verdict.passed);
+    expect(contribution.score).not.toBe(inflatedScore);
+    expect(contribution.score).toBe(0);
+    expect(contribution.passed).toBe(false);
+    expect(contribution.runOutcome).toBe('failed');
   });
 });
 

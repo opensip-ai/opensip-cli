@@ -154,7 +154,11 @@ export async function deliverGraphResult(
   const suppressedCount = finalized.suppressedCount;
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
   const isWorkspaceChild = readGraphEnv<boolean>('OPENSIP_GRAPH_WORKSPACE_CHILD') === true;
-  const session = buildGraphSessionContribution(opts, finalized);
+  // One envelope is the source of truth for live delivery AND session score/
+  // passed (ADR-0177). Build it once before any mode branch so gate/catalog/
+  // human/json cannot diverge from the persisted session headline.
+  const envelope = envelopeFor(opts, result, durationMs);
+  const session = buildGraphSessionContribution(opts, finalized, envelope.verdict);
   if (opts.gateSave === true || opts.gateCompare === true) {
     // ADR-0036: the envelope arrives fingerprint-stamped — `buildGraphEnvelope`
     // passes graph's byte-preserved strategy into `buildSignalEnvelope`, which
@@ -162,7 +166,6 @@ export async function deliverGraphResult(
     // the former post-hoc gate-path stamp produced). The host seams only read
     // `signal.fingerprint`. runGateMode owns the deliverSignals call
     // (host-derived exit), so the command-spec skips it.
-    const envelope = envelopeFor(opts, result, durationMs);
     await runGateMode(opts, envelope, cli, result.catalog?.resolutionMode);
     log.info({
       evt: EVT_GRAPH_COMPLETE,
@@ -182,11 +185,11 @@ export async function deliverGraphResult(
     });
     return {
       kind: 'direct',
-      envelope: envelopeFor(opts, result, durationMs),
+      envelope,
       session,
     };
   }
-  const envelope = await renderGraphResult(opts, result, startedAt, cli);
+  await renderGraphResult(opts, result, startedAt, cli, envelope);
   if (opts.json !== true) {
     cli.setExitCode(EXIT_CODES.SUCCESS);
   }
@@ -213,33 +216,32 @@ export async function deliverGraphResult(
 }
 
 /**
- * Render the run and return its {@link SignalEnvelope} (ADR-0011).
+ * Render the run using the caller-built {@link SignalEnvelope} (ADR-0011).
  *
  * `--json` emits the envelope through the shared `formatSignalJson`
  * (`cli.emitEnvelope`). The default/`--verbose` path hands a {@link RunPresentation}
  * to the render seam (Ink on TTY, plain text in pipes/CI): the SAME `envelope`
- * already built here IS carried on the render object (envelope-first-presentation
- * plan, RP-2), so `presentationToView` derives the PASS/FAIL summary and verdict
- * from it — graph no longer carries a count-based `graph-done` summary. The
- * verbose catalog/findings/entry-point body rides as `verboseDetail`
- * ({kind:'lines'}, ADR-0021), and that verbose/detail surface also carries the
- * per-unit table; graph's fast-tier caveat moves to `RunPresentation.banners` (a
- * muted line above the summary); the non-verbose footer hints are emitted by the
- * shared seam. The host-stamped
- * `durationMs` (ADR-0051) is threaded as `RunPresentation.durationMs` so the
- * summary shows the real wall-clock — graph's envelope units carry `durationMs: 0`,
- * so without this thread `presentationToView`'s unit-sum default would render
- * `0ms`. The envelope is also RETURNED for the composition root's cloud +
- * `--report-to` delivery (egress, a separate plane — untouched here).
+ * already built by {@link deliverGraphResult} is carried on the render object
+ * (envelope-first-presentation plan, RP-2), so `presentationToView` derives the
+ * PASS/FAIL summary and verdict from it — graph no longer carries a count-based
+ * `graph-done` summary. The verbose catalog/findings/entry-point body rides as
+ * `verboseDetail` ({kind:'lines'}, ADR-0021), and that verbose/detail surface
+ * also carries the per-unit table; graph's fast-tier caveat moves to
+ * `RunPresentation.banners` (a muted line above the summary); the non-verbose
+ * footer hints are emitted by the shared seam. The host-stamped `durationMs`
+ * (ADR-0051) is threaded as `RunPresentation.durationMs` so the summary shows
+ * the real wall-clock — graph's envelope units carry `durationMs: 0`, so without
+ * this thread `presentationToView`'s unit-sum default would render `0ms`.
+ * Session score/passed also copy this envelope (ADR-0177).
  */
 async function renderGraphResult(
   opts: GraphCommandOptions,
   result: RunGraphResult,
   startedAt: string,
   cli: ToolCliContext,
-): Promise<SignalEnvelope> {
+  envelope: SignalEnvelope,
+): Promise<void> {
   const durationMs = Math.max(0, Date.now() - Date.parse(startedAt));
-  const envelope = envelopeFor(opts, result, durationMs);
   // Fail-loud partial-coverage notice: a catalog missing unparseable files is
   // surfaced on every run-output surface (banner in human mode, outcome
   // warning in --json); the run log names each dropped file.
@@ -279,7 +281,7 @@ async function renderGraphResult(
       evt: 'graph.render.json.complete',
       module: MODULE_GRAPH_RENDER,
     });
-    return envelope;
+    return;
   }
   log.info({
     evt: 'graph.render.presentation.start',
@@ -326,5 +328,4 @@ async function renderGraphResult(
     evt: 'graph.render.presentation.complete',
     module: MODULE_GRAPH_RENDER,
   });
-  return envelope;
 }

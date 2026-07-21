@@ -22,15 +22,19 @@ import {
   type ToolSessionContribution,
 } from '@opensip-cli/core';
 
+import { buildGraphSessionPayload } from '../persistence/session-payload.js';
+
 import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { envelopeToLiveRunTableRows } from './graph-envelope-view.js';
 import { SHARDED_STAGE_LABELS, STAGE_LABELS, toProgressEvent } from './graph-progress.js';
 import { parseFailureBannerText, resolutionBannerText } from './graph-report.js';
 import {
-  buildLiveGraphOutput,
-  contributionFromSignals,
+  contributionFromGraphPayload,
   evaluatedRuleSlugs,
+} from './graph-session-contribution.js';
+import {
+  buildLiveGraphOutput,
   runShardedLiveBuild,
   type LiveGraphOutput,
 } from './graph.js';
@@ -183,18 +187,18 @@ export async function renderGraphLive(
           }
 
           const finalized = assertFinalizedAcrossBoundary(result.signals, result.suppressedCount);
-          const session: ToolSessionContribution = contributionFromSignals(
-            { cwd: args.cwd, recipe: args.recipe },
-            finalized.signals,
-            evaluatedRuleSlugs(args.rules),
-          );
-
+          // One envelope owns live delivery AND session score/passed (ADR-0177).
           const envelope = buildGraphEnvelope({
             signals: finalized.signals,
             recipe: args.recipe,
             runId: currentScope()?.runId ?? '',
             createdAt: new Date().toISOString(),
           });
+          const session: ToolSessionContribution = contributionFromGraphPayload(
+            { cwd: args.cwd, recipe: args.recipe },
+            buildGraphSessionPayload(finalized.signals, evaluatedRuleSlugs(args.rules)),
+            envelope.verdict,
+          );
           const { verdict } = envelope;
           // Parity with the static path's `RunPresentation.banners`: the live
           // done frame carries one banner slot, so stack the caveats as lines.

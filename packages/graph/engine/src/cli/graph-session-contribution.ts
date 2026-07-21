@@ -1,4 +1,3 @@
-import { passRate } from '@opensip-cli/contracts';
 import { deriveRunOutcome } from '@opensip-cli/core';
 
 import { GRAPH_LAYOUT_KEY } from '../identity.js';
@@ -6,22 +5,34 @@ import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 import { mapOpenSipRuleIdToEngineSlug } from '../render/rule-id-mapping.js';
 import { currentRules } from '../rules/registry.js';
 
+import { buildGraphEnvelope } from './build-envelope.js';
+
 import type { FinalizedSignals } from './apply-suppressions.js';
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphSessionPayload } from '../persistence/session-payload.js';
 import type { Rule } from '../types.js';
 import type { Signal, ToolSessionContribution } from '@opensip-cli/core';
 
+/** Headline verdict fields copied onto the generic session contribution row. */
+export type SessionVerdict = {
+  readonly score: number;
+  readonly passed: boolean;
+};
+
 /**
  * Build the generic-session contribution for a single-process graph run from
- * branded finalized signals. The host run plane stamps timing + id and persists
- * the row after the handler returns; graph never writes the generic session row.
+ * branded finalized signals and the same envelope verdict the delivery path
+ * already computed (ADR-0177). The host run plane stamps timing + id and
+ * persists the row after the handler returns; graph never writes the generic
+ * session row.
  */
 export function buildGraphSessionContribution(
   opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
   finalized: FinalizedSignals,
+  verdict: SessionVerdict,
 ): ToolSessionContribution {
-  return contributionFromSignals(opts, finalized.signals);
+  const payload = buildGraphSessionPayload(finalized.signals, evaluatedRuleSlugs());
+  return contributionFromGraphPayload(opts, payload, verdict);
 }
 
 /**
@@ -73,6 +84,10 @@ export function evaluatedRuleSlugs(explicitRules?: readonly Rule[]): readonly st
  * Build graph's generic-session contribution from engine-slug signals plus the
  * engine slugs of the rules evaluated. Shared by static dispatch and live Ink
  * so the contribution shape cannot drift.
+ *
+ * Score/passed come from {@link buildGraphEnvelope} (ADR-0177) — the same pure
+ * assembly the live delivery path uses — not from `passRate` over the
+ * all-evaluated payload summary (clean-rule inventory stays in payload only).
  */
 export function contributionFromSignals(
   opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
@@ -80,26 +95,36 @@ export function contributionFromSignals(
   evaluatedSlugs: readonly string[] = evaluatedRuleSlugs(),
 ): ToolSessionContribution {
   const payload = buildGraphSessionPayload(signals, evaluatedSlugs);
-  return contributionFromGraphPayload(opts, payload);
+  // Pure assembly; runId/createdAt do not affect verdict.score/passed.
+  const envelope = buildGraphEnvelope({
+    signals,
+    recipe: opts.recipe,
+    runId: '',
+    createdAt: '',
+  });
+  return contributionFromGraphPayload(opts, payload, envelope.verdict);
 }
 
 /**
  * Finalize a graph-owned payload into the host's generic session contribution.
  * Ordinary graph and impact runs share this score/verdict assembly while
  * retaining explicit payload construction at their two call sites.
+ *
+ * `verdict` MUST be the envelope's `score`/`passed` (ADR-0177). Payload detail
+ * may list every evaluated rule; it must not recompute the headline.
  */
 export function contributionFromGraphPayload(
   opts: Pick<GraphCommandOptions, 'cwd' | 'recipe'>,
   payload: GraphSessionPayload,
+  verdict: SessionVerdict,
 ): ToolSessionContribution {
-  const passed = payload.summary.errors === 0;
   return {
     tool: GRAPH_LAYOUT_KEY,
     cwd: opts.cwd,
     ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
-    score: passRate(payload.summary),
-    passed,
-    runOutcome: deriveRunOutcome({ passed }),
+    score: verdict.score,
+    passed: verdict.passed,
+    runOutcome: deriveRunOutcome({ passed: verdict.passed }),
     payload,
   };
 }

@@ -217,7 +217,10 @@ export function buildImpactSessionContribution(
       ? { impactStatus: 'omitted-overflow' as const }
       : { impactStatus: 'available' as const, impact }),
   };
-  return contributionFromGraphPayload({ cwd: opts.cwd }, payload);
+  // ADR-0177: session score/passed copy the impact envelope verdict, not
+  // passRate of the payload summary (parity with ordinary graph + fit/yagni).
+  const envelope = buildImpactEnvelope(result, 0);
+  return contributionFromGraphPayload({ cwd: opts.cwd }, payload, envelope.verdict);
 }
 
 function digestIdentity(value: string): string {
