@@ -18,6 +18,8 @@ const admitToolPackage = vi.fn();
 const recordInstalledToolTrust = vi.fn();
 const execFileSync = vi.fn();
 const cleanup = vi.fn();
+const readFileSync = vi.fn();
+const existsSync = vi.fn();
 
 vi.mock('../commands/tools/validate.js', () => ({
   runToolValidation: (...a: unknown[]) => runToolValidation(...a),
@@ -34,8 +36,17 @@ vi.mock('../bootstrap/tool-trust.js', () => ({
 vi.mock('node:child_process', () => ({
   execFileSync: (...a: unknown[]) => execFileSync(...a),
 }));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    readFileSync: (...a: unknown[]) => readFileSync(...a),
+    existsSync: (...a: unknown[]) => existsSync(...a),
+  };
+});
 
-const { toolsInstall } = await import('../commands/tools/install.js');
+const { expectedNpmPackTarballName, resolvePackedTarballPath, toolsInstall } =
+  await import('../commands/tools/install.js');
 
 function validation(verdict: ToolsValidateResult['verdict']): ToolsValidateResult {
   return { type: 'tools-validate', spec: '@x/demo', verdict, sections: [] };
@@ -57,12 +68,17 @@ beforeEach(() => {
     admitToolPackage,
     recordInstalledToolTrust,
     execFileSync,
+    readFileSync,
+    existsSync,
     cleanup,
   ]) {
     m.mockReset();
   }
   // npm pack prints the tarball name on the last stdout line.
   execFileSync.mockReturnValue('npm notice\ndemo-1.0.0.tgz\n');
+  // Staged package identity — preferred over pack stdout for the tarball name.
+  readFileSync.mockReturnValue(JSON.stringify({ name: 'demo', version: '1.0.0' }));
+  existsSync.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -169,5 +185,46 @@ describe('toolsInstall — activation', () => {
     const result = await toolsInstall({ spec: '@x/demo', cwd: '/proj' });
     expect(result.success).toBe(false);
     expect(result.error).toBe('activation failed');
+  });
+
+  it('prefers package.json identity over hostile pack stdout basename (L7)', async () => {
+    stageValidation('passed', '/staged/demo');
+    // On main, this stdout would be joined into `/staged/demo/../../etc/passwd.tgz`.
+    execFileSync.mockReturnValue('npm notice\n../../etc/passwd.tgz\n');
+    readFileSync.mockReturnValue(JSON.stringify({ name: '@x/demo', version: '1.0.0' }));
+    admitToolPackage.mockResolvedValue({
+      manifest: { id: 'demo', version: '1.0.0', commands: [] },
+      provenance: { manifestHash: 'manifest-hash-demo' },
+    });
+    addToolPlugin.mockReturnValue({ type: 'plugin-add', packageName: '@x/demo', success: true });
+
+    const result = await toolsInstall({ spec: '@x/demo', cwd: '/proj' });
+    expect(result.success).toBe(true);
+    expect(addToolPlugin).toHaveBeenCalledWith('/staged/demo/x-demo-1.0.0.tgz', '/proj', false);
+  });
+});
+
+describe('resolvePackedTarballPath (L7 pack-stdout trust)', () => {
+  it('builds the expected npm pack name from scoped package identity', () => {
+    expect(expectedNpmPackTarballName('@scope/pkg', '2.3.4')).toBe('scope-pkg-2.3.4.tgz');
+    expect(expectedNpmPackTarballName('plain', '1.0.0')).toBe('plain-1.0.0.tgz');
+  });
+
+  it('rejects path-shaped pack stdout when package.json identity is unavailable', () => {
+    readFileSync.mockImplementation(() => {
+      throw new Error('missing');
+    });
+    expect(() => resolvePackedTarballPath('/staged/demo', '../../evil.tgz\n')).toThrow(
+      /usable tarball name/,
+    );
+  });
+
+  it('accepts a bare stdout basename only when package.json is missing', () => {
+    readFileSync.mockImplementation(() => {
+      throw new Error('missing');
+    });
+    expect(resolvePackedTarballPath('/staged/demo', 'npm notice\nok-1.0.0.tgz\n')).toBe(
+      '/staged/demo/ok-1.0.0.tgz',
+    );
   });
 });

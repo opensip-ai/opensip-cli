@@ -13,6 +13,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+
+import { isPathInside } from '@opensip-cli/core';
 
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
 import { policyCiEvidenceFromCurrentEnv } from '../../bootstrap/policy-evidence.js';
@@ -37,6 +41,67 @@ export interface ToolsInstallOptions {
   readonly project?: boolean;
 }
 
+/**
+ * Expected npm-pack tarball basename from package.json identity
+ * (`@scope/name` → `scope-name-version.tgz`). Never trust pack stdout alone.
+ */
+export function expectedNpmPackTarballName(packageName: string, version: string): string {
+  const base = packageName.startsWith('@') ? packageName.slice(1).replace('/', '-') : packageName;
+  return `${base}-${version}.tgz`;
+}
+
+/**
+ * Resolve the packed tarball path inside `stagedPkgDir` without trusting
+ * attacker-controlled `npm pack` stdout as a path (L7).
+ *
+ * Preference order:
+ * 1. package.json name+version → expected basename (known identity)
+ * 2. basename-only of the last pack stdout line, only if it is a bare `.tgz`
+ *    name with no path separators / `..` and resolves inside the staged dir
+ */
+export function resolvePackedTarballPath(stagedPkgDir: string, packStdout: string): string {
+  let expected: string | undefined;
+  try {
+    const raw = JSON.parse(readFileSync(join(stagedPkgDir, 'package.json'), 'utf8')) as {
+      name?: unknown;
+      version?: unknown;
+    };
+    if (typeof raw.name === 'string' && typeof raw.version === 'string') {
+      expected = expectedNpmPackTarballName(raw.name, raw.version);
+    }
+  } catch {
+    // @swallow-ok package.json missing/malformed — fall through to basename validation.
+  }
+
+  const reportedLine = packStdout.trim().split('\n').at(-1)?.trim() ?? '';
+  const reportedBase = reportedLine.length > 0 ? basename(reportedLine) : '';
+  // Reject path components, parent segments, and non-tarball names in the
+  // stdout-derived candidate. basename alone is not enough if the reported
+  // line was already a bare hostile name that we should not prefer over identity.
+  const stdoutSafe =
+    reportedBase.length > 0 &&
+    reportedBase === reportedLine &&
+    !reportedBase.includes('..') &&
+    !reportedBase.includes('/') &&
+    !reportedBase.includes('\\') &&
+    /\.tgz$/i.test(reportedBase);
+
+  // Prefer package.json identity over pack stdout when both are available.
+  const name = expected ?? (stdoutSafe ? reportedBase : '');
+  if (name.length === 0 || name.includes('..') || name.includes('/') || name.includes('\\')) {
+    throw new Error(
+      'npm pack did not produce a usable tarball name (expected package.json name/version or a bare .tgz basename)',
+    );
+  }
+  // Bare basename + join keeps the path inside stagedPkgDir; realpath containment
+  // is an extra check once the file exists (symlink escape after pack).
+  const tarball = join(stagedPkgDir, name);
+  if (existsSync(tarball) && !isPathInside(tarball, stagedPkgDir)) {
+    throw new Error(`npm pack tarball is outside the staged package dir: ${name}`);
+  }
+  return tarball;
+}
+
 /** Pack the staged package dir into a tarball beside it; returns the tarball path. */
 function packStagedDir(stagedPkgDir: string): string {
   const out = execFileSync('npm', ['pack', '--pack-destination', stagedPkgDir, '.'], {
@@ -44,8 +109,7 @@ function packStagedDir(stagedPkgDir: string): string {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', process.stderr],
   });
-  const name = out.trim().split('\n').at(-1)?.trim() ?? '';
-  return `${stagedPkgDir}/${name}`;
+  return resolvePackedTarballPath(stagedPkgDir, out);
 }
 
 function installNextSteps(manifest: ToolPluginManifest | undefined): readonly string[] | undefined {
