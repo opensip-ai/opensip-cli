@@ -19,7 +19,12 @@
 
 import { logger } from '@opensip-cli/core';
 
-import { eachOccurrence, everyTwinInTestFile, hasProductionTwin } from '../occurrence-iter.js';
+import {
+  anyTwinInTestFile,
+  eachOccurrence,
+  everyTwinInTestFile,
+  hasProductionTwin,
+} from '../occurrence-iter.js';
 import { pkgOf, resolveCallee } from '../resolve-callee.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 
@@ -259,8 +264,8 @@ function computeProdReachable(catalog: Catalog, indexes: Indexes): Set<string> {
 function computeTestReachable(indexes: Indexes): Set<string> {
   const seeds = new Set<string>();
   // ADR-0178: any twin in a test file seeds the hash (union inTestFile).
-  for (const [hash, occs] of indexes.occurrencesByHash) {
-    if (occs.some((o) => o.inTestFile)) seeds.add(hash);
+  for (const hash of indexes.occurrencesByHash.keys()) {
+    if (anyTwinInTestFile(indexes, hash)) seeds.add(hash);
   }
   return bfsForward(seeds, indexes);
 }
