@@ -10,6 +10,15 @@
 
 // ── The factory + author surface ────────────────────────────────────────────
 export { defineExternalToolAdapter } from './define-external-tool-adapter.js';
+// ── Observability (OBS-ADAPTER): bounded lifecycle decisions on the bus ─────
+export {
+  ADAPTER_DIAG_EVT,
+  ADAPTER_DIAG_MODULE,
+  ADAPTER_DIAG_SOURCE,
+  boundDecisionData,
+  emitAdapterDecision,
+} from './adapter-diagnostics.js';
+export type { AdapterDecisionInput, AdapterDiagEvt } from './adapter-diagnostics.js';
 export type {
   AdapterProvenance,
   AdapterRunContext,

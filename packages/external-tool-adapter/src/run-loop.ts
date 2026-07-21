@@ -31,6 +31,7 @@ import {
   ToolError,
 } from '@opensip-cli/core';
 
+import { ADAPTER_DIAG_EVT, emitAdapterDecision } from './adapter-diagnostics.js';
 import { resolveBinary, defaultBinaryEnvVar } from './binary-resolver.js';
 import { DEFAULT_EXIT_MODEL, interpretExit } from './exit-model.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
@@ -59,9 +60,6 @@ import type { ExternalAdapterProgressBridge } from './progress.js';
 import type { ScanCompletion } from './scan-emit.js';
 import type { AdapterProvenance, BinarySpec, ExternalCommandSpec } from './types.js';
 import type { FingerprintStrategy, ToolCliContext } from '@opensip-cli/core';
-
-/** Logger `module` field for every event this loop emits. */
-const MODULE = 'external-tool-adapter';
 
 /** Default scanner process budget. */
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -135,11 +133,14 @@ export async function runScanLoop(
   // fails fast — no wasted scanner subprocess — and return early (the host replays
   // the recorded reportFailure → exit 2).
   if (input.opts.gateSave === true && input.opts.gateCompare === true) {
-    cli.logger.warn({
-      evt: 'adapter.gate.config_error',
-      module: MODULE,
+    emitAdapterDecision({
+      cli,
       tool,
-      reason: 'mutually-exclusive flags',
+      evt: ADAPTER_DIAG_EVT.GATE_CONFIG_ERROR,
+      phase: 'validate',
+      level: 'warn',
+      message: `${tool}: --gate-save and --gate-compare are mutually exclusive`,
+      data: { reason: 'mutually-exclusive flags' },
     });
     await cli.reportFailure({
       message: 'Error: --gate-save and --gate-compare are mutually exclusive.',
@@ -200,13 +201,18 @@ export async function runScanLoop(
   const args = [...command.args(ctx)];
   await applyScanExclusion(cli, command, ctx, args);
 
-  cli.logger.info({
-    evt: 'adapter.binary.resolved',
-    module: MODULE,
+  emitAdapterDecision({
+    cli,
     tool,
-    layer: resolution.layer,
-    path: resolution.path,
-    version: version ?? null,
+    evt: ADAPTER_DIAG_EVT.BINARY_RESOLVED,
+    phase: 'load',
+    level: 'info',
+    message: `${tool}: binary resolved (${resolution.layer})`,
+    data: {
+      layer: resolution.layer,
+      path: resolution.path,
+      version: version ?? null,
+    },
   });
 
   const startedAt = new Date().toISOString();
@@ -223,11 +229,14 @@ export async function runScanLoop(
   const durationMs = Math.max(0, Math.round(performance.now() - begin));
 
   if (proc.timedOut) {
-    cli.logger.warn({
-      evt: 'adapter.scan.faulted',
-      module: MODULE,
+    emitAdapterDecision({
+      cli,
       tool,
-      reason: 'timeout',
+      evt: ADAPTER_DIAG_EVT.SCAN_FAULTED,
+      phase: 'execute',
+      level: 'warn',
+      message: `${tool}: scan timed out`,
+      data: { reason: 'timeout', timeoutMs: deps.timeoutMs },
     });
     throw new TimeoutError(`${tool} scan timed out after ${String(deps.timeoutMs)}ms`, {
       code: 'ADAPTER.SCAN.TIMEOUT',
@@ -251,11 +260,14 @@ export async function runScanLoop(
     artifactValid: read.artifactValid,
   });
   if (verdict === 'fault') {
-    cli.logger.warn({
-      evt: 'adapter.scan.faulted',
-      module: MODULE,
+    emitAdapterDecision({
+      cli,
       tool,
-      code: proc.code,
+      evt: ADAPTER_DIAG_EVT.SCAN_FAULTED,
+      phase: 'execute',
+      level: 'warn',
+      message: `${tool}: scan faulted (exit ${String(proc.code)})`,
+      data: { reason: 'exit-fault', code: proc.code },
     });
     throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
       stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
@@ -268,11 +280,14 @@ export async function runScanLoop(
   // below would overwrite the real report with the empty buffer. We throw BEFORE
   // writeArtifact, so the scanner's report on disk is never destroyed.
   if (!read.artifactValid) {
-    cli.logger.warn({
-      evt: 'adapter.scan.faulted',
-      module: MODULE,
+    emitAdapterDecision({
+      cli,
       tool,
-      reason: `artifact-${read.invalidReason ?? 'invalid'}`,
+      evt: ADAPTER_DIAG_EVT.SCAN_FAULTED,
+      phase: 'execute',
+      level: 'warn',
+      message: `${tool}: invalid scan artifact`,
+      data: { reason: `artifact-${read.invalidReason ?? 'invalid'}` },
     });
     throw invalidArtifactFault(tool, command, read, deps.maxBuffer, proc.stderr);
   }
@@ -285,12 +300,14 @@ export async function runScanLoop(
     (signals) => ({ signals: signals.length, findings: signals.length }),
   );
   if (isEmptyReclaimedStdoutFindings(command, proc.code, verdict, parsed.length)) {
-    cli.logger.warn({
-      evt: 'adapter.scan.faulted',
-      module: MODULE,
+    emitAdapterDecision({
+      cli,
       tool,
-      code: proc.code,
-      reason: 'empty-stdout-findings',
+      evt: ADAPTER_DIAG_EVT.SCAN_FAULTED,
+      phase: 'execute',
+      level: 'warn',
+      message: `${tool}: empty stdout with findings exit`,
+      data: { reason: 'empty-stdout-findings', code: proc.code },
     });
     throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
       stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
@@ -299,12 +316,14 @@ export async function runScanLoop(
 
   // Persist the raw artifact through the HOST seam (0600 + retention, ADR-0080/0091).
   await cli.writeArtifact(artifactFullPath, raw);
-  cli.logger.info({
-    evt: 'adapter.artifact.stored',
-    module: MODULE,
+  emitAdapterDecision({
+    cli,
     tool,
-    path: artifactFullPath,
-    bytes: raw.length,
+    evt: ADAPTER_DIAG_EVT.ARTIFACT_STORED,
+    phase: 'persist',
+    level: 'info',
+    message: `${tool}: artifact stored`,
+    data: { path: artifactFullPath, bytes: raw.length },
   });
 
   const provenance: AdapterProvenance = {

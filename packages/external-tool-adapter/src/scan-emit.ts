@@ -11,6 +11,7 @@
 
 import { buildFindingGroups, runHostGateDispatch } from '@opensip-cli/contracts';
 
+import { ADAPTER_DIAG_EVT, emitAdapterDecision } from './adapter-diagnostics.js';
 import { renderGateCompareLines, renderGateSaveLines } from './gate-render.js';
 import { externalAdapterProgressOf } from './progress.js';
 import { buildAdapterSessionPayload } from './session-payload.js';
@@ -18,9 +19,6 @@ import { buildAdapterSessionPayload } from './session-payload.js';
 import type { BinaryResolutionLayer } from './types.js';
 import type { RunPresentation, SignalEnvelope } from '@opensip-cli/contracts';
 import type { Signal, ToolCliContext } from '@opensip-cli/core';
-
-/** Logger `module` field for every event this module emits. */
-const MODULE = 'external-tool-adapter';
 
 /** What the host persists + dispatches after a scan (the run loop's return shape). */
 export interface ScanCompletion {
@@ -119,17 +117,22 @@ interface LogCompletedInput {
   readonly degraded?: boolean;
 }
 
-/** One `adapter.scan.completed` log line, with the optional gate-mode annotations. */
+/** One `adapter.scan.completed` decision (diagnostics bus + log). */
 function logCompleted(input: LogCompletedInput): void {
   const { cli, tool, signalCount, passed, gate, degraded } = input;
-  cli.logger.info({
-    evt: 'adapter.scan.completed',
-    module: MODULE,
+  emitAdapterDecision({
+    cli,
     tool,
-    findings: signalCount,
-    passed,
-    ...(gate === undefined ? {} : { gate }),
-    ...(degraded === undefined ? {} : { degraded }),
+    evt: ADAPTER_DIAG_EVT.SCAN_COMPLETED,
+    phase: 'deliver',
+    level: 'info',
+    message: `${tool}: scan completed (${String(signalCount)} finding(s), passed=${String(passed)})`,
+    data: {
+      findings: signalCount,
+      passed,
+      ...(gate === undefined ? {} : { gate }),
+      ...(degraded === undefined ? {} : { degraded }),
+    },
   });
 }
 
