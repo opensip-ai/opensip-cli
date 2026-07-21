@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.8.1
+release: v0.8.2
 title: "Project-local plugins"
 audience: [plugin-authors, getting-started]
 purpose: "The fastest path to extend opensip: drop .mjs files under opensip-cli/{fit,sim}/ — checks, recipes, scenarios."

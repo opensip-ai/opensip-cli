@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-13
-release: v0.8.1
+release: v0.8.2
 title: "Environment variables"
 audience: [ci-integrators, operators]
 purpose: "Every environment variable the opensip-cli CLI reads — name, effect, coercion, default. The governed env surface (§5.12)."
@@ -17,9 +17,9 @@ related-docs:
 # Environment variables
 
 Every environment variable the CLI reads is declared as an `EnvVarSpec` and read
-through a single `EnvRegistry` ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
+through a single `EnvRegistry` ([ADR-0024](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0024-command-outcome-and-observability.md)),
 so the surface is governed, coerced, and documented. The source of truth is
-`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/cli/src/env/host-env-specs.ts);
+`describeHostEnv()` in [`packages/cli/src/env/host-env-specs.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/cli/src/env/host-env-specs.ts);
 the `env-via-registry` fitness check fails CI on any raw `process.env` read that
 bypasses the registry.
 
@@ -34,15 +34,15 @@ bypasses the registry.
 | Variable | Effect |
 |---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint. When set, the CLI enables OpenTelemetry tracing; unset is a hard no-op (standalone runs pay nothing). |
-| `OPENSIP_PROFILING` | Explicit gate for local CPU-profile artifacts ([ADR-0163](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0163-local-cpu-profiling-independent-of-otel-export.md)). `1` or `true` enables profiling without requiring an OTLP endpoint; unset, `0`, and `false` are off. An OTLP endpoint alone never creates profile artifacts. |
+| `OPENSIP_PROFILING` | Explicit gate for local CPU-profile artifacts ([ADR-0163](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0163-local-cpu-profiling-independent-of-otel-export.md)). `1` or `true` enables profiling without requiring an OTLP endpoint; unset, `0`, and `false` are off. An OTLP endpoint alone never creates profile artifacts. |
 | `OPENSIP_PROFILE_DIR` | Optional caller-selected directory for local `.cpuprofile` and `.labels.json` artifacts. Relative paths resolve from the CLI process working directory; files are created exclusively with owner-only permissions. |
 | `TRACEPARENT` | W3C traceparent of a parent trace (read only when telemetry is on); run spans nest under it. |
 
 ## Update notifier
 
 Product update I/O (not telemetry — see
-[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0073-update-notification-policy.md) and
-[ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)).
+[ADR-0073](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0073-update-notification-policy.md) and
+[ADR-0070](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0070-telemetry-and-outbound-network-posture.md)).
 Default-on for interactive TTY; hourly npm version fetch; update-state stores only
 `{ latest }`.
 
@@ -60,7 +60,7 @@ removed: repo-committed workflow files and direnv can set env for a direct
 `opensip` invocation, so an env allowlist re-opened the analyzed-repo trust
 inversion. The single capability-pack trust surface is the user-level
 global-config trust list written by `opensip policy trust <pack>`
-([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
+([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
 
 ## Authored tools
 
@@ -99,13 +99,13 @@ global-config trust list written by `opensip policy trust <pack>`
 
 | Variable | Effect |
 |---|---|
-| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
+| `OPENSIP_CLI_NO_WORKER` | Set to `1` to run a **bundled** tool's engine in the main process instead of a forked off-process worker ([ADR-0028](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0028-off-main-thread-execution.md)). Interactive (TTY) runs normally fork a headless worker so the live spinner + clock never stall under a synchronous CPU blast; this forces the in-process path (debugging / constrained runtimes). The live view may stutter; machine output and exit codes are unchanged. **Bundled-only** ([ADR-0054](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0054-tool-fault-isolation-boundary.md) trust tier): external (installed / project-local / user-global) tool commands always fork the worker — this flag never makes an external tool run in the host process, and an external tool that cannot fork is a hard error. |
 | `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH` | Explicit opt-in list of extra env var names to forward into external-tool dispatch workers beyond the default allowlist and manifest-declared env resources. Arbitrary parent secrets are not inherited by default. Admission controls are forwarded so the worker sees the supervisor's exact trust decision. Does not affect bundled live-run worker forks. |
 
 ## State write locking
 
 Optional overrides for datastore-file and artifact-file write locks
-([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
+([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
 Local interactive runs wait longer by default; CI runs fail faster.
 
 | Variable | Default | Effect |

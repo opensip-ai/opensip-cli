@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-07
-release: v0.8.1
+release: v0.8.2
 title: "Sim execution model"
 audience: [contributors]
 purpose: "How the sim engine runs scenarios. Dispatcher, executor lifecycle, result aggregation, exit semantics."
@@ -53,7 +53,7 @@ opensip sim --recipe <name>
                                                                        shell prompt
 ```
 
-Both executors live under [`packages/simulation/engine/src/kinds/<kind>/executor.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/kinds/). Each accepts a kind-specific config (validated at `define*Scenario` time, carrying the BYO `target` + `workload`) and a `ScenarioExecutionContext` (signal/abort, correlation id, logger).
+Both executors live under [`packages/simulation/engine/src/kinds/<kind>/executor.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/kinds/). Each accepts a kind-specific config (validated at `define*Scenario` time, carrying the BYO `target` + `workload`) and a `ScenarioExecutionContext` (signal/abort, correlation id, logger).
 
 ---
 
@@ -61,10 +61,10 @@ Both executors live under [`packages/simulation/engine/src/kinds/<kind>/executor
 
 ### Load executor
 
-[`packages/simulation/engine/src/kinds/load/executor.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/kinds/load/executor.ts)
+[`packages/simulation/engine/src/kinds/load/executor.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/kinds/load/executor.ts)
 
 The load executor delegates to the shared `runLoadWindow` driver
-([`packages/simulation/engine/src/framework/execution/run-load-window.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/framework/execution/run-load-window.ts)). Its job:
+([`packages/simulation/engine/src/framework/execution/run-load-window.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/framework/execution/run-load-window.ts)). Its job:
 
 1. **Ramp + pace.** Increase the issue rate from 0 to `workload.rps` over `workload.rampUp` seconds, then sustain for `duration` seconds.
 2. **Drive the target.** Per request: call `config.target`, bounded by `workload.concurrency` in-flight; resolve = success, throw/abort = failure. Measure real wall-clock latency.
@@ -77,9 +77,9 @@ A load scenario that's interrupted (signal abort, timeout) drains in-flight requ
 
 ### Chaos executor
 
-[`packages/simulation/engine/src/kinds/chaos/executor.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/kinds/chaos/executor.ts)
+[`packages/simulation/engine/src/kinds/chaos/executor.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/kinds/chaos/executor.ts)
 
-The chaos executor drives the same shared `runLoadWindow` driver, but wraps the target with the **fault model** ([`packages/simulation/engine/src/framework/execution/fault-model.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/framework/execution/fault-model.ts)) for the steady-state window. The full sequence:
+The chaos executor drives the same shared `runLoadWindow` driver, but wraps the target with the **fault model** ([`packages/simulation/engine/src/framework/execution/fault-model.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/framework/execution/fault-model.ts)) for the steady-state window. The full sequence:
 
 1. Build the fault model from `config.fault` (with an injectable RNG — `Math.random` in production, a stub in tests). Run the steady-state window: `runLoadWindow({ workload }, ctx, { windowMs: duration*1000, target: faultModel.wrap(config.target) })`. Per request, at `fault.probability` the model perturbs the **real** call — adds latency, aborts it, or drops it (recording a `ChaosEvent`); otherwise the call passes through unperturbed.
 2. Run the recovery window: `runLoadWindow({ workload }, ctx, { windowMs: recoveryWindowMs, target: config.target })` — the **bare** target, faults lifted.
@@ -88,7 +88,7 @@ The chaos executor drives the same shared `runLoadWindow` driver, but wraps the 
 
 The result type is `ChaosScenarioExecutorResult` — steady + recovery `SimulationMetrics`, the per-phase assertion verdicts, and the `ChaosEvent[]`. Pass/fail is the AND of every steady-state and recovery assertion.
 
-The shipped fault vocabulary ([`packages/simulation/engine/src/framework/execution/fault-spec.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/framework/execution/fault-spec.ts)) is the **client-side** set: `'latency'` (delay the call), `'abort'` (cancel the in-flight request), `'drop'` (skip it, counting a client-observed failure). Server-side faults (500s, killed dependencies) are not injected here — point the `target` at a fault-injectable endpoint you control (see the honesty boundary in [`01-scenarios-and-recipes.md`](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/)).
+The shipped fault vocabulary ([`packages/simulation/engine/src/framework/execution/fault-spec.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/framework/execution/fault-spec.ts)) is the **client-side** set: `'latency'` (delay the call), `'abort'` (cancel the in-flight request), `'drop'` (skip it, counting a client-observed failure). Server-side faults (500s, killed dependencies) are not injected here — point the `target` at a fault-injectable endpoint you control (see the honesty boundary in [`01-scenarios-and-recipes.md`](/docs/opensip-cli/30-sim/01-scenarios-and-recipes/)).
 
 ---
 
@@ -99,7 +99,7 @@ The recipe's `execution.mode` decides ordering:
 - **`sequential`** — one scenario at a time. The default for sim recipes. Required for load and chaos scenarios that drive the same target system: running them in parallel would create cross-contamination (latency injected for chaos #1 affects load #2's measurements).
 - **`parallel`** — N scenarios at once, bounded by `maxParallel`. Safe for scenarios that fan out across independent inputs and don't share a target system.
 
-The recipe service ([`packages/simulation/engine/src/recipes/service.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/simulation/engine/src/recipes/service.ts)) dispatches based on mode. Sequential dispatch awaits each scenario's result before starting the next; parallel uses a `Promise.all`-with-concurrency wrapper similar to fit's parallel dispatcher.
+The recipe service ([`packages/simulation/engine/src/recipes/service.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/simulation/engine/src/recipes/service.ts)) dispatches based on mode. Sequential dispatch awaits each scenario's result before starting the next; parallel uses a `Promise.all`-with-concurrency wrapper similar to fit's parallel dispatcher.
 
 A recipe's `kind` selector narrows the selected scenarios to one or more kinds **before they run** — non-matching scenarios (which have real side effects) are never executed.
 
@@ -107,7 +107,7 @@ A recipe's `kind` selector narrows the selected scenarios to one or more kinds *
 
 ## The aggregated result
 
-After every scenario runs, the recipe service builds the run's **`SignalEnvelope`** (each scenario is a *unit* that produces signals, ADR-0011) and returns it inside the shared render-only `RunPresentation` ([`packages/contracts/src/run-presentation.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.1/packages/contracts/src/run-presentation.ts)):
+After every scenario runs, the recipe service builds the run's **`SignalEnvelope`** (each scenario is a *unit* that produces signals, ADR-0011) and returns it inside the shared render-only `RunPresentation` ([`packages/contracts/src/run-presentation.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.2/packages/contracts/src/run-presentation.ts)):
 
 ```ts
 interface RunPresentation {

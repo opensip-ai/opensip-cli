@@ -2,6 +2,54 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.8.2] - 2026-07-20
+
+Carries the fixes for the four macOS qualification failures that stopped the
+0.8.1 candidate from promoting, plus a capability-load parity fix and the
+observability that surfaced it, so consumer-visible `latest` can finally move
+off 0.7.0 as a coherent set.
+
+### Security
+
+- **`brace-expansion` DoS advisory** (exponential-time expansion of consecutive
+  non-expanding `{}` groups) patched by pinning the `@5` override to `^5.0.7`.
+
+### Fixed
+
+- **One authoritative capability-load driver (ADR-0174)**: a tool's check surface
+  no longer diverges by provenance. The in-process (bundled) and dispatched
+  (external) `fit` paths resolved different pack sets — the dispatched path fell
+  through to auto-discovery under a divergent anchor and dropped bundled packs.
+  The host driver, keyed on the canonical project root, is now the single loader
+  on both paths (worker-side for a dispatched tool); the engine's lazy loader
+  observes it and no-ops.
+- **Worker diagnostics fold back into the host run**: a dispatched worker's
+  lifecycle events + metrics (capability-domain load results, denied packs,
+  foreign-core skips) now reach `--json` diagnostics via `DiagnosticsBus.ingest`
+  instead of dying with the worker; the load event names its anchor and pack set.
+- **`report` accepts `--cwd`**, restoring the cache-init promotion journey that
+  drives `report` from outside the project root.
+- **`init` on a read-only project root fails as a structured `command.error`**
+  (naming `opensip-cli.config.yml` and the underlying `EACCES`) instead of a
+  soft `status: "ok"` JSON body with a nonzero exit.
+- **Published installs no longer warn about the private `checks-dogfood`
+  pack**: bundled fit-packs are seeded only when they actually resolve under
+  the CLI install tree, keeping `fit --json` output pure under a PTY. The
+  monorepo keeps dogfood trust-admitted when present.
+- **node_modules probes fail loud on resource-class errors**: `EMFILE`/`EIO`
+  during pack resolution now throw `SYSTEM.PLUGINS.FS_PROBE_FAILED` instead of
+  silently reading as "package not installed" — under load that silently
+  shrank the seeded check surface. Absence (`ENOENT`/`ENOTDIR`) and
+  permission-denied ancestors still read as not-installed.
+- **External tool workers no longer lose their final result to the exit race**:
+  the dispatch supervisor defers its premature-exit rejection and the worker
+  drains its terminal IPC send (the same race closed for capability workers in
+  0.7.1), eliminating spurious `exit_nonzero` failures with empty output under
+  heavy load.
+- Agent-eval's MCP handshake expects surface epoch 8, matching the live server.
+- Core discovery tests assert only their own temp tree, removing a false
+  ambient-package failure under full-lane parallel coverage.
+
 ## [0.8.1] - 2026-07-19
 
 Ships the 0.8.0 feature set to npm `latest`. The 0.8.0 cut reached a partial
