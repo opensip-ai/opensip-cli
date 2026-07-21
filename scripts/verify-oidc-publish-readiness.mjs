@@ -84,7 +84,9 @@ function npmViewOrNull(spec) {
   } catch (error) {
     const text = `${error.stdout ?? ''}${error.stderr ?? ''}${error.message ?? ''}`;
     if (/E404|404 Not Found|is not in this registry|no such package/i.test(text)) return null;
-    throw new Error(`npm view ${spec} failed (not an E404): ${text.slice(0, 200)}`, { cause: error });
+    throw new Error(`npm view ${spec} failed (not an E404): ${text.slice(0, 200)}`, {
+      cause: error,
+    });
   }
 }
 
@@ -104,7 +106,10 @@ function probePackage(name) {
   if (view === null) return null;
   const versions = Array.isArray(view.versions) ? view.versions : Object.keys(view.versions ?? {});
   if (versions.length === 0) return null;
-  const highest = versions.filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort(cmpVersion).at(-1);
+  const highest = versions
+    .filter((v) => /^\d+\.\d+\.\d+$/.test(v))
+    .sort(cmpVersion)
+    .at(-1);
   const perVersion = npmViewOrNull(`${name}@${highest}`);
   const dist = perVersion?.dist ?? {};
   return { highestVersion: highest, highestVersionAttested: dist.attestations != null };
