@@ -4,3 +4,4 @@ export * from './context-mutation.js';
 export * from './detached-promises.js';
 export * from './no-raw-fetch.js';
 export * from './no-unbounded-concurrency.js';
+export * from './timer-callback-async-needs-catch.js';

@@ -5310,9 +5310,16 @@ function startSharedHeartbeat(
       wantsUser,
       input,
       policy,
-    ).finally(() => {
-      inFlight = false;
-    });
+    )
+      .catch(() => {
+        // @swallow-ok Best-effort heartbeat. A rejection must not escape this
+        // process-global timer as an unhandled rejection — that would crash the
+        // host process (Node's default). `.finally` alone does NOT handle a
+        // rejection; this `.catch` is the actual guard.
+      })
+      .finally(() => {
+        inFlight = false;
+      });
   }, policy.heartbeatMs);
   timer.unref?.();
   return timer;

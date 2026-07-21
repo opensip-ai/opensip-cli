@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-19
+last_verified: 2026-07-21
 release: v0.8.x
 title: "Checks reference"
 audience: [getting-started, ci-integrators, plugin-authors]
@@ -21,7 +21,7 @@ related-docs:
 ---
 # Checks reference
 
-opensip-cli ships **152 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
+opensip-cli ships **153 built-in checks** across seven packs. Each check is a single source file that returns violations when the rule is broken. Below: every check by pack, grouped by primary tag, with the one-line description from `defineCheck`.
 
 > This page is **auto-generated** from the source by [`scripts/build-checks-index.mjs`](https://github.com/opensip-ai/opensip-cli/blob/main/scripts/build-checks-index.mjs). Do not edit it by hand — edit the check's source file (the link in each row), then re-run the generator.
 
@@ -161,7 +161,7 @@ Language-agnostic; runs against every project.
 
 ---
 
-## TypeScript  *(50 checks)*
+## TypeScript  *(51 checks)*
 
 TypeScript/JavaScript projects; uses TS-AST analysis.
 
@@ -224,7 +224,7 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 | [`typescript-frontend`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/quality/linting/typescript-frontend.ts) | Validates TypeScript compilation for frontend apps |
 | [`unused-config-options`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/quality/unused-config-options.ts) | Detects configuration properties defined but never accessed |
 
-### Resilience  *(5)*
+### Resilience  *(6)*
 
 | Slug | Description |
 |---|---|
@@ -233,6 +233,7 @@ TypeScript/JavaScript projects; uses TS-AST analysis.
 | [`detached-promises`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/resilience/detached-promises.ts) | Detect promises that may not be awaited (potential silent failures) |
 | [`no-raw-fetch`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/resilience/no-raw-fetch.ts) | Detect direct fetch() calls that should use wrapped HTTP clients |
 | [`no-unbounded-concurrency`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/resilience/no-unbounded-concurrency.ts) | Detect Promise.all with unbounded concurrency |
+| [`timer-callback-async-needs-catch`](https://github.com/opensip-ai/opensip-cli/blob/main/packages/fitness/checks-typescript/src/checks/resilience/timer-callback-async-needs-catch.ts) | Timer-callback promises must have a `.catch` (an unhandled rejection on a timer crashes the process) |
 
 ### Testing  *(1)*
 
