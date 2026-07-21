@@ -161,7 +161,8 @@ function advanceInQuotedString(
   quote: string,
 ): { next: number; closed: boolean } {
   const ch = line[i];
-  // M6: honour backslash escapes (e.g. const s = "foo\" // not-a-comment"; // @graph-ignore-next-line x).
+  // M6: honour backslash escapes so an escaped quote cannot end the string early
+  // (regression covered in suppress.test — escaped-quote mid-string cases).
   if (ch === '\\' && i + 1 < line.length) {
     return { next: i + 2, closed: false };
   }

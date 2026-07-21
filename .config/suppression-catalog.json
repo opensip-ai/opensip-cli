@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-21T06:16:21.992Z",
+  "generatedAt": "2026-07-21T06:20:26.862Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -175,17 +175,16 @@
         }
       },
       "graph": {
-        "total": 33,
+        "total": 32,
         "byRuleId": {
           "graph:always-throws-branch": 1,
           "graph:near-duplicate-function-body": 25,
-          "graph:x).": 1,
           "graph:cycle": 6
         },
         "byPackage": {
           "cli": 3,
           "cli-ui": 1,
-          "core": 2,
+          "core": 1,
           "fitness/engine": 1,
           "graph/engine": 5,
           "graph/graph-adapter-common": 1,
@@ -469,9 +468,9 @@
     "budgetGateFitnessSlugs": 72,
     "productRuntimeFitness": 72,
     "productRuntimeFitnessSlugs": 27,
-    "productRuntimeGraph": 33,
-    "productRuntimeGraphRuleIds": 4,
-    "productRuntimeCombined": 105,
+    "productRuntimeGraph": 32,
+    "productRuntimeGraphRuleIds": 3,
+    "productRuntimeCombined": 104,
     "checkPackageFitness": 172,
     "testSupportFitness": 2,
     "testsFitness": 62,
@@ -492,8 +491,8 @@
     },
     "delta": {
       "productRuntimeFitness": -233,
-      "productRuntimeGraph": 26,
-      "productRuntimeCombined": -207,
+      "productRuntimeGraph": 25,
+      "productRuntimeCombined": -208,
       "budgetGateFitness": -296,
       "checkPackageFitness": -62,
       "productRuntimeSafetyTotal": -183,
