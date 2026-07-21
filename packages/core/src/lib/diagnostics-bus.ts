@@ -18,6 +18,7 @@
  * identically, with no SDK dependency in the kernel.
  */
 
+import { toJsonRecord } from './json-value.js';
 import { currentTraceparent } from './telemetry.js';
 
 import type { RunCorrelation } from './run-correlation.js';
@@ -68,10 +69,19 @@ export class DiagnosticsBus {
 
   /**
    * Append a lifecycle event. The bus stamps `at` (ISO-8601) when the caller did
-   * not supply one. Cheap and allocation-light; safe to call from any phase.
+   * not supply one. Optional `data` is normalized to a bounded JSON-safe record
+   * at admission (ADR-0175) so a snapshot always survives `JSON.stringify`.
+   * Cheap and allocation-light; safe to call from any phase.
    */
   emit(event: DiagnosticEventInput): void {
-    this.events.push({ ...event, at: event.at ?? new Date().toISOString() });
+    const data = event.data === undefined ? undefined : toJsonRecord(event.data);
+    this.events.push({
+      phase: event.phase,
+      level: event.level,
+      message: event.message,
+      at: event.at ?? new Date().toISOString(),
+      ...(data === undefined ? {} : { data }),
+    });
   }
 
   /** Convenience: emit at a given phase/level with an optional data bag. */

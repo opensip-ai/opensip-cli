@@ -3,17 +3,25 @@
  * outcome wrapper (with the byte-identical `.envelope`); human mode renders the
  * inner payload and never serializes; a pure error/bootstrap outcome renders
  * nothing in human mode.
+ *
+ * ADR-0175: residual unserializable outcomes still write a fallback JSON document
+ * (never zero stdout) and rethrow so the host exit plane can mark failure.
  */
 
 import {
   buildSignalEnvelope,
+  EXIT_CODES,
   type CommandOutcome,
   type CommandResult,
 } from '@opensip-cli/contracts';
 import { HOST_VERDICT_POLICY_FALLBACK, runEmbeddedRender } from '@opensip-cli/core';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
-import { renderOutcome } from '../commands/render-outcome.js';
+import {
+  OUTCOME_SERIALIZE_FAILED_CODE,
+  renderOutcome,
+  renderRaw,
+} from '../commands/render-outcome.js';
 
 const ENVELOPE = buildSignalEnvelope({
   tool: 'fit',
@@ -140,5 +148,48 @@ describe('renderOutcome contract — uniform across emitJson / emitEnvelope / em
     await renderOutcome(outcome, { jsonRequested: true, render });
     expect(stdout[0]).toContain('"kind": "x.run"');
     expect(render).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * OBS-JSON / ADR-0175 — on main, unguarded JSON.stringify throws, output-plane
+ * catches, and a successful --json run emits zero stdout + RUNTIME_ERROR.
+ */
+describe('renderOutcome — guaranteed JSON fallback (ADR-0175)', () => {
+  it('writes a fallback outcome document then rethrows when primary serialization fails', async () => {
+    spyStdout();
+    const render = vi.fn();
+    // Intentionally hostile residual payload — envelope/data are not emit-normalized.
+    const circular: CommandResult & { self?: unknown } = { type: 'hostile' };
+    circular.self = circular;
+    const outcome: CommandOutcome = {
+      kind: 'fit.run',
+      status: 'ok',
+      exitCode: 0,
+      data: circular,
+    };
+
+    await expect(renderOutcome(outcome, { jsonRequested: true, render })).rejects.toThrow(
+      /circular|Converting circular/i,
+    );
+    expect(stdout).toHaveLength(1);
+    const parsed = JSON.parse(stdout[0]) as CommandOutcome;
+    expect(parsed.kind).toBe('fit.run');
+    expect(parsed.status).toBe('error');
+    expect(parsed.exitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
+    expect(parsed.errors?.[0]?.code).toBe(OUTCOME_SERIALIZE_FAILED_CODE);
+    expect(parsed.envelope).toBeUndefined();
+    expect(parsed.data).toBeUndefined();
+  });
+
+  it('renderRaw writes a compact fallback then rethrows on unserializable values', () => {
+    spyStdout();
+    expect(() => renderRaw(1n)).toThrow(/BigInt/i);
+    expect(stdout).toHaveLength(1);
+    const parsed = JSON.parse(stdout[0]) as {
+      error: { code: string; message: string; valueType: string };
+    };
+    expect(parsed.error.code).toBe(OUTCOME_SERIALIZE_FAILED_CODE);
+    expect(parsed.error.valueType).toBe('bigint');
   });
 });

@@ -66,6 +66,36 @@ describe('DiagnosticsBus', () => {
     expect(snap.events[0].data).toEqual({ count: 2 });
   });
 
+  /**
+   * OBS-JSON / ADR-0175 — fails on main without emit-time normalization:
+   * circular / BigInt / throwing toJSON data bags make JSON.stringify(snapshot)
+   * throw, which the output plane turns into zero stdout + RUNTIME_ERROR.
+   */
+  it('normalizes hostile data bags at emit so snapshots always JSON.stringify', () => {
+    const bus = new DiagnosticsBus('run_hostile');
+    const circular: Record<string, unknown> = { ok: true };
+    circular.self = circular;
+    bus.event('load', 'warn', 'circular data', circular);
+    bus.event('execute', 'info', 'bigint data', { n: 99n });
+    bus.event('execute', 'error', 'throwing toJSON', {
+      payload: {
+        toJSON() {
+          throw new Error('hostile');
+        },
+      },
+    });
+    bus.event('deliver', 'debug', 'error instance', { err: new Error('nope') });
+
+    const snap = bus.snapshot();
+    expect(() => JSON.stringify(snap)).not.toThrow();
+    expect(snap.events[0].data).toEqual({ ok: true, self: '[Circular]' });
+    expect(snap.events[1].data).toEqual({ n: '99n' });
+    expect(snap.events[2].data).toEqual({ payload: '[Unserializable]' });
+    expect(snap.events[3].data).toEqual({
+      err: { name: 'Error', message: 'nope' },
+    });
+  });
+
   describe('emitSubprocessEvent', () => {
     it('stamps the correlation join keys into the event data bag, merged with extras', () => {
       const bus = new DiagnosticsBus('run_6');

@@ -21,14 +21,24 @@
  * That deliberately opts out of the one-outcome shape, so its single sanctioned
  * write also lives HERE (the one stdout-JSON seam), reached via `cli.emitRaw`, not
  * hand-rolled in each command body.
+ *
+ * ADR-0175: if primary `JSON.stringify` throws (hostile envelope residual, etc.),
+ * write a minimal always-serializable fallback document first so a `--json` run
+ * never emits zero stdout, then rethrow so the host exit plane can mark failure.
  */
 
+import {
+  EXIT_CODES,
+  type CommandOutcome,
+  type CommandResult,
+} from '@opensip-cli/contracts';
 import { isEmbeddedRender } from '@opensip-cli/core';
-
-import type { CommandOutcome, CommandResult } from '@opensip-cli/contracts';
 
 /** Pretty-print width matches the legacy `formatSignalJson` / `emitJson` writers. */
 const JSON_INDENT = 2;
+
+/** Stable code for the guaranteed fallback document (ADR-0175). */
+export const OUTCOME_SERIALIZE_FAILED_CODE = 'SYSTEM.OUTPUT.SERIALIZE_FAILED';
 
 export interface RenderOutcomeOptions {
   /** True when `--json` was requested: serialize the whole outcome to stdout. */
@@ -58,7 +68,7 @@ export async function renderOutcome(
   // its capturing ToolCliContext and write a second document directly to stdout.
   if (isEmbeddedRender()) return;
   if (opts.jsonRequested) {
-    process.stdout.write(JSON.stringify(outcome, null, JSON_INDENT) + '\n');
+    writeJsonDocument(outcome, () => buildOutcomeSerializeFallback(outcome));
     return;
   }
   const inner = outcome.envelope ?? outcome.data;
@@ -75,5 +85,62 @@ export async function renderOutcome(
  * so no command body hand-rolls `process.stdout.write(JSON.stringify(...))`.
  */
 export function renderRaw(value: unknown): void {
-  process.stdout.write(JSON.stringify(value) + '\n');
+  writeJsonDocument(value, () => buildRawSerializeFallback(value), /* pretty */ false);
+}
+
+/**
+ * Write JSON to stdout. On primary serialization failure, write the guaranteed
+ * fallback document, then rethrow so the output plane can flip a successful
+ * run to RUNTIME_ERROR (ADR-0175).
+ */
+function writeJsonDocument(
+  value: unknown,
+  buildFallback: () => unknown,
+  pretty = true,
+): void {
+  const space = pretty ? JSON_INDENT : undefined;
+  try {
+    process.stdout.write(JSON.stringify(value, null, space) + '\n');
+  } catch (error) {
+    // Fallback is constructed from primitives only and must never throw.
+    process.stdout.write(JSON.stringify(buildFallback(), null, space) + '\n');
+    throw error;
+  }
+}
+
+/**
+ * Minimal always-serializable outcome used when the primary document cannot be
+ * stringified. Preserves the attempted `kind` for correlation; forces
+ * `status:'error'` and RUNTIME_ERROR so the document does not claim success.
+ */
+export function buildOutcomeSerializeFallback(outcome: CommandOutcome): CommandOutcome {
+  const reason = 'CommandOutcome JSON serialization failed';
+  return {
+    kind: typeof outcome.kind === 'string' && outcome.kind.length > 0 ? outcome.kind : 'command.error',
+    status: 'error',
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+    errors: [
+      {
+        message: reason,
+        code: OUTCOME_SERIALIZE_FAILED_CODE,
+      },
+    ],
+  };
+}
+
+/** Compact fallback for RAW_STREAM when the bare value is unserializable. */
+export function buildRawSerializeFallback(value: unknown): {
+  readonly error: {
+    readonly code: typeof OUTCOME_SERIALIZE_FAILED_CODE;
+    readonly message: string;
+    readonly valueType: string;
+  };
+} {
+  return {
+    error: {
+      code: OUTCOME_SERIALIZE_FAILED_CODE,
+      message: 'RAW_STREAM JSON serialization failed',
+      valueType: value === null ? 'null' : typeof value,
+    },
+  };
 }

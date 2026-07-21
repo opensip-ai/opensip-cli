@@ -18,8 +18,10 @@
  * Serialization-safe by construction: every field is a primitive, a readonly
  * array of primitives/records, or a plain record — no functions, no class
  * instances, no clock captured here. The producer (the scope-owned diagnostics
- * bus, `@opensip-cli/core`) stamps `at` at the emit site; this layer stays
- * pure (the formatter-purity contract that `SignalEnvelope` also honours).
+ * bus, `@opensip-cli/core`) stamps `at` at the emit site and normalizes optional
+ * `data` bags through `toJsonValue` (ADR-0175) so snapshots always survive
+ * `JSON.stringify`. This layer stays pure (the formatter-purity contract that
+ * `SignalEnvelope` also honours).
  */
 
 /**
@@ -37,7 +39,8 @@ export type DiagnosticLevel = 'debug' | 'info' | 'warn' | 'error';
  * One structured diagnostics event. `at` is an ISO-8601 timestamp supplied by
  * the emitter (core stays `Date.now()`-free in its pure paths; the bus owns the
  * clock). `data` is an optional bag of JSON-safe extras (e.g. which plugin
- * loaded, how many checks matched) — never functions or class instances.
+ * loaded, how many checks matched) — the bus admits open bags and normalizes
+ * them at emit (ADR-0175); callers never need to pre-sanitize.
  */
 export interface DiagnosticEvent {
   readonly phase: DiagnosticPhase;
