@@ -306,6 +306,26 @@ describe('suppression directive scanning', () => {
     expect(scan.lineIgnoredIds.get(2)).toEqual(new Set(['graph:cycle']));
   });
 
+  it('M6: finds a trailing directive after a string with escaped quotes', () => {
+    // Without escape handling, the `\"` would end the string early and hide the
+    // real `//` comment opener (or match a fake `//` inside the string).
+    const scan = scanSuppressionDirectives(
+      'const s = "foo\\" // not-a-comment"; // @graph-ignore-next-line graph:cycle\ncode',
+      GRAPH_KEYWORDS,
+    );
+
+    expect(scan.lineIgnoredIds.get(2)).toEqual(new Set(['graph:cycle']));
+  });
+
+  it('M6: does not treat // inside a string with escaped quotes as a directive', () => {
+    const scan = scanSuppressionDirectives(
+      'const s = "foo // @graph-ignore-next-line graph:cycle";\ncode',
+      GRAPH_KEYWORDS,
+    );
+
+    expect(scan.lineIgnoredIds.size).toBe(0);
+  });
+
   it('rejects directive prefixes without a token boundary or identifier', () => {
     const scan = scanSuppressionDirectives(
       [

@@ -157,8 +157,13 @@ function findFirstRealCommentOpener(line: string): { index: number; length: numb
   while (i < len) {
     const ch = line[i];
     if (inString) {
+      // M6: honour backslash escapes so `\"` / `\'` do not end the string early
+      // (e.g. const s = "foo\" // not-a-comment"; // @graph-ignore-next-line x).
+      if (ch === '\\' && i + 1 < len) {
+        i += 2;
+        continue;
+      }
       if (ch === inString) {
-        // naive: no escape handling (sufficient for directive scanner; escaped quotes are rare in practice here)
         inString = null;
       }
       i++;
