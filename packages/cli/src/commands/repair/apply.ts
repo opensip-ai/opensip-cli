@@ -52,6 +52,36 @@ function toApplyResult(
   };
 }
 
+/**
+ * M8: multi-file apply must not leave a partial mutation on mid-write failure.
+ * Capture before-content, write each file, and on any write failure restore
+ * every file already written in this batch.
+ *
+ * Exported for unit tests of the rollback contract (fails-on-main shape).
+ */
+export function applyAllOrRollback(
+  writes: readonly { absolutePath: string; before: string; after: string }[],
+): Result<void, RepairError> {
+  const committed: { absolutePath: string; before: string }[] = [];
+  try {
+    for (const write of writes) {
+      writeFileSync(write.absolutePath, write.after, 'utf8');
+      committed.push({ absolutePath: write.absolutePath, before: write.before });
+    }
+    return ok(undefined);
+  } catch (error) {
+    for (const done of committed.reverse()) {
+      try {
+        writeFileSync(done.absolutePath, done.before, 'utf8');
+      } catch {
+        // Best-effort restore; surface the original write failure below.
+      }
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return err(repairError('apply-failed', `repair apply failed mid-batch: ${message}`));
+  }
+}
+
 export function applyRepair(input: ApplyRepairInput): Result<RepairApplyResult, RepairError> {
   const plan = buildRepairPlan(input);
   if (!plan.ok) return plan;
@@ -67,6 +97,7 @@ export function applyRepair(input: ApplyRepairInput): Result<RepairApplyResult, 
   );
   if (!clean.ok) return clean;
 
+  const writes: { absolutePath: string; before: string; after: string }[] = [];
   for (const change of modified) {
     const current = readSafeTextFile(input.projectRoot, change.filePath);
     if (!current.ok) return current;
@@ -78,11 +109,15 @@ export function applyRepair(input: ApplyRepairInput): Result<RepairApplyResult, 
         ),
       );
     }
+    writes.push({
+      absolutePath: change.absolutePath,
+      before: current.value.content,
+      after: change.afterContent,
+    });
   }
 
-  for (const change of modified) {
-    writeFileSync(change.absolutePath, change.afterContent, 'utf8');
-  }
+  const applied = applyAllOrRollback(writes);
+  if (!applied.ok) return applied;
 
   return ok(toApplyResult(plan.value, 'applied'));
 }

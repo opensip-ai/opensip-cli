@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { applyAndVerifyRepair, applyRepair } from '../apply.js';
+import { applyAllOrRollback, applyAndVerifyRepair, applyRepair } from '../apply.js';
 import { previewRepair } from '../planner.js';
 
 import type { RepairBuildInput } from '../types.js';
@@ -107,6 +107,27 @@ describe('repair planner', () => {
     if (!result.ok) return;
     expect(result.value.status).toBe('applied');
     expect(readFileSync(join(root, 'src/example.ts'), 'utf8')).toContain('@ts-expect-error');
+  });
+
+  it('M8: rolls back earlier files when a later write fails mid-batch', () => {
+    const aPath = join(root, 'a.ts');
+    const bPath = join(root, 'b-dir');
+    writeFileSync(aPath, 'before-a\n', 'utf8');
+    // Second target is a directory so writeFileSync throws after a.ts is committed.
+    mkdirSync(bPath, { recursive: true });
+
+    const result = applyAllOrRollback([
+      { absolutePath: aPath, before: 'before-a\n', after: 'after-a\n' },
+      { absolutePath: bPath, before: 'before-b\n', after: 'after-b\n' },
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('apply-failed');
+      expect(result.error.message).toMatch(/mid-batch/);
+    }
+    // a.ts must be restored to its before content — no partial multi-file apply.
+    expect(readFileSync(aPath, 'utf8')).toBe('before-a\n');
   });
 
   it('uses signal file fallback and preserves CRLF text replacement newlines', () => {
