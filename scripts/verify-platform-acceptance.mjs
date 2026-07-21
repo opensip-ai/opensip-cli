@@ -144,6 +144,11 @@ const CANDIDATE_KINDS = new Set(['packed-release', 'published-version']);
 // the behavior under test (for example, a seeded fitness finding exits 1). All
 // other passing journeys must carry clean zero-exit terminal evidence.
 const EXPECTED_NON_ZERO_EXIT = new Map([
+  // The cache-init promotion journey intentionally drives two clean command
+  // failures — a bounded-lock/refusal exit (2) and a gate/config exit (1) — and
+  // asserts each fails cleanly (structured error, no signal/timeout). Allow both
+  // exact codes; the exact count is pinned in EXPECTED_ABNORMAL_TERMINAL_COUNTS.
+  ['persistence.cache-init-promotion', new Set([1, 2])],
   ['analysis.audit-preinit', new Set([1])],
   ['analysis.fit', new Set([1])],
   ['analysis.yagni', new Set([1])],
@@ -167,6 +172,7 @@ const EXPECTED_POSITIVE_EXIT = new Set([
   'macos.contention-recovery',
 ]);
 const EXPECTED_ABNORMAL_TERMINAL_COUNTS = new Map([
+  ['persistence.cache-init-promotion', new Map([['positive-exit', 2]])],
   ['persistence.contention-retry', new Map([['positive-exit', 1]])],
   ['persistence.interrupted-recovery', new Map([['cancellation', 1]])],
   ['resilience.signals', new Map([['cancellation', 1]])],
