@@ -12,7 +12,7 @@
  * class. MCP imports this free function, never `SessionRepo`.
  */
 
-import { buildToolIdentityIndex } from '@opensip-cli/core';
+import { buildToolIdentityIndex, isFiniteNumber } from '@opensip-cli/core';
 
 import { RunRepo } from './run-repo.js';
 import { SessionRepo } from './session-repo.js';
@@ -113,12 +113,13 @@ function sessionSummary(payload: unknown): HistorySession['summary'] | undefined
   const summary = (payload as { summary?: unknown }).summary;
   if (summary === null || typeof summary !== 'object') return undefined;
   const { total, passed, failed, errors, warnings } = summary as Record<string, unknown>;
+  // ADR-0180: require finite numbers so NaN/Infinity never reach sessions list / MCP.
   if (
-    typeof total !== 'number' ||
-    typeof passed !== 'number' ||
-    typeof failed !== 'number' ||
-    typeof errors !== 'number' ||
-    typeof warnings !== 'number'
+    !isFiniteNumber(total) ||
+    !isFiniteNumber(passed) ||
+    !isFiniteNumber(failed) ||
+    !isFiniteNumber(errors) ||
+    !isFiniteNumber(warnings)
   ) {
     return undefined;
   }

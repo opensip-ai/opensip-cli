@@ -44,6 +44,7 @@ boundary is fine.
 
 ## Index (most recent first)
 
+- [ADR-0180](ADR-0180-finite-number-decode-plane.md) — Session decode and scalar projection admit only **finite** numbers (`isFiniteNumber` / `Number.isFinite`); required fields reject non-finite, optional bags and list summaries omit them — mirrors the write plane so NaN/Infinity cannot reach MCP, report, or `sessions list`.
 - [ADR-0179](ADR-0179-canonical-one-based-signal-columns.md) — Signal columns are canonical **1-based** at `createSignal` (finite integers ≥ 1; omit otherwise); graph lifts parser-native 0-based occurrence columns in `createGraphSignal`; emitters must not pass raw `match.index`; SARIF emits the stored base without re-guessing 0-vs-1.
 - [ADR-0178](ADR-0178-graph-rules-all-occurrences-not-bodyhash-winners.md) — Occurrence-local graph rules and twin-sensitive features consume all `occurrencesByHash` members (or twin-union `inTestFile`); `byBodyHash` last-writer winners must not mask a production twin when a test twin wins the content-dedup slot (extends ADR-0003 adjacency twin-awareness to rule consumers).
 - [ADR-0177](ADR-0177-graph-session-verdict-from-envelope.md) — Graph generic-session `score`/`passed` copy `envelope.verdict` (same `buildGraphEnvelope` owner as live delivery); all-evaluated clean-rule inventory stays in payload detail only and must not recompute the headline score (parity with fit/yagni).

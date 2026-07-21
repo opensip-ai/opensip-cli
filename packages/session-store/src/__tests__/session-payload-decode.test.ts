@@ -353,7 +353,7 @@ describe('decodeSessionPayload — graph-style options (all strict)', () => {
         },
         graphOpts,
       ),
-    ).toThrow(/graph session check\.violationCount must be a number/);
+    ).toThrow(/graph session check\.violationCount must be a finite number/);
   });
 });
 
@@ -366,7 +366,7 @@ describe('decodeSessionPayload — validation errors', () => {
     {
       name: 'non-number summary field',
       payload: { summary: { ...SUMMARY, total: 'x' }, checks: [] },
-      message: /total must be a number/,
+      message: /total must be a finite number/,
     },
     { name: 'missing checks[]', payload: { summary: SUMMARY }, message: /missing checks\[\]/ },
     {
@@ -445,8 +445,64 @@ describe('decodeSessionPayload — validation errors', () => {
 describe('exported field coercers', () => {
   it('numberField returns numbers and rejects non-numbers', () => {
     expect(numberField({ n: 3 }, 'n', 'L')).toBe(3);
-    expect(() => numberField({ n: 'x' }, 'n', 'L')).toThrow(/L\.n must be a number/);
+    expect(() => numberField({ n: 'x' }, 'n', 'L')).toThrow(/L\.n must be a finite number/);
   });
+
+  it('numberField rejects NaN and Infinity (ADR-0180; fails on main)', () => {
+    expect(() => numberField({ n: Number.NaN }, 'n', 'L')).toThrow(/L\.n must be a finite number/);
+    expect(() => numberField({ n: Number.POSITIVE_INFINITY }, 'n', 'L')).toThrow(
+      /L\.n must be a finite number/,
+    );
+  });
+
+  it('decodeSessionPayload rejects non-finite summary counts (ADR-0180)', () => {
+    expect(() =>
+      decodeSessionPayload(
+        {
+          summary: {
+            total: Number.NaN,
+            passed: 0,
+            failed: 0,
+            errors: 0,
+            warnings: 0,
+          },
+          checks: [],
+        },
+        { tool: 'fit' },
+      ),
+    ).toThrow(/summary\.total must be a finite number/);
+  });
+
+  it('omits non-finite optional finding columns and metadata numbers (ADR-0180)', () => {
+    const decoded = decodeSessionPayload(
+      {
+        summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
+        checks: [
+          {
+            checkSlug: 'c',
+            passed: false,
+            durationMs: 1,
+            findings: [
+              {
+                ruleId: 'r',
+                message: 'm',
+                severity: 'error',
+                line: Number.NaN,
+                column: Number.POSITIVE_INFINITY,
+                metadata: { ok: 2, bad: Number.NaN },
+              },
+            ],
+          },
+        ],
+      },
+      { tool: 'fit', allowMetadata: true },
+    );
+    const finding = decoded.checks[0]?.findings[0];
+    expect(finding?.line).toBeUndefined();
+    expect(finding?.column).toBeUndefined();
+    expect(finding?.metadata).toEqual({ ok: 2 });
+  });
+
   it('stringField returns strings and rejects non-strings', () => {
     expect(stringField({ s: 'hi' }, 's', 'L')).toBe('hi');
     expect(() => stringField({ s: 2 }, 's', 'L')).toThrow(/L\.s must be a string/);

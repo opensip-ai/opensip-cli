@@ -99,6 +99,7 @@ const EXPORT_ALLOWLIST = {
   namespacedRuleId: 'shared-data-contracts',
   noopSignalSink: 'shared-data-contracts',
   policyPasses: 'shared-data-contracts',
+  isFiniteNumber: 'shared-data-contracts',
   projectJsonScalarMetadata: 'shared-data-contracts',
   resolveFailOnDegraded: 'shared-data-contracts',
   resolveVerdictPolicy: 'shared-data-contracts',

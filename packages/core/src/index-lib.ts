@@ -132,7 +132,7 @@ export type { ReadYamlFileOrThrowOptions } from './lib/yaml.js';
 
 // Lib — shallow JSON-value guards shared by config/projector code paths.
 export { isPlainRecord } from './lib/json-guards.js';
-export { projectJsonScalarMetadata } from './lib/json-scalars.js';
+export { isFiniteNumber, projectJsonScalarMetadata } from './lib/json-scalars.js';
 export type { JsonScalar } from './lib/json-scalars.js';
 // Lib — bounded JSON-safe trees for diagnostics admission (ADR-0175). The
 // normalizer + its caps/types are internal: callers never normalize (the

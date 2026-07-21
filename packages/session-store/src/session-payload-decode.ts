@@ -24,7 +24,7 @@
  * skeleton + the detected `payloadVersion` when present.
  */
 
-import { extractPayloadVersion } from '@opensip-cli/core';
+import { extractPayloadVersion, isFiniteNumber } from '@opensip-cli/core';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
 import type { SignalRepair } from '@opensip-cli/core';
@@ -147,7 +147,7 @@ function decodeCheck(value: unknown, opts: DecodeSessionPayloadOptions): Decoded
   let violationCount: number | undefined;
   if (opts.requireViolationCount) {
     violationCount = numberField(check, 'violationCount', label);
-  } else if (typeof check.violationCount === 'number') {
+  } else if (isFiniteNumber(check.violationCount)) {
     violationCount = check.violationCount;
   }
   if (!Array.isArray(check.findings)) {
@@ -228,7 +228,7 @@ function decodeRepair(value: unknown): SignalRepair | undefined {
   if (typeof raw.autofixable === 'boolean') out.autofixable = raw.autofixable;
   if (typeof raw.suggestedCommand === 'string') out.suggestedCommand = raw.suggestedCommand;
   if (typeof raw.docsRef === 'string') out.docsRef = raw.docsRef;
-  if (typeof raw.confidence === 'number') out.confidence = raw.confidence;
+  if (isFiniteNumber(raw.confidence)) out.confidence = raw.confidence;
   const patchHint = decodePatchHint(raw.patchHint);
   if (patchHint !== undefined) out.patchHint = patchHint;
   const actions = decodeRepairActions(raw.actions);
@@ -280,7 +280,7 @@ function decodeRepairAction(value: unknown): DecodedRepairAction | undefined {
     autofixable: raw.autofixable,
   };
   if (typeof raw.description === 'string') out.description = raw.description;
-  if (typeof raw.confidence === 'number') out.confidence = raw.confidence;
+  if (isFiniteNumber(raw.confidence)) out.confidence = raw.confidence;
   const patchHint = decodePatchHint(raw.patchHint);
   if (patchHint !== undefined) out.patchHint = patchHint;
   const verification = decodeRepairVerification(raw.verification);
@@ -313,7 +313,7 @@ function decodeRepairActionTarget(value: unknown): DecodedRepairAction['target']
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const out: Record<string, string | number | boolean> = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+    if (typeof entry === 'string' || typeof entry === 'boolean' || isFiniteNumber(entry)) {
       out[key] = entry;
     }
   }
@@ -327,17 +327,17 @@ function decodeMetadata(
   if (value === null || typeof value !== 'object') return undefined;
   const out: Record<string, SessionPayloadScalar> = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+    if (typeof entry === 'string' || typeof entry === 'boolean' || isFiniteNumber(entry)) {
       out[key] = entry;
     }
   }
   return Object.keys(out).length === 0 ? undefined : out;
 }
 
-/** @throws {Error} when the field is not a number. */
+/** @throws {Error} when the field is not a finite number (ADR-0180). */
 export function numberField(source: Record<string, unknown>, field: string, label: string): number {
   const value = source[field];
-  if (typeof value !== 'number') throw new Error(`${label}.${field} must be a number`);
+  if (!isFiniteNumber(value)) throw new Error(`${label}.${field} must be a finite number`);
   return value;
 }
 
@@ -364,5 +364,5 @@ function optionalString(value: unknown): string | undefined {
 }
 
 function optionalNumber(value: unknown): number | undefined {
-  return typeof value === 'number' ? value : undefined;
+  return isFiniteNumber(value) ? value : undefined;
 }

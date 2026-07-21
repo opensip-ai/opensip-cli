@@ -69,6 +69,7 @@ const EXPECTED_VALUE_EXPORTS = [
   // ADR-0035: host-owned verdict policy surface.
   'HOST_VERDICT_POLICY_FALLBACK',
   'policyPasses',
+  'isFiniteNumber',
   'projectJsonScalarMetadata',
   'resolveVerdictPolicy',
   // Host-owned baseline/ratchet plane (ADR-0036).

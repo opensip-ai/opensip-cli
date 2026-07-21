@@ -106,6 +106,25 @@ describe('listSessionSummaries', () => {
     expect(withoutSummary?.summary).toBeUndefined();
   });
 
+  it('omits summary when counts are non-finite (ADR-0180; fails on main)', () => {
+    repo.save(
+      makeSession({
+        id: 'FIT_NAN',
+        payload: {
+          summary: {
+            total: Number.NaN,
+            passed: 0,
+            failed: 0,
+            errors: 0,
+            warnings: 0,
+          },
+        },
+      }),
+    );
+    const result = listSessionSummaries(datastore, { summaryOnly: true });
+    expect(result.sessions.find((session) => session.id === 'FIT_NAN')?.summary).toBeUndefined();
+  });
+
   it('attaches ledger step references when a session is linked from run_steps', () => {
     repo.save(makeSession({ id: 'FIT_LEDGER' }));
     new RunRepo(datastore).saveRunWithSteps(makeRun(), [
