@@ -27,7 +27,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 
 import { chunkByCount, DEFAULT_CHUNK_SIZE } from './partition-chunk.js';
 
@@ -60,7 +60,17 @@ const DEFAULT_HEAP_ELEVATION_THRESHOLD = 2500;
 /** Default partitioning depth for the `directory-depth` strategy. */
 const DEFAULT_DIRECTORY_DEPTH = 2;
 
-const SOURCE_EXTENSIONS: readonly string[] = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+const SOURCE_EXTENSIONS: readonly string[] = [
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+];
+const DECLARATION_SUFFIXES: readonly string[] = ['.d.ts', '.d.mts', '.d.cts'];
 const SKIPPED_DIR_NAMES: ReadonlySet<string> = new Set([
   'node_modules',
   'dist',
@@ -120,9 +130,7 @@ export function detectMonorepoLayout(input: DetectMonorepoLayoutInput): Monorepo
     input.rootPackageJson === undefined
       ? readRootPackageJson(input.repoRoot)
       : input.rootPackageJson;
-  const hasWorkspaces =
-    nestedPackageDirs.length > 0 ||
-    (Array.isArray(rootPkg?.workspaces) && rootPkg.workspaces.length > 0);
+  const hasWorkspaces = nestedPackageDirs.length > 0 || hasWorkspacePatterns(rootPkg?.workspaces);
 
   if (hasWorkspaces) {
     return { kind: 'workspaces', packageDirs: nestedPackageDirs };
@@ -130,6 +138,14 @@ export function detectMonorepoLayout(input: DetectMonorepoLayoutInput): Monorepo
 
   const files = input.files ?? findSourceFiles(input.repoRoot);
   return files.length > threshold ? { kind: 'flat-large', files } : { kind: 'flat-small', files };
+}
+
+/** npm/pnpm array form and Yarn's `{ packages: [...] }` form. */
+function hasWorkspacePatterns(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value !== 'object' || value === null) return false;
+  const packages = (value as { readonly packages?: unknown }).packages;
+  return Array.isArray(packages) && packages.length > 0;
 }
 
 export interface PartitionFlatRepoInput {
@@ -182,6 +198,9 @@ export function partitionFlatRepo(input: PartitionFlatRepoInput): readonly Synth
   const chunkSize = input.chunkSize ?? DEFAULT_CHUNK_SIZE;
   if (chunkSize <= 0) {
     throw new Error('partitionFlatRepo: chunkSize must be > 0');
+  }
+  if (!Number.isSafeInteger(chunkSize)) {
+    throw new TypeError('partitionFlatRepo: chunkSize must be a positive safe integer');
   }
 
   if (input.strategy === 'file-count-chunks') {
@@ -256,6 +275,9 @@ function chunkByDirectoryDepth(
   if (depth < 1) {
     throw new Error('chunkByDirectoryDepth: depth must be >= 1');
   }
+  if (!Number.isSafeInteger(depth)) {
+    throw new TypeError('chunkByDirectoryDepth: depth must be a positive safe integer');
+  }
   const buckets = new Map<string, string[]>();
   for (const file of files) {
     const id = partitionIdFor(file, repoRoot, depth);
@@ -284,7 +306,7 @@ function chunkByDirectoryDepth(
 function partitionIdFor(file: string, repoRoot: string, depth: number): string {
   const rel = relative(repoRoot, file);
   if (rel === '' || rel === '.') return '_root';
-  if (rel.startsWith('..')) return '_external';
+  if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return '_external';
   const segments = rel.split(sep).filter((s) => s.length > 0);
   if (segments.length === 0) return '_root';
   // Last segment is the filename — exclude from the directory prefix.
@@ -384,6 +406,7 @@ function findSourceFiles(repoRoot: string): readonly string[] {
 }
 
 function hasSourceExtension(filename: string): boolean {
+  if (DECLARATION_SUFFIXES.some((suffix) => filename.endsWith(suffix))) return false;
   for (const ext of SOURCE_EXTENSIONS) {
     if (filename.endsWith(ext)) return true;
   }

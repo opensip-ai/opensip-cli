@@ -541,8 +541,8 @@ function sessionReplayResult(
  *   it as a usage/parse error, which the CLI boundary maps to exit 2).
  */
 function parseConcurrency(v: string): number {
-  const n = Number.parseInt(v, 10);
-  if (!Number.isFinite(n) || n < 1) {
+  const n = Number(v);
+  if (!/^\d+$/.test(v) || !Number.isSafeInteger(n) || n < 1) {
     throw new Error(`--concurrency must be a positive integer (received '${v}')`);
   }
   return n;

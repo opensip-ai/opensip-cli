@@ -13,6 +13,7 @@ describe('isFixturePath', () => {
   it('matches a `/__fixtures__/` segment anywhere in the path', () => {
     expect(isFixturePath('packages/alpha/src/__fixtures__/sample.ts')).toBe(true);
     expect(isFixturePath('a/__fixtures__/b/c.ts')).toBe(true);
+    expect(isFixturePath('__fixtures__/root-sample.ts')).toBe(true);
   });
 
   it('does NOT match production or real test files', () => {

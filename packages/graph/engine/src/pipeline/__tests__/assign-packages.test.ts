@@ -99,4 +99,18 @@ describe('assignPackages', () => {
     const l = labels(['solo.ts']);
     expect(l['solo.ts']).toBe('<unknown>');
   });
+
+  it('preserves a function bucket named like an Object prototype property', () => {
+    const input = catalogOf([]);
+    const prototypeNamed = occ('src/prototype.ts');
+    const output = assignPackages(
+      {
+        ...input,
+        functions: Object.fromEntries([['__proto__', [prototypeNamed]]]),
+      },
+      root,
+    );
+    expect(Object.hasOwn(output.functions, '__proto__')).toBe(true);
+    expect(output.functions.__proto__?.[0]?.package).toBe('src');
+  });
 });

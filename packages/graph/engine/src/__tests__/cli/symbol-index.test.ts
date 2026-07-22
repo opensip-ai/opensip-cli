@@ -114,6 +114,23 @@ describe('graph symbol-index', () => {
       expect(artifact.symbols.fn).toHaveLength(2);
       expect(artifact.fileSymbols['src/a.ts']).toEqual(['fn']);
     });
+
+    it('preserves JavaScript prototype-like symbol names and file paths', () => {
+      const prototypeNamed = occ({
+        bodyHash: 'proto',
+        simpleName: '__proto__',
+        filePath: '__proto__',
+      });
+      const catalog = makeCatalog([]);
+      const artifact = buildArtifact({
+        ...catalog,
+        functions: Object.fromEntries([['__proto__', [prototypeNamed]]]),
+      });
+      expect(Object.hasOwn(artifact.symbols, '__proto__')).toBe(true);
+      expect(artifact.symbols.__proto__?.[0]?.bodyHash).toBe('proto');
+      expect(Object.hasOwn(artifact.fileSymbols, '__proto__')).toBe(true);
+      expect(artifact.fileSymbols.__proto__).toEqual(['__proto__']);
+    });
   });
 
   describe('executeSymbolIndex', () => {

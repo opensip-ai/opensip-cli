@@ -36,13 +36,15 @@ export function assignPackages(catalog: Catalog, projectRoot: string): Catalog {
         return seg && seg !== filePath ? seg : UNKNOWN;
       };
 
-      const functions: Record<string, FunctionOccurrence[]> = {};
-      for (const [name, occs] of Object.entries(catalog.functions)) {
-        functions[name] = occs.map((occ) => ({
-          ...occ,
-          package: labelOf(occ.filePath),
-        }));
-      }
+      const functions = Object.fromEntries(
+        Object.entries(catalog.functions).map(([name, occs]) => [
+          name,
+          occs.map((occ) => ({
+            ...occ,
+            package: labelOf(occ.filePath),
+          })),
+        ]),
+      ) as Record<string, FunctionOccurrence[]>;
       return { ...catalog, functions };
     },
     { 'graph.assign_packages.project': projectRoot },

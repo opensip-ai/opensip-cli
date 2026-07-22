@@ -98,6 +98,16 @@ describe('findPackageRoot / derivePackageRoots (on-disk walk)', () => {
     expect(findPackageRoot(join(root, 'loose'), root)).toBeNull();
   });
 
+  it('does not discover a package root outside the project boundary', () => {
+    const projectRoot = join(root, 'nested-project');
+    const externalPackage = join(root, 'external-package');
+    mkdirSync(projectRoot, { recursive: true });
+    mkdirSync(join(externalPackage, 'src'), { recursive: true });
+    writeFileSync(join(externalPackage, 'package.json'), JSON.stringify({ name: '@t/external' }));
+
+    expect(findPackageRoot(join(externalPackage, 'src'), projectRoot)).toBeNull();
+  });
+
   it('dedupes roots and memoizes per directory (two files, same package)', () => {
     const roots = derivePackageRoots(
       [

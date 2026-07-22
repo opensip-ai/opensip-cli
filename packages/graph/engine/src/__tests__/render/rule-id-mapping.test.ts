@@ -64,6 +64,10 @@ describe('mapEngineSlugToOpenSipRuleId', () => {
     expect(() => mapEngineSlugToOpenSipRuleId('orphan-subtree')).toThrow();
   });
 
+  it('does not treat inherited Object prototype names as rule mappings', () => {
+    expect(() => mapEngineSlugToOpenSipRuleId('toString')).toThrow();
+  });
+
   it('mapping table has no extras beyond the registered rules', () => {
     const rules = withGraphScopeSync(() => currentRules());
     const registeredSlugs = new Set(rules.map((r) => r.slug));
@@ -84,5 +88,9 @@ describe('mapOpenSipRuleIdToEngineSlug', () => {
     expect(mapOpenSipRuleIdToEngineSlug('graph:already-an-engine-slug')).toBe(
       'graph:already-an-engine-slug',
     );
+  });
+
+  it('passes through inherited Object prototype names', () => {
+    expect(mapOpenSipRuleIdToEngineSlug('toString')).toBe('toString');
   });
 });

@@ -64,6 +64,17 @@ describe('detectMonorepoLayout', () => {
     expect(layout.kind).toBe('workspaces');
   });
 
+  it('classifies Yarn object-form workspaces as workspaces', () => {
+    const layout = detectMonorepoLayout({
+      repoRoot: dir,
+      files: [],
+      nestedPackageDirs: [],
+      rootPackageJson: { workspaces: { packages: ['apps/*'] } },
+    });
+
+    expect(layout.kind).toBe('workspaces');
+  });
+
   it('classifies a small flat repo (no workspaces) as flat-small', () => {
     // 100 synthetic .ts files — below the default 2500 threshold.
     const files = Array.from({ length: 100 }, (_, i) => join(dir, 'src', `file-${String(i)}.ts`));
@@ -132,6 +143,29 @@ describe('detectMonorepoLayout', () => {
       expect(layout.files.every((f) => !f.includes('node_modules'))).toBe(true);
     }
   });
+
+  it('includes module TypeScript sources and excludes declaration files', () => {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(join(dir, 'src', 'module.mts'), 'export const esm = 1;', 'utf8');
+    writeFileSync(join(dir, 'src', 'module.cts'), 'export const cjs = 1;', 'utf8');
+    writeFileSync(join(dir, 'src', 'types.d.ts'), 'export declare const a: number;', 'utf8');
+    writeFileSync(join(dir, 'src', 'types.d.mts'), 'export declare const b: number;', 'utf8');
+    writeFileSync(join(dir, 'src', 'types.d.cts'), 'export declare const c: number;', 'utf8');
+
+    const layout = detectMonorepoLayout({
+      repoRoot: dir,
+      nestedPackageDirs: [],
+      rootPackageJson: null,
+    });
+
+    expect(layout.kind).toBe('flat-small');
+    if (layout.kind === 'flat-small') {
+      expect(layout.files.map((file) => file.split(sep).at(-1))).toEqual([
+        'module.cts',
+        'module.mts',
+      ]);
+    }
+  });
 });
 
 describe('partitionFlatRepo — directory-depth', () => {
@@ -186,6 +220,18 @@ describe('partitionFlatRepo — directory-depth', () => {
 
     expect(partitions).toHaveLength(1);
     expect(partitions[0]?.id).toBe('_root');
+  });
+
+  it('does not mistake an in-root dot-dot-prefixed directory for an external path', () => {
+    const partitions = partitionFlatRepo({
+      files: [`${repoRoot}/..cache/foo.ts`],
+      repoRoot,
+      strategy: 'directory-depth',
+      depth: 1,
+    });
+
+    expect(partitions).toHaveLength(1);
+    expect(partitions[0]?.id).toBe('..cache');
   });
 
   it('returns partitions in stable lexicographic order', () => {
@@ -312,6 +358,34 @@ describe('partitionFlatRepo — input validation', () => {
       }),
     ).toThrow(/chunkSize must be > 0/);
   });
+
+  it.each([1.5, Number.POSITIVE_INFINITY, Number.NaN])(
+    'throws when chunkSize is not a positive safe integer: %s',
+    (chunkSize) => {
+      expect(() =>
+        partitionFlatRepo({
+          files: ['/repo/a.ts'],
+          repoRoot: '/repo',
+          strategy: 'file-count-chunks',
+          chunkSize,
+        }),
+      ).toThrow(/chunkSize must be a positive safe integer/);
+    },
+  );
+
+  it.each([1.5, Number.POSITIVE_INFINITY, Number.NaN])(
+    'throws when directory depth is not a positive safe integer: %s',
+    (depth) => {
+      expect(() =>
+        partitionFlatRepo({
+          files: ['/repo/a.ts'],
+          repoRoot: '/repo',
+          strategy: 'directory-depth',
+          depth,
+        }),
+      ).toThrow(/depth must be a positive safe integer/);
+    },
+  );
 });
 
 describe('selectStrategyForLayout', () => {

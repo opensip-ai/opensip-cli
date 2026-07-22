@@ -62,7 +62,7 @@ export const OPENSIP_RULE_ID_REGEX = /^graph\.[a-z-]+\.[a-z-]+$/;
  *   at SARIF emission rather than emit an invalid wire format.
  */
 export function mapEngineSlugToOpenSipRuleId(slug: string): string {
-  const mapped = RULE_ID_MAPPING[slug];
+  const mapped = Object.hasOwn(RULE_ID_MAPPING, slug) ? RULE_ID_MAPPING[slug] : undefined;
   if (mapped === undefined) {
     throw new ValidationError(
       `No OpenSIP rule-ID mapping for engine slug "${slug}". Add an entry to RULE_ID_MAPPING in engine/src/render/rule-id-mapping.ts.`,
@@ -88,5 +88,7 @@ export const OPENSIP_RULE_ID_TO_ENGINE_SLUG: Readonly<Record<string, string>> = 
  * unmapped) so callers can pass through signals that were never remapped.
  */
 export function mapOpenSipRuleIdToEngineSlug(ruleId: string): string {
-  return OPENSIP_RULE_ID_TO_ENGINE_SLUG[ruleId] ?? ruleId;
+  return Object.hasOwn(OPENSIP_RULE_ID_TO_ENGINE_SLUG, ruleId)
+    ? (OPENSIP_RULE_ID_TO_ENGINE_SLUG[ruleId] ?? ruleId)
+    : ruleId;
 }

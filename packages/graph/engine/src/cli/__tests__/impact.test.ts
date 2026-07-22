@@ -683,6 +683,29 @@ describe('executeImpact', () => {
     datastore.close();
   });
 
+  it('rejects a numeric --top prefix followed by junk', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const cli = mockCli(datastore);
+    await expect(
+      executeImpact({ cwd: '/proj', json: true, files: ['src/callee.ts'], top: '1junk' }, cli),
+    ).rejects.toBeInstanceOf(ConfigurationError);
+    expect(cli.emitJson).not.toHaveBeenCalled();
+    datastore.close();
+  });
+
+  it('preserves leading-zero integer --top values', async () => {
+    const datastore = DataStoreFactory.open({ backend: 'memory' });
+    new CatalogRepo(datastore).replaceAll(makeCatalog());
+    const result = await executeImpact(
+      { cwd: '/proj', json: true, files: ['src/callee.ts'], top: '01' },
+      mockCli(datastore),
+    );
+    expect(result.changedFunctions).toHaveLength(1);
+    expect(result.truncated).toBe(true);
+    datastore.close();
+  });
+
   it('declares --files as a repeatable parser on the command spec', () => {
     const filesOption = graphImpactCommandSpec.options?.find((option) => option.flag === '--files');
     expect(filesOption?.arrayDefault).toEqual([]);

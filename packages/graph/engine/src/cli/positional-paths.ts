@@ -6,7 +6,7 @@
  */
 
 import { existsSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
 
@@ -64,6 +64,6 @@ export function resolvePositionalPaths(paths: readonly string[], cwd: string): r
 export function positionalPathLabel(absPath: string, cwd: string = process.cwd()): string {
   const rel = relative(cwd, absPath);
   if (rel.length === 0) return '.';
-  if (!rel.startsWith('..') && !isAbsolute(rel)) return rel;
+  if (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)) return rel;
   return absPath;
 }

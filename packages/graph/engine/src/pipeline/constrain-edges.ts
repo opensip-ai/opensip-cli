@@ -55,12 +55,12 @@ export function constrainCrossPackageEdges(catalog: Catalog): Catalog {
   const { occurrencesByHash } = buildHashMaps(catalog);
   const importedByFile = buildImportedPackagesByFile(catalog);
 
-  const functions: Record<string, FunctionOccurrence[]> = {};
-  for (const [name, occs] of Object.entries(catalog.functions)) {
-    functions[name] = occs.map((occ) =>
-      constrainOccurrence(occ, occurrencesByHash, importedByFile),
-    );
-  }
+  const functions = Object.fromEntries(
+    Object.entries(catalog.functions).map(([name, occs]) => [
+      name,
+      occs.map((occ) => constrainOccurrence(occ, occurrencesByHash, importedByFile)),
+    ]),
+  ) as Record<string, FunctionOccurrence[]>;
   return { ...catalog, functions };
 }
 

@@ -41,7 +41,7 @@ const FIXTURES_SEGMENT = '/__fixtures__/';
  */
 export function isFixturePath(filePath: string): boolean {
   const normalized = filePath.replaceAll('\\', '/');
-  return normalized.includes(FIXTURES_SEGMENT);
+  return normalized.startsWith('__fixtures__/') || normalized.includes(FIXTURES_SEGMENT);
 }
 
 /**

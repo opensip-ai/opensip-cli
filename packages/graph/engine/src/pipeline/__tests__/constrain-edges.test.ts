@@ -301,4 +301,17 @@ describe('constrainCrossPackageEdges', () => {
     const input = catalogOf({ f: [target], caller: [caller] }, 'fast');
     expect(constrainCrossPackageEdges(input)).toBe(input);
   });
+
+  it('preserves a function bucket named like an Object prototype property', () => {
+    const prototypeNamed = occ({
+      bodyHash: 'H',
+      filePath: 'packages/pkg-a/src/prototype.ts',
+      package: PKGA,
+      simpleName: '__proto__',
+    });
+    const input = catalogOf(Object.fromEntries([['__proto__', [prototypeNamed]]]));
+    const output = constrainCrossPackageEdges(input);
+    expect(Object.hasOwn(output.functions, '__proto__')).toBe(true);
+    expect(output.functions.__proto__?.[0]).toEqual(prototypeNamed);
+  });
 });

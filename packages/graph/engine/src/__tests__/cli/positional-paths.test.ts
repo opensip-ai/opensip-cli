@@ -98,6 +98,11 @@ describe('positionalPathLabel', () => {
     expect(positionalPathLabel(sub, cwd)).toBe('a/b');
   });
 
+  it('does not mistake a child beginning with two dots for a parent path', () => {
+    const sub = join(cwd, '..cache');
+    expect(positionalPathLabel(sub, cwd)).toBe('..cache');
+  });
+
   it('returns the absolute path when not under cwd', () => {
     const other = '/some/totally/different/path';
     expect(positionalPathLabel(other, cwd)).toBe(other);

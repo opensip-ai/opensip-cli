@@ -163,7 +163,7 @@ export function buildSymbolIndexEntries(catalog: Catalog): SymbolEntry[] {
   const entries: SymbolEntry[] = [];
   // fileSymbols is the file→names index `buildArtifact` keeps; the flat-entry
   // core does not need it, so collect into a throwaway map.
-  const fileSymbols: Record<string, string[]> = {};
+  const fileSymbols = new Map<string, string[]>();
   for (const name of Object.keys(catalog.functions)) {
     const bucket = catalog.functions[name];
     if (!bucket) continue;
@@ -179,20 +179,20 @@ export function buildSymbolIndexEntries(catalog: Catalog): SymbolEntry[] {
  * building both the name→occurrences and file→names maps in one pass.
  */
 export function buildArtifact(catalog: Catalog): SymbolIndexArtifact {
-  const symbols: Record<string, SymbolEntry[]> = {};
-  const fileSymbols: Record<string, string[]> = {};
+  const symbols = new Map<string, SymbolEntry[]>();
+  const fileSymbols = new Map<string, string[]>();
   for (const name of Object.keys(catalog.functions)) {
     const bucket = catalog.functions[name];
     if (!bucket) continue;
     const entries = collectEntriesForName(bucket, name, fileSymbols);
-    if (entries.length > 0) symbols[name] = entries;
+    if (entries.length > 0) symbols.set(name, entries);
   }
   return {
     version: '1.0',
     tool: 'graph',
     generatedAt: new Date().toISOString(),
-    symbols,
-    fileSymbols,
+    symbols: Object.fromEntries(symbols),
+    fileSymbols: Object.fromEntries(fileSymbols),
   };
 }
 
@@ -207,7 +207,7 @@ function collectEntriesForName(
     readonly visibility: string;
   }[],
   name: string,
-  fileSymbols: Record<string, string[]>,
+  fileSymbols: Map<string, string[]>,
 ): SymbolEntry[] {
   const entries: SymbolEntry[] = [];
   for (const occ of bucket) {
@@ -227,14 +227,14 @@ function collectEntriesForName(
 }
 
 function addNameToFileBucket(
-  fileSymbols: Record<string, string[]>,
+  fileSymbols: Map<string, string[]>,
   filePath: string,
   name: string,
 ): void {
-  let bucket = fileSymbols[filePath];
+  let bucket = fileSymbols.get(filePath);
   if (!bucket) {
     bucket = [];
-    fileSymbols[filePath] = bucket;
+    fileSymbols.set(filePath, bucket);
   }
   if (!bucket.includes(name)) bucket.push(name);
 }

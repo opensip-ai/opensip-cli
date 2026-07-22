@@ -70,8 +70,12 @@ describe('graphCommandSpec option parsers', () => {
       (option) => option.flag === '--concurrency',
     );
     expect(concurrency?.parse?.('3', undefined)).toBe(3);
+    expect(concurrency?.parse?.('03', undefined)).toBe(3);
     expect(() => concurrency?.parse?.('0', undefined)).toThrow(/positive integer/);
     expect(() => concurrency?.parse?.('abc', undefined)).toThrow(/positive integer/);
+    expect(() => concurrency?.parse?.('1.5', undefined)).toThrow(/positive integer/);
+    expect(() => concurrency?.parse?.('2workers', undefined)).toThrow(/positive integer/);
+    expect(() => concurrency?.parse?.('9007199254740992', undefined)).toThrow(/positive integer/);
   });
 });
 

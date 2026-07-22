@@ -11,7 +11,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { buildPackageManifestIndexFromRoots } from '../../cross-package/export-index.js';
 
@@ -65,11 +65,16 @@ export function derivePackageRoots(files: readonly string[], projectRoot: string
 /** Nearest ancestor dir of `startDir` (inclusive) containing a `package.json`,
  *  up to `projectRoot`; `null` if none. */
 export function findPackageRoot(startDir: string, projectRoot: string): string | null {
-  let dir = startDir;
+  const boundary = resolve(projectRoot);
+  let dir = resolve(startDir);
+  const fromBoundary = relative(boundary, dir);
+  if (fromBoundary === '..' || fromBoundary.startsWith(`..${sep}`) || isAbsolute(fromBoundary)) {
+    return null;
+  }
   for (;;) {
     if (existsSync(join(dir, 'package.json'))) return dir;
     const parent = dirname(dir);
-    if (dir === projectRoot || parent === dir) return null;
+    if (dir === boundary || parent === dir) return null;
     dir = parent;
   }
 }

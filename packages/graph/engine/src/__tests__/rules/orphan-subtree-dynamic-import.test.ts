@@ -195,4 +195,77 @@ describe('orphan-subtree — dynamic import reachability (heuristic 6)', () => {
     const eps = inferEntryPoints(catalog, buildIndexes(catalog));
     expect(eps.find((e) => e.bodyHash === 'mp')).toBeDefined();
   });
+
+  it('resolves relative imports from every body-hash twin occurrence', () => {
+    const loaderA = occ({
+      bodyHash: 'shared-loader-body',
+      simpleName: 'load',
+      visibility: 'exported',
+      filePath: 'src/a/loader.ts',
+      calls: [edge("import('./handler.js')")],
+    });
+    const loaderB = occ({
+      bodyHash: 'shared-loader-body',
+      simpleName: 'load',
+      visibility: 'exported',
+      filePath: 'src/b/loader.ts',
+      calls: [edge("import('./handler.js')")],
+    });
+    const handlerA = occ({
+      bodyHash: 'handler-a',
+      simpleName: 'handleA',
+      visibility: 'exported',
+      filePath: 'src/a/handler.ts',
+    });
+    const handlerB = occ({
+      bodyHash: 'handler-b',
+      simpleName: 'handleB',
+      visibility: 'exported',
+      filePath: 'src/b/handler.ts',
+    });
+    const deadCallerA = occ({
+      bodyHash: 'dead-a',
+      simpleName: 'deadA',
+      visibility: 'module-local',
+      filePath: 'src/a/dead.ts',
+      calls: [staticCall('handler-a')],
+    });
+    const deadCallerB = occ({
+      bodyHash: 'dead-b',
+      simpleName: 'deadB',
+      visibility: 'module-local',
+      filePath: 'src/b/dead.ts',
+      calls: [staticCall('handler-b')],
+    });
+    const catalog = makeCatalog([loaderA, loaderB, handlerA, handlerB, deadCallerA, deadCallerB]);
+    const eps = inferEntryPoints(catalog, buildIndexes(catalog));
+    expect(eps.find((entry) => entry.bodyHash === 'handler-a')?.reason).toBe('dynamic-import');
+    expect(eps.find((entry) => entry.bodyHash === 'handler-b')?.reason).toBe('dynamic-import');
+  });
+
+  it('does not resolve a dynamic import that escapes the project root', () => {
+    const importer = occ({
+      bodyHash: 'escape-importer',
+      simpleName: 'loadOutside',
+      visibility: 'exported',
+      filePath: 'src/loader.ts',
+      calls: [edge("import('../../outside.js')")],
+    });
+    const outsideNamedFile = occ({
+      bodyHash: 'outside-handler',
+      simpleName: 'outsideHandler',
+      visibility: 'exported',
+      filePath: 'outside.ts',
+    });
+    const deadCaller = occ({
+      bodyHash: 'outside-dead-caller',
+      simpleName: 'deadOutsideCaller',
+      visibility: 'module-local',
+      filePath: 'outside-dead.ts',
+      calls: [staticCall('outside-handler')],
+    });
+    const catalog = makeCatalog([importer, outsideNamedFile, deadCaller]);
+    const eps = inferEntryPoints(catalog, buildIndexes(catalog));
+    expect(eps.find((entry) => entry.bodyHash === 'outside-handler')).toBeUndefined();
+  });
 });

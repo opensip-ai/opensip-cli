@@ -63,8 +63,8 @@ export interface ImpactCommandOptions {
 
 function parseTopCap(top?: string): number | undefined {
   if (top === undefined || top === '') return undefined;
-  const n = Number.parseInt(top, 10);
-  if (!Number.isFinite(n) || n < 0) {
+  const n = Number(top);
+  if (!/^\d+$/.test(top) || !Number.isSafeInteger(n)) {
     throw new ConfigurationError(`Invalid --top value "${top}": must be a non-negative integer`);
   }
   return n;
