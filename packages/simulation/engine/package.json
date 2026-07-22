@@ -216,7 +216,7 @@
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/session-store": "workspace:*",
     "commander": "^15.0.0",
-    "react": "^19.2.7",
+    "react": "^19.2.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {
