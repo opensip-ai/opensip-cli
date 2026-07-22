@@ -185,6 +185,7 @@ const EXPORT_ALLOWLIST = {
   CapabilityPackageAdmission: 'discovery-substrate',
   CapabilityResourceDecision: 'discovery-substrate',
   CapabilityRegistrar: 'discovery-substrate',
+  CapabilityRegistrationContext: 'discovery-substrate',
   CapabilityRegistry: 'discovery-substrate',
   CheckCapabilityContributionCompatibilityArgs: 'discovery-substrate',
   DiscoverCapabilityContributionsOptions: 'discovery-substrate',

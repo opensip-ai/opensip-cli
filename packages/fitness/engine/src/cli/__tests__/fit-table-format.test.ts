@@ -8,7 +8,7 @@ import {
   formatValidatedColumn,
   parseValidatedCount,
   sortFitRowPriority,
-} from '../fit-table-format.js';
+} from './fit-table-format.fixture.js';
 
 describe('sortFitRowPriority', () => {
   it('orders timeout/error before fail before warned pass before clean pass', () => {

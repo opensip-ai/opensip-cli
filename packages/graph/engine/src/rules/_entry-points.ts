@@ -200,7 +200,8 @@ function collectDynamicImportTargetFiles(indexes: Indexes): ReadonlySet<string> 
       const specifier = match[1];
       // Only relative specifiers resolve into the catalog.
       if (!specifier.startsWith('.')) continue;
-      targets.add(resolveRelative(dirOf(occ.filePath), specifier));
+      const target = resolveRelative(dirOf(occ.filePath), specifier);
+      if (target !== null) targets.add(target);
     }
   }
   return targets;
@@ -226,13 +227,18 @@ function dirOf(filePath: string): string {
 }
 
 /** Resolve a relative specifier against a posix directory, collapsing
- *  `.` / `..` segments. Returns a project-relative posix path. */
-function resolveRelative(dir: string, specifier: string): string {
+ *  `.` / `..` segments. Returns a project-relative posix path, or `null` when
+ *  the specifier escapes the project root (a `..` that pops past the top). */
+function resolveRelative(dir: string, specifier: string): string | null {
   const segments = dir.length > 0 ? dir.split('/') : [];
   for (const part of specifier.split('/')) {
     if (part === '' || part === '.') continue;
-    if (part === '..') segments.pop();
-    else segments.push(part);
+    if (part === '..') {
+      if (segments.length === 0) return null;
+      segments.pop();
+    } else {
+      segments.push(part);
+    }
   }
   return segments.join('/');
 }

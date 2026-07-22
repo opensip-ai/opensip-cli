@@ -14,26 +14,6 @@
 /* eslint-disable sonarjs/cognitive-complexity, sonarjs/no-duplicate-string -- audited state-machine branches */
 
 import { createHash } from 'node:crypto';
-import {
-  chmodSync,
-  closeSync,
-  constants,
-  existsSync,
-  fchmodSync,
-  fstatSync,
-  fsyncSync,
-  linkSync,
-  lstatSync,
-  mkdirSync,
-  opendirSync,
-  openSync,
-  readSync,
-  realpathSync,
-  renameSync,
-  rmdirSync,
-  unlinkSync,
-  writeFileSync,
-} from 'node:fs';
 import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 
@@ -48,6 +28,28 @@ import {
   type SafetyBiasedProcessInspector,
 } from './host-process-identity.js';
 import { generateUUID } from './ids.js';
+import {
+  constants,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  opendirSync,
+  readSync,
+  realpathSync,
+} from './node-fs-inspect.js';
+import {
+  chmodSync,
+  closeSync,
+  fchmodSync,
+  fsyncSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from './node-fs-mutate.js';
 import {
   projectCoordinationKey,
   resolveCoordinationPaths,

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-21T06:20:26.862Z",
+  "generatedAt": "2026-07-22T06:38:45.793Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,7 +25,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 246,
+        "total": 244,
         "bySlug": {
           "missing-type-exports": 4,
           "async-waterfall-detection": 15,
@@ -42,7 +42,7 @@
           "env-secret-exposure": 3,
           "stream-buffer-size-limits": 1,
           "shipped-checks-must-be-generic": 12,
-          "fitness-check-standards": 17,
+          "fitness-check-standards": 16,
           "null-safety": 7,
           "correlation-id-coverage": 6,
           "duplicate-utility-functions": 5,
@@ -60,7 +60,7 @@
           "sonarjs-backend": 1,
           "stubbed-implementation-detection": 1,
           "callback-invocation-safe": 1,
-          "semgrep-scan": 8,
+          "semgrep-scan": 7,
           "semgrep-justifications": 3,
           "no-todo-comments": 4,
           "no-unimplemented-markers": 1,
@@ -108,7 +108,7 @@
           "dashboard": 1,
           "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
-          "fitness/checks-universal": 103,
+          "fitness/checks-universal": 101,
           "fitness/engine": 12,
           "graph/engine": 12,
           "graph/graph-typescript": 1,
@@ -199,10 +199,10 @@
     },
     "check-package": {
       "fitness": {
-        "total": 172,
+        "total": 170,
         "bySlug": {
           "shipped-checks-must-be-generic": 12,
-          "fitness-check-standards": 17,
+          "fitness-check-standards": 16,
           "null-safety": 7,
           "correlation-id-coverage": 6,
           "duplicate-utility-functions": 4,
@@ -222,7 +222,7 @@
           "sonarjs-backend": 1,
           "stubbed-implementation-detection": 1,
           "callback-invocation-safe": 1,
-          "semgrep-scan": 7,
+          "semgrep-scan": 6,
           "interface-implementation-consistency": 1,
           "semgrep-justifications": 3,
           "no-todo-comments": 4,
@@ -257,7 +257,7 @@
         "byPackage": {
           "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
-          "fitness/checks-universal": 103
+          "fitness/checks-universal": 101
         }
       },
       "graph": {
@@ -464,14 +464,14 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 246,
+    "budgetGateFitness": 244,
     "budgetGateFitnessSlugs": 72,
     "productRuntimeFitness": 72,
     "productRuntimeFitnessSlugs": 27,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
     "productRuntimeCombined": 104,
-    "checkPackageFitness": 172,
+    "checkPackageFitness": 170,
     "testSupportFitness": 2,
     "testsFitness": 62,
     "testsGraph": 34,
@@ -493,8 +493,8 @@
       "productRuntimeFitness": -233,
       "productRuntimeGraph": 25,
       "productRuntimeCombined": -208,
-      "budgetGateFitness": -296,
-      "checkPackageFitness": -62,
+      "budgetGateFitness": -298,
+      "checkPackageFitness": -64,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
     },

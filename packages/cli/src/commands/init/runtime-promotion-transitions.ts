@@ -1,21 +1,27 @@
+// Source/destination verification + destination-parent readiness.
 import {
   advancePreexistingDestinationReady,
+  recordDestinationParentCreateIntent,
+  recordDestinationReady,
+  verifyPromotionDestination,
+  verifyPromotionSource,
+  // Source retirement + rollback transitions.
   beginRuntimePromotionRollback,
+  recordRuntimeRollbackIntent,
+  recordRuntimeRolledBack,
+  recordSourceRetired,
+  recordSourceRetireIntent,
+} from './runtime-promotion-transitions-runtime.js';
+// Runtime staging, destination backup, and install transitions (re-exported via
+// a companion module to stay under the heavy-import threshold w/o duplicate imports).
+import {
   recordDestinationBackedUp,
   recordDestinationBackupCreateIntent,
   recordDestinationInstallIntent,
-  recordDestinationParentCreateIntent,
-  recordDestinationReady,
   recordRuntimeInstalled,
-  recordRuntimeRollbackIntent,
-  recordRuntimeRolledBack,
   recordRuntimeStageCreateIntent,
   recordRuntimeStaged,
-  recordSourceRetired,
-  recordSourceRetireIntent,
-  verifyPromotionDestination,
-  verifyPromotionSource,
-} from './runtime-promotion-transitions-runtime.js';
+} from './runtime-promotion-transitions-staging.js';
 import {
   bindAuthoredCommittedReceipt,
   bindAuthoredPreparedReceipt,

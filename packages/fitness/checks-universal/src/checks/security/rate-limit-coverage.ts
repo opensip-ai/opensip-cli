@@ -178,9 +178,12 @@ export const rateLimitCoverage = defineCheck({
         }
 
         const lineStart = content.lastIndexOf('\n', match.index - 1) + 1;
+        // 1-based column within the line. `match.index` is a global content
+        // offset here, so subtract the line start before the +1.
+        const column = match.index - lineStart + 1;
         const violation: CheckViolation = {
           line: content.slice(0, match.index).split('\n').length,
-          column: match.index - lineStart,
+          column,
           message: pattern.message,
           severity: pattern.severity,
           suggestion: pattern.suggestion,

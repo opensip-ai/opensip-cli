@@ -136,6 +136,7 @@ function emitShardMilestone(
   diagnostics.emitSubprocessEvent('load', level, message, correlation, data);
 }
 
+/** Inputs for the sharded build: the shards to run plus the shared project root, CLI entry, and worker limits. */
 export interface RunShardsInput {
   readonly shards: readonly Shard[];
   /** Common project root — every fragment's filePaths resolve against it. */
@@ -174,6 +175,7 @@ export interface ShardFailure {
   readonly signal?: string;
 }
 
+/** Result of the sharded build: successful fragments plus any per-shard failures. */
 export interface RunShardsOutput {
   readonly fragments: readonly ShardBuildResult[];
   readonly failures: readonly ShardFailure[];

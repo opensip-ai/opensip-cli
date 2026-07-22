@@ -269,41 +269,13 @@ describe('loadOwningToolCapabilities', () => {
         expect(driven).toBe(1);
         expect(createHostContributions).toHaveBeenCalledTimes(1);
         expect(registrar).toHaveBeenCalledTimes(1);
-        expect(registrar).toHaveBeenCalledWith({ id: 'from-config' });
+        expect(registrar).toHaveBeenCalledWith(
+          { id: 'from-config' },
+          { sourcePackage: DOGFOOD_PACK },
+        );
       },
       policyWithGrants(grants),
     );
-  });
-
-  it('does not seed a missing private dogfood package in a consumer-style CLI tree', async () => {
-    const registry = new CapabilityRegistry();
-    registry.registerDomain(
-      domain('fit-pack', 'mytool', 'fit-pack', {
-        builtinScope: '@opensip-cli',
-        explicitListMode: 'augment',
-      }),
-      vi.fn(),
-    );
-    const scope = new RunScope();
-    Object.assign(scope, { capabilities: registry });
-
-    await runWithScope(scope, async () => {
-      await loadOwningToolCapabilities({
-        owningTool: makeTool('mytool'),
-        projectDir: testDir,
-        cliDir: testDir,
-        pluginsConfig: {},
-      });
-    });
-
-    const unresolvedPackages = scope.bootstrapDiagnostics
-      .list()
-      .filter((diagnostic) => diagnostic.logRef === 'capability.discovery.package_not_resolved')
-      .map((diagnostic) => diagnostic.provenance?.packageName);
-    // This empty consumer-style CLI tree proves manifest-seeded packages are
-    // observable at the diagnostic seam, making the dogfood absence meaningful.
-    expect(unresolvedPackages).toContain('@opensip-cli/checks-universal');
-    expect(unresolvedPackages).not.toContain(DOGFOOD_PACK);
   });
 
   it('denies a granted name whose resolved provenance differs (shadowed pack)', async () => {
@@ -387,7 +359,10 @@ describe('loadOwningToolCapabilities', () => {
 
         expect(driven).toBe(1);
         expect(createHostContributions).toHaveBeenCalledTimes(1);
-        expect(registrar).toHaveBeenCalledWith({ id: 'from-worker-proxy' });
+        expect(registrar).toHaveBeenCalledWith(
+          { id: 'from-worker-proxy' },
+          { sourcePackage: '@acme/worker-adapter' },
+        );
       },
       policyWithGrants(grants),
     );

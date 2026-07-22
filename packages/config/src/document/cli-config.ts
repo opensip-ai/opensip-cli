@@ -113,6 +113,7 @@ export const cliConfigSchema = z.object({
     .object({
       keep: z.number().int().min(0).default(10),
     })
+    .strict()
     .optional(),
   // Host-owned session/datastore retention. The host prunes the `sessions`
   // table after each run, keeping the newest `keep` rows AND dropping anything

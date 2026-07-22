@@ -1,5 +1,14 @@
 import { renderAgentGuidanceTargets } from './agent-guidance.js';
 import { generateConfigFromRenderedScaffolds } from './config-templates.js';
+import {
+  caseFoldPath,
+  compareUtf8,
+  normalizeLanguages,
+  normalizeProjectRelativePath,
+  normalizeToolIdentities,
+  sha256Bytes,
+  sha256Parts,
+} from './init-authored-plan-hashing.js';
 import { encodeAuthoredReplayManifest } from './init-authored-plan-manifest.js';
 import {
   buildGuidanceSnapshots,
@@ -7,24 +16,21 @@ import {
   validateAuthoredSnapshot,
 } from './init-authored-plan-snapshot-validation.js';
 import { collectToolDesiredEntries } from './init-authored-plan-targets.js';
+// Manifest/caps protocol constants + the plan-failure helper.
 import {
   AUTHORED_REPLAY_MANIFEST_KIND,
   AUTHORED_REPLAY_MANIFEST_VERSION,
   INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES,
   INIT_AUTHORED_PLAN_CAPS,
-  absentPathState,
   authoredPlanFailure,
-  caseFoldPath,
-  compareUtf8,
+  // Authored path-state construction/comparison helpers.
+  absentPathState,
   directoryDigest,
-  normalizeLanguages,
-  normalizeProjectRelativePath,
-  normalizeToolIdentities,
   sameAuthoredPathState,
-  sha256Bytes,
-  sha256Parts,
   stateFromSnapshot,
 } from './init-authored-plan-types.js';
+// Hashing + value-normalization helpers (re-exported via a companion module so
+// this consumer stays under the heavy-import threshold without duplicate imports).
 import { renderGitignore } from './scaffold-writer.js';
 
 import type { InitAuthoredDesiredTarget } from './init-authored-plan-targets.js';

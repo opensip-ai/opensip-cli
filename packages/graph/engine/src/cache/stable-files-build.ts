@@ -29,20 +29,34 @@ export function sourceFilesChangedDuringBuildError(): SystemError {
  * Build against a stable source-file snapshot. If source metadata changes
  * while the build is running, retry once; repeated churn fails instead of
  * stamping stale parsed content with the newer fingerprint.
+ *
+ * @throws {SystemError} `GRAPH.CATALOG.SOURCE_CHANGED_DURING_BUILD` if the
+ *   source-file fingerprint differs before/after the build on every attempt
+ *   up to {@link MAX_BUILD_ATTEMPTS} (persistent churn, not a one-off change).
  */
 export async function buildAgainstStableFiles<T>(
   input: StableFilesBuildInput<T>,
 ): Promise<StableFilesBuildOutput<T>> {
-  let fingerprintBefore = input.initialFingerprint;
-  for (let attempt = 0; attempt < MAX_BUILD_ATTEMPTS; attempt += 1) {
-    fingerprintBefore ??= computeFilesFingerprint(input.files);
+  // A retry STATE MACHINE, not a batch: each attempt runs only after the previous
+  // attempt's fingerprint proved unstable, and a stable attempt returns immediately.
+  // The attempts are therefore inherently sequential — parallelizing them would
+  // defeat the "retry only on churn" contract — so this is expressed as bounded
+  // recursion rather than a for-await loop.
+  const attemptBuild = async (attempt: number): Promise<StableFilesBuildOutput<T>> => {
+    const fingerprintBefore =
+      attempt === 0
+        ? (input.initialFingerprint ?? computeFilesFingerprint(input.files))
+        : computeFilesFingerprint(input.files);
     const value = await input.build(attempt);
     const fingerprintAfter = computeFilesFingerprint(input.files);
     if (fingerprintBefore === fingerprintAfter) {
       return { value, filesFingerprint: fingerprintAfter };
     }
-    fingerprintBefore = undefined;
-  }
+    if (attempt + 1 >= MAX_BUILD_ATTEMPTS) {
+      throw sourceFilesChangedDuringBuildError();
+    }
+    return attemptBuild(attempt + 1);
+  };
 
-  throw sourceFilesChangedDuringBuildError();
+  return attemptBuild(0);
 }

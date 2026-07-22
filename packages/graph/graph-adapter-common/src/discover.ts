@@ -48,13 +48,8 @@ export interface TreeSitterDiscoverConfig {
 export function createDiscover(
   config: TreeSitterDiscoverConfig,
 ): (input: DiscoverInput) => DiscoverOutput {
-  const {
-    extension,
-    excludedDirGlobs,
-    preserveExcludedPath,
-    configCandidates,
-    languageId,
-  } = config;
+  const { extension, excludedDirGlobs, preserveExcludedPath, configCandidates, languageId } =
+    config;
   const module = `graph:discover:${languageId}`;
   const pattern = `**/*.${extension}`;
 
@@ -160,8 +155,7 @@ function buildIgnore(
   if (preserveExcludedPath === undefined) return baseIgnore;
 
   return {
-    ignored: (path) =>
-      !preserveExcludedPath(path.relativePosix()) && baseIgnore.ignored(path),
+    ignored: (path) => !preserveExcludedPath(path.relativePosix()) && baseIgnore.ignored(path),
     childrenIgnored: (path) =>
       !preserveExcludedPath(path.relativePosix()) && baseIgnore.childrenIgnored(path),
   };

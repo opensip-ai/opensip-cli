@@ -138,6 +138,15 @@ function cloneParsedOptions(opts: Record<string, unknown>): Record<string, unkno
   );
 }
 
+/**
+ * Rewrap a recovery-required bootstrap failure with actionable guidance, or
+ * propagate any other error unchanged.
+ *
+ * @throws {ConfigurationError} When `error` is a `ConfigurationError` whose
+ *   code is `CONFIGURATION.RECOVERY_REQUIRED` — rethrown with `opensip
+ *   status`/`opensip init` guidance appended to the message.
+ * @throws {unknown} Rethrows `error` as-is for every other error.
+ */
 function recoveryGuidance(error: unknown): never {
   if (error instanceof ConfigurationError && error.code === 'CONFIGURATION.RECOVERY_REQUIRED') {
     throw new ConfigurationError(
@@ -155,6 +164,14 @@ function unstableRuntimeContext(): ConfigurationError {
   );
 }
 
+/**
+ * Verify a startup-held lease's coordination key still matches the
+ * (re-)discovered project root.
+ *
+ * @throws {ConfigurationError} When `startup` is defined and its lease's
+ *   coordination key no longer matches `projectCoordinationKey(projectRoot)`
+ *   (code `CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE`).
+ */
 function assertStartupProjectKey(
   startup: StartupRuntimeLeaseHandoff | undefined,
   projectRoot: string,
@@ -214,6 +231,17 @@ function handOffStartupLease(
  * Discover tentatively, acquire the declared runtime footprint, then replan
  * authoritatively while the lease is held. Repeated canonical-root churn is
  * bounded and visible.
+ *
+ * @throws {ConfigurationError} When no declared runtime scope exists for the
+ *   mounted command (`CONFIGURATION.COMMAND_SCOPE_UNDECLARED`, via {@link
+ *   declaredScopeForCommand}); when the canonical project root changes
+ *   repeatedly across all stabilization attempts
+ *   (`CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE`); or when planning/lease
+ *   acquisition fails and {@link recoveryGuidance} rethrows a
+ *   `CONFIGURATION.RECOVERY_REQUIRED` error with resume/reconcile guidance
+ *   appended.
+ * @throws {unknown} Rethrows, via {@link recoveryGuidance}, any other error
+ *   raised by `deps.plan` or `deps.acquire` unchanged.
  */
 export async function prepareLeasedBootstrapPlan(
   input: PrepareLeasedBootstrapPlanInput,

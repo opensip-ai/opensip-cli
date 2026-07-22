@@ -5,9 +5,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BOOTSTRAP_PHASE_MAP } from '../phase-map.js';
 import { PRE_ACTION_PHASES } from '../pre-action-bootstrap-phases.js';
-import { TOOL_LIFECYCLE_STEPS } from '../tool-lifecycle.js';
+
+import { BOOTSTRAP_PHASE_MAP } from './phase-map.fixture.js';
+import { TOOL_LIFECYCLE_STEPS } from './tool-lifecycle.fixture.js';
 
 describe('BOOTSTRAP_PHASE_MAP completeness', () => {
   it('maps every tool lifecycle step', () => {

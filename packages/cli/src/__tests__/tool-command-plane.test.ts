@@ -25,8 +25,8 @@ import {
 import { Command } from 'commander';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 
+import { TOOL_LIFECYCLE_STEPS } from '../bootstrap/__tests__/tool-lifecycle.fixture.js';
 import { mountAllToolCommands } from '../bootstrap/register-tools.js';
-import { TOOL_LIFECYCLE_STEPS } from '../bootstrap/tool-lifecycle.js';
 import { isValidTool } from '../bootstrap/validate-tool.js';
 
 /** A throwaway handler-facing `ToolCliContext` (no Commander program — 3.0.0). */

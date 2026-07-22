@@ -22,7 +22,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { readPackageVersion } from '@opensip-cli/core';
+import { currentLogger, readPackageVersion } from '@opensip-cli/core';
 import { defineExternalToolAdapter } from '@opensip-cli/external-tool-adapter';
 
 import { parseGitleaksJson } from './parse-gitleaks-json.js';
@@ -175,7 +175,17 @@ function readProjectConfig(path: string): string | undefined {
     const MAX_GITLEAKS_CONFIG_BYTES = 1_048_576;
     if (statSync(path).size > MAX_GITLEAKS_CONFIG_BYTES) return undefined;
     return readFileSync(path, 'utf8').trimEnd();
-  } catch {
+  } catch (error) {
+    // Best-effort: an unreadable/oversized project gitleaks config falls back
+    // to the default exclusion config (see addRuntimeExclusion) rather than
+    // failing the scan — but the swallow must stay observable.
+    const logger = currentLogger();
+    logger.debug({
+      evt: 'gitleaks.project_config.read_failed',
+      module: 'tool-gitleaks',
+      path,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return undefined;
   }
 }

@@ -41,27 +41,32 @@ import { buildIndexes } from '../../pipeline/indexes.js';
 import { evaluateRules, resolveRuleSet } from '../../rules/evaluate-rules.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
-import { catalogBuildCoverage } from './catalog-build-coverage.js';
-import { countCatalogCallSites, countCatalogFunctions } from './catalog-stats.js';
 import {
+  boundedShardFailureEvidence,
+  catalogBuildCoverage,
+  countCatalogCallSites,
+  countCatalogFunctions,
   mergeShardFragments,
+  planShardWork,
   reattributeDeclarationDependencies,
   resolveCrossBoundaryCalls,
+  runShardsInParallel,
   stampAndConstrainPackages,
-} from './cross-shard-resolve.js';
-import { boundedShardFailureEvidence, planShardWork, runShardsInParallel } from './shard-runner.js';
+} from './shard-pipeline-internals.js';
 
-import type { Shard, ShardBuildResult, ShardRunStats } from './shard-model.js';
 import type {
   GraphProgressCallback,
   GraphStage,
   RunShardedInput,
   RunShardedResult,
-} from './types.js';
+  Shard,
+  ShardBuildResult,
+  ShardRunStats,
+} from './shard-pipeline-internals.js';
 import type { CatalogRepo } from '../../persistence/catalog-repo.js';
 import type { Catalog, GraphConfig } from '../../types.js';
 
-export type { RunShardedInput, RunShardedResult } from './types.js';
+export type { RunShardedInput, RunShardedResult } from './shard-pipeline-internals.js';
 
 const MAX_SOURCE_STABILITY_ATTEMPTS = 2;
 
@@ -348,6 +353,12 @@ function projectRelativePath(projectRoot: string, absolutePath: string): string 
   return value.length === 0 ? '.' : value;
 }
 
+/**
+ * @throws {SystemError} `GRAPH.CATALOG.SOURCE_CHANGED_DURING_BUILD` if the
+ *   source-file fingerprint changed during this build AND the retry budget
+ *   ({@link MAX_SOURCE_STABILITY_ATTEMPTS}) is exhausted (persistent churn,
+ *   not a one-off change).
+ */
 function retryShardedBuildForChangedSources(
   input: RunShardedInput,
   span: Span,

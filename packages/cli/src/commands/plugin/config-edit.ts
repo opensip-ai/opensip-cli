@@ -74,6 +74,14 @@ export function editPluginList(
   return removeFromPluginList(doc, root, domain, name, configPath);
 }
 
+/**
+ * Add `name` to `plugins.<domain>` in `doc`/`root`, creating the `plugins`
+ * map and/or the `<domain>` sequence when absent. Returns false when `name`
+ * is already present (idempotent).
+ *
+ * @throws {Error} When `root.plugins` exists but is not a mapping, or when
+ *   `plugins.<domain>` exists but is not a sequence.
+ */
 function appendToPluginList(
   doc: YAMLDocument,
   root: YAMLMap,

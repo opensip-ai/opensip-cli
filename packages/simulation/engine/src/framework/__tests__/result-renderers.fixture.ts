@@ -13,8 +13,8 @@
  * omission as a compile-time error.
  */
 
-import type { ScenarioExecutorResult } from './scenario-executor-result.js';
-import type { SimulationMetrics } from '../types/base-types.js';
+import type { SimulationMetrics } from '../../types/base-types.js';
+import type { ScenarioExecutorResult } from '../scenario-executor-result.js';
 
 /** View-friendly summary common to every kind. */
 export interface ScenarioResultView {

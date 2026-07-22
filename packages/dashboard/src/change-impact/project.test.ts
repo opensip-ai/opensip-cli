@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { CATALOG_IDENTITY_DIGEST_VECTORS } from './catalog-identity-digest-vectors.js';
+import { CATALOG_IDENTITY_DIGEST_VECTORS } from './__tests__/catalog-identity-digest-vectors.fixture.js';
 import { boundChangeImpactRuns, projectChangeImpactRuns } from './project.js';
 
 import type { DashboardRun } from '../generator.js';

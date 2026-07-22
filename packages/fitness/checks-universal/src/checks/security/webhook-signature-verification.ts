@@ -189,7 +189,7 @@ function namedSecretViolations(
     if (quoteEnd === -1 || line.slice(quoteStart + 1, quoteEnd).length < 10) continue;
     violations.push({
       line: lineNum + 1,
-      column: match.index,
+      column: match.index + 1,
       message: 'Hardcoded webhook secret detected - use environment variables',
       severity: 'error',
       suggestion:
@@ -214,7 +214,7 @@ function insecureSignatureViolations(
     return [
       {
         line: lineNum + 1,
-        column: match.index,
+        column: match.index + 1,
         message:
           'Direct signature comparison detected - use timing-safe comparison to prevent timing attacks',
         severity: 'warning' as const,

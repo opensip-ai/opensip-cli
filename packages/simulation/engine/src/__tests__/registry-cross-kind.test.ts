@@ -6,6 +6,7 @@
 import { enterScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { renderScenarioResultView } from '../framework/__tests__/result-renderers.fixture.js';
 import { ASSERTIONS } from '../framework/assertions.js';
 import { fault } from '../framework/execution/fault-builders.js';
 import {
@@ -15,7 +16,6 @@ import {
   getScenariosByKind,
   getScenariosByTag,
 } from '../framework/registry.js';
-import { renderScenarioResultView } from '../framework/result-renderers.js';
 import { defineChaosScenario } from '../kinds/chaos/define.js';
 import { defineLoadScenario } from '../kinds/load/define.js';
 import { SCENARIO_KINDS } from '../types/kind-types.js';

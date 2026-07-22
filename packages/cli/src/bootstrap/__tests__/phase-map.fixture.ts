@@ -4,8 +4,9 @@
  * and pre-action-bootstrap-phases.ts as the one source of truth.
  */
 
-import { PRE_ACTION_PHASES } from './pre-action-bootstrap-phases.js';
-import { TOOL_LIFECYCLE_STEPS } from './tool-lifecycle.js';
+import { PRE_ACTION_PHASES } from '../pre-action-bootstrap-phases.js';
+
+import { TOOL_LIFECYCLE_STEPS } from './tool-lifecycle.fixture.js';
 
 /** One row in the orchestration map. */
 export interface PhaseMapEntry {

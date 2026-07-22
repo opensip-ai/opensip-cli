@@ -1102,24 +1102,3 @@ export function findCodeMatch(
 export function hasCodeMatch(pattern: RegExp, content: string, codeMask: string): boolean {
   return findCodeMatch(pattern, content, codeMask) !== null;
 }
-
-function isIdentifierCharacter(character: string | undefined): boolean {
-  return character !== undefined && /[\w$]/.test(character);
-}
-
-export function hasCodeIdentifier(content: string, codeMask: string, identifier: string): boolean {
-  let fromIndex = 0;
-  while (fromIndex < content.length) {
-    const index = content.indexOf(identifier, fromIndex);
-    if (index === -1) return false;
-
-    const before = content[index - 1];
-    const after = content[index + identifier.length];
-    const startsInCode = codeMask[index] !== undefined && !/\s/.test(codeMask[index] ?? ' ');
-    if (startsInCode && !isIdentifierCharacter(before) && !isIdentifierCharacter(after)) {
-      return true;
-    }
-    fromIndex = index + identifier.length;
-  }
-  return false;
-}

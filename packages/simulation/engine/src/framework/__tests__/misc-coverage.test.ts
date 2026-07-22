@@ -19,7 +19,8 @@ import { Registry, type Registerable, ValidationError } from '@opensip-cli/core'
 import { describe, expect, it } from 'vitest';
 
 import { LatencyTracker } from '../execution/latency-tracker.js';
-import { renderScenarioResultView } from '../result-renderers.js';
+
+import { renderScenarioResultView } from './result-renderers.fixture.js';
 
 import type { ScenarioExecutorResult } from '../scenario-executor-result.js';
 
