@@ -130,6 +130,18 @@ describe('readGlobalConfig (missing / malformed paths)', () => {
     const { readGlobalConfig } = await loadModule();
     expect(readGlobalConfig()).toEqual({});
   });
+
+  it.each(['scalar-value', '- one\n- two\n'])(
+    'returns {} when the YAML root is not a mapping',
+    async (content) => {
+      const { writeFileSync, mkdirSync } = await import('node:fs');
+      const opensipDir = join(HOME, '.opensip-cli');
+      mkdirSync(opensipDir, { recursive: true });
+      writeFileSync(join(opensipDir, 'config.yml'), content);
+      const { readGlobalConfig } = await loadModule();
+      expect(readGlobalConfig()).toEqual({});
+    },
+  );
 });
 
 describe('readGlobalTrustPolicy', () => {
@@ -251,6 +263,20 @@ describe('capability trust grant persistence', () => {
       policy: invalidPolicy,
     });
   });
+
+  it('rejects a grant that would exceed the policy schema limit without mutating it', async () => {
+    const { grantCapabilityTrust, readGlobalTrustPolicy, writeGlobalConfig } = await loadModule();
+    const grants = Array.from({ length: 200 }, (_, index) => ({
+      id: `@acme/rules-${String(index)}`,
+      manifestHash: HASH_A,
+    }));
+    writeGlobalConfig({ policy: { trustedCapabilityPacks: grants } });
+
+    expect(() => grantCapabilityTrust({ id: '@acme/one-too-many', manifestHash: HASH_B })).toThrow(
+      /would make the user policy invalid/u,
+    );
+    expect(readGlobalTrustPolicy().policy?.trustedCapabilityPacks).toEqual(grants);
+  });
 });
 
 describe('resolveApiKey', () => {
@@ -286,6 +312,12 @@ describe('resolveApiKey', () => {
 
   it('returns undefined when no key is configured anywhere', async () => {
     const { resolveApiKey } = await loadModule();
+    expect(resolveApiKey()).toBeUndefined();
+  });
+
+  it('ignores a non-string key in a hand-edited global config', async () => {
+    const { resolveApiKey, writeGlobalConfig } = await loadModule();
+    writeGlobalConfig({ apiKey: 123 as never });
     expect(resolveApiKey()).toBeUndefined();
   });
 });

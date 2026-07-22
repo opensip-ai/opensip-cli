@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 
 import {
   isReservedSuiteName,
@@ -41,6 +42,17 @@ describe('reserved suite names (ADR-0159)', () => {
       'my-review': { steps: [VALID_STEP] },
     });
     expect(result.success).toBe(true);
+  });
+
+  it('rejects a prototype-magic name instead of silently dropping the suite', () => {
+    const document = parseYaml(`
+__proto__:
+  steps:
+    - tool: ${VALID_STEP.tool}
+      command: ${VALID_STEP.command}
+`);
+    expect(Object.prototype.hasOwnProperty.call(document, '__proto__')).toBe(true);
+    expect(suitesConfigSchema.safeParse(document).success).toBe(false);
   });
 
   it('keeps the empty default', () => {

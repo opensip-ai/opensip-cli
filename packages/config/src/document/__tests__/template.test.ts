@@ -86,4 +86,49 @@ describe('renderDocumentHeader', () => {
     const schema = composeConfigSchema(hostConfigDeclarations());
     expect(() => validateConfigDocument(schema, parsed)).not.toThrow();
   });
+
+  it('round-trips YAML-sensitive strings and an empty target exclude list', () => {
+    const target: TargetTemplateInput = {
+      name: 'api-source',
+      description: 'API: backend # primary',
+      languages: ['type:script', 'null'],
+      concerns: ['backend # primary'],
+      include: ['src/"quoted"/**', 'src/line\nbreak.ts'],
+      exclude: [],
+    };
+    const globalExcludes = ['**/"quoted"/**', '**/line\nbreak/**'];
+    const out = renderDocumentHeader({
+      schemaVersion: 1,
+      globalExcludes,
+      targets: [target],
+    });
+    const parsed = parseYaml(out) as {
+      globalExcludes: string[];
+      targets: Record<string, Omit<TargetTemplateInput, 'name'>>;
+    };
+
+    expect(parsed.globalExcludes).toEqual(globalExcludes);
+    expect(parsed.targets['api-source']).toEqual({
+      description: target.description,
+      languages: target.languages,
+      concerns: target.concerns,
+      include: target.include,
+      exclude: [],
+    });
+    const schema = composeConfigSchema(hostConfigDeclarations());
+    expect(() => validateConfigDocument(schema, parsed)).not.toThrow();
+  });
+
+  it('renders empty document collections as collections rather than null', () => {
+    const out = renderDocumentHeader({
+      schemaVersion: 1,
+      globalExcludes: [],
+      targets: [],
+    });
+    const parsed = parseYaml(out);
+
+    expect(parsed).toEqual({ schemaVersion: 1, globalExcludes: [], targets: {} });
+    const schema = composeConfigSchema(hostConfigDeclarations());
+    expect(() => validateConfigDocument(schema, parsed)).not.toThrow();
+  });
 });

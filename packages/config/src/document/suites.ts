@@ -10,6 +10,15 @@ import { z } from 'zod';
 export const RESERVED_SUITE_NAMES = ['audit', 'agent-context'] as const;
 
 const reservedSuiteNames: ReadonlySet<string> = new Set(RESERVED_SUITE_NAMES);
+const suiteNameSchema = z.string().trim().min(1);
+
+function hasPrototypeMagicSuiteName(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.prototype.hasOwnProperty.call(value, '__proto__')
+  );
+}
 
 /** True when `name` is reserved for a built-in suite (ADR-0159). */
 export function isReservedSuiteName(name: string): boolean {
@@ -70,7 +79,14 @@ export const suiteDefinitionSchema = z
   .strict();
 
 export const suitesConfigSchema = z
-  .record(z.string().trim().min(1), suiteDefinitionSchema)
+  // Zod's record parser deliberately omits `__proto__` before key validation,
+  // which would otherwise turn a configured suite into a successful empty
+  // record. Inspect the raw mapping before record parsing loses that key.
+  .unknown()
+  .refine((value) => !hasPrototypeMagicSuiteName(value), {
+    message: 'suite name __proto__ is not supported',
+  })
+  .pipe(z.record(suiteNameSchema, suiteDefinitionSchema))
   .superRefine((suites, ctx) => {
     for (const name of Object.keys(suites)) {
       if (!reservedSuiteNames.has(name)) continue;

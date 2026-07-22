@@ -23,6 +23,8 @@
  * drifts from validation.
  */
 
+import { stringify as stringifyYaml } from 'yaml';
+
 /** One named target as the template should scaffold it. */
 export interface TargetTemplateInput {
   readonly name: string;
@@ -53,18 +55,31 @@ export interface DocumentHeaderInput {
  */
 const DEFAULT_GLOBAL_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
 
+/**
+ * Render one string on an inline YAML position without changing ordinary
+ * starter-template formatting. YAML's scalar formatter quotes ambiguous
+ * values; JSON quoting handles the multiline form that YAML would otherwise
+ * render as an indented block.
+ */
+function renderInlineYamlString(value: string): string {
+  const rendered = stringifyYaml(value).trimEnd();
+  return rendered.includes('\n') ? JSON.stringify(value) : rendered;
+}
+
 /** Render one target into the `targets:` block, matching `targetsRecordSchema`. */
 function renderTarget(t: TargetTemplateInput): string[] {
   const concerns = t.concerns ?? ['backend'];
   return [
-    `  ${t.name}:`,
-    `    description: ${t.description}`,
-    `    languages: [${t.languages.join(', ')}]`,
-    `    concerns: [${concerns.join(', ')}]`,
-    '    include:',
-    ...t.include.map((p) => `      - "${p}"`),
-    '    exclude:',
-    ...t.exclude.map((p) => `      - "${p}"`),
+    `  ${renderInlineYamlString(t.name)}:`,
+    `    description: ${renderInlineYamlString(t.description)}`,
+    `    languages: [${t.languages.map(renderInlineYamlString).join(', ')}]`,
+    `    concerns: [${concerns.map(renderInlineYamlString).join(', ')}]`,
+    ...(t.include.length === 0
+      ? ['    include: []']
+      : ['    include:', ...t.include.map((p) => `      - ${JSON.stringify(p)}`)]),
+    ...(t.exclude.length === 0
+      ? ['    exclude: []']
+      : ['    exclude:', ...t.exclude.map((p) => `      - ${JSON.stringify(p)}`)]),
     '',
   ];
 }
@@ -89,10 +104,11 @@ export function renderDocumentHeader(input: DocumentHeaderInput): string {
     '',
     `schemaVersion: ${input.schemaVersion}`,
     '',
-    'globalExcludes:',
-    ...globalExcludes.map((p) => `  - "${p}"`),
+    ...(globalExcludes.length === 0
+      ? ['globalExcludes: []']
+      : ['globalExcludes:', ...globalExcludes.map((p) => `  - ${JSON.stringify(p)}`)]),
     '',
-    'targets:',
+    input.targets.length === 0 ? 'targets: {}' : 'targets:',
   ];
   for (const t of input.targets) lines.push(...renderTarget(t));
   return lines.join('\n');

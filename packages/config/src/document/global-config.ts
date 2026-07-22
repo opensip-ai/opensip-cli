@@ -29,7 +29,7 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { EnvRegistry, type EnvVarSpec } from '@opensip-cli/core';
+import { EnvRegistry, isPlainRecord, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import {
@@ -83,7 +83,8 @@ export function readGlobalConfig(): GlobalConfig {
   if (!existsSync(GLOBAL_CONFIG_PATH)) return {};
   try {
     const raw = readFileSync(GLOBAL_CONFIG_PATH, 'utf8');
-    return (parseYaml(raw) as GlobalConfig) ?? {};
+    const parsed: unknown = parseYaml(raw);
+    return isPlainRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -137,9 +138,17 @@ export function grantCapabilityTrust(grant: {
   }
   const policy: UserTrustPolicyDocument = existing.policy ?? {};
   const grants = (policy.trustedCapabilityPacks ?? []).filter((entry) => entry.id !== grant.id);
+  const nextPolicy = userTrustPolicySchema.safeParse({
+    ...policy,
+    trustedCapabilityPacks: [...grants, { ...grant }],
+  });
+  if (!nextPolicy.success) {
+    const summary = nextPolicy.error.issues.map((issue) => issue.message).join('; ');
+    throw new Error(`capability trust grant would make the user policy invalid: ${summary}`);
+  }
   writeGlobalConfig({
     ...config,
-    policy: { ...policy, trustedCapabilityPacks: [...grants, { ...grant }] },
+    policy: nextPolicy.data,
   });
 }
 
@@ -219,7 +228,7 @@ export function resolveApiKey(cliFlag?: string): string | undefined {
   const fromEnv = CONFIG_ENV.get<string>('OPENSIP_API_KEY');
   if (fromEnv) return fromEnv;
   const config = readGlobalConfig();
-  return config.apiKey ?? undefined;
+  return typeof config.apiKey === 'string' ? config.apiKey : undefined;
 }
 
 /** Read + validate the user-level `cloud:` block, defensively. */

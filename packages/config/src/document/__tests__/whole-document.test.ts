@@ -128,6 +128,7 @@ describe('composed whole-document validation', () => {
       'cli.sessions (unknown key)',
       { ...WHOLE_DOCUMENT, cli: { sessions: { keep: 5, maxAgeDayz: 1 } } },
     ],
+    ['cli.artifacts (unknown key)', { ...WHOLE_DOCUMENT, cli: { artifacts: { kepe: 5 } } }],
     ['fitness', { ...WHOLE_DOCUMENT, fitness: { faliOnErrors: 1 } }],
     ['graph', { ...WHOLE_DOCUMENT, graph: { minDuplicateBodyLine: 10 } }],
   ])('throws one ConfigurationError on a typo in the %s block', (_label, doc) => {
