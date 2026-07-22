@@ -335,6 +335,25 @@ describe('parseOsvJson', () => {
     const [s] = parseOsvJson(parsed(doc), CTX);
     expect(s?.filePath).toBe('package-lock.json');
   });
+
+  it('relativizes an in-project source whose basename starts with two dots', () => {
+    const doc = JSON.stringify({
+      results: [
+        {
+          source: { path: '/proj/..lock' },
+          packages: [
+            {
+              package: { name: 'x', version: '1.0.0', ecosystem: 'npm' },
+              vulnerabilities: [{ id: 'V-1', summary: 'x' }],
+              groups: [{ ids: ['V-1'] }],
+            },
+          ],
+        },
+      ],
+    });
+    const [s] = parseOsvJson(parsed(doc), CTX);
+    expect(s?.filePath).toBe('..lock');
+  });
 });
 
 describe('osv-golden.json — CVSS self-consistency (A10 guard)', () => {

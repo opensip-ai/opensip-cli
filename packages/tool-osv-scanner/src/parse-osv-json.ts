@@ -24,7 +24,7 @@
  * Pure: defensive JSON navigation (never throws on malformed input → `[]`).
  */
 
-import { isAbsolute, relative } from 'node:path';
+import { isAbsolute, relative, sep } from 'node:path';
 
 import { createSignal } from '@opensip-cli/core';
 import {
@@ -51,8 +51,11 @@ function relativizeSourcePath(sourcePath: string, projectRoot: string | undefine
   }
   if (!isAbsolute(sourcePath)) return sourcePath;
   const rel = relative(projectRoot, sourcePath);
-  // `relative` yields '' for the root itself and paths that leave the root start with '..'.
-  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return sourcePath;
+  // `relative` yields '' for the root itself; paths outside it are exactly `..`
+  // or begin with a parent segment. A valid basename such as `..lock` stays inside.
+  if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    return sourcePath;
+  }
   return rel;
 }
 
