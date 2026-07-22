@@ -322,6 +322,48 @@ describe('sentry-pii-scrubbing branches', () => {
   });
 });
 
+// 2026-07-20 regression: PII_FIELD_NAMES matched as an unanchored substring,
+// so `name` matched inside `hostname`/`filename`-shaped keys that aren't PII.
+describe('sentry-pii-scrubbing · field-name boundary regression', () => {
+  let cwd: string;
+
+  beforeAll(() => {
+    cwd = makeFixtureDir('sentry-pii-boundary');
+    writeFixture(
+      cwd,
+      'src/non-pii-keys.ts',
+      [
+        'import * as Sentry from "@sentry/node";',
+        "Sentry.setContext('deployment', { hostname: host, filename: file });",
+      ].join('\n'),
+    );
+    writeFixture(
+      cwd,
+      'src/real-name-field.ts',
+      [
+        "import * as Sentry from '@sentry/node';",
+        "Sentry.setContext('user', { name: userName });",
+      ].join('\n'),
+    );
+  });
+
+  afterAll(() => rmSync(cwd, { recursive: true, force: true }));
+
+  it('does not flag hostname/filename as the PII field "name"', async () => {
+    const result = await findCheck('sentry-pii-scrubbing').run(cwd, {
+      targetFiles: [join(cwd, 'src/non-pii-keys.ts')],
+    });
+    expect(result.signals.length).toBe(0);
+  });
+
+  it('still flags a genuine `name` field', async () => {
+    const result = await findCheck('sentry-pii-scrubbing').run(cwd, {
+      targetFiles: [join(cwd, 'src/real-name-field.ts')],
+    });
+    expect(result.signals.length).toBeGreaterThan(0);
+  });
+});
+
 // =============================================================================
 // sentry-helpers: extractSentryInitBlock unclosed branch
 // =============================================================================

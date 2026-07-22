@@ -60,7 +60,11 @@ const DATA_LOSS_CONFIRMATION = /DATA-LOSS.*intentional/i;
 export const drizzleOrmMigrationGuardrails = defineCheck({
   id: 'b67ccead-3731-40c5-9a90-6fc4b88c2bc5',
   slug: 'drizzle-orm-migration-guardrails',
-  contentFilter: 'strip-strings',
+  // 'raw': DANGEROUS_PATTERNS is meant to match SQL text inside `sql\`...\``
+  // template literals — 'strip-strings' blanks exactly that content before
+  // analyze() runs, so DROP/ALTER/TRUNCATE never match their canonical
+  // Drizzle raw-SQL usage (only the code-level `sql.unsafe(` pattern survives).
+  contentFilter: 'raw',
   scope: { languages: ['typescript'], concerns: ['backend'] },
   confidence: 'high',
   description:

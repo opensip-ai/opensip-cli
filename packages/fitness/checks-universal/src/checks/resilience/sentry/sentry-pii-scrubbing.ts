@@ -38,6 +38,22 @@ const PII_FIELD_NAMES = [
   'api_key',
 ];
 
+/**
+ * Find `field` in `line` as a whole property-key match — the character
+ * immediately before the match must not be an identifier character, so
+ * `name` doesn't match inside `hostname`/`filename`/`username`-shaped keys
+ * that merely end with the substring `name`.
+ */
+function findFieldNameIndex(line: string, field: string): number {
+  let idx = line.indexOf(field);
+  while (idx !== -1) {
+    const before = line[idx - 1];
+    if (before === undefined || !/[\w$]/.test(before)) return idx;
+    idx = line.indexOf(field, idx + 1);
+  }
+  return -1;
+}
+
 // eslint-disable-next-line sonarjs/cognitive-complexity -- tiered detector: 3 tiers (init-level, capture-level, key-name) all need a single pass for clear precedence
 function analyze(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
@@ -82,7 +98,7 @@ function analyze(content: string, filePath: string): CheckViolation[] {
 
     // Check for PII field names in the call
     for (const field of PII_FIELD_NAMES) {
-      const fieldIdx = line.indexOf(field);
+      const fieldIdx = findFieldNameIndex(line, field);
       if (fieldIdx === -1) continue;
 
       // Verify it looks like a property (followed by : or ,)

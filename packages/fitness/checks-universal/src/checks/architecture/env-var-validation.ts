@@ -75,13 +75,16 @@ const NON_RUNTIME_PATTERNS = [
   CONFIG_FILE_PATTERN,
 ];
 
+// Tested against the forward-looking multi-line window: each pattern is
+// anchored to `process\.env\.\w+` (or, for isCapturedAndGuarded, to the
+// captured variable name), so matching it anywhere in the window still means
+// it describes the access under review, not unrelated nearby text.
 const SAFE_PATTERNS = [
   NULLISH_COALESCING_PATTERN,
   LOGICAL_OR_PATTERN,
   NON_NULL_ASSERTION_PATTERN,
   GET_ENV_PATTERN,
   CONFIG_ACCESS_PATTERN,
-  ENV_ACCESS_PATTERN,
   REQUIRE_ENV_PATTERN,
   OPTIONAL_ENV_PATTERN,
   BOOLEAN_COERCION_PATTERN,
@@ -245,7 +248,11 @@ function analyzeMatchForIssues(
 
   // Skip if in safe context (idiomatic guards may sit on a following line, so
   // the safe-context test uses the multi-line window, not just the access line).
-  if (isSafeContext(window)) {
+  // ENV_ACCESS_PATTERN is tested against the access's own same-line context
+  // only — it isn't anchored to `process.env.\w+`, so testing it against the
+  // window let an unrelated `env.X` read on a following line mark an
+  // unguarded `process.env.Y` access as safe.
+  if (isSafeContext(window) || ENV_ACCESS_PATTERN.test(context)) {
     return null;
   }
 

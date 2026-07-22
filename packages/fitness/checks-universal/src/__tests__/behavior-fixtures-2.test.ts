@@ -830,6 +830,44 @@ describe('docker-best-practices', () => {
   });
 });
 
+// 2026-07-20 regression: the frozen-lockfile patterns required the flag
+// immediately after `install`/`ci` — `pnpm install --prod --frozen-lockfile`
+// (flag order reversed) was flagged as missing the flag even though it's
+// present later on the same line.
+describe('docker-best-practices · frozen-lockfile flag-order regression', () => {
+  let cwd: string;
+
+  beforeAll(() => {
+    cwd = makeFixtureDir('docker-bp-lockfile-order');
+    writeFixture(
+      cwd,
+      'Dockerfile.flag-order',
+      ['FROM node:20', 'COPY . .', 'RUN pnpm install --prod --frozen-lockfile'].join('\n'),
+    );
+    writeFixture(
+      cwd,
+      'Dockerfile.no-flag',
+      ['FROM node:20', 'COPY . .', 'RUN pnpm install --prod'].join('\n'),
+    );
+  });
+
+  afterAll(() => rmSync(cwd, { recursive: true, force: true }));
+
+  it('does not flag a frozen install when --frozen-lockfile follows another flag', async () => {
+    const result = await findCheck('docker-best-practices').run(cwd, {
+      targetFiles: [join(cwd, 'Dockerfile.flag-order')],
+    });
+    expect(result.signals.some((s) => s.message?.includes('frozen lockfile'))).toBe(false);
+  });
+
+  it('still flags a pnpm install with no frozen-lockfile flag at all', async () => {
+    const result = await findCheck('docker-best-practices').run(cwd, {
+      targetFiles: [join(cwd, 'Dockerfile.no-flag')],
+    });
+    expect(result.signals.some((s) => s.message?.includes('frozen lockfile'))).toBe(true);
+  });
+});
+
 // =============================================================================
 // project-readme-existence — already 100%, but useful smoke test
 // =============================================================================

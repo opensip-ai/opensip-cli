@@ -58,10 +58,13 @@ function isAsciiLetter(ch: string | undefined): boolean {
  * something the strip pass never does. See the scanner functions
  * for the CPython-spec citation.
  */
-function matchStringStart(src: string, i: number): { quoteIndex: number } | null {
+function matchStringStart(
+  src: string,
+  i: number,
+): { quoteIndex: number; isFString: boolean } | null {
   const c = src[i];
   if (c === '"' || c === "'") {
-    return { quoteIndex: i };
+    return { quoteIndex: i, isFString: false };
   }
   if (!isAsciiLetter(c)) return null;
 
@@ -77,7 +80,7 @@ function matchStringStart(src: string, i: number): { quoteIndex: number } | null
     if (TWO_CHAR_PREFIXES.has(two)) {
       const after = src[i + 2];
       if (after === '"' || after === "'") {
-        return { quoteIndex: i + 2 };
+        return { quoteIndex: i + 2, isFString: two.includes('f') };
       }
     }
   }
@@ -87,7 +90,7 @@ function matchStringStart(src: string, i: number): { quoteIndex: number } | null
   if (one && ONE_CHAR_PREFIXES.has(one)) {
     const after = src[i + 1];
     if (after === '"' || after === "'") {
-      return { quoteIndex: i + 1 };
+      return { quoteIndex: i + 1, isFString: one === 'f' };
     }
   }
 
@@ -100,9 +103,38 @@ interface StringScanResult {
   readonly next: number;
 }
 
-function scanTripleString(src: string, contentStart: number, quote: string): StringScanResult {
+/**
+ * Brace depth inside an f-string's `{expr}` interpolation. PEP 701
+ * (Python 3.12+) lets an f-string expression reuse the string's own quote
+ * character (e.g. f"{d["key"]}") — such a quote must NOT terminate the
+ * outer string. Depth-tracking `{`/`}` (regardless of whether a given brace
+ * is an escaped `{{`/`}}` literal or a real expression delimiter) is
+ * sufficient because valid Python always balances them either way.
+ *
+ * Returns the updated depth when `ch` is a brace under f-string tracking,
+ * or `null` when `ch` isn't a brace (or bracing isn't tracked for this
+ * string), meaning the caller should fall through to its own handling.
+ */
+function stepFStringBraceDepth(
+  ch: string | undefined,
+  depth: number,
+  isFString: boolean,
+): number | null {
+  if (!isFString) return null;
+  if (ch === '{') return depth + 1;
+  if (ch === '}') return depth > 0 ? depth - 1 : depth;
+  return null;
+}
+
+function scanTripleString(
+  src: string,
+  contentStart: number,
+  quote: string,
+  isFString: boolean,
+): StringScanResult {
   const len = src.length;
   let i = contentStart;
+  let depth = 0;
   while (i < len) {
     const ch = src[i];
     if (ch === '\\') {
@@ -119,7 +151,13 @@ function scanTripleString(src: string, contentStart: number, quote: string): Str
       i += 2;
       continue;
     }
-    if (ch === quote && src[i + 1] === quote && src[i + 2] === quote) {
+    const newDepth = stepFStringBraceDepth(ch, depth, isFString);
+    if (newDepth !== null) {
+      depth = newDepth;
+      i++;
+      continue;
+    }
+    if (depth === 0 && ch === quote && src[i + 1] === quote && src[i + 2] === quote) {
       return { contentStart, contentEnd: i, next: i + 3 };
     }
     i++;
@@ -128,16 +166,22 @@ function scanTripleString(src: string, contentStart: number, quote: string): Str
   return { contentStart, contentEnd: len, next: len };
 }
 
-function scanSingleString(src: string, contentStart: number, quote: string): StringScanResult {
+function scanSingleString(
+  src: string,
+  contentStart: number,
+  quote: string,
+  isFString: boolean,
+): StringScanResult {
   const len = src.length;
   let i = contentStart;
+  let depth = 0;
   while (i < len) {
     const ch = src[i];
     // Newline terminates a non-triple string in Python (it's a syntax
     // error to span lines without explicit continuation, but for
     // strip purposes treat newline as a terminator to avoid eating
     // the rest of the file on malformed input).
-    if (ch === '\n') {
+    if (ch === '\n' && depth === 0) {
       return { contentStart, contentEnd: i, next: i };
     }
     if (ch === '\\') {
@@ -154,7 +198,13 @@ function scanSingleString(src: string, contentStart: number, quote: string): Str
       i += 2;
       continue;
     }
-    if (ch === quote) {
+    const newDepth = stepFStringBraceDepth(ch, depth, isFString);
+    if (newDepth !== null) {
+      depth = newDepth;
+      i++;
+      continue;
+    }
+    if (depth === 0 && ch === quote) {
       return { contentStart, contentEnd: i, next: i + 1 };
     }
     i++;
@@ -183,17 +233,17 @@ function scan(src: string): ScanResult {
     // String literal (with optional prefix).
     const stringStart = matchStringStart(src, i);
     if (stringStart) {
-      const { quoteIndex } = stringStart;
+      const { quoteIndex, isFString } = stringStart;
       const quote = src[quoteIndex];
       // Triple-quoted?
       if (src[quoteIndex + 1] === quote && src[quoteIndex + 2] === quote) {
         const contentStart = quoteIndex + 3;
-        const result = scanTripleString(src, contentStart, quote);
+        const result = scanTripleString(src, contentStart, quote, isFString);
         stringRegions.push({ start: result.contentStart, end: result.contentEnd });
         i = result.next;
       } else {
         const contentStart = quoteIndex + 1;
-        const result = scanSingleString(src, contentStart, quote);
+        const result = scanSingleString(src, contentStart, quote, isFString);
         stringRegions.push({ start: result.contentStart, end: result.contentEnd });
         i = result.next;
       }
