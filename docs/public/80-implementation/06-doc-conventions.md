@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.8.3
+release: v0.8.4
 title: "Doc conventions"
 audience: [contributors]
 purpose: "Voice, frontmatter, diagrams, and verification trail conventions for the architecture doc set."
@@ -154,7 +154,7 @@ Most docs end with a "What's next" section. A few — especially the reference d
 ```markdown
 ## Verification trail
 
-Last verified at v0.8.3 against:
+Last verified at v0.8.4 against:
 
 - `packages/` directory listing — `scripts/release-package-order.mjs` is the source of truth (58 publishable packages plus the three workspace-private support packages `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and `@opensip-cli/checks-dogfood`).
 - Each package's `package.json` `description` and `name` field, read directly.

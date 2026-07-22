@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-13
-release: v0.8.3
+release: v0.8.4
 title: "Performance profiling"
 audience: [contributors, ci-integrators]
 purpose: "Contributor workflow for clean-wall benchmarks, CPU profiles, graph stage evidence, toolchain throughput, and performance PR proof."
@@ -129,7 +129,7 @@ The CLI uses Node's built-in inspector profiler. Profiling is explicit:
 `OPENSIP_PROFILING=1` enables local profiles; an OTLP endpoint alone does not.
 Tracing and metrics remain separately gated by `OTEL_EXPORTER_OTLP_ENDPOINT`.
 This boundary is recorded in
-[ADR-0163](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/docs/decisions/ADR-0163-local-cpu-profiling-independent-of-otel-export.md).
+[ADR-0163](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0163-local-cpu-profiling-independent-of-otel-export.md).
 
 ```bash
 pnpm bench:profile -- --profile pr --scenario graph-cold --runs 1 \
@@ -199,7 +199,7 @@ pnpm bench:toolchain -- --cache-mode force --runs 3 \
 The fixed order is workspace build, workspace typecheck, then type-aware ESLint.
 `force` bypasses Turbo cache reads; `reuse` deliberately measures the cached
 developer path. Neither report implies that emitted JavaScript runs faster.
-[ADR-0162](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/docs/decisions/ADR-0162-typescript-7-1-readiness.md) keeps TypeScript
+[ADR-0162](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0162-typescript-7-1-readiness.md) keeps TypeScript
 7.x deferred until a stable compiler API satisfies OpenSIP's parsing, scanner,
 program, diagnostics, symbol, type, signature, alias, and declaration needs.
 

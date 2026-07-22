@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-02
-release: v0.8.3
+release: v0.8.4
 title: "Compatibility policy"
 audience: [ci-integrators, plugin-authors, contributors]
 purpose: "The public compatibility contract classes, version markers, deprecation posture, and migration/check lanes for opensip-cli."
@@ -40,7 +40,7 @@ so the CLI records them as named compatibility contract classes in
 | `platform-support` | 1 | root release scripts | Support rows are additive; changing a `supported` tuple restarts burn-in before re-promotion. A `PLATFORM_SUPPORT_CONTRACT_VERSION` bump requires qualification-evidence, acceptance-profile, and supported-platforms docs review. |
 
 The registry lives in
-[`packages/core/src/lib/compatibility-policy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/packages/core/src/lib/compatibility-policy.ts)
+[`packages/core/src/lib/compatibility-policy.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/core/src/lib/compatibility-policy.ts)
 and is re-exported from `@opensip-cli/contracts` for public consumers.
 
 ## Project config migration
@@ -88,7 +88,7 @@ class because `engines.node` cannot encode any of those dimensions, and because
 `supported` is an *evidence* claim, never an engine-compatibility inference.
 
 The registry lives in
-[`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/packages/core/src/lib/platform-support.ts)
+[`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/core/src/lib/platform-support.ts)
 and is rendered into the authoritative
 [supported-platforms matrix](/docs/opensip-cli/70-reference/17-supported-platforms/) by
 `pnpm docs:platform-support` (CI enforces sync via

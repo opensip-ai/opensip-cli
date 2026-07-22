@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-11
-release: v0.8.3
+release: v0.8.4
 title: "Layered package graph"
 audience: [contributors]
 purpose: "The layered workspace, the six-layer dependency rule, why dependency-cruiser exists, and the trade-offs."
@@ -36,7 +36,7 @@ This document is the conceptual map. For the lookup-shaped catalog of every pack
 
 ## The six layers
 
-The layer model the dependency-cruiser config enforces ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/.config/dependency-cruiser.cjs)):
+The layer model the dependency-cruiser config enforces ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs)):
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -90,7 +90,7 @@ The layer model the dependency-cruiser config enforces ([`.config/dependency-cru
 - **`@opensip-cli/config`** is the capability-configuration substrate (ADR-0023): the `composeConfigSchema` composer that folds each tool's namespaced Zod schema into one strict whole-document schema, the resolver, and the `ToolConfigDeclaration` declaration type. The dependency-cruiser rule here is **directional**: `config` must not import a tool. Tools, by contrast, **do** import `@opensip-cli/config` — for the `ToolConfigDeclaration` type they use to declare their config namespace. So the edge runs tool → config, never config → tool. Depends on `core`.
 - **`@opensip-cli/targeting`** is the host file-targeting runtime substrate (ADR-0037): the `TargetRegistry`, the uniform glob expansion (`resolveTargets`, always applying per-target `exclude` **and** `globalExcludes`), and `applyGlobalExcludes`. The CLI bootstrap builds it once per run from the validated config document and exposes it as `scope.targets`; any tool resolves named file sets without importing fitness. Depends on `config` (targeting types) and `core` (the generic `Registry<T>` base) — never a tool engine. The check-domain half (`checkOverrides`, scope matching, the content `fileCache`) stays in `fitness` as a thin consumer.
 - **`@opensip-cli/codebase`** is the persistence-free project inventory substrate: it projects bounded target membership, file metadata, package manifests, and conservative verification commands into deterministic evidence facts. It reads through the captured structural target resolver and retains no source or raw manifest content. Graph and MCP consume it from above.
-- **`@opensip-cli/shared-analysis`** is the cross-tool analysis **runtime** extracted from `contracts` ([ADR-0172](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/docs/decisions/ADR-0172-shared-analysis-layer-extraction.md)): the changed→impact compute engine behind `graph impact` and `fit --changed` / `--include-impacted`, review-brief derivation and correlation, and agent-catalog assembly. It depends on `core` and `contracts` only; tool engines and the host depend on **it**, never the reverse (the `shared-analysis-no-tool-or-cli-edges` dep-cruiser rule). The persisted contract shapes those functions produce (the `ReviewBrief*` and `AgentCatalog*` types, zod schemas, and version constants) stay in `contracts`, which remains a genuine type/constant/facade surface.
+- **`@opensip-cli/shared-analysis`** is the cross-tool analysis **runtime** extracted from `contracts` ([ADR-0172](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0172-shared-analysis-layer-extraction.md)): the changed→impact compute engine behind `graph impact` and `fit --changed` / `--include-impacted`, review-brief derivation and correlation, and agent-catalog assembly. It depends on `core` and `contracts` only; tool engines and the host depend on **it**, never the reverse (the `shared-analysis-no-tool-or-cli-edges` dep-cruiser rule). The persisted contract shapes those functions produce (the `ReviewBrief*` and `AgentCatalog*` types, zod schemas, and version constants) stay in `contracts`, which remains a genuine type/constant/facade surface.
 - **`@opensip-cli/dashboard`** is the self-contained HTML report renderer; consumed by the CLI-owned `report` command and each tool's auto-open hook. It does not implement the `Tool` contract; it is a library the composition root consumes.
 - **`@opensip-cli/external-tool-adapter`** is the shared normalization and command substrate for external scanner Tools.
 - **Language adapters** — `lang-typescript`, `lang-rust`, `lang-python`, `lang-java`, `lang-go`, `lang-cpp` implement the `LanguageAdapter` contract used by fitness checks. (The graph engine has its own `GraphLanguageAdapter` contract, implemented by the publishable `graph-*` adapter packs at Layer 5.) See [`50-extend/05-language-adapters.md`](/docs/opensip-cli/50-extend/05-language-adapters/) for the distinction.
@@ -113,7 +113,7 @@ direction, while the support packages are unavailable to production source.
 
 ## How the layer rule is enforced
 
-The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/.config/dependency-cruiser.cjs) at lint time. The relevant rules:
+The layer rule — "dependencies flow up only" — is enforced by [dependency-cruiser](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs) at lint time. The relevant rules:
 
 ```js
 // core imports nothing else from the workspace.
@@ -143,7 +143,7 @@ The build runs `pnpm depcruise` as part of the standard `pnpm lint` flow. A forb
 
 ## Two cruiser passes — no standing layer exception
 
-Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/.config/dependency-cruiser.cjs); both have since been **paid down** and deleted:
+Real codebases have edge cases. Two earlier cross-layer exceptions once lived in [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs); both have since been **paid down** and deleted:
 
 - **`lang-typescript` → `fitness`** (the `filterContent` back-edge): `filterContent` / `clearFilterCache` / `FilteredContent` now live in `@opensip-cli/lang-typescript` itself, so no lang pack reaches up into a tool. The `lang-no-fitness-except-typescript` rule is gone.
 - **`graph` → `fitness`** (SARIF reuse): SARIF is now the single shared `formatSignalSarif` formatter in `@opensip-cli/output`, applied at the composition root (ADR-0011) — `graph` returns a `SignalEnvelope` and imports neither fitness nor `@opensip-cli/output`. The `graph-may-import-fitness-sarif` info-exception is gone.
@@ -152,9 +152,9 @@ What remains is not an exception but a *second lens*. The layer ruleset runs twi
 
 ### Type-only edges are caught by the type-aware pass
 
-The **runtime pass** ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/.config/dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
+The **runtime pass** ([`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs)) sets `tsPreCompilationDeps: false`, so type-only imports (`import type { ... }`) don't count as edges. It models what actually runs: two files that only `import type` from each other form no runtime cycle, and TypeScript erases those imports, so flagging them would be a false positive.
 
-That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.config/dependency-cruiser.types.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/.config/dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
+That leaves a blind spot — a type-only *layer inversion* or *cycle* would be invisible to the runtime pass. The **type-aware pass** ([`.config/dependency-cruiser.types.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.types.cjs)) closes it: it flips `tsPreCompilationDeps: true` and re-runs the **same** `forbidden` ruleset over the type-inclusive graph. Every directional layer rule — and `no-circular` — therefore also fires on type-only edges.
 
 The upshot: there is **no** standing "you may `import type` upward" allowance. A type-only import from a lower layer into a higher one trips the type-aware pass exactly as a runtime import trips the runtime pass. (The historical type-only cycles that predated this pass were paid down before it was promoted from visibility-only to gating.)
 
@@ -223,8 +223,8 @@ The `cli` imports the bundled language adapters to register them (Layer 5 → La
 ## Complete boundaries, derived and locked
 
 The layer cake above is enforced by more than the dependency-cruiser layer rules.
-Two decisions ([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)
-and [ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.8.3/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md))
+Two decisions ([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)
+and [ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md))
 make the boundaries **derived** and **complete** rather than hand-maintained. The
 current package/tool inventory is authoritative in the generated
 [`architecture-map.md`](/docs/opensip-cli/80-implementation/architecture-map/) and the release

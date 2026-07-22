@@ -2,6 +2,75 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [0.8.4] - 2026-07-22
+
+The largest correctness-and-hardening cut since the production launch. It folds
+in the post-0.8.3 observability and architecture work, the canonical-column and
+finite-decode planes, cleared dependency advisories, and a broad
+bug-correctness sweep — most consequentially, a class of security/quality
+checks that had been silently missing real violations, and a live capability
+trust-boundary gap.
+
+### Security
+
+- **The private dogfood check-pack is no longer auto-trusted.** The
+  bundled-tools manifest listed `@opensip-cli/checks-dogfood` (a private,
+  never-published, dev-only pack), which made capability admission treat it as
+  operator-trusted unconditionally — short-circuiting the trust-policy grant
+  check that gates external capability packs. It now requires explicit
+  `plugins.checkPackages` selection plus an operator `policy trust` grant, wired
+  through the release workflow and preflight.
+- **Cleared transitive dependency advisories** surfaced by the live
+  `dependency-vulnerability-audit` check: two HIGH `fast-uri` host-confusion
+  advisories (pinned to the patched `^3.1.4`, within ajv's major) and a MODERATE
+  `@hono/node-server` path-traversal (forced to `^2.0.5`; unreachable in the
+  stdio-only MCP server, but removed from the tree regardless).
+- **Telemetry endpoint secrets are redacted** before they can reach logs, and
+  the gitleaks description field is no longer echoed unredacted.
+
+### Fixed
+
+- **Fitness checks no longer match against string-blanked source.** A family of
+  security and quality checks — rate-limit coverage, centralized-crypto,
+  webhook-signature verification, JWT validation, transaction/event/service
+  patterns, unbounded-memory, heavy-import detection, error-code registration,
+  the drizzle/fastify/error-handling/test-only TypeScript checks, and Python
+  bare-except — previously ran their matchers over `contentFilter: 'strip-strings'`
+  output, so real violations wrapped in computed, string, or template forms were
+  missed and comments containing code-like text produced false positives. They
+  now match against a code-aware AST/mask substrate, closing both gaps.
+- **Signal/violation columns are canonically 1-based at construction** (ADR-0179),
+  so SARIF, reports, and MCP evidence point at the correct character rather than
+  one column early; a decode plane rejects non-finite numeric session fields
+  (ADR-0180).
+- **Bounded, JSON-safe run diagnostics** (ADR-0175) with a guaranteed `--json`
+  fallback, bootstrap diagnostics folded into the run-outcome plane (ADR-0176),
+  external-scanner lifecycle events on the diagnostics bus, and SARIF ingest that
+  fails closed on an invalid artifact.
+- **Language and call-graph accuracy across every adapter.** TypeScript now
+  discovers `.mts/.cts/.js/.jsx/.mjs/.cjs`, resolves aliased and
+  namespace/qualified imports, and names computed/private members; the Python,
+  Rust, Go, Java, and C/C++ adapters fix parser edge cases (raw C strings,
+  multi-character literals, carriage returns, bare-except continuation, macro
+  token grammar, build-like source packages). Dynamic imports and positional
+  paths that escape the project root are no longer resolved into the catalog.
+- **A crashed background heartbeat can no longer take down the host.** The shared
+  runtime-lease heartbeat ran an async task without a rejection handler, so a
+  rejection became an unhandled rejection on a process-global timer; it now
+  swallows the rejection.
+- **CLI and config correctness:** prototype-pollution and trust-file corruption
+  guards on the config document, `cli.artifacts` config now rejects unknown keys,
+  signed-zero suite arguments compare correctly, version and numeric options are
+  validated, session-purge dates are bounded against overflow, user-uninstall
+  recovery is resumable, and nested command surfaces are complete. `--include-tests`
+  no longer hard-codes a default, letting the resolved config supply it.
+
+### Added
+
+- **`timer-callback-async-needs-catch`** (checks-typescript, resilience) flags a
+  `void`-detached async timer callback whose promise chain lacks a `.catch` — the
+  gap that let the heartbeat rejection escape `no-floating-promises`.
+
 ## [0.8.3] - 2026-07-20
 
 Promotes the 0.8.2 change set to npm `latest`. The 0.8.2 cut published a
