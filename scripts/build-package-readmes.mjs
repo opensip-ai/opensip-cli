@@ -26,9 +26,11 @@
  * them); CI runs `--check` to keep them in sync with package.json.
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { collectPackageJsonPaths } from './lib/collect-package-json-paths.mjs';
 
 const REPO_OWNER = 'opensip-ai';
 const REPO_NAME = 'opensip-cli';
@@ -41,20 +43,6 @@ const PACKAGES_DIR = join(REPO_ROOT, 'packages');
 const CHECK_ONLY = process.argv.slice(2).includes('--check');
 
 const log = (msg) => console.error(`[build-package-readmes] ${msg}`);
-
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.claude', 'coverage']);
-
-/** Recursively collect every package.json path under packages/. */
-function collectPackageJsonPaths(dir, out) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      collectPackageJsonPaths(join(dir, entry.name), out);
-    } else if (entry.name === 'package.json') {
-      out.push(join(dir, entry.name));
-    }
-  }
-}
 
 /** The release ref the README's source links pin to (e.g. `v1.0.0`). */
 function readReleaseRef() {

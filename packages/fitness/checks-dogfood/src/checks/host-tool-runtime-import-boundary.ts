@@ -27,7 +27,7 @@
  */
 // @fitness-ignore-file shipped-checks-must-be-generic -- dogfood check for this repo's ADR-0054 capstone boundary; AST precision keeps the host/worker import distinction mechanically exact.
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
-import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
+import { getSharedSourceFile, unwrapExpression } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 const CLI_HOST_PATH = 'packages/cli/src/';
@@ -98,20 +98,6 @@ function propertyNameText(name: ts.PropertyName): string | undefined {
 
 /** The kind of policy a runtime-import argument expresses (capstone discrimination). */
 type PolicyKind = 'host-bundled' | 'worker' | 'other';
-
-function unwrapExpression(expr: ts.Expression): ts.Expression {
-  let current = expr;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isTypeAssertionExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 /** A call to a named policy helper, e.g. `hostRuntimeImportPolicyFor(source)`. */
 function helperCallName(arg: ts.Expression): string | undefined {

@@ -5,6 +5,7 @@
  */
 import { defineCheck } from '@opensip-cli/fitness';
 
+import { lineOfNeedle } from './line-of-needle.mjs';
 import { toolEnginePathRe, toolPackageSegmentForPath } from './tool-engine-paths.mjs';
 
 const TOOL_ENGINE_PATH = toolEnginePathRe();
@@ -29,16 +30,6 @@ function isTestOrFixture(filePath) {
     /\/fixtures?\//.test(rel) ||
     /\.test\.tsx?$/.test(rel)
   );
-}
-
-function lineOfNeedle(content, needle) {
-  const index = content.indexOf(needle);
-  if (index < 0) return 1;
-  let line = 1;
-  for (let i = 0; i < index; i++) {
-    if (content[i] === '\n') line++;
-  }
-  return line;
 }
 
 export async function analyzeAllReportProducerOpenFlag(files) {

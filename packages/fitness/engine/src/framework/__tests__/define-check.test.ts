@@ -508,6 +508,129 @@ describe('defineCheck — analyzeAll mode end-to-end run', () => {
   });
 });
 
+describe('defineCheck — repair derivation end-to-end run', () => {
+  it('passes an explicit violation.repair straight through untouched', async () => {
+    fixture('a.ts', 'const x = 1;');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const explicitRepair = {
+      repairKind: 'add-test' as const,
+      autofixable: false,
+      confidence: 0.42,
+    };
+
+    const check = defineCheck({
+      id: 'dd000000-dd00-4dd0-8dd0-dd0000000001',
+      slug: 'explicit-repair',
+      description: 'd',
+      tags: ['quality'],
+      analyze: () => [
+        {
+          line: 1,
+          message: 'needs a test',
+          severity: 'warning' as const,
+          repair: explicitRepair,
+        },
+      ],
+    });
+
+    const result = await check.run(testDir);
+    expect(result.signals).toHaveLength(1);
+    // The explicit `repair` field wins over any fix/suggestion derivation —
+    // repairFromViolation's `if (violation.repair !== undefined) return
+    // violation.repair;` short-circuit (define-check.ts).
+    expect(result.signals[0]?.repair).toEqual(explicitRepair);
+  });
+
+  it('derives repairKind "extract-module" and an "Apply refactor..." patch hint from fix.action=refactor (no suggestion)', async () => {
+    const filePath = fixture('a.ts', 'const x = 1;');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'dd000000-dd00-4dd0-8dd0-dd0000000002',
+      slug: 'refactor-fix',
+      description: 'd',
+      tags: ['quality'],
+      analyze: (_content, fp) => [
+        {
+          line: 1,
+          message: 'extract this',
+          severity: 'warning' as const,
+          filePath: fp,
+          fix: { action: 'refactor' as const, confidence: 0.7 },
+        },
+      ],
+    });
+
+    const result = await check.run(testDir);
+    expect(result.signals).toHaveLength(1);
+    const repair = result.signals[0]?.repair;
+    // repairKindForFitnessAction('refactor') -> 'extract-module'
+    expect(repair?.repairKind).toBe('extract-module');
+    expect(repair?.confidence).toBe(0.7);
+    // No fix.replacement -> autofixable must be false regardless of action.
+    expect(repair?.autofixable).toBe(false);
+    // No suggestion -> summary falls back to "Apply <action> remediation...";
+    // non-empty filePath -> patchHint carries a `target`.
+    expect(repair?.patchHint).toEqual({
+      kind: 'text',
+      summary: 'Apply refactor remediation for this finding',
+      target: filePath,
+    });
+  });
+
+  it('marks autofixable=true only when fix.replacement is set AND action is replace/insert/delete', async () => {
+    fixture('a.ts', 'const x = 1;');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'dd000000-dd00-4dd0-8dd0-dd0000000003',
+      slug: 'delete-fix',
+      description: 'd',
+      tags: ['quality'],
+      analyze: () => [
+        {
+          line: 1,
+          message: 'remove this',
+          severity: 'error' as const,
+          fix: { action: 'delete' as const, replacement: '', confidence: 0.9 },
+        },
+      ],
+    });
+
+    const result = await check.run(testDir);
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.repair?.autofixable).toBe(true);
+    expect(result.signals[0]?.repair?.repairKind).toBe('manual');
+  });
+
+  it('omits patchHint.target (but still sets summary) when a violation has no resolvable filePath', async () => {
+    fixture('a.ts', 'export const a = 1');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'dd000000-dd00-4dd0-8dd0-dd0000000004',
+      slug: 'no-path-suggestion',
+      description: 'd',
+      tags: ['quality'],
+      // analyzeAll violations without filePath resolve toSignal's
+      // `defaultFilePath` to undefined too, so repairFromViolation sees
+      // filePath === '' (define-check.ts toSignal fallback chain).
+      // eslint-disable-next-line @typescript-eslint/require-await -- analyzeAll signature is async; body is sync
+      analyzeAll: async () => [
+        { line: 1, message: 'global issue', severity: 'warning' as const, suggestion: 'fix it' },
+      ],
+    });
+
+    const result = await check.run(testDir);
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.repair?.patchHint).toEqual({
+      kind: 'text',
+      summary: 'fix it',
+    });
+  });
+});
+
 describe('defineCheck — command mode end-to-end run', () => {
   it('runs the configured external command and parses output', async () => {
     fixture('a.ts', 'export const a = 1');
@@ -560,5 +683,59 @@ describe('defineCheck — command mode end-to-end run', () => {
     const result = await check.run(testDir);
     expect(result).toBeDefined();
     expect(Array.isArray(result.signals)).toBe(true);
+  });
+
+  it('skips invocation and reports "Skipped: no matched files" for a file-list command when zero files match', async () => {
+    // Deliberately prewarm a pattern that matches nothing in testDir, so
+    // ctx.matchFiles() (and hence `files`) is empty — executeCommandMode's
+    // fail-closed guard for file-list-driven scanners (define-check.ts).
+    await fileCache.prewarm(testDir, ['**/*.this-extension-does-not-exist']);
+
+    const check = defineCheck({
+      id: 'cc000000-cc00-4cc0-8cc0-cc0000000003',
+      slug: 'file-list-cmd',
+      description: 'd',
+      tags: ['quality'],
+      command: {
+        // `args` is a function with arity > 0 (files) -> the
+        // no-matched-files skip path applies instead of invoking `echo`.
+        bin: 'echo',
+        args: (files: readonly string[]) => files,
+        parseOutput: () => [],
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.passed).toBe(true);
+    expect(result.signals).toHaveLength(0);
+    expect(result.info?.label).toBe('Skipped: no matched files');
+    expect(result.metadata.extra?.skipped).toBe(true);
+    expect(result.metadata.extra?.skipReason).toBe('no-matched-files');
+  });
+
+  it('surfaces an unexpected exit code as an error result (not a silent skip)', async () => {
+    fixture('a.ts', 'export const a = 1');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const check = defineCheck({
+      id: 'cc000000-cc00-4cc0-8cc0-cc0000000004',
+      slug: 'nonzero-exit-cmd',
+      description: 'd',
+      tags: ['quality'],
+      command: {
+        // A real binary (node) that exits with a code outside the default
+        // expected set [0, 1] -> command-executor's unexpectedExitResult,
+        // which is NOT `notInstalled` -> executeCommandMode's
+        // `return builder.buildError(result.error)` path (define-check.ts).
+        bin: process.execPath,
+        args: ['-e', 'process.exit(2)'],
+        parseOutput: () => [],
+      },
+    });
+
+    const result = await check.run(testDir);
+    expect(result.passed).toBe(false);
+    expect(result.errors).toBeGreaterThanOrEqual(1);
+    expect(result.metadata.extra?.skipped).toBeUndefined();
   });
 });

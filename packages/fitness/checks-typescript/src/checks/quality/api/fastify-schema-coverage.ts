@@ -11,7 +11,7 @@
  */
 
 import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
-import { filterContent, getSharedSourceFile } from '@opensip-cli/lang-typescript';
+import { filterContent, getSharedSourceFile, unwrapExpression } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
@@ -239,20 +239,6 @@ function checkRouteSchema(options: CheckRouteSchemaOptions): CheckViolation[] {
   }
 
   return violations;
-}
-
-function unwrapExpression(expression: ts.Expression): ts.Expression {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isTypeAssertionExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
 }
 
 function propertyNameText(property: ts.ObjectLiteralElementLike): string | undefined {

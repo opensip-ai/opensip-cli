@@ -40,6 +40,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { evidenceDigest, parseAcceptanceEvidence } from './contract.mjs';
+import { writeAllSync } from './write-all-sync.mjs';
 
 /** Closed, kebab-case reason codes for a write failure. */
 export const WRITER_REASON_CODES = Object.freeze({
@@ -273,19 +274,6 @@ function atomicWrite(fs, outPath, serialized, platform) {
       W.WRITE_FAILED,
       `could not persist the evidence rename: ${error instanceof Error ? error.message : String(error)}`,
     );
-  }
-}
-
-function writeAllSync(fs, descriptor, serialized) {
-  const buffer = Buffer.from(serialized, 'utf8');
-  let offset = 0;
-  while (offset < buffer.length) {
-    const remaining = buffer.length - offset;
-    const written = fs.writeSync(descriptor, buffer, offset, remaining);
-    if (!Number.isSafeInteger(written) || written <= 0 || written > remaining) {
-      throw new Error('writeSync returned an invalid byte count');
-    }
-    offset += written;
   }
 }
 

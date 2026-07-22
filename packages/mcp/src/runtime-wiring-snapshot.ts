@@ -1,8 +1,6 @@
 // @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
 /** Command/tool graph assembly for immutable live runtime-wiring snapshots. */
 
-import { isAbsolute, relative, resolve, sep } from 'node:path';
-
 import {
   EMPTY_RUNTIME_COMMAND_INVENTORY,
   ephemeralProjectCacheKey,
@@ -13,6 +11,7 @@ import {
 import { compareCodePointStrings } from '@opensip-cli/graph/read';
 
 import { digestCanonicalIdentity } from './graph-query-page.js';
+import { projectRelativeConfigPath } from './project-relative-config-path.js';
 import {
   addRuntimeEdge,
   addRuntimeManifestNodes,
@@ -53,17 +52,6 @@ export interface RuntimeWiringSnapshot {
   readonly coverage: RuntimeWiringResult['coverage'];
   readonly identityIndex: RuntimeToolIdentityIndex;
   readonly inventory: RuntimeCommandInventory;
-}
-
-function projectRelativeConfigPath(projectRoot: string, configPath: string): string {
-  if (/\p{Cc}/u.test(configPath)) return '<invalid-config-path>';
-  const root = resolve(projectRoot);
-  const absolute = resolve(root, configPath);
-  const value = relative(root, absolute);
-  if (value === '..' || value.startsWith(`..${sep}`) || isAbsolute(value)) {
-    return '<outside-project>';
-  }
-  return (value || '.').split(sep).join('/');
 }
 
 function inventoryIdentityPayload(inventory: RuntimeCommandInventory): unknown {

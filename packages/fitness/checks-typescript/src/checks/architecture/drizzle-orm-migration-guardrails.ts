@@ -13,6 +13,7 @@ import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitne
 import {
   filterContent,
   getSharedSourceFile,
+  unwrapExpression,
   walkNodes,
   type FilteredContent,
 } from '@opensip-cli/lang-typescript';
@@ -132,20 +133,6 @@ function sqlTemplateFragments(
     });
   }
   return fragments;
-}
-
-function unwrapExpression(expression: ts.Expression): ts.Expression {
-  let current = expression;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isTypeAssertionExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
 }
 
 function propertyName(expression: ts.Expression): string | null {

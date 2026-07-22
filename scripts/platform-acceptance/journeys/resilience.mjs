@@ -11,7 +11,7 @@
  * plus sampled process-table model.
  */
 
-import { chmodSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { expectEnvelope } from '../../cli-acceptance-core.mjs';
@@ -23,6 +23,7 @@ import {
   pass,
   runCli,
 } from '../journey-kit.mjs';
+import { seedProject } from '../seed-fit-project.mjs';
 
 /** True when any file exists anywhere under `dir` (bounded walk). */
 function hasAnyFile(dir) {
@@ -44,16 +45,6 @@ function hasAnyFile(dir) {
     }
   }
   return false;
-}
-
-/** Seed a minimal TS project (a single console.log file fit will flag) under `dir`. */
-function seedProject(dir) {
-  mkdirSync(join(dir, 'src'), { recursive: true });
-  writeFileSync(join(dir, 'src', 'bad.ts'), "console.log('debug');\n");
-  writeFileSync(
-    join(dir, 'tsconfig.json'),
-    `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
-  );
 }
 
 const FIT_ENVELOPE_EXPECT = {

@@ -13,7 +13,17 @@
  */
 export type PathPattern = string | RegExp;
 
-function testFromStart(pattern: RegExp, value: string): boolean {
+/**
+ * Tests `pattern` against `value`, always starting from index 0.
+ *
+ * `RegExp.prototype.test` on a `g`/`y` pattern advances `lastIndex` as a
+ * side effect, which would silently skip matches on repeated calls against a
+ * shared pattern instance. Exported so other check-utils modules (e.g.
+ * {@link ../test-helpers.ts | test-helpers}) that test caller-supplied
+ * `RegExp` patterns share the same stateless-test behavior instead of
+ * carrying their own copy.
+ */
+export function testFromStart(pattern: RegExp, value: string): boolean {
   if (!pattern.global && !pattern.sticky) {
     return pattern.test(value);
   }

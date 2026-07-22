@@ -36,8 +36,9 @@
  * the tool engines). The path guard makes the check inert in adopter repos and
  * exempts the config package itself (the one allowed home).
  *
- * The shared `yamlDocBindings` helper (an internal sibling of the original
- * shipped check) is inlined below — this self-check is self-contained.
+ * The `yamlDocBindings` helper is shared with the sibling `one-config-document`
+ * check via `./yaml-doc-bindings.mjs` (both anchor their own detection on the
+ * same "identifiers bound to a parsed YAML document" scan).
  *
  * `raw` content: the block keys + field projections are code member-accesses,
  * not strings; the binding regex keys off `const x = <yamlDoc>.<key>`.
@@ -45,6 +46,7 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { toolEnginePathRe } from './tool-engine-paths.mjs';
+import { yamlDocBindings } from './yaml-doc-bindings.mjs';
 
 /** First-party paths that read the opensip-cli config document (config pkg excluded). */
 const CONFIG_READER_PATH = /packages\/cli\/src\//;
@@ -59,20 +61,6 @@ const DOCUMENT_LEVEL_KEYS = [
   'dashboard',
   'plugins',
 ];
-
-/**
- * Identifiers bound to a parsed YAML document in this file — the result of a
- * `const <id> = readYamlFile(...)` (or a sibling reader: `readYamlFileOrThrow`,
- * `parseYaml`, `loadYaml`). Inlined from the original shipped check's internal
- * `_yaml-doc-bindings.ts` helper so this self-check stands alone.
- */
-function yamlDocBindings(content) {
-  const docs = new Set();
-  const re =
-    /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?(?:readYamlFile|readYamlFileOrThrow|parseYaml|loadYaml)\s*\(/g;
-  for (const m of content.matchAll(re)) docs.add(m[1]);
-  return docs;
-}
 
 /**
  * Find `const <local> = <yamlDoc>.<docKey>` bindings (docKey a document-level

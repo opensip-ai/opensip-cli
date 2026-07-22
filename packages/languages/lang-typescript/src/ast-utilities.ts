@@ -138,6 +138,33 @@ export function isInStringLiteral(node: ts.Node): boolean {
 }
 
 // =============================================================================
+// EXPRESSION UNWRAPPING
+// =============================================================================
+
+/**
+ * Strip the non-semantic expression wrappers TypeScript's compiler API keeps
+ * as distinct nodes — parentheses, `as`/angle-bracket type assertions,
+ * `satisfies`, and non-null (`!`) — down to the innermost expression.
+ *
+ * Use before a shape check (`ts.isObjectLiteralExpression`, `ts.isCallExpression`,
+ * `ts.isStringLiteral`, etc.) that should see through `(x)`, `x as T`, `<T>x`,
+ * `x satisfies T`, and `x!` to the expression they wrap.
+ */
+export function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+// =============================================================================
 // NODE FINDERS
 // =============================================================================
 

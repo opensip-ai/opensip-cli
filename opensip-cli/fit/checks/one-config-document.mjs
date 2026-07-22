@@ -57,6 +57,7 @@
 import { defineCheck } from '@opensip-cli/fitness';
 
 import { toolEnginePathRe, toolPackageSegmentForPath } from './tool-engine-paths.mjs';
+import { yamlDocBindings } from './yaml-doc-bindings.mjs';
 
 /** Resolved-path fragment identifying a first-party tool-engine source file. */
 const TOOL_ENGINE_PATH = toolEnginePathRe();
@@ -70,20 +71,6 @@ const NAMESPACE_BY_DIR = {
 
 /** The recipe-name key — an own-namespace read of ONLY this is exempt (ADR-0022). */
 const RECIPE_KEY = 'recipe';
-
-/**
- * Identifiers bound to a parsed YAML document in this file — the result of a
- * `const <id> = readYamlFile(...)` (or a sibling reader: `readYamlFileOrThrow`,
- * `parseYaml`, `loadYaml`). Inlined from the pack-internal `_yaml-doc-bindings`
- * helper shared by `one-config-document` + `no-config-loader-outside-config`.
- */
-function yamlDocBindings(content) {
-  const docs = new Set();
-  const re =
-    /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?(?:readYamlFile|readYamlFileOrThrow|parseYaml|loadYaml)\s*\(/g;
-  for (const m of content.matchAll(re)) docs.add(m[1]);
-  return docs;
-}
 
 /**
  * Find the local identifier(s) a file binds the tool's own namespace block to,

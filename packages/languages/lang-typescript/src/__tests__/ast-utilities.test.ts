@@ -109,6 +109,16 @@ describe('getIdentifierName / getPropertyChain', () => {
     expect(result).toBe('a.b.c');
   });
 
+  it('getIdentifierName also resolves the property name from a PropertyAccessExpression', () => {
+    const sf = parse('a.b;');
+    if (!sf) throw new Error('parse failed');
+    let result = '';
+    walkNodes(sf, (n) => {
+      if (ts.isPropertyAccessExpression(n) && result === '') result = getIdentifierName(n);
+    });
+    expect(result).toBe('b');
+  });
+
   it('returns empty string for non-identifier non-property nodes', () => {
     const sf = parse('1 + 2;');
     if (!sf) throw new Error('parse failed');
@@ -177,6 +187,7 @@ describe('isLiteral', () => {
     ['false', true],
     ['null', true],
     ['undefined', true],
+    ['`hi`', true],
     ['x', false],
   ])('isLiteral(%s) === %s', (src, expected) => {
     const sf = parse(`(${src});`);
@@ -258,6 +269,26 @@ describe('isInStringLiteral', () => {
     });
     expect(sawCall).toBe(true);
   });
+
+  // Coverage note: when the queried node sits TWO levels inside a
+  // substitution (an argument of a call that IS the substitution's whole
+  // expression), the ancestor walk passes through the call expression first
+  // (not a TemplateSpan/head/tail/expression itself), then reaches the
+  // TemplateSpan where `current.expression === node` is false (current.expression
+  // is the *call*, not the argument) — so the walk continues past the span
+  // to the enclosing TemplateExpression, which is also not "in a string".
+  it('returns false for an argument nested two levels inside a template-literal substitution', () => {
+    const sf = parse('const x = `${dangerousCall(arg)}`;');
+    if (!sf) throw new Error('parse failed');
+    let sawArg = false;
+    walkNodes(sf, (n) => {
+      if (ts.isIdentifier(n) && n.text === 'arg') {
+        sawArg = true;
+        expect(isInStringLiteral(n)).toBe(false);
+      }
+    });
+    expect(sawArg).toBe(true);
+  });
 });
 
 describe('findCallExpressions', () => {
@@ -279,6 +310,24 @@ describe('findCallExpressions', () => {
     const sf = parse('foo();');
     if (!sf) throw new Error('parse failed');
     expect(findCallExpressions(sf, 'console', 'log')).toEqual([]);
+  });
+
+  it('skips property-access calls whose method name does not match', () => {
+    const sf = parse('foo.other(); console.log(1);');
+    if (!sf) throw new Error('parse failed');
+    const calls = findCallExpressions(sf, 'console', 'log');
+    expect(calls.length).toBe(1);
+  });
+
+  it('skips calls whose method name matches but whose object chain does not', () => {
+    // `foo.log()` has the right method name ("log") but the wrong object
+    // chain ("foo", neither equal to nor ending with ".console") — it must
+    // be excluded while `console.log(1)` in the same source is kept.
+    const sf = parse('foo.log(); console.log(1);');
+    if (!sf) throw new Error('parse failed');
+    const calls = findCallExpressions(sf, 'console', 'log');
+    expect(calls.length).toBe(1);
+    expect(calls[0].getText(sf)).toBe('console.log(1)');
   });
 });
 
@@ -334,6 +383,20 @@ describe('isInComment', () => {
     const sf = parse(src);
     if (!sf) throw new Error('parse failed');
     const insideIdx = src.indexOf('comment');
+    expect(isInComment(insideIdx, sf)).toBe(true);
+  });
+
+  // Coverage note: with two separate comments in the file, checking a
+  // position inside the SECOND one forces at least one non-matching range
+  // check along the way (the first statement's leading comment range does
+  // not contain this position), exercising the loop's full-scan fallthrough
+  // in `isPositionInRanges` rather than always matching on the first range
+  // examined.
+  it('returns true for a position inside the second of two separate comments', () => {
+    const src = '// first comment\nconst x = 1;\n// second comment\nconst y = 2;';
+    const sf = parse(src);
+    if (!sf) throw new Error('parse failed');
+    const insideIdx = src.indexOf('second comment');
     expect(isInComment(insideIdx, sf)).toBe(true);
   });
 });
@@ -412,6 +475,14 @@ describe('findEnclosingFunctionBody', () => {
     const body = findEnclosingFunctionBody(arrow.body);
     expect(body).toBeNull();
   });
+
+  it('returns null at module scope (no enclosing function at all)', () => {
+    const sf = parse('const x = 1;');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(findEnclosingFunctionBody(decl)).toBeNull();
+  });
 });
 
 describe('getEnclosingFunctionName', () => {
@@ -438,6 +509,38 @@ describe('getEnclosingFunctionName', () => {
     if (!decl) throw new Error('decl not found');
     expect(getEnclosingFunctionName(decl, sf)).toBeNull();
   });
+
+  it('returns the get-accessor name', () => {
+    const sf = parse('class C { get foo() { const x = 1; return x; } }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBe('foo');
+  });
+
+  it('returns the set-accessor name', () => {
+    const sf = parse('class C { set foo(v) { const x = v; } }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBe('foo');
+  });
+
+  it('returns "constructor" inside a class constructor', () => {
+    const sf = parse('class C { constructor() { const x = 1; } }');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, ts.isVariableDeclaration);
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBe('constructor');
+  });
+
+  it('returns the name of a named function expression', () => {
+    const sf = parse('const f = function namedFn() { const x = 1; };');
+    if (!sf) throw new Error('parse failed');
+    const decl = find(sf, (n) => ts.isVariableDeclaration(n) && n.name.getText(sf) === 'x');
+    if (!decl) throw new Error('decl not found');
+    expect(getEnclosingFunctionName(decl, sf)).toBe('namedFn');
+  });
 });
 
 describe('findEnclosingScope', () => {
@@ -457,6 +560,15 @@ describe('findEnclosingScope', () => {
     const scope = findEnclosingScope(decl);
     expect(ts.isFunctionDeclaration(scope)).toBe(true);
   });
+
+  it('returns the SourceFile itself when called directly on it (no .parent to walk from)', () => {
+    // `node.parent` is undefined for a SourceFile (it is the AST root), so
+    // the while loop never executes — the function falls straight through
+    // to its `node.getSourceFile()` fallback.
+    const sf = parse('const x = 1;');
+    if (!sf) throw new Error('parse failed');
+    expect(findEnclosingScope(sf)).toBe(sf);
+  });
 });
 
 describe('isAsync', () => {
@@ -474,6 +586,17 @@ describe('isAsync', () => {
     const fn = find(sf, ts.isFunctionDeclaration);
     if (!fn) throw new Error('fn not found');
     expect(isAsync(fn)).toBe(false);
+  });
+
+  it('returns false (via the ?? fallback) for a node that cannot carry modifiers at all', () => {
+    // `ts.canHaveModifiers` is false for a plain Identifier, so `modifiers`
+    // is `undefined` and `isAsync` falls through the `??` to `false` rather
+    // than calling `.some` on it.
+    const sf = parse('foo;');
+    if (!sf) throw new Error('parse failed');
+    const ident = find(sf, ts.isIdentifier);
+    if (!ident) throw new Error('identifier not found');
+    expect(isAsync(ident)).toBe(false);
   });
 });
 
@@ -534,5 +657,39 @@ describe('isInsideConditionalBlock', () => {
     const ret = find(sf, ts.isReturnStatement);
     if (!ret) throw new Error('return not found');
     expect(isInsideConditionalBlock(ret)).toBe(false);
+  });
+
+  it("returns true for a switch statement's own discriminant expression", () => {
+    // The discriminant's parent is the SwitchStatement directly (not via a
+    // CaseClause), pinning the `ts.isSwitchStatement(current)` branch itself
+    // rather than the CaseClause branch already covered above.
+    const sf = parse('function f() { switch (getDiscriminant()) { case 1: break; } }');
+    if (!sf) throw new Error('parse failed');
+    const call = find(
+      sf,
+      (n) => ts.isCallExpression(n) && n.expression.getText(sf) === 'getDiscriminant',
+    );
+    if (!call) throw new Error('call not found');
+    expect(isInsideConditionalBlock(call)).toBe(true);
+  });
+
+  it('returns true inside a ternary conditional expression', () => {
+    const sf = parse('function f() { const y = cond ? doThing() : other(); }');
+    if (!sf) throw new Error('parse failed');
+    const call = find(sf, (n) => ts.isCallExpression(n) && n.expression.getText(sf) === 'doThing');
+    if (!call) throw new Error('call not found');
+    expect(isInsideConditionalBlock(call)).toBe(true);
+  });
+
+  it('returns false at pure module scope (no enclosing function, no conditional)', () => {
+    // Unlike the "top of a function body" case above (which returns false
+    // via the isFunctionLike branch), this node has NO function ancestor at
+    // all — the walk runs all the way up to the SourceFile and falls
+    // through the loop's final `return false` naturally.
+    const sf = parse('foo();');
+    if (!sf) throw new Error('parse failed');
+    const call = find(sf, ts.isCallExpression);
+    if (!call) throw new Error('call not found');
+    expect(isInsideConditionalBlock(call)).toBe(false);
   });
 });

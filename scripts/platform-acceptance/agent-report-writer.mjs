@@ -23,6 +23,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { isSensitiveKey, redactSensitiveText } from './sensitive-text.mjs';
+import { writeAllSync } from './write-all-sync.mjs';
 
 /** The fixed upper bound for both source and sanitized installed-smoke reports. */
 export const MAX_INSTALLED_AGENT_REPORT_BYTES = 4 * 1024 * 1024;
@@ -222,19 +223,6 @@ function atomicExclusiveWrite(fs, target, serialized, platform) {
   // The hard link is the commit point. Failure to unlink its private sibling
   // must not turn a successful, durable final artifact into a false failure.
   tryRemove(fs, temp);
-}
-
-function writeAllSync(fs, descriptor, serialized) {
-  const buffer = Buffer.from(serialized, 'utf8');
-  let offset = 0;
-  while (offset < buffer.length) {
-    const remaining = buffer.length - offset;
-    const written = fs.writeSync(descriptor, buffer, offset, remaining);
-    if (!Number.isSafeInteger(written) || written <= 0 || written > remaining) {
-      throw new Error('writeSync returned an invalid byte count');
-    }
-    offset += written;
-  }
 }
 
 /**

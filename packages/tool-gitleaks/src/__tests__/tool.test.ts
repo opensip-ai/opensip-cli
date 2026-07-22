@@ -8,7 +8,7 @@
  * via the acceptance harness — including a redaction check across the envelope.
  */
 
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,7 @@ import {
   normalizedSignalShape,
   runAcceptanceCase,
 } from '@opensip-cli/external-tool-adapter';
+import { makeTestScope, withScopeSync } from '@opensip-cli/test-support';
 import { describe, expect, it } from 'vitest';
 
 import { parseGitleaksJson } from '../parse-gitleaks-json.js';
@@ -34,7 +35,7 @@ import {
   tool,
 } from '../tool.js';
 
-import type { ToolPluginManifest } from '@opensip-cli/core';
+import type { Logger, ToolPluginManifest } from '@opensip-cli/core';
 import type { AdapterRunContext, ScannerExitModel } from '@opensip-cli/external-tool-adapter';
 
 const PKG = JSON.parse(
@@ -253,6 +254,123 @@ describe('gitleaks tool — A3 .runtime exclusion (buildGitleaksExclude)', () =>
     const modernHeaders = withProject.configFile.contents.match(/^\s*\[\[allowlists\]\]/gm) ?? [];
     expect(modernHeaders).toHaveLength(2);
     expect(withProject.configFile.contents).not.toMatch(/^\s*\[allowlist\]/m);
+  });
+
+  it('inserts a new CRLF paths line into a legacy allowlist with no existing paths key, staying inside the section boundary', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-crlf-legacy-'));
+    // CRLF line endings, a legacy [allowlist] section that carries a
+    // non-paths key (so there is nothing to merge into), followed by ANOTHER
+    // TOML table — proves the new paths line lands inside the [allowlist]
+    // section (bounded by the next header) rather than at end-of-file.
+    writeFileSync(
+      join(dir, '.gitleaks.toml'),
+      '[extend]\r\nuseDefault = true\r\n\r\n[allowlist]\r\ndescription = "legacy"\r\n\r\n[another]\r\nkey = "val"\r\n',
+    );
+    const withProject = buildGitleaksExclude({
+      excludePath: join(dir, 'opensip-cli', '.runtime'),
+      configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
+    });
+    const contents = withProject.configFile.contents;
+    expect(contents.match(/^\s*\[allowlist\]/gm)).toHaveLength(1);
+    expect((contents.match(/paths = \[/g) ?? []).length).toBe(1);
+    // Preserves the project's own key and stays CRLF throughout the insertion.
+    expect(contents).toContain('description = "legacy"');
+    expect(contents).toMatch(/paths = \[.*\]\r\n/);
+    // Bounded by the next table: the new paths line precedes [another].
+    expect(contents.indexOf('paths = [')).toBeLessThan(contents.indexOf('[another]'));
+    expect(contents).toContain('opensip-cli/\\.runtime');
+  });
+
+  it('inserts a leading newline before a new paths line when the legacy header sits at the exact end of the file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-eof-legacy-'));
+    // No trailing newline after [allowlist] — the header IS the end of the
+    // file, and the file uses bare LF elsewhere (no CRLF present at all).
+    writeFileSync(join(dir, '.gitleaks.toml'), '[extend]\nuseDefault = true\n\n[allowlist]');
+    const withProject = buildGitleaksExclude({
+      excludePath: join(dir, 'opensip-cli', '.runtime'),
+      configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
+    });
+    const contents = withProject.configFile.contents;
+    expect(contents.match(/^\s*\[allowlist\]/gm)).toHaveLength(1);
+    expect((contents.match(/paths = \[/g) ?? []).length).toBe(1);
+    // The inserted line is LF-terminated (no CRLF anywhere in the source) and
+    // a newline was synthesized between the header and the new paths line
+    // (there was none in the original file).
+    expect(contents).toContain('[allowlist]\npaths = [');
+    expect(contents).toContain('opensip-cli/\\.runtime');
+  });
+});
+
+describe('gitleaks tool — projectRootFromRuntimeExclude fallback', () => {
+  it('derives the project root with a single dirname() step when the exclude path is not the standard opensip-cli/.runtime shape', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-custom-exclude-'));
+    // Marker content only present in the config placed directly under `dir`
+    // (one dirname() step above the exclude path). If the resolver mistakenly
+    // took the opensip-cli/.runtime double-dirname step here, it would look
+    // one directory too far up and never find this file.
+    writeFileSync(join(dir, '.gitleaks.toml'), '[extend]\nuseDefault = true\n# fallback-marker\n');
+    const excludePath = join(dir, 'some-other-runtime-dir');
+    const withProject = buildGitleaksExclude({
+      excludePath,
+      configPath: (name) => join(excludePath, name),
+    });
+    expect(withProject.configFile.contents).toContain('# fallback-marker');
+    expect(withProject.configFile.contents).toContain('useDefault = true');
+  });
+});
+
+describe('gitleaks tool — readProjectConfig fallback (oversized / unreadable project config)', () => {
+  it('falls back to the default ruleset when the project config exceeds the byte cap', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-oversized-cfg-'));
+    // MAX_GITLEAKS_CONFIG_BYTES (1_048_576) + 1 byte — deliberately over the
+    // cap so the size guard rejects the file before ever reading its contents.
+    writeFileSync(join(dir, '.gitleaks.toml'), Buffer.alloc(1_048_577, 0x61));
+    const withProject = buildGitleaksExclude({
+      excludePath: join(dir, 'opensip-cli', '.runtime'),
+      configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
+    });
+    // Same shape as "no project config at all" — the oversized file's content
+    // is never inlined into the generated exclude config.
+    expect(withProject.configFile.contents).toContain('useDefault = true');
+    expect(withProject.configFile.contents).not.toMatch(/^path\s*=/m);
+    expect(withProject.configFile.contents).not.toContain('a'.repeat(64));
+  });
+
+  it('falls back to the default ruleset and logs the swallow when the project config is unreadable', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gitleaks-unreadable-cfg-'));
+    // A directory named `.gitleaks.toml` passes existsSync (so the adapter
+    // believes the project has a config) and passes the size guard (a
+    // directory's reported size is tiny), but readFileSync throws EISDIR —
+    // the real shape of "config path exists but is not a readable file".
+    const configPath = join(dir, '.gitleaks.toml');
+    mkdirSync(configPath);
+    const logs: { level: string; message: string | Record<string, unknown> }[] = [];
+    const logger: Logger = {
+      debug: (message) => logs.push({ level: 'debug', message }),
+      info: (message) => logs.push({ level: 'info', message }),
+      warn: (message) => logs.push({ level: 'warn', message }),
+      error: (message) => logs.push({ level: 'error', message }),
+    };
+    const scope = makeTestScope({ logger });
+
+    const withProject = withScopeSync(scope, () =>
+      buildGitleaksExclude({
+        excludePath: join(dir, 'opensip-cli', '.runtime'),
+        configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
+      }),
+    );
+
+    expect(withProject.configFile.contents).toContain('useDefault = true');
+    expect(withProject.configFile.contents).toMatch(/(?:^|\n)\[allowlist\](?:\n|$)/);
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.level).toBe('debug');
+    expect(logs[0]?.message).toMatchObject({
+      evt: 'gitleaks.project_config.read_failed',
+      module: 'tool-gitleaks',
+      path: configPath,
+    });
+    const message = logs[0]?.message as Record<string, unknown>;
+    expect(String(message.error)).toMatch(/EISDIR/);
   });
 });
 

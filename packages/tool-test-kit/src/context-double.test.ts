@@ -79,6 +79,21 @@ describe('createToolCliContextDouble', () => {
     expect(double.captured.reportFailures).toEqual([detail]);
   });
 
+  it('captures the optional structured `data` payload on log entries, omitting the field when absent', () => {
+    const double = createToolCliContextDouble();
+
+    double.ctx.logger.debug('no payload');
+    double.ctx.logger.warn('with payload', { code: 'W1', attempt: 2 });
+
+    expect(double.captured.logs).toEqual([
+      { level: 'debug', message: 'no payload' },
+      { level: 'warn', message: 'with payload', data: { code: 'W1', attempt: 2 } },
+    ]);
+    // The no-payload entry never got a `data` key at all (not `data: undefined`).
+    expect(Object.hasOwn(double.captured.logs[0] ?? {}, 'data')).toBe(false);
+    expect(Object.hasOwn(double.captured.logs[1] ?? {}, 'data')).toBe(true);
+  });
+
   it('captures envelopes and validates envelope shape', () => {
     const double = createToolCliContextDouble();
     const envelope = sampleEnvelope();
@@ -220,8 +235,41 @@ describe('assertion helpers', () => {
         verdict: { ...valid.verdict, score: Number.NaN },
       }),
     ).toThrow(/score/u);
+    expect(() =>
+      assertSignalEnvelope({
+        ...valid,
+        verdict: { ...valid.verdict, passed: 'yes' },
+      }),
+    ).toThrow(/verdict\.passed to be a boolean/u);
+    expect(() =>
+      assertSignalEnvelope({
+        ...valid,
+        verdict: { ...valid.verdict, summary: 'not-an-object' },
+      }),
+    ).toThrow(/verdict\.summary object/u);
+    expect(() =>
+      assertSignalEnvelope({
+        ...valid,
+        baselineIdentity: { fingerprintStrategyId: '', fingerprintStrategyVersion: '1' },
+      }),
+    ).toThrow(/identify a fingerprint strategy/u);
+    expect(() =>
+      assertSignalEnvelope({
+        ...valid,
+        baselineIdentity: { fingerprintStrategyId: 'sha256', fingerprintStrategyVersion: '' },
+      }),
+    ).toThrow(/identify a fingerprint strategy/u);
     expect(() => assertSignalEnvelope({ ...valid, baselineIdentity: undefined })).toThrow(
       /baselineIdentity/u,
+    );
+    expect(() => assertSignalEnvelope({ ...valid, verdict: 'not-an-object' })).toThrow(
+      /verdict object/u,
+    );
+    expect(() => assertSignalEnvelope({ ...valid, units: { not: 'an-array' } })).toThrow(
+      /units array/u,
+    );
+    expect(() => assertSignalEnvelope({ ...valid, signals: { not: 'an-array' } })).toThrow(
+      /signals array/u,
     );
 
     expect(() => assertSignalEnvelope(null)).toThrow(TypeError);
@@ -273,6 +321,12 @@ describe('assertion helpers', () => {
     );
     expect(() => assertReportFailureDetail({ message: 'failed', exitCode: Number.NaN })).toThrow(
       TypeError,
+    );
+    // Finite but fractional — exercises the `!Number.isInteger` half of the
+    // finite-integer check independently of the `!Number.isFinite` half above
+    // (NaN short-circuits the OR before isInteger ever runs).
+    expect(() => assertReportFailureDetail({ message: 'failed', exitCode: 2.5 })).toThrow(
+      /finite integer/u,
     );
     expect(() => assertReportFailureDetail({ message: 'failed', jsonRequested: 'yes' })).toThrow(
       TypeError,

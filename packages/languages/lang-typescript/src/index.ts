@@ -53,4 +53,5 @@ export {
   findTemplateLiterals,
   isInComment,
   countUnescapedBackticks,
+  unwrapExpression,
 } from './ast-utilities.js';

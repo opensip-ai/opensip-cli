@@ -1,6 +1,4 @@
 // @fitness-ignore-file file-length-limit -- composition/facade surface retained as a single module for the MCP/CLI audit evidence rollout; split tracked as follow-up.
-import { isAbsolute, relative, resolve, sep } from 'node:path';
-
 import { ephemeralProjectCacheKey, err, ok, type Result } from '@opensip-cli/core';
 import {
   compileSourceRoleMatcher,
@@ -13,6 +11,7 @@ import {
 import { freshnessFromVerification, missingFreshness } from './freshness.js';
 import { bindCursor, decodeCursor, encodeCursor, type GroupSummary } from './graph-query-page.js';
 import { readError } from './mcp-error.js';
+import { projectRelativeConfigPath } from './project-relative-config-path.js';
 
 import type { CatalogFreshnessVerifyOptions } from './catalog-freshness-controller.js';
 import type { CatalogGeneration, GraphGenerationController } from './catalog-generation.js';
@@ -102,17 +101,6 @@ function* catalogFilePaths(catalog: Catalog): Generator<string> {
     if (!occs) continue;
     for (const occ of occs) yield occ.filePath;
   }
-}
-
-function projectRelativeConfigPath(projectRoot: string, configPath: string): string {
-  if (/\p{Cc}/u.test(configPath)) return '<invalid-config-path>';
-  const root = resolve(projectRoot);
-  const absolute = resolve(root, configPath);
-  const value = relative(root, absolute);
-  if (value === '..' || value.startsWith(`..${sep}`) || isAbsolute(value)) {
-    return '<outside-project>';
-  }
-  return (value || '.').split(sep).join('/');
 }
 
 /** Construction dependencies for the package-internal SQLite query context. */

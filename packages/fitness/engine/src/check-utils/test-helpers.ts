@@ -6,6 +6,8 @@
  * These utilities are specific to code analysis tooling.
  */
 
+import { testFromStart } from './path-matching.js';
+
 /**
  * Options for isTestFile detection
  */
@@ -60,19 +62,6 @@ const TEST_FILE_PATTERNS = {
   /** Declaration files that should be excluded */
   declarationFile: /\.d\.[cm]?ts$/,
 } as const;
-
-function testFromStart(pattern: RegExp, value: string): boolean {
-  if (!pattern.global && !pattern.sticky) {
-    return pattern.test(value);
-  }
-  const previousLastIndex = pattern.lastIndex;
-  try {
-    pattern.lastIndex = 0;
-    return pattern.test(value);
-  } finally {
-    pattern.lastIndex = previousLastIndex;
-  }
-}
 
 /**
  * Check if a file path is a test file.

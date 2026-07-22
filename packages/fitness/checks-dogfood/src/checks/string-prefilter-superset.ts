@@ -21,25 +21,11 @@
  */
 
 import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
-import { getSharedSourceFile } from '@opensip-cli/lang-typescript';
+import { getSharedSourceFile, unwrapExpression } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
 const CHECK_PACK_PATH = /(?:^|\/)packages\/fitness\/checks-[^/]+\/src\/checks\//;
 const NON_SOURCE = /(?:\.test\.tsx?$|\/__tests__\/|\/__fixtures__\/)/;
-
-function unwrapExpression(expr: ts.Expression): ts.Expression {
-  let current = expr;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isTypeAssertionExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isNonNullExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
 
 function isEndAnchoredNonMultilineRegex(node: ts.Node): boolean {
   if (!ts.isRegularExpressionLiteral(node)) return false;

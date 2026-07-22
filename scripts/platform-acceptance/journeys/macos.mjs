@@ -53,6 +53,7 @@ import {
   runCli,
   unavailable,
 } from '../journey-kit.mjs';
+import { seedProject } from '../seed-fit-project.mjs';
 import {
   initProject,
   runInterruptedSqliteProbe,
@@ -445,16 +446,6 @@ function runProcess(context, argv, options = {}) {
   if (options.timeoutMs !== undefined) spec.timeoutMs = options.timeoutMs;
   if (options.pty !== undefined) spec.pty = options.pty;
   return context.process.run(spec);
-}
-
-/** Seed a minimal TS project (a console.log fit flags) under `dir`. */
-function seedProject(dir) {
-  mkdirSync(join(dir, 'src'), { recursive: true });
-  writeFileSync(join(dir, 'src', 'bad.ts'), "console.log('debug');\n");
-  writeFileSync(
-    join(dir, 'tsconfig.json'),
-    `${JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'NodeNext' } }, null, 2)}\n`,
-  );
 }
 
 function seedIdentifiedProject(dir) {

@@ -241,6 +241,27 @@ describe('filterContent', () => {
       const { code } = filterContent(src);
       expect(code).toContain('const after = 1');
     });
+
+    // Regression/coverage: `findRegularExpressionRegions` only trusts an
+    // AST-recognized RegularExpressionLiteral when its own text contains a
+    // real closing slash (`literalText.lastIndexOf('/') > 0`). TypeScript's
+    // parser DOES recognize an unterminated `/unterminated` as a (malformed)
+    // regex node, but its text is just `"/unterminated"` — lastIndexOf('/')
+    // is 0, so that AST region is deliberately excluded. The scanner then
+    // falls back to canStartRegExpLiteral's token-based heuristic, whose
+    // `default` arm (any token not explicitly listed as "value-producing",
+    // e.g. an assignment's `=`) decides regex-vs-division on its own. This
+    // is the only place that heuristic's default branch is actually reached
+    // instead of being short-circuited by the AST-derived region set.
+    it('treats an unterminated regex-like slash after "=" as a regex (AST-omitted malformed literal, heuristic fallback)', () => {
+      const src = 'const re = /unterminated\nconst after = 1;';
+      const { code } = filterContent(src);
+      // Regex content is left as code (unmasked) …
+      expect(code).toContain('/unterminated');
+      // … and, critically, the scanner must not desync: the next line's
+      // real statement survives untouched.
+      expect(code).toContain('const after = 1;');
+    });
   });
 
   describe('codeNoCommentsOrRegexLiterals — opt-in regex masking', () => {

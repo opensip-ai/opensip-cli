@@ -26,10 +26,12 @@
  * Mirrors build-package-readmes.mjs (sibling generator + gate).
  */
 
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { collectPackageJsonPaths } from './lib/collect-package-json-paths.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = dirname(dirname(__filename));
@@ -38,8 +40,6 @@ const CHECK_ONLY = process.argv.slice(2).includes('--check');
 const CLI_PACKAGE_NAME = 'opensip-cli';
 
 const log = (msg) => console.error(`[build-package-keywords] ${msg}`);
-
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.claude', 'coverage']);
 
 // ---- derivation -----------------------------------------------------------
 
@@ -131,17 +131,6 @@ function deriveKeywords(pkg) {
 }
 
 // ---- io -------------------------------------------------------------------
-
-function collectPackageJsonPaths(dir, out) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      collectPackageJsonPaths(join(dir, entry.name), out);
-    } else if (entry.name === 'package.json') {
-      out.push(join(dir, entry.name));
-    }
-  }
-}
 
 function isReleasable(pkg) {
   return (
