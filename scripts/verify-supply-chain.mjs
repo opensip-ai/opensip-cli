@@ -572,35 +572,26 @@ function checkReleaseArtifactAttestations(workflows) {
 }
 
 /**
- * The scheduled macOS qualification lane (Plan 02) must PARTICIPATE in the same
- * action-pin + least-privilege policy as the release workflow: every `uses:`
- * pinned to a full commit SHA, the exact `macos-26` runner (never a floating
- * label), `contents: read` only, and no publish/promotion/OIDC credential. It
- * already participates in the frozen-install policy via checkFrozenInstalls
- * (which scans every workflow); this makes its pinning + privilege explicit so a
- * new native lane can never regress into a mutable, over-privileged runner.
+ * Shared policy for every scheduled native-qualification lane (Plan 02 macOS,
+ * Plan 12 Linux): every `uses:` pinned to a full commit SHA, the exact pinned
+ * runner (never a floating label), `contents: read` only, no
+ * publish/promotion/OIDC credential of any kind, and broad push+PR path filters.
+ * Each lane also participates in the frozen-install policy via
+ * checkFrozenInstalls (which scans every workflow); this makes its pinning +
+ * privilege explicit so a new native lane can never regress into a mutable,
+ * over-privileged runner. Returns a (possibly empty) list of policy problems.
  */
-function checkMacosQualificationLane(workflows) {
-  const workflow = workflows.find(
-    (entry) => entry.relPath === '.github/workflows/macos-qualification.yml',
-  );
-  if (workflow === undefined) {
-    fail(8, '.github/workflows/macos-qualification.yml is missing.');
-    return;
-  }
-  const content = stripComments(workflow.content);
+function qualificationLanePolicyProblems(content, { runnerPin, forbiddenRunner, runnerLabel }) {
   const problems = [];
-
   const refs = [...content.matchAll(/uses:\s*[^@\s]+@([^\s#]+)/g)].map((m) => m[1]);
   if (refs.length === 0) problems.push('no pinned actions found');
   for (const ref of refs) {
     if (!/^[a-f0-9]{40}$/.test(ref))
       problems.push(`action ref "${ref}" must be a full 40-char commit SHA, not a tag`);
   }
-  if (!/runs-on:\s*macos-26\b/u.test(content))
-    problems.push('the lane must pin the macos-26 runner');
-  if (/macos-latest/u.test(content))
-    problems.push('macos-latest is forbidden — it can silently drift the image');
+  if (!runnerPin.test(content)) problems.push(`the lane must pin the ${runnerLabel} runner`);
+  if (forbiddenRunner.test(content))
+    problems.push('a floating runner label is forbidden — it can silently drift the image');
   if (!/permissions:\s*\n\s*contents:\s*read/u.test(content))
     problems.push('the lane must be least-privilege (contents: read only)');
   if (/id-token:\s*write/u.test(content))
@@ -609,8 +600,8 @@ function checkMacosQualificationLane(workflows) {
     problems.push('the qualification lane must NOT publish to npm');
   if (/npm\s+dist-tag\s+add/u.test(content))
     problems.push('the qualification lane must NOT promote to latest');
-  if (/secrets\.MACBOOKM5/u.test(content))
-    problems.push('the qualification lane must NOT hold the promotion secret MACBOOKM5');
+  if (/secrets\./u.test(content))
+    problems.push('the qualification lane must NOT hold any secret (no promotion credential)');
   for (const path of [
     "'packages/**'",
     "'scripts/**'",
@@ -624,7 +615,22 @@ function checkMacosQualificationLane(workflows) {
       problems.push(`${path} must trigger both push and pull_request qualification`);
     }
   }
+  return problems;
+}
 
+function checkMacosQualificationLane(workflows) {
+  const workflow = workflows.find(
+    (entry) => entry.relPath === '.github/workflows/macos-qualification.yml',
+  );
+  if (workflow === undefined) {
+    fail(8, '.github/workflows/macos-qualification.yml is missing.');
+    return;
+  }
+  const problems = qualificationLanePolicyProblems(stripComments(workflow.content), {
+    runnerPin: /runs-on:\s*macos-26\b/u,
+    forbiddenRunner: /macos-latest/u,
+    runnerLabel: 'macos-26',
+  });
   if (problems.length === 0) {
     pass(
       8,
@@ -632,6 +638,29 @@ function checkMacosQualificationLane(workflows) {
     );
   } else {
     fail(8, `macOS qualification lane policy problems:\n    ${problems.join('\n    ')}`);
+  }
+}
+
+function checkLinuxQualificationLane(workflows) {
+  const workflow = workflows.find(
+    (entry) => entry.relPath === '.github/workflows/linux-qualification.yml',
+  );
+  if (workflow === undefined) {
+    fail(9, '.github/workflows/linux-qualification.yml is missing.');
+    return;
+  }
+  const problems = qualificationLanePolicyProblems(stripComments(workflow.content), {
+    runnerPin: /runs-on:\s*ubuntu-24\.04\b/u,
+    forbiddenRunner: /ubuntu-latest/u,
+    runnerLabel: 'ubuntu-24.04',
+  });
+  if (problems.length === 0) {
+    pass(
+      9,
+      'Linux qualification lane is pinned, least-privilege, and holds no publish/promotion credential.',
+    );
+  } else {
+    fail(9, `Linux qualification lane policy problems:\n    ${problems.join('\n    ')}`);
   }
 }
 
@@ -644,6 +673,7 @@ checkTrustedPublish(workflows);
 checkDependencyAutomation();
 checkReleaseArtifactAttestations(workflows);
 checkMacosQualificationLane(workflows);
+checkLinuxQualificationLane(workflows);
 
 for (const p of passes) console.log(`✓ [${p.id}] ${p.msg}`);
 if (failures.length > 0) {

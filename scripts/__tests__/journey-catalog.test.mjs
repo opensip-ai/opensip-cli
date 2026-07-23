@@ -42,10 +42,19 @@ const MACOS_V2_PATH = join(
   'platform-acceptance',
   'macos-26-arm64-node24-npm11-v2.json',
 );
+const UBUNTU_V2_PATH = join(
+  HERE,
+  '..',
+  '..',
+  '.config',
+  'platform-acceptance',
+  'ubuntu-2404-x64-node24-npm11-v2.json',
+);
 const commonV1 = JSON.parse(readFileSync(COMMON_V1_PATH, 'utf8'));
 const commonV2 = JSON.parse(readFileSync(COMMON_V2_PATH, 'utf8'));
 const macosV1 = JSON.parse(readFileSync(MACOS_V1_PATH, 'utf8'));
 const macosV2 = JSON.parse(readFileSync(MACOS_V2_PATH, 'utf8'));
+const ubuntuV2 = JSON.parse(readFileSync(UBUNTU_V2_PATH, 'utf8'));
 
 // Placeholder absolute paths only — this test projects scenarios (no filesystem
 // writes), so the exact location is irrelevant and never touched.
@@ -121,6 +130,36 @@ test('the committed common-v2.json selects exactly the catalog ids with required
   assert.deepEqual(continuity?.requiredPorts, ['mcp']);
   assert.equal(macosV2.schemaVersion, 2);
   assert.equal(macosV2.base?.id, 'common-v2');
+});
+
+test('the committed ubuntu-v2 profile composes on common-v2 and appends exactly the linux journeys', () => {
+  assert.equal(ubuntuV2.schemaVersion, 2);
+  assert.equal(ubuntuV2.version, 2);
+  assert.equal(ubuntuV2.base?.id, 'common-v2');
+  assert.equal(ubuntuV2.supportRow?.rowId, 'ubuntu-2404-x64-node24-npm11-v1');
+  assert.equal(ubuntuV2.supportRow?.contractVersion, 1);
+  const ids = ubuntuV2.journeys.map((entry) => entry.id);
+  // Full selection = common-v2 (in order) then exactly the linux journeys — no
+  // fork, no dropped common journey, no reordering.
+  assert.deepEqual(
+    ids,
+    [...COMMON_V2_JOURNEY_IDS, ...LINUX_JOURNEY_IDS],
+    'ubuntu-v2 drifted from common-v2 ∪ linux',
+  );
+  // Profile closure: every selected journey resolves in the registry.
+  for (const entry of ubuntuV2.journeys) {
+    assert.ok(
+      JOURNEY_REGISTRY.has(entry.id),
+      `ubuntu-v2 references unregistered journey ${entry.id}`,
+    );
+    assert.ok(Array.isArray(entry.requiredPorts), `${entry.id} missing requiredPorts`);
+  }
+  // The three linux journeys are required and native (no injected ports).
+  for (const id of LINUX_JOURNEY_IDS) {
+    const entry = ubuntuV2.journeys.find((j) => j.id === id);
+    assert.equal(entry.required, true, `${id} must be required`);
+    assert.deepEqual(entry.requiredPorts, [], `${id} must need no injected port`);
+  }
 });
 
 test('lifecycle order qualifies the installed target before uninstalling state or package', () => {
