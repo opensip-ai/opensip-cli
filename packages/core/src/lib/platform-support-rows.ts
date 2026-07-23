@@ -83,10 +83,54 @@ export const MACOS_INTEL_ROW: PlatformSupportRow = Object.freeze({
     'Intel GA evidence. Other Intel tuples remain unqualified until measured.',
 });
 
+/**
+ * The exact Ubuntu 24.04 x64 tuple (Plan 12 — Linux qualification). The row/
+ * profile id is dot-free (`ubuntu-2404-…`) to satisfy the stable-id grammar; the
+ * human-facing `ubuntu-24.04` runner label lives only in the qualification
+ * workflow's `runs-on`. glibc is NOT a tuple dimension — the `better-sqlite3`
+ * prebuild-load journey is the real proof the glibc-linked binding loads.
+ */
+const UBUNTU_2404_ROW_ID = 'ubuntu-2404-x64-node24-npm11-v1';
+const UBUNTU_INSTALL_CHANNELS = Object.freeze(['npm-exact-version'] as const);
+
+export const UBUNTU_2404_PREVIEW_ROW: PlatformSupportRow = Object.freeze({
+  id: UBUNTU_2404_ROW_ID,
+  status: 'preview',
+  tuple: Object.freeze({
+    osPlatform: 'linux',
+    osName: 'Ubuntu',
+    osVersionMajor: 24,
+    osVersionRange: '24.x',
+    kernelName: 'Linux',
+    kernelVersionMajor: 6,
+    kernelVersionRange: '6.x',
+    arch: 'x64',
+    nodeVersionMajor: 24,
+    nodeAbi: '137',
+    npmVersionMajor: 11,
+    filesystemType: 'ext4',
+    caseSensitive: true,
+    installChannels: UBUNTU_INSTALL_CHANNELS,
+  }),
+  profile: Object.freeze({ id: 'ubuntu-2404-x64-node24-npm11-v2', version: 2 }),
+  docsPath: MACOS_SUPPORT_DOCS_PATH,
+  docsUrl: MACOS_SUPPORT_DOCS_URL,
+  evidence: Object.freeze({
+    artifact: 'opensip-cli-linux-qualification.v2.json',
+    url: null,
+  }),
+  notes:
+    'Ubuntu 24.04 LTS on x86_64 with Node 24 (ABI 137) / npm 11 over ext4 ' +
+    '(case-sensitive). Qualified via the linux-qualification acceptance lane ' +
+    'against published bytes. Preview until a 14-day scheduled-lane burn-in and ' +
+    'a staged release pass promote it to supported.',
+});
+
 /** The immutable platform-support registry. */
 export const PLATFORM_SUPPORT_ROWS: readonly PlatformSupportRow[] = Object.freeze([
   MACOS_PREVIEW_ROW,
   MACOS_INTEL_ROW,
+  UBUNTU_2404_PREVIEW_ROW,
 ]);
 
 // Fail-closed: validate the frozen registry at module load (see
