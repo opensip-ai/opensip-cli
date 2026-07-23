@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensip.ai/schemas/error-resiliency-inventory/v1",
+  "title": "OpenSIP Error And Resiliency Inventory Evidence",
+  "description": "Versioned evidence contract for Plan 00 error/resiliency inventory. Schema version is authoritative; unsupported versions fail closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Inventory evidence schema version. Only 1 is accepted."
+    },
+    "inventoryRunId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "rubricVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "commit": {
+      "type": "string",
+      "minLength": 7,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]+$"
+    },
+    "createdAt": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 64
+    },
+    "fileClassification": {
+      "type": "string",
+      "enum": [
+        "production",
+        "runtime-asset",
+        "manifest-build",
+        "test",
+        "fixture",
+        "generated",
+        "docs",
+        "excluded"
+      ]
+    },
+    "exclusionReason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "boundaryFamily": {
+      "type": "string",
+      "enum": [
+        "cli-failure-reporting",
+        "worker-ipc-process",
+        "filesystem-datastore",
+        "http-egress-retry",
+        "external-scanner-lifecycle",
+        "mcp-stdio-transport",
+        "cancellation-timeout",
+        "logging-redaction-telemetry",
+        "plugin-trust-compatibility",
+        "release-init",
+        "other"
+      ]
+    },
+    "siteKind": {
+      "type": "string",
+      "enum": [
+        "error-definition",
+        "error-construction",
+        "throw",
+        "catch",
+        "retry",
+        "timer",
+        "signal-listener",
+        "fallback",
+        "worker-boundary",
+        "redaction",
+        "logging",
+        "timeout",
+        "cancellation",
+        "cleanup",
+        "presentation",
+        "serialization",
+        "human-flow"
+      ]
+    },
+    "disposition": {
+      "type": "string",
+      "enum": [
+        "migrate",
+        "already-conformant",
+        "retain-internal-invariant",
+        "normalize-at-enclosing-boundary",
+        "remove-obsolete-path",
+        "no-error-resiliency-responsibility",
+        "excluded-generated-or-vendor",
+        "needs-decision"
+      ]
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "detectorCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detectorVersion", "languages", "siteKinds", "humanReviewOnly"],
+      "properties": {
+        "detectorVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "languages": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["language", "mode"],
+            "properties": {
+              "language": { "type": "string", "minLength": 1, "maxLength": 32 },
+              "mode": {
+                "type": "string",
+                "enum": ["structural-typescript", "human-review-only"]
+              },
+              "siteKinds": {
+                "type": "array",
+                "maxItems": 32,
+                "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+              }
+            }
+          }
+        },
+        "siteKinds": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+        },
+        "humanReviewOnly": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["language", "reason"],
+            "properties": {
+              "language": { "type": "string", "minLength": 1, "maxLength": 32 },
+              "reason": { "type": "string", "minLength": 1, "maxLength": 256 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "bounds": {
+      "description": "Hard bounds enforced by the inventory library (not only JSON Schema).",
+      "maxPathLength": 512,
+      "maxStringLength": 4096,
+      "maxFilesPerSnapshot": 100000,
+      "maxSitesPerFile": 2000,
+      "maxRecordsPerPackage": 50000,
+      "maxSourceFileBytes": 2097152,
+      "maxNestingDepth": 32,
+      "maxAcceptedBytes": 52428800
+    },
+    "fileRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "blobOid",
+        "classification",
+        "packageName",
+        "fullFileRead",
+        "disposition",
+        "reviewers"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "blobOid": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]+$"
+        },
+        "classification": {
+          "$ref": "#/properties/fileClassification"
+        },
+        "exclusionReason": { "$ref": "#/properties/exclusionReason" },
+        "packageName": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "byteLength": { "type": "integer", "minimum": 0, "maximum": 2097152 },
+        "weight": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "fullFileRead": { "type": "boolean" },
+        "disposition": { "$ref": "#/properties/disposition" },
+        "reviewers": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "identity", "reviewedAt"],
+            "properties": {
+              "role": {
+                "type": "string",
+                "enum": ["primary", "secondary", "boundary", "lead", "coordinator"]
+              },
+              "identity": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "reviewedAt": { "type": "string", "minLength": 10, "maxLength": 64 }
+            }
+          }
+        },
+        "sites": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": { "$ref": "#/definitions/siteRecord" }
+        },
+        "decisionRefs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "rationale": { "type": "string", "maxLength": 4096 }
+      }
+    },
+    "siteRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["siteId", "kind", "source", "disposition"],
+      "properties": {
+        "siteId": { "type": "string", "minLength": 8, "maxLength": 256 },
+        "kind": { "$ref": "#/properties/siteKind" },
+        "source": {
+          "type": "string",
+          "enum": ["structural", "human"]
+        },
+        "boundaryFamily": { "$ref": "#/properties/boundaryFamily" },
+        "owner": { "type": "string", "maxLength": 256 },
+        "currentCode": { "type": "string", "maxLength": 256 },
+        "targetCode": { "type": "string", "maxLength": 256 },
+        "disposition": { "$ref": "#/properties/disposition" },
+        "risk": { "$ref": "#/properties/risk" },
+        "line": { "type": "integer", "minimum": 1, "maximum": 10000000 },
+        "column": { "type": "integer", "minimum": 0, "maximum": 100000 },
+        "fingerprint": { "type": "string", "minLength": 8, "maxLength": 128 },
+        "rationale": { "type": "string", "maxLength": 4096 },
+        "decisionRefs": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        }
+      }
+    }
+  }
+}
