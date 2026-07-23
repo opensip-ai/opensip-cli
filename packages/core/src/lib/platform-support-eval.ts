@@ -309,9 +309,12 @@ function selectBestCandidate(
   observed: ObservedHost,
   candidates: readonly PlatformSupportRow[],
 ): { readonly row: PlatformSupportRow; readonly evaluation: DimensionEvaluation } {
-  let best:
-    | { row: PlatformSupportRow; evaluation: DimensionEvaluation; clean: boolean; score: number }
-    | null = null;
+  let best: {
+    row: PlatformSupportRow;
+    evaluation: DimensionEvaluation;
+    clean: boolean;
+    score: number;
+  } | null = null;
   for (const row of candidates) {
     const evaluation = classifyAgainst(observed, row.tuple);
     const clean = evaluation.reasonCodes.length === 0;

@@ -27,7 +27,14 @@
  *     fail-closed `unavailable`, never a silent pass.
  */
 
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -434,10 +441,18 @@ const caseSensitivityExecutor = async (context) => {
       args: ['fit', '--json', '--check', 'no-console-log'],
       cwd: dir,
     });
-    const outcome = assertCommand(context, result, FIT_ENVELOPE_EXPECT, 'case-distinct-project-failed');
+    const outcome = assertCommand(
+      context,
+      result,
+      FIT_ENVELOPE_EXPECT,
+      'case-distinct-project-failed',
+    );
     if (outcome.status !== 'pass') return outcome;
   }
-  return pass([line, context.assert.diagnostic('case-only-distinct project roots resolved cleanly')]);
+  return pass([
+    line,
+    context.assert.diagnostic('case-only-distinct project roots resolved cleanly'),
+  ]);
 };
 
 // ---------------------------------------------------------------------------

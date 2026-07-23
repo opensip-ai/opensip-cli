@@ -49,7 +49,10 @@ test('every Linux journey is registered under the linux category with known capa
     assert.equal(typeof journey.executor, 'function');
     assert.ok(journey.steps.length > 0, `${id} has no steps`);
     for (const capability of journey.capabilities) {
-      assert.ok(KNOWN_CAPABILITIES.has(capability), `${id} declares unknown capability ${capability}`);
+      assert.ok(
+        KNOWN_CAPABILITIES.has(capability),
+        `${id} declares unknown capability ${capability}`,
+      );
     }
   }
 });
@@ -64,13 +67,19 @@ test('evaluateLinuxTupleCrosscheck passes for the exact Ubuntu tuple via the rea
 test("evaluateLinuxTupleCrosscheck accepts Ubuntu's leading-zero calendar version (majorOf regression)", () => {
   // The ONLY difference from OK_FACTS is making the calendar minor explicit; a
   // semver-strict major parser used to reject "24.04" → os-version-mismatch.
-  const verdict = evaluateLinuxTupleCrosscheck({ ...OK_FACTS, osVersion: '24.04' }, assessHostSupport);
+  const verdict = evaluateLinuxTupleCrosscheck(
+    { ...OK_FACTS, osVersion: '24.04' },
+    assessHostSupport,
+  );
   assert.equal(verdict.ok, true, JSON.stringify(verdict));
   assert.doesNotMatch(verdict.lines.join('\n'), /os-version-mismatch/);
 });
 
 test('evaluateLinuxTupleCrosscheck fails a missing required source (never a silent pass)', () => {
-  const verdict = evaluateLinuxTupleCrosscheck({ ...OK_FACTS, npmVersion: null }, assessHostSupport);
+  const verdict = evaluateLinuxTupleCrosscheck(
+    { ...OK_FACTS, npmVersion: null },
+    assessHostSupport,
+  );
   assert.equal(verdict.ok, false);
   assert.equal(verdict.reasonCode, 'tuple-source-unavailable');
   assert.ok(verdict.lines.at(-1).includes('npm'));
@@ -106,7 +115,11 @@ test('evaluateLinuxTupleCrosscheck fails a non-ubuntu row selection (injected po
 });
 
 test('evaluateLinuxTupleCrosscheck fails an unsupported row status (injected policy)', () => {
-  const stub = () => ({ reasonCodes: [], row: { id: UBUNTU_PREVIEW_ROW_ID }, status: 'unqualified' });
+  const stub = () => ({
+    reasonCodes: [],
+    row: { id: UBUNTU_PREVIEW_ROW_ID },
+    status: 'unqualified',
+  });
   const verdict = evaluateLinuxTupleCrosscheck(OK_FACTS, stub);
   assert.equal(verdict.ok, false);
   assert.equal(verdict.reasonCode, 'tuple-status-unsupported');

@@ -126,14 +126,26 @@ test('linux-qualification.yml is least-privilege and holds no publish/promotion 
 test('linux-qualification.yml binds the exact profile + independent verifier and always uploads evidence', () => {
   const raw = readWorkflow(WORKFLOW);
   const wf = stripComments(raw);
-  assert.match(wf, new RegExp(PROFILE_PATH.replaceAll('.', '\\.')), 'the exact Ubuntu profile must be pinned');
+  assert.match(
+    wf,
+    new RegExp(PROFILE_PATH.replaceAll('.', '\\.')),
+    'the exact Ubuntu profile must be pinned',
+  );
   assert.equal(
     raw.split(PROFILE_PATH).length - 1,
     1,
     'the profile path is referenced exactly once (the LINUX_PROFILE env), then used via $LINUX_PROFILE',
   );
-  assert.match(wf, /SUPPORT_ROW:\s*ubuntu-2404-x64-node24-npm11-v1/, 'the support row must be pinned');
-  assert.match(wf, /SUPPORT_CONTRACT_VERSION:\s*'1'/, 'the support contract version must be pinned');
+  assert.match(
+    wf,
+    /SUPPORT_ROW:\s*ubuntu-2404-x64-node24-npm11-v1/,
+    'the support row must be pinned',
+  );
+  assert.match(
+    wf,
+    /SUPPORT_CONTRACT_VERSION:\s*'1'/,
+    'the support contract version must be pinned',
+  );
   assert.match(
     wf,
     /scripts\/verify-platform-acceptance\.mjs/,
@@ -149,7 +161,11 @@ test('linux-qualification.yml binds the exact profile + independent verifier and
   const upload = wf.slice(wf.indexOf('Upload qualification evidence'));
   assert.match(upload, /if:\s*always\(\)/, 'evidence upload must run under if: always()');
   assert.match(upload, /actions\/upload-artifact@[a-f0-9]{40}/, 'the upload action must be pinned');
-  assert.match(upload, /opensip-cli-linux-qualification\.v2\.json/, 'the sealed Linux evidence uploads');
+  assert.match(
+    upload,
+    /opensip-cli-linux-qualification\.v2\.json/,
+    'the sealed Linux evidence uploads',
+  );
   assert.match(upload, /agent-eval-installed-smoke\.json/, 'the sanitized agent report uploads');
 });
 
@@ -177,12 +193,27 @@ test('linux-qualification.yml carries the full Linux tuple verifier flags and no
     '--expect-case-sensitive true',
     '--expect-no-previous-candidate',
   ]) {
-    assert.match(wf, new RegExp(flag.replaceAll('-', '\\-').replaceAll('.', '\\.')), `missing ${flag}`);
+    assert.match(
+      wf,
+      new RegExp(flag.replaceAll('-', '\\-').replaceAll('.', '\\.')),
+      `missing ${flag}`,
+    );
   }
   // Deliberately NOT gated on Linux (documented omission; still recorded in evidence).
-  assert.doesNotMatch(wf, /--expect-shell/, 'the Linux lane must not gate the fragile shell dimension');
+  assert.doesNotMatch(
+    wf,
+    /--expect-shell/,
+    'the Linux lane must not gate the fragile shell dimension',
+  );
   // No macOS tuple token may leak into the Linux lane.
-  for (const macToken of [/\barm64\b/, /\bapfs\b/, /\bdarwin\b/, /macos-\d+/, /--expected-sw-vers-major 26/, /--expected-kernel-major 25/]) {
+  for (const macToken of [
+    /\barm64\b/,
+    /\bapfs\b/,
+    /\bdarwin\b/,
+    /macos-\d+/,
+    /--expected-sw-vers-major 26/,
+    /--expected-kernel-major 25/,
+  ]) {
     assert.doesNotMatch(wf, macToken, `macOS token ${macToken} must not appear in the Linux lane`);
   }
 });
@@ -214,7 +245,11 @@ test('separate-prefix npm 11 is bound into the acceptance npm invocation', () =>
   for (const line of wf
     .split('\n')
     .filter((entry) => /npm install --prefix "\$HOME\/\.npm-cli" npm@11/.test(entry))) {
-    assert.match(line, /--registry https:\/\/registry\.npmjs\.org\//, 'npm bootstrap pins the registry');
+    assert.match(
+      line,
+      /--registry https:\/\/registry\.npmjs\.org\//,
+      'npm bootstrap pins the registry',
+    );
   }
 });
 
@@ -239,9 +274,17 @@ test('linux-qualification path filters broadly cover measured runtime and build 
 
 test('linux-qualification artifact/evidence names use controlled identifiers, not untrusted event input', () => {
   const wf = readWorkflow(WORKFLOW);
-  assert.doesNotMatch(wf, /\$\{\{\s*github\.event\.[^}]*\.(?:title|body|name)/, 'no untrusted event text');
+  assert.doesNotMatch(
+    wf,
+    /\$\{\{\s*github\.event\.[^}]*\.(?:title|body|name)/,
+    'no untrusted event text',
+  );
   assert.doesNotMatch(wf, /\$\{\{\s*github\.head_ref/, 'no head_ref interpolation');
-  assert.doesNotMatch(wf, /\$\{\{\s*github\.event\.pull_request/, 'no pull_request payload interpolation');
+  assert.doesNotMatch(
+    wf,
+    /\$\{\{\s*github\.event\.pull_request/,
+    'no pull_request payload interpolation',
+  );
   assert.match(
     stripComments(wf),
     /artifact="linux-qualification-c\$\{SUPPORT_CONTRACT_VERSION\}/,
@@ -270,7 +313,11 @@ test('release qualify-linux is a pinned, least-privilege sibling of qualify-maco
   assert.doesNotMatch(linux, /secrets\./, 'no secret of any kind in the qualification job');
   assert.doesNotMatch(linux, /\bnpm\s+publish\b/, 'the Linux gate must never publish');
   assert.doesNotMatch(linux, /npm\s+dist-tag\s+add/, 'the Linux gate must never promote');
-  assert.doesNotMatch(linux, /softprops\/action-gh-release/, 'the Linux gate must never cut a Release');
+  assert.doesNotMatch(
+    linux,
+    /softprops\/action-gh-release/,
+    'the Linux gate must never cut a Release',
+  );
 });
 
 test('release qualify-linux runs the published-version profile with the full Linux tuple', () => {
@@ -295,11 +342,29 @@ test('release qualify-linux runs the published-version profile with the full Lin
   ]) {
     assert.ok(linux.includes(flag), `qualify-linux is missing ${flag}`);
   }
-  assert.doesNotMatch(linux, /--expect-shell/, 'the Linux gate must not gate the fragile shell dimension');
-  for (const macToken of [/\barm64\b/, /\bapfs\b/, /\bdarwin\b/, /macos-\d+/, /--expected-kernel-major 25/]) {
-    assert.doesNotMatch(linux, macToken, `macOS token ${macToken} must not appear in qualify-linux`);
+  assert.doesNotMatch(
+    linux,
+    /--expect-shell/,
+    'the Linux gate must not gate the fragile shell dimension',
+  );
+  for (const macToken of [
+    /\barm64\b/,
+    /\bapfs\b/,
+    /\bdarwin\b/,
+    /macos-\d+/,
+    /--expected-kernel-major 25/,
+  ]) {
+    assert.doesNotMatch(
+      linux,
+      macToken,
+      `macOS token ${macToken} must not appear in qualify-linux`,
+    );
   }
-  assert.match(linux, /opensip-cli-linux-qualification\.v2\.json/, 'qualify-linux seals the Linux evidence');
+  assert.match(
+    linux,
+    /opensip-cli-linux-qualification\.v2\.json/,
+    'qualify-linux seals the Linux evidence',
+  );
 });
 
 test('status↔gate lockstep: qualify-linux gates promotion iff the ubuntu row is supported', () => {
@@ -311,7 +376,11 @@ test('status↔gate lockstep: qualify-linux gates promotion iff the ubuntu row i
       inNeeds,
       'a `supported` ubuntu row REQUIRES qualify-linux in promote-release.needs — a supported row with an advisory gate is a false promise',
     );
-    assert.match(promote, /qualify-linux/, 'a supported row must have promotion consume the qualify-linux evidence');
+    assert.match(
+      promote,
+      /qualify-linux/,
+      'a supported row must have promotion consume the qualify-linux evidence',
+    );
   } else {
     assert.ok(
       !inNeeds,

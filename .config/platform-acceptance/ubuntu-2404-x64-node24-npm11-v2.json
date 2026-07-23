@@ -68,8 +68,18 @@
     { "id": "extensions.fit-pack", "required": true, "requiredPorts": [] },
     { "id": "extensions.sim-pack", "required": true, "requiredPorts": [] },
     { "id": "resilience.spaces-unicode", "required": true, "requiredPorts": [] },
-    { "id": "resilience.symlink-root", "required": true, "capabilities": ["symlink"], "requiredPorts": [] },
-    { "id": "resilience.permissions", "required": true, "capabilities": ["permissions"], "requiredPorts": [] },
+    {
+      "id": "resilience.symlink-root",
+      "required": true,
+      "capabilities": ["symlink"],
+      "requiredPorts": []
+    },
+    {
+      "id": "resilience.permissions",
+      "required": true,
+      "capabilities": ["permissions"],
+      "requiredPorts": []
+    },
     { "id": "resilience.isolated-home", "required": true, "requiredPorts": [] },
     { "id": "resilience.signals", "required": true, "requiredPorts": [] },
     { "id": "resilience.timeout-cleanup", "required": true, "requiredPorts": [] },

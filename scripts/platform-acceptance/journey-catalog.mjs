@@ -365,11 +365,7 @@ function buildRegistry(journeys) {
       `journey-catalog: common-v2 may only add persistence.cache-init-promotion; got ${JSON.stringify(v2Only)}`,
     );
   }
-  const selected = new Set([
-    ...COMMON_V2_JOURNEY_IDS,
-    ...MACOS_JOURNEY_IDS,
-    ...LINUX_JOURNEY_IDS,
-  ]);
+  const selected = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS, ...LINUX_JOURNEY_IDS]);
   if (
     selected.size !==
     COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length + LINUX_JOURNEY_IDS.length
