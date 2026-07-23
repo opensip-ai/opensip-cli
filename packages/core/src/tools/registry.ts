@@ -17,6 +17,9 @@
  */
 
 import { Registry, type Registerable } from '../lib/registry.js';
+import type { ErrorCatalog, ErrorDefinition } from '../lib/error-definition.js';
+import { ErrorDefinitionError } from '../lib/error-definition.js';
+import { aggregateErrorCatalogs } from './error-catalog.js';
 
 import type { Tool } from './types.js';
 
@@ -34,6 +37,9 @@ export class ToolRegistry {
     evtPrefix: 'tool.registry',
   });
 
+  /** Per-invocation index of tool error catalogs (rebuilt on register). */
+  private catalogIndex: ReturnType<typeof aggregateErrorCatalogs> | undefined;
+
   /**
    * Register a tool. **First writer wins** — re-registering the same
    * (human) id is a no-op and emits a `tool.registry.duplicate` warning.
@@ -41,10 +47,54 @@ export class ToolRegistry {
    * The registry is keyed by the human `metadata.name` (the former `id` value)
    * for continuity with callers that do registry.get('fitness') etc. The stable
    * UUID lives in metadata.id and is not used as the registry key.
+   *
+   * When `extensionPoints.errorCatalog` is present, cross-tool code collisions
+   * fail registration with {@link ErrorDefinitionError}.
    */
   register(tool: Tool, opts: { sourcePackage?: string } = {}): void {
     const key = tool.metadata.name ?? tool.metadata.id;
     this.inner.register({ id: key, name: key, tool }, { sourcePackage: opts.sourcePackage });
+    this.catalogIndex = undefined;
+    // Validate catalogs eagerly so bootstrap fails before commands mount.
+    this.getErrorCatalogIndex();
+  }
+
+  /**
+   * Aggregate core + loaded tool error catalogs for this invocation.
+   * Throws if two tools claim the same code with different owners.
+   */
+  getErrorCatalogIndex(): {
+    readonly byCode: ReadonlyMap<string, ErrorDefinition & { readonly toolName?: string }>;
+  } {
+    if (this.catalogIndex) {
+      if (this.catalogIndex.collisions.length > 0) {
+        const first = this.catalogIndex.collisions[0];
+        throw new ErrorDefinitionError(
+          `error catalog collision on ${first.code} between ${first.owners.join(' and ')}`,
+        );
+      }
+      return this.catalogIndex;
+    }
+
+    const toolCatalogs: { toolName: string; toolId: string; catalog: ErrorCatalog }[] = [];
+    for (const tool of this.values()) {
+      const catalog = tool.extensionPoints?.errorCatalog;
+      if (catalog) {
+        toolCatalogs.push({
+          toolName: tool.metadata.name,
+          toolId: tool.metadata.id,
+          catalog,
+        });
+      }
+    }
+    this.catalogIndex = aggregateErrorCatalogs(toolCatalogs);
+    if (this.catalogIndex.collisions.length > 0) {
+      const first = this.catalogIndex.collisions[0];
+      throw new ErrorDefinitionError(
+        `error catalog collision on ${first.code} between ${first.owners.join(' and ')}`,
+      );
+    }
+    return this.catalogIndex;
   }
 
   list(): readonly Tool[] {
@@ -74,5 +124,6 @@ export class ToolRegistry {
 
   clear(): void {
     this.inner.clear();
+    this.catalogIndex = undefined;
   }
 }

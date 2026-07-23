@@ -49,6 +49,7 @@ import type { ToolIdentity } from './identity.js';
 import type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 import type { ToolSessionReplayContribution } from './tool-sessions.js';
 import type { FingerprintStrategy } from '../baseline/fingerprint-strategy.js';
+import type { ErrorCatalog } from '../lib/error-definition.js';
 import type { ContributeScopeResult, ToolScope } from '../lib/scope-types.js';
 import type { PluginLayout } from '../plugins/types.js';
 
@@ -99,7 +100,12 @@ export * from './tool-results.js';
  *
  * See ADR-0046 for the full policy, alternatives considered, and enforcement.
  */
-export const TOOL_CONTRACT_VERSION = '1.0.0';
+/**
+ * Bumped for optional {@link ToolExtensionPoints.errorCatalog} (Plan 00).
+ * Old tools without the field remain compatible; hosts that understand 1.1.0
+ * validate contributions when present (ADR-0046).
+ */
+export const TOOL_CONTRACT_VERSION = '1.1.0';
 
 /** Static descriptor for a tool plugin: id, semver, and one-line description. */
 export interface ToolMetadata {
@@ -249,6 +255,13 @@ export interface ToolExtensionPoints {
    * validate domain-specific version semantics.
    */
   readonly contractVersions?: Readonly<Record<string, string>>;
+
+  /**
+   * Optional immutable error catalog for this tool (Plan 00).
+   * Schema version is carried on the catalog (`ERROR_CATALOG_SCHEMA_VERSION`).
+   * Host aggregates per invocation; definitions travel with thrown errors.
+   */
+  readonly errorCatalog?: ErrorCatalog;
 }
 
 /**

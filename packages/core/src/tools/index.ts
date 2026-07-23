@@ -46,6 +46,13 @@ export type { ScaffoldContext, ScaffoldFile } from './scaffold.js';
 export { UnknownLiveViewError } from './types.js';
 export { TOOL_CONTRACT_VERSION } from './types.js';
 export { ToolRegistry } from './registry.js';
+export {
+  coreSystemErrorCatalog,
+  ERROR_CATALOG_SCHEMA_VERSION,
+  aggregateErrorCatalogs,
+  validateToolErrorCatalogContribution,
+} from './error-catalog.js';
+export type { ToolErrorCatalogContribution } from './error-catalog.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
 // (launch raw-vs-admitted contract).
 export { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from './manifest.js';
