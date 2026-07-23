@@ -4,6 +4,11 @@
 
 This is the **START HERE** document for AI agents working on the OpenSIP CLI codebase.
 
+## Working Principles
+
+- **Verify before asserting.** Check any load-bearing claim about this codebase (a type, a pattern, whether something exists or is used) against the actual source before stating it as fact. If it matters and you have not checked, say "let me verify" and check — do not assert from memory.
+- **When unsure between thorough and minimal, choose thorough.** Default to the correct and complete option — enforce the guardrail, fix the root cause, refactor properly — and let the maintainer dial it back. Do not default to minimizing churn.
+
 <!-- opensip:agent-guidance start -->
 ## OpenSIP MCP First
 
