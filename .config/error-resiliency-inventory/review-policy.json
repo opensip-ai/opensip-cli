@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "rubricVersion": "1.0.0",
+  "inventorySchemaVersion": 1,
+  "roles": [
+    "coordinator",
+    "inventory-lead",
+    "graph-owner",
+    "primary-reviewer",
+    "secondary-reviewer",
+    "boundary-reviewer"
+  ],
+  "gates": {
+    "C0": {
+      "name": "Scope",
+      "required": ["frozenCommit", "schemaVersion", "rubricVersion", "includedSurfaces", "exclusions"],
+      "blocks": "phase-1"
+    },
+    "C1": {
+      "name": "Assignment",
+      "required": ["shards", "primaryReviewers", "secondaryReviewers", "boundaryOwners", "graphOwner"],
+      "blocks": "phase-1-broad-review"
+    },
+    "C2": {
+      "name": "Calibration",
+      "required": ["pilotThroughput", "projectedReviewerHours", "maxShardSize", "waveBudget"],
+      "blocks": "phase-1-full-inventory"
+    },
+    "C3": {
+      "name": "Ambiguities",
+      "required": ["decisions"],
+      "blocks": "phase-2"
+    },
+    "C4": {
+      "name": "Pre-infra acceptance",
+      "required": ["snapshotDigest", "dualReviewComplete", "noNeedsDecision"],
+      "blocks": "phase-2"
+    },
+    "C5": {
+      "name": "Post-infra acceptance",
+      "required": ["snapshotDigest", "plan01LedgerDigest", "dualReviewComplete", "noNeedsDecision"],
+      "blocks": "plan-01-activation"
+    }
+  },
+  "boundaryFamilies": [
+    "cli-failure-reporting",
+    "worker-ipc-process",
+    "filesystem-datastore",
+    "http-egress-retry",
+    "external-scanner-lifecycle",
+    "mcp-stdio-transport",
+    "cancellation-timeout",
+    "logging-redaction-telemetry",
+    "plugin-trust-compatibility",
+    "release-init"
+  ],
+  "highRiskSignOffFamilies": [
+    "cli-failure-reporting",
+    "worker-ipc-process",
+    "filesystem-datastore",
+    "http-egress-retry",
+    "external-scanner-lifecycle",
+    "mcp-stdio-transport",
+    "logging-redaction-telemetry",
+    "plugin-trust-compatibility",
+    "release-init"
+  ],
+  "rules": {
+    "fullFileReadRequired": true,
+    "blindSecondary": true,
+    "noSourceEditsDuringInventory": true,
+    "needsDecisionForbiddenAtAcceptance": true,
+    "silentCoverageThinningForbidden": true,
+    "exactlyOneGraphOwner": true,
+    "agentsWriteOnlyOwnedShards": true
+  },
+  "assignmentPacketFields": [
+    "role",
+    "shardId",
+    "frozenCommit",
+    "scopeDigest",
+    "shardDigest",
+    "rubricVersion",
+    "files",
+    "outputPath",
+    "completionCommand"
+  ],
+  "completionCommand": "pnpm error-inventory:check -- --policy",
+  "notes": "Raw assignments and coordinator notes live under docs/internal/coop/error-resiliency-inventory/ (gitignored). This policy file is machine-checked."
+}

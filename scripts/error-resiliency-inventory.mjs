@@ -303,8 +303,30 @@ function runCheck(repoRoot, flags, stdout) {
       problems.push(`missing ${REVIEW_POLICY_PATH}`);
     } else {
       const policy = parseJsonSafe(readFileSync(policyPath, 'utf8'), { label: 'review-policy' });
-      if (!policy || typeof policy !== 'object' || /** @type {any} */ (policy).schemaVersion !== 1) {
+      const p = /** @type {any} */ (policy);
+      if (!p || typeof p !== 'object' || p.schemaVersion !== 1) {
         problems.push('review-policy.json must have schemaVersion 1');
+      } else {
+        for (const gate of ['C0', 'C1', 'C2', 'C3', 'C4', 'C5']) {
+          if (!p.gates?.[gate]) problems.push(`review-policy missing gate ${gate}`);
+        }
+        if (!Array.isArray(p.boundaryFamilies) || p.boundaryFamilies.length < 8) {
+          problems.push('review-policy boundaryFamilies incomplete');
+        }
+        const requiredFamilies = [
+          'external-scanner-lifecycle',
+          'mcp-stdio-transport',
+          'cli-failure-reporting',
+          'worker-ipc-process',
+        ];
+        for (const family of requiredFamilies) {
+          if (!p.boundaryFamilies.includes(family)) {
+            problems.push(`review-policy missing boundary family ${family}`);
+          }
+        }
+        if (!p.rules?.blindSecondary || !p.rules?.needsDecisionForbiddenAtAcceptance) {
+          problems.push('review-policy rules must require blind secondary and forbid needs-decision at acceptance');
+        }
       }
     }
   }
