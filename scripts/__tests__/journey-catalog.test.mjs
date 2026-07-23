@@ -14,6 +14,7 @@ import {
   COMMON_V1_JOURNEY_IDS,
   COMMON_V2_JOURNEY_IDS,
   JOURNEY_REGISTRY,
+  LINUX_JOURNEY_IDS,
   MACOS_JOURNEY_IDS,
   RELEASE_SMOKE_JOURNEY_IDS,
   getJourney,
@@ -55,9 +56,9 @@ const SMOKE_PARAMS = Object.freeze({
   fitPackTarball: '/acceptance-run/fit.tgz',
 });
 
-test('registry holds exactly COMMON_V2 ∪ MACOS ids, once each', () => {
+test('registry holds exactly COMMON_V2 ∪ MACOS ∪ LINUX ids, once each', () => {
   // The registry is the closed union of common-v2 (every v1 id + cache→Init) and
-  // the macOS additive journeys. Immutable COMMON_V1 remains a strict subset.
+  // the macOS + Linux additive journeys. Immutable COMMON_V1 remains a strict subset.
   assert.equal(COMMON_V1_JOURNEY_IDS.length, 46);
   assert.equal(COMMON_V2_JOURNEY_IDS.length, 47);
   assert.equal(new Set(COMMON_V1_JOURNEY_IDS).size, 46, 'COMMON_V1_JOURNEY_IDS has a duplicate');
@@ -67,15 +68,20 @@ test('registry holds exactly COMMON_V2 ∪ MACOS ids, once each', () => {
     MACOS_JOURNEY_IDS.length,
     'MACOS_JOURNEY_IDS has a duplicate',
   );
+  assert.equal(
+    new Set(LINUX_JOURNEY_IDS).size,
+    LINUX_JOURNEY_IDS.length,
+    'LINUX_JOURNEY_IDS has a duplicate',
+  );
   for (const id of COMMON_V1_JOURNEY_IDS) {
     assert.ok(COMMON_V2_JOURNEY_IDS.includes(id), `common-v2 drops ${id}`);
   }
   assert.ok(COMMON_V2_JOURNEY_IDS.includes('persistence.cache-init-promotion'));
-  const union = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
+  const union = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS, ...LINUX_JOURNEY_IDS]);
   assert.equal(
     union.size,
-    COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length,
-    'COMMON_V2_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap',
+    COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length + LINUX_JOURNEY_IDS.length,
+    'COMMON_V2 / MACOS / LINUX journey id sets overlap',
   );
   assert.equal(JOURNEY_REGISTRY.size, union.size);
   for (const id of union) {

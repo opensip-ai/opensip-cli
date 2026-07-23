@@ -54,6 +54,7 @@ const KNOWN_CATEGORIES = new Set([
   'extensions',
   'resilience',
   'macos',
+  'linux',
 ]);
 
 const roots = [];
